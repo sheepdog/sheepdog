@@ -1,0 +1,34 @@
+#!/usr/bin/perl
+
+# Examples
+#
+# stop-dogs.pl 0 3 4
+# stop-dogs.pl [0-100]
+
+@index_list = @ARGV;
+if (@index_list == 0) {
+    @index_list = (0);
+}
+
+$dport = 7000;
+
+foreach $proc (`ps -o pid,args -C sheep -C java -C jsvc`) {
+    foreach $i (@index_list) {
+	if ($i =~ /\[(\d+)-(\d+)\]/) {
+	    &stop_dog($dport + $_) foreach ($1..$2);
+	} else {
+	    &stop_dog($dport + $i);
+	}
+    }
+}
+
+sub stop_dog {
+    my ($dport) = @_;
+    if ($proc =~ /dport $dport/) {
+	$proc =~ s/^\s+(.*)/$1/;
+	($pid, @cmd) = split /\s/, $proc;
+	print "kill -9 $pid (@cmd)\n";
+	system "kill -9 $pid";
+	system "jsvc -stop -pidfile /tmp/sheepdog-$dport.pid net.osrg.sheepdog.Sheepdog";
+    }
+}

@@ -1,0 +1,18 @@
+.PHONY:all
+all:
+	cd shepherd; make
+	cd sheep; make
+	cd dog; make
+
+.PHONY:clean
+clean:
+	cd shepherd; make clean
+	cd sheep; make clean
+	cd dog; make clean
+	cd lib; make clean
+
+.PHONY:install
+install:
+	cd shepherd; make install
+	cd sheep; make install
+	cd dog; make install

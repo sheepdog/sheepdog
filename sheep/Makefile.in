@@ -1,0 +1,31 @@
+CFLAGS += -g -O2 -Wall -Wstrict-prototypes -I../include
+CFLAGS += -D_GNU_SOURCE
+LIBS += -lpthread -lcrypto
+
+PROGRAMS = sheep
+SHEEP_OBJS = sheep.o store.o net.o work.o ../lib/event.o ../lib/net.o ../lib/logger.o
+SHEEP_DEP = $(SHEEP_OBJS:.o=.d)
+
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+
+.PHONY:all
+all: $(PROGRAMS)
+
+sheep: $(SHEEP_OBJS)
+	$(CC) $^ -o $@ $(LIBS)
+
+-include $(SHEEP_DEP)
+
+%.o: %.c
+	$(CC) -c $(CFLAGS) $*.c -o $*.o
+	@$(CC) -MM $(CFLAGS) -MF $*.d -MT $*.o $*.c
+
+.PHONY:clean
+clean:
+	rm -f *.[od] $(PROGRAMS)
+
+.PHONY:install
+install: $(PROGRAMS)
+	install $< $(bindir)

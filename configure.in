@@ -1,0 +1,70 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.64])
+AC_INIT
+AC_CONFIG_SRCDIR([lib/net.c])
+
+# Checks for programs.
+AC_PROG_CC
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+if test "$JAVA_HOME" = ""; then
+    JAVA_HOME=/usr/lib/jvm/java-6-sun
+fi
+AC_SUBST(JAVA_HOME, $JAVA_HOME)
+AC_CHECK_FILE($JAVA_HOME/bin/java, , AC_MSG_ERROR("install sun-java6-sdk and define JAVA_HOME to be the root of your Java installation"))
+AC_CHECK_FILE($JAVA_HOME/bin/javac, , AC_MSG_ERROR("install sun-java6-sdk and define JAVA_HOME to be the root of your Java installation"))
+AC_CHECK_FILE($JAVA_HOME/bin/jar, , AC_MSG_ERROR("install sun-java6-sdk and define JAVA_HOME to be the root of your Java installation"))
+if test "$JAVA_LIB" = ""; then
+    JAVA_LIB=/usr/share/java
+fi
+AC_SUBST(JAVA_LIB, $JAVA_LIB)
+AC_CHECK_FILE($JAVA_LIB/jgroups-all.jar, , AC_MSG_ERROR("install libjgroups-java and define JAVA_LIB to be the root of the installation"))
+AC_CHECK_FILE($JAVA_LIB/commons-daemon.jar, , AC_MSG_ERROR("install libcommons-daemon-java and define JAVA_LIB to be the root of the installation"))
+AC_CHECK_FILE($JAVA_LIB/commons-cli.jar, , AC_MSG_ERROR("install libcommons-cli-java and define JAVA_LIB to be the root of the installation"))
+AC_CHECK_FILE($JAVA_LIB/commons-logging.jar, , AC_MSG_ERROR("install libcommons-logging-java and define JAVA_LIB to be the root of the installation"))
+AC_CHECK_FILE($JAVA_LIB/log4j-1.2.jar, , AC_MSG_ERROR("install liblog4j1.2-java and define JAVA_LIB to be the root of the installation"))
+AC_CHECK_PROG(ANT, ant, ant, no)
+if test "$ANT" = no ; then
+   AC_MSG_ERROR(could not find ant)
+fi
+AC_CHECK_PROG(JSVC, jsvc, jsvc, no)
+if test "$JSVC" = no ; then
+   AC_MSG_ERROR(could not find jsvc)
+fi
+
+# Checks for libraries.
+AC_CHECK_LIB([crypto], [main], , AC_MSG_ERROR("could not find SSL development libraries"))
+AC_CHECK_LIB([ncurses], [main], , AC_MSG_ERROR("could not find ncurses libraries"))
+AC_CHECK_LIB([pthread], [main], , AC_MSG_ERROR("could not find pthread libraries"))
+
+# Checks for header files.
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h inttypes.h mntent.h netdb.h netinet/in.h stdint.h stdlib.h string.h sys/ioctl.h sys/socket.h sys/statvfs.h sys/time.h syslog.h unistd.h])
+
+# Checks for archtecture. 
+AC_C_BIGENDIAN([AC_MSG_ERROR("big endian architecture is not supported")])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_C_INLINE
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T
+
+# Checks for library functions.
+AC_FUNC_FORK
+AC_FUNC_GETMNTENT
+AC_FUNC_MALLOC
+AC_CHECK_FUNCS([dup2 ftruncate getmntent localtime_r memset mkdir socket strcasecmp strchr strdup strerror strtoul])
+
+AC_CONFIG_FILES([Makefile
+                 dog/Makefile
+                 lib/Makefile
+                 sheep/Makefile
+                 shepherd/Makefile])
+AC_OUTPUT

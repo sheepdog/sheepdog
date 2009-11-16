@@ -1,0 +1,17 @@
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+bindir = @bindir@
+
+ANT = env JAVA_HOME=@JAVA_HOME@ JAVA_LIB=@JAVA_LIB@ ant
+
+.PHONY:all
+all:
+	@$(ANT)
+
+.PHONY:clean
+clean:
+	@$(ANT) clean
+
+.PHONY:install
+install:
+	@$(ANT) -Dinstall.dir=$(bindir) install

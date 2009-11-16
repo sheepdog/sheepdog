@@ -1,0 +1,161 @@
+Sheepdog: Distributed Storage System for KVM
+============================================
+
+Overview
+--------
+Sheepdog is a distributed storage system for KVM/QEMU. It provides
+highly available block level storage volumes to virtual machines. 
+Sheepdog supports advanced volume management features such as snapshot,
+cloning, and thin provisioning. The architecture of Sheepdog is fully
+symmetric; there is no central node such as a meta-data server.
+Sheepdog is an Open Source software, released under the terms of the
+GNU General Public License version 2. 
+
+For the latest information about Sheepdog, please visit our website at:
+
+   http://www.osrg.net/sheepdog/
+
+Requirements
+------------
+* Three or more x86-64 machines
+* libssl (SSL development libraries)
+* sun java development kit 6 (`dog' program is written by Java to use
+  JGroups)
+* some java libraries
+    - JGroups (toolkit for reliable multicast communication)
+    - commons-daemon
+    - commons-logging
+    - commons-cli
+    - log4j 1.2
+
+Install
+-------
+1. Install x86-64 Linux.
+
+2. Download KVM source code.
+
+   $ git clone git://git.kernel.org/pub/scm/virt/kvm/qemu-kvm.git
+   $ git checkout -b sheepdog 249cdd0
+
+3. Download Sheepdog codes.
+
+   $ wget http://www.osrg.net/sheepdog/download/sheepdog-2009102101.tar.bz2
+   $ tar jxf sheepdog-2009102101.tar.bz2
+   $ wget http://www.osrg.net/download/sheepdog-kvm-2009102101.patch
+
+4. Apply the patche.
+
+   $ cd qemu-kvm
+   $ patch -p1 < ../sheepdog-kvm-2009102101.patch
+   $ cd ..
+
+5. Build
+
+   $ cd qemu-kvm
+   $ ./configure
+   $ make install
+   $ cd ../sheepdog
+   $ ./configure
+   $ make install
+   $ cd ..
+
+Usage
+-----
+* Setup Sheepdog
+   1. Launch sheep and dog programs on each machines of the cluster.
+
+      $ sheep /dir/
+      $ dog
+
+      Notes:
+      - The argument of the sheep programs is a directory to store objects.
+        The directory must be on the Btrfs to get tolerance against the
+        failure. If you want to try Sheepdog and allow data loss, you can
+        use ext3 file system with a user_xattr mount option.
+      - Do not launch programs simultaneously. Before you start the next
+        dog or sheep program, make sure that the previous one returns. This
+        problem will be fixed in the future release.
+
+   2. Make fs
+
+      $ shepherd mkfs --copies=3
+
+   3. --copies specifies the number of default data redundancy. In this case,
+
+      the replicated data is stored on three machines.
+
+* Create a virtual machine image ****
+   1. Create a 256 GB virtual machine image of Alice.
+
+      $ kvm-img create -f sheepdog "Alice's Disk" 256G
+
+   2. You can also convert from existing KVM images to Sheepdog ones.
+
+      $ kvm-img convert -f raw -O sheepdog ~/amd64.raw "Bob's Disk"
+
+   3. See Sheepdog images by the following command.
+
+      $ shepherd info -t vdi
+         40000 : Alice's Disk  256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:17:18, tag:        0, current
+         80000 : Bob's Disk    256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:29:20, tag:        0, current
+
+* Boot the virtual machine
+   1. Boot the virtual machine.
+
+      $ kvm --drive format=sheepdog,file="Alice's Disk"
+
+   2. Following command checks used images.
+
+      $ shepherd info -t vm
+      Name            |Vdi size |Allocated| Shared  | Status
+      ----------------+---------+---------+---------+------------
+      Alice's Disk    |   256 GB|     0 MB|     0 MB| running on xx.xx.xx.xx
+      Bob's Disk      |   256 GB|     0 MB|     0 MB| not running
+
+* Snapshot
+   1. Snapshot
+
+      $ kvm-img snapshot -c name sheepdog:"Alice's Disk"
+
+      -c flag is meaningless currently
+
+   3. You can boot from the snapshot image by spcifing tag id
+
+      $ kvm --drive format=sheepdog,file="Alice's Disk":0
+
+   4. After getting snapshot, a new virtual machine images are added as a not-
+      current image.
+
+      $ shepherd info -t vdi
+         40000 : Alice's Disk  256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:17:18, tag:        0, not current
+         80000 : Bob's Disk    256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:29:20, tag:        0, current
+         c0000 : Alice's Disk  256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:37:31, tag: 4ad6cc8b, current
+
+* Cloning from the snapshot
+   1. Create a Charlie image as a clone of Alice's image.
+
+      $ kvm-img create -b sheepdog:"Alice's Disk":0 -f sheepdog "Charlie's Disk"
+
+   2. Charlie's image is added to the virtual machine list.
+
+      $ shepherd info -t vdi
+         40000 : Alice's Disk   256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:17:18, tag:        0, not current
+         80000 : Bob's Disk     256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:29:20, tag:        0, current
+         c0000 : Alice's Disk   256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:37:31, tag: 4ad6cc8b, current
+        100000 : Charlie's Disk 256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:47:46, tag:        0, current
+
+   3. To check parent-child relationship of the images, use tree format output.
+
+      $ shepherd info -t vdi -f tree
+      Alice's Disk---[09-10-16 10:02:31]-+-[09-10-19 09:42:21]---(You Are Here)
+                                         `-[09-10-18 20:53:47]---[09-10-18 23:11:42]
+      Bob's Disk---[09-10-15 16:29:20]-+-[09-10-18 20:51:13]
+                                       `-(You Are Here)
+      Charlie's Disk---(You Are Here)
+
+Test Environment
+----------------
+    - Debian lenny amd64
+
+===============================================================================
+Copyright (C) 2009, Nippon Telegraph and Telephone Corporation.
