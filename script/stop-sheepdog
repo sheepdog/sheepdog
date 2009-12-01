@@ -12,7 +12,7 @@ if (@index_list == 0) {
 
 $dport = 7000;
 
-foreach $proc (`ps -o pid,args -C sheep -C java -C jsvc`) {
+foreach $proc (`ps -o pid,args -C collie`) {
     foreach $i (@index_list) {
 	if ($i =~ /\[(\d+)-(\d+)\]/) {
 	    &stop_dog($dport + $_) foreach ($1..$2);
@@ -23,12 +23,11 @@ foreach $proc (`ps -o pid,args -C sheep -C java -C jsvc`) {
 }
 
 sub stop_dog {
-    my ($dport) = @_;
-    if ($proc =~ /dport $dport/) {
+    my ($port) = @_;
+    if ($proc =~ /port $port/) {
 	$proc =~ s/^\s+(.*)/$1/;
 	($pid, @cmd) = split /\s/, $proc;
 	print "kill -9 $pid (@cmd)\n";
 	system "kill -9 $pid";
-	system "jsvc -stop -pidfile /tmp/sheepdog-$dport.pid net.osrg.sheepdog.Sheepdog";
     }
 }
