@@ -34,11 +34,11 @@
 #include "treeview.h"
 
 static char program_name[] = "shepherd";
-static int dogport = DOG_LISTEN_PORT;
+static int sdport = SD_LISTEN_PORT;
 
 static struct option const long_options[] =
 {
-	{"dport", required_argument, 0, 'D'},
+	{"port", required_argument, 0, 'p'},
 	{"copies", required_argument, 0, 'c'},
 	{"epoch", required_argument, 0, 'e'},
 	{"index", required_argument, 0, 'i'},
@@ -51,7 +51,7 @@ static struct option const long_options[] =
 	{0, 0, 0, 0},
 };
 
-static char *short_options = "D:f:rR:t:H:o:i:e:h";
+static char *short_options = "p:f:rR:t:H:o:i:e:h";
 
 enum info_type {
 	INFO_VDI,
@@ -109,7 +109,7 @@ static int update_node_list(int max_nodes, int epoch)
 	struct sd_node_req hdr;
 	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&hdr;
 
-	fd = connect_to("localhost", dogport);
+	fd = connect_to("localhost", sdport);
 	if (fd < 0)
 		return -1;
 
@@ -186,7 +186,7 @@ static int mkfs(int copies)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	unsigned rlen, wlen;
 
-	fd = connect_to("localhost", dogport);
+	fd = connect_to("localhost", sdport);
 	if (fd < 0)
 		return -1;
 
@@ -286,7 +286,7 @@ static int debug(char *op, char *arg)
 		return 1;
 
 	strcpy(name, "localhost");
-	fd = connect_to(name, dogport);
+	fd = connect_to(name, sdport);
 	if (fd < 0)
 		return -1;
 
@@ -341,7 +341,7 @@ static int shutdown_sheepdog(void)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 
-	fd = connect_to("localhost", dogport);
+	fd = connect_to("localhost", sdport);
 	if (fd < 0)
 		return -1;
 
@@ -936,7 +936,7 @@ rerun:
 		char *data;
 		struct vm_list_info vli;
 
-		fd = connect_to("localhost", dogport);
+		fd = connect_to("localhost", sdport);
 		if (fd < 0)
 			break;
 
@@ -998,8 +998,8 @@ int main(int argc, char **argv)
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
 		switch (ch) {
-		case 'D':
-			dogport = atoi(optarg);
+		case 'p':
+			sdport = atoi(optarg);
 			break;
 		case 'c':
 			copies = atoi(optarg);

@@ -15,8 +15,7 @@
 #include <openssl/sha.h>
 #include "util.h"
 
-#define SHEEP_LISTEN_PORT 10095
-#define DOG_LISTEN_PORT 7000
+#define SD_LISTEN_PORT 7000
 
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096
