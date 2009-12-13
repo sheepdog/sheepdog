@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Main-Class: net.osrg.sheepdog.Sheepdog
-Class-Path: @JAVA_LIB@/jgroups-all.jar @JAVA_LIB@/commons-logging.jar @JAVA_LIB@/log4j-1.2.jar @JAVA_LIB@/commons-cli.jar @JAVA_LIB@/commons-daemon.jar
