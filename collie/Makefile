@@ -1,3 +1,5 @@
+sbindir ?= $(PREFIX)/sbin
+
 CFLAGS += -g -O2 -Wall -Wstrict-prototypes -I../include
 CFLAGS += -D_GNU_SOURCE
 LIBS += -lpthread -lcrypto -lcpg
@@ -5,10 +7,6 @@ LIBS += -lpthread -lcrypto -lcpg
 PROGRAMS = collie
 COLLIE_OBJS = collie.o net.o vdi.o group.o store.o work.o ../lib/event.o ../lib/net.o ../lib/logger.o
 COLLIE_DEP = $(COLLIE_OBJS:.o=.d)
-
-prefix = @prefix@
-exec_prefix = @exec_prefix@
-bindir = @bindir@
 
 .PHONY:all
 all: $(PROGRAMS)
@@ -28,4 +26,5 @@ clean:
 
 .PHONY:install
 install: $(PROGRAMS)
-	install $< $(bindir)
+	install -d -m 755 $(DESTDIR)$(sbindir)
+	install -m 755 $(PROGRAMS) $(DESTDIR)$(sbindir)
