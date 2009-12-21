@@ -63,7 +63,7 @@ struct cluster_info {
 	uint32_t this_pid;
 	struct sheepdog_node_list_entry this_node;
 
-	uint64_t epoch;
+	uint32_t epoch;
 
 	struct list_head node_list;
 	struct list_head vm_list;

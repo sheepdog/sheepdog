@@ -132,6 +132,26 @@ static int read_from_other_sheeps(struct cluster_info *cluster,
 	return ret;
 }
 
+static int check_epoch(struct cluster_info *cluster, struct request *req)
+{
+	struct sd_req *hdr = (struct sd_req *)&req->rq;
+	uint32_t req_epoch = hdr->epoch;
+	uint32_t opcode = hdr->opcode;
+	int ret = SD_RES_SUCCESS;
+
+	if (before(req_epoch, cluster->epoch)) {
+		ret = SD_RES_OLD_NODE_VER;
+		eprintf("old node version %u %u, %x\n",
+			cluster->epoch, req_epoch, opcode);
+	} else if (after(req_epoch, cluster->epoch)) {
+		ret = SD_RES_NEW_NODE_VER;
+			eprintf("new node version %u %u %x\n",
+				cluster->epoch, req_epoch, opcode);
+	}
+
+	return ret;
+}
+
 void store_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -163,17 +183,9 @@ void store_queue_request(struct work *work, int idx)
 	}
 
 	if (opcode != SD_OP_GET_NODE_LIST) {
-		if (before(req_epoch, epoch)) {
-			ret = SD_RES_OLD_NODE_VER;
-			eprintf("old node version %u %u, %x %" PRIx64 "\n",
-				epoch, req_epoch, opcode, oid);
+		ret = check_epoch(cluster, req);
+		if (ret != SD_RES_SUCCESS)
 			goto out;
-		} else if (after(req_epoch, epoch)) {
-			ret = SD_RES_NEW_NODE_VER;
-			eprintf("new node version %u %u %x %" PRIx64 "\n",
-				epoch, req_epoch, opcode, oid);
-			goto out;
-		}
 	}
 
 	switch (opcode) {
