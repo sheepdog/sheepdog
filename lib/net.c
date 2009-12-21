@@ -429,3 +429,38 @@ int read_object(struct sheepdog_node_list_entry *e,
 
 	return -1;
 }
+
+/* TODO: clean up with the above functions */
+int exec_reqs(struct sheepdog_node_list_entry *e,
+	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr, int nr)
+{
+	char name[128];
+	int i = 0, n, fd, ret;
+	int success = 0;
+
+	for (i = 0; i < nr; i++) {
+		unsigned wlen = 0, rlen = 0;
+
+		n = obj_to_sheep(e, nodes, oid, i);
+
+		snprintf(name, sizeof(name), "%d.%d.%d.%d",
+			 e[n].addr[12],
+			 e[n].addr[13],
+			 e[n].addr[14],
+			 e[n].addr[15]);
+
+		fd = connect_to(name, e[n].port);
+		if (fd < 0)
+			return -1;
+
+		hdr->epoch = node_version;
+
+		ret = exec_req(fd, hdr, NULL, &wlen, &rlen);
+		close(fd);
+
+		if (!ret)
+			success++;
+	}
+
+	return !success;
+}

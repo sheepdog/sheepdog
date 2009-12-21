@@ -44,6 +44,9 @@ int read_object(struct sheepdog_node_list_entry *e,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
 
+int exec_reqs(struct sheepdog_node_list_entry *e,
+	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr, int nr);
+
 int create_listen_ports(int port, int (*callback)(int fd, void *), void *data);
 
 #endif

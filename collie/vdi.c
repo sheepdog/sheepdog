@@ -257,3 +257,27 @@ out:
 	free(buf);
 	return ret;
 }
+
+/* todo: cleanup with the above */
+int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr)
+{
+	struct timeval tv;
+	int nr_nodes, ret;
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	struct sd_so_req req;
+
+	gettimeofday(&tv, NULL);
+	memset(&req, 0, sizeof(req));
+
+	req.oid = SD_DIR_OID;
+	req.opcode = SD_OP_SO;
+	req.ctime = (uint64_t)tv.tv_sec << 32 | tv.tv_usec * 1000;
+	req.copies = ((struct sd_obj_req *)hdr)->copies;
+
+	nr_nodes = build_node_list(&ci->node_list, entries);
+
+	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+			SD_DIR_OID, (struct sd_req *)&req, req.copies);
+
+	return ret;
+}

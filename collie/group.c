@@ -326,10 +326,6 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	void *data = msg->data;
 	int ret = SD_RES_SUCCESS, is_current;
 	uint64_t oid = 0;
-	struct sheepdog_super_block *sb;
-	struct timeval tv;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
@@ -347,19 +343,7 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_RELEASE_VDI:
 		break;
 	case SD_OP_MAKE_FS:
-		sb = zalloc(sizeof(*sb));
-		if (!sb) {
-			ret = -1;
-			break;
-		}
-		gettimeofday(&tv, NULL);
-		sb->ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
-		sb->default_nr_copies = 3;
-
-		nr_nodes = build_node_list(&ci->node_list, entries);
-		ret = write_object(entries, nr_nodes, ci->epoch,
-				   SD_DIR_OID, (char *)sb, sizeof(*sb), 0,
-				   sb->default_nr_copies, 1);
+		ret = make_super_object(ci, &msg->req);
 		break;
 	case SD_OP_UPDATE_EPOCH:
 		break;

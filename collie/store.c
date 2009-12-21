@@ -20,6 +20,9 @@
 #include "collie.h"
 #include "meta.h"
 
+#define ANAME_LAST_OID "user.sheepdog.last_oid"
+#define ANAME_COPIES "user.sheepdog.copes"
+
 static char *obj_dir;
 static char *mnt_dir;
 static char *zero_block;
@@ -160,7 +163,6 @@ void store_queue_request(struct work *work, int idx)
 	int fd = -1, ret = SD_RES_SUCCESS;
 	int flags = O_RDWR;
 	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
-	char aname[] = "user.sheepdog.copies";
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
@@ -221,7 +223,7 @@ void store_queue_request(struct work *work, int idx)
 			goto out;
 		}
 
-		ret = fsetxattr(fd, aname, &hdr->copies,
+		ret = fsetxattr(fd, ANAME_COPIES, &hdr->copies,
 				sizeof(hdr->copies), 0);
 		if (ret) {
 			eprintf("use 'user_xattr' option?\n");
@@ -270,7 +272,7 @@ void store_queue_request(struct work *work, int idx)
 		 * performance; qemu doesn't always need the copies.
 		 */
 		copies = 0;
-		ret = fgetxattr(fd, aname, &copies, sizeof(copies));
+		ret = fgetxattr(fd, ANAME_COPIES, &copies, sizeof(copies));
 		if (ret != sizeof(copies)) {
 			ret = SD_RES_SYSTEM_ERROR;
 			goto out;
@@ -314,6 +316,67 @@ out:
 
 		rsp->result = ret;
 	}
+
+	if (fd != -1)
+		close(fd);
+}
+
+void so_queue_request(struct work *work, int idx)
+{
+	struct request *req = container_of(work, struct request, work);
+	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
+	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
+	struct cluster_info *cluster = req->ci->cluster;
+	int fd = -1, ret, result = SD_RES_SUCCESS;
+	uint32_t opcode = hdr->opcode;
+	uint64_t last_oid = 0;
+	char path[1024];
+
+	if (list_empty(&cluster->node_list)) {
+		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
+		result = SD_RES_SYSTEM_ERROR;
+		goto out;
+	}
+
+	result = check_epoch(cluster, req);
+	if (result != SD_RES_SUCCESS)
+		goto out;
+
+	memset(path, 0, sizeof(path));
+
+	switch (opcode) {
+	case SD_OP_SO:
+		snprintf(path, sizeof(path), "%s/vdi", obj_dir);
+		ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
+			    S_IWGRP | S_IXGRP);
+		if (ret && errno != EEXIST) {
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		fd = open(path, O_RDONLY);
+		if (fd < 0) {
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		ret = fsetxattr(fd, ANAME_LAST_OID, &last_oid,
+				sizeof(last_oid), 0);
+		if (ret) {
+			close(fd);
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		ret = fsetxattr(fd, ANAME_COPIES, &hdr->copies,
+				sizeof(hdr->copies), 0);
+		if (ret)
+			result = SD_RES_EIO;
+	}
+
+out:
+	if (result != SD_RES_SUCCESS)
+		rsp->result = result;
 
 	if (fd != -1)
 		close(fd);

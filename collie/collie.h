@@ -81,10 +81,14 @@ int add_vdi(struct cluster_info *cluster,
 int lookup_vdi(struct cluster_info *cluster, char *filename, uint64_t * oid,
 	       uint32_t tag, int do_lock, int *current);
 
+int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr);
+
 int build_node_list(struct list_head *node_list,
 		    struct sheepdog_node_list_entry *entries);
 
 struct cluster_info *create_cluster(int port);
+
+void so_queue_request(struct work *work, int idx);
 
 void store_queue_request(struct work *work, int idx);
 

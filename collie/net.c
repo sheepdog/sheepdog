@@ -61,6 +61,9 @@ static void queue_request(struct request *req)
 	case SD_OP_SHUTDOWN:
 		req->work.fn = cluster_queue_request;
 		break;
+	case SD_OP_SO:
+		req->work.fn = so_queue_request;
+		break;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);
 		return;
