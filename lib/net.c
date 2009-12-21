@@ -432,14 +432,15 @@ int read_object(struct sheepdog_node_list_entry *e,
 
 /* TODO: clean up with the above functions */
 int exec_reqs(struct sheepdog_node_list_entry *e,
-	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr, int nr)
+	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr,
+	      char *wdata, unsigned int wdatalen, int nr)
 {
 	char name[128];
 	int i = 0, n, fd, ret;
 	int success = 0;
 
 	for (i = 0; i < nr; i++) {
-		unsigned wlen = 0, rlen = 0;
+		unsigned wlen = wdatalen, rlen = 0;
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
@@ -454,8 +455,11 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 			return -1;
 
 		hdr->epoch = node_version;
+		if (wdatalen)
+			hdr->flags = SD_FLAG_CMD_WRITE;
+		hdr->data_length = wlen;
 
-		ret = exec_req(fd, hdr, NULL, &wlen, &rlen);
+		ret = exec_req(fd, hdr, wdata, &wlen, &rlen);
 		close(fd);
 
 		if (!ret)

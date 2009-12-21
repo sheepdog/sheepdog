@@ -45,6 +45,9 @@
 
 /* collie <-> collie */
 #define SD_OP_SO             0x60
+#define SD_OP_SO_NEW_VDI     0x61
+#define SD_OP_SO_DEL_VDI     0x62
+#define SD_OP_SO_LOOKUP_VDI  0x63
 
 #define SD_OP_STAT_SHEEP     0xB0
 
@@ -77,6 +80,7 @@
 #define SD_RES_VDI_NOT_LOCKED   0x17 /* Vdi is not locked */
 #define SD_RES_SHUTDOWN      0x18 /* Sheepdog is shutting down */
 
+#define SD_VDI_RSP_FLAG_CURRENT 0x01
 
 struct sd_req {
 	uint8_t		proto_ver;
@@ -109,7 +113,8 @@ struct sd_so_req {
 	uint64_t	oid;
 	uint64_t	ctime;
 	uint32_t	copies;
-	uint32_t	opcode_specific[3];
+	uint32_t	tag;
+	uint32_t	opcode_specific[2];
 };
 
 struct sd_so_rsp {
@@ -163,8 +168,6 @@ struct sd_vdi_req {
 	uint64_t	vdi_size;
 	uint32_t        pad[2];
 };
-
-#define SD_VDI_RSP_FLAG_CURRENT 0x01;
 
 struct sd_vdi_rsp {
 	uint8_t		proto_ver;

@@ -62,6 +62,8 @@ static void queue_request(struct request *req)
 		req->work.fn = cluster_queue_request;
 		break;
 	case SD_OP_SO:
+	case SD_OP_SO_NEW_VDI:
+	case SD_OP_SO_LOOKUP_VDI:
 		req->work.fn = so_queue_request;
 		break;
 	default:

@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <mntent.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/xattr.h>
 #include <sys/statvfs.h>
@@ -22,6 +23,7 @@
 
 #define ANAME_LAST_OID "user.sheepdog.last_oid"
 #define ANAME_COPIES "user.sheepdog.copes"
+#define ANAME_CURRENT "user.sheepdog.current"
 
 static char *obj_dir;
 static char *mnt_dir;
@@ -321,13 +323,85 @@ out:
 		close(fd);
 }
 
+static int so_lookup_vdi(struct request *req)
+{
+	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
+	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
+	DIR *dir;
+	struct dirent *dent;
+	char *p;
+	int fd, ret;
+	uint64_t coid, oid;
+	char path[1024];
+
+	memset(path, 0, sizeof(path));
+	snprintf(path, sizeof(path), "%s/vdi/", obj_dir);
+	strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
+
+	dprintf("%s, %x\n", path, hdr->tag);
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0) {
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	ret = fgetxattr(fd, ANAME_CURRENT, &coid,
+			sizeof(coid));
+	if (ret != sizeof(coid)) {
+		close(fd);
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	dprintf("%lx, %x\n", coid, hdr->tag);
+
+	close(fd);
+
+	if (hdr->tag == 0xffffffff) {
+		close(fd);
+		rsp->oid = coid;
+		rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
+		return SD_RES_SUCCESS;
+	}
+
+	dir = opendir(path);
+
+	while ((dent = readdir(dir))) {
+		if (!strcmp(dent->d_name, ".") ||
+		    !strcmp(dent->d_name, ".."))
+			continue;
+
+		p = strchr(dent->d_name, '-');
+		if (!p) {
+			eprintf("bug %s\n", dent->d_name);
+			continue;
+		}
+
+		if (strtoull(p + 1, NULL, 16) == hdr->tag) {
+			*p = '\0';
+			oid = strtoull(dent->d_name, NULL, 16);
+			rsp->oid = oid;
+			dprintf("%lx, %x\n", oid, hdr->tag);
+			if (oid == coid)
+				rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
+
+			ret = SD_RES_SUCCESS;
+			break;
+		}
+	}
+	closedir(dir);
+
+	return SD_RES_SUCCESS;
+}
+
 void so_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
 	struct cluster_info *cluster = req->ci->cluster;
-	int fd = -1, ret, result = SD_RES_SUCCESS;
+	int nfd, fd = -1, ret, result = SD_RES_SUCCESS;
 	uint32_t opcode = hdr->opcode;
 	uint64_t last_oid = 0;
 	char path[1024];
@@ -343,10 +417,10 @@ void so_queue_request(struct work *work, int idx)
 		goto out;
 
 	memset(path, 0, sizeof(path));
+	snprintf(path, sizeof(path), "%s/vdi", obj_dir);
 
 	switch (opcode) {
 	case SD_OP_SO:
-		snprintf(path, sizeof(path), "%s/vdi", obj_dir);
 		ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
 			    S_IWGRP | S_IXGRP);
 		if (ret && errno != EEXIST) {
@@ -372,6 +446,79 @@ void so_queue_request(struct work *work, int idx)
 				sizeof(hdr->copies), 0);
 		if (ret)
 			result = SD_RES_EIO;
+		break;
+	case SD_OP_SO_NEW_VDI:
+		fd = open(path, O_RDONLY);
+		if (fd < 0) {
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		ret = fgetxattr(fd, ANAME_LAST_OID, &last_oid,
+				sizeof(last_oid));
+		if (ret != sizeof(last_oid)) {
+			close(fd);
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		strncpy(path + strlen(path), "/", 1);
+		strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
+
+		if (hdr->tag)
+			;
+		else {
+			ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
+				    S_IWGRP | S_IXGRP);
+			if (ret) {
+				eprintf("%m\n");
+				result = SD_RES_EIO;
+				goto out;
+			}
+		}
+
+		nfd = open(path, O_RDONLY);
+		if (nfd < 0) {
+			eprintf("%m\n");
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		last_oid += MAX_DATA_OBJS;
+
+		snprintf(path+ strlen(path), sizeof(path) - strlen(path),
+			 "/%016lx-%08x", last_oid, hdr->tag);
+		ret = creat(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+		if (ret < 0) {
+			eprintf("%m\n");
+			result = SD_RES_EIO;
+			goto out;
+		}
+		close(ret);
+
+		ret = fsetxattr(fd, ANAME_LAST_OID, &last_oid,
+				sizeof(last_oid), 0);
+		if (ret) {
+			eprintf("%m\n");
+			close(fd);
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		close(fd);
+
+		ret = fsetxattr(nfd, ANAME_CURRENT, &last_oid,
+				sizeof(last_oid), 0);
+
+		close(nfd);
+
+		eprintf("%lx\n", last_oid);
+		rsp->oid = last_oid;
+		break;
+
+	case SD_OP_SO_LOOKUP_VDI:
+		ret = so_lookup_vdi(req);
+		break;
 	}
 
 out:

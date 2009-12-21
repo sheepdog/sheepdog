@@ -17,15 +17,6 @@
 #include "meta.h"
 #include "collie.h"
 
-static int sheepdog_match(struct sheepdog_dir_entry *ent, char *name, int len)
-{
-	if (!ent->name_len)
-		return 0;
-	if (ent->name_len != len)
-		return 0;
-	return !memcmp(ent->name, name, len);
-}
-
 /* TODO: should be performed atomically */
 static int create_inode_obj(struct sheepdog_node_list_entry *entries,
 			    int nr_nodes, uint64_t epoch, int copies,
@@ -87,103 +78,49 @@ static int create_inode_obj(struct sheepdog_node_list_entry *entries,
 	return ret;
 }
 
-#define DIR_BUF_LEN (UINT64_C(1) << 20)
-
 /*
  * TODO: handle larger buffer
  */
-int add_vdi(struct cluster_info *cluster, char *name, int len, uint64_t size,
+int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 	int nr_nodes;
-	struct sheepdog_dir_entry *prv, *ent;
 	uint64_t oid = 0;
-	char *buf;
-	int ret, rest;
-	struct sheepdog_super_block *sb;
+	int ret;
 	int copies;
+	struct sd_so_req req;
 
-	nr_nodes = build_node_list(&cluster->node_list, entries);
+	memset(&req, 0, sizeof(req));
 
-	eprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
+	nr_nodes = build_node_list(&ci->node_list, entries);
+
+	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
 		base_oid);
 
-	buf = zalloc(DIR_BUF_LEN);
-	if (!buf)
-		return 1;
+	/* todo */
+/* 	copies = sb->default_nr_copies; */
+	copies = 3;
+	if (copies > nr_nodes)
+		copies = nr_nodes;
 
-	ret = read_object(entries, nr_nodes, cluster->epoch,
-			  SD_DIR_OID, buf, DIR_BUF_LEN, 0, nr_nodes);
-	if (ret < 0) {
-		ret = SD_RES_DIR_READ;
-		goto out;
-	}
+	req.opcode = SD_OP_SO_NEW_VDI;
+	req.copies = copies;
+	req.tag = tag;
 
-	sb = (struct sheepdog_super_block *)buf;
-	copies = sb->default_nr_copies;
+	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+			SD_DIR_OID, (struct sd_req *)&req, name, len, copies);
 
-	ret = read_object(entries, nr_nodes, cluster->epoch,
-			  SD_DIR_OID, buf, DIR_BUF_LEN, sizeof(*sb), nr_nodes);
-	if (ret < 0) {
-		ret = SD_RES_DIR_READ;
-		goto out;
-	}
+	/* todo: error handling */
 
-	ent = (struct sheepdog_dir_entry *)buf;
-	rest = ret;
-	while (rest > 0) {
-		if (!ent->name_len)
-			break;
-
-		if (sheepdog_match(ent, name, len) && !tag) {
-			ret = SD_RES_VDI_EXIST;
-			goto out;
-		}
-		oid = ent->oid;
-		prv = ent;
-		ent = next_entry(prv);
-		rest -= ((char *)ent - (char *)prv);
-	}
-
-	/* need to check if the buffer is large enough here. */
-	oid += (1 << 18);
-
-	ret = create_inode_obj(entries, nr_nodes, cluster->epoch, copies,
-			       oid, size, base_oid);
-	if (ret)
-		goto out;
-
-	ent->oid = oid;
-	ent->tag = tag;
-
-	ent->flags = FLAG_CURRENT;
-	ent->name_len = len;
-	memcpy(ent->name, name, len);
-
-	if (tag) {
-		struct sheepdog_dir_entry *e = (struct sheepdog_dir_entry *)buf;
-
-		while (e < ent) {
-			if (sheepdog_match(e, name, len))
-				e->flags &= ~FLAG_CURRENT;
-			e = next_entry(e);
-		}
-	}
-
-	ent = next_entry(ent);
-
-	ret = write_object(entries, nr_nodes, cluster->epoch,
-			   SD_DIR_OID, buf, (char *)ent - buf, sizeof(*sb),
-			   copies, 0);
-	if (ret) {
-		ret = SD_RES_DIR_WRITE;
-		goto out;
-	}
-
+	oid = ((struct sd_so_rsp *)&req)->oid;
 	*added_oid = oid;
-out:
-	free(buf);
+
+	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
+		oid);
+
+	ret = create_inode_obj(entries, nr_nodes, ci->epoch, copies,
+			       oid, size, base_oid);
 
 	return ret;
 }
@@ -193,68 +130,41 @@ int del_vdi(struct cluster_info *cluster, char *name, int len)
 	return 0;
 }
 
-int lookup_vdi(struct cluster_info *cluster,
+int lookup_vdi(struct cluster_info *ci,
 	       char *filename, uint64_t * oid, uint32_t tag, int do_lock,
 	       int *current)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 	int nr_nodes;
-	int rest, ret;
-	char *buf;
-	struct sheepdog_dir_entry *prv, *ent;
+	int ret, copies;
+	struct sd_so_req req;
+	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req;
 
-	nr_nodes = build_node_list(&cluster->node_list, entries);
+	memset(&req, 0, sizeof(req));
+
+	nr_nodes = build_node_list(&ci->node_list, entries);
 
 	*current = 0;
-	buf = zalloc(DIR_BUF_LEN);
-	if (!buf)
-		return 1;
 
-	ret = read_object(entries, nr_nodes, cluster->epoch,
-			  SD_DIR_OID, buf, DIR_BUF_LEN,
-			  sizeof(struct sheepdog_super_block), nr_nodes);
-	if (ret < 0) {
-		ret = SD_RES_DIR_READ;
-		goto out;
-	}
+	dprintf("looking for %s %zd\n", filename, strlen(filename));
 
-	eprintf("looking for %s %zd, %d\n", filename, strlen(filename), ret);
+	/* todo */
+	copies = 3;
+	if (copies > nr_nodes)
+		copies = nr_nodes;
 
-	ent = (struct sheepdog_dir_entry *)buf;
-	rest = ret;
-	ret = SD_RES_NO_VDI;
-	while (rest > 0) {
-		if (!ent->name_len)
-			break;
+	req.opcode = SD_OP_SO_LOOKUP_VDI;
+	req.tag = tag;
 
-		eprintf("%s %d %" PRIu64 "\n", ent->name, ent->name_len,
-			ent->oid);
+	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+			SD_DIR_OID, (struct sd_req *)&req, filename, strlen(filename), copies);
 
-		if (sheepdog_match(ent, filename, strlen(filename))) {
-			if (ent->tag != tag && tag != -1) {
-				ret = SD_RES_NO_TAG;
-				goto next;
-			}
-			if (ent->tag != tag && !(ent->flags & FLAG_CURRENT)) {
-				/* current vdi must exsit */
-				ret = SD_RES_SYSTEM_ERROR;
-				goto next;
-			}
+	*oid = rsp->oid;
+	if (rsp->flags & SD_VDI_RSP_FLAG_CURRENT)
+		*current = 1;
 
-			*oid = ent->oid;
-			ret = 0;
+	dprintf("looking for %s %lx\n", filename, *oid);
 
-			if (ent->flags & FLAG_CURRENT)
-				*current = 1;
-			break;
-		}
-next:
-		prv = ent;
-		ent = next_entry(prv);
-		rest -= ((char *)ent - (char *)prv);
-	}
-out:
-	free(buf);
 	return ret;
 }
 
@@ -277,7 +187,7 @@ int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr)
 	nr_nodes = build_node_list(&ci->node_list, entries);
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, req.copies);
+			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, req.copies);
 
 	return ret;
 }
