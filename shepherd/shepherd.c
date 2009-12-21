@@ -25,7 +25,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <term.h>
-#include <openssl/sha.h>
 #include <curses.h>
 
 #include "meta.h"
@@ -857,8 +856,8 @@ rerun:
 		}
 		break;
 	case INFO_DOG:
-		printf("  Idx\tNode id (SHA1)                               - Host:Port\n");
-		printf("-----------------------------------------------------------------------\n");
+		printf("  Idx\tNode id (FNV-1a)    - Host:Port\n");
+		printf("--------------------------------------------------\n");
 		for (i = 0; i < nr_nodes; i++) {
 			char data[128];
 

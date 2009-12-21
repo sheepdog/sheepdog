@@ -13,6 +13,7 @@
 
 #include <stdint.h>
 #include "util.h"
+#include "list.h"
 
 #define SD_DIR_OID 0
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)

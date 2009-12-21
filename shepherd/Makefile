@@ -2,7 +2,7 @@ sbindir ?= $(PREFIX)/sbin
 
 CFLAGS += -g -O2 -Wall -Wstrict-prototypes -I../include
 CFLAGS += -D_GNU_SOURCE
-LIBS += -lncurses -lcrypto
+LIBS += -lncurses
 
 PROGRAMS = shepherd
 SHEPHERD_OBJS = shepherd.o treeview.o ../lib/event.o ../lib/net.o ../lib/logger.o

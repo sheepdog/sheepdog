@@ -12,7 +12,6 @@
 #define __SHEEPDOG_PROTO_H__
 
 #include <stdint.h>
-#include <openssl/sha.h>
 #include "util.h"
 
 #define SD_LISTEN_PORT 7000
@@ -218,31 +217,44 @@ struct sheepdog_vm_list_entry {
 };
 
 struct sheepdog_node_list_entry {
-	uint8_t         id[20];
+	uint64_t        id;
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	pad;
 };
 
+/*
+ * 64 bit FNV-1a non-zero initial basis
+ */
+#define FNV1A_64_INIT ((uint64_t) 0xcbf29ce484222325ULL)
+
+/*
+ * 64 bit Fowler/Noll/Vo FNV-1a hash code
+ */
+static inline uint64_t fnv_64a_buf(void *buf, size_t len, uint64_t hval)
+{
+	unsigned char *bp = (unsigned char *) buf;
+	unsigned char *be = bp + len;
+	while (bp < be) {
+		hval ^= (uint64_t) *bp++;
+		hval += (hval << 1) + (hval << 4) + (hval << 5) +
+			(hval << 7) + (hval << 8) + (hval << 40);
+	}
+	return hval;
+}
+
 static inline int obj_to_sheep(struct sheepdog_node_list_entry *entries,
 			       int nr_entries, uint64_t oid, int idx)
 {
-	SHA_CTX ctx;
-	uint8_t id[20];
+	uint64_t id;
 	int i;
 	struct sheepdog_node_list_entry *e = entries, *n;
 
-	SHA1_Init(&ctx);
-
-	SHA1_Update(&ctx, &oid, sizeof(oid));
-
-	SHA1_Final(id, &ctx);
+	id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 
 	for (i = 0; i < nr_entries - 1; i++, e++) {
 		n = e + 1;
-
-		if (memcmp(id, e->id, sizeof(id)) > 0 &&
-		    memcmp(id, n->id, sizeof(id)) <= 0)
+		if (id > e->id && id <= n->id)
 			break;
 	}
 
@@ -252,10 +264,10 @@ static inline int obj_to_sheep(struct sheepdog_node_list_entry *entries,
 static inline void print_node_list_entry(struct sheepdog_node_list_entry *e,
 					 char *str, size_t size)
 {
-	uint32_t *p = (uint32_t *)e->id;
+	uint16_t *p = (uint16_t *)&e->id;
 
-	snprintf(str, size, "%08x:%08x:%08x:%08x:%08x - %d.%d.%d.%d:%d",
-		p[0] ,p[1], p[2], p[3] ,p[4],
+	snprintf(str, size, "%04x:%04x:%04x:%04x - %d.%d.%d.%d:%d",
+		p[0] ,p[1], p[2], p[3],
 		e->addr[12], e->addr[13],
 		e->addr[14], e->addr[15], e->port);
 }

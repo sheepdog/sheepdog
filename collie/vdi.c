@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <openssl/sha.h>
 
 #include "sheepdog_proto.h"
 #include "meta.h"

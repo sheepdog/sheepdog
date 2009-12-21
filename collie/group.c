@@ -87,7 +87,12 @@ static int node_cmp(const void *a, const void *b)
 {
 	const struct sheepdog_node_list_entry *node1 = a;
 	const struct sheepdog_node_list_entry *node2 = b;
-	return memcmp(node1->id, node2->id, sizeof(node1->id));
+
+	if (node1->id < node2->id)
+		return -1;
+	if (node1->id > node2->id)
+		return 1;
+	return 0;
 }
 
 static int send_message(cpg_handle_t handle, struct message_header *msg)
@@ -657,10 +662,11 @@ struct cluster_info *create_cluster(int port)
 	struct cluster_info *ci;
 	struct addrinfo hints, *res;
 	char name[INET6_ADDRSTRLEN];
-	SHA_CTX ctx;
 	struct cpg_name group = { 8, "sheepdog" };
 	cpg_callbacks_t cb = { &sd_deliver, &sd_confch };
 	unsigned int nodeid = 0;
+	uint64_t hval;
+	int i;
 
 	ci = zalloc(sizeof(*ci));
 	if (!ci)
@@ -728,10 +734,12 @@ join_retry:
 
 	ci->this_node.port = port;
 
-	SHA1_Init(&ctx);
-	SHA1_Update(&ctx, ci->this_node.addr, sizeof(ci->this_node.addr));
-	SHA1_Update(&ctx, &ci->this_node.port, sizeof(ci->this_node.port));
-	SHA1_Final(ci->this_node.id, &ctx);
+	hval = fnv_64a_buf(&ci->this_node.port, sizeof(ci->this_node.port),
+			   FNV1A_64_INIT);
+	for (i = ARRAY_SIZE(ci->this_node.addr) - 1; i >= 0; i--)
+		hval = fnv_64a_buf(&ci->this_node.addr[i], 1, hval);
+
+	ci->this_node.id = hval;
 
 	ci->synchronized = 0;
 	INIT_LIST_HEAD(&ci->node_list);
