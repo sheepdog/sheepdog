@@ -109,7 +109,7 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	req.tag = tag;
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, name, len, copies);
+			SD_DIR_OID, (struct sd_req *)&req, name, len, 0, copies);
 
 	/* todo: error handling */
 
@@ -157,7 +157,7 @@ int lookup_vdi(struct cluster_info *ci,
 	req.tag = tag;
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, filename, strlen(filename), copies);
+			SD_DIR_OID, (struct sd_req *)&req, filename, strlen(filename), 0, copies);
 
 	*oid = rsp->oid;
 	if (rsp->flags & SD_VDI_RSP_FLAG_CURRENT)
@@ -187,7 +187,7 @@ int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr)
 	nr_nodes = build_node_list(&ci->node_list, entries);
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, req.copies);
+			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0, req.copies);
 
 	return ret;
 }

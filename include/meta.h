@@ -48,15 +48,6 @@ static inline int is_data_obj(uint64_t oid)
 
 #define SHEEPDOG_SUPER_OBJ_SIZE (UINT64_C(1) << 12)
 
-struct sheepdog_super_block {
-	uint64_t ctime;
-	uint8_t default_nr_copies;
-	uint8_t pad1[7];
-
-	uint8_t pad2[SHEEPDOG_SUPER_OBJ_SIZE - 16];
-	uint8_t pad3[1 << 24];
-};
-
 #define FLAG_CURRENT 1
 
 struct sheepdog_dir_entry {

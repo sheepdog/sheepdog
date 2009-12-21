@@ -388,14 +388,19 @@ int parse_vdi(vdi_parser_func_t func, void *data)
 	char *buf;
 	int rest, ret;
 	struct sheepdog_inode i;
+	struct sd_so_req req;
+
+	memset(&req, 0, sizeof(req));
 
 	buf = zalloc(DIR_BUF_LEN);
 	if (!buf)
 		return 1;
 
-	ret = read_object(node_list_entries, nr_nodes, node_list_version,
-			  SD_DIR_OID, buf, DIR_BUF_LEN,
-			  sizeof(struct sheepdog_super_block), nr_nodes);
+	req.opcode = SD_OP_SO_READ_VDIS;
+
+	ret = exec_reqs(node_list_entries, nr_nodes, node_list_version,
+			SD_DIR_OID, (struct sd_req *)&req, buf, 0, DIR_BUF_LEN,nr_nodes);
+
 	if (ret < 0) {
 		ret = 1;
 		goto out;

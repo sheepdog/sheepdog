@@ -48,6 +48,7 @@
 #define SD_OP_SO_NEW_VDI     0x61
 #define SD_OP_SO_DEL_VDI     0x62
 #define SD_OP_SO_LOOKUP_VDI  0x63
+#define SD_OP_SO_READ_VDIS   0x64
 
 #define SD_OP_STAT_SHEEP     0xB0
 

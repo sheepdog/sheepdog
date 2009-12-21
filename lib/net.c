@@ -433,14 +433,15 @@ int read_object(struct sheepdog_node_list_entry *e,
 /* TODO: clean up with the above functions */
 int exec_reqs(struct sheepdog_node_list_entry *e,
 	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr,
-	      char *wdata, unsigned int wdatalen, int nr)
+	      char *data, unsigned int wdatalen, unsigned int rdatalen, int nr)
 {
 	char name[128];
 	int i = 0, n, fd, ret;
 	int success = 0;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
 	for (i = 0; i < nr; i++) {
-		unsigned wlen = wdatalen, rlen = 0;
+		unsigned wlen = wdatalen, rlen = rdatalen;
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
@@ -454,16 +455,27 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 		if (fd < 0)
 			return -1;
 
+		rsp->result = 0;
 		hdr->epoch = node_version;
-		if (wdatalen)
+		if (wdatalen) {
 			hdr->flags = SD_FLAG_CMD_WRITE;
-		hdr->data_length = wlen;
+			hdr->data_length = wdatalen;
+		} else if (rdatalen)
+			hdr->data_length = rdatalen;
+		else
+			hdr->data_length = 0;
 
-		ret = exec_req(fd, hdr, wdata, &wlen, &rlen);
+		ret = exec_req(fd, hdr, data, &wlen, &rlen);
 		close(fd);
 
-		if (!ret)
-			success++;
+		if (rdatalen) {
+			if (!ret) {
+				if (rsp->result == SD_RES_SUCCESS)
+					return rlen;
+			}
+		} else
+			if (!ret)
+				success++;
 	}
 
 	return !success;

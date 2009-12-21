@@ -323,6 +323,83 @@ out:
 		close(fd);
 }
 
+static int so_read_vdis(struct request *req)
+{
+	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
+	DIR *dir, *vdir;
+	struct dirent *dent, *vdent;
+	char *p;
+	int fd, ret;
+	uint64_t coid;
+	char path[1024], vpath[1024];
+	struct sheepdog_dir_entry *sde = req->data;
+
+	memset(path, 0, sizeof(path));
+	snprintf(path, sizeof(path), "%s/vdi", obj_dir);
+
+	dir = opendir(path);
+
+	while ((dent = readdir(dir))) {
+		if (!strcmp(dent->d_name, ".") ||
+		    !strcmp(dent->d_name, ".."))
+			continue;
+
+		memcpy(vpath, path, sizeof(vpath));
+		snprintf(vpath + strlen(vpath), sizeof(vpath) - strlen(vpath),
+			 "/%s", dent->d_name);
+
+		fd = open(vpath, O_RDONLY);
+		if (fd < 0) {
+			eprintf("%m\n");
+			return SD_RES_EIO;
+		}
+
+		ret = fgetxattr(fd, ANAME_CURRENT, &coid,
+				sizeof(coid));
+		if (ret != sizeof(coid)) {
+			close(fd);
+			eprintf("%s, %m\n", path);
+			return SD_RES_EIO;
+		}
+
+		dprintf("%lx\n", coid);
+
+		close(fd);
+
+		vdir = opendir(vpath);
+		while ((vdent = readdir(vdir))) {
+			if (!strcmp(vdent->d_name, ".") ||
+			    !strcmp(vdent->d_name, ".."))
+				continue;
+
+			p = strchr(vdent->d_name, '-');
+			if (!p) {
+				eprintf("bug %s\n", vdent->d_name);
+				continue;
+			}
+
+			dprintf("%s\n", vdent->d_name);
+
+			*p = '\0';
+
+			sde->oid = strtoull(vdent->d_name, NULL, 16);
+			sde->tag = strtoull(p + 1, NULL, 16);
+
+			if (sde->oid == coid)
+				sde->flags = FLAG_CURRENT;
+
+			sde->name_len = strlen(dent->d_name);
+			strcpy(sde->name, dent->d_name);
+			sde = next_entry(sde);
+		}
+	}
+
+	rsp->data_length = (char *)sde - (char *)req->data;
+	dprintf("%d\n", rsp->data_length);
+
+	return SD_RES_SUCCESS;
+}
+
 static int so_lookup_vdi(struct request *req)
 {
 	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
@@ -518,6 +595,9 @@ void so_queue_request(struct work *work, int idx)
 
 	case SD_OP_SO_LOOKUP_VDI:
 		ret = so_lookup_vdi(req);
+		break;
+	case SD_OP_SO_READ_VDIS:
+		ret = so_read_vdis(req);
 		break;
 	}
 
