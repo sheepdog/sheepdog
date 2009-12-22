@@ -338,6 +338,8 @@ static int so_read_vdis(struct request *req)
 	snprintf(path, sizeof(path), "%s/vdi", obj_dir);
 
 	dir = opendir(path);
+	if (!dir)
+		return SD_RES_NO_SUPER_OBJ;
 
 	while ((dent = readdir(dir))) {
 		if (!strcmp(dent->d_name, ".") ||
@@ -367,6 +369,9 @@ static int so_read_vdis(struct request *req)
 		close(fd);
 
 		vdir = opendir(vpath);
+		if (!vdir)
+			return SD_RES_NO_VDI;
+
 		while ((vdent = readdir(vdir))) {
 			if (!strcmp(vdent->d_name, ".") ||
 			    !strcmp(vdent->d_name, ".."))
@@ -443,6 +448,8 @@ static int so_lookup_vdi(struct request *req)
 	}
 
 	dir = opendir(path);
+	if (!dir)
+		return SD_RES_NO_VDI;
 
 	while ((dent = readdir(dir))) {
 		if (!strcmp(dent->d_name, ".") ||
