@@ -438,7 +438,8 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 	char name[128];
 	int i = 0, n, fd, ret;
 	int success = 0;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req tmp;
+	struct sd_rsp *rsp = (struct sd_rsp *)&tmp;
 
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = wdatalen, rlen = rdatalen;
@@ -455,7 +456,6 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 		if (fd < 0)
 			return -1;
 
-		rsp->result = 0;
 		hdr->epoch = node_version;
 		if (wdatalen) {
 			hdr->flags = SD_FLAG_CMD_WRITE;
@@ -465,18 +465,23 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 		else
 			hdr->data_length = 0;
 
-		ret = exec_req(fd, hdr, data, &wlen, &rlen);
+		memcpy(&tmp, hdr, sizeof(tmp));
+		ret = exec_req(fd, &tmp, data, &wlen, &rlen);
 		close(fd);
 
+		rsp = (struct sd_rsp *)&tmp;
 		if (rdatalen) {
 			if (!ret) {
-				if (rsp->result == SD_RES_SUCCESS)
+				if (rsp->result == SD_RES_SUCCESS) {
+					memcpy(hdr, rsp, sizeof(*rsp));
 					return rlen;
+				}
 			}
 		} else
 			if (!ret)
 				success++;
 	}
+	memcpy(hdr, rsp, sizeof(*rsp));
 
 	return !success;
 }
