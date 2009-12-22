@@ -22,7 +22,7 @@
 #include "meta.h"
 
 #define ANAME_LAST_OID "user.sheepdog.last_oid"
-#define ANAME_COPIES "user.sheepdog.copes"
+#define ANAME_COPIES "user.sheepdog.copies"
 #define ANAME_CURRENT "user.sheepdog.current"
 
 static char *obj_dir;
