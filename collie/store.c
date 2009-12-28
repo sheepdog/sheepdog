@@ -606,6 +606,33 @@ void so_queue_request(struct work *work, int idx)
 	case SD_OP_SO_READ_VDIS:
 		ret = so_read_vdis(req);
 		break;
+	case SD_OP_SO_STAT:
+		fd = open(path, O_RDONLY);
+		if (fd < 0) {
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		rsp->oid = 0;
+		ret = fgetxattr(fd, ANAME_LAST_OID, &rsp->oid,
+				sizeof(rsp->oid));
+		if (ret != sizeof(rsp->oid)) {
+			close(fd);
+			result = SD_RES_SYSTEM_ERROR;
+			goto out;
+		}
+
+		rsp->copies = 0;
+		ret = fgetxattr(fd, ANAME_COPIES, &rsp->copies,
+				sizeof(rsp->copies));
+		if (ret != sizeof(rsp->copies)) {
+			close(fd);
+			result = SD_RES_SYSTEM_ERROR;
+			goto out;
+		}
+
+		result = SD_RES_SUCCESS;
+		break;
 	}
 
 out:

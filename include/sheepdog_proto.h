@@ -48,6 +48,7 @@
 #define SD_OP_SO_DEL_VDI     0x62
 #define SD_OP_SO_LOOKUP_VDI  0x63
 #define SD_OP_SO_READ_VDIS   0x64
+#define SD_OP_SO_STAT        0x65
 
 #define SD_OP_STAT_SHEEP     0xB0
 
@@ -125,8 +126,10 @@ struct sd_so_rsp {
 	uint32_t        id;
 	uint32_t        data_length;
 	uint32_t        result;
+	uint32_t	copies;
+	uint64_t	ctime;
 	uint64_t	oid;
-	uint32_t	opcode_specific[5];
+	uint32_t	opcode_specific[2];
 };
 
 struct sd_obj_req {

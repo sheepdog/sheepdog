@@ -398,7 +398,8 @@ int parse_vdi(vdi_parser_func_t func, void *data)
 	req.opcode = SD_OP_SO_READ_VDIS;
 
 	ret = exec_reqs(node_list_entries, nr_nodes, node_list_version,
-			SD_DIR_OID, (struct sd_req *)&req, buf, 0, DIR_BUF_LEN,nr_nodes);
+			SD_DIR_OID, (struct sd_req *)&req, buf, 0, DIR_BUF_LEN,
+			nr_nodes, 1);
 
 	if (ret < 0) {
 		ret = 1;

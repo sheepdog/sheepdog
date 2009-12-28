@@ -84,11 +84,12 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes;
+	int nr_nodes, nr_reqs;
 	uint64_t oid = 0;
 	int ret;
 	int copies;
 	struct sd_so_req req;
+	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req;
 
 	memset(&req, 0, sizeof(req));
 
@@ -97,22 +98,31 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
 		base_oid);
 
-	/* todo */
-/* 	copies = sb->default_nr_copies; */
-	copies = 3;
-	if (copies > nr_nodes)
-		copies = nr_nodes;
+	req.opcode = SD_OP_SO_STAT;
+	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0,
+			nr_nodes, 1);
+	if (ret < 0)
+		return rsp->result;
+
+	copies = rsp->copies;
+	nr_reqs = copies;
+	if (nr_reqs > nr_nodes)
+		nr_reqs = nr_nodes;
+
+	memset(&req, 0, sizeof(req));
 
 	req.opcode = SD_OP_SO_NEW_VDI;
 	req.copies = copies;
 	req.tag = tag;
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, name, len, 0, copies);
+			SD_DIR_OID, (struct sd_req *)&req, name, len, 0,
+			nr_reqs, nr_reqs);
 
 	/* todo: error handling */
 
-	oid = ((struct sd_so_rsp *)&req)->oid;
+	oid = rsp->oid;
 	*added_oid = oid;
 
 	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
@@ -134,7 +144,7 @@ int lookup_vdi(struct cluster_info *ci,
 	       int *current)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes;
+	int nr_nodes, nr_reqs;
 	int ret, copies;
 	struct sd_so_req req;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req;
@@ -147,16 +157,26 @@ int lookup_vdi(struct cluster_info *ci,
 
 	dprintf("looking for %s %zd\n", filename, strlen(filename));
 
-	/* todo */
-	copies = 3;
-	if (copies > nr_nodes)
-		copies = nr_nodes;
+	req.opcode = SD_OP_SO_STAT;
+	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0,
+			nr_nodes, 1);
+	if (ret < 0)
+		return rsp->result;
+
+	copies = rsp->copies;
+	nr_reqs = copies;
+	if (nr_reqs > nr_nodes)
+		nr_reqs = nr_nodes;
+
+	memset(&req, 0, sizeof(req));
 
 	req.opcode = SD_OP_SO_LOOKUP_VDI;
 	req.tag = tag;
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, filename, strlen(filename), 0, copies);
+			SD_DIR_OID, (struct sd_req *)&req, filename, strlen(filename), 0,
+			nr_reqs, 1);
 
 	*oid = rsp->oid;
 	if (rsp->flags & SD_VDI_RSP_FLAG_CURRENT)
@@ -164,7 +184,10 @@ int lookup_vdi(struct cluster_info *ci,
 
 	dprintf("looking for %s %lx\n", filename, *oid);
 
-	return ret;
+	if (ret < 0)
+		return rsp->result;
+
+	return SD_RES_SUCCESS;
 }
 
 /* todo: cleanup with the above */
@@ -186,7 +209,11 @@ int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr)
 	nr_nodes = build_node_list(&ci->node_list, entries);
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0, req.copies);
+			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0, req.copies,
+			req.copies);
 
-	return ret;
+	if (ret < 0)
+		return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
 }

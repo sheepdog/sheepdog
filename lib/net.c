@@ -433,16 +433,19 @@ int read_object(struct sheepdog_node_list_entry *e,
 /* TODO: clean up with the above functions */
 int exec_reqs(struct sheepdog_node_list_entry *e,
 	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr,
-	      char *data, unsigned int wdatalen, unsigned int rdatalen, int nr)
+	      char *data, unsigned int wdatalen, unsigned int rdatalen, int nr,
+	      int quorum)
 {
 	char name[128];
 	int i = 0, n, fd, ret;
 	int success = 0;
 	struct sd_req tmp;
 	struct sd_rsp *rsp = (struct sd_rsp *)&tmp;
+	unsigned wlen, rlen;
 
 	for (i = 0; i < nr; i++) {
-		unsigned wlen = wdatalen, rlen = rdatalen;
+		wlen = wdatalen;
+		rlen = rdatalen;
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
@@ -453,8 +456,10 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 			 e[n].addr[15]);
 
 		fd = connect_to(name, e[n].port);
-		if (fd < 0)
+		if (fd < 0) {
+			((struct sd_rsp *) hdr)->result = SD_RES_EIO;
 			return -1;
+		}
 
 		hdr->epoch = node_version;
 		if (wdatalen) {
@@ -470,18 +475,23 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 		close(fd);
 
 		rsp = (struct sd_rsp *)&tmp;
-		if (rdatalen) {
-			if (!ret) {
-				if (rsp->result == SD_RES_SUCCESS) {
-					memcpy(hdr, rsp, sizeof(*rsp));
-					return rlen;
-				}
-			}
-		} else
-			if (!ret)
+
+		if (!ret) {
+			if (rsp->result == SD_RES_SUCCESS)
 				success++;
+		}
+
+		if (success >= quorum)
+			break;
 	}
+
 	memcpy(hdr, rsp, sizeof(*rsp));
 
-	return !success;
+	if (success < quorum)
+		return -1;
+
+	if (rdatalen)
+		return rlen;
+	else
+		return wlen;
 }

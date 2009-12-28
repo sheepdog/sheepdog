@@ -340,7 +340,7 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
 		ret = lookup_vdi(ci, data, &oid, hdr->tag, 1, &is_current);
-		if (ret < 0)
+		if (ret != SD_RES_SUCCESS)
 			break;
 		if (is_current)
 			rsp->flags = SD_VDI_RSP_FLAG_CURRENT;

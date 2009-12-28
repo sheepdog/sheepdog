@@ -65,6 +65,7 @@ static void queue_request(struct request *req)
 	case SD_OP_SO_NEW_VDI:
 	case SD_OP_SO_LOOKUP_VDI:
 	case SD_OP_SO_READ_VDIS:
+	case SD_OP_SO_STAT:
 		req->work.fn = so_queue_request;
 		break;
 	default:
