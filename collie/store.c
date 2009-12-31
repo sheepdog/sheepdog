@@ -157,13 +157,32 @@ static int check_epoch(struct cluster_info *cluster, struct request *req)
 	return ret;
 }
 
+static int ob_open(uint64_t oid, int aflags, int *ret)
+{
+	char path[1024];
+	int flags = O_RDWR | aflags;
+	int fd;
+
+	snprintf(path, sizeof(path), "%s/%" PRIx64, obj_dir, oid);
+
+	fd = open(path, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+	if (fd < 0) {
+		if (errno == ENOENT)
+			*ret = SD_RES_NO_OBJ;
+		else
+			*ret = SD_RES_UNKNOWN;
+	} else
+		*ret = 0;
+
+	return fd;
+}
+
 void store_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct cluster_info *cluster = req->ci->cluster;
 	char path[1024];
 	int fd = -1, ret = SD_RES_SUCCESS;
-	int flags = O_RDWR;
 	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
@@ -197,18 +216,14 @@ void store_queue_request(struct work *work, int idx)
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_READ_OBJ:
 	case SD_OP_SYNC_OBJ:
+
 		if (opcode == SD_OP_CREATE_AND_WRITE_OBJ)
-			flags |= O_CREAT;
+			fd = ob_open(oid, O_CREAT, &ret);
+		else
+			fd = ob_open(oid, 0, &ret);
 
-		fd = open(path, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
-		if (fd < 0) {
-			if (errno == ENOENT)
-				ret = SD_RES_NO_OBJ;
-			else
-				ret = SD_RES_UNKNOWN;
-
+		if (fd < 0)
 			goto out;
-		}
 
 		if (opcode != SD_OP_CREATE_AND_WRITE_OBJ)
 			break;
