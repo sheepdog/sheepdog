@@ -125,6 +125,8 @@ again:
 		}
 	}
 
+	free(e);
+
 	return -1;
 }
 
@@ -152,7 +154,7 @@ static int forward_obj_req(struct cluster_info *cluster, struct request *req)
 	uint64_t oid = hdr->oid;
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-
+again:
 	nr = build_node_list(&cluster->node_list, e);
 
 	nr = hdr->copies;
@@ -181,7 +183,14 @@ static int forward_obj_req(struct cluster_info *cluster, struct request *req)
 		hdr2.flags |= SD_FLAG_CMD_FORWARD;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr2, req->data, &wlen, &rlen);
+
+		close(fd);
+
+		if (ret) /* network errors */
+			goto again;
 	}
+
+	free(e);
 
 	return 0;
 }
