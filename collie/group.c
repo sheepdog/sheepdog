@@ -358,8 +358,6 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_MAKE_FS:
 		ret = make_super_object(ci, &msg->req);
 		break;
-	case SD_OP_UPDATE_EPOCH:
-		break;
 	default:
 		ret = SD_RES_SYSTEM_ERROR;
 		eprintf("opcode %d is not implemented\n", hdr->opcode);
@@ -411,8 +409,6 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 		free(vm);
 		break;
 	case SD_OP_GET_VDI_INFO:
-		break;
-	case SD_OP_UPDATE_EPOCH:
 		break;
 	case SD_OP_MAKE_FS:
 		if (ret == SD_RES_SUCCESS) {

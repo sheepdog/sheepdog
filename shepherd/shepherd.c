@@ -275,12 +275,6 @@ static int debug(char *op, char *arg)
 			opcode = SD_OP_GET_EPOCH;
 			flags = 0;
 		}
-	} else if (!strcasecmp(op, "update_epoch")) {
-		rlen = 0;
-		wlen = 0;
-		oid = strtoul(arg, NULL, 10);
-		opcode = SD_OP_UPDATE_EPOCH;
-		flags = 0;
 	} else
 		return 1;
 

@@ -28,7 +28,6 @@ static void __done(struct work *work, int idx)
 	case SD_OP_RELEASE_VDI:
 	case SD_OP_GET_VDI_INFO:
 	case SD_OP_MAKE_FS:
-	case SD_OP_UPDATE_EPOCH:
 	case SD_OP_SHUTDOWN:
 		/* request is forwarded to cpg group */
 		return;
@@ -57,7 +56,6 @@ static void queue_request(struct request *req)
 	case SD_OP_RELEASE_VDI:
 	case SD_OP_GET_VDI_INFO:
 	case SD_OP_MAKE_FS:
-	case SD_OP_UPDATE_EPOCH:
 	case SD_OP_SHUTDOWN:
 		req->work.fn = cluster_queue_request;
 		break;
