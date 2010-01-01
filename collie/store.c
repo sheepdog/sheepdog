@@ -137,6 +137,52 @@ static int read_from_other_sheeps(struct cluster_info *cluster,
 	return ret;
 }
 
+static int forward_obj_req(struct cluster_info *cluster, struct request *req)
+{
+	int i, n, nr, fd, ret;
+	unsigned wlen, rlen;
+	char name[128];
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sheepdog_node_list_entry *e;
+	struct sd_obj_req hdr2;
+	uint64_t oid = hdr->oid;
+
+	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
+
+	nr = build_node_list(&cluster->node_list, e);
+
+/* 	nr = hdr->copies; */
+	nr = 3;
+
+	for (i = 0; i < nr; i++) {
+		n = obj_to_sheep(e, nr, oid, i);
+
+		snprintf(name, sizeof(name), "%d.%d.%d.%d",
+			 e[n].addr[12], e[n].addr[13],
+			 e[n].addr[14], e[n].addr[15]);
+
+		fd = connect_to(name, e[n].port);
+		if (fd < 0)
+			continue;
+
+		memcpy(&hdr2, hdr, sizeof(hdr2));
+
+		if (hdr->flags & SD_FLAG_CMD_WRITE) {
+			wlen = hdr->data_length;
+			rlen = 0;
+		} else {
+			wlen = 0;
+			rlen = hdr->data_length;
+		}
+
+		hdr2.flags |= SD_FLAG_CMD_FORWARD;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr2, req->data, &wlen, &rlen);
+	}
+
+	return 0;
+}
+
 static int check_epoch(struct cluster_info *cluster, struct request *req)
 {
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
@@ -209,6 +255,16 @@ void store_queue_request(struct work *work, int idx)
 		ret = check_epoch(cluster, req);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
+	}
+
+	if (opcode == SD_OP_STAT_SHEEP) {
+		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free);
+		goto out;
+	}
+
+	if (!(hdr->flags & SD_FLAG_CMD_FORWARD)) {
+		ret = forward_obj_req(cluster, req);
+		goto out;
 	}
 
 	switch (opcode) {
@@ -321,9 +377,6 @@ void store_queue_request(struct work *work, int idx)
 			else
 				ret = SD_RES_UNKNOWN;
 		}
-		break;
-	case SD_OP_STAT_SHEEP:
-		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free);
 		break;
 	}
 out:

@@ -344,6 +344,8 @@ int write_object(struct sheepdog_node_list_entry *e,
 	uint16_t vosts[3];
 	char name[128];
 
+	nr = 1;
+
 	for (i = 0; i < nr; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
