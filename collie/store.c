@@ -25,6 +25,8 @@
 #define ANAME_COPIES "user.sheepdog.copies"
 #define ANAME_CURRENT "user.sheepdog.current"
 
+#define VDI_PATH "vdi"
+
 static char *obj_dir;
 static char *mnt_dir;
 static char *zero_block;
@@ -403,7 +405,7 @@ static int so_read_vdis(struct request *req)
 	struct sheepdog_dir_entry *sde = req->data;
 
 	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s/vdi", obj_dir);
+	snprintf(path, sizeof(path), "%s/" VDI_PATH, obj_dir);
 
 	dir = opendir(path);
 	if (!dir)
@@ -485,7 +487,7 @@ static int so_lookup_vdi(struct request *req)
 	char path[1024];
 
 	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s/vdi/", obj_dir);
+	snprintf(path, sizeof(path), "%s/" VDI_PATH "/", obj_dir);
 	strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
 
 	dprintf("%s, %x\n", path, hdr->tag);
@@ -569,7 +571,7 @@ void so_queue_request(struct work *work, int idx)
 		goto out;
 
 	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s/vdi", obj_dir);
+	snprintf(path, sizeof(path), "%s/" VDI_PATH, obj_dir);
 
 	switch (opcode) {
 	case SD_OP_SO:
