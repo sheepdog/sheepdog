@@ -343,7 +343,7 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
 		ret = add_vdi(ci, data, strlen(data), hdr->vdi_size, &oid,
-			      hdr->base_oid, hdr->tag);
+			      hdr->base_oid, hdr->tag, hdr->copies);
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
@@ -415,8 +415,10 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_UPDATE_EPOCH:
 		break;
 	case SD_OP_MAKE_FS:
-		if (ret == SD_RES_SUCCESS)
+		if (ret == SD_RES_SUCCESS) {
 			ci->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
+			eprintf("%d\n", ci->nr_sobjs);
+		}
 
 		break;
 	default:
@@ -517,8 +519,6 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 
 	queue_work(&w->work);
 }
-
-extern int nr_sobjs;
 
 static void __sd_confch(struct work *work, int idx)
 {

@@ -81,13 +81,12 @@ static int create_inode_obj(struct sheepdog_node_list_entry *entries,
  * TODO: handle larger buffer
  */
 int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
-	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag)
+	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 	int nr_nodes, nr_reqs;
 	uint64_t oid = 0;
 	int ret;
-	int copies;
 	struct sd_so_req req;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req;
 
@@ -98,19 +97,16 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
 		base_oid);
 
-	req.opcode = SD_OP_SO_STAT;
-	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0,
-			nr_nodes, 1);
-	if (ret < 0)
-		return rsp->result;
-
-	copies = rsp->copies;
-	nr_reqs = copies;
+	nr_reqs = ci->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 
 	memset(&req, 0, sizeof(req));
+
+	eprintf("%d %d\n", copies, ci->nr_sobjs);
+	/* qemu doesn't specify the copies, then we use the default. */
+	if (!copies)
+		copies = ci->nr_sobjs;
 
 	req.opcode = SD_OP_SO_NEW_VDI;
 	req.copies = copies;
@@ -145,7 +141,7 @@ int lookup_vdi(struct cluster_info *ci,
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 	int nr_nodes, nr_reqs;
-	int ret, copies;
+	int ret;
 	struct sd_so_req req;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req;
 
@@ -157,15 +153,7 @@ int lookup_vdi(struct cluster_info *ci,
 
 	dprintf("looking for %s %zd\n", filename, strlen(filename));
 
-	req.opcode = SD_OP_SO_STAT;
-	ret = exec_reqs(entries, nr_nodes, ci->epoch,
-			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0,
-			nr_nodes, 1);
-	if (ret < 0)
-		return rsp->result;
-
-	copies = rsp->copies;
-	nr_reqs = copies;
+	nr_reqs = ci->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 

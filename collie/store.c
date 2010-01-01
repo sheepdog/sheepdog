@@ -155,8 +155,7 @@ static int forward_obj_req(struct cluster_info *cluster, struct request *req)
 
 	nr = build_node_list(&cluster->node_list, e);
 
-/* 	nr = hdr->copies; */
-	nr = 3;
+	nr = hdr->copies;
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);

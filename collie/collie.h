@@ -78,7 +78,7 @@ int init_store(char *dir);
 
 int add_vdi(struct cluster_info *cluster,
 	    char *name, int len, uint64_t size, uint64_t * added_oid,
-	    uint64_t base_oid, uint32_t tag);
+	    uint64_t base_oid, uint32_t tag, int copies);
 
 int lookup_vdi(struct cluster_info *cluster, char *filename, uint64_t * oid,
 	       uint32_t tag, int do_lock, int *current);
@@ -95,5 +95,7 @@ void so_queue_request(struct work *work, int idx);
 void store_queue_request(struct work *work, int idx);
 
 void cluster_queue_request(struct work *work, int idx);
+
+extern int nr_sobjs;
 
 #endif

@@ -170,7 +170,8 @@ struct sd_vdi_req {
 	uint64_t        base_oid;
 	uint64_t        tag;
 	uint64_t	vdi_size;
-	uint32_t        pad[2];
+	uint32_t	copies;
+	uint32_t        pad[1];
 };
 
 struct sd_vdi_rsp {
