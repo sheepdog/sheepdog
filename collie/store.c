@@ -159,6 +159,10 @@ again:
 
 	nr = hdr->copies;
 
+	/* temporary hack */
+	if (!nr)
+		nr = cluster->nr_sobjs;
+
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
