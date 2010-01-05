@@ -32,6 +32,7 @@ static char *mnt_path;
 static char *zero_block;
 
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
+static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 int nr_sobjs;
 
@@ -229,7 +230,7 @@ static int ob_open(uint64_t oid, int aflags, int *ret)
 
 	snprintf(path, sizeof(path), "%s%" PRIx64, obj_path, oid);
 
-	fd = open(path, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		if (errno == ENOENT)
 			*ret = SD_RES_NO_OBJ;
@@ -581,8 +582,7 @@ void so_queue_request(struct work *work, int idx)
 
 	switch (opcode) {
 	case SD_OP_SO:
-		ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
-			    S_IWGRP | S_IXGRP);
+		ret = mkdir(path, def_dmode);
 		if (ret && errno != EEXIST) {
 			result = SD_RES_EIO;
 			goto out;
@@ -628,8 +628,7 @@ void so_queue_request(struct work *work, int idx)
 		if (hdr->tag)
 			;
 		else {
-			ret = mkdir(path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
-				    S_IWGRP | S_IXGRP);
+			ret = mkdir(path, def_dmode);
 			if (ret) {
 				eprintf("%m\n");
 				result = SD_RES_EIO;
@@ -648,7 +647,7 @@ void so_queue_request(struct work *work, int idx)
 
 		snprintf(path+ strlen(path), sizeof(path) - strlen(path),
 			 "/%016lx-%08x", last_oid, hdr->tag);
-		ret = creat(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+		ret = creat(path, def_fmode);
 		if (ret < 0) {
 			eprintf("%m\n");
 			result = SD_RES_EIO;
