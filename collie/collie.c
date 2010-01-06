@@ -96,11 +96,11 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	dobj_queue = init_worker(DATA_OBJ_NR_WORKER_THREAD);
+	dobj_queue = init_work_queue(DATA_OBJ_NR_WORKER_THREAD);
 	if (!dobj_queue)
 		exit(1);
 
-	group_queue = init_worker(GROUP_OBJ_NR_WORKER_THREAD);
+	group_queue = init_work_queue(GROUP_OBJ_NR_WORKER_THREAD);
 	if (!group_queue)
 		exit(1);
 

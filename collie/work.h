@@ -17,8 +17,8 @@ struct work {
 	work_func_t done;
 };
 
-struct work_queue *init_worker(int nr);
-void exit_worker(struct work_queue *q);
+struct work_queue *init_work_queue(int nr);
+void exit_work_queue(struct work_queue *q);
 void queue_work(struct work_queue *q, struct work *work);
 
 #endif

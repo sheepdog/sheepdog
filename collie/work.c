@@ -171,7 +171,7 @@ static int init_signalfd(void)
 	return 0;
 }
 
-struct work_queue *init_worker(int nr)
+struct work_queue *init_work_queue(int nr)
 {
 	int i, ret;
 	struct worker_info *wi;
@@ -230,7 +230,7 @@ destroy_threads:
 	return NULL;
 }
 
-void exit_worker(struct work_queue *q)
+void exit_work_queue(struct work_queue *q)
 {
 	int i;
 	struct worker_info *wi = container_of(q, struct worker_info, q);
