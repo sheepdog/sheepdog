@@ -331,7 +331,7 @@ static void update_cluster_info(struct cluster_info *ci,
 	ci->synchronized = 1;
 
 	/* we are ready for object operations */
-	update_epoch_store(ci->epoch);
+	update_epoch_store(ci, ci->epoch);
 	resume_work_queue(dobj_queue);
 out:
 	wait_work_queue_inactive(dobj_queue);
@@ -347,7 +347,7 @@ out:
 
 	ci->epoch++;
 
-	update_epoch_store(ci->epoch);
+	update_epoch_store(ci, ci->epoch);
 
 	resume_work_queue(dobj_queue);
 

@@ -96,7 +96,7 @@ void store_queue_request(struct work *work, int idx);
 
 void cluster_queue_request(struct work *work, int idx);
 
-int update_epoch_store(uint32_t epoch);
+int update_epoch_store(struct cluster_info *cluster, uint32_t epoch);
 
 extern int nr_sobjs;
 

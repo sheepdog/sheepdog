@@ -157,18 +157,19 @@ static int forward_obj_req(struct cluster_info *cluster, struct request *req)
 	struct sheepdog_node_list_entry *e;
 	struct sd_obj_req hdr2;
 	uint64_t oid = hdr->oid;
+	int copies;
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
 	nr = build_node_list(&cluster->node_list, e);
 
-	nr = hdr->copies;
+	copies = hdr->copies;
 
 	/* temporary hack */
-	if (!nr)
-		nr = cluster->nr_sobjs;
+	if (!copies)
+		copies = cluster->nr_sobjs;
 
-	for (i = 0; i < nr; i++) {
+	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
 		snprintf(name, sizeof(name), "%d.%d.%d.%d",
@@ -244,12 +245,64 @@ static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 	return fd;
 }
 
-int update_epoch_store(uint32_t epoch)
+static int is_my_obj(struct cluster_info *ci, uint64_t oid, int copies)
 {
-	char path[1024];
+	int i, n, nr;
+	struct sheepdog_node_list_entry e[SD_MAX_NODES];
 
-	snprintf(path, sizeof(path), "%s%08u/", obj_path, epoch);
-	return mkdir(path, def_dmode);
+	nr = build_node_list(&ci->node_list, e);
+
+	for (i = 0; i < copies; i++) {
+		n = obj_to_sheep(e, nr, oid, i);
+		if (e[n].id == ci->this_node.id)
+			return 1;
+	}
+
+	return 0;
+}
+
+int update_epoch_store(struct cluster_info *ci, uint32_t epoch)
+{
+	int ret;
+	char new[1024], old[1024];
+	struct stat s;
+	DIR *dir;
+	struct dirent *d;
+	uint64_t oid;
+
+	snprintf(new, sizeof(new), "%s%08u/", obj_path, epoch);
+	mkdir(new, def_dmode);
+
+	snprintf(old, sizeof(old), "%s%08u/", obj_path, epoch - 1);
+
+	ret = stat(old, &s);
+	if (ret)
+		return 0;
+
+	dir = opendir(old);
+	if (!dir) {
+		eprintf("%s, %s, %m\n", old, new);
+		return 1;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		oid = strtoull(d->d_name, NULL, 16);
+		/* TODO: use proper object coipes */
+		if (is_my_obj(ci, oid, ci->nr_sobjs)) {
+			snprintf(new, sizeof(new), "%s%08u/%s", obj_path, epoch,
+				d->d_name);
+			snprintf(old, sizeof(old), "%s%08u/%s", obj_path, epoch - 1,
+				d->d_name);
+			link(old, new);
+		}
+	}
+
+	closedir(dir);
+
+	return 0;
 }
 
 void store_queue_request(struct work *work, int idx)
