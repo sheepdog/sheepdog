@@ -329,6 +329,8 @@ static void update_cluster_info(struct cluster_info *ci,
 
 	ci->epoch = msg->epoch;
 	ci->synchronized = 1;
+	/* we are ready for object operations */
+	resume_work_queue(dobj_queue);
 out:
 	add_node(ci, msg->nodeid, msg->pid, &msg->header.from);
 
@@ -547,8 +549,10 @@ static void __sd_confch(struct work *work, int idx)
 
 	if (member_list_entries == joined_list_entries - left_list_entries &&
 	    ci->this_nodeid == member_list[0].nodeid &&
-	    ci->this_pid == member_list[0].pid)
+	    ci->this_pid == member_list[0].pid) {
 		ci->synchronized = 1;
+		resume_work_queue(dobj_queue);
+	}
 
 	for (i = 0; i < left_list_entries; i++) {
 		list_for_each_entry_safe(node, e, &ci->node_list, list) {

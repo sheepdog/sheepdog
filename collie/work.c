@@ -43,6 +43,12 @@ extern int signalfd(int fd, const sigset_t *mask, int flags);
 static int sig_fd;
 static LIST_HEAD(worker_info_list);
 
+enum wq_state {
+	WQ_INACTIVE,
+	WQ_ACTIVE,
+	WQ_DEAD,
+};
+
 struct worker_info {
 	struct list_head worker_info_siblings;
 
@@ -58,13 +64,28 @@ struct worker_info {
 	/* protected by pending_lock */
 
 	struct work_queue q;
+	int wq_state;
 
 	pthread_mutex_t startup_lock;
 
-	int stop;
-
 	pthread_t worker_thread[0];
 };
+
+void kill_work_queue(struct work_queue *q)
+{
+	struct worker_info *wi = container_of(q, struct worker_info, q);
+
+	wi->wq_state = WQ_DEAD;
+}
+
+void resume_work_queue(struct work_queue *q)
+{
+	struct worker_info *wi = container_of(q, struct worker_info, q);
+
+	wi->wq_state = WQ_ACTIVE;
+
+	pthread_cond_signal(&wi->pending_cond);
+}
 
 static void bs_thread_request_done(int fd, int events, void *data)
 {
@@ -113,12 +134,12 @@ static void *worker_routine(void *arg)
 	dprintf("started this thread %d\n", idx);
 	pthread_mutex_unlock(&wi->startup_lock);
 
-	while (!wi->stop) {
+	while (wi->wq_state != WQ_DEAD) {
 		pthread_mutex_lock(&wi->pending_lock);
 retest:
-		if (list_empty(&wi->q.pending_list)) {
+		if (list_empty(&wi->q.pending_list) || wi->wq_state != WQ_ACTIVE) {
 			pthread_cond_wait(&wi->pending_cond, &wi->pending_lock);
-			if (wi->stop) {
+			if (wi->wq_state == WQ_DEAD) {
 				pthread_mutex_unlock(&wi->pending_lock);
 				pthread_exit(NULL);
 			}
@@ -185,6 +206,7 @@ struct work_queue *init_work_queue(int nr)
 		return NULL;
 
 	wi->nr_threads = nr;
+	wi->wq_state = WQ_INACTIVE;
 
 	INIT_LIST_HEAD(&wi->q.pending_list);
 	INIT_LIST_HEAD(&wi->finished_list);
@@ -214,7 +236,7 @@ struct work_queue *init_work_queue(int nr)
 	return &wi->q;
 destroy_threads:
 
-	wi->stop = 1;
+	kill_work_queue(&wi->q);
 	pthread_mutex_unlock(&wi->startup_lock);
 	for (; i > 0; i--) {
 		pthread_join(wi->worker_thread[i - 1], NULL);
@@ -235,7 +257,7 @@ void exit_work_queue(struct work_queue *q)
 	int i;
 	struct worker_info *wi = container_of(q, struct worker_info, q);
 
-	wi->stop = 1;
+	kill_work_queue(q);
 	pthread_cond_broadcast(&wi->pending_cond);
 
 	for (i = 0; wi->worker_thread[i] &&
@@ -246,8 +268,6 @@ void exit_work_queue(struct work_queue *q)
 	pthread_mutex_destroy(&wi->pending_lock);
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
-
-	wi->stop = 0;
 }
 
 void queue_work(struct work_queue *q, struct work *work)

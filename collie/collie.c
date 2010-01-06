@@ -103,6 +103,7 @@ int main(int argc, char **argv)
 	group_queue = init_work_queue(GROUP_OBJ_NR_WORKER_THREAD);
 	if (!group_queue)
 		exit(1);
+	resume_work_queue(group_queue);
 
 	ci = create_cluster(port);
 	if (!ci) {
