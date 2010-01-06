@@ -224,13 +224,13 @@ static int check_epoch(struct cluster_info *cluster, struct request *req)
 	return ret;
 }
 
-static int ob_open(uint64_t oid, int aflags, int *ret)
+static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 {
 	char path[1024];
 	int flags = O_RDWR | aflags;
 	int fd;
 
-	snprintf(path, sizeof(path), "%s%" PRIx64, obj_path, oid);
+	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path, epoch, oid);
 
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
@@ -242,6 +242,14 @@ static int ob_open(uint64_t oid, int aflags, int *ret)
 		*ret = 0;
 
 	return fd;
+}
+
+int update_epoch_store(uint32_t epoch)
+{
+	char path[1024];
+
+	snprintf(path, sizeof(path), "%s%08u/", obj_path, epoch);
+	return mkdir(path, def_dmode);
 }
 
 void store_queue_request(struct work *work, int idx)
@@ -291,9 +299,9 @@ void store_queue_request(struct work *work, int idx)
 	case SD_OP_SYNC_OBJ:
 
 		if (opcode == SD_OP_CREATE_AND_WRITE_OBJ)
-			fd = ob_open(oid, O_CREAT, &ret);
+			fd = ob_open(req_epoch, oid, O_CREAT, &ret);
 		else
-			fd = ob_open(oid, 0, &ret);
+			fd = ob_open(req_epoch, oid, 0, &ret);
 
 		if (fd < 0)
 			goto out;
@@ -725,7 +733,7 @@ int epoch_log_write(uint32_t epoch, char *buf, int len)
 	int fd, ret;
 	char path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s%x", epoch_path, epoch);
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDWR | O_CREAT |O_SYNC, def_fmode);
 	if (fd < 0)
 		return -1;
@@ -745,7 +753,7 @@ int epoch_log_read(uint32_t epoch, char *buf, int len)
 	int fd;
 	char path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s%x", epoch_path, epoch);
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDONLY);
 	if (fd < 0)
 		return -1;

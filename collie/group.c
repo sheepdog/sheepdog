@@ -329,7 +329,9 @@ static void update_cluster_info(struct cluster_info *ci,
 
 	ci->epoch = msg->epoch;
 	ci->synchronized = 1;
+
 	/* we are ready for object operations */
+	update_epoch_store(ci->epoch);
 	resume_work_queue(dobj_queue);
 out:
 	wait_work_queue_inactive(dobj_queue);
@@ -344,6 +346,9 @@ out:
 		eprintf("can't write epoch %u\n", ci->epoch + 1);
 
 	ci->epoch++;
+
+	update_epoch_store(ci->epoch);
+
 	resume_work_queue(dobj_queue);
 
 	print_node_list(ci);
