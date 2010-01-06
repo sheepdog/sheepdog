@@ -261,7 +261,6 @@ static void add_node(struct cluster_info *ci, uint32_t nodeid, uint32_t pid,
 	node->pid = pid;
 	node->ent = *sd_ent;
 	list_add_tail(&node->list, &ci->node_list);
-	ci->epoch++;
 }
 
 static int is_master(struct cluster_info *ci)
@@ -308,8 +307,9 @@ static void update_cluster_info(struct cluster_info *ci,
 				struct join_message *msg)
 {
 	int i;
-	int nr_nodes = msg->nr_nodes;
+	int ret, nr_nodes = msg->nr_nodes;
 	struct node *node, *e;
+	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 
 	if (!ci->nr_sobjs)
 		ci->nr_sobjs = msg->nr_sobjs;
@@ -331,6 +331,16 @@ static void update_cluster_info(struct cluster_info *ci,
 	ci->synchronized = 1;
 out:
 	add_node(ci, msg->nodeid, msg->pid, &msg->header.from);
+
+	nr_nodes = build_node_list(&ci->node_list, entry);
+
+	ret = epoch_log_write(ci->epoch + 1, (char *)entry,
+			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+	if (ret < 0)
+		eprintf("can't write epoch %u\n", ci->epoch + 1);
+
+	ci->epoch++;
+
 	print_node_list(ci);
 }
 
@@ -515,7 +525,10 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	w->work.fn = __sd_deliver;
 	w->work.done = __sd_deliver_done;
 
-	queue_work(dobj_queue, &w->work);
+	if (m->op == SD_MSG_JOIN)
+		queue_work(group_queue, &w->work);
+	else
+		queue_work(dobj_queue, &w->work);
 }
 
 static void __sd_confch(struct work *work, int idx)
@@ -539,12 +552,23 @@ static void __sd_confch(struct work *work, int idx)
 
 	for (i = 0; i < left_list_entries; i++) {
 		list_for_each_entry_safe(node, e, &ci->node_list, list) {
+			int nr;
+			unsigned pid;
+			struct sheepdog_node_list_entry e[SD_MAX_NODES];
+
 			if (node->nodeid != left_list[i].nodeid ||
 			    node->pid != left_list[i].pid)
 				continue;
 
+			pid = node->pid;
+
 			list_del(&node->list);
 			free(node);
+
+			nr = build_node_list(&ci->node_list, e);
+			epoch_log_write(ci->epoch + 1, (char *)e,
+					nr * sizeof(struct sheepdog_node_list_entry));
+
 			ci->epoch++;
 		}
 	}

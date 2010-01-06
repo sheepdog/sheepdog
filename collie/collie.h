@@ -105,4 +105,7 @@ extern struct work_queue *dobj_queue;
 #define GROUP_OBJ_NR_WORKER_THREAD 1
 extern struct work_queue *group_queue;
 
+int epoch_log_write(uint32_t epoch, char *buf, int len);
+int epoch_log_read(uint32_t epoch, char *buf, int len);
+
 #endif

@@ -27,6 +27,7 @@
 
 static char *vdi_path;
 static char *obj_path;
+static char *epoch_path;
 static char *mnt_path;
 
 static char *zero_block;
@@ -719,6 +720,43 @@ out:
 		close(fd);
 }
 
+int epoch_log_write(uint32_t epoch, char *buf, int len)
+{
+	int fd, ret;
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "%s%x", epoch_path, epoch);
+	fd = open(path, O_RDWR | O_CREAT |O_SYNC, def_fmode);
+	if (fd < 0)
+		return -1;
+
+	ret = write(fd, buf, len);
+
+	close(fd);
+
+	if (ret != len)
+		return -1;
+
+	return 0;
+}
+
+int epoch_log_read(uint32_t epoch, char *buf, int len)
+{
+	int fd;
+	char path[PATH_MAX];
+
+	snprintf(path, sizeof(path), "%s%x", epoch_path, epoch);
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	len = read(fd, buf, len);
+
+	close(fd);
+
+	return len;
+}
+
 static int init_path(char *d, int *new)
 {
 	int ret, retry = 0;
@@ -797,10 +835,22 @@ static int init_obj_path(char *base_path)
 {
 	int new;
 
-	obj_path = zalloc(strlen(base_path) + strlen(OBJ_PATH) + 2);
+	obj_path = zalloc(strlen(base_path) + strlen(OBJ_PATH) + 1);
 	sprintf(obj_path, "%s" OBJ_PATH, base_path);
 
 	return init_path(obj_path, &new);
+}
+
+#define EPOCH_PATH "/epoch/"
+
+static int init_epoch_path(char *base_path)
+{
+	int new;
+
+	epoch_path = zalloc(strlen(base_path) + strlen(EPOCH_PATH) + 1);
+	sprintf(epoch_path, "%s" EPOCH_PATH, base_path);
+
+	return init_path(epoch_path, &new);
 }
 
 static int init_mnt_path(char *base_path)
@@ -847,6 +897,10 @@ int init_store(char *d)
 		return ret;
 
 	ret = init_obj_path(d);
+	if (ret)
+		return ret;
+
+	ret = init_epoch_path(d);
 	if (ret)
 		return ret;
 
