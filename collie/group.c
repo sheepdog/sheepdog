@@ -85,6 +85,8 @@ struct work_confch {
 	struct work work;
 };
 
+struct work_queue *group_queue;
+
 static int node_cmp(const void *a, const void *b)
 {
 	const struct sheepdog_node_list_entry *node1 = a;
@@ -633,7 +635,7 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 	w->work.fn = __sd_confch;
 	w->work.done = __sd_confch_done;
 
-	queue_work(dobj_queue, &w->work);
+	queue_work(group_queue, &w->work);
 
 	return;
 err:

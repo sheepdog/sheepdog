@@ -101,4 +101,8 @@ extern int nr_sobjs;
 #define DATA_OBJ_NR_WORKER_THREAD 4
 extern struct work_queue *dobj_queue;
 
+/* all works are serialized */
+#define GROUP_OBJ_NR_WORKER_THREAD 1
+extern struct work_queue *group_queue;
+
 #endif
