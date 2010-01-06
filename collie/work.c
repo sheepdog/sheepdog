@@ -62,9 +62,10 @@ struct worker_info {
 	/* locked by tgtd and workers */
 	pthread_mutex_t pending_lock;
 	/* protected by pending_lock */
-
 	struct work_queue q;
 	int wq_state;
+	int nr_active;
+	pthread_cond_t active_cond;
 
 	pthread_mutex_t startup_lock;
 
@@ -85,6 +86,25 @@ void resume_work_queue(struct work_queue *q)
 	wi->wq_state = WQ_ACTIVE;
 
 	pthread_cond_signal(&wi->pending_cond);
+}
+
+void wait_work_queue_inactive(struct work_queue *q)
+{
+	struct worker_info *wi = container_of(q, struct worker_info, q);
+
+	wi->wq_state = WQ_INACTIVE;
+
+again:
+	pthread_mutex_lock(&wi->pending_lock);
+	if (wi->nr_active) {
+		pthread_cond_wait(&wi->active_cond, &wi->pending_lock);
+		if (!wi->nr_active) {
+			pthread_mutex_unlock(&wi->pending_lock);
+			return;
+		}
+		goto again;
+	}
+	pthread_mutex_unlock(&wi->pending_lock);
 }
 
 static void bs_thread_request_done(int fd, int events, void *data)
@@ -135,6 +155,7 @@ static void *worker_routine(void *arg)
 	pthread_mutex_unlock(&wi->startup_lock);
 
 	while (wi->wq_state != WQ_DEAD) {
+
 		pthread_mutex_lock(&wi->pending_lock);
 retest:
 		if (list_empty(&wi->q.pending_list) || wi->wq_state != WQ_ACTIVE) {
@@ -150,13 +171,17 @@ retest:
 				       struct work, w_list);
 
 		list_del(&work->w_list);
+		wi->nr_active++;
 		pthread_mutex_unlock(&wi->pending_lock);
 
 		work->fn(work, idx);
 
 		pthread_mutex_lock(&wi->finished_lock);
 		list_add_tail(&work->w_list, &wi->finished_list);
+		wi->nr_active--;
 		pthread_mutex_unlock(&wi->finished_lock);
+
+		pthread_cond_signal(&wi->active_cond);
 
 		kill(getpid(), SIGUSR2);
 	}
@@ -212,6 +237,8 @@ struct work_queue *init_work_queue(int nr)
 	INIT_LIST_HEAD(&wi->finished_list);
 
 	pthread_cond_init(&wi->pending_cond, NULL);
+
+	pthread_cond_init(&wi->active_cond, NULL);
 
 	pthread_mutex_init(&wi->finished_lock, NULL);
 	pthread_mutex_init(&wi->pending_lock, NULL);

@@ -332,6 +332,8 @@ static void update_cluster_info(struct cluster_info *ci,
 	/* we are ready for object operations */
 	resume_work_queue(dobj_queue);
 out:
+	wait_work_queue_inactive(dobj_queue);
+
 	add_node(ci, msg->nodeid, msg->pid, &msg->header.from);
 
 	nr_nodes = build_node_list(&ci->node_list, entry);
@@ -342,6 +344,7 @@ out:
 		eprintf("can't write epoch %u\n", ci->epoch + 1);
 
 	ci->epoch++;
+	resume_work_queue(dobj_queue);
 
 	print_node_list(ci);
 }
