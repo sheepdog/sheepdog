@@ -25,11 +25,13 @@
 #define ANAME_COPIES "user.sheepdog.copies"
 #define ANAME_CURRENT "user.sheepdog.current"
 
-#define VDI_PATH "vdi"
+static char *vdi_path;
+static char *obj_path;
+static char *mnt_path;
 
-static char *obj_dir;
-static char *mnt_dir;
 static char *zero_block;
+
+static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 
 int nr_sobjs;
 
@@ -43,11 +45,11 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 	struct stat s;
 	char path[1024];
 
-	ret = statvfs(mnt_dir, &vs);
+	ret = statvfs(mnt_path, &vs);
 	if (ret)
 		return SD_RES_EIO;
 
-	dir = opendir(obj_dir);
+	dir = opendir(obj_path);
 	if (!dir)
 		return SD_RES_EIO;
 
@@ -55,7 +57,7 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
 			continue;
 
-		snprintf(path, sizeof(path), "%s/%s", obj_dir, d->d_name);
+		snprintf(path, sizeof(path), "%s%s", obj_path, d->d_name);
 
 		ret = stat(path, &s);
 		if (ret)
@@ -225,7 +227,7 @@ static int ob_open(uint64_t oid, int aflags, int *ret)
 	int flags = O_RDWR | aflags;
 	int fd;
 
-	snprintf(path, sizeof(path), "%s/%" PRIx64, obj_dir, oid);
+	snprintf(path, sizeof(path), "%s%" PRIx64, obj_path, oid);
 
 	fd = open(path, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
 	if (fd < 0) {
@@ -255,11 +257,7 @@ void store_queue_request(struct work *work, int idx)
 	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
 	int copies;
 
-	/* use le_to_cpu */
-
-	snprintf(path, sizeof(path), "%s/%" PRIx64, obj_dir, oid);
-
-	dprintf("%d, %x, %s, %u, %u\n", idx, opcode, path, epoch, req_epoch);
+	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
 
 	if (list_empty(&cluster->node_list)) {
 		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
@@ -351,6 +349,7 @@ void store_queue_request(struct work *work, int idx)
 
 	switch (opcode) {
 	case SD_OP_REMOVE_OBJ:
+		snprintf(path, sizeof(path), "%s%" PRIx64, obj_path, oid);
 		ret = unlink(path);
 		if (ret)
 			ret = 1;
@@ -397,9 +396,8 @@ void store_queue_request(struct work *work, int idx)
 	}
 out:
 	if (ret != SD_RES_SUCCESS) {
-		dprintf("failed, %d, %d, %x, %s, %u, %u\n", ret, idx, opcode,
-			path, epoch, req_epoch);
-
+		dprintf("failed, %d, %x, %" PRIx64" , %u, %u\n",
+			idx, opcode, oid, epoch, req_epoch);
 		rsp->result = ret;
 	}
 
@@ -415,13 +413,10 @@ static int so_read_vdis(struct request *req)
 	char *p;
 	int fd, ret;
 	uint64_t coid;
-	char path[1024], vpath[1024];
+	char vpath[1024];
 	struct sheepdog_dir_entry *sde = req->data;
 
-	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s/" VDI_PATH, obj_dir);
-
-	dir = opendir(path);
+	dir = opendir(vdi_path);
 	if (!dir)
 		return SD_RES_NO_SUPER_OBJ;
 
@@ -430,9 +425,7 @@ static int so_read_vdis(struct request *req)
 		    !strcmp(dent->d_name, ".."))
 			continue;
 
-		memcpy(vpath, path, sizeof(vpath));
-		snprintf(vpath + strlen(vpath), sizeof(vpath) - strlen(vpath),
-			 "/%s", dent->d_name);
+		snprintf(vpath, sizeof(vpath), "%s%s", vdi_path, dent->d_name);
 
 		fd = open(vpath, O_RDONLY);
 		if (fd < 0) {
@@ -444,7 +437,6 @@ static int so_read_vdis(struct request *req)
 				sizeof(coid));
 		if (ret != sizeof(coid)) {
 			close(fd);
-			eprintf("%s, %m\n", path);
 			return SD_RES_EIO;
 		}
 
@@ -501,7 +493,7 @@ static int so_lookup_vdi(struct request *req)
 	char path[1024];
 
 	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s/" VDI_PATH "/", obj_dir);
+	snprintf(path, sizeof(path), "%s", vdi_path);
 	strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
 
 	dprintf("%s, %x\n", path, hdr->tag);
@@ -585,7 +577,7 @@ void so_queue_request(struct work *work, int idx)
 		goto out;
 
 	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s/" VDI_PATH, obj_dir);
+	snprintf(path, sizeof(path), "%s", vdi_path);
 
 	switch (opcode) {
 	case SD_OP_SO:
@@ -727,69 +719,100 @@ out:
 		close(fd);
 }
 
-int init_store(char *dir)
+static int init_path(char *d, int *new)
 {
-	int ret;
-	struct mntent *mnt;
-	struct stat s, ms;
-	FILE *fp;
-	char path[1024];
-
-	ret = stat(dir, &s);
+	int ret, retry = 0;
+	struct stat s;
+again:
+	ret = stat(d, &s);
 	if (ret) {
-		if (errno == ENOENT) {
-			ret = mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP |
-				    S_IWGRP | S_IXGRP);
-			if (ret) {
-				eprintf("can't create the object dir %s, %m\n",
-					dir);
-				return 1;
-			} else {
-				ret = stat(dir, &s);
-				if (ret)
-					return 1;
-
-				eprintf("created the object dir %s\n", dir);
-			}
-		} else {
-			eprintf("can't handle the object dir %s, %m\n", dir);
-			return 1;
-		}
-	} else {
-		if (!S_ISDIR(s.st_mode)) {
-			eprintf("%s is not a directory\n", dir);
+		if (retry || errno != ENOENT) {
+			eprintf("can't handle the dir %s, %m\n", d);
 			return 1;
 		}
 
-		memset(path, 0, sizeof(path));
-		strncpy(path, dir, sizeof(path));
-		strncat(path, "/" VDI_PATH, sizeof(path) - strlen(path));
-
-		ret = stat(path, &s);
+		ret = mkdir(d, def_dmode);
 		if (ret) {
-			if (errno != ENOENT)
-				return 1;
+			eprintf("can't create the dir %s, %m\n", d);
+			return 1;
 		} else {
-			int fd, copies = 0;
-
-			/* we need to recover the super object here. */
-
-			fd = open(path, O_RDONLY);
-			if (fd < 0)
-				return 1;
-
-			ret = fgetxattr(fd, ANAME_COPIES, &copies, sizeof(copies));
-
-			close(fd);
-
-			if (ret != sizeof(copies))
-				return 1;
-
-			nr_sobjs = copies;
+			*new = 1;
+			retry++;
+			goto again;
 		}
 	}
 
-	obj_dir = dir;
+	if (!S_ISDIR(s.st_mode)) {
+		eprintf("%s is not a directory\n", d);
+		return 1;
+	}
+
+	return 0;
+}
+
+static int init_base_path(char *d, int *new)
+{
+	return init_path(d, new);
+}
+
+#define VDI_PATH "/vdi/"
+
+static int init_vdi_path(char *base_path, int new)
+{
+	int ret;
+	struct stat s;
+
+	vdi_path = zalloc(strlen(base_path) + strlen(VDI_PATH) + 1);
+	sprintf(vdi_path, "%s" VDI_PATH, base_path);
+
+	ret = stat(vdi_path, &s);
+	if (ret) {
+		if (errno != ENOENT)
+			return 0;
+	} else if (!new) {
+		int fd, copies = 0;
+
+		/* we need to recover the super object here. */
+
+		fd = open(vdi_path, O_RDONLY);
+		if (fd < 0)
+			return 1;
+
+		ret = fgetxattr(fd, ANAME_COPIES, &copies, sizeof(copies));
+
+		close(fd);
+
+		if (ret != sizeof(copies))
+			return 1;
+
+		nr_sobjs = copies;
+	}
+
+	return 0;
+}
+
+#define OBJ_PATH "/obj/"
+
+static int init_obj_path(char *base_path)
+{
+	int new;
+
+	obj_path = zalloc(strlen(base_path) + strlen(OBJ_PATH) + 2);
+	sprintf(obj_path, "%s" OBJ_PATH, base_path);
+
+	return init_path(obj_path, &new);
+}
+
+static int init_mnt_path(char *base_path)
+{
+	int ret;
+	FILE *fp;
+	struct mntent *mnt;
+	struct stat s, ms;
+
+	ret = stat(base_path, &s);
+	if (ret)
+		return 1;
 
 	fp = setmntent(MOUNTED, "r");
 	if (!fp)
@@ -801,12 +824,35 @@ int init_store(char *dir)
 			continue;
 
 		if (ms.st_dev == s.st_dev) {
-			mnt_dir = strdup(mnt->mnt_dir);
+			mnt_path = strdup(mnt->mnt_dir);
 			break;
 		}
 	}
 
 	endmntent(fp);
+
+	return 0;
+}
+
+int init_store(char *d)
+{
+	int ret, new = 0;
+
+	ret = init_base_path(d, &new);
+	if (ret)
+		return ret;
+
+	ret = init_vdi_path(d, new);
+	if (ret)
+		return ret;
+
+	ret = init_obj_path(d);
+	if (ret)
+		return ret;
+
+	ret = init_mnt_path(d);
+	if (ret)
+		return ret;
 
 	zero_block = zalloc(SD_DATA_OBJ_SIZE * NR_WORKER_THREAD);
 	if (!zero_block)
