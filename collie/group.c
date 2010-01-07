@@ -592,6 +592,8 @@ static void __sd_confch(struct work *work, int idx)
 
 			ci->epoch++;
 
+			update_epoch_store(ci, ci->epoch);
+
 			resume_work_queue(dobj_queue);
 		}
 	}
