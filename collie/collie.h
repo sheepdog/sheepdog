@@ -68,6 +68,8 @@ struct cluster_info {
 	struct list_head node_list;
 	struct list_head vm_list;
 	struct list_head pending_list;
+
+	int nr_sobjs;
 };
 
 int create_listen_port(int port, void *data);

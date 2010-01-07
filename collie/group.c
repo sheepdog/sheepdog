@@ -50,6 +50,8 @@ struct join_message {
 	struct sheepdog_node_list_entry master_node;
 	uint32_t epoch;
 	uint32_t nr_nodes;
+	uint32_t nr_sobjs;
+	uint32_t pad;
 	struct {
 		uint32_t nodeid;
 		uint32_t pid;
@@ -287,7 +289,11 @@ static void join(struct cluster_info *ci, struct join_message *msg)
 	if (!is_master(ci))
 		return;
 
+	if (msg->nr_sobjs)
+		ci->nr_sobjs = msg->nr_sobjs;
+
 	msg->epoch = ci->epoch;
+	msg->nr_sobjs = ci->nr_sobjs;
 	list_for_each_entry(node, &ci->node_list, list) {
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
 		msg->nodes[msg->nr_nodes].pid = node->pid;
@@ -302,6 +308,9 @@ static void update_cluster_info(struct cluster_info *ci,
 	int i;
 	int nr_nodes = msg->nr_nodes;
 	struct node *node, *e;
+
+	if (!ci->nr_sobjs)
+		ci->nr_sobjs = msg->nr_sobjs;
 
 	if (ci->synchronized)
 		goto out;
@@ -318,7 +327,6 @@ static void update_cluster_info(struct cluster_info *ci,
 
 	ci->epoch = msg->epoch;
 	ci->synchronized = 1;
-
 out:
 	add_node(ci, msg->nodeid, msg->pid, &msg->header.from);
 	print_node_list(ci);
@@ -407,6 +415,9 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_UPDATE_EPOCH:
 		break;
 	case SD_OP_MAKE_FS:
+		if (ret == SD_RES_SUCCESS)
+			ci->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
+
 		break;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);
@@ -507,6 +518,8 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	queue_work(&w->work);
 }
 
+extern int nr_sobjs;
+
 static void __sd_confch(struct work *work, int idx)
 {
 	struct work_confch *w = container_of(work, struct work_confch, work);
@@ -549,6 +562,7 @@ static void __sd_confch(struct work *work, int idx)
 			msg.header.from = ci->this_node;
 			msg.nodeid = ci->this_nodeid;
 			msg.pid = ci->this_pid;
+			msg.nr_sobjs = nr_sobjs;
 
 			send_message(ci->handle, (struct message_header *)&msg);
 		}

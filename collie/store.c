@@ -31,6 +31,8 @@ static char *obj_dir;
 static char *mnt_dir;
 static char *zero_block;
 
+int nr_sobjs;
+
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 {
 	struct statvfs vs;
@@ -719,6 +721,7 @@ int init_store(char *dir)
 	struct mntent *mnt;
 	struct stat s, ms;
 	FILE *fp;
+	char path[1024];
 
 	ret = stat(dir, &s);
 	if (ret) {
@@ -740,9 +743,38 @@ int init_store(char *dir)
 			eprintf("can't handle the object dir %s, %m\n", dir);
 			return 1;
 		}
-	} else if (!S_ISDIR(s.st_mode)) {
-		eprintf("%s is not a directory\n", dir);
-		return 1;
+	} else {
+		if (!S_ISDIR(s.st_mode)) {
+			eprintf("%s is not a directory\n", dir);
+			return 1;
+		}
+
+		memset(path, 0, sizeof(path));
+		strncpy(path, dir, sizeof(path));
+		strncat(path, "/" VDI_PATH, sizeof(path) - strlen(path));
+
+		ret = stat(path, &s);
+		if (ret) {
+			if (errno != ENOENT)
+				return 1;
+		} else {
+			int fd, copies = 0;
+
+			/* we need to recover the super object here. */
+
+			fd = open(path, O_RDONLY);
+			if (fd < 0)
+				return 1;
+
+			ret = fgetxattr(fd, ANAME_COPIES, &copies, sizeof(copies));
+
+			close(fd);
+
+			if (ret != sizeof(copies))
+				return 1;
+
+			nr_sobjs = copies;
+		}
 	}
 
 	obj_dir = dir;
