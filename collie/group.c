@@ -593,8 +593,8 @@ static void __sd_confch(struct work *work, int idx)
 	}
 
 	for (i = 0; i < joined_list_entries; i++) {
-		if (ci->this_nodeid == joined_list[0].nodeid &&
-		    ci->this_pid == joined_list[0].pid) {
+		if (ci->this_nodeid == joined_list[i].nodeid &&
+		    ci->this_pid == joined_list[i].pid) {
 			struct join_message msg;
 
 			msg.header.op = SD_MSG_JOIN;
@@ -606,6 +606,7 @@ static void __sd_confch(struct work *work, int idx)
 			msg.nr_sobjs = nr_sobjs;
 
 			send_message(ci->handle, (struct message_header *)&msg);
+			break;
 		}
 	}
 
