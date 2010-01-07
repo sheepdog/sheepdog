@@ -330,6 +330,13 @@ static void update_cluster_info(struct cluster_info *ci,
 	ci->epoch = msg->epoch;
 	ci->synchronized = 1;
 
+	nr_nodes = build_node_list(&ci->node_list, entry);
+
+	ret = epoch_log_write(ci->epoch, (char *)entry,
+			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+	if (ret < 0)
+		eprintf("can't write epoch %u\n", ci->epoch);
+
 	/* we are ready for object operations */
 	update_epoch_store(ci, ci->epoch);
 	resume_work_queue(dobj_queue);
