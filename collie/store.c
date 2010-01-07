@@ -156,6 +156,7 @@ static int forward_obj_req(struct cluster_info *cluster, struct request *req)
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sheepdog_node_list_entry *e;
 	struct sd_obj_req hdr2;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr2;
 	uint64_t oid = hdr->oid;
 	int copies;
 
@@ -198,11 +199,24 @@ again:
 
 		if (ret) /* network errors */
 			goto again;
+
+		if (hdr->flags & SD_FLAG_CMD_WRITE) {
+			if (rsp->result != SD_RES_SUCCESS) {
+				free(e);
+				return rsp->result;
+			}
+		} else {
+			if (rsp->result == SD_RES_SUCCESS) {
+				memcpy(&req->rp, rsp, sizeof(req->rp));
+				free(e);
+				return SD_RES_SUCCESS;
+			}
+		}
 	}
 
 	free(e);
 
-	return 0;
+	return (hdr->flags & SD_FLAG_CMD_WRITE) ? SD_RES_SUCCESS: rsp->result;
 }
 
 static int check_epoch(struct cluster_info *cluster, struct request *req)
