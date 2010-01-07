@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <syscall.h>
 #include <sys/types.h>
 #include <linux/types.h>
@@ -39,8 +40,13 @@
 
 extern int signalfd(int fd, const sigset_t *mask, int flags);
 
+static int sig_fd;
+static LIST_HEAD(worker_info_list);
+
 struct worker_info {
-	pthread_t worker_thread[NR_WORKER_THREAD];
+	struct list_head worker_info_siblings;
+
+	int nr_threads;
 
 	pthread_mutex_t finished_lock;
 	struct list_head finished_list;
@@ -50,21 +56,20 @@ struct worker_info {
 	/* locked by tgtd and workers */
 	pthread_mutex_t pending_lock;
 	/* protected by pending_lock */
-	struct list_head pending_list;
+
+	struct work_queue q;
 
 	pthread_mutex_t startup_lock;
 
-	int sig_fd;
-
 	int stop;
-};
 
-static struct worker_info __wi;
+	pthread_t worker_thread[0];
+};
 
 static void bs_thread_request_done(int fd, int events, void *data)
 {
 	int ret;
-	struct worker_info *wi = data;
+	struct worker_info *wi;
 	struct work *work;
 	struct signalfd_siginfo siginfo[16];
 	LIST_HEAD(list);
@@ -73,25 +78,33 @@ static void bs_thread_request_done(int fd, int events, void *data)
 	if (ret <= 0)
 		return;
 
-	pthread_mutex_lock(&wi->finished_lock);
-	list_splice_init(&wi->finished_list, &list);
-	pthread_mutex_unlock(&wi->finished_lock);
+	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+		pthread_mutex_lock(&wi->finished_lock);
+		list_splice_init(&wi->finished_list, &list);
+		pthread_mutex_unlock(&wi->finished_lock);
 
-	while (!list_empty(&list)) {
-		work = list_first_entry(&list, struct work, w_list);
-		list_del(&work->w_list);
+		while (!list_empty(&list)) {
+			work = list_first_entry(&list, struct work, w_list);
+			list_del(&work->w_list);
 
-		work->done(work, 0);
+			work->done(work, 0);
+		}
 	}
 }
 
 static void *worker_routine(void *arg)
 {
-	struct worker_info *wi = &__wi;
+	struct worker_info *wi = arg;
 	struct work *work;
-	pthread_t *p = arg;
-	int idx = p - wi->worker_thread;
+	int i, idx = 0;
 	sigset_t set;
+
+	for (i = 0; i < ARRAY_SIZE(wi->worker_thread); i++) {
+		if (wi->worker_thread[i] == pthread_self()) {
+			idx = i;
+			break;
+		}
+	}
 
 	sigfillset(&set);
 	sigprocmask(SIG_BLOCK, &set, NULL);
@@ -103,7 +116,7 @@ static void *worker_routine(void *arg)
 	while (!wi->stop) {
 		pthread_mutex_lock(&wi->pending_lock);
 retest:
-		if (list_empty(&wi->pending_list)) {
+		if (list_empty(&wi->q.pending_list)) {
 			pthread_cond_wait(&wi->pending_cond, &wi->pending_lock);
 			if (wi->stop) {
 				pthread_mutex_unlock(&wi->pending_lock);
@@ -112,7 +125,7 @@ retest:
 			goto retest;
 		}
 
-		work = list_first_entry(&wi->pending_list,
+		work = list_first_entry(&wi->q.pending_list,
 				       struct work, w_list);
 
 		list_del(&work->w_list);
@@ -130,13 +143,50 @@ retest:
 	pthread_exit(NULL);
 }
 
-int init_worker(void)
+static int init_signalfd(void)
+{
+	int ret;
+	sigset_t mask;
+	static int done = 0;
+
+	if (done++)
+		return 0;
+
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGUSR2);
+	sigprocmask(SIG_BLOCK, &mask, NULL);
+
+	sig_fd = signalfd(-1, &mask, 0);
+	if (sig_fd < 0) {
+		eprintf("failed to create a signal fd, %m\n");
+		return 1;
+	}
+
+	ret = fcntl(sig_fd, F_GETFL);
+	ret |= fcntl(sig_fd, F_SETFL, ret | O_NONBLOCK);
+
+	ret = register_event(sig_fd, bs_thread_request_done, NULL);
+
+
+	return 0;
+}
+
+struct work_queue *init_worker(int nr)
 {
 	int i, ret;
-	sigset_t mask;
-	struct worker_info *wi = &__wi;
+	struct worker_info *wi;
 
-	INIT_LIST_HEAD(&wi->pending_list);
+	ret = init_signalfd();
+	if (ret)
+		return NULL;
+
+	wi = zalloc(sizeof(*wi) + nr * sizeof(pthread_t));
+	if (!wi)
+		return NULL;
+
+	wi->nr_threads = nr;
+
+	INIT_LIST_HEAD(&wi->q.pending_list);
 	INIT_LIST_HEAD(&wi->finished_list);
 
 	pthread_cond_init(&wi->pending_cond, NULL);
@@ -145,29 +195,10 @@ int init_worker(void)
 	pthread_mutex_init(&wi->pending_lock, NULL);
 	pthread_mutex_init(&wi->startup_lock, NULL);
 
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGUSR2);
-	sigprocmask(SIG_BLOCK, &mask, NULL);
-
-	wi->sig_fd = signalfd(-1, &mask, 0);
-	if (wi->sig_fd < 0) {
-		eprintf("failed to create a signal fd, %m\n");
-		return 1;
-	}
-
-	ret = fcntl(wi->sig_fd, F_GETFL);
-	ret = fcntl(wi->sig_fd, F_SETFL, ret | O_NONBLOCK);
-
-	ret = register_event(wi->sig_fd, bs_thread_request_done, wi);
-	if (ret) {
-		eprintf("failed to add epoll event\n");
-		goto destroy_cond_mutex;
-	}
-
 	pthread_mutex_lock(&wi->startup_lock);
-	for (i = 0; i < NR_WORKER_THREAD; i++) {
+	for (i = 0; i < wi->nr_threads; i++) {
 		ret = pthread_create(&wi->worker_thread[i], NULL,
-				     worker_routine, &wi->worker_thread[i]);
+				     worker_routine, wi);
 
 		if (ret) {
 			eprintf("failed to create a worker thread, %d %s\n",
@@ -178,7 +209,9 @@ int init_worker(void)
 	}
 	pthread_mutex_unlock(&wi->startup_lock);
 
-	return 0;
+	list_add(&wi->worker_info_siblings, &worker_info_list);
+
+	return &wi->q;
 destroy_threads:
 
 	wi->stop = 1;
@@ -188,20 +221,19 @@ destroy_threads:
 		eprintf("stopped the worker thread %d\n", i - 1);
 	}
 
-	unregister_event(wi->sig_fd);
-destroy_cond_mutex:
+/* destroy_cond_mutex: */
 	pthread_cond_destroy(&wi->pending_cond);
 	pthread_mutex_destroy(&wi->pending_lock);
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
 
-	return 1;
+	return NULL;
 }
 
-void exit_worker(void)
+void exit_worker(struct work_queue *q)
 {
 	int i;
-	struct worker_info *wi = &__wi;
+	struct worker_info *wi = container_of(q, struct worker_info, q);
 
 	wi->stop = 1;
 	pthread_cond_broadcast(&wi->pending_cond);
@@ -215,18 +247,16 @@ void exit_worker(void)
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
 
-	unregister_event(wi->sig_fd);
-
 	wi->stop = 0;
 }
 
-void queue_work(struct work *work)
+void queue_work(struct work_queue *q, struct work *work)
 {
-	struct worker_info *wi = &__wi;
+	struct worker_info *wi = container_of(q, struct worker_info, q);
 
 	pthread_mutex_lock(&wi->pending_lock);
 
-	list_add_tail(&work->w_list, &wi->pending_list);
+	list_add_tail(&work->w_list, &wi->q.pending_list);
 
 	pthread_mutex_unlock(&wi->pending_lock);
 

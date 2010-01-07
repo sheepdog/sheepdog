@@ -75,7 +75,7 @@ static void queue_request(struct request *req)
 
 	list_del(&req->r_wlist);
 
-	queue_work(&req->work);
+	queue_work(dobj_queue, &req->work);
 }
 
 static struct request *alloc_request(struct client_info *ci, int data_length)

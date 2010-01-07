@@ -96,8 +96,8 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_worker();
-	if (ret)
+	dobj_queue = init_worker(DATA_OBJ_NR_WORKER_THREAD);
+	if (!dobj_queue)
 		exit(1);
 
 	ci = create_cluster(port);

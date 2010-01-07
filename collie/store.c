@@ -35,6 +35,7 @@ static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IX
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 int nr_sobjs;
+struct work_queue *dobj_queue;
 
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 {
@@ -853,7 +854,7 @@ int init_store(char *d)
 	if (ret)
 		return ret;
 
-	zero_block = zalloc(SD_DATA_OBJ_SIZE * NR_WORKER_THREAD);
+	zero_block = zalloc(SD_DATA_OBJ_SIZE * DATA_OBJ_NR_WORKER_THREAD);
 	if (!zero_block)
 		return 1;
 

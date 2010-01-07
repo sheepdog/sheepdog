@@ -513,7 +513,7 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	w->work.fn = __sd_deliver;
 	w->work.done = __sd_deliver_done;
 
-	queue_work(&w->work);
+	queue_work(dobj_queue, &w->work);
 }
 
 static void __sd_confch(struct work *work, int idx)
@@ -633,7 +633,7 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 	w->work.fn = __sd_confch;
 	w->work.done = __sd_confch_done;
 
-	queue_work(&w->work);
+	queue_work(dobj_queue, &w->work);
 
 	return;
 err:

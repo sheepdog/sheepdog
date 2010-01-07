@@ -98,4 +98,7 @@ void cluster_queue_request(struct work *work, int idx);
 
 extern int nr_sobjs;
 
+#define DATA_OBJ_NR_WORKER_THREAD 4
+extern struct work_queue *dobj_queue;
+
 #endif
