@@ -116,7 +116,8 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 			SD_DIR_OID, (struct sd_req *)&req, name, len, 0,
 			nr_reqs, nr_reqs);
 
-	/* todo: error handling */
+	if (ret < 0)
+		return rsp->result;
 
 	oid = rsp->oid;
 	*added_oid = oid;

@@ -578,8 +578,12 @@ static int so_lookup_vdi(struct request *req)
 
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
-		eprintf("%m\n");
-		return SD_RES_EIO;
+		if (errno == ENOENT)
+			return SD_RES_NO_VDI;
+		else {
+			eprintf("%m\n");
+			return SD_RES_EIO;
+		}
 	}
 
 	ret = fgetxattr(fd, ANAME_CURRENT, &coid,
@@ -603,7 +607,7 @@ static int so_lookup_vdi(struct request *req)
 
 	dir = opendir(path);
 	if (!dir)
-		return SD_RES_NO_VDI;
+		return SD_RES_EIO;
 
 	while ((dent = readdir(dir))) {
 		if (!strcmp(dent->d_name, ".") ||
@@ -707,8 +711,12 @@ void so_queue_request(struct work *work, int idx)
 		else {
 			ret = mkdir(path, def_dmode);
 			if (ret) {
-				eprintf("%m\n");
-				result = SD_RES_EIO;
+				if (errno == EEXIST)
+					result = SD_RES_VDI_EXIST;
+				else {
+					eprintf("%m\n");
+					result = SD_RES_EIO;
+				}
 				goto out;
 			}
 		}
@@ -753,14 +761,15 @@ void so_queue_request(struct work *work, int idx)
 		break;
 
 	case SD_OP_SO_LOOKUP_VDI:
-		ret = so_lookup_vdi(req);
+		result = so_lookup_vdi(req);
 		break;
 	case SD_OP_SO_READ_VDIS:
-		ret = so_read_vdis(req);
+		result = so_read_vdis(req);
 		break;
 	case SD_OP_SO_STAT:
 		fd = open(path, O_RDONLY);
 		if (fd < 0) {
+			eprintf("%m\n");
 			result = SD_RES_EIO;
 			goto out;
 		}
