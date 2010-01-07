@@ -579,6 +579,8 @@ static void __sd_confch(struct work *work, int idx)
 			    node->pid != left_list[i].pid)
 				continue;
 
+			wait_work_queue_inactive(dobj_queue);
+
 			pid = node->pid;
 
 			list_del(&node->list);
@@ -589,6 +591,8 @@ static void __sd_confch(struct work *work, int idx)
 					nr * sizeof(struct sheepdog_node_list_entry));
 
 			ci->epoch++;
+
+			resume_work_queue(dobj_queue);
 		}
 	}
 
