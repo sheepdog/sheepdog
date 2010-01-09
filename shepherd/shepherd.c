@@ -99,6 +99,22 @@ static struct sheepdog_node_list_entry *node_list_entries;
 static int nr_nodes;
 static unsigned master_idx;
 
+static char *size_to_str(uint64_t size, char *str, int str_size)
+{
+	char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+	int i = 0;
+
+	size /= 1024 * 1024;
+	while (i < ARRAY_SIZE(units) && size >= 1024) {
+		i++;
+		size /= 1024;
+	}
+
+	snprintf(str, str_size, "%" PRId64 " %s", size, units[i]);
+
+	return str;
+}
+
 static int update_node_list(int max_nodes, int epoch)
 {
 	int fd, ret;
@@ -547,6 +563,7 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 {
 	int idx;
 	uint64_t my_objs, cow_objs;
+	char vdi_size_str[8], my_objs_str[8], cow_objs_str[8];
 	time_t ti;
 	struct tm tm;
 	char dbuf[128];
@@ -555,7 +572,7 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 	localtime_r(&ti, &tm);
 
 	strftime(dbuf, sizeof(dbuf),
-		 "%Y-%m-%d %H:%M:%S", &tm);
+		 "%Y-%m-%d %H:%M", &tm);
 
 	my_objs = 0;
 	cow_objs = 0;
@@ -568,13 +585,14 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 			cow_objs++;
 	}
 
+	size_to_str(i->vdi_size, vdi_size_str, sizeof(vdi_size_str));
+	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
+	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
+
 	if (!data || strcmp(name, data) == 0) {
-		printf("%8" PRIx64 " : %-8s\t%" PRIu64 " MB (allocated: %" PRIu64
-		       " MB, shared: %" PRIu64 " MB), %s, tag: %8x, %s\n",
-		       oid, name, i->vdi_size / 1024 / 1024,
-		       my_objs * SD_DATA_OBJ_SIZE / 1024 / 1024,
-		       cow_objs * SD_DATA_OBJ_SIZE / 1024 / 1024, dbuf, tag,
-		       flags & FLAG_CURRENT ? "current" : "not current");
+		printf("%c %-8s %5d %7s %7s %7s %s  %9" PRIx64 "\n",
+		       flags & FLAG_CURRENT ? ' ' : 's', name, tag,
+		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, oid);
 	}
 }
 
@@ -835,6 +853,8 @@ rerun:
 	case INFO_VDI:
 		switch (format) {
 		case FORMAT_LIST:
+			printf("  name        id    size    used  shared    creation time  object id\n");
+			printf("--------------------------------------------------------------------\n");
 			ret = parse_vdi(print_vdi_list, name);
 			break;
 		case FORMAT_TREE:
