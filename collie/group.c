@@ -85,8 +85,6 @@ struct work_confch {
 	struct work work;
 };
 
-struct work_queue *group_queue;
-
 static int node_cmp(const void *a, const void *b)
 {
 	const struct sheepdog_node_list_entry *node1 = a;
@@ -339,10 +337,7 @@ static void update_cluster_info(struct cluster_info *ci,
 
 	/* we are ready for object operations */
 	update_epoch_store(ci, ci->epoch);
-	resume_work_queue(dobj_queue);
 out:
-	wait_work_queue_inactive(dobj_queue);
-
 	add_node(ci, msg->nodeid, msg->pid, &msg->header.from);
 
 	nr_nodes = build_node_list(&ci->node_list, entry);
@@ -355,8 +350,6 @@ out:
 	ci->epoch++;
 
 	update_epoch_store(ci, ci->epoch);
-
-	resume_work_queue(dobj_queue);
 
 	print_node_list(ci);
 }
@@ -543,9 +536,9 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	w->work.done = __sd_deliver_done;
 
 	if (m->op == SD_MSG_JOIN)
-		queue_work(group_queue, &w->work);
-	else
-		queue_work(dobj_queue, &w->work);
+		w->work.attr = WORK_ORDERED;
+
+	queue_work(dobj_queue, &w->work);
 }
 
 static void __sd_confch(struct work *work, int idx)
@@ -564,10 +557,8 @@ static void __sd_confch(struct work *work, int idx)
 
 	if (member_list_entries == joined_list_entries - left_list_entries &&
 	    ci->this_nodeid == member_list[0].nodeid &&
-	    ci->this_pid == member_list[0].pid) {
+	    ci->this_pid == member_list[0].pid)
 		ci->synchronized = 1;
-		resume_work_queue(dobj_queue);
-	}
 
 	for (i = 0; i < left_list_entries; i++) {
 		list_for_each_entry_safe(node, e, &ci->node_list, list) {
@@ -578,8 +569,6 @@ static void __sd_confch(struct work *work, int idx)
 			if (node->nodeid != left_list[i].nodeid ||
 			    node->pid != left_list[i].pid)
 				continue;
-
-			wait_work_queue_inactive(dobj_queue);
 
 			pid = node->pid;
 
@@ -593,8 +582,6 @@ static void __sd_confch(struct work *work, int idx)
 			ci->epoch++;
 
 			update_epoch_store(ci, ci->epoch);
-
-			resume_work_queue(dobj_queue);
 		}
 	}
 
@@ -684,9 +671,9 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 
 	w->work.fn = __sd_confch;
 	w->work.done = __sd_confch_done;
+	w->work.attr = WORK_ORDERED;
 
-	queue_work(group_queue, &w->work);
-
+	queue_work(dobj_queue, &w->work);
 	return;
 err:
 	if (!w)
