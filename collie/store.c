@@ -75,6 +75,46 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 	return SD_RES_SUCCESS;
 }
 
+static int get_obj_list(struct request *req)
+{
+	DIR *dir;
+	struct dirent *d;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+	uint64_t oid;
+	uint64_t oid_hash;
+	uint64_t start_hash = hdr->oid;
+	uint64_t end_hash = hdr->cow_oid;
+	char path[1024];
+	uint64_t *p = (uint64_t *)req->data;
+	int nr = 0;
+
+	snprintf(path, sizeof(path), "%s%08u/", obj_path, hdr->obj_ver);
+
+	dir = opendir(path);
+	if (!dir)
+		return SD_RES_EIO;
+
+	while ((d = readdir(dir))) {
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		oid = strtoull(d->d_name, NULL, 16);
+		oid_hash = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+
+		if (oid_hash >= start_hash && oid_hash < end_hash) {
+			if ((nr + 1) * sizeof(uint64_t) > hdr->data_length)
+				break;
+
+			*(p + nr) = oid;
+			nr++;
+		}
+	}
+	rsp->data_length = nr * 8;
+
+	return SD_RES_SUCCESS;
+}
+
 static int read_from_one(struct cluster_info *cluster, uint64_t oid,
 			 unsigned *rlen, void *buf, uint64_t offset)
 {
@@ -354,6 +394,11 @@ void store_queue_request(struct work *work, int idx)
 		goto out;
 	}
 
+	if (opcode == SD_OP_GET_OBJ_LIST) {
+		ret = get_obj_list(req);
+		goto out;
+	}
+
 	if (!(hdr->flags & SD_FLAG_CMD_FORWARD)) {
 		ret = forward_obj_req(cluster, req);
 		goto out;
@@ -364,7 +409,6 @@ void store_queue_request(struct work *work, int idx)
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_READ_OBJ:
 	case SD_OP_SYNC_OBJ:
-
 		if (opcode == SD_OP_CREATE_AND_WRITE_OBJ)
 			fd = ob_open(req_epoch, oid, O_CREAT, &ret);
 		else

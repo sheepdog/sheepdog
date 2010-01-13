@@ -46,6 +46,7 @@ static void queue_request(struct request *req)
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_SYNC_OBJ:
 	case SD_OP_STAT_SHEEP:
+	case SD_OP_GET_OBJ_LIST:
 		req->work.fn = store_queue_request;
 		break;
 	case SD_OP_GET_NODE_LIST:

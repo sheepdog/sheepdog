@@ -42,6 +42,7 @@
 #define SD_OP_READ_OBJ       0x03
 #define SD_OP_WRITE_OBJ      0x04
 #define SD_OP_SYNC_OBJ       0x05
+#define SD_OP_GET_OBJ_LIST   0x06
 
 /* collie <-> collie */
 #define SD_OP_SO             0x60
