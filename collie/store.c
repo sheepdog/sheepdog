@@ -69,6 +69,8 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 		used += s.st_size;
 	}
 
+	closedir(dir);
+
 	*store_size = vs.f_frsize * vs.f_bfree;
 	*store_free = vs.f_frsize * vs.f_bfree - used;
 
@@ -126,7 +128,10 @@ static int get_obj_list(struct request *req)
 			nr++;
 		}
 	}
+
 	rsp->data_length = nr * 8;
+
+	closedir(dir);
 
 	return SD_RES_SUCCESS;
 }
@@ -568,12 +573,14 @@ static int so_read_vdis(struct request *req)
 		fd = open(vpath, O_RDONLY);
 		if (fd < 0) {
 			eprintf("%m\n");
+			closedir(dir);
 			return SD_RES_EIO;
 		}
 
 		ret = fgetxattr(fd, ANAME_CURRENT, &coid,
 				sizeof(coid));
 		if (ret != sizeof(coid)) {
+			closedir(dir);
 			close(fd);
 			return SD_RES_EIO;
 		}
@@ -583,8 +590,10 @@ static int so_read_vdis(struct request *req)
 		close(fd);
 
 		vdir = opendir(vpath);
-		if (!vdir)
+		if (!vdir) {
+			closedir(dir);
 			return SD_RES_NO_VDI;
+		}
 
 		while ((vdent = readdir(vdir))) {
 			if (!strcmp(vdent->d_name, ".") ||
@@ -611,10 +620,14 @@ static int so_read_vdis(struct request *req)
 			strcpy(sde->name, dent->d_name);
 			sde = next_entry(sde);
 		}
+
+		closedir(vdir);
 	}
 
 	rsp->data_length = (char *)sde - (char *)req->data;
 	dprintf("%d\n", rsp->data_length);
+
+	closedir(dir);
 
 	return SD_RES_SUCCESS;
 }
@@ -659,7 +672,6 @@ static int so_lookup_vdi(struct request *req)
 	close(fd);
 
 	if (hdr->tag == 0xffffffff) {
-		close(fd);
 		rsp->oid = coid;
 		rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
 		return SD_RES_SUCCESS;
@@ -703,7 +715,7 @@ void so_queue_request(struct work *work, int idx)
 	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
 	struct cluster_info *cluster = req->ci->cluster;
-	int nfd, fd = -1, ret, result = SD_RES_SUCCESS;
+	int nfd = -1, fd = -1, ret, result = SD_RES_SUCCESS;
 	uint32_t opcode = hdr->opcode;
 	uint64_t last_oid = 0;
 	char path[1024];
@@ -758,7 +770,6 @@ void so_queue_request(struct work *work, int idx)
 		ret = fgetxattr(fd, ANAME_LAST_OID, &last_oid,
 				sizeof(last_oid));
 		if (ret != sizeof(last_oid)) {
-			close(fd);
 			result = SD_RES_EIO;
 			goto out;
 		}
@@ -862,6 +873,8 @@ out:
 
 	if (fd != -1)
 		close(fd);
+	if (nfd != -1)
+		close(nfd);
 }
 
 int epoch_log_write(uint32_t epoch, char *buf, int len)
