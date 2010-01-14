@@ -11,6 +11,7 @@
 #ifndef __SHEEPDOG_PROTO_H__
 #define __SHEEPDOG_PROTO_H__
 
+#include <inttypes.h>
 #include <stdint.h>
 #include "util.h"
 
@@ -269,12 +270,9 @@ static inline int obj_to_sheep(struct sheepdog_node_list_entry *entries,
 static inline void print_node_list_entry(struct sheepdog_node_list_entry *e,
 					 char *str, size_t size)
 {
-	uint16_t *p = (uint16_t *)&e->id;
-
-	snprintf(str, size, "%04x:%04x:%04x:%04x - %d.%d.%d.%d:%d",
-		p[0] ,p[1], p[2], p[3],
-		e->addr[12], e->addr[13],
-		e->addr[14], e->addr[15], e->port);
+	snprintf(str, size, "%016" PRIx64 " - %d.%d.%d.%d:%d",
+		 e->id, e->addr[12], e->addr[13],
+		 e->addr[14], e->addr[15], e->port);
 }
 
 #endif
