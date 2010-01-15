@@ -209,7 +209,11 @@ static int read_from_other_sheeps(struct cluster_info *cluster,
 	return ret;
 }
 
-static int forward_obj_req(struct cluster_info *cluster, struct request *req)
+static int store_queue_request_local(struct cluster_info *cluster,
+				     struct request *req, char *buf);
+
+static int forward_obj_req(struct cluster_info *cluster, struct request *req,
+			   char *buf)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
@@ -238,6 +242,13 @@ again:
 			 e[n].addr[12], e[n].addr[13],
 			 e[n].addr[14], e[n].addr[15]);
 
+		/* TODO: we can do better; we need to chech this first */
+		if (e[n].id == cluster->this_node.id) {
+			store_queue_request_local(cluster, req, buf);
+			memcpy(rsp, &req->rp, sizeof(*rsp));
+			goto done;
+		}
+
 		fd = connect_to(name, e[n].port);
 		if (fd < 0)
 			continue;
@@ -261,6 +272,7 @@ again:
 		if (ret) /* network errors */
 			goto again;
 
+	done:
 		if (hdr->flags & SD_FLAG_CMD_WRITE) {
 			if (rsp->result != SD_RES_SUCCESS) {
 				free(e);
@@ -380,50 +392,17 @@ int update_epoch_store(struct cluster_info *ci, uint32_t epoch)
 	return 0;
 }
 
-void store_queue_request(struct work *work, int idx)
+static int store_queue_request_local(struct cluster_info *cluster,
+				     struct request *req, char *buf)
 {
-	struct request *req = container_of(work, struct request, work);
-	struct cluster_info *cluster = req->ci->cluster;
-	char path[1024];
-	int fd = -1, ret = SD_RES_SUCCESS;
-	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
+	int fd = -1, copies;
+	int ret = SD_RES_SUCCESS;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
-	uint32_t epoch = cluster->epoch;
 	uint32_t req_epoch = hdr->epoch;
-	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
-	int copies;
-
-	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
-
-	if (list_empty(&cluster->node_list)) {
-		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
-		ret = SD_RES_SYSTEM_ERROR;
-		goto out;
-	}
-
-	if (opcode != SD_OP_GET_NODE_LIST) {
-		ret = check_epoch(cluster, req);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-	}
-
-	if (opcode == SD_OP_STAT_SHEEP) {
-		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free);
-		goto out;
-	}
-
-	if (opcode == SD_OP_GET_OBJ_LIST) {
-		ret = get_obj_list(req);
-		goto out;
-	}
-
-	if (!(hdr->flags & SD_FLAG_CMD_FORWARD)) {
-		ret = forward_obj_req(cluster, req);
-		goto out;
-	}
+	char path[1024];
 
 	switch (opcode) {
 	case SD_OP_CREATE_AND_WRITE_OBJ:
@@ -538,14 +517,62 @@ void store_queue_request(struct work *work, int idx)
 		break;
 	}
 out:
+	if (fd != -1)
+		close(fd);
+
+	return ret;
+}
+
+void store_queue_request(struct work *work, int idx)
+{
+	struct request *req = container_of(work, struct request, work);
+	struct cluster_info *cluster = req->ci->cluster;
+	int ret = SD_RES_SUCCESS;
+	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+	uint64_t oid = hdr->oid;
+	uint32_t opcode = hdr->opcode;
+	uint32_t epoch = cluster->epoch;
+	uint32_t req_epoch = hdr->epoch;
+	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
+
+	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
+
+	if (list_empty(&cluster->node_list)) {
+		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
+		ret = SD_RES_SYSTEM_ERROR;
+		goto out;
+	}
+
+	if (opcode != SD_OP_GET_NODE_LIST) {
+		ret = check_epoch(cluster, req);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+	}
+
+	if (opcode == SD_OP_STAT_SHEEP) {
+		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free);
+		goto out;
+	}
+
+	if (opcode == SD_OP_GET_OBJ_LIST) {
+		ret = get_obj_list(req);
+		goto out;
+	}
+
+	if (!(hdr->flags & SD_FLAG_CMD_FORWARD)) {
+		ret = forward_obj_req(cluster, req, buf);
+		goto out;
+	}
+
+	ret = store_queue_request_local(cluster, req, buf);
+out:
 	if (ret != SD_RES_SUCCESS) {
 		dprintf("failed, %d, %x, %" PRIx64" , %u, %u\n",
 			idx, opcode, oid, epoch, req_epoch);
 		rsp->result = ret;
 	}
-
-	if (fd != -1)
-		close(fd);
 }
 
 static int so_read_vdis(struct request *req)
