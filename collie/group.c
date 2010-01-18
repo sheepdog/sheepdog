@@ -503,6 +503,17 @@ static void __sd_deliver(struct work *work, int idx)
 static void __sd_deliver_done(struct work *work, int idx)
 {
 	struct work_deliver *w = container_of(work, struct work_deliver, work);
+/* 	struct message_header *m = w->msg; */
+/* 	struct cluster_info *ci = w->ci; */
+
+	/*
+	 * FIXME: we want to recover only after all nodes are fully
+	 * synchronized
+	 */
+
+	/* disabled for now */
+/* 	if (m->done && m->op == SD_MSG_JOIN) */
+/* 		start_recovery(ci, ci->epoch, 1); */
 
 	free(w->msg);
 	free(w);
@@ -612,6 +623,14 @@ static void __sd_confch(struct work *work, int idx)
 static void __sd_confch_done(struct work *work, int idx)
 {
 	struct work_confch *w = container_of(work, struct work_confch, work);
+	struct cluster_info *ci = w->ci;
+
+	/* FIXME: worker threads can't call start_recovery */
+	if (w->left_list_entries) {
+		if (w->left_list_entries > 1)
+			eprintf("we can't handle %Zd\n", w->left_list_entries);
+		start_recovery(ci, ci->epoch, 0);
+	}
 
 	free(w->member_list);
 	free(w->left_list);

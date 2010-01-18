@@ -91,21 +91,37 @@ static int get_obj_list(struct request *req)
 
 	snprintf(path, sizeof(path), "%s%08u/", obj_path, hdr->obj_ver);
 
+	dprintf("%d\n", req->ci->cluster->this_node.port);
+
 	dir = opendir(path);
-	if (!dir)
+	if (!dir) {
+		eprintf("%s\n", path);
 		return SD_RES_EIO;
+	}
 
 	while ((d = readdir(dir))) {
+		int got = 0;
+
 		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
 			continue;
 
 		oid = strtoull(d->d_name, NULL, 16);
 		oid_hash = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 
-		if (oid_hash >= start_hash && oid_hash < end_hash) {
-			if ((nr + 1) * sizeof(uint64_t) > hdr->data_length)
-				break;
+		if ((nr + 1) * sizeof(uint64_t) > hdr->data_length)
+			break;
 
+		if (start_hash < end_hash) {
+			if (oid_hash >= start_hash && oid_hash < end_hash)
+				got = 1;
+		} else
+			if (end_hash <= oid_hash || oid_hash < start_hash)
+				got = 1;
+
+		dprintf("%d, %u, %016lx, %016lx, %016lx %016lx\n", got, hdr->obj_ver,
+			oid, oid_hash, start_hash, end_hash);
+
+		if (got) {
 			*(p + nr) = oid;
 			nr++;
 		}
@@ -883,6 +899,355 @@ int epoch_log_read(uint32_t epoch, char *buf, int len)
 	close(fd);
 
 	return len;
+}
+
+static int node_distance(int my, int her, int nr)
+{
+	return (my + nr - her) % nr;
+}
+
+static int node_from_distance(int my, int dist, int nr)
+{
+	return (my + nr - dist) % nr;
+}
+
+struct recovery_work {
+	uint32_t epoch;
+	uint32_t done;
+
+	uint32_t iteration;
+
+	struct sheepdog_node_list_entry e;
+
+	struct work work;
+	struct list_head rw_siblings;
+	struct cluster_info *ci;
+
+	int count;
+	char *buf;
+};
+
+static LIST_HEAD(recovery_work_list);
+static int recovering;
+
+static void recover_one(struct work *work, int idx)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work, work);
+	struct sheepdog_node_list_entry *e = &rw->e;
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp;
+	char name[128];
+	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
+	unsigned wlen = 0, rlen = SD_DATA_OBJ_SIZE;
+	int fd, ret;
+	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
+
+	eprintf("%d %d, %16lx\n", rw->done, rw->count, oid);
+
+	snprintf(name, sizeof(name), "%d.%d.%d.%d",
+		 e->addr[12], e->addr[13],
+		 e->addr[14], e->addr[15]);
+
+	fd = connect_to(name, e->port);
+	if (fd < 0) {
+		eprintf("%s %d\n", name, e->port);
+		return;
+	}
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.oid = oid;
+	hdr.epoch = rw->ci->epoch;
+	hdr.flags = 0;
+	hdr.data_length = rlen;
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+
+	close(fd);
+
+	rsp = (struct sd_obj_rsp *)&hdr;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		eprintf("%d\n", rsp->result);
+		return;
+	}
+
+	fd = ob_open(rw->epoch, oid, O_CREAT, &ret);
+	write(fd, buf, SD_DATA_OBJ_SIZE);
+}
+
+static void __start_recovery(struct work *work, int idx);
+static void __start_recovery_done(struct work *work, int idx);
+
+static void recover_one_done(struct work *work, int idx)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work, work);
+
+	if (rw->done < rw->count) {
+		rw->done++;
+		queue_work(dobj_queue, &rw->work);
+		return;
+	}
+
+	if (rw->iteration) {
+		if (++rw->iteration <= rw->ci->nr_sobjs) {
+			free(rw->buf);
+
+			rw->done = 0;
+
+			rw->work.fn = __start_recovery;
+			rw->work.done = __start_recovery_done;
+
+			queue_work(dobj_queue, &rw->work);
+
+			return;
+		}
+	}
+
+	recovering--;
+
+	list_del(&rw->rw_siblings);
+
+	if (rw->buf)
+		free(rw->buf);
+	free(rw);
+
+	if (!list_empty(&recovery_work_list)) {
+		rw = list_first_entry(&recovery_work_list,
+				      struct recovery_work, rw_siblings);
+
+		recovering++;
+		queue_work(dobj_queue, &rw->work);
+	}
+}
+
+static int fill_obj_list(struct recovery_work *rw,
+			 struct sheepdog_node_list_entry *e,
+			 uint64_t start_hash, uint64_t end_hash)
+{
+	int fd, ret;
+	uint32_t epoch = rw->epoch;
+	unsigned wlen, rlen;
+	char name[128];
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp;
+
+	snprintf(name, sizeof(name), "%d.%d.%d.%d",
+		 e->addr[12], e->addr[13],
+		 e->addr[14], e->addr[15]);
+
+	dprintf("%s %d\n", name, e->port);
+
+	fd = connect_to(name, e->port);
+	if (fd < 0) {
+		eprintf("%s %d\n", name, e->port);
+		return -1;
+	}
+
+	wlen = 0;
+	rlen = 1 << 20;
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_GET_OBJ_LIST;
+	hdr.epoch = rw->ci->epoch;
+	hdr.oid = start_hash;
+	hdr.cow_oid = end_hash;
+	hdr.obj_ver = epoch - 1;
+	hdr.flags = 0;
+	hdr.data_length = rlen;
+
+	dprintf("%016lx, %016lx\n", hdr.oid, hdr.cow_oid);
+
+	rw->buf = malloc(rlen);
+	memcpy(&rw->e, e, sizeof(rw->e));
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, rw->buf, &wlen, &rlen);
+
+	close(fd);
+
+	rsp = (struct sd_obj_rsp *)&hdr;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		eprintf("%d\n", rsp->result);
+		return -1;
+	}
+
+	dprintf("%d\n", rsp->data_length);
+
+	if (rsp->data_length)
+		rw->count = rsp->data_length / sizeof(uint64_t);
+	else
+		rw->count = 0;
+
+	return 0;
+}
+
+static void __start_recovery(struct work *work, int idx)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work, work);
+	uint32_t epoch = rw->epoch;
+	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
+		cur_entry[SD_MAX_NODES];
+	int old_nr, cur_nr;
+	int my_idx = -1, ch_idx = -1;
+	int i, j, n;
+	uint64_t start_hash, end_hash;
+
+	dprintf("%u\n", epoch);
+
+	cur_nr = epoch_log_read(epoch, (char *)cur_entry, sizeof(cur_entry));
+	if (cur_nr <= 0)
+		goto fail;
+	cur_nr /= sizeof(struct sheepdog_node_list_entry);
+
+	old_nr = epoch_log_read(epoch - 1, (char *)old_entry, sizeof(old_entry));
+	if (old_nr <= 0)
+		goto fail;
+	old_nr /= sizeof(struct sheepdog_node_list_entry);
+
+	if (!rw->ci->nr_sobjs || cur_nr < rw->ci->nr_sobjs || old_nr < rw->ci->nr_sobjs)
+		goto fail;
+
+	if (cur_nr < old_nr) {
+		for (i = 0; i < old_nr; i++) {
+			if (old_entry[i].id == rw->ci->this_node.id) {
+				my_idx = i;
+				break;
+			}
+		}
+
+		dprintf("%u %u %u, %d\n", cur_nr, old_nr, epoch, my_idx);
+
+		for (i = 0; i < old_nr; i++) {
+			for (j = 0; j < cur_nr; j++) {
+				if (old_entry[i].id == cur_entry[j].id)
+					break;
+			}
+
+			if (j == cur_nr)
+				ch_idx = i;
+		}
+
+		dprintf("%u %u %u\n", my_idx, ch_idx,
+			node_distance(my_idx, ch_idx, old_nr));
+
+		if (node_distance(my_idx, ch_idx, old_nr) > rw->ci->nr_sobjs)
+			return;
+
+		n = node_from_distance(my_idx, rw->ci->nr_sobjs, old_nr);
+
+		dprintf("%d %d\n", n, rw->ci->nr_sobjs);
+
+		start_hash = old_entry[(n - 1 + old_nr) % old_nr].id;
+		end_hash = old_entry[n].id;
+
+		/* FIXME */
+		if (node_distance(my_idx, ch_idx, old_nr) == rw->ci->nr_sobjs) {
+			n++;
+			n %= old_nr;
+		}
+
+		fill_obj_list(rw, old_entry + n, start_hash, end_hash);
+	} else {
+		for (i = 0; i < cur_nr; i++) {
+			if (cur_entry[i].id == rw->ci->this_node.id) {
+				my_idx = i;
+				break;
+			}
+		}
+
+		dprintf("%u %u %u, %d\n", cur_nr, old_nr, epoch, my_idx);
+
+		if (my_idx == -1)
+			return;
+
+		n = node_from_distance(my_idx, rw->iteration, cur_nr);
+		start_hash = cur_entry[n].id;
+		end_hash = cur_entry[(n + 1 + cur_nr) % cur_nr].id;
+
+		if (rw->iteration == 1)
+			n = (my_idx + 1 + cur_nr) % cur_nr;
+		else
+			n = (n + 1 + cur_nr) % cur_nr;
+
+		dprintf("%u %u %u\n", my_idx, n, rw->iteration);
+
+		start_hash = cur_entry[n].id;
+		end_hash = cur_entry[(n - 1 + cur_nr) % cur_nr].id;
+
+		fill_obj_list(rw, cur_entry + n, start_hash, end_hash);
+	}
+
+	return;
+
+fail:
+	rw->count = 0;
+	rw->iteration = 0;
+	return;
+}
+
+static void __start_recovery_done(struct work *work, int idx)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work, work);
+
+	if (!rw->count) {
+		if (rw->iteration) {
+			if (++rw->iteration <= rw->ci->nr_sobjs) {
+				free(rw->buf);
+
+				rw->work.fn = __start_recovery;
+				rw->work.done = __start_recovery_done;
+
+				queue_work(dobj_queue, &rw->work);
+
+				return;
+			}
+		}
+
+		free(rw->buf);
+		free(rw);
+		return;
+	}
+
+	rw->work.fn = recover_one;
+	rw->work.done = recover_one_done;
+
+	/* TODO: we should avoid races with qemu I/Os */
+/* 	rw->work.attr = WORK_ORDERED; */
+
+	queue_work(dobj_queue, &rw->work);
+}
+
+int start_recovery(struct cluster_info *ci, uint32_t epoch, int add)
+{
+	struct recovery_work *rw;
+
+	/* disable for now */
+	if (add)
+		return 0;
+
+	rw = zalloc(sizeof(struct recovery_work));
+	if (!rw)
+		return -1;
+
+	rw->epoch = epoch;
+	rw->ci = ci;
+	rw->count = 0;
+
+	if (add)
+		rw->iteration = 1;
+
+	rw->work.fn = __start_recovery;
+	rw->work.done = __start_recovery_done;
+
+	list_add_tail(&rw->rw_siblings, &recovery_work_list);
+
+	if (!recovering) {
+		recovering++;
+		queue_work(dobj_queue, &rw->work);
+	}
+
+	return 0;
 }
 
 static int init_path(char *d, int *new)
