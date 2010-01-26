@@ -27,8 +27,8 @@
 #include <term.h>
 #include <curses.h>
 
-#include "meta.h"
 #include "sheepdog_proto.h"
+#include "meta.h"
 #include "net.h"
 #include "treeview.h"
 
@@ -377,7 +377,7 @@ typedef void (*vdi_parser_func_t)(uint64_t oid, char *name, uint32_t tag, uint32
  */
 int parse_vdi(vdi_parser_func_t func, void *data)
 {
-	struct sheepdog_dir_entry *prv, *ent;
+	struct sheepdog_vdi_info *ent;
 	char *buf;
 	int rest, ret;
 	struct sheepdog_inode i;
@@ -400,7 +400,7 @@ int parse_vdi(vdi_parser_func_t func, void *data)
 		goto out;
 	}
 
-	ent = (struct sheepdog_dir_entry *) buf;
+	ent = (struct sheepdog_vdi_info *)buf;
 	rest = ret;
 	while (rest > 0) {
 		if (!ent->name_len)
@@ -410,11 +410,10 @@ int parse_vdi(vdi_parser_func_t func, void *data)
 				  ent->oid, (void *)&i, sizeof(i), 0, nr_nodes);
 
 		if (ret == sizeof(i))
-			func(ent->oid, ent->name, ent->tag, ent->flags, &i, data);
+			func(ent->oid, ent->name, ent->id, ent->flags, &i, data);
 
-		prv = ent;
-		ent = next_entry(prv);
-		rest -= ((char *)ent - (char *)prv);
+		ent++;
+		rest -= sizeof(*ent);
 	}
 
 out:

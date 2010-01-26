@@ -20,6 +20,8 @@
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096
 
+#define SD_MAX_VDI_LEN 256
+
 /* -> vmon */
 
 #define SD_OP_NEW_VDI        0x11

@@ -581,7 +581,7 @@ static int so_read_vdis(struct request *req)
 	struct dirent *dent, *vdent;
 	char *p;
 	char vpath[1024];
-	struct sheepdog_dir_entry *sde = req->data;
+	struct sheepdog_vdi_info *sde = req->data;
 
 	dir = opendir(vdi_path);
 	if (!dir)
@@ -614,15 +614,15 @@ static int so_read_vdis(struct request *req)
 
 			sde->oid = strtoull(vdent->d_name, NULL, 16);
 			if (p)
-				sde->tag = strtoull(p + 1, NULL, 16);
+				sde->id = strtoull(p + 1, NULL, 16);
 			else {
-				sde->tag = 0;
+				sde->id = 0;
 				sde->flags = FLAG_CURRENT;
 			}
 
 			sde->name_len = strlen(dent->d_name);
 			strcpy(sde->name, dent->d_name);
-			sde = next_entry(sde);
+			sde++;
 		}
 
 		closedir(vdir);

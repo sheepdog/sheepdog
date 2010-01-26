@@ -51,26 +51,17 @@ static inline int is_data_obj(uint64_t oid)
 
 #define FLAG_CURRENT 1
 
-struct sheepdog_dir_entry {
+struct sheepdog_vdi_info {
 	uint64_t oid;
-	uint32_t tag;
+	uint16_t id;
 	uint16_t name_len;
+	uint16_t tag_len;
 	uint8_t type;
 	uint8_t flags;
 	uint32_t epoch;
-	uint32_t pad;
-	char name[0];
+	char name[SD_MAX_VDI_LEN];
+	char tag[SD_MAX_VDI_LEN];
 };
-
-#define SD_DIR_ALIGN 8
-
-static inline struct sheepdog_dir_entry *next_entry(struct sheepdog_dir_entry *ent)
-{
-	int len = offsetof(struct sheepdog_dir_entry, name)
-		+ roundup(ent->name_len, SD_DIR_ALIGN);
-
-	return (struct sheepdog_dir_entry *)((char *)ent + len);
-}
 
 #define MAX_DATA_OBJS (1 << 18)
 #define MAX_CHILDREN 1024
