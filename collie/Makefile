@@ -1,7 +1,7 @@
 sbindir ?= $(PREFIX)/sbin
 
 CFLAGS += -g -O2 -Wall -Wstrict-prototypes -I../include
-CFLAGS += -D_GNU_SOURCE
+CFLAGS += -D_GNU_SOURCE -DSD_VERSION=\"$(VERSION)\"
 LIBS += -lpthread -lcpg
 
 PROGRAMS = collie

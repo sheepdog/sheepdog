@@ -38,12 +38,12 @@ static void usage(int status)
 	else {
 		printf("Usage: %s [OPTION] [PATH]\n", program_name);
 		printf("\
-Sheepdog Daemon\n\
+Sheepdog Daemon, version %s\n\
   -p, --port              specify the listen port number\n\
   -f, --foreground        make the program run in the foreground\n\
   -d, --debug             print debug messages\n\
   -h, --help              display this help and exit\n\
-");
+", SD_VERSION);
 	}
 	exit(status);
 }
@@ -109,6 +109,8 @@ int main(int argc, char **argv)
 	ret = create_listen_port(port, ci);
 	if (ret)
 		exit(1);
+
+	dprintf("Sheepdog daemon (version %s) started\n", SD_VERSION);
 
 	event_loop(-1);
 

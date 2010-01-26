@@ -1,6 +1,8 @@
+VERSION ?= $(shell git log -1 --pretty=format:%h-%p || echo "unknown-version")
+
 PREFIX ?= /usr
 
-export PREFIX
+export VERSION PREFIX
 
 .PHONY:all
 all:
