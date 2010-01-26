@@ -740,9 +740,78 @@ void so_queue_request(struct work *work, int idx)
 		goto out;
 	}
 
-	result = check_epoch(cluster, req);
-	if (result != SD_RES_SUCCESS)
-		goto out;
+	/*
+	 * FIXME: too hacky; we need to rethink about how to all the
+	 * VDI operaitons
+	 */
+	if (opcode == SD_OP_SO_READ_VDIS) {
+		struct sheepdog_node_list_entry *e;
+		int nr, i, n;
+		int local = 0;
+
+		e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
+		nr = build_node_list(&cluster->node_list, e);
+
+		for (i = 0; i < cluster->nr_sobjs; i++) {
+			n = obj_to_sheep(e, nr, SD_DIR_OID, i);
+
+			if (e[n].id == cluster->this_node.id) {
+				local = 1;
+				break;
+			}
+		}
+
+		if (!local) {
+			struct sd_so_req hdr2;
+			char name[128];
+			int fd;
+			unsigned wlen, rlen;
+
+			n = obj_to_sheep(e, nr, SD_DIR_OID, 0);
+
+			snprintf(name, sizeof(name), "%d.%d.%d.%d",
+				 e[n].addr[12], e[n].addr[13],
+				 e[n].addr[14], e[n].addr[15]);
+
+			eprintf("%s %d\n", name, e[n].port);
+
+			fd = connect_to(name, e[n].port);
+			if (fd < 0) {
+				rsp->result = SD_RES_EIO;
+				goto out;
+			}
+
+			memset(&hdr2, 0, sizeof(hdr2));
+			hdr2.opcode = SD_OP_SO_READ_VDIS;
+			hdr2.epoch = cluster->epoch;
+			hdr2.data_length = hdr->data_length;
+
+			wlen = 0;
+			rlen = hdr->data_length;
+
+			eprintf("%d\n", fd);
+
+			ret = exec_req(fd, (struct sd_req *)&hdr2,
+				       req->data, &wlen, &rlen);
+
+			close(fd);
+
+			rsp->result = ((struct sd_rsp *)&hdr2)->result;
+			rsp->data_length = ((struct sd_rsp *)&hdr2)->data_length;
+
+			eprintf("%d\n", rsp->result);
+		}
+
+		free(e);
+		if (!local)
+			goto out;
+	}
+
+	if (opcode != SD_OP_SO_READ_VDIS) {
+		result = check_epoch(cluster, req);
+		if (result != SD_RES_SUCCESS)
+			goto out;
+	}
 
 	memset(path, 0, sizeof(path));
 	snprintf(path, sizeof(path), "%s", vdi_path);
