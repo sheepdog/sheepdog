@@ -295,7 +295,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int *wlen)
 
 	ret = do_write(sockfd, &msg, sizeof(*hdr) + *wlen);
 	if (ret) {
-		eprintf("failed to send a req, %m\n");
+		eprintf("failed to send a req, %x %d, %m\n", hdr->opcode,
+			*wlen);
 		ret = -1;
 	}
 

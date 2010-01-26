@@ -136,10 +136,10 @@ static int get_obj_list(struct request *req)
 }
 
 static int read_from_one(struct cluster_info *cluster, uint64_t oid,
-			 unsigned *rlen, void *buf, uint64_t offset)
+			 unsigned *ori_rlen, void *buf, uint64_t offset)
 {
 	int i, n, nr, fd, ret;
-	unsigned wlen;
+	unsigned wlen, rlen;
 	char name[128];
 	struct sheepdog_node_list_entry *e;
 	struct sd_obj_req hdr;
@@ -156,6 +156,10 @@ again:
 			 e[n].addr[12], e[n].addr[13],
 			 e[n].addr[14], e[n].addr[15]);
 
+		/* FIXME: do like store_queue_request_local() */
+		if (e[n].id == cluster->this_node.id)
+			continue;
+
 		fd = connect_to(name, e[n].port);
 		if (fd < 0)
 			continue;
@@ -165,11 +169,13 @@ again:
 		hdr.oid = oid;
 		hdr.epoch = cluster->epoch;
 
+		rlen = *ori_rlen;
+		wlen = 0;
 		hdr.flags = 0;
-		hdr.data_length = *rlen;
+		hdr.data_length = rlen;
 		hdr.offset = offset;
 
-		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, rlen);
+		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
 		close(fd);
 
@@ -178,6 +184,7 @@ again:
 
 		switch (rsp->result) {
 		case SD_RES_SUCCESS:
+			*ori_rlen = rlen;
 			return 0;
 		case SD_RES_OLD_NODE_VER:
 		case SD_RES_NEW_NODE_VER:
