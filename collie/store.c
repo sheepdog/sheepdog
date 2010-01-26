@@ -209,7 +209,7 @@ static int read_from_other_sheeps(struct cluster_info *cluster,
 }
 
 static int store_queue_request_local(struct cluster_info *cluster,
-				     struct request *req, char *buf);
+				     struct request *req, char *buf, uint32_t epoch);
 
 static int forward_obj_req(struct cluster_info *cluster, struct request *req,
 			   char *buf)
@@ -243,8 +243,9 @@ again:
 
 		/* TODO: we can do better; we need to chech this first */
 		if (e[n].id == cluster->this_node.id) {
-			store_queue_request_local(cluster, req, buf);
+			ret = store_queue_request_local(cluster, req, buf, cluster->epoch);
 			memcpy(rsp, &req->rp, sizeof(*rsp));
+			rsp->result = ret;
 			goto done;
 		}
 
@@ -263,6 +264,7 @@ again:
 		}
 
 		hdr2.flags |= SD_FLAG_CMD_FORWARD;
+		hdr2.epoch = cluster->epoch;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr2, req->data, &wlen, &rlen);
 
@@ -392,7 +394,7 @@ int update_epoch_store(struct cluster_info *ci, uint32_t epoch)
 }
 
 static int store_queue_request_local(struct cluster_info *cluster,
-				     struct request *req, char *buf)
+				     struct request *req, char *buf, uint32_t epoch)
 {
 	int fd = -1, copies;
 	int ret = SD_RES_SUCCESS;
@@ -400,7 +402,6 @@ static int store_queue_request_local(struct cluster_info *cluster,
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
-	uint32_t req_epoch = hdr->epoch;
 	char path[1024];
 
 	switch (opcode) {
@@ -409,9 +410,9 @@ static int store_queue_request_local(struct cluster_info *cluster,
 	case SD_OP_READ_OBJ:
 	case SD_OP_SYNC_OBJ:
 		if (opcode == SD_OP_CREATE_AND_WRITE_OBJ)
-			fd = ob_open(req_epoch, oid, O_CREAT, &ret);
+			fd = ob_open(epoch, oid, O_CREAT, &ret);
 		else
-			fd = ob_open(req_epoch, oid, 0, &ret);
+			fd = ob_open(epoch, oid, 0, &ret);
 
 		if (fd < 0)
 			goto out;
@@ -544,7 +545,7 @@ void store_queue_request(struct work *work, int idx)
 		goto out;
 	}
 
-	if (opcode != SD_OP_GET_NODE_LIST) {
+	if (hdr->flags & SD_FLAG_CMD_FORWARD) {
 		ret = check_epoch(cluster, req);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
@@ -565,7 +566,7 @@ void store_queue_request(struct work *work, int idx)
 		goto out;
 	}
 
-	ret = store_queue_request_local(cluster, req, buf);
+	ret = store_queue_request_local(cluster, req, buf, epoch);
 out:
 	if (ret != SD_RES_SUCCESS) {
 		dprintf("failed, %d, %x, %" PRIx64" , %u, %u\n",

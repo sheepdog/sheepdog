@@ -723,6 +723,19 @@ int build_node_list(struct list_head *node_list,
 	return nr;
 }
 
+static void update_node_list_idx(struct cluster_info *ci,
+				 struct sheepdog_node_list_entry *e, int nr)
+{
+	int i;
+
+	for (i = 0; i < nr; i++) {
+		if (e->id == ci->this_node.id) {
+			ci->node_list_idx = i;
+			break;
+		}
+	}
+}
+
 struct cluster_info *create_cluster(int port)
 {
 	int fd, ret;

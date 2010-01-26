@@ -66,6 +66,7 @@ struct cluster_info {
 	uint32_t epoch;
 
 	struct list_head node_list;
+	int node_list_idx;
 	struct list_head vm_list;
 	struct list_head pending_list;
 
