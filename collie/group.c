@@ -741,7 +741,7 @@ struct cluster_info *create_cluster(int port)
 	int fd, ret;
 	cpg_handle_t cpg_handle;
 	struct cluster_info *ci;
-	struct addrinfo hints, *res;
+	struct addrinfo hints, *res, *res0;
 	char name[INET6_ADDRSTRLEN];
 	struct cpg_name group = { 8, "sheepdog" };
 	cpg_callbacks_t cb = { &sd_deliver, &sd_confch };
@@ -795,23 +795,43 @@ join_retry:
 	memset(&hints, 0, sizeof(hints));
 
 	hints.ai_socktype = SOCK_STREAM;
-	ret = getaddrinfo(name, NULL, &hints, &res);
+	ret = getaddrinfo(name, NULL, &hints, &res0);
 	if (ret)
 		exit(1);
 
-	if (res->ai_family == AF_INET) {
-		struct sockaddr_in *addr = (struct sockaddr_in *)res->ai_addr;
-		memset(ci->this_node.addr, 0, sizeof(ci->this_node.addr));
-		memcpy(ci->this_node.addr + 12, &addr->sin_addr, 4);
-	} else if (res->ai_family == AF_INET6) {
-		struct sockaddr_in6 *addr = (struct sockaddr_in6 *)res->ai_addr;
-		memcpy(ci->this_node.addr, &addr->sin6_addr, 16);
-	} else {
-		eprintf("unknown address family\n");
-		exit(1);
+	for (res = res0; res; res = res->ai_next) {
+		if (res->ai_family == AF_INET) {
+			struct sockaddr_in *addr;
+			addr = (struct sockaddr_in *)res->ai_addr;
+
+			if (((char *) &addr->sin_addr)[0] == 127)
+				continue;
+
+			memset(ci->this_node.addr, 0, 12);
+			memcpy(ci->this_node.addr + 12, &addr->sin_addr, 4);
+			break;
+		} else if (res->ai_family == AF_INET6) {
+			struct sockaddr_in6 *addr;
+			uint8_t localhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
+						  0, 0, 0, 0, 0, 0, 0, 1 };
+
+			addr = (struct sockaddr_in6 *)res->ai_addr;
+
+			if (memcmp(&addr->sin6_addr, localhost, 16) == 0)
+				continue;
+
+			memcpy(ci->this_node.addr, &addr->sin6_addr, 16);
+			break;
+		} else
+			dprintf("unknown address family\n");
 	}
 
-	freeaddrinfo(res);
+	if (res == NULL) {
+		eprintf("failed to get address info\n");
+		return NULL;
+	}
+
+	freeaddrinfo(res0);
 
 	ci->this_node.port = port;
 
