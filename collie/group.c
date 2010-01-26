@@ -364,7 +364,7 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
-		ret = add_vdi(ci, data, strlen(data), hdr->vdi_size, &oid,
+		ret = add_vdi(ci, data, hdr->data_length, hdr->vdi_size, &oid,
 			      hdr->base_oid, hdr->tag, hdr->copies, hdr->flags);
 		break;
 	case SD_OP_LOCK_VDI:

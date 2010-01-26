@@ -631,9 +631,13 @@ static int so_read_vdis(struct request *req)
 				*p = '\0';
 
 			sde->oid = strtoull(vdent[i]->d_name, NULL, 16);
-			if (p)
+			if (p) {
 				sde->id = strtoull(p + 1, NULL, 16);
-			else {
+
+				p = strchr(p + 1, '-');
+				if (p)
+					strcpy(sde->tag, p + 1);
+			} else {
 				sde->id = 0;
 				sde->flags = FLAG_CURRENT;
 			}
@@ -708,6 +712,7 @@ static int so_lookup_vdi(struct request *req)
 			*p = '\0';
 			oid = strtoull(dent->d_name, NULL, 16);
 			rsp->oid = oid;
+
 			dprintf("%lx, %x\n", oid, hdr->tag);
 
 			ret = SD_RES_SUCCESS;
@@ -786,8 +791,8 @@ void so_queue_request(struct work *work, int idx)
 			goto out;
 		}
 
-		strncpy(path + strlen(path), "/", 1);
-		strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
+		snprintf(path + strlen(path), sizeof(path) - strlen(path),
+			 "/%s", (char *)req->data);
 
 		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT) {
 			DIR *dir;
@@ -865,7 +870,11 @@ void so_queue_request(struct work *work, int idx)
 		close(fd);
 
 		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT) {
-			snprintf(path, sizeof(path), "%s-%04x", oldname, id);
+			if (hdr->data_length == SD_MAX_VDI_LEN * 2)
+				snprintf(path, sizeof(path), "%s-%04x-%s", oldname,
+					 id, (char *)req->data + SD_MAX_VDI_LEN);
+			else
+				snprintf(path, sizeof(path), "%s-%04x", oldname, id);
 			ret = rename(oldname, path);
 			if (ret) {
 				eprintf("%s, %s, %m\n", oldname, path);
