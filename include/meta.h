@@ -76,7 +76,6 @@ struct sheepdog_inode {
 	uint64_t parent_oid;
 	uint64_t child_oid[MAX_CHILDREN];
 	uint64_t data_oid[MAX_DATA_OBJS];
-	uint32_t epoch[MAX_DATA_OBJS];
 };
 
 #endif
