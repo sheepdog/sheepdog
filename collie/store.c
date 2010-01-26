@@ -697,31 +697,27 @@ static int so_lookup_vdi(struct request *req)
 			continue;
 
 		p = strchr(dent->d_name, '-');
-		if (!p) {
-			if (!hdr->tag) {
-				rsp->oid = strtoull(dent->d_name, NULL, 16);
-				rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
-
-				ret = SD_RES_SUCCESS;
-				break;
-			} else
+		if (p) {
+			if (strtoull(p + 1, NULL, 16) != hdr->tag)
 				continue;
-		}
 
-		if (strtoull(p + 1, NULL, 16) == hdr->tag) {
-			*p = '\0';
 			oid = strtoull(dent->d_name, NULL, 16);
 			rsp->oid = oid;
 
-			dprintf("%lx, %x\n", oid, hdr->tag);
-
 			ret = SD_RES_SUCCESS;
-			break;
+			goto found;
+		} else if (!hdr->tag) {
+			rsp->oid = strtoull(dent->d_name, NULL, 16);
+			rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
+			ret = SD_RES_SUCCESS;
+			goto found;
 		}
 	}
+	ret = SD_RES_NO_VDI;
+found:
 	closedir(dir);
 
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 void so_queue_request(struct work *work, int idx)
