@@ -574,11 +574,35 @@ out:
 	}
 }
 
+static int vdi_sort(const void *a, const void *b)
+{
+	struct dirent *s1 = *((struct dirent **)a) , *s2 = *((struct dirent **)b);
+	char *p, *q;
+
+	p = strchr(s1->d_name, '-');
+	if (!p)
+		return -1;
+
+	q = strchr(s2->d_name, '-');
+	if (!q)
+		return 1;
+
+	if (atoi(p + 1) > atoi(q + 1))
+		return 1;
+	else
+		return -1;
+}
+
+static int filter(const struct dirent *dir)
+{
+	return strcmp(dir->d_name, ".") && strcmp(dir->d_name, "..");
+}
+
 static int so_read_vdis(struct request *req)
 {
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
-	DIR *dir, *vdir;
-	struct dirent *dent, *vdent;
+	DIR *dir;
+	struct dirent *dent, **vdent;
 	char *p;
 	char vpath[1024];
 	struct sheepdog_vdi_info *sde = req->data;
@@ -588,31 +612,25 @@ static int so_read_vdis(struct request *req)
 		return SD_RES_NO_SUPER_OBJ;
 
 	while ((dent = readdir(dir))) {
+		int i, n;
+
 		if (!strcmp(dent->d_name, ".") ||
 		    !strcmp(dent->d_name, ".."))
 			continue;
 
 		snprintf(vpath, sizeof(vpath), "%s%s", vdi_path, dent->d_name);
 
-		vdir = opendir(vpath);
-		if (!vdir) {
-			closedir(dir);
-			return SD_RES_NO_VDI;
-		}
+		n = scandir(vpath, &vdent, filter, vdi_sort);
 
-		while ((vdent = readdir(vdir))) {
-			if (!strcmp(vdent->d_name, ".") ||
-			    !strcmp(vdent->d_name, ".."))
-				continue;
+		for (i = 0; i < n; i++) {
+			p = strchr(vdent[i]->d_name, '-');
 
-			p = strchr(vdent->d_name, '-');
-
-			dprintf("%s\n", vdent->d_name);
+			dprintf("%s\n", vdent[i]->d_name);
 
 			if (p)
 				*p = '\0';
 
-			sde->oid = strtoull(vdent->d_name, NULL, 16);
+			sde->oid = strtoull(vdent[i]->d_name, NULL, 16);
 			if (p)
 				sde->id = strtoull(p + 1, NULL, 16);
 			else {
@@ -625,7 +643,7 @@ static int so_read_vdis(struct request *req)
 			sde++;
 		}
 
-		closedir(vdir);
+		free(vdent);
 	}
 
 	rsp->data_length = (char *)sde - (char *)req->data;
