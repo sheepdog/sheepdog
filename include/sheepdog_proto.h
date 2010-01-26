@@ -58,6 +58,8 @@
 #define SD_FLAG_CMD_COW      0x02
 #define SD_FLAG_CMD_FORWARD  0x04
 
+#define SD_FLAG_CMD_SNAPSHOT (1U << 8)
+
 #define SD_RES_SUCCESS       0x00 /* Success */
 #define SD_RES_UNKNOWN       0x01 /* Unknown error */
 #define SD_RES_NO_OBJ        0x02 /* No object found */

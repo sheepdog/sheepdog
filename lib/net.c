@@ -463,11 +463,12 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 
 		hdr->epoch = node_version;
 		if (wdatalen) {
-			hdr->flags = SD_FLAG_CMD_WRITE;
+			hdr->flags |= SD_FLAG_CMD_WRITE;
 			hdr->data_length = wdatalen;
-		} else if (rdatalen)
+		} else if (rdatalen) {
+			hdr->flags &= ~SD_FLAG_CMD_WRITE;
 			hdr->data_length = rdatalen;
-		else
+		} else
 			hdr->data_length = 0;
 
 		memcpy(&tmp, hdr, sizeof(tmp));

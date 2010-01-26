@@ -804,7 +804,7 @@ void so_queue_request(struct work *work, int idx)
 		strncpy(path + strlen(path), "/", 1);
 		strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
 
-		if (hdr->tag)
+		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT)
 			;
 		else {
 			ret = mkdir(path, def_dmode);

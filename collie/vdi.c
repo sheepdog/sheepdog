@@ -81,7 +81,8 @@ static int create_inode_obj(struct sheepdog_node_list_entry *entries,
  * TODO: handle larger buffer
  */
 int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
-	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies)
+	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies,
+	    uint16_t flags)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 	int nr_nodes, nr_reqs;
@@ -111,6 +112,7 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	req.opcode = SD_OP_SO_NEW_VDI;
 	req.copies = copies;
 	req.tag = tag;
+	req.flags |= flags;
 
 	ret = exec_reqs(entries, nr_nodes, ci->epoch,
 			SD_DIR_OID, (struct sd_req *)&req, name, len, 0,

@@ -522,8 +522,7 @@ static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
 			 "[%y-%m-%d %H:%M:%S]", &tm);
 	}
 
-	add_proc(name, buf, oid,
-		 tag == 0 ? 0 : i->parent_oid,
+	add_proc(name, buf, oid, i->parent_oid,
 		 info->highlight && (flags & FLAG_CURRENT));
 }
 

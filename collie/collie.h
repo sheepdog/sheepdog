@@ -76,9 +76,9 @@ int create_listen_port(int port, void *data);
 
 int init_store(char *dir);
 
-int add_vdi(struct cluster_info *cluster,
-	    char *name, int len, uint64_t size, uint64_t * added_oid,
-	    uint64_t base_oid, uint32_t tag, int copies);
+int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
+	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies,
+	    uint16_t flags);
 
 int lookup_vdi(struct cluster_info *cluster, char *filename, uint64_t * oid,
 	       uint32_t tag, int do_lock, int *current);
