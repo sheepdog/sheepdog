@@ -23,7 +23,6 @@
 
 #define ANAME_LAST_OID "user.sheepdog.last_oid"
 #define ANAME_COPIES "user.sheepdog.copies"
-#define ANAME_CURRENT "user.sheepdog.current"
 
 static char *vdi_path;
 static char *obj_path;
@@ -581,8 +580,6 @@ static int so_read_vdis(struct request *req)
 	DIR *dir, *vdir;
 	struct dirent *dent, *vdent;
 	char *p;
-	int fd, ret;
-	uint64_t coid;
 	char vpath[1024];
 	struct sheepdog_dir_entry *sde = req->data;
 
@@ -597,25 +594,6 @@ static int so_read_vdis(struct request *req)
 
 		snprintf(vpath, sizeof(vpath), "%s%s", vdi_path, dent->d_name);
 
-		fd = open(vpath, O_RDONLY);
-		if (fd < 0) {
-			eprintf("%m\n");
-			closedir(dir);
-			return SD_RES_EIO;
-		}
-
-		ret = fgetxattr(fd, ANAME_CURRENT, &coid,
-				sizeof(coid));
-		if (ret != sizeof(coid)) {
-			closedir(dir);
-			close(fd);
-			return SD_RES_EIO;
-		}
-
-		dprintf("%lx\n", coid);
-
-		close(fd);
-
 		vdir = opendir(vpath);
 		if (!vdir) {
 			closedir(dir);
@@ -628,20 +606,19 @@ static int so_read_vdis(struct request *req)
 				continue;
 
 			p = strchr(vdent->d_name, '-');
-			if (!p) {
-				eprintf("bug %s\n", vdent->d_name);
-				continue;
-			}
 
 			dprintf("%s\n", vdent->d_name);
 
-			*p = '\0';
+			if (p)
+				*p = '\0';
 
 			sde->oid = strtoull(vdent->d_name, NULL, 16);
-			sde->tag = strtoull(p + 1, NULL, 16);
-
-			if (sde->oid == coid)
+			if (p)
+				sde->tag = strtoull(p + 1, NULL, 16);
+			else {
+				sde->tag = 0;
 				sde->flags = FLAG_CURRENT;
+			}
 
 			sde->name_len = strlen(dent->d_name);
 			strcpy(sde->name, dent->d_name);
@@ -667,7 +644,7 @@ static int so_lookup_vdi(struct request *req)
 	struct dirent *dent;
 	char *p;
 	int fd, ret;
-	uint64_t coid, oid;
+	uint64_t oid;
 	char path[1024];
 
 	memset(path, 0, sizeof(path));
@@ -686,23 +663,7 @@ static int so_lookup_vdi(struct request *req)
 		}
 	}
 
-	ret = fgetxattr(fd, ANAME_CURRENT, &coid,
-			sizeof(coid));
-	if (ret != sizeof(coid)) {
-		close(fd);
-		eprintf("%m\n");
-		return SD_RES_EIO;
-	}
-
-	dprintf("%lx, %x\n", coid, hdr->tag);
-
 	close(fd);
-
-	if (hdr->tag == 0xffffffff) {
-		rsp->oid = coid;
-		rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
-		return SD_RES_SUCCESS;
-	}
 
 	dir = opendir(path);
 	if (!dir)
@@ -715,8 +676,14 @@ static int so_lookup_vdi(struct request *req)
 
 		p = strchr(dent->d_name, '-');
 		if (!p) {
-			eprintf("bug %s\n", dent->d_name);
-			continue;
+			if (!hdr->tag) {
+				rsp->oid = strtoull(dent->d_name, NULL, 16);
+				rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
+
+				ret = SD_RES_SUCCESS;
+				break;
+			} else
+				continue;
 		}
 
 		if (strtoull(p + 1, NULL, 16) == hdr->tag) {
@@ -724,8 +691,6 @@ static int so_lookup_vdi(struct request *req)
 			oid = strtoull(dent->d_name, NULL, 16);
 			rsp->oid = oid;
 			dprintf("%lx, %x\n", oid, hdr->tag);
-			if (oid == coid)
-				rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
 
 			ret = SD_RES_SUCCESS;
 			break;
@@ -746,6 +711,8 @@ void so_queue_request(struct work *work, int idx)
 	uint32_t opcode = hdr->opcode;
 	uint64_t last_oid = 0;
 	char path[1024];
+	char oldname[1024];
+	uint16_t id = 0;
 
 	if (list_empty(&cluster->node_list)) {
 		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
@@ -804,9 +771,39 @@ void so_queue_request(struct work *work, int idx)
 		strncpy(path + strlen(path), "/", 1);
 		strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
 
-		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT)
-			;
-		else {
+		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT) {
+			DIR *dir;
+			struct dirent *dent;
+
+			dir = opendir(path);
+			if (!dir) {
+				ret = SD_RES_NO_VDI;
+				goto out;
+			}
+
+			while ((dent = readdir(dir))) {
+				uint16_t tmp;
+				char *p;
+
+				if (!strcmp(dent->d_name, ".") ||
+				    !strcmp(dent->d_name, ".."))
+					continue;
+				p = strchr(dent->d_name, '-');
+				if (!p) {
+					memset(oldname, 0, sizeof(oldname));
+					snprintf(oldname, sizeof(oldname), "%s/%s",
+						 path, dent->d_name);
+					continue;
+				}
+
+				tmp = strtoul(p + 1, NULL, 16);
+				if (tmp > id)
+					id = tmp;
+			}
+			/* TODO: wraparound */
+			id++;
+			closedir(dir);
+		} else {
 			ret = mkdir(path, def_dmode);
 			if (ret) {
 				if (errno == EEXIST)
@@ -828,8 +825,8 @@ void so_queue_request(struct work *work, int idx)
 
 		last_oid += MAX_DATA_OBJS;
 
-		snprintf(path+ strlen(path), sizeof(path) - strlen(path),
-			 "/%016lx-%08x", last_oid, hdr->tag);
+		snprintf(path+ strlen(path), sizeof(path) - strlen(path), "/%016lx", last_oid);
+
 		ret = creat(path, def_fmode);
 		if (ret < 0) {
 			eprintf("%m\n");
@@ -849,8 +846,15 @@ void so_queue_request(struct work *work, int idx)
 
 		close(fd);
 
-		ret = fsetxattr(nfd, ANAME_CURRENT, &last_oid,
-				sizeof(last_oid), 0);
+		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT) {
+			snprintf(path, sizeof(path), "%s-%04x", oldname, id);
+			ret = rename(oldname, path);
+			if (ret) {
+				eprintf("%s, %s, %m\n", oldname, path);
+				result = SD_RES_EIO;
+				goto out;
+			}
+		}
 
 		close(nfd);
 
