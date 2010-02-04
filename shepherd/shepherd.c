@@ -534,7 +534,7 @@ static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
 		localtime_r(&ti, &tm);
 
 		strftime(buf, sizeof(buf),
-			 "[%y-%m-%d %H:%M:%S]", &tm);
+			 "[%y-%m-%d %H:%M]", &tm);
 	}
 
 	add_proc(name, buf, oid, i->parent_oid,

@@ -93,12 +93,12 @@ void init_tree(void)
 	list = NULL;
 }
 
-static PROC *find_proc(uint64_t oid)
+static PROC *find_proc(uint64_t oid, const char *name)
 {
 	PROC *walk;
 
 	for (walk = list; walk; walk = walk->next)
-		if (walk->oid == oid)
+		if (walk->oid == oid && (name == NULL || !strcmp(walk->label, name)))
 			break;
 	return walk;
 }
@@ -121,6 +121,18 @@ static PROC *new_proc(const char *label, const char *tag, uint64_t oid)
 	return list = new;
 }
 
+static void del_child(PROC * parent, PROC * child)
+{
+	CHILD *new, **walk;
+
+	for (walk = &parent->children; *walk; walk = &(*walk)->next) {
+		if ((*walk)->child->oid == child->oid) {
+			*walk = (*walk)->next;
+			break;
+		}
+	}
+}
+
 static void add_child(PROC * parent, PROC * child)
 {
 	CHILD *new, **walk;
@@ -137,9 +149,10 @@ static void add_child(PROC * parent, PROC * child)
 
 void add_proc(const char *label, const char *tag, uint64_t oid, uint64_t poid, int highlight)
 {
-	PROC *this, *parent, *root;
+	PROC *this, *parent, *root = NULL;
+	const CHILD *walk;
 
-	if (!(this = find_proc(oid)))
+	if (!(this = find_proc(oid, label)))
 		this = new_proc(label, tag, oid);
 	else {
 		strcpy(this->label, label);
@@ -150,14 +163,22 @@ void add_proc(const char *label, const char *tag, uint64_t oid, uint64_t poid, i
 		poid = 0;
 		return;
 	}
-	if (!(parent = find_proc(poid))) {
-		root = find_proc(1);
-		parent = new_proc("", label, -oid);
+	if (!(parent = find_proc(poid, label))) {
+		root = find_proc(1, NULL);
+		parent = new_proc("", label, poid);
 		add_child(root, parent);
 	}
 
 	add_child(parent, this);
 	this->parent = parent;
+
+	for (walk = find_proc(1, NULL)->children; walk; walk = walk->next) {
+		if (walk->child->oid == oid) {
+			add_child(this, walk->child->children->child);
+			del_child(find_proc(1, NULL), walk->child);
+			break;
+		}
+	}
 }
 
 static void _dump_tree(PROC * current, int level, int leaf, int last)
@@ -225,6 +246,6 @@ void dump_tree(void)
 
 	sym = &sym_ascii;
 
-	for (walk = find_proc(1)->children; walk; walk = walk->next)
+	for (walk = find_proc(1, NULL)->children; walk; walk = walk->next)
 		_dump_tree(walk->child, 0, 1, 1);
 }
