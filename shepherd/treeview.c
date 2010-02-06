@@ -12,240 +12,184 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <getopt.h>
-#include <dirent.h>
-#include <curses.h>
 #include <term.h>
+
+#include "list.h"
 
 #ifndef MAX_DEPTH
 #define MAX_DEPTH    100
 #endif
 
-typedef struct _proc {
+struct vdi_tree {
+	char name[1024];
 	char label[256];
-	char tag[256];
 	uint64_t oid;
+	uint64_t poid;
 	int highlight;
-	struct _child *children;
-	struct _proc *parent;
-	struct _proc *next;
-} PROC;
+	struct list_head children;
+	struct list_head siblings;
+};
 
-typedef struct _child {
-	PROC *child;
-	struct _child *next;
-} CHILD;
+static int *width, *more;
+static struct vdi_tree *root;
 
-static struct {
-	const char *empty_2;	/*    */
-	const char *branch_2;	/* |- */
-	const char *vert_2;	/* |  */
-	const char *last_2;	/* `- */
-	const char *single_3;	/* --- */
-	const char *first_3;	/* -+- */
-} sym_ascii = {
-"  ", "|-", "| ", "`-", "---", "-+-"}
-
-, *sym = &sym_ascii;
-
-static PROC *list = NULL;
-static int width[MAX_DEPTH], more[MAX_DEPTH];
-static int trunc = 1;
-static int output_width = 132;
-static int cur_x = 1;
-static char last_char = 0;
-
-static void out_char(char c)
+static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint64_t oid,
+				 char *name)
 {
-	cur_x += (c & 0xc0) != 0x80;	/* only count first UTF-8 char */
-	if (cur_x <= output_width || !trunc)
-		putchar(c);
-	if (cur_x == output_width + 1 && trunc && ((c & 0xc0) != 0x80)) {
-		if (last_char || (c & 0x80))
-			putchar('+');
-		else {
-			last_char = c;
-			cur_x--;
-			return;
-		}
+	struct vdi_tree *vdi, *ret;
+
+	list_for_each_entry(vdi, &parent->children, siblings) {
+		if (vdi->oid == oid && !strcmp(vdi->name, name))
+			return vdi;
+
+		ret = find_vdi(vdi, oid, name);
+		if (ret)
+			return ret;
 	}
+	return NULL;
 }
 
-static void out_string(const char *str)
+static struct vdi_tree *new_vdi(char *name, char *label, uint64_t oid,
+			   uint64_t poid, int highlight)
 {
-	while (*str)
-		out_char(*str++);
-}
+	struct vdi_tree *vdi;
 
-static void out_newline(void)
-{
-	if (last_char && cur_x == output_width)
-		putchar(last_char);
-	last_char = 0;
-	putchar('\n');
-	cur_x = 1;
+	vdi = malloc(sizeof(struct vdi_tree));
+	if (!vdi) {
+		fprintf(stderr, "malloc\n");
+		return NULL;
+	}
+	strcpy(vdi->name, name);
+	strcpy(vdi->label, label);
+	vdi->oid = oid;
+	vdi->poid = poid;
+	vdi->highlight = highlight;
+	INIT_LIST_HEAD(&vdi->children);
+	return vdi;
 }
 
 void init_tree(void)
 {
-	list = NULL;
+	root = new_vdi("", "", 0, 0, 0);
 }
 
-static PROC *find_proc(uint64_t oid, const char *name)
+void add_vdi_tree(char *name, char *label, uint64_t oid, uint64_t poid,
+		  int highlight)
 {
-	PROC *walk;
+	struct vdi_tree *vdi, *parent;
 
-	for (walk = list; walk; walk = walk->next)
-		if (walk->oid == oid && (name == NULL || !strcmp(walk->label, name)))
-			break;
-	return walk;
+	vdi = new_vdi(name, label, oid, poid, highlight);
+	if (!vdi)
+		return;
+
+	parent = find_vdi(root, poid, name);
+	if (!parent)
+		parent = root;
+
+	list_add_tail(&vdi->siblings, &parent->children);
 }
 
-static PROC *new_proc(const char *label, const char *tag, uint64_t oid)
+static void compaction(struct vdi_tree *parent)
 {
-	PROC *new;
+	struct vdi_tree *vdi, *e, *new_parent;
 
-	if (!(new = malloc(sizeof(PROC)))) {
-		perror("malloc");
-		exit(1);
-	}
-	strcpy(new->label, label);
-	strcpy(new->tag, tag);
-	new->oid = oid;
-	new->highlight = 0;
-	new->children = NULL;
-	new->parent = NULL;
-	new->next = list;
-	return list = new;
-}
-
-static void del_child(PROC * parent, PROC * child)
-{
-	CHILD *new, **walk;
-
-	for (walk = &parent->children; *walk; walk = &(*walk)->next) {
-		if ((*walk)->child->oid == child->oid) {
-			*walk = (*walk)->next;
-			break;
+	list_for_each_entry_safe(vdi, e, &parent->children, siblings) {
+		new_parent = find_vdi(root, vdi->poid, vdi->name);
+		if (new_parent && parent != new_parent) {
+			list_del(&vdi->siblings);
+			list_add_tail(&vdi->siblings, &new_parent->children);
 		}
+
+		compaction(vdi);
 	}
 }
 
-static void add_child(PROC * parent, PROC * child)
+static int get_depth(struct vdi_tree *parent)
 {
-	CHILD *new, **walk;
+	struct vdi_tree *vdi;
+	int max_depth = 0, depth;
 
-	if (!(new = malloc(sizeof(CHILD)))) {
-		perror("malloc");
-		exit(1);
+	list_for_each_entry(vdi, &parent->children, siblings) {
+		depth = get_depth(vdi);
+		if (max_depth < depth)
+			max_depth = depth;
 	}
-	new->child = child;
-	for (walk = &parent->children; *walk; walk = &(*walk)->next) ;
-	new->next = *walk;
-	*walk = new;
+	return max_depth + 1;
 }
 
-void add_proc(const char *label, const char *tag, uint64_t oid, uint64_t poid, int highlight)
+static void spaces(int n)
 {
-	PROC *this, *parent, *root = NULL;
-	const CHILD *walk;
+	while (n--)
+		putchar(' ');
+}
 
-	if (!(this = find_proc(oid, label)))
-		this = new_proc(label, tag, oid);
+static void indent(int level, int first, int last)
+{
+	int lvl;
+
+	if (first)
+		printf(last ? "---" : "-+-");
 	else {
-		strcpy(this->label, label);
-		strcpy(this->tag, tag);
-	}
-	this->highlight = highlight;
-	if (oid == poid) {
-		poid = 0;
-		return;
-	}
-	if (!(parent = find_proc(poid, label))) {
-		root = find_proc(1, NULL);
-		parent = new_proc("", label, poid);
-		add_child(root, parent);
-	}
-
-	add_child(parent, this);
-	this->parent = parent;
-
-	for (walk = find_proc(1, NULL)->children; walk; walk = walk->next) {
-		if (walk->child->oid == oid) {
-			add_child(this, walk->child->children->child);
-			del_child(find_proc(1, NULL), walk->child);
-			break;
+		for (lvl = 0; lvl < level - 1; lvl++) {
+			spaces(width[lvl] + 1);
+			printf(more[lvl + 1] ? "| " : "  ");
 		}
+
+		spaces(width[level - 1] + 1);
+		printf(last ? "`-" : "|-");
 	}
 }
 
-static void _dump_tree(PROC * current, int level, int leaf, int last)
+static void _dump_tree(struct vdi_tree *current, int level, int first, int last)
 {
-	CHILD *walk, *next;
-	int lvl, i, add, offset, tag_len, first;
-	const char *tmp, *here;
+	char *tmp;
+	struct vdi_tree *vdi;
 
-	if (!current)
-		return;
-	if (level >= MAX_DEPTH - 1) {
-		fprintf(stderr, "Internal error: MAX_DEPTH not big enough.\n");
-		exit(1);
-	}
-	if (!leaf)
-		for (lvl = 0; lvl < level; lvl++) {
-			for (i = width[lvl] + 1; i; i--)
-				out_char(' ');
-			out_string(lvl ==
-				   level -
-				   1 ? last ? sym->
-				   last_2 : sym->branch_2 : more[lvl +
-								 1] ? sym->
-				   vert_2 : sym->empty_2);
-		}
-	add = 0;
+	indent(level, first, last);
+
 	if (current->highlight && (tmp = tgetstr("md", NULL)))
 		tputs(tmp, 1, putchar);
-	tag_len = 0;
-	for (here = current->tag; *here; here++) {
-		out_char(*here);
-		tag_len++;
-	}
-	offset = cur_x;
+
+	printf(current->label);
+
 	if (current->highlight && (tmp = tgetstr("me", NULL)))
 		tputs(tmp, 1, putchar);
-	if (!current->children) {
-		out_newline();
-	} else {
-		more[level] = !last;
-		width[level] = tag_len + cur_x - offset + add;
-		if (cur_x >= output_width && trunc) {
-			out_string(sym->first_3);
-			out_string("+");
-			out_newline();
-		} else {
-			first = 1;
-			for (walk = current->children; walk; walk = next) {
-				next = walk->next;
-				if (first) {
-					out_string(next ? sym->
-						   first_3 : sym->single_3);
-					first = 0;
-				}
-				_dump_tree(walk->child, level + 1,
-					   walk == current->children, !next);
-			}
-		}
+
+	if (list_empty(&current->children)) {
+		putchar('\n');
+		return;
+	}
+
+	more[level] = !last;
+	width[level] = strlen(current->label);
+
+	list_for_each_entry(vdi, &current->children, siblings) {
+		_dump_tree(vdi, level + 1,
+			   &vdi->siblings == current->children.next,
+			   vdi->siblings.next == &current->children);
 	}
 }
 
 void dump_tree(void)
 {
-	const CHILD *walk;
+	struct vdi_tree *vdi;
+	int depth;
 
-	sym = &sym_ascii;
+	compaction(root);
 
-	for (walk = find_proc(1, NULL)->children; walk; walk = walk->next)
-		_dump_tree(walk->child, 0, 1, 1);
+	depth = get_depth(root);
+
+	width = malloc(sizeof(int) * depth);
+	more = malloc(sizeof(int) * depth);
+	if (!width || !more) {
+		fprintf(stderr, "out of memory\n");
+		return;
+	}
+
+	list_for_each_entry(vdi, &root->children, siblings) {
+		printf(vdi->name);
+		more[0] = 0;
+		width[0] = strlen(vdi->name);
+		_dump_tree(vdi, 1, 1, 1);
+	}
 }

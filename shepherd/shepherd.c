@@ -537,7 +537,7 @@ static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
 			 "[%y-%m-%d %H:%M]", &tm);
 	}
 
-	add_proc(name, buf, oid, i->parent_oid,
+	add_vdi_tree(name, buf, oid, i->parent_oid,
 		 info->highlight && (flags & FLAG_CURRENT));
 }
 
@@ -549,7 +549,6 @@ static int treeview_vdi(char *vdiname, int highlight)
 	i.highlight = highlight;
 
 	init_tree();
-	add_proc("", "root", 1, 1, 0);
 
 	parse_vdi(print_vdi_tree, &i);
 

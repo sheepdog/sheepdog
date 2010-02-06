@@ -12,7 +12,8 @@
 #define __TREEVIEW__
 
 void init_tree(void);
-void add_proc(const char *label, const char *tag, uint64_t pid, uint64_t ppid, int highlight);
+void add_vdi_tree(const char *label, const char *tag, uint64_t pid,
+		  uint64_t ppid, int highlight);
 void dump_tree(void);
 
 #endif
