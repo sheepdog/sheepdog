@@ -258,7 +258,7 @@ again:
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0)
-			continue;
+			goto again;
 
 		memcpy(&hdr2, hdr, sizeof(hdr2));
 
