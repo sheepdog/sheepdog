@@ -212,6 +212,8 @@ int connect_to(char *name, int port)
 				name, port, strerror(errno));
 		else
 			goto success;
+
+		close(fd);
 	}
 	fd = -1;
 success:
