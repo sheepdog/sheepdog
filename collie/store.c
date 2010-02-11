@@ -330,6 +330,7 @@ static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
+		eprintf("failed to open %s, %s\n", path, strerror(errno));
 		if (errno == ENOENT)
 			*ret = SD_RES_NO_OBJ;
 		else
@@ -576,8 +577,8 @@ void store_queue_request(struct work *work, int idx)
 	ret = store_queue_request_local(cluster, req, buf, epoch);
 out:
 	if (ret != SD_RES_SUCCESS) {
-		dprintf("failed, %d, %x, %" PRIx64" , %u, %u\n",
-			idx, opcode, oid, epoch, req_epoch);
+		dprintf("failed, %d, %x, %" PRIx64" , %u, %u, %x\n",
+			idx, opcode, oid, epoch, req_epoch, ret);
 		rsp->result = ret;
 	}
 }
