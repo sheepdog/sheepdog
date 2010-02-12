@@ -70,8 +70,8 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 
 	closedir(dir);
 
-	*store_size = vs.f_frsize * vs.f_bfree;
-	*store_free = vs.f_frsize * vs.f_bfree - used;
+	*store_size = vs.f_frsize * vs.f_bfree + used;
+	*store_free = vs.f_frsize * vs.f_bfree;
 
 	return SD_RES_SUCCESS;
 }
