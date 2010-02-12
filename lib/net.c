@@ -183,6 +183,7 @@ int connect_to(char *name, int port)
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 	int fd, ret;
 	struct addrinfo hints, *res, *res0;
+	struct linger linger_opt = {1, 0};
 
 	memset(&hints, 0, sizeof(hints));
 	snprintf(buf, sizeof(buf), "%d", port);
@@ -205,6 +206,14 @@ int connect_to(char *name, int port)
 		fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (fd < 0)
 			continue;
+
+		ret = setsockopt(fd, SOL_SOCKET, SO_LINGER, &linger_opt,
+				 sizeof(linger_opt));
+		if (ret) {
+			eprintf("can't set SO_LINGER, %m\n");
+			close(fd);
+			continue;
+		}
 
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret)
