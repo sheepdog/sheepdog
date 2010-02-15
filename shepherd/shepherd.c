@@ -102,15 +102,25 @@ static unsigned master_idx;
 static char *size_to_str(uint64_t size, char *str, int str_size)
 {
 	char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
-	int i = 0;
+	int i = 0, frac = 0;
 
 	size /= 1024 * 1024;
 	while (i < ARRAY_SIZE(units) && size >= 1024) {
 		i++;
+
+		frac = size % 1024;
+		if (frac > 1000)
+			frac -= 100;
+		while (frac > 10)
+			frac /= 10;
+
 		size /= 1024;
 	}
 
-	snprintf(str, str_size, "%" PRId64 " %s", size, units[i]);
+	if (size > 9)
+		snprintf(str, str_size, "%" PRId64 " %s", size, units[i]);
+	else
+		snprintf(str, str_size, "%" PRId64 ".%d %s", size, frac, units[i]);
 
 	return str;
 }
@@ -452,6 +462,7 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 	struct tm tm;
 	char date[128];
 	char time[128];
+	char size_str[8];
 
 	if (info->name && strcmp(info->name, name) != 0)
 		return;
@@ -464,6 +475,7 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 
 	strftime(date, sizeof(date), "%y-%m-%d", &tm);
 	strftime(time, sizeof(time), "%H:%M:%S", &tm);
+	size_to_str(i->vdi_size, size_str, sizeof(size_str));
 
 	printf("  \"%" PRIu64 "\" [shape = \"box\","
 	       "fontname = \"Courier\","
@@ -473,10 +485,10 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 	       oid, name);
 	printf("name: %8s\\n"
 	       "tag : %8x\\n"
-	       "size: %5" PRIu64 " MB\\n"
+	       "size: %8s\\n"
 	       "date: %8s\\n"
 	       "time: %8s",
-	       name, tag, i->vdi_size / 1024 / 1024, date, time);
+	       name, tag, size_str, date, time);
 
 	if (info->highlight && (flags & FLAG_CURRENT))
 		printf("\", color=\"red\"];\n");
@@ -607,6 +619,7 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 	int i, j;
 	uint64_t my_objs, cow_objs;
 	struct vm_list_info *vli = (struct vm_list_info *)data;
+	char vdi_size_str[8], my_objs_str[8], cow_objs_str[8];
 
 	if (!(flags & FLAG_CURRENT))
 		return;
@@ -627,16 +640,16 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 			cow_objs++;
 	}
 
+	size_to_str(inode->vdi_size, vdi_size_str, sizeof(vdi_size_str));
+	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
+	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 	if (i < vli->nr_vms) {
 		char *tmp;
 		if (vli->highlight && (tmp = tgetstr("md", NULL)))
 			tputs(tmp, 1, putchar);
 
-		printf("%-16s|%6" PRIu64 " MB|%6" PRIu64 " MB|%6"
-		       PRIu64 " MB| running on %d.%d.%d.%d", name,
-		       inode->vdi_size / 1024 / 1024,
-		       my_objs * SD_DATA_OBJ_SIZE / 1024 / 1024,
-		       cow_objs * SD_DATA_OBJ_SIZE / 1024 / 1024,
+		printf("%-16s|%9s|%9s|%9s| running on %d.%d.%d.%d", name,
+		       vdi_size_str, my_objs_str, cow_objs_str,
 		       vli->vm_list_entries[i].host_addr[12],
 		       vli->vm_list_entries[i].host_addr[13],
 		       vli->vm_list_entries[i].host_addr[14],
@@ -645,11 +658,8 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 			tputs(tmp, 1, putchar);
 		printf("\n");
 	} else
-		printf("%-16s|%6" PRIu64 " MB|%6" PRIu64 " MB|%6" PRIu64
-		       " MB| not running\n", name,
-		       inode->vdi_size / 1024 / 1024,
-		       my_objs * SD_DATA_OBJ_SIZE / 1024 / 1024,
-		       cow_objs * SD_DATA_OBJ_SIZE / 1024 / 1024);
+		printf("%-16s|%9s|%9s|%9s| not running\n", name,
+		       vdi_size_str, my_objs_str, cow_objs_str);
 }
 
 static void cal_total_vdi_size(uint64_t oid, char *name, uint32_t tag,
@@ -834,6 +844,7 @@ int info(enum info_type type, enum format_type format, char *name,
 {
 	int i, ret = -1;
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
+	char total_str[8], avail_str[8], vdi_size_str[8];
 
 	if (real_time) {
 		setupterm(NULL, 1, (int *)0);
@@ -868,8 +879,8 @@ rerun:
 		}
 		break;
 	case INFO_DOG:
-		printf("  Idx\tNode id (FNV-1a)    - Host:Port\n");
-		printf("--------------------------------------------------\n");
+		printf("  Idx\tNode id (FNV-1a) - Host:Port\n");
+		printf("------------------------------------------------\n");
 		for (i = 0; i < nr_nodes; i++) {
 			char data[128];
 
@@ -897,6 +908,7 @@ rerun:
 			unsigned wlen, rlen;
 			struct sd_node_req req;
 			struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
+			char store_str[8], free_str[8];
 
 			snprintf(name, sizeof(name), "%d.%d.%d.%d",
 				 node_list_entries[i].addr[12],
@@ -918,10 +930,11 @@ rerun:
 			ret = exec_req(fd, (struct sd_req *)&req, NULL, &wlen, &rlen);
 			close(fd);
 
+			size_to_str(rsp->store_size, store_str, sizeof(store_str));
+			size_to_str(rsp->store_size - rsp->store_free, free_str,
+				    sizeof(free_str));
 			if (!ret && rsp->result == SD_RES_SUCCESS)
-				printf("%2d\t%" PRIu64 "G\t%" PRIu64 "G\t%3d%%\n", i,
-				       rsp->store_size / 1024 / 1024 / 1024,
-				       (rsp->store_size - rsp->store_free) / 1024 / 1024 / 1024,
+				printf("%2d\t%s\t%s\t%3d%%\n", i, store_str, free_str,
 				       (int)(((double)(rsp->store_size - rsp->store_free) / rsp->store_size) * 100));
 
 			total_size += rsp->store_size;
@@ -932,11 +945,13 @@ rerun:
 
 		parse_vdi(cal_total_vdi_size, &total_vdi_size);
 
-		printf("Total\t%" PRIu64 "G\t%" PRIu64 "G\t%3d%%, total virtual VDI Size\t%" PRIu64 "G\n",
-		       total_size / 1024 / 1024 / 1024,
-		       (total_size - total_avail) / 1024 / 1024 / 1024,
+		size_to_str(total_size, total_str, sizeof(total_str));
+		size_to_str(total_size - total_avail, avail_str, sizeof(avail_str));
+		size_to_str(total_vdi_size, vdi_size_str, sizeof(vdi_size_str));
+		printf("Total\t%s\t%s\t%3d%%, total virtual VDI Size\t%s\n",
+		       total_str, avail_str,
 		       (int)(((double)(total_size - total_avail) / total_size) * 100),
-		       total_vdi_size / 1024 / 1024 / 1024);
+		       vdi_size_str);
 
 		ret = 0;
 		break;
