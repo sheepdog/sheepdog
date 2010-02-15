@@ -37,7 +37,7 @@ static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 int nr_sobjs;
 struct work_queue *dobj_queue;
 
-static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
+static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
 	int ret;
@@ -45,13 +45,14 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 	struct dirent *d;
 	uint64_t used = 0;
 	struct stat s;
-	char path[1024];
+	char path[1024], store_dir[1024];
 
 	ret = statvfs(mnt_path, &vs);
 	if (ret)
 		return SD_RES_EIO;
 
-	dir = opendir(obj_path);
+	snprintf(store_dir, sizeof(store_dir), "%s%08u", obj_path, epoch);
+	dir = opendir(store_dir);
 	if (!dir)
 		return SD_RES_EIO;
 
@@ -59,7 +60,7 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free)
 		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
 			continue;
 
-		snprintf(path, sizeof(path), "%s%s", obj_path, d->d_name);
+		snprintf(path, sizeof(path), "%s/%s", store_dir, d->d_name);
 
 		ret = stat(path, &s);
 		if (ret)
@@ -560,7 +561,7 @@ void store_queue_request(struct work *work, int idx)
 	}
 
 	if (opcode == SD_OP_STAT_SHEEP) {
-		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free);
+		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free, epoch);
 		goto out;
 	}
 
