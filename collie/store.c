@@ -93,7 +93,7 @@ static int get_obj_list(struct request *req)
 
 	snprintf(path, sizeof(path), "%s%08u/", obj_path, hdr->obj_ver);
 
-	dprintf("%d\n", req->ci->cluster->this_node.port);
+	dprintf("%d\n", sys->this_node.port);
 
 	dir = opendir(path);
 	if (!dir) {
@@ -136,7 +136,7 @@ static int get_obj_list(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
-static int read_from_one(struct cluster_info *cluster, uint64_t oid,
+static int read_from_one(uint64_t oid,
 			 unsigned *ori_rlen, void *buf, uint64_t offset)
 {
 	int i, n, nr, fd, ret;
@@ -148,7 +148,7 @@ static int read_from_one(struct cluster_info *cluster, uint64_t oid,
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
-	nr = build_node_list(&cluster->node_list, e);
+	nr = build_node_list(&sys->node_list, e);
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
@@ -158,7 +158,7 @@ again:
 			 e[n].addr[14], e[n].addr[15]);
 
 		/* FIXME: do like store_queue_request_local() */
-		if (e[n].id == cluster->this_node.id)
+		if (e[n].id == sys->this_node.id)
 			continue;
 
 		fd = connect_to(name, e[n].port);
@@ -168,7 +168,7 @@ again:
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.oid = oid;
-		hdr.epoch = cluster->epoch;
+		hdr.epoch = sys->epoch;
 
 		rlen = *ori_rlen;
 		wlen = 0;
@@ -203,24 +203,21 @@ again:
 	return -1;
 }
 
-static int read_from_other_sheeps(struct cluster_info *cluster,
-				  uint64_t oid, char *buf, int copies)
+static int read_from_other_sheeps(uint64_t oid, char *buf, int copies)
 {
 	int ret;
 	unsigned int rlen;
 
 	rlen = SD_DATA_OBJ_SIZE;
 
-	ret = read_from_one(cluster, oid, &rlen, buf, 0);
+	ret = read_from_one(oid, &rlen, buf, 0);
 
 	return ret;
 }
 
-static int store_queue_request_local(struct cluster_info *cluster,
-				     struct request *req, char *buf, uint32_t epoch);
+static int store_queue_request_local(struct request *req, char *buf, uint32_t epoch);
 
-static int forward_obj_req(struct cluster_info *cluster, struct request *req,
-			   char *buf)
+static int forward_obj_req(struct request *req, char *buf)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
@@ -234,13 +231,13 @@ static int forward_obj_req(struct cluster_info *cluster, struct request *req,
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
-	nr = build_node_list(&cluster->node_list, e);
+	nr = build_node_list(&sys->node_list, e);
 
 	copies = hdr->copies;
 
 	/* temporary hack */
 	if (!copies)
-		copies = cluster->nr_sobjs;
+		copies = sys->nr_sobjs;
 
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
@@ -250,8 +247,8 @@ again:
 			 e[n].addr[14], e[n].addr[15]);
 
 		/* TODO: we can do better; we need to chech this first */
-		if (e[n].id == cluster->this_node.id) {
-			ret = store_queue_request_local(cluster, req, buf, cluster->epoch);
+		if (e[n].id == sys->this_node.id) {
+			ret = store_queue_request_local(req, buf, sys->epoch);
 			memcpy(rsp, &req->rp, sizeof(*rsp));
 			rsp->result = ret;
 			goto done;
@@ -272,7 +269,7 @@ again:
 		}
 
 		hdr2.flags |= SD_FLAG_CMD_FORWARD;
-		hdr2.epoch = cluster->epoch;
+		hdr2.epoch = sys->epoch;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr2, req->data, &wlen, &rlen);
 
@@ -301,21 +298,21 @@ again:
 	return (hdr->flags & SD_FLAG_CMD_WRITE) ? SD_RES_SUCCESS: rsp->result;
 }
 
-static int check_epoch(struct cluster_info *cluster, struct request *req)
+static int check_epoch(struct request *req)
 {
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	uint32_t req_epoch = hdr->epoch;
 	uint32_t opcode = hdr->opcode;
 	int ret = SD_RES_SUCCESS;
 
-	if (before(req_epoch, cluster->epoch)) {
+	if (before(req_epoch, sys->epoch)) {
 		ret = SD_RES_OLD_NODE_VER;
 		eprintf("old node version %u %u, %x\n",
-			cluster->epoch, req_epoch, opcode);
-	} else if (after(req_epoch, cluster->epoch)) {
+			sys->epoch, req_epoch, opcode);
+	} else if (after(req_epoch, sys->epoch)) {
 		ret = SD_RES_NEW_NODE_VER;
 			eprintf("new node version %u %u %x\n",
-				cluster->epoch, req_epoch, opcode);
+				sys->epoch, req_epoch, opcode);
 	}
 
 	return ret;
@@ -342,23 +339,23 @@ static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 	return fd;
 }
 
-static int is_my_obj(struct cluster_info *ci, uint64_t oid, int copies)
+static int is_my_obj(uint64_t oid, int copies)
 {
 	int i, n, nr;
 	struct sheepdog_node_list_entry e[SD_MAX_NODES];
 
-	nr = build_node_list(&ci->node_list, e);
+	nr = build_node_list(&sys->node_list, e);
 
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
-		if (e[n].id == ci->this_node.id)
+		if (e[n].id == sys->this_node.id)
 			return 1;
 	}
 
 	return 0;
 }
 
-int update_epoch_store(struct cluster_info *ci, uint32_t epoch)
+int update_epoch_store(uint32_t epoch)
 {
 	int ret;
 	char new[1024], old[1024];
@@ -388,7 +385,7 @@ int update_epoch_store(struct cluster_info *ci, uint32_t epoch)
 
 		oid = strtoull(d->d_name, NULL, 16);
 		/* TODO: use proper object coipes */
-		if (is_my_obj(ci, oid, ci->nr_sobjs)) {
+		if (is_my_obj(oid, sys->nr_sobjs)) {
 			snprintf(new, sizeof(new), "%s%08u/%s", obj_path, epoch,
 				d->d_name);
 			snprintf(old, sizeof(old), "%s%08u/%s", obj_path, epoch - 1,
@@ -402,8 +399,7 @@ int update_epoch_store(struct cluster_info *ci, uint32_t epoch)
 	return 0;
 }
 
-static int store_queue_request_local(struct cluster_info *cluster,
-				     struct request *req, char *buf, uint32_t epoch)
+static int store_queue_request_local(struct request *req, char *buf, uint32_t epoch)
 {
 	int fd = -1, copies;
 	int ret = SD_RES_SUCCESS;
@@ -455,8 +451,7 @@ static int store_queue_request_local(struct cluster_info *cluster,
 		if (hdr->flags & SD_FLAG_CMD_COW) {
 			dprintf("%" PRIu64 "\n", hdr->cow_oid);
 
-			ret = read_from_other_sheeps(cluster,
-						     hdr->cow_oid, buf,
+			ret = read_from_other_sheeps(hdr->cow_oid, buf,
 						     hdr->copies);
 			if (ret) {
 				ret = 1;
@@ -535,27 +530,26 @@ out:
 void store_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
-	struct cluster_info *cluster = req->ci->cluster;
 	int ret = SD_RES_SUCCESS;
 	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
-	uint32_t epoch = cluster->epoch;
+	uint32_t epoch = sys->epoch;
 	uint32_t req_epoch = hdr->epoch;
 	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
 
 	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
 
-	if (list_empty(&cluster->node_list)) {
+	if (list_empty(&sys->node_list)) {
 		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
 		ret = SD_RES_SYSTEM_ERROR;
 		goto out;
 	}
 
 	if (hdr->flags & SD_FLAG_CMD_FORWARD) {
-		ret = check_epoch(cluster, req);
+		ret = check_epoch(req);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 	}
@@ -571,11 +565,11 @@ void store_queue_request(struct work *work, int idx)
 	}
 
 	if (!(hdr->flags & SD_FLAG_CMD_FORWARD)) {
-		ret = forward_obj_req(cluster, req, buf);
+		ret = forward_obj_req(req, buf);
 		goto out;
 	}
 
-	ret = store_queue_request_local(cluster, req, buf, epoch);
+	ret = store_queue_request_local(req, buf, epoch);
 out:
 	if (ret != SD_RES_SUCCESS) {
 		dprintf("failed, %d, %x, %" PRIx64" , %u, %u, %x\n",
@@ -735,7 +729,6 @@ void so_queue_request(struct work *work, int idx)
 	struct request *req = container_of(work, struct request, work);
 	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
-	struct cluster_info *cluster = req->ci->cluster;
 	int nfd = -1, fd = -1, ret, result = SD_RES_SUCCESS;
 	uint32_t opcode = hdr->opcode;
 	uint64_t last_oid = 0;
@@ -743,7 +736,7 @@ void so_queue_request(struct work *work, int idx)
 	char oldname[1024];
 	uint16_t id = 0;
 
-	if (list_empty(&cluster->node_list)) {
+	if (list_empty(&sys->node_list)) {
 		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
 		result = SD_RES_SYSTEM_ERROR;
 		goto out;
@@ -759,12 +752,12 @@ void so_queue_request(struct work *work, int idx)
 		int local = 0;
 
 		e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-		nr = build_node_list(&cluster->node_list, e);
+		nr = build_node_list(&sys->node_list, e);
 
-		for (i = 0; i < cluster->nr_sobjs; i++) {
+		for (i = 0; i < sys->nr_sobjs; i++) {
 			n = obj_to_sheep(e, nr, SD_DIR_OID, i);
 
-			if (e[n].id == cluster->this_node.id) {
+			if (e[n].id == sys->this_node.id) {
 				local = 1;
 				break;
 			}
@@ -792,7 +785,7 @@ void so_queue_request(struct work *work, int idx)
 
 			memset(&hdr2, 0, sizeof(hdr2));
 			hdr2.opcode = SD_OP_SO_READ_VDIS;
-			hdr2.epoch = cluster->epoch;
+			hdr2.epoch = sys->epoch;
 			hdr2.data_length = hdr->data_length;
 
 			wlen = 0;
@@ -817,7 +810,7 @@ void so_queue_request(struct work *work, int idx)
 	}
 
 	if (opcode != SD_OP_SO_READ_VDIS) {
-		result = check_epoch(cluster, req);
+		result = check_epoch(req);
 		if (result != SD_RES_SUCCESS)
 			goto out;
 	}
@@ -1067,7 +1060,6 @@ struct recovery_work {
 
 	struct work work;
 	struct list_head rw_siblings;
-	struct cluster_info *ci;
 
 	int count;
 	char *buf;
@@ -1103,7 +1095,7 @@ static void recover_one(struct work *work, int idx)
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.oid = oid;
-	hdr.epoch = rw->ci->epoch;
+	hdr.epoch = sys->epoch;
 	hdr.flags = 0;
 	hdr.data_length = rlen;
 
@@ -1136,7 +1128,7 @@ static void recover_one_done(struct work *work, int idx)
 	}
 
 	if (rw->iteration) {
-		if (++rw->iteration <= rw->ci->nr_sobjs) {
+		if (++rw->iteration <= sys->nr_sobjs) {
 			free(rw->buf);
 
 			rw->done = 0;
@@ -1195,7 +1187,7 @@ static int fill_obj_list(struct recovery_work *rw,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_OBJ_LIST;
-	hdr.epoch = rw->ci->epoch;
+	hdr.epoch = sys->epoch;
 	hdr.oid = start_hash;
 	hdr.cow_oid = end_hash;
 	hdr.obj_ver = epoch - 1;
@@ -1251,12 +1243,12 @@ static void __start_recovery(struct work *work, int idx)
 		goto fail;
 	old_nr /= sizeof(struct sheepdog_node_list_entry);
 
-	if (!rw->ci->nr_sobjs || cur_nr < rw->ci->nr_sobjs || old_nr < rw->ci->nr_sobjs)
+	if (!sys->nr_sobjs || cur_nr < sys->nr_sobjs || old_nr < sys->nr_sobjs)
 		goto fail;
 
 	if (cur_nr < old_nr) {
 		for (i = 0; i < old_nr; i++) {
-			if (old_entry[i].id == rw->ci->this_node.id) {
+			if (old_entry[i].id == sys->this_node.id) {
 				my_idx = i;
 				break;
 			}
@@ -1277,18 +1269,18 @@ static void __start_recovery(struct work *work, int idx)
 		dprintf("%u %u %u\n", my_idx, ch_idx,
 			node_distance(my_idx, ch_idx, old_nr));
 
-		if (node_distance(my_idx, ch_idx, old_nr) > rw->ci->nr_sobjs)
+		if (node_distance(my_idx, ch_idx, old_nr) > sys->nr_sobjs)
 			return;
 
-		n = node_from_distance(my_idx, rw->ci->nr_sobjs, old_nr);
+		n = node_from_distance(my_idx, sys->nr_sobjs, old_nr);
 
-		dprintf("%d %d\n", n, rw->ci->nr_sobjs);
+		dprintf("%d %d\n", n, sys->nr_sobjs);
 
 		start_hash = old_entry[(n - 1 + old_nr) % old_nr].id;
 		end_hash = old_entry[n].id;
 
 		/* FIXME */
-		if (node_distance(my_idx, ch_idx, old_nr) == rw->ci->nr_sobjs) {
+		if (node_distance(my_idx, ch_idx, old_nr) == sys->nr_sobjs) {
 			n++;
 			n %= old_nr;
 		}
@@ -1296,7 +1288,7 @@ static void __start_recovery(struct work *work, int idx)
 		fill_obj_list(rw, old_entry + n, start_hash, end_hash);
 	} else {
 		for (i = 0; i < cur_nr; i++) {
-			if (cur_entry[i].id == rw->ci->this_node.id) {
+			if (cur_entry[i].id == sys->this_node.id) {
 				my_idx = i;
 				break;
 			}
@@ -1338,7 +1330,7 @@ static void __start_recovery_done(struct work *work, int idx)
 
 	if (!rw->count) {
 		if (rw->iteration) {
-			if (++rw->iteration <= rw->ci->nr_sobjs) {
+			if (++rw->iteration <= sys->nr_sobjs) {
 				free(rw->buf);
 
 				rw->work.fn = __start_recovery;
@@ -1364,7 +1356,7 @@ static void __start_recovery_done(struct work *work, int idx)
 	queue_work(dobj_queue, &rw->work);
 }
 
-int start_recovery(struct cluster_info *ci, uint32_t epoch, int add)
+int start_recovery(uint32_t epoch, int add)
 {
 	struct recovery_work *rw;
 
@@ -1377,7 +1369,6 @@ int start_recovery(struct cluster_info *ci, uint32_t epoch, int add)
 		return -1;
 
 	rw->epoch = epoch;
-	rw->ci = ci;
 	rw->count = 0;
 
 	if (add)

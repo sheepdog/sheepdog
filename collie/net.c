@@ -198,7 +198,7 @@ static void init_tx_hdr(struct client_info *ci)
 	/* use cpu_to_le */
 	memcpy(rsp, &req->rp, sizeof(*rsp));
 
-	rsp->epoch = ci->cluster->epoch;
+	rsp->epoch = sys->epoch;
 	rsp->opcode = req->rq.opcode;
 	rsp->id = req->rq.id;
 }
@@ -277,8 +277,6 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 	INIT_LIST_HEAD(&ci->done_reqs);
 
 	init_rx_hdr(ci);
-
-	ci->cluster = cluster;
 
 	return ci;
 }

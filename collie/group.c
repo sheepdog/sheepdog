@@ -69,7 +69,6 @@ struct vdi_op_message {
 struct work_deliver {
 	struct message_header *msg;
 
-	struct cluster_info *ci;
 	struct work work;
 };
 
@@ -81,7 +80,6 @@ struct work_confch {
 	struct cpg_address *joined_list;
 	size_t joined_list_entries;
 
-	struct cluster_info *ci;
 	struct work work;
 };
 
@@ -131,33 +129,32 @@ static int get_node_idx(struct sheepdog_node_list_entry *ent,
 	return ent - entries;
 }
 
-static void get_node_list(struct cluster_info *cluster, struct sd_node_req *req,
+static void get_node_list(struct sd_node_req *req,
 			  struct sd_node_rsp *rsp, void *data)
 {
 	int nr_nodes;
 	struct node *node;
 
-	nr_nodes = build_node_list(&cluster->node_list, data);
+	nr_nodes = build_node_list(&sys->node_list, data);
 	rsp->data_length = nr_nodes * sizeof(struct sheepdog_node_list_entry);
 	rsp->nr_nodes = nr_nodes;
-	rsp->local_idx = get_node_idx(&cluster->this_node, data, nr_nodes);
+	rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
 
-	if (list_empty(&cluster->node_list)) {
+	if (list_empty(&sys->node_list)) {
 		rsp->master_idx = -1;
 		return;
 	}
-	node = list_first_entry(&cluster->node_list, struct node, list);
+	node = list_first_entry(&sys->node_list, struct node, list);
 	rsp->master_idx = get_node_idx(&node->ent, data, nr_nodes);
 }
 
-static void get_vm_list(struct cluster_info *cluster, struct sd_rsp *rsp,
-			void *data)
+static void get_vm_list(struct sd_rsp *rsp, void *data)
 {
 	int nr_vms;
 	struct vm *vm;
 
 	struct sheepdog_vm_list_entry *p = data;
-	list_for_each_entry(vm, &cluster->vm_list, list) {
+	list_for_each_entry(vm, &sys->vm_list, list) {
 		*p++ = vm->ent;
 	}
 
@@ -170,7 +167,6 @@ void cluster_queue_request(struct work *work, int idx)
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
-	struct cluster_info *cluster = req->ci->cluster;
 	struct vdi_op_message *msg;
 	int ret = SD_RES_SUCCESS;
 
@@ -178,11 +174,11 @@ void cluster_queue_request(struct work *work, int idx)
 
 	switch (hdr->opcode) {
 	case SD_OP_GET_NODE_LIST:
-		get_node_list(cluster, (struct sd_node_req *)hdr,
+		get_node_list((struct sd_node_req *)hdr,
 			      (struct sd_node_rsp *)rsp, req->data);
 		break;
 	case SD_OP_GET_VM_LIST:
-		get_vm_list(cluster, rsp, req->data);
+		get_vm_list(rsp, req->data);
 		break;
 	default:
 		/* forward request to group */
@@ -202,15 +198,15 @@ forward:
 	msg->header.op = SD_MSG_VDI_OP;
 	msg->header.done = 0;
 	msg->header.msg_length = sizeof(*msg) + hdr->data_length;
-	msg->header.from = cluster->this_node;
+	msg->header.from = sys->this_node;
 	msg->req = *((struct sd_vdi_req *)&req->rq);
 	msg->rsp = *((struct sd_vdi_rsp *)&req->rp);
 	if (hdr->flags & SD_FLAG_CMD_WRITE)
 		memcpy(msg->data, req->data, hdr->data_length);
 
-	list_add(&req->pending_list, &cluster->pending_list);
+	list_add(&req->pending_list, &sys->pending_list);
 
-	send_message(cluster->handle, (struct message_header *)msg);
+	send_message(sys->handle, (struct message_header *)msg);
 
 	free(msg);
 }
@@ -229,23 +225,22 @@ static struct vm *lookup_vm(struct list_head *entries, char *name)
 
 static void group_handler(int listen_fd, int events, void *data)
 {
-	struct cluster_info *ci = data;
-	cpg_dispatch(ci->handle, CPG_DISPATCH_ALL);
+	cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
 }
 
-static void print_node_list(struct cluster_info *ci)
+static void print_node_list(void)
 {
 	struct node *node;
-	list_for_each_entry(node, &ci->node_list, list) {
+	list_for_each_entry(node, &sys->node_list, list) {
 		dprintf("%c nodeid: %x, pid: %d, ip: %d.%d.%d.%d:%d\n",
-			node_cmp(&node->ent, &ci->this_node) ? ' ' : 'l',
+			node_cmp(&node->ent, &sys->this_node) ? ' ' : 'l',
 			node->nodeid, node->pid,
 			node->ent.addr[12], node->ent.addr[13],
 			node->ent.addr[14], node->ent.addr[15], node->ent.port);
 	}
 }
 
-static void add_node(struct cluster_info *ci, uint32_t nodeid, uint32_t pid,
+static void add_node(uint32_t nodeid, uint32_t pid,
 		     struct sheepdog_node_list_entry *sd_ent)
 {
 	struct node *node;
@@ -258,42 +253,42 @@ static void add_node(struct cluster_info *ci, uint32_t nodeid, uint32_t pid,
 	node->nodeid = nodeid;
 	node->pid = pid;
 	node->ent = *sd_ent;
-	list_add_tail(&node->list, &ci->node_list);
+	list_add_tail(&node->list, &sys->node_list);
 }
 
-static int is_master(struct cluster_info *ci)
+static int is_master(void)
 {
 	struct node *node;
 
-	if (!ci->synchronized)
+	if (!sys->synchronized)
 		return 0;
 
-	if (list_empty(&ci->node_list))
+	if (list_empty(&sys->node_list))
 		return 1;
 
-	node = list_first_entry(&ci->node_list, struct node, list);
-	if (node_cmp(&node->ent, &ci->this_node) == 0)
+	node = list_first_entry(&sys->node_list, struct node, list);
+	if (node_cmp(&node->ent, &sys->this_node) == 0)
 		return 1;
 
 	return 0;
 }
 
-static void join(struct cluster_info *ci, struct join_message *msg)
+static void join(struct join_message *msg)
 {
 	struct node *node;
 
-	if (!ci->synchronized)
+	if (!sys->synchronized)
 		return;
 
-	if (!is_master(ci))
+	if (!is_master())
 		return;
 
 	if (msg->nr_sobjs)
-		ci->nr_sobjs = msg->nr_sobjs;
+		sys->nr_sobjs = msg->nr_sobjs;
 
-	msg->epoch = ci->epoch;
-	msg->nr_sobjs = ci->nr_sobjs;
-	list_for_each_entry(node, &ci->node_list, list) {
+	msg->epoch = sys->epoch;
+	msg->nr_sobjs = sys->nr_sobjs;
+	list_for_each_entry(node, &sys->node_list, list) {
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
 		msg->nodes[msg->nr_nodes].pid = node->pid;
 		msg->nodes[msg->nr_nodes].ent = node->ent;
@@ -301,60 +296,59 @@ static void join(struct cluster_info *ci, struct join_message *msg)
 	}
 }
 
-static void update_cluster_info(struct cluster_info *ci,
-				struct join_message *msg)
+static void update_cluster_info(struct join_message *msg)
 {
 	int i;
 	int ret, nr_nodes = msg->nr_nodes;
 	struct node *node, *e;
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 
-	if (!ci->nr_sobjs)
-		ci->nr_sobjs = msg->nr_sobjs;
+	if (!sys->nr_sobjs)
+		sys->nr_sobjs = msg->nr_sobjs;
 
-	if (ci->synchronized)
+	if (sys->synchronized)
 		goto out;
 
-	list_for_each_entry_safe(node, e, &ci->node_list, list) {
+	list_for_each_entry_safe(node, e, &sys->node_list, list) {
 		list_del(&node->list);
 		free(node);
 	}
 
-	INIT_LIST_HEAD(&ci->node_list);
+	INIT_LIST_HEAD(&sys->node_list);
 	for (i = 0; i < nr_nodes; i++)
-		add_node(ci, msg->nodes[i].nodeid, msg->nodes[i].pid,
+		add_node(msg->nodes[i].nodeid, msg->nodes[i].pid,
 			 &msg->nodes[i].ent);
 
-	ci->epoch = msg->epoch;
-	ci->synchronized = 1;
+	sys->epoch = msg->epoch;
+	sys->synchronized = 1;
 
-	nr_nodes = build_node_list(&ci->node_list, entry);
+	nr_nodes = build_node_list(&sys->node_list, entry);
 
-	ret = epoch_log_write(ci->epoch, (char *)entry,
+	ret = epoch_log_write(sys->epoch, (char *)entry,
 			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
 	if (ret < 0)
-		eprintf("can't write epoch %u\n", ci->epoch);
+		eprintf("can't write epoch %u\n", sys->epoch);
 
 	/* we are ready for object operations */
-	update_epoch_store(ci, ci->epoch);
+	update_epoch_store(sys->epoch);
 out:
-	add_node(ci, msg->nodeid, msg->pid, &msg->header.from);
+	add_node(msg->nodeid, msg->pid, &msg->header.from);
 
-	nr_nodes = build_node_list(&ci->node_list, entry);
+	nr_nodes = build_node_list(&sys->node_list, entry);
 
-	ret = epoch_log_write(ci->epoch + 1, (char *)entry,
+	ret = epoch_log_write(sys->epoch + 1, (char *)entry,
 			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
 	if (ret < 0)
-		eprintf("can't write epoch %u\n", ci->epoch + 1);
+		eprintf("can't write epoch %u\n", sys->epoch + 1);
 
-	ci->epoch++;
+	sys->epoch++;
 
-	update_epoch_store(ci, ci->epoch);
+	update_epoch_store(sys->epoch);
 
-	print_node_list(ci);
+	print_node_list();
 }
 
-static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
+static void vdi_op(struct vdi_op_message *msg)
 {
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
@@ -364,12 +358,12 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
-		ret = add_vdi(ci, data, hdr->data_length, hdr->vdi_size, &oid,
+		ret = add_vdi(data, hdr->data_length, hdr->vdi_size, &oid,
 			      hdr->base_oid, hdr->tag, hdr->copies, hdr->flags);
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
-		ret = lookup_vdi(ci, data, &oid, hdr->tag, 1, &is_current);
+		ret = lookup_vdi(data, &oid, hdr->tag, 1, &is_current);
 		if (ret != SD_RES_SUCCESS)
 			break;
 		if (is_current)
@@ -378,7 +372,7 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_RELEASE_VDI:
 		break;
 	case SD_OP_MAKE_FS:
-		ret = make_super_object(ci, &msg->req);
+		ret = make_super_object(&msg->req);
 		break;
 	default:
 		ret = SD_RES_SYSTEM_ERROR;
@@ -390,7 +384,7 @@ static void vdi_op(struct cluster_info *ci, struct vdi_op_message *msg)
 	rsp->result = ret;
 }
 
-static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
+static void vdi_op_done(struct vdi_op_message *msg)
 {
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
@@ -403,7 +397,7 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 	case SD_OP_NEW_VDI:
 		break;
 	case SD_OP_LOCK_VDI:
-		if (lookup_vm(&ci->vm_list, (char *)data)) {
+		if (lookup_vm(&sys->vm_list, (char *)data)) {
 			ret = SD_RES_VDI_LOCKED;
 			break;
 		}
@@ -418,10 +412,10 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 		       sizeof(vm->ent.host_addr));
 		vm->ent.host_port = msg->header.from.port;
 
-		list_add(&vm->list, &ci->vm_list);
+		list_add(&vm->list, &sys->vm_list);
 		break;
 	case SD_OP_RELEASE_VDI:
-		vm = lookup_vm(&ci->vm_list, (char *)data);
+		vm = lookup_vm(&sys->vm_list, (char *)data);
 		if (!vm) {
 			ret = SD_RES_VDI_NOT_LOCKED;
 			break;
@@ -434,8 +428,8 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 		break;
 	case SD_OP_MAKE_FS:
 		if (ret == SD_RES_SUCCESS) {
-			ci->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
-			eprintf("%d\n", ci->nr_sobjs);
+			sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
+			eprintf("%d\n", sys->nr_sobjs);
 		}
 
 		break;
@@ -444,10 +438,10 @@ static void vdi_op_done(struct cluster_info *ci, struct vdi_op_message *msg)
 		ret = SD_RES_UNKNOWN;
 	}
 
-	if (node_cmp(&ci->this_node, &msg->header.from) != 0)
+	if (node_cmp(&sys->this_node, &msg->header.from) != 0)
 		return;
 
-	req = list_first_entry(&ci->pending_list, struct request, pending_list);
+	req = list_first_entry(&sys->pending_list, struct request, pending_list);
 
 	rsp->result = ret;
 	memcpy(req->data, data, rsp->data_length);
@@ -460,7 +454,6 @@ static void __sd_deliver(struct work *work, int idx)
 {
 	struct work_deliver *w = container_of(work, struct work_deliver, work);
 	struct message_header *m = w->msg;
-	struct cluster_info *ci = w->ci;
 
 	dprintf("op: %d, done: %d, size: %d, from: %d.%d.%d.%d:%d\n",
 		m->op, m->done, m->msg_length,
@@ -468,15 +461,15 @@ static void __sd_deliver(struct work *work, int idx)
 		m->from.addr[14], m->from.addr[15], m->from.port);
 
 	if (!m->done) {
-		if (!is_master(ci))
+		if (!is_master())
 			return;
 
 		switch (m->op) {
 		case SD_MSG_JOIN:
-			join(ci, (struct join_message *)m);
+			join((struct join_message *)m);
 			break;
 		case SD_MSG_VDI_OP:
-			vdi_op(ci, (struct vdi_op_message *)m);
+			vdi_op((struct vdi_op_message *)m);
 			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
@@ -484,14 +477,14 @@ static void __sd_deliver(struct work *work, int idx)
 		}
 
 		m->done = 1;
-		send_message(ci->handle, m);
+		send_message(sys->handle, m);
 	} else {
 		switch (m->op) {
 		case SD_MSG_JOIN:
-			update_cluster_info(ci, (struct join_message *)m);
+			update_cluster_info((struct join_message *)m);
 			break;
 		case SD_MSG_VDI_OP:
-			vdi_op_done(ci, (struct vdi_op_message *)m);
+			vdi_op_done((struct vdi_op_message *)m);
 			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
@@ -524,13 +517,11 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 {
 	struct work_deliver *w;
 	struct message_header *m = msg;
-	struct cluster_info *ci;
 
 	dprintf("op: %d, done: %d, size: %d, from: %d.%d.%d.%d:%d\n",
 		m->op, m->done, m->msg_length,
 		m->from.addr[12], m->from.addr[13],
 		m->from.addr[14], m->from.addr[15], m->from.port);
-	cpg_context_get(handle, (void **)&ci);
 
 	w = zalloc(sizeof(*w));
 	if (!w)
@@ -540,8 +531,6 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	if (!w->msg)
 		return;
 	memcpy(w->msg, msg, msg_len);
-
-	w->ci = ci;
 
 	w->work.fn = __sd_deliver;
 	w->work.done = __sd_deliver_done;
@@ -555,7 +544,6 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 static void __sd_confch(struct work *work, int idx)
 {
 	struct work_confch *w = container_of(work, struct work_confch, work);
-	struct cluster_info *ci = w->ci;
 	struct node *node, *e;
 	int i;
 
@@ -567,12 +555,12 @@ static void __sd_confch(struct work *work, int idx)
 	size_t joined_list_entries = w->joined_list_entries;
 
 	if (member_list_entries == joined_list_entries - left_list_entries &&
-	    ci->this_nodeid == member_list[0].nodeid &&
-	    ci->this_pid == member_list[0].pid)
-		ci->synchronized = 1;
+	    sys->this_nodeid == member_list[0].nodeid &&
+	    sys->this_pid == member_list[0].pid)
+		sys->synchronized = 1;
 
 	for (i = 0; i < left_list_entries; i++) {
-		list_for_each_entry_safe(node, e, &ci->node_list, list) {
+		list_for_each_entry_safe(node, e, &sys->node_list, list) {
 			int nr;
 			unsigned pid;
 			struct sheepdog_node_list_entry e[SD_MAX_NODES];
@@ -586,30 +574,33 @@ static void __sd_confch(struct work *work, int idx)
 			list_del(&node->list);
 			free(node);
 
-			nr = build_node_list(&ci->node_list, e);
-			epoch_log_write(ci->epoch + 1, (char *)e,
+			nr = build_node_list(&sys->node_list, e);
+			epoch_log_write(sys->epoch + 1, (char *)e,
 					nr * sizeof(struct sheepdog_node_list_entry));
 
-			ci->epoch++;
+			sys->epoch++;
 
-			update_epoch_store(ci, ci->epoch);
+			update_epoch_store(sys->epoch);
 		}
 	}
 
 	for (i = 0; i < joined_list_entries; i++) {
-		if (ci->this_nodeid == joined_list[i].nodeid &&
-		    ci->this_pid == joined_list[i].pid) {
+		if (sys->this_nodeid == joined_list[i].nodeid &&
+		    sys->this_pid == joined_list[i].pid) {
 			struct join_message msg;
 
 			msg.header.op = SD_MSG_JOIN;
 			msg.header.done = 0;
 			msg.header.msg_length = sizeof(msg);
-			msg.header.from = ci->this_node;
-			msg.nodeid = ci->this_nodeid;
-			msg.pid = ci->this_pid;
+			msg.header.from = sys->this_node;
+			msg.nodeid = sys->this_nodeid;
+			msg.pid = sys->this_pid;
 			msg.nr_sobjs = nr_sobjs;
 
-			send_message(ci->handle, (struct message_header *)&msg);
+			send_message(sys->handle, (struct message_header *)&msg);
+
+			eprintf("%d\n", i);
+
 			break;
 		}
 	}
@@ -617,19 +608,18 @@ static void __sd_confch(struct work *work, int idx)
 	if (left_list_entries == 0)
 		return;
 
-	print_node_list(ci);
+	print_node_list();
 }
 
 static void __sd_confch_done(struct work *work, int idx)
 {
 	struct work_confch *w = container_of(work, struct work_confch, work);
-	struct cluster_info *ci = w->ci;
 
 	/* FIXME: worker threads can't call start_recovery */
 	if (w->left_list_entries) {
 		if (w->left_list_entries > 1)
 			eprintf("we can't handle %Zd\n", w->left_list_entries);
-		start_recovery(ci, ci->epoch, 0);
+		start_recovery(sys->epoch, 0);
 	}
 
 	free(w->member_list);
@@ -647,7 +637,6 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 		      size_t joined_list_entries)
 {
 	struct work_confch *w = NULL;
-	struct cluster_info *ci;
 	int i, size;
 
 	dprintf("confchg nodeid %x\n", member_list[0].nodeid);
@@ -658,8 +647,6 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 			member_list[i].nodeid, member_list[i].pid,
 			member_list[i].reason);
 	}
-
-	cpg_context_get(handle, (void **)&ci);
 
 	w = zalloc(sizeof(*w));
 	if (!w)
@@ -685,8 +672,6 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 		goto err;
 	memcpy(w->joined_list, joined_list, size);
 	w->joined_list_entries = joined_list_entries;
-
-	w->ci = ci;
 
 	w->work.fn = __sd_confch;
 	w->work.done = __sd_confch_done;
@@ -723,24 +708,10 @@ int build_node_list(struct list_head *node_list,
 	return nr;
 }
 
-static void update_node_list_idx(struct cluster_info *ci,
-				 struct sheepdog_node_list_entry *e, int nr)
-{
-	int i;
-
-	for (i = 0; i < nr; i++) {
-		if (e->id == ci->this_node.id) {
-			ci->node_list_idx = i;
-			break;
-		}
-	}
-}
-
-struct cluster_info *create_cluster(int port)
+int create_cluster(int port)
 {
 	int fd, ret;
 	cpg_handle_t cpg_handle;
-	struct cluster_info *ci;
 	struct addrinfo hints, *res, *res0;
 	char name[INET6_ADDRSTRLEN];
 	struct cpg_name group = { 8, "sheepdog" };
@@ -749,15 +720,11 @@ struct cluster_info *create_cluster(int port)
 	uint64_t hval;
 	int i;
 
-	ci = zalloc(sizeof(*ci));
-	if (!ci)
-		return NULL;
-
 	ret = cpg_initialize(&cpg_handle, &cb);
 	if (ret != CS_OK) {
 		eprintf("Failed to initialize cpg, %d\n", ret);
 		eprintf("Is corosync running?\n");
-		return NULL;
+		return -1;
 	}
 
 join_retry:
@@ -784,11 +751,9 @@ join_retry:
 		exit(1);
 	}
 
-	ci->handle = cpg_handle;
-	ci->this_nodeid = nodeid;
-	ci->this_pid = getpid();
-
-	memset(&ci->this_node, 0, sizeof(ci->this_node));
+	sys->handle = cpg_handle;
+	sys->this_nodeid = nodeid;
+	sys->this_pid = getpid();
 
 	gethostname(name, sizeof(name));
 
@@ -807,8 +772,8 @@ join_retry:
 			if (((char *) &addr->sin_addr)[0] == 127)
 				continue;
 
-			memset(ci->this_node.addr, 0, 12);
-			memcpy(ci->this_node.addr + 12, &addr->sin_addr, 4);
+			memset(sys->this_node.addr, 0, 12);
+			memcpy(sys->this_node.addr + 12, &addr->sin_addr, 4);
 			break;
 		} else if (res->ai_family == AF_INET6) {
 			struct sockaddr_in6 *addr;
@@ -820,7 +785,7 @@ join_retry:
 			if (memcmp(&addr->sin6_addr, localhost, 16) == 0)
 				continue;
 
-			memcpy(ci->this_node.addr, &addr->sin6_addr, 16);
+			memcpy(sys->this_node.addr, &addr->sin6_addr, 16);
 			break;
 		} else
 			dprintf("unknown address family\n");
@@ -828,27 +793,27 @@ join_retry:
 
 	if (res == NULL) {
 		eprintf("failed to get address info\n");
-		return NULL;
+		return -1;
 	}
 
 	freeaddrinfo(res0);
 
-	ci->this_node.port = port;
+	sys->this_node.port = port;
 
-	hval = fnv_64a_buf(&ci->this_node.port, sizeof(ci->this_node.port),
+	hval = fnv_64a_buf(&sys->this_node.port, sizeof(sys->this_node.port),
 			   FNV1A_64_INIT);
-	for (i = ARRAY_SIZE(ci->this_node.addr) - 1; i >= 0; i--)
-		hval = fnv_64a_buf(&ci->this_node.addr[i], 1, hval);
+	for (i = ARRAY_SIZE(sys->this_node.addr) - 1; i >= 0; i--)
+		hval = fnv_64a_buf(&sys->this_node.addr[i], 1, hval);
 
-	ci->this_node.id = hval;
+	sys->this_node.id = hval;
 
-	ci->synchronized = 0;
-	INIT_LIST_HEAD(&ci->node_list);
-	INIT_LIST_HEAD(&ci->vm_list);
-	INIT_LIST_HEAD(&ci->pending_list);
-	cpg_context_set(cpg_handle, ci);
+	sys->synchronized = 0;
+	INIT_LIST_HEAD(&sys->node_list);
+	INIT_LIST_HEAD(&sys->vm_list);
+	INIT_LIST_HEAD(&sys->pending_list);
+	cpg_context_set(cpg_handle, sys);
 
 	cpg_fd_get(cpg_handle, &fd);
-	register_event(fd, group_handler, ci);
-	return ci;
+	register_event(fd, group_handler, NULL);
+	return 0;
 }

@@ -80,7 +80,7 @@ static int create_inode_obj(struct sheepdog_node_list_entry *entries,
 /*
  * TODO: handle larger buffer
  */
-int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
+int add_vdi(char *name, int len, uint64_t size,
 	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies,
 	    uint16_t flags)
 {
@@ -93,28 +93,28 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 
 	memset(&req, 0, sizeof(req));
 
-	nr_nodes = build_node_list(&ci->node_list, entries);
+	nr_nodes = build_node_list(&sys->node_list, entries);
 
 	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
 		base_oid);
 
-	nr_reqs = ci->nr_sobjs;
+	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 
 	memset(&req, 0, sizeof(req));
 
-	eprintf("%d %d\n", copies, ci->nr_sobjs);
+	eprintf("%d %d\n", copies, sys->nr_sobjs);
 	/* qemu doesn't specify the copies, then we use the default. */
 	if (!copies)
-		copies = ci->nr_sobjs;
+		copies = sys->nr_sobjs;
 
 	req.opcode = SD_OP_SO_NEW_VDI;
 	req.copies = copies;
 	req.tag = tag;
 	req.flags |= flags;
 
-	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+	ret = exec_reqs(entries, nr_nodes, sys->epoch,
 			SD_DIR_OID, (struct sd_req *)&req, name, len, 0,
 			nr_reqs, nr_reqs);
 
@@ -127,19 +127,18 @@ int add_vdi(struct cluster_info *ci, char *name, int len, uint64_t size,
 	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
 		oid);
 
-	ret = create_inode_obj(entries, nr_nodes, ci->epoch, copies,
+	ret = create_inode_obj(entries, nr_nodes, sys->epoch, copies,
 			       oid, size, base_oid);
 
 	return ret;
 }
 
-int del_vdi(struct cluster_info *cluster, char *name, int len)
+int del_vdi(char *name, int len)
 {
 	return 0;
 }
 
-int lookup_vdi(struct cluster_info *ci,
-	       char *filename, uint64_t * oid, uint32_t tag, int do_lock,
+int lookup_vdi(char *filename, uint64_t * oid, uint32_t tag, int do_lock,
 	       int *current)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
@@ -150,13 +149,13 @@ int lookup_vdi(struct cluster_info *ci,
 
 	memset(&req, 0, sizeof(req));
 
-	nr_nodes = build_node_list(&ci->node_list, entries);
+	nr_nodes = build_node_list(&sys->node_list, entries);
 
 	*current = 0;
 
 	dprintf("looking for %s %zd\n", filename, strlen(filename));
 
-	nr_reqs = ci->nr_sobjs;
+	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 
@@ -165,7 +164,7 @@ int lookup_vdi(struct cluster_info *ci,
 	req.opcode = SD_OP_SO_LOOKUP_VDI;
 	req.tag = tag;
 
-	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+	ret = exec_reqs(entries, nr_nodes, sys->epoch,
 			SD_DIR_OID, (struct sd_req *)&req, filename, strlen(filename), 0,
 			nr_reqs, 1);
 
@@ -182,7 +181,7 @@ int lookup_vdi(struct cluster_info *ci,
 }
 
 /* todo: cleanup with the above */
-int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr)
+int make_super_object(struct sd_vdi_req *hdr)
 {
 	struct timeval tv;
 	int nr_nodes, ret;
@@ -197,9 +196,9 @@ int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr)
 	req.ctime = (uint64_t)tv.tv_sec << 32 | tv.tv_usec * 1000;
 	req.copies = ((struct sd_obj_req *)hdr)->copies;
 
-	nr_nodes = build_node_list(&ci->node_list, entries);
+	nr_nodes = build_node_list(&sys->node_list, entries);
 
-	ret = exec_reqs(entries, nr_nodes, ci->epoch,
+	ret = exec_reqs(entries, nr_nodes, sys->epoch,
 			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0, req.copies,
 			req.copies);
 

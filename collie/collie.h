@@ -33,8 +33,6 @@ struct client_info {
 
 	struct list_head reqs;
 	struct list_head done_reqs;
-
-	struct cluster_info *cluster;
 };
 
 struct request;
@@ -73,23 +71,25 @@ struct cluster_info {
 	int nr_sobjs;
 };
 
+struct cluster_info *sys;
+
 int create_listen_port(int port, void *data);
 
 int init_store(char *dir);
 
-int add_vdi(struct cluster_info *ci, char *buf, int len, uint64_t size,
+int add_vdi(char *buf, int len, uint64_t size,
 	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies,
 	    uint16_t flags);
 
-int lookup_vdi(struct cluster_info *cluster, char *filename, uint64_t * oid,
+int lookup_vdi(char *filename, uint64_t * oid,
 	       uint32_t tag, int do_lock, int *current);
 
-int make_super_object(struct cluster_info *ci, struct sd_vdi_req *hdr);
+int make_super_object(struct sd_vdi_req *hdr);
 
 int build_node_list(struct list_head *node_list,
 		    struct sheepdog_node_list_entry *entries);
 
-struct cluster_info *create_cluster(int port);
+int create_cluster(int port);
 
 void so_queue_request(struct work *work, int idx);
 
@@ -97,7 +97,7 @@ void store_queue_request(struct work *work, int idx);
 
 void cluster_queue_request(struct work *work, int idx);
 
-int update_epoch_store(struct cluster_info *cluster, uint32_t epoch);
+int update_epoch_store(uint32_t epoch);
 
 extern int nr_sobjs;
 
@@ -107,6 +107,6 @@ extern struct work_queue *dobj_queue;
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
 
-int start_recovery(struct cluster_info *ci, uint32_t epoch, int add);
+int start_recovery(uint32_t epoch, int add);
 
 #endif

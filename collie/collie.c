@@ -48,6 +48,8 @@ Sheepdog Daemon, version %s\n\
 	exit(status);
 }
 
+struct cluster_info __sys, *sys = &__sys;
+
 int main(int argc, char **argv)
 {
 	int ch, longindex;
@@ -55,7 +57,6 @@ int main(int argc, char **argv)
 	char *dir = DEFAULT_OBJECT_DIR;
 	int is_daemon = 1;
 	int is_debug = 0;
-	struct cluster_info *ci;
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
@@ -100,13 +101,13 @@ int main(int argc, char **argv)
 	if (!dobj_queue)
 		exit(1);
 
-	ci = create_cluster(port);
-	if (!ci) {
+	ret = create_cluster(port);
+	if (ret) {
 		eprintf("failed to create sheepdog cluster.\n");
 		exit(1);
 	}
 
-	ret = create_listen_port(port, ci);
+	ret = create_listen_port(port, sys);
 	if (ret)
 		exit(1);
 
