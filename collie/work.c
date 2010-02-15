@@ -110,12 +110,12 @@ static void work_post_queued(struct work_queue *q, struct work *w)
 		work_queue_set_blocked(q);
 }
 
-static void work_post_done(struct work_queue *q, struct work *w)
+static void work_post_done(struct work_queue *q, enum work_attr attr)
 {
 	struct work *n, *t;
 
 	q->nr_active--;
-	if (w->attr == WORK_ORDERED)
+	if (attr == WORK_ORDERED)
 		work_queue_clear_blocked(q);
 
 	list_for_each_entry_safe(n, t, &q->blocked_list, w_list) {
@@ -145,11 +145,17 @@ static void bs_thread_request_done(int fd, int events, void *data)
 		pthread_mutex_unlock(&wi->finished_lock);
 
 		while (!list_empty(&list)) {
+			enum work_attr attr;
 			work = list_first_entry(&list, struct work, w_list);
 			list_del(&work->w_list);
 
+			/*
+			 * work->done might free the work so we must
+			 * save its attr for qork_post_done().
+			 */
+			attr = work->attr;
 			work->done(work, 0);
-			work_post_done(&wi->q, work);
+			work_post_done(&wi->q, attr);
 		}
 	}
 }
