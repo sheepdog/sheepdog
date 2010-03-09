@@ -682,9 +682,9 @@ static void get_oid(uint64_t oid, char *name, uint32_t tag,
 	struct get_oid_info *info = data;
 	char *p;
 
-	p = strchr(info->name, ':');
-
 	if (info->name) {
+		p = strchr(info->name, ':');
+
 		if (p) {
 			if (!strncmp(name, info->name, p - info->name) &&
 			    tag == strtoul(p + 1, NULL, 16))
@@ -806,6 +806,10 @@ static void print_obj(char *vdiname, unsigned index)
 	ret = parse_vdi(get_oid, &info);
 
 	oid = info.oid;
+	if (oid == 0) {
+		printf("No such vdi\n");
+		return;
+	}
 
 	if (index == ~0) {
 		printf("Looking for the inode object 0x%" PRIx64 " with %d nodes\n\n",
@@ -956,6 +960,10 @@ rerun:
 		ret = 0;
 		break;
 	case INFO_OBJ:
+		if (!name) {
+			printf("Please specify the vdiname\n");
+			break;
+		}
 		print_obj(name, index);
 		ret = 0;
 		break;
