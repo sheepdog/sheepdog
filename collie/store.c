@@ -153,9 +153,7 @@ again:
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
-		snprintf(name, sizeof(name), "%d.%d.%d.%d",
-			 e[n].addr[12], e[n].addr[13],
-			 e[n].addr[14], e[n].addr[15]);
+		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		/* FIXME: do like store_queue_request_local() */
 		if (e[n].id == sys->this_node.id)
@@ -242,9 +240,7 @@ again:
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
-		snprintf(name, sizeof(name), "%d.%d.%d.%d",
-			 e[n].addr[12], e[n].addr[13],
-			 e[n].addr[14], e[n].addr[15]);
+		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		/* TODO: we can do better; we need to chech this first */
 		if (e[n].id == sys->this_node.id) {
@@ -771,9 +767,7 @@ void so_queue_request(struct work *work, int idx)
 
 			n = obj_to_sheep(e, nr, SD_DIR_OID, 0);
 
-			snprintf(name, sizeof(name), "%d.%d.%d.%d",
-				 e[n].addr[12], e[n].addr[13],
-				 e[n].addr[14], e[n].addr[15]);
+			addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 			eprintf("%s %d\n", name, e[n].port);
 
@@ -1082,9 +1076,7 @@ static void recover_one(struct work *work, int idx)
 
 	eprintf("%d %d, %16lx\n", rw->done, rw->count, oid);
 
-	snprintf(name, sizeof(name), "%d.%d.%d.%d",
-		 e->addr[12], e->addr[13],
-		 e->addr[14], e->addr[15]);
+	addr_to_str(name, sizeof(name), e->addr, 0);
 
 	fd = connect_to(name, e->port);
 	if (fd < 0) {
@@ -1170,9 +1162,7 @@ static int fill_obj_list(struct recovery_work *rw,
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp;
 
-	snprintf(name, sizeof(name), "%d.%d.%d.%d",
-		 e->addr[12], e->addr[13],
-		 e->addr[14], e->addr[15]);
+	addr_to_str(name, sizeof(name), e->addr, 0);
 
 	dprintf("%s %d\n", name, e->port);
 

@@ -361,9 +361,7 @@ int write_object(struct sheepdog_node_list_entry *e,
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
-		snprintf(name, sizeof(name), "%d.%d.%d.%d",
-			 e[n].addr[12], e[n].addr[13],
-			 e[n].addr[14], e[n].addr[15]);
+		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0) {
@@ -411,11 +409,7 @@ int read_object(struct sheepdog_node_list_entry *e,
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
-		snprintf(name, sizeof(name), "%d.%d.%d.%d",
-			 e[n].addr[12],
-			 e[n].addr[13],
-			 e[n].addr[14],
-			 e[n].addr[15]);
+		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0)
@@ -461,11 +455,7 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
-		snprintf(name, sizeof(name), "%d.%d.%d.%d",
-			 e[n].addr[12],
-			 e[n].addr[13],
-			 e[n].addr[14],
-			 e[n].addr[15]);
+		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0) {
@@ -507,4 +497,17 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 		return rlen;
 	else
 		return wlen;
+}
+
+/* TODO: support IPv6 */
+char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
+{
+	if (port)
+		snprintf(str, size, "%d.%d.%d.%d:%d",
+			 addr[12], addr[13], addr[14], addr[15], port);
+	else
+		snprintf(str, size, "%d.%d.%d.%d",
+			 addr[12], addr[13], addr[14], addr[15]);
+
+	return str;
 }

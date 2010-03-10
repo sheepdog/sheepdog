@@ -764,11 +764,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 		struct sd_obj_req hdr;
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
-		snprintf(name, sizeof(name), "%d.%d.%d.%d",
-			 node_list_entries[i].addr[12],
-			 node_list_entries[i].addr[13],
-			 node_list_entries[i].addr[14],
-			 node_list_entries[i].addr[15]);
+		addr_to_str(name, sizeof(name), node_list_entries[i].addr, 0);
 
 		fd = connect_to(name, node_list_entries[i].port);
 		if (fd < 0)
@@ -914,11 +910,7 @@ rerun:
 			struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 			char store_str[8], free_str[8];
 
-			snprintf(name, sizeof(name), "%d.%d.%d.%d",
-				 node_list_entries[i].addr[12],
-				 node_list_entries[i].addr[13],
-				 node_list_entries[i].addr[14],
-				 node_list_entries[i].addr[15]);
+			addr_to_str(name, sizeof(name), node_list_entries[i].addr, 0);
 
 			fd = connect_to(name, node_list_entries[i].port);
 			if (fd < 0)

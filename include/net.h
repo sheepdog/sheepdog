@@ -51,4 +51,6 @@ int exec_reqs(struct sheepdog_node_list_entry *e,
 
 int create_listen_ports(int port, int (*callback)(int fd, void *), void *data);
 
+char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port);
+
 #endif

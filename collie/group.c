@@ -231,12 +231,12 @@ static void group_handler(int listen_fd, int events, void *data)
 static void print_node_list(void)
 {
 	struct node *node;
+	char name[128];
 	list_for_each_entry(node, &sys->node_list, list) {
-		dprintf("%c nodeid: %x, pid: %d, ip: %d.%d.%d.%d:%d\n",
+		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",
 			node_cmp(&node->ent, &sys->this_node) ? ' ' : 'l',
 			node->nodeid, node->pid,
-			node->ent.addr[12], node->ent.addr[13],
-			node->ent.addr[14], node->ent.addr[15], node->ent.port);
+			addr_to_str(name, sizeof(name), node->ent.addr, node->ent.port));
 	}
 }
 
@@ -454,11 +454,11 @@ static void __sd_deliver(struct work *work, int idx)
 {
 	struct work_deliver *w = container_of(work, struct work_deliver, work);
 	struct message_header *m = w->msg;
+	char name[128];
 
-	dprintf("op: %d, done: %d, size: %d, from: %d.%d.%d.%d:%d\n",
+	dprintf("op: %d, done: %d, size: %d, from: %s\n",
 		m->op, m->done, m->msg_length,
-		m->from.addr[12], m->from.addr[13],
-		m->from.addr[14], m->from.addr[15], m->from.port);
+		addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
 
 	if (!m->done) {
 		if (!is_master())
@@ -517,11 +517,11 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 {
 	struct work_deliver *w;
 	struct message_header *m = msg;
+	char name[128];
 
-	dprintf("op: %d, done: %d, size: %d, from: %d.%d.%d.%d:%d\n",
+	dprintf("op: %d, done: %d, size: %d, from: %s\n",
 		m->op, m->done, m->msg_length,
-		m->from.addr[12], m->from.addr[13],
-		m->from.addr[14], m->from.addr[15], m->from.port);
+		addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
 
 	w = zalloc(sizeof(*w));
 	if (!w)
