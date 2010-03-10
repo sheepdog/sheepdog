@@ -401,6 +401,8 @@ static void vdi_op(struct vdi_op_message *msg)
 	case SD_OP_MAKE_FS:
 		ret = make_super_object(&msg->req);
 		break;
+	case SD_OP_SHUTDOWN:
+		break;
 	default:
 		ret = SD_RES_SYSTEM_ERROR;
 		eprintf("opcode %d is not implemented\n", hdr->opcode);
@@ -459,6 +461,8 @@ static void vdi_op_done(struct vdi_op_message *msg)
 			eprintf("%d\n", sys->nr_sobjs);
 		}
 
+	case SD_OP_SHUTDOWN:
+		sys->status = SD_STATUS_SHUTDOWN;
 		break;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);
@@ -698,6 +702,9 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 			member_list[i].nodeid, member_list[i].pid,
 			member_list[i].reason);
 	}
+
+	if (sys->status & SD_STATUS_SHUTDOWN_MASK || sys->status & SD_STATUS_ERROR_MASK)
+		return;
 
 	w = zalloc(sizeof(*w));
 	if (!w)
