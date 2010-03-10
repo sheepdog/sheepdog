@@ -231,7 +231,7 @@ struct sheepdog_node_list_entry {
 	uint64_t        id;
 	uint8_t         addr[16];
 	uint16_t        port;
-	uint16_t	pad;
+	uint16_t	pad[3];
 };
 
 /*
