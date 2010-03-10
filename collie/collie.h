@@ -107,6 +107,8 @@ extern struct work_queue *dobj_queue;
 
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
+int set_cluster_ctime(uint64_t ctime);
+uint64_t get_cluster_ctime(void);
 
 int start_recovery(uint32_t epoch, int add);
 

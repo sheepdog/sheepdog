@@ -22,6 +22,7 @@
 #include "meta.h"
 
 #define ANAME_LAST_OID "user.sheepdog.last_oid"
+#define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
 
 static char *vdi_path;
@@ -829,7 +830,13 @@ void so_queue_request(struct work *work, int idx)
 		ret = fsetxattr(fd, ANAME_LAST_OID, &last_oid,
 				sizeof(last_oid), 0);
 		if (ret) {
-			close(fd);
+			result = SD_RES_EIO;
+			goto out;
+		}
+
+		ret = fsetxattr(fd, ANAME_CTIME, &hdr->ctime,
+				sizeof(hdr->ctime), 0);
+		if (ret) {
 			result = SD_RES_EIO;
 			goto out;
 		}
@@ -1032,6 +1039,39 @@ int epoch_log_read(uint32_t epoch, char *buf, int len)
 	close(fd);
 
 	return len;
+}
+
+int set_cluster_ctime(uint64_t ctime)
+{
+	int fd, ret;
+
+	fd = open(epoch_path, O_RDONLY);
+	if (fd < 0)
+		return -1;
+
+	ret = fsetxattr(fd, ANAME_CTIME, &ctime, sizeof(ctime), 0);
+	close(fd);
+
+	if (ret)
+		return -1;
+	return 0;
+}
+
+uint64_t get_cluster_ctime(void)
+{
+	int fd, ret;
+	uint64_t ctime;
+
+	fd = open(epoch_path, O_RDONLY);
+	if (fd < 0)
+		return 0;
+
+	ret = fgetxattr(fd, ANAME_CTIME, &ctime, sizeof(ctime));
+	close(fd);
+
+	if (ret != sizeof(ctime))
+		return 0;
+	return ctime;
 }
 
 static int node_distance(int my, int her, int nr)

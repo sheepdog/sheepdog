@@ -207,19 +207,23 @@ out:
 static int mkfs(int copies)
 {
 	int fd, ret;
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_so_req hdr;
+	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
 	unsigned rlen, wlen;
+	struct timeval tv;
 
 	fd = connect_to("localhost", sdport);
 	if (fd < 0)
 		return -1;
+
+	gettimeofday(&tv, NULL);
 
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_MAKE_FS;
 	hdr.copies = copies;
 	hdr.epoch = node_list_version;
+	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	rlen = 0;
 	wlen = 0;
