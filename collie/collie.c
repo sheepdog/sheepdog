@@ -101,15 +101,15 @@ int main(int argc, char **argv)
 	if (!dobj_queue)
 		exit(1);
 
+	ret = create_listen_port(port, sys);
+	if (ret)
+		exit(1);
+
 	ret = create_cluster(port);
 	if (ret) {
 		eprintf("failed to create sheepdog cluster.\n");
 		exit(1);
 	}
-
-	ret = create_listen_port(port, sys);
-	if (ret)
-		exit(1);
 
 	dprintf("Sheepdog daemon (version %s) started\n", SD_VERSION);
 
