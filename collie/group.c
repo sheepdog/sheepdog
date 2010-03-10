@@ -135,16 +135,16 @@ static void get_node_list(struct sd_node_req *req,
 	int nr_nodes;
 	struct node *node;
 
-	nr_nodes = build_node_list(&sys->node_list, data);
+	nr_nodes = build_node_list(&sys->sd_node_list, data);
 	rsp->data_length = nr_nodes * sizeof(struct sheepdog_node_list_entry);
 	rsp->nr_nodes = nr_nodes;
 	rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
 
-	if (list_empty(&sys->node_list)) {
+	if (list_empty(&sys->sd_node_list)) {
 		rsp->master_idx = -1;
 		return;
 	}
-	node = list_first_entry(&sys->node_list, struct node, list);
+	node = list_first_entry(&sys->sd_node_list, struct node, list);
 	rsp->master_idx = get_node_idx(&node->ent, data, nr_nodes);
 }
 
@@ -228,11 +228,11 @@ static void group_handler(int listen_fd, int events, void *data)
 	cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
 }
 
-static void print_node_list(void)
+static void print_node_list(struct list_head *node_list)
 {
 	struct node *node;
 	char name[128];
-	list_for_each_entry(node, &sys->node_list, list) {
+	list_for_each_entry(node, node_list, list) {
 		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",
 			node_cmp(&node->ent, &sys->this_node) ? ' ' : 'l',
 			node->nodeid, node->pid,
@@ -240,7 +240,7 @@ static void print_node_list(void)
 	}
 }
 
-static void add_node(uint32_t nodeid, uint32_t pid,
+static void add_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid,
 		     struct sheepdog_node_list_entry *sd_ent)
 {
 	struct node *node;
@@ -252,8 +252,21 @@ static void add_node(uint32_t nodeid, uint32_t pid,
 	}
 	node->nodeid = nodeid;
 	node->pid = pid;
-	node->ent = *sd_ent;
-	list_add_tail(&node->list, &sys->node_list);
+	if (sd_ent)
+		node->ent = *sd_ent;
+	list_add_tail(&node->list, node_list);
+}
+
+static struct node *find_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid)
+{
+	struct node *node;
+
+	list_for_each_entry(node, node_list, list) {
+		if (node->nodeid == nodeid && node->pid == pid)
+			return node;
+	}
+
+	return NULL;
 }
 
 static int is_master(void)
@@ -263,10 +276,10 @@ static int is_master(void)
 	if (!sys->synchronized)
 		return 0;
 
-	if (list_empty(&sys->node_list))
+	if (list_empty(&sys->sd_node_list))
 		return 1;
 
-	node = list_first_entry(&sys->node_list, struct node, list);
+	node = list_first_entry(&sys->sd_node_list, struct node, list);
 	if (node_cmp(&node->ent, &sys->this_node) == 0)
 		return 1;
 
@@ -288,7 +301,12 @@ static void join(struct join_message *msg)
 
 	msg->epoch = sys->epoch;
 	msg->nr_sobjs = sys->nr_sobjs;
-	list_for_each_entry(node, &sys->node_list, list) {
+	list_for_each_entry(node, &sys->cpg_node_list, list) {
+		if (node->nodeid == msg->nodeid && node->pid == msg->pid)
+			continue;
+		if (node->ent.id == 0)
+			continue;
+
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
 		msg->nodes[msg->nr_nodes].pid = node->pid;
 		msg->nodes[msg->nr_nodes].ent = node->ent;
@@ -309,20 +327,29 @@ static void update_cluster_info(struct join_message *msg)
 	if (sys->synchronized)
 		goto out;
 
-	list_for_each_entry_safe(node, e, &sys->node_list, list) {
+	list_for_each_entry_safe(node, e, &sys->sd_node_list, list) {
 		list_del(&node->list);
 		free(node);
 	}
 
-	INIT_LIST_HEAD(&sys->node_list);
-	for (i = 0; i < nr_nodes; i++)
-		add_node(msg->nodes[i].nodeid, msg->nodes[i].pid,
+	INIT_LIST_HEAD(&sys->sd_node_list);
+	for (i = 0; i < nr_nodes; i++) {
+		node = find_node(&sys->cpg_node_list, msg->nodes[i].nodeid,
+				 msg->nodes[i].pid);
+		if (!node)
+			continue;
+
+		if (!node->ent.id)
+			node->ent = msg->nodes[i].ent;
+
+		add_node(&sys->sd_node_list, msg->nodes[i].nodeid, msg->nodes[i].pid,
 			 &msg->nodes[i].ent);
+	}
 
 	sys->epoch = msg->epoch;
 	sys->synchronized = 1;
 
-	nr_nodes = build_node_list(&sys->node_list, entry);
+	nr_nodes = build_node_list(&sys->sd_node_list, entry);
 
 	ret = epoch_log_write(sys->epoch, (char *)entry,
 			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
@@ -332,9 +359,9 @@ static void update_cluster_info(struct join_message *msg)
 	/* we are ready for object operations */
 	update_epoch_store(sys->epoch);
 out:
-	add_node(msg->nodeid, msg->pid, &msg->header.from);
+	add_node(&sys->sd_node_list, msg->nodeid, msg->pid, &msg->header.from);
 
-	nr_nodes = build_node_list(&sys->node_list, entry);
+	nr_nodes = build_node_list(&sys->sd_node_list, entry);
 
 	ret = epoch_log_write(sys->epoch + 1, (char *)entry,
 			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
@@ -345,7 +372,7 @@ out:
 
 	update_epoch_store(sys->epoch);
 
-	print_node_list();
+	print_node_list(&sys->sd_node_list);
 }
 
 static void vdi_op(struct vdi_op_message *msg)
@@ -455,10 +482,25 @@ static void __sd_deliver(struct work *work, int idx)
 	struct work_deliver *w = container_of(work, struct work_deliver, work);
 	struct message_header *m = w->msg;
 	char name[128];
+	struct node *node;
 
 	dprintf("op: %d, done: %d, size: %d, from: %s\n",
 		m->op, m->done, m->msg_length,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
+
+	if (m->op == SD_MSG_JOIN) {
+		uint32_t nodeid = ((struct join_message *)m)->nodeid;
+		uint32_t pid = ((struct join_message *)m)->pid;
+
+		node = find_node(&sys->cpg_node_list, nodeid, pid);
+		if (!node) {
+			dprintf("the node was left before join operation is finished\n");
+			return;
+		}
+
+		if (!node->ent.id)
+			node->ent = m->from;
+	}
 
 	if (!m->done) {
 		if (!is_master())
@@ -544,7 +586,7 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 static void __sd_confch(struct work *work, int idx)
 {
 	struct work_confch *w = container_of(work, struct work_confch, work);
-	struct node *node, *e;
+	struct node *node;
 	int i;
 
 	const struct cpg_address *member_list = w->member_list;
@@ -559,22 +601,31 @@ static void __sd_confch(struct work *work, int idx)
 	    sys->this_pid == member_list[0].pid)
 		sys->synchronized = 1;
 
+	if (list_empty(&sys->cpg_node_list)) {
+		for (i = 0; i < member_list_entries; i++)
+			add_node(&sys->cpg_node_list, member_list[i].nodeid, member_list[i].pid, NULL);
+	} else {
+		for (i = 0; i < joined_list_entries; i++)
+			add_node(&sys->cpg_node_list, joined_list[i].nodeid, joined_list[i].pid, NULL);
+	}
+
 	for (i = 0; i < left_list_entries; i++) {
-		list_for_each_entry_safe(node, e, &sys->node_list, list) {
+		node = find_node(&sys->cpg_node_list, left_list[i].nodeid, left_list[i].pid);
+		if (node) {
+			list_del(&node->list);
+			free(node);
+		} else
+			eprintf("System error\n");
+
+		node = find_node(&sys->sd_node_list, left_list[i].nodeid, left_list[i].pid);
+		if (node) {
 			int nr;
-			unsigned pid;
 			struct sheepdog_node_list_entry e[SD_MAX_NODES];
-
-			if (node->nodeid != left_list[i].nodeid ||
-			    node->pid != left_list[i].pid)
-				continue;
-
-			pid = node->pid;
 
 			list_del(&node->list);
 			free(node);
 
-			nr = build_node_list(&sys->node_list, e);
+			nr = build_node_list(&sys->sd_node_list, e);
 			epoch_log_write(sys->epoch + 1, (char *)e,
 					nr * sizeof(struct sheepdog_node_list_entry));
 
@@ -608,7 +659,7 @@ static void __sd_confch(struct work *work, int idx)
 	if (left_list_entries == 0)
 		return;
 
-	print_node_list();
+	print_node_list(&sys->sd_node_list);
 }
 
 static void __sd_confch_done(struct work *work, int idx)
@@ -808,7 +859,8 @@ join_retry:
 	sys->this_node.id = hval;
 
 	sys->synchronized = 0;
-	INIT_LIST_HEAD(&sys->node_list);
+	INIT_LIST_HEAD(&sys->sd_node_list);
+	INIT_LIST_HEAD(&sys->cpg_node_list);
 	INIT_LIST_HEAD(&sys->vm_list);
 	INIT_LIST_HEAD(&sys->pending_list);
 	cpg_context_set(cpg_handle, sys);

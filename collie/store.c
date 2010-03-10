@@ -148,7 +148,7 @@ static int read_from_one(uint64_t oid,
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
-	nr = build_node_list(&sys->node_list, e);
+	nr = build_node_list(&sys->sd_node_list, e);
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
@@ -229,7 +229,7 @@ static int forward_obj_req(struct request *req, char *buf)
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
-	nr = build_node_list(&sys->node_list, e);
+	nr = build_node_list(&sys->sd_node_list, e);
 
 	copies = hdr->copies;
 
@@ -340,7 +340,7 @@ static int is_my_obj(uint64_t oid, int copies)
 	int i, n, nr;
 	struct sheepdog_node_list_entry e[SD_MAX_NODES];
 
-	nr = build_node_list(&sys->node_list, e);
+	nr = build_node_list(&sys->sd_node_list, e);
 
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
@@ -538,7 +538,7 @@ void store_queue_request(struct work *work, int idx)
 
 	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
 
-	if (list_empty(&sys->node_list)) {
+	if (list_empty(&sys->sd_node_list)) {
 		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
 		ret = SD_RES_SYSTEM_ERROR;
 		goto out;
@@ -732,7 +732,7 @@ void so_queue_request(struct work *work, int idx)
 	char oldname[1024];
 	uint16_t id = 0;
 
-	if (list_empty(&sys->node_list)) {
+	if (list_empty(&sys->sd_node_list)) {
 		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
 		result = SD_RES_SYSTEM_ERROR;
 		goto out;
@@ -748,7 +748,7 @@ void so_queue_request(struct work *work, int idx)
 		int local = 0;
 
 		e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-		nr = build_node_list(&sys->node_list, e);
+		nr = build_node_list(&sys->sd_node_list, e);
 
 		for (i = 0; i < sys->nr_sobjs; i++) {
 			n = obj_to_sheep(e, nr, SD_DIR_OID, i);

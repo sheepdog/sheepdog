@@ -93,7 +93,7 @@ int add_vdi(char *name, int len, uint64_t size,
 
 	memset(&req, 0, sizeof(req));
 
-	nr_nodes = build_node_list(&sys->node_list, entries);
+	nr_nodes = build_node_list(&sys->sd_node_list, entries);
 
 	dprintf("%s (%d) %" PRIu64 ", base: %" PRIu64 "\n", name, len, size,
 		base_oid);
@@ -149,7 +149,7 @@ int lookup_vdi(char *filename, uint64_t * oid, uint32_t tag, int do_lock,
 
 	memset(&req, 0, sizeof(req));
 
-	nr_nodes = build_node_list(&sys->node_list, entries);
+	nr_nodes = build_node_list(&sys->sd_node_list, entries);
 
 	*current = 0;
 
@@ -196,7 +196,7 @@ int make_super_object(struct sd_vdi_req *hdr)
 	req.ctime = (uint64_t)tv.tv_sec << 32 | tv.tv_usec * 1000;
 	req.copies = ((struct sd_obj_req *)hdr)->copies;
 
-	nr_nodes = build_node_list(&sys->node_list, entries);
+	nr_nodes = build_node_list(&sys->sd_node_list, entries);
 
 	ret = exec_reqs(entries, nr_nodes, sys->epoch,
 			SD_DIR_OID, (struct sd_req *)&req, NULL, 0, 0, req.copies,
