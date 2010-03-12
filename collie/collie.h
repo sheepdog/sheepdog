@@ -62,6 +62,7 @@ struct cluster_info {
 	struct sheepdog_node_list_entry this_node;
 
 	uint32_t epoch;
+	uint32_t status;
 
 	struct list_head cpg_node_list;
 	struct list_head sd_node_list;
@@ -96,6 +97,10 @@ void so_queue_request(struct work *work, int idx);
 
 void store_queue_request(struct work *work, int idx);
 
+int read_epoch(uint32_t *epoch, uint64_t *ctime,
+	       struct sheepdog_node_list_entry *entries, int *nr_entries);
+void epoch_queue_request(struct work *work, int idx);
+
 void cluster_queue_request(struct work *work, int idx);
 
 int update_epoch_store(uint32_t epoch);
@@ -107,6 +112,8 @@ extern struct work_queue *dobj_queue;
 
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
+int get_latest_epoch(void);
+int remove_epoch(int epoch);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 

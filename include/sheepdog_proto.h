@@ -35,6 +35,7 @@
 #define SD_OP_UPDATE_EPOCH   0x22
 #define SD_OP_GET_EPOCH      0x23
 #define SD_OP_SHUTDOWN       0x24
+#define SD_OP_READ_EPOCH     0x25
 
 #define SD_OP_DEBUG_INC_NVER 0xA0
 #define SD_OP_DEBUG_SET_NODE 0xA1
@@ -55,12 +56,18 @@
 #define SD_OP_SO_STAT        0x65
 
 #define SD_OP_STAT_SHEEP     0xB0
+#define SD_OP_STAT_CLUSTER   0xB1
 
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
 #define SD_FLAG_CMD_FORWARD  0x04
 
 #define SD_FLAG_CMD_SNAPSHOT (1U << 8)
+
+#define SD_STATUS_OK            0x00
+#define SD_STATUS_STARTUP       0x01
+#define SD_STATUS_SHUTDOWN      0x02
+#define SD_STATUS_INCONSISTENT_EPOCHS   0x03
 
 #define SD_RES_SUCCESS       0x00 /* Success */
 #define SD_RES_UNKNOWN       0x01 /* Unknown error */
@@ -87,6 +94,8 @@
 #define SD_RES_NO_EPOCH      0x16 /* Requested epoch is not found */
 #define SD_RES_VDI_NOT_LOCKED   0x17 /* Vdi is not locked */
 #define SD_RES_SHUTDOWN      0x18 /* Sheepdog is shutting down */
+#define SD_RES_NO_MEM        0x19 /* Cannot allocate memory */
+#define SD_RES_INCONSISTENT_EPOCHS  0x1A /* There is inconsistency between epochs */
 
 #define SD_VDI_RSP_FLAG_CURRENT 0x01
 
@@ -109,6 +118,29 @@ struct sd_rsp {
 	uint32_t        data_length;
 	uint32_t        result;
 	uint32_t	opcode_specific[7];
+};
+
+struct sd_epoch_req {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t	pad[8];
+};
+
+struct sd_epoch_rsp {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t        result;
+	uint32_t        latest_epoch;
+	uint64_t        ctime;
+	uint32_t	pad[4];
 };
 
 struct sd_so_req {
@@ -232,6 +264,13 @@ struct sheepdog_node_list_entry {
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	pad[3];
+};
+
+struct epoch_log {
+	uint64_t ctime;
+	uint32_t epoch;
+	uint32_t nr_nodes;
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
 };
 
 /*

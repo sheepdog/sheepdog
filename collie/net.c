@@ -38,6 +38,33 @@ static void __done(struct work *work, int idx)
 static void queue_request(struct request *req)
 {
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;;
+
+	if (sys->status == SD_STATUS_SHUTDOWN) {
+		rsp->result = SD_RES_SHUTDOWN;
+		req->done(req);
+		return;
+	}
+
+	if (sys->status == SD_STATUS_STARTUP ||
+	    sys->status == SD_STATUS_INCONSISTENT_EPOCHS) {
+		/* TODO: cleanup */
+		switch (hdr->opcode) {
+		case SD_OP_STAT_CLUSTER:
+		case SD_OP_MAKE_FS:
+		case SD_OP_GET_NODE_LIST:
+		case SD_OP_SO:
+		case SD_OP_READ_EPOCH:
+			break;
+		default:
+			if (sys->status == SD_STATUS_STARTUP)
+				rsp->result = SD_RES_STARTUP;
+			else
+				rsp->result = SD_RES_INCONSISTENT_EPOCHS;
+			req->done(req);
+			return;
+		}
+	}
 
 	switch (hdr->opcode) {
 	case SD_OP_CREATE_AND_WRITE_OBJ:
@@ -49,6 +76,9 @@ static void queue_request(struct request *req)
 	case SD_OP_GET_OBJ_LIST:
 		req->work.fn = store_queue_request;
 		break;
+	case SD_OP_READ_EPOCH:
+		req->work.fn = epoch_queue_request;
+		break;
 	case SD_OP_GET_NODE_LIST:
 	case SD_OP_GET_VM_LIST:
 	case SD_OP_NEW_VDI:
@@ -58,6 +88,7 @@ static void queue_request(struct request *req)
 	case SD_OP_GET_VDI_INFO:
 	case SD_OP_MAKE_FS:
 	case SD_OP_SHUTDOWN:
+	case SD_OP_STAT_CLUSTER:
 		req->work.fn = cluster_queue_request;
 		break;
 	case SD_OP_SO:
@@ -69,6 +100,8 @@ static void queue_request(struct request *req)
 		break;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);
+		rsp->result = SD_RES_SYSTEM_ERROR;
+		req->done(req);
 		return;
 	}
 

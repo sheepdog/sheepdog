@@ -48,9 +48,9 @@ struct join_message {
 	uint32_t nodeid;
 	uint32_t pid;
 	struct sheepdog_node_list_entry master_node;
-	uint32_t epoch;
 	uint32_t nr_nodes;
 	uint32_t nr_sobjs;
+	uint32_t cluster_status;
 	uint32_t pad;
 	struct {
 		uint32_t nodeid;
@@ -168,6 +168,7 @@ void cluster_queue_request(struct work *work, int idx)
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 	struct vdi_op_message *msg;
+	struct epoch_log *log;
 	int ret = SD_RES_SUCCESS;
 
 	eprintf("%p %x\n", req, hdr->opcode);
@@ -179,6 +180,24 @@ void cluster_queue_request(struct work *work, int idx)
 		break;
 	case SD_OP_GET_VM_LIST:
 		get_vm_list(rsp, req->data);
+		break;
+	case SD_OP_STAT_CLUSTER:
+		log = (struct epoch_log *)req->data;
+
+		((struct sd_vdi_rsp *)rsp)->rsvd = sys->status;
+		log->ctime = get_cluster_ctime();
+		log->epoch = get_latest_epoch();
+		log->nr_nodes = epoch_log_read(log->epoch, (char *)log->nodes,
+					       sizeof(log->nodes));
+		if (log->nr_nodes == -1) {
+			rsp->data_length = 0;
+			log->nr_nodes = 0;
+		} else{
+			rsp->data_length = sizeof(*log);
+			log->nr_nodes /= sizeof(log->nodes[0]);
+		}
+
+		rsp->result = SD_RES_SUCCESS;
 		break;
 	default:
 		/* forward request to group */
@@ -286,6 +305,96 @@ static int is_master(void)
 	return 0;
 }
 
+static int get_cluster_status(struct sheepdog_node_list_entry *node)
+{
+	struct sd_epoch_req hdr;
+	struct sd_epoch_rsp *rsp = (struct sd_epoch_rsp *)&hdr;
+	unsigned int rlen, wlen;
+	int ret, fd, i, j;
+	char name[128];
+	uint64_t ctime;
+	int nr_entries, nr_local_entries;
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
+	uint32_t epoch;
+
+	if (sys->status == SD_STATUS_INCONSISTENT_EPOCHS)
+		return SD_STATUS_INCONSISTENT_EPOCHS;
+
+	if (node->id == sys->this_node.id) {
+		nr_entries = ARRAY_SIZE(entries);
+		ret = read_epoch(&epoch, &ctime, entries, &nr_entries);
+	} else {
+		addr_to_str(name, sizeof(name), node->addr, 0);
+
+		fd = connect_to(name, node->port);
+		if (fd < 0)
+			return SD_STATUS_INCONSISTENT_EPOCHS;
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.opcode = SD_OP_READ_EPOCH;
+		hdr.epoch = sys->epoch;
+		hdr.data_length = sizeof(entries);
+		rlen = hdr.data_length;
+		wlen = 0;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, entries,
+			       &wlen, &rlen);
+
+
+		nr_entries = rlen / sizeof(*entries);
+		if (ret != 0) {
+			eprintf("failed to send request, %x, %s\n", ret, name);
+			close(fd);
+			return SD_STATUS_INCONSISTENT_EPOCHS;
+		}
+		epoch = rsp->latest_epoch;
+		ctime = rsp->ctime;
+		ret = rsp->result;
+
+		close(fd);
+	}
+
+	if (ret != SD_RES_SUCCESS) {
+		eprintf("failed to read epoch, %x\n", ret);
+		return SD_STATUS_STARTUP;
+	}
+
+	if (epoch != get_latest_epoch())
+		return SD_STATUS_INCONSISTENT_EPOCHS;
+
+	if (ctime != get_cluster_ctime())
+		return SD_STATUS_INCONSISTENT_EPOCHS;
+
+	nr_local_entries = epoch_log_read(epoch, (char *)local_entries,
+					  sizeof(local_entries));
+	nr_local_entries /= sizeof(local_entries[0]);
+
+	if (nr_entries != nr_local_entries)
+		return SD_STATUS_INCONSISTENT_EPOCHS;
+
+	if (memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0)
+		return SD_STATUS_INCONSISTENT_EPOCHS;
+
+	nr_entries = build_node_list(&sys->sd_node_list, entries);
+	if (nr_entries + 1 != nr_local_entries)
+		return SD_STATUS_STARTUP;
+
+	for (i = 0; i < nr_local_entries; i++) {
+		if (local_entries[i].id == node->id)
+			goto next;
+		for (j = 0; j < nr_entries; j++) {
+			if (local_entries[i].id == entries[j].id)
+				goto next;
+		}
+		return SD_STATUS_STARTUP;
+	next:
+		;
+	}
+
+	return SD_STATUS_OK;
+}
+
 static void join(struct join_message *msg)
 {
 	struct node *node;
@@ -299,8 +408,8 @@ static void join(struct join_message *msg)
 	if (msg->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
 
-	msg->epoch = sys->epoch;
 	msg->nr_sobjs = sys->nr_sobjs;
+	msg->nr_nodes = 0;
 	list_for_each_entry(node, &sys->cpg_node_list, list) {
 		if (node->nodeid == msg->nodeid && node->pid == msg->pid)
 			continue;
@@ -312,6 +421,11 @@ static void join(struct join_message *msg)
 		msg->nodes[msg->nr_nodes].ent = node->ent;
 		msg->nr_nodes++;
 	}
+
+	if (sys->status == SD_STATUS_STARTUP)
+		msg->cluster_status = get_cluster_status(&msg->header.from);
+	else
+		msg->cluster_status = sys->status;
 }
 
 static void update_cluster_info(struct join_message *msg)
@@ -346,33 +460,45 @@ static void update_cluster_info(struct join_message *msg)
 			 &msg->nodes[i].ent);
 	}
 
-	sys->epoch = msg->epoch;
 	sys->synchronized = 1;
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entry);
+	eprintf("system status = %d\n", msg->cluster_status);
+	if (sys->status == SD_STATUS_OK) {
+		nr_nodes = build_node_list(&sys->sd_node_list, entry);
 
-	ret = epoch_log_write(sys->epoch, (char *)entry,
-			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
-	if (ret < 0)
-		eprintf("can't write epoch %u\n", sys->epoch);
+		dprintf("update epoch, %d, %d\n", sys->epoch, nr_nodes);
+		ret = epoch_log_write(sys->epoch, (char *)entry,
+				      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+		if (ret < 0)
+			eprintf("can't write epoch %u\n", sys->epoch);
+	}
 
-	/* we are ready for object operations */
-	update_epoch_store(sys->epoch);
 out:
 	add_node(&sys->sd_node_list, msg->nodeid, msg->pid, &msg->header.from);
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entry);
+	if (sys->status == SD_STATUS_OK) {
+		nr_nodes = build_node_list(&sys->sd_node_list, entry);
 
-	ret = epoch_log_write(sys->epoch + 1, (char *)entry,
-			      nr_nodes * sizeof(struct sheepdog_node_list_entry));
-	if (ret < 0)
-		eprintf("can't write epoch %u\n", sys->epoch + 1);
+		dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr_nodes);
+		ret = epoch_log_write(sys->epoch + 1, (char *)entry,
+				      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+		if (ret < 0)
+			eprintf("can't write epoch %u\n", sys->epoch + 1);
 
-	sys->epoch++;
+		sys->epoch++;
 
-	update_epoch_store(sys->epoch);
+		update_epoch_store(sys->epoch);
+	}
 
 	print_node_list(&sys->sd_node_list);
+
+	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK)
+		sys->epoch = get_latest_epoch();
+
+	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS)
+		sys->status = msg->cluster_status;
+
+	return;
 }
 
 static void vdi_op(struct vdi_op_message *msg)
@@ -421,6 +547,12 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	struct vm *vm;
 	struct request *req;
 	int ret = msg->rsp.result;
+	int i, latest_epoch, nr_nodes;
+	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	uint64_t ctime;
+
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
@@ -456,11 +588,28 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	case SD_OP_GET_VDI_INFO:
 		break;
 	case SD_OP_MAKE_FS:
-		if (ret == SD_RES_SUCCESS) {
-			sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
-			eprintf("%d\n", sys->nr_sobjs);
-		}
+		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
+		eprintf("%d\n", sys->nr_sobjs);
 
+		ctime = ((struct sd_so_req *)hdr)->ctime;
+		set_cluster_ctime(ctime);
+
+		latest_epoch = get_latest_epoch();
+		for (i = 1; i <= latest_epoch; i++)
+			remove_epoch(i);
+
+		sys->epoch = 1;
+		nr_nodes = build_node_list(&sys->sd_node_list, entry);
+
+		dprintf("write epoch log, %d, %d\n", sys->epoch, nr_nodes);
+		ret = epoch_log_write(sys->epoch, (char *)entry,
+				      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+		if (ret < 0)
+			eprintf("can't write epoch %u\n", sys->epoch);
+		update_epoch_store(sys->epoch);
+
+		sys->status = SD_STATUS_OK;
+		break;
 	case SD_OP_SHUTDOWN:
 		sys->status = SD_STATUS_SHUTDOWN;
 		break;
@@ -468,7 +617,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		eprintf("unknown operation %d\n", hdr->opcode);
 		ret = SD_RES_UNKNOWN;
 	}
-
+out:
 	if (node_cmp(&sys->this_node, &msg->header.from) != 0)
 		return;
 
@@ -629,13 +778,16 @@ static void __sd_confch(struct work *work, int idx)
 			list_del(&node->list);
 			free(node);
 
-			nr = build_node_list(&sys->sd_node_list, e);
-			epoch_log_write(sys->epoch + 1, (char *)e,
-					nr * sizeof(struct sheepdog_node_list_entry));
+			if (sys->status == SD_STATUS_OK) {
+				nr = build_node_list(&sys->sd_node_list, e);
+				dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr);
+				epoch_log_write(sys->epoch + 1, (char *)e,
+						nr * sizeof(struct sheepdog_node_list_entry));
 
-			sys->epoch++;
+				sys->epoch++;
 
-			update_epoch_store(sys->epoch);
+				update_epoch_store(sys->epoch);
+			}
 		}
 	}
 
@@ -703,7 +855,7 @@ static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
 			member_list[i].reason);
 	}
 
-	if (sys->status & SD_STATUS_SHUTDOWN_MASK || sys->status & SD_STATUS_ERROR_MASK)
+	if (sys->status == SD_STATUS_SHUTDOWN || sys->status == SD_STATUS_INCONSISTENT_EPOCHS)
 		return;
 
 	w = zalloc(sizeof(*w));
@@ -866,6 +1018,7 @@ join_retry:
 	sys->this_node.id = hval;
 
 	sys->synchronized = 0;
+	sys->status = SD_STATUS_STARTUP;
 	INIT_LIST_HEAD(&sys->sd_node_list);
 	INIT_LIST_HEAD(&sys->cpg_node_list);
 	INIT_LIST_HEAD(&sys->vm_list);

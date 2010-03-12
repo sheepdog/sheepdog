@@ -24,6 +24,7 @@
 #define ANAME_LAST_OID "user.sheepdog.last_oid"
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
+#define ANAME_OBJECT_UPDATED "user.sheepdog.object_updated"
 
 static char *vdi_path;
 static char *obj_path;
@@ -504,8 +505,9 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		if (ret != hdr->data_length) {
 			ret = SD_RES_EIO;
 			goto out;
-		} else
-			ret = SD_RES_SUCCESS;
+		}
+
+		ret = SD_RES_SUCCESS;
 		break;
 	case SD_OP_SYNC_OBJ:
 		ret = fsync(fd);
@@ -843,8 +845,11 @@ void so_queue_request(struct work *work, int idx)
 
 		ret = fsetxattr(fd, ANAME_COPIES, &hdr->copies,
 				sizeof(hdr->copies), 0);
-		if (ret)
+		if (ret) {
 			result = SD_RES_EIO;
+			goto out;
+		}
+
 		break;
 	case SD_OP_SO_NEW_VDI:
 		fd = open(path, O_RDONLY);
@@ -956,8 +961,8 @@ void so_queue_request(struct work *work, int idx)
 
 		eprintf("%lx\n", last_oid);
 		rsp->oid = last_oid;
-		break;
 
+		break;
 	case SD_OP_SO_LOOKUP_VDI:
 		result = so_lookup_vdi(req);
 		break;
@@ -1039,6 +1044,91 @@ int epoch_log_read(uint32_t epoch, char *buf, int len)
 	close(fd);
 
 	return len;
+}
+
+int get_latest_epoch(void)
+{
+	DIR *dir;
+	struct dirent *d;
+	uint32_t e, epoch = 0;
+
+	dir = opendir(epoch_path);
+	if (!dir)
+		return -1;
+
+	while ((d = readdir(dir))) {
+		e = atoi(d->d_name);
+		if (e > epoch)
+			epoch = e;
+	}
+	closedir(dir);
+
+	return epoch;
+}
+
+/* remove directory recursively */
+static int rmdir_r(char *dir_path)
+{
+	int ret;
+	struct stat s;
+	DIR *dir;
+	struct dirent *d;
+	char path[PATH_MAX];
+
+	dir = opendir(dir_path);
+	if (!dir) {
+		if (errno != ENOENT)
+			eprintf("failed, %s, %d\n", dir_path, errno);
+		return -errno;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
+		ret = stat(path, &s);
+		if (ret) {
+			eprintf("cannot remove directory %s\n", path);
+			goto out;
+		}
+		if (S_ISDIR(s.st_mode))
+			ret = rmdir_r(path);
+		else
+			ret = unlink(path);
+
+		if (ret != 0) {
+			eprintf("failed, %s, %d, %d\n", path, S_ISDIR(s.st_mode), errno);
+			goto out;
+		}
+	}
+
+	ret = rmdir(dir_path);
+out:
+	closedir(dir);
+	return ret;
+}
+
+int remove_epoch(int epoch)
+{
+	int ret;
+	char path[PATH_MAX];
+
+	dprintf("remove epoch %d\n", epoch);
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	ret = unlink(path);
+	if (ret && ret != -ENOENT) {
+		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
+		return SD_RES_EIO;
+	}
+
+	snprintf(path, sizeof(path), "%s%08u", obj_path, epoch);
+	ret = rmdir_r(path);
+	if (ret && ret != -ENOENT) {
+		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
+		return SD_RES_EIO;
+	}
+	return 0;
 }
 
 int set_cluster_ctime(uint64_t ctime)
@@ -1573,4 +1663,47 @@ int init_store(char *d)
 		return 1;
 
 	return ret;
+}
+
+int read_epoch(uint32_t *epoch, uint64_t *ctime,
+	       struct sheepdog_node_list_entry *entries, int *nr_entries)
+{
+	int ret;
+
+	*epoch = get_latest_epoch();
+	ret = epoch_log_read(*epoch, (char *)entries,
+			     *nr_entries * sizeof(*entries));
+	if (ret == -1) {
+		eprintf("failed to read epoch %d\n", *epoch);
+		*nr_entries = 0;
+		return SD_RES_EIO;
+	}
+	*nr_entries = ret / sizeof(*entries);
+
+	*ctime = get_cluster_ctime();
+
+	return SD_RES_SUCCESS;
+}
+
+void epoch_queue_request(struct work *work, int idx)
+{
+	struct request *req = container_of(work, struct request, work);
+	int ret = SD_RES_SUCCESS, n;
+	struct sd_epoch_req *hdr = (struct sd_epoch_req *)&req->rq;
+	struct sd_epoch_rsp *rsp = (struct sd_epoch_rsp *)&req->rp;
+	uint32_t opcode = hdr->opcode;
+	struct sheepdog_node_list_entry *entries;
+
+	switch (opcode) {
+	case SD_OP_READ_EPOCH:
+		entries = req->data;
+		n = hdr->data_length / sizeof(*entries);
+		ret = read_epoch(&rsp->latest_epoch, &rsp->ctime, entries, &n);
+		rsp->data_length = n * sizeof(*entries);
+		break;
+	}
+	if (ret != SD_RES_SUCCESS) {
+		dprintf("failed, %d, %x, %x\n", idx, opcode, ret);
+		rsp->result = ret;
+	}
 }
