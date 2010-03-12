@@ -58,6 +58,7 @@ enum info_type {
 	INFO_SHEEP,
 	INFO_OBJ,
 	INFO_VM,
+	INFO_CLUSTER,
 	INFO_NONE,
 };
 
@@ -78,7 +79,7 @@ static void usage(int status)
 \n\
 Command syntax:\n\
   mkfs [--copies=N]\n\
-  info -t (vdi|dog|sheep|obj) [-f (list|tree|graph)] [-H (on|off)] [-R (on|off)] [-i N] [-e N] [vdiname]\n\
+  info -t (vdi|dog|sheep|obj|cluster) [-f (list|tree|graph)] [-H (on|off)] [-R (on|off)] [-i N] [-e N] [vdiname]\n\
   debug -o node_version\n\
   shutdown\n\
 \n\
@@ -176,6 +177,10 @@ static int update_node_list(int max_nodes, int epoch)
 		goto out;
 	case SD_RES_NO_EPOCH:
 		fprintf(stderr, "requested epoch is not found\n");
+		ret = -1;
+		goto out;
+	case SD_RES_INCONSISTENT_EPOCHS:
+		fprintf(stderr, "there is inconsistency betweeen epochs\n");
 		ret = -1;
 		goto out;
 	default:
@@ -998,6 +1003,82 @@ rerun:
 		ret = parse_vdi(print_vm_list, &vli);
 		break;
 	}
+	case INFO_CLUSTER:
+	{
+		int fd;
+		struct sd_vdi_req hdr;
+		struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+		unsigned rlen, wlen;
+		struct epoch_log logs[8];
+		int nr_logs;
+		time_t ti;
+		struct tm tm;
+		char time[128];
+
+		fd = connect_to("localhost", sdport);
+		if (fd < 0)
+			break;
+
+		memset(&hdr, 0, sizeof(hdr));
+
+		hdr.opcode = SD_OP_STAT_CLUSTER;
+		hdr.epoch = node_list_version;
+		hdr.data_length = sizeof(logs);
+
+		rlen = hdr.data_length;
+		wlen = 0;
+		ret = exec_req(fd, (struct sd_req *)&hdr, logs, &wlen, &rlen);
+		close(fd);
+
+		if (ret != 0)
+			break;
+
+		if (rsp->result != SD_RES_SUCCESS) {
+			fprintf(stderr, "failed to get cluster status, %x\n", rsp->result);
+			break;
+		}
+		switch (rsp->rsvd) {
+		case SD_STATUS_OK:
+			printf("running\n");
+			break;
+		case SD_STATUS_STARTUP:
+			printf("startup\n");
+			break;
+		case SD_STATUS_INCONSISTENT_EPOCHS:
+			printf("there is inconsistency between epochs\n");
+			break;
+		case SD_STATUS_SHUTDOWN:
+			printf("shutdown\n");
+			break;
+		default:
+			printf("%d\n", rsp->rsvd);
+			break;
+		}
+		printf("\n");
+		printf("Ctime              Epoch Nodes\n");
+		nr_logs = rsp->data_length / sizeof(struct epoch_log);
+		for (i = 0; i < nr_logs; i++) {
+			int j;
+			char name[128];
+			struct sheepdog_node_list_entry *entry;
+
+			ti = logs[i].ctime >> 32;
+			localtime_r(&ti, &tm);
+			strftime(time, sizeof(time), "%y-%m-%d %H:%M:%S", &tm);
+
+			printf("%s %6d", time, logs[i].epoch);
+			printf(" [");
+			for (j = 0; j < logs[i].nr_nodes; j++) {
+				entry = logs[i].nodes + j;
+				printf("%s%s",
+				       (j == 0) ? "" : ", ",
+				       addr_to_str(name, sizeof(name),
+						   entry->addr, entry->port));
+			}
+			printf("]\n");
+		}
+		break;
+	}
 	default:
 		ret = -1;
 		break;
@@ -1081,6 +1162,8 @@ int main(int argc, char **argv)
 				type = INFO_OBJ;
 			else if (!strcasecmp(optarg, "vm"))
 				type = INFO_VM;
+			else if (!strcasecmp(optarg, "cluster"))
+				type = INFO_CLUSTER;
 			else
 				usage(1);
 			break;
@@ -1105,13 +1188,19 @@ int main(int argc, char **argv)
 	if (optind >= argc)
 		usage(0);
 
-
 	node_list_entries = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-	ret = update_node_list(SD_MAX_NODES, epoch);
-	if (ret < 0)
-		return 1;
-
 	command = argv[optind++];
+
+	/* TODO: cleanup */
+	if (strcasecmp(command, "mkfs") == 0)
+		;
+	else if (strcasecmp(command, "info") == 0 && type == INFO_CLUSTER)
+		;
+	else {
+		ret = update_node_list(SD_MAX_NODES, epoch);
+		if (ret < 0)
+			return 1;
+	}
 
 	if (!strcasecmp(command, "info")) {
 		char *name = NULL;
