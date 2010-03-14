@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/syslog.h>
 
 #include "collie.h"
 
@@ -23,12 +24,13 @@ static char program_name[] = "collie";
 static struct option const long_options[] = {
 	{"port", required_argument, 0, 'p'},
 	{"foreground", no_argument, 0, 'f'},
+	{"loglevel", required_argument, 0, 'l'},
 	{"debug", no_argument, 0, 'd'},
 	{"help", no_argument, 0, 'h'},
 	{0, 0, 0, 0},
 };
 
-static char *short_options = "p:fdh";
+static char *short_options = "p:fl:dh";
 
 static void usage(int status)
 {
@@ -41,6 +43,7 @@ static void usage(int status)
 Sheepdog Daemon, version %s\n\
   -p, --port              specify the listen port number\n\
   -f, --foreground        make the program run in the foreground\n\
+  -l, --loglevel          specify the message level printed by default\n\
   -d, --debug             print debug messages\n\
   -h, --help              display this help and exit\n\
 ", SD_VERSION);
@@ -56,7 +59,7 @@ int main(int argc, char **argv)
 	int ret, port = SD_LISTEN_PORT;
 	char *dir = DEFAULT_OBJECT_DIR;
 	int is_daemon = 1;
-	int is_debug = 0;
+	int log_level = LOG_INFO;
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
@@ -67,8 +70,11 @@ int main(int argc, char **argv)
 		case 'f':
 			is_daemon = 0;
 			break;
+		case 'l':
+			log_level = atoi(optarg);
 		case 'd':
-			is_debug = 1;
+			/* removed soon. use loglevel instead */
+			log_level = LOG_DEBUG;
 			break;
 		case 'h':
 			usage(0);
@@ -82,7 +88,7 @@ int main(int argc, char **argv)
 	if (optind != argc)
 		dir = argv[optind];
 
-	ret = log_init(program_name, LOG_SPACE_SIZE, is_daemon, is_debug);
+	ret = log_init(program_name, LOG_SPACE_SIZE, is_daemon, log_level);
 	if (ret)
 		exit(1);
 
@@ -111,7 +117,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	dprintf("Sheepdog daemon (version %s) started\n", SD_VERSION);
+	vprintf(SDOG_NOTICE "Sheepdog daemon (version %s) started\n", SD_VERSION);
 
 	event_loop(-1);
 

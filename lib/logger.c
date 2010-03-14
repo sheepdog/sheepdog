@@ -45,7 +45,7 @@
 
 static struct logarea *la;
 static char *log_name;
-static int is_debug;
+static int log_level;
 static pid_t pid;
 
 static int logarea_init (int size)
@@ -159,12 +159,13 @@ static void dump_logarea (void)
 }
 #endif
 
-static int log_enqueue(int prio, const char *fmt, va_list ap)
+static int log_enqueue(int prio, const char *func, int line, const char *fmt,
+		       va_list ap)
 {
 	int len, fwd;
-	char buff[MAX_MSG_SIZE];
-	struct logmsg * msg;
-	struct logmsg * lastmsg;
+	char *p, buff[MAX_MSG_SIZE];
+	struct logmsg *msg;
+	struct logmsg *lastmsg;
 
 	lastmsg = (struct logmsg *)la->tail;
 
@@ -173,7 +174,19 @@ static int log_enqueue(int prio, const char *fmt, va_list ap)
 		      strlen((char *)&lastmsg->str) * sizeof(char) + 1;
 		la->tail += fwd;
 	}
-	vsnprintf(buff, MAX_MSG_SIZE, fmt, ap);
+
+	p = buff;
+	snprintf(p, MAX_MSG_SIZE, "%s(%d) ", func, line);
+
+	p += strlen(p);
+
+	vsnprintf(p, MAX_MSG_SIZE - strlen(p), fmt, ap);
+
+	if (p[0] == '<' && p[2] == '>') {
+		prio = atoi(p + 1);
+		memmove(p, p + 3, strlen(p) - 3 + 1);
+	}
+
 	len = strlen(buff) * sizeof(char) + 1;
 
 	/* not enough space on tail : rewind */
@@ -250,7 +263,7 @@ static void log_syslog (void * buff)
 	syslog(msg->prio, "%s", (char *)&msg->str);
 }
 
-static void dolog(int prio, const char *fmt, va_list ap)
+static void dolog(int prio, const char *func, int line, const char *fmt, va_list ap)
 {
 	struct timespec ts;
 	struct sembuf ops;
@@ -267,7 +280,7 @@ static void dolog(int prio, const char *fmt, va_list ap)
 			return;
 		}
 
-		log_enqueue(prio, fmt, ap);
+		log_enqueue(prio, func, line, fmt, ap);
 
 		ops.sem_op = 1;
 		if (semop(la->semid, &ops, 1) < 0) {
@@ -275,37 +288,33 @@ static void dolog(int prio, const char *fmt, va_list ap)
 			return;
 		}
 	} else {
+		char *p, q[MAX_MSG_SIZE];
+
+		p = q;
+		vsnprintf(p, MAX_MSG_SIZE, fmt, ap);
+
+		if (p[0] == '<' && p[2] == '>') {
+			prio = atoi(p + 1);
+			p += 3;
+		}
+
+		if (prio > log_level)
+			return;
+
 		if (log_name)
-			fprintf(stderr, "%s: ", log_name);
-		vfprintf(stderr, fmt, ap);
+			fprintf(stderr, "%s: %s(%d) %s", log_name, func, line, p);
+		else
+			fprintf(stderr, "%s(%d) %s", func, line, p);
+
 		fflush(stderr);
 	}
 }
 
-void log_warning(const char *fmt, ...)
+void log_write(int prio, const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
 	va_start(ap, fmt);
-	dolog(LOG_WARNING, fmt, ap);
-	va_end(ap);
-}
-
-void log_error(const char *fmt, ...)
-{
-	va_list ap;
-	va_start(ap, fmt);
-	dolog(LOG_ERR, fmt, ap);
-	va_end(ap);
-}
-
-void log_debug(const char *fmt, ...)
-{
-	if (!is_debug)
-		return;
-
-	va_list ap;
-	va_start(ap, fmt);
-	dolog(LOG_DEBUG, fmt, ap);
+	dolog(prio, func, line, fmt, ap);
 	va_end(ap);
 }
 
@@ -333,9 +342,9 @@ static void log_flush(void)
 	}
 }
 
-int log_init(char *program_name, int size, int daemon, int debug)
+int log_init(char *program_name, int size, int daemon, int level)
 {
-	is_debug = debug;
+	log_level = level;
 
 	logdbg(stderr,"enter log_init\n");
 	log_name = program_name;
