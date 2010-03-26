@@ -21,12 +21,9 @@
 #include "collie.h"
 #include "meta.h"
 
-#define ANAME_LAST_OID "user.sheepdog.last_oid"
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
-#define ANAME_OBJECT_UPDATED "user.sheepdog.object_updated"
 
-static char *vdi_path;
 static char *obj_path;
 static char *epoch_path;
 static char *mnt_path;
@@ -36,7 +33,6 @@ static char *zero_block;
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
-int nr_sobjs;
 struct work_queue *dobj_queue;
 
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
@@ -577,438 +573,6 @@ out:
 	}
 }
 
-static int vdi_sort(const void *a, const void *b)
-{
-	struct dirent *s1 = *((struct dirent **)a) , *s2 = *((struct dirent **)b);
-	char *p, *q;
-
-	p = strchr(s1->d_name, '-');
-	if (!p)
-		return -1;
-
-	q = strchr(s2->d_name, '-');
-	if (!q)
-		return 1;
-
-	if (atoi(p + 1) > atoi(q + 1))
-		return 1;
-	else
-		return -1;
-}
-
-static int filter(const struct dirent *dir)
-{
-	return strcmp(dir->d_name, ".") && strcmp(dir->d_name, "..");
-}
-
-static int so_read_vdis(struct request *req)
-{
-	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
-	DIR *dir;
-	struct dirent *dent, **vdent;
-	char *p;
-	char vpath[1024];
-	struct sheepdog_vdi_info *sde = req->data;
-
-	dir = opendir(vdi_path);
-	if (!dir)
-		return SD_RES_NO_SUPER_OBJ;
-
-	while ((dent = readdir(dir))) {
-		int i, n;
-
-		if (!strcmp(dent->d_name, ".") ||
-		    !strcmp(dent->d_name, ".."))
-			continue;
-
-		snprintf(vpath, sizeof(vpath), "%s%s", vdi_path, dent->d_name);
-
-		n = scandir(vpath, &vdent, filter, vdi_sort);
-
-		for (i = 0; i < n; i++) {
-			p = strchr(vdent[i]->d_name, '-');
-
-			dprintf("%s\n", vdent[i]->d_name);
-
-			if (p)
-				*p = '\0';
-
-			sde->oid = strtoull(vdent[i]->d_name, NULL, 16);
-			if (p) {
-				sde->id = strtoull(p + 1, NULL, 16);
-
-				p = strchr(p + 1, '-');
-				if (p)
-					strcpy(sde->tag, p + 1);
-			} else {
-				sde->id = 0;
-				sde->flags = FLAG_CURRENT;
-			}
-
-			sde->name_len = strlen(dent->d_name);
-			strcpy(sde->name, dent->d_name);
-			sde++;
-		}
-
-		free(vdent);
-	}
-
-	rsp->data_length = (char *)sde - (char *)req->data;
-	dprintf("%d\n", rsp->data_length);
-
-	closedir(dir);
-
-	return SD_RES_SUCCESS;
-}
-
-static int so_lookup_vdi(struct request *req)
-{
-	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
-	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
-	DIR *dir;
-	struct dirent *dent;
-	char *p;
-	int fd, ret;
-	uint64_t oid;
-	char path[1024];
-
-	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s", vdi_path);
-	strncpy(path + strlen(path), (char *)req->data,	hdr->data_length);
-
-	dprintf("%s, %x\n", path, hdr->tag);
-
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		if (errno == ENOENT)
-			return SD_RES_NO_VDI;
-		else {
-			eprintf("%m\n");
-			return SD_RES_EIO;
-		}
-	}
-
-	close(fd);
-
-	dir = opendir(path);
-	if (!dir)
-		return SD_RES_EIO;
-
-	while ((dent = readdir(dir))) {
-		if (!strcmp(dent->d_name, ".") ||
-		    !strcmp(dent->d_name, ".."))
-			continue;
-
-		p = strchr(dent->d_name, '-');
-		if (p) {
-			if (strtoull(p + 1, NULL, 16) != hdr->tag)
-				continue;
-
-			oid = strtoull(dent->d_name, NULL, 16);
-			rsp->oid = oid;
-
-			ret = SD_RES_SUCCESS;
-			goto found;
-		} else if (!hdr->tag) {
-			rsp->oid = strtoull(dent->d_name, NULL, 16);
-			rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
-			ret = SD_RES_SUCCESS;
-			goto found;
-		}
-	}
-	ret = SD_RES_NO_VDI;
-found:
-	closedir(dir);
-
-	return ret;
-}
-
-void so_queue_request(struct work *work, int idx)
-{
-	struct request *req = container_of(work, struct request, work);
-	struct sd_so_req *hdr = (struct sd_so_req *)&req->rq;
-	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&req->rp;
-	int nfd = -1, fd = -1, ret, result = SD_RES_SUCCESS;
-	uint32_t opcode = hdr->opcode;
-	uint64_t last_oid = 0;
-	char path[1024];
-	char oldname[1024];
-	uint16_t id = 0;
-
-	if (list_empty(&sys->sd_node_list)) {
-		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
-		result = SD_RES_SYSTEM_ERROR;
-		goto out;
-	}
-
-	/*
-	 * FIXME: too hacky; we need to rethink about how to all the
-	 * VDI operaitons
-	 */
-	if (opcode == SD_OP_SO_READ_VDIS) {
-		struct sheepdog_node_list_entry *e;
-		int nr, i, n;
-		int local = 0;
-
-		e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-		nr = build_node_list(&sys->sd_node_list, e);
-
-		for (i = 0; i < sys->nr_sobjs; i++) {
-			n = obj_to_sheep(e, nr, SD_DIR_OID, i);
-
-			if (e[n].id == sys->this_node.id) {
-				local = 1;
-				break;
-			}
-		}
-
-		if (!local) {
-			struct sd_so_req hdr2;
-			char name[128];
-			int fd;
-			unsigned wlen, rlen;
-
-			n = obj_to_sheep(e, nr, SD_DIR_OID, 0);
-
-			addr_to_str(name, sizeof(name), e[n].addr, 0);
-
-			eprintf("%s %d\n", name, e[n].port);
-
-			fd = connect_to(name, e[n].port);
-			if (fd < 0) {
-				rsp->result = SD_RES_EIO;
-				goto out;
-			}
-
-			memset(&hdr2, 0, sizeof(hdr2));
-			hdr2.opcode = SD_OP_SO_READ_VDIS;
-			hdr2.epoch = sys->epoch;
-			hdr2.data_length = hdr->data_length;
-
-			wlen = 0;
-			rlen = hdr->data_length;
-
-			eprintf("%d\n", fd);
-
-			ret = exec_req(fd, (struct sd_req *)&hdr2,
-				       req->data, &wlen, &rlen);
-
-			close(fd);
-
-			rsp->result = ((struct sd_rsp *)&hdr2)->result;
-			rsp->data_length = ((struct sd_rsp *)&hdr2)->data_length;
-
-			eprintf("%d\n", rsp->result);
-		}
-
-		free(e);
-		if (!local)
-			goto out;
-	}
-
-	if (opcode != SD_OP_SO_READ_VDIS) {
-		result = check_epoch(req);
-		if (result != SD_RES_SUCCESS)
-			goto out;
-	}
-
-	memset(path, 0, sizeof(path));
-	snprintf(path, sizeof(path), "%s", vdi_path);
-
-	switch (opcode) {
-	case SD_OP_SO:
-		ret = mkdir(path, def_dmode);
-		if (ret && errno != EEXIST) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		fd = open(path, O_RDONLY);
-		if (fd < 0) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		ret = fsetxattr(fd, ANAME_LAST_OID, &last_oid,
-				sizeof(last_oid), 0);
-		if (ret) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		ret = fsetxattr(fd, ANAME_CTIME, &hdr->ctime,
-				sizeof(hdr->ctime), 0);
-		if (ret) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		ret = fsetxattr(fd, ANAME_COPIES, &hdr->copies,
-				sizeof(hdr->copies), 0);
-		if (ret) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		break;
-	case SD_OP_SO_NEW_VDI:
-		fd = open(path, O_RDONLY);
-		if (fd < 0) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		ret = fgetxattr(fd, ANAME_LAST_OID, &last_oid,
-				sizeof(last_oid));
-		if (ret != sizeof(last_oid)) {
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		snprintf(path + strlen(path), sizeof(path) - strlen(path),
-			 "/%s", (char *)req->data);
-
-		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT) {
-			DIR *dir;
-			struct dirent *dent;
-
-			dir = opendir(path);
-			if (!dir) {
-				ret = SD_RES_NO_VDI;
-				goto out;
-			}
-
-			while ((dent = readdir(dir))) {
-				uint16_t tmp;
-				char *p;
-
-				if (!strcmp(dent->d_name, ".") ||
-				    !strcmp(dent->d_name, ".."))
-					continue;
-				p = strchr(dent->d_name, '-');
-				if (!p) {
-					memset(oldname, 0, sizeof(oldname));
-					snprintf(oldname, sizeof(oldname), "%s/%s",
-						 path, dent->d_name);
-					continue;
-				}
-
-				tmp = strtoul(p + 1, NULL, 16);
-				if (tmp > id)
-					id = tmp;
-			}
-			/* TODO: wraparound */
-			id++;
-			closedir(dir);
-		} else {
-			ret = mkdir(path, def_dmode);
-			if (ret) {
-				if (errno == EEXIST)
-					result = SD_RES_VDI_EXIST;
-				else {
-					eprintf("%m\n");
-					result = SD_RES_EIO;
-				}
-				goto out;
-			}
-		}
-
-		nfd = open(path, O_RDONLY);
-		if (nfd < 0) {
-			eprintf("%m\n");
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		last_oid += MAX_DATA_OBJS;
-
-		snprintf(path+ strlen(path), sizeof(path) - strlen(path), "/%016lx", last_oid);
-
-		ret = creat(path, def_fmode);
-		if (ret < 0) {
-			eprintf("%m\n");
-			result = SD_RES_EIO;
-			goto out;
-		}
-		close(ret);
-
-		ret = fsetxattr(fd, ANAME_LAST_OID, &last_oid,
-				sizeof(last_oid), 0);
-		if (ret) {
-			eprintf("%m\n");
-			close(fd);
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		close(fd);
-
-		if (hdr->flags & SD_FLAG_CMD_SNAPSHOT) {
-			if (hdr->data_length == SD_MAX_VDI_LEN * 2)
-				snprintf(path, sizeof(path), "%s-%04x-%s", oldname,
-					 id, (char *)req->data + SD_MAX_VDI_LEN);
-			else
-				snprintf(path, sizeof(path), "%s-%04x", oldname, id);
-			ret = rename(oldname, path);
-			if (ret) {
-				eprintf("%s, %s, %m\n", oldname, path);
-				result = SD_RES_EIO;
-				goto out;
-			}
-		}
-
-		close(nfd);
-
-		eprintf("%lx\n", last_oid);
-		rsp->oid = last_oid;
-
-		break;
-	case SD_OP_SO_LOOKUP_VDI:
-		result = so_lookup_vdi(req);
-		break;
-	case SD_OP_SO_READ_VDIS:
-		result = so_read_vdis(req);
-		break;
-	case SD_OP_SO_STAT:
-		fd = open(path, O_RDONLY);
-		if (fd < 0) {
-			eprintf("%m\n");
-			result = SD_RES_EIO;
-			goto out;
-		}
-
-		rsp->oid = 0;
-		ret = fgetxattr(fd, ANAME_LAST_OID, &rsp->oid,
-				sizeof(rsp->oid));
-		if (ret != sizeof(rsp->oid)) {
-			close(fd);
-			result = SD_RES_SYSTEM_ERROR;
-			goto out;
-		}
-
-		rsp->copies = 0;
-		ret = fgetxattr(fd, ANAME_COPIES, &rsp->copies,
-				sizeof(rsp->copies));
-		if (ret != sizeof(rsp->copies)) {
-			close(fd);
-			result = SD_RES_SYSTEM_ERROR;
-			goto out;
-		}
-
-		result = SD_RES_SUCCESS;
-		break;
-	}
-
-out:
-	if (result != SD_RES_SUCCESS)
-		rsp->result = result;
-
-	if (fd != -1)
-		close(fd);
-	if (nfd != -1)
-		close(nfd);
-}
-
 int epoch_log_write(uint32_t epoch, char *buf, int len)
 {
 	int fd, ret;
@@ -1543,42 +1107,6 @@ static int init_base_path(char *d, int *new)
 	return init_path(d, new);
 }
 
-#define VDI_PATH "/vdi/"
-
-static int init_vdi_path(char *base_path, int new)
-{
-	int ret;
-	struct stat s;
-
-	vdi_path = zalloc(strlen(base_path) + strlen(VDI_PATH) + 1);
-	sprintf(vdi_path, "%s" VDI_PATH, base_path);
-
-	ret = stat(vdi_path, &s);
-	if (ret) {
-		if (errno != ENOENT)
-			return 0;
-	} else if (!new) {
-		int fd, copies = 0;
-
-		/* we need to recover the super object here. */
-
-		fd = open(vdi_path, O_RDONLY);
-		if (fd < 0)
-			return 1;
-
-		ret = fgetxattr(fd, ANAME_COPIES, &copies, sizeof(copies));
-
-		close(fd);
-
-		if (ret != sizeof(copies))
-			return 1;
-
-		nr_sobjs = copies;
-	}
-
-	return 0;
-}
-
 #define OBJ_PATH "/obj/"
 
 static int init_obj_path(char *base_path)
@@ -1642,10 +1170,6 @@ int init_store(char *d)
 	if (ret)
 		return ret;
 
-	ret = init_vdi_path(d, new);
-	if (ret)
-		return ret;
-
 	ret = init_obj_path(d);
 	if (ret)
 		return ret;
@@ -1706,4 +1230,43 @@ void epoch_queue_request(struct work *work, int idx)
 		dprintf("failed, %d, %x, %x\n", idx, opcode, ret);
 		rsp->result = ret;
 	}
+}
+
+static int global_nr_copies(uint32_t *copies, int set)
+{
+	int ret, fd;
+
+	fd = open(epoch_path, O_RDONLY);
+	if (fd < 0)
+		return SD_RES_EIO;
+
+	if (set)
+		ret = fsetxattr(fd, ANAME_COPIES, copies, sizeof(*copies), 0);
+	else
+		ret = fgetxattr(fd, ANAME_COPIES, copies, sizeof(*copies));
+
+	close(fd);
+
+	if (set) {
+		if (ret) {
+			eprintf("use 'user_xattr' option?\n");
+			return SD_RES_SYSTEM_ERROR;
+		}
+	} else {
+		if (ret != sizeof(*copies)) {
+			return SD_RES_SYSTEM_ERROR;
+		}
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+int set_global_nr_copies(uint32_t copies)
+{
+	return global_nr_copies(&copies, 1);
+}
+
+int get_global_nr_copies(uint32_t *copies)
+{
+	return global_nr_copies(copies, 1);
 }

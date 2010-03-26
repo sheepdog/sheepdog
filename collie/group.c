@@ -527,7 +527,7 @@ static void vdi_op(struct vdi_op_message *msg)
 	case SD_OP_RELEASE_VDI:
 		break;
 	case SD_OP_MAKE_FS:
-		ret = make_super_object(&msg->req);
+		ret = SD_RES_SUCCESS;
 		break;
 	case SD_OP_SHUTDOWN:
 		break;
@@ -595,8 +595,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	case SD_OP_GET_VDI_INFO:
 		break;
 	case SD_OP_MAKE_FS:
-		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
-		eprintf("%d\n", sys->nr_sobjs);
+		sys->nr_sobjs = ((struct sd_vdi_req *)hdr)->copies;
 
 		ctime = ((struct sd_so_req *)hdr)->ctime;
 		set_cluster_ctime(ctime);
@@ -614,6 +613,8 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		if (ret < 0)
 			eprintf("can't write epoch %u\n", sys->epoch);
 		update_epoch_store(sys->epoch);
+
+		set_global_nr_copies(sys->nr_sobjs);
 
 		sys->status = SD_STATUS_OK;
 		break;
@@ -809,7 +810,8 @@ static void __sd_confch(struct work *work, int idx)
 			msg.header.from = sys->this_node;
 			msg.nodeid = sys->this_nodeid;
 			msg.pid = sys->this_pid;
-			msg.nr_sobjs = nr_sobjs;
+
+			get_global_nr_copies(&msg.nr_sobjs);
 
 			send_message(sys->handle, (struct message_header *)&msg);
 

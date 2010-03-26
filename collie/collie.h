@@ -90,8 +90,6 @@ int lookup_vdi(char *data, int data_len, uint64_t *oid, uint32_t snapid);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
-int make_super_object(struct sd_vdi_req *hdr);
-
 int build_node_list(struct list_head *node_list,
 		    struct sheepdog_node_list_entry *entries);
 
@@ -109,7 +107,8 @@ void cluster_queue_request(struct work *work, int idx);
 
 int update_epoch_store(uint32_t epoch);
 
-extern int nr_sobjs;
+int set_global_nr_copies(uint32_t copies);
+int get_global_nr_copies(uint32_t *copies);
 
 #define DATA_OBJ_NR_WORKER_THREAD 4
 extern struct work_queue *dobj_queue;

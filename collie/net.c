@@ -53,7 +53,6 @@ static void queue_request(struct request *req)
 		case SD_OP_STAT_CLUSTER:
 		case SD_OP_MAKE_FS:
 		case SD_OP_GET_NODE_LIST:
-		case SD_OP_SO:
 		case SD_OP_READ_EPOCH:
 			break;
 		default:
@@ -91,12 +90,6 @@ static void queue_request(struct request *req)
 	case SD_OP_STAT_CLUSTER:
 	case SD_OP_READ_VDIS:
 		req->work.fn = cluster_queue_request;
-		break;
-	case SD_OP_SO:
-	case SD_OP_SO_LOOKUP_VDI:
-	case SD_OP_SO_READ_VDIS:
-	case SD_OP_SO_STAT:
-		req->work.fn = so_queue_request;
 		break;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);

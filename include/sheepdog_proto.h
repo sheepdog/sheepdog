@@ -46,22 +46,12 @@
 #define SD_OP_SYNC_OBJ       0x05
 #define SD_OP_GET_OBJ_LIST   0x06
 
-/* collie <-> collie */
-#define SD_OP_SO             0x60
-#define SD_OP_SO_NEW_VDI     0x61
-#define SD_OP_SO_DEL_VDI     0x62
-#define SD_OP_SO_LOOKUP_VDI  0x63
-#define SD_OP_SO_READ_VDIS   0x64
-#define SD_OP_SO_STAT        0x65
-
 #define SD_OP_STAT_SHEEP     0xB0
 #define SD_OP_STAT_CLUSTER   0xB1
 
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
 #define SD_FLAG_CMD_FORWARD  0x04
-
-#define SD_FLAG_CMD_SNAPSHOT (1U << 8)
 
 #define SD_STATUS_OK            0x00
 #define SD_STATUS_STARTUP       0x01
@@ -96,8 +86,6 @@
 #define SD_RES_NO_MEM        0x19 /* Cannot allocate memory */
 #define SD_RES_INCONSISTENT_EPOCHS  0x1A /* There is inconsistency between epochs */
 #define SD_RES_FULL_VDI      0x1B /* we already have the maximum vdis */
-
-#define SD_VDI_RSP_FLAG_CURRENT 0x01
 
 struct sd_req {
 	uint8_t		proto_ver;

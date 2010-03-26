@@ -15,7 +15,6 @@
 #include "util.h"
 #include "list.h"
 
-#define SD_DIR_OID 0
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 
 /*
@@ -37,20 +36,6 @@
 #define MAX_CHILDREN 1024
 
 #define SD_NR_VDIS   (1U << 24)
-
-#define FLAG_CURRENT 1
-
-struct sheepdog_vdi_info {
-	uint64_t oid;
-	uint16_t id;
-	uint16_t name_len;
-	uint16_t tag_len;
-	uint8_t type;
-	uint8_t flags;
-	uint32_t epoch;
-	char name[SD_MAX_VDI_LEN];
-	char tag[SD_MAX_VDI_LEN];
-};
 
 struct sheepdog_inode {
 	char name[SD_MAX_VDI_LEN];
