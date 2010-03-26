@@ -100,6 +100,11 @@ static struct sheepdog_node_list_entry *node_list_entries;
 static int nr_nodes;
 static unsigned master_idx;
 
+static int is_current(struct sheepdog_inode *i)
+{
+	return !i->snap_ctime;
+}
+
 static char *size_to_str(uint64_t size, char *str, int str_size)
 {
 	char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
@@ -407,52 +412,45 @@ static int shutdown_sheepdog(void)
 typedef void (*vdi_parser_func_t)(uint64_t oid, char *name, uint32_t tag, uint32_t flags,
 				  struct sheepdog_inode *i, void *data);
 
-/*
- * TODO: handle larger buffer
- */
+
+
 int parse_vdi(vdi_parser_func_t func, void *data)
 {
-	struct sheepdog_vdi_info *ent;
-	char *buf;
-	int rest, ret;
-	struct sheepdog_inode i;
-	struct sd_so_req req;
+	int ret, fd;
+	unsigned long nr;
+	static struct sheepdog_inode i;
+	struct sd_req req;
+	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	unsigned int rlen, wlen = 0;
+
+	fd = connect_to("localhost", sdport);
+	if (fd < 0)
+		return fd;
 
 	memset(&req, 0, sizeof(req));
 
-	buf = zalloc(DIR_BUF_LEN);
-	if (!buf)
-		return 1;
+	req.opcode = SD_OP_READ_VDIS;
+	req.data_length = sizeof(vdi_inuse);
+	req.epoch = node_list_version;
 
-	req.opcode = SD_OP_SO_READ_VDIS;
+	rlen = sizeof(vdi_inuse);
+	ret = exec_req(fd, &req, vdi_inuse, &wlen, &rlen);
+	close(fd);
 
-	ret = exec_reqs(node_list_entries, nr_nodes, node_list_version,
-			SD_DIR_OID, (struct sd_req *)&req, buf, 0, DIR_BUF_LEN,
-			nr_nodes, 1);
+	if (ret < 0)
+		return ret;
 
-	if (ret < 0) {
-		ret = 1;
-		goto out;
-	}
-
-	ent = (struct sheepdog_vdi_info *)buf;
-	rest = ret;
-	while (rest > 0) {
-		if (!ent->name_len)
-			break;
+	for (nr = 0; nr < SD_NR_VDIS; nr++) {
+		if (!test_bit(nr, vdi_inuse))
+			continue;
 
 		ret = read_object(node_list_entries, nr_nodes, node_list_version,
-				  ent->oid, (void *)&i, sizeof(i), 0, nr_nodes);
+				  bit_to_oid(nr), (void *)&i, sizeof(i), 0, nr_nodes);
 
 		if (ret == sizeof(i))
-			func(ent->oid, ent->name, ent->id, ent->flags, &i, data);
+			func(i.oid, i.name, i.snap_id, 0, &i, data);
 
-		ent++;
-		rest -= sizeof(*ent);
 	}
-
-out:
-	free(buf);
 
 	return 0;
 }
@@ -499,7 +497,7 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 	       "time: %8s",
 	       name, tag, size_str, date, time);
 
-	if (info->highlight && (flags & FLAG_CURRENT))
+	if (info->highlight && is_current(i))
 		printf("\", color=\"red\"];\n");
 	else
 		printf("\"];\n");
@@ -548,9 +546,9 @@ static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
 	if (info->name && strcmp(name, info->name))
 		return;
 
-	if (flags & FLAG_CURRENT) {
+	if (is_current(i))
 		strcpy(buf, "(You Are Here)");
-	} else {
+	else {
 		ti = i->ctime >> 32;
 		localtime_r(&ti, &tm);
 
@@ -559,7 +557,7 @@ static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
 	}
 
 	add_vdi_tree(name, buf, oid, i->parent_oid,
-		 info->highlight && (flags & FLAG_CURRENT));
+		     info->highlight && is_current(i));
 }
 
 static int treeview_vdi(char *vdiname, int highlight)
@@ -599,7 +597,7 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 	for (idx = 0; idx < MAX_DATA_OBJS; idx++) {
 		if (!i->data_oid[idx])
 			continue;
-		if (is_data_obj_writeable(i->data_oid[idx], oid))
+		if (is_data_obj_writeable(i, idx))
 			my_objs++;
 		else
 			cow_objs++;
@@ -611,7 +609,7 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 
 	if (!data || strcmp(name, data) == 0) {
 		printf("%c %-8s %5d %7s %7s %7s %s  %9" PRIx64 "\n",
-		       flags & FLAG_CURRENT ? ' ' : 's', name, tag,
+		       is_current(i) ? ' ' : 's', name, tag,
 		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, oid);
 	}
 }
@@ -630,7 +628,7 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 	struct vm_list_info *vli = (struct vm_list_info *)data;
 	char vdi_size_str[8], my_objs_str[8], cow_objs_str[8];
 
-	if (!(flags & FLAG_CURRENT))
+	if (!is_current(inode))
 		return;
 
 	for (i = 0; i < vli->nr_vms; i++) {
@@ -643,7 +641,7 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 	for (j = 0; j < MAX_DATA_OBJS; j++) {
 		if (!inode->data_oid[j])
 			continue;
-		if (is_data_obj_writeable(inode->data_oid[j], oid))
+		if (is_data_obj_writeable(inode, j))
 			my_objs++;
 		else
 			cow_objs++;
@@ -676,7 +674,7 @@ static void cal_total_vdi_size(uint64_t oid, char *name, uint32_t tag,
 {
 	uint64_t *size = data;
 
-	if (flags & FLAG_CURRENT)
+	if (is_current(i))
 		*size += i->vdi_size;
 }
 

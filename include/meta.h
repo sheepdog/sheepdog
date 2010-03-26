@@ -21,33 +21,22 @@
 /*
  * Object ID rules
  *
- *  0 - 17 (18 bits): data object
- * 17 - 55 (37 bits): inode object
- * 56 - 63 ( 8 bits): PGID
- *
- * each VDI can use 2^18 data objects.
+ *  0 - 19 (20 bits): data object space
+ * 20 - 31 (12 bits): reserved data object space
+ * 32 - 55 (24 bits): vdi object space
+ * 56 - 62 (17 bits): reserved vdi object space
+ * 63 - 63 ( 1 bit ): set if vdi
  */
 
-#define DATA_SPACE_SHIFT 18
-
+#define VDI_SPACE   24
+#define VDI_SPACE_SHIFT   32
+#define VDI_BIT (UINT64_C(1) << 63)
 #define DEAFAULT_NR_COPIES 1
+#define SD_MAX_VDI_LEN 256
+#define MAX_DATA_OBJS (1ULL << 20)
+#define MAX_CHILDREN 1024
 
-static inline uint64_t oid_to_ino(uint64_t inode_oid)
-{
-	return (inode_oid >> DATA_SPACE_SHIFT) & ((UINT64_C(1) << 37) - 1);
-}
-
-static inline int is_data_obj_writeable(uint64_t inode_oid, uint64_t data_oid)
-{
-	return oid_to_ino(inode_oid) == oid_to_ino(data_oid);
-}
-
-static inline int is_data_obj(uint64_t oid)
-{
-	return oid & ((UINT64_C(1) << DATA_SPACE_SHIFT) - 1);
-}
-
-#define SHEEPDOG_SUPER_OBJ_SIZE (UINT64_C(1) << 12)
+#define SD_NR_VDIS   (1U << 24)
 
 #define FLAG_CURRENT 1
 
@@ -63,19 +52,37 @@ struct sheepdog_vdi_info {
 	char tag[SD_MAX_VDI_LEN];
 };
 
-#define MAX_DATA_OBJS (1 << 18)
-#define MAX_CHILDREN 1024
-
 struct sheepdog_inode {
+	char name[SD_MAX_VDI_LEN];
 	uint64_t oid;
 	uint64_t ctime;
+	uint64_t snap_ctime;
 	uint64_t vdi_size;
-	uint64_t block_size;
-	uint32_t copy_policy;
-	uint32_t nr_copies;
+	uint16_t copy_policy;
+	uint8_t  nr_copies;
+	uint8_t  block_size_shift;
+	uint32_t snap_id;
 	uint64_t parent_oid;
 	uint64_t child_oid[MAX_CHILDREN];
 	uint64_t data_oid[MAX_DATA_OBJS];
 };
+
+static inline int is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
+{
+	return (inode->oid >> VDI_SPACE_SHIFT) ==
+		(inode->data_oid[idx] >> VDI_SPACE_SHIFT);
+}
+
+static inline int is_data_obj(uint64_t oid)
+{
+	return !(VDI_BIT & oid);
+}
+
+#define NR_VDIS (1U << DATA_SPECE_SHIFT)
+
+static inline uint64_t bit_to_oid(unsigned long nr)
+{
+	return ((unsigned long long)nr << VDI_SPACE_SHIFT) | VDI_BIT;
+}
 
 #endif

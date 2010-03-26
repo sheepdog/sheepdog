@@ -19,6 +19,7 @@
 #include "logger.h"
 #include "work.h"
 #include "net.h"
+#include "meta.h"
 
 #define SD_MSG_JOIN             0x01
 #define SD_MSG_VDI_OP           0x02
@@ -70,6 +71,8 @@ struct cluster_info {
 	struct list_head vm_list;
 	struct list_head pending_list;
 
+	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+
 	int nr_sobjs;
 };
 
@@ -79,12 +82,13 @@ int create_listen_port(int port, void *data);
 
 int init_store(char *dir);
 
-int add_vdi(char *buf, int len, uint64_t size,
-	    uint64_t *added_oid, uint64_t base_oid, uint32_t tag, int copies,
-	    uint16_t flags);
+int add_vdi(char *data, int data_len, uint64_t size,
+	    uint64_t *new_oid, uint64_t base_oid, uint32_t copies,
+	    int is_snapshot);
 
-int lookup_vdi(char *filename, uint64_t * oid,
-	       uint32_t tag, int do_lock, int *current);
+int lookup_vdi(char *data, int data_len, uint64_t *oid, uint32_t snapid);
+
+int read_vdis(char *data, int len, unsigned int *rsp_len);
 
 int make_super_object(struct sd_vdi_req *hdr);
 

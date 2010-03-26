@@ -199,6 +199,9 @@ void cluster_queue_request(struct work *work, int idx)
 
 		rsp->result = SD_RES_SUCCESS;
 		break;
+	case SD_OP_READ_VDIS:
+		rsp->result = read_vdis(req->data, hdr->data_length, &rsp->data_length);
+		break;
 	default:
 		/* forward request to group */
 		goto forward;
@@ -506,21 +509,20 @@ static void vdi_op(struct vdi_op_message *msg)
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
 	void *data = msg->data;
-	int ret = SD_RES_SUCCESS, is_current;
+	int ret = SD_RES_SUCCESS;
 	uint64_t oid = 0;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
 		ret = add_vdi(data, hdr->data_length, hdr->vdi_size, &oid,
-			      hdr->base_oid, hdr->tag, hdr->copies, hdr->flags);
+			      hdr->base_oid, hdr->copies,
+			      hdr->snapid);
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
-		ret = lookup_vdi(data, &oid, hdr->tag, 1, &is_current);
+		ret = lookup_vdi(data, hdr->data_length, &oid, hdr->snapid);
 		if (ret != SD_RES_SUCCESS)
 			break;
-		if (is_current)
-			rsp->flags = SD_VDI_RSP_FLAG_CURRENT;
 		break;
 	case SD_OP_RELEASE_VDI:
 		break;
@@ -556,7 +558,12 @@ static void vdi_op_done(struct vdi_op_message *msg)
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
+	{
+		unsigned long nr = (rsp->oid & ~VDI_BIT) >> VDI_SPACE_SHIFT;
+		vprintf(SDOG_INFO "done %d %ld %" PRIx64 "\n", ret, nr, rsp->oid);
+		set_bit(nr, sys->vdi_inuse);
 		break;
+	}
 	case SD_OP_LOCK_VDI:
 		if (lookup_vm(&sys->vm_list, (char *)data)) {
 			ret = SD_RES_VDI_LOCKED;

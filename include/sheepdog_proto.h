@@ -20,8 +20,6 @@
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096
 
-#define SD_MAX_VDI_LEN 256
-
 /* -> vmon */
 
 #define SD_OP_NEW_VDI        0x11
@@ -36,6 +34,7 @@
 #define SD_OP_GET_EPOCH      0x23
 #define SD_OP_SHUTDOWN       0x24
 #define SD_OP_READ_EPOCH     0x25
+#define SD_OP_READ_VDIS      0x26
 
 #define SD_OP_DEBUG_INC_NVER 0xA0
 #define SD_OP_DEBUG_SET_NODE 0xA1
@@ -96,6 +95,7 @@
 #define SD_RES_SHUTDOWN      0x18 /* Sheepdog is shutting down */
 #define SD_RES_NO_MEM        0x19 /* Cannot allocate memory */
 #define SD_RES_INCONSISTENT_EPOCHS  0x1A /* There is inconsistency between epochs */
+#define SD_RES_FULL_VDI      0x1B /* we already have the maximum vdis */
 
 #define SD_VDI_RSP_FLAG_CURRENT 0x01
 
@@ -206,10 +206,10 @@ struct sd_vdi_req {
 	uint32_t        id;
 	uint32_t        data_length;
 	uint64_t        base_oid;
-	uint64_t        tag;
 	uint64_t	vdi_size;
 	uint32_t	copies;
-	uint32_t        pad[1];
+	uint32_t        snapid;
+	uint32_t        pad[2];
 };
 
 struct sd_vdi_rsp {
