@@ -54,6 +54,7 @@ static void queue_request(struct request *req)
 		case SD_OP_MAKE_FS:
 		case SD_OP_GET_NODE_LIST:
 		case SD_OP_READ_EPOCH:
+		case SD_OP_READ_VDIS:
 			break;
 		default:
 			if (sys->status == SD_STATUS_STARTUP)
@@ -88,9 +89,12 @@ static void queue_request(struct request *req)
 	case SD_OP_MAKE_FS:
 	case SD_OP_SHUTDOWN:
 	case SD_OP_STAT_CLUSTER:
-	case SD_OP_READ_VDIS:
 		req->work.fn = cluster_queue_request;
 		break;
+	case SD_OP_READ_VDIS:
+		rsp->result = read_vdis(req->data, hdr->data_length, &rsp->data_length);
+		req->done(req);
+		return;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;

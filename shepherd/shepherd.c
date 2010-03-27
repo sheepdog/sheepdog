@@ -449,6 +449,8 @@ int parse_vdi(vdi_parser_func_t func, void *data)
 
 		if (ret == sizeof(i))
 			func(i.oid, i.name, i.snap_id, 0, &i, data);
+		else
+			printf("error %lu %" PRIx64 ", %d\n", nr, bit_to_oid(nr), ret);
 
 	}
 

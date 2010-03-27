@@ -70,4 +70,9 @@ static inline uint64_t bit_to_oid(unsigned long nr)
 	return ((unsigned long long)nr << VDI_SPACE_SHIFT) | VDI_BIT;
 }
 
+static inline unsigned long oid_to_bit(uint64_t oid)
+{
+	return (oid & ~VDI_BIT) >> VDI_SPACE_SHIFT;
+}
+
 #endif

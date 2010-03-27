@@ -412,8 +412,11 @@ int read_object(struct sheepdog_node_list_entry *e,
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		fd = connect_to(name, e[n].port);
-		if (fd < 0)
+		if (fd < 0) {
+			printf("%s(%d): %s, %m\n", __func__, __LINE__,
+			       name);
 			return -1;
+		}
 
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.epoch = node_version;

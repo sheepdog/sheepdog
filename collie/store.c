@@ -439,9 +439,6 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 			goto out;
 		}
 
-		if (!is_data_obj(oid))
-			break;
-
 		if (hdr->flags & SD_FLAG_CMD_COW) {
 			dprintf("%" PRIu64 "\n", hdr->cow_oid);
 
@@ -567,7 +564,7 @@ void store_queue_request(struct work *work, int idx)
 	ret = store_queue_request_local(req, buf, epoch);
 out:
 	if (ret != SD_RES_SUCCESS) {
-		dprintf("failed, %d, %x, %" PRIx64" , %u, %u, %x\n",
+		dprintf("failed, %d, %x, %" PRIx64" , %u, %u, %d\n",
 			idx, opcode, oid, epoch, req_epoch, ret);
 		rsp->result = ret;
 	}
@@ -1075,6 +1072,8 @@ static int init_path(char *d, int *new)
 {
 	int ret, retry = 0;
 	struct stat s;
+
+	*new = 0;
 again:
 	ret = stat(d, &s);
 	if (ret) {
@@ -1123,12 +1122,50 @@ static int init_obj_path(char *base_path)
 
 static int init_epoch_path(char *base_path)
 {
-	int new;
+	int new, ret;
+	uint32_t epoch;
+	DIR *dir;
+	char path[1024];
+	struct dirent *dent;
+	uint64_t oid;
 
 	epoch_path = zalloc(strlen(base_path) + strlen(EPOCH_PATH) + 1);
 	sprintf(epoch_path, "%s" EPOCH_PATH, base_path);
 
-	return init_path(epoch_path, &new);
+	ret = init_path(epoch_path, &new);
+	if (new || ret)
+		return ret;
+
+	epoch = get_latest_epoch();
+
+	snprintf(path, sizeof(path), "%s/%08u", obj_path, epoch);
+
+	vprintf(SDOG_INFO "found the epoch dir, %s\n", path);
+
+	dir = opendir(path);
+	if (!dir) {
+		vprintf(SDOG_ERR "failed to open the epoch dir, %m\n");
+		return SD_RES_EIO;
+	}
+
+	while ((dent = readdir(dir))) {
+		if (!strcmp(dent->d_name, ".") ||
+		    !strcmp(dent->d_name, ".."))
+			continue;
+
+		oid = strtoull(dent->d_name, NULL, 16);
+
+		if (is_data_obj(oid))
+			continue;
+
+		vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 " %lu\n",
+			oid, oid_to_bit(oid));
+
+		set_bit(oid_to_bit(oid), sys->vdi_inuse);
+	}
+	closedir(dir);
+
+	return 0;
 }
 
 static int init_mnt_path(char *base_path)
@@ -1254,6 +1291,7 @@ static int global_nr_copies(uint32_t *copies, int set)
 		}
 	} else {
 		if (ret != sizeof(*copies)) {
+			eprintf("use 'user_xattr' option?\n");
 			return SD_RES_SYSTEM_ERROR;
 		}
 	}
@@ -1268,5 +1306,5 @@ int set_global_nr_copies(uint32_t copies)
 
 int get_global_nr_copies(uint32_t *copies)
 {
-	return global_nr_copies(copies, 1);
+	return global_nr_copies(copies, 0);
 }

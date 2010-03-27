@@ -199,9 +199,6 @@ void cluster_queue_request(struct work *work, int idx)
 
 		rsp->result = SD_RES_SUCCESS;
 		break;
-	case SD_OP_READ_VDIS:
-		rsp->result = read_vdis(req->data, hdr->data_length, &rsp->data_length);
-		break;
 	default:
 		/* forward request to group */
 		goto forward;
@@ -431,6 +428,58 @@ static void join(struct join_message *msg)
 		msg->cluster_status = sys->status;
 }
 
+static void get_vdi_bitmap_from_all(void)
+{
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	int i, j, ret, nr_nodes, fd;
+	/* fixme: we need this until starting up. */
+	static DECLARE_BITMAP(tmp_vdi_inuse, SD_NR_VDIS);
+	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	unsigned int rlen, wlen;
+	char host[128];
+
+	/*
+	 * we don't need the proper order but this is the simplest
+	 * way.
+	 */
+	nr_nodes = build_node_list(&sys->sd_node_list, entry);
+
+	for (i = 0; i < nr_nodes; i++) {
+		if (!memcmp(&sys->this_node, &entry[i], sizeof(sys->this_node)))
+			continue;
+
+		addr_to_str(host, sizeof(host), entry[i].addr, 0);
+
+		fd = connect_to(host, entry[i].port);
+		if (fd < 0) {
+			vprintf(SDOG_ERR "can't get the vdi bitmap %s, %m\n", host);
+		}
+
+		vprintf(SDOG_ERR "get the vdi bitmap %d %s\n", i, host);
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.opcode = SD_OP_READ_VDIS;
+		hdr.epoch = sys->epoch;
+		hdr.data_length = sizeof(tmp_vdi_inuse);
+		rlen = hdr.data_length;
+		wlen = 0;
+
+		ret = exec_req(fd, &hdr, (char *)tmp_vdi_inuse,
+			       &wlen, &rlen);
+
+		close(fd);
+
+		if (ret || rsp->result != SD_RES_SUCCESS) {
+			vprintf(SDOG_ERR "can't get the vdi bitmap %d %d\n", ret,
+				rsp->result);
+		}
+
+		for (j = 0; j < ARRAY_SIZE(sys->vdi_inuse); j++)
+			sys->vdi_inuse[j] |= tmp_vdi_inuse[j];
+	}
+}
+
 static void update_cluster_info(struct join_message *msg)
 {
 	int i;
@@ -498,9 +547,14 @@ out:
 	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK)
 		sys->epoch = get_latest_epoch();
 
-	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS)
-		sys->status = msg->cluster_status;
+	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS) {
+		if (msg->cluster_status == SD_STATUS_OK) {
+			get_vdi_bitmap_from_all();
+			set_global_nr_copies(sys->nr_sobjs);
+		}
 
+		sys->status = msg->cluster_status;
+	}
 	return;
 }
 
