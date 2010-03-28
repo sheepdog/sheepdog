@@ -670,6 +670,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 			eprintf("can't write epoch %u\n", sys->epoch);
 		update_epoch_store(sys->epoch);
 
+		set_nodeid(sys->this_node.id);
 		set_global_nr_copies(sys->nr_sobjs);
 
 		sys->status = SD_STATUS_OK;
@@ -1036,8 +1037,6 @@ int create_cluster(int port)
 	struct cpg_name group = { 8, "sheepdog" };
 	cpg_callbacks_t cb = { &sd_deliver, &sd_confch };
 	unsigned int nodeid = 0;
-	uint64_t hval;
-	int i;
 
 	ret = cpg_initialize(&cpg_handle, &cb);
 	if (ret != CS_OK) {
@@ -1077,12 +1076,18 @@ join_retry:
 	set_addr(nodeid);
 	sys->this_node.port = port;
 
-	hval = fnv_64a_buf(&sys->this_node.port, sizeof(sys->this_node.port),
-			   FNV1A_64_INIT);
-	for (i = ARRAY_SIZE(sys->this_node.addr) - 1; i >= 0; i--)
-		hval = fnv_64a_buf(&sys->this_node.addr[i], 1, hval);
+	ret = get_nodeid(&sys->this_node.id);
+	if (!sys->this_node.id) {
+		uint64_t hval;
+		int i;
 
-	sys->this_node.id = hval;
+		hval = fnv_64a_buf(&sys->this_node.port,
+				   sizeof(sys->this_node.port),
+				   FNV1A_64_INIT);
+		for (i = ARRAY_SIZE(sys->this_node.addr) - 1; i >= 0; i--)
+			hval = fnv_64a_buf(&sys->this_node.addr[i], 1, hval);
+		sys->this_node.id = hval;
+	}
 
 	sys->synchronized = 0;
 	sys->status = SD_STATUS_STARTUP;

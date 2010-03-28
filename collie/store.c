@@ -23,6 +23,7 @@
 
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
+#define ANAME_NODEID "user.sheepdog.nodeid"
 
 static char *obj_path;
 static char *epoch_path;
@@ -1101,6 +1102,45 @@ again:
 	return 0;
 }
 
+
+static int attr(char *path, char *attr, void *var, int len, int set)
+{
+	int ret, fd;
+
+	fd = open(path, O_RDONLY);
+	if (fd < 0)
+		return SD_RES_EIO;
+
+	if (set)
+		ret = fsetxattr(fd, attr, var, len, 0);
+	else
+		ret = fgetxattr(fd, attr, var, len);
+
+	close(fd);
+
+	if (set) {
+		if (ret) {
+			eprintf("use 'user_xattr' option?, %s\n", attr);
+			return SD_RES_SYSTEM_ERROR;
+		}
+	} else {
+		if (ret != len)
+			return SD_RES_SYSTEM_ERROR;
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+int set_nodeid(uint64_t nodeid)
+{
+	return attr(epoch_path, ANAME_NODEID, &nodeid, sizeof(nodeid), 1);
+}
+
+int get_nodeid(uint64_t *nodeid)
+{
+	return attr(epoch_path, ANAME_NODEID, nodeid, sizeof(*nodeid), 0);
+}
+
 static int init_base_path(char *d, int *new)
 {
 	return init_path(d, new);
@@ -1269,42 +1309,12 @@ void epoch_queue_request(struct work *work, int idx)
 	}
 }
 
-static int global_nr_copies(uint32_t *copies, int set)
-{
-	int ret, fd;
-
-	fd = open(epoch_path, O_RDONLY);
-	if (fd < 0)
-		return SD_RES_EIO;
-
-	if (set)
-		ret = fsetxattr(fd, ANAME_COPIES, copies, sizeof(*copies), 0);
-	else
-		ret = fgetxattr(fd, ANAME_COPIES, copies, sizeof(*copies));
-
-	close(fd);
-
-	if (set) {
-		if (ret) {
-			eprintf("use 'user_xattr' option?\n");
-			return SD_RES_SYSTEM_ERROR;
-		}
-	} else {
-		if (ret != sizeof(*copies)) {
-			eprintf("use 'user_xattr' option?\n");
-			return SD_RES_SYSTEM_ERROR;
-		}
-	}
-
-	return SD_RES_SUCCESS;
-}
-
 int set_global_nr_copies(uint32_t copies)
 {
-	return global_nr_copies(&copies, 1);
+	return attr(epoch_path, ANAME_COPIES, &copies, sizeof(copies), 1);
 }
 
 int get_global_nr_copies(uint32_t *copies)
 {
-	return global_nr_copies(copies, 0);
+	return attr(epoch_path, ANAME_COPIES, copies, sizeof(*copies), 0);
 }

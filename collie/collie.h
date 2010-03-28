@@ -109,6 +109,8 @@ int update_epoch_store(uint32_t epoch);
 
 int set_global_nr_copies(uint32_t copies);
 int get_global_nr_copies(uint32_t *copies);
+int set_nodeid(uint64_t nodeid);
+int get_nodeid(uint64_t *nodeid);
 
 #define DATA_OBJ_NR_WORKER_THREAD 4
 extern struct work_queue *dobj_queue;
