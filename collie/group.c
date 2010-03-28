@@ -12,8 +12,10 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 #include <sys/time.h>
 #include <corosync/cpg.h>
+#include <corosync/cfg.h>
 
 #include "sheepdog_proto.h"
 #include "collie.h"
@@ -981,12 +983,56 @@ int build_node_list(struct list_head *node_list,
 	return nr;
 }
 
+static void set_addr(unsigned int nodeid)
+{
+	int ret, nr;
+	corosync_cfg_handle_t handle;
+	corosync_cfg_node_address_t addr;
+	struct sockaddr_storage *ss = (struct sockaddr_storage *)addr.address;
+	struct sockaddr_in *sin = (struct sockaddr_in *)addr.address;
+	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr.address;
+	void *saddr;
+	char tmp[INET6_ADDRSTRLEN];
+
+	memset(sys->this_node.addr, 0, sizeof(sys->this_node.addr));
+
+	ret = corosync_cfg_initialize(&handle, NULL);
+	if (ret != CS_OK) {
+		vprintf(SDOG_ERR "failed to initiazize cfg %d\n", ret);
+		exit(1);
+	}
+
+	ret = corosync_cfg_get_node_addrs(handle, nodeid, 1, &nr, &addr);
+	if (ret != CS_OK) {
+		vprintf(SDOG_ERR "failed to get addr %d\n", ret);
+		exit(1);
+	}
+
+	if (!nr) {
+		vprintf(SDOG_ERR "we got no address\n");
+		exit(1);
+	}
+
+	if (ss->ss_family == AF_INET6) {
+		saddr = &sin6->sin6_addr;
+		memcpy(sys->this_node.addr, saddr, 16);
+	} else if (ss->ss_family == AF_INET) {
+		saddr = &sin->sin_addr;
+		memcpy(sys->this_node.addr + 12, saddr, 16);
+	} else {
+		vprintf(SDOG_ERR "unknown protocol %d\n", ss->ss_family);
+		exit(1);
+	}
+
+	inet_ntop(ss->ss_family, saddr, tmp, sizeof(tmp));
+
+	vprintf(SDOG_INFO "addr = %s\n", tmp);
+}
+
 int create_cluster(int port)
 {
 	int fd, ret;
 	cpg_handle_t cpg_handle;
-	struct addrinfo hints, *res, *res0;
-	char name[INET6_ADDRSTRLEN];
 	struct cpg_name group = { 8, "sheepdog" };
 	cpg_callbacks_t cb = { &sd_deliver, &sd_confch };
 	unsigned int nodeid = 0;
@@ -1028,49 +1074,7 @@ join_retry:
 	sys->this_nodeid = nodeid;
 	sys->this_pid = getpid();
 
-	gethostname(name, sizeof(name));
-
-	memset(&hints, 0, sizeof(hints));
-
-	hints.ai_socktype = SOCK_STREAM;
-	ret = getaddrinfo(name, NULL, &hints, &res0);
-	if (ret)
-		exit(1);
-
-	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family == AF_INET) {
-			struct sockaddr_in *addr;
-			addr = (struct sockaddr_in *)res->ai_addr;
-
-			if (((char *) &addr->sin_addr)[0] == 127)
-				continue;
-
-			memset(sys->this_node.addr, 0, 12);
-			memcpy(sys->this_node.addr + 12, &addr->sin_addr, 4);
-			break;
-		} else if (res->ai_family == AF_INET6) {
-			struct sockaddr_in6 *addr;
-			uint8_t localhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
-						  0, 0, 0, 0, 0, 0, 0, 1 };
-
-			addr = (struct sockaddr_in6 *)res->ai_addr;
-
-			if (memcmp(&addr->sin6_addr, localhost, 16) == 0)
-				continue;
-
-			memcpy(sys->this_node.addr, &addr->sin6_addr, 16);
-			break;
-		} else
-			dprintf("unknown address family\n");
-	}
-
-	if (res == NULL) {
-		eprintf("failed to get address info\n");
-		return -1;
-	}
-
-	freeaddrinfo(res0);
-
+	set_addr(nodeid);
 	sys->this_node.port = port;
 
 	hval = fnv_64a_buf(&sys->this_node.port, sizeof(sys->this_node.port),
