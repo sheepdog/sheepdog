@@ -119,7 +119,12 @@ int main(int argc, char **argv)
 
 	vprintf(SDOG_NOTICE "Sheepdog daemon (version %s) started\n", SD_VERSION);
 
-	event_loop(-1);
+	while (sys->status != SD_STATUS_SHUTDOWN)
+		event_loop(-1);
+
+	vprintf(SDOG_INFO "shutdown\n");
+
+	log_close();
 
 	return 0;
 }

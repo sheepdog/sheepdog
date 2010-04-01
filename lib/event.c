@@ -167,7 +167,6 @@ void event_loop(int timeout)
 	int i, nr;
 	struct epoll_event events[128];
 
-retry:
 	nr = epoll_wait(efd, events, ARRAY_SIZE(events), TICK * 1000);
 	if (nr < 0) {
 		eprintf("epoll_wait failed, %m\n");
@@ -181,6 +180,4 @@ retry:
 		}
 	} else
 		do_timer();
-
-	goto retry;
 }
