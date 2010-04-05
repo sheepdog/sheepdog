@@ -52,6 +52,7 @@
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
 #define SD_FLAG_CMD_FORWARD  0x04
+#define SD_FLAG_CMD_RECOVERY 0x08
 
 #define SD_STATUS_OK            0x00
 #define SD_STATUS_STARTUP       0x01
@@ -169,7 +170,7 @@ struct sd_obj_req {
 	uint64_t        oid;
 	uint64_t        cow_oid;
 	uint32_t        copies;
-	uint32_t        obj_ver;
+	uint32_t        tgt_epoch;
 	uint64_t        offset;
 };
 
@@ -183,6 +184,31 @@ struct sd_obj_rsp {
 	uint32_t        result;
 	uint32_t        obj_ver;
 	uint32_t        copies;
+	uint32_t        pad[5];
+};
+
+struct sd_list_req {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint64_t        start;
+	uint64_t        end;
+	uint32_t        tgt_epoch;
+	uint32_t        pad[3];
+};
+
+struct sd_list_rsp {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t        result;
+	uint64_t        next;
 	uint32_t        pad[5];
 };
 
@@ -281,22 +307,30 @@ static inline uint64_t fnv_64a_buf(void *buf, size_t len, uint64_t hval)
 	return hval;
 }
 
-static inline int obj_to_sheep(struct sheepdog_node_list_entry *entries,
-			       int nr_entries, uint64_t oid, int idx)
+static inline int hval_to_sheep(struct sheepdog_node_list_entry *entries,
+				int nr_entries, uint64_t id, int idx)
 {
-	uint64_t id;
 	int i;
 	struct sheepdog_node_list_entry *e = entries, *n;
 
-	id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+	printf("%lx\n", id);
 
 	for (i = 0; i < nr_entries - 1; i++, e++) {
 		n = e + 1;
+		printf("%d, %lx, %lx, %lx\n", i, e->id, n->id, id);
 		if (id > e->id && id <= n->id)
 			break;
 	}
 
 	return (i + 1 + idx) % nr_entries;
+}
+
+static inline int obj_to_sheep(struct sheepdog_node_list_entry *entries,
+			       int nr_entries, uint64_t oid, int idx)
+{
+	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+
+	return hval_to_sheep(entries, nr_entries, id, idx);
 }
 
 static inline void print_node_list_entry(struct sheepdog_node_list_entry *e,
