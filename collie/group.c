@@ -255,7 +255,7 @@ static void print_node_list(struct list_head *node_list)
 	char name[128];
 	list_for_each_entry(node, node_list, list) {
 		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",
-			node_cmp(&node->ent, &sys->this_node) ? ' ' : 'l',
+			is_myself(&node->ent) ? 'l' : ' ',
 			node->nodeid, node->pid,
 			addr_to_str(name, sizeof(name), node->ent.addr, node->ent.port));
 	}
@@ -301,9 +301,8 @@ static int is_master(void)
 		return 1;
 
 	node = list_first_entry(&sys->sd_node_list, struct node, list);
-	if (node_cmp(&node->ent, &sys->this_node) == 0)
+	if (is_myself(&node->ent))
 		return 1;
-
 	return 0;
 }
 
@@ -323,7 +322,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 	if (sys->status == SD_STATUS_INCONSISTENT_EPOCHS)
 		return SD_STATUS_INCONSISTENT_EPOCHS;
 
-	if (node->id == sys->this_node.id) {
+	if (is_myself(node)) {
 		nr_entries = ARRAY_SIZE(entries);
 		ret = read_epoch(&epoch, &ctime, entries, &nr_entries);
 	} else {
@@ -448,7 +447,7 @@ static void get_vdi_bitmap_from_all(void)
 	nr_nodes = build_node_list(&sys->sd_node_list, entry);
 
 	for (i = 0; i < nr_nodes; i++) {
-		if (!memcmp(&sys->this_node, &entry[i], sizeof(sys->this_node)))
+		if (is_myself(&entry[i]))
 			continue;
 
 		addr_to_str(host, sizeof(host), entry[i].addr, 0);
@@ -683,7 +682,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		ret = SD_RES_UNKNOWN;
 	}
 out:
-	if (node_cmp(&sys->this_node, &msg->header.from) != 0)
+	if (!is_myself(&msg->header.from))
 		return;
 
 	req = list_first_entry(&sys->pending_list, struct request, pending_list);

@@ -155,7 +155,7 @@ again:
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		/* FIXME: do like store_queue_request_local() */
-		if (e[n].id == sys->this_node.id)
+		if (is_myself(&e[n]))
 			continue;
 
 		fd = connect_to(name, e[n].port);
@@ -242,7 +242,7 @@ again:
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		/* TODO: we can do better; we need to chech this first */
-		if (e[n].id == sys->this_node.id) {
+		if (is_myself(&e[n])) {
 			ret = store_queue_request_local(req, buf, sys->epoch);
 			memcpy(rsp, &req->rp, sizeof(*rsp));
 			rsp->result = ret;
@@ -343,7 +343,7 @@ static int is_my_obj(uint64_t oid, int copies)
 
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
-		if (e[n].id == sys->this_node.id)
+		if (is_myself(&e[n]))
 			return 1;
 	}
 
@@ -930,7 +930,7 @@ static void __start_recovery(struct work *work, int idx)
 
 	if (cur_nr < old_nr) {
 		for (i = 0; i < old_nr; i++) {
-			if (old_entry[i].id == sys->this_node.id) {
+			if (is_myself(&old_entry[i])) {
 				my_idx = i;
 				break;
 			}
@@ -970,7 +970,7 @@ static void __start_recovery(struct work *work, int idx)
 		fill_obj_list(rw, old_entry + n, start_hash, end_hash);
 	} else {
 		for (i = 0; i < cur_nr; i++) {
-			if (cur_entry[i].id == sys->this_node.id) {
+			if (is_myself(&cur_entry[i])) {
 				my_idx = i;
 				break;
 			}

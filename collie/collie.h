@@ -124,4 +124,9 @@ uint64_t get_cluster_ctime(void);
 
 int start_recovery(uint32_t epoch, int add);
 
+static inline int is_myself(struct sheepdog_node_list_entry *e)
+{
+	return e->id == sys->this_node.id;
+}
+
 #endif
