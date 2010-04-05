@@ -53,7 +53,7 @@ struct join_message {
 	uint32_t nr_nodes;
 	uint32_t nr_sobjs;
 	uint32_t cluster_status;
-	uint32_t pad;
+	uint32_t epoch;
 	struct {
 		uint32_t nodeid;
 		uint32_t pid;
@@ -411,6 +411,10 @@ static void join(struct join_message *msg)
 
 	msg->nr_sobjs = sys->nr_sobjs;
 	msg->nr_nodes = 0;
+	if (sys->status == SD_STATUS_OK)
+		msg->epoch = sys->epoch;
+	else
+		msg->epoch = 0;
 	list_for_each_entry(node, &sys->cpg_node_list, list) {
 		if (node->nodeid == msg->nodeid && node->pid == msg->pid)
 			continue;
@@ -515,7 +519,14 @@ static void update_cluster_info(struct join_message *msg)
 
 	sys->synchronized = 1;
 
-	eprintf("system status = %d\n", msg->cluster_status);
+	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK) {
+		if (msg->epoch > 0) {
+			sys->epoch = msg->epoch;
+			sys->status = SD_STATUS_OK;
+		}
+	}
+
+	eprintf("system status = %d, epoch = %d\n", msg->cluster_status, sys->epoch);
 	if (sys->status == SD_STATUS_OK) {
 		nr_nodes = build_node_list(&sys->sd_node_list, entry);
 
@@ -545,8 +556,10 @@ out:
 
 	print_node_list(&sys->sd_node_list);
 
-	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK)
-		sys->epoch = get_latest_epoch();
+	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK) {
+		if (msg->epoch == 0)
+			sys->epoch = get_latest_epoch();
+	}
 
 	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS) {
 		if (msg->cluster_status == SD_STATUS_OK) {
