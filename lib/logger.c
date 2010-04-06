@@ -34,7 +34,6 @@
 
 #include "logger.h"
 
-#define SEMKEY	0xA8L
 #define LOGDBG 0
 
 #if LOGDBG
@@ -47,6 +46,7 @@ static struct logarea *la;
 static char *log_name;
 static int log_level;
 static pid_t pid;
+static key_t semkey;
 
 static int logarea_init (int size)
 {
@@ -110,7 +110,7 @@ static int logarea_init (int size)
 
 	shmctl(shmid, IPC_RMID, NULL);
 
-	if ((la->semid = semget(SEMKEY, 1, 0666 | IPC_CREAT)) < 0) {
+	if ((la->semid = semget(semkey, 1, 0666 | IPC_CREAT)) < 0) {
 		syslog(LOG_ERR, "semget failed %d", errno);
 		shmdt(la->buff);
 		shmdt(la->start);
@@ -348,6 +348,8 @@ int log_init(char *program_name, int size, int daemon, int level)
 
 	logdbg(stderr,"enter log_init\n");
 	log_name = program_name;
+
+	semkey = random();
 
 	if (daemon) {
 		struct sigaction sa_old;
