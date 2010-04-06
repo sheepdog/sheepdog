@@ -49,7 +49,6 @@ struct join_message {
 	struct message_header header;
 	uint32_t nodeid;
 	uint32_t pid;
-	struct sheepdog_node_list_entry master_node;
 	uint32_t nr_nodes;
 	uint32_t nr_sobjs;
 	uint32_t cluster_status;
