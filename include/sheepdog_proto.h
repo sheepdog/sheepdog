@@ -38,6 +38,7 @@
 
 #define SD_OP_DEBUG_INC_NVER 0xA0
 #define SD_OP_DEBUG_SET_NODE 0xA1
+#define SD_OP_DEBUG_KILL     0xA2
 
 #define SD_OP_CREATE_AND_WRITE_OBJ  0x01
 #define SD_OP_REMOVE_OBJ     0x02

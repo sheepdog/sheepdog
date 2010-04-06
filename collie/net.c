@@ -40,6 +40,11 @@ static void queue_request(struct request *req)
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;;
 
+	if (hdr->opcode == SD_OP_DEBUG_KILL) {
+		log_close();
+		exit(1);
+	}
+
 	if (sys->status == SD_STATUS_SHUTDOWN) {
 		rsp->result = SD_RES_SHUTDOWN;
 		req->done(req);

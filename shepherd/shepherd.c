@@ -275,6 +275,8 @@ static int debug(char *op, char *arg)
 	if (!op)
 		return 1;
 
+	strcpy(name, "localhost");
+
 	if (!strcasecmp(op, "node_version")) {
 		rlen = 0;
 		wlen = 0;
@@ -315,10 +317,19 @@ static int debug(char *op, char *arg)
 			opcode = SD_OP_GET_EPOCH;
 			flags = 0;
 		}
+	} else if (!strcasecmp(op, "kill")) {
+		if (!arg) {
+			fprintf(stderr, "specify hostname\n");
+			return 1;
+		}
+		strcpy(name, arg);
+		rlen = 0;
+		wlen = 0;
+		opcode = SD_OP_DEBUG_KILL;
+		flags = 0;
 	} else
 		return 1;
 
-	strcpy(name, "localhost");
 	fd = connect_to(name, sdport);
 	if (fd < 0)
 		return -1;
