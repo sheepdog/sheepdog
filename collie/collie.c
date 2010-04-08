@@ -18,6 +18,7 @@
 
 #define EPOLL_SIZE 4096
 #define DEFAULT_OBJECT_DIR "/tmp"
+#define LOG_FILE_NAME "collie.log"
 
 static char program_name[] = "collie";
 
@@ -60,6 +61,7 @@ int main(int argc, char **argv)
 	char *dir = DEFAULT_OBJECT_DIR;
 	int is_daemon = 1;
 	int log_level = LOG_INFO;
+	char path[PATH_MAX];
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
@@ -72,6 +74,7 @@ int main(int argc, char **argv)
 			break;
 		case 'l':
 			log_level = atoi(optarg);
+			break;
 		case 'd':
 			/* removed soon. use loglevel instead */
 			log_level = LOG_DEBUG;
@@ -88,7 +91,13 @@ int main(int argc, char **argv)
 	if (optind != argc)
 		dir = argv[optind];
 
-	ret = log_init(program_name, LOG_SPACE_SIZE, is_daemon, log_level);
+	snprintf(path, sizeof(path), "%s/" LOG_FILE_NAME, dir);
+
+	ret = init_store(dir);
+	if (ret)
+		exit(1);
+
+	ret = log_init(program_name, LOG_SPACE_SIZE, is_daemon, log_level, path);
 	if (ret)
 		exit(1);
 
@@ -96,10 +105,6 @@ int main(int argc, char **argv)
 		exit(1);
 
 	ret = init_event(EPOLL_SIZE);
-	if (ret)
-		exit(1);
-
-	ret = init_store(dir);
 	if (ret)
 		exit(1);
 

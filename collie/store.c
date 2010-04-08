@@ -1373,9 +1373,11 @@ int get_nodeid(uint64_t *nodeid)
 	return attr(epoch_path, ANAME_NODEID, nodeid, sizeof(*nodeid), 0);
 }
 
-static int init_base_path(char *d, int *new)
+int init_base_path(char *d)
 {
-	return init_path(d, new);
+	int new = 0;
+
+	return init_path(d, &new);
 }
 
 #define OBJ_PATH "/obj/"
@@ -1473,9 +1475,9 @@ static int init_mnt_path(char *base_path)
 
 int init_store(char *d)
 {
-	int ret, new = 0;
+	int ret;
 
-	ret = init_base_path(d, &new);
+	ret = init_base_path(d);
 	if (ret)
 		return ret;
 

@@ -55,9 +55,10 @@ struct logarea {
 	char *buff;
 	int semid;
 	union semun semarg;
+	int fd;
 };
 
-extern int log_init(char * progname, int size, int daemon, int level);
+extern int log_init(char * progname, int size, int daemon, int level, char *outfile);
 extern void log_close (void);
 extern void dump_logmsg (void *);
 extern void log_write(int prio, const char *func, int line, const char *fmt, ...)

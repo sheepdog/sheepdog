@@ -26,6 +26,7 @@
 #include <syslog.h>
 #include <signal.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/shm.h>
 #include <sys/ipc.h>
 #include <sys/stat.h>
@@ -132,6 +133,8 @@ static int logarea_init (int size)
 
 static void free_logarea (void)
 {
+	if (la->fd >= 0)
+		close(la->fd);
 	semctl(la->semid, 0, IPC_RMID, la->semarg);
 	shmdt(la->buff);
 	shmdt(la->start);
@@ -176,6 +179,18 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 	}
 
 	p = buff;
+
+	if (la->fd != -1) {
+		time_t t;
+		struct tm *tmp;
+
+		t = time(NULL);
+		tmp = localtime(&t);
+
+		strftime(p, MAX_MSG_SIZE, "%b %2d %I:%M:%S ", tmp);
+		p += strlen(p);
+	}
+
 	snprintf(p, MAX_MSG_SIZE, "%s(%d) ", func, line);
 
 	p += strlen(p);
@@ -260,7 +275,10 @@ static void log_syslog (void * buff)
 {
 	struct logmsg * msg = (struct logmsg *)buff;
 
-	syslog(msg->prio, "%s", (char *)&msg->str);
+	if (la->fd >= 0)
+		write(la->fd, (char *)&msg->str, strlen((char *)&msg->str));
+	else
+		syslog(msg->prio, "%s", (char *)&msg->str);
 }
 
 static void dolog(int prio, const char *func, int line, const char *fmt, va_list ap)
@@ -342,7 +360,7 @@ static void log_flush(void)
 	}
 }
 
-int log_init(char *program_name, int size, int daemon, int level)
+int log_init(char *program_name, int size, int daemon, int level, char *outfile)
 {
 	log_level = level;
 
@@ -356,8 +374,15 @@ int log_init(char *program_name, int size, int daemon, int level)
 		struct sigaction sa_new;
 		int fd;
 
-		openlog(log_name, 0, LOG_DAEMON);
-		setlogmask (LOG_UPTO (LOG_DEBUG));
+		if (outfile) {
+			fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
+			if (fd < 0)
+				syslog(LOG_ERR, "failed to open %s\n", outfile);
+		} else {
+			fd = -1;
+			openlog(log_name, 0, LOG_DAEMON);
+			setlogmask (LOG_UPTO (LOG_DEBUG));
+		}
 
 		if (logarea_init(size)) {
 			syslog(LOG_ERR, "failed to initialize the logger\n");
@@ -365,6 +390,7 @@ int log_init(char *program_name, int size, int daemon, int level)
 		}
 
 		la->active = 1;
+		la->fd = fd;
 		pid = fork();
 		if (pid < 0) {
 			syslog(LOG_ERR, "fail to fork the logger\n");
