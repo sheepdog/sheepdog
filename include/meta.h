@@ -54,7 +54,7 @@ struct sheepdog_inode {
 
 static inline int is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
 {
-	return (inode->oid >> VDI_SPACE_SHIFT) ==
+	return ((inode->oid & ~VDI_BIT) >> VDI_SPACE_SHIFT) ==
 		(inode->data_oid[idx] >> VDI_SPACE_SHIFT);
 }
 
