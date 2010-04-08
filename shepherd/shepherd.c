@@ -777,9 +777,15 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 {
 	char name[128];
 	int i, fd, ret;
+	char *buf;
+
+	buf = zalloc(sizeof(struct sheepdog_inode));
+	if (!buf) {
+		fprintf(stderr, "out of memory\n");
+		return;
+	}
 
 	for (i = 0; i < nr_nodes; i++) {
-		char buf[sizeof(struct sheepdog_inode)];
 		unsigned wlen = 0, rlen = sizeof(buf);
 		struct sd_obj_req hdr;
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
@@ -808,6 +814,8 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 		else
 			func(name, oid, rsp, buf, data);
 	}
+
+	free(buf);
 }
 
 static void print_obj(char *vdiname, unsigned index)
