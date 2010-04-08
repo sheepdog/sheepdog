@@ -293,8 +293,8 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 		ops.sem_num = 0;
 		ops.sem_flg = 0;
 		ops.sem_op = -1;
-		if (semtimedop(la->semid, &ops, 1, &ts) < 0) {
-			syslog(LOG_ERR, "semop up failed");
+		if (semop(la->semid, &ops, 1) < 0) {
+			syslog(LOG_ERR, "semop up failed %m");
 			return;
 		}
 
