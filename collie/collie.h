@@ -88,6 +88,8 @@ int add_vdi(char *data, int data_len, uint64_t size,
 	    uint64_t *new_oid, uint64_t base_oid, uint32_t copies,
 	    int is_snapshot);
 
+int del_vdi(char *data, int data_len, uint32_t snapid);
+
 int lookup_vdi(char *data, int data_len, uint64_t *oid, uint32_t snapid);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
@@ -125,6 +127,7 @@ int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 
 int start_recovery(uint32_t epoch);
+int start_deletion(uint64_t oid);
 
 static inline int is_myself(struct sheepdog_node_list_entry *e)
 {

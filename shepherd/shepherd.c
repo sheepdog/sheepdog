@@ -79,6 +79,7 @@ static void usage(int status)
 \n\
 Command syntax:\n\
   mkfs [--copies=N]\n\
+  delete [-i snapshot_id] vdiname\n\
   info -t (vdi|dog|sheep|obj|cluster) [-f (list|tree|graph)] [-H (on|off)] [-R (on|off)] [-i N] [-e N] [vdiname]\n\
   debug -o node_version\n\
   shutdown\n\
@@ -255,6 +256,56 @@ static int mkfs(int copies)
 			break;
 		default:
 			fprintf(stderr, "unknown error\n");
+			break;
+		}
+	}
+
+	return 0;
+}
+
+static int delete(char *data, uint32_t id)
+{
+	int fd, ret;
+	struct sd_vdi_req hdr;
+	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	unsigned rlen, wlen;
+	char vdiname[SD_MAX_VDI_LEN];
+
+	fd = connect_to("localhost", sdport);
+	if (fd < 0)
+		return -1;
+
+	memset(&hdr, 0, sizeof(hdr));
+
+	rlen = 0;
+	wlen = sizeof(vdiname);
+
+	hdr.opcode = SD_OP_DEL_VDI;
+	if (id != ~0)
+		hdr.snapid = id;
+	hdr.epoch = node_list_version;
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = wlen;
+	strncpy(vdiname, data, sizeof(vdiname));
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, vdiname, &wlen, &rlen);
+	close(fd);
+
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to connect the dog\n");
+		return ret;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		switch (rsp->result) {
+		case SD_RES_VDI_LOCKED:
+			fprintf(stderr, "the vdi is locked\n");
+			break;
+		case SD_RES_NO_VDI:
+			fprintf(stderr, "no such vdi\n");
+			break;
+		default:
+			fprintf(stderr, "error, %d\n", rsp->result);
 			break;
 		}
 	}
@@ -458,9 +509,11 @@ int parse_vdi(vdi_parser_func_t func, void *data)
 		ret = read_object(node_list_entries, nr_nodes, node_list_version,
 				  bit_to_oid(nr), (void *)&i, sizeof(i), 0, nr_nodes);
 
-		if (ret == sizeof(i))
+		if (ret == sizeof(i)) {
+			if (i.name[0] == '\0') /* deleted */
+				continue;
 			func(i.oid, i.name, i.snap_id, 0, &i, data);
-		else
+		} else
 			printf("error %lu %" PRIx64 ", %d\n", nr, bit_to_oid(nr), ret);
 
 	}
@@ -1232,6 +1285,8 @@ int main(int argc, char **argv)
 		info(type, format, name, highlight, real_time, index);
 	} else if (!strcasecmp(command, "mkfs"))
 		ret = mkfs(copies);
+	else if (!strcasecmp(command, "delete"))
+		ret = delete(argv[optind], index);
 	else if (!strcasecmp(command, "debug"))
 		ret = debug(op, argv[optind]);
 	else if (!strcasecmp(command, "shutdown"))

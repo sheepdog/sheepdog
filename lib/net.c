@@ -439,6 +439,52 @@ int read_object(struct sheepdog_node_list_entry *e,
 	return -1;
 }
 
+int remove_object(struct sheepdog_node_list_entry *e,
+		  int nodes, uint32_t node_version,
+		  uint64_t oid, int nr)
+{
+	char name[128];
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	int i = 0, n, fd, ret;
+
+	if (nr > nodes)
+		nr = nodes;
+
+	for (i = 0; i < nr; i++) {
+		unsigned wlen = 0, rlen = 0;
+
+		n = obj_to_sheep(e, nodes, oid, i);
+
+		addr_to_str(name, sizeof(name), e[n].addr, 0);
+
+		fd = connect_to(name, e[n].port);
+		if (fd < 0) {
+			rsp->result = SD_RES_EIO;
+			return -1;
+		}
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.epoch = node_version;
+		hdr.opcode = SD_OP_REMOVE_OBJ;
+		hdr.oid = oid;
+
+		hdr.flags = 0;
+		hdr.data_length = rlen;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+		close(fd);
+
+		if (ret)
+			return -1;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS)
+		return -1;
+
+	return 0;
+}
+
 /* TODO: clean up with the above functions */
 int exec_reqs(struct sheepdog_node_list_entry *e,
 	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr,

@@ -272,9 +272,49 @@ int add_vdi(char *data, int data_len, uint64_t size,
 	return ret;
 }
 
-int del_vdi(char *name, int len)
+int del_vdi(char *data, int data_len, uint32_t snapid)
 {
-	return 0;
+	char *name = data;
+	uint64_t oid;
+	uint32_t dummy0;
+	unsigned long dummy1, dummy2;
+	int ret;
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int nr_nodes, nr_reqs;
+	static struct sheepdog_inode inode;
+
+	if (data_len != SD_MAX_VDI_LEN)
+		return SD_RES_INVALID_PARMS;
+
+	ret = do_lookup_vdi(name, strlen(name), &oid, snapid,
+			     &dummy0, &dummy1, &dummy2);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+	nr_reqs = sys->nr_sobjs;
+	if (nr_reqs > nr_nodes)
+		nr_reqs = nr_nodes;
+
+	ret = read_object(entries, nr_nodes, sys->epoch,
+			  oid, (char *)&inode, sizeof(inode), 0,
+			  nr_reqs);
+	if (ret < 0)
+		return SD_RES_EIO;
+
+	memset(inode.name, 0, sizeof(inode.name));
+
+	ret = write_object(entries, nr_nodes, sys->epoch,
+			  oid, (char *)&inode, sizeof(inode), 0,
+			   nr_reqs, 0);
+	if (ret < 0)
+		return SD_RES_EIO;
+
+	ret = start_deletion(oid);
+	if (ret < 0)
+		return SD_RES_NO_MEM;
+
+	return SD_RES_SUCCESS;
 }
 
 int read_vdis(char *data, int len, unsigned int *rsp_len)
@@ -286,4 +326,224 @@ int read_vdis(char *data, int len, unsigned int *rsp_len)
 	*rsp_len = sizeof(sys->vdi_inuse);
 
 	return SD_RES_SUCCESS;
+}
+
+struct deletion_work {
+	uint32_t done;
+
+	struct work work;
+	struct list_head dw_siblings;
+
+	uint64_t oid;
+
+	int count;
+	char *buf;
+};
+
+static LIST_HEAD(deletion_work_list);
+static int deleting;
+
+static void delete_one(struct work *work, int idx)
+{
+	struct deletion_work *dw = container_of(work, struct deletion_work, work);
+	uint64_t vdi_oid = *(((uint64_t *)dw->buf) + dw->count - dw->done - 1);
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int nr_nodes;
+	int ret, i;
+	static struct sheepdog_inode inode;
+
+	eprintf("%d %d, %16lx\n", dw->done, dw->count, vdi_oid);
+
+	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+
+	ret = read_object(entries, nr_nodes, sys->epoch,
+			  vdi_oid, (void *)&inode, sizeof(inode), 0, sys->nr_sobjs);
+
+	if (ret != sizeof(inode)) {
+		eprintf("cannot find vdi object\n");
+		return;
+	}
+
+	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		if (!inode.data_oid[i])
+			continue;
+
+		remove_object(entries, nr_nodes, sys->epoch,
+			      inode.data_oid[i], inode.nr_copies);
+	}
+
+	if (remove_object(entries, nr_nodes, sys->epoch, vdi_oid, sys->nr_sobjs))
+		eprintf("failed to remove vdi objects %lx\n", vdi_oid);
+}
+
+static void __start_deletion(struct work *work, int idx);
+static void __start_deletion_done(struct work *work, int idx);
+
+static void delete_one_done(struct work *work, int idx)
+{
+	struct deletion_work *dw = container_of(work, struct deletion_work, work);
+
+	dw->done++;
+	if (dw->done < dw->count) {
+		queue_work(dobj_queue, &dw->work);
+		return;
+	}
+
+	deleting--;
+
+	list_del(&dw->dw_siblings);
+
+	free(dw->buf);
+	free(dw);
+
+	if (!list_empty(&deletion_work_list)) {
+		dw = list_first_entry(&deletion_work_list,
+				      struct deletion_work, dw_siblings);
+
+		deleting++;
+		queue_work(dobj_queue, &dw->work);
+	}
+}
+
+static int fill_vdi_list(struct deletion_work *dw,
+			 struct sheepdog_node_list_entry *entries,
+			 int nr_entries, uint64_t root_oid)
+{
+	int ret, i;
+	static struct sheepdog_inode inode;
+	int done = dw->count;
+	uint64_t oid;
+
+	((uint64_t *)dw->buf)[dw->count++] = root_oid;
+again:
+	oid = ((uint64_t *)dw->buf)[done++];
+	ret = read_object(entries, nr_entries, sys->epoch,
+			  oid, (void *)&inode, sizeof(inode), 0, nr_entries);
+
+	if (ret != sizeof(inode)) {
+		eprintf("cannot find vdi object\n");
+		return 0;
+	}
+
+	if (inode.name[0] != '\0')
+		return 1;
+
+	for (i = 0; i < ARRAY_SIZE(inode.child_oid); i++) {
+		if (!inode.child_oid[i])
+			continue;
+
+		((uint64_t *)dw->buf)[dw->count++] = inode.child_oid[i];
+	}
+
+	if (((uint64_t *)dw->buf)[done])
+		goto again;
+
+	return 0;
+}
+
+static uint64_t get_vdi_root(struct sheepdog_node_list_entry *entries,
+			     int nr_entries, uint64_t oid)
+{
+	int ret;
+	static struct sheepdog_inode inode;
+
+next:
+	ret = read_object(entries, nr_entries, sys->epoch, oid,
+			  (void *)&inode, sizeof(inode), 0, nr_entries);
+
+	if (ret != sizeof(inode)) {
+		eprintf("cannot find vdi object\n");
+		return 0;
+	}
+
+	if (!inode.parent_oid)
+		return oid;
+
+	oid = inode.parent_oid;
+
+	goto next;
+}
+
+static void __start_deletion(struct work *work, int idx)
+{
+	struct deletion_work *dw = container_of(work, struct deletion_work, work);
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int nr_nodes, ret;
+	uint64_t root_oid;
+
+	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+
+	root_oid = get_vdi_root(entries, nr_nodes, dw->oid);
+	if (!root_oid)
+		goto fail;
+
+	ret = fill_vdi_list(dw, entries, nr_nodes, root_oid);
+	if (ret)
+		goto fail;
+
+	return;
+
+fail:
+	dw->count = 0;
+	return;
+}
+
+static void __start_deletion_done(struct work *work, int idx)
+{
+	struct deletion_work *dw = container_of(work, struct deletion_work, work);
+
+	dprintf("%d\n", dw->count);
+
+	if (dw->count) {
+		dw->work.fn = delete_one;
+		dw->work.done = delete_one_done;
+
+		queue_work(dobj_queue, &dw->work);
+		return;
+	}
+
+	deleting--;
+
+	list_del(&dw->dw_siblings);
+
+	free(dw->buf);
+	free(dw);
+
+	if (!list_empty(&deletion_work_list)) {
+		dw = list_first_entry(&deletion_work_list,
+				      struct deletion_work, dw_siblings);
+
+		deleting++;
+		queue_work(dobj_queue, &dw->work);
+	}
+}
+
+int start_deletion(uint64_t oid)
+{
+	struct deletion_work *dw;
+
+	dw = zalloc(sizeof(struct deletion_work));
+	if (!dw)
+		return -1;
+
+	dw->buf = zalloc(1 << 20); /* FIXME: handle larger buffer */
+	if (!dw->buf) {
+		free(dw);
+		return -1;
+	}
+
+	dw->count = 0;
+	dw->oid = oid;
+
+	dw->work.fn = __start_deletion;
+	dw->work.done = __start_deletion_done;
+
+	list_add_tail(&dw->dw_siblings, &deletion_work_list);
+
+	if (!deleting) {
+		deleting++;
+		queue_work(dobj_queue, &dw->work);
+	}
+
+	return 0;
 }

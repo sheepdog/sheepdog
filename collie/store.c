@@ -493,10 +493,15 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 
 	switch (opcode) {
 	case SD_OP_REMOVE_OBJ:
-		snprintf(path, sizeof(path), "%s%" PRIx64, obj_path, oid);
+		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
+			 epoch, oid);
 		ret = unlink(path);
-		if (ret)
-			ret = 1;
+		if (ret) {
+			if (errno == ENOENT)
+				ret = SD_RES_NO_OBJ;
+			else
+				ret = SD_RES_EIO;
+		}
 		break;
 	case SD_OP_READ_OBJ:
 		/*
