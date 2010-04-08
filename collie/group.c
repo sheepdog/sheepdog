@@ -71,6 +71,7 @@ struct work_deliver {
 	struct message_header *msg;
 
 	struct work work;
+	struct list_head work_deliver_list;
 };
 
 struct work_confch {
@@ -402,9 +403,6 @@ static void join(struct join_message *msg)
 	if (!sys->synchronized)
 		return;
 
-	if (!is_master())
-		return;
-
 	if (msg->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
 
@@ -414,12 +412,8 @@ static void join(struct join_message *msg)
 		msg->epoch = sys->epoch;
 	else
 		msg->epoch = 0;
-	list_for_each_entry(node, &sys->cpg_node_list, list) {
-		if (node->nodeid == msg->nodeid && node->pid == msg->pid)
-			continue;
-		if (node->ent.id == 0)
-			continue;
 
+	list_for_each_entry(node, &sys->sd_node_list, list) {
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
 		msg->nodes[msg->nr_nodes].pid = node->pid;
 		msg->nodes[msg->nr_nodes].ent = node->ent;
@@ -747,6 +741,8 @@ static void __sd_deliver(struct work *work, int idx)
 			break;
 		}
 
+		vprintf(SDOG_DEBUG "will send\n");
+
 		m->done = 1;
 		send_message(sys->handle, m);
 	} else {
@@ -766,8 +762,23 @@ static void __sd_deliver(struct work *work, int idx)
 
 static void __sd_deliver_done(struct work *work, int idx)
 {
-	struct work_deliver *w = container_of(work, struct work_deliver, work);
-	struct message_header *m = w->msg;
+	struct work_deliver *w, *n = NULL;
+	struct message_header *m;
+
+	w = container_of(work, struct work_deliver, work);
+	m = w->msg;
+
+	list_del(&w->work_deliver_list);
+
+	/*
+	 * When I finished one message, if I have pending messages, I
+	 * need to perform the first of them now.
+	 */
+	if (m->done && !list_empty(&sys->work_deliver_siblings)) {
+
+		n = list_first_entry(&sys->work_deliver_siblings,
+				     struct work_deliver, work_deliver_list);
+	}
 
 	/*
 	 * FIXME: we want to recover only after all nodes are fully
@@ -779,6 +790,9 @@ static void __sd_deliver_done(struct work *work, int idx)
 
 	free(w->msg);
 	free(w);
+
+	if (n)
+		queue_work(dobj_queue, &n->work);
 }
 
 static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
@@ -800,12 +814,34 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	if (!w->msg)
 		return;
 	memcpy(w->msg, msg, msg_len);
+	INIT_LIST_HEAD(&w->work_deliver_list);
 
 	w->work.fn = __sd_deliver;
 	w->work.done = __sd_deliver_done;
 
-	if (m->op == SD_MSG_JOIN)
-		w->work.attr = WORK_ORDERED;
+	if (is_master()) {
+		if (!m->done) {
+			int run = 0;
+
+			/*
+			 * I can broadcast this message if there is no
+			 * outstanding messages.
+			 */
+			if (list_empty(&sys->work_deliver_siblings))
+				run = 1;
+
+			list_add_tail(&w->work_deliver_list,
+				      &sys->work_deliver_siblings);
+			if (run) {
+				vprintf(SDOG_DEBUG "%u\n", pid);
+				queue_work(dobj_queue, &w->work);
+			} else
+				vprintf(SDOG_DEBUG "%u\n", pid);
+
+			return;
+		}
+	} else if (m->op == SD_MSG_JOIN)
+		  w->work.attr = WORK_ORDERED;
 
 	queue_work(dobj_queue, &w->work);
 }
@@ -815,6 +851,7 @@ static void __sd_confch(struct work *work, int idx)
 	struct work_confch *w = container_of(work, struct work_confch, work);
 	struct node *node;
 	int i;
+	int init = 0;
 
 	const struct cpg_address *member_list = w->member_list;
 	size_t member_list_entries = w->member_list_entries;
@@ -825,8 +862,10 @@ static void __sd_confch(struct work *work, int idx)
 
 	if (member_list_entries == joined_list_entries - left_list_entries &&
 	    sys->this_nodeid == member_list[0].nodeid &&
-	    sys->this_pid == member_list[0].pid)
+	    sys->this_pid == member_list[0].pid){
 		sys->synchronized = 1;
+		init = 1;
+	}
 
 	if (list_empty(&sys->cpg_node_list)) {
 		for (i = 0; i < member_list_entries; i++)
@@ -863,6 +902,28 @@ static void __sd_confch(struct work *work, int idx)
 				update_epoch_store(sys->epoch);
 			}
 		}
+	}
+
+	if (init) {
+		struct join_message msg;
+
+		/*
+		 * If I'm the first collie joins in colosync, I
+		 * becomes the master without sending JOIN.
+		 */
+
+		vprintf(SDOG_DEBUG "%d %x\n", sys->this_pid, sys->this_nodeid);
+
+		memset(&msg, 0, sizeof(msg));
+
+		msg.header.from = sys->this_node;
+		msg.nodeid = sys->this_nodeid;
+		msg.pid = sys->this_pid;
+		msg.cluster_status = get_cluster_status(&msg.header.from);
+
+		update_cluster_info(&msg);
+
+		return;
 	}
 
 	for (i = 0; i < joined_list_entries; i++) {
@@ -993,7 +1054,7 @@ int build_node_list(struct list_head *node_list,
 	return nr;
 }
 
-static void set_addr(unsigned int nodeid)
+static void set_addr(unsigned int nodeid, int port)
 {
 	int ret, nr;
 	corosync_cfg_handle_t handle;
@@ -1036,7 +1097,7 @@ static void set_addr(unsigned int nodeid)
 
 	inet_ntop(ss->ss_family, saddr, tmp, sizeof(tmp));
 
-	vprintf(SDOG_INFO "addr = %s\n", tmp);
+	vprintf(SDOG_INFO "addr = %s, port = %d\n", tmp, port);
 }
 
 int create_cluster(int port)
@@ -1082,7 +1143,7 @@ join_retry:
 	sys->this_nodeid = nodeid;
 	sys->this_pid = getpid();
 
-	set_addr(nodeid);
+	set_addr(nodeid, port);
 	sys->this_node.port = port;
 
 	ret = get_nodeid(&sys->this_node.id);
@@ -1104,6 +1165,7 @@ join_retry:
 	INIT_LIST_HEAD(&sys->cpg_node_list);
 	INIT_LIST_HEAD(&sys->vm_list);
 	INIT_LIST_HEAD(&sys->pending_list);
+	INIT_LIST_HEAD(&sys->work_deliver_siblings);
 	cpg_context_set(cpg_handle, sys);
 
 	cpg_fd_get(cpg_handle, &fd);

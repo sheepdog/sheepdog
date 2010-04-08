@@ -74,6 +74,8 @@ struct cluster_info {
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
 	int nr_sobjs;
+
+	struct list_head work_deliver_siblings;
 };
 
 struct cluster_info *sys;
