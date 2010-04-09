@@ -303,9 +303,6 @@ static int is_master(void)
 	if (!sys->synchronized)
 		return 0;
 
-	if (list_empty(&sys->sd_node_list))
-		return 1;
-
 	node = list_first_entry(&sys->sd_node_list, struct node, list);
 	if (is_myself(&node->ent))
 		return 1;
