@@ -483,7 +483,7 @@ static void update_cluster_info(struct join_message *msg)
 {
 	int i;
 	int ret, nr_nodes = msg->nr_nodes;
-	struct node *node, *e;
+	struct node *node;
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 
 	if (!sys->nr_sobjs)
@@ -492,12 +492,6 @@ static void update_cluster_info(struct join_message *msg)
 	if (sys->synchronized)
 		goto out;
 
-	list_for_each_entry_safe(node, e, &sys->sd_node_list, list) {
-		list_del(&node->list);
-		free(node);
-	}
-
-	INIT_LIST_HEAD(&sys->sd_node_list);
 	for (i = 0; i < nr_nodes; i++) {
 		node = find_node(&sys->cpg_node_list, msg->nodes[i].nodeid,
 				 msg->nodes[i].pid);
