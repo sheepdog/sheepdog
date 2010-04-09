@@ -401,9 +401,6 @@ static void join(struct join_message *msg)
 {
 	struct node *node;
 
-	if (!sys->synchronized)
-		return;
-
 	if (msg->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
 
