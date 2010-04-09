@@ -144,13 +144,18 @@ static int get_node_idx(struct sheepdog_node_list_entry *ent,
 	return ent - entries;
 }
 
+static int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
+{
+	return build_node_list(&sys->sd_node_list, entries);
+}
+
 static void get_node_list(struct sd_node_req *req,
 			  struct sd_node_rsp *rsp, void *data)
 {
 	int nr_nodes;
 	struct node *node;
 
-	nr_nodes = build_node_list(&sys->sd_node_list, data);
+	nr_nodes = get_ordered_sd_node_list(data);
 	rsp->data_length = nr_nodes * sizeof(struct sheepdog_node_list_entry);
 	rsp->nr_nodes = nr_nodes;
 	rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
@@ -378,7 +383,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 	if (memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0)
 		return SD_STATUS_INCONSISTENT_EPOCHS;
 
-	nr_entries = build_node_list(&sys->sd_node_list, entries);
+	nr_entries = get_ordered_sd_node_list(entries);
 	if (nr_entries + 1 != nr_local_entries)
 		return SD_STATUS_STARTUP;
 
@@ -439,7 +444,7 @@ static void get_vdi_bitmap_from_all(void)
 	 * we don't need the proper order but this is the simplest
 	 * way.
 	 */
-	nr_nodes = build_node_list(&sys->sd_node_list, entry);
+	nr_nodes = get_ordered_sd_node_list(entry);
 
 	for (i = 0; i < nr_nodes; i++) {
 		if (is_myself(&entry[i]))
@@ -513,7 +518,7 @@ static void update_cluster_info(struct join_message *msg)
 
 	eprintf("system status = %d, epoch = %d\n", msg->cluster_status, sys->epoch);
 	if (sys->status == SD_STATUS_OK) {
-		nr_nodes = build_node_list(&sys->sd_node_list, entry);
+		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("update epoch, %d, %d\n", sys->epoch, nr_nodes);
 		ret = epoch_log_write(sys->epoch, (char *)entry,
@@ -526,7 +531,7 @@ out:
 	add_node(&sys->sd_node_list, msg->nodeid, msg->pid, &msg->header.from);
 
 	if (sys->status == SD_STATUS_OK) {
-		nr_nodes = build_node_list(&sys->sd_node_list, entry);
+		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr_nodes);
 		ret = epoch_log_write(sys->epoch + 1, (char *)entry,
@@ -667,7 +672,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 			remove_epoch(i);
 
 		sys->epoch = 1;
-		nr_nodes = build_node_list(&sys->sd_node_list, entry);
+		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("write epoch log, %d, %d\n", sys->epoch, nr_nodes);
 		ret = epoch_log_write(sys->epoch, (char *)entry,
@@ -893,7 +898,7 @@ static void __sd_confch(struct work *work, int idx)
 			free(node);
 
 			if (sys->status == SD_STATUS_OK) {
-				nr = build_node_list(&sys->sd_node_list, e);
+				nr = get_ordered_sd_node_list(e);
 				dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr);
 				epoch_log_write(sys->epoch + 1, (char *)e,
 						nr * sizeof(struct sheepdog_node_list_entry));
