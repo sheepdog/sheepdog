@@ -65,8 +65,13 @@ struct cluster_info {
 	uint32_t epoch;
 	uint32_t status;
 
+	/*
+	 * we add a node to cpg_node_list in confchg then move it to
+	 * sd_node_list when the node joins sheepdog.
+	 */
 	struct list_head cpg_node_list;
 	struct list_head sd_node_list;
+
 	int node_list_idx;
 	struct list_head vm_list;
 	struct list_head pending_list;

@@ -495,11 +495,28 @@ static void get_vdi_bitmap_from_all(void)
 	}
 }
 
+static int move_node_to_sd_list(uint32_t nodeid, uint32_t pid,
+				struct sheepdog_node_list_entry ent)
+{
+	struct node *node;
+
+	node = find_node(&sys->cpg_node_list, nodeid, pid);
+	if (!node)
+		return 1;
+
+	if (!node->ent.id)
+		node->ent = ent;
+
+	list_del(&node->list);
+	list_add_tail(&node->list, &sys->sd_node_list);
+
+	return 0;
+}
+
 static void update_cluster_info(struct join_message *msg)
 {
 	int i;
 	int ret, nr_nodes = msg->nr_nodes;
-	struct node *node;
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 
 	if (!sys->nr_sobjs)
@@ -509,16 +526,16 @@ static void update_cluster_info(struct join_message *msg)
 		goto out;
 
 	for (i = 0; i < nr_nodes; i++) {
-		node = find_node(&sys->cpg_node_list, msg->nodes[i].nodeid,
-				 msg->nodes[i].pid);
-		if (!node)
-			continue;
-
-		if (!node->ent.id)
-			node->ent = msg->nodes[i].ent;
-
-		add_node(&sys->sd_node_list, msg->nodes[i].nodeid, msg->nodes[i].pid,
-			 &msg->nodes[i].ent);
+		ret = move_node_to_sd_list(msg->nodes[i].nodeid,
+					   msg->nodes[i].pid,
+					   msg->nodes[i].ent);
+		/*
+		 * the node belonged to sheepdog when the master build
+		 * the JOIN response however it has gone.
+		 */
+		if (ret)
+			vprintf(SDOG_INFO "nodeid: %x, pid: %d has gone\n",
+				msg->nodes[i].nodeid, msg->nodes[i].pid);
 	}
 
 	sys->synchronized = 1;
@@ -542,7 +559,14 @@ static void update_cluster_info(struct join_message *msg)
 	}
 
 out:
-	add_node(&sys->sd_node_list, msg->nodeid, msg->pid, &msg->header.from);
+	ret = move_node_to_sd_list(msg->nodeid, msg->pid, msg->header.from);
+	/*
+	 * this should not happen since __sd_deliver() checks if the
+	 * host from msg on cpg_node_list.
+	 */
+	if (ret)
+		vprintf(SDOG_ERR "nodeid: %x, pid: %d has gone\n",
+			msg->nodeid, msg->pid);
 
 	if (sys->status == SD_STATUS_OK) {
 		nr_nodes = get_ordered_sd_node_list(entry);
@@ -902,12 +926,7 @@ static void __sd_confch(struct work *work, int idx)
 	}
 
 	for (i = 0; i < left_list_entries; i++) {
-		node = find_node(&sys->cpg_node_list, left_list[i].nodeid, left_list[i].pid);
-		if (node) {
-			list_del(&node->list);
-			free(node);
-		} else
-			eprintf("System error\n");
+		/* the node must be on sd_node_list or cpg_node_list. */
 
 		node = find_node(&sys->sd_node_list, left_list[i].nodeid, left_list[i].pid);
 		if (node) {
@@ -926,6 +945,13 @@ static void __sd_confch(struct work *work, int idx)
 				sys->epoch++;
 
 				update_epoch_store(sys->epoch);
+			}
+		} else {
+			node = find_node(&sys->cpg_node_list, left_list[i].nodeid,
+					 left_list[i].pid);
+			if (node) {
+				list_del(&node->list);
+				free(node);
 			}
 		}
 	}
