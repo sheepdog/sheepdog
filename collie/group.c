@@ -859,7 +859,13 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 				vprintf(SDOG_DEBUG "%u\n", pid);
 
 			return;
-		}
+		} else
+			/*
+			 * must be blocked until the message with
+			 * m->done == 0 is completely finished
+			 * (__sd_deliver_done is called)
+			 */
+			w->work.attr = WORK_ORDERED;
 	} else if (m->op == SD_MSG_JOIN)
 		  w->work.attr = WORK_ORDERED;
 
