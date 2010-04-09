@@ -29,7 +29,7 @@ static int create_vdi_obj(char *name, uint64_t new_oid, uint64_t size,
 	int ret, nr_nodes;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+	nr_nodes = get_ordered_sd_node_list(entries);
 
 	if (base_oid) {
 		ret = read_object(entries, nr_nodes, sys->epoch,
@@ -127,7 +127,7 @@ static int find_first_vdi(unsigned long start, unsigned long end,
 	int nr_nodes, nr_reqs;
 	int ret;
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+	nr_nodes = get_ordered_sd_node_list(entries);
 
 	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_nodes)
@@ -291,7 +291,7 @@ int del_vdi(char *data, int data_len, uint32_t snapid)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+	nr_nodes = get_ordered_sd_node_list(entries);
 	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
@@ -354,7 +354,7 @@ static void delete_one(struct work *work, int idx)
 
 	eprintf("%d %d, %16lx\n", dw->done, dw->count, vdi_oid);
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+	nr_nodes = get_ordered_sd_node_list(entries);
 
 	ret = read_object(entries, nr_nodes, sys->epoch,
 			  vdi_oid, (void *)&inode, sizeof(inode), 0, sys->nr_sobjs);
@@ -471,7 +471,7 @@ static void __start_deletion(struct work *work, int idx)
 	int nr_nodes, ret;
 	uint64_t root_oid;
 
-	nr_nodes = build_node_list(&sys->sd_node_list, entries);
+	nr_nodes = get_ordered_sd_node_list(entries);
 
 	root_oid = get_vdi_root(entries, nr_nodes, dw->oid);
 	if (!root_oid)

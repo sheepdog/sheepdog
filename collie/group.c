@@ -144,7 +144,24 @@ static int get_node_idx(struct sheepdog_node_list_entry *ent,
 	return ent - entries;
 }
 
-static int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
+static int build_node_list(struct list_head *node_list,
+			   struct sheepdog_node_list_entry *entries)
+{
+	struct node *node;
+	int nr = 0;
+
+	list_for_each_entry(node, node_list, list) {
+		if (entries)
+			memcpy(entries + nr, &node->ent, sizeof(*entries));
+		nr++;
+	}
+	if (entries)
+		qsort(entries, nr, sizeof(*entries), node_cmp);
+
+	return nr;
+}
+
+int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
 {
 	return build_node_list(&sys->sd_node_list, entries);
 }
@@ -1038,23 +1055,6 @@ err:
 		free(w->left_list);
 	if (w->joined_list)
 		free(w->joined_list);
-}
-
-int build_node_list(struct list_head *node_list,
-		    struct sheepdog_node_list_entry *entries)
-{
-	struct node *node;
-	int nr = 0;
-
-	list_for_each_entry(node, node_list, list) {
-		if (entries)
-			memcpy(entries + nr, &node->ent, sizeof(*entries));
-		nr++;
-	}
-	if (entries)
-		qsort(entries, nr, sizeof(*entries), node_cmp);
-
-	return nr;
 }
 
 static void set_addr(unsigned int nodeid, int port)

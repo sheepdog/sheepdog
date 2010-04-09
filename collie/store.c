@@ -220,7 +220,7 @@ static int read_from_one(uint64_t oid,
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
-	nr = build_node_list(&sys->sd_node_list, e);
+	nr = get_ordered_sd_node_list(e);
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
@@ -314,7 +314,7 @@ static int forward_obj_req(struct request *req, char *buf)
 
 	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
 again:
-	nr = build_node_list(&sys->sd_node_list, e);
+	nr = get_ordered_sd_node_list(e);
 
 	copies = hdr->copies;
 

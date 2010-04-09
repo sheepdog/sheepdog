@@ -94,8 +94,7 @@ int lookup_vdi(char *data, int data_len, uint64_t *oid, uint32_t snapid);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
-int build_node_list(struct list_head *node_list,
-		    struct sheepdog_node_list_entry *entries);
+int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 
 int create_cluster(int port);
 
