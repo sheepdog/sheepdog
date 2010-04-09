@@ -206,6 +206,8 @@ out:
 	return res;
 }
 
+static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret);
+
 static int read_from_one(uint64_t oid,
 			 unsigned *ori_rlen, void *buf, uint64_t offset)
 {
@@ -225,9 +227,18 @@ again:
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
-		/* FIXME: do like store_queue_request_local() */
-		if (is_myself(&e[n]))
-			continue;
+		if (is_myself(&e[n])) {
+			fd = ob_open(sys->epoch, oid, 0, &ret);
+			if (fd < 0 || ret != 0)
+				continue;
+
+			ret = pread64(fd, buf, *ori_rlen, offset);
+			if (ret < 0)
+				continue;
+			*ori_rlen = ret;
+			ret = 0;
+			goto out;
+		}
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0)
@@ -254,7 +265,8 @@ again:
 		switch (rsp->result) {
 		case SD_RES_SUCCESS:
 			*ori_rlen = rlen;
-			return 0;
+			ret = 0;
+			goto out;
 		case SD_RES_OLD_NODE_VER:
 		case SD_RES_NEW_NODE_VER:
 			/* waits for the node list timer */
@@ -266,9 +278,11 @@ again:
 		}
 	}
 
+	ret = -1;
+out:
 	free(e);
 
-	return -1;
+	return ret;
 }
 
 static int read_from_other_sheeps(uint64_t oid, char *buf, int copies)
@@ -467,12 +481,13 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		}
 
 		if (hdr->flags & SD_FLAG_CMD_COW) {
-			dprintf("%" PRIu64 "\n", hdr->cow_oid);
+			dprintf("%" PRIx64 "\n", hdr->cow_oid);
 
 			ret = read_from_other_sheeps(hdr->cow_oid, buf,
 						     hdr->copies);
 			if (ret) {
-				ret = 1;
+				eprintf("failed to read old object\n");
+				ret = SD_RES_EIO;
 				goto out;
 			}
 		} else {
