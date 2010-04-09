@@ -160,7 +160,7 @@ static void get_node_list(struct sd_node_req *req,
 	rsp->nr_nodes = nr_nodes;
 	rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
 
-	if (list_empty(&sys->sd_node_list)) {
+	if (!nr_nodes) {
 		rsp->master_idx = -1;
 		return;
 	}
