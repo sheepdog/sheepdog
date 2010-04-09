@@ -85,6 +85,19 @@ struct work_confch {
 	struct work work;
 };
 
+#define print_node_list(node_list)				\
+({								\
+	struct node *node;					\
+	char name[128];						\
+	list_for_each_entry(node, node_list, list) {		\
+		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",	\
+			is_myself(&node->ent) ? 'l' : ' ',	\
+			node->nodeid, node->pid,		\
+			addr_to_str(name, sizeof(name),		\
+			node->ent.addr, node->ent.port));	\
+	}							\
+})
+
 static int node_cmp(const void *a, const void *b)
 {
 	const struct sheepdog_node_list_entry *node1 = a;
@@ -247,18 +260,6 @@ static struct vm *lookup_vm(struct list_head *entries, char *name)
 static void group_handler(int listen_fd, int events, void *data)
 {
 	cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
-}
-
-static void print_node_list(struct list_head *node_list)
-{
-	struct node *node;
-	char name[128];
-	list_for_each_entry(node, node_list, list) {
-		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",
-			is_myself(&node->ent) ? 'l' : ' ',
-			node->nodeid, node->pid,
-			addr_to_str(name, sizeof(name), node->ent.addr, node->ent.port));
-	}
 }
 
 static void add_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid,
