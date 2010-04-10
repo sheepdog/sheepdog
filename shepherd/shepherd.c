@@ -926,6 +926,7 @@ int info(enum info_type type, enum format_type format, char *name,
 	int i, ret = -1;
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
 	char total_str[8], avail_str[8], vdi_size_str[8];
+	int success;
 
 	if (real_time) {
 		setupterm(NULL, 1, (int *)0);
@@ -983,6 +984,7 @@ rerun:
 	case INFO_SHEEP:
 		printf("Id\tSize\tUsed\tUse%%\n");
 
+		success = 0;
 		for (i = 0; i < nr_nodes; i++) {
 			char name[128];
 			int fd;
@@ -1010,15 +1012,23 @@ rerun:
 			size_to_str(rsp->store_size, store_str, sizeof(store_str));
 			size_to_str(rsp->store_size - rsp->store_free, free_str,
 				    sizeof(free_str));
-			if (!ret && rsp->result == SD_RES_SUCCESS)
+			if (!ret && rsp->result == SD_RES_SUCCESS) {
 				printf("%2d\t%s\t%s\t%3d%%\n", i, store_str, free_str,
 				       (int)(((double)(rsp->store_size - rsp->store_free) / rsp->store_size) * 100));
+				success++;
+			}
 
 			total_size += rsp->store_size;
 			total_avail += rsp->store_free;
 		}
 
 		printf("\n");
+
+		if (success == 0) {
+			fprintf(stderr, "cannot get information from any nodes\n");
+			ret = -1;
+			break;
+		}
 
 		parse_vdi(cal_total_vdi_size, &total_vdi_size);
 
