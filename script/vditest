@@ -1,0 +1,318 @@
+#!/usr/bin/perl
+#
+# Copyright (C) 2010 MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License version
+# 2 as published by the Free Software Foundation.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+use strict;
+use Getopt::Std;
+use Switch;
+
+my $program = "vditest";
+my %opts = ();
+my ($vdiname, $vdisize);
+
+my $use_aio = 0;
+my ($lblk, $hblk) = (512, 1048576);
+my $cache = 'writethrough';
+my $cycles = 256;
+my ($rrate, $wrate) = (50, 50);
+my $no_act = 0;
+my $offset = 0;
+my $seek_pattern = "linear";
+my $seed = time();
+my ($sblk, $eblk) = (0, 0);
+
+parse();
+print_options();
+
+vdi_open($vdiname, $cache);
+
+vdi_main();
+
+vdi_flush();
+vdi_close();
+
+sub get_aligned_blk {
+    my ($l, $h) = @_;
+
+    return $l + 512 * int(rand($h - $l + 512) / 512);
+}
+
+sub to_bytes {
+    my ($size) = @_;
+
+    switch ($size) {
+	case /K/i { $size *= 1024; }
+	case /M/i { $size *= 1024 ** 2; }
+	case /G/i { $size *= 1024 ** 3; }
+    }
+
+    $_[0] = $size;
+}
+
+sub print_options {
+    my $opt = "options: ";
+
+    $opt .= "-a "  if $use_aio;
+    $opt .= "-B $lblk:$hblk ";
+    $opt .= "-c $cache ";
+    $opt .= "-C $cycles ";
+    $opt .= "-D $rrate:$wrate ";
+    $opt .= "-n "  if $no_act;
+    $opt .= "-o $offset\n";
+    $opt .= "         ";
+    $opt .= "-p $seek_pattern ";
+    $opt .= "-s $seed ";
+    $opt .= "-S $sblk:$eblk ";
+
+    print $opt;
+}
+
+sub print_qemu {
+    my ($cmd) = @_;
+
+    print $cmd;
+
+    print QEMU $cmd  if !$no_act;
+}
+
+sub vdi_open {
+    my ($vdiname, $cache) = @_;
+    my $cmd;
+
+    return  if $no_act;
+
+    switch ($cache) {
+	case 'none' {
+	    $cmd = "| qemu-io -n sheepdog:$vdiname";
+	}
+	case 'writeback' {
+	    # BDRV_O_CACHE_WB option is not suported by qemu-io
+	    $cmd = "| qemu-io sheepdog:$vdiname";
+	}
+	case 'writethrough' {
+	    $cmd = "| qemu-io sheepdog:$vdiname";
+	}
+    }
+
+    open QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
+}
+
+sub vdi_close {
+    print_qemu("quit\n");
+
+    close QEMU  if !$no_act;
+}
+
+sub vdi_read {
+    my ($offset, $length, $ptn, $ptn_length) = @_;
+
+    if ($use_aio) {
+	if ($length == $ptn_length) {
+	    print_qemu("aio_read -P $ptn $offset $length\n");
+	} else {
+	    # partial check is not supported
+	    print_qemu("aio_read $offset $length\n");
+	}
+    } else {
+	if ($ptn_length > 0) {
+	    print_qemu("read -P $ptn -l $ptn_length $offset $length\n");
+	} else {
+	    print_qemu("read $offset $length\n");
+	}
+    }
+}
+
+sub vdi_write {
+    my ($offset, $length, $ptn) = @_;
+
+    if ($use_aio) {
+	print_qemu("aio_write -P $ptn $offset $length\n");
+    } else {
+	print_qemu("write -P $ptn $offset $length\n");
+    }
+}
+
+sub vdi_flush {
+    if ($use_aio) {
+	print_qemu("aio_flush\n");
+    } else {
+	print_qemu("flush\n");
+    }
+}
+
+sub parse {
+    getopts("aB:c:C:D:hno:p:s:S:t:", \%opts) or help(1);
+
+    foreach my $key (keys %opts) {
+	my $val = $opts{$key};
+	switch ($key) {
+	    case 'a' {
+		$use_aio = 1;
+	    }
+	    case 'B' {
+		($lblk, $hblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
+		to_bytes($lblk);
+		to_bytes($hblk);
+		$hblk = $lblk  if $hblk == 0;
+
+		error("$lblk is not sector aligned\n")  if $lblk % 512 != 0;
+		error("$lblk is not valid\n")  if $lblk == 0;
+		error("$hblk is not sector aligned\n")  if $hblk % 512 != 0;
+		error("$hblk is too large\n")  if $lblk > 1048576;
+		error("transfer range is invalid\n")  if $lblk > $hblk;
+	    }
+	    case 'c' {
+		if ($val !~ /(none|write(back|through))/) {
+		    error("\"$val\" is not valid\n");
+		}
+		$cache = $val;
+	    }
+	    case 'C' {
+		error("\"$val\" is not valid\n")  if ($val <= 0);
+		$cycles = $val;
+	    }
+	    case 'D' {
+		($rrate, $wrate) = ($val =~ /(\d+)\%?:?(\d*)\%?/);
+	    }
+	    case 'h' {
+		help(0);
+	    }
+	    case 'n' {
+		$no_act = 1;
+	    }
+	    case 'o' {
+		error("\"$val\" is not valid\n")  if ($val < 0);
+		$offset = $val;
+	    }
+	    case 'p' {
+		if ($val =~ /^l/) {
+		    $seek_pattern = "linear";
+		} elsif ($val =~ /^r/) {
+		    $seek_pattern = "random";
+		} else {
+		    error("\"$val\" is not valid\n");
+		}
+	    }
+	    case 's' {
+		$seed = $val;
+	    }
+	    case 'S' {
+		($sblk, $eblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
+		to_bytes($sblk);
+		to_bytes($eblk);
+
+		error("$sblk is not sector aligned\n")  if $sblk % 512 != 0;
+		error("$eblk is not sector aligned\n")  if $eblk % 512 != 0;
+	    }
+	}
+    }
+
+    error("vdiname must be specified\n")  if @ARGV == 0;
+    error("too many arguments\n")  if @ARGV > 1;
+
+    $vdiname = $ARGV[0];
+    $vdisize = `qemu-io -c length sheepdog:$vdiname`;
+    to_bytes($vdisize);
+
+    error("cannot get vdi size\n")  if $vdisize == 0;
+
+    $eblk = $vdisize  if $eblk == 0;
+
+    error("test block range is invalid\n")  if $sblk >= $eblk;
+    error("transfer size is too large\n")  if $hblk > $eblk - $sblk;
+}
+
+sub vdi_main {
+    my $roffset = $offset;
+    my $woffset = $offset;
+    my %written_data = ();
+
+    srand($seed);
+
+    foreach my $i (1 .. $cycles) {
+	my $length = get_aligned_blk($lblk, $hblk);
+	my $pattern;
+	my $ptn_length = 0;
+
+	print "$i: ";
+
+	if (rand($rrate + $wrate) < $rrate) {
+	    # read
+	    $length = $eblk - $roffset  if $roffset + $length > $eblk;
+	    $pattern = $written_data{$roffset};
+
+	    for (my $n = $roffset; $n < $roffset + $length; $n += 512) {
+		last  if $pattern != $written_data{$n} || $pattern == 0;
+		$ptn_length += 512;
+	    }
+
+	    vdi_read($roffset, $length, $pattern, $ptn_length);
+
+	    if ($seek_pattern eq 'linear') {
+		$roffset += $length;
+		$roffset -= $eblk - $sblk  while $roffset >= $eblk;
+	    } else {
+		$roffset = get_aligned_blk($sblk, $eblk - 512);
+	    }
+	} else {
+	    # write
+	    $length = $eblk - $woffset  if $woffset + $length > $eblk;
+	    $pattern = $i % 251 + 1;
+
+	    vdi_write($woffset, $length, $pattern);
+
+	    for (my $n = $woffset; $n < $woffset + $length; $n += 512) {
+		$written_data{$n} = $pattern;
+	    }
+
+	    if ($seek_pattern eq 'linear') {
+		$woffset += $length;
+		$woffset -= $eblk - $sblk  while $woffset >= $eblk;
+	    } else {
+		$woffset = get_aligned_blk($sblk, $eblk - 512);
+	    }
+	}
+
+	%written_data = ()  if %written_data > 1000000;
+
+	vdi_flush()  if ($use_aio && $i % 4 == 0);
+    }
+}
+
+sub help {
+    my ($status) = @_;
+    print <<END_OF_HELP;
+Usage: $program [OPTION] vdiname
+
+  -a                   use asynchronous I/O for testing.
+  -B lblk[:hblk]       set the block transfer size.
+  -c cache             specify how to use the host cache.
+                       cache is "none", "writeback", or "writethrough".
+  -C cycles            run until cycles disk access cycles are complete.
+  -D r%:w%             duty cycle used while reading and/or writing.
+  -h                   display this help text and exit.
+  -n                   print events that would occur but do not access disk.
+  -o offset            set the start offset.
+  -p seek_pattern      set the pattern of disk seeks.
+                       seek_pattern is "linear" or "random".
+  -s seed              set seed for random number generation.
+  -S sblk[:eblk]       set the start [and stop] test block.
+
+END_OF_HELP
+    exit($status);
+}
+
+sub error {
+    my ($msg) = @_;
+
+    print STDERR $msg;
+
+    exit(1);
+}
