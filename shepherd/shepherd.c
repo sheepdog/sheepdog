@@ -322,9 +322,12 @@ static int debug(char *op, char *arg)
 	unsigned rlen, wlen;
 	unsigned opcode, flags;
 	uint64_t oid = 0;
+	char vdiname[SD_MAX_VDI_LEN];
 
 	if (!op)
 		return 1;
+
+	memset(vdiname, 0, sizeof(vdiname));
 
 	strcpy(name, "localhost");
 
@@ -344,16 +347,20 @@ static int debug(char *op, char *arg)
 		if (!arg)
 			return 1;
 		rlen = 0;
-		wlen = strlen(arg) + 1;
+		strncpy(vdiname, arg, sizeof(vdiname));
+		wlen = sizeof(vdiname);
 		opcode = SD_OP_LOCK_VDI;
 		flags = SD_FLAG_CMD_WRITE;
+		arg = vdiname;
 	} else if (!strcasecmp(op, "release_vdi")) {
 		if (!arg)
 			return 1;
 		rlen = 0;
-		wlen = strlen(arg) + 1;
+		strncpy(vdiname, arg, sizeof(vdiname));
+		wlen = sizeof(vdiname);
 		opcode = SD_OP_RELEASE_VDI;
 		flags = SD_FLAG_CMD_WRITE;
+		arg = vdiname;
 	} else if (!strcasecmp(op, "vdi_info")) {
 		if (!arg)
 			return 1;
