@@ -284,8 +284,7 @@ static void group_handler(int listen_fd, int events, void *data)
 	cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
 }
 
-static void add_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid,
-		     struct sheepdog_node_list_entry *sd_ent)
+static void add_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid)
 {
 	struct node *node;
 
@@ -296,8 +295,7 @@ static void add_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid,
 	}
 	node->nodeid = nodeid;
 	node->pid = pid;
-	if (sd_ent)
-		node->ent = *sd_ent;
+
 	list_add_tail(&node->list, node_list);
 }
 
@@ -953,10 +951,10 @@ static void __sd_confch(struct work *work, int idx)
 
 	if (list_empty(&sys->cpg_node_list)) {
 		for (i = 0; i < member_list_entries; i++)
-			add_node(&sys->cpg_node_list, member_list[i].nodeid, member_list[i].pid, NULL);
+			add_node(&sys->cpg_node_list, member_list[i].nodeid, member_list[i].pid);
 	} else {
 		for (i = 0; i < joined_list_entries; i++)
-			add_node(&sys->cpg_node_list, joined_list[i].nodeid, joined_list[i].pid, NULL);
+			add_node(&sys->cpg_node_list, joined_list[i].nodeid, joined_list[i].pid);
 	}
 
 	for (i = 0; i < left_list_entries; i++) {
