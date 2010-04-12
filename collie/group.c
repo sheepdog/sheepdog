@@ -37,11 +37,19 @@ struct node {
 	struct list_head list;
 };
 
+enum deliver_msg_state {
+	DM_INIT = 1,
+	DM_CONT,
+	DM_FIN,
+};
+
 struct message_header {
 	uint8_t op;
-	uint8_t done;
+	uint8_t state;
 	uint8_t pad[2];
 	uint32_t msg_length;
+		uint32_t nodeid;
+		uint32_t pid;
 	struct sheepdog_node_list_entry from;
 };
 
@@ -252,7 +260,7 @@ forward:
 	}
 
 	msg->header.op = SD_MSG_VDI_OP;
-	msg->header.done = 0;
+	msg->header.state = DM_INIT;
 	msg->header.msg_length = sizeof(*msg) + hdr->data_length;
 	msg->header.from = sys->this_node;
 	msg->req = *((struct sd_vdi_req *)&req->rq);
@@ -742,6 +750,51 @@ out:
 	req->done(req);
 }
 
+static void handle_join(struct work_deliver *w)
+{
+	struct message_header *m;
+	struct vm *vm;
+	struct sheepdog_vm_list_entry *e;
+	int i, nr = 2000;
+	char *buf;
+
+	buf = malloc(sizeof(*m) + sizeof(*e) * nr);
+	m = (struct message_header *)buf;
+	e = (struct sheepdog_vm_list_entry *)(buf + sizeof(*m));
+
+	i = 0;
+	m->state = DM_CONT;
+	m->pid = ((struct join_message *)w->msg)->pid;
+	m->nodeid = ((struct join_message *)w->msg)->nodeid;
+
+	vprintf(SDOG_DEBUG "%u %u\n", m->pid, m->nodeid);
+
+	list_for_each_entry(vm, &sys->vm_list, list) {
+		*e = vm->ent;
+		vprintf(SDOG_DEBUG "%d %s\n", i, e->name);
+		e++;
+		i++;
+
+		if (!(i % nr)) {
+			m->msg_length = sizeof(*m) + i * sizeof(*e);
+			send_message(sys->handle, m);
+			e = (struct sheepdog_vm_list_entry *)(buf + sizeof(*m));
+			i = 0;
+		}
+	}
+
+	if (i) {
+		m->msg_length = sizeof(*m) + i * sizeof(*e);
+		vprintf(SDOG_DEBUG "%d %d\n", i, m->msg_length);
+		send_message(sys->handle, m);
+	}
+
+	m = w->msg;
+	join((struct join_message *)m);
+	m->state = DM_FIN;
+	send_message(sys->handle, m);
+}
+
 static void __sd_deliver(struct work *work, int idx)
 {
 	struct work_deliver *w = container_of(work, struct work_deliver, work);
@@ -749,8 +802,8 @@ static void __sd_deliver(struct work *work, int idx)
 	char name[128];
 	struct node *node;
 
-	dprintf("op: %d, done: %d, size: %d, from: %s\n",
-		m->op, m->done, m->msg_length,
+	dprintf("op: %d, state: %u, size: %d, from: %s\n",
+		m->op, m->state, m->msg_length,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
 
 	if (m->op == SD_MSG_JOIN) {
@@ -767,27 +820,24 @@ static void __sd_deliver(struct work *work, int idx)
 			node->ent = m->from;
 	}
 
-	if (!m->done) {
+	if (m->state == DM_INIT) {
 		if (!is_master())
 			return;
 
 		switch (m->op) {
 		case SD_MSG_JOIN:
-			join((struct join_message *)m);
+			handle_join(w);
 			break;
 		case SD_MSG_VDI_OP:
 			vdi_op((struct vdi_op_message *)m);
+			m->state = DM_FIN;
+			send_message(sys->handle, m);
 			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
 			break;
 		}
-
-		vprintf(SDOG_DEBUG "will send\n");
-
-		m->done = 1;
-		send_message(sys->handle, m);
-	} else {
+	} else if (m->state == DM_FIN) {
 		switch (m->op) {
 		case SD_MSG_JOIN:
 			update_cluster_info((struct join_message *)m);
@@ -819,7 +869,7 @@ static void __sd_deliver_done(struct work *work, int idx)
 	 * for the non master nodes, when I get one finished message,
 	 * if I can forget it.
 	 */
-	if (m->done && !list_empty(&sys->work_deliver_siblings)) {
+	if (m->state == DM_FIN && !list_empty(&sys->work_deliver_siblings)) {
 
 		n = list_first_entry(&sys->work_deliver_siblings,
 				     struct work_deliver, work_deliver_list);
@@ -830,7 +880,7 @@ static void __sd_deliver_done(struct work *work, int idx)
 	 * synchronized
 	 */
 
-	if (m->done && m->op == SD_MSG_JOIN && sys->epoch >= 2)
+	if (m->state == DM_FIN && m->op == SD_MSG_JOIN && sys->epoch >= 2)
 		start_recovery(sys->epoch);
 
 	free(w->msg);
@@ -845,8 +895,8 @@ static void __sd_deliver_done(struct work *work, int idx)
 		char name[128];
 		m = n->msg;
 
-		dprintf("op: %d, done: %d, size: %d, from: %s\n",
-		m->op, m->done, m->msg_length,
+		dprintf("op: %d, state: %u, size: %d, from: %s\n",
+		m->op, m->state, m->msg_length,
 			addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
 
 		list_del(&n->work_deliver_list);
@@ -862,9 +912,46 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	struct message_header *m = msg;
 	char name[128];
 
-	dprintf("op: %d, done: %d, size: %d, from: %s\n",
-		m->op, m->done, m->msg_length,
+	dprintf("op: %d, state: %u, size: %d, from: %s\n",
+		m->op, m->state, m->msg_length,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
+
+	if (m->state == DM_CONT) {
+		struct sheepdog_vm_list_entry *e;
+		int nr, i;
+		struct vm *vm;
+
+		dprintf("op: %d, state: %u, size: %d, from: %s\n",
+			m->op, m->state, m->msg_length,
+			addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
+
+		if (is_master())
+			return;
+
+		vprintf(SDOG_DEBUG "%u %u %u %u\n",
+			m->nodeid, m->pid, sys->this_nodeid, sys->this_pid);
+
+		if (sys->this_nodeid != m->nodeid ||
+		    sys->this_pid != m->pid)
+			return;
+
+		/* This is my JOIN message. */
+		vprintf(SDOG_DEBUG "we update the vm list\n");
+
+		nr = (m->msg_length - sizeof(*m)) / sizeof(*e);
+		e = (struct sheepdog_vm_list_entry *)((char *)msg + sizeof(*m));
+
+		for (i = 0; i < nr; i++) {
+			vm = zalloc(sizeof(*vm));
+			if (!vm)
+				break;
+
+			vm->ent = e[i];
+			vprintf(SDOG_DEBUG "%d, got %s\n", i, e[i].name);
+			list_add(&vm->list, &sys->vm_list);
+		}
+		return;
+	}
 
 	w = zalloc(sizeof(*w));
 	if (!w)
@@ -880,7 +967,7 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	w->work.done = __sd_deliver_done;
 
 	if (is_master()) {
-		if (!m->done) {
+		if (m->state == DM_INIT) {
 			int run = 0;
 
 			/*
@@ -902,12 +989,12 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 		} else
 			/*
 			 * must be blocked until the message with
-			 * m->done == 0 is completely finished
+			 * m->state == DM_INIT is completely finished
 			 * (__sd_deliver_done is called)
 			 */
 			w->work.attr = WORK_ORDERED;
 	} else {
-		if (!m->done) {
+		if (m->state == DM_INIT) {
 			list_add_tail(&w->work_deliver_list,
 				      &sys->work_deliver_siblings);
 
@@ -916,8 +1003,7 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 			 * work_deliver_siblings.
 			 */
 			return;
-		}
-
+		} else
 		/*
 		 * __sd_deliver_done() frees requests on
 		 * work_deliver_siblings in order.
@@ -1016,7 +1102,7 @@ static void __sd_confch(struct work *work, int idx)
 			struct join_message msg;
 
 			msg.header.op = SD_MSG_JOIN;
-			msg.header.done = 0;
+			msg.header.state = DM_INIT;
 			msg.header.msg_length = sizeof(msg);
 			msg.header.from = sys->this_node;
 			msg.nodeid = sys->this_nodeid;

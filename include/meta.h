@@ -31,7 +31,6 @@
 #define VDI_SPACE_SHIFT   32
 #define VDI_BIT (UINT64_C(1) << 63)
 #define DEAFAULT_NR_COPIES 1
-#define SD_MAX_VDI_LEN 256
 #define MAX_DATA_OBJS (1ULL << 20)
 #define MAX_CHILDREN 1024
 

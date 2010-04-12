@@ -19,6 +19,7 @@
 
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096
+#define SD_MAX_VDI_LEN 256
 
 /* -> vmon */
 
@@ -268,7 +269,7 @@ struct sd_node_rsp {
 };
 
 struct sheepdog_vm_list_entry {
-	uint8_t         name[32];
+	uint8_t         name[SD_MAX_VDI_LEN];
 	uint8_t         host_addr[16];
 	uint16_t        host_port;
 	uint8_t	        pad[6];
@@ -314,11 +315,8 @@ static inline int hval_to_sheep(struct sheepdog_node_list_entry *entries,
 	int i;
 	struct sheepdog_node_list_entry *e = entries, *n;
 
-	printf("%lx\n", id);
-
 	for (i = 0; i < nr_entries - 1; i++, e++) {
 		n = e + 1;
-		printf("%d, %lx, %lx, %lx\n", i, e->id, n->id, id);
 		if (id > e->id && id <= n->id)
 			break;
 	}
