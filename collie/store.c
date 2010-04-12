@@ -865,7 +865,7 @@ static int __recover_one(struct recovery_work *rw,
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	char name[128];
-	unsigned wlen = 0, rlen = SD_DATA_OBJ_SIZE;
+	unsigned wlen = 0, rlen;
 	int fd, ret;
 	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
 		cur_entry[SD_MAX_NODES], *next_entry;
@@ -920,6 +920,11 @@ next:
 		return -1;
 	}
 
+	if (is_data_obj(oid))
+		rlen = SD_DATA_OBJ_SIZE;
+	else
+		rlen = sizeof(struct sheepdog_inode);
+
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.oid = oid;
@@ -941,8 +946,8 @@ next:
 
 	if (rsp->result == SD_RES_SUCCESS) {
 		fd = ob_open(epoch, oid, O_CREAT, &ret);
-		ret = write(fd, buf, SD_DATA_OBJ_SIZE);
-		if (ret != SD_DATA_OBJ_SIZE) {
+		ret = write(fd, buf, rlen);
+		if (ret != rlen) {
 			eprintf("failed to write object\n");
 			return -1;
 		}
@@ -991,7 +996,7 @@ not_found:
 static void recover_one(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
+	char *buf = NULL;
 	int ret;
 	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
 	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
@@ -1002,10 +1007,15 @@ static void recover_one(struct work *work, int idx)
 
 	eprintf("%d %d, %16lx\n", rw->done, rw->count, oid);
 
+	if (is_data_obj(oid))
+		buf = malloc(SD_DATA_OBJ_SIZE);
+	else
+		buf = malloc(sizeof(struct sheepdog_inode));
+
 	cur_nr = epoch_log_read(epoch, (char *)cur_entry, sizeof(cur_entry));
 	if (cur_nr <= 0) {
 		eprintf("failed to read current epoch, %d\n", epoch);
-		return;
+		goto out;
 	}
 	cur_nr /= sizeof(struct sheepdog_node_list_entry);
 
@@ -1033,7 +1043,7 @@ static void recover_one(struct work *work, int idx)
 	ret = __recover_one(rw, old_entry, old_nr, cur_entry, cur_nr, cur_idx,
 			    copy_idx, epoch, epoch - 1, oid, buf, SD_DATA_OBJ_SIZE);
 	if (ret == 0)
-		return;
+		goto out;
 
 	for (i = 0; i < sys->nr_sobjs; i++) {
 		if (i == copy_idx)
@@ -1042,10 +1052,13 @@ static void recover_one(struct work *work, int idx)
 				    cur_entry, cur_nr, cur_idx, i,
 				    epoch, epoch - 1, oid, buf, SD_DATA_OBJ_SIZE);
 		if (ret == 0)
-			return;
+			goto out;
 	}
 fail:
 	eprintf("failed to recover object %lx\n", oid);
+out:
+	if (buf)
+		free(buf);
 }
 
 static void __start_recovery(struct work *work, int idx);
