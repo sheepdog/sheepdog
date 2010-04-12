@@ -815,8 +815,11 @@ static void __sd_deliver_done(struct work *work, int idx)
 	list_del(&w->work_deliver_list);
 
 	/*
-	 * When I finished one message, if I have pending messages, I
-	 * need to perform the first of them now.
+	 * for the master node, when I finished one message, if I have
+	 * pending messages, I need to perform the first of them now.
+	 *
+	 * for the non master nodes, when I get one finished message,
+	 * if I can forget it.
 	 */
 	if (m->done && !list_empty(&sys->work_deliver_siblings)) {
 
@@ -835,8 +838,23 @@ static void __sd_deliver_done(struct work *work, int idx)
 	free(w->msg);
 	free(w);
 
-	if (n)
+	if (!n)
+		return;
+
+	if (is_master())
 		queue_work(dobj_queue, &n->work);
+	else {
+		char name[128];
+		m = n->msg;
+
+		dprintf("op: %d, done: %d, size: %d, from: %s\n",
+		m->op, m->done, m->msg_length,
+			addr_to_str(name, sizeof(name), m->from.addr, m->from.port));
+
+		list_del(&n->work_deliver_list);
+		free(n->msg);
+		free(n);
+	}
 }
 
 static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
@@ -890,8 +908,24 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 			 * (__sd_deliver_done is called)
 			 */
 			w->work.attr = WORK_ORDERED;
-	} else if (m->op == SD_MSG_JOIN)
-		  w->work.attr = WORK_ORDERED;
+	} else {
+		if (!m->done) {
+			list_add_tail(&w->work_deliver_list,
+				      &sys->work_deliver_siblings);
+
+			/*
+			 * non master nodes just links it to
+			 * work_deliver_siblings.
+			 */
+			return;
+		}
+
+		/*
+		 * __sd_deliver_done() frees requests on
+		 * work_deliver_siblings in order.
+		 */
+		w->work.attr = WORK_ORDERED;
+	}
 
 	queue_work(dobj_queue, &w->work);
 }
