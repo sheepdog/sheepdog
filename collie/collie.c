@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
 #include <linux/limits.h>
 #include <sys/syslog.h>
 
@@ -93,6 +94,8 @@ int main(int argc, char **argv)
 		dir = argv[optind];
 
 	snprintf(path, sizeof(path), "%s/" LOG_FILE_NAME, dir);
+
+	srandom(port);
 
 	ret = init_store(dir);
 	if (ret)
