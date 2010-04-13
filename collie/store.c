@@ -24,6 +24,7 @@
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
 #define ANAME_NODEID "user.sheepdog.nodeid"
+#define ANAME_CHECKSUM "user.sheepdog.checksum"
 
 static char *obj_path;
 static char *epoch_path;
@@ -105,6 +106,8 @@ static int get_obj_list(struct request *req, char *buf, int buf_len)
 	int e_nr;
 	int idx;
 	int res = SD_RES_SUCCESS;
+	uint64_t checksum = 0;
+	int ret;
 
 	if (epoch == 1)
 		goto local;
@@ -114,10 +117,26 @@ static int get_obj_list(struct request *req, char *buf, int buf_len)
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
 		eprintf("failed to open %s, %s\n", path, strerror(errno));
-		close(fd);
-		return SD_RES_EIO;
+		res = SD_RES_EIO;
+		goto out;
 	}
 	obj_nr = read(fd, buf, buf_len);
+
+	ret = fgetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum));
+	if (ret != sizeof(checksum)) {
+		eprintf("failed to read checksum %s, %m\n", path);
+		close(fd);
+		res = SD_RES_EIO;
+		goto out;
+	}
+	if (checksum != fnv_64a_buf(buf, obj_nr, FNV1A_64_INIT)) {
+		eprintf("invalid checksum %s, %m\n", path);
+		close(fd);
+		res = SD_RES_EIO;
+		goto out;
+	}
+	dprintf("read objct list from %s, %d, %lx\n", path, obj_nr, checksum);
+
 	obj_nr /= sizeof(uint64_t);
 	objlist = (uint64_t *)buf;
 	for (i = 0; i < obj_nr; i++) {
@@ -140,7 +159,8 @@ local:
 	dir = opendir(path);
 	if (!dir) {
 		eprintf("%s\n", path);
-		return SD_RES_EIO;
+		res = SD_RES_EIO;
+		goto out;
 	}
 
 	while ((d = readdir(dir))) {
@@ -168,7 +188,6 @@ local:
 	}
 
 	eprintf("nr = %d\n", nr);
-	rsp->data_length = nr * sizeof(uint64_t);
 
 	e_nr = epoch_log_read(epoch, buf, buf_len);
 	e_nr /= sizeof(*e);
@@ -176,6 +195,7 @@ local:
 
 	if (e_nr <= sys->nr_sobjs) {
 		rsp->next = end_hash;
+		closedir(dir);
 		goto out;
 	}
 
@@ -200,9 +220,13 @@ local:
 	} else
 		res = SD_RES_SYSTEM_ERROR;
 
-out:
 	closedir(dir);
 
+out:
+	rsp->data_length = nr * sizeof(uint64_t);
+	for (i = 0; i < nr; i++) {
+		eprintf("oid %lx, %lx\n", *(p + i), p[i]);
+	}
 	return res;
 }
 
@@ -1209,6 +1233,8 @@ static void __start_recovery(struct work *work, int idx)
 	int i, fd;
 	uint64_t start_hash, end_hash;
 	char path[PATH_MAX];
+	uint64_t checksum;
+	int ret;
 
 	dprintf("%u\n", epoch);
 
@@ -1245,6 +1271,9 @@ static void __start_recovery(struct work *work, int idx)
 		goto fail;
 	}
 
+	if (rw->retry)
+		goto fail;
+
 	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
 	dprintf("write object list file to %s\n", path);
 
@@ -1254,6 +1283,16 @@ static void __start_recovery(struct work *work, int idx)
 		goto fail;
 	}
 	write(fd, rw->buf, sizeof(uint64_t) * rw->count);
+	fsync(fd);
+
+	checksum = fnv_64a_buf(rw->buf, sizeof(uint64_t) * rw->count, FNV1A_64_INIT);
+	ret = fsetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum), 0);
+	if (ret) {
+		eprintf("couldn't set xattr to %s, %m\n", path);
+		close(fd);
+		goto fail;
+	}
+
 	close(fd);
 
 	return;
