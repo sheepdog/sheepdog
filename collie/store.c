@@ -1085,15 +1085,13 @@ static void recover_one_done(struct work *work, int idx)
 
 	rw->done++;
 
-	if (rw->done < rw->count && rw->rw_siblings.next == &recovery_work_list) {
+	if (rw->done < rw->count && list_empty(&recovery_work_list)) {
 		queue_work(dobj_queue, &rw->work);
 		return;
 	}
 
 	dprintf("recovery done, %d\n", rw->epoch);
-	recovering--;
-
-	list_del(&rw->rw_siblings);
+	recovering = 0;
 
 	free(rw->buf);
 	free(rw);
@@ -1102,7 +1100,9 @@ static void recover_one_done(struct work *work, int idx)
 		rw = list_first_entry(&recovery_work_list,
 				      struct recovery_work, rw_siblings);
 
-		recovering++;
+		list_del(&rw->rw_siblings);
+
+		recovering = 1;
 		queue_work(dobj_queue, &rw->work);
 	}
 }
@@ -1129,7 +1129,7 @@ static int __fill_obj_list(struct recovery_work *rw,
 	}
 
 	wlen = 0;
-	rlen = 1 << 20;
+	rlen = (1 << 20) - (rw->count * sizeof(uint64_t));
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_OBJ_LIST;
@@ -1150,10 +1150,10 @@ static int __fill_obj_list(struct recovery_work *rw,
 
 	rsp = (struct sd_list_rsp *)&hdr;
 
-	if (rsp->result != SD_RES_SUCCESS) {
+	if (ret || rsp->result != SD_RES_SUCCESS) {
 		rw->retry = 1;
 		*done_hash = end_hash;
-		eprintf("try again, %d\n", rsp->result);
+		eprintf("try again, %d, %d\n", ret, rsp->result);
 		return 0;
 	}
 
@@ -1281,7 +1281,7 @@ static void __start_recovery_done(struct work *work, int idx)
 		return;
 	}
 
-	if (rw->count && rw->rw_siblings.next == &recovery_work_list) {
+	if (rw->count && list_empty(&recovery_work_list)) {
 		rw->work.fn = recover_one;
 		rw->work.done = recover_one_done;
 
@@ -1293,9 +1293,7 @@ static void __start_recovery_done(struct work *work, int idx)
 	}
 
 	dprintf("recovery done, %d\n", rw->epoch);
-	recovering--;
-
-	list_del(&rw->rw_siblings);
+	recovering = 0;
 
 	free(rw->buf);
 	free(rw);
@@ -1304,7 +1302,9 @@ static void __start_recovery_done(struct work *work, int idx)
 		rw = list_first_entry(&recovery_work_list,
 				      struct recovery_work, rw_siblings);
 
-		recovering++;
+		list_del(&rw->rw_siblings);
+
+		recovering = 1;
 		queue_work(dobj_queue, &rw->work);
 	}
 }
@@ -1324,10 +1324,10 @@ int start_recovery(uint32_t epoch)
 	rw->work.fn = __start_recovery;
 	rw->work.done = __start_recovery_done;
 
-	list_add_tail(&rw->rw_siblings, &recovery_work_list);
-
-	if (!recovering) {
-		recovering++;
+	if (recovering)
+		list_add_tail(&rw->rw_siblings, &recovery_work_list);
+	else {
+		recovering = 1;
 		queue_work(dobj_queue, &rw->work);
 	}
 
