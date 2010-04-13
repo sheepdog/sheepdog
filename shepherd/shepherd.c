@@ -846,7 +846,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 	}
 
 	for (i = 0; i < nr_nodes; i++) {
-		unsigned wlen = 0, rlen = sizeof(buf);
+		unsigned wlen = 0, rlen = sizeof(sizeof(struct sheepdog_inode));
 		struct sd_obj_req hdr;
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
