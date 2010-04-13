@@ -197,7 +197,7 @@ static void *worker_routine(void *arg)
 	int i, idx = 0;
 	sigset_t set;
 
-	for (i = 0; i < ARRAY_SIZE(wi->worker_thread); i++) {
+	for (i = 0; i < wi->nr_threads; i++) {
 		if (wi->worker_thread[i] == pthread_self()) {
 			idx = i;
 			break;
@@ -339,7 +339,7 @@ void exit_work_queue(struct work_queue *q)
 	pthread_cond_broadcast(&wi->pending_cond);
 
 	for (i = 0; wi->worker_thread[i] &&
-		     i < ARRAY_SIZE(wi->worker_thread); i++)
+		     i < wi->nr_threads; i++)
 		pthread_join(wi->worker_thread[i], NULL);
 
 	pthread_cond_destroy(&wi->pending_cond);
