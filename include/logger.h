@@ -36,7 +36,7 @@ union semun {
 	struct seminfo *__buf;
 };
 
-#define LOG_SPACE_SIZE 16384
+#define LOG_SPACE_SIZE 1048576
 #define MAX_MSG_SIZE 256
 
 struct logmsg {
