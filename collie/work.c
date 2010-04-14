@@ -110,6 +110,36 @@ static void work_post_queued(struct work_queue *q, struct work *w)
 		work_queue_set_blocked(q);
 }
 
+static void __queue_work(struct work_queue *q, struct work *work, int enabled)
+{
+	struct worker_info *wi = container_of(q, struct worker_info, q);
+
+	if (enabled) {
+		pthread_mutex_lock(&wi->pending_lock);
+
+		list_add_tail(&work->w_list, &wi->q.pending_list);
+
+		pthread_mutex_unlock(&wi->pending_lock);
+
+		pthread_cond_signal(&wi->pending_cond);
+
+		work_post_queued(q, work);
+	} else
+		list_add_tail(&work->w_list, &wi->q.blocked_list);
+}
+
+void queue_work(struct work_queue *q, struct work *work)
+{
+	int enabled;
+
+	if (!list_empty(&q->blocked_list))
+		enabled = 0;
+	else
+		enabled = work_enabled(q, work);
+
+	__queue_work(q, work, enabled);
+}
+
 static void work_post_done(struct work_queue *q, enum work_attr attr)
 {
 	struct work *n, *t;
@@ -123,7 +153,7 @@ static void work_post_done(struct work_queue *q, enum work_attr attr)
 			break;
 
 		list_del(&n->w_list);
-		queue_work(q, n);
+		__queue_work(q, n, 1);
 	}
 }
 
@@ -316,25 +346,4 @@ void exit_work_queue(struct work_queue *q)
 	pthread_mutex_destroy(&wi->pending_lock);
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
-}
-
-void queue_work(struct work_queue *q, struct work *work)
-{
-	int enabled;
-	struct worker_info *wi = container_of(q, struct worker_info, q);
-
-	enabled = work_enabled(q, work);
-
-	if (enabled) {
-		pthread_mutex_lock(&wi->pending_lock);
-
-		list_add_tail(&work->w_list, &wi->q.pending_list);
-
-		pthread_mutex_unlock(&wi->pending_lock);
-
-		pthread_cond_signal(&wi->pending_cond);
-
-		work_post_queued(q, work);
-	} else
-		list_add_tail(&work->w_list, &wi->q.blocked_list);
 }
