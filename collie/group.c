@@ -1050,6 +1050,18 @@ static void __sd_confch(struct work *work, int idx)
 		if (node) {
 			int nr;
 			struct sheepdog_node_list_entry e[SD_MAX_NODES];
+			struct vm *vm, *n;
+
+			list_for_each_entry_safe(vm, n, &sys->vm_list, list) {
+				if (memcmp(vm->ent.host_addr, node->ent.addr,
+					   sizeof(node->ent.addr)) != 0)
+					continue;
+				if (vm->ent.host_port != node->ent.port)
+					continue;
+
+				list_del(&vm->list);
+				free(vm);
+			}
 
 			list_del(&node->list);
 			free(node);
