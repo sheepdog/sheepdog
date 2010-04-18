@@ -90,6 +90,9 @@ struct work_confch {
 	struct cpg_address *joined_list;
 	size_t joined_list_entries;
 
+	unsigned long *failed_vdis;
+	int nr_failed_vdis;
+
 	struct work work;
 };
 
@@ -881,7 +884,7 @@ static void __sd_deliver_done(struct work *work, int idx)
 	 */
 
 	if (m->state == DM_FIN && m->op == SD_MSG_JOIN && sys->epoch >= 2)
-		start_recovery(sys->epoch);
+		start_recovery(sys->epoch, NULL, 0);
 
 	free(w->msg);
 	free(w);
@@ -1051,13 +1054,35 @@ static void __sd_confch(struct work *work, int idx)
 			int nr;
 			struct sheepdog_node_list_entry e[SD_MAX_NODES];
 			struct vm *vm, *n;
+			int ret, size;
+			uint64_t oid;
+			void *buf;
 
+			size = sizeof(*w->failed_vdis) * 64;
+			w->failed_vdis = malloc(size);
 			list_for_each_entry_safe(vm, n, &sys->vm_list, list) {
 				if (memcmp(vm->ent.host_addr, node->ent.addr,
 					   sizeof(node->ent.addr)) != 0)
 					continue;
 				if (vm->ent.host_port != node->ent.port)
 					continue;
+
+				if (w->nr_failed_vdis * sizeof(*w->failed_vdis) >= size) {
+					size *= 2;
+					buf = realloc(w->failed_vdis, size);
+					if (!buf) {
+						eprintf("out of memory, %d\n", size);
+						break;
+					}
+					w->failed_vdis = buf;
+				}
+
+				ret = lookup_vdi((char *)vm->ent.name,
+						 sizeof(vm->ent.name), &oid, 0);
+				if (ret == SD_RES_SUCCESS)
+					w->failed_vdis[w->nr_failed_vdis++] = oid_to_bit(oid);
+				else
+					eprintf("cannot find vdi %s\n", vm->ent.name);
 
 				list_del(&vm->list);
 				free(vm);
@@ -1144,12 +1169,13 @@ static void __sd_confch_done(struct work *work, int idx)
 	if (w->left_list_entries) {
 		if (w->left_list_entries > 1)
 			eprintf("we can't handle %Zd\n", w->left_list_entries);
-		start_recovery(sys->epoch);
+		start_recovery(sys->epoch, w->failed_vdis, w->nr_failed_vdis);
 	}
 
 	free(w->member_list);
 	free(w->left_list);
 	free(w->joined_list);
+	free(w->failed_vdis);
 	free(w);
 }
 
