@@ -41,7 +41,9 @@ struct sheepdog_inode {
 	uint64_t oid;
 	uint64_t ctime;
 	uint64_t snap_ctime;
+	uint64_t vm_clock_nsec;
 	uint64_t vdi_size;
+	uint64_t vm_state_size;
 	uint16_t copy_policy;
 	uint8_t  nr_copies;
 	uint8_t  block_size_shift;
