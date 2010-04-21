@@ -77,7 +77,7 @@ struct work_deliver {
 	struct message_header *msg;
 };
 
-struct work_confch {
+struct work_confchg {
 	struct cpg_address *member_list;
 	size_t member_list_entries;
 	struct cpg_address *left_list;
@@ -101,7 +101,7 @@ struct cpg_event {
 	unsigned int skip;
 
 	union {
-		struct work_confch c;
+		struct work_confchg c;
 		struct work_deliver d;
 	};
 };
@@ -928,9 +928,9 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	start_cpg_event_work();
 }
 
-static void __sd_confch(struct cpg_event *cevent)
+static void __sd_confchg(struct cpg_event *cevent)
 {
-	struct work_confch *w = &cevent->c;
+	struct work_confchg *w = &cevent->c;
 	struct node *node;
 	int i;
 
@@ -1046,9 +1046,9 @@ static void __sd_confch(struct cpg_event *cevent)
 	print_node_list(&sys->sd_node_list);
 }
 
-static void __sd_confch_done(struct cpg_event *cevent)
+static void __sd_confchg_done(struct cpg_event *cevent)
 {
-	struct work_confch *w = &cevent->c;
+	struct work_confchg *w = &cevent->c;
 	int i;
 
 	if (w->first_cpg_node)
@@ -1089,7 +1089,7 @@ static void cpg_event_free(struct cpg_event *cevent)
 {
 	switch (cevent->ctype) {
 	case CPG_EVENT_CONCHG: {
-		struct work_confch *w = &cevent->c;
+		struct work_confchg *w = &cevent->c;
 		free(w->member_list);
 		free(w->left_list);
 		free(w->joined_list);
@@ -1116,12 +1116,12 @@ void cpg_event_fn(struct work *w, int idx)
 
 	/*
 	 * we can't touch sys->cpg_event_siblings because of a race
-	 * with sd_deliver() and sd_confch()...
+	 * with sd_deliver() and sd_confchg()...
 	 */
 
 	switch (cevent->ctype) {
 	case CPG_EVENT_CONCHG:
-		__sd_confch(cevent);
+		__sd_confchg(cevent);
 		break;
 	case CPG_EVENT_DELIVER:
 		vprintf(SDOG_DEBUG "%d\n", cevent->d.msg->state);
@@ -1154,7 +1154,7 @@ void cpg_event_done(struct work *w, int idx)
 
 	switch (cevent->ctype) {
 	case CPG_EVENT_CONCHG:
-		__sd_confch_done(cevent);
+		__sd_confchg_done(cevent);
 		break;
 	case CPG_EVENT_DELIVER:
 		if (cevent->d.msg->state == DM_INIT) {
@@ -1220,16 +1220,16 @@ static void start_cpg_event_work(void)
 	queue_work(dobj_queue, &cpg_event_work);
 }
 
-static void sd_confch(cpg_handle_t handle, const struct cpg_name *group_name,
-		      const struct cpg_address *member_list,
-		      size_t member_list_entries,
-		      const struct cpg_address *left_list,
-		      size_t left_list_entries,
-		      const struct cpg_address *joined_list,
-		      size_t joined_list_entries)
+static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
+		       const struct cpg_address *member_list,
+		       size_t member_list_entries,
+		       const struct cpg_address *left_list,
+		       size_t left_list_entries,
+		       const struct cpg_address *joined_list,
+		       size_t joined_list_entries)
 {
 	struct cpg_event *cevent;
-	struct work_confch *w = NULL;
+	struct work_confchg *w = NULL;
 	int i, size;
 
 	dprintf("confchg nodeid %x\n", member_list[0].nodeid);
@@ -1341,7 +1341,7 @@ int create_cluster(int port)
 	int fd, ret;
 	cpg_handle_t cpg_handle;
 	struct cpg_name group = { 8, "sheepdog" };
-	cpg_callbacks_t cb = { &sd_deliver, &sd_confch };
+	cpg_callbacks_t cb = {&sd_deliver, &sd_confchg};
 	unsigned int nodeid = 0;
 
 	ret = cpg_initialize(&cpg_handle, &cb);
