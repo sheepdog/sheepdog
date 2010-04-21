@@ -105,8 +105,6 @@ int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 
 int create_cluster(int port);
 
-void so_queue_request(struct work *work, int idx);
-
 void store_queue_request(struct work *work, int idx);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
