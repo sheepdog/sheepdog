@@ -80,7 +80,9 @@ struct cluster_info {
 
 	int nr_sobjs;
 
-	struct list_head work_deliver_siblings;
+	struct list_head cpg_event_siblings;
+	struct cpg_event *cur_cevent;
+	unsigned long cpg_event_work_flags;
 };
 
 struct cluster_info *sys;

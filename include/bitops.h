@@ -130,3 +130,8 @@ static inline int test_bit(unsigned int nr, const unsigned long *addr)
 	return ((1UL << (nr % BITS_PER_LONG)) &
 		(((unsigned long *)addr)[nr / BITS_PER_LONG])) != 0;
 }
+
+static inline void clear_bit(unsigned int nr, unsigned long *addr)
+{
+	addr[nr / BITS_PER_LONG] &= ~(1UL << (nr % BITS_PER_LONG));
+}
