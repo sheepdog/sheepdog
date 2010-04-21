@@ -57,7 +57,8 @@ struct request {
 
 struct cluster_info {
 	cpg_handle_t handle;
-	int synchronized;
+	/* set after finishing the JOIN procedure */
+	int join_finished;
 	uint32_t this_nodeid;
 	uint32_t this_pid;
 	struct sheepdog_node_list_entry this_node;

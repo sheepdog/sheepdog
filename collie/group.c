@@ -359,7 +359,7 @@ static int is_master(void)
 {
 	struct node *node;
 
-	if (!sys->synchronized)
+	if (!sys->join_finished)
 		return 0;
 
 	node = list_first_entry(&sys->sd_node_list, struct node, list);
@@ -564,7 +564,7 @@ static void update_cluster_info(struct join_message *msg)
 	if (!sys->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
 
-	if (sys->synchronized)
+	if (sys->join_finished)
 		goto out;
 
 	for (i = 0; i < nr_nodes; i++) {
@@ -580,7 +580,7 @@ static void update_cluster_info(struct join_message *msg)
 				msg->nodes[i].nodeid, msg->nodes[i].pid);
 	}
 
-	sys->synchronized = 1;
+	sys->join_finished = 1;
 
 	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK) {
 		if (msg->epoch > 0) {
@@ -802,7 +802,7 @@ static void __sd_deliver(struct cpg_event *cevent)
 	 * we don't want to perform any deliver events until we
 	 * join; we wait for our JOIN message.
 	 */
-	if (!sys->synchronized) {
+	if (!sys->join_finished) {
 		if (m->pid != sys->this_pid || m->nodeid != sys->this_nodeid) {
 			cevent->skip = 1;
 			return;
@@ -944,7 +944,7 @@ static void __sd_confch(struct cpg_event *cevent)
 	if (member_list_entries == joined_list_entries - left_list_entries &&
 	    sys->this_nodeid == member_list[0].nodeid &&
 	    sys->this_pid == member_list[0].pid){
-		sys->synchronized = 1;
+		sys->join_finished = 1;
 		w->first_cpg_node = 1;
 	}
 
@@ -1395,7 +1395,6 @@ join_retry:
 		sys->this_node.id = hval;
 	}
 
-	sys->synchronized = 0;
 	sys->status = SD_STATUS_STARTUP;
 	INIT_LIST_HEAD(&sys->sd_node_list);
 	INIT_LIST_HEAD(&sys->cpg_node_list);
