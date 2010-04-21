@@ -952,8 +952,6 @@ struct recovery_work {
 	uint32_t epoch;
 	uint32_t done;
 
-	struct sheepdog_node_list_entry e;
-
 	struct timer timer;
 	int retry;
 	struct work work;
@@ -1303,8 +1301,6 @@ static int __fill_obj_list(struct recovery_work *rw,
 	hdr.data_length = rlen;
 
 	dprintf("%016lx, %016lx\n", hdr.start, hdr.end);
-
-	memcpy(&rw->e, e, sizeof(rw->e));
 
 	ret = exec_req(fd, (struct sd_req *)&hdr, rw->buf + rw->count * sizeof(uint64_t), &wlen, &rlen);
 
