@@ -1246,7 +1246,7 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 
 	cevent = zalloc(sizeof(*cevent));
 	if (!cevent)
-		return; /* should die */
+		goto oom;
 
 	cevent->ctype = CPG_EVENT_CONCHG;
 	w = &cevent->c;
@@ -1256,21 +1256,21 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 	size = sizeof(struct cpg_address) * member_list_entries;
 	w->member_list = zalloc(size);
 	if (!w->member_list)
-		goto err;
+		goto oom;
 	memcpy(w->member_list, member_list, size);
 	w->member_list_entries = member_list_entries;
 
 	size = sizeof(struct cpg_address) * left_list_entries;
 	w->left_list = zalloc(size);
 	if (!w->left_list)
-		goto err;
+		goto oom;
 	memcpy(w->left_list, left_list, size);
 	w->left_list_entries = left_list_entries;
 
 	size = sizeof(struct cpg_address) * joined_list_entries;
 	w->joined_list = zalloc(size);
 	if (!w->joined_list)
-		goto err;
+		goto oom;
 	memcpy(w->joined_list, joined_list, size);
 	w->joined_list_entries = joined_list_entries;
 
@@ -1278,16 +1278,16 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 	start_cpg_event_work();
 
 	return;
-err:
-	if (!w)
-		return;
-
-	if (w->member_list)
-		free(w->member_list);
-	if (w->left_list)
-		free(w->left_list);
-	if (w->joined_list)
-		free(w->joined_list);
+oom:
+	if (w) {
+		if (w->member_list)
+			free(w->member_list);
+		if (w->left_list)
+			free(w->left_list);
+		if (w->joined_list)
+			free(w->joined_list);
+	}
+	panic("failed to allocate memory for a confchg event\n");
 }
 
 static void set_addr(unsigned int nodeid, int port)
