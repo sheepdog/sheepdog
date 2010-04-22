@@ -106,28 +106,23 @@ static int is_current(struct sheepdog_inode *i)
 	return !i->snap_ctime;
 }
 
-static char *size_to_str(uint64_t size, char *str, int str_size)
+static char *size_to_str(uint64_t _size, char *str, int str_size)
 {
 	char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
-	int i = 0, frac = 0;
+	int i = 0;
+	double size = (double)_size;
 
 	size /= 1024 * 1024;
 	while (i < ARRAY_SIZE(units) && size >= 1024) {
 		i++;
 
-		frac = size % 1024;
-		if (frac > 1000)
-			frac -= 100;
-		while (frac > 10)
-			frac /= 10;
-
 		size /= 1024;
 	}
 
-	if (size > 9)
-		snprintf(str, str_size, "%" PRId64 " %s", size, units[i]);
+	if (size >= 10)
+		snprintf(str, str_size, "%.0lf %s", size, units[i]);
 	else
-		snprintf(str, str_size, "%" PRId64 ".%d %s", size, frac, units[i]);
+		snprintf(str, str_size, "%.1lf %s", size, units[i]);
 
 	return str;
 }
