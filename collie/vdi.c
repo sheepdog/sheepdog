@@ -385,7 +385,7 @@ static void delete_one_done(struct work *work, int idx)
 
 	dw->done++;
 	if (dw->done < dw->count) {
-		queue_work(dobj_queue, &dw->work);
+		queue_work(&dw->work);
 		return;
 	}
 
@@ -401,7 +401,7 @@ static void delete_one_done(struct work *work, int idx)
 				      struct deletion_work, dw_siblings);
 
 		deleting++;
-		queue_work(dobj_queue, &dw->work);
+		queue_work(&dw->work);
 	}
 }
 
@@ -498,7 +498,7 @@ static void __start_deletion_done(struct work *work, int idx)
 		dw->work.fn = delete_one;
 		dw->work.done = delete_one_done;
 
-		queue_work(dobj_queue, &dw->work);
+		queue_work(&dw->work);
 		return;
 	}
 
@@ -514,7 +514,7 @@ static void __start_deletion_done(struct work *work, int idx)
 				      struct deletion_work, dw_siblings);
 
 		deleting++;
-		queue_work(dobj_queue, &dw->work);
+		queue_work(&dw->work);
 	}
 }
 
@@ -542,7 +542,7 @@ int start_deletion(uint64_t oid)
 
 	if (!deleting) {
 		deleting++;
-		queue_work(dobj_queue, &dw->work);
+		queue_work(&dw->work);
 	}
 
 	return 0;

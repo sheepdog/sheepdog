@@ -43,6 +43,13 @@ extern int signalfd(int fd, const sigset_t *mask, int flags);
 static int sig_fd;
 static LIST_HEAD(worker_info_list);
 
+struct work_queue {
+	int wq_state;
+	int nr_active;
+	struct list_head pending_list;
+	struct list_head blocked_list;
+};
+
 enum wq_state {
 	WQ_BLOCKED = (1U << 0),
 	WQ_DEAD = (1U << 1),
@@ -128,16 +135,18 @@ static void __queue_work(struct work_queue *q, struct work *work, int enabled)
 		list_add_tail(&work->w_list, &wi->q.blocked_list);
 }
 
-void queue_work(struct work_queue *q, struct work *work)
+static struct work_queue *wqueue;
+
+void queue_work(struct work *work)
 {
 	int enabled;
 
-	if (!list_empty(&q->blocked_list))
+	if (!list_empty(&wqueue->blocked_list))
 		enabled = 0;
 	else
-		enabled = work_enabled(q, work);
+		enabled = work_enabled(wqueue, work);
 
-	__queue_work(q, work, enabled);
+	__queue_work(wqueue, work, enabled);
 }
 
 static void work_post_done(struct work_queue *q, enum work_attr attr)
@@ -266,22 +275,21 @@ static int init_signalfd(void)
 
 	ret = register_event(sig_fd, bs_thread_request_done, NULL);
 
-
 	return 0;
 }
 
-struct work_queue *init_work_queue(int nr)
+int init_work_queue(int nr)
 {
 	int i, ret;
 	struct worker_info *wi;
 
 	ret = init_signalfd();
 	if (ret)
-		return NULL;
+		return -1;
 
 	wi = zalloc(sizeof(*wi) + nr * sizeof(pthread_t));
 	if (!wi)
-		return NULL;
+		return -1;
 
 	wi->nr_threads = nr;
 
@@ -310,8 +318,9 @@ struct work_queue *init_work_queue(int nr)
 	pthread_mutex_unlock(&wi->startup_lock);
 
 	list_add(&wi->worker_info_siblings, &worker_info_list);
+	wqueue = &wi->q;
 
-	return &wi->q;
+	return 0;
 destroy_threads:
 
 	wi->q.wq_state |= WQ_DEAD;
@@ -327,7 +336,7 @@ destroy_threads:
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
 
-	return NULL;
+	return -1;
 }
 
 void exit_work_queue(struct work_queue *q)

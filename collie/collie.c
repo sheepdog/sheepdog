@@ -112,8 +112,8 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	dobj_queue = init_work_queue(DATA_OBJ_NR_WORKER_THREAD);
-	if (!dobj_queue)
+	ret = init_work_queue(NR_WORKER_THREAD);
+	if (ret)
 		exit(1);
 
 	ret = create_listen_port(port, sys);

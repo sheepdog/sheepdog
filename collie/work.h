@@ -10,13 +10,6 @@ enum work_attr {
 	WORK_ORDERED,
 };
 
-struct work_queue {
-	int wq_state;
-	int nr_active;
-	struct list_head pending_list;
-	struct list_head blocked_list;
-};
-
 struct work {
 	struct list_head w_list;
 	work_func_t fn;
@@ -24,10 +17,7 @@ struct work {
 	enum work_attr attr;
 };
 
-struct work_queue *init_work_queue(int nr);
-void exit_work_queue(struct work_queue *q);
-void queue_work(struct work_queue *q, struct work *work);
-void resume_work_queue(struct work_queue *q);
-void wait_work_queue_inactive(struct work_queue *q);
+int init_work_queue(int nr);
+void queue_work(struct work *work);
 
 #endif

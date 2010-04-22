@@ -36,8 +36,6 @@ static char *zero_block;
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
-struct work_queue *dobj_queue;
-
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
@@ -1228,7 +1226,7 @@ static void __start_recovery(struct work *work, int idx);
 static void recover_timer(void *data)
 {
 	struct recovery_work *rw = (struct recovery_work *)data;
-	queue_work(dobj_queue, &rw->work);
+	queue_work(&rw->work);
 }
 
 static void recover_done(struct work *work, int idx)
@@ -1247,7 +1245,7 @@ static void recover_done(struct work *work, int idx)
 	if (rw->done < rw->count && list_empty(&recovery_work_list)) {
 		rw->work.fn = recover_one;
 
-		queue_work(dobj_queue, &rw->work);
+		queue_work(&rw->work);
 		return;
 	}
 
@@ -1265,7 +1263,7 @@ static void recover_done(struct work *work, int idx)
 		list_del(&rw->rw_siblings);
 
 		recovering = 1;
-		queue_work(dobj_queue, &rw->work);
+		queue_work(&rw->work);
 	}
 }
 
@@ -1466,7 +1464,7 @@ int start_recovery(uint32_t epoch, unsigned long *failed_vdis, int nr_failed_vdi
 		list_add_tail(&rw->rw_siblings, &recovery_work_list);
 	else {
 		recovering = 1;
-		queue_work(dobj_queue, &rw->work);
+		queue_work(&rw->work);
 	}
 
 	return 0;
@@ -1669,7 +1667,7 @@ int init_store(char *d)
 	if (ret)
 		return ret;
 
-	zero_block = zalloc(SD_DATA_OBJ_SIZE * DATA_OBJ_NR_WORKER_THREAD);
+	zero_block = zalloc(SD_DATA_OBJ_SIZE * NR_WORKER_THREAD);
 	if (!zero_block)
 		return 1;
 

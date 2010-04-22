@@ -1317,7 +1317,7 @@ static void start_cpg_event_work(void)
 	cpg_event_work.fn = cpg_event_fn;
 	cpg_event_work.done = cpg_event_done;
 
-	queue_work(dobj_queue, &cpg_event_work);
+	queue_work(&cpg_event_work);
 }
 
 static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
