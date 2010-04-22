@@ -88,6 +88,7 @@ struct work_confchg {
 	unsigned long *failed_vdis;
 	int nr_failed_vdis;
 	int first_cpg_node;
+	int sd_node_left;
 };
 
 enum cpg_event_type {
@@ -1030,6 +1031,8 @@ static void del_node(struct cpg_address *addr, struct work_confchg *w)
 		uint64_t oid;
 		void *buf;
 
+		w->sd_node_left++;
+
 		size = sizeof(*w->failed_vdis) * 64;
 		w->failed_vdis = malloc(size);
 		list_for_each_entry_safe(vm, n, &sys->vm_list, list) {
@@ -1167,10 +1170,11 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 			   send_join_request, w);
 
 skip_join:
-	/* FIXME: worker threads can't call start_recovery */
-	if (w->left_list_entries) {
-		if (w->left_list_entries > 1)
-			eprintf("we can't handle %Zd\n", w->left_list_entries);
+	if (w->sd_node_left) {
+		if (w->sd_node_left > 1)
+			panic("we can't handle the departure of multiple nodes %d, %Zd\n",
+			      w->sd_node_left, w->left_list_entries);
+
 		start_recovery(sys->epoch, w->failed_vdis, w->nr_failed_vdis);
 	}
 }
