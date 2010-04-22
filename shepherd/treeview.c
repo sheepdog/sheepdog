@@ -15,6 +15,7 @@
 #include <term.h>
 
 #include "list.h"
+#include "treeview.h"
 
 #ifndef MAX_DEPTH
 #define MAX_DEPTH    100
@@ -34,7 +35,7 @@ static int *width, *more;
 static struct vdi_tree *root;
 
 static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint64_t oid,
-				 char *name)
+				 const char *name)
 {
 	struct vdi_tree *vdi, *ret;
 
@@ -49,8 +50,8 @@ static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint64_t oid,
 	return NULL;
 }
 
-static struct vdi_tree *new_vdi(char *name, char *label, uint64_t oid,
-			   uint64_t poid, int highlight)
+static struct vdi_tree *new_vdi(const char *name, const char *label,
+		uint64_t oid, uint64_t poid, int highlight)
 {
 	struct vdi_tree *vdi;
 
@@ -73,8 +74,8 @@ void init_tree(void)
 	root = new_vdi("", "", 0, 0, 0);
 }
 
-void add_vdi_tree(char *name, char *label, uint64_t oid, uint64_t poid,
-		  int highlight)
+void add_vdi_tree(const char *name, const char *label, uint64_t oid,
+		uint64_t poid, int highlight)
 {
 	struct vdi_tree *vdi, *parent;
 

@@ -1547,7 +1547,7 @@ int get_nodeid(uint64_t *nodeid)
 	return attr(epoch_path, ANAME_NODEID, nodeid, sizeof(*nodeid), 0);
 }
 
-int init_base_path(char *d)
+static int init_base_path(char *d)
 {
 	int new = 0;
 

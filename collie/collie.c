@@ -25,12 +25,12 @@
 static char program_name[] = "collie";
 
 static struct option const long_options[] = {
-	{"port", required_argument, 0, 'p'},
-	{"foreground", no_argument, 0, 'f'},
-	{"loglevel", required_argument, 0, 'l'},
-	{"debug", no_argument, 0, 'd'},
-	{"help", no_argument, 0, 'h'},
-	{0, 0, 0, 0},
+	{"port", required_argument, NULL, 'p'},
+	{"foreground", no_argument, NULL, 'f'},
+	{"loglevel", required_argument, NULL, 'l'},
+	{"debug", no_argument, NULL, 'd'},
+	{"help", no_argument, NULL, 'h'},
+	{NULL, 0, NULL, 0},
 };
 
 static char *short_options = "p:fl:dh";
@@ -54,7 +54,8 @@ Sheepdog Daemon, version %s\n\
 	exit(status);
 }
 
-struct cluster_info __sys, *sys = &__sys;
+static struct cluster_info __sys;
+struct cluster_info *sys = &__sys;
 
 int main(int argc, char **argv)
 {

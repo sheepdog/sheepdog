@@ -85,7 +85,7 @@ struct cluster_info {
 	unsigned long cpg_event_work_flags;
 };
 
-struct cluster_info *sys;
+extern struct cluster_info *sys;
 
 int create_listen_port(int port, void *data);
 

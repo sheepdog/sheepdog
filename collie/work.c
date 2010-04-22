@@ -75,12 +75,12 @@ struct worker_info {
 	pthread_t worker_thread[0];
 };
 
-void work_queue_set_blocked(struct work_queue *q)
+static void work_queue_set_blocked(struct work_queue *q)
 {
 	q->wq_state |= WQ_BLOCKED;
 }
 
-void work_queue_clear_blocked(struct work_queue *q)
+static void work_queue_clear_blocked(struct work_queue *q)
 {
 	q->wq_state &= ~WQ_BLOCKED;
 }

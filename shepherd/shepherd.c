@@ -37,17 +37,17 @@ static int sdport = SD_LISTEN_PORT;
 
 static struct option const long_options[] =
 {
-	{"port", required_argument, 0, 'p'},
-	{"copies", required_argument, 0, 'c'},
-	{"epoch", required_argument, 0, 'e'},
-	{"index", required_argument, 0, 'i'},
-	{"format", required_argument, 0, 'f'},
-	{"type", required_argument, 0, 't'},
-	{"highlight", required_argument, 0, 'H'},
-	{"resident", required_argument, 0, 'R'},
-	{"op", required_argument, 0, 'o'},
-	{"help", no_argument, 0, 'h'},
-	{0, 0, 0, 0},
+	{"port", required_argument, NULL, 'p'},
+	{"copies", required_argument, NULL, 'c'},
+	{"epoch", required_argument, NULL, 'e'},
+	{"index", required_argument, NULL, 'i'},
+	{"format", required_argument, NULL, 'f'},
+	{"type", required_argument, NULL, 't'},
+	{"highlight", required_argument, NULL, 'H'},
+	{"resident", required_argument, NULL, 'R'},
+	{"op", required_argument, NULL, 'o'},
+	{"help", no_argument, NULL, 'h'},
+	{NULL, 0, NULL, 0},
 };
 
 static char *short_options = "p:f:rR:t:H:o:i:e:h";
@@ -478,7 +478,7 @@ typedef void (*vdi_parser_func_t)(uint64_t oid, char *name, uint32_t tag, uint32
 
 
 
-int parse_vdi(vdi_parser_func_t func, void *data)
+static int parse_vdi(vdi_parser_func_t func, void *data)
 {
 	int ret, fd;
 	unsigned long nr;
@@ -582,7 +582,7 @@ static int graphview_vdi(char *vdiname, int highlight)
 	i.root = -1;
 
 	/* print a header */
-	printf("digraph G \{\n");
+	printf("digraph G {\n");
 
 	parse_vdi(print_graph_tree, &i);
 
@@ -922,7 +922,7 @@ static void print_obj(char *vdiname, unsigned index)
 	}
 }
 
-int info(enum info_type type, enum format_type format, char *name,
+static int info(enum info_type type, enum format_type format, char *name,
 	 int highlight, int real_time, unsigned index)
 {
 	int i, ret = -1;
