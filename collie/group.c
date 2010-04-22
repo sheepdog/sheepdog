@@ -771,6 +771,36 @@ out:
 	req->done(req);
 }
 
+static void update_running_vm_state(struct cpg_event *cevent)
+{
+	struct work_deliver *w = &cevent->d;
+	struct message_header *m = w->msg;
+	struct sheepdog_vm_list_entry *e;
+	int nr, i;
+	struct vm *vm;
+
+	if (sys->join_finished)
+		goto out;
+
+	/* This is my JOIN message. */
+	vprintf(SDOG_DEBUG "we update the vm list\n");
+
+	nr = (m->msg_length - sizeof(*m)) / sizeof(*e);
+	e = (struct sheepdog_vm_list_entry *)(m + 1);
+
+	for (i = 0; i < nr; i++) {
+		vm = zalloc(sizeof(*vm));
+		if (!vm)
+			panic("failed to allocate memory for a vm\n");
+
+		vm->ent = e[i];
+		vprintf(SDOG_DEBUG "%d, got %s\n", i, e[i].name);
+		list_add(&vm->list, &sys->vm_list);
+	}
+out:
+	cevent->skip = 1;
+}
+
 static void __sd_deliver(struct cpg_event *cevent)
 {
 	struct work_deliver *w = &cevent->d;
@@ -822,7 +852,9 @@ static void __sd_deliver(struct cpg_event *cevent)
 		}
 	}
 
-	if (m->state == DM_FIN) {
+	if (m->state == DM_CONT)
+		update_running_vm_state(cevent);
+	else if (m->state == DM_FIN) {
 		switch (m->op) {
 		case SD_MSG_JOIN:
 			update_cluster_info((struct join_message *)m);
@@ -835,6 +867,55 @@ static void __sd_deliver(struct cpg_event *cevent)
 			break;
 		}
 	}
+}
+
+static void send_join_response(struct work_deliver *w)
+{
+	struct message_header *m;
+	struct vm *vm;
+	struct sheepdog_vm_list_entry *e;
+	int i, nr = 2000;
+	char *buf;
+
+	/*
+	 * FIXME: we need to inform the node of the JOIN failure in
+	 * the case of OOM.
+	 */
+	buf = malloc(sizeof(*m) + sizeof(*e) * nr);
+	m = (struct message_header *)buf;
+	e = (struct sheepdog_vm_list_entry *)(buf + sizeof(*m));
+
+	i = 0;
+	m->state = DM_CONT;
+	m->pid = w->msg->pid;
+	m->nodeid = w->msg->nodeid;
+
+	vprintf(SDOG_DEBUG "%u %u\n", m->pid, m->nodeid);
+
+	list_for_each_entry(vm, &sys->vm_list, list) {
+		*e = vm->ent;
+		vprintf(SDOG_DEBUG "%d %s\n", i, e->name);
+		e++;
+		i++;
+
+		if (!(i % nr)) {
+			m->msg_length = sizeof(*m) + i * sizeof(*e);
+			send_message(sys->handle, m);
+			e = (struct sheepdog_vm_list_entry *)(buf + sizeof(*m));
+			i = 0;
+		}
+	}
+
+	if (i) {
+		m->msg_length = sizeof(*m) + i * sizeof(*e);
+		vprintf(SDOG_DEBUG "%d %d\n", i, m->msg_length);
+		send_message(sys->handle, m);
+	}
+
+	m = w->msg;
+	join((struct join_message *)m);
+	m->state = DM_FIN;
+	send_message(sys->handle, m);
 }
 
 static void __sd_deliver_done(struct cpg_event *cevent)
@@ -853,8 +934,7 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 	if (m->state == DM_INIT && is_master()) {
 		switch (m->op) {
 		case SD_MSG_JOIN:
-			m->state = DM_FIN;
-			send_message(sys->handle, m);
+			send_join_response(w);
 			break;
 		case SD_MSG_VDI_OP:
 			m->state = DM_FIN;
@@ -1167,7 +1247,13 @@ static void cpg_event_done(struct work *w, int idx)
 		__sd_confchg_done(cevent);
 		break;
 	case CPG_EVENT_DELIVER:
-		if (cevent->d.msg->state == DM_INIT) {
+		/*
+		 * if we are in the process of the JOIN, we will not
+		 * be suspended. So sd_deliver() links events to
+		 * cpg_event_siblings in order. The events except for
+		 * JOIN with DM_CONT and DM_FIN are skipped.
+		 */
+		if (sys->join_finished && cevent->d.msg->state == DM_INIT) {
 			struct cpg_event *f_cevent;
 
 			list_for_each_entry(f_cevent, &sys->cpg_event_siblings,
