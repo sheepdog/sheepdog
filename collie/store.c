@@ -1218,33 +1218,35 @@ fail:
 out:
 	if (buf)
 		free(buf);
+
+	if (!rw->retry)
+		rw->done++;
 }
 
 static void __start_recovery(struct work *work, int idx);
-static void __start_recovery_done(struct work *work, int idx);
 
-static void recover_one_timer(void *data)
+static void recover_timer(void *data)
 {
 	struct recovery_work *rw = (struct recovery_work *)data;
 	queue_work(dobj_queue, &rw->work);
 }
 
-static void recover_one_done(struct work *work, int idx)
+static void recover_done(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 
 	if (rw->retry) {
 		rw->retry = 0;
 
-		rw->timer.callback = recover_one_timer;
+		rw->timer.callback = recover_timer;
 		rw->timer.data = rw;
 		add_timer(&rw->timer, 2);
 		return;
 	}
 
-	rw->done++;
-
 	if (rw->done < rw->count && list_empty(&recovery_work_list)) {
+		rw->work.fn = recover_one;
+
 		queue_work(dobj_queue, &rw->work);
 		return;
 	}
@@ -1435,54 +1437,6 @@ fail:
 	return;
 }
 
-static void start_recovery_timer(void *data)
-{
-	struct recovery_work *rw = (struct recovery_work *)data;
-	queue_work(dobj_queue, &rw->work);
-}
-
-static void __start_recovery_done(struct work *work, int idx)
-{
-	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-
-	if (rw->retry) {
-		rw->retry = 0;
-
-		rw->timer.callback = start_recovery_timer;
-		rw->timer.data = rw;
-		add_timer(&rw->timer, 1);
-		return;
-	}
-
-	if (rw->count && list_empty(&recovery_work_list)) {
-		rw->work.fn = recover_one;
-		rw->work.done = recover_one_done;
-
-		/* TODO: we should avoid races with qemu I/Os */
-		/* rw->work.attr = WORK_ORDERED; */
-
-		queue_work(dobj_queue, &rw->work);
-		return;
-	}
-
-	dprintf("recovery done, %d\n", rw->epoch);
-	recovering = 0;
-
-	free(rw->buf);
-	free(rw->failed_vdis);
-	free(rw);
-
-	if (!list_empty(&recovery_work_list)) {
-		rw = list_first_entry(&recovery_work_list,
-				      struct recovery_work, rw_siblings);
-
-		list_del(&rw->rw_siblings);
-
-		recovering = 1;
-		queue_work(dobj_queue, &rw->work);
-	}
-}
-
 int start_recovery(uint32_t epoch, unsigned long *failed_vdis, int nr_failed_vdis)
 {
 	struct recovery_work *rw;
@@ -1506,7 +1460,7 @@ int start_recovery(uint32_t epoch, unsigned long *failed_vdis, int nr_failed_vdi
 	}
 
 	rw->work.fn = __start_recovery;
-	rw->work.done = __start_recovery_done;
+	rw->work.done = recover_done;
 
 	if (recovering)
 		list_add_tail(&rw->rw_siblings, &recovery_work_list);
