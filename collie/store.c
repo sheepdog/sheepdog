@@ -1151,7 +1151,7 @@ static void recover_one(struct work *work, int idx)
 		cur_entry[SD_MAX_NODES];
 	int old_nr, cur_nr;
 	uint32_t epoch = rw->epoch;
-	int i, my_idx = -1, copy_idx, cur_idx = -1;
+	int i, my_idx = -1, copy_idx = 0, cur_idx = -1;
 	int is_failed_oid = 0;
 
 	eprintf("%d %d, %16lx\n", rw->done, rw->count, oid);
