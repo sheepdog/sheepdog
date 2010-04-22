@@ -48,12 +48,9 @@ static inline int after(uint32_t seq1, uint32_t seq2)
 	(void) (&_x == &_y);		\
 	_x > _y ? _x : _y; })
 
-#define zalloc(size)			\
-({					\
-	void *ptr = malloc(size);	\
-	if (ptr)			\
-		memset(ptr, 0, size);	\
-	ptr;				\
-})
+static inline void *zalloc(size_t size)
+{
+	return calloc(1, size);
+}
 
 #endif
