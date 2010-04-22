@@ -732,12 +732,6 @@ void store_queue_request(struct work *work, int idx)
 
 	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
 
-	if (list_empty(&sys->sd_node_list)) {
-		/* we haven't got SD_OP_GET_NODE_LIST response yet. */
-		ret = SD_RES_SYSTEM_ERROR;
-		goto out;
-	}
-
 	if (hdr->flags & SD_FLAG_CMD_FORWARD) {
 		ret = check_epoch(req);
 		if (ret != SD_RES_SUCCESS)
