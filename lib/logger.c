@@ -1,20 +1,15 @@
 /*
- * Copyright (C) 2002-2003 Ardis Technolgies <roman@ardistech.com>
+ * Copyright (C) 2009-2010 Nippon Telegraph and Telephone Corporation.
  *
  * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License as
- * published by the Free Software Foundation, version 2 of the
- * License.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
+ * modify it under the terms of the GNU General Public License version
+ * 2 as published by the Free Software Foundation.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
- * 02110-1301 USA
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * This code is based on log.c from Linux target framework (tgt):
+ *   Copyright (C) 2002-2003 Ardis Technolgies <roman@ardistech.com>
  */
 #include <ctype.h>
 #include <fcntl.h>
