@@ -18,144 +18,172 @@ For the latest information about Sheepdog, please visit our website at:
 Requirements
 ------------
 * Three or more x86-64 machines
-* libssl (SSL development libraries)
-* sun java development kit 6 (`dog' program is written by Java to use
-  JGroups)
-* some java libraries
-    - JGroups (toolkit for reliable multicast communication)
-    - commons-daemon
-    - commons-logging
-    - commons-cli
-    - log4j 1.2
+* Corosync cluster engine
 
 Install
 -------
 1. Install x86-64 Linux.
+2. Install and setup corosync.
 
-2. Download KVM source code.
+   If you use Debian Squeeze,
 
-   $ git clone git://git.kernel.org/pub/scm/virt/kvm/qemu-kvm.git
-   $ git checkout -b sheepdog 249cdd0
+   $ aptitude install corosync     # or compile corosync.
+   $ sudo corosync                 # run corosync daemon as root
 
 3. Download Sheepdog codes.
 
-   $ wget http://www.osrg.net/sheepdog/download/sheepdog-2009102101.tar.bz2
-   $ tar jxf sheepdog-2009102101.tar.bz2
-   $ wget http://www.osrg.net/download/sheepdog-kvm-2009102101.patch
+   $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/qemu-kvm
+   $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/sheepdog
 
-4. Apply the patche.
-
-   $ cd qemu-kvm
-   $ patch -p1 < ../sheepdog-kvm-2009102101.patch
-   $ cd ..
-
-5. Build
+4. Build
 
    $ cd qemu-kvm
    $ ./configure
    $ make install
    $ cd ../sheepdog
-   $ ./configure
    $ make install
    $ cd ..
 
 Usage
 -----
 * Setup Sheepdog
-   1. Launch sheep and dog programs on each machines of the cluster.
+   1. Launch sheepdog on each machines of the cluster.
 
-      $ sheep /dir/
-      $ dog
+      $ collie /store_dir
 
       Notes:
-      - The argument of the sheep programs is a directory to store objects.
-        The directory must be on the Btrfs to get tolerance against the
-        failure. If you want to try Sheepdog and allow data loss, you can
-        use ext3 file system with a user_xattr mount option.
-      - Do not launch programs simultaneously. Before you start the next
-        dog or sheep program, make sure that the previous one returns. This
-        problem will be fixed in the future release.
+        /store_dir is a directory to store objects. The directory must
+        be on the filesystem with an xattr support. In case of ext3, you
+        need to add 'user_xattr' to the mount options.
+
+        $ sudo mount -o remount,user_xattr /store_device
 
    2. Make fs
 
       $ shepherd mkfs --copies=3
 
-   3. --copies specifies the number of default data redundancy. In this case,
-
+      --copies specifies the number of default data redundancy. In this case,
       the replicated data is stored on three machines.
 
-* Create a virtual machine image ****
+   3. Check cluster state
+
+      Following list shows that Sheepdog is running on 32 nodes.
+
+      $ shepherd info -t dog
+        Idx	Node id (FNV-1a) - Host:Port
+      ------------------------------------------------
+        0	0308164db75cff7e - 10.68.13.15:7000
+      * 1	03104d8b4315c8e4 - 10.68.13.1:7000
+        2	0ab18c565bc14aea - 10.68.13.3:7000
+        3	0c0d27f0ac395f5d - 10.68.13.16:7000
+        4	127ee4802991f308 - 10.68.13.13:7000
+        5	135ff2beab2a9809 - 10.68.14.5:7000
+        6	17bd6240eab65870 - 10.68.14.4:7000
+        7	1cf35757cbf47d7b - 10.68.13.10:7000
+        8	1df9580b8960a992 - 10.68.13.11:7000
+        9	29307d3fa5a04f78 - 10.68.14.12:7000
+        10	29dcb3474e31d4f3 - 10.68.14.15:7000
+        11	29e089c98dd2a144 - 10.68.14.16:7000
+        12	2a118b7e2738f479 - 10.68.13.4:7000
+        13	3d6aea26ba79d75f - 10.68.13.6:7000
+        14	42f9444ead801767 - 10.68.14.11:7000
+        15	562c6f38283d09fe - 10.68.14.2:7000
+        16	5dd5e540cca1556a - 10.68.14.6:7000
+        17	6c12a5d10f10e291 - 10.68.14.13:7000
+        18	6dae1d955ca72d96 - 10.68.13.7:7000
+        19	711db0f5fa40b412 - 10.68.14.14:7000
+        20	7c6b95212ee7c085 - 10.68.14.9:7000
+        21	7d010c31bf11df73 - 10.68.13.2:7000
+        22	82c43e908b1f3f01 - 10.68.13.12:7000
+        23	931d2de0aaf61cf5 - 10.68.13.8:7000
+        24	961d9d391e6021e7 - 10.68.13.14:7000
+        25	9a3ef6fa1081026c - 10.68.13.9:7000
+        26	b0b3d300fed8bc26 - 10.68.14.10:7000
+        27	b0f08fb98c8f5edc - 10.68.14.8:7000
+        28	b9cc316dc5aba880 - 10.68.13.5:7000
+        29	d9eda1ec29c2eeeb - 10.68.14.7:7000
+        30	e53cebb2617c86fd - 10.68.14.1:7000
+        31	ea46913c4999ccdf - 10.68.14.3:7000
+
+* Create a virtual machine image
    1. Create a 256 GB virtual machine image of Alice.
 
-      $ kvm-img create -f sheepdog "Alice's Disk" 256G
+      $ qemu-img create -f sheepdog Alice 256G
 
    2. You can also convert from existing KVM images to Sheepdog ones.
 
-      $ kvm-img convert -f raw -O sheepdog ~/amd64.raw "Bob's Disk"
+      $ qemu-img convert -f raw -O sheepdog ~/amd64.raw Bob
 
    3. See Sheepdog images by the following command.
 
       $ shepherd info -t vdi
-         40000 : Alice's Disk  256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:17:18, tag:        0, current
-         80000 : Bob's Disk    256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:29:20, tag:        0, current
+        name        id    size    used  shared    creation time  object id
+      --------------------------------------------------------------------
+        Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
+        Alice        0  256 GB  0.0 MB  0.0 MB 2010-03-23 16:16      40000
 
 * Boot the virtual machine
    1. Boot the virtual machine.
 
-      $ kvm --drive format=sheepdog,file="Alice's Disk"
+      $ qemu-system-x86_64 --drive format=sheepdog,file=Alice
 
    2. Following command checks used images.
 
       $ shepherd info -t vm
       Name            |Vdi size |Allocated| Shared  | Status
       ----------------+---------+---------+---------+------------
-      Alice's Disk    |   256 GB|     0 MB|     0 MB| running on xx.xx.xx.xx
-      Bob's Disk      |   256 GB|     0 MB|     0 MB| not running
+      Bob             |   2.0 GB|   1.6 GB|   0.0 MB| running on xx.xx.xx.xx
+      Alice           |   256 GB|   0.0 MB|   0.0 MB| not running
 
 * Snapshot
    1. Snapshot
 
-      $ kvm-img snapshot -c name sheepdog:"Alice's Disk"
+      $ qemu-img snapshot -c name sheepdog:Alice
 
       -c flag is meaningless currently
 
-   3. You can boot from the snapshot image by spcifing tag id
-
-      $ kvm --drive format=sheepdog,file="Alice's Disk":0
-
-   4. After getting snapshot, a new virtual machine images are added as a not-
+   2. After getting snapshot, a new virtual machine images are added as a not-
       current image.
 
       $ shepherd info -t vdi
-         40000 : Alice's Disk  256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:17:18, tag:        0, not current
-         80000 : Bob's Disk    256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:29:20, tag:        0, current
-         c0000 : Alice's Disk  256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:37:31, tag: 4ad6cc8b, current
+        name        id    size    used  shared    creation time  object id
+      --------------------------------------------------------------------
+        Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
+        Alice        0  256 GB  0.0 MB  0.0 MB 2010-03-23 16:21      c0000
+      s Alice        1  256 GB  0.0 MB  0.0 MB 2010-03-23 16:16      40000
+
+   3. You can boot from the snapshot image by spcifing tag id
+
+      $ qemu-system-x86_64 --drive format=sheepdog,file=Alice:1
 
 * Cloning from the snapshot
    1. Create a Charlie image as a clone of Alice's image.
 
-      $ kvm-img create -b sheepdog:"Alice's Disk":0 -f sheepdog "Charlie's Disk"
+      $ qemu-img create -b sheepdog:Alice:1 -f sheepdog Charlie
 
    2. Charlie's image is added to the virtual machine list.
 
       $ shepherd info -t vdi
-         40000 : Alice's Disk   256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:17:18, tag:        0, not current
-         80000 : Bob's Disk     256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:29:20, tag:        0, current
-         c0000 : Alice's Disk   256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:37:31, tag: 4ad6cc8b, current
-        100000 : Charlie's Disk 256 GB (allocated: 0 MB, shared: 0 MB), 2009-10-15 16:47:46, tag:        0, current
+        name        id    size    used  shared    creation time  object id
+      --------------------------------------------------------------------
+        Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
+        Alice        0  256 GB  0.0 MB  0.0 MB 2010-03-23 16:21      c0000
+      s Alice        1  256 GB  0.0 MB  0.0 MB 2010-03-23 16:16      40000
+        Charlie      0  256 GB  0.0 MB  0.0 MB 2010-03-23 16:23     100000
 
    3. To check parent-child relationship of the images, use tree format output.
 
       $ shepherd info -t vdi -f tree
-      Alice's Disk---[09-10-16 10:02:31]-+-[09-10-19 09:42:21]---(You Are Here)
-                                         `-[09-10-18 20:53:47]---[09-10-18 23:11:42]
-      Bob's Disk---[09-10-15 16:29:20]-+-[09-10-18 20:51:13]
-                                       `-(You Are Here)
-      Charlie's Disk---(You Are Here)
+      Bob---[09-10-15 16:29]-+-[09-10-18 20:51]
+                             `-(You Are Here)
+      Alice---[09-10-16 10:02]-+-[09-10-19 09:42]---(You Are Here)
+                               `-[09-10-18 20:53]---[09-10-18 23:11]
+      Charlie---(You Are Here)
 
 Test Environment
 ----------------
+    - Debian squeeze amd64
     - Debian lenny amd64
 
 ===============================================================================
-Copyright (C) 2009, Nippon Telegraph and Telephone Corporation.
+Copyright (C) 2009-2010, Nippon Telegraph and Telephone Corporation.
