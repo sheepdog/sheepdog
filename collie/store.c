@@ -86,6 +86,63 @@ static int is_obj_in_range(uint64_t oid, uint64_t start, uint64_t end)
 		return (start < hval || hval <= end);
 }
 
+static int verify_object(int fd, char *buf, size_t len, int set_chksum)
+{
+	int ret;
+	uint64_t checksum;
+	struct stat s;
+	char *p = NULL;
+
+	if (!buf) {
+		ret = fstat(fd, &s);
+		if (ret < 0) {
+			eprintf("failed to get file size, %m\n");
+			goto err;
+		}
+		len = s.st_size;
+
+		p = malloc(len);
+		if (!p) {
+			eprintf("out of memory\n");
+			goto err;
+		}
+		buf = p;
+
+		ret = pread64(fd, buf, len, 0);
+		if (ret < 0) {
+			eprintf("failed to read file, %m\n");
+			goto err;
+		}
+	}
+
+	if (set_chksum) {
+		checksum = fnv_64a_buf(buf, len, FNV1A_64_INIT);
+		ret = fsetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum), 0);
+		if (ret < 0) {
+			eprintf("failed to set xattr, %m\n");
+			goto err;
+		}
+	} else {
+		ret = fgetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum));
+		if (ret != sizeof(checksum)) {
+			eprintf("failed to read checksum, %m\n");
+			goto err;
+		}
+
+		if (checksum != fnv_64a_buf(buf, len, FNV1A_64_INIT)) {
+			eprintf("invalid checksum, %lx, %lx\n", checksum,
+				fnv_64a_buf(buf, len, FNV1A_64_INIT));
+			goto err;
+		}
+	}
+
+	free(p);
+	return 0;
+err:
+	free(p);
+	return -1;
+}
+
 static int get_obj_list(struct request *req, char *buf, int buf_len)
 {
 	DIR *dir;
@@ -105,7 +162,6 @@ static int get_obj_list(struct request *req, char *buf, int buf_len)
 	int e_nr;
 	int idx;
 	int res = SD_RES_SUCCESS;
-	uint64_t checksum = 0;
 	int ret;
 
 	if (epoch == 1)
@@ -121,20 +177,14 @@ static int get_obj_list(struct request *req, char *buf, int buf_len)
 	}
 	obj_nr = read(fd, buf, buf_len);
 
-	ret = fgetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum));
-	if (ret != sizeof(checksum)) {
-		eprintf("failed to read checksum %s, %m\n", path);
+	ret = verify_object(fd, buf, obj_nr, 0);
+	if (ret < 0) {
+		eprintf("verification failed, %s, %m\n", path);
 		close(fd);
 		res = SD_RES_EIO;
 		goto out;
 	}
-	if (checksum != fnv_64a_buf(buf, obj_nr, FNV1A_64_INIT)) {
-		eprintf("invalid checksum %s, %m\n", path);
-		close(fd);
-		res = SD_RES_EIO;
-		goto out;
-	}
-	dprintf("read objct list from %s, %d, %lx\n", path, obj_nr, checksum);
+	dprintf("read objct list from %s, %d\n", path, obj_nr);
 
 	obj_nr /= sizeof(uint64_t);
 	objlist = (uint64_t *)buf;
@@ -675,20 +725,49 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		}
 
 		ret = pread64(fd, req->data, hdr->data_length, hdr->offset);
-		if (ret < 0)
+		if (ret < 0) {
 			ret = SD_RES_EIO;
-		else {
-			rsp->data_length = ret;
-			rsp->copies = copies;
-			ret = SD_RES_SUCCESS;
+			goto out;
 		}
+
+		rsp->data_length = ret;
+		rsp->copies = copies;
+
+		if (!is_data_obj(oid)) {
+			ret = verify_object(fd, NULL, 0, 0);
+			if (ret < 0) {
+				eprintf("verification failed, %lx\n", oid);
+				ret = SD_RES_EIO;
+				goto out;
+			}
+		}
+
+		ret = SD_RES_SUCCESS;
 		break;
-	case SD_OP_CREATE_AND_WRITE_OBJ:
 	case SD_OP_WRITE_OBJ:
+		if (!is_data_obj(oid)) {
+			ret = verify_object(fd, NULL, 0, 0);
+			if (ret < 0) {
+				eprintf("verification failed, %lx\n", oid);
+				ret = SD_RES_EIO;
+				goto out;
+			}
+		}
+		/* fall through */
+	case SD_OP_CREATE_AND_WRITE_OBJ:
 		ret = pwrite64(fd, req->data, hdr->data_length, hdr->offset);
 		if (ret != hdr->data_length) {
 			ret = SD_RES_EIO;
 			goto out;
+		}
+
+		if (!is_data_obj(oid)) {
+			ret = verify_object(fd, NULL, 0, 1);
+			if (ret < 0) {
+				eprintf("failed to set checksum, %lx\n", oid);
+				ret = SD_RES_EIO;
+				goto out;
+			}
 		}
 
 		ret = SD_RES_SUCCESS;
@@ -1361,7 +1440,6 @@ static void __start_recovery(struct work *work, int idx)
 	int i, fd;
 	uint64_t start_hash, end_hash;
 	char path[PATH_MAX];
-	uint64_t checksum;
 	int ret;
 
 	dprintf("%u\n", epoch);
@@ -1413,10 +1491,9 @@ static void __start_recovery(struct work *work, int idx)
 	write(fd, rw->buf, sizeof(uint64_t) * rw->count);
 	fsync(fd);
 
-	checksum = fnv_64a_buf(rw->buf, sizeof(uint64_t) * rw->count, FNV1A_64_INIT);
-	ret = fsetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum), 0);
-	if (ret) {
-		eprintf("couldn't set xattr to %s, %m\n", path);
+	ret = verify_object(fd, rw->buf, sizeof(uint64_t) * rw->count, 1);
+	if (ret < 0) {
+		eprintf("failed to set check sum, %s, %m\n", path);
 		close(fd);
 		goto fail;
 	}
