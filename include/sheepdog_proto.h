@@ -211,8 +211,9 @@ struct sd_list_rsp {
 	uint32_t        id;
 	uint32_t        data_length;
 	uint32_t        result;
+	uint32_t        rsvd;
 	uint64_t        next;
-	uint32_t        pad[5];
+	uint32_t        pad[4];
 };
 
 struct sd_vdi_req {
