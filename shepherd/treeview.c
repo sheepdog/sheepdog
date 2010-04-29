@@ -24,8 +24,8 @@
 struct vdi_tree {
 	char name[1024];
 	char label[256];
-	uint64_t oid;
-	uint64_t poid;
+	uint32_t vid;
+	uint32_t pvid;
 	int highlight;
 	struct list_head children;
 	struct list_head siblings;
@@ -34,16 +34,16 @@ struct vdi_tree {
 static int *width, *more;
 static struct vdi_tree *root;
 
-static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint64_t oid,
+static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint32_t vid,
 				 const char *name)
 {
 	struct vdi_tree *vdi, *ret;
 
 	list_for_each_entry(vdi, &parent->children, siblings) {
-		if (vdi->oid == oid && !strcmp(vdi->name, name))
+		if (vdi->vid == vid && !strcmp(vdi->name, name))
 			return vdi;
 
-		ret = find_vdi(vdi, oid, name);
+		ret = find_vdi(vdi, vid, name);
 		if (ret)
 			return ret;
 	}
@@ -51,7 +51,7 @@ static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint64_t oid,
 }
 
 static struct vdi_tree *new_vdi(const char *name, const char *label,
-		uint64_t oid, uint64_t poid, int highlight)
+				uint64_t vid, uint64_t pvid, int highlight)
 {
 	struct vdi_tree *vdi;
 
@@ -62,8 +62,8 @@ static struct vdi_tree *new_vdi(const char *name, const char *label,
 	}
 	strcpy(vdi->name, name);
 	strcpy(vdi->label, label);
-	vdi->oid = oid;
-	vdi->poid = poid;
+	vdi->vid = vid;
+	vdi->pvid = pvid;
 	vdi->highlight = highlight;
 	INIT_LIST_HEAD(&vdi->children);
 	return vdi;
@@ -74,16 +74,16 @@ void init_tree(void)
 	root = new_vdi("", "", 0, 0, 0);
 }
 
-void add_vdi_tree(const char *name, const char *label, uint64_t oid,
-		uint64_t poid, int highlight)
+void add_vdi_tree(const char *name, const char *label, uint32_t vid,
+		  uint32_t pvid, int highlight)
 {
 	struct vdi_tree *vdi, *parent;
 
-	vdi = new_vdi(name, label, oid, poid, highlight);
+	vdi = new_vdi(name, label, vid, pvid, highlight);
 	if (!vdi)
 		return;
 
-	parent = find_vdi(root, poid, name);
+	parent = find_vdi(root, pvid, name);
 	if (!parent)
 		parent = root;
 
@@ -95,7 +95,7 @@ static void compaction(struct vdi_tree *parent)
 	struct vdi_tree *vdi, *e, *new_parent;
 
 	list_for_each_entry_safe(vdi, e, &parent->children, siblings) {
-		new_parent = find_vdi(root, vdi->poid, vdi->name);
+		new_parent = find_vdi(root, vdi->pvid, vdi->name);
 		if (new_parent && parent != new_parent) {
 			list_del(&vdi->siblings);
 			list_add_tail(&vdi->siblings, &new_parent->children);

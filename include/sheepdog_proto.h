@@ -222,11 +222,11 @@ struct sd_vdi_req {
 	uint32_t	epoch;
 	uint32_t        id;
 	uint32_t        data_length;
-	uint64_t        base_oid;
 	uint64_t	vdi_size;
+	uint32_t        base_vdi_id;
 	uint32_t	copies;
 	uint32_t        snapid;
-	uint32_t        pad[2];
+	uint32_t        pad[3];
 };
 
 struct sd_vdi_rsp {
@@ -238,9 +238,9 @@ struct sd_vdi_rsp {
 	uint32_t        data_length;
 	uint32_t        result;
 	uint32_t        rsvd;
-	uint64_t        oid;
+	uint32_t        vdi_id;
 	uint32_t	vdi_epoch;
-	uint32_t        pad[3];
+	uint32_t        pad[4];
 };
 
 struct sd_node_req {

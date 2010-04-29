@@ -85,7 +85,7 @@ struct work_confchg {
 	struct cpg_address *joined_list;
 	size_t joined_list_entries;
 
-	unsigned long *failed_vdis;
+	uint32_t *failed_vdis;
 	int nr_failed_vdis;
 	int first_cpg_node;
 	int sd_node_left;
@@ -634,12 +634,12 @@ static void vdi_op(struct vdi_op_message *msg)
 	struct sd_vdi_rsp *rsp = &msg->rsp;
 	void *data = msg->data;
 	int ret = SD_RES_SUCCESS;
-	uint64_t oid = 0;
+	uint32_t vid = 0;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
-		ret = add_vdi(data, hdr->data_length, hdr->vdi_size, &oid,
-			      hdr->base_oid, hdr->copies,
+		ret = add_vdi(data, hdr->data_length, hdr->vdi_size, &vid,
+			      hdr->base_vdi_id, hdr->copies,
 			      hdr->snapid);
 		break;
 	case SD_OP_DEL_VDI:
@@ -651,7 +651,7 @@ static void vdi_op(struct vdi_op_message *msg)
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
-		ret = lookup_vdi(data, hdr->data_length, &oid, hdr->snapid);
+		ret = lookup_vdi(data, hdr->data_length, &vid, hdr->snapid);
 		if (ret != SD_RES_SUCCESS)
 			break;
 		break;
@@ -668,7 +668,7 @@ static void vdi_op(struct vdi_op_message *msg)
 		break;
 	}
 
-	rsp->oid = oid;
+	rsp->vdi_id = vid;
 	rsp->result = ret;
 }
 
@@ -690,8 +690,8 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
 	{
-		unsigned long nr = (rsp->oid & ~VDI_BIT) >> VDI_SPACE_SHIFT;
-		vprintf(SDOG_INFO "done %d %ld %" PRIx64 "\n", ret, nr, rsp->oid);
+		unsigned long nr = rsp->vdi_id;
+		vprintf(SDOG_INFO "done %d %ld\n", ret, nr);
 		set_bit(nr, sys->vdi_inuse);
 		break;
 	}
@@ -728,7 +728,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	case SD_OP_GET_VDI_INFO:
 		break;
 	case SD_OP_MAKE_FS:
-		sys->nr_sobjs = ((struct sd_vdi_req *)hdr)->copies;
+		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
 
 		ctime = ((struct sd_so_req *)hdr)->ctime;
 		set_cluster_ctime(ctime);
@@ -1028,7 +1028,7 @@ static void del_node(struct cpg_address *addr, struct work_confchg *w)
 		struct sheepdog_node_list_entry e[SD_MAX_NODES];
 		struct vm *vm, *n;
 		int ret, size;
-		uint64_t oid;
+		uint32_t vid;
 		void *buf;
 
 		w->sd_node_left++;
@@ -1053,9 +1053,9 @@ static void del_node(struct cpg_address *addr, struct work_confchg *w)
 			}
 
 			ret = lookup_vdi((char *)vm->ent.name,
-					 sizeof(vm->ent.name), &oid, 0);
+					 sizeof(vm->ent.name), &vid, 0);
 			if (ret == SD_RES_SUCCESS)
-				w->failed_vdis[w->nr_failed_vdis++] = oid_to_bit(oid);
+				w->failed_vdis[w->nr_failed_vdis++] = vid;
 			else
 				eprintf("cannot find vdi %s\n", vm->ent.name);
 

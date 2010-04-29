@@ -316,7 +316,7 @@ static int debug(char *op, char *arg)
 	char name[128];
 	unsigned rlen, wlen;
 	unsigned opcode, flags;
-	uint64_t oid = 0;
+	uint32_t vid = 0;
 	char vdiname[SD_MAX_VDI_LEN];
 
 	if (!op)
@@ -360,8 +360,8 @@ static int debug(char *op, char *arg)
 		if (!arg)
 			return 1;
 		rlen = 0;
-		oid = strtoul(arg, NULL, 10);
-		if (oid == 0) {
+		vid = strtoul(arg, NULL, 10);
+		if (vid == 0) {
 			wlen = strlen(arg) + 1;
 			opcode = SD_OP_GET_VDI_INFO;
 			flags = SD_FLAG_CMD_WRITE;
@@ -393,8 +393,8 @@ static int debug(char *op, char *arg)
 	hdr.data_length = wlen;
 	hdr.flags = flags;
 	hdr.epoch = node_list_version;
-	if (oid > 0) {
-		((struct sd_vdi_req *)&hdr)->base_oid = oid;
+	if (vid > 0) {
+		((struct sd_vdi_req *)&hdr)->base_vdi_id = vid;
 	}
 
 	ret = exec_req(fd, &hdr, arg, &wlen, &rlen);
@@ -425,8 +425,8 @@ static int debug(char *op, char *arg)
 
 	if (!strcasecmp(op, "vdi_info")) {
 		struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
-		printf("name = %s, oid = %"PRIu64", epoch = %d\n",
-		       arg, vdi_rsp->oid, vdi_rsp->vdi_epoch);
+		printf("name = %s, vid = %"PRIu32", epoch = %d\n",
+		       arg, vdi_rsp->vdi_id, vdi_rsp->vdi_epoch);
 	}
 	return ret;
 }
@@ -473,7 +473,7 @@ static int shutdown_sheepdog(void)
 
 #define DIR_BUF_LEN (UINT64_C(1) << 20)
 
-typedef void (*vdi_parser_func_t)(uint64_t oid, char *name, uint32_t tag, uint32_t flags,
+typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, uint32_t tag, uint32_t flags,
 				  struct sheepdog_inode *i, void *data);
 
 
@@ -509,14 +509,15 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 			continue;
 
 		ret = read_object(node_list_entries, nr_nodes, node_list_version,
-				  bit_to_oid(nr), (void *)&i, sizeof(i), 0, nr_nodes);
+				  vid_to_vdi_oid(nr), (void *)&i,
+				  sizeof(i), 0, nr_nodes);
 
 		if (ret == sizeof(i)) {
 			if (i.name[0] == '\0') /* deleted */
 				continue;
-			func(i.oid, i.name, i.snap_id, 0, &i, data);
+			func(i.vdi_id, i.name, i.snap_id, 0, &i, data);
 		} else
-			printf("error %lu %" PRIx64 ", %d\n", nr, bit_to_oid(nr), ret);
+			printf("error %lu, %d\n", nr, ret);
 
 	}
 
@@ -529,7 +530,7 @@ struct graph_info {
 	int highlight;
 };
 
-static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
+static void print_graph_tree(uint32_t vid, char *name, uint32_t tag,
 			     uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	struct graph_info *info = (struct graph_info *)data;
@@ -543,7 +544,7 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 		return;
 
 	if (info->root < 0)
-		info->root = i->parent_oid;
+		info->root = vid_to_vdi_oid(i->parent_vdi_id);
 
 	ti = i->ctime >> 32;
 	localtime_r(&ti, &tm);
@@ -552,12 +553,12 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 	strftime(time, sizeof(time), "%H:%M:%S", &tm);
 	size_to_str(i->vdi_size, size_str, sizeof(size_str));
 
-	printf("  \"%" PRIu64 "\" [shape = \"box\","
+	printf("  \"%" PRIu32 "\" [shape = \"box\","
 	       "fontname = \"Courier\","
 	       "fontsize = \"12\","
 	       "group = \"%s\","
 	       "label = \"",
-	       oid, name);
+	       vid, name);
 	printf("name: %8s\\n"
 	       "tag : %8x\\n"
 	       "size: %8s\\n"
@@ -570,7 +571,7 @@ static void print_graph_tree(uint64_t oid, char *name, uint32_t tag,
 	else
 		printf("\"];\n");
 
-	printf("  \"%" PRIu64 "\" -> \"%" PRIu64 "\";\n", i->parent_oid, oid);
+	printf("  \"%" PRIu32 "\" -> \"%" PRIu32 "\";\n", i->parent_vdi_id, vid);
 }
 
 static int graphview_vdi(char *vdiname, int highlight)
@@ -603,7 +604,7 @@ struct tree_info {
 	char *name;
 };
 
-static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
+static void print_vdi_tree(uint32_t vid, char *name, uint32_t tag,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	struct tree_info *info = (struct tree_info *)data;
@@ -624,7 +625,7 @@ static void print_vdi_tree(uint64_t oid, char *name, uint32_t tag,
 			 "[%y-%m-%d %H:%M]", &tm);
 	}
 
-	add_vdi_tree(name, buf, oid, i->parent_oid,
+	add_vdi_tree(name, buf, vid, i->parent_vdi_id,
 		     info->highlight && is_current(i));
 }
 
@@ -644,7 +645,7 @@ static int treeview_vdi(char *vdiname, int highlight)
 	return 0;
 }
 
-static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
+static void print_vdi_list(uint32_t vid, char *name, uint32_t tag,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	int idx;
@@ -663,7 +664,7 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 	my_objs = 0;
 	cow_objs = 0;
 	for (idx = 0; idx < MAX_DATA_OBJS; idx++) {
-		if (!i->data_oid[idx])
+		if (!i->data_vdi_id[idx])
 			continue;
 		if (is_data_obj_writeable(i, idx))
 			my_objs++;
@@ -676,9 +677,9 @@ static void print_vdi_list(uint64_t oid, char *name, uint32_t tag,
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 
 	if (!data || strcmp(name, data) == 0) {
-		printf("%c %-8s %5d %7s %7s %7s %s  %9" PRIx64 "\n",
+		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
 		       is_current(i) ? ' ' : 's', name, tag,
-		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, oid);
+		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
 	}
 }
 
@@ -688,7 +689,7 @@ struct vm_list_info {
 	int highlight;
 };
 
-static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
+static void print_vm_list(uint32_t vid, char *name, uint32_t tag,
 			  uint32_t flags, struct sheepdog_inode *inode, void *data)
 {
 	int i, j;
@@ -707,7 +708,7 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 	my_objs = 0;
 	cow_objs = 0;
 	for (j = 0; j < MAX_DATA_OBJS; j++) {
-		if (!inode->data_oid[j])
+		if (!inode->data_vdi_id[j])
 			continue;
 		if (is_data_obj_writeable(inode, j))
 			my_objs++;
@@ -737,8 +738,8 @@ static void print_vm_list(uint64_t oid, char *name, uint32_t tag,
 		       vdi_size_str, my_objs_str, cow_objs_str);
 }
 
-static void cal_total_vdi_size(uint64_t oid, char *name, uint32_t tag,
-			   uint32_t flags, struct sheepdog_inode *i, void *data)
+static void cal_total_vdi_size(uint32_t vid, char *name, uint32_t tag,
+			       uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	uint64_t *size = data;
 
@@ -746,15 +747,15 @@ static void cal_total_vdi_size(uint64_t oid, char *name, uint32_t tag,
 		*size += i->vdi_size;
 }
 
-struct get_oid_info {
+struct get_vid_info {
 	char *name;
-	uint64_t oid;
+	uint32_t vid;
 };
 
-static void get_oid(uint64_t oid, char *name, uint32_t tag,
+static void get_oid(uint32_t vid, char *name, uint32_t tag,
 		    uint32_t flags, struct sheepdog_inode *i, void *data)
 {
-	struct get_oid_info *info = data;
+	struct get_vid_info *info = data;
 	char *p;
 
 	if (info->name) {
@@ -763,10 +764,10 @@ static void get_oid(uint64_t oid, char *name, uint32_t tag,
 		if (p) {
 			if (!strncmp(name, info->name, p - info->name) &&
 			    tag == strtoul(p + 1, NULL, 16))
-				info->oid = oid;
+				info->vid = vid;
 		} else {
 			if (!strcmp(name, info->name))
-				info->oid = oid;
+				info->vid = vid;
 		}
 	}
 }
@@ -813,7 +814,7 @@ static void get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 		if (info->success)
 			break;
 		info->success = 1;
-		info->data_oid = inode->data_oid[info->idx];
+		info->data_oid = vid_to_data_oid(inode->data_vdi_id[info->idx], info->idx);
 		break;
 	case SD_RES_NO_OBJ:
 		break;
@@ -876,24 +877,24 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 static void print_obj(char *vdiname, unsigned index)
 {
 	int ret;
-	struct get_oid_info info;
-	uint64_t oid;
+	struct get_vid_info info;
+	uint32_t vid;
 
 	info.name = vdiname;
-	info.oid = 0;
+	info.vid = 0;
 
 	ret = parse_vdi(get_oid, &info);
 
-	oid = info.oid;
-	if (oid == 0) {
+	vid = info.vid;
+	if (vid == 0) {
 		printf("No such vdi\n");
 		return;
 	}
 
 	if (index == ~0) {
-		printf("Looking for the inode object 0x%" PRIx64 " with %d nodes\n\n",
-		       oid, nr_nodes);
-		parse_objs(oid, do_print_obj, NULL);
+		printf("Looking for the inode object 0x%" PRIx32 " with %d nodes\n\n",
+		       vid, nr_nodes);
+		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL);
 	} else {
 		struct get_data_oid_info info;
 
@@ -905,20 +906,20 @@ static void print_obj(char *vdiname, unsigned index)
 			exit(1);
 		}
 
-		parse_objs(oid, get_data_oid, &info);
+		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &info);
 
 		if (info.success) {
 			if (info.data_oid) {
 				printf("Looking for the object 0x%" PRIx64
-				       " (the inode oid 0x%" PRIx64 " index %u) with %d nodes\n\n",
-				       info.data_oid, oid, index, nr_nodes);
+				       " (the inode vid 0x%" PRIx32 " index %u) with %d nodes\n\n",
+				       info.data_oid, vid, index, nr_nodes);
 
 				parse_objs(info.data_oid, do_print_obj, NULL);
 			} else
-				printf("The inode object 0x%" PRIx64 " index %u is not allocated\n",
-				       oid, index);
+				printf("The inode object 0x%" PRIx32 " index %u is not allocated\n",
+				       vid, index);
 		} else
-			printf("failed to read the inode object 0x%" PRIx64 "\n", oid);
+			printf("failed to read the inode object 0x%" PRIx32 "\n", vid);
 	}
 }
 
@@ -947,8 +948,8 @@ rerun:
 	case INFO_VDI:
 		switch (format) {
 		case FORMAT_LIST:
-			printf("  name        id    size    used  shared    creation time  object id\n");
-			printf("--------------------------------------------------------------------\n");
+			printf("  name        id    size    used  shared    creation time   vdi id\n");
+			printf("------------------------------------------------------------------\n");
 			ret = parse_vdi(print_vdi_list, name);
 			break;
 		case FORMAT_TREE:

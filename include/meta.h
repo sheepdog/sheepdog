@@ -23,13 +23,14 @@
  *  0 - 19 (20 bits): data object space
  * 20 - 31 (12 bits): reserved data object space
  * 32 - 55 (24 bits): vdi object space
- * 56 - 62 (17 bits): reserved vdi object space
- * 63 - 63 ( 1 bit ): set if vdi
+ * 56 - 59 ( 4 bits): reserved vdi object space
+ * 60 - 63 ( 4 bit ): object type indentifier space
  */
 
 #define VDI_SPACE   24
 #define VDI_SPACE_SHIFT   32
 #define VDI_BIT (UINT64_C(1) << 63)
+#define VMSTATE_BIT (UINT64_C(1) << 62)
 #define DEAFAULT_NR_COPIES 1
 #define MAX_DATA_OBJS (1ULL << 20)
 #define MAX_CHILDREN 1024
@@ -38,7 +39,6 @@
 
 struct sheepdog_inode {
 	char name[SD_MAX_VDI_LEN];
-	uint64_t oid;
 	uint64_t ctime;
 	uint64_t snap_ctime;
 	uint64_t vm_clock_nsec;
@@ -48,15 +48,15 @@ struct sheepdog_inode {
 	uint8_t  nr_copies;
 	uint8_t  block_size_shift;
 	uint32_t snap_id;
-	uint64_t parent_oid;
-	uint64_t child_oid[MAX_CHILDREN];
-	uint64_t data_oid[MAX_DATA_OBJS];
+	uint32_t vdi_id;
+	uint32_t parent_vdi_id;
+	uint32_t child_vdi_id[MAX_CHILDREN];
+	uint32_t data_vdi_id[MAX_DATA_OBJS];
 };
 
 static inline int is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
 {
-	return ((inode->oid & ~VDI_BIT) >> VDI_SPACE_SHIFT) ==
-		(inode->data_oid[idx] >> VDI_SPACE_SHIFT);
+	return inode->vdi_id == inode->data_vdi_id[idx];
 }
 
 static inline int is_data_obj(uint64_t oid)
@@ -64,16 +64,21 @@ static inline int is_data_obj(uint64_t oid)
 	return !(VDI_BIT & oid);
 }
 
+static inline uint64_t vid_to_vdi_oid(uint32_t vid)
+{
+	return VDI_BIT | ((uint64_t)vid << VDI_SPACE_SHIFT);
+}
+
+static inline uint64_t vid_to_data_oid(uint32_t vid, uint32_t idx)
+{
+	return ((uint64_t)vid << VDI_SPACE_SHIFT) | idx;
+}
+
+static inline uint32_t oid_to_vid(uint64_t oid)
+{
+	return (~VDI_BIT & oid) >> VDI_SPACE_SHIFT;
+}
+
 #define NR_VDIS (1U << DATA_SPECE_SHIFT)
-
-static inline uint64_t bit_to_oid(unsigned long nr)
-{
-	return ((unsigned long long)nr << VDI_SPACE_SHIFT) | VDI_BIT;
-}
-
-static inline unsigned long oid_to_bit(uint64_t oid)
-{
-	return (oid & ~VDI_BIT) >> VDI_SPACE_SHIFT;
-}
 
 #endif

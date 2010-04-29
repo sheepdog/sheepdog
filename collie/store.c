@@ -1254,7 +1254,7 @@ static void recover_one(struct work *work, int idx)
 	cur_idx = obj_to_sheep(cur_entry, cur_nr, oid, 0);
 
 	for (i = 0; i < rw->nr_failed_vdis; i++) {
-		if (rw->failed_vdis[i] == oid_to_bit(oid))
+		if (rw->failed_vdis[i] == oid_to_vid(oid))
 			is_failed_oid = 1;
 	}
 
@@ -1506,7 +1506,7 @@ fail:
 	return;
 }
 
-int start_recovery(uint32_t epoch, unsigned long *failed_vdis, int nr_failed_vdis)
+int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis)
 {
 	struct recovery_work *rw;
 
@@ -1677,10 +1677,9 @@ static int init_epoch_path(char *base_path)
 		if (is_data_obj(oid))
 			continue;
 
-		vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 " %lu\n",
-			oid, oid_to_bit(oid));
+		vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 "\n", oid);
 
-		set_bit(oid_to_bit(oid), sys->vdi_inuse);
+		set_bit(oid_to_vid(oid), sys->vdi_inuse);
 	}
 	closedir(dir);
 
