@@ -78,7 +78,7 @@ struct cluster_info {
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	int nr_sobjs;
+	uint32_t nr_sobjs;
 
 	struct list_head cpg_event_siblings;
 	struct cpg_event *cur_cevent;

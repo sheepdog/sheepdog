@@ -1099,6 +1099,7 @@ static void __sd_confchg(struct cpg_event *cevent)
 	    w->joined_list_entries - w->left_list_entries &&
 	    is_my_cpg_addr(w->member_list)) {
 		sys->join_finished = 1;
+		get_global_nr_copies(&sys->nr_sobjs);
 		w->first_cpg_node = 1;
 	}
 
