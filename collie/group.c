@@ -406,7 +406,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to read epoch, %x\n", ret);
-		return SD_STATUS_STARTUP;
+		return SD_STATUS_WAIT_FOR_FORMAT;
 	}
 
 	if (epoch != get_latest_epoch())
@@ -427,7 +427,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 
 	nr_entries = get_ordered_sd_node_list(entries);
 	if (nr_entries + 1 != nr_local_entries)
-		return SD_STATUS_STARTUP;
+		return SD_STATUS_WAIT_FOR_JOIN;
 
 	for (i = 0; i < nr_local_entries; i++) {
 		if (local_entries[i].id == node->id)
@@ -436,7 +436,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 			if (local_entries[i].id == entries[j].id)
 				goto next;
 		}
-		return SD_STATUS_STARTUP;
+		return SD_STATUS_WAIT_FOR_JOIN;
 	next:
 		;
 	}
@@ -465,7 +465,7 @@ static void join(struct join_message *msg)
 		msg->nr_nodes++;
 	}
 
-	if (sys->status == SD_STATUS_STARTUP)
+	if (sys->status == SD_STATUS_WAIT_FOR_JOIN)
 		msg->cluster_status = get_cluster_status(&msg->header.from);
 	else
 		msg->cluster_status = sys->status;
@@ -568,7 +568,7 @@ static void update_cluster_info(struct join_message *msg)
 
 	sys->join_finished = 1;
 
-	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK) {
+	if (sys->status == SD_STATUS_WAIT_FOR_JOIN && msg->cluster_status == SD_STATUS_OK) {
 		if (msg->epoch > 0) {
 			sys->epoch = msg->epoch;
 			sys->status = SD_STATUS_OK;
@@ -612,7 +612,7 @@ out:
 
 	print_node_list(&sys->sd_node_list);
 
-	if (sys->status == SD_STATUS_STARTUP && msg->cluster_status == SD_STATUS_OK) {
+	if (sys->status == SD_STATUS_WAIT_FOR_JOIN && msg->cluster_status == SD_STATUS_OK) {
 		if (msg->epoch == 0)
 			sys->epoch = get_latest_epoch();
 	}
@@ -1496,7 +1496,10 @@ join_retry:
 		sys->this_node.id = hval;
 	}
 
-	sys->status = SD_STATUS_STARTUP;
+	if (get_latest_epoch() == 0)
+		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
+	else
+		sys->status = SD_STATUS_WAIT_FOR_JOIN;
 	INIT_LIST_HEAD(&sys->sd_node_list);
 	INIT_LIST_HEAD(&sys->cpg_node_list);
 	INIT_LIST_HEAD(&sys->vm_list);

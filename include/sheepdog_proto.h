@@ -58,9 +58,10 @@
 #define SD_FLAG_CMD_RECOVERY 0x08
 
 #define SD_STATUS_OK            0x00
-#define SD_STATUS_STARTUP       0x01
-#define SD_STATUS_SHUTDOWN      0x02
-#define SD_STATUS_INCONSISTENT_EPOCHS   0x03
+#define SD_STATUS_WAIT_FOR_FORMAT   0x01
+#define SD_STATUS_WAIT_FOR_JOIN     0x02
+#define SD_STATUS_SHUTDOWN          0x03
+#define SD_STATUS_INCONSISTENT_EPOCHS   0x04
 
 #define SD_RES_SUCCESS       0x00 /* Success */
 #define SD_RES_UNKNOWN       0x01 /* Unknown error */
@@ -90,6 +91,8 @@
 #define SD_RES_NO_MEM        0x19 /* Cannot allocate memory */
 #define SD_RES_INCONSISTENT_EPOCHS  0x1A /* There is inconsistency between epochs */
 #define SD_RES_FULL_VDI      0x1B /* we already have the maximum vdis */
+#define SD_RES_WAIT_FOR_FORMAT      0x1C /* Sheepdog is waiting for a format operation */
+#define SD_RES_WAIT_FOR_JOIN        0x1D /* Sheepdog is waiting for other nodes joining */
 
 struct sd_req {
 	uint8_t		proto_ver;

@@ -168,8 +168,12 @@ static int update_node_list(int max_nodes, int epoch)
 		fprintf(stderr, "cannot read directory object\n");
 		ret = -1;
 		goto out;
-	case SD_RES_STARTUP:
-		fprintf(stderr, "sheepdog is not ready\n");
+	case SD_RES_WAIT_FOR_FORMAT:
+		fprintf(stderr, "sheepdog is not formatted yet\n");
+		ret = -1;
+		goto out;
+	case SD_RES_WAIT_FOR_JOIN:
+		fprintf(stderr, "there is not enough nodes to start sheepdog\n");
 		ret = -1;
 		goto out;
 	case SD_RES_SHUTDOWN:
@@ -1126,8 +1130,11 @@ rerun:
 		case SD_STATUS_OK:
 			printf("running\n");
 			break;
-		case SD_STATUS_STARTUP:
-			printf("startup\n");
+		case SD_STATUS_WAIT_FOR_FORMAT:
+			printf("sheepdog is not formatted yet\n");
+			break;
+		case SD_STATUS_WAIT_FOR_JOIN:
+			printf("sheepdog is waiting for other nodes joining\n");
 			break;
 		case SD_STATUS_INCONSISTENT_EPOCHS:
 			printf("there is inconsistency between epochs\n");

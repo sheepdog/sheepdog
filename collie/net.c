@@ -51,7 +51,8 @@ static void queue_request(struct request *req)
 		return;
 	}
 
-	if (sys->status == SD_STATUS_STARTUP ||
+	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
+	    sys->status == SD_STATUS_WAIT_FOR_JOIN ||
 	    sys->status == SD_STATUS_INCONSISTENT_EPOCHS) {
 		/* TODO: cleanup */
 		switch (hdr->opcode) {
@@ -62,8 +63,10 @@ static void queue_request(struct request *req)
 		case SD_OP_READ_VDIS:
 			break;
 		default:
-			if (sys->status == SD_STATUS_STARTUP)
-				rsp->result = SD_RES_STARTUP;
+			if (sys->status == SD_STATUS_WAIT_FOR_FORMAT)
+				rsp->result = SD_RES_WAIT_FOR_FORMAT;
+			else if (sys->status == SD_STATUS_WAIT_FOR_JOIN)
+				rsp->result = SD_RES_WAIT_FOR_JOIN;
 			else
 				rsp->result = SD_RES_INCONSISTENT_EPOCHS;
 			req->done(req);
