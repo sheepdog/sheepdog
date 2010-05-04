@@ -1663,6 +1663,10 @@ static int init_epoch_path(char *base_path)
 
 	dir = opendir(path);
 	if (!dir) {
+		if (errno == ENOENT)
+			/* probably, sheepdog is not formatted yet  */
+			return 0;
+
 		vprintf(SDOG_ERR "failed to open the epoch dir, %m\n");
 		return SD_RES_EIO;
 	}
