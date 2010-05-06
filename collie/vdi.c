@@ -18,7 +18,7 @@
 
 
 /* TODO: should be performed atomically */
-static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
+static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t size,
 			  uint32_t base_vid, uint32_t cur_vid, uint32_t copies,
 			  uint32_t snapid, int is_snapshot)
 {
@@ -32,7 +32,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 	nr_nodes = get_ordered_sd_node_list(entries);
 
 	if (base_vid) {
-		ret = read_object(entries, nr_nodes, sys->epoch,
+		ret = read_object(entries, nr_nodes, epoch,
 				  vid_to_vdi_oid(base_vid), (char *)&base,
 				  sizeof(base), 0, copies);
 		if (ret < 0)
@@ -46,7 +46,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 			vprintf(SDOG_INFO "tree snapshot %s %" PRIx32 " %" PRIx32 "\n",
 				name, cur_vid, base_vid);
 
-			ret = read_object(entries, nr_nodes, sys->epoch,
+			ret = read_object(entries, nr_nodes, epoch,
 					  vid_to_vdi_oid(cur_vid), (char *)&cur,
 					  sizeof(cur), 0, copies);
 			if (ret < 0) {
@@ -89,7 +89,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 	}
 
 	if (is_snapshot && cur_vid != base_vid) {
-		ret = write_object(entries, nr_nodes, sys->epoch,
+		ret = write_object(entries, nr_nodes, epoch,
 				   vid_to_vdi_oid(cur_vid), (char *)&cur,
 				   sizeof(cur), 0, copies, 0);
 		if (ret < 0) {
@@ -99,7 +99,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 	}
 
 	if (base_vid) {
-		ret = write_object(entries, nr_nodes, sys->epoch,
+		ret = write_object(entries, nr_nodes, epoch,
 				   vid_to_vdi_oid(base_vid), (char *)&base,
 				   sizeof(base), 0, copies, 0);
 		if (ret < 0) {
@@ -108,7 +108,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 		}
 	}
 
-	ret = write_object(entries, nr_nodes, sys->epoch,
+	ret = write_object(entries, nr_nodes, epoch,
 			   vid_to_vdi_oid(new_vid), (char *)&new, sizeof(new),
 			   0, copies, 1);
 	if (ret < 0)
@@ -117,7 +117,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 	return ret;
 }
 
-static int find_first_vdi(unsigned long start, unsigned long end,
+static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end,
 			  char *name, int namelen, uint32_t snapid, uint32_t *vid,
 			  unsigned long *deleted_nr, uint32_t *next_snap)
 {
@@ -134,7 +134,7 @@ static int find_first_vdi(unsigned long start, unsigned long end,
 		nr_reqs = nr_nodes;
 
 	for (i = start; i >= end; i--) {
-		ret = read_object(entries, nr_nodes, sys->epoch,
+		ret = read_object(entries, nr_nodes, epoch,
 				  vid_to_vdi_oid(i), (char *)&inode,
 				  sizeof(inode), 0, nr_reqs);
 		if (ret < 0)
@@ -158,8 +158,8 @@ static int find_first_vdi(unsigned long start, unsigned long end,
 }
 
 
-static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, uint32_t snapid,
-			 uint32_t *next_snapid,
+static int do_lookup_vdi(uint32_t epoch, char *name, int namelen, uint32_t *vid,
+			 uint32_t snapid, uint32_t *next_snapid,
 			 unsigned long *right_nr,  unsigned long *deleted_nr)
 {
 	int ret;
@@ -177,7 +177,7 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, uint32_t snapid
 	} else if (nr < SD_NR_VDIS) {
 	right_side:
 		/* look up on the right side of the hash point */
-		ret = find_first_vdi(nr - 1, start_nr, name, namelen, snapid, vid,
+		ret = find_first_vdi(epoch, nr - 1, start_nr, name, namelen, snapid, vid,
 				     deleted_nr, next_snapid);
 		return ret;
 	} else {
@@ -188,7 +188,7 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, uint32_t snapid
 			return SD_RES_FULL_VDI;
 		else if (nr) {
 			/* look up on the left side of the hash point */
-			ret = find_first_vdi(nr - 1, 0, name, namelen, snapid, vid,
+			ret = find_first_vdi(epoch, nr - 1, 0, name, namelen, snapid, vid,
 					     deleted_nr, next_snapid);
 			if (ret == SD_RES_NO_VDI)
 				; /* we need to go to the right side */
@@ -201,7 +201,7 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, uint32_t snapid
 	}
 }
 
-int lookup_vdi(char *data, int data_len, uint32_t *vid, uint32_t snapid)
+int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid)
 {
 	char *name = data;
 	uint32_t dummy0;
@@ -210,11 +210,11 @@ int lookup_vdi(char *data, int data_len, uint32_t *vid, uint32_t snapid)
 	if (data_len != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
 
-	return do_lookup_vdi(name, strlen(name), vid, snapid,
+	return do_lookup_vdi(epoch, name, strlen(name), vid, snapid,
 			     &dummy0, &dummy1, &dummy2);
 }
 
-int add_vdi(char *data, int data_len, uint64_t size,
+int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies, int is_snapshot)
 {
 	uint32_t cur_vid;
@@ -228,7 +228,7 @@ int add_vdi(char *data, int data_len, uint64_t size,
 
 	name = data;
 
-	ret = do_lookup_vdi(name, strlen(name), &cur_vid, 0, &next_snapid,
+	ret = do_lookup_vdi(epoch, name, strlen(name), &cur_vid, 0, &next_snapid,
 			    &right_nr, &deleted_nr);
 
 	if (is_snapshot) {
@@ -266,13 +266,15 @@ int add_vdi(char *data, int data_len, uint64_t size,
 		copies = sys->nr_sobjs;
 	}
 
-	ret = create_vdi_obj(name, *new_vid, size, base_vid, cur_vid, copies,
+	ret = create_vdi_obj(epoch, name, *new_vid, size, base_vid, cur_vid, copies,
 			     next_snapid, is_snapshot);
 
 	return ret;
 }
 
-int del_vdi(char *data, int data_len, uint32_t snapid)
+int start_deletion(uint32_t vid, uint32_t epoch);
+
+int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t snapid)
 {
 	char *name = data;
 	uint32_t vid;
@@ -286,7 +288,7 @@ int del_vdi(char *data, int data_len, uint32_t snapid)
 	if (data_len != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
 
-	ret = do_lookup_vdi(name, strlen(name), &vid, snapid,
+	ret = do_lookup_vdi(epoch, name, strlen(name), &vid, snapid,
 			     &dummy0, &dummy1, &dummy2);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -296,7 +298,7 @@ int del_vdi(char *data, int data_len, uint32_t snapid)
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 
-	ret = read_object(entries, nr_nodes, sys->epoch,
+	ret = read_object(entries, nr_nodes, epoch,
 			  vid_to_vdi_oid(vid), (char *)&inode, sizeof(inode), 0,
 			  nr_reqs);
 	if (ret < 0)
@@ -304,13 +306,13 @@ int del_vdi(char *data, int data_len, uint32_t snapid)
 
 	memset(inode.name, 0, sizeof(inode.name));
 
-	ret = write_object(entries, nr_nodes, sys->epoch,
+	ret = write_object(entries, nr_nodes, epoch,
 			   vid_to_vdi_oid(vid), (char *)&inode, sizeof(inode), 0,
 			   nr_reqs, 0);
 	if (ret < 0)
 		return SD_RES_EIO;
 
-	ret = start_deletion(vid);
+	ret = start_deletion(vid, epoch);
 	if (ret < 0)
 		return SD_RES_NO_MEM;
 
@@ -330,6 +332,7 @@ int read_vdis(char *data, int len, unsigned int *rsp_len)
 
 struct deletion_work {
 	uint32_t done;
+	uint32_t epoch;
 
 	struct work work;
 	struct list_head dw_siblings;
@@ -356,7 +359,7 @@ static void delete_one(struct work *work, int idx)
 
 	nr_nodes = get_ordered_sd_node_list(entries);
 
-	ret = read_object(entries, nr_nodes, sys->epoch,
+	ret = read_object(entries, nr_nodes, dw->epoch,
 			  vid_to_vdi_oid(vdi_id), (void *)&inode, sizeof(inode),
 			  0, sys->nr_sobjs);
 
@@ -369,12 +372,12 @@ static void delete_one(struct work *work, int idx)
 		if (!inode.data_vdi_id[i])
 			continue;
 
-		remove_object(entries, nr_nodes, sys->epoch,
+		remove_object(entries, nr_nodes, dw->epoch,
 			      vid_to_data_oid(inode.data_vdi_id[i], i),
 			      inode.nr_copies);
 	}
 
-	if (remove_object(entries, nr_nodes, sys->epoch, vid_to_vdi_oid(vdi_id),
+	if (remove_object(entries, nr_nodes, dw->epoch, vid_to_vdi_oid(vdi_id),
 			  sys->nr_sobjs))
 		eprintf("failed to remove vdi objects %x\n", vdi_id);
 }
@@ -420,7 +423,7 @@ static int fill_vdi_list(struct deletion_work *dw,
 	((uint32_t *)dw->buf)[dw->count++] = root_vid;
 again:
 	vid = ((uint32_t *)dw->buf)[done++];
-	ret = read_object(entries, nr_entries, sys->epoch,
+	ret = read_object(entries, nr_entries, dw->epoch,
 			  vid_to_vdi_oid(vid), (void *)&inode, sizeof(inode),
 			  0, nr_entries);
 
@@ -446,13 +449,13 @@ again:
 }
 
 static uint64_t get_vdi_root(struct sheepdog_node_list_entry *entries,
-			     int nr_entries, uint32_t vid)
+			     int nr_entries, uint32_t epoch, uint32_t vid)
 {
 	int ret;
 	static struct sheepdog_inode inode;
 
 next:
-	ret = read_object(entries, nr_entries, sys->epoch,
+	ret = read_object(entries, nr_entries, epoch,
 			  vid_to_vdi_oid(vid),
 			  (void *)&inode, sizeof(inode), 0, nr_entries);
 
@@ -478,7 +481,7 @@ static void __start_deletion(struct work *work, int idx)
 
 	nr_nodes = get_ordered_sd_node_list(entries);
 
-	root_vid = get_vdi_root(entries, nr_nodes, dw->vid);
+	root_vid = get_vdi_root(entries, nr_nodes, dw->epoch, dw->vid);
 	if (!root_vid)
 		goto fail;
 
@@ -523,7 +526,7 @@ static void __start_deletion_done(struct work *work, int idx)
 	}
 }
 
-int start_deletion(uint32_t vid)
+int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw;
 
@@ -539,6 +542,7 @@ int start_deletion(uint32_t vid)
 
 	dw->count = 0;
 	dw->vid = vid;
+	dw->epoch = epoch;
 
 	dw->work.fn = __start_deletion;
 	dw->work.done = __start_deletion_done;

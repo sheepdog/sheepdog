@@ -628,7 +628,7 @@ static void vdi_op(struct vdi_op_message *msg)
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
-		ret = add_vdi(data, hdr->data_length, hdr->vdi_size, &vid,
+		ret = add_vdi(hdr->epoch, data, hdr->data_length, hdr->vdi_size, &vid,
 			      hdr->base_vdi_id, hdr->copies,
 			      hdr->snapid);
 		break;
@@ -637,11 +637,11 @@ static void vdi_op(struct vdi_op_message *msg)
 			ret = SD_RES_VDI_LOCKED;
 			break;
 		}
-		ret = del_vdi(data, hdr->data_length, hdr->snapid);
+		ret = del_vdi(hdr->epoch, data, hdr->data_length, hdr->snapid);
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
-		ret = lookup_vdi(data, hdr->data_length, &vid, hdr->snapid);
+		ret = lookup_vdi(hdr->epoch, data, hdr->data_length, &vid, hdr->snapid);
 		if (ret != SD_RES_SUCCESS)
 			break;
 		break;
@@ -1042,7 +1042,7 @@ static void del_node(struct cpg_address *addr, struct work_confchg *w)
 				w->failed_vdis = buf;
 			}
 
-			ret = lookup_vdi((char *)vm->ent.name,
+			ret = lookup_vdi(sys->epoch, (char *)vm->ent.name,
 					 sizeof(vm->ent.name), &vid, 0);
 			if (ret == SD_RES_SUCCESS)
 				w->failed_vdis[w->nr_failed_vdis++] = vid;

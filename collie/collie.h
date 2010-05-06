@@ -106,13 +106,13 @@ int create_listen_port(int port, void *data);
 int is_io_request(unsigned op);
 int init_store(char *dir);
 
-int add_vdi(char *data, int data_len, uint64_t size,
+int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies,
 	    int is_snapshot);
 
-int del_vdi(char *data, int data_len, uint32_t snapid);
+int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t snapid);
 
-int lookup_vdi(char *data, int data_len, uint32_t *vid, uint32_t snapid);
+int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
@@ -146,7 +146,6 @@ int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 
 int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis);
-int start_deletion(uint32_t vid);
 
 static inline int is_myself(struct sheepdog_node_list_entry *e)
 {

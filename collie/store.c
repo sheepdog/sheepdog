@@ -281,7 +281,7 @@ out:
 
 static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret);
 
-static int read_from_one(uint64_t oid,
+static int read_from_one(uint32_t epoch, uint64_t oid,
 			 unsigned *ori_rlen, void *buf, uint64_t offset)
 {
 	int i, n, nr, fd, ret;
@@ -301,7 +301,7 @@ again:
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		if (is_myself(&e[n])) {
-			fd = ob_open(sys->epoch, oid, 0, &ret);
+			fd = ob_open(epoch, oid, 0, &ret);
 			if (fd < 0 || ret != 0)
 				continue;
 
@@ -320,7 +320,7 @@ again:
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.oid = oid;
-		hdr.epoch = sys->epoch;
+		hdr.epoch = epoch;
 
 		rlen = *ori_rlen;
 		wlen = 0;
@@ -358,14 +358,14 @@ out:
 	return ret;
 }
 
-static int read_from_other_sheeps(uint64_t oid, char *buf, int copies)
+static int read_from_other_sheeps(uint32_t epoch, uint64_t oid, char *buf, int copies)
 {
 	int ret;
 	unsigned int rlen;
 
 	rlen = SD_DATA_OBJ_SIZE;
 
-	ret = read_from_one(oid, &rlen, buf, 0);
+	ret = read_from_one(epoch, oid, &rlen, buf, 0);
 
 	return ret;
 }
@@ -396,14 +396,13 @@ static int forward_read_obj_req(struct request *req, char *buf)
 		copies = sys->nr_sobjs;
 
 	hdr->flags |= SD_FLAG_CMD_DIRECT;
-	hdr->epoch = sys->epoch;
 
 	/* TODO: we can do better; we need to check this first */
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
 		if (is_myself(&e[n])) {
-			ret = store_queue_request_local(req, buf, sys->epoch);
+			ret = store_queue_request_local(req, buf, hdr->epoch);
 			goto out;
 		}
 	}
@@ -471,7 +470,6 @@ static int forward_write_obj_req(struct request *req, char *buf)
 		pfds[i].fd = -1;
 
 	hdr->flags |= SD_FLAG_CMD_DIRECT;
-	hdr->epoch = sys->epoch;
 
 	wlen = hdr->data_length;
 	rlen = 0;
@@ -506,7 +504,7 @@ static int forward_write_obj_req(struct request *req, char *buf)
 	}
 
 	if (local) {
-		ret = store_queue_request_local(req, buf, sys->epoch);
+		ret = store_queue_request_local(req, buf, hdr->epoch);
 		rsp->result = ret;
 
 		if (nr_fds == 0) {
@@ -657,7 +655,7 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		if (hdr->flags & SD_FLAG_CMD_COW) {
 			dprintf("%" PRIx64 "\n", hdr->cow_oid);
 
-			ret = read_from_other_sheeps(hdr->cow_oid, buf,
+			ret = read_from_other_sheeps(hdr->epoch, hdr->cow_oid, buf,
 						     hdr->copies);
 			if (ret) {
 				eprintf("failed to read old object\n");
@@ -785,11 +783,10 @@ void store_queue_request(struct work *work, int idx)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
-	uint32_t epoch = sys->epoch;
-	uint32_t req_epoch = hdr->epoch;
+	uint32_t epoch = hdr->epoch;
 	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
 
-	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
+	dprintf("%d, %x, %" PRIx64" , %u\n", idx, opcode, oid, epoch);
 
 	if (hdr->flags & SD_FLAG_CMD_RECOVERY)
 		epoch = hdr->tgt_epoch;
@@ -815,8 +812,8 @@ void store_queue_request(struct work *work, int idx)
 	ret = store_queue_request_local(req, buf, epoch);
 out:
 	if (ret != SD_RES_SUCCESS) {
-		dprintf("failed, %d, %x, %" PRIx64" , %u, %u, %d\n",
-			idx, opcode, oid, epoch, req_epoch, ret);
+		dprintf("failed, %d, %x, %" PRIx64" , %u, %d\n",
+			idx, opcode, oid, epoch, ret);
 		rsp->result = ret;
 	}
 }
@@ -1123,7 +1120,7 @@ next:
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.oid = oid;
-	hdr.epoch = sys->epoch;
+	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_DIRECT;
 	hdr.tgt_epoch = tgt_epoch;
 	hdr.data_length = rlen;
@@ -1340,7 +1337,8 @@ static int __fill_obj_list(struct recovery_work *rw,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_OBJ_LIST;
-	hdr.epoch = sys->epoch;
+	/* we don't need to set epoch */
+	hdr.epoch = epoch;
 	hdr.start = start_hash;
 	hdr.end = end_hash;
 	hdr.tgt_epoch = epoch - 1;
