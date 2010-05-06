@@ -281,7 +281,7 @@ out:
 
 static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret);
 
-static int read_from_one(uint32_t epoch, uint64_t oid,
+static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 			 unsigned *ori_rlen, void *buf, uint64_t offset)
 {
 	int i, n, nr, fd, ret;
@@ -291,9 +291,8 @@ static int read_from_one(uint32_t epoch, uint64_t oid,
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
-	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-again:
-	nr = get_ordered_sd_node_list(e);
+	e = req->entry;
+	nr = req->nr_nodes;
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
@@ -343,8 +342,6 @@ again:
 		case SD_RES_OLD_NODE_VER:
 		case SD_RES_NEW_NODE_VER:
 			/* waits for the node list timer */
-			sleep(2);
-			goto again;
 			break;
 		default:
 			;
@@ -358,14 +355,15 @@ out:
 	return ret;
 }
 
-static int read_from_other_sheeps(uint32_t epoch, uint64_t oid, char *buf, int copies)
+static int read_from_other_sheeps(struct request *req, uint32_t epoch,
+				  uint64_t oid, char *buf, int copies)
 {
 	int ret;
 	unsigned int rlen;
 
 	rlen = SD_DATA_OBJ_SIZE;
 
-	ret = read_from_one(epoch, oid, &rlen, buf, 0);
+	ret = read_from_one(req, epoch, oid, &rlen, buf, 0);
 
 	return ret;
 }
@@ -383,11 +381,8 @@ static int forward_read_obj_req(struct request *req, char *buf)
 	uint64_t oid = hdr->oid;
 	int copies;
 
-	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-	if (!e)
-		return SD_RES_NO_MEM;
-
-	nr = get_ordered_sd_node_list(e);
+	e = req->entry;
+	nr = req->nr_nodes;
 
 	copies = hdr->copies;
 
@@ -432,7 +427,6 @@ static int forward_read_obj_req(struct request *req, char *buf)
 	}
 
 out:
-	free(e);
 
 	return ret;
 }
@@ -451,11 +445,8 @@ static int forward_write_obj_req(struct request *req, char *buf)
 	int done, nr_fds, local = 0;
 
 	dprintf("%lx\n", oid);
-	e = zalloc(SD_MAX_NODES * sizeof(struct sheepdog_node_list_entry));
-	if (!e)
-		return SD_RES_NO_MEM;
-
-	nr = get_ordered_sd_node_list(e);
+	e = req->entry;
+	nr = req->nr_nodes;
 
 	copies = hdr->copies;
 
@@ -565,7 +556,6 @@ again:
 
 	ret = SD_RES_SUCCESS;
 out:
-	free(e);
 
 	for (i = 0; i < ARRAY_SIZE(pfds); i++){
 		if (pfds[i].fd >= 0)
@@ -655,7 +645,7 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		if (hdr->flags & SD_FLAG_CMD_COW) {
 			dprintf("%" PRIx64 "\n", hdr->cow_oid);
 
-			ret = read_from_other_sheeps(hdr->epoch, hdr->cow_oid, buf,
+			ret = read_from_other_sheeps(req, hdr->epoch, hdr->cow_oid, buf,
 						     hdr->copies);
 			if (ret) {
 				eprintf("failed to read old object\n");

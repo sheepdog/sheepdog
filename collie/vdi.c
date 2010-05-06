@@ -357,6 +357,11 @@ static void delete_one(struct work *work, int idx)
 
 	eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
 
+	/*
+	 * FIXME: can't use get_ordered_sd_node_list() here since this
+	 * is called in threads and not serialized with cpg_event so
+	 * we can't access to epoch and sd_node_list safely.
+	 */
 	nr_nodes = get_ordered_sd_node_list(entries);
 
 	ret = read_object(entries, nr_nodes, dw->epoch,

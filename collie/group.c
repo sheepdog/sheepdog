@@ -201,6 +201,11 @@ int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
 	return build_node_list(&sys->sd_node_list, entries);
 }
 
+int setup_ordered_sd_node_list(struct request *req)
+{
+	return get_ordered_sd_node_list(req->entry);
+}
+
 static void get_node_list(struct sd_node_req *req,
 			  struct sd_node_rsp *rsp, void *data)
 {

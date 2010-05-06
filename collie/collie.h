@@ -64,6 +64,9 @@ struct request {
 	struct list_head r_wlist;
 	struct list_head pending_list;
 
+	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	int nr_nodes;
+
 	req_end_t done;
 	struct work work;
 };
@@ -116,6 +119,7 @@ int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
+int setup_ordered_sd_node_list(struct request *req);
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 
 int create_cluster(int port);
