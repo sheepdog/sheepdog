@@ -485,69 +485,6 @@ int remove_object(struct sheepdog_node_list_entry *e,
 	return 0;
 }
 
-/* TODO: clean up with the above functions */
-int exec_reqs(struct sheepdog_node_list_entry *e,
-	      int nodes, uint32_t node_version, uint64_t oid, struct sd_req *hdr,
-	      char *data, unsigned int wdatalen, unsigned int rdatalen, int nr,
-	      int quorum)
-{
-	char name[128];
-	int i = 0, n, fd, ret;
-	int success = 0;
-	struct sd_req tmp;
-	struct sd_rsp *rsp = (struct sd_rsp *)&tmp;
-	unsigned wlen, rlen;
-
-	for (i = 0; i < nr; i++) {
-		wlen = wdatalen;
-		rlen = rdatalen;
-
-		n = obj_to_sheep(e, nodes, oid, i);
-
-		addr_to_str(name, sizeof(name), e[n].addr, 0);
-
-		fd = connect_to(name, e[n].port);
-		if (fd < 0) {
-			((struct sd_rsp *) hdr)->result = SD_RES_EIO;
-			return -1;
-		}
-
-		hdr->epoch = node_version;
-		if (wdatalen) {
-			hdr->flags |= SD_FLAG_CMD_WRITE;
-			hdr->data_length = wdatalen;
-		} else if (rdatalen) {
-			hdr->flags &= ~SD_FLAG_CMD_WRITE;
-			hdr->data_length = rdatalen;
-		} else
-			hdr->data_length = 0;
-
-		memcpy(&tmp, hdr, sizeof(tmp));
-		ret = exec_req(fd, &tmp, data, &wlen, &rlen);
-		close(fd);
-
-		rsp = (struct sd_rsp *)&tmp;
-
-		if (!ret) {
-			if (rsp->result == SD_RES_SUCCESS)
-				success++;
-		}
-
-		if (success >= quorum)
-			break;
-	}
-
-	memcpy(hdr, rsp, sizeof(*rsp));
-
-	if (success < quorum)
-		return -1;
-
-	if (rdatalen)
-		return rlen;
-	else
-		return wlen;
-}
-
 /* TODO: support IPv6 */
 char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
 {
