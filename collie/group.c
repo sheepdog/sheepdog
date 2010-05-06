@@ -74,10 +74,14 @@ struct vdi_op_message {
 };
 
 struct work_deliver {
+	struct cpg_event cev;
+
 	struct message_header *msg;
 };
 
 struct work_confchg {
+	struct cpg_event cev;
+
 	struct cpg_address *member_list;
 	size_t member_list_entries;
 	struct cpg_address *left_list;
@@ -89,22 +93,6 @@ struct work_confchg {
 	int nr_failed_vdis;
 	int first_cpg_node;
 	int sd_node_left;
-};
-
-enum cpg_event_type {
-	CPG_EVENT_CONCHG,
-	CPG_EVENT_DELIVER,
-};
-
-struct cpg_event {
-	enum cpg_event_type ctype;
-	struct list_head cpg_event_list;
-	unsigned int skip;
-
-	union {
-		struct work_confchg c;
-		struct work_deliver d;
-	};
 };
 
 #define print_node_list(node_list)				\
@@ -774,7 +762,7 @@ out:
 
 static void update_running_vm_state(struct cpg_event *cevent)
 {
-	struct work_deliver *w = &cevent->d;
+	struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 	struct message_header *m = w->msg;
 	struct sheepdog_vm_list_entry *e;
 	int nr, i;
@@ -804,7 +792,7 @@ out:
 
 static void __sd_deliver(struct cpg_event *cevent)
 {
-	struct work_deliver *w = &cevent->d;
+	struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 	struct message_header *m = w->msg;
 	char name[128];
 	struct node *node;
@@ -921,7 +909,7 @@ static void send_join_response(struct work_deliver *w)
 
 static void __sd_deliver_done(struct cpg_event *cevent)
 {
-	struct work_deliver *w = &cevent->d;
+	struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 	struct message_header *m;
 	char name[128];
 
@@ -971,12 +959,12 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port),
 		nodeid, pid);
 
-	cevent = zalloc(sizeof(*cevent));
-	if (!cevent)
+	w = zalloc(sizeof(*w));
+	if (!w)
 		return;
 
+	cevent = &w->cev;
 	cevent->ctype = CPG_EVENT_DELIVER;
-	w = &cevent->d;
 
 	vprintf(SDOG_DEBUG "allow new deliver, %p\n", cevent);
 
@@ -1093,7 +1081,7 @@ static int is_my_cpg_addr(struct cpg_address *addr)
 
 static void __sd_confchg(struct cpg_event *cevent)
 {
-	struct work_confchg *w = &cevent->c;
+	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
 
 	if (w->member_list_entries ==
 	    w->joined_list_entries - w->left_list_entries &&
@@ -1162,7 +1150,7 @@ static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
 
 static void __sd_confchg_done(struct cpg_event *cevent)
 {
-	struct work_confchg *w = &cevent->c;
+	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
 
 	if (w->first_cpg_node)
 		goto skip_join;
@@ -1184,20 +1172,21 @@ static void cpg_event_free(struct cpg_event *cevent)
 {
 	switch (cevent->ctype) {
 	case CPG_EVENT_CONCHG: {
-		struct work_confchg *w = &cevent->c;
+		struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
 		free(w->member_list);
 		free(w->left_list);
 		free(w->joined_list);
 		free(w->failed_vdis);
+		free(w);
 		break;
 	}
 	case CPG_EVENT_DELIVER: {
-		struct work_deliver *w = &cevent->d;
+		struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 		free(w->msg);
+		free(w);
 		break;
 	}
 	}
-	free(cevent);
 }
 
 static struct work cpg_event_work;
@@ -1219,9 +1208,12 @@ static void cpg_event_fn(struct work *w, int idx)
 		__sd_confchg(cevent);
 		break;
 	case CPG_EVENT_DELIVER:
-		vprintf(SDOG_DEBUG "%d\n", cevent->d.msg->state);
+	{
+		struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
+		vprintf(SDOG_DEBUG "%d\n", w->msg->state);
 		__sd_deliver(cevent);
 		break;
+	}
 	default:
 		vprintf(SDOG_ERR "unknown event %d\n", cevent->ctype);
 	}
@@ -1252,19 +1244,22 @@ static void cpg_event_done(struct work *w, int idx)
 		__sd_confchg_done(cevent);
 		break;
 	case CPG_EVENT_DELIVER:
+	{
+		struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 		/*
 		 * if we are in the process of the JOIN, we will not
 		 * be suspended. So sd_deliver() links events to
 		 * cpg_event_siblings in order. The events except for
 		 * JOIN with DM_CONT and DM_FIN are skipped.
 		 */
-		if (sys->join_finished && cevent->d.msg->state == DM_INIT) {
+		if (sys->join_finished && w->msg->state == DM_INIT) {
 			struct cpg_event *f_cevent;
 
 			list_for_each_entry(f_cevent, &sys->cpg_event_siblings,
 					    cpg_event_list) {
+				w = container_of(f_cevent, struct work_deliver, cev);
 				if (f_cevent->ctype == CPG_EVENT_DELIVER &&
-				    f_cevent->d.msg->state == DM_FIN) {
+				    w->msg->state == DM_FIN) {
 					vprintf("already got fin %p\n",
 						f_cevent);
 
@@ -1279,6 +1274,7 @@ static void cpg_event_done(struct work *w, int idx)
 	got_fin:
 		__sd_deliver_done(cevent);
 		break;
+	}
 	default:
 		vprintf(SDOG_ERR "unknown event %d\n", cevent->ctype);
 	}
@@ -1345,12 +1341,13 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 	if (sys->status == SD_STATUS_SHUTDOWN || sys->status == SD_STATUS_INCONSISTENT_EPOCHS)
 		return;
 
-	cevent = zalloc(sizeof(*cevent));
-	if (!cevent)
+	w = zalloc(sizeof(*w));
+	if (!w)
 		goto oom;
 
+	cevent = &w->cev;
 	cevent->ctype = CPG_EVENT_CONCHG;
-	w = &cevent->c;
+
 
 	vprintf(SDOG_DEBUG "allow new confchg, %p\n", cevent);
 

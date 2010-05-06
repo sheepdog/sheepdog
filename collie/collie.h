@@ -25,6 +25,17 @@
 #define SD_MSG_VDI_OP           0x02
 #define SD_MSG_MASTER_CHANGED   0x03
 
+enum cpg_event_type {
+	CPG_EVENT_CONCHG,
+	CPG_EVENT_DELIVER,
+};
+
+struct cpg_event {
+	enum cpg_event_type ctype;
+	struct list_head cpg_event_list;
+	unsigned int skip;
+};
+
 struct client_info {
 	struct connection conn;
 
