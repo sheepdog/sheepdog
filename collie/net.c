@@ -16,6 +16,25 @@
 
 #include "collie.h"
 
+int is_io_request(unsigned op)
+{
+	int ret = 0;
+
+	switch (op) {
+	case SD_OP_CREATE_AND_WRITE_OBJ:
+	case SD_OP_REMOVE_OBJ:
+	case SD_OP_READ_OBJ:
+	case SD_OP_WRITE_OBJ:
+	case SD_OP_SYNC_OBJ:
+		ret = 1;
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
 static void __done(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -32,6 +51,19 @@ static void __done(struct work *work, int idx)
 		/* request is forwarded to cpg group */
 		return;
 	}
+
+	if (is_io_request(hdr->opcode)) {
+		sys->nr_outstanding_io--;
+		/*
+		 * TODO: if the request failed due to epoch unmatch,
+		 * we should retry here (adds this request to the tail
+		 * of sys->cpg_event_siblings.
+		 */
+		if (!sys->nr_outstanding_io &&
+		    !list_empty(&sys->cpg_event_siblings))
+			start_cpg_event_work();
+	}
+
 	req->done(req);
 }
 

@@ -1336,15 +1336,19 @@ void start_cpg_event_work(void)
 
 	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
+
 		if (cevent->ctype != CPG_EVENT_REQUEST)
-			continue;
+			break;
+
+		if (is_io_request(req->rq.opcode))
+			sys->nr_outstanding_io++;
 
 		list_del(&cevent->cpg_event_list);
 		queue_work(&req->work);
 	}
 
 	if (cpg_event_running() || cpg_event_suspended() ||
-	    list_empty(&sys->cpg_event_siblings))
+	    list_empty(&sys->cpg_event_siblings) || sys->nr_outstanding_io)
 		return;
 
 	cevent = list_first_entry(&sys->cpg_event_siblings,

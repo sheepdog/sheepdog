@@ -96,12 +96,14 @@ struct cluster_info {
 	struct list_head cpg_event_siblings;
 	struct cpg_event *cur_cevent;
 	unsigned long cpg_event_work_flags;
+	int nr_outstanding_io;
 };
 
 extern struct cluster_info *sys;
 
 int create_listen_port(int port, void *data);
 
+int is_io_request(unsigned op);
 int init_store(char *dir);
 
 int add_vdi(char *data, int data_len, uint64_t size,
