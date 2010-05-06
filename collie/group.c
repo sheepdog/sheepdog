@@ -1238,10 +1238,8 @@ static void cpg_event_done(struct work *w, int idx)
 
 	vprintf(SDOG_DEBUG "%p\n", cevent);
 
-	if (cpg_event_suspended()) {
-		cpg_event_clear_running();
-		return;
-	}
+	if (cpg_event_suspended())
+		goto out;
 
 	if (cevent->skip)
 		goto out;
