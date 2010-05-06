@@ -72,7 +72,7 @@ static void queue_request(struct request *req)
 	struct cpg_event *cevent = &req->cev;
 
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 
 	if (hdr->opcode == SD_OP_DEBUG_KILL) {
 		log_close();
