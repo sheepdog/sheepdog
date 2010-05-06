@@ -356,7 +356,7 @@ int write_object(struct sheepdog_node_list_entry *e,
 	uint16_t vosts[3];
 	char name[128];
 
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < nr; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
 		n = obj_to_sheep(e, nodes, oid, i);
@@ -379,7 +379,7 @@ int write_object(struct sheepdog_node_list_entry *e,
 		hdr.oid = oid;
 		hdr.copies = nr;
 
-		hdr.flags = SD_FLAG_CMD_WRITE;
+		hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
 		hdr.data_length = wlen;
 		hdr.offset = offset;
 
@@ -423,7 +423,7 @@ int read_object(struct sheepdog_node_list_entry *e,
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.oid = oid;
 
-		hdr.flags = 0;
+		hdr.flags =  SD_FLAG_CMD_DIRECT;
 		hdr.data_length = rlen;
 		hdr.offset = offset;
 
