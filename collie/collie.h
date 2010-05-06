@@ -28,6 +28,7 @@
 enum cpg_event_type {
 	CPG_EVENT_CONCHG,
 	CPG_EVENT_DELIVER,
+	CPG_EVENT_REQUEST,
 };
 
 struct cpg_event {
@@ -52,6 +53,7 @@ struct request;
 typedef void (*req_end_t) (struct request *);
 
 struct request {
+	struct cpg_event cev;
 	struct sd_req rq;
 	struct sd_rsp rp;
 
@@ -116,6 +118,7 @@ int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 
 int create_cluster(int port);
 
+void start_cpg_event_work(void);
 void store_queue_request(struct work *work, int idx);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,

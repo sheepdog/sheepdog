@@ -944,8 +944,6 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 		start_recovery(sys->epoch, NULL, 0);
 }
 
-static void start_cpg_event_work(void);
-
 static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 		       uint32_t nodeid, uint32_t pid, void *msg, size_t msg_len)
 {
@@ -1186,6 +1184,8 @@ static void cpg_event_free(struct cpg_event *cevent)
 		free(w);
 		break;
 	}
+	default:
+		break;
 	}
 }
 
@@ -1214,6 +1214,9 @@ static void cpg_event_fn(struct work *w, int idx)
 		__sd_deliver(cevent);
 		break;
 	}
+	case CPG_EVENT_REQUEST:
+		vprintf(SDOG_ERR "should not happen\n");
+		break;
 	default:
 		vprintf(SDOG_ERR "unknown event %d\n", cevent->ctype);
 	}
@@ -1275,6 +1278,8 @@ static void cpg_event_done(struct work *w, int idx)
 		__sd_deliver_done(cevent);
 		break;
 	}
+	case CPG_EVENT_REQUEST:
+		vprintf(SDOG_ERR "should not happen\n");
 	default:
 		vprintf(SDOG_ERR "unknown event %d\n", cevent->ctype);
 	}
@@ -1289,21 +1294,33 @@ out:
 }
 
 /* can be called only by the main process */
-static void start_cpg_event_work(void)
+void start_cpg_event_work(void)
 {
-	struct cpg_event *cevent;
-
-	if (cpg_event_running())
-		return;
+	struct cpg_event *cevent, *n;
 
 	if (list_empty(&sys->cpg_event_siblings))
 		vprintf(SDOG_ERR "bug\n");
 
-	cevent = list_first_entry(&sys->cpg_event_siblings,
-				  struct cpg_event, cpg_event_list);
+	if (cpg_event_running())
+		return;
 
 	if (cpg_event_suspended())
 		return;
+
+	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
+		struct request *req = container_of(cevent, struct request, cev);
+		if (cevent->ctype != CPG_EVENT_REQUEST)
+			continue;
+
+		list_del(&cevent->cpg_event_list);
+		queue_work(&req->work);
+	}
+
+	if (list_empty(&sys->cpg_event_siblings))
+		return;
+
+	cevent = list_first_entry(&sys->cpg_event_siblings,
+				  struct cpg_event, cpg_event_list);
 
 	list_del(&cevent->cpg_event_list);
 	sys->cur_cevent = cevent;

@@ -37,6 +37,8 @@ static void __done(struct work *work, int idx)
 
 static void queue_request(struct request *req)
 {
+	struct cpg_event *cevent = &req->cev;
+
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;;
 
@@ -114,7 +116,9 @@ static void queue_request(struct request *req)
 
 	list_del(&req->r_wlist);
 
-	queue_work(&req->work);
+	cevent->ctype = CPG_EVENT_REQUEST;
+	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+	start_cpg_event_work();
 }
 
 static struct request *alloc_request(struct client_info *ci, int data_length)
