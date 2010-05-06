@@ -54,7 +54,7 @@
 
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
-#define SD_FLAG_CMD_FORWARD  0x04
+#define SD_FLAG_CMD_DIRECT   0x04
 #define SD_FLAG_CMD_RECOVERY 0x08
 
 #define SD_STATUS_OK            0x00

@@ -395,7 +395,7 @@ static int forward_read_obj_req(struct request *req, char *buf)
 	if (!copies)
 		copies = sys->nr_sobjs;
 
-	hdr->flags |= SD_FLAG_CMD_FORWARD;
+	hdr->flags |= SD_FLAG_CMD_DIRECT;
 	hdr->epoch = sys->epoch;
 
 	/* TODO: we can do better; we need to check this first */
@@ -470,7 +470,7 @@ static int forward_write_obj_req(struct request *req, char *buf)
 	for (i = 0; i < ARRAY_SIZE(pfds); i++)
 		pfds[i].fd = -1;
 
-	hdr->flags |= SD_FLAG_CMD_FORWARD;
+	hdr->flags |= SD_FLAG_CMD_DIRECT;
 	hdr->epoch = sys->epoch;
 
 	wlen = hdr->data_length;
@@ -811,7 +811,7 @@ void store_queue_request(struct work *work, int idx)
 
 	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
 
-	if (hdr->flags & SD_FLAG_CMD_FORWARD) {
+	if (hdr->flags & SD_FLAG_CMD_DIRECT) {
 		ret = check_epoch(req);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
@@ -830,7 +830,7 @@ void store_queue_request(struct work *work, int idx)
 		goto out;
 	}
 
-	if (!(hdr->flags & SD_FLAG_CMD_FORWARD)) {
+	if (!(hdr->flags & SD_FLAG_CMD_DIRECT)) {
 		if (hdr->flags & SD_FLAG_CMD_WRITE)
 			ret = forward_write_obj_req(req, buf);
 		else
@@ -1150,7 +1150,7 @@ next:
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.oid = oid;
 	hdr.epoch = sys->epoch;
-	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_FORWARD;
+	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_DIRECT;
 	hdr.tgt_epoch = tgt_epoch;
 	hdr.data_length = rlen;
 
