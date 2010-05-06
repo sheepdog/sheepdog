@@ -111,6 +111,7 @@ struct work_confchg {
 enum cpg_event_work_bits {
 	CPG_EVENT_WORK_RUNNING = 1,
 	CPG_EVENT_WORK_SUSPENDED,
+	CPG_EVENT_WORK_JOINING,
 };
 
 #define CPG_EVENT_WORK_FNS(bit, name)					\
@@ -130,6 +131,7 @@ static void cpg_event_set_##name(void)					\
 
 CPG_EVENT_WORK_FNS(RUNNING, running)
 CPG_EVENT_WORK_FNS(SUSPENDED, suspended)
+CPG_EVENT_WORK_FNS(JOINING, joining)
 
 static int node_cmp(const void *a, const void *b)
 {
@@ -974,6 +976,8 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	if (cpg_event_suspended() && m->state == DM_FIN) {
 		list_add(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 		cpg_event_clear_suspended();
+		if (m->op == SD_MSG_JOIN)
+			cpg_event_clear_joining();
 	} else
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 
@@ -1260,9 +1264,10 @@ static void cpg_event_done(struct work *w, int idx)
 
 			list_for_each_entry(f_cevent, &sys->cpg_event_siblings,
 					    cpg_event_list) {
-				w = container_of(f_cevent, struct work_deliver, cev);
+				struct work_deliver *fw =
+					container_of(f_cevent, struct work_deliver, cev);
 				if (f_cevent->ctype == CPG_EVENT_DELIVER &&
-				    w->msg->state == DM_FIN) {
+				    fw->msg->state == DM_FIN) {
 					vprintf("already got fin %p\n",
 						f_cevent);
 
@@ -1273,6 +1278,8 @@ static void cpg_event_done(struct work *w, int idx)
 				}
 			}
 			cpg_event_set_suspended();
+			if (w->msg->op == SD_MSG_JOIN)
+				cpg_event_set_joining();
 		}
 	got_fin:
 		__sd_deliver_done(cevent);
@@ -1301,11 +1308,31 @@ void start_cpg_event_work(void)
 	if (list_empty(&sys->cpg_event_siblings))
 		vprintf(SDOG_ERR "bug\n");
 
-	if (cpg_event_running())
+	cevent = list_first_entry(&sys->cpg_event_siblings,
+				  struct cpg_event, cpg_event_list);
+
+	vprintf(SDOG_DEBUG "%lx %u\n", sys->cpg_event_work_flags,
+		cevent->ctype);
+
+	/*
+	 * we need to serialize cpg events so we don't call queue_work
+	 * if a thread is still running for a cpg event; executing
+	 * cpg_event_fn() or cpg_event_done(). A exception: if a
+	 * thread is running for a deliver for VDI, then we need to
+	 * run io requests.
+	 */
+	if (cpg_event_running() && cevent->ctype == CPG_EVENT_CONCHG)
 		return;
 
-	if (cpg_event_suspended())
+	/*
+	 * we are in the processing of handling JOIN so we can't
+	 * execute requests (or cpg events).
+	 */
+	if (cpg_event_joining()) {
+		if (!cpg_event_suspended())
+			panic("should not happen\n");
 		return;
+	}
 
 	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
@@ -1316,7 +1343,8 @@ void start_cpg_event_work(void)
 		queue_work(&req->work);
 	}
 
-	if (list_empty(&sys->cpg_event_siblings))
+	if (cpg_event_running() || cpg_event_suspended() ||
+	    list_empty(&sys->cpg_event_siblings))
 		return;
 
 	cevent = list_first_entry(&sys->cpg_event_siblings,
