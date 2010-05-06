@@ -577,26 +577,6 @@ out:
 	return ret;
 }
 
-static int check_epoch(struct request *req)
-{
-	struct sd_req *hdr = (struct sd_req *)&req->rq;
-	uint32_t req_epoch = hdr->epoch;
-	uint32_t opcode = hdr->opcode;
-	int ret = SD_RES_SUCCESS;
-
-	if (before(req_epoch, sys->epoch)) {
-		ret = SD_RES_OLD_NODE_VER;
-		eprintf("old node version %u %u, %x\n",
-			sys->epoch, req_epoch, opcode);
-	} else if (after(req_epoch, sys->epoch)) {
-		ret = SD_RES_NEW_NODE_VER;
-			eprintf("new node version %u %u %x\n",
-				sys->epoch, req_epoch, opcode);
-	}
-
-	return ret;
-}
-
 static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 {
 	char path[1024];
@@ -810,12 +790,6 @@ void store_queue_request(struct work *work, int idx)
 	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
 
 	dprintf("%d, %x, %" PRIx64" , %u, %u\n", idx, opcode, oid, epoch, req_epoch);
-
-	if (hdr->flags & SD_FLAG_CMD_DIRECT) {
-		ret = check_epoch(req);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-	}
 
 	if (hdr->flags & SD_FLAG_CMD_RECOVERY)
 		epoch = hdr->tgt_epoch;

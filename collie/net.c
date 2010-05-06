@@ -148,6 +148,15 @@ static void queue_request(struct request *req)
 
 	list_del(&req->r_wlist);
 
+	/*
+	 * we set epoch for non direct requests here. Note that we
+	 * can't access to sys->epoch after calling
+	 * start_cpg_event_work(that is, passing requests to work
+	 * threads).
+	 */
+	if (!(hdr->flags & SD_FLAG_CMD_DIRECT))
+		hdr->epoch = sys->epoch;
+
 	cevent->ctype = CPG_EVENT_REQUEST;
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 	start_cpg_event_work();

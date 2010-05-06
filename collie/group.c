@@ -1298,6 +1298,24 @@ out:
 		start_cpg_event_work();
 }
 
+static int check_epoch(struct request *req)
+{
+	uint32_t req_epoch = req->rq.epoch;
+	uint32_t opcode = req->rq.opcode;
+	int ret = SD_RES_SUCCESS;
+
+	if (before(req_epoch, sys->epoch)) {
+		ret = SD_RES_OLD_NODE_VER;
+		eprintf("old node version %u %u, %x\n",
+			sys->epoch, req_epoch, opcode);
+	} else if (after(req_epoch, sys->epoch)) {
+		ret = SD_RES_NEW_NODE_VER;
+			eprintf("new node version %u %u %x\n",
+				sys->epoch, req_epoch, opcode);
+	}
+	return ret;
+}
+
 /* can be called only by the main process */
 void start_cpg_event_work(void)
 {
@@ -1338,10 +1356,20 @@ void start_cpg_event_work(void)
 		if (cevent->ctype != CPG_EVENT_REQUEST)
 			break;
 
-		if (is_io_request(req->rq.opcode))
+		list_del(&cevent->cpg_event_list);
+
+		if (is_io_request(req->rq.opcode)) {
 			sys->nr_outstanding_io++;
 
-		list_del(&cevent->cpg_event_list);
+			if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
+				int ret = check_epoch(req);
+				if (ret != SD_RES_SUCCESS) {
+					req->rp.result = ret;
+					req->done(req);
+					continue;
+				}
+			}
+		}
 		queue_work(&req->work);
 	}
 
