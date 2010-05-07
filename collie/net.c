@@ -53,18 +53,72 @@ static void __done(struct work *work, int idx)
 	}
 
 	if (is_io_request(hdr->opcode)) {
+		struct request *next, *tmp;
+		list_del(&req->r_wlist);
+
 		sys->nr_outstanding_io--;
 		/*
 		 * TODO: if the request failed due to epoch unmatch,
 		 * we should retry here (adds this request to the tail
 		 * of sys->cpg_event_siblings.
 		 */
+
+		list_for_each_entry_safe(next, tmp, &sys->req_wait_for_obj_list,
+					 r_wlist) {
+			struct cpg_event *cevent = &next->cev;
+
+			list_del(&next->r_wlist);
+			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+		}
+
 		if (!sys->nr_outstanding_io &&
 		    !list_empty(&sys->cpg_event_siblings))
 			start_cpg_event_work();
 	}
 
 	req->done(req);
+}
+
+
+static int is_access_local(struct sheepdog_node_list_entry *e, int nr_nodes,
+			   uint64_t oid, int copies)
+{
+	int i, n;
+
+	for (i = 0; i < copies; i++) {
+		n = obj_to_sheep(e, nr_nodes, oid, i);
+
+		if (is_myself(&e[n]))
+			return 1;
+	}
+
+	return 0;
+}
+
+static void setup_access_to_local_objects(struct request *req)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	int copies;
+
+	if (hdr->flags & SD_FLAG_CMD_DIRECT) {
+		req->local_oid[0] = hdr->oid;
+
+		if (hdr->flags & SD_FLAG_CMD_COW)
+			req->local_oid[1] = hdr->cow_oid;
+
+		return;
+	}
+
+	copies = hdr->copies;
+	if (!copies)
+		copies = sys->nr_sobjs;
+
+	if (is_access_local(req->entry, req->nr_nodes, hdr->oid, copies))
+		req->local_oid[0] = hdr->oid;
+
+	if ((hdr->flags & SD_FLAG_CMD_COW) &&
+	    is_access_local(req->entry, req->nr_nodes, hdr->cow_oid, copies))
+		req->local_oid[1] = hdr->cow_oid;
 }
 
 static void queue_request(struct request *req)
@@ -158,6 +212,7 @@ static void queue_request(struct request *req)
 		hdr->epoch = sys->epoch;
 
 	req->nr_nodes = setup_ordered_sd_node_list(req);
+	setup_access_to_local_objects(req);
 
 	cevent->ctype = CPG_EVENT_REQUEST;
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);

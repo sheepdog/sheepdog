@@ -1321,6 +1321,30 @@ static int check_epoch(struct request *req)
 	return ret;
 }
 
+static int is_access_to_busy_objects(struct request *req)
+{
+	struct request *o_req;
+
+	if (!req->local_oid[0] && !req->local_oid[1])
+		return 0;
+
+	list_for_each_entry(o_req, &sys->outstanding_req_list, r_wlist) {
+
+		if (req->local_oid[0]) {
+			if (req->local_oid[0] == o_req->local_oid[0] ||
+			    req->local_oid[0] == o_req->local_oid[1])
+				return 1;
+		}
+
+		if (req->local_oid[1]) {
+			if (req->local_oid[1] == o_req->local_oid[0] ||
+			    req->local_oid[1] == o_req->local_oid[1])
+				return 1;
+		}
+	}
+	return 0;
+}
+
 /* can be called only by the main process */
 void start_cpg_event_work(void)
 {
@@ -1364,6 +1388,13 @@ void start_cpg_event_work(void)
 		list_del(&cevent->cpg_event_list);
 
 		if (is_io_request(req->rq.opcode)) {
+			if (is_access_to_busy_objects(req)) {
+				list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
+				continue;
+			}
+
+			list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
+
 			sys->nr_outstanding_io++;
 
 			if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
@@ -1581,6 +1612,9 @@ join_retry:
 	INIT_LIST_HEAD(&sys->cpg_node_list);
 	INIT_LIST_HEAD(&sys->vm_list);
 	INIT_LIST_HEAD(&sys->pending_list);
+
+	INIT_LIST_HEAD(&sys->outstanding_req_list);
+	INIT_LIST_HEAD(&sys->req_wait_for_obj_list);
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
 	cpg_context_set(cpg_handle, sys);

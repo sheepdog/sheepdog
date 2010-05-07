@@ -64,6 +64,8 @@ struct request {
 	struct list_head r_wlist;
 	struct list_head pending_list;
 
+	uint64_t local_oid[2];
+
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 	int nr_nodes;
 
@@ -93,6 +95,9 @@ struct cluster_info {
 	struct list_head pending_list;
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+
+	struct list_head outstanding_req_list;
+	struct list_head req_wait_for_obj_list;
 
 	uint32_t nr_sobjs;
 
