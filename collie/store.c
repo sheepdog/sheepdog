@@ -1775,29 +1775,6 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	return SD_RES_SUCCESS;
 }
 
-void epoch_queue_request(struct work *work, int idx)
-{
-	struct request *req = container_of(work, struct request, work);
-	int ret = SD_RES_SUCCESS, n;
-	struct sd_epoch_req *hdr = (struct sd_epoch_req *)&req->rq;
-	struct sd_epoch_rsp *rsp = (struct sd_epoch_rsp *)&req->rp;
-	uint32_t opcode = hdr->opcode;
-	struct sheepdog_node_list_entry *entries;
-
-	switch (opcode) {
-	case SD_OP_READ_EPOCH:
-		entries = req->data;
-		n = hdr->data_length / sizeof(*entries);
-		ret = read_epoch(&rsp->latest_epoch, &rsp->ctime, entries, &n);
-		rsp->data_length = n * sizeof(*entries);
-		break;
-	}
-	if (ret != SD_RES_SUCCESS) {
-		dprintf("failed, %d, %x, %x\n", idx, opcode, ret);
-		rsp->result = ret;
-	}
-}
-
 int set_global_nr_copies(uint32_t copies)
 {
 	return attr(epoch_path, ANAME_COPIES, &copies, sizeof(copies), 1);

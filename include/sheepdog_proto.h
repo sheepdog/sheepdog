@@ -35,8 +35,7 @@
 #define SD_OP_UPDATE_EPOCH   0x22
 #define SD_OP_GET_EPOCH      0x23
 #define SD_OP_SHUTDOWN       0x24
-#define SD_OP_READ_EPOCH     0x25
-#define SD_OP_READ_VDIS      0x26
+#define SD_OP_READ_VDIS      0x25
 
 #define SD_OP_DEBUG_INC_NVER 0xA0
 #define SD_OP_DEBUG_SET_NODE 0xA1
@@ -113,29 +112,6 @@ struct sd_rsp {
 	uint32_t        data_length;
 	uint32_t        result;
 	uint32_t	opcode_specific[7];
-};
-
-struct sd_epoch_req {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t	pad[8];
-};
-
-struct sd_epoch_rsp {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        result;
-	uint32_t        latest_epoch;
-	uint64_t        ctime;
-	uint32_t	pad[4];
 };
 
 struct sd_so_req {

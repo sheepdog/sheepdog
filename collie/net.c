@@ -169,7 +169,6 @@ static void queue_request(struct request *req)
 		case SD_OP_STAT_CLUSTER:
 		case SD_OP_MAKE_FS:
 		case SD_OP_GET_NODE_LIST:
-		case SD_OP_READ_EPOCH:
 		case SD_OP_READ_VDIS:
 			break;
 		default:
@@ -193,9 +192,6 @@ static void queue_request(struct request *req)
 	case SD_OP_STAT_SHEEP:
 	case SD_OP_GET_OBJ_LIST:
 		req->work.fn = store_queue_request;
-		break;
-	case SD_OP_READ_EPOCH:
-		req->work.fn = epoch_queue_request;
 		break;
 	case SD_OP_GET_NODE_LIST:
 	case SD_OP_GET_VM_LIST:
