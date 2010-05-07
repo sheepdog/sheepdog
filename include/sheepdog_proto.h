@@ -61,6 +61,7 @@
 #define SD_STATUS_WAIT_FOR_JOIN     0x02
 #define SD_STATUS_SHUTDOWN          0x03
 #define SD_STATUS_INCONSISTENT_EPOCHS   0x04
+#define SD_STATUS_JOIN_FAILED   0x05
 
 #define SD_RES_SUCCESS       0x00 /* Success */
 #define SD_RES_UNKNOWN       0x01 /* Unknown error */
@@ -92,6 +93,9 @@
 #define SD_RES_FULL_VDI      0x1B /* we already have the maximum vdis */
 #define SD_RES_WAIT_FOR_FORMAT      0x1C /* Sheepdog is waiting for a format operation */
 #define SD_RES_WAIT_FOR_JOIN        0x1D /* Sheepdog is waiting for other nodes joining */
+#define SD_RES_NOT_FORMATTED 0x1E /* Sheepdog is not formatted yet */
+#define SD_RES_INVALID_CTIME 0x1F /* Creation time of sheepdog is different */
+#define SD_RES_INVALID_EPOCH 0x20 /* Invalid epoch */
 
 struct sd_req {
 	uint8_t		proto_ver;
