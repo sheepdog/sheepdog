@@ -126,6 +126,9 @@ int read_vdis(char *data, int len, unsigned int *rsp_len);
 
 int setup_ordered_sd_node_list(struct request *req);
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
+int is_access_to_busy_objects(uint64_t oid);
+
+void resume_pending_requests(void);
 
 int create_cluster(int port);
 
@@ -155,6 +158,8 @@ int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 
 int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis);
+void resume_recovery_work(void);
+int is_recoverying_oid(uint64_t oid);
 
 static inline int is_myself(struct sheepdog_node_list_entry *e)
 {

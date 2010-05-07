@@ -35,6 +35,22 @@ int is_io_request(unsigned op)
 	return ret;
 }
 
+void resume_pending_requests(void)
+{
+	struct request *next, *tmp;
+
+	list_for_each_entry_safe(next, tmp, &sys->req_wait_for_obj_list,
+				 r_wlist) {
+		struct cpg_event *cevent = &next->cev;
+
+		list_del(&next->r_wlist);
+		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+	}
+
+	if (list_empty(&sys->cpg_event_siblings))
+		start_cpg_event_work();
+}
+
 static void __done(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -53,7 +69,6 @@ static void __done(struct work *work, int idx)
 	}
 
 	if (is_io_request(hdr->opcode)) {
-		struct request *next, *tmp;
 		list_del(&req->r_wlist);
 
 		sys->nr_outstanding_io--;
@@ -63,17 +78,8 @@ static void __done(struct work *work, int idx)
 		 * of sys->cpg_event_siblings.
 		 */
 
-		list_for_each_entry_safe(next, tmp, &sys->req_wait_for_obj_list,
-					 r_wlist) {
-			struct cpg_event *cevent = &next->cev;
-
-			list_del(&next->r_wlist);
-			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
-		}
-
-		if (!sys->nr_outstanding_io &&
-		    !list_empty(&sys->cpg_event_siblings))
-			start_cpg_event_work();
+		resume_pending_requests();
+		resume_recovery_work();
 	}
 
 	req->done(req);

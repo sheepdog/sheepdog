@@ -1321,27 +1321,30 @@ static int check_epoch(struct request *req)
 	return ret;
 }
 
-static int is_access_to_busy_objects(struct request *req)
+int is_access_to_busy_objects(uint64_t oid)
 {
-	struct request *o_req;
+	struct request *req;
 
-	if (!req->local_oid[0] && !req->local_oid[1])
+	if (!oid)
 		return 0;
 
-	list_for_each_entry(o_req, &sys->outstanding_req_list, r_wlist) {
-
-		if (req->local_oid[0]) {
-			if (req->local_oid[0] == o_req->local_oid[0] ||
-			    req->local_oid[0] == o_req->local_oid[1])
+	list_for_each_entry(req, &sys->outstanding_req_list, r_wlist) {
+		if (oid == req->local_oid[0] || oid == req->local_oid[1])
 				return 1;
-		}
-
-		if (req->local_oid[1]) {
-			if (req->local_oid[1] == o_req->local_oid[0] ||
-			    req->local_oid[1] == o_req->local_oid[1])
-				return 1;
-		}
 	}
+	return 0;
+}
+
+static int __is_access_to_busy_objects(struct request *req)
+{
+	if (is_access_to_busy_objects(req->local_oid[0]) ||
+	    is_access_to_busy_objects(req->local_oid[1]))
+		return 1;
+
+	if (is_recoverying_oid(req->local_oid[0]) ||
+	    is_recoverying_oid(req->local_oid[1]))
+		return 1;
+
 	return 0;
 }
 
@@ -1388,7 +1391,7 @@ void start_cpg_event_work(void)
 		list_del(&cevent->cpg_event_list);
 
 		if (is_io_request(req->rq.opcode)) {
-			if (is_access_to_busy_objects(req)) {
+			if (__is_access_to_busy_objects(req)) {
 				list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
 				continue;
 			}

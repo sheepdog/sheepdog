@@ -1255,17 +1255,57 @@ out:
 		rw->done++;
 }
 
+static struct recovery_work *suspended_recovery_work;
+static uint64_t recovering_oid;
+
 static void __start_recovery(struct work *work, int idx);
 
 static void recover_timer(void *data)
 {
 	struct recovery_work *rw = (struct recovery_work *)data;
+	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
+
+	if (is_access_to_busy_objects(oid)) {
+		suspended_recovery_work = rw;
+		return;
+	}
+
+	recovering_oid = oid;
 	queue_work(&rw->work);
+}
+
+void resume_recovery_work(void)
+{
+	struct recovery_work *rw;
+	uint64_t oid;
+
+	if (!suspended_recovery_work)
+		return;
+
+	rw = suspended_recovery_work;
+
+	oid =  *(((uint64_t *)rw->buf) + rw->done);
+	if (is_access_to_busy_objects(oid))
+		return;
+
+	suspended_recovery_work = NULL;
+	recovering_oid = oid;
+	queue_work(&rw->work);
+}
+
+int is_recoverying_oid(uint64_t oid)
+{
+	return recovering_oid && recovering_oid == oid;
 }
 
 static void recover_done(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
+	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
+
+	recovering_oid = 0;
+
+	resume_pending_requests();
 
 	if (rw->retry) {
 		rw->retry = 0;
@@ -1279,6 +1319,11 @@ static void recover_done(struct work *work, int idx)
 	if (rw->done < rw->count && list_empty(&recovery_work_list)) {
 		rw->work.fn = recover_one;
 
+		if (is_access_to_busy_objects(oid)) {
+			suspended_recovery_work = rw;
+			return;
+		}
+		recovering_oid = oid;
 		queue_work(&rw->work);
 		return;
 	}
