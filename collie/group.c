@@ -1352,6 +1352,7 @@ static int __is_access_to_busy_objects(struct request *req)
 void start_cpg_event_work(void)
 {
 	struct cpg_event *cevent, *n;
+	LIST_HEAD(failed_req_list);
 
 	if (list_empty(&sys->cpg_event_siblings))
 		vprintf(SDOG_ERR "bug\n");
@@ -1404,12 +1405,21 @@ void start_cpg_event_work(void)
 				int ret = check_epoch(req);
 				if (ret != SD_RES_SUCCESS) {
 					req->rp.result = ret;
-					req->done(req);
+					list_del(&req->r_wlist);
+					list_add_tail(&req->r_wlist, &failed_req_list);
 					continue;
 				}
 			}
 		}
 		queue_work(&req->work);
+	}
+
+	while (!list_empty(&failed_req_list)) {
+		struct request *req = list_first_entry(&failed_req_list,
+						       struct request, r_wlist);
+
+		list_del(&req->r_wlist);
+		req->done(req);
 	}
 
 	if (cpg_event_running() || cpg_event_suspended() ||
