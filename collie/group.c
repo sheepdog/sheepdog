@@ -59,6 +59,7 @@ struct join_message {
 	uint32_t nr_sobjs;
 	uint32_t cluster_status;
 	uint32_t epoch;
+	uint64_t ctime;
 	struct {
 		uint32_t nodeid;
 		uint32_t pid;
@@ -349,60 +350,17 @@ static int is_master(void)
 	return 0;
 }
 
-static int get_cluster_status(struct sheepdog_node_list_entry *node)
+static int get_cluster_status(struct sheepdog_node_list_entry *from,
+			      struct sheepdog_node_list_entry *entries,
+			      int nr_entries, uint64_t ctime, uint32_t epoch)
 {
-	struct sd_epoch_req hdr;
-	struct sd_epoch_rsp *rsp = (struct sd_epoch_rsp *)&hdr;
-	unsigned int rlen, wlen;
-	int ret, fd, i, j;
-	char name[128];
-	uint64_t ctime;
-	int nr_entries, nr_local_entries;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int i;
+	int nr_local_entries;
 	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
-	uint32_t epoch;
+	struct node *node;
 
 	if (sys->status == SD_STATUS_INCONSISTENT_EPOCHS)
 		return SD_STATUS_INCONSISTENT_EPOCHS;
-
-	if (is_myself(node)) {
-		nr_entries = ARRAY_SIZE(entries);
-		ret = read_epoch(&epoch, &ctime, entries, &nr_entries);
-	} else {
-		addr_to_str(name, sizeof(name), node->addr, 0);
-
-		fd = connect_to(name, node->port);
-		if (fd < 0)
-			return SD_STATUS_INCONSISTENT_EPOCHS;
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_EPOCH;
-		hdr.epoch = sys->epoch;
-		hdr.data_length = sizeof(entries);
-		rlen = hdr.data_length;
-		wlen = 0;
-
-		ret = exec_req(fd, (struct sd_req *)&hdr, entries,
-			       &wlen, &rlen);
-
-
-		nr_entries = rlen / sizeof(*entries);
-		if (ret != 0) {
-			eprintf("failed to send request, %x, %s\n", ret, name);
-			close(fd);
-			return SD_STATUS_INCONSISTENT_EPOCHS;
-		}
-		epoch = rsp->latest_epoch;
-		ctime = rsp->ctime;
-		ret = rsp->result;
-
-		close(fd);
-	}
-
-	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to read epoch, %x\n", ret);
-		return SD_STATUS_WAIT_FOR_FORMAT;
-	}
 
 	if (epoch != get_latest_epoch())
 		return SD_STATUS_INCONSISTENT_EPOCHS;
@@ -420,15 +378,19 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 	if (memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0)
 		return SD_STATUS_INCONSISTENT_EPOCHS;
 
-	nr_entries = get_ordered_sd_node_list(entries);
-	if (nr_entries + 1 != nr_local_entries)
+	nr_entries = 1;
+	list_for_each_entry(node, &sys->sd_node_list, list) {
+		nr_entries++;
+	}
+
+	if (nr_entries != nr_local_entries)
 		return SD_STATUS_WAIT_FOR_JOIN;
 
 	for (i = 0; i < nr_local_entries; i++) {
-		if (local_entries[i].id == node->id)
+		if (local_entries[i].id == from->id)
 			goto next;
-		for (j = 0; j < nr_entries; j++) {
-			if (local_entries[i].id == entries[j].id)
+		list_for_each_entry(node, &sys->sd_node_list, list) {
+			if (local_entries[i].id == node->ent.id)
 				goto next;
 		}
 		return SD_STATUS_WAIT_FOR_JOIN;
@@ -442,6 +404,8 @@ static int get_cluster_status(struct sheepdog_node_list_entry *node)
 static void join(struct join_message *msg)
 {
 	struct node *node;
+	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	int i;
 
 	if (msg->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
@@ -453,17 +417,23 @@ static void join(struct join_message *msg)
 	else
 		msg->epoch = 0;
 
+	if (sys->status == SD_STATUS_WAIT_FOR_JOIN) {
+		for (i = 0; i < msg->nr_nodes; i++)
+			entry[i] = msg->nodes[i].ent;
+
+		msg->cluster_status = get_cluster_status(&msg->header.from,
+							 entry, msg->nr_nodes,
+							 msg->ctime, msg->epoch);
+	} else
+		msg->cluster_status = sys->status;
+
+	msg->nr_nodes = 0;
 	list_for_each_entry(node, &sys->sd_node_list, list) {
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
 		msg->nodes[msg->nr_nodes].pid = node->pid;
 		msg->nodes[msg->nr_nodes].ent = node->ent;
 		msg->nr_nodes++;
 	}
-
-	if (sys->status == SD_STATUS_WAIT_FOR_JOIN)
-		msg->cluster_status = get_cluster_status(&msg->header.from);
-	else
-		msg->cluster_status = sys->status;
 }
 
 static void get_vdi_bitmap_from_all(void)
@@ -1089,6 +1059,7 @@ static int is_my_cpg_addr(struct cpg_address *addr)
 static void __sd_confchg(struct cpg_event *cevent)
 {
 	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
+	int ret, status;
 
 	if (w->member_list_entries ==
 	    w->joined_list_entries - w->left_list_entries &&
@@ -1110,6 +1081,10 @@ static void __sd_confchg(struct cpg_event *cevent)
 
 	if (w->first_cpg_node) {
 		struct join_message msg;
+		struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+		int nr_entries;
+		uint64_t ctime;
+		uint32_t epoch;
 
 		/*
 		 * If I'm the first collie joins in colosync, I
@@ -1123,7 +1098,16 @@ static void __sd_confchg(struct cpg_event *cevent)
 		msg.header.from = sys->this_node;
 		msg.header.nodeid = sys->this_nodeid;
 		msg.header.pid = sys->this_pid;
-		msg.cluster_status = get_cluster_status(&msg.header.from);
+
+		nr_entries = ARRAY_SIZE(entries);
+		ret = read_epoch(&epoch, &ctime, entries, &nr_entries);
+		if (ret == SD_RES_SUCCESS) {
+			status = get_cluster_status(&msg.header.from,
+						    entries, nr_entries,
+						    ctime, epoch);
+			msg.cluster_status = status;
+		} else
+			msg.cluster_status = SD_STATUS_WAIT_FOR_FORMAT;
 
 		update_cluster_info(&msg);
 
@@ -1136,6 +1120,8 @@ static void __sd_confchg(struct cpg_event *cevent)
 static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
 {
 	struct join_message msg;
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int nr_entries, i, ret;
 
 	/* if I've just joined in cpg, I'll join in sheepdog. */
 	if (!is_my_cpg_addr(addr))
@@ -1149,6 +1135,14 @@ static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
 	msg.header.pid = sys->this_pid;
 
 	get_global_nr_copies(&msg.nr_sobjs);
+
+	nr_entries = ARRAY_SIZE(entries);
+	ret = read_epoch(&msg.epoch, &msg.ctime, entries, &nr_entries);
+	if (ret == SD_RES_SUCCESS) {
+		msg.nr_nodes = nr_entries;
+		for (i = 0; i < nr_entries; i++)
+			msg.nodes[i].ent = entries[i];
+	}
 
 	send_message(sys->handle, (struct message_header *)&msg);
 
