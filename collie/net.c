@@ -51,41 +51,6 @@ void resume_pending_requests(void)
 		start_cpg_event_work();
 }
 
-static void __done(struct work *work, int idx)
-{
-	struct request *req = container_of(work, struct request, work);
-	struct sd_req *hdr = (struct sd_req *)&req->rq;
-
-	switch (hdr->opcode) {
-	case SD_OP_NEW_VDI:
-	case SD_OP_DEL_VDI:
-	case SD_OP_LOCK_VDI:
-	case SD_OP_RELEASE_VDI:
-	case SD_OP_GET_VDI_INFO:
-	case SD_OP_MAKE_FS:
-	case SD_OP_SHUTDOWN:
-		/* request is forwarded to cpg group */
-		return;
-	}
-
-	if (is_io_request(hdr->opcode)) {
-		list_del(&req->r_wlist);
-
-		sys->nr_outstanding_io--;
-		/*
-		 * TODO: if the request failed due to epoch unmatch,
-		 * we should retry here (adds this request to the tail
-		 * of sys->cpg_event_siblings.
-		 */
-
-		resume_pending_requests();
-		resume_recovery_work();
-	}
-
-	req->done(req);
-}
-
-
 static int is_access_local(struct sheepdog_node_list_entry *e, int nr_nodes,
 			   uint64_t oid, int copies)
 {
@@ -125,6 +90,57 @@ static void setup_access_to_local_objects(struct request *req)
 	if ((hdr->flags & SD_FLAG_CMD_COW) &&
 	    is_access_local(req->entry, req->nr_nodes, hdr->cow_oid, copies))
 		req->local_oid[1] = hdr->cow_oid;
+}
+
+static void __done(struct work *work, int idx)
+{
+	struct request *req = container_of(work, struct request, work);
+	struct sd_req *hdr = (struct sd_req *)&req->rq;
+	int again = 0;
+
+	switch (hdr->opcode) {
+	case SD_OP_NEW_VDI:
+	case SD_OP_DEL_VDI:
+	case SD_OP_LOCK_VDI:
+	case SD_OP_RELEASE_VDI:
+	case SD_OP_GET_VDI_INFO:
+	case SD_OP_MAKE_FS:
+	case SD_OP_SHUTDOWN:
+		/* request is forwarded to cpg group */
+		return;
+	}
+
+	if (is_io_request(hdr->opcode)) {
+		struct cpg_event *cevent = &req->cev;
+
+		list_del(&req->r_wlist);
+
+		sys->nr_outstanding_io--;
+		/*
+		 * TODO: if the request failed due to epoch unmatch,
+		 * we should retry here (adds this request to the tail
+		 * of sys->cpg_event_siblings.
+		 */
+
+		if (!(req->rq.flags & SD_FLAG_CMD_DIRECT) &&
+		    (req->rp.result == SD_RES_OLD_NODE_VER ||
+		     req->rp.result == SD_RES_NEW_NODE_VER)) {
+
+
+			req->rq.epoch = sys->epoch;
+			req->nr_nodes = setup_ordered_sd_node_list(req);
+			setup_access_to_local_objects(req);
+
+			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+			again = 1;
+		}
+
+		resume_pending_requests();
+		resume_recovery_work();
+	}
+
+	if (!again)
+		req->done(req);
 }
 
 static void queue_request(struct request *req)

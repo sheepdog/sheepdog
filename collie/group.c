@@ -1353,6 +1353,7 @@ void start_cpg_event_work(void)
 {
 	struct cpg_event *cevent, *n;
 	LIST_HEAD(failed_req_list);
+	int retry;
 
 	if (list_empty(&sys->cpg_event_siblings))
 		vprintf(SDOG_ERR "bug\n");
@@ -1382,6 +1383,9 @@ void start_cpg_event_work(void)
 			panic("should not happen\n");
 		return;
 	}
+
+do_retry:
+	retry = 0;
 
 	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
@@ -1417,10 +1421,14 @@ void start_cpg_event_work(void)
 	while (!list_empty(&failed_req_list)) {
 		struct request *req = list_first_entry(&failed_req_list,
 						       struct request, r_wlist);
-
 		list_del(&req->r_wlist);
 		req->done(req);
+
+		retry = 1;
 	}
+
+	if (retry)
+		goto do_retry;
 
 	if (cpg_event_running() || cpg_event_suspended() ||
 	    list_empty(&sys->cpg_event_siblings) || sys->nr_outstanding_io)
