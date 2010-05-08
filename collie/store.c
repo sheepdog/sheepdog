@@ -702,24 +702,26 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		rsp->copies = copies;
 
 		if (!is_data_obj(oid)) {
-			ret = verify_object(fd, NULL, 0, 0);
-			if (ret < 0) {
-				eprintf("verification failed, %lx\n", oid);
-				ret = SD_RES_EIO;
-				goto out;
-			}
+			/* FIXME: need to check whether the object is valid or not */
+/* 			ret = verify_object(fd, NULL, 0, 0); */
+/* 			if (ret < 0) { */
+/* 				eprintf("verification failed, %lx\n", oid); */
+/* 				ret = SD_RES_EIO; */
+/* 				goto out; */
+/* 			} */
 		}
 
 		ret = SD_RES_SUCCESS;
 		break;
 	case SD_OP_WRITE_OBJ:
 		if (!is_data_obj(oid)) {
-			ret = verify_object(fd, NULL, 0, 0);
-			if (ret < 0) {
-				eprintf("verification failed, %lx\n", oid);
-				ret = SD_RES_EIO;
-				goto out;
-			}
+			/* FIXME: need to check whether the object is valid or not */
+/* 			ret = verify_object(fd, NULL, 0, 0); */
+/* 			if (ret < 0) { */
+/* 				eprintf("verification failed, %lx\n", oid); */
+/* 				ret = SD_RES_EIO; */
+/* 				goto out; */
+/* 			} */
 		}
 		/* fall through */
 	case SD_OP_CREATE_AND_WRITE_OBJ:
@@ -730,12 +732,13 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		}
 
 		if (!is_data_obj(oid)) {
-			ret = verify_object(fd, NULL, 0, 1);
-			if (ret < 0) {
-				eprintf("failed to set checksum, %lx\n", oid);
-				ret = SD_RES_EIO;
-				goto out;
-			}
+			/* FIXME: need to update atomically */
+/* 			ret = verify_object(fd, NULL, 0, 1); */
+/* 			if (ret < 0) { */
+/* 				eprintf("failed to set checksum, %lx\n", oid); */
+/* 				ret = SD_RES_EIO; */
+/* 				goto out; */
+/* 			} */
 		}
 
 		ret = SD_RES_SUCCESS;
