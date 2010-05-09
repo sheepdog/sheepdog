@@ -467,8 +467,8 @@ static void do_print_obj(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 {
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
-		printf("%s: has the version %u (should be %d copies)\n",
-		       sheep, rsp->obj_ver, rsp->copies);
+		printf("%s: has the object (should be %d copies)\n",
+		       sheep, rsp->copies);
 		break;
 	case SD_RES_NO_OBJ:
 		printf("%s: doesn't have\n", sheep);

@@ -116,9 +116,8 @@ struct sd_obj_rsp {
 	uint32_t        id;
 	uint32_t        data_length;
 	uint32_t        result;
-	uint32_t        obj_ver;
 	uint32_t        copies;
-	uint32_t        pad[5];
+	uint32_t        pad[6];
 };
 
 struct sd_vdi_req {
@@ -145,8 +144,7 @@ struct sd_vdi_rsp {
 	uint32_t        result;
 	uint32_t        rsvd;
 	uint32_t        vdi_id;
-	uint32_t	vdi_epoch;
-	uint32_t        pad[4];
+	uint32_t        pad[5];
 };
 
 struct sheepdog_inode {
