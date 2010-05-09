@@ -15,9 +15,12 @@
 #include "util.h"
 #include "list.h"
 
+#define SD_COLLIE_PROTO_VER 0x01
+
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096 /* FIXME: should be removed */
 
+#define SD_OP_COLLIE         0x80
 #define SD_OP_DEL_VDI        0x81
 #define SD_OP_GET_NODE_LIST  0x82
 #define SD_OP_GET_VM_LIST    0x83
@@ -170,6 +173,11 @@ static inline void print_node_list_entry(struct sheepdog_node_list_entry *e,
 	snprintf(str, size, "%016" PRIx64 " - %d.%d.%d.%d:%d",
 		 e->id, e->addr[12], e->addr[13],
 		 e->addr[14], e->addr[15], e->port);
+}
+
+static inline int is_collie_op(uint8_t op)
+{
+	return op & SD_OP_COLLIE;
 }
 
 #endif

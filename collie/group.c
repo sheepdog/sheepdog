@@ -43,9 +43,10 @@ enum deliver_msg_state {
 };
 
 struct message_header {
+	uint8_t proto_ver;
+	uint8_t pad;
 	uint8_t op;
 	uint8_t state;
-	uint8_t pad[2];
 	uint32_t msg_length;
 	uint32_t nodeid;
 	uint32_t pid;
@@ -475,6 +476,12 @@ static void join(struct join_message *msg)
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 	int i;
 
+	if (msg->header.proto_ver != SD_COLLIE_PROTO_VER) {
+		eprintf("joining node send a wrong version message\n");
+		msg->result = SD_RES_VER_MISMATCH;
+		return;
+	}
+
 	if (msg->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
 
@@ -581,9 +588,8 @@ static void update_cluster_info(struct join_message *msg)
 		if (is_myself(&msg->header.from)) {
 			eprintf("failed to join sheepdog, %d\n", msg->result);
 			sys->status = SD_STATUS_JOIN_FAILED;
-			return;
-		} else
-			return;
+		}
+		return;
 	}
 
 	if (!sys->nr_sobjs)
@@ -656,7 +662,7 @@ out:
 			sys->epoch = get_latest_epoch();
 	}
 
-	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS) {
+	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS || sys->status != SD_STATUS_JOIN_FAILED) {
 		if (msg->cluster_status == SD_STATUS_OK) {
 			get_vdi_bitmap_from_all();
 			set_global_nr_copies(sys->nr_sobjs);
@@ -690,6 +696,10 @@ static void vdi_op(struct vdi_op_message *msg)
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
+		if (hdr->proto_ver != SD_PROTO_VER) {
+			ret = SD_RES_VER_MISMATCH;
+			break;
+		}
 		ret = lookup_vdi(hdr->epoch, data, hdr->data_length, &vid, hdr->snapid);
 		if (ret != SD_RES_SUCCESS)
 			break;

@@ -15,6 +15,8 @@
 #include <stdint.h>
 #include "util.h"
 
+#define SD_PROTO_VER 0x01
+
 #define SD_LISTEN_PORT 7000
 
 #define SD_OP_CREATE_AND_WRITE_OBJ  0x01
@@ -50,6 +52,7 @@
 #define SD_RES_SHUTDOWN      0x11 /* Sheepdog is shutting down */
 #define SD_RES_NO_MEM        0x12 /* Cannot allocate memory */
 #define SD_RES_FULL_VDI      0x13 /* we already have the maximum vdis */
+#define SD_RES_VER_MISMATCH  0x14 /* Protocol version mismatch */
 
 /*
  * Object ID rules

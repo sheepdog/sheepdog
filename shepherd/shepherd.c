@@ -843,6 +843,7 @@ static int vdi_lock(int argc, char **argv)
 
 	memset(&hdr, 0, sizeof(hdr));
 
+	hdr.proto_ver = SD_PROTO_VER; /* version is checked when locking */
 	hdr.opcode = opcode;
 	hdr.data_length = wlen;
 	hdr.flags = flags;
