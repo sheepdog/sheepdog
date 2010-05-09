@@ -350,8 +350,6 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 
 	ret = -1;
 out:
-	free(e);
-
 	return ret;
 }
 
