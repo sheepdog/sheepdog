@@ -28,7 +28,7 @@
 #include <curses.h>
 
 #include "sheepdog_proto.h"
-#include "meta.h"
+#include "collie.h"
 #include "net.h"
 #include "treeview.h"
 
@@ -133,10 +133,6 @@ static int update_node_list(int max_nodes, int epoch)
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		break;
-	case SD_RES_DIR_READ:
-		fprintf(stderr, "cannot read directory object\n");
-		ret = -1;
-		goto out;
 	case SD_RES_WAIT_FOR_FORMAT:
 		fprintf(stderr, "sheepdog is not formatted yet\n");
 		ret = -1;
@@ -147,10 +143,6 @@ static int update_node_list(int max_nodes, int epoch)
 		goto out;
 	case SD_RES_SHUTDOWN:
 		fprintf(stderr, "sheepdog is shutting down\n");
-		ret = -1;
-		goto out;
-	case SD_RES_NO_EPOCH:
-		fprintf(stderr, "requested epoch is not found\n");
 		ret = -1;
 		goto out;
 	case SD_RES_INCONSISTENT_EPOCHS:
@@ -306,20 +298,35 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 		return ret;
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
+		struct sd_obj_req hdr;
+		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+
 		if (!test_bit(nr, vdi_inuse))
 			continue;
 
-		ret = read_object(node_list_entries, nr_nodes, node_list_version,
-				  vid_to_vdi_oid(nr), (void *)&i,
-				  sizeof(i), 0, nr_nodes);
+		wlen = 0;
+		rlen = sizeof(i);
 
-		if (ret == sizeof(i)) {
+		fd = connect_to("localhost", sdport);
+		if (fd < 0) {
+			printf("failed to connect, %m\n");
+			return -1;
+		}
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.opcode = SD_OP_READ_OBJ;
+		hdr.oid = vid_to_vdi_oid(nr);
+		hdr.data_length = rlen;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, &i, &wlen, &rlen);
+		close(fd);
+
+		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			if (i.name[0] == '\0') /* deleted */
 				continue;
 			func(i.vdi_id, i.name, i.snap_id, 0, &i, data);
 		} else
 			printf("error %lu, %d\n", nr, ret);
-
 	}
 
 	return 0;
@@ -968,24 +975,20 @@ static int cluster_info(int argc, char **argv)
 	if (ret != 0)
 		return 1;
 
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to get cluster status, %x\n", rsp->result);
-		return 1;
-	}
-	switch (rsp->rsvd) {
-	case SD_STATUS_OK:
+	switch (rsp->result) {
+	case SD_RES_SUCCESS:
 		printf("running\n");
 		break;
-	case SD_STATUS_WAIT_FOR_FORMAT:
+	case SD_RES_WAIT_FOR_FORMAT:
 		printf("sheepdog is not formatted yet\n");
 		break;
-	case SD_STATUS_WAIT_FOR_JOIN:
+	case SD_RES_WAIT_FOR_JOIN:
 		printf("sheepdog is waiting for other nodes joining\n");
 		break;
-	case SD_STATUS_INCONSISTENT_EPOCHS:
+	case SD_RES_INCONSISTENT_EPOCHS:
 		printf("there is inconsistency between epochs\n");
 		break;
-	case SD_STATUS_SHUTDOWN:
+	case SD_RES_SHUTDOWN:
 		printf("shutdown\n");
 		break;
 	default:

@@ -16,7 +16,7 @@
 #include <linux/limits.h>
 #include <sys/syslog.h>
 
-#include "collie.h"
+#include "collie_priv.h"
 
 #define EPOLL_SIZE 4096
 #define DEFAULT_OBJECT_DIR "/tmp"

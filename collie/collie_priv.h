@@ -8,8 +8,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __COLLIE_H__
-#define __COLLIE_H__
+#ifndef __COLLIE_PRIV_H__
+#define __COLLIE_PRIV_H__
 
 #include <inttypes.h>
 #include <corosync/cpg.h>
@@ -19,11 +19,25 @@
 #include "logger.h"
 #include "work.h"
 #include "net.h"
-#include "meta.h"
+#include "collie.h"
+
+#define SD_MAX_REDUNDANCY 8
+
+#define SD_OP_REMOVE_OBJ     0x91
+#define SD_OP_SYNC_OBJ       0x92
+
+#define SD_OP_GET_OBJ_LIST   0xA1
 
 #define SD_MSG_JOIN             0x01
 #define SD_MSG_VDI_OP           0x02
 #define SD_MSG_MASTER_CHANGED   0x03
+
+#define SD_STATUS_OK                0x00
+#define SD_STATUS_WAIT_FOR_FORMAT   0x01
+#define SD_STATUS_WAIT_FOR_JOIN     0x02
+#define SD_STATUS_SHUTDOWN          0x03
+#define SD_STATUS_INCONSISTENT_EPOCHS   0x04
+#define SD_STATUS_JOIN_FAILED       0x05
 
 enum cpg_event_type {
 	CPG_EVENT_CONCHG,
@@ -158,6 +172,18 @@ uint64_t get_cluster_ctime(void);
 int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis);
 void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
+
+int write_object(struct sheepdog_node_list_entry *e,
+		 int nodes, uint32_t node_version,
+		 uint64_t oid, char *data, unsigned int datalen,
+		 uint64_t offset, int nr, int create);
+int read_object(struct sheepdog_node_list_entry *e,
+		int nodes, uint32_t node_version,
+		uint64_t oid, char *data, unsigned int datalen,
+		uint64_t offset, int nr);
+int remove_object(struct sheepdog_node_list_entry *e,
+		  int nodes, uint32_t node_version,
+		  uint64_t oid, int nr);
 
 static inline int is_myself(struct sheepdog_node_list_entry *e)
 {

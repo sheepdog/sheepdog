@@ -19,8 +19,7 @@
 #include <sys/xattr.h>
 #include <sys/statvfs.h>
 
-#include "collie.h"
-#include "meta.h"
+#include "collie_priv.h"
 
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"

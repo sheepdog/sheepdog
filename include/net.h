@@ -35,18 +35,6 @@ int connect_to(char *name, int port);
 int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int *wlen);
 int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	     unsigned int *wlen, unsigned int *rlen);
-int write_object(struct sheepdog_node_list_entry *e,
-		 int nodes, uint32_t node_version,
-		 uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, int nr, int create);
-int read_object(struct sheepdog_node_list_entry *e,
-		int nodes, uint32_t node_version,
-		uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int nr);
-int remove_object(struct sheepdog_node_list_entry *e,
-		  int nodes, uint32_t node_version,
-		  uint64_t oid, int nr);
-
 int create_listen_ports(int port, int (*callback)(int fd, void *), void *data);
 
 char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port);

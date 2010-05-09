@@ -18,10 +18,9 @@
 #include <corosync/cfg.h>
 
 #include "sheepdog_proto.h"
-#include "collie.h"
+#include "collie_priv.h"
 #include "list.h"
 #include "util.h"
-#include "meta.h"
 #include "logger.h"
 #include "work.h"
 
@@ -264,7 +263,6 @@ void cluster_queue_request(struct work *work, int idx)
 	case SD_OP_STAT_CLUSTER:
 		log = (struct epoch_log *)req->data;
 
-		((struct sd_vdi_rsp *)rsp)->rsvd = sys->status;
 		log->ctime = get_cluster_ctime();
 		log->epoch = get_latest_epoch();
 		log->nr_nodes = epoch_log_read(log->epoch, (char *)log->nodes,
@@ -277,7 +275,29 @@ void cluster_queue_request(struct work *work, int idx)
 			log->nr_nodes /= sizeof(log->nodes[0]);
 		}
 
-		rsp->result = SD_RES_SUCCESS;
+		switch (sys->status) {
+		case SD_STATUS_OK:
+			ret = SD_RES_SUCCESS;
+			break;
+		case SD_STATUS_WAIT_FOR_FORMAT:
+			ret = SD_RES_WAIT_FOR_FORMAT;
+			break;
+		case SD_STATUS_WAIT_FOR_JOIN:
+			ret = SD_RES_WAIT_FOR_JOIN;
+			break;
+		case SD_STATUS_SHUTDOWN:
+			ret = SD_RES_SHUTDOWN;
+			break;
+		case SD_STATUS_INCONSISTENT_EPOCHS:
+			ret = SD_RES_INCONSISTENT_EPOCHS;
+			break;
+		case SD_STATUS_JOIN_FAILED:
+			ret = SD_RES_JOIN_FAILED;
+			break;
+		default:
+			ret = SD_RES_SYSTEM_ERROR;
+			break;
+		}
 		break;
 	default:
 		/* forward request to group */
