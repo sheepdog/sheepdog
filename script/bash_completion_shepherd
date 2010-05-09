@@ -1,0 +1,47 @@
+#!bash
+
+_shepherd()
+{
+	local opts cur prev
+	opts="cluster node vdi vm"
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+	case "${prev}" in
+		cluster)
+	     	COMPREPLY=( $( \
+		    compgen -W "info format shutdown" \
+		    ${COMP_WORDS[COMP_CWORD]}
+	    	))
+	    	return 0
+	    	;;
+
+		node)
+	     	COMPREPLY=( $( \
+		    compgen -W "info list" \
+		    ${COMP_WORDS[COMP_CWORD]}
+	    	))
+	    	return 0
+	    	;;
+
+		vdi)
+	     	COMPREPLY=( $( \
+		    compgen -W "list delete object lock release" \
+		    ${COMP_WORDS[COMP_CWORD]}
+	    	))
+	    	return 0
+	    	;;
+
+		vm)
+	     	COMPREPLY=( $( \
+		    compgen -W "list" \
+		    ${COMP_WORDS[COMP_CWORD]}
+	    	))
+	    	return 0
+	    	;;
+	esac
+
+	COMPREPLY=( $( compgen -W "${opts}" ${cur} ) )
+}
+
+complete -F _shepherd shepherd
