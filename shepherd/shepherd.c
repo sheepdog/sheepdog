@@ -292,10 +292,10 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 
 	rlen = sizeof(vdi_inuse);
 	ret = exec_req(fd, &req, vdi_inuse, &wlen, &rlen);
-	close(fd);
-
-	if (ret < 0)
+	if (ret < 0) {
+		close(fd);
 		return ret;
+	}
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
 		struct sd_obj_req hdr;
@@ -305,13 +305,8 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 			continue;
 
 		wlen = 0;
-		rlen = sizeof(i);
-
-		fd = connect_to("localhost", sdport);
-		if (fd < 0) {
-			printf("failed to connect, %m\n");
-			return -1;
-		}
+		/* don't need to read the entire object */
+		rlen = sizeof(i) - sizeof(i.data_vdi_id);
 
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.opcode = SD_OP_READ_OBJ;
@@ -319,7 +314,6 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 		hdr.data_length = rlen;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr, &i, &wlen, &rlen);
-		close(fd);
 
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			if (i.name[0] == '\0') /* deleted */
@@ -328,6 +322,8 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 		} else
 			printf("error %lu, %d\n", nr, ret);
 	}
+
+	close(fd);
 
 	return 0;
 }
