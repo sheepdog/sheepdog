@@ -1204,6 +1204,7 @@ static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
 	if (!is_my_cpg_addr(addr))
 		return;
 
+	msg.header.proto_ver = SD_COLLIE_PROTO_VER;
 	msg.header.op = SD_MSG_JOIN;
 	msg.header.state = DM_INIT;
 	msg.header.msg_length = sizeof(msg);
