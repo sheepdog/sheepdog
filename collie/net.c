@@ -46,7 +46,7 @@ void resume_pending_requests(void)
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 	}
 
-	if (list_empty(&sys->cpg_event_siblings))
+	if (!list_empty(&sys->cpg_event_siblings))
 		start_cpg_event_work();
 }
 
