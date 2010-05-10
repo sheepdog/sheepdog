@@ -607,7 +607,6 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 	case SD_OP_CREATE_AND_WRITE_OBJ:
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_READ_OBJ:
-	case SD_OP_SYNC_OBJ:
 		if (opcode == SD_OP_CREATE_AND_WRITE_OBJ)
 			fd = ob_open(epoch, oid, O_CREAT, &ret);
 		else
@@ -745,15 +744,6 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		}
 
 		ret = SD_RES_SUCCESS;
-		break;
-	case SD_OP_SYNC_OBJ:
-		ret = fsync(fd);
-		if (ret) {
-			if (errno == EIO)
-				ret = SD_RES_EIO;
-			else
-				ret = SD_RES_UNKNOWN;
-		}
 		break;
 	}
 out:

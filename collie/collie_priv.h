@@ -24,7 +24,6 @@
 #define SD_MAX_REDUNDANCY 8
 
 #define SD_OP_REMOVE_OBJ     0x91
-#define SD_OP_SYNC_OBJ       0x92
 
 #define SD_OP_GET_OBJ_LIST   0xA1
 
