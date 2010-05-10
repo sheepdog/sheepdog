@@ -145,10 +145,6 @@ static int update_node_list(int max_nodes, int epoch)
 		fprintf(stderr, "sheepdog is shutting down\n");
 		ret = -1;
 		goto out;
-	case SD_RES_INCONSISTENT_EPOCHS:
-		fprintf(stderr, "there is inconsistency betweeen epochs\n");
-		ret = -1;
-		goto out;
 	default:
 		fprintf(stderr, "unknown error: %d\n", rsp->result);
 		ret = -1;
@@ -985,11 +981,11 @@ static int cluster_info(int argc, char **argv)
 	case SD_RES_WAIT_FOR_JOIN:
 		printf("sheepdog is waiting for other nodes joining\n");
 		break;
-	case SD_RES_INCONSISTENT_EPOCHS:
-		printf("there is inconsistency between epochs\n");
-		break;
 	case SD_RES_SHUTDOWN:
 		printf("shutdown\n");
+		break;
+	case SD_RES_JOIN_FAILED:
+		printf("failed to join sheepdog\n");
 		break;
 	default:
 		printf("%d\n", rsp->rsvd);

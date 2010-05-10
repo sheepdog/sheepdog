@@ -40,8 +40,7 @@
 #define SD_RES_NOT_FORMATTED 0x45 /* Sheepdog is not formatted yet */
 #define SD_RES_INVALID_CTIME 0x46 /* Creation time of sheepdog is different */
 #define SD_RES_INVALID_EPOCH 0x47 /* Invalid epoch */
-#define SD_RES_INCONSISTENT_EPOCHS  0x48 /* There is inconsistency between epochs */
-#define SD_RES_JOIN_FAILED   0x49 /* Target node was failed to join sheepdog */
+#define SD_RES_JOIN_FAILED   0x48 /* Target node was failed to join sheepdog */
 
 struct sd_so_req {
 	uint8_t		proto_ver;

@@ -36,8 +36,7 @@
 #define SD_STATUS_WAIT_FOR_FORMAT   0x01
 #define SD_STATUS_WAIT_FOR_JOIN     0x02
 #define SD_STATUS_SHUTDOWN          0x03
-#define SD_STATUS_INCONSISTENT_EPOCHS   0x04
-#define SD_STATUS_JOIN_FAILED       0x05
+#define SD_STATUS_JOIN_FAILED       0x04
 
 enum cpg_event_type {
 	CPG_EVENT_CONCHG,

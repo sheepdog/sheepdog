@@ -289,9 +289,6 @@ void cluster_queue_request(struct work *work, int idx)
 		case SD_STATUS_SHUTDOWN:
 			ret = SD_RES_SHUTDOWN;
 			break;
-		case SD_STATUS_INCONSISTENT_EPOCHS:
-			ret = SD_RES_INCONSISTENT_EPOCHS;
-			break;
 		case SD_STATUS_JOIN_FAILED:
 			ret = SD_RES_JOIN_FAILED;
 			break;
@@ -462,8 +459,6 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		break;
 	case SD_STATUS_SHUTDOWN:
 		return SD_RES_SHUTDOWN;
-	case SD_STATUS_INCONSISTENT_EPOCHS:
-		return SD_RES_INCONSISTENT_EPOCHS;
 	default:
 		break;
 	}
@@ -662,7 +657,7 @@ out:
 			sys->epoch = get_latest_epoch();
 	}
 
-	if (sys->status != SD_STATUS_INCONSISTENT_EPOCHS || sys->status != SD_STATUS_JOIN_FAILED) {
+	if (sys->status != SD_STATUS_JOIN_FAILED) {
 		if (msg->cluster_status == SD_STATUS_OK) {
 			get_vdi_bitmap_from_all();
 			set_global_nr_copies(sys->nr_sobjs);
@@ -1546,7 +1541,7 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 			member_list[i].reason);
 	}
 
-	if (sys->status == SD_STATUS_SHUTDOWN || sys->status == SD_STATUS_INCONSISTENT_EPOCHS)
+	if (sys->status == SD_STATUS_SHUTDOWN)
 		return;
 
 	w = zalloc(sizeof(*w));

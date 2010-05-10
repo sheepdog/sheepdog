@@ -162,8 +162,7 @@ static void queue_request(struct request *req)
 	}
 
 	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
-	    sys->status == SD_STATUS_WAIT_FOR_JOIN ||
-	    sys->status == SD_STATUS_INCONSISTENT_EPOCHS) {
+	    sys->status == SD_STATUS_WAIT_FOR_JOIN) {
 		/* TODO: cleanup */
 		switch (hdr->opcode) {
 		case SD_OP_STAT_CLUSTER:
@@ -174,10 +173,8 @@ static void queue_request(struct request *req)
 		default:
 			if (sys->status == SD_STATUS_WAIT_FOR_FORMAT)
 				rsp->result = SD_RES_WAIT_FOR_FORMAT;
-			else if (sys->status == SD_STATUS_WAIT_FOR_JOIN)
-				rsp->result = SD_RES_WAIT_FOR_JOIN;
 			else
-				rsp->result = SD_RES_INCONSISTENT_EPOCHS;
+				rsp->result = SD_RES_WAIT_FOR_JOIN;
 			req->done(req);
 			return;
 		}
