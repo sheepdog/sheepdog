@@ -707,6 +707,9 @@ static struct subcommand vm_cmd[] = {
 
 static int vdi_list(int argc, char **argv)
 {
+	printf("  name        id    size    used  shared    creation time   vdi id\n");
+	printf("------------------------------------------------------------------\n");
+
 	parse_vdi(print_vdi_list, NULL);
 	return 0;
 }
