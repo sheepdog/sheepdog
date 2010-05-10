@@ -1083,11 +1083,11 @@ static int (*command_parser)(int, char *);
 static int (*command_fn)(int, char **);
 static void (*command_help)(void);
 
-static void setup_command(char *cmd, char *subcmd)
+static unsigned long setup_command(char *cmd, char *subcmd)
 {
 	int i, found = 0;
 	struct subcommand *s;
-	unsigned long flags;
+	unsigned long flags = 0;
 
 	for (i = 0; i < ARRAY_SIZE(commands); i++) {
 		if (!strncmp(commands[i].name, cmd, strlen(commands[i].name))) {
@@ -1122,19 +1122,14 @@ static void setup_command(char *cmd, char *subcmd)
 		exit(1);
 	}
 
-	if (flags & SUBCMD_FLAG_NEED_THIRD_ARG) {
-		fprintf(stderr, "'%s %s' needs the third argument\n", cmd, subcmd);
-		exit(1);
-	}
-
-	if (flags & SUBCMD_FLAG_NEED_NOEDLIST)
-		update_node_list(SD_MAX_NODES, 0);
+	return flags;
 }
 
 int main(int argc, char **argv)
 {
 	int ch, longindex;
 	char termcap_area[1024];
+	unsigned long flags;
 
 	if (getenv("TERM"))
 		tgetent(termcap_area, getenv("TERM"));
@@ -1142,7 +1137,10 @@ int main(int argc, char **argv)
 	if (argc < 3)
 		usage(0);
 
-	setup_command(argv[1], argv[2]);
+	flags = setup_command(argv[1], argv[2]);
+
+	if (flags & SUBCMD_FLAG_NEED_NOEDLIST)
+		update_node_list(SD_MAX_NODES, 0);
 
 	optind = 3;
 
@@ -1167,6 +1165,11 @@ int main(int argc, char **argv)
 				usage(1);
 			break;
 		}
+	}
+
+	if (flags & SUBCMD_FLAG_NEED_THIRD_ARG && argc == optind) {
+		fprintf(stderr, "'%s %s' needs the third argument\n", argv[1], argv[2]);
+		exit(1);
 	}
 
 	return command_fn(argc, argv);
