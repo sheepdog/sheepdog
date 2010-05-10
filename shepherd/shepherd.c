@@ -130,23 +130,8 @@ static int update_node_list(int max_nodes, int epoch)
 		goto out;
 	}
 
-	switch (rsp->result) {
-	case SD_RES_SUCCESS:
-		break;
-	case SD_RES_WAIT_FOR_FORMAT:
-		fprintf(stderr, "sheepdog is not formatted yet\n");
-		ret = -1;
-		goto out;
-	case SD_RES_WAIT_FOR_JOIN:
-		fprintf(stderr, "there is not enough nodes to start sheepdog\n");
-		ret = -1;
-		goto out;
-	case SD_RES_SHUTDOWN:
-		fprintf(stderr, "sheepdog is shutting down\n");
-		ret = -1;
-		goto out;
-	default:
-		fprintf(stderr, "unknown error: %d\n", rsp->result);
+	switch (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
 		ret = -1;
 		goto out;
 	}
@@ -202,23 +187,14 @@ static int cluster_format(int argc, char **argv)
 	ret = exec_req(fd, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
 	close(fd);
 
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to connect the dog\n");
+	if (ret) {
+		fprintf(stderr, "failed to connect\n");
 		return ret;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		switch (rsp->result) {
-		case SD_RES_STARTUP:
-			fprintf(stderr, "the dog is not ready for the mkfs operation\n");
-			break;
-		case SD_RES_SHUTDOWN:
-			fprintf(stderr, "the dog is shutting down\n");
-			break;
-		default:
-			fprintf(stderr, "unknown error\n");
-			break;
-		}
+		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		return 1;
 	}
 
 	return 0;
@@ -245,20 +221,14 @@ static int shutdown_sheepdog(void)
 	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
 	close(fd);
 
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to connect the dog\n");
+	if (ret) {
+		fprintf(stderr, "failed to connect\n");
 		return ret;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		switch (rsp->result) {
-		case SD_RES_STARTUP:
-			fprintf(stderr, "the dog is not ready for the mkfs operation\n");
-			break;
-		default:
-			fprintf(stderr, "unknown error\n");
-			break;
-		}
+		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		return 1;
 	}
 
 	return 0;
@@ -740,23 +710,14 @@ static int vdi_delete(int argc, char **argv)
 	ret = exec_req(fd, (struct sd_req *)&hdr, vdiname, &wlen, &rlen);
 	close(fd);
 
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to connect the dog\n");
+	if (ret) {
+		fprintf(stderr, "failed to connect\n");
 		return ret;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		switch (rsp->result) {
-		case SD_RES_VDI_LOCKED:
-			fprintf(stderr, "the vdi is locked\n");
-			break;
-		case SD_RES_NO_VDI:
-			fprintf(stderr, "no such vdi\n");
-			break;
-		default:
-			fprintf(stderr, "error, %d\n", rsp->result);
-			break;
-		}
+		fprintf(stderr, "%s: %s\n", vdiname, sd_strerror(rsp->result));
+		return 1;
 	}
 
 	return 0;
@@ -853,20 +814,7 @@ static int vdi_lock(int argc, char **argv)
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		switch(rsp->result) {
-		case SD_RES_VDI_LOCKED:
-			fprintf(stderr, "%s is already locked\n", vdiname);
-			break;
-		case SD_RES_VDI_NOT_LOCKED:
-			fprintf(stderr, "%s is not locked\n", vdiname);
-			break;
-		case SD_RES_NO_VDI:
-			fprintf(stderr, "%s: no such vdi\n", vdiname);
-			break;
-		default:
-			fprintf(stderr, "error %d\n", rsp->result);
-			break;
-		}
+		fprintf(stderr, "%s: %s\n", vdiname, sd_strerror(rsp->result));
 		return 1;
 	}
 
@@ -912,20 +860,7 @@ static int vdi_release(int argc, char **argv)
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		switch(rsp->result) {
-		case SD_RES_VDI_LOCKED:
-			fprintf(stderr, "%s is already locked\n", vdiname);
-			break;
-		case SD_RES_VDI_NOT_LOCKED:
-			fprintf(stderr, "%s is not locked\n", vdiname);
-			break;
-		case SD_RES_NO_VDI:
-			fprintf(stderr, "%s: no such vdi\n", vdiname);
-			break;
-		default:
-			fprintf(stderr, "error %d\n", rsp->result);
-			break;
-		}
+		fprintf(stderr, "%s: %s\n", vdiname, sd_strerror(rsp->result));
 		return 1;
 	}
 
@@ -971,26 +906,11 @@ static int cluster_info(int argc, char **argv)
 	if (ret != 0)
 		return 1;
 
-	switch (rsp->result) {
-	case SD_RES_SUCCESS:
+	if (rsp->result == SD_RES_SUCCESS)
 		printf("running\n");
-		break;
-	case SD_RES_WAIT_FOR_FORMAT:
-		printf("sheepdog is not formatted yet\n");
-		break;
-	case SD_RES_WAIT_FOR_JOIN:
-		printf("sheepdog is waiting for other nodes joining\n");
-		break;
-	case SD_RES_SHUTDOWN:
-		printf("shutdown\n");
-		break;
-	case SD_RES_JOIN_FAILED:
-		printf("failed to join sheepdog\n");
-		break;
-	default:
-		printf("%d\n", rsp->rsvd);
-		break;
-	}
+	else
+		printf("%s\n", sd_strerror(rsp->result));
+
 	printf("\n");
 	printf("Ctime              Epoch Nodes\n");
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);

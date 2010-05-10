@@ -179,4 +179,52 @@ static inline int is_collie_op(uint8_t op)
 	return op & SD_OP_COLLIE;
 }
 
+static inline const char *sd_strerror(int err)
+{
+	int i;
+
+	static const struct {
+		int err;
+		const char *desc;
+	} errors[] = {
+		{SD_RES_SUCCESS, "Success"},
+		{SD_RES_UNKNOWN, "Unknown error"},
+		{SD_RES_NO_OBJ, "No object found"},
+		{SD_RES_EIO, "I/O error"},
+		{SD_RES_VDI_EXIST, "VDI exists already"},
+		{SD_RES_INVALID_PARMS, "Invalid parameters"},
+		{SD_RES_SYSTEM_ERROR, "System error"},
+		{SD_RES_VDI_LOCKED, "VDI is already locked"},
+		{SD_RES_NO_VDI, "No vdi found"},
+		{SD_RES_NO_BASE_VDI, "No base VDI found"},
+		{SD_RES_VDI_READ, "Failed read the requested VDI"},
+		{SD_RES_VDI_WRITE, "Failed to write the requested VDI"},
+		{SD_RES_BASE_VDI_READ, "Failed to read the base VDI"},
+		{SD_RES_BASE_VDI_WRITE, "Failed to write the base VDI"},
+		{SD_RES_NO_TAG, "Failed to find the requested tag"},
+		{SD_RES_STARTUP, "The system is still booting"},
+		{SD_RES_VDI_NOT_LOCKED, "VDI isn't locked"},
+		{SD_RES_SHUTDOWN, "The system is shutting down"},
+		{SD_RES_NO_MEM, "Out of memory on the server"},
+		{SD_RES_FULL_VDI, "We already have the maximum vdis"},
+		{SD_RES_VER_MISMATCH, "Protocol version mismatch"},
+		{SD_RES_NO_SPACE, "Server has no space for new objects"},
+
+		{SD_RES_OLD_NODE_VER, "Remote node has an old epoch"},
+		{SD_RES_NEW_NODE_VER, "Remote node has a new epoch"},
+		{SD_RES_WAIT_FOR_FORMAT, "Waiting for a format operation"},
+		{SD_RES_WAIT_FOR_JOIN, "Waiting for other nodes joining"},
+		{SD_RES_NOT_FORMATTED, "Not formatted yet"},
+		{SD_RES_INVALID_CTIME, "Creation time is different"},
+		{SD_RES_INVALID_EPOCH, "Invalid epoch"},
+		{SD_RES_JOIN_FAILED, "The node was failed to join sheepdog"},
+	};
+
+	for (i = 0; i < ARRAY_SIZE(errors); ++i)
+		if (errors[i].err == err)
+			return errors[i].desc;
+
+	return "Invalid error code";
+}
+
 #endif
