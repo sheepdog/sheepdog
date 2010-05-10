@@ -53,6 +53,7 @@
 #define SD_RES_NO_MEM        0x12 /* Cannot allocate memory */
 #define SD_RES_FULL_VDI      0x13 /* we already have the maximum vdis */
 #define SD_RES_VER_MISMATCH  0x14 /* Protocol version mismatch */
+#define SD_RES_NO_SPACE      0x15 /* Server has no room for new objects */
 
 /*
  * Object ID rules

@@ -658,7 +658,10 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 
 		ret = pwrite64(fd, buf, SD_DATA_OBJ_SIZE, 0);
 		if (ret != SD_DATA_OBJ_SIZE) {
-			ret = SD_RES_EIO;
+			if (errno == ENOSPC)
+				ret = SD_RES_NO_SPACE;
+			else
+				ret = SD_RES_EIO;
 			goto out;
 		}
 	default:
@@ -724,7 +727,10 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 	case SD_OP_CREATE_AND_WRITE_OBJ:
 		ret = pwrite64(fd, req->data, hdr->data_length, hdr->offset);
 		if (ret != hdr->data_length) {
-			ret = SD_RES_EIO;
+			if (errno == ENOSPC)
+				ret = SD_RES_NO_SPACE;
+			else
+				ret = SD_RES_EIO;
 			goto out;
 		}
 
