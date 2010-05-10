@@ -167,7 +167,6 @@ static int cluster_format(int argc, char **argv)
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
 	unsigned rlen, wlen;
 	struct timeval tv;
-	int copies = cluster_cmd_data.copies ? cluster_cmd_data.copies : 3;
 
 	fd = connect_to("localhost", sdport);
 	if (fd < 0)
@@ -178,7 +177,7 @@ static int cluster_format(int argc, char **argv)
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_MAKE_FS;
-	hdr.copies = copies;
+	hdr.copies = cluster_cmd_data.copies;
 	hdr.epoch = node_list_version;
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 

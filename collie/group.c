@@ -773,6 +773,8 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		break;
 	case SD_OP_MAKE_FS:
 		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
+		if (!sys->nr_sobjs)
+			sys->nr_sobjs = SD_DEFAULT_REDUNDANCY;
 
 		ctime = ((struct sd_so_req *)hdr)->ctime;
 		set_cluster_ctime(ctime);

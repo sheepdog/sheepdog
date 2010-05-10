@@ -21,6 +21,7 @@
 #include "net.h"
 #include "collie.h"
 
+#define SD_DEFAULT_REDUNDANCY 3
 #define SD_MAX_REDUNDANCY 8
 
 #define SD_OP_REMOVE_OBJ     0x91
