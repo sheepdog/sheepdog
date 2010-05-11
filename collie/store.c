@@ -1311,7 +1311,7 @@ static void recover_done(struct work *work, int idx)
 
 	resume_pending_requests();
 
-	if (rw->retry) {
+	if (rw->retry && list_empty(&recovery_work_list)) {
 		rw->retry = 0;
 
 		rw->timer.callback = recover_timer;
