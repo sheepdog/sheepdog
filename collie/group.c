@@ -488,6 +488,7 @@ static void join(struct join_message *msg)
 					 msg->epoch, &msg->cluster_status);
 	msg->nr_sobjs = sys->nr_sobjs;
 	msg->epoch = sys->epoch;
+	msg->ctime = get_cluster_ctime();
 	msg->nr_nodes = 0;
 	list_for_each_entry(node, &sys->sd_node_list, list) {
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
@@ -642,6 +643,7 @@ out:
 
 		get_vdi_bitmap_from_all();
 		set_global_nr_copies(sys->nr_sobjs);
+		set_cluster_ctime(msg->ctime);
 	}
 
 	print_node_list(&sys->sd_node_list);
