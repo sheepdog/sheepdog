@@ -1041,7 +1041,7 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 
 int main(int argc, char **argv)
 {
-	int ch, longindex;
+	int ch, longindex, ret;
 	char termcap_area[1024];
 	unsigned long flags;
 
@@ -1052,9 +1052,6 @@ int main(int argc, char **argv)
 		usage(0);
 
 	flags = setup_command(argv[1], argv[2]);
-
-	if (flags & SUBCMD_FLAG_NEED_NOEDLIST)
-		update_node_list(SD_MAX_NODES, 0);
 
 	optind = 3;
 
@@ -1078,6 +1075,14 @@ int main(int argc, char **argv)
 			else
 				usage(1);
 			break;
+		}
+	}
+
+	if (flags & SUBCMD_FLAG_NEED_NOEDLIST) {
+		ret = update_node_list(SD_MAX_NODES, 0);
+		if (ret < 0) {
+			fprintf(stderr, "failed to get node list\n");
+			exit(1);
 		}
 	}
 
