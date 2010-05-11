@@ -999,7 +999,7 @@ static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr,
 			 struct sheepdog_node_list_entry *cur_entry, int cur_nr, int cur_idx,
 			 int copy_idx)
 {
-	int i, idx;
+	int i, j, idx;
 
 	dprintf("%d, %d, %d, %d, %d\n", old_idx, old_nr, cur_idx, cur_nr, copy_idx);
 
@@ -1012,23 +1012,31 @@ static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr,
 		}
 	}
 
-	for (i = 0; ; i++) {
+	for (i = 0, j = 0; ; i++, j++) {
 		if (i < cur_nr) {
 			idx = contains_node(cur_entry[(cur_idx + i) % cur_nr].id,
 					    old_entry, old_nr, old_idx);
 			if (idx >= 0)
 				continue;
 
-			while (contains_node(old_entry[old_idx].id, cur_entry, cur_nr, cur_idx) >= 0)
-				old_idx = (old_idx + 1) % old_nr;
-
+			while (contains_node(old_entry[(old_idx + j) % old_nr].id,
+					     cur_entry, cur_nr, cur_idx) >= 0 && j < old_nr)
+				j++;
 		}
-		if (i == copy_idx) {
-			dprintf("%d, %d, %d, %d\n", old_idx, copy_idx, cur_idx, cur_nr);
+		if (j == old_nr) {
+			/* old_nr should be smaller than sys->nr_sobjs */
+			if (old_nr >= sys->nr_sobjs)
+				eprintf("bug: %d, %d\n", old_nr, sys->nr_sobjs);
+
 			return old_idx;
 		}
 
-		old_idx = (old_idx + 1) % old_nr;
+		if (i == copy_idx) {
+			dprintf("%d, %d, %d\n", (old_idx + j) % old_nr, copy_idx,
+				(cur_idx + i) % cur_nr);
+			return (old_idx + j) % old_nr;
+		}
+
 	}
 	return -1;
 }
