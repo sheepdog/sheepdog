@@ -1166,6 +1166,8 @@ static void __sd_confchg(struct cpg_event *cevent)
 		nr_entries = ARRAY_SIZE(entries);
 		ret = read_epoch(&epoch, &ctime, entries, &nr_entries);
 		if (ret == SD_RES_SUCCESS) {
+			sys->epoch = epoch;
+			msg.ctime = ctime;
 			get_cluster_status(&msg.header.from, entries, nr_entries,
 					   ctime, epoch, &msg.cluster_status);
 		} else
