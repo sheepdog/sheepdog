@@ -888,7 +888,6 @@ static void __sd_deliver(struct cpg_event *cevent)
 	if (m->state == DM_INIT && is_master()) {
 		switch (m->op) {
 		case SD_MSG_JOIN:
-			join((struct join_message *)m);
 			break;
 		case SD_MSG_VDI_OP:
 			vdi_op((struct vdi_op_message *)m);
