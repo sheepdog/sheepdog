@@ -1404,7 +1404,7 @@ static int __fill_obj_list(struct recovery_work *rw,
 static int fill_obj_list(struct recovery_work *rw,
 			 struct sheepdog_node_list_entry *old_entry, int old_nr,
 			 struct sheepdog_node_list_entry *cur_entry, int cur_nr,
-			 uint64_t start_hval, uint64_t end_hval)
+			 uint64_t start_hval, uint64_t end_hval, int nr_objs)
 {
 	int i, idx, old_idx, cur_idx;
 	uint64_t hval, done_hval = end_hval;
@@ -1414,13 +1414,13 @@ again:
 	old_idx = hval_to_sheep(old_entry, old_nr, hval + 1, 0);
 	cur_idx = hval_to_sheep(cur_entry, cur_nr, hval + 1, 0);
 
-	for (i = 0; i < sys->nr_sobjs; i++) {
+	for (i = 0; i < nr_objs; i++) {
 		idx = find_tgt_node(old_entry, old_nr, old_idx, cur_entry, cur_nr, cur_idx, i);
 		dprintf("%d, %d\n", idx, i);
 		if (__fill_obj_list(rw, old_entry + idx, hval, end_hval, &done_hval) == 0)
 			break;
 	}
-	if (i == sys->nr_sobjs)
+	if (i == nr_objs)
 		return -1;
 
 	if (done_hval != end_hval) {
@@ -1438,7 +1438,7 @@ static void __start_recovery(struct work *work, int idx)
 	uint32_t epoch = rw->epoch;
 	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
 		cur_entry[SD_MAX_NODES];
-	int old_nr, cur_nr;
+	int old_nr, cur_nr, nr_objs;
 	int my_idx = -1;
 	int i, fd;
 	uint64_t start_hash, end_hash;
@@ -1461,7 +1461,10 @@ static void __start_recovery(struct work *work, int idx)
 	}
 	old_nr /= sizeof(struct sheepdog_node_list_entry);
 
-	if (!sys->nr_sobjs)
+	nr_objs = sys->nr_sobjs;
+	if (nr_objs > cur_nr)
+		nr_objs = cur_nr;
+	if (!nr_objs)
 		goto fail;
 
 	for (i = 0; i < cur_nr; i++) {
@@ -1470,12 +1473,12 @@ static void __start_recovery(struct work *work, int idx)
 			break;
 		}
 	}
-	start_hash = cur_entry[(my_idx - sys->nr_sobjs + cur_nr) % cur_nr].id;
+	start_hash = cur_entry[(my_idx - nr_objs + cur_nr) % cur_nr].id;
 	end_hash = cur_entry[my_idx].id;
 
 	dprintf("fill obj list (from 0x%lx to 0x%lx)\n", start_hash, end_hash);
 	if (fill_obj_list(rw, old_entry, old_nr, cur_entry, cur_nr,
-			  start_hash, end_hash) != 0) {
+			  start_hash, end_hash, nr_objs) != 0) {
 		eprintf("fatal recovery error\n");
 		goto fail;
 	}
