@@ -385,6 +385,9 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 
 	switch (sys->status) {
 	case SD_STATUS_OK:
+		if (nr_entries == 0)
+			break;
+
 		if (ctime != get_cluster_ctime()) {
 			eprintf("joining node has invalid ctime, %ld\n", from->id);
 			return SD_RES_INVALID_CTIME;
@@ -477,23 +480,14 @@ static void join(struct join_message *msg)
 		return;
 	}
 
-	if (msg->nr_sobjs)
-		sys->nr_sobjs = msg->nr_sobjs;
-
-	msg->nr_sobjs = sys->nr_sobjs;
-	msg->nr_nodes = 0;
-	if (sys->status == SD_STATUS_OK)
-		msg->epoch = sys->epoch;
-	else
-		msg->epoch = 0;
-
 	for (i = 0; i < msg->nr_nodes; i++)
 		entry[i] = msg->nodes[i].ent;
 
 	msg->result = get_cluster_status(&msg->header.from, entry,
 					 msg->nr_nodes, msg->ctime,
 					 msg->epoch, &msg->cluster_status);
-
+	msg->nr_sobjs = sys->nr_sobjs;
+	msg->epoch = sys->epoch;
 	msg->nr_nodes = 0;
 	list_for_each_entry(node, &sys->sd_node_list, list) {
 		msg->nodes[msg->nr_nodes].nodeid = node->nodeid;
@@ -587,12 +581,16 @@ static void update_cluster_info(struct join_message *msg)
 		return;
 	}
 
+	if (sys->status == SD_STATUS_JOIN_FAILED)
+		return;
+
 	if (!sys->nr_sobjs)
 		sys->nr_sobjs = msg->nr_sobjs;
 
 	if (sys->join_finished)
 		goto out;
 
+	sys->epoch = msg->epoch;
 	for (i = 0; i < nr_nodes; i++) {
 		ret = move_node_to_sd_list(msg->nodes[i].nodeid,
 					   msg->nodes[i].pid,
@@ -608,15 +606,8 @@ static void update_cluster_info(struct join_message *msg)
 
 	sys->join_finished = 1;
 
-	if (sys->status == SD_STATUS_WAIT_FOR_JOIN && msg->cluster_status == SD_STATUS_OK) {
-		if (msg->epoch > 0) {
-			sys->epoch = msg->epoch;
-			sys->status = SD_STATUS_OK;
-		}
-	}
-
 	eprintf("system status = %d, epoch = %d\n", msg->cluster_status, sys->epoch);
-	if (sys->status == SD_STATUS_OK) {
+	if (msg->cluster_status == SD_STATUS_OK) {
 		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("update epoch, %d, %d\n", sys->epoch, nr_nodes);
@@ -636,7 +627,7 @@ out:
 		vprintf(SDOG_ERR "nodeid: %x, pid: %d has gone\n",
 			msg->header.nodeid, msg->header.pid);
 
-	if (sys->status == SD_STATUS_OK) {
+	if (msg->cluster_status == SD_STATUS_OK) {
 		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr_nodes);
@@ -648,23 +639,14 @@ out:
 		sys->epoch++;
 
 		update_epoch_store(sys->epoch);
+
+		get_vdi_bitmap_from_all();
+		set_global_nr_copies(sys->nr_sobjs);
 	}
 
 	print_node_list(&sys->sd_node_list);
 
-	if (sys->status == SD_STATUS_WAIT_FOR_JOIN && msg->cluster_status == SD_STATUS_OK) {
-		if (msg->epoch == 0)
-			sys->epoch = get_latest_epoch();
-	}
-
-	if (sys->status != SD_STATUS_JOIN_FAILED) {
-		if (msg->cluster_status == SD_STATUS_OK) {
-			get_vdi_bitmap_from_all();
-			set_global_nr_copies(sys->nr_sobjs);
-		}
-
-		sys->status = msg->cluster_status;
-	}
+	sys->status = msg->cluster_status;
 	return;
 }
 
