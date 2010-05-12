@@ -1477,8 +1477,7 @@ do_retry:
 	while (!list_empty(&failed_req_list)) {
 		struct request *req = list_first_entry(&failed_req_list,
 						       struct request, r_wlist);
-		list_del(&req->r_wlist);
-		req->done(req);
+		req->work.done(&req->work, 0);
 
 		retry = 1;
 	}
