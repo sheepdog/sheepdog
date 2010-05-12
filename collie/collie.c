@@ -130,7 +130,7 @@ static int update_node_list(int max_nodes, int epoch)
 		goto out;
 	}
 
-	switch (rsp->result != SD_RES_SUCCESS) {
+	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
 		ret = -1;
 		goto out;
