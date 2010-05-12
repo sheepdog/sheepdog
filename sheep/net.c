@@ -160,6 +160,12 @@ static void queue_request(struct request *req)
 		return;
 	}
 
+	if (sys->status == SD_STATUS_JOIN_FAILED) {
+		rsp->result = SD_RES_JOIN_FAILED;
+		req->done(req);
+		return;
+	}
+
 	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
 	    sys->status == SD_STATUS_WAIT_FOR_JOIN) {
 		/* TODO: cleanup */
