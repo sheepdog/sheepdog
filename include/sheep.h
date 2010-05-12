@@ -35,12 +35,9 @@
 
 #define SD_RES_OLD_NODE_VER  0x41 /* Remote node has an old epoch */
 #define SD_RES_NEW_NODE_VER  0x42 /* Remote node has a new epoch */
-#define SD_RES_WAIT_FOR_FORMAT      0x43 /* Sheepdog is waiting for a format operation */
-#define SD_RES_WAIT_FOR_JOIN        0x44 /* Sheepdog is waiting for other nodes joining */
-#define SD_RES_NOT_FORMATTED 0x45 /* Sheepdog is not formatted yet */
-#define SD_RES_INVALID_CTIME 0x46 /* Creation time of sheepdog is different */
-#define SD_RES_INVALID_EPOCH 0x47 /* Invalid epoch */
-#define SD_RES_JOIN_FAILED   0x48 /* Target node was failed to join sheepdog */
+#define SD_RES_NOT_FORMATTED 0x43 /* Sheepdog is not formatted yet */
+#define SD_RES_INVALID_CTIME 0x44 /* Creation time of sheepdog is different */
+#define SD_RES_INVALID_EPOCH 0x45 /* Invalid epoch */
 
 struct sd_so_req {
 	uint8_t		proto_ver;
@@ -209,15 +206,15 @@ static inline const char *sd_strerror(int err)
 		{SD_RES_FULL_VDI, "We already have the maximum vdis"},
 		{SD_RES_VER_MISMATCH, "Protocol version mismatch"},
 		{SD_RES_NO_SPACE, "Server has no space for new objects"},
+		{SD_RES_WAIT_FOR_FORMAT, "Waiting for a format operation"},
+		{SD_RES_WAIT_FOR_JOIN, "Waiting for other nodes joining"},
+		{SD_RES_JOIN_FAILED, "The node had failed to join sheepdog"},
 
 		{SD_RES_OLD_NODE_VER, "Remote node has an old epoch"},
 		{SD_RES_NEW_NODE_VER, "Remote node has a new epoch"},
-		{SD_RES_WAIT_FOR_FORMAT, "Waiting for a format operation"},
-		{SD_RES_WAIT_FOR_JOIN, "Waiting for other nodes joining"},
 		{SD_RES_NOT_FORMATTED, "Not formatted yet"},
 		{SD_RES_INVALID_CTIME, "Creation time is different"},
 		{SD_RES_INVALID_EPOCH, "Invalid epoch"},
-		{SD_RES_JOIN_FAILED, "The node was failed to join sheepdog"},
 	};
 
 	for (i = 0; i < ARRAY_SIZE(errors); ++i)

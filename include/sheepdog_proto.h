@@ -54,6 +54,9 @@
 #define SD_RES_FULL_VDI      0x13 /* we already have the maximum vdis */
 #define SD_RES_VER_MISMATCH  0x14 /* Protocol version mismatch */
 #define SD_RES_NO_SPACE      0x15 /* Server has no room for new objects */
+#define SD_RES_WAIT_FOR_FORMAT  0x16 /* Sheepdog is waiting for a format operation */
+#define SD_RES_WAIT_FOR_JOIN    0x17 /* Sheepdog is waiting for other nodes joining */
+#define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 
 /*
  * Object ID rules
