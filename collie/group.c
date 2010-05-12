@@ -953,8 +953,10 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 	struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 	struct message_header *m;
 	char name[128];
+	int do_recovery;
 
 	m = w->msg;
+	do_recovery = (m->state == DM_FIN && m->op == SD_MSG_JOIN);
 
 	dprintf("op: %d, state: %u, size: %d, from: %s\n",
 		m->op, m->state, m->msg_length,
@@ -976,12 +978,7 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 		}
 	}
 
-	/*
-	 * FIXME: we want to recover only after all nodes are fully
-	 * synchronized
-	 */
-
-	if (m->state == DM_FIN && m->op == SD_MSG_JOIN && sys->epoch >= 2)
+	if (do_recovery && sys->status == SD_STATUS_OK)
 		start_recovery(sys->epoch, NULL, 0);
 }
 
@@ -1225,7 +1222,7 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 			   send_join_request, w);
 
 skip_join:
-	if (w->sd_node_left) {
+	if (w->sd_node_left && sys->status == SD_STATUS_OK) {
 		if (w->sd_node_left > 1)
 			panic("we can't handle the departure of multiple nodes %d, %Zd\n",
 			      w->sd_node_left, w->left_list_entries);
