@@ -270,8 +270,7 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 			continue;
 
 		wlen = 0;
-		/* don't need to read the entire object */
-		rlen = sizeof(i) - sizeof(i.data_vdi_id);
+		rlen = sizeof(i);
 
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.opcode = SD_OP_READ_OBJ;
