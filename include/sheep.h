@@ -8,19 +8,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __COLLIE_H__
-#define __COLLIE_H__
+#ifndef __SHEEP_H__
+#define __SHEEP_H__
 
 #include <stdint.h>
 #include "util.h"
 #include "list.h"
 
-#define SD_COLLIE_PROTO_VER 0x01
+#define SD_SHEEP_PROTO_VER 0x01
 
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096 /* FIXME: should be removed */
 
-#define SD_OP_COLLIE         0x80
+#define SD_OP_SHEEP         0x80
 #define SD_OP_DEL_VDI        0x81
 #define SD_OP_GET_NODE_LIST  0x82
 #define SD_OP_GET_VM_LIST    0x83
@@ -174,9 +174,9 @@ static inline void print_node_list_entry(struct sheepdog_node_list_entry *e,
 		 e->addr[14], e->addr[15], e->port);
 }
 
-static inline int is_collie_op(uint8_t op)
+static inline int is_sheep_op(uint8_t op)
 {
-	return op & SD_OP_COLLIE;
+	return op & SD_OP_SHEEP;
 }
 
 static inline const char *sd_strerror(int err)

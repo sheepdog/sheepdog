@@ -9,18 +9,18 @@ export VERSION PREFIX
 
 .PHONY:all
 all:
-	$(MAKE) -C shepherd
+	$(MAKE) -C sheep
 	$(MAKE) -C collie
 
 .PHONY:clean
 clean:
-	$(MAKE) -C shepherd clean
+	$(MAKE) -C sheep clean
 	$(MAKE) -C collie clean
 	$(MAKE) -C lib clean
 
 .PHONY:install
 install:
-	$(MAKE) -C shepherd install
+	$(MAKE) -C sheep install
 	$(MAKE) -C collie install
 
 .PHONY:check

@@ -1,11 +1,11 @@
 sbindir ?= $(PREFIX)/sbin
 
 CFLAGS += -g -O2 -Wall -Wstrict-prototypes -I../include
-CFLAGS += -D_GNU_SOURCE -DSD_VERSION=\"$(VERSION)\"
-LIBS += -lpthread -lcpg -lcfg
+CFLAGS += -D_GNU_SOURCE
+LIBS += -lncurses
 
 PROGRAMS = collie
-COLLIE_OBJS = collie.o net.o vdi.o group.o store.o work.o ../lib/event.o ../lib/net.o ../lib/logger.o
+COLLIE_OBJS = collie.o treeview.o ../lib/event.o ../lib/net.o ../lib/logger.o
 COLLIE_DEP = $(COLLIE_OBJS:.o=.d)
 
 .PHONY:all

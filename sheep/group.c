@@ -18,7 +18,7 @@
 #include <corosync/cfg.h>
 
 #include "sheepdog_proto.h"
-#include "collie_priv.h"
+#include "sheep_priv.h"
 #include "list.h"
 #include "util.h"
 #include "logger.h"
@@ -474,7 +474,7 @@ static void join(struct join_message *msg)
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 	int i;
 
-	if (msg->header.proto_ver != SD_COLLIE_PROTO_VER) {
+	if (msg->header.proto_ver != SD_SHEEP_PROTO_VER) {
 		eprintf("joining node send a wrong version message\n");
 		msg->result = SD_RES_VER_MISMATCH;
 		return;
@@ -1148,7 +1148,7 @@ static void __sd_confchg(struct cpg_event *cevent)
 		uint32_t epoch;
 
 		/*
-		 * If I'm the first collie joins in colosync, I
+		 * If I'm the first sheep joins in colosync, I
 		 * becomes the master without sending JOIN.
 		 */
 
@@ -1188,7 +1188,7 @@ static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
 	if (!is_my_cpg_addr(addr))
 		return;
 
-	msg.header.proto_ver = SD_COLLIE_PROTO_VER;
+	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
 	msg.header.op = SD_MSG_JOIN;
 	msg.header.state = DM_INIT;
 	msg.header.msg_length = sizeof(msg);

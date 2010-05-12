@@ -1,6 +1,6 @@
 #!bash
 
-_shepherd()
+_collie()
 {
 	local opts cur prev
 	opts="cluster node vdi vm"
@@ -44,4 +44,4 @@ _shepherd()
 	COMPREPLY=( $( compgen -W "${opts}" ${cur} ) )
 }
 
-complete -F _shepherd shepherd
+complete -F _collie collie

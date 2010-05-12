@@ -14,7 +14,7 @@
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
 
-#include "collie_priv.h"
+#include "sheep_priv.h"
 
 int is_io_request(unsigned op)
 {

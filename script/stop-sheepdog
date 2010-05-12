@@ -2,8 +2,8 @@
 
 # Examples
 #
-# stop-dogs.pl 0 3 4
-# stop-dogs.pl [0-100]
+# stop-sheepdog 0 3 4
+# stop-sheepdog [0-100]
 
 @index_list = @ARGV;
 if (@index_list == 0) {
@@ -12,7 +12,7 @@ if (@index_list == 0) {
 
 $dport = 7000;
 
-foreach $proc (`ps -o pid,args -C collie`) {
+foreach $proc (`ps -o pid,args -C sheep`) {
     foreach $i (@index_list) {
 	if ($i =~ /\[(\d+)-(\d+)\]/) {
 	    &stop_dog($dport + $_) foreach ($1..$2);

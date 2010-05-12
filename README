@@ -49,7 +49,7 @@ Usage
 * Setup Sheepdog
    1. Launch sheepdog on each machines of the cluster.
 
-      $ collie /store_dir
+      $ sheep /store_dir
 
       Notes:
         /store_dir is a directory to store objects. The directory must
@@ -60,7 +60,7 @@ Usage
 
    2. Make fs
 
-      $ shepherd mkfs --copies=3
+      $ collie cluster format --copies=3
 
       --copies specifies the number of default data redundancy. In this case,
       the replicated data is stored on three machines.
@@ -69,7 +69,7 @@ Usage
 
       Following list shows that Sheepdog is running on 32 nodes.
 
-      $ shepherd info -t dog
+      $ collie node list
         Idx	Node id (FNV-1a) - Host:Port
       ------------------------------------------------
         0	0308164db75cff7e - 10.68.13.15:7000
@@ -116,7 +116,7 @@ Usage
 
    3. See Sheepdog images by the following command.
 
-      $ shepherd info -t vdi
+      $ collie vdi list
         name        id    size    used  shared    creation time  object id
       --------------------------------------------------------------------
         Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
@@ -129,7 +129,7 @@ Usage
 
    2. Following command checks used images.
 
-      $ shepherd info -t vm
+      $ collie vm list
       Name            |Vdi size |Allocated| Shared  | Status
       ----------------+---------+---------+---------+------------
       Bob             |   2.0 GB|   1.6 GB|   0.0 MB| running on xx.xx.xx.xx
@@ -145,7 +145,7 @@ Usage
    2. After getting snapshot, a new virtual machine images are added as a not-
       current image.
 
-      $ shepherd info -t vdi
+      $ collie vdi list
         name        id    size    used  shared    creation time  object id
       --------------------------------------------------------------------
         Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
@@ -163,22 +163,13 @@ Usage
 
    2. Charlie's image is added to the virtual machine list.
 
-      $ shepherd info -t vdi
+      $ collie vdi list
         name        id    size    used  shared    creation time  object id
       --------------------------------------------------------------------
         Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
         Alice        0  256 GB  0.0 MB  0.0 MB 2010-03-23 16:21      c0000
       s Alice        1  256 GB  0.0 MB  0.0 MB 2010-03-23 16:16      40000
         Charlie      0  256 GB  0.0 MB  0.0 MB 2010-03-23 16:23     100000
-
-   3. To check parent-child relationship of the images, use tree format output.
-
-      $ shepherd info -t vdi -f tree
-      Bob---[09-10-15 16:29]-+-[09-10-18 20:51]
-                             `-(You Are Here)
-      Alice---[09-10-16 10:02]-+-[09-10-19 09:42]---(You Are Here)
-                               `-[09-10-18 20:53]---[09-10-18 23:11]
-      Charlie---(You Are Here)
 
 Test Environment
 ----------------

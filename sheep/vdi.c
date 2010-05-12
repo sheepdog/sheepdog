@@ -13,7 +13,7 @@
 #include <sys/time.h>
 
 #include "sheepdog_proto.h"
-#include "collie_priv.h"
+#include "sheep_priv.h"
 
 
 /* TODO: should be performed atomically */

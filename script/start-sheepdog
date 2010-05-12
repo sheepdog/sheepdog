@@ -2,7 +2,7 @@
 
 # Examples
 #
-# run-dogs.pl -n=5 -d=/tmp/1203
+# start-sheepdog -n=5 -d=/tmp/1203
 
 $port = 7000;
 $nr = 1;
@@ -37,11 +37,11 @@ foreach $host (grep {!$count{$_}++} @hosts) {
 for ($i = 0; $i < $nr; $i++, $port++) {
     $_dir = $dir.$i;
     if ($hosts[$i]) {
-	print("ssh $hosts[$i] $home/collie/collie --port $port $_dir -d\n");
-	system("ssh $hosts[$i] $home/collie/collie --port $port $_dir -d");
+	print("ssh $hosts[$i] $home/sheep/sheep --port $port $_dir -d\n");
+	system("ssh $hosts[$i] $home/sheep/sheep --port $port $_dir -d");
     } else {
-	print("$home/collie/collie --port $port $_dir -d\n");
-	system("$home/collie/collie --port $port $_dir -d");
+	print("$home/sheep/sheep --port $port $_dir -d\n");
+	system("$home/sheep/sheep --port $port $_dir -d");
     }
 }
 

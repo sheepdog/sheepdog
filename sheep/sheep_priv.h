@@ -8,8 +8,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __COLLIE_PRIV_H__
-#define __COLLIE_PRIV_H__
+#ifndef __SHEEP_PRIV_H__
+#define __SHEEP_PRIV_H__
 
 #include <inttypes.h>
 #include <corosync/cpg.h>
@@ -19,7 +19,7 @@
 #include "logger.h"
 #include "work.h"
 #include "net.h"
-#include "collie.h"
+#include "sheep.h"
 
 #define SD_DEFAULT_REDUNDANCY 3
 #define SD_MAX_REDUNDANCY 8
