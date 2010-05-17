@@ -8,6 +8,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#include "../include/config.h"
+
 #include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,7 +52,7 @@ Sheepdog Daemon, version %s\n\
   -l, --loglevel          specify the message level printed by default\n\
   -d, --debug             print debug messages\n\
   -h, --help              display this help and exit\n\
-", SD_VERSION);
+", PACKAGE_VERSION);
 	}
 	exit(status);
 }
@@ -127,7 +130,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	vprintf(SDOG_NOTICE "Sheepdog daemon (version %s) started\n", SD_VERSION);
+	vprintf(SDOG_NOTICE "Sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
 
 	while (sys->status != SD_STATUS_SHUTDOWN)
 		event_loop(-1);

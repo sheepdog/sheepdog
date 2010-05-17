@@ -18,6 +18,9 @@
 #include <poll.h>
 #include <sys/xattr.h>
 #include <sys/statvfs.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "sheep_priv.h"
 
