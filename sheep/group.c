@@ -389,36 +389,36 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			break;
 
 		if (ctime != get_cluster_ctime()) {
-			eprintf("joining node has invalid ctime, %ld\n", from->id);
+			eprintf("joining node has invalid ctime, %"PRIu64"\n", from->id);
 			return SD_RES_INVALID_CTIME;
 		}
 
 		local_epoch = get_latest_epoch();
 		if (epoch > local_epoch) {
-			eprintf("sheepdog is running with older epoch, %d %d %ld\n",
+			eprintf("sheepdog is running with older epoch, %"PRIu32" %"PRIu32" %"PRIu64"\n",
 				epoch, local_epoch, from->id);
 			return SD_RES_OLD_NODE_VER;
 		}
 		break;
 	case SD_STATUS_WAIT_FOR_FORMAT:
 		if (nr_entries != 0) {
-			eprintf("joining node is not clean, %ld\n", from->id);
+			eprintf("joining node is not clean, %"PRIu64"\n", from->id);
 			return SD_RES_NOT_FORMATTED;
 		}
 		break;
 	case SD_STATUS_WAIT_FOR_JOIN:
 		if (ctime != get_cluster_ctime()) {
-			eprintf("joining node has invalid ctime, %ld\n", from->id);
+			eprintf("joining node has invalid ctime, %"PRIu64"\n", from->id);
 			return SD_RES_INVALID_CTIME;
 		}
 
 		local_epoch = get_latest_epoch();
 		if (epoch > local_epoch) {
-			eprintf("sheepdog is waiting with older epoch, %d %d %ld\n",
+			eprintf("sheepdog is waiting with older epoch, %"PRIu32" %"PRIu32" %"PRIu64"\n",
 				epoch, local_epoch, from->id);
 			return SD_RES_OLD_NODE_VER;
 		} else if (epoch < local_epoch) {
-			eprintf("sheepdog is waiting with newer epoch, %d %d %ld\n",
+			eprintf("sheepdog is waiting with newer epoch, %"PRIu32" %"PRIu32" %"PRIu64"\n",
 				epoch, local_epoch, from->id);
 			return SD_RES_NEW_NODE_VER;
 		}
@@ -428,13 +428,13 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		nr_local_entries /= sizeof(local_entries[0]);
 
 		if (nr_entries != nr_local_entries) {
-			eprintf("joining node has invalid epoch, %d %ld\n",
+			eprintf("joining node has invalid epoch, %"PRIu32" %"PRIu64"\n",
 				epoch, from->id);
 			return SD_RES_INVALID_EPOCH;
 		}
 
 		if (memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0) {
-			eprintf("joining node has invalid epoch, %ld\n", from->id);
+			eprintf("joining node has invalid epoch, %"PRIu64"\n", from->id);
 			return SD_RES_INVALID_EPOCH;
 		}
 
