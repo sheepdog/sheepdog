@@ -745,25 +745,25 @@ static int vdi_object(int argc, char **argv)
 		       vid, nr_nodes);
 		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL);
 	} else {
-		struct get_data_oid_info info;
+		struct get_data_oid_info old_info;
 
-		info.success = 0;
-		info.idx = idx;
+		old_info.success = 0;
+		old_info.idx = idx;
 
 		if (idx >= MAX_DATA_OBJS) {
 			printf("The offset is too large!\n");
 			exit(1);
 		}
 
-		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &info);
+		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &old_info);
 
-		if (info.success) {
-			if (info.data_oid) {
+		if (old_info.success) {
+			if (old_info.data_oid) {
 				printf("Looking for the object 0x%" PRIx64
 				       " (the inode vid 0x%" PRIx32 " idx %u) with %d nodes\n\n",
-				       info.data_oid, vid, idx, nr_nodes);
+				       old_info.data_oid, vid, idx, nr_nodes);
 
-				parse_objs(info.data_oid, do_print_obj, NULL);
+				parse_objs(old_info.data_oid, do_print_obj, NULL);
 			} else
 				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
 				       vid, idx);
