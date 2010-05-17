@@ -77,7 +77,7 @@ static int is_current(struct sheepdog_inode *i)
 
 static char *size_to_str(uint64_t _size, char *str, int str_size)
 {
-	char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 	int i = 0;
 	double size = (double)_size;
 
