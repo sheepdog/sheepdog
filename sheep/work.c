@@ -334,7 +334,8 @@ destroy_threads:
 	return -1;
 }
 
-void exit_work_queue(struct work_queue *q)
+#ifdef COMPILE_UNUSED_CODE
+static void exit_work_queue(struct work_queue *q)
 {
 	int i;
 	struct worker_info *wi = container_of(q, struct worker_info, q);
@@ -351,3 +352,4 @@ void exit_work_queue(struct work_queue *q)
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
 }
+#endif
