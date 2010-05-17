@@ -884,7 +884,7 @@ static int cluster_info(int argc, char **argv)
 	int nr_logs;
 	time_t ti;
 	struct tm tm;
-	char time[128];
+	char time_str[128];
 
 	fd = connect_to("localhost", sdport);
 	if (fd < 0)
@@ -919,9 +919,9 @@ static int cluster_info(int argc, char **argv)
 
 		ti = logs[i].ctime >> 32;
 		localtime_r(&ti, &tm);
-		strftime(time, sizeof(time), "%y-%m-%d %H:%M:%S", &tm);
+		strftime(time_str, sizeof(time_str), "%y-%m-%d %H:%M:%S", &tm);
 
-		printf("%s %6d", time, logs[i].epoch);
+		printf("%s %6d", time_str, logs[i].epoch);
 		printf(" [");
 		for (j = 0; j < logs[i].nr_nodes; j++) {
 			entry = logs[i].nodes + j;
