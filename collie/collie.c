@@ -368,7 +368,7 @@ static void print_vm_list(uint32_t vid, char *name, uint32_t tag,
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 	if (i < vli->nr_vms) {
 		char *tmp;
-		if (vli->highlight && (tmp = tgetstr("md", NULL)))
+		if (vli->highlight && (tmp = tgetstr((char *)"md", (char **)NULL)))
 			tputs(tmp, 1, putchar);
 
 		printf("%-16s|%9s|%9s|%9s| running on %d.%d.%d.%d", name,
@@ -377,7 +377,7 @@ static void print_vm_list(uint32_t vid, char *name, uint32_t tag,
 		       vli->vm_list_entries[i].host_addr[13],
 		       vli->vm_list_entries[i].host_addr[14],
 		       vli->vm_list_entries[i].host_addr[15]);
-		if (vli->highlight && (tmp = tgetstr("me", NULL)))
+		if (vli->highlight && (tmp = tgetstr((char *)"me", (char **)NULL)))
 			tputs(tmp, 1, putchar);
 		printf("\n");
 	} else
@@ -544,10 +544,10 @@ static int node_list(int argc, char **argv)
 		if (i == master_idx) {
 			const char *tmp;
 
-			if (highlight && (tmp = tgetstr("md", NULL)))
+			if (highlight && (tmp = tgetstr((char *)"md", (char **)NULL)))
 				tputs(tmp, 1, putchar);
 			printf("* %d\t%s\n", i, data);
-			if (highlight && (tmp = tgetstr("me", NULL)))
+			if (highlight && (tmp = tgetstr((char *)"me", (char **)NULL)))
 				tputs(tmp, 1, putchar);
 		} else
 			printf("  %d\t%s\n", i, data);
