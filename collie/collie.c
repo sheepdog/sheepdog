@@ -968,7 +968,7 @@ static struct option cluster_long_options[] =
 };
 
 static struct {
-	char *name;
+	const char *name;
 	struct subcommand *sub;
 	struct option *lopts;
 	char *sopts;
