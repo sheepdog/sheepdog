@@ -971,7 +971,7 @@ static struct {
 	const char *name;
 	struct subcommand *sub;
 	struct option *lopts;
-	char *sopts;
+	const char *sopts;
 	int (*parser)(int, char *);
 	void (*help)(void);
 } commands[] = {
@@ -991,7 +991,7 @@ static struct option common_long_options[] =
 };
 
 static struct option *long_options = common_long_options;
-static char *short_options = COMMON_SHORT_OPTIONS;
+static const char *short_options = COMMON_SHORT_OPTIONS;
 static int (*command_parser)(int, char *);
 static int (*command_fn)(int, char **);
 static void (*command_help)(void);
