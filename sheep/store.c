@@ -1597,7 +1597,7 @@ again:
 }
 
 
-static int attr(char *path, char *attr, void *var, int len, int set)
+static int attr(char *path, const char *attr, void *var, int len, int set)
 {
 	int ret, fd;
 
