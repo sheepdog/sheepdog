@@ -525,7 +525,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 #define SUBCMD_FLAG_NEED_THIRD_ARG (1 << 1)
 
 struct subcommand {
-	char *name;
+	const char *name;
 	unsigned long flags;
 	int (*fn)(int, char **);
 };
