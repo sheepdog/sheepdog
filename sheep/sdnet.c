@@ -510,7 +510,6 @@ int write_object(struct sheepdog_node_list_entry *e,
 {
 	struct sd_obj_req hdr;
 	int i, n, fd, ret, success = 0;
-	uint16_t vosts[3];
 	char name[128];
 
 	for (i = 0; i < nr; i++) {
@@ -522,7 +521,7 @@ int write_object(struct sheepdog_node_list_entry *e,
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0) {
-			eprintf("can't connect to vost %u, %s\n", vosts[i], name);
+			eprintf("can't connect to vost %s\n", name);
 			continue;
 		}
 
@@ -543,7 +542,7 @@ int write_object(struct sheepdog_node_list_entry *e,
 		ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
 		close(fd);
 		if (ret)
-			eprintf("can't update vost %u, %s\n", vosts[i], name);
+			eprintf("can't update vost %s\n", name);
 		else
 			success++;
 	}
