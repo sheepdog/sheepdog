@@ -1077,6 +1077,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (!isatty(STDOUT_FILENO))
+		highlight = 0;
+
 	if (flags & SUBCMD_FLAG_NEED_NOEDLIST) {
 		ret = update_node_list(SD_MAX_NODES, 0);
 		if (ret < 0) {
