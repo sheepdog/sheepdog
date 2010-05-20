@@ -2,7 +2,6 @@ sbindir ?= $(PREFIX)/sbin
 
 CFLAGS += -g -O2 -Wall -Wstrict-prototypes -I../include
 CFLAGS += -D_GNU_SOURCE
-LIBS += -lncurses
 
 PROGRAMS = collie
 COLLIE_OBJS = collie.o treeview.o ../lib/event.o ../lib/net.o ../lib/logger.o

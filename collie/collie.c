@@ -25,7 +25,6 @@
 #include <time.h>
 #include <sys/time.h>
 #include <term.h>
-#include <curses.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
@@ -35,6 +34,9 @@
 static char program_name[] = "collie";
 static int sdport = SD_LISTEN_PORT;
 static int highlight = 1;
+
+#define TEXT_NORMAL "\033[0m"
+#define TEXT_BOLD   "\033[1m"
 
 #define COMMON_LONG_OPTIONS				\
 	{"port", required_argument, NULL, 'p'},		\
@@ -367,9 +369,8 @@ static void print_vm_list(uint32_t vid, char *name, uint32_t tag,
 	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 	if (i < vli->nr_vms) {
-		char *tmp;
-		if (vli->highlight && (tmp = tgetstr((char *)"md", (char **)NULL)))
-			tputs(tmp, 1, putchar);
+		if (vli->highlight)
+			printf(TEXT_BOLD);
 
 		printf("%-16s|%9s|%9s|%9s| running on %d.%d.%d.%d", name,
 		       vdi_size_str, my_objs_str, cow_objs_str,
@@ -377,8 +378,8 @@ static void print_vm_list(uint32_t vid, char *name, uint32_t tag,
 		       vli->vm_list_entries[i].host_addr[13],
 		       vli->vm_list_entries[i].host_addr[14],
 		       vli->vm_list_entries[i].host_addr[15]);
-		if (vli->highlight && (tmp = tgetstr((char *)"me", (char **)NULL)))
-			tputs(tmp, 1, putchar);
+		if (vli->highlight)
+			printf(TEXT_NORMAL);
 		printf("\n");
 	} else
 		printf("%-16s|%9s|%9s|%9s| not running\n", name,
@@ -542,13 +543,11 @@ static int node_list(int argc, char **argv)
 		print_node_list_entry(&node_list_entries[i], data, sizeof(data));
 
 		if (i == master_idx) {
-			const char *tmp;
-
-			if (highlight && (tmp = tgetstr((char *)"md", (char **)NULL)))
-				tputs(tmp, 1, putchar);
+			if (highlight)
+				printf(TEXT_BOLD);
 			printf("* %d\t%s\n", i, data);
-			if (highlight && (tmp = tgetstr((char *)"me", (char **)NULL)))
-				tputs(tmp, 1, putchar);
+			if (highlight)
+				printf(TEXT_NORMAL);
 		} else
 			printf("  %d\t%s\n", i, data);
 	}
@@ -1041,11 +1040,7 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret;
-	char termcap_area[1024];
 	unsigned long flags;
-
-	if (getenv("TERM"))
-		tgetent(termcap_area, getenv("TERM"));
 
 	if (argc < 3)
 		usage(0);

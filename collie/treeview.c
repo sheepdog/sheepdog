@@ -21,6 +21,9 @@
 #define MAX_DEPTH    100
 #endif
 
+#define TEXT_NORMAL "\033[0m"
+#define TEXT_BOLD   "\033[1m"
+
 struct vdi_tree {
 	char name[1024];
 	char label[256];
@@ -143,18 +146,17 @@ static void indent(int level, int first, int last)
 
 static void _dump_tree(struct vdi_tree *current, int level, int first, int last)
 {
-	char *tmp;
 	struct vdi_tree *vdi;
 
 	indent(level, first, last);
 
-	if (current->highlight && (tmp = tgetstr("md", NULL)))
-		tputs(tmp, 1, putchar);
+	if (current->highlight)
+		printf(TEXT_BOLD);
 
 	printf(current->label);
 
-	if (current->highlight && (tmp = tgetstr("me", NULL)))
-		tputs(tmp, 1, putchar);
+	if (current->highlight)
+		printf(TEXT_NORMAL);
 
 	if (list_empty(&current->children)) {
 		putchar('\n');
