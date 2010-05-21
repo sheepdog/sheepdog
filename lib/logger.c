@@ -38,6 +38,11 @@
 #define logdbg(file, fmt, args...) do {} while (0)
 #endif
 
+static int log_enqueue(int prio, const char *func, int line, const char *fmt,
+		       va_list ap) __attribute__ ((format (printf, 4, 0)));
+static void dolog(int prio, const char *func, int line, const char *fmt,
+		  va_list ap) __attribute__ ((format (printf, 4, 0)));
+
 static struct logarea *la;
 static char *log_name;
 static int log_level;
