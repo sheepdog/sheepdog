@@ -244,12 +244,13 @@ static int log_dequeue(void *buff)
 	struct logmsg * src = (struct logmsg *)la->head;
 	struct logmsg * dst = (struct logmsg *)buff;
 	struct logmsg * lst = (struct logmsg *)la->tail;
+	int len;
 
 	if (la->empty)
 		return 1;
 
-	int len = strlen((char *)&src->str) * sizeof(char) +
-		  sizeof(struct logmsg) + 1;
+	len = strlen((char *)&src->str) * sizeof(char) +
+		sizeof(struct logmsg) + 1;
 
 	dst->prio = src->prio;
 	memcpy(dst, src,  len);
