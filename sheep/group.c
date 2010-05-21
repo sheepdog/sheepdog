@@ -1258,7 +1258,7 @@ static void cpg_event_free(struct cpg_event *cevent)
 
 static struct work cpg_event_work;
 
-static void cpg_event_fn(struct work *w, int idx)
+static void cpg_event_fn(struct work *work, int idx)
 {
 	struct cpg_event *cevent = sys->cur_cevent;
 
@@ -1289,7 +1289,7 @@ static void cpg_event_fn(struct work *w, int idx)
 	}
 }
 
-static void cpg_event_done(struct work *w, int idx)
+static void cpg_event_done(struct work *work, int idx)
 {
 	struct cpg_event *cevent;
 
