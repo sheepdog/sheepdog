@@ -59,7 +59,7 @@ int rx(struct connection *conn, enum conn_state next_state)
 	}
 
 	conn->rx_length -= ret;
-	conn->rx_buf += ret;
+	conn->rx_buf = (char *)conn->rx_buf + ret;
 
 	if (!conn->rx_length)
 		conn->c_rx_state = next_state;
@@ -81,7 +81,7 @@ again:
 	}
 
 	conn->tx_length -= ret;
-	conn->tx_buf += ret;
+	conn->tx_buf = (char *)conn->tx_buf + ret;
 
 	if (conn->tx_length)
 		goto again;
@@ -243,7 +243,7 @@ reread:
 	}
 
 	len -= ret;
-	buf += ret;
+	buf = (char *)buf + ret;
 	if (len)
 		goto reread;
 

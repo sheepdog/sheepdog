@@ -90,7 +90,7 @@ static int logarea_init (int size)
 	shmctl(shmid, IPC_RMID, NULL);
 
 	la->empty = 1;
-	la->end = la->start + size;
+	la->end = (char *)la->start + size;
 	la->head = la->start;
 	la->tail = la->start;
 
@@ -175,7 +175,7 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 	if (!la->empty) {
 		fwd = sizeof(struct logmsg) +
 		      strlen((char *)&lastmsg->str) * sizeof(char) + 1;
-		la->tail += fwd;
+		la->tail = (char *)la->tail + fwd;
 	}
 
 	p = buff;
@@ -206,14 +206,14 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 
 	/* not enough space on tail : rewind */
 	if (la->head <= la->tail &&
-	    (len + sizeof(struct logmsg)) > (la->end - la->tail)) {
+	    (len + sizeof(struct logmsg)) > ((char *)la->end - (char *)la->tail)) {
 		logdbg(stderr, "enqueue: rewind tail to %p\n", la->tail);
 			la->tail = la->start;
 	}
 
 	/* not enough space on head : drop msg */
 	if (la->head > la->tail &&
-	    (len + sizeof(struct logmsg)) > (la->head - la->tail)) {
+	    (len + sizeof(struct logmsg)) > ((char *)la->head - (char *)la->tail)) {
 		logdbg(stderr, "enqueue: log area overrun, drop msg\n");
 
 		if (!la->empty)
