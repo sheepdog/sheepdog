@@ -23,10 +23,9 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= collie
 
-collie_SOURCES		= collie.c treeview.c ../lib/event.c ../lib/net.c ../lib/logger.c
-collie_LDADD	  	= 
-collie_DEPENDENCIES	= 
-
+collie_SOURCES		= collie.c treeview.c
+collie_LDADD	  	= ../lib/libsheepdog.a
+collie_DEPENDENCIES	= ../lib/libsheepdog.a
 
 noinst_HEADERS		= treeview.h
 

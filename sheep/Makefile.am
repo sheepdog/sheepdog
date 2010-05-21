@@ -23,9 +23,9 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include $(libcpg_CFLAGS) $
 
 sbin_PROGRAMS		= sheep
 
-sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c ../lib/event.c ../lib/logger.c ../lib/net.c
-sheep_LDADD	  	= $(libcpg_LIBS) $(libcfg_LIBS)
-sheep_DEPENDENCIES	= 
+sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c
+sheep_LDADD	  	= $(libcpg_LIBS) $(libcfg_LIBS) ../lib/libsheepdog.a
+sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
 noinst_HEADERS		= work.h sheep_priv.h

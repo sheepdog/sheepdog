@@ -1,3 +1,7 @@
-MAINTAINERCLEANFILES    = Makefile.in config.h.in
+MAINTAINERCLEANFILES    = Makefile.in
 
-noinst_HEADERS          = event.c logger.c net.c
+INCLUDES                = -I$(top_builddir)/include -I$(top_srcdir)/include
+
+noinst_LIBRARIES	= libsheepdog.a
+
+libsheepdog_a_SOURCES	= event.c logger.c net.c

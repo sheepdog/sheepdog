@@ -13,7 +13,7 @@ sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
 sheepdogsysconf_DATA	= 
 
-SUBDIRS			= collie sheep include script lib
+SUBDIRS			= lib collie sheep include script
 
 install-exec-local:
 
