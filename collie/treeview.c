@@ -153,7 +153,7 @@ static void _dump_tree(struct vdi_tree *current, int level, int first, int last)
 	if (current->highlight)
 		printf(TEXT_BOLD);
 
-	printf(current->label);
+	printf("%s", current->label);
 
 	if (current->highlight)
 		printf(TEXT_NORMAL);
@@ -190,7 +190,7 @@ void dump_tree(void)
 	}
 
 	list_for_each_entry(vdi, &root->children, siblings) {
-		printf(vdi->name);
+		printf("%s", vdi->name);
 		more[0] = 0;
 		width[0] = strlen(vdi->name);
 		_dump_tree(vdi, 1, 1, 1);
