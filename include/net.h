@@ -31,7 +31,7 @@ int is_conn_dead(struct connection *conn);
 int do_read(int sockfd, void *buf, int len);
 int rx(struct connection *conn, enum conn_state next_state);
 int tx(struct connection *conn, enum conn_state next_state, int flags);
-int connect_to(char *name, int port);
+int connect_to(const char *name, int port);
 int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int *wlen);
 int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	     unsigned int *wlen, unsigned int *rlen);

@@ -177,7 +177,7 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 	return !success;
 }
 
-int connect_to(char *name, int port)
+int connect_to(const char *name, int port)
 {
 	char buf[64];
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
