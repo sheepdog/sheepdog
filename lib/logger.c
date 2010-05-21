@@ -361,7 +361,7 @@ static void log_flush(void)
 	}
 }
 
-int log_init(char *program_name, int size, int daemon, int level, char *outfile)
+int log_init(char *program_name, int size, int is_daemon, int level, char *outfile)
 {
 	log_level = level;
 
@@ -370,7 +370,7 @@ int log_init(char *program_name, int size, int daemon, int level, char *outfile)
 
 	semkey = random();
 
-	if (daemon) {
+	if (is_daemon) {
 		struct sigaction sa_old;
 		struct sigaction sa_new;
 		int fd;
