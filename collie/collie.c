@@ -909,7 +909,7 @@ static int cluster_info(int argc, char **argv)
 		printf("%s\n", sd_strerror(rsp->result));
 
 	printf("\n");
-	printf("Ctime              Epoch Nodes\n");
+	printf("Ctime                Epoch Nodes\n");
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = 0; i < nr_logs; i++) {
 		int j;
@@ -918,7 +918,7 @@ static int cluster_info(int argc, char **argv)
 
 		ti = logs[i].ctime >> 32;
 		localtime_r(&ti, &tm);
-		strftime(time_str, sizeof(time_str), "%y-%m-%d %H:%M:%S", &tm);
+		strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm);
 
 		printf("%s %6d", time_str, logs[i].epoch);
 		printf(" [");
