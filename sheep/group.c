@@ -629,21 +629,23 @@ out:
 			msg->header.nodeid, msg->header.pid);
 
 	if (msg->cluster_status == SD_STATUS_OK) {
-		nr_nodes = get_ordered_sd_node_list(entry);
+		if (sys->status == SD_STATUS_OK) {
+			nr_nodes = get_ordered_sd_node_list(entry);
 
-		dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr_nodes);
-		ret = epoch_log_write(sys->epoch + 1, (char *)entry,
-				      nr_nodes * sizeof(struct sheepdog_node_list_entry));
-		if (ret < 0)
-			eprintf("can't write epoch %u\n", sys->epoch + 1);
+			dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr_nodes);
+			ret = epoch_log_write(sys->epoch + 1, (char *)entry,
+					      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+			if (ret < 0)
+				eprintf("can't write epoch %u\n", sys->epoch + 1);
 
-		sys->epoch++;
+			sys->epoch++;
 
-		update_epoch_store(sys->epoch);
-
-		get_vdi_bitmap_from_all();
-		set_global_nr_copies(sys->nr_sobjs);
-		set_cluster_ctime(msg->ctime);
+			update_epoch_store(sys->epoch);
+		} else {
+			get_vdi_bitmap_from_all();
+			set_global_nr_copies(sys->nr_sobjs);
+			set_cluster_ctime(msg->ctime);
+		}
 	}
 
 	print_node_list(&sys->sd_node_list);
