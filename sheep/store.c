@@ -1597,7 +1597,7 @@ again:
 }
 
 
-static int attr(char *path, const char *attr, void *var, int len, int set)
+static int attr(char *path, const char *name, void *var, int len, int set)
 {
 	int ret, fd;
 
@@ -1606,15 +1606,15 @@ static int attr(char *path, const char *attr, void *var, int len, int set)
 		return SD_RES_EIO;
 
 	if (set)
-		ret = fsetxattr(fd, attr, var, len, 0);
+		ret = fsetxattr(fd, name, var, len, 0);
 	else
-		ret = fgetxattr(fd, attr, var, len);
+		ret = fgetxattr(fd, name, var, len);
 
 	close(fd);
 
 	if (set) {
 		if (ret) {
-			eprintf("use 'user_xattr' option?, %s\n", attr);
+			eprintf("use 'user_xattr' option?, %s\n", name);
 			return SD_RES_SYSTEM_ERROR;
 		}
 	} else {
