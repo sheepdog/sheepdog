@@ -32,15 +32,17 @@ Install
 
 3. Download Sheepdog codes.
 
-   $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/qemu-kvm
+   $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/qemu
    $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/sheepdog
 
 4. Build
 
-   $ cd qemu-kvm
+   $ cd qemu
    $ ./configure
    $ make install
    $ cd ../sheepdog
+   $ ./autogen.sh
+   $ ./configure
    $ make install
    $ cd ..
 
@@ -108,11 +110,11 @@ Usage
 * Create a virtual machine image
    1. Create a 256 GB virtual machine image of Alice.
 
-      $ qemu-img create -f sheepdog Alice 256G
+      $ qemu-img create sheepdog:Alice 256G
 
    2. You can also convert from existing KVM images to Sheepdog ones.
 
-      $ qemu-img convert -f raw -O sheepdog ~/amd64.raw Bob
+      $ qemu-img convert ~/amd64.raw sheepdog:Bob
 
    3. See Sheepdog images by the following command.
 
@@ -125,7 +127,7 @@ Usage
 * Boot the virtual machine
    1. Boot the virtual machine.
 
-      $ qemu-system-x86_64 --drive format=sheepdog,file=Alice
+      $ qemu-system-x86_64 -hda sheepdog:Alice
 
    2. Following command checks used images.
 
@@ -154,12 +156,12 @@ Usage
 
    3. You can boot from the snapshot image by spcifing tag id
 
-      $ qemu-system-x86_64 --drive format=sheepdog,file=Alice:1
+      $ qemu-system-x86_64 -hda sheepdog:Alice:1
 
 * Cloning from the snapshot
    1. Create a Charlie image as a clone of Alice's image.
 
-      $ qemu-img create -b sheepdog:Alice:1 -f sheepdog Charlie
+      $ qemu-img create -b sheepdog:Alice:1 sheepdog:Charlie
 
    2. Charlie's image is added to the virtual machine list.
 
