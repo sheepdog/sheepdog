@@ -36,7 +36,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static char *short_options = "p:fl:dh";
+static const char *short_options = "p:fl:dh";
 
 static void usage(int status)
 {
