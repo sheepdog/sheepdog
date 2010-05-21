@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 {
 	int ch, longindex;
 	int ret, port = SD_LISTEN_PORT;
-	char *dir = DEFAULT_OBJECT_DIR;
+	const char *dir = DEFAULT_OBJECT_DIR;
 	int is_daemon = 1;
 	int log_level = LOG_INFO;
 	char path[PATH_MAX];

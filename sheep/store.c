@@ -1563,7 +1563,7 @@ fail:
 	return -1;
 }
 
-static int init_path(char *d, int *new)
+static int init_path(const char *d, int *new)
 {
 	int ret, retry = 0;
 	struct stat s;
@@ -1635,7 +1635,7 @@ int get_nodeid(uint64_t *nodeid)
 	return attr(epoch_path, ANAME_NODEID, nodeid, sizeof(*nodeid), 0);
 }
 
-static int init_base_path(char *d)
+static int init_base_path(const char *d)
 {
 	int new = 0;
 
@@ -1644,7 +1644,7 @@ static int init_base_path(char *d)
 
 #define OBJ_PATH "/obj/"
 
-static int init_obj_path(char *base_path)
+static int init_obj_path(const char *base_path)
 {
 	int new;
 
@@ -1656,7 +1656,7 @@ static int init_obj_path(char *base_path)
 
 #define EPOCH_PATH "/epoch/"
 
-static int init_epoch_path(char *base_path)
+static int init_epoch_path(const char *base_path)
 {
 	int new, ret;
 	uint32_t epoch;
@@ -1707,7 +1707,7 @@ static int init_epoch_path(char *base_path)
 	return 0;
 }
 
-static int init_mnt_path(char *base_path)
+static int init_mnt_path(const char *base_path)
 {
 	int ret;
 	FILE *fp;
@@ -1738,7 +1738,7 @@ static int init_mnt_path(char *base_path)
 	return 0;
 }
 
-int init_store(char *d)
+int init_store(const char *d)
 {
 	int ret;
 
