@@ -24,7 +24,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <sys/time.h>
-#include <term.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"

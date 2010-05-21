@@ -12,7 +12,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <term.h>
 
 #include "list.h"
 #include "treeview.h"
