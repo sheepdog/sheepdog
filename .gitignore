@@ -1,0 +1,55 @@
+#
+# Normal rules
+#
+.*
+*.o
+*.o.*
+*.a
+*.s
+*.ko
+*.so
+*.mod.c
+*.i
+*.lst
+*.symtypes
+*.d
+*.orig
+*.rej
+
+#
+# for GLOBAL
+#
+GTAGS
+GRTAGS
+GPATH
+GSYMS
+
+#
+# programs
+#
+collie/collie
+sheep/sheep
+
+
+# directories
+.deps
+autom4te.cache
+
+aclocal.m4
+Makefile
+Makefile.in
+INSTALL
+config.log
+config.status
+config.guess
+config.sub
+configure
+depcomp
+install-sh
+missing
+push
+stamp-h1
+libtool
+ltmain.sh
+config.h
+config.h.in
