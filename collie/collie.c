@@ -56,7 +56,7 @@ static void usage(int status)
 Command syntax:\n\
   cluster (info|format|shutdown)\n\
   node (info|list)\n\
-  vdi (list|delete|object|lock|release)\n\
+  vdi (list|tree|delete|object|lock|release)\n\
   vm list\n\
 \n\
 Common parameters:\n\
@@ -332,6 +332,26 @@ static void print_vdi_list(uint32_t vid, char *name, uint32_t tag,
 		       is_current(i) ? ' ' : 's', name, tag,
 		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
 	}
+}
+
+static void print_vdi_tree(uint32_t vid, char *name, uint32_t tag,
+			   uint32_t flags, struct sheepdog_inode *i, void *data)
+{
+	time_t ti;
+	struct tm tm;
+	char buf[128];
+
+	if (is_current(i))
+		strcpy(buf, "(You Are Here)");
+	else {
+		ti = i->ctime >> 32;
+		localtime_r(&ti, &tm);
+
+		strftime(buf, sizeof(buf),
+			 "[%Y-%m-%d %H:%M]", &tm);
+	}
+
+	add_vdi_tree(name, buf, vid, i->parent_vdi_id, highlight && is_current(i));
 }
 
 struct vm_list_info {
@@ -679,6 +699,15 @@ static int vdi_list(int argc, char **argv)
 	return 0;
 }
 
+static int vdi_tree(int argc, char **argv)
+{
+	init_tree();
+	parse_vdi(print_vdi_tree, NULL);
+	dump_tree();
+
+	return 0;
+}
+
 static int vdi_delete(int argc, char **argv)
 {
 	char *data = argv[optind];
@@ -869,6 +898,7 @@ static int vdi_release(int argc, char **argv)
 static struct subcommand vdi_cmd[] = {
 	{"delete", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", SUBCMD_FLAG_NEED_NOEDLIST, vdi_list},
+	{"tree", SUBCMD_FLAG_NEED_NOEDLIST, vdi_tree},
 	{"object", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
 	{"lock", SUBCMD_FLAG_NEED_THIRD_ARG, vdi_lock},
 	{"release", SUBCMD_FLAG_NEED_THIRD_ARG, vdi_release},
