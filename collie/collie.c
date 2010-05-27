@@ -31,6 +31,7 @@
 #include "treeview.h"
 
 static char program_name[] = "collie";
+static const char *sdhost = "localhost";
 static int sdport = SD_LISTEN_PORT;
 static int highlight = 1;
 
@@ -38,10 +39,11 @@ static int highlight = 1;
 #define TEXT_BOLD   "\033[1m"
 
 #define COMMON_LONG_OPTIONS				\
+	{"address", required_argument, NULL, 'a'},	\
 	{"port", required_argument, NULL, 'p'},		\
 	{"help", no_argument, NULL, 'h'},		\
 
-#define COMMON_SHORT_OPTIONS "p:h"
+#define COMMON_SHORT_OPTIONS "a:p:h"
 
 static void usage(int status)
 {
@@ -58,6 +60,7 @@ Command syntax:\n\
   vm list\n\
 \n\
 Common parameters:\n\
+  -a, --address           specify the daemon address (default: localhost)\n\
   -p, --port              specify the daemon port\n\
   -h, --help              display this help and exit\n\
 ");
@@ -106,7 +109,7 @@ static int update_node_list(int max_nodes, int epoch)
 	struct sd_node_req hdr;
 	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&hdr;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return -1;
 
@@ -169,7 +172,7 @@ static int cluster_format(int argc, char **argv)
 	unsigned rlen, wlen;
 	struct timeval tv;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return -1;
 
@@ -207,7 +210,7 @@ static int shutdown_sheepdog(void)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return -1;
 
@@ -246,7 +249,7 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	unsigned int rlen, wlen = 0;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return fd;
 
@@ -633,7 +636,7 @@ static int vm_list(int argc, char **argv)
 	char *data;
 	struct vm_list_info vli;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return 1;
 
@@ -686,7 +689,7 @@ static int vdi_delete(int argc, char **argv)
 	char vdiname[SD_MAX_VDI_LEN];
 	uint32_t id = ~0;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return -1;
 
@@ -789,7 +792,7 @@ static int vdi_lock(int argc, char **argv)
 	opcode = SD_OP_LOCK_VDI;
 	flags = SD_FLAG_CMD_WRITE;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return 1;
 
@@ -836,7 +839,7 @@ static int vdi_release(int argc, char **argv)
 	opcode = SD_OP_RELEASE_VDI;
 	flags = SD_FLAG_CMD_WRITE;
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return 1;
 
@@ -884,7 +887,7 @@ static int cluster_info(int argc, char **argv)
 	struct tm tm;
 	char time_str[128];
 
-	fd = connect_to("localhost", sdport);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return 1;
 
@@ -1052,6 +1055,9 @@ int main(int argc, char **argv)
 				&longindex)) >= 0) {
 
 		switch (ch) {
+		case 'a':
+			sdhost = optarg;
+			break;
 		case 'p':
 			sdport = atoi(optarg);
 			break;
