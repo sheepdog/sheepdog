@@ -56,7 +56,7 @@ static void usage(int status)
 Command syntax:\n\
   cluster (info|format|shutdown)\n\
   node (info|list)\n\
-  vdi (list|tree|delete|object|lock|release)\n\
+  vdi (list|tree|graph|delete|object|lock|release)\n\
   vm list\n\
 \n\
 Common parameters:\n\
@@ -352,6 +352,39 @@ static void print_vdi_tree(uint32_t vid, char *name, uint32_t tag,
 	}
 
 	add_vdi_tree(name, buf, vid, i->parent_vdi_id, highlight && is_current(i));
+}
+
+static void print_vdi_graph(uint32_t vid, char *name, uint32_t tag,
+			    uint32_t flags, struct sheepdog_inode *i, void *data)
+{
+	time_t ti;
+	struct tm tm;
+	char dbuf[128], tbuf[128], size_str[128];
+
+	ti = i->ctime >> 32;
+	localtime_r(&ti, &tm);
+
+	strftime(dbuf, sizeof(dbuf), "%Y-%m-%d", &tm);
+	strftime(tbuf, sizeof(tbuf), "%H:%M:%S", &tm);
+	size_to_str(i->vdi_size, size_str, sizeof(size_str));
+
+	printf("  \"%x\" -> \"%x\";\n", i->parent_vdi_id, vid);
+	printf("  \"%x\" [\n"
+	       "    group = \"%s\",\n"
+	       "    label = \"",
+	       vid, name);
+	printf("name: %10s\\n"
+	       "tag : %10x\\n"
+	       "size: %10s\\n"
+	       "date: %10s\\n"
+	       "time: %10s",
+	       name, tag, size_str, dbuf, tbuf);
+
+	if (is_current(i))
+		printf("\",\n    color=\"red\"\n  ];\n\n");
+	else
+		printf("\"\n  ];\n\n");
+
 }
 
 struct vm_list_info {
@@ -708,6 +741,21 @@ static int vdi_tree(int argc, char **argv)
 	return 0;
 }
 
+static int vdi_graph(int argc, char **argv)
+{
+	/* print a header */
+	printf("digraph G \{\n");
+	printf("  node [shape = \"box\", fontname = \"Courier\"];\n\n");
+	printf("  \"0\" [shape = \"ellipse\", label = \"root\"];\n\n");
+
+	parse_vdi(print_vdi_graph, NULL);
+
+	/* print a footer */
+	printf("}\n");
+
+	return 0;
+}
+
 static int vdi_delete(int argc, char **argv)
 {
 	char *data = argv[optind];
@@ -899,6 +947,7 @@ static struct subcommand vdi_cmd[] = {
 	{"delete", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", SUBCMD_FLAG_NEED_NOEDLIST, vdi_list},
 	{"tree", SUBCMD_FLAG_NEED_NOEDLIST, vdi_tree},
+	{"graph", SUBCMD_FLAG_NEED_NOEDLIST, vdi_graph},
 	{"object", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
 	{"lock", SUBCMD_FLAG_NEED_THIRD_ARG, vdi_lock},
 	{"release", SUBCMD_FLAG_NEED_THIRD_ARG, vdi_release},
