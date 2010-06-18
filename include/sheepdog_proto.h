@@ -74,6 +74,7 @@
 #define MAX_DATA_OBJS (1ULL << 20)
 #define MAX_CHILDREN 1024
 #define SD_MAX_VDI_LEN 256
+#define SD_MAX_VDI_TAG_LEN 256
 #define SD_NR_VDIS   (1U << 24)
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 
@@ -156,6 +157,7 @@ struct sd_vdi_rsp {
 
 struct sheepdog_inode {
 	char name[SD_MAX_VDI_LEN];
+	char tag[SD_MAX_VDI_TAG_LEN];
 	uint64_t ctime;
 	uint64_t snap_ctime;
 	uint64_t vm_clock_nsec;
