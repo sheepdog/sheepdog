@@ -161,7 +161,7 @@ int get_global_nr_copies(uint32_t *copies);
 int set_nodeid(uint64_t nodeid);
 int get_nodeid(uint64_t *nodeid);
 
-#define NR_WORKER_THREAD 4
+#define NR_WORKER_THREAD 64
 
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
