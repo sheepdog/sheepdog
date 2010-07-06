@@ -10,7 +10,7 @@ typedef void (*event_handler_t)(int fd, int events, void *data);
 int init_event(int nr);
 int register_event(int fd, event_handler_t h, void *data);
 void unregister_event(int fd);
-void modify_event(int fd, unsigned int events);
+int modify_event(int fd, unsigned int events);
 void event_loop(int timeout);
 
 struct timer {

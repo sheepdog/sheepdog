@@ -238,6 +238,9 @@ static void queue_request(struct request *req)
 	start_cpg_event_work();
 }
 
+static void client_incref(struct client_info *ci);
+static void client_decref(struct client_info *ci);
+
 static struct request *alloc_request(struct client_info *ci, int data_length)
 {
 	struct request *req;
@@ -247,6 +250,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 		return NULL;
 
 	req->ci = ci;
+	client_incref(ci);
 	if (data_length)
 		req->data = (char *)req + sizeof(*req);
 
@@ -258,6 +262,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 
 static void free_request(struct request *req)
 {
+	client_decref(req->ci);
 	list_del(&req->r_siblings);
 	free(req);
 }
@@ -265,7 +270,10 @@ static void free_request(struct request *req)
 static void req_done(struct request *req)
 {
 	list_add(&req->r_wlist, &req->ci->done_reqs);
-	conn_tx_on(&req->ci->conn);
+	if (conn_tx_on(&req->ci->conn)) {
+		dprintf("connection seems to be dead\n");
+		free_request(req);
+	}
 }
 
 static void init_rx_hdr(struct client_info *ci)
@@ -317,7 +325,12 @@ static void client_rx_handler(struct client_info *ci)
 		eprintf("BUG: unknown state %d\n", conn->c_rx_state);
 	}
 
-	if (is_conn_dead(conn) || conn->c_rx_state != C_IO_END)
+	if (is_conn_dead(conn) && ci->rx_req) {
+		free_request(ci->rx_req);
+		return;
+	}
+
+	if (conn->c_rx_state != C_IO_END)
 		return;
 
 	/* now we have a complete command */
@@ -406,8 +419,10 @@ again:
 	opt = 0;
 	setsockopt(ci->conn.fd, SOL_TCP, TCP_CORK, &opt, sizeof(opt));
 
-	if (is_conn_dead(&ci->conn) || ci->conn.c_tx_state != C_IO_END)
+	if (is_conn_dead(&ci->conn)) {
+		free_request(ci->tx_req);
 		return;
+	}
 
 	if (ci->conn.c_tx_state == C_IO_END) {
 		free_request(ci->tx_req);
@@ -422,6 +437,18 @@ static void destroy_client(struct client_info *ci)
 	free(ci);
 }
 
+static void client_incref(struct client_info *ci)
+{
+	if (ci)
+		ci->refcnt++;
+}
+
+static void client_decref(struct client_info *ci)
+{
+	if (ci && --ci->refcnt == 0)
+		destroy_client(ci);
+}
+
 static struct client_info *create_client(int fd, struct cluster_info *cluster)
 {
 	struct client_info *ci;
@@ -431,6 +458,7 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 		return NULL;
 
 	ci->conn.fd = fd;
+	ci->refcnt = 1;
 
 	INIT_LIST_HEAD(&ci->reqs);
 	INIT_LIST_HEAD(&ci->done_reqs);
@@ -453,7 +481,7 @@ static void client_handler(int fd, int events, void *data)
 	if (is_conn_dead(&ci->conn)) {
 		dprintf("closed a connection, %d\n", fd);
 		unregister_event(fd);
-		destroy_client(ci);
+		client_decref(ci);
 	}
 }
 

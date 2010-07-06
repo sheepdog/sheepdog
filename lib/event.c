@@ -141,7 +141,7 @@ void unregister_event(int fd)
 	free(ei);
 }
 
-void modify_event(int fd, unsigned int events)
+int modify_event(int fd, unsigned int events)
 {
 	int ret;
 	struct epoll_event ev;
@@ -150,7 +150,7 @@ void modify_event(int fd, unsigned int events)
 	ei = lookup_event(fd);
 	if (!ei) {
 		eprintf("can't find event info %d\n", fd);
-		return;
+		return 1;
 	}
 
 	memset(&ev, 0, sizeof(ev));
@@ -158,8 +158,11 @@ void modify_event(int fd, unsigned int events)
 	ev.data.ptr = ei;
 
 	ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
-	if (ret)
+	if (ret) {
 		eprintf("can't del epoll event, %m\n");
+		return 1;
+	}
+	return 0;
 }
 
 void event_loop(int timeout)

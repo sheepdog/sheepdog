@@ -29,14 +29,14 @@
 #include "net.h"
 #include "logger.h"
 
-void conn_tx_off(struct connection *conn)
+int conn_tx_off(struct connection *conn)
 {
-	modify_event(conn->fd, EPOLLIN);
+	return modify_event(conn->fd, EPOLLIN);
 }
 
-void conn_tx_on(struct connection *conn)
+int conn_tx_on(struct connection *conn)
 {
-	modify_event(conn->fd, EPOLLIN|EPOLLOUT);
+	return modify_event(conn->fd, EPOLLIN|EPOLLOUT);
 }
 
 int is_conn_dead(struct connection *conn)

@@ -59,6 +59,8 @@ struct client_info {
 
 	struct list_head reqs;
 	struct list_head done_reqs;
+
+	int refcnt;
 };
 
 struct request;
