@@ -172,6 +172,8 @@ void event_loop(int timeout)
 
 	nr = epoll_wait(efd, events, ARRAY_SIZE(events), TICK * 1000);
 	if (nr < 0) {
+		if (errno == EINTR)
+			return;
 		eprintf("epoll_wait failed, %m\n");
 		exit(1);
 	} else if (nr) {
