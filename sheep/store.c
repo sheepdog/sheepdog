@@ -33,8 +33,6 @@ static char *obj_path;
 static char *epoch_path;
 static char *mnt_path;
 
-static char *zero_block;
-
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
@@ -145,7 +143,7 @@ err:
 	return -1;
 }
 
-static int get_obj_list(struct request *req, char *buf, int buf_len)
+static int get_obj_list(struct request *req)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -164,7 +162,17 @@ static int get_obj_list(struct request *req, char *buf, int buf_len)
 	int e_nr;
 	int idx;
 	int res = SD_RES_SUCCESS;
-	int ret;
+	int ret, buf_len;
+	char *buf;
+
+	/* FIXME: handle larger size */
+	buf_len = (1 << 22);
+	buf = zalloc(buf_len);
+	if (!buf) {
+		eprintf("failed to allocate memory\n");
+		res = SD_RES_NO_MEM;
+		goto out;
+	}
 
 	if (epoch == 1)
 		goto local;
@@ -274,6 +282,7 @@ local:
 	closedir(dir);
 
 out:
+	free(buf);
 	rsp->data_length = nr * sizeof(uint64_t);
 	for (i = 0; i < nr; i++) {
 		eprintf("oid %"PRIx64", %"PRIx64"\n", *(p + i), p[i]);
@@ -368,9 +377,9 @@ static int read_from_other_sheeps(struct request *req, uint32_t epoch,
 	return ret;
 }
 
-static int store_queue_request_local(struct request *req, char *buf, uint32_t epoch);
+static int store_queue_request_local(struct request *req, uint32_t epoch);
 
-static int forward_read_obj_req(struct request *req, char *buf)
+static int forward_read_obj_req(struct request *req)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
@@ -397,7 +406,7 @@ static int forward_read_obj_req(struct request *req, char *buf)
 		n = obj_to_sheep(e, nr, oid, i);
 
 		if (is_myself(&e[n])) {
-			ret = store_queue_request_local(req, buf, hdr->epoch);
+			ret = store_queue_request_local(req, hdr->epoch);
 			goto out;
 		}
 	}
@@ -431,7 +440,7 @@ out:
 	return ret;
 }
 
-static int forward_write_obj_req(struct request *req, char *buf)
+static int forward_write_obj_req(struct request *req)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
@@ -495,7 +504,7 @@ static int forward_write_obj_req(struct request *req, char *buf)
 	}
 
 	if (local) {
-		ret = store_queue_request_local(req, buf, hdr->epoch);
+		ret = store_queue_request_local(req, hdr->epoch);
 		rsp->result = ret;
 
 		if (nr_fds == 0) {
@@ -596,7 +605,7 @@ int update_epoch_store(uint32_t epoch)
 	return 0;
 }
 
-static int store_queue_request_local(struct request *req, char *buf, uint32_t epoch)
+static int store_queue_request_local(struct request *req, uint32_t epoch)
 {
 	int fd = -1, copies;
 	int ret = SD_RES_SUCCESS;
@@ -604,7 +613,7 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
-	char path[1024];
+	char path[1024], *buf;
 
 	switch (opcode) {
 	case SD_OP_CREATE_AND_WRITE_OBJ:
@@ -642,30 +651,42 @@ static int store_queue_request_local(struct request *req, char *buf, uint32_t ep
 		}
 
 		if (hdr->flags & SD_FLAG_CMD_COW) {
-			dprintf("%" PRIx64 "\n", hdr->cow_oid);
+			dprintf("%" PRIu64 ", %" PRIx64 "\n", oid, hdr->cow_oid);
 
+			buf = zalloc(SD_DATA_OBJ_SIZE);
+			if (!buf) {
+				eprintf("failed to allocate memory\n");
+				ret = SD_RES_NO_MEM;
+				goto out;
+			}
 			ret = read_from_other_sheeps(req, hdr->epoch, hdr->cow_oid, buf,
 						     hdr->copies);
+			free(buf);
 			if (ret) {
 				eprintf("failed to read old object\n");
 				ret = SD_RES_EIO;
 				goto out;
 			}
+			if (ret != SD_DATA_OBJ_SIZE) {
+				if (errno == ENOSPC)
+					ret = SD_RES_NO_SPACE;
+				else
+					ret = SD_RES_EIO;
+				goto out;
+			}
 		} else {
-			dprintf("%" PRIu64 "\n", oid);
-			memset(buf, 0, SD_DATA_OBJ_SIZE);
+			int zero = 0;
+
+			ret = pwrite64(fd, &zero, sizeof(zero), SD_DATA_OBJ_SIZE - sizeof(zero));
+			if (ret != sizeof(zero)) {
+				if (errno == ENOSPC)
+					ret = SD_RES_NO_SPACE;
+				else
+					ret = SD_RES_EIO;
+				goto out;
+			}
 		}
 
-		dprintf("%" PRIu64 "\n", oid);
-
-		ret = pwrite64(fd, buf, SD_DATA_OBJ_SIZE, 0);
-		if (ret != SD_DATA_OBJ_SIZE) {
-			if (errno == ENOSPC)
-				ret = SD_RES_NO_SPACE;
-			else
-				ret = SD_RES_EIO;
-			goto out;
-		}
 	default:
 		break;
 	}
@@ -767,7 +788,6 @@ void store_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
 	int ret = SD_RES_SUCCESS;
-	char *buf = zero_block + idx * SD_DATA_OBJ_SIZE;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
@@ -786,19 +806,19 @@ void store_queue_request(struct work *work, int idx)
 	}
 
 	if (opcode == SD_OP_GET_OBJ_LIST) {
-		ret = get_obj_list(req, buf, SD_DATA_OBJ_SIZE);
+		ret = get_obj_list(req);
 		goto out;
 	}
 
 	if (!(hdr->flags & SD_FLAG_CMD_DIRECT)) {
 		if (hdr->flags & SD_FLAG_CMD_WRITE)
-			ret = forward_write_obj_req(req, buf);
+			ret = forward_write_obj_req(req);
 		else
-			ret = forward_read_obj_req(req, buf);
+			ret = forward_read_obj_req(req);
 		goto out;
 	}
 
-	ret = store_queue_request_local(req, buf, epoch);
+	ret = store_queue_request_local(req, epoch);
 out:
 	if (ret != SD_RES_SUCCESS) {
 		dprintf("failed, %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
@@ -1757,10 +1777,6 @@ int init_store(const char *d)
 	ret = init_mnt_path(d);
 	if (ret)
 		return ret;
-
-	zero_block = zalloc(SD_DATA_OBJ_SIZE * NR_WORKER_THREAD);
-	if (!zero_block)
-		return 1;
 
 	return ret;
 }
