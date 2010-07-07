@@ -30,10 +30,10 @@ Install
    $ aptitude install corosync     # or compile corosync.
    $ sudo corosync                 # run corosync daemon as root
 
-3. Download Sheepdog codes.
+3. Download QEMU and Sheepdog codes.
 
-   $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/qemu
-   $ git clone git://sheepdog.git.sourceforge.net/gitroot/sheepdog/sheepdog
+   $ git clone git://git.sv.gnu.org/qemu.git
+   $ git clone git://sheepdog.git.sf.net/gitroot/sheepdog/sheepdog
 
 4. Build
 
