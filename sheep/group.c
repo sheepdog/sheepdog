@@ -673,7 +673,7 @@ static void vdi_op(struct vdi_op_message *msg)
 			ret = SD_RES_VDI_LOCKED;
 			break;
 		}
-		ret = del_vdi(hdr->epoch, data, hdr->data_length, hdr->snapid);
+		ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid, hdr->snapid);
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
@@ -726,7 +726,12 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		break;
 	}
 	case SD_OP_DEL_VDI:
+	{
+		unsigned long nr = rsp->vdi_id;
+		vprintf(SDOG_INFO "done %d %ld\n", ret, nr);
+		clear_bit(nr, sys->vdi_inuse);
 		break;
+	}
 	case SD_OP_LOCK_VDI:
 		if (lookup_vm(&sys->vm_list, (char *)data)) {
 			ret = SD_RES_VDI_LOCKED;

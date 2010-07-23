@@ -285,10 +285,9 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 
 int start_deletion(uint32_t vid, uint32_t epoch);
 
-int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t snapid)
+int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid)
 {
 	char *name = data;
-	uint32_t vid;
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
@@ -299,7 +298,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t snapid)
 	if (data_len != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
 
-	ret = do_lookup_vdi(epoch, name, strlen(name), &vid, NULL, snapid,
+	ret = do_lookup_vdi(epoch, name, strlen(name), vid, NULL, snapid,
 			     &dummy0, &dummy1, &dummy2);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -310,7 +309,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t snapid)
 		nr_reqs = nr_nodes;
 
 	ret = read_object(entries, nr_nodes, epoch,
-			  vid_to_vdi_oid(vid), (char *)&inode, sizeof(inode), 0,
+			  vid_to_vdi_oid(*vid), (char *)&inode, sizeof(inode), 0,
 			  nr_reqs);
 	if (ret < 0)
 		return SD_RES_EIO;
@@ -318,12 +317,12 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t snapid)
 	memset(inode.name, 0, sizeof(inode.name));
 
 	ret = write_object(entries, nr_nodes, epoch,
-			   vid_to_vdi_oid(vid), (char *)&inode, sizeof(inode), 0,
+			   vid_to_vdi_oid(*vid), (char *)&inode, sizeof(inode), 0,
 			   nr_reqs, 0);
 	if (ret < 0)
 		return SD_RES_EIO;
 
-	ret = start_deletion(vid, epoch);
+	ret = start_deletion(*vid, epoch);
 	if (ret < 0)
 		return SD_RES_NO_MEM;
 
