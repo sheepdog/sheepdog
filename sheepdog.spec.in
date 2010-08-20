@@ -1,0 +1,52 @@
+Name: sheepdog
+Summary: The Sheepdog Distributed Storage System for KVM/QEMU
+Version: @version@
+Release: 1%{?dist}
+License: GPL
+Group: System Environment/Base
+URL: http://www.osrg.net/sheepdog
+Source0: http://downloads.sourceforge.net/project/sheepdog/%{name}/%{version}/%{name}-%{version}.tar.gz
+
+# Runtime bits
+Requires: corosync corosynclib
+
+# Build bits
+BuildRequires: autoconf automake
+BuildRequires: corosync corosynclib corosynclib-devel
+
+BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
+
+%prep
+%setup -q -n %{name}-%{version}
+
+%build
+./autogen.sh
+%{configure} --with-initddir=%{_initrddir}
+
+make %{_smp_mflags}
+
+%install
+rm -rf %{buildroot}
+
+make install DESTDIR=%{buildroot}
+
+## tree fixup
+# drop static libs
+rm -f %{buildroot}%{_libdir}/*.a
+
+%clean
+rm -rf %{buildroot}
+
+%description
+This package contains the Sheepdog server, and command line tool.
+
+%files
+%defattr(-,root,root,-)
+%doc COPYING README
+%{_sbindir}/sheep
+%{_sbindir}/collie
+%dir %{_localstatedir}/lib/sheepdog
+
+%changelog
+* @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
+- Autotools generated version
