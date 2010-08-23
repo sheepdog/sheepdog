@@ -45,6 +45,7 @@ This package contains the Sheepdog server, and command line tool.
 %doc COPYING README
 %{_sbindir}/sheep
 %{_sbindir}/collie
+%{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
 
 %changelog

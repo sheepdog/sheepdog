@@ -274,6 +274,7 @@ AC_SUBST([OS_DYFLAGS])
 
 AM_CONDITIONAL(BUILD_HTML_DOCS, test -n "${GROFF}")
 
+AC_SUBST([INITDDIR])
 AC_SUBST([LINT_FLAGS])
 
 AC_DEFINE_UNQUOTED([LOCALSTATEDIR], "$(eval echo ${localstatedir})", [localstate directory])
