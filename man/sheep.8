@@ -1,0 +1,54 @@
+.TH SHEEPDOG 2010-08-24
+.SH NAME
+sheep \- Distributed Block Storage System for KVM
+.SH SNYNOPSIS
+.B "sheep [options] [PATH]"
+.SH DESCRIPTION
+.B sheep
+Sheepdog is a distributed storage system for KVM/QEMU. It provides
+highly available block level storage volumes to virtual machines.
+Sheepdog supports advanced volume management features such as snapshot,
+cloning, and thin provisioning. The architecture of Sheepdog is fully
+symmetric; there is no central node such as a meta-data server.
+
+The server daemon is called sheep(8).  A command line utility is available
+via collie(8).  KVM/QEMU virtual machines use the sheep daemon via a block
+driver available in qemu(1).
+.SH OPTIONS
+.TP
+.BI \-p "\fR, \fP" \--port " port"
+This option specifies the IP port over which \fBsheep\fP looks for other
+sheepdog cluster nodes.
+.TP
+.BI \-f "\fR, \fP" \--foreground
+This option forces the sheepdog daemon to run in the foreground.
+.TP
+.BI \-l "\fR, \fP" \--loglevel " loglevel"
+This option specifies the message level printed.
+.TP
+.BI \-d "\fR, \fP" \--debug
+This option displays debug messages.
+.TP
+.BI \-h "\fR, \fP" \--help
+Display help and exit.
+.SH PATH
+Proper LSB systems will store sheepdog files in /var/lib/sheepdog.  The init
+script uses this directory by default.  The directory must be on a filesystem
+with xattr support.  In the case of ext3, user_xattr should be added to the
+mount options.
+
+mount \-o remount,user_xattr /var/lib/shepdog
+
+.SH DEPENDENCIES
+\fBsheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z.
+
+.SH FILES
+.B /var/lib/sheepdog - Directory containing block storage information
+
+.SH SEE ALSO
+.BR collie(8),qemu(1),corosync_overview(8)
+
+.SH AUTHORS
+This software is developed by the sheepdog community which may be reached
+via mailing list at <sheepdog@lists.wpkg.org>.
+.PP

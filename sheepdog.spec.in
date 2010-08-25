@@ -47,6 +47,7 @@ This package contains the Sheepdog server, and command line tool.
 %{_sbindir}/collie
 %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
+%{_mandir}/man8/sheep.8*
 
 %changelog
 * @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
