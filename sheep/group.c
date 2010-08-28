@@ -1401,6 +1401,11 @@ int is_access_to_busy_objects(uint64_t oid)
 		return 0;
 
 	list_for_each_entry(req, &sys->outstanding_req_list, r_wlist) {
+		if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
+			if (req->rq.opcode != SD_OP_READ_OBJ)
+				eprintf("bug\n");
+			continue;
+		}
 		if (oid == req->local_oid[0] || oid == req->local_oid[1])
 				return 1;
 	}
@@ -1409,6 +1414,12 @@ int is_access_to_busy_objects(uint64_t oid)
 
 static int __is_access_to_busy_objects(struct request *req)
 {
+	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
+		if (req->rq.opcode != SD_OP_READ_OBJ)
+			eprintf("bug\n");
+		return 0;
+	}
+
 	if (is_access_to_busy_objects(req->local_oid[0]) ||
 	    is_access_to_busy_objects(req->local_oid[1]))
 		return 1;
