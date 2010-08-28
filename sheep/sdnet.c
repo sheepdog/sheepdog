@@ -123,8 +123,10 @@ static void __done(struct work *work, int idx)
 
 		if (!(req->rq.flags & SD_FLAG_CMD_DIRECT) &&
 		    (req->rp.result == SD_RES_OLD_NODE_VER ||
-		     req->rp.result == SD_RES_NEW_NODE_VER)) {
-
+		     req->rp.result == SD_RES_NEW_NODE_VER ||
+		     req->rp.result == SD_RES_NETWORK_ERROR ||
+		     req->rp.result == SD_RES_WAIT_FOR_JOIN ||
+		     req->rp.result == SD_RES_WAIT_FOR_FORMAT)) {
 
 			req->rq.epoch = sys->epoch;
 			req->nr_nodes = setup_ordered_sd_node_list(req);

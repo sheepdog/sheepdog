@@ -38,6 +38,8 @@
 #define SD_STATUS_SHUTDOWN          0x03
 #define SD_STATUS_JOIN_FAILED       0x04
 
+#define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheeps */
+
 enum cpg_event_type {
 	CPG_EVENT_CONCHG,
 	CPG_EVENT_DELIVER,

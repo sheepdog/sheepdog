@@ -431,7 +431,7 @@ static int forward_read_obj_req(struct request *req)
 
 	fd = connect_to(name, e[n].port);
 	if (fd < 0) {
-		ret = SD_RES_EIO;
+		ret = SD_RES_NETWORK_ERROR;
 		goto out;
 	}
 
@@ -443,7 +443,7 @@ static int forward_read_obj_req(struct request *req)
 	close(fd);
 
 	if (ret) /* network errors */
-		ret = SD_RES_EIO;
+		ret = SD_RES_NETWORK_ERROR;
 	else {
 		memcpy(&req->rp, rsp, sizeof(*rsp));
 		ret = rsp->result;
@@ -504,13 +504,13 @@ static int forward_write_obj_req(struct request *req)
 		fd = connect_to(name, e[n].port);
 		if (fd < 0) {
 			eprintf("failed to connect to %s:%"PRIu32"\n", name, e[n].port);
-			ret = SD_RES_EIO;
+			ret = SD_RES_NETWORK_ERROR;
 			goto out;
 		}
 
 		ret = send_req(fd, (struct sd_req *)hdr, req->data, &wlen);
 		if (ret) { /* network errors */
-			ret = SD_RES_EIO;
+			ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %"PRIu32"\n", ret);
 			goto out;
 		}
@@ -562,7 +562,7 @@ again:
 
 		if (ret) {
 			eprintf("failed to get a rsp, %m\n");
-			ret = SD_RES_EIO;
+			ret = SD_RES_NETWORK_ERROR;
 			goto out;
 		}
 
