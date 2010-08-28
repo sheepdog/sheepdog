@@ -1126,6 +1126,44 @@ static int is_my_cpg_addr(struct cpg_address *addr)
 
 static void __sd_confchg(struct cpg_event *cevent)
 {
+}
+
+static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
+{
+	struct join_message msg;
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int nr_entries, i, ret;
+
+	/* if I've just joined in cpg, I'll join in sheepdog. */
+	if (!is_my_cpg_addr(addr))
+		return;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
+	msg.header.op = SD_MSG_JOIN;
+	msg.header.state = DM_INIT;
+	msg.header.msg_length = sizeof(msg);
+	msg.header.from = sys->this_node;
+	msg.header.nodeid = sys->this_nodeid;
+	msg.header.pid = sys->this_pid;
+
+	get_global_nr_copies(&msg.nr_sobjs);
+
+	nr_entries = ARRAY_SIZE(entries);
+	ret = read_epoch(&msg.epoch, &msg.ctime, entries, &nr_entries);
+	if (ret == SD_RES_SUCCESS) {
+		msg.nr_nodes = nr_entries;
+		for (i = 0; i < nr_entries; i++)
+			msg.nodes[i].ent = entries[i];
+	}
+
+	send_message(sys->handle, (struct message_header *)&msg);
+
+	vprintf(SDOG_INFO "%u %u\n", sys->this_nodeid, sys->this_pid);
+}
+
+static void __sd_confchg_done(struct cpg_event *cevent)
+{
 	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
 	int ret;
 
@@ -1183,44 +1221,6 @@ static void __sd_confchg(struct cpg_event *cevent)
 	}
 
 	print_node_list(&sys->sd_node_list);
-}
-
-static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
-{
-	struct join_message msg;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_entries, i, ret;
-
-	/* if I've just joined in cpg, I'll join in sheepdog. */
-	if (!is_my_cpg_addr(addr))
-		return;
-
-	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
-	msg.header.op = SD_MSG_JOIN;
-	msg.header.state = DM_INIT;
-	msg.header.msg_length = sizeof(msg);
-	msg.header.from = sys->this_node;
-	msg.header.nodeid = sys->this_nodeid;
-	msg.header.pid = sys->this_pid;
-
-	get_global_nr_copies(&msg.nr_sobjs);
-
-	nr_entries = ARRAY_SIZE(entries);
-	ret = read_epoch(&msg.epoch, &msg.ctime, entries, &nr_entries);
-	if (ret == SD_RES_SUCCESS) {
-		msg.nr_nodes = nr_entries;
-		for (i = 0; i < nr_entries; i++)
-			msg.nodes[i].ent = entries[i];
-	}
-
-	send_message(sys->handle, (struct message_header *)&msg);
-
-	vprintf(SDOG_INFO "%u %u\n", sys->this_nodeid, sys->this_pid);
-}
-
-static void __sd_confchg_done(struct cpg_event *cevent)
-{
-	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
 
 	if (w->first_cpg_node)
 		goto skip_join;
