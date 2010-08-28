@@ -36,6 +36,18 @@ static char *mnt_path;
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
+static int obj_cmp(const void *oid1, const void *oid2)
+{
+	const uint64_t hval1 = fnv_64a_buf((void *)oid1, sizeof(uint64_t), FNV1A_64_INIT);
+	const uint64_t hval2 = fnv_64a_buf((void *)oid2, sizeof(uint64_t), FNV1A_64_INIT);
+
+	if (hval1 < hval2)
+		return -1;
+	if (hval1 > hval2)
+		return 1;
+	return 0;
+}
+
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
@@ -1326,7 +1338,11 @@ void resume_recovery_work(void)
 
 int is_recoverying_oid(uint64_t oid)
 {
-	return recovering_oid && recovering_oid == oid;
+	uint64_t hval = fnv_64a_buf(&oid, sizeof(uint64_t), FNV1A_64_INIT);
+	uint64_t recovering_hval = fnv_64a_buf(&recovering_oid, sizeof(uint64_t), FNV1A_64_INIT);
+
+	return before(sys->recovered_epoch, sys->epoch - 1) ||
+		(sys->recovered_epoch == sys->epoch - 1 && recovering_hval <= hval);
 }
 
 static void recover_done(struct work *work, int idx)
@@ -1361,6 +1377,9 @@ static void recover_done(struct work *work, int idx)
 
 	dprintf("recovery done, %"PRIu32"\n", rw->epoch);
 	recovering = 0;
+
+	sys->recovered_epoch = rw->epoch;
+	resume_pending_requests();
 
 	free(rw->buf);
 	free(rw->failed_vdis);
@@ -1520,6 +1539,8 @@ static void __start_recovery(struct work *work, int idx)
 
 	if (rw->retry)
 		goto fail;
+
+	qsort(rw->buf, rw->count, sizeof(uint64_t), obj_cmp);
 
 	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
 	dprintf("write object list file to %s\n", path);

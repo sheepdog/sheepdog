@@ -775,6 +775,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 			remove_epoch(i);
 
 		sys->epoch = 1;
+		sys->recovered_epoch = 1;
 		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("write epoch log, %d, %d\n", sys->epoch, nr_nodes);

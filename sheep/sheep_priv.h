@@ -120,6 +120,8 @@ struct cluster_info {
 	struct cpg_event *cur_cevent;
 	unsigned long cpg_event_work_flags;
 	int nr_outstanding_io;
+
+	uint32_t recovered_epoch;
 };
 
 extern struct cluster_info *sys;
