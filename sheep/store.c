@@ -398,6 +398,8 @@ static int forward_read_obj_req(struct request *req)
 	/* temporary hack */
 	if (!copies)
 		copies = sys->nr_sobjs;
+	if (copies > req->nr_nodes)
+		copies = req->nr_nodes;
 
 	hdr->flags |= SD_FLAG_CMD_DIRECT;
 
@@ -462,6 +464,8 @@ static int forward_write_obj_req(struct request *req)
 	/* temporary hack */
 	if (!copies)
 		copies = sys->nr_sobjs;
+	if (copies > req->nr_nodes)
+		copies = req->nr_nodes;
 
 	nr_fds = 0;
 	done = 0;
