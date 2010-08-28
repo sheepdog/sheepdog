@@ -61,7 +61,8 @@ struct join_message {
 	uint32_t epoch;
 	uint64_t ctime;
 	uint32_t result;
-	uint32_t pad;
+	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
+	uint8_t pad[3];
 	struct {
 		uint32_t nodeid;
 		uint32_t pid;
@@ -373,7 +374,7 @@ static int is_master(void)
 static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			      struct sheepdog_node_list_entry *entries,
 			      int nr_entries, uint64_t ctime, uint32_t epoch,
-			      uint32_t *status)
+			      uint32_t *status, uint8_t *inc_epoch)
 {
 	int i;
 	int nr_local_entries;
@@ -382,9 +383,14 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 	uint32_t local_epoch;
 
 	*status = sys->status;
+	if (inc_epoch)
+		*inc_epoch = 0;
 
 	switch (sys->status) {
 	case SD_STATUS_OK:
+		if (inc_epoch)
+			*inc_epoch = 1;
+
 		if (nr_entries == 0)
 			break;
 
@@ -485,7 +491,8 @@ static void join(struct join_message *msg)
 
 	msg->result = get_cluster_status(&msg->header.from, entry,
 					 msg->nr_nodes, msg->ctime,
-					 msg->epoch, &msg->cluster_status);
+					 msg->epoch, &msg->cluster_status,
+					 &msg->inc_epoch);
 	msg->nr_sobjs = sys->nr_sobjs;
 	msg->epoch = sys->epoch;
 	msg->ctime = get_cluster_ctime();
@@ -629,7 +636,7 @@ out:
 			msg->header.nodeid, msg->header.pid);
 
 	if (msg->cluster_status == SD_STATUS_OK) {
-		if (sys->status == SD_STATUS_OK) {
+		if (msg->inc_epoch) {
 			nr_nodes = get_ordered_sd_node_list(entry);
 
 			dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr_nodes);
@@ -641,7 +648,8 @@ out:
 			sys->epoch++;
 
 			update_epoch_store(sys->epoch);
-		} else {
+		}
+		if (sys->status != SD_STATUS_OK) {
 			get_vdi_bitmap_from_all();
 			set_global_nr_copies(sys->nr_sobjs);
 			set_cluster_ctime(msg->ctime);
@@ -1212,7 +1220,7 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 			sys->epoch = epoch;
 			msg.ctime = ctime;
 			get_cluster_status(&msg.header.from, entries, nr_entries,
-					   ctime, epoch, &msg.cluster_status);
+					   ctime, epoch, &msg.cluster_status, NULL);
 		} else
 			msg.cluster_status = SD_STATUS_WAIT_FOR_FORMAT;
 
