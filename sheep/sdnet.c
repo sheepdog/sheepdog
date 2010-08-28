@@ -262,7 +262,6 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 
 static void free_request(struct request *req)
 {
-	client_decref(req->ci);
 	list_del(&req->r_siblings);
 	free(req);
 }
@@ -274,6 +273,7 @@ static void req_done(struct request *req)
 		dprintf("connection seems to be dead\n");
 		free_request(req);
 	}
+	client_decref(req->ci);
 }
 
 static void init_rx_hdr(struct client_info *ci)
