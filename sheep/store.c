@@ -450,6 +450,7 @@ static int forward_read_obj_req(struct request *req)
 	}
 
 out:
+	hdr->flags &= ~SD_FLAG_CMD_DIRECT;
 
 	return ret;
 }
@@ -586,6 +587,8 @@ out:
 		if (pfds[i].fd >= 0)
 			close(pfds[i].fd);
 	}
+
+	hdr->flags &= ~SD_FLAG_CMD_DIRECT;
 
 	return ret;
 }
