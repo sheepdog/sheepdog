@@ -1,5 +1,5 @@
 #!/bin/bash
-# chkconfig: - 21 21
+# chkconfig: - 21 79
 # description: Sheepdog
 # processname: sheep
 #
