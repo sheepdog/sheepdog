@@ -346,15 +346,25 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	return 0;
 }
 
-/* TODO: support IPv6 */
 char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
 {
-	if (port)
-		snprintf(str, size, "%d.%d.%d.%d:%d",
-			 addr[12], addr[13], addr[14], addr[15], port);
-	else
-		snprintf(str, size, "%d.%d.%d.%d",
-			 addr[12], addr[13], addr[14], addr[15]);
+	int  af = AF_INET6;
+	int  addr_start_idx = 0;
+
+	/* Find address family type */
+	if (addr[12]) {
+		int  oct_no = 0;
+		while (!addr[oct_no] && oct_no++ < 12 );
+		if (oct_no == 12) {
+			af = AF_INET;
+			addr_start_idx = 12;
+		}
+	}
+	inet_ntop(af, addr + addr_start_idx, str, size);
+	if (port) {
+		int  len = strlen(str);
+		snprintf(str + len, size - len, ":%d", port);
+	}
 
 	return str;
 }

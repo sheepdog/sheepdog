@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include "util.h"
 #include "list.h"
+#include "net.h"
 
 #define SD_SHEEP_PROTO_VER 0x01
 
@@ -166,9 +167,9 @@ static inline int obj_to_sheep(struct sheepdog_node_list_entry *entries,
 static inline void print_node_list_entry(struct sheepdog_node_list_entry *e,
 					 char *str, size_t size)
 {
-	snprintf(str, size, "%016" PRIx64 " - %d.%d.%d.%d:%d",
-		 e->id, e->addr[12], e->addr[13],
-		 e->addr[14], e->addr[15], e->port);
+	char  buf[INET6_ADDRSTRLEN];
+	snprintf(str, size, "%016" PRIx64 " - %s",
+		 e->id, addr_to_str(buf, sizeof(buf), e->addr, e->port));
 }
 
 static inline int is_sheep_op(uint8_t op)
