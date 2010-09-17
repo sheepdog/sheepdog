@@ -22,32 +22,14 @@ Requirements
 
 Install
 -------
-1. Install x86-64 Linux.
-2. Install and setup corosync.
-
-   If you use Debian Squeeze,
-
-   $ aptitude install corosync     # or compile corosync.
-   $ sudo corosync                 # run corosync daemon as root
-
-3. Download QEMU and Sheepdog codes.
-
-   $ git clone git://git.sv.gnu.org/qemu.git
-   $ git clone git://sheepdog.git.sf.net/gitroot/sheepdog/sheepdog
-
-4. Build
-
-   $ cd qemu
-   $ ./configure
-   $ make install
-   $ cd ../sheepdog
-   $ ./autogen.sh
-   $ ./configure
-   $ make install
-   $ cd ..
+Please read the INSTALL file distributed with this package for detailed
+instructions on installing or compiling from source.
 
 Usage
 -----
+* Configure corosync.  Reference the corosync(8) and corosync.conf(5) man page
+  for further details.
+
 * Setup Sheepdog
    1. Launch sheepdog on each machines of the cluster.
 
