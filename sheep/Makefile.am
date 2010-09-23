@@ -40,3 +40,7 @@ all-local:
 
 clean-local:
 	rm -f sheep *.o gmon.out *.da *.bb *.bbg
+
+# support for GNU Flymake
+check-syntax:
+	$(COMPILE) -fsyntax-only $(CHK_SOURCES)
