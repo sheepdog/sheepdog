@@ -1226,6 +1226,9 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 
 		update_cluster_info(&msg);
 
+		if (sys->status == SD_STATUS_OK) /* sheepdog starts with one node */
+			start_recovery(sys->epoch, NULL, 0);
+
 		return;
 	}
 
