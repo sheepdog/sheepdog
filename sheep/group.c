@@ -905,9 +905,6 @@ static void __sd_deliver(struct cpg_event *cevent)
 		case SD_MSG_JOIN:
 			update_cluster_info((struct join_message *)m);
 			break;
-		case SD_MSG_VDI_OP:
-			vdi_op_done((struct vdi_op_message *)m);
-			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
 			break;
@@ -1331,6 +1328,10 @@ static void cpg_event_done(struct work *work, int idx)
 	case CPG_EVENT_DELIVER:
 	{
 		struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
+
+		if (w->msg->state == DM_FIN && w->msg->op == SD_MSG_VDI_OP)
+			vdi_op_done((struct vdi_op_message *)w->msg);
+
 		/*
 		 * if we are in the process of the JOIN, we will not
 		 * be suspended. So sd_deliver() links events to
