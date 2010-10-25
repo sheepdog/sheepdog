@@ -391,11 +391,10 @@ static int read_from_other_sheeps(struct request *req, uint32_t epoch,
 
 static int store_queue_request_local(struct request *req, uint32_t epoch);
 
-static int forward_read_obj_req(struct request *req)
+static int forward_read_obj_req(struct request *req, int idx)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
-	char name[128];
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)hdr;
 	struct sheepdog_node_list_entry *e;
@@ -427,9 +426,7 @@ static int forward_read_obj_req(struct request *req)
 
 	n = obj_to_sheep(e, nr, oid, 0);
 
-	addr_to_str(name, sizeof(name), e[n].addr, 0);
-
-	fd = connect_to(name, e[n].port);
+	fd = get_sheep_fd(e, n, hdr->epoch, idx);
 	if (fd < 0) {
 		ret = SD_RES_NETWORK_ERROR;
 		goto out;
@@ -439,8 +436,6 @@ static int forward_read_obj_req(struct request *req)
 	rlen = hdr->data_length;
 
 	ret = exec_req(fd, (struct sd_req *)hdr, req->data, &wlen, &rlen);
-
-	close(fd);
 
 	if (ret) /* network errors */
 		ret = SD_RES_NETWORK_ERROR;
@@ -455,7 +450,7 @@ out:
 	return ret;
 }
 
-static int forward_write_obj_req(struct request *req)
+static int forward_write_obj_req(struct request *req, int idx)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
@@ -501,7 +496,7 @@ static int forward_write_obj_req(struct request *req)
 			continue;
 		}
 
-		fd = connect_to(name, e[n].port);
+		fd = get_sheep_fd(e, n, hdr->epoch, idx);
 		if (fd < 0) {
 			eprintf("failed to connect to %s:%"PRIu32"\n", name, e[n].port);
 			ret = SD_RES_NETWORK_ERROR;
@@ -582,12 +577,6 @@ again:
 
 	ret = SD_RES_SUCCESS;
 out:
-
-	for (i = 0; i < ARRAY_SIZE(pfds); i++){
-		if (pfds[i].fd >= 0)
-			close(pfds[i].fd);
-	}
-
 	hdr->flags &= ~SD_FLAG_CMD_DIRECT;
 
 	return ret;
@@ -831,9 +820,9 @@ void store_queue_request(struct work *work, int idx)
 
 	if (!(hdr->flags & SD_FLAG_CMD_DIRECT)) {
 		if (hdr->flags & SD_FLAG_CMD_WRITE)
-			ret = forward_write_obj_req(req);
+			ret = forward_write_obj_req(req, idx);
 		else
-			ret = forward_read_obj_req(req);
+			ret = forward_read_obj_req(req, idx);
 		goto out;
 	}
 

@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
+#include <fcntl.h>
 
 #include "sheep_priv.h"
 
@@ -669,4 +670,97 @@ int remove_object(struct sheepdog_node_list_entry *e,
 		return -1;
 
 	return 0;
+}
+
+static int set_nonblocking(int fd)
+{
+	int ret;
+
+	ret = fcntl(fd, F_GETFL);
+	if (ret < 0) {
+		eprintf("can't fcntl (F_GETFL), %m\n");
+		close(fd);
+	} else {
+		ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
+		if (ret < 0)
+			eprintf("can't fcntl (O_NONBLOCK), %m\n");
+	}
+
+	return ret;
+}
+
+static int set_nodelay(int fd)
+{
+	int ret, opt;
+
+	opt = 1;
+	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+	return ret;
+}
+
+int get_sheep_fd(struct sheepdog_node_list_entry *e, int node_idx,
+		 uint32_t epoch, int worker_idx)
+{
+	static int cached_fds[NR_WORKER_THREAD][SD_MAX_NODES];
+	static uint32_t cached_epoch = 0;
+	int i, j, fd, ret;
+	char name[INET6_ADDRSTRLEN];
+
+	if (cached_epoch == 0) {
+		/* initialize */
+		for (i = 0; i < NR_WORKER_THREAD; i++) {
+			for (j = 0; j < SD_MAX_NODES; j++)
+				cached_fds[i][j] = -1;
+		}
+		cached_epoch = epoch;
+	}
+
+	if (before(epoch, cached_epoch)) {
+		eprintf("requested epoch is smaller than the previous one, %d %d\n",
+			cached_epoch, epoch);
+		return -1;
+	}
+	if (after(epoch, cached_epoch)) {
+		for (i = 0; i < NR_WORKER_THREAD; i++) {
+			for (j = 0; j < SD_MAX_NODES; j++) {
+				if (cached_fds[i][j] >= 0)
+					close(cached_fds[i][j]);
+
+				cached_fds[i][j] = -1;
+			}
+		}
+		cached_epoch = epoch;
+	}
+
+	fd = cached_fds[worker_idx][node_idx];
+	dprintf("%d, %d\n", epoch, fd);
+
+	if (cached_epoch == epoch && fd >= 0) {
+		dprintf("use a cached fd %d\n", fd);
+		return fd;
+	}
+
+	addr_to_str(name, sizeof(name), e[node_idx].addr, 0);
+
+	fd = connect_to(name, e[node_idx].port);
+	if (fd < 0)
+		return -1;
+
+	ret = set_nonblocking(fd);
+	if (ret) {
+		eprintf("%m\n");
+		close(fd);
+		return -1;
+	}
+
+	ret = set_nodelay(fd);
+	if (ret) {
+		eprintf("%m\n");
+		close(fd);
+		return -1;
+	}
+
+	cached_fds[worker_idx][node_idx] = fd;
+
+	return fd;
 }

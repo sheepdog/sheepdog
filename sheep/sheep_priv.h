@@ -190,6 +190,9 @@ int remove_object(struct sheepdog_node_list_entry *e,
 		  int nodes, uint32_t node_version,
 		  uint64_t oid, int nr);
 
+int get_sheep_fd(struct sheepdog_node_list_entry *e, int node_idx,
+		 uint32_t epoch, int worker_idx);
+
 static inline int is_myself(struct sheepdog_node_list_entry *e)
 {
 	return e->id == sys->this_node.id;
