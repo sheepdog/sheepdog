@@ -596,7 +596,7 @@ out:
 static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 {
 	char path[1024];
-	int flags = O_RDWR | aflags;
+	int flags = O_SYNC | O_RDWR | aflags;
 	int fd;
 
 	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path, epoch, oid);
