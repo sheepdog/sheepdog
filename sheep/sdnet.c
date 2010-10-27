@@ -271,12 +271,17 @@ static void free_request(struct request *req)
 
 static void req_done(struct request *req)
 {
+	int dead = 0;
+
 	list_add(&req->r_wlist, &req->ci->done_reqs);
 	if (conn_tx_on(&req->ci->conn)) {
 		dprintf("connection seems to be dead\n");
-		free_request(req);
+		dead = 1;
 	}
 	client_decref(req->ci);
+
+	if (dead)
+		free_request(req);
 }
 
 static void init_rx_hdr(struct client_info *ci)
