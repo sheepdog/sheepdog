@@ -203,6 +203,11 @@ static inline int is_data_obj(uint64_t oid)
 	return !(VDI_BIT & oid);
 }
 
+static inline uint64_t data_oid_to_idx(uint64_t oid)
+{
+	return oid & (MAX_DATA_OBJS - 1);
+}
+
 static inline uint64_t vid_to_vdi_oid(uint32_t vid)
 {
 	return VDI_BIT | ((uint64_t)vid << VDI_SPACE_SHIFT);

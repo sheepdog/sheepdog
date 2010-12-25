@@ -703,6 +703,53 @@ out:
 	return ret;
 }
 
+static int fix_object_consistency(struct request *req, int idx)
+{
+	int ret;
+	unsigned int data_length;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_req req_bak = *((struct sd_obj_req *)&req->rq);
+	struct sd_obj_rsp rsp_bak = *((struct sd_obj_rsp *)&req->rp);
+	void *data = req->data, *buf;
+
+	if (is_data_obj(hdr->oid))
+		data_length = SD_DATA_OBJ_SIZE;
+	else
+		data_length = sizeof(struct sheepdog_inode);
+
+	buf = zalloc(data_length);
+	if (buf == NULL) {
+		eprintf("out of memory\n");
+		goto out;
+	}
+
+	req->data = buf;
+	hdr->offset = 0;
+	hdr->data_length = data_length;
+	hdr->opcode = SD_OP_READ_OBJ;
+	hdr->flags = 0;
+	ret = forward_read_obj_req(req, idx);
+	if (ret < 0) {
+		eprintf("failed to read object, %d\n", ret);
+		goto out;
+	}
+
+	hdr->opcode = SD_OP_WRITE_OBJ;
+	hdr->flags = SD_FLAG_CMD_WRITE;
+	ret = forward_write_obj_req(req, idx);
+	if (ret < 0) {
+		eprintf("failed to write object, %d\n", ret);
+		goto out;
+	}
+out:
+	free(buf);
+	req->data = data;
+	*((struct sd_obj_req *)&req->rq) = req_bak;
+	*((struct sd_obj_rsp *)&req->rp) = rsp_bak;
+
+	return ret;
+}
+
 void store_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -730,6 +777,13 @@ void store_queue_request(struct work *work, int idx)
 	}
 
 	if (!(hdr->flags & SD_FLAG_CMD_DIRECT)) {
+		/* fix object consistency when we read the object for the first time */
+		if (req->check_consistency) {
+			ret = fix_object_consistency(req, idx);
+			if (ret < 0)
+				goto out;
+		}
+
 		if (hdr->flags & SD_FLAG_CMD_WRITE)
 			ret = forward_write_obj_req(req, idx);
 		else

@@ -1500,6 +1500,21 @@ do_retry:
 					list_add_tail(&req->r_wlist, &failed_req_list);
 					continue;
 				}
+			} else if (req->rq.opcode == SD_OP_READ_OBJ) {
+				struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+				uint32_t vdi_id = oid_to_vid(hdr->oid);
+				struct data_object_bmap *bmap;
+
+				req->check_consistency = 1;
+				if (is_data_obj(hdr->oid)) {
+					list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
+						if (bmap->vdi_id == vdi_id) {
+							if (test_bit(data_oid_to_idx(hdr->oid), bmap->dobjs))
+								req->check_consistency = 0;
+							break;
+						}
+					}
+				}
 			}
 		}
 		queue_work(&req->work);
@@ -1722,6 +1737,7 @@ join_retry:
 
 	INIT_LIST_HEAD(&sys->outstanding_req_list);
 	INIT_LIST_HEAD(&sys->req_wait_for_obj_list);
+	INIT_LIST_HEAD(&sys->consistent_obj_list);
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
 	cpg_context_set(cpg_handle, sys);

@@ -135,8 +135,28 @@ static void __done(struct work *work, int idx)
 
 			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 			again = 1;
-		}
+		} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
+			struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
+			uint32_t vdi_id = oid_to_vid(obj_hdr->oid);
+			struct data_object_bmap *bmap;
 
+			list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
+				if (bmap->vdi_id == vdi_id) {
+					set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+					goto done;
+				}
+			}
+			bmap = zalloc(sizeof(*bmap));
+			if (bmap == NULL) {
+				eprintf("out of memory\n");
+				goto done;
+			}
+			dprintf("allocate a new object map\n");
+			bmap->vdi_id = vdi_id;
+			list_add(&bmap->list, &sys->consistent_obj_list);
+			set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+		}
+done:
 		resume_pending_requests();
 		resume_recovery_work();
 	}

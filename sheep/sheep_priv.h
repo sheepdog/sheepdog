@@ -85,9 +85,17 @@ struct request {
 
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 	int nr_nodes;
+	int check_consistency;
 
 	req_end_t done;
 	struct work work;
+};
+
+struct data_object_bmap {
+	uint32_t vdi_id;
+	DECLARE_BITMAP(dobjs, MAX_DATA_OBJS);
+
+	struct list_head list;
 };
 
 struct cluster_info {
@@ -115,6 +123,7 @@ struct cluster_info {
 
 	struct list_head outstanding_req_list;
 	struct list_head req_wait_for_obj_list;
+	struct list_head consistent_obj_list;
 
 	uint32_t nr_sobjs;
 
