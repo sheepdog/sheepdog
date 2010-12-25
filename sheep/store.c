@@ -27,7 +27,6 @@
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
 #define ANAME_NODEID "user.sheepdog.nodeid"
-#define ANAME_CHECKSUM "user.sheepdog.checksum"
 
 static char *obj_path;
 static char *epoch_path;
@@ -98,63 +97,6 @@ static int is_obj_in_range(uint64_t oid, uint64_t start, uint64_t end)
 		return (start < hval || hval <= end);
 }
 
-static int verify_object(int fd, char *buf, size_t len, int set_chksum)
-{
-	int ret;
-	uint64_t checksum;
-	struct stat s;
-	char *p = NULL;
-
-	if (!buf) {
-		ret = fstat(fd, &s);
-		if (ret < 0) {
-			eprintf("failed to get file size, %m\n");
-			goto err;
-		}
-		len = s.st_size;
-
-		p = malloc(len);
-		if (!p) {
-			eprintf("out of memory\n");
-			goto err;
-		}
-		buf = p;
-
-		ret = pread64(fd, buf, len, 0);
-		if (ret < 0) {
-			eprintf("failed to read file, %m\n");
-			goto err;
-		}
-	}
-
-	if (set_chksum) {
-		checksum = fnv_64a_buf(buf, len, FNV1A_64_INIT);
-		ret = fsetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum), 0);
-		if (ret < 0) {
-			eprintf("failed to set xattr, %m\n");
-			goto err;
-		}
-	} else {
-		ret = fgetxattr(fd, ANAME_CHECKSUM, &checksum, sizeof(checksum));
-		if (ret != sizeof(checksum)) {
-			eprintf("failed to read checksum, %m\n");
-			goto err;
-		}
-
-		if (checksum != fnv_64a_buf(buf, len, FNV1A_64_INIT)) {
-			eprintf("invalid checksum, %"PRIx64", %"PRIx64"\n", checksum,
-				fnv_64a_buf(buf, len, FNV1A_64_INIT));
-			goto err;
-		}
-	}
-
-	free(p);
-	return 0;
-err:
-	free(p);
-	return -1;
-}
-
 static int get_obj_list(struct request *req)
 {
 	DIR *dir;
@@ -174,7 +116,7 @@ static int get_obj_list(struct request *req)
 	int e_nr;
 	int idx;
 	int res = SD_RES_SUCCESS;
-	int ret, buf_len;
+	int buf_len;
 	char *buf;
 
 	/* FIXME: handle larger size */
@@ -198,14 +140,6 @@ static int get_obj_list(struct request *req)
 		goto out;
 	}
 	obj_nr = read(fd, buf, buf_len);
-
-	ret = verify_object(fd, buf, obj_nr, 0);
-	if (ret < 0) {
-		eprintf("verification failed, %s, %m\n", path);
-		close(fd);
-		res = SD_RES_EIO;
-		goto out;
-	}
 	dprintf("read objct list from %s, %"PRIu32"\n", path, obj_nr);
 
 	obj_nr /= sizeof(uint64_t);
@@ -732,30 +666,13 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		rsp->data_length = ret;
 		rsp->copies = copies;
 
-		if (!is_data_obj(oid)) {
-			/* FIXME: need to check whether the object is valid or not */
-/* 			ret = verify_object(fd, NULL, 0, 0); */
-/* 			if (ret < 0) { */
-/* 				eprintf("verification failed, %"PRIx64"\n", oid); */
-/* 				ret = SD_RES_EIO; */
-/* 				goto out; */
-/* 			} */
-		}
-
 		ret = SD_RES_SUCCESS;
 		break;
 	case SD_OP_WRITE_OBJ:
-		if (!is_data_obj(oid)) {
-			/* FIXME: need to check whether the object is valid or not */
-/* 			ret = verify_object(fd, NULL, 0, 0); */
-/* 			if (ret < 0) { */
-/* 				eprintf("verification failed, %"PRIx64"\n", oid); */
-/* 				ret = SD_RES_EIO; */
-/* 				goto out; */
-/* 			} */
-		}
-		/* fall through */
 	case SD_OP_CREATE_AND_WRITE_OBJ:
+		if (!is_data_obj(oid)) {
+			/* FIXME: write data to journal */
+		}
 		ret = pwrite64(fd, req->data, hdr->data_length, hdr->offset);
 		if (ret != hdr->data_length) {
 			if (errno == ENOSPC)
@@ -766,13 +683,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		}
 
 		if (!is_data_obj(oid)) {
-			/* FIXME: need to update atomically */
-/* 			ret = verify_object(fd, NULL, 0, 1); */
-/* 			if (ret < 0) { */
-/* 				eprintf("failed to set checksum, %"PRIx64"\n", oid); */
-/* 				ret = SD_RES_EIO; */
-/* 				goto out; */
-/* 			} */
+			/* FIXME: remove journal data */
 		}
 
 		ret = SD_RES_SUCCESS;
@@ -1488,7 +1399,7 @@ static void __start_recovery(struct work *work, int idx)
 	int my_idx = -1;
 	int i, fd;
 	uint64_t start_hash, end_hash;
-	char path[PATH_MAX];
+	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int ret;
 
 	dprintf("%u\n", epoch);
@@ -1535,24 +1446,23 @@ static void __start_recovery(struct work *work, int idx)
 	qsort(rw->buf, rw->count, sizeof(uint64_t), obj_cmp);
 
 	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
-	dprintf("write object list file to %s\n", path);
+	snprintf(tmp_path, sizeof(tmp_path), "%s%08u/list.tmp", obj_path, epoch);
 
-	fd = open(path, O_RDWR | O_CREAT, def_fmode);
+	dprintf("write object list to %s\n", tmp_path);
+	fd = open(tmp_path, O_RDWR | O_CREAT | O_SYNC, def_fmode);
 	if (fd < 0) {
-		eprintf("failed to open %s, %s\n", path, strerror(errno));
+		eprintf("failed to open %s, %s, %m\n", tmp_path, strerror(errno));
 		goto fail;
 	}
 	write(fd, rw->buf, sizeof(uint64_t) * rw->count);
-	fsync(fd);
+	close(fd);
 
-	ret = verify_object(fd, rw->buf, sizeof(uint64_t) * rw->count, 1);
+	dprintf("rename %s to %s\n", tmp_path, path);
+	ret = rename(tmp_path, path);
 	if (ret < 0) {
-		eprintf("failed to set check sum, %s, %m\n", path);
-		close(fd);
+		eprintf("failed to rename %s to %s, %m\n", tmp_path, path);
 		goto fail;
 	}
-
-	close(fd);
 
 	return;
 fail:
