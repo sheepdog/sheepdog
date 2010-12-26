@@ -24,11 +24,6 @@
 #include "logger.h"
 #include "work.h"
 
-struct vm {
-	struct sheepdog_vm_list_entry ent;
-	struct list_head list;
-};
-
 struct node {
 	uint32_t nodeid;
 	uint32_t pid;
@@ -93,8 +88,6 @@ struct work_confchg {
 	struct cpg_address *joined_list;
 	size_t joined_list_entries;
 
-	uint32_t *failed_vdis;
-	int nr_failed_vdis;
 	int first_cpg_node;
 	int sd_node_left;
 };
@@ -229,20 +222,6 @@ static void get_node_list(struct sd_node_req *req,
 	rsp->master_idx = get_node_idx(&node->ent, data, nr_nodes);
 }
 
-static void get_vm_list(struct sd_rsp *rsp, void *data)
-{
-	int nr_vms;
-	struct vm *vm;
-
-	struct sheepdog_vm_list_entry *p = data;
-	list_for_each_entry(vm, &sys->vm_list, list) {
-		*p++ = vm->ent;
-	}
-
-	nr_vms = p - (struct sheepdog_vm_list_entry *)data;
-	rsp->data_length = nr_vms * sizeof(struct sheepdog_vm_list_entry);
-}
-
 void cluster_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -258,9 +237,6 @@ void cluster_queue_request(struct work *work, int idx)
 	case SD_OP_GET_NODE_LIST:
 		get_node_list((struct sd_node_req *)hdr,
 			      (struct sd_node_rsp *)rsp, req->data);
-		break;
-	case SD_OP_GET_VM_LIST:
-		get_vm_list(rsp, req->data);
 		break;
 	case SD_OP_STAT_CLUSTER:
 		log = (struct epoch_log *)req->data;
@@ -327,18 +303,6 @@ forward:
 	send_message(sys->handle, (struct message_header *)msg);
 
 	free(msg);
-}
-
-static struct vm *lookup_vm(struct list_head *entries, char *name)
-{
-	struct vm *vm;
-
-	list_for_each_entry(vm, entries, list) {
-		if (!strcmp((char *)vm->ent.name, name))
-			return vm;
-	}
-
-	return NULL;
 }
 
 static void group_handler(int listen_fd, int events, void *data)
@@ -677,10 +641,6 @@ static void vdi_op(struct vdi_op_message *msg)
 			      hdr->snapid);
 		break;
 	case SD_OP_DEL_VDI:
-		if (lookup_vm(&sys->vm_list, (char *)data)) {
-			ret = SD_RES_VDI_LOCKED;
-			break;
-		}
 		ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid, hdr->snapid);
 		break;
 	case SD_OP_LOCK_VDI:
@@ -715,7 +675,6 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
 	void *data = msg->data;
-	struct vm *vm;
 	struct request *req;
 	int ret = msg->rsp.result;
 	int i, latest_epoch, nr_nodes;
@@ -741,33 +700,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		break;
 	}
 	case SD_OP_LOCK_VDI:
-		if (lookup_vm(&sys->vm_list, (char *)data)) {
-			ret = SD_RES_VDI_LOCKED;
-			break;
-		}
-
-		vm = zalloc(sizeof(*vm));
-		if (!vm) {
-			ret = SD_RES_UNKNOWN;
-			break;
-		}
-		strcpy((char *)vm->ent.name, (char *)data);
-		memcpy(vm->ent.host_addr, msg->header.from.addr,
-		       sizeof(vm->ent.host_addr));
-		vm->ent.host_port = msg->header.from.port;
-
-		list_add(&vm->list, &sys->vm_list);
-		break;
 	case SD_OP_RELEASE_VDI:
-		vm = lookup_vm(&sys->vm_list, (char *)data);
-		if (!vm) {
-			ret = SD_RES_VDI_NOT_LOCKED;
-			break;
-		}
-
-		list_del(&vm->list);
-		free(vm);
-		break;
 	case SD_OP_GET_VDI_INFO:
 		break;
 	case SD_OP_MAKE_FS:
@@ -816,36 +749,6 @@ out:
 	memcpy(&req->rp, rsp, sizeof(req->rp));
 	list_del(&req->pending_list);
 	req->done(req);
-}
-
-static void update_running_vm_state(struct cpg_event *cevent)
-{
-	struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
-	struct message_header *m = w->msg;
-	struct sheepdog_vm_list_entry *e;
-	int nr, i;
-	struct vm *vm;
-
-	if (sys->join_finished)
-		goto out;
-
-	/* This is my JOIN message. */
-	vprintf(SDOG_DEBUG "we update the vm list\n");
-
-	nr = (m->msg_length - sizeof(*m)) / sizeof(*e);
-	e = (struct sheepdog_vm_list_entry *)(m + 1);
-
-	for (i = 0; i < nr; i++) {
-		vm = zalloc(sizeof(*vm));
-		if (!vm)
-			panic("failed to allocate memory for a vm\n");
-
-		vm->ent = e[i];
-		vprintf(SDOG_DEBUG "%d, got %s\n", i, e[i].name);
-		list_add(&vm->list, &sys->vm_list);
-	}
-out:
-	cevent->skip = 1;
 }
 
 static void __sd_deliver(struct cpg_event *cevent)
@@ -898,9 +801,7 @@ static void __sd_deliver(struct cpg_event *cevent)
 		}
 	}
 
-	if (m->state == DM_CONT)
-		update_running_vm_state(cevent);
-	else if (m->state == DM_FIN) {
+	if (m->state == DM_FIN) {
 		switch (m->op) {
 		case SD_MSG_JOIN:
 			update_cluster_info((struct join_message *)m);
@@ -915,45 +816,6 @@ static void __sd_deliver(struct cpg_event *cevent)
 static void send_join_response(struct work_deliver *w)
 {
 	struct message_header *m;
-	struct vm *vm;
-	struct sheepdog_vm_list_entry *e;
-	int i, nr = 2000;
-	char *buf;
-
-	/*
-	 * FIXME: we need to inform the node of the JOIN failure in
-	 * the case of OOM.
-	 */
-	buf = malloc(sizeof(*m) + sizeof(*e) * nr);
-	m = (struct message_header *)buf;
-	e = (struct sheepdog_vm_list_entry *)(buf + sizeof(*m));
-
-	i = 0;
-	m->state = DM_CONT;
-	m->pid = w->msg->pid;
-	m->nodeid = w->msg->nodeid;
-
-	vprintf(SDOG_DEBUG "%u %u\n", m->pid, m->nodeid);
-
-	list_for_each_entry(vm, &sys->vm_list, list) {
-		*e = vm->ent;
-		vprintf(SDOG_DEBUG "%d %s\n", i, e->name);
-		e++;
-		i++;
-
-		if (!(i % nr)) {
-			m->msg_length = sizeof(*m) + i * sizeof(*e);
-			send_message(sys->handle, m);
-			e = (struct sheepdog_vm_list_entry *)(buf + sizeof(*m));
-			i = 0;
-		}
-	}
-
-	if (i) {
-		m->msg_length = sizeof(*m) + i * sizeof(*e);
-		vprintf(SDOG_DEBUG "%d %d\n", i, m->msg_length);
-		send_message(sys->handle, m);
-	}
 
 	m = w->msg;
 	join((struct join_message *)m);
@@ -992,7 +854,7 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 	}
 
 	if (do_recovery && sys->status == SD_STATUS_OK)
-		start_recovery(sys->epoch, NULL, 0);
+		start_recovery(sys->epoch);
 }
 
 static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
@@ -1065,42 +927,8 @@ static void del_node(struct cpg_address *addr, struct work_confchg *w)
 	if (node) {
 		int nr;
 		struct sheepdog_node_list_entry e[SD_MAX_NODES];
-		struct vm *vm, *n;
-		int ret, size;
-		uint32_t vid;
-		void *buf;
 
 		w->sd_node_left++;
-
-		size = sizeof(*w->failed_vdis) * 64;
-		w->failed_vdis = malloc(size);
-		list_for_each_entry_safe(vm, n, &sys->vm_list, list) {
-			if (memcmp(vm->ent.host_addr, node->ent.addr,
-				   sizeof(node->ent.addr)) != 0)
-				continue;
-			if (vm->ent.host_port != node->ent.port)
-				continue;
-
-			if (w->nr_failed_vdis * sizeof(*w->failed_vdis) >= size) {
-				size *= 2;
-				buf = realloc(w->failed_vdis, size);
-				if (!buf) {
-					eprintf("out of memory, %d\n", size);
-					break;
-				}
-				w->failed_vdis = buf;
-			}
-
-			ret = lookup_vdi(sys->epoch, (char *)vm->ent.name,
-					 sizeof(vm->ent.name), &vid, 0);
-			if (ret == SD_RES_SUCCESS)
-				w->failed_vdis[w->nr_failed_vdis++] = vid;
-			else
-				eprintf("cannot find vdi %s\n", vm->ent.name);
-
-			list_del(&vm->list);
-			free(vm);
-		}
 
 		list_del(&node->list);
 		free(node);
@@ -1224,7 +1052,7 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 		update_cluster_info(&msg);
 
 		if (sys->status == SD_STATUS_OK) /* sheepdog starts with one node */
-			start_recovery(sys->epoch, NULL, 0);
+			start_recovery(sys->epoch);
 
 		return;
 	}
@@ -1243,7 +1071,7 @@ skip_join:
 			panic("we can't handle the departure of multiple nodes %d, %Zd\n",
 			      w->sd_node_left, w->left_list_entries);
 
-		start_recovery(sys->epoch, w->failed_vdis, w->nr_failed_vdis);
+		start_recovery(sys->epoch);
 	}
 }
 
@@ -1255,7 +1083,6 @@ static void cpg_event_free(struct cpg_event *cevent)
 		free(w->member_list);
 		free(w->left_list);
 		free(w->joined_list);
-		free(w->failed_vdis);
 		free(w);
 		break;
 	}
@@ -1732,7 +1559,6 @@ join_retry:
 		sys->status = SD_STATUS_WAIT_FOR_JOIN;
 	INIT_LIST_HEAD(&sys->sd_node_list);
 	INIT_LIST_HEAD(&sys->cpg_node_list);
-	INIT_LIST_HEAD(&sys->vm_list);
 	INIT_LIST_HEAD(&sys->pending_list);
 
 	INIT_LIST_HEAD(&sys->outstanding_req_list);

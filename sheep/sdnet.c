@@ -218,7 +218,6 @@ static void queue_request(struct request *req)
 		req->work.fn = store_queue_request;
 		break;
 	case SD_OP_GET_NODE_LIST:
-	case SD_OP_GET_VM_LIST:
 	case SD_OP_NEW_VDI:
 	case SD_OP_DEL_VDI:
 	case SD_OP_LOCK_VDI:

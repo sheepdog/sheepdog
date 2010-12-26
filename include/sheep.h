@@ -120,13 +120,6 @@ struct sd_node_rsp {
 	uint64_t	store_free;
 };
 
-struct sheepdog_vm_list_entry {
-	uint8_t         name[SD_MAX_VDI_LEN];
-	uint8_t         host_addr[16];
-	uint16_t        host_port;
-	uint8_t	        pad[6];
-};
-
 struct sheepdog_node_list_entry {
 	uint64_t        id;
 	uint8_t         addr[16];

@@ -1016,9 +1016,6 @@ struct recovery_work {
 	struct work work;
 	struct list_head rw_siblings;
 
-	unsigned long *failed_vdis;
-	int nr_failed_vdis;
-
 	int count;
 	char *buf;
 };
@@ -1221,7 +1218,6 @@ static void recover_one(struct work *work, int idx)
 	int old_nr, cur_nr;
 	uint32_t epoch = rw->epoch;
 	int i, my_idx = -1, copy_idx = 0, cur_idx = -1;
-	int is_failed_oid = 0;
 
 	eprintf("%"PRIu32" %"PRIu32", %16"PRIx64"\n", rw->done, rw->count, oid);
 
@@ -1249,30 +1245,23 @@ static void recover_one(struct work *work, int idx)
 
 	cur_idx = obj_to_sheep(cur_entry, cur_nr, oid, 0);
 
-	for (i = 0; i < rw->nr_failed_vdis; i++) {
-		if (rw->failed_vdis[i] == oid_to_vid(oid))
-			is_failed_oid = 1;
-	}
-
-	if (!is_failed_oid) {
-		for (i = 0; i < cur_nr; i++) {
-			if (cur_entry[i].id == sys->this_node.id) {
-				my_idx = i;
-				break;
-			}
+	for (i = 0; i < cur_nr; i++) {
+		if (cur_entry[i].id == sys->this_node.id) {
+			my_idx = i;
+			break;
 		}
-		copy_idx = node_distance(my_idx, cur_idx, cur_nr);
-		dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", my_idx, cur_idx, cur_nr, copy_idx);
-
-		ret = __recover_one(rw, old_entry, old_nr, cur_entry, cur_nr,
-				    cur_idx, copy_idx, epoch, epoch - 1, oid,
-				    buf, SD_DATA_OBJ_SIZE);
-		if (ret == 0)
-			goto out;
 	}
+	copy_idx = node_distance(my_idx, cur_idx, cur_nr);
+	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", my_idx, cur_idx, cur_nr, copy_idx);
+
+	ret = __recover_one(rw, old_entry, old_nr, cur_entry, cur_nr,
+			    cur_idx, copy_idx, epoch, epoch - 1, oid,
+			    buf, SD_DATA_OBJ_SIZE);
+	if (ret == 0)
+		goto out;
 
 	for (i = 0; i < sys->nr_sobjs; i++) {
-		if (!is_failed_oid && i == copy_idx)
+		if (i == copy_idx)
 			continue;
 		ret = __recover_one(rw, old_entry, old_nr,
 				    cur_entry, cur_nr, cur_idx, i,
@@ -1374,7 +1363,6 @@ static void recover_done(struct work *work, int idx)
 	resume_pending_requests();
 
 	free(rw->buf);
-	free(rw->failed_vdis);
 	free(rw);
 
 	if (!list_empty(&recovery_work_list)) {
@@ -1559,7 +1547,7 @@ fail:
 	return;
 }
 
-int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis)
+int start_recovery(uint32_t epoch)
 {
 	struct recovery_work *rw;
 
@@ -1570,16 +1558,6 @@ int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis)
 	rw->buf = malloc(1 << 20); /* FIXME */
 	rw->epoch = epoch;
 	rw->count = 0;
-
-	if (failed_vdis) {
-		rw->failed_vdis = malloc(nr_failed_vdis * sizeof(*failed_vdis));
-		if (!rw->failed_vdis) {
-			eprintf("out of memory\n");
-			goto fail;
-		}
-		memcpy(rw->failed_vdis, failed_vdis,
-		       nr_failed_vdis * sizeof(*failed_vdis));
-	}
 
 	rw->work.fn = __start_recovery;
 	rw->work.done = recover_done;
@@ -1592,11 +1570,6 @@ int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis)
 	}
 
 	return 0;
-fail:
-	free(rw->buf);
-	free(rw->failed_vdis);
-	free(rw);
-	return -1;
 }
 
 static int init_path(const char *d, int *new)

@@ -116,7 +116,6 @@ struct cluster_info {
 	struct list_head cpg_node_list;
 	struct list_head sd_node_list;
 
-	struct list_head vm_list;
 	struct list_head pending_list;
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
@@ -183,7 +182,7 @@ int remove_epoch(int epoch);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 
-int start_recovery(uint32_t epoch, uint32_t *failed_vdis, int nr_failed_vdis);
+int start_recovery(uint32_t epoch);
 void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
 
