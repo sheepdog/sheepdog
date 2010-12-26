@@ -56,8 +56,7 @@ static void usage(int status)
 Command syntax:\n\
   cluster (info|format|shutdown)\n\
   node (info|list)\n\
-  vdi (list|tree|graph|delete|object|lock|release)\n\
-  vm list\n\
+  vdi (list|tree|graph|delete|object)\n\
 \n\
 Common parameters:\n\
   -a, --address           specify the daemon address (default: localhost)\n\
@@ -387,60 +386,6 @@ static void print_vdi_graph(uint32_t vid, char *name, uint32_t tag,
 
 }
 
-struct vm_list_info {
-	struct sheepdog_vm_list_entry *vm_list_entries;
-	int nr_vms;
-	int highlight;
-};
-
-static void print_vm_list(uint32_t vid, char *name, uint32_t tag,
-			  uint32_t flags, struct sheepdog_inode *inode, void *data)
-{
-	int i, j;
-	uint64_t my_objs, cow_objs;
-	struct vm_list_info *vli = (struct vm_list_info *)data;
-	char vdi_size_str[8], my_objs_str[8], cow_objs_str[8];
-
-	if (!is_current(inode))
-		return;
-
-	for (i = 0; i < vli->nr_vms; i++) {
-		if (!strcmp((char *)vli->vm_list_entries[i].name, name))
-			break;
-	}
-
-	my_objs = 0;
-	cow_objs = 0;
-	for (j = 0; j < MAX_DATA_OBJS; j++) {
-		if (!inode->data_vdi_id[j])
-			continue;
-		if (is_data_obj_writeable(inode, j))
-			my_objs++;
-		else
-			cow_objs++;
-	}
-
-	size_to_str(inode->vdi_size, vdi_size_str, sizeof(vdi_size_str));
-	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
-	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
-	if (i < vli->nr_vms) {
-		if (vli->highlight)
-			printf(TEXT_BOLD);
-
-		printf("%-16s|%9s|%9s|%9s| running on %d.%d.%d.%d", name,
-		       vdi_size_str, my_objs_str, cow_objs_str,
-		       vli->vm_list_entries[i].host_addr[12],
-		       vli->vm_list_entries[i].host_addr[13],
-		       vli->vm_list_entries[i].host_addr[14],
-		       vli->vm_list_entries[i].host_addr[15]);
-		if (vli->highlight)
-			printf(TEXT_NORMAL);
-		printf("\n");
-	} else
-		printf("%-16s|%9s|%9s|%9s| not running\n", name,
-		       vdi_size_str, my_objs_str, cow_objs_str);
-}
-
 static void cal_total_vdi_size(uint32_t vid, char *name, uint32_t tag,
 			       uint32_t flags, struct sheepdog_inode *i, void *data)
 {
@@ -681,48 +626,6 @@ static struct subcommand node_cmd[] = {
 	{NULL,},
 };
 
-static int vm_list(int argc, char **argv)
-{
-	int fd, ret;
-	struct sd_req hdr;
-	unsigned rlen, wlen;
-	char *data;
-	struct vm_list_info vli;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return 1;
-
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_GET_VM_LIST;
-	hdr.data_length = sizeof(struct sheepdog_vm_list_entry) * SD_MAX_VMS;
-	hdr.epoch = node_list_version;
-	data = zalloc(hdr.data_length);
-
-	rlen = hdr.data_length;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
-	close(fd);
-
-	if (ret != SD_RES_SUCCESS)
-		return 1;
-	vli.vm_list_entries = (struct sheepdog_vm_list_entry *)data;
-	vli.nr_vms = rlen / sizeof(struct sheepdog_vm_list_entry);
-	vli.highlight = highlight;
-
-	printf("Name            |Vdi size |Allocated| Shared  | Status\n");
-	printf("----------------+---------+---------+---------+------------\n");
-	ret = parse_vdi(print_vm_list, &vli);
-
-	return 0;
-}
-
-static struct subcommand vm_cmd[] = {
-	{"list", SUBCMD_FLAG_NEED_NOEDLIST, vm_list},
-	{NULL,},
-};
-
 static int vdi_list(int argc, char **argv)
 {
 	printf("  name        id    size    used  shared    creation time   vdi id\n");
@@ -852,105 +755,12 @@ static int vdi_object(int argc, char **argv)
 	return 0;
 }
 
-static int vdi_lock(int argc, char **argv)
-{
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int ret;
-	char vdiname[SD_MAX_VDI_LEN];
-	unsigned rlen = 0, wlen = 0;
-	unsigned opcode, flags;
-	int fd;
-
-	memset(vdiname, 0, sizeof(vdiname));
-
-	strncpy(vdiname, argv[optind], sizeof(vdiname));
-	wlen = sizeof(vdiname);
-	opcode = SD_OP_LOCK_VDI;
-	flags = SD_FLAG_CMD_WRITE;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return 1;
-
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.proto_ver = SD_PROTO_VER; /* version is checked when locking */
-	hdr.opcode = opcode;
-	hdr.data_length = wlen;
-	hdr.flags = flags;
-	hdr.epoch = node_list_version;
-
-	ret = exec_req(fd, &hdr, vdiname, &wlen, &rlen);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "communication error\n");
-		return 1;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "%s: %s\n", vdiname, sd_strerror(rsp->result));
-		return 1;
-	}
-
-	return 0;
-}
-
-static int vdi_release(int argc, char **argv)
-{
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int ret;
-	char vdiname[SD_MAX_VDI_LEN];
-	unsigned rlen = 0, wlen = 0;
-	unsigned opcode, flags;
-	int fd;
-	char *data = NULL;
-
-	memset(vdiname, 0, sizeof(vdiname));
-
-	strncpy(vdiname, argv[optind], sizeof(vdiname));
-	wlen = sizeof(vdiname);
-	data = vdiname;
-	opcode = SD_OP_RELEASE_VDI;
-	flags = SD_FLAG_CMD_WRITE;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return 1;
-
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = opcode;
-	hdr.data_length = wlen;
-	hdr.flags = flags;
-	hdr.epoch = node_list_version;
-
-	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "communication error\n");
-		return 1;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "%s: %s\n", vdiname, sd_strerror(rsp->result));
-		return 1;
-	}
-
-	return 0;
-}
-
 static struct subcommand vdi_cmd[] = {
 	{"delete", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", SUBCMD_FLAG_NEED_NOEDLIST, vdi_list},
 	{"tree", SUBCMD_FLAG_NEED_NOEDLIST, vdi_tree},
 	{"graph", SUBCMD_FLAG_NEED_NOEDLIST, vdi_graph},
 	{"object", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
-	{"lock", SUBCMD_FLAG_NEED_THIRD_ARG, vdi_lock},
-	{"release", SUBCMD_FLAG_NEED_THIRD_ARG, vdi_release},
 	{NULL,},
 };
 
@@ -1057,7 +867,6 @@ static struct {
 } commands[] = {
 	{"vdi", vdi_cmd,},
 	{"node", node_cmd,},
-	{"vm", vm_cmd,},
 	{"cluster", cluster_cmd,
 	 cluster_long_options,
 	 COMMON_SHORT_OPTIONS "c:",
