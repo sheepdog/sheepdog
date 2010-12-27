@@ -112,6 +112,8 @@ int main(int argc, char **argv)
 	if (is_daemon && daemon(0, 0))
 		exit(1);
 
+	jrnl_recover();
+
 	ret = init_event(EPOLL_SIZE);
 	if (ret)
 		exit(1);

@@ -31,9 +31,30 @@
 static char *obj_path;
 static char *epoch_path;
 static char *mnt_path;
+static char *jrnl_path;
 
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
+
+/* Journal internal data structures */
+/* Journal Handlers for Data Object */
+static int jrnl_vdi_has_end_mark(struct jrnl_descriptor *jd);
+static int jrnl_vdi_write_header(struct jrnl_descriptor *jd);
+static int jrnl_vdi_write_data(struct jrnl_descriptor *jd);
+static int jrnl_vdi_write_end_mark(struct jrnl_descriptor *jd);
+static int jrnl_vdi_apply_to_target_object(struct jrnl_file_desc *jfd);
+static int jrnl_vdi_commit_data(struct jrnl_descriptor *jd);
+
+static struct jrnl_handler jrnl_handlers[JRNL_MAX_TYPES] = {
+	{
+		.has_end_mark = jrnl_vdi_has_end_mark,
+		.write_header = jrnl_vdi_write_header,
+		.write_data = jrnl_vdi_write_data,
+		.write_end_mark = jrnl_vdi_write_end_mark,
+		.apply_to_target_object = jrnl_vdi_apply_to_target_object,
+		.commit_data = jrnl_vdi_commit_data
+	}
+};
 
 static int obj_cmp(const void *oid1, const void *oid2)
 {
@@ -556,6 +577,8 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
 	char path[1024], *buf;
+	struct jrnl_descriptor jd;
+	struct jrnl_vdi_head jh;
 
 	switch (opcode) {
 	case SD_OP_CREATE_AND_WRITE_OBJ:
@@ -671,19 +694,31 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_CREATE_AND_WRITE_OBJ:
 		if (!is_data_obj(oid)) {
-			/* FIXME: write data to journal */
-		}
-		ret = pwrite64(fd, req->data, hdr->data_length, hdr->offset);
-		if (ret != hdr->data_length) {
-			if (errno == ENOSPC)
-				ret = SD_RES_NO_SPACE;
-			else
-				ret = SD_RES_EIO;
-			goto out;
-		}
+			jd.jdf_epoch = epoch;
+			jd.jdf_oid = oid;
+			jd.jdf_target_fd = fd;
 
-		if (!is_data_obj(oid)) {
-			/* FIXME: remove journal data */
+			jh.jh_type = JRNL_TYPE_VDI;
+			jh.jh_offset = hdr->offset;
+			jh.jh_size = hdr->data_length;
+
+			jd.jd_head = &jh;
+			jd.jd_data = req->data;
+			jd.jd_end_mark = SET_END_MARK;
+
+			ret = jrnl_perform(&jd);
+			if (ret)
+				goto out;
+		} else {
+			ret = pwrite64(fd, req->data, hdr->data_length,
+				       hdr->offset);
+			if (ret != hdr->data_length) {
+				if (errno == ENOSPC)
+					ret = SD_RES_NO_SPACE;
+				else
+					ret = SD_RES_EIO;
+				goto out;
+			}
 		}
 
 		ret = SD_RES_SUCCESS;
@@ -1739,6 +1774,27 @@ static int init_mnt_path(const char *base_path)
 	return 0;
 }
 
+#define JRNL_PATH "/journal/"
+
+static int init_jrnl_path(const char *base_path)
+{
+	int new, ret;
+
+	/* Create journal directory */
+	jrnl_path = zalloc(strlen(base_path) + strlen(JRNL_PATH) + 1);
+	sprintf(jrnl_path, "%s" JRNL_PATH, base_path);
+
+	ret = init_path(jrnl_path, &new);
+	/* Error during directory creation */
+	if (ret)
+		return ret;
+	/* If journal is newly created */
+	if (new)
+		return 0;
+
+	return 0;
+}
+
 int init_store(const char *d)
 {
 	int ret;
@@ -1756,6 +1812,10 @@ int init_store(const char *d)
 		return ret;
 
 	ret = init_mnt_path(d);
+	if (ret)
+		return ret;
+
+	ret = init_jrnl_path(d);
 	if (ret)
 		return ret;
 
@@ -1790,4 +1850,358 @@ int set_global_nr_copies(uint32_t copies)
 int get_global_nr_copies(uint32_t *copies)
 {
 	return attr(epoch_path, ANAME_COPIES, copies, sizeof(*copies), 0);
+}
+
+/* Journal APIs */
+int jrnl_exists(struct jrnl_file_desc *jfd)
+{
+	int ret;
+	char path[1024];
+	struct stat s;
+
+	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, jrnl_path,
+		 jfd->jf_epoch, jfd->jf_oid);
+
+	ret = stat(path, &s);
+	if (ret)
+		return 1;
+
+	return 0;
+}
+
+int jrnl_update_epoch_store(uint32_t epoch)
+{
+	char new[1024];
+	struct stat s;
+
+	snprintf(new, sizeof(new), "%s%08u/", jrnl_path, epoch);
+	if (stat(new, &s) < 0)
+		if (errno == ENOENT)
+			mkdir(new, def_dmode);
+
+	return 0;
+}
+
+int jrnl_open(struct jrnl_file_desc *jfd, int aflags)
+{
+	char path[1024];
+	int flags = aflags;
+	int fd, ret;
+
+
+	jrnl_update_epoch_store(jfd->jf_epoch);
+	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, jrnl_path,
+		 jfd->jf_epoch, jfd->jf_oid);
+
+	fd = open(path, flags, def_fmode);
+	if (fd < 0) {
+		eprintf("failed to open %s, %s\n", path, strerror(errno));
+		if (errno == ENOENT)
+			ret = SD_RES_NO_OBJ;
+		else
+			ret = SD_RES_UNKNOWN;
+	} else {
+		jfd->jf_fd = fd;
+		ret = SD_RES_SUCCESS;
+	}
+
+	return ret;
+}
+
+int jrnl_close(struct jrnl_file_desc *jfd)
+{
+	close(jfd->jf_fd);
+	jfd->jf_fd = -1;
+
+	return 0;
+}
+
+int jrnl_create(struct jrnl_file_desc *jfd)
+{
+	return jrnl_open(jfd, O_RDWR | O_CREAT);
+}
+
+inline uint32_t jrnl_get_type(struct jrnl_descriptor *jd)
+{
+	return *((uint32_t *) jd->jd_head);
+}
+
+int jrnl_get_type_from_file(struct jrnl_file_desc *jfd, uint32_t *jrnl_type)
+{
+	ssize_t retsize;
+
+	retsize = pread64(jfd->jf_fd, jrnl_type, sizeof(*jrnl_type), 0);
+
+	if (retsize != sizeof(*jrnl_type))
+		return SD_RES_EIO;
+	else
+		return SD_RES_SUCCESS;
+}
+
+int jrnl_remove(struct jrnl_file_desc *jfd)
+{
+	char path[1024];
+	int ret;
+
+	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, jrnl_path,
+		 jfd->jf_epoch, jfd->jf_oid);
+	ret = unlink(path);
+	if (ret) {
+		eprintf("failed to remove %s, %s\n", path, strerror(errno));
+		ret = SD_RES_EIO;
+	} else
+		ret = SD_RES_SUCCESS;
+
+	return ret;
+}
+
+inline int jrnl_has_end_mark(struct jrnl_descriptor *jd)
+{
+	return jrnl_handlers[jrnl_get_type(jd)].has_end_mark(jd);
+}
+
+inline int jrnl_write_header(struct jrnl_descriptor *jd)
+{
+	return jrnl_handlers[jrnl_get_type(jd)].write_header(jd);
+}
+
+inline int jrnl_write_data(struct jrnl_descriptor *jd)
+{
+	return jrnl_handlers[jrnl_get_type(jd)].write_data(jd);
+}
+
+inline int jrnl_write_end_mark(struct jrnl_descriptor *jd)
+{
+	return jrnl_handlers[jrnl_get_type(jd)].write_end_mark(jd);
+}
+
+inline int jrnl_apply_to_target_object(struct jrnl_file_desc *jfd)
+{
+	int ret;
+	uint32_t jrnl_type;
+
+	ret = jrnl_get_type_from_file(jfd, &jrnl_type);
+
+	return jrnl_handlers[jrnl_type].apply_to_target_object(jfd);
+}
+
+inline int jrnl_commit_data(struct jrnl_descriptor *jd)
+{
+	return jrnl_handlers[jrnl_get_type(jd)].commit_data(jd);
+}
+
+int jrnl_perform(struct jrnl_descriptor *jd)
+{
+	int ret;
+
+	ret = jrnl_create(&jd->jd_jfd);
+	if (ret)
+		goto out;
+
+	ret = jrnl_write_header(jd);
+	if (ret)
+		goto out;
+
+	ret = jrnl_write_data(jd);
+	if (ret)
+		goto out;
+
+	ret = jrnl_write_end_mark(jd);
+	if (ret)
+		goto out;
+
+	ret = jrnl_commit_data(jd);
+	if (ret)
+		goto out;
+
+	ret = jrnl_remove(&jd->jd_jfd);
+
+out:
+	return ret;
+}
+
+int jrnl_recover(void)
+{
+	DIR *dir;
+	struct dirent *d;
+	char jrnl_dir[PATH_MAX], jrnl_file_path[PATH_MAX], obj_file_path[PATH_MAX];
+	int epoch;
+
+	epoch = get_latest_epoch();
+	if (epoch < 0)
+		return 1;
+
+	snprintf(jrnl_dir, sizeof(jrnl_dir), "%s%08u/", jrnl_path, epoch);
+
+	eprintf("Openning the directory %s.\n", jrnl_dir);
+	dir = opendir(jrnl_dir);
+	if (!dir)
+		return -1;
+
+	vprintf(SDOG_NOTICE "start jrnl_recovery.\n");
+	while ((d = readdir(dir))) {
+		int ret;
+		struct jrnl_file_desc jfd;
+
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		jfd.jf_epoch = epoch;
+		sscanf(d->d_name, "%" PRIx64, &jfd.jf_oid);
+		snprintf(jrnl_file_path, sizeof(jrnl_file_path), "%s%016" PRIx64,
+			 jrnl_dir, jfd.jf_oid);
+		snprintf(obj_file_path, sizeof(obj_file_path), "%s%08u/%016" PRIx64,
+			 obj_path, epoch, jfd.jf_oid);
+		ret = jrnl_open(&jfd, O_RDONLY);
+		if (ret) {
+			eprintf("Unable to open the journal file, %s, for reading.\n",
+				jrnl_file_path);
+			goto end_while_3;
+		}
+		jfd.jf_target_fd = ob_open(epoch, jfd.jf_oid, 0, &ret);
+		if (ret) {
+			eprintf("Unable to open the object file, %s, to recover.\n",
+				obj_file_path);
+			goto end_while_2;
+		}
+		ret = jrnl_apply_to_target_object(&jfd);
+		if (ret)
+			eprintf("Unable to recover the object, %s.\n",
+				obj_file_path);
+
+		close(jfd.jf_target_fd);
+		jfd.jf_target_fd = -1;
+end_while_2:
+		jrnl_close(&jfd);
+end_while_3:
+		vprintf(SDOG_INFO "recovered the object in journal, %s\n",
+			jrnl_file_path);
+		jrnl_remove(&jfd);
+	}
+	closedir(dir);
+	vprintf(SDOG_NOTICE "end jrnl_recovery.\n");
+
+	return 0;
+}
+
+/* VDI data journalling functions */
+static int jrnl_vdi_has_end_mark(struct jrnl_descriptor *jd)
+{
+	ssize_t ret;
+	uint32_t end_mark = UNSET_END_MARK;
+	struct jrnl_vdi_head *head = (struct jrnl_vdi_head *) jd->jd_head;
+
+	ret = pread64(jd->jdf_fd, &end_mark, sizeof(end_mark),
+		      sizeof(*head) + head->jh_size);
+
+	return IS_END_MARK_SET(end_mark) ? SET_END_MARK : UNSET_END_MARK;
+}
+
+static int jrnl_vdi_write_header(struct jrnl_descriptor *jd)
+{
+	ssize_t ret;
+	struct jrnl_vdi_head *head = (struct jrnl_vdi_head *) jd->jd_head;
+
+	ret = pwrite64(jd->jdf_fd, head, sizeof(*head), 0);
+
+	if (ret != sizeof(*head)) {
+		if (errno == ENOSPC)
+			ret = SD_RES_NO_SPACE;
+		else
+			ret = SD_RES_EIO;
+	} else
+		ret = SD_RES_SUCCESS;
+
+	return ret;
+}
+
+static int jrnl_vdi_write_data(struct jrnl_descriptor *jd)
+{
+	ssize_t ret;
+	struct jrnl_vdi_head *head = (struct jrnl_vdi_head *) jd->jd_head;
+
+	ret = pwrite64(jd->jdf_fd, jd->jd_data, head->jh_size, sizeof(*head));
+
+	if (ret != head->jh_size) {
+		if (errno == ENOSPC)
+			ret = SD_RES_NO_SPACE;
+		else
+			ret = SD_RES_EIO;
+	} else
+		ret = SD_RES_SUCCESS;
+
+	return ret;
+}
+
+static int jrnl_vdi_write_end_mark(struct jrnl_descriptor *jd)
+{
+	ssize_t retsize;
+	int ret;
+	uint32_t end_mark = SET_END_MARK;
+	struct jrnl_vdi_head *head = (struct jrnl_vdi_head *) jd->jd_head;
+
+	retsize = pwrite64(jd->jdf_fd, &end_mark, sizeof(end_mark),
+			   sizeof(*head) + head->jh_size);
+
+	if (retsize != sizeof(end_mark)) {
+		if (errno == ENOSPC)
+			ret = SD_RES_NO_SPACE;
+		else
+			ret = SD_RES_EIO;
+	} else
+		ret = SD_RES_SUCCESS;
+
+	jd->jd_end_mark = end_mark;
+
+	return ret;
+}
+
+static int jrnl_vdi_apply_to_target_object(struct jrnl_file_desc *jfd)
+{
+	char *buf = NULL;
+	int buf_len, res = 0;
+	ssize_t retsize;
+	struct jrnl_vdi_head jh;
+
+	/* FIXME: handle larger size */
+	buf_len = (1 << 22);
+	buf = zalloc(buf_len);
+	if (!buf) {
+		eprintf("failed to allocate memory\n");
+		return SD_RES_NO_MEM;
+	}
+
+	/* Flush out journal to disk (vdi object) */
+	retsize = pread64(jfd->jf_fd, &jh, sizeof(jh), 0);
+	retsize = pread64(jfd->jf_fd, buf, jh.jh_size, sizeof(jh));
+	retsize = pwrite64(jfd->jf_target_fd, buf, jh.jh_size, jh.jh_offset);
+	if (retsize != jh.jh_size) {
+		if (errno == ENOSPC)
+			res = SD_RES_NO_SPACE;
+		else
+			res = SD_RES_EIO;
+	}
+
+	/* Clean up */
+	free(buf);
+
+	return res;
+}
+
+static int jrnl_vdi_commit_data(struct jrnl_descriptor *jd)
+{
+	int ret = 0;
+	ssize_t retsize;
+	struct jrnl_vdi_head *head = (struct jrnl_vdi_head *) jd->jd_head;
+
+	retsize = pwrite64(jd->jdf_target_fd, jd->jd_data, head->jh_size,
+			   head->jh_offset);
+	if (retsize != head->jh_size) {
+		if (errno == ENOSPC)
+			ret = SD_RES_NO_SPACE;
+		else
+			ret = SD_RES_EIO;
+	}
+
+	return ret;
 }
