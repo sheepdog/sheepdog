@@ -1159,7 +1159,20 @@ next:
 	rsp = (struct sd_obj_rsp *)&hdr;
 
 	if (rsp->result == SD_RES_SUCCESS) {
-		fd = ob_open(epoch, oid, O_CREAT, &ret);
+		char path[PATH_MAX], tmp_path[PATH_MAX];
+		int flags = O_SYNC | O_RDWR | O_CREAT;
+
+		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
+			 epoch, oid);
+		snprintf(tmp_path, sizeof(tmp_path), "%s%08u/%016" PRIx64 ".tmp",
+			 obj_path, epoch, oid);
+
+		fd = open(tmp_path, flags, def_fmode);
+		if (fd < 0) {
+			eprintf("failed to open %s, %s\n", tmp_path, strerror(errno));
+			return -1;
+		}
+
 		ret = write(fd, buf, rlen);
 		if (ret != rlen) {
 			eprintf("failed to write object\n");
@@ -1174,6 +1187,13 @@ next:
 		}
 
 		close(fd);
+
+		dprintf("rename %s to %s\n", tmp_path, path);
+		ret = rename(tmp_path, path);
+		if (ret < 0) {
+			eprintf("failed to rename %s to %s, %m\n", tmp_path, path);
+			return -1;
+		}
 		dprintf("recovered oid %"PRIx64" to epoch %"PRIu32"\n", oid, epoch);
 		return 0;
 	}
