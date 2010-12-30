@@ -1021,7 +1021,8 @@ struct recovery_work {
 };
 
 static LIST_HEAD(recovery_work_list);
-static int recovering;
+static struct recovery_work *recovering_work;
+static uint64_t blocking_oid;
 
 static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr, int old_idx,
 			 struct sheepdog_node_list_entry *cur_entry, int cur_nr, int cur_idx,
@@ -1238,8 +1239,19 @@ static void recover_one(struct work *work, int idx)
 	int old_nr, cur_nr;
 	uint32_t epoch = rw->epoch;
 	int i, my_idx = -1, copy_idx = 0, cur_idx = -1;
+	int fd;
 
 	eprintf("%"PRIu32" %"PRIu32", %16"PRIx64"\n", rw->done, rw->count, oid);
+
+	if (blocking_oid)
+		oid = blocking_oid; /* recover the blocked object first */
+
+	fd = ob_open(epoch, oid, 0, &ret);
+	if (fd != -1) {
+		/* the object is already recovered */
+		close(fd);
+		goto out;
+	}
 
 	if (is_data_obj(oid))
 		buf = malloc(SD_DATA_OBJ_SIZE);
@@ -1341,19 +1353,42 @@ int is_recoverying_oid(uint64_t oid)
 {
 	uint64_t hval = fnv_64a_buf(&oid, sizeof(uint64_t), FNV1A_64_INIT);
 	uint64_t recovering_hval = fnv_64a_buf(&recovering_oid, sizeof(uint64_t), FNV1A_64_INIT);
+	struct recovery_work *rw = recovering_work;
+	int ret, fd;
 
-	return before(sys->recovered_epoch, sys->epoch - 1) ||
-		(sys->recovered_epoch == sys->epoch - 1 && recovering_hval <= hval);
+	if (oid == 0)
+		return 0;
+
+	if (!rw)
+		return 0; /* there is no thread working for object recovery */
+
+	if (before(rw->epoch, sys->epoch))
+		return 1;
+
+	fd = ob_open(sys->epoch, oid, 0, &ret);
+	if (fd != -1) {
+		dprintf("the object %lx is already recoverd\n", oid);
+		close(fd);
+		return 0;
+	}
+
+	if (recovering_hval <= hval) {
+		if (bsearch(&oid, ((uint64_t *)rw->buf) + rw->done,
+			    rw->count - rw->done, sizeof(oid), obj_cmp)) {
+			dprintf("recover the object %lx first\n", oid);
+			blocking_oid = oid;
+			return 1;
+		}
+	}
+
+	dprintf("the object %lx is not found\n", oid);
+	return 0;
 }
 
 static void recover_done(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
-
-	recovering_oid = 0;
-
-	resume_pending_requests();
 
 	if (rw->retry && list_empty(&recovery_work_list)) {
 		rw->retry = 0;
@@ -1364,6 +1399,8 @@ static void recover_done(struct work *work, int idx)
 		return;
 	}
 
+	blocking_oid = 0;
+
 	if (rw->done < rw->count && list_empty(&recovery_work_list)) {
 		rw->work.fn = recover_one;
 
@@ -1372,12 +1409,14 @@ static void recover_done(struct work *work, int idx)
 			return;
 		}
 		recovering_oid = oid;
+		resume_pending_requests();
 		queue_work(&rw->work);
 		return;
 	}
 
 	dprintf("recovery done, %"PRIu32"\n", rw->epoch);
-	recovering = 0;
+	recovering_oid = 0;
+	recovering_work = NULL;
 
 	sys->recovered_epoch = rw->epoch;
 	resume_pending_requests();
@@ -1391,7 +1430,7 @@ static void recover_done(struct work *work, int idx)
 
 		list_del(&rw->rw_siblings);
 
-		recovering = 1;
+		recovering_work = rw;
 		queue_work(&rw->work);
 	}
 }
@@ -1582,10 +1621,10 @@ int start_recovery(uint32_t epoch)
 	rw->work.fn = __start_recovery;
 	rw->work.done = recover_done;
 
-	if (recovering)
+	if (recovering_work != NULL)
 		list_add_tail(&rw->rw_siblings, &recovery_work_list);
 	else {
-		recovering = 1;
+		recovering_work = rw;
 		queue_work(&rw->work);
 	}
 
