@@ -1562,7 +1562,6 @@ join_retry:
 	INIT_LIST_HEAD(&sys->consistent_obj_list);
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
-	cpg_context_set(cpg_handle, sys);
 
 	cpg_fd_get(cpg_handle, &fd);
 	register_event(fd, group_handler, NULL);
