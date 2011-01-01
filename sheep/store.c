@@ -576,7 +576,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
-	char path[1024], *buf;
+	char path[1024], *buf = NULL;
 	struct jrnl_descriptor jd;
 	struct jrnl_vdi_head jh;
 
@@ -626,12 +626,12 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			}
 			ret = read_from_other_sheeps(req, hdr->epoch, hdr->cow_oid, buf,
 						     hdr->copies);
-			free(buf);
 			if (ret) {
 				eprintf("failed to read old object\n");
 				ret = SD_RES_EIO;
 				goto out;
 			}
+			ret = pwrite64(fd, buf, SD_DATA_OBJ_SIZE, 0);
 			if (ret != SD_DATA_OBJ_SIZE) {
 				if (errno == ENOSPC)
 					ret = SD_RES_NO_SPACE;
@@ -639,6 +639,8 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 					ret = SD_RES_EIO;
 				goto out;
 			}
+			free(buf);
+			buf = NULL;
 		} else {
 			int zero = 0;
 
@@ -725,6 +727,9 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		break;
 	}
 out:
+	if (buf)
+		free(buf);
+
 	if (fd != -1)
 		close(fd);
 
