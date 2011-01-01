@@ -183,7 +183,13 @@ static void queue_request(struct request *req)
 		return;
 	}
 
-	if (sys->status == SD_STATUS_JOIN_FAILED) {
+	/*
+	 * we can know why this node failed to join with
+	 * SD_OP_STAT_CLUSTER, so the request should be handled even
+	 * when the cluster status is SD_STATUS_JOIN_FAILED
+	 */
+	if (sys->status == SD_STATUS_JOIN_FAILED &&
+	    hdr->opcode != SD_OP_STAT_CLUSTER) {
 		rsp->result = SD_RES_JOIN_FAILED;
 		req->done(req);
 		return;
