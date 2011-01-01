@@ -959,6 +959,13 @@ int remove_epoch(int epoch)
 		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
 		return SD_RES_EIO;
 	}
+
+	snprintf(path, sizeof(path), "%s%08u/", jrnl_path, epoch);
+	ret = rmdir_r(path);
+	if (ret && ret != -ENOENT) {
+		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
+		return SD_RES_EIO;
+	}
 	return 0;
 }
 
