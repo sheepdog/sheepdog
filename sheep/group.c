@@ -709,6 +709,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		latest_epoch = get_latest_epoch();
 		for (i = 1; i <= latest_epoch; i++)
 			remove_epoch(i);
+		memset(sys->vdi_inuse, 0, sizeof(sys->vdi_inuse));
 
 		sys->epoch = 1;
 		sys->recovered_epoch = 1;
