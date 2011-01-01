@@ -579,7 +579,7 @@ static void update_cluster_info(struct join_message *msg)
 	sys->join_finished = 1;
 
 	eprintf("system status = %d, epoch = %d\n", msg->cluster_status, sys->epoch);
-	if (msg->cluster_status == SD_STATUS_OK) {
+	if (msg->cluster_status == SD_STATUS_OK && msg->inc_epoch) {
 		nr_nodes = get_ordered_sd_node_list(entry);
 
 		dprintf("update epoch, %d, %d\n", sys->epoch, nr_nodes);
