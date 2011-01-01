@@ -650,7 +650,7 @@ static int vdi_tree(int argc, char **argv)
 static int vdi_graph(int argc, char **argv)
 {
 	/* print a header */
-	printf("digraph G \{\n");
+	printf("digraph G {\n");
 	printf("  node [shape = \"box\", fontname = \"Courier\"];\n\n");
 	printf("  \"0\" [shape = \"ellipse\", label = \"root\"];\n\n");
 
