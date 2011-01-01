@@ -130,6 +130,7 @@ struct cluster_info {
 	struct cpg_event *cur_cevent;
 	unsigned long cpg_event_work_flags;
 	int nr_outstanding_io;
+	int nr_outstanding_reqs;
 
 	uint32_t recovered_epoch;
 };

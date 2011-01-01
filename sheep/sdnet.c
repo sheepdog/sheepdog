@@ -279,6 +279,8 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 	list_add(&req->r_siblings, &ci->reqs);
 	INIT_LIST_HEAD(&req->r_wlist);
 
+	sys->nr_outstanding_reqs++;
+
 	return req;
 }
 
@@ -286,6 +288,8 @@ static void free_request(struct request *req)
 {
 	list_del(&req->r_siblings);
 	free(req);
+
+	sys->nr_outstanding_reqs--;
 }
 
 static void req_done(struct request *req)
@@ -518,6 +522,12 @@ static void listen_handler(int listen_fd, int events, void *data)
 	socklen_t namesize;
 	int fd, ret, opt;
 	struct client_info *ci;
+
+	if (sys->status == SD_STATUS_SHUTDOWN) {
+		dprintf("unregister %d\n", listen_fd);
+		unregister_event(listen_fd);
+		return;
+	}
 
 	namesize = sizeof(from);
 	fd = accept(listen_fd, (struct sockaddr *)&from, &namesize);
