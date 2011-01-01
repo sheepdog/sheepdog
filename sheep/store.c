@@ -1379,7 +1379,7 @@ int is_recoverying_oid(uint64_t oid)
 
 	fd = ob_open(sys->epoch, oid, 0, &ret);
 	if (fd != -1) {
-		dprintf("the object %lx is already recoverd\n", oid);
+		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
 		close(fd);
 		return 0;
 	}
@@ -1387,13 +1387,13 @@ int is_recoverying_oid(uint64_t oid)
 	if (recovering_hval <= hval) {
 		if (bsearch(&oid, ((uint64_t *)rw->buf) + rw->done,
 			    rw->count - rw->done, sizeof(oid), obj_cmp)) {
-			dprintf("recover the object %lx first\n", oid);
+			dprintf("recover the object %" PRIx64 " first\n", oid);
 			blocking_oid = oid;
 			return 1;
 		}
 	}
 
-	dprintf("the object %lx is not found\n", oid);
+	dprintf("the object %" PRIx64 " is not found\n", oid);
 	return 0;
 }
 
