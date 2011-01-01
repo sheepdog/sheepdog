@@ -1602,7 +1602,12 @@ static void __start_recovery(struct work *work, int idx)
 		eprintf("failed to open %s, %s, %m\n", tmp_path, strerror(errno));
 		goto fail;
 	}
-	write(fd, rw->buf, sizeof(uint64_t) * rw->count);
+	ret = write(fd, rw->buf, sizeof(uint64_t) * rw->count);
+	if (ret != sizeof(uint64_t) * rw->count) {
+		eprintf("failed to write to %s, %m\n", tmp_path);
+		close(fd);
+		goto fail;
+	}
 	close(fd);
 
 	dprintf("rename %s to %s\n", tmp_path, path);
