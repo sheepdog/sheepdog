@@ -163,6 +163,10 @@ struct cluster_cmd_data {
 	int copies;
 } cluster_cmd_data;
 
+struct vdi_cmd_data {
+	int snapshot;
+} vdi_cmd_data;
+
 static int cluster_format(int argc, char **argv)
 {
 	int fd, ret;
@@ -667,7 +671,6 @@ static int vdi_delete(int argc, char **argv)
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
 	unsigned rlen, wlen;
 	char vdiname[SD_MAX_VDI_LEN];
-	uint32_t id = ~0;
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
@@ -679,8 +682,7 @@ static int vdi_delete(int argc, char **argv)
 	wlen = sizeof(vdiname);
 
 	hdr.opcode = SD_OP_DEL_VDI;
-	if (id != ~0)
-		hdr.snapid = id;
+	hdr.snapid = vdi_cmd_data.snapshot;
 	hdr.epoch = node_list_version;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
@@ -763,6 +765,24 @@ static struct subcommand vdi_cmd[] = {
 	{"object", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
 	{NULL,},
 };
+
+static struct option vdi_long_options[] =
+{
+	COMMON_LONG_OPTIONS
+	{"snapshot", required_argument, NULL, 's'},
+	{NULL, 0, NULL, 0},
+};
+
+static int vdi_parser(int ch, char *opt)
+{
+	switch (ch) {
+	case 's':
+		vdi_cmd_data.snapshot = atoi(opt);
+		break;
+	}
+
+	return 0;
+}
 
 static int cluster_info(int argc, char **argv)
 {
@@ -865,7 +885,10 @@ static struct {
 	int (*parser)(int, char *);
 	void (*help)(void);
 } commands[] = {
-	{"vdi", vdi_cmd,},
+	{"vdi", vdi_cmd,
+	 vdi_long_options,
+	 COMMON_SHORT_OPTIONS "s:",
+	 vdi_parser,},
 	{"node", node_cmd,},
 	{"cluster", cluster_cmd,
 	 cluster_long_options,
