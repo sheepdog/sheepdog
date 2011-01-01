@@ -693,12 +693,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		break;
 	}
 	case SD_OP_DEL_VDI:
-	{
-		unsigned long nr = rsp->vdi_id;
-		vprintf(SDOG_INFO "done %d %ld\n", ret, nr);
-		clear_bit(nr, sys->vdi_inuse);
 		break;
-	}
 	case SD_OP_LOCK_VDI:
 	case SD_OP_RELEASE_VDI:
 	case SD_OP_GET_VDI_INFO:
