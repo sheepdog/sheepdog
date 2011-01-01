@@ -164,8 +164,9 @@ struct cluster_cmd_data {
 } cluster_cmd_data;
 
 struct vdi_cmd_data {
+	unsigned int index;
 	int snapshot;
-} vdi_cmd_data;
+} vdi_cmd_data = { ~0, };
 
 static int cluster_format(int argc, char **argv)
 {
@@ -408,14 +409,11 @@ static void get_oid(uint32_t vid, char *name, uint32_t tag,
 		    uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	struct get_vid_info *info = data;
-	char *p;
+	int snapshot_id = vdi_cmd_data.snapshot;
 
 	if (info->name) {
-		p = strchr(info->name, ':');
-
-		if (p) {
-			if (!strncmp(name, info->name, p - info->name) &&
-			    tag == strtoul(p + 1, NULL, 16))
+		if (snapshot_id) {
+			if (!strcmp(name, info->name) && tag == snapshot_id)
 				info->vid = vid;
 		} else {
 			if (!strcmp(name, info->name))
@@ -466,7 +464,8 @@ static void get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 		if (info->success)
 			break;
 		info->success = 1;
-		info->data_oid = vid_to_data_oid(inode->data_vdi_id[info->idx], info->idx);
+		if (inode->data_vdi_id[info->idx])
+			info->data_oid = vid_to_data_oid(inode->data_vdi_id[info->idx], info->idx);
 		break;
 	case SD_RES_NO_OBJ:
 		break;
@@ -494,7 +493,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 	}
 
 	for (i = 0; i < nr_nodes; i++) {
-		unsigned wlen = 0, rlen = sizeof(sizeof(struct sheepdog_inode));
+		unsigned wlen = 0, rlen = sizeof(struct sheepdog_inode);
 		struct sd_obj_req hdr;
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
@@ -707,7 +706,7 @@ static int vdi_delete(int argc, char **argv)
 static int vdi_object(int argc, char **argv)
 {
 	char *vdiname = argv[optind];
-	unsigned idx = ~0;
+	unsigned idx = vdi_cmd_data.index;
 	int ret;
 	struct get_vid_info info;
 	uint32_t vid;
@@ -769,6 +768,7 @@ static struct subcommand vdi_cmd[] = {
 static struct option vdi_long_options[] =
 {
 	COMMON_LONG_OPTIONS
+	{"index", required_argument, NULL, 'i'},
 	{"snapshot", required_argument, NULL, 's'},
 	{NULL, 0, NULL, 0},
 };
@@ -776,6 +776,9 @@ static struct option vdi_long_options[] =
 static int vdi_parser(int ch, char *opt)
 {
 	switch (ch) {
+	case 'i':
+		vdi_cmd_data.index = atoi(opt);
+		break;
 	case 's':
 		vdi_cmd_data.snapshot = atoi(opt);
 		break;
@@ -887,7 +890,7 @@ static struct {
 } commands[] = {
 	{"vdi", vdi_cmd,
 	 vdi_long_options,
-	 COMMON_SHORT_OPTIONS "s:",
+	 COMMON_SHORT_OPTIONS "i:s:",
 	 vdi_parser,},
 	{"node", node_cmd,},
 	{"cluster", cluster_cmd,
