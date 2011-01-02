@@ -1,47 +1,167 @@
 #!bash
 
+_collie_cluster_format()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-c --copies" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_vdi_delete()
+{
+    local cur collie vdilist
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    collie="${COMP_WORDS[0]}"
+    vdilist="$(${collie} vdi list | tail -n+3 | grep '^  ' | awk '{print $1}')"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-s --snapshot" \
+                -- ${cur} ))
+            ;;
+        *)
+            COMPREPLY=($( compgen -W "${vdilist}" -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_vdi_object()
+{
+    local cur collie vdilist
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    collie="${COMP_WORDS[0]}"
+    vdilist="$(${collie} vdi list | tail -n+3 | grep '^  ' | awk '{print $1}')"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-i --index -s --snapshot" \
+                -- ${cur} ))
+            ;;
+        *)
+            COMPREPLY=($( compgen -W "${vdilist}" -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_cluster()
+{
+    local opts
+    opts="info format shutdown"
+
+    case "$1" in
+        info)
+            ;;
+        format)
+            _collie_cluster_format
+            ;;
+        shutdown)
+            ;;
+        "")
+            COMPREPLY=($( compgen \
+                -W "${opts}" \
+                -- "${COMP_WORDS[COMP_CWORD]}" ))
+            ;;
+        *)
+            COMPREPLY=()
+            ;;
+    esac
+}
+
+_collie_node()
+{
+    local opts
+    opts="info list"
+
+    case "$1" in
+        info)
+            ;;
+        list)
+            ;;
+        "")
+            COMPREPLY=($( compgen \
+                -W "${opts}" \
+                -- "${COMP_WORDS[COMP_CWORD]}" ))
+            ;;
+        *)
+            COMPREPLY=()
+            ;;
+    esac
+}
+
+_collie_vdi()
+{
+    local opts
+    opts="list tree graph delete object"
+
+    case "$1" in
+        list)
+            ;;
+        tree)
+            ;;
+        graph)
+            ;;
+        delete)
+            _collie_vdi_delete
+            ;;
+        object)
+            _collie_vdi_object
+            ;;
+        "")
+            COMPREPLY=($( compgen \
+                -W "${opts}" \
+                -- "${COMP_WORDS[COMP_CWORD]}" ))
+            ;;
+        *)
+            COMPREPLY=()
+            ;;
+    esac
+}
+
 _collie()
 {
-	local opts cur prev
-	opts="cluster node vdi vm"
-	cur="${COMP_WORDS[COMP_CWORD]}"
-	prev="${COMP_WORDS[COMP_CWORD-1]}"
+    local opts cur cmd subcmd i
+    opts="cluster node vdi"
+    cur="${COMP_WORDS[COMP_CWORD]}"
 
-	case "${prev}" in
-		cluster)
-	     	COMPREPLY=( $( \
-		    compgen -W "info format shutdown" \
-		    ${COMP_WORDS[COMP_CWORD]}
-	    	))
-	    	return 0
-	    	;;
+    if [ $COMP_CWORD -gt 1 ]; then
+        cmd=${COMP_WORDS[1]}
+    fi
 
-		node)
-	     	COMPREPLY=( $( \
-		    compgen -W "info list" \
-		    ${COMP_WORDS[COMP_CWORD]}
-	    	))
-	    	return 0
-	    	;;
+    if [ $COMP_CWORD -gt 2 ]; then
+        subcmd=${COMP_WORDS[2]}
+    fi
 
-		vdi)
-	     	COMPREPLY=( $( \
-		    compgen -W "list delete object lock release" \
-		    ${COMP_WORDS[COMP_CWORD]}
-	    	))
-	    	return 0
-	    	;;
+    COMPREPLY=($( compgen -W "-a --address -p --port -h --help" -- ${cur} ))
 
-		vm)
-	     	COMPREPLY=( $( \
-		    compgen -W "list" \
-		    ${COMP_WORDS[COMP_CWORD]}
-	    	))
-	    	return 0
-	    	;;
-	esac
-
-	COMPREPLY=( $( compgen -W "${opts}" ${cur} ) )
+    case "${cmd}" in
+        cluster)
+            _collie_cluster ${subcmd}
+            ;;
+        node)
+            _collie_node ${subcmd}
+            ;;
+        vdi)
+            _collie_vdi ${subcmd}
+            ;;
+        "")
+            COMPREPLY=($( compgen -W "${opts}" -- ${cur} ))
+            ;;
+        *)
+            COMPREPLY=()
+            ;;
+    esac
 }
 
 complete -F _collie collie
