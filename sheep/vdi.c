@@ -391,10 +391,6 @@ static void delete_one(struct work *work, int idx)
 			      vid_to_data_oid(inode.data_vdi_id[i], i),
 			      inode.nr_copies);
 	}
-
-	if (remove_object(entries, nr_nodes, dw->epoch, vid_to_vdi_oid(vdi_id),
-			  sys->nr_sobjs))
-		eprintf("failed to remove vdi objects %x\n", vdi_id);
 }
 
 static void __start_deletion(struct work *work, int idx);
