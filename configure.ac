@@ -18,7 +18,7 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-AC_INIT([sheepdog], [0.1.0], [sheepdog@lists.wpkg.org])
+AC_INIT([sheepdog], [0.2.0], [sheepdog@lists.wpkg.org])
 AM_INIT_AUTOMAKE([-Wno-portability])
 
 AC_CONFIG_SRCDIR([collie/collie.c])
