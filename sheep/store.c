@@ -2063,6 +2063,10 @@ int jrnl_perform(struct jrnl_descriptor *jd)
 	if (ret)
 		goto out;
 
+	ret = jrnl_close(&jd->jd_jfd);
+	if (ret)
+		goto out;
+
 	ret = jrnl_remove(&jd->jd_jfd);
 
 out:
