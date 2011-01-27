@@ -354,7 +354,6 @@ struct deletion_work {
 };
 
 static LIST_HEAD(deletion_work_list);
-static int deleting;
 
 static void delete_one(struct work *work, int idx)
 {
@@ -393,9 +392,6 @@ static void delete_one(struct work *work, int idx)
 	}
 }
 
-static void __start_deletion(struct work *work, int idx);
-static void __start_deletion_done(struct work *work, int idx);
-
 static void delete_one_done(struct work *work, int idx)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
@@ -406,8 +402,6 @@ static void delete_one_done(struct work *work, int idx)
 		return;
 	}
 
-	deleting--;
-
 	list_del(&dw->dw_siblings);
 
 	free(dw->buf);
@@ -417,7 +411,6 @@ static void delete_one_done(struct work *work, int idx)
 		dw = list_first_entry(&deletion_work_list,
 				      struct deletion_work, dw_siblings);
 
-		deleting++;
 		queue_work(&dw->work);
 	}
 }
@@ -483,63 +476,12 @@ next:
 	goto next;
 }
 
-static void __start_deletion(struct work *work, int idx)
-{
-	struct deletion_work *dw = container_of(work, struct deletion_work, work);
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes, ret;
-	uint32_t root_vid;
-
-	nr_nodes = get_ordered_sd_node_list(entries);
-
-	root_vid = get_vdi_root(entries, nr_nodes, dw->epoch, dw->vid);
-	if (!root_vid)
-		goto fail;
-
-	ret = fill_vdi_list(dw, entries, nr_nodes, root_vid);
-	if (ret)
-		goto fail;
-
-	return;
-
-fail:
-	dw->count = 0;
-	return;
-}
-
-static void __start_deletion_done(struct work *work, int idx)
-{
-	struct deletion_work *dw = container_of(work, struct deletion_work, work);
-
-	dprintf("%d\n", dw->count);
-
-	if (dw->count) {
-		dw->work.fn = delete_one;
-		dw->work.done = delete_one_done;
-
-		queue_work(&dw->work);
-		return;
-	}
-
-	deleting--;
-
-	list_del(&dw->dw_siblings);
-
-	free(dw->buf);
-	free(dw);
-
-	if (!list_empty(&deletion_work_list)) {
-		dw = list_first_entry(&deletion_work_list,
-				      struct deletion_work, dw_siblings);
-
-		deleting++;
-		queue_work(&dw->work);
-	}
-}
-
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw;
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	int nr_nodes, ret;
+	uint32_t root_vid;
 
 	dw = zalloc(sizeof(struct deletion_work));
 	if (!dw)
@@ -555,15 +497,31 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	dw->vid = vid;
 	dw->epoch = epoch;
 
-	dw->work.fn = __start_deletion;
-	dw->work.done = __start_deletion_done;
+	dw->work.fn = delete_one;
+	dw->work.done = delete_one_done;
+
+	nr_nodes = get_ordered_sd_node_list(entries);
+
+	root_vid = get_vdi_root(entries, nr_nodes, dw->epoch, dw->vid);
+	if (!root_vid)
+		return -1;
+
+	ret = fill_vdi_list(dw, entries, nr_nodes, root_vid);
+	if (ret)
+		return 0;
+
+	dprintf("%d\n", dw->count);
+
+	if (dw->count == 0)
+		return 0;
+
+	if (!list_empty(&deletion_work_list)) {
+		list_add_tail(&dw->dw_siblings, &deletion_work_list);
+		return 0;
+	}
 
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
-
-	if (!deleting) {
-		deleting++;
-		queue_work(&dw->work);
-	}
+	queue_work(&dw->work);
 
 	return 0;
 }
