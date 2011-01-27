@@ -751,6 +751,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	struct sd_obj_req req_bak = *((struct sd_obj_req *)&req->rq);
 	struct sd_obj_rsp rsp_bak = *((struct sd_obj_rsp *)&req->rp);
 	void *data = req->data, *buf;
+	uint64_t oid = hdr->oid;
 
 	if (is_data_obj(hdr->oid))
 		data_length = SD_DATA_OBJ_SIZE;
@@ -776,6 +777,7 @@ static int fix_object_consistency(struct request *req, int idx)
 
 	hdr->opcode = SD_OP_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
+	hdr->oid = oid;
 	ret = forward_write_obj_req(req, idx);
 	if (ret < 0) {
 		eprintf("failed to write object, %d\n", ret);
