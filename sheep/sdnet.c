@@ -583,6 +583,9 @@ int write_object(struct sheepdog_node_list_entry *e,
 	int i, n, fd, ret, success = 0;
 	char name[128];
 
+	if (nr > nodes)
+		nr = nodes;
+
 	for (i = 0; i < nr; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
@@ -630,6 +633,9 @@ int read_object(struct sheepdog_node_list_entry *e,
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	char name[128];
 	int i = 0, n, fd, ret;
+
+	if (nr > nodes)
+		nr = nodes;
 
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = datalen;
