@@ -162,6 +162,10 @@ int create_cluster(int port);
 
 void start_cpg_event_work(void);
 void store_queue_request(struct work *work, int idx);
+int write_object_local(uint64_t oid, char *data, unsigned int datalen,
+		       uint64_t offset, int copies, uint32_t epoch, int create);
+int read_object_local(uint64_t oid, char *data, unsigned int datalen,
+		      uint64_t offset, int copies, uint32_t epoch);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	       struct sheepdog_node_list_entry *entries, int *nr_entries);

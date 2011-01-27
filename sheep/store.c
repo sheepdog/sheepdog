@@ -568,6 +568,54 @@ int update_epoch_store(uint32_t epoch)
 	return 0;
 }
 
+int write_object_local(uint64_t oid, char *data, unsigned int datalen,
+		       uint64_t offset, int copies, uint32_t epoch, int create)
+{
+	struct request req;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req.rq;
+
+	memset(&req, 0, sizeof(req));
+
+	hdr->oid = oid;
+	if (create)
+		hdr->opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+	else
+		hdr->opcode = SD_OP_WRITE_OBJ;
+	hdr->copies = copies;
+	hdr->flags = SD_FLAG_CMD_WRITE;
+	hdr->offset = offset;
+	hdr->data_length = datalen;
+	req.data = data;
+
+	return store_queue_request_local(&req, epoch);
+}
+
+int read_object_local(uint64_t oid, char *data, unsigned int datalen,
+		      uint64_t offset, int copies, uint32_t epoch)
+{
+	int ret;
+	struct request req;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req.rq;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req.rp;
+
+	memset(&req, 0, sizeof(req));
+
+	hdr->oid = oid;
+	hdr->opcode = SD_OP_READ_OBJ;
+	hdr->copies = copies;
+	hdr->flags = 0;
+	hdr->offset = offset;
+	hdr->data_length = datalen;
+	req.data = data;
+
+	ret = store_queue_request_local(&req, epoch);
+
+	if (ret != 0 || rsp->data_length != datalen)
+		return -rsp->result;
+
+	return rsp->data_length;
+}
+
 static int store_queue_request_local(struct request *req, uint32_t epoch)
 {
 	int fd = -1, copies;

@@ -591,6 +591,19 @@ int write_object(struct sheepdog_node_list_entry *e,
 
 		n = obj_to_sheep(e, nodes, oid, i);
 
+		if (memcmp(e[n].addr, sys->this_node.addr, sizeof(e[n].addr)) == 0 &&
+		    e[n].port == sys->this_node.port) {
+			ret = write_object_local(oid, data, datalen, offset, nr,
+						 node_version, create);
+
+			if (ret != 0)
+				eprintf("fail %"PRIx64" %"PRIx32"\n", oid, ret);
+			else
+				success++;
+
+			continue;
+		}
+
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
 		fd = connect_to(name, e[n].port);
@@ -636,6 +649,32 @@ int read_object(struct sheepdog_node_list_entry *e,
 
 	if (nr > nodes)
 		nr = nodes;
+
+	/* search a local object first */
+	for (i = 0; i < nr; i++) {
+		n = obj_to_sheep(e, nodes, oid, i);
+
+		if (memcmp(e[n].addr, sys->this_node.addr, sizeof(e[n].addr)) == 0 &&
+		    e[n].port == sys->this_node.port) {
+			ret = read_object_local(oid, data, datalen, offset, nr,
+						node_version);
+
+			if (ret < 0) {
+				eprintf("fail %"PRIx64" %"PRId32"\n", oid, ret);
+				return ret;
+			}
+
+			/* fix replication consistency */
+			if (nr > 1) {
+				if (write_object(e, nodes, node_version, oid,
+						 data, datalen, offset, nr, 0))
+					eprintf("failed to fix obj consistency\n");
+			}
+
+			return ret;
+		}
+
+	}
 
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = datalen;
