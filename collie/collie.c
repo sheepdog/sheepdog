@@ -269,33 +269,49 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 		close(fd);
 		return ret;
 	}
+	close(fd);
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
 		struct sd_obj_req hdr;
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+		uint64_t oid;
+		int n;
+		char name[128];
 
 		if (!test_bit(nr, vdi_inuse))
 			continue;
+
+		oid = vid_to_vdi_oid(nr);
+		n = obj_to_sheep(node_list_entries, nr_nodes, oid, 0);
+		addr_to_str(name, sizeof(name), node_list_entries[n].addr, 0);
+
+		fd = connect_to(name, node_list_entries[n].port);
+		if (fd < 0) {
+			printf("failed to connect %s:%d\n", name,
+			       node_list_entries[n].port);
+			continue;
+		}
 
 		wlen = 0;
 		rlen = sizeof(i);
 
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.oid = vid_to_vdi_oid(nr);
+		hdr.oid = oid;
 		hdr.data_length = rlen;
+		hdr.flags = SD_FLAG_CMD_DIRECT;
+		hdr.epoch = node_list_version;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr, &i, &wlen, &rlen);
+		close(fd);
 
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			if (i.name[0] == '\0') /* deleted */
 				continue;
 			func(i.vdi_id, i.name, i.snap_id, 0, &i, data);
 		} else
-			printf("error %lu, %d\n", nr, ret);
+			printf("error %lu, %d, %x\n", nr, ret, rsp->result);
 	}
-
-	close(fd);
 
 	return 0;
 }
