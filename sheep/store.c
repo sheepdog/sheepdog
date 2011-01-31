@@ -301,7 +301,7 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 
 		rlen = *ori_rlen;
 		wlen = 0;
-		hdr.flags = 0;
+		hdr.flags = SD_FLAG_CMD_DIRECT;
 		hdr.data_length = rlen;
 		hdr.offset = offset;
 
