@@ -244,7 +244,7 @@ static int shutdown_sheepdog(void)
 typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, uint32_t tag, uint32_t flags,
 				  struct sheepdog_inode *i, void *data);
 
-static int parse_vdi(vdi_parser_func_t func, void *data)
+static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 {
 	int ret, fd;
 	unsigned long nr;
@@ -293,7 +293,8 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 		}
 
 		wlen = 0;
-		rlen = sizeof(i);
+		rlen = SD_INODE_HEADER_SIZE;
+		memset(&i, 0, sizeof(i));
 
 		memset(&hdr, 0, sizeof(hdr));
 		hdr.opcode = SD_OP_READ_OBJ;
@@ -303,14 +304,45 @@ static int parse_vdi(vdi_parser_func_t func, void *data)
 		hdr.epoch = node_list_version;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr, &i, &wlen, &rlen);
-		close(fd);
 
-		if (!ret && rsp->result == SD_RES_SUCCESS) {
-			if (i.name[0] == '\0') /* deleted */
-				continue;
-			func(i.vdi_id, i.name, i.snap_id, 0, &i, data);
-		} else
-			printf("error %lu, %d, %x\n", nr, ret, rsp->result);
+		if (ret || rsp->result != SD_RES_SUCCESS) {
+			printf("failed to read a inode header %lu, %d, %x\n",
+			       nr, ret, rsp->result);
+			goto next;
+		}
+
+		if (i.name[0] == '\0') /* this vdi is deleted */
+			goto next;
+
+		if (size > SD_INODE_HEADER_SIZE) {
+			wlen = 0;
+			rlen = DIV_ROUND_UP(i.vdi_size, SD_DATA_OBJ_SIZE) *
+				sizeof(i.data_vdi_id[0]);
+			if (rlen > size - SD_INODE_HEADER_SIZE)
+				rlen = size - SD_INODE_HEADER_SIZE;
+
+			memset(&hdr, 0, sizeof(hdr));
+			hdr.opcode = SD_OP_READ_OBJ;
+			hdr.oid = oid;
+			hdr.offset = SD_INODE_HEADER_SIZE;
+			hdr.data_length = rlen;
+			hdr.flags = SD_FLAG_CMD_DIRECT;
+			hdr.epoch = node_list_version;
+
+			ret = exec_req(fd, (struct sd_req *)&hdr,
+				       ((char *)&i) + SD_INODE_HEADER_SIZE,
+				       &wlen, &rlen);
+
+			if (ret || rsp->result != SD_RES_SUCCESS) {
+				printf("failed to read inode %lu, %d, %x\n",
+				       nr, ret, rsp->result);
+				goto next;
+			}
+		}
+
+		func(i.vdi_id, i.name, i.snap_id, 0, &i, data);
+	next:
+		close(fd);
 	}
 
 	return 0;
@@ -626,7 +658,7 @@ static int node_info(int argc, char **argv)
 		return 1;
 	}
 
-	parse_vdi(cal_total_vdi_size, &total_vdi_size);
+	parse_vdi(cal_total_vdi_size, SD_INODE_HEADER_SIZE, &total_vdi_size);
 
 	size_to_str(total_size, total_str, sizeof(total_str));
 	size_to_str(total_size - total_avail, avail_str, sizeof(avail_str));
@@ -650,14 +682,14 @@ static int vdi_list(int argc, char **argv)
 	printf("  name        id    size    used  shared    creation time   vdi id\n");
 	printf("------------------------------------------------------------------\n");
 
-	parse_vdi(print_vdi_list, NULL);
+	parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL);
 	return 0;
 }
 
 static int vdi_tree(int argc, char **argv)
 {
 	init_tree();
-	parse_vdi(print_vdi_tree, NULL);
+	parse_vdi(print_vdi_tree, SD_INODE_HEADER_SIZE, NULL);
 	dump_tree();
 
 	return 0;
@@ -670,7 +702,7 @@ static int vdi_graph(int argc, char **argv)
 	printf("  node [shape = \"box\", fontname = \"Courier\"];\n\n");
 	printf("  \"0\" [shape = \"ellipse\", label = \"root\"];\n\n");
 
-	parse_vdi(print_vdi_graph, NULL);
+	parse_vdi(print_vdi_graph, SD_INODE_HEADER_SIZE, NULL);
 
 	/* print a footer */
 	printf("}\n");
@@ -730,7 +762,7 @@ static int vdi_object(int argc, char **argv)
 	info.name = vdiname;
 	info.vid = 0;
 
-	ret = parse_vdi(get_oid, &info);
+	ret = parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info);
 
 	vid = info.vid;
 	if (vid == 0) {

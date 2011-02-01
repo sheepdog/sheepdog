@@ -79,6 +79,8 @@
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 
 #define SD_INODE_SIZE (sizeof(struct sheepdog_inode))
+#define SD_INODE_HEADER_SIZE (sizeof(struct sheepdog_inode) - \
+			      sizeof(uint32_t) * MAX_DATA_OBJS)
 #define CURRENT_VDI_ID 0
 
 struct sd_req {
