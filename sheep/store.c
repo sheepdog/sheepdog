@@ -350,16 +350,16 @@ static int forward_read_obj_req(struct request *req, int idx)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)hdr;
+	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sheepdog_node_list_entry *e;
-	uint64_t oid = hdr->oid;
+	uint64_t oid = hdr.oid;
 	int copies;
 
 	e = req->entry;
 	nr = req->nr_nodes;
 
-	copies = hdr->copies;
+	copies = hdr.copies;
 
 	/* temporary hack */
 	if (!copies)
@@ -367,30 +367,30 @@ static int forward_read_obj_req(struct request *req, int idx)
 	if (copies > req->nr_nodes)
 		copies = req->nr_nodes;
 
-	hdr->flags |= SD_FLAG_CMD_DIRECT;
+	hdr.flags |= SD_FLAG_CMD_DIRECT;
 
 	/* TODO: we can do better; we need to check this first */
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
 		if (is_myself(&e[n])) {
-			ret = store_queue_request_local(req, hdr->epoch);
+			ret = store_queue_request_local(req, hdr.epoch);
 			goto out;
 		}
 	}
 
 	n = obj_to_sheep(e, nr, oid, 0);
 
-	fd = get_sheep_fd(e, n, hdr->epoch, idx);
+	fd = get_sheep_fd(e, n, hdr.epoch, idx);
 	if (fd < 0) {
 		ret = SD_RES_NETWORK_ERROR;
 		goto out;
 	}
 
 	wlen = 0;
-	rlen = hdr->data_length;
+	rlen = hdr.data_length;
 
-	ret = exec_req(fd, (struct sd_req *)hdr, req->data, &wlen, &rlen);
+	ret = exec_req(fd, (struct sd_req *)&hdr, req->data, &wlen, &rlen);
 
 	if (ret) /* network errors */
 		ret = SD_RES_NETWORK_ERROR;
@@ -398,10 +398,7 @@ static int forward_read_obj_req(struct request *req, int idx)
 		memcpy(&req->rp, rsp, sizeof(*rsp));
 		ret = rsp->result;
 	}
-
 out:
-	hdr->flags &= ~SD_FLAG_CMD_DIRECT;
-
 	return ret;
 }
 
@@ -410,10 +407,10 @@ static int forward_write_obj_req(struct request *req, int idx)
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
 	char name[128];
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	struct sheepdog_node_list_entry *e;
-	uint64_t oid = hdr->oid;
+	uint64_t oid = hdr.oid;
 	int copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
 	int done, nr_fds, local = 0;
@@ -422,7 +419,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 	e = req->entry;
 	nr = req->nr_nodes;
 
-	copies = hdr->copies;
+	copies = hdr.copies;
 
 	/* temporary hack */
 	if (!copies)
@@ -436,9 +433,9 @@ static int forward_write_obj_req(struct request *req, int idx)
 	for (i = 0; i < ARRAY_SIZE(pfds); i++)
 		pfds[i].fd = -1;
 
-	hdr->flags |= SD_FLAG_CMD_DIRECT;
+	hdr.flags |= SD_FLAG_CMD_DIRECT;
 
-	wlen = hdr->data_length;
+	wlen = hdr.data_length;
 	rlen = 0;
 
 	for (i = 0; i < copies; i++) {
@@ -451,14 +448,14 @@ static int forward_write_obj_req(struct request *req, int idx)
 			continue;
 		}
 
-		fd = get_sheep_fd(e, n, hdr->epoch, idx);
+		fd = get_sheep_fd(e, n, hdr.epoch, idx);
 		if (fd < 0) {
 			eprintf("failed to connect to %s:%"PRIu32"\n", name, e[n].port);
 			ret = SD_RES_NETWORK_ERROR;
 			goto out;
 		}
 
-		ret = send_req(fd, (struct sd_req *)hdr, req->data, &wlen);
+		ret = send_req(fd, (struct sd_req *)&hdr, req->data, &wlen);
 		if (ret) { /* network errors */
 			ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %"PRIu32"\n", ret);
@@ -471,7 +468,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 	}
 
 	if (local) {
-		ret = store_queue_request_local(req, hdr->epoch);
+		ret = store_queue_request_local(req, hdr.epoch);
 		rsp->result = ret;
 
 		if (nr_fds == 0) {
@@ -532,8 +529,6 @@ again:
 
 	ret = SD_RES_SUCCESS;
 out:
-	hdr->flags &= ~SD_FLAG_CMD_DIRECT;
-
 	return ret;
 }
 
