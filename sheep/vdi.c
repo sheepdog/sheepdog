@@ -429,7 +429,7 @@ again:
 	vid = ((uint32_t *)dw->buf)[done++];
 	ret = read_object(entries, nr_entries, dw->epoch,
 			  vid_to_vdi_oid(vid), (void *)&inode, sizeof(inode),
-			  0, nr_entries);
+			  0, sys->nr_sobjs);
 
 	if (ret != sizeof(inode)) {
 		eprintf("cannot find vdi object\n");
@@ -461,7 +461,7 @@ static uint64_t get_vdi_root(struct sheepdog_node_list_entry *entries,
 next:
 	ret = read_object(entries, nr_entries, epoch,
 			  vid_to_vdi_oid(vid),
-			  (void *)&inode, sizeof(inode), 0, nr_entries);
+			  (void *)&inode, sizeof(inode), 0, sys->nr_sobjs);
 
 	if (ret != sizeof(inode)) {
 		eprintf("cannot find vdi object\n");
