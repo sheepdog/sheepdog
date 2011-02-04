@@ -323,8 +323,8 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t sn
 		return SD_RES_EIO;
 
 	ret = start_deletion(*vid, epoch);
-	if (ret < 0)
-		return SD_RES_NO_MEM;
+	if (ret != SD_RES_SUCCESS)
+		return ret;
 
 	return SD_RES_SUCCESS;
 }
@@ -485,12 +485,12 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 
 	dw = zalloc(sizeof(struct deletion_work));
 	if (!dw)
-		return -1;
+		return SD_RES_NO_MEM;
 
 	dw->buf = zalloc(1 << 20); /* FIXME: handle larger buffer */
 	if (!dw->buf) {
 		free(dw);
-		return -1;
+		return SD_RES_NO_MEM;
 	}
 
 	dw->count = 0;
@@ -504,24 +504,24 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 
 	root_vid = get_vdi_root(entries, nr_nodes, dw->epoch, dw->vid);
 	if (!root_vid)
-		return -1;
+		return SD_RES_EIO;
 
 	ret = fill_vdi_list(dw, entries, nr_nodes, root_vid);
 	if (ret)
-		return 0;
+		return SD_RES_SUCCESS;
 
 	dprintf("%d\n", dw->count);
 
 	if (dw->count == 0)
-		return 0;
+		return SD_RES_SUCCESS;
 
 	if (!list_empty(&deletion_work_list)) {
 		list_add_tail(&dw->dw_siblings, &deletion_work_list);
-		return 0;
+		return SD_RES_SUCCESS;
 	}
 
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
 	queue_work(&dw->work);
 
-	return 0;
+	return SD_RES_SUCCESS;
 }
