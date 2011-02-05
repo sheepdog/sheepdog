@@ -664,13 +664,6 @@ int read_object(struct sheepdog_node_list_entry *e,
 				return ret;
 			}
 
-			/* fix replication consistency */
-			if (nr > 1) {
-				if (write_object(e, nodes, node_version, oid,
-						 data, datalen, offset, nr, 0))
-					eprintf("failed to fix obj consistency\n");
-			}
-
 			return ret;
 		}
 
