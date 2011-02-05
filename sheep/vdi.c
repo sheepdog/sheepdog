@@ -47,7 +47,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 			ret = read_object(entries, nr_nodes, epoch,
 					  vid_to_vdi_oid(cur_vid), (char *)&cur,
-					  sizeof(cur), 0, copies);
+					  SD_INODE_HEADER_SIZE, 0, copies);
 			if (ret < 0) {
 				vprintf(SDOG_ERR "failed\n");
 				return SD_RES_BASE_VDI_READ;
@@ -90,7 +90,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (is_snapshot && cur_vid != base_vid) {
 		ret = write_object(entries, nr_nodes, epoch,
 				   vid_to_vdi_oid(cur_vid), (char *)&cur,
-				   sizeof(cur), 0, copies, 0);
+				   SD_INODE_HEADER_SIZE, 0, copies, 0);
 		if (ret < 0) {
 			vprintf(SDOG_ERR "failed\n");
 			return SD_RES_BASE_VDI_READ;
@@ -100,7 +100,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (base_vid) {
 		ret = write_object(entries, nr_nodes, epoch,
 				   vid_to_vdi_oid(base_vid), (char *)&base,
-				   sizeof(base), 0, copies, 0);
+				   SD_INODE_HEADER_SIZE, 0, copies, 0);
 		if (ret < 0) {
 			vprintf(SDOG_ERR "failed\n");
 			return SD_RES_BASE_VDI_WRITE;
@@ -135,7 +135,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 	for (i = start; i >= end; i--) {
 		ret = read_object(entries, nr_nodes, epoch,
 				  vid_to_vdi_oid(i), (char *)&inode,
-				  sizeof(inode), 0, nr_reqs);
+				  SD_INODE_HEADER_SIZE, 0, nr_reqs);
 		if (ret < 0)
 			return SD_RES_EIO;
 
@@ -313,16 +313,16 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t sn
 		nr_reqs = nr_nodes;
 
 	ret = read_object(entries, nr_nodes, epoch,
-			  vid_to_vdi_oid(*vid), (char *)&inode, sizeof(inode), 0,
-			  nr_reqs);
+			  vid_to_vdi_oid(*vid), (char *)&inode,
+			  SD_INODE_HEADER_SIZE, 0, nr_reqs);
 	if (ret < 0)
 		return SD_RES_EIO;
 
 	memset(inode.name, 0, sizeof(inode.name));
 
 	ret = write_object(entries, nr_nodes, epoch,
-			   vid_to_vdi_oid(*vid), (char *)&inode, sizeof(inode), 0,
-			   nr_reqs, 0);
+			   vid_to_vdi_oid(*vid), (char *)&inode,
+			   SD_INODE_HEADER_SIZE, 0, nr_reqs, 0);
 	if (ret < 0)
 		return SD_RES_EIO;
 
@@ -432,8 +432,8 @@ static int fill_vdi_list(struct deletion_work *dw,
 again:
 	vid = ((uint32_t *)dw->buf)[done++];
 	ret = read_object(entries, nr_entries, dw->epoch,
-			  vid_to_vdi_oid(vid), (void *)&inode, sizeof(inode),
-			  0, sys->nr_sobjs);
+			  vid_to_vdi_oid(vid), (void *)&inode,
+			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
 	if (ret != sizeof(inode)) {
 		eprintf("cannot find vdi object\n");
@@ -464,8 +464,8 @@ static uint64_t get_vdi_root(struct sheepdog_node_list_entry *entries,
 
 next:
 	ret = read_object(entries, nr_entries, epoch,
-			  vid_to_vdi_oid(vid),
-			  (void *)&inode, sizeof(inode), 0, sys->nr_sobjs);
+			  vid_to_vdi_oid(vid), (void *)&inode,
+			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
 	if (ret != sizeof(inode)) {
 		eprintf("cannot find vdi object\n");
