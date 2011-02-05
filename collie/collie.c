@@ -165,7 +165,8 @@ struct cluster_cmd_data {
 
 struct vdi_cmd_data {
 	unsigned int index;
-	int snapshot;
+	int snapshot_id;
+	char snapshot_tag[SD_MAX_VDI_TAG_LEN];
 } vdi_cmd_data = { ~0, };
 
 static int cluster_format(int argc, char **argv)
@@ -241,7 +242,8 @@ static int shutdown_sheepdog(void)
 	return 0;
 }
 
-typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, uint32_t tag, uint32_t flags,
+typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, char *tag,
+				  uint32_t snapid, uint32_t flags,
 				  struct sheepdog_inode *i, void *data);
 
 static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
@@ -340,7 +342,7 @@ static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 			}
 		}
 
-		func(i.vdi_id, i.name, i.snap_id, 0, &i, data);
+		func(i.vdi_id, i.name, i.tag, i.snap_id, 0, &i, data);
 	next:
 		close(fd);
 	}
@@ -348,7 +350,7 @@ static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	return 0;
 }
 
-static void print_vdi_list(uint32_t vid, char *name, uint32_t tag,
+static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	int idx;
@@ -381,12 +383,12 @@ static void print_vdi_list(uint32_t vid, char *name, uint32_t tag,
 
 	if (!data || strcmp(name, data) == 0) {
 		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
-		       is_current(i) ? ' ' : 's', name, tag,
+		       is_current(i) ? ' ' : 's', name, snapid,
 		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
 	}
 }
 
-static void print_vdi_tree(uint32_t vid, char *name, uint32_t tag,
+static void print_vdi_tree(uint32_t vid, char *name, char * tag, uint32_t snapid,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	time_t ti;
@@ -406,7 +408,7 @@ static void print_vdi_tree(uint32_t vid, char *name, uint32_t tag,
 	add_vdi_tree(name, buf, vid, i->parent_vdi_id, highlight && is_current(i));
 }
 
-static void print_vdi_graph(uint32_t vid, char *name, uint32_t tag,
+static void print_vdi_graph(uint32_t vid, char *name, char * tag, uint32_t snapid,
 			    uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	time_t ti;
@@ -430,7 +432,7 @@ static void print_vdi_graph(uint32_t vid, char *name, uint32_t tag,
 	       "size: %10s\\n"
 	       "date: %10s\\n"
 	       "time: %10s",
-	       name, tag, size_str, dbuf, tbuf);
+	       name, snapid, size_str, dbuf, tbuf);
 
 	if (is_current(i))
 		printf("\",\n    color=\"red\"\n  ];\n\n");
@@ -439,8 +441,9 @@ static void print_vdi_graph(uint32_t vid, char *name, uint32_t tag,
 
 }
 
-static void cal_total_vdi_size(uint32_t vid, char *name, uint32_t tag,
-			       uint32_t flags, struct sheepdog_inode *i, void *data)
+static void cal_total_vdi_size(uint32_t vid, char *name, char * tag,
+			       uint32_t snapid, uint32_t flags,
+			       struct sheepdog_inode *i, void *data)
 {
 	uint64_t *size = data;
 
@@ -450,18 +453,22 @@ static void cal_total_vdi_size(uint32_t vid, char *name, uint32_t tag,
 
 struct get_vid_info {
 	char *name;
+	char *tag;
 	uint32_t vid;
+	uint32_t snapid;
 };
 
-static void get_oid(uint32_t vid, char *name, uint32_t tag,
+static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
 		    uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	struct get_vid_info *info = data;
-	int snapshot_id = vdi_cmd_data.snapshot;
 
 	if (info->name) {
-		if (snapshot_id) {
-			if (!strcmp(name, info->name) && tag == snapshot_id)
+		if (info->tag) {
+			if (!strcmp(name, info->name) && !strcmp(tag, info->tag))
+				info->vid = vid;
+		} else if (info->snapid) {
+			if (!strcmp(name, info->name) && snapid == info->snapid)
 				info->vid = vid;
 		} else {
 			if (!strcmp(name, info->name))
@@ -717,7 +724,7 @@ static int vdi_delete(int argc, char **argv)
 	struct sd_vdi_req hdr;
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
 	unsigned rlen, wlen;
-	char vdiname[SD_MAX_VDI_LEN];
+	char vdiname[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
@@ -729,11 +736,14 @@ static int vdi_delete(int argc, char **argv)
 	wlen = sizeof(vdiname);
 
 	hdr.opcode = SD_OP_DEL_VDI;
-	hdr.snapid = vdi_cmd_data.snapshot;
+	hdr.snapid = vdi_cmd_data.snapshot_id;
 	hdr.epoch = node_list_version;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
-	strncpy(vdiname, data, sizeof(vdiname));
+	memset(vdiname, 0, sizeof(vdiname));
+	strncpy(vdiname, data, SD_MAX_VDI_LEN);
+	strncpy(vdiname + SD_MAX_VDI_LEN, vdi_cmd_data.snapshot_tag,
+		SD_MAX_VDI_TAG_LEN);
 
 	ret = exec_req(fd, (struct sd_req *)&hdr, vdiname, &wlen, &rlen);
 	close(fd);
@@ -759,8 +769,11 @@ static int vdi_object(int argc, char **argv)
 	struct get_vid_info info;
 	uint32_t vid;
 
+	memset(&info, 0, sizeof(info));
 	info.name = vdiname;
+	info.tag = vdi_cmd_data.snapshot_tag;
 	info.vid = 0;
+	info.snapid = vdi_cmd_data.snapshot_id;
 
 	ret = parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info);
 
@@ -828,7 +841,10 @@ static int vdi_parser(int ch, char *opt)
 		vdi_cmd_data.index = atoi(opt);
 		break;
 	case 's':
-		vdi_cmd_data.snapshot = atoi(opt);
+		vdi_cmd_data.snapshot_id = atoi(opt);
+		if (vdi_cmd_data.snapshot_id == 0)
+			strncpy(vdi_cmd_data.snapshot_tag, opt,
+				sizeof(vdi_cmd_data.snapshot_tag));
 		break;
 	}
 

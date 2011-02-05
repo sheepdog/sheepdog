@@ -287,7 +287,7 @@ int start_deletion(uint32_t vid, uint32_t epoch);
 
 int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid)
 {
-	char *name = data;
+	char *name = data, *tag;
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
@@ -295,10 +295,14 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t sn
 	int nr_nodes, nr_reqs;
 	static struct sheepdog_inode inode;
 
-	if (data_len != SD_MAX_VDI_LEN)
+	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
+		tag = data + SD_MAX_VDI_LEN;
+	else if (data_len == SD_MAX_VDI_LEN)
+		tag = NULL;
+	else
 		return SD_RES_INVALID_PARMS;
 
-	ret = do_lookup_vdi(epoch, name, strlen(name), vid, NULL, snapid,
+	ret = do_lookup_vdi(epoch, name, strlen(name), vid, tag, snapid,
 			     &dummy0, &dummy1, &dummy2);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
