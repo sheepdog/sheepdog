@@ -645,7 +645,7 @@ int read_object(struct sheepdog_node_list_entry *e,
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	char name[128];
-	int i = 0, n, fd, ret;
+	int i = 0, n, fd, ret, last_error = SD_RES_SUCCESS;
 
 	if (nr > nodes)
 		nr = nodes;
@@ -680,7 +680,7 @@ int read_object(struct sheepdog_node_list_entry *e,
 		if (fd < 0) {
 			printf("%s(%d): %s, %m\n", __func__, __LINE__,
 			       name);
-			return -1;
+			return -SD_RES_EIO;
 		}
 
 		memset(&hdr, 0, sizeof(hdr));
@@ -695,13 +695,18 @@ int read_object(struct sheepdog_node_list_entry *e,
 		ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
 		close(fd);
 
-		if (!ret) {
-			if (rsp->result == SD_RES_SUCCESS)
-				return rsp->data_length;
+		if (ret) {
+			last_error = SD_RES_EIO;
+			continue;
 		}
+
+		if (rsp->result == SD_RES_SUCCESS)
+			return rsp->data_length;
+
+		last_error = rsp->result;
 	}
 
-	return -1;
+	return -last_error;
 }
 
 int remove_object(struct sheepdog_node_list_entry *e,

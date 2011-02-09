@@ -605,7 +605,10 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 
 	ret = store_queue_request_local(&req, epoch);
 
-	if (ret != 0 || rsp->data_length != datalen)
+	if (ret != 0)
+		return -SD_RES_EIO;
+
+	if (rsp->data_length != datalen)
 		return -rsp->result;
 
 	return rsp->data_length;
