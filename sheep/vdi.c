@@ -535,3 +535,61 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 
 	return SD_RES_SUCCESS;
 }
+
+int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
+		 uint32_t *attrid, int creat, int excl)
+{
+	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	char attr_buf[SD_ATTR_HEADER_SIZE], inode_buf[SD_INODE_HEADER_SIZE];
+	uint64_t oid;
+	uint32_t end;
+	int ret, nr_nodes, copies;
+
+	if (data_len != SD_ATTR_HEADER_SIZE)
+		return SD_RES_INVALID_PARMS;
+
+	nr_nodes = get_ordered_sd_node_list(entries);
+
+	ret = read_object(entries, nr_nodes, epoch, vid_to_vdi_oid(vid),
+			  inode_buf, sizeof(inode_buf), 0, sys->nr_sobjs);
+	if (ret != SD_INODE_HEADER_SIZE) {
+		eprintf("failed to read vdi object, %"PRIx32"\n", vid);
+		return -ret;
+	}
+
+	copies = ((struct sheepdog_inode *)inode_buf)->nr_copies;
+
+	*attrid = fnv_64a_buf(data, data_len, FNV1A_64_INIT);
+	*attrid &= (UINT64_C(1) << VDI_SPACE_SHIFT) - 1;
+
+	end = *attrid - 1;
+	while (*attrid != end) {
+		oid = vid_to_attr_oid(vid, *attrid);
+		ret = read_object(entries, nr_nodes, epoch, oid, attr_buf,
+				  sizeof(attr_buf), 0, copies);
+
+		if (ret == -SD_RES_NO_OBJ && creat) {
+			ret = write_object(entries, nr_nodes, epoch, oid, data,
+					   data_len, 0, copies, 1);
+			if (ret)
+				return SD_RES_EIO;
+
+			return SD_RES_SUCCESS;
+		}
+
+		if (ret < 0)
+			return -ret;
+
+		if (memcmp(attr_buf, data, sizeof(attr_buf)) == 0) {
+			if (excl)
+				return SD_RES_VDI_EXIST;
+			else
+				return SD_RES_SUCCESS;
+		}
+
+		(*attrid)++;
+	}
+
+	dprintf("there is no space for new vdis\n");
+	return SD_RES_FULL_VDI;
+}

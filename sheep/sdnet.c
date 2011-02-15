@@ -106,6 +106,7 @@ static void __done(struct work *work, int idx)
 	case SD_OP_GET_VDI_INFO:
 	case SD_OP_MAKE_FS:
 	case SD_OP_SHUTDOWN:
+	case SD_OP_GET_VDI_ATTR:
 		/* request is forwarded to cpg group */
 		return;
 	}
@@ -232,6 +233,7 @@ static void queue_request(struct request *req)
 	case SD_OP_MAKE_FS:
 	case SD_OP_SHUTDOWN:
 	case SD_OP_STAT_CLUSTER:
+	case SD_OP_GET_VDI_ATTR:
 		req->work.fn = cluster_queue_request;
 		break;
 	case SD_OP_READ_VDIS:

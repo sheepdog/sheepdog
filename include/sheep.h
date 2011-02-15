@@ -16,7 +16,7 @@
 #include "list.h"
 #include "net.h"
 
-#define SD_SHEEP_PROTO_VER 0x01
+#define SD_SHEEP_PROTO_VER 0x02
 
 #define SD_MAX_NODES 1024
 #define SD_MAX_VMS   4096 /* FIXME: should be removed */
@@ -30,9 +30,12 @@
 #define SD_OP_STAT_SHEEP     0x86
 #define SD_OP_STAT_CLUSTER   0x87
 #define SD_OP_KILL_NODE      0x88
+#define SD_OP_GET_VDI_ATTR   0x89
 
 #define SD_FLAG_CMD_DIRECT   0x10
 #define SD_FLAG_CMD_RECOVERY 0x20
+#define SD_FLAG_CMD_CREAT    0x40
+#define SD_FLAG_CMD_EXCL     0x80
 
 #define SD_RES_OLD_NODE_VER  0x41 /* Remote node has an old epoch */
 #define SD_RES_NEW_NODE_VER  0x42 /* Remote node has a new epoch */

@@ -55,6 +55,21 @@ _collie_vdi_object()
     esac
 }
 
+_collie_vdi_setattr()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-d --delete -x --exclusive" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
 _collie_cluster()
 {
     local opts
@@ -103,7 +118,7 @@ _collie_node()
 _collie_vdi()
 {
     local opts
-    opts="list tree graph delete object"
+    opts="list tree graph delete object setattr getattr"
 
     case "$1" in
         list)
@@ -117,6 +132,11 @@ _collie_vdi()
             ;;
         object)
             _collie_vdi_object
+            ;;
+        setattr)
+            _collie_vdi_setattr
+            ;;
+        getattr)
             ;;
         "")
             COMPREPLY=($( compgen \

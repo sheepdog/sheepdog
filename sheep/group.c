@@ -632,7 +632,7 @@ static void vdi_op(struct vdi_op_message *msg)
 	struct sd_vdi_rsp *rsp = &msg->rsp;
 	void *data = msg->data;
 	int ret = SD_RES_SUCCESS;
-	uint32_t vid = 0, nr_copies = sys->nr_sobjs;
+	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_sobjs;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
@@ -655,6 +655,16 @@ static void vdi_op(struct vdi_op_message *msg)
 		if (ret != SD_RES_SUCCESS)
 			break;
 		break;
+	case SD_OP_GET_VDI_ATTR:
+		ret = lookup_vdi(hdr->epoch, data,
+				 min(SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN, hdr->data_length),
+				 &vid, hdr->snapid, &nr_copies);
+		if (ret != SD_RES_SUCCESS)
+			break;
+		ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,
+				   &attrid, hdr->flags & SD_FLAG_CMD_CREAT,
+				   hdr->flags & SD_FLAG_CMD_EXCL);
+		break;
 	case SD_OP_RELEASE_VDI:
 		break;
 	case SD_OP_MAKE_FS:
@@ -669,6 +679,7 @@ static void vdi_op(struct vdi_op_message *msg)
 	}
 
 	rsp->vdi_id = vid;
+	rsp->attr_id = attrid;
 	rsp->copies = nr_copies;
 	rsp->result = ret;
 }
@@ -700,6 +711,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	case SD_OP_LOCK_VDI:
 	case SD_OP_RELEASE_VDI:
 	case SD_OP_GET_VDI_INFO:
+	case SD_OP_GET_VDI_ATTR:
 		break;
 	case SD_OP_MAKE_FS:
 		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;

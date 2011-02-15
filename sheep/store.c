@@ -606,10 +606,10 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	ret = store_queue_request_local(&req, epoch);
 
 	if (ret != 0)
-		return -SD_RES_EIO;
+		return -ret;
 
 	if (rsp->data_length != datalen)
-		return -rsp->result;
+		return -SD_RES_EIO;
 
 	return rsp->data_length;
 }
@@ -741,6 +741,9 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		break;
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_CREATE_AND_WRITE_OBJ:
+		if (hdr->flags & SD_FLAG_CMD_TRUNCATE)
+			ftruncate(fd, hdr->offset + hdr->data_length);
+
 		if (!is_data_obj(oid)) {
 			jd.jdf_epoch = epoch;
 			jd.jdf_oid = oid;

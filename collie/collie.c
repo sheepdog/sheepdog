@@ -56,7 +56,7 @@ static void usage(int status)
 Command syntax:\n\
   cluster (info|format|shutdown)\n\
   node (info|list)\n\
-  vdi (list|tree|graph|delete|object)\n\
+  vdi (list|tree|graph|delete|object|setattr|getattr)\n\
 \n\
 Common parameters:\n\
   -a, --address           specify the daemon address (default: localhost)\n\
@@ -167,6 +167,8 @@ struct vdi_cmd_data {
 	unsigned int index;
 	int snapshot_id;
 	char snapshot_tag[SD_MAX_VDI_TAG_LEN];
+	int exclusive;
+	int delete;
 } vdi_cmd_data = { ~0, };
 
 static int cluster_format(int argc, char **argv)
@@ -817,12 +819,255 @@ static int vdi_object(int argc, char **argv)
 	return 0;
 }
 
+static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
+			     char *key, uint32_t *vid, uint64_t *oid,
+			     unsigned int *nr_copies, int creat, int excl)
+{
+	struct sd_vdi_req hdr;
+	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	int fd, ret;
+	unsigned int wlen, rlen;
+	char buf[SD_ATTR_HEADER_SIZE];
+
+	memset(buf, 0, sizeof(buf));
+	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
+	strncpy(buf + SD_MAX_VDI_LEN, vdi_cmd_data.snapshot_tag,
+		SD_MAX_VDI_TAG_LEN);
+	memcpy(buf + SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN,
+	       &vdi_cmd_data.snapshot_id, sizeof(uint32_t));
+	strncpy(buf + SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN + sizeof(uint32_t),
+		key, SD_MAX_VDI_ATTR_KEY_LEN);
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0) {
+		fprintf(stderr, "failed to connect\n\n");
+		return SD_RES_EIO;
+	}
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_GET_VDI_ATTR;
+	wlen = SD_ATTR_HEADER_SIZE;
+	rlen = 0;
+	hdr.proto_ver = SD_PROTO_VER;
+	hdr.data_length = wlen;
+	hdr.snapid = vdi_cmd_data.snapshot_id;
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	if (creat)
+		hdr.flags |= SD_FLAG_CMD_CREAT;
+	if (excl)
+		hdr.flags |= SD_FLAG_CMD_EXCL;
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	if (ret) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		ret = rsp->result;
+		goto out;
+	}
+
+	*vid = rsp->vdi_id;
+	*oid = vid_to_attr_oid(rsp->vdi_id, rsp->attr_id);
+	*nr_copies = rsp->copies;
+
+	ret = SD_RES_SUCCESS;
+out:
+	close(fd);
+	return ret;
+}
+
+static int vdi_setattr(int argc, char **argv)
+{
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	char name[128];
+	int i = 0, n, fd, ret;
+	uint64_t oid, attr_oid = 0;
+	uint32_t vid = 0, nr_copies = 0;
+	char *vdiname = argv[optind++], *key, *value;
+	unsigned int wlen = 0, rlen = 0;
+	uint64_t offset;
+
+	key = argv[optind++];
+	if (!key) {
+		fprintf(stderr, "please specify the name of key\n");
+		return 1;
+	}
+
+	value = argv[optind++];
+	if (!value) {
+		value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
+		if (!value) {
+			fprintf(stderr, "failed to allocate memory\n");
+			return 1;
+		}
+
+		offset = 0;
+reread:
+		ret = read(STDIN_FILENO, value + offset,
+			   SD_MAX_VDI_ATTR_VALUE_LEN - offset);
+		if (ret < 0) {
+			fprintf(stderr, "failed to read from stdin, %m\n");
+			return 1;
+		}
+		if (ret > 0) {
+			offset += ret;
+			goto reread;
+		}
+	}
+
+	ret = find_vdi_attr_oid(vdiname, vdi_cmd_data.snapshot_tag,
+				vdi_cmd_data.snapshot_id, key, &vid, &attr_oid,
+				&nr_copies, !vdi_cmd_data.delete,
+				vdi_cmd_data.exclusive);
+	if (ret) {
+		if (ret == SD_RES_VDI_EXIST) {
+			fprintf(stderr, "the attribute already exists, %s\n", key);
+		} else if (ret == SD_RES_NO_OBJ) {
+			fprintf(stderr, "no such attribute, %s\n", key);
+		} else
+			fprintf(stderr, "failed to find attr oid, %s\n",
+				sd_strerror(ret));
+		return 1;
+	}
+
+	oid = attr_oid;
+	for (i = 0; i < nr_copies; i++) {
+		rlen = 0;
+		if (vdi_cmd_data.delete)
+			wlen = 1;
+		else
+			wlen = strlen(value);
+
+		n = obj_to_sheep(node_list_entries, nr_nodes, oid, i);
+
+		addr_to_str(name, sizeof(name), node_list_entries[n].addr, 0);
+
+		fd = connect_to(name, node_list_entries[n].port);
+		if (fd < 0) {
+			printf("%s(%d): %s, %m\n", __func__, __LINE__,
+			       name);
+			break;
+		}
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.epoch = node_list_version;
+		hdr.opcode = SD_OP_WRITE_OBJ;
+		hdr.oid = oid;
+
+		hdr.data_length = wlen;
+		if (vdi_cmd_data.delete) {
+			hdr.flags =  SD_FLAG_CMD_DIRECT | SD_FLAG_CMD_WRITE;
+			hdr.offset = offsetof(struct sheepdog_inode, name);
+			value = (char *)"";
+		} else {
+			hdr.flags =  SD_FLAG_CMD_DIRECT | SD_FLAG_CMD_WRITE |
+				SD_FLAG_CMD_TRUNCATE;
+			hdr.offset = SD_ATTR_HEADER_SIZE;
+		}
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, value, &wlen, &rlen);
+		close(fd);
+
+		if (ret) {
+			fprintf(stderr, "failed to set attribute\n");
+			return 1;
+		}
+		if (rsp->result != SD_RES_SUCCESS) {
+			fprintf(stderr, "failed to set attribute, %s\n",
+				sd_strerror(rsp->result));
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static int vdi_getattr(int argc, char **argv)
+{
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	char name[128];
+	int i = 0, n, fd, ret;
+	uint64_t oid, attr_oid = 0;
+	uint32_t vid = 0, nr_copies = 0;
+	char *vdiname = argv[optind++], *key, *value;
+	unsigned int wlen = 0, rlen = 0;
+
+	key = argv[optind++];
+	if (!key) {
+		fprintf(stderr, "please specify the name of key\n");
+		return 1;
+	}
+
+	ret = find_vdi_attr_oid(vdiname, vdi_cmd_data.snapshot_tag,
+				vdi_cmd_data.snapshot_id, key, &vid, &attr_oid,
+				&nr_copies, 0, 0);
+	if (ret == SD_RES_NO_OBJ) {
+		fprintf(stderr, "no such attribute, %s\n", key);
+		return 1;
+	} else if (ret) {
+		fprintf(stderr, "failed to find attr oid, %s\n",
+			sd_strerror(ret));
+		return 1;
+	}
+
+	oid = attr_oid;
+	value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
+	if (!value) {
+		fprintf(stderr, "failed to allocate memory\n");
+		return 1;
+	}
+	for (i = 0; i < nr_copies; i++) {
+		rlen = SD_MAX_VDI_ATTR_VALUE_LEN;
+		wlen = 0;
+
+		n = obj_to_sheep(node_list_entries, nr_nodes, oid, i);
+
+		addr_to_str(name, sizeof(name), node_list_entries[n].addr, 0);
+
+		fd = connect_to(name, node_list_entries[n].port);
+		if (fd < 0) {
+			printf("%s(%d): %s, %m\n", __func__, __LINE__,
+			       name);
+			goto out;
+		}
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.epoch = node_list_version;
+		hdr.opcode = SD_OP_READ_OBJ;
+		hdr.oid = oid;
+
+		hdr.data_length = rlen;
+		hdr.flags =  SD_FLAG_CMD_DIRECT;
+		hdr.offset = SD_ATTR_HEADER_SIZE;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, value, &wlen, &rlen);
+		close(fd);
+
+		if (!ret) {
+			if (rsp->result == SD_RES_SUCCESS) {
+				printf("%s", value);
+				free(value);
+				return 0;
+			}
+		}
+	}
+out:
+	free(value);
+	return 1;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"delete", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", SUBCMD_FLAG_NEED_NOEDLIST, vdi_list},
 	{"tree", SUBCMD_FLAG_NEED_NOEDLIST, vdi_tree},
 	{"graph", SUBCMD_FLAG_NEED_NOEDLIST, vdi_graph},
 	{"object", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
+	{"setattr", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
+	{"getattr", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
 	{NULL,},
 };
 
@@ -831,6 +1076,8 @@ static struct option vdi_long_options[] =
 	COMMON_LONG_OPTIONS
 	{"index", required_argument, NULL, 'i'},
 	{"snapshot", required_argument, NULL, 's'},
+	{"exclusive", no_argument, NULL, 'x'},
+	{"delete", no_argument, NULL, 'd'},
 	{NULL, 0, NULL, 0},
 };
 
@@ -845,6 +1092,12 @@ static int vdi_parser(int ch, char *opt)
 		if (vdi_cmd_data.snapshot_id == 0)
 			strncpy(vdi_cmd_data.snapshot_tag, opt,
 				sizeof(vdi_cmd_data.snapshot_tag));
+		break;
+	case 'x':
+		vdi_cmd_data.exclusive = 1;
+		break;
+	case 'd':
+		vdi_cmd_data.delete = 1;
 		break;
 	}
 
@@ -954,7 +1207,7 @@ static struct {
 } commands[] = {
 	{"vdi", vdi_cmd,
 	 vdi_long_options,
-	 COMMON_SHORT_OPTIONS "i:s:",
+	 COMMON_SHORT_OPTIONS "i:s:xd",
 	 vdi_parser,},
 	{"node", node_cmd,},
 	{"cluster", cluster_cmd,

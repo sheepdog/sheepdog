@@ -154,6 +154,9 @@ int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
+int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
+		 uint32_t *attrid, int creat, int excl);
+
 int setup_ordered_sd_node_list(struct request *req);
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 int is_access_to_busy_objects(uint64_t oid);
