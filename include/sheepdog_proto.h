@@ -154,7 +154,8 @@ struct sd_vdi_rsp {
 	uint32_t        result;
 	uint32_t        rsvd;
 	uint32_t        vdi_id;
-	uint32_t        pad[5];
+	uint32_t        copies;
+	uint32_t        pad[4];
 };
 
 struct sheepdog_inode {

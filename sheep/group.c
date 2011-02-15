@@ -632,16 +632,17 @@ static void vdi_op(struct vdi_op_message *msg)
 	struct sd_vdi_rsp *rsp = &msg->rsp;
 	void *data = msg->data;
 	int ret = SD_RES_SUCCESS;
-	uint32_t vid = 0;
+	uint32_t vid = 0, nr_copies = sys->nr_sobjs;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
 		ret = add_vdi(hdr->epoch, data, hdr->data_length, hdr->vdi_size, &vid,
 			      hdr->base_vdi_id, hdr->copies,
-			      hdr->snapid);
+			      hdr->snapid, &nr_copies);
 		break;
 	case SD_OP_DEL_VDI:
-		ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid, hdr->snapid);
+		ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid,
+			      hdr->snapid, &nr_copies);
 		break;
 	case SD_OP_LOCK_VDI:
 	case SD_OP_GET_VDI_INFO:
@@ -649,7 +650,8 @@ static void vdi_op(struct vdi_op_message *msg)
 			ret = SD_RES_VER_MISMATCH;
 			break;
 		}
-		ret = lookup_vdi(hdr->epoch, data, hdr->data_length, &vid, hdr->snapid);
+		ret = lookup_vdi(hdr->epoch, data, hdr->data_length, &vid,
+				 hdr->snapid, &nr_copies);
 		if (ret != SD_RES_SUCCESS)
 			break;
 		break;
@@ -667,6 +669,7 @@ static void vdi_op(struct vdi_op_message *msg)
 	}
 
 	rsp->vdi_id = vid;
+	rsp->copies = nr_copies;
 	rsp->result = ret;
 }
 

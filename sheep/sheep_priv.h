@@ -144,11 +144,13 @@ int init_store(const char *dir);
 
 int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies,
-	    int is_snapshot);
+	    int is_snapshot, unsigned int *nr_copies);
 
-int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid);
+int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
+	    uint32_t snapid, unsigned int *nr_copies);
 
-int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid);
+int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
+	       uint32_t snapid, unsigned int *nr_copies);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 

@@ -118,7 +118,8 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end,
 			  char *name, char *tag, uint32_t snapid, uint32_t *vid,
-			  unsigned long *deleted_nr, uint32_t *next_snap)
+			  unsigned long *deleted_nr, uint32_t *next_snap,
+			  unsigned int *nr_copies)
 {
 	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 	static struct sheepdog_inode inode;
@@ -154,6 +155,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 
 			*next_snap = inode.snap_id + 1;
 			*vid = inode.vdi_id;
+			*nr_copies = inode.nr_copies;
 			return SD_RES_SUCCESS;
 		}
 	}
@@ -167,7 +169,8 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 
 static int do_lookup_vdi(uint32_t epoch, char *name, int namelen, uint32_t *vid,
 			 char *tag, uint32_t snapid, uint32_t *next_snapid,
-			 unsigned long *right_nr,  unsigned long *deleted_nr)
+			 unsigned long *right_nr,  unsigned long *deleted_nr,
+			 unsigned int *nr_copies)
 {
 	int ret;
 	unsigned long nr, start_nr;
@@ -185,7 +188,7 @@ static int do_lookup_vdi(uint32_t epoch, char *name, int namelen, uint32_t *vid,
 	right_side:
 		/* look up on the right side of the hash point */
 		ret = find_first_vdi(epoch, nr - 1, start_nr, name, tag, snapid, vid,
-				     deleted_nr, next_snapid);
+				     deleted_nr, next_snapid, nr_copies);
 		return ret;
 	} else {
 		/* round up... bitmap search from the head of the bitmap */
@@ -196,7 +199,7 @@ static int do_lookup_vdi(uint32_t epoch, char *name, int namelen, uint32_t *vid,
 		else if (nr) {
 			/* look up on the left side of the hash point */
 			ret = find_first_vdi(epoch, nr - 1, 0, name, tag, snapid, vid,
-					     deleted_nr, next_snapid);
+					     deleted_nr, next_snapid, nr_copies);
 			if (ret == SD_RES_NO_VDI)
 				; /* we need to go to the right side */
 			else
@@ -208,7 +211,8 @@ static int do_lookup_vdi(uint32_t epoch, char *name, int namelen, uint32_t *vid,
 	}
 }
 
-int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid)
+int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
+	       uint32_t snapid, unsigned int *nr_copies)
 {
 	char *name = data, *tag;
 	uint32_t dummy0;
@@ -222,11 +226,12 @@ int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t
 		return SD_RES_INVALID_PARMS;
 
 	return do_lookup_vdi(epoch, name, strlen(name), vid, tag, snapid,
-			     &dummy0, &dummy1, &dummy2);
+			     &dummy0, &dummy1, &dummy2, nr_copies);
 }
 
 int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
-	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies, int is_snapshot)
+	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies,
+	    int is_snapshot, unsigned int *nr_copies)
 {
 	uint32_t cur_vid;
 	uint32_t next_snapid;
@@ -240,7 +245,7 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	name = data;
 
 	ret = do_lookup_vdi(epoch, name, strlen(name), &cur_vid, NULL, 0, &next_snapid,
-			    &right_nr, &deleted_nr);
+			    &right_nr, &deleted_nr, nr_copies);
 
 	if (is_snapshot) {
 		if (ret != SD_RES_SUCCESS) {
@@ -285,7 +290,8 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 
 int start_deletion(uint32_t vid, uint32_t epoch);
 
-int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t snapid)
+int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
+	    uint32_t snapid, unsigned int *nr_copies)
 {
 	char *name = data, *tag;
 	uint32_t dummy0;
@@ -303,7 +309,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid, uint32_t sn
 		return SD_RES_INVALID_PARMS;
 
 	ret = do_lookup_vdi(epoch, name, strlen(name), vid, tag, snapid,
-			     &dummy0, &dummy1, &dummy2);
+			    &dummy0, &dummy1, &dummy2, nr_copies);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
