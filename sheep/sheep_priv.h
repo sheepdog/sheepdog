@@ -81,7 +81,7 @@ struct request {
 	struct list_head r_wlist;
 	struct list_head pending_list;
 
-	uint64_t local_oid[2];
+	uint64_t local_oid;
 
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 	int nr_nodes;

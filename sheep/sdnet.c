@@ -72,11 +72,7 @@ static void setup_access_to_local_objects(struct request *req)
 	int copies;
 
 	if (hdr->flags & SD_FLAG_CMD_DIRECT) {
-		req->local_oid[0] = hdr->oid;
-
-		if (hdr->flags & SD_FLAG_CMD_COW)
-			req->local_oid[1] = hdr->cow_oid;
-
+		req->local_oid = hdr->oid;
 		return;
 	}
 
@@ -85,11 +81,7 @@ static void setup_access_to_local_objects(struct request *req)
 		copies = sys->nr_sobjs;
 
 	if (is_access_local(req->entry, req->nr_nodes, hdr->oid, copies))
-		req->local_oid[0] = hdr->oid;
-
-	if ((hdr->flags & SD_FLAG_CMD_COW) &&
-	    is_access_local(req->entry, req->nr_nodes, hdr->cow_oid, copies))
-		req->local_oid[1] = hdr->cow_oid;
+		req->local_oid = hdr->oid;
 }
 
 static void __done(struct work *work, int idx)

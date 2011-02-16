@@ -1248,7 +1248,7 @@ int is_access_to_busy_objects(uint64_t oid)
 				eprintf("bug\n");
 			continue;
 		}
-		if (oid == req->local_oid[0] || oid == req->local_oid[1])
+		if (oid == req->local_oid)
 				return 1;
 	}
 	return 0;
@@ -1262,12 +1262,10 @@ static int __is_access_to_busy_objects(struct request *req)
 		return 0;
 	}
 
-	if (is_access_to_busy_objects(req->local_oid[0]) ||
-	    is_access_to_busy_objects(req->local_oid[1]))
+	if (is_access_to_busy_objects(req->local_oid))
 		return 1;
 
-	if (is_recoverying_oid(req->local_oid[0]) ||
-	    is_recoverying_oid(req->local_oid[1]))
+	if (is_recoverying_oid(req->local_oid))
 		return 1;
 
 	return 0;
