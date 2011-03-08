@@ -441,7 +441,7 @@ again:
 			  vid_to_vdi_oid(vid), (void *)&inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
-	if (ret != sizeof(inode)) {
+	if (ret != SD_INODE_HEADER_SIZE) {
 		eprintf("cannot find vdi object\n");
 		return 0;
 	}
@@ -473,7 +473,7 @@ next:
 			  vid_to_vdi_oid(vid), (void *)&inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
-	if (ret != sizeof(inode)) {
+	if (ret != SD_INODE_HEADER_SIZE) {
 		eprintf("cannot find vdi object\n");
 		return 0;
 	}
