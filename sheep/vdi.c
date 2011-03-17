@@ -91,7 +91,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 		ret = write_object(entries, nr_nodes, epoch,
 				   vid_to_vdi_oid(cur_vid), (char *)&cur,
 				   SD_INODE_HEADER_SIZE, 0, copies, 0);
-		if (ret < 0) {
+		if (ret != 0) {
 			vprintf(SDOG_ERR "failed\n");
 			return SD_RES_BASE_VDI_READ;
 		}
@@ -101,7 +101,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 		ret = write_object(entries, nr_nodes, epoch,
 				   vid_to_vdi_oid(base_vid), (char *)&base,
 				   SD_INODE_HEADER_SIZE, 0, copies, 0);
-		if (ret < 0) {
+		if (ret != 0) {
 			vprintf(SDOG_ERR "failed\n");
 			return SD_RES_BASE_VDI_WRITE;
 		}
@@ -110,7 +110,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	ret = write_object(entries, nr_nodes, epoch,
 			   vid_to_vdi_oid(new_vid), (char *)&new, sizeof(new),
 			   0, copies, 1);
-	if (ret < 0)
+	if (ret != 0)
 		return SD_RES_VDI_WRITE;
 
 	return ret;
@@ -329,7 +329,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	ret = write_object(entries, nr_nodes, epoch,
 			   vid_to_vdi_oid(*vid), (char *)&inode,
 			   SD_INODE_HEADER_SIZE, 0, nr_reqs, 0);
-	if (ret < 0)
+	if (ret != 0)
 		return SD_RES_EIO;
 
 	ret = start_deletion(*vid, epoch);
