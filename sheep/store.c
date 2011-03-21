@@ -1058,6 +1058,13 @@ static int node_distance(int my, int her, int nr)
 	return (my + nr - her) % nr;
 }
 
+/*
+ * contains_node - checks that the node id is included in the target nodes
+ *
+ * The target nodes to store replicated objects are the first N nodes
+ * from the base_idx'th on the consistent hash ring, where N is the
+ * number of copies of objects.
+ */
 static int contains_node(uint64_t id, struct sheepdog_node_list_entry *entry,
 			 int nr, int base_idx)
 {
@@ -1087,6 +1094,38 @@ static LIST_HEAD(recovery_work_list);
 static struct recovery_work *recovering_work;
 static uint64_t blocking_oid;
 
+/*
+ * find_tgt_node - find the node from which we should recover objects
+ *
+ * This function compares two node lists, the current target nodes and
+ * the previous target nodes, and finds the node from the previous
+ * target nodes which corresponds to the copy_idx'th node of the
+ * current target nodes.  The correspondence is injective and
+ * maximizes the number of nodes which can recover objects locally.
+ *
+ * For example, consider the number of redundancy is 5, the consistent
+ * hash ring is {A, B, C, D, E, F}, and the node G is newly added.
+ * The parameters of this function are
+ *   old_entry = {A, B, C, D, E, F},    old_nr = 6, old_idx = 3
+ *   cur_entry = {A, B, C, D, E, F, G}, cur_nr = 7, cur_idx = 3
+ *
+ * In this case:
+ *   the previous target nodes: {D, E, F, A, B}
+ *     (the first 5 nodes from the 3rd node on the previous hash ring)
+ *   the current target nodes : {D, E, F, G, A}
+ *     (the first 5 nodes from the 3rd node on the current hash ring)
+ *
+ * The correspondence between copy_idx and return value are as follows:
+ * ----------------------------
+ * copy_idx       0  1  2  3  4
+ * src_node       D  E  F  G  A
+ * tgt_node       D  E  F  B  A
+ * return value   0  1  2  4  3
+ * ----------------------------
+ *
+ * The node D, E, F, and A can recover objects from local, and the
+ * node G recovers from the node B.
+ */
 static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr, int old_idx,
 			 struct sheepdog_node_list_entry *cur_entry, int cur_nr, int cur_idx,
 			 int copy_idx)
@@ -1096,6 +1135,7 @@ static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr,
 	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", old_idx, old_nr, cur_idx, cur_nr, copy_idx);
 
 	if (copy_idx < cur_nr) {
+		/* If the same node is in the previous target nodes, return its index */
 		idx = contains_node(cur_entry[(cur_idx + copy_idx) % cur_nr].id,
 				    old_entry, old_nr, old_idx);
 		if (idx >= 0) {
@@ -1106,16 +1146,24 @@ static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr,
 
 	for (i = 0, j = 0; ; i++, j++) {
 		if (i < cur_nr) {
+			/* Skip if the node can recover from its local */
 			idx = contains_node(cur_entry[(cur_idx + i) % cur_nr].id,
 					    old_entry, old_nr, old_idx);
 			if (idx >= 0)
 				continue;
 
+			/* Find the next target which needs to recover from remote */
 			while (contains_node(old_entry[(old_idx + j) % old_nr].id,
 					     cur_entry, cur_nr, cur_idx) >= 0 && j < old_nr)
 				j++;
 		}
 		if (j == old_nr) {
+			/*
+			 * Cannot find the target because the number of nodes
+			 * is smaller than the number of copies.  We can select
+			 * any node in this case, so select the first one.
+			 */
+
 			/* old_nr should be smaller than sys->nr_sobjs */
 			if (old_nr >= sys->nr_sobjs)
 				eprintf("bug: %"PRIu32", %"PRIu32"\n", old_nr, sys->nr_sobjs);
@@ -1124,6 +1172,7 @@ static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr,
 		}
 
 		if (i == copy_idx) {
+			/* Found the target node correspoinding to copy_idx */
 			dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n", (old_idx + j) % old_nr, copy_idx,
 				(cur_idx + i) % cur_nr);
 			return (old_idx + j) % old_nr;
