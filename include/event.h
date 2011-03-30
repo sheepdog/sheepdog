@@ -14,10 +14,8 @@ int modify_event(int fd, unsigned int events);
 void event_loop(int timeout);
 
 struct timer {
-	struct list_head entry;
 	void (*callback)(void *);
 	void *data;
-	unsigned int when;
 };
 
 void add_timer(struct timer *t, unsigned int seconds);

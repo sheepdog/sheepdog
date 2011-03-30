@@ -12,7 +12,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 
 #include "list.h"
 #include "util.h"
@@ -22,49 +24,44 @@
 static int efd;
 static LIST_HEAD(events_list);
 
-static LIST_HEAD(active_timer_list);
-static LIST_HEAD(inactive_timer_list);
-
-static int jiffies;
-
 #define TICK 1
+
+static void timer_handler(int fd, int events, void *data)
+{
+	struct timer *t = data;
+	uint64_t val;
+
+	if (read(fd, &val, sizeof(val)) < 0)
+		return;
+
+	t->callback(t->data);
+
+	unregister_event(fd);
+	close(fd);
+}
 
 void add_timer(struct timer *t, unsigned int seconds)
 {
-	struct timer *n;
+	struct itimerspec it;
+	int tfd;
 
-	if (seconds) {
-		t->when = roundup(seconds, TICK) + jiffies;
-
-		list_for_each_entry(n, &inactive_timer_list, entry) {
-			if (before(t->when, n->when))
-				break;
-		}
-
-		list_add_tail(&t->entry, &n->entry);
-	} else
-		list_add_tail(&t->entry, &active_timer_list);
-}
-
-static void do_timer(void)
-{
-	struct timer *t, *n;
-
-	list_for_each_entry_safe(t, n, &inactive_timer_list, entry) {
-		if (after(jiffies, t->when)) {
-			list_del(&t->entry);
-			list_add_tail(&t->entry, &active_timer_list);
-		} else
-			break;
+	tfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+	if (tfd < 0) {
+		eprintf("timerfd_create, %m\n");
+		return;
 	}
 
-	while (!list_empty(&active_timer_list)) {
-		t = list_first_entry(&active_timer_list, struct timer, entry);
-		list_del_init(&t->entry);
-		t->callback(t->data);
+	memset(&it, 0, sizeof(it));
+	it.it_value.tv_sec = seconds;
+
+	if (timerfd_settime(tfd, 0, &it, NULL) < 0) {
+		eprintf("timerfd_settime, %m\n");
+		return;
 	}
 
-	jiffies++;
+	if (register_event(tfd, timer_handler, t) < 0) {
+		eprintf("failed to register timer fd\n");
+	}
 }
 
 struct event_info {
@@ -183,6 +180,5 @@ void event_loop(int timeout)
 			ei = (struct event_info *)events[i].data.ptr;
 			ei->handler(ei->fd, events[i].events, ei->data);
 		}
-	} else
-		do_timer();
+	}
 }
