@@ -19,13 +19,11 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <signal.h>
 #include <stdlib.h>
 #include <syscall.h>
 #include <sys/types.h>
+#include <sys/eventfd.h>
 #include <linux/types.h>
-#define _LINUX_FCNTL_H
-#include <linux/signalfd.h>
 
 #include "list.h"
 #include "util.h"
@@ -33,9 +31,7 @@
 #include "logger.h"
 #include "event.h"
 
-extern int signalfd(int fd, const sigset_t *mask, int flags);
-
-static int sig_fd;
+static int efd;
 static LIST_HEAD(worker_info_list);
 
 struct work_queue {
@@ -166,11 +162,11 @@ static void bs_thread_request_done(int fd, int events, void *data)
 	int ret;
 	struct worker_info *wi;
 	struct work *work;
-	struct signalfd_siginfo siginfo[16];
+	eventfd_t value;
 	LIST_HEAD(list);
 
-	ret = read(fd, (char *)siginfo, sizeof(siginfo));
-	if (ret <= 0)
+	ret = eventfd_read(fd, &value);
+	if (ret < 0)
 		return;
 
 	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
@@ -199,7 +195,7 @@ static void *worker_routine(void *arg)
 	struct worker_info *wi = arg;
 	struct work *work;
 	int i, idx = 0;
-	sigset_t set;
+	eventfd_t value = 1;
 
 	for (i = 0; i < wi->nr_threads; i++) {
 		if (wi->worker_thread[i] == pthread_self()) {
@@ -207,9 +203,6 @@ static void *worker_routine(void *arg)
 			break;
 		}
 	}
-
-	sigfillset(&set);
-	sigprocmask(SIG_BLOCK, &set, NULL);
 
 	pthread_mutex_lock(&wi->startup_lock);
 	dprintf("started this thread %d\n", idx);
@@ -240,35 +233,27 @@ retest:
 		list_add_tail(&work->w_list, &wi->finished_list);
 		pthread_mutex_unlock(&wi->finished_lock);
 
-		kill(getpid(), SIGUSR2);
+		eventfd_write(efd, value);
 	}
 
 	pthread_exit(NULL);
 }
 
-static int init_signalfd(void)
+static int init_eventfd(void)
 {
 	int ret;
-	sigset_t mask;
 	static int done = 0;
 
 	if (done++)
 		return 0;
 
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGUSR2);
-	sigprocmask(SIG_BLOCK, &mask, NULL);
-
-	sig_fd = signalfd(-1, &mask, 0);
-	if (sig_fd < 0) {
-		eprintf("failed to create a signal fd, %m\n");
+	efd = eventfd(0, EFD_NONBLOCK);
+	if (efd < 0) {
+		eprintf("failed to create an event fd, %m\n");
 		return 1;
 	}
 
-	ret = fcntl(sig_fd, F_GETFL);
-	ret |= fcntl(sig_fd, F_SETFL, ret | O_NONBLOCK);
-
-	ret = register_event(sig_fd, bs_thread_request_done, NULL);
+	ret = register_event(efd, bs_thread_request_done, NULL);
 
 	return 0;
 }
@@ -278,7 +263,7 @@ int init_work_queue(int nr)
 	int i, ret;
 	struct worker_info *wi;
 
-	ret = init_signalfd();
+	ret = init_eventfd();
 	if (ret)
 		return -1;
 
