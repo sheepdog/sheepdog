@@ -345,6 +345,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
 	struct node *node;
 	uint32_t local_epoch;
+	char str[256];
 
 	*status = sys->status;
 	if (inc_epoch)
@@ -359,37 +360,43 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			break;
 
 		if (ctime != get_cluster_ctime()) {
-			eprintf("joining node has invalid ctime, %"PRIu64"\n", from->id);
+			eprintf("joining node has invalid ctime, %s\n",
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_INVALID_CTIME;
 		}
 
 		local_epoch = get_latest_epoch();
 		if (epoch > local_epoch) {
-			eprintf("sheepdog is running with older epoch, %"PRIu32" %"PRIu32" %"PRIu64"\n",
-				epoch, local_epoch, from->id);
+			eprintf("sheepdog is running with older epoch, %"PRIu32" %"PRIu32" %s\n",
+				epoch, local_epoch,
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_OLD_NODE_VER;
 		}
 		break;
 	case SD_STATUS_WAIT_FOR_FORMAT:
 		if (nr_entries != 0) {
-			eprintf("joining node is not clean, %"PRIu64"\n", from->id);
+			eprintf("joining node is not clean, %s\n",
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_NOT_FORMATTED;
 		}
 		break;
 	case SD_STATUS_WAIT_FOR_JOIN:
 		if (ctime != get_cluster_ctime()) {
-			eprintf("joining node has invalid ctime, %"PRIu64"\n", from->id);
+			eprintf("joining node has invalid ctime, %s\n",
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_INVALID_CTIME;
 		}
 
 		local_epoch = get_latest_epoch();
 		if (epoch > local_epoch) {
-			eprintf("sheepdog is waiting with older epoch, %"PRIu32" %"PRIu32" %"PRIu64"\n",
-				epoch, local_epoch, from->id);
+			eprintf("sheepdog is waiting with older epoch, %"PRIu32" %"PRIu32" %s\n",
+				epoch, local_epoch,
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_OLD_NODE_VER;
 		} else if (epoch < local_epoch) {
-			eprintf("sheepdog is waiting with newer epoch, %"PRIu32" %"PRIu32" %"PRIu64"\n",
-				epoch, local_epoch, from->id);
+			eprintf("sheepdog is waiting with newer epoch, %"PRIu32" %"PRIu32" %s\n",
+				epoch, local_epoch,
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_NEW_NODE_VER;
 		}
 
@@ -398,13 +405,15 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		nr_local_entries /= sizeof(local_entries[0]);
 
 		if (nr_entries != nr_local_entries) {
-			eprintf("joining node has invalid epoch, %"PRIu32" %"PRIu64"\n",
-				epoch, from->id);
+			eprintf("joining node has invalid epoch, %"PRIu32" %s\n",
+				epoch,
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_INVALID_EPOCH;
 		}
 
 		if (memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0) {
-			eprintf("joining node has invalid epoch, %"PRIu64"\n", from->id);
+			eprintf("joining node has invalid epoch, %s\n",
+				addr_to_str(str, sizeof(str), from->addr, from->port));
 			return SD_RES_INVALID_EPOCH;
 		}
 
@@ -417,10 +426,10 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			return SD_RES_SUCCESS;
 
 		for (i = 0; i < nr_local_entries; i++) {
-			if (local_entries[i].id == from->id)
+			if (node_cmp(local_entries + i, from) == 0)
 				goto next;
 			list_for_each_entry(node, &sys->sd_node_list, list) {
-				if (local_entries[i].id == node->ent.id)
+				if (node_cmp(local_entries + i, &node->ent) == 0)
 					goto next;
 			}
 			return SD_RES_SUCCESS;
