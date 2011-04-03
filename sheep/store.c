@@ -1225,9 +1225,9 @@ next:
 			return 0;
 
 		if (errno == ENOENT) {
-			next_nr = epoch_log_read(tgt_epoch, buf, buf_len);
+			next_nr = epoch_log_read(tgt_epoch - 1, buf, buf_len);
 			if (next_nr <= 0) {
-				eprintf("no previous epoch, %"PRIu32"\n", tgt_epoch);
+				eprintf("no previous epoch, %"PRIu32"\n", tgt_epoch - 1);
 				return -1;
 			}
 			next_entry = (struct sheepdog_node_list_entry *)buf;
