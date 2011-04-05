@@ -70,7 +70,8 @@ Common parameters:\n\
 static uint64_t node_list_version;
 
 static struct sheepdog_node_list_entry node_list_entries[SD_MAX_NODES];
-static int nr_nodes;
+static struct sheepdog_vnode_list_entry vnode_list_entries[SD_MAX_VNODES];
+static int nr_nodes, nr_vnodes;
 static unsigned master_idx;
 
 static int is_current(struct sheepdog_inode *i)
@@ -148,6 +149,7 @@ static int update_node_list(int max_nodes, int epoch)
 	}
 
 	memcpy(node_list_entries, buf, size);
+	nr_vnodes = nodes_to_vnodes(node_list_entries, nr_nodes, vnode_list_entries);
 	node_list_version = hdr.epoch;
 	master_idx = rsp->master_idx;
 out:
@@ -286,13 +288,13 @@ static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 			continue;
 
 		oid = vid_to_vdi_oid(nr);
-		n = obj_to_sheep(node_list_entries, nr_nodes, oid, 0);
-		addr_to_str(name, sizeof(name), node_list_entries[n].addr, 0);
+		n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, 0);
+		addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
 
-		fd = connect_to(name, node_list_entries[n].port);
+		fd = connect_to(name, vnode_list_entries[n].port);
 		if (fd < 0) {
 			printf("failed to connect %s:%d\n", name,
-			       node_list_entries[n].port);
+			       vnode_list_entries[n].port);
 			continue;
 		}
 
@@ -595,21 +597,22 @@ static int node_list(int argc, char **argv)
 {
 	int i;
 
-	printf("  Idx\tNode id (FNV-1a) - Host:Port\n");
+	printf("   Idx - Host:Port              Number of vnodes\n");
 	printf("------------------------------------------------\n");
 	for (i = 0; i < nr_nodes; i++) {
 		char data[128];
 
-		print_node_list_entry(&node_list_entries[i], data, sizeof(data));
+		addr_to_str(data, sizeof(data), node_list_entries[i].addr,
+			    node_list_entries[i].port);
 
 		if (i == master_idx) {
 			if (highlight)
 				printf(TEXT_BOLD);
-			printf("* %d\t%s\n", i, data);
+			printf("* %4d - %-20s\t%d\n", i, data, node_list_entries[i].nr_vnodes);
 			if (highlight)
 				printf(TEXT_NORMAL);
 		} else
-			printf("  %d\t%s\n", i, data);
+			printf("  %4d - %-20s\t%d\n", i, data, node_list_entries[i].nr_vnodes);
 	}
 
 	return 0;
@@ -941,11 +944,11 @@ reread:
 		else
 			wlen = strlen(value);
 
-		n = obj_to_sheep(node_list_entries, nr_nodes, oid, i);
+		n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, i);
 
-		addr_to_str(name, sizeof(name), node_list_entries[n].addr, 0);
+		addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
 
-		fd = connect_to(name, node_list_entries[n].port);
+		fd = connect_to(name, vnode_list_entries[n].port);
 		if (fd < 0) {
 			printf("%s(%d): %s, %m\n", __func__, __LINE__,
 			       name);
@@ -1024,11 +1027,11 @@ static int vdi_getattr(int argc, char **argv)
 		rlen = SD_MAX_VDI_ATTR_VALUE_LEN;
 		wlen = 0;
 
-		n = obj_to_sheep(node_list_entries, nr_nodes, oid, i);
+		n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, i);
 
-		addr_to_str(name, sizeof(name), node_list_entries[n].addr, 0);
+		addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
 
-		fd = connect_to(name, node_list_entries[n].port);
+		fd = connect_to(name, vnode_list_entries[n].port);
 		if (fd < 0) {
 			printf("%s(%d): %s, %m\n", __func__, __LINE__,
 			       name);

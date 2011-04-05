@@ -21,9 +21,6 @@
 #include "net.h"
 #include "sheep.h"
 
-#define SD_DEFAULT_REDUNDANCY 3
-#define SD_MAX_REDUNDANCY 8
-
 #define SD_OP_REMOVE_OBJ     0x91
 
 #define SD_OP_GET_OBJ_LIST   0xA1
@@ -83,7 +80,8 @@ struct request {
 
 	uint64_t local_oid;
 
-	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	struct sheepdog_vnode_list_entry entry[SD_MAX_VNODES];
+	int nr_vnodes;
 	int nr_nodes;
 	int check_consistency;
 
@@ -115,6 +113,10 @@ struct cluster_info {
 	 */
 	struct list_head cpg_node_list;
 	struct list_head sd_node_list;
+
+	/* this array contains a list of ordered virtual nodes */
+	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
+	int nr_vnodes;
 
 	struct list_head pending_list;
 
@@ -157,8 +159,10 @@ int read_vdis(char *data, int len, unsigned int *rsp_len);
 int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 		 uint32_t *attrid, int creat, int excl);
 
-int setup_ordered_sd_node_list(struct request *req);
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
+void setup_ordered_sd_vnode_list(struct request *req);
+void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
+			       int *nr_vnodes, int *nr_nodes);
 int is_access_to_busy_objects(uint64_t oid);
 
 void resume_pending_requests(void);
@@ -180,8 +184,6 @@ int update_epoch_store(uint32_t epoch);
 
 int set_global_nr_copies(uint32_t copies);
 int get_global_nr_copies(uint32_t *copies);
-int set_nodeid(uint64_t nodeid);
-int get_nodeid(uint64_t *nodeid);
 
 #define NR_WORKER_THREAD 64
 
@@ -196,19 +198,19 @@ int start_recovery(uint32_t epoch);
 void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
 
-int write_object(struct sheepdog_node_list_entry *e,
-		 int nodes, uint32_t node_version,
+int write_object(struct sheepdog_vnode_list_entry *e,
+		 int vnodes, int nodes, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, int nr, int create);
-int read_object(struct sheepdog_node_list_entry *e,
-		int nodes, uint32_t node_version,
+int read_object(struct sheepdog_vnode_list_entry *e,
+		int vnodes, int nodes, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
-int remove_object(struct sheepdog_node_list_entry *e,
-		  int nodes, uint32_t node_version,
+int remove_object(struct sheepdog_vnode_list_entry *e,
+		  int vnodes, int nodes, uint32_t node_version,
 		  uint64_t oid, int nr);
 
-int get_sheep_fd(struct sheepdog_node_list_entry *e, int node_idx,
+int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		 uint32_t epoch, int worker_idx);
 
 /* Journal */
@@ -271,9 +273,11 @@ inline int jrnl_commit_data(struct jrnl_descriptor *jd);
 int jrnl_perform(struct jrnl_descriptor *jd);
 int jrnl_recover(void);
 
-static inline int is_myself(struct sheepdog_node_list_entry *e)
+static inline int is_myself(uint8_t *addr, uint16_t port)
 {
-	return e->id == sys->this_node.id;
+	return (memcmp(addr, sys->this_node.addr,
+		       sizeof(sys->this_node.addr)) == 0) &&
+		port == sys->this_node.port;
 }
 
 #define panic(fmt, args...)			\

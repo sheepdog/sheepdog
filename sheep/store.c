@@ -26,7 +26,6 @@
 
 #define ANAME_CTIME "user.sheepdog.ctime"
 #define ANAME_COPIES "user.sheepdog.copies"
-#define ANAME_NODEID "user.sheepdog.nodeid"
 
 static char *obj_path;
 static char *epoch_path;
@@ -108,16 +107,6 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch
 	return SD_RES_SUCCESS;
 }
 
-static int is_obj_in_range(uint64_t oid, uint64_t start, uint64_t end)
-{
-	uint64_t hval = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
-
-	if (start < end)
-		return (start < hval && hval <= end);
-	else
-		return (start < hval || hval <= end);
-}
-
 static int get_obj_list(struct request *req)
 {
 	DIR *dir;
@@ -125,17 +114,12 @@ static int get_obj_list(struct request *req)
 	struct sd_list_req *hdr = (struct sd_list_req *)&req->rq;
 	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&req->rp;
 	uint64_t oid;
-	uint64_t start_hash = hdr->start;
-	uint64_t end_hash = hdr->end;
 	uint32_t epoch = hdr->tgt_epoch;
 	char path[1024];
 	uint64_t *p = (uint64_t *)req->data;
 	int nr = 0;
 	uint64_t *objlist = NULL;
 	int obj_nr = 0, fd, i;
-	struct sheepdog_node_list_entry *e;
-	int e_nr;
-	int idx;
 	int res = SD_RES_SUCCESS;
 	int buf_len;
 	char *buf;
@@ -166,11 +150,7 @@ static int get_obj_list(struct request *req)
 	obj_nr /= sizeof(uint64_t);
 	objlist = (uint64_t *)buf;
 	for (i = 0; i < obj_nr; i++) {
-		if (is_obj_in_range(objlist[i], start_hash, end_hash)) {
-			dprintf("%u, %016"PRIx64", %016"PRIx64" %016"PRIx64"\n", epoch,
-				objlist[i], start_hash, end_hash);
-			p[nr++] = objlist[i];
-		}
+		p[nr++] = objlist[i];
 
 		if (nr * sizeof(uint64_t) >= hdr->data_length)
 			break;
@@ -203,11 +183,7 @@ local:
 		if (i < obj_nr)
 			continue;
 
-		if (is_obj_in_range(oid, start_hash, end_hash)) {
-			dprintf("%u, %016"PRIx64", %016"PRIx64" %016"PRIx64"\n", epoch,
-				oid, start_hash, end_hash);
-			p[nr++] = oid;
-		}
+		p[nr++] = oid;
 
 		if (nr * sizeof(uint64_t) >= hdr->data_length)
 			break;
@@ -215,39 +191,7 @@ local:
 
 	eprintf("nr = %"PRIu32"\n", nr);
 
-	e_nr = epoch_log_read(epoch, buf, buf_len);
-	e_nr /= sizeof(*e);
-	e = (struct sheepdog_node_list_entry *)buf;
-
-	if (e_nr <= sys->nr_sobjs) {
-		rsp->next = end_hash;
-		closedir(dir);
-		goto out;
-	}
-
-	for (idx = 0; idx < e_nr; idx++) {
-		if (e[idx].id == sys->this_node.id)
-			break;
-	}
-	if (idx != e_nr) {
-		uint64_t hval = e[idx % e_nr].id;
-
-		rsp->next = end_hash;
-
-		if (start_hash < end_hash) {
-			if (start_hash < hval && hval <= end_hash)
-				rsp->next = hval;
-		} else
-			if (start_hash < hval || hval <= end_hash)
-				rsp->next = hval;
-
-		dprintf("%u, %016"PRIx64", %016"PRIx64" %016"PRIx64"\n", epoch, hval,
-			start_hash, end_hash);
-	} else
-		res = SD_RES_SYSTEM_ERROR;
-
 	closedir(dir);
-
 out:
 	free(buf);
 	rsp->data_length = nr * sizeof(uint64_t);
@@ -265,19 +209,19 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
 	char name[128];
-	struct sheepdog_node_list_entry *e;
+	struct sheepdog_vnode_list_entry *e;
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
 	e = req->entry;
-	nr = req->nr_nodes;
+	nr = req->nr_vnodes;
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
-		if (is_myself(&e[n])) {
+		if (is_myself(e[n].addr, e[n].port)) {
 			fd = ob_open(epoch, oid, 0, &ret);
 			if (fd < 0 || ret != 0)
 				continue;
@@ -352,12 +296,12 @@ static int forward_read_obj_req(struct request *req, int idx)
 	unsigned wlen, rlen;
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	struct sheepdog_node_list_entry *e;
+	struct sheepdog_vnode_list_entry *e;
 	uint64_t oid = hdr.oid;
 	int copies;
 
 	e = req->entry;
-	nr = req->nr_nodes;
+	nr = req->nr_vnodes;
 
 	copies = hdr.copies;
 
@@ -373,7 +317,7 @@ static int forward_read_obj_req(struct request *req, int idx)
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
 
-		if (is_myself(&e[n])) {
+		if (is_myself(e[n].addr, e[n].port)) {
 			ret = store_queue_request_local(req, hdr.epoch);
 			goto out;
 		}
@@ -381,7 +325,7 @@ static int forward_read_obj_req(struct request *req, int idx)
 
 	n = obj_to_sheep(e, nr, oid, 0);
 
-	fd = get_sheep_fd(e, n, hdr.epoch, idx);
+	fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch, idx);
 	if (fd < 0) {
 		ret = SD_RES_NETWORK_ERROR;
 		goto out;
@@ -409,7 +353,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 	char name[128];
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
-	struct sheepdog_node_list_entry *e;
+	struct sheepdog_vnode_list_entry *e;
 	uint64_t oid = hdr.oid;
 	int copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
@@ -417,7 +361,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 
 	dprintf("%"PRIx64"\n", oid);
 	e = req->entry;
-	nr = req->nr_nodes;
+	nr = req->nr_vnodes;
 
 	copies = hdr.copies;
 
@@ -443,12 +387,12 @@ static int forward_write_obj_req(struct request *req, int idx)
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
-		if (is_myself(&e[n])) {
+		if (is_myself(e[n].addr, e[n].port)) {
 			local = 1;
 			continue;
 		}
 
-		fd = get_sheep_fd(e, n, hdr.epoch, idx);
+		fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch, idx);
 		if (fd < 0) {
 			eprintf("failed to connect to %s:%"PRIu32"\n", name, e[n].port);
 			ret = SD_RES_NETWORK_ERROR;
@@ -1053,11 +997,6 @@ uint64_t get_cluster_ctime(void)
 	return ctime;
 }
 
-static int node_distance(int my, int her, int nr)
-{
-	return (my + nr - her) % nr;
-}
-
 /*
  * contains_node - checks that the node id is included in the target nodes
  *
@@ -1065,14 +1004,17 @@ static int node_distance(int my, int her, int nr)
  * from the base_idx'th on the consistent hash ring, where N is the
  * number of copies of objects.
  */
-static int contains_node(uint64_t id, struct sheepdog_node_list_entry *entry,
+static int contains_node(struct sheepdog_vnode_list_entry *key,
+			 struct sheepdog_vnode_list_entry *entry,
 			 int nr, int base_idx)
 {
 	int i;
 
 	for (i = 0; i < sys->nr_sobjs; i++) {
-		if (entry[(base_idx + i) % nr].id == id)
-			return (base_idx + i) % nr;
+		int idx = get_nth_node(entry, nr, base_idx, i);
+		if (memcmp(key->addr, entry[idx].addr, sizeof(key->addr)) == 0
+		    && key->port == entry[idx].port)
+			return idx;
 	}
 	return -1;
 }
@@ -1126,17 +1068,17 @@ static uint64_t blocking_oid;
  * The node D, E, F, and A can recover objects from local, and the
  * node G recovers from the node B.
  */
-static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr, int old_idx,
-			 struct sheepdog_node_list_entry *cur_entry, int cur_nr, int cur_idx,
+static int find_tgt_node(struct sheepdog_vnode_list_entry *old_entry, int old_nr, int old_idx,
+			 struct sheepdog_vnode_list_entry *cur_entry, int cur_nr, int cur_idx,
 			 int copy_idx)
 {
 	int i, j, idx;
 
 	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", old_idx, old_nr, cur_idx, cur_nr, copy_idx);
 
-	if (copy_idx < cur_nr) {
+	if (copy_idx < sys->nr_sobjs) {
 		/* If the same node is in the previous target nodes, return its index */
-		idx = contains_node(cur_entry[(cur_idx + copy_idx) % cur_nr].id,
+		idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, copy_idx),
 				    old_entry, old_nr, old_idx);
 		if (idx >= 0) {
 			dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", idx, copy_idx, cur_idx, cur_nr);
@@ -1145,57 +1087,55 @@ static int find_tgt_node(struct sheepdog_node_list_entry *old_entry, int old_nr,
 	}
 
 	for (i = 0, j = 0; ; i++, j++) {
-		if (i < cur_nr) {
+		if (i < copy_idx) {
 			/* Skip if the node can recover from its local */
-			idx = contains_node(cur_entry[(cur_idx + i) % cur_nr].id,
+			idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, i),
 					    old_entry, old_nr, old_idx);
 			if (idx >= 0)
 				continue;
 
 			/* Find the next target which needs to recover from remote */
-			while (contains_node(old_entry[(old_idx + j) % old_nr].id,
-					     cur_entry, cur_nr, cur_idx) >= 0 && j < old_nr)
+			while (j < sys->nr_sobjs &&
+			       contains_node(old_entry + get_nth_node(old_entry, old_nr, old_idx, j),
+					     cur_entry, cur_nr, cur_idx) >= 0)
 				j++;
 		}
-		if (j == old_nr) {
+		if (j == sys->nr_sobjs) {
 			/*
 			 * Cannot find the target because the number of nodes
 			 * is smaller than the number of copies.  We can select
 			 * any node in this case, so select the first one.
 			 */
-
-			/* old_nr should be smaller than sys->nr_sobjs */
-			if (old_nr >= sys->nr_sobjs)
-				eprintf("bug: %"PRIu32", %"PRIu32"\n", old_nr, sys->nr_sobjs);
-
 			return old_idx;
 		}
 
 		if (i == copy_idx) {
 			/* Found the target node correspoinding to copy_idx */
-			dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n", (old_idx + j) % old_nr, copy_idx,
-				(cur_idx + i) % cur_nr);
-			return (old_idx + j) % old_nr;
+			dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n",
+				get_nth_node(old_entry, old_nr, old_idx, j),
+				copy_idx, (cur_idx + i) % cur_nr);
+			return get_nth_node(old_entry, old_nr, old_idx, j);
 		}
 
 	}
+
 	return -1;
 }
 
 static int __recover_one(struct recovery_work *rw,
-			 struct sheepdog_node_list_entry *_old_entry, int old_nr,
-			 struct sheepdog_node_list_entry *_cur_entry, int cur_nr, int cur_idx,
+			 struct sheepdog_vnode_list_entry *_old_entry, int old_nr,
+			 struct sheepdog_vnode_list_entry *_cur_entry, int cur_nr, int cur_idx,
 			 int copy_idx, uint32_t epoch, uint32_t tgt_epoch,
 			 uint64_t oid, char *buf, int buf_len)
 {
-	struct sheepdog_node_list_entry *e;
+	struct sheepdog_vnode_list_entry *e;
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	char name[128];
 	unsigned wlen = 0, rlen;
 	int fd, ret;
-	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
-		cur_entry[SD_MAX_NODES], *next_entry;
+	struct sheepdog_vnode_list_entry old_entry[SD_MAX_VNODES],
+		cur_entry[SD_MAX_VNODES], next_entry[SD_MAX_VNODES];
 	int next_nr;
 	int tgt_idx = -1;
 	int old_idx;
@@ -1213,7 +1153,7 @@ next:
 	}
 	e = old_entry + tgt_idx;
 
-	if (e->id == sys->this_node.id) {
+	if (is_myself(e->addr, e->port)) {
 		char old[PATH_MAX], new[PATH_MAX];
 
 		snprintf(old, sizeof(old), "%s%08u/%016" PRIx64, obj_path,
@@ -1230,8 +1170,9 @@ next:
 				eprintf("no previous epoch, %"PRIu32"\n", tgt_epoch - 1);
 				return -1;
 			}
-			next_entry = (struct sheepdog_node_list_entry *)buf;
-			next_nr /= sizeof(*next_entry);
+			next_nr = nodes_to_vnodes((struct sheepdog_node_list_entry *)buf,
+						  next_nr / sizeof(struct sheepdog_node_list_entry),
+						  next_entry);
 			goto not_found;
 		}
 
@@ -1321,14 +1262,21 @@ next:
 		eprintf("%"PRIu32"\n", rsp->result);
 		return -1;
 	}
-	next_entry = (struct sheepdog_node_list_entry *)buf;
-	next_nr = rsp->data_length / sizeof(*old_entry);
+	next_nr = nodes_to_vnodes((struct sheepdog_node_list_entry *)buf,
+				  rsp->data_length / sizeof(struct sheepdog_node_list_entry),
+				  next_entry);
 
 not_found:
-	copy_idx = node_distance(tgt_idx, old_idx, old_nr);
+	for (copy_idx = 0; copy_idx < sys->nr_sobjs; copy_idx++)
+		if (get_nth_node(old_entry, old_nr, old_idx, copy_idx) == tgt_idx)
+			break;
+	if (copy_idx == sys->nr_sobjs) {
+		eprintf("bug: cannot find the proper copy_idx\n");
+		return -1;
+	}
+
 	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", rsp->result, rsp->data_length, tgt_idx,
 		old_idx, old_nr, copy_idx);
-
 	memcpy(cur_entry, old_entry, sizeof(*old_entry) * old_nr);
 	cur_nr = old_nr;
 	cur_idx = old_idx;
@@ -1346,12 +1294,15 @@ static void recover_one(struct work *work, int idx)
 	char *buf = NULL;
 	int ret;
 	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
-	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
-		cur_entry[SD_MAX_NODES];
-	int old_nr, cur_nr;
+	struct sheepdog_node_list_entry old_nodes[SD_MAX_NODES];
+	struct sheepdog_node_list_entry cur_nodes[SD_MAX_NODES];
+	struct sheepdog_vnode_list_entry old_vnodes[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry cur_vnodes[SD_MAX_VNODES];
+	int old_nr_nodes, cur_nr_nodes, old_nr_vnodes, cur_nr_vnodes;
 	uint32_t epoch = rw->epoch;
-	int i, my_idx = -1, copy_idx = 0, cur_idx = -1;
+	int i, copy_idx = 0, cur_idx = -1;
 	int fd;
+	int nr_objs;
 
 	eprintf("%"PRIu32" %"PRIu32", %16"PRIx64"\n", rw->done, rw->count, oid);
 
@@ -1370,35 +1321,48 @@ static void recover_one(struct work *work, int idx)
 	else
 		buf = malloc(sizeof(struct sheepdog_inode));
 
-	cur_nr = epoch_log_read(epoch, (char *)cur_entry, sizeof(cur_entry));
-	if (cur_nr <= 0) {
+	cur_nr_nodes = epoch_log_read(epoch, (char *)cur_nodes, sizeof(cur_nodes));
+	if (cur_nr_nodes <= 0) {
 		eprintf("failed to read current epoch, %"PRIu32"\n", epoch);
 		goto out;
 	}
-	cur_nr /= sizeof(struct sheepdog_node_list_entry);
+	cur_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
 
-	old_nr = epoch_log_read(epoch - 1, (char *)old_entry, sizeof(old_entry));
-	if (old_nr <= 0) {
+	old_nr_nodes = epoch_log_read(epoch - 1, (char *)old_nodes, sizeof(old_nodes));
+	if (old_nr_nodes <= 0) {
 		eprintf("failed to read previous epoch, %"PRIu32"\n", epoch - 1);
 		goto fail;
 	}
-	old_nr /= sizeof(struct sheepdog_node_list_entry);
+	old_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
+
+	old_nr_vnodes = nodes_to_vnodes(old_nodes, old_nr_nodes, old_vnodes);
+	cur_nr_vnodes = nodes_to_vnodes(cur_nodes, cur_nr_nodes, cur_vnodes);
 
 	if (!sys->nr_sobjs)
 		goto fail;
 
-	cur_idx = obj_to_sheep(cur_entry, cur_nr, oid, 0);
+	cur_idx = obj_to_sheep(cur_vnodes, cur_nr_vnodes, oid, 0);
 
-	for (i = 0; i < cur_nr; i++) {
-		if (cur_entry[i].id == sys->this_node.id) {
-			my_idx = i;
+	nr_objs = sys->nr_sobjs;
+	if (nr_objs > cur_nr_nodes)
+		nr_objs = cur_nr_nodes;
+
+	copy_idx = -1;
+	for (i = 0; i < nr_objs; i++) {
+		int n = obj_to_sheep(cur_vnodes, cur_nr_vnodes, oid, i);
+		if (is_myself(cur_vnodes[n].addr, cur_vnodes[n].port)) {
+			copy_idx = i;
 			break;
 		}
 	}
-	copy_idx = node_distance(my_idx, cur_idx, cur_nr);
-	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", my_idx, cur_idx, cur_nr, copy_idx);
+	if (copy_idx < 0) {
+		eprintf("shouldn't happen\n");
+		goto out;
+	}
 
-	ret = __recover_one(rw, old_entry, old_nr, cur_entry, cur_nr,
+	dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n", cur_idx, cur_nr_nodes, copy_idx);
+
+	ret = __recover_one(rw, old_vnodes, old_nr_vnodes, cur_vnodes, cur_nr_vnodes,
 			    cur_idx, copy_idx, epoch, epoch - 1, oid,
 			    buf, SD_DATA_OBJ_SIZE);
 	if (ret == 0)
@@ -1407,8 +1371,8 @@ static void recover_one(struct work *work, int idx)
 	for (i = 0; i < sys->nr_sobjs; i++) {
 		if (i == copy_idx)
 			continue;
-		ret = __recover_one(rw, old_entry, old_nr,
-				    cur_entry, cur_nr, cur_idx, i,
+		ret = __recover_one(rw, old_vnodes, old_nr_vnodes,
+				    cur_vnodes, cur_nr_vnodes, cur_idx, i,
 				    epoch, epoch - 1, oid, buf, SD_DATA_OBJ_SIZE);
 		if (ret == 0)
 			goto out;
@@ -1547,12 +1511,10 @@ static void recover_done(struct work *work, int idx)
 	}
 }
 
-static int __fill_obj_list(struct recovery_work *rw,
-			   struct sheepdog_node_list_entry *e,
-			   uint64_t start_hash, uint64_t end_hash, uint64_t *done_hash)
+static int __fill_obj_list(struct sheepdog_node_list_entry *e, uint32_t epoch,
+			   uint8_t *buf, size_t buf_size)
 {
 	int fd, ret;
-	uint32_t epoch = rw->epoch;
 	unsigned wlen, rlen;
 	char name[128];
 	struct sd_list_req hdr;
@@ -1569,72 +1531,98 @@ static int __fill_obj_list(struct recovery_work *rw,
 	}
 
 	wlen = 0;
-	rlen = (1 << 20) - (rw->count * sizeof(uint64_t));
+	rlen = buf_size;
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_OBJ_LIST;
 	/* we don't need to set epoch */
 	hdr.epoch = epoch;
-	hdr.start = start_hash;
-	hdr.end = end_hash;
 	hdr.tgt_epoch = epoch - 1;
 	hdr.flags = 0;
 	hdr.data_length = rlen;
 
-	dprintf("%016"PRIx64", %016"PRIx64"\n", hdr.start, hdr.end);
-
-	ret = exec_req(fd, (struct sd_req *)&hdr, rw->buf + rw->count * sizeof(uint64_t), &wlen, &rlen);
+	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
 	close(fd);
 
 	rsp = (struct sd_list_rsp *)&hdr;
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		rw->retry = 1;
-		*done_hash = end_hash;
 		eprintf("try again, %"PRIu32", %"PRIu32"\n", ret, rsp->result);
-		return 0;
+		return -1;
 	}
 
 	dprintf("%"PRIu32"\n", rsp->data_length);
 
-	if (rsp->data_length)
-		rw->count += rsp->data_length / sizeof(uint64_t);
+	return rsp->data_length / sizeof(uint64_t);
+}
 
-	*done_hash = rsp->next;
+static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entries,
+			 uint64_t *list1, int nr_list1,
+			 uint64_t *list2, int nr_list2, int nr_objs)
+{
+	int i, j, idx;
 
-	return 0;
+	for (i = 0; i < nr_list2; i++) {
+		for (j = 0; j < nr_objs; j++) {
+			idx = obj_to_sheep(entries, nr_entries, list2[i], j);
+			if (is_myself(entries[idx].addr, entries[idx].port))
+				break;
+		}
+		if (j == nr_objs)
+			continue;
+
+		if (bsearch(list2 + i, list1, nr_list1, sizeof(*list1), obj_cmp))
+			continue;
+
+		list1[nr_list1++] = list2[i];
+	}
+
+	qsort(list1, nr_list1, sizeof(*list1), obj_cmp);
+
+	return nr_list1;
 }
 
 static int fill_obj_list(struct recovery_work *rw,
 			 struct sheepdog_node_list_entry *old_entry, int old_nr,
 			 struct sheepdog_node_list_entry *cur_entry, int cur_nr,
-			 uint64_t start_hval, uint64_t end_hval, int nr_objs)
+			 int nr_objs)
 {
-	int i, idx, old_idx, cur_idx;
-	uint64_t hval, done_hval = end_hval;
+	int i, j;
+	uint8_t *buf = NULL;
+	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
+	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
+	int nr_vnodes;
 
-	hval = start_hval;
-again:
-	old_idx = hval_to_sheep(old_entry, old_nr, hval + 1, 0);
-	cur_idx = hval_to_sheep(cur_entry, cur_nr, hval + 1, 0);
+	buf = malloc(buf_size);
+	if (!buf)
+		goto fail;
 
-	for (i = 0; i < nr_objs; i++) {
-		idx = find_tgt_node(old_entry, old_nr, old_idx, cur_entry, cur_nr, cur_idx, i);
-		dprintf("%"PRIu32", %"PRIu32"\n", idx, i);
-		if (__fill_obj_list(rw, old_entry + idx, hval, end_hval, &done_hval) == 0)
-			break;
+	nr_vnodes = nodes_to_vnodes(cur_entry, cur_nr, vnodes);
+	for (i = 0; i < cur_nr; i++) {
+		int nr;
+
+		for (j = 0; j < old_nr; j++)
+			if (node_cmp(cur_entry + i, old_entry + j) == 0)
+				break;
+
+		if (j == old_nr)
+			/* cur_entry[i] doesn't have a list file */
+			continue;
+
+		nr  = __fill_obj_list(cur_entry + i, rw->epoch, buf, buf_size);
+		if (nr < 0)
+			goto fail;
+		rw->count = merge_objlist(vnodes, nr_vnodes, (uint64_t *)rw->buf,
+					  rw->count, (uint64_t *)buf, nr, nr_objs);
 	}
-	if (i == nr_objs)
-		return -1;
 
-	if (done_hval != end_hval) {
-		dprintf("%"PRIx64", %"PRIx64"\n", done_hval, end_hval);
-		hval = done_hval;
-		goto again;
-	}
-
+	free(buf);
 	return 0;
+fail:
+	free(buf);
+	rw->retry = 1;
+	return -1;
 }
 
 static void __start_recovery(struct work *work, int idx)
@@ -1644,9 +1632,7 @@ static void __start_recovery(struct work *work, int idx)
 	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
 		cur_entry[SD_MAX_NODES];
 	int old_nr, cur_nr, nr_objs;
-	int my_idx = -1;
-	int i, fd;
-	uint64_t start_hash, end_hash;
+	int fd;
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int ret;
 
@@ -1672,26 +1658,13 @@ static void __start_recovery(struct work *work, int idx)
 	if (!nr_objs)
 		goto fail;
 
-	for (i = 0; i < cur_nr; i++) {
-		if (cur_entry[i].id == sys->this_node.id) {
-			my_idx = i;
-			break;
-		}
-	}
-	start_hash = cur_entry[(my_idx - nr_objs + cur_nr) % cur_nr].id;
-	end_hash = cur_entry[my_idx].id;
-
-	dprintf("fill obj list (from 0x%"PRIx64" to 0x%"PRIx64")\n", start_hash, end_hash);
-	if (fill_obj_list(rw, old_entry, old_nr, cur_entry, cur_nr,
-			  start_hash, end_hash, nr_objs) != 0) {
+	if (fill_obj_list(rw, old_entry, old_nr, cur_entry, cur_nr, nr_objs) != 0) {
 		eprintf("fatal recovery error\n");
 		goto fail;
 	}
 
 	if (rw->retry)
 		goto fail;
-
-	qsort(rw->buf, rw->count, sizeof(uint64_t), obj_cmp);
 
 	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
 	snprintf(tmp_path, sizeof(tmp_path), "%s%08u/list.tmp", obj_path, epoch);
@@ -1808,16 +1781,6 @@ static int attr(char *path, const char *name, void *var, int len, int set)
 	}
 
 	return SD_RES_SUCCESS;
-}
-
-int set_nodeid(uint64_t nodeid)
-{
-	return attr(epoch_path, ANAME_NODEID, &nodeid, sizeof(nodeid), 1);
-}
-
-int get_nodeid(uint64_t *nodeid)
-{
-	return attr(epoch_path, ANAME_NODEID, nodeid, sizeof(*nodeid), 0);
 }
 
 static int init_base_path(const char *d)

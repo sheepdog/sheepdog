@@ -21,17 +21,17 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 			  uint32_t base_vid, uint32_t cur_vid, uint32_t copies,
 			  uint32_t snapid, int is_snapshot)
 {
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
 	/* we are not called concurrently */
 	static struct sheepdog_inode new, base, cur;
 	struct timeval tv;
-	int ret, nr_nodes;
+	int ret, nr_vnodes, nr_nodes;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
 
-	nr_nodes = get_ordered_sd_node_list(entries);
+	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
 
 	if (base_vid) {
-		ret = read_object(entries, nr_nodes, epoch,
+		ret = read_object(entries, nr_vnodes, nr_nodes, epoch,
 				  vid_to_vdi_oid(base_vid), (char *)&base,
 				  sizeof(base), 0, copies);
 		if (ret < 0)
@@ -45,7 +45,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 			vprintf(SDOG_INFO "tree snapshot %s %" PRIx32 " %" PRIx32 "\n",
 				name, cur_vid, base_vid);
 
-			ret = read_object(entries, nr_nodes, epoch,
+			ret = read_object(entries, nr_vnodes, nr_nodes, epoch,
 					  vid_to_vdi_oid(cur_vid), (char *)&cur,
 					  SD_INODE_HEADER_SIZE, 0, copies);
 			if (ret < 0) {
@@ -88,7 +88,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	}
 
 	if (is_snapshot && cur_vid != base_vid) {
-		ret = write_object(entries, nr_nodes, epoch,
+		ret = write_object(entries, nr_vnodes, nr_nodes, epoch,
 				   vid_to_vdi_oid(cur_vid), (char *)&cur,
 				   SD_INODE_HEADER_SIZE, 0, copies, 0);
 		if (ret != 0) {
@@ -98,7 +98,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	}
 
 	if (base_vid) {
-		ret = write_object(entries, nr_nodes, epoch,
+		ret = write_object(entries, nr_vnodes, nr_nodes, epoch,
 				   vid_to_vdi_oid(base_vid), (char *)&base,
 				   SD_INODE_HEADER_SIZE, 0, copies, 0);
 		if (ret != 0) {
@@ -107,7 +107,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 		}
 	}
 
-	ret = write_object(entries, nr_nodes, epoch,
+	ret = write_object(entries, nr_vnodes, nr_nodes, epoch,
 			   vid_to_vdi_oid(new_vid), (char *)&new, sizeof(new),
 			   0, copies, 1);
 	if (ret != 0)
@@ -121,20 +121,20 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 			  unsigned long *deleted_nr, uint32_t *next_snap,
 			  unsigned int *nr_copies)
 {
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
 	static struct sheepdog_inode inode;
 	unsigned long i;
-	int nr_nodes, nr_reqs;
+	int nr_vnodes, nr_nodes, nr_reqs;
 	int ret, vdi_found = 0;
 
-	nr_nodes = get_ordered_sd_node_list(entries);
+	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
 
 	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 
 	for (i = start; i >= end; i--) {
-		ret = read_object(entries, nr_nodes, epoch,
+		ret = read_object(entries, nr_vnodes, nr_nodes, epoch,
 				  vid_to_vdi_oid(i), (char *)&inode,
 				  SD_INODE_HEADER_SIZE, 0, nr_reqs);
 		if (ret < 0)
@@ -297,8 +297,8 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes, nr_reqs;
+	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	int nr_vnodes, nr_nodes, nr_reqs;
 	static struct sheepdog_inode inode;
 
 	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
@@ -313,12 +313,12 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	nr_nodes = get_ordered_sd_node_list(entries);
+	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
 	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_nodes)
 		nr_reqs = nr_nodes;
 
-	ret = read_object(entries, nr_nodes, epoch,
+	ret = read_object(entries, nr_vnodes, nr_nodes, epoch,
 			  vid_to_vdi_oid(*vid), (char *)&inode,
 			  SD_INODE_HEADER_SIZE, 0, nr_reqs);
 	if (ret < 0)
@@ -326,7 +326,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 
 	memset(inode.name, 0, sizeof(inode.name));
 
-	ret = write_object(entries, nr_nodes, epoch,
+	ret = write_object(entries, nr_vnodes, nr_nodes, epoch,
 			   vid_to_vdi_oid(*vid), (char *)&inode,
 			   SD_INODE_HEADER_SIZE, 0, nr_reqs, 0);
 	if (ret != 0)
@@ -369,8 +369,8 @@ static void delete_one(struct work *work, int idx)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(((uint32_t *)dw->buf) + dw->count - dw->done - 1);
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes;
+	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	int nr_vnodes, nr_nodes;
 	int ret, i;
 	static struct sheepdog_inode inode;
 
@@ -381,9 +381,9 @@ static void delete_one(struct work *work, int idx)
 	 * is called in threads and not serialized with cpg_event so
 	 * we can't access to epoch and sd_node_list safely.
 	 */
-	nr_nodes = get_ordered_sd_node_list(entries);
+	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
 
-	ret = read_object(entries, nr_nodes, dw->epoch,
+	ret = read_object(entries, nr_vnodes, nr_nodes, dw->epoch,
 			  vid_to_vdi_oid(vdi_id), (void *)&inode, sizeof(inode),
 			  0, sys->nr_sobjs);
 
@@ -396,7 +396,7 @@ static void delete_one(struct work *work, int idx)
 		if (!inode.data_vdi_id[i])
 			continue;
 
-		remove_object(entries, nr_nodes, dw->epoch,
+		remove_object(entries, nr_vnodes, nr_nodes, dw->epoch,
 			      vid_to_data_oid(inode.data_vdi_id[i], i),
 			      inode.nr_copies);
 	}
@@ -426,8 +426,8 @@ static void delete_one_done(struct work *work, int idx)
 }
 
 static int fill_vdi_list(struct deletion_work *dw,
-			 struct sheepdog_node_list_entry *entries,
-			 int nr_entries, uint32_t root_vid)
+			 struct sheepdog_vnode_list_entry *entries,
+			 int nr_vnodes, int nr_nodes, uint32_t root_vid)
 {
 	int ret, i;
 	static struct sheepdog_inode inode;
@@ -437,7 +437,7 @@ static int fill_vdi_list(struct deletion_work *dw,
 	((uint32_t *)dw->buf)[dw->count++] = root_vid;
 again:
 	vid = ((uint32_t *)dw->buf)[done++];
-	ret = read_object(entries, nr_entries, dw->epoch,
+	ret = read_object(entries, nr_vnodes, nr_nodes, dw->epoch,
 			  vid_to_vdi_oid(vid), (void *)&inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
@@ -462,14 +462,15 @@ again:
 	return 0;
 }
 
-static uint64_t get_vdi_root(struct sheepdog_node_list_entry *entries,
-			     int nr_entries, uint32_t epoch, uint32_t vid)
+static uint64_t get_vdi_root(struct sheepdog_vnode_list_entry *entries,
+			     int nr_vnodes, int nr_nodes, uint32_t epoch,
+			     uint32_t vid)
 {
 	int ret;
 	static struct sheepdog_inode inode;
 
 next:
-	ret = read_object(entries, nr_entries, epoch,
+	ret = read_object(entries, nr_vnodes, nr_nodes, epoch,
 			  vid_to_vdi_oid(vid), (void *)&inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
@@ -489,8 +490,8 @@ next:
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_nodes, ret;
+	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	int nr_vnodes, nr_nodes, ret;
 	uint32_t root_vid;
 
 	dw = zalloc(sizeof(struct deletion_work));
@@ -510,13 +511,13 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	dw->work.fn = delete_one;
 	dw->work.done = delete_one_done;
 
-	nr_nodes = get_ordered_sd_node_list(entries);
+	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
 
-	root_vid = get_vdi_root(entries, nr_nodes, dw->epoch, dw->vid);
+	root_vid = get_vdi_root(entries, nr_vnodes, nr_nodes, dw->epoch, dw->vid);
 	if (!root_vid)
 		return SD_RES_EIO;
 
-	ret = fill_vdi_list(dw, entries, nr_nodes, root_vid);
+	ret = fill_vdi_list(dw, entries, nr_vnodes, nr_nodes, root_vid);
 	if (ret)
 		return SD_RES_SUCCESS;
 
@@ -539,18 +540,18 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 		 uint32_t *attrid, int creat, int excl)
 {
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
 	char attr_buf[SD_ATTR_HEADER_SIZE], inode_buf[SD_INODE_HEADER_SIZE];
 	uint64_t oid;
 	uint32_t end;
-	int ret, nr_nodes, copies;
+	int ret, nr_nodes, nr_vnodes, copies;
 
 	if (data_len != SD_ATTR_HEADER_SIZE)
 		return SD_RES_INVALID_PARMS;
 
-	nr_nodes = get_ordered_sd_node_list(entries);
+	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
 
-	ret = read_object(entries, nr_nodes, epoch, vid_to_vdi_oid(vid),
+	ret = read_object(entries, nr_vnodes, nr_nodes, epoch, vid_to_vdi_oid(vid),
 			  inode_buf, sizeof(inode_buf), 0, sys->nr_sobjs);
 	if (ret != SD_INODE_HEADER_SIZE) {
 		eprintf("failed to read vdi object, %"PRIx32"\n", vid);
@@ -565,11 +566,11 @@ int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 	end = *attrid - 1;
 	while (*attrid != end) {
 		oid = vid_to_attr_oid(vid, *attrid);
-		ret = read_object(entries, nr_nodes, epoch, oid, attr_buf,
+		ret = read_object(entries, nr_vnodes, nr_nodes, epoch, oid, attr_buf,
 				  sizeof(attr_buf), 0, copies);
 
 		if (ret == -SD_RES_NO_OBJ && creat) {
-			ret = write_object(entries, nr_nodes, epoch, oid, data,
+			ret = write_object(entries, nr_vnodes, nr_nodes, epoch, oid, data,
 					   data_len, 0, copies, 1);
 			if (ret)
 				return SD_RES_EIO;

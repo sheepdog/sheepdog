@@ -51,7 +51,7 @@ void resume_pending_requests(void)
 		start_cpg_event_work();
 }
 
-static int is_access_local(struct sheepdog_node_list_entry *e, int nr_nodes,
+static int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
 			   uint64_t oid, int copies)
 {
 	int i, n;
@@ -59,7 +59,7 @@ static int is_access_local(struct sheepdog_node_list_entry *e, int nr_nodes,
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr_nodes, oid, i);
 
-		if (is_myself(&e[n]))
+		if (is_myself(e[n].addr, e[n].port))
 			return 1;
 	}
 
@@ -80,7 +80,7 @@ static void setup_access_to_local_objects(struct request *req)
 	if (!copies)
 		copies = sys->nr_sobjs;
 
-	if (is_access_local(req->entry, req->nr_nodes, hdr->oid, copies))
+	if (is_access_local(req->entry, req->nr_vnodes, hdr->oid, copies))
 		req->local_oid = hdr->oid;
 }
 
@@ -123,7 +123,7 @@ static void __done(struct work *work, int idx)
 		     req->rp.result == SD_RES_WAIT_FOR_FORMAT)) {
 
 			req->rq.epoch = sys->epoch;
-			req->nr_nodes = setup_ordered_sd_node_list(req);
+			setup_ordered_sd_vnode_list(req);
 			setup_access_to_local_objects(req);
 
 			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
@@ -252,7 +252,7 @@ static void queue_request(struct request *req)
 	if (!(hdr->flags & SD_FLAG_CMD_DIRECT))
 		hdr->epoch = sys->epoch;
 
-	req->nr_nodes = setup_ordered_sd_node_list(req);
+	setup_ordered_sd_vnode_list(req);
 	setup_access_to_local_objects(req);
 
 	cevent->ctype = CPG_EVENT_REQUEST;
@@ -568,8 +568,8 @@ int create_listen_port(int port, void *data)
 	return create_listen_ports(port, create_listen_port_fn, data);
 }
 
-int write_object(struct sheepdog_node_list_entry *e,
-		 int nodes, uint32_t node_version,
+int write_object(struct sheepdog_vnode_list_entry *e,
+		 int vnodes, int nodes, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, int nr, int create)
 {
@@ -583,7 +583,7 @@ int write_object(struct sheepdog_node_list_entry *e,
 	for (i = 0; i < nr; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
-		n = obj_to_sheep(e, nodes, oid, i);
+		n = obj_to_sheep(e, vnodes, oid, i);
 
 		if (memcmp(e[n].addr, sys->this_node.addr, sizeof(e[n].addr)) == 0 &&
 		    e[n].port == sys->this_node.port) {
@@ -631,8 +631,8 @@ int write_object(struct sheepdog_node_list_entry *e,
 	return !success;
 }
 
-int read_object(struct sheepdog_node_list_entry *e,
-		int nodes, uint32_t node_version,
+int read_object(struct sheepdog_vnode_list_entry *e,
+		int vnodes, int nodes, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr)
 {
@@ -646,7 +646,7 @@ int read_object(struct sheepdog_node_list_entry *e,
 
 	/* search a local object first */
 	for (i = 0; i < nr; i++) {
-		n = obj_to_sheep(e, nodes, oid, i);
+		n = obj_to_sheep(e, vnodes, oid, i);
 
 		if (memcmp(e[n].addr, sys->this_node.addr, sizeof(e[n].addr)) == 0 &&
 		    e[n].port == sys->this_node.port) {
@@ -666,7 +666,7 @@ int read_object(struct sheepdog_node_list_entry *e,
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = datalen;
 
-		n = obj_to_sheep(e, nodes, oid, i);
+		n = obj_to_sheep(e, vnodes, oid, i);
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
@@ -703,8 +703,8 @@ int read_object(struct sheepdog_node_list_entry *e,
 	return -last_error;
 }
 
-int remove_object(struct sheepdog_node_list_entry *e,
-		  int nodes, uint32_t node_version,
+int remove_object(struct sheepdog_vnode_list_entry *e,
+		  int vnodes, int nodes, uint32_t node_version,
 		  uint64_t oid, int nr)
 {
 	char name[128];
@@ -718,7 +718,7 @@ int remove_object(struct sheepdog_node_list_entry *e,
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = 0;
 
-		n = obj_to_sheep(e, nodes, oid, i);
+		n = obj_to_sheep(e, vnodes, oid, i);
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
@@ -775,7 +775,7 @@ static int set_nodelay(int fd)
 	return ret;
 }
 
-int get_sheep_fd(struct sheepdog_node_list_entry *e, int node_idx,
+int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		 uint32_t epoch, int worker_idx)
 {
 	static int cached_fds[NR_WORKER_THREAD][SD_MAX_NODES];
@@ -817,9 +817,9 @@ int get_sheep_fd(struct sheepdog_node_list_entry *e, int node_idx,
 		return fd;
 	}
 
-	addr_to_str(name, sizeof(name), e[node_idx].addr, 0);
+	addr_to_str(name, sizeof(name), addr, 0);
 
-	fd = connect_to(name, e[node_idx].port);
+	fd = connect_to(name, port);
 	if (fd < 0)
 		return -1;
 

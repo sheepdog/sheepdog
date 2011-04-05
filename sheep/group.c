@@ -98,7 +98,7 @@ struct work_confchg {
 	char name[128];						\
 	list_for_each_entry(node, node_list, list) {		\
 		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",	\
-			is_myself(&node->ent) ? 'l' : ' ',	\
+			is_myself(node->ent.addr, node->ent.port) ? 'l' : ' ',	\
 			node->nodeid, node->pid,		\
 			addr_to_str(name, sizeof(name),		\
 			node->ent.addr, node->ent.port));	\
@@ -129,18 +129,6 @@ static void cpg_event_set_##name(void)					\
 CPG_EVENT_WORK_FNS(RUNNING, running)
 CPG_EVENT_WORK_FNS(SUSPENDED, suspended)
 CPG_EVENT_WORK_FNS(JOINING, joining)
-
-static int node_cmp(const void *a, const void *b)
-{
-	const struct sheepdog_node_list_entry *node1 = a;
-	const struct sheepdog_node_list_entry *node2 = b;
-
-	if (node1->id < node2->id)
-		return -1;
-	if (node1->id > node2->id)
-		return 1;
-	return 0;
-}
 
 static int send_message(cpg_handle_t handle, struct message_header *msg)
 {
@@ -198,9 +186,26 @@ int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
 	return build_node_list(&sys->sd_node_list, entries);
 }
 
-int setup_ordered_sd_node_list(struct request *req)
+void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
+			       int *nr_vnodes, int *nr_nodes)
 {
-	return get_ordered_sd_node_list(req->entry);
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	int nr;
+
+	nr = build_node_list(&sys->sd_node_list, nodes);
+	*nr_nodes = nr;
+
+	if (sys->nr_vnodes == 0)
+		sys->nr_vnodes = nodes_to_vnodes(nodes, nr, sys->vnodes);
+
+	memcpy(entries, sys->vnodes, sizeof(*entries) * sys->nr_vnodes);
+
+	*nr_vnodes = sys->nr_vnodes;
+}
+
+void setup_ordered_sd_vnode_list(struct request *req)
+{
+	get_ordered_sd_vnode_list(req->entry, &req->nr_vnodes, &req->nr_nodes);
 }
 
 static void get_node_list(struct sd_node_req *req,
@@ -330,7 +335,7 @@ static int is_master(void)
 		return 0;
 
 	node = list_first_entry(&sys->sd_node_list, struct node, list);
-	if (is_myself(&node->ent))
+	if (is_myself(node->ent.addr, node->ent.port))
 		return 1;
 	return 0;
 }
@@ -496,7 +501,7 @@ static void get_vdi_bitmap_from_all(void)
 	nr_nodes = get_ordered_sd_node_list(entry);
 
 	for (i = 0; i < nr_nodes; i++) {
-		if (is_myself(&entry[i]))
+		if (is_myself(entry[i].addr, entry[i].port))
 			continue;
 
 		addr_to_str(host, sizeof(host), entry[i].addr, 0);
@@ -539,11 +544,11 @@ static int move_node_to_sd_list(uint32_t nodeid, uint32_t pid,
 	if (!node)
 		return 1;
 
-	if (!node->ent.id)
-		node->ent = ent;
+	node->ent = ent;
 
 	list_del(&node->list);
 	list_add_tail(&node->list, &sys->sd_node_list);
+	sys->nr_vnodes = 0;
 
 	return 0;
 }
@@ -555,7 +560,7 @@ static void update_cluster_info(struct join_message *msg)
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 
 	if (msg->result != SD_RES_SUCCESS) {
-		if (is_myself(&msg->header.from)) {
+		if (is_myself(msg->header.from.addr, msg->header.from.port)) {
 			eprintf("failed to join sheepdog, %d\n", msg->result);
 			sys->status = SD_STATUS_JOIN_FAILED;
 		}
@@ -746,7 +751,6 @@ static void vdi_op_done(struct vdi_op_message *msg)
 			eprintf("can't write epoch %u\n", sys->epoch);
 		update_epoch_store(sys->epoch);
 
-		set_nodeid(sys->this_node.id);
 		set_global_nr_copies(sys->nr_sobjs);
 
 		sys->status = SD_STATUS_OK;
@@ -759,7 +763,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		ret = SD_RES_UNKNOWN;
 	}
 out:
-	if (!is_myself(&msg->header.from))
+	if (!is_myself(msg->header.from.addr, msg->header.from.port))
 		return;
 
 	req = list_first_entry(&sys->pending_list, struct request, pending_list);
@@ -804,8 +808,7 @@ static void __sd_deliver(struct cpg_event *cevent)
 			return;
 		}
 
-		if (!node->ent.id)
-			node->ent = m->from;
+		node->ent = m->from;
 	}
 
 	if (m->state == DM_INIT && is_master()) {
@@ -949,6 +952,7 @@ static void del_node(struct cpg_address *addr, struct work_confchg *w)
 		struct sheepdog_node_list_entry e[SD_MAX_NODES];
 
 		w->sd_node_left++;
+		sys->nr_vnodes = 0;
 
 		list_del(&node->list);
 		free(node);
@@ -1557,19 +1561,7 @@ join_retry:
 
 	set_addr(nodeid, port);
 	sys->this_node.port = port;
-
-	ret = get_nodeid(&sys->this_node.id);
-	if (!sys->this_node.id) {
-		uint64_t hval;
-		int i;
-
-		hval = fnv_64a_buf(&sys->this_node.port,
-				   sizeof(sys->this_node.port),
-				   FNV1A_64_INIT);
-		for (i = ARRAY_SIZE(sys->this_node.addr) - 1; i >= 0; i--)
-			hval = fnv_64a_buf(&sys->this_node.addr[i], 1, hval);
-		sys->this_node.id = hval;
-	}
+	sys->this_node.nr_vnodes = SD_DEFAULT_VNODES;
 
 	if (get_latest_epoch() == 0)
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
