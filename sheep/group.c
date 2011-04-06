@@ -1355,7 +1355,7 @@ do_retry:
 				struct data_object_bmap *bmap;
 
 				req->check_consistency = 1;
-				if (is_data_obj(hdr->oid)) {
+				if (!is_vdi_obj(hdr->oid)) {
 					list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
 						if (bmap->vdi_id == vdi_id) {
 							if (test_bit(data_oid_to_idx(hdr->oid), bmap->dobjs))

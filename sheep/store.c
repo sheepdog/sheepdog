@@ -688,7 +688,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		if (hdr->flags & SD_FLAG_CMD_TRUNCATE)
 			ftruncate(fd, hdr->offset + hdr->data_length);
 
-		if (!is_data_obj(oid)) {
+		if (is_vdi_obj(oid)) {
 			jd.jdf_epoch = epoch;
 			jd.jdf_oid = oid;
 			jd.jdf_target_fd = fd;
@@ -746,10 +746,12 @@ static int fix_object_consistency(struct request *req, int idx)
 	void *data = req->data, *buf;
 	uint64_t oid = hdr->oid;
 
-	if (is_data_obj(hdr->oid))
-		data_length = SD_DATA_OBJ_SIZE;
-	else
+	if (is_vdi_obj(hdr->oid))
 		data_length = sizeof(struct sheepdog_inode);
+	else if (is_vdi_attr_obj(hdr->oid))
+		data_length = SD_MAX_VDI_ATTR_VALUE_LEN;
+	else
+		data_length = SD_DATA_OBJ_SIZE;
 
 	buf = zalloc(data_length);
 	if (buf == NULL) {
@@ -1188,10 +1190,12 @@ next:
 		return -1;
 	}
 
-	if (is_data_obj(oid))
-		rlen = SD_DATA_OBJ_SIZE;
-	else
+	if (is_vdi_obj(oid))
 		rlen = sizeof(struct sheepdog_inode);
+	else if (is_vdi_attr_obj(oid))
+		rlen = SD_MAX_VDI_ATTR_VALUE_LEN;
+	else
+		rlen = SD_DATA_OBJ_SIZE;
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
@@ -1316,10 +1320,12 @@ static void recover_one(struct work *work, int idx)
 		goto out;
 	}
 
-	if (is_data_obj(oid))
-		buf = malloc(SD_DATA_OBJ_SIZE);
-	else
+	if (is_vdi_obj(oid))
 		buf = malloc(sizeof(struct sheepdog_inode));
+	else if (is_vdi_attr_obj(oid))
+		buf = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
+	else
+		buf = malloc(SD_DATA_OBJ_SIZE);
 
 	cur_nr_nodes = epoch_log_read(epoch, (char *)cur_nodes, sizeof(cur_nodes));
 	if (cur_nr_nodes <= 0) {
@@ -1843,7 +1849,7 @@ static int init_epoch_path(const char *base_path)
 
 		oid = strtoull(dent->d_name, NULL, 16);
 
-		if (is_data_obj(oid))
+		if (!is_vdi_obj(oid))
 			continue;
 
 		vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 "\n", oid);

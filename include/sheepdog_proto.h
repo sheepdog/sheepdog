@@ -208,9 +208,25 @@ static inline int is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
 	return inode->vdi_id == inode->data_vdi_id[idx];
 }
 
+static inline int is_vdi_obj(uint64_t oid)
+{
+	return !!(oid & VDI_BIT);
+}
+
+static inline int is_vmstate_obj(uint64_t oid)
+{
+	return !!(oid & VMSTATE_BIT);
+}
+
+static inline int is_vdi_attr_obj(uint64_t oid)
+{
+	return !!(oid & VDI_ATTR_BIT);
+}
+
 static inline int is_data_obj(uint64_t oid)
 {
-	return !(VDI_BIT & oid);
+	return !is_vdi_obj(oid) && !is_vmstate_obj(oid) &&
+		!is_vdi_attr_obj(oid);
 }
 
 static inline uint64_t data_oid_to_idx(uint64_t oid)
