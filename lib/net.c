@@ -70,25 +70,21 @@ int rx(struct connection *conn, enum conn_state next_state)
 int tx(struct connection *conn, enum conn_state next_state, int flags)
 {
 	int ret;
-again:
+
 	ret = send(conn->fd, conn->tx_buf, conn->tx_length, flags);
 	if (ret < 0) {
-		if (errno == EAGAIN)
-			goto again;
-
-		conn->c_tx_state = C_IO_CLOSED;
+		if (errno != EAGAIN)
+			conn->c_tx_state = C_IO_CLOSED;
 		return 0;
 	}
 
 	conn->tx_length -= ret;
 	conn->tx_buf = (char *)conn->tx_buf + ret;
 
-	if (conn->tx_length)
-		goto again;
+	if (!conn->tx_length)
+		conn->c_tx_state = next_state;
 
-	conn->c_tx_state = next_state;
-
-	return 1;
+	return ret;
 }
 
 int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)

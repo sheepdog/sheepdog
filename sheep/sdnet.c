@@ -429,11 +429,7 @@ again:
 
 	switch (ci->conn.c_tx_state) {
 	case C_IO_HEADER:
-		if (rsp->data_length)
-			ret = tx(&ci->conn, C_IO_DATA_INIT, MSG_MORE);
-		else
-			ret = tx(&ci->conn, C_IO_DATA_INIT, 0);
-
+		ret = tx(&ci->conn, C_IO_DATA_INIT, 0);
 		if (!ret)
 			break;
 
@@ -543,6 +539,12 @@ static void listen_handler(int listen_fd, int events, void *data)
 	}
 
 	ret = set_nodelay(fd);
+	if (ret) {
+		close(fd);
+		return;
+	}
+
+	ret = set_nonblocking(fd);
 	if (ret) {
 		close(fd);
 		return;
