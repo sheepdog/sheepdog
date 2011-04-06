@@ -479,8 +479,13 @@ out:
 static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 {
 	char path[1024];
-	int flags = O_SYNC | O_RDWR | aflags;
+	int flags;
 	int fd;
+
+	if (sys->use_directio && is_data_obj(oid))
+		flags = O_DIRECT | O_RDWR | aflags;
+	else
+		flags = O_SYNC | O_RDWR | aflags;
 
 	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path, epoch, oid);
 
@@ -608,7 +613,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		if (hdr->flags & SD_FLAG_CMD_COW) {
 			dprintf("%" PRIu64 ", %" PRIx64 "\n", oid, hdr->cow_oid);
 
-			buf = zalloc(SD_DATA_OBJ_SIZE);
+			buf = valloc(SD_DATA_OBJ_SIZE);
 			if (!buf) {
 				eprintf("failed to allocate memory\n");
 				ret = SD_RES_NO_MEM;
@@ -632,10 +637,19 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			free(buf);
 			buf = NULL;
 		} else {
-			int zero = 0;
+			int size = SECTOR_SIZE;
+			buf = valloc(size);
+			if (!buf) {
+				eprintf("failed to allocate memory\n");
+				ret = SD_RES_NO_MEM;
+				goto out;
+			}
+			memset(buf, 0, size);
+			ret = pwrite64(fd, buf, size, SD_DATA_OBJ_SIZE - size);
+			free(buf);
+			buf = NULL;
 
-			ret = pwrite64(fd, &zero, sizeof(zero), SD_DATA_OBJ_SIZE - sizeof(zero));
-			if (ret != sizeof(zero)) {
+			if (ret != size) {
 				if (errno == ENOSPC)
 					ret = SD_RES_NO_SPACE;
 				else
@@ -753,11 +767,12 @@ static int fix_object_consistency(struct request *req, int idx)
 	else
 		data_length = SD_DATA_OBJ_SIZE;
 
-	buf = zalloc(data_length);
+	buf = valloc(data_length);
 	if (buf == NULL) {
 		eprintf("out of memory\n");
 		goto out;
 	}
+	memset(buf, 0, data_length);
 
 	req->data = buf;
 	hdr->offset = 0;
@@ -1324,6 +1339,8 @@ static void recover_one(struct work *work, int idx)
 		buf = malloc(sizeof(struct sheepdog_inode));
 	else if (is_vdi_attr_obj(oid))
 		buf = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
+	else if (is_data_obj(oid))
+		buf = valloc(SD_DATA_OBJ_SIZE);
 	else
 		buf = malloc(SD_DATA_OBJ_SIZE);
 

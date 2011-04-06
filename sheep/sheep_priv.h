@@ -135,6 +135,8 @@ struct cluster_info {
 	int nr_outstanding_reqs;
 
 	uint32_t recovered_epoch;
+
+	int use_directio;
 };
 
 extern struct cluster_info *sys;

@@ -267,14 +267,19 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 {
 	struct request *req;
 
-	req = zalloc(sizeof(struct request) + data_length);
+	req = zalloc(sizeof(struct request));
 	if (!req)
 		return NULL;
 
 	req->ci = ci;
 	client_incref(ci);
-	if (data_length)
-		req->data = (char *)req + sizeof(*req);
+	if (data_length) {
+		req->data = valloc(data_length);
+		if (!req->data) {
+			free(req);
+			return NULL;
+		}
+	}
 
 	list_add(&req->r_siblings, &ci->reqs);
 	INIT_LIST_HEAD(&req->r_wlist);
@@ -287,6 +292,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 static void free_request(struct request *req)
 {
 	list_del(&req->r_siblings);
+	free(req->data);
 	free(req);
 
 	sys->nr_outstanding_reqs--;

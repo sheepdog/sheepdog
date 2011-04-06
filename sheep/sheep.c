@@ -32,11 +32,12 @@ static struct option const long_options[] = {
 	{"foreground", no_argument, NULL, 'f'},
 	{"loglevel", required_argument, NULL, 'l'},
 	{"debug", no_argument, NULL, 'd'},
+	{"directio", no_argument, NULL, 'D'},
 	{"help", no_argument, NULL, 'h'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "p:fl:dh";
+static const char *short_options = "p:fl:dDh";
 
 static void usage(int status)
 {
@@ -51,6 +52,7 @@ Sheepdog Daemon, version %s\n\
   -f, --foreground        make the program run in the foreground\n\
   -l, --loglevel          specify the message level printed by default\n\
   -d, --debug             print debug messages\n\
+  -D, --directio          use direct IO\n\
   -h, --help              display this help and exit\n\
 ", PACKAGE_VERSION);
 	}
@@ -84,6 +86,10 @@ int main(int argc, char **argv)
 		case 'd':
 			/* removed soon. use loglevel instead */
 			log_level = LOG_DEBUG;
+			break;
+		case 'D':
+			dprintf("direct IO mode\n");
+			sys->use_directio = 1;
 			break;
 		case 'h':
 			usage(0);
