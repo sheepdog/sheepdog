@@ -849,6 +849,8 @@ out:
 		dprintf("failed, %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
 			idx, opcode, oid, epoch, ret);
 		rsp->result = ret;
+		if (!(ret == SD_RES_NO_OBJ && hdr->flags & SD_FLAG_CMD_RECOVERY))
+			rsp->data_length = 0;
 	}
 }
 
