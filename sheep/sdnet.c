@@ -804,13 +804,6 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 	if (fd < 0)
 		return -1;
 
-	ret = set_nonblocking(fd);
-	if (ret) {
-		eprintf("%m\n");
-		close(fd);
-		return -1;
-	}
-
 	ret = set_nodelay(fd);
 	if (ret) {
 		eprintf("%m\n");
