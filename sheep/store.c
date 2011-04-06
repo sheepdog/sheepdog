@@ -780,7 +780,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->opcode = SD_OP_READ_OBJ;
 	hdr->flags = 0;
 	ret = forward_read_obj_req(req, idx);
-	if (ret < 0) {
+	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to read object, %d\n", ret);
 		goto out;
 	}
@@ -789,7 +789,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->oid = oid;
 	ret = forward_write_obj_req(req, idx);
-	if (ret < 0) {
+	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to write object, %d\n", ret);
 		goto out;
 	}
@@ -832,7 +832,7 @@ void store_queue_request(struct work *work, int idx)
 		/* fix object consistency when we read the object for the first time */
 		if (req->check_consistency) {
 			ret = fix_object_consistency(req, idx);
-			if (ret < 0)
+			if (ret != SD_RES_SUCCESS)
 				goto out;
 		}
 
