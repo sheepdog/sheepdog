@@ -38,5 +38,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 int create_listen_ports(int port, int (*callback)(int fd, void *), void *data);
 
 char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port);
+int set_nonblocking(int fd);
+int set_nodelay(int fd);
 
 #endif

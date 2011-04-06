@@ -146,18 +146,10 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 			continue;
 		}
 
-		ret = fcntl(fd, F_GETFL);
+		ret = set_nonblocking(fd);
 		if (ret < 0) {
-			eprintf("can't fcntl (F_GETFL), %m\n");
 			close(fd);
 			continue;
-		} else {
-			ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
-			if (ret < 0) {
-				eprintf("can't fcntl (O_NONBLOCK), %m\n");
-				close(fd);
-				continue;
-			}
 		}
 
 		ret = callback(fd, data);
@@ -367,4 +359,30 @@ char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
 	}
 
 	return str;
+}
+
+int set_nonblocking(int fd)
+{
+	int ret;
+
+	ret = fcntl(fd, F_GETFL);
+	if (ret < 0) {
+		eprintf("can't fcntl (F_GETFL), %m\n");
+		close(fd);
+	} else {
+		ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
+		if (ret < 0)
+			eprintf("can't fcntl (O_NONBLOCK), %m\n");
+	}
+
+	return ret;
+}
+
+int set_nodelay(int fd)
+{
+	int ret, opt;
+
+	opt = 1;
+	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+	return ret;
 }

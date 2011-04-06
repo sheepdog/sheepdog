@@ -526,7 +526,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 {
 	struct sockaddr_storage from;
 	socklen_t namesize;
-	int fd, ret, opt;
+	int fd, ret;
 	struct client_info *ci;
 
 	if (sys->status == SD_STATUS_SHUTDOWN) {
@@ -542,8 +542,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 		return;
 	}
 
-	opt = 1;
-	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
+	ret = set_nodelay(fd);
 	if (ret) {
 		close(fd);
 		return;
@@ -753,32 +752,6 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 		return -1;
 
 	return 0;
-}
-
-static int set_nonblocking(int fd)
-{
-	int ret;
-
-	ret = fcntl(fd, F_GETFL);
-	if (ret < 0) {
-		eprintf("can't fcntl (F_GETFL), %m\n");
-		close(fd);
-	} else {
-		ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
-		if (ret < 0)
-			eprintf("can't fcntl (O_NONBLOCK), %m\n");
-	}
-
-	return ret;
-}
-
-static int set_nodelay(int fd)
-{
-	int ret, opt;
-
-	opt = 1;
-	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
-	return ret;
 }
 
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
