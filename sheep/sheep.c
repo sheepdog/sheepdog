@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <signal.h>
 #include <linux/limits.h>
 #include <sys/syslog.h>
 
@@ -70,6 +71,8 @@ int main(int argc, char **argv)
 	int is_daemon = 1;
 	int log_level = LOG_INFO;
 	char path[PATH_MAX];
+
+	signal(SIGPIPE, SIG_IGN);
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
