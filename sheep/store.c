@@ -1048,7 +1048,7 @@ struct recovery_work {
 	struct list_head rw_siblings;
 
 	int count;
-	char *buf;
+	uint64_t *oids;
 };
 
 static LIST_HEAD(recovery_work_list);
@@ -1314,7 +1314,7 @@ static void recover_one(struct work *work, int idx)
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	char *buf = NULL;
 	int ret;
-	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
+	uint64_t oid = rw->oids[rw->done];
 	struct sheepdog_node_list_entry old_nodes[SD_MAX_NODES];
 	struct sheepdog_node_list_entry cur_nodes[SD_MAX_NODES];
 	struct sheepdog_vnode_list_entry old_vnodes[SD_MAX_VNODES];
@@ -1420,7 +1420,7 @@ static void __start_recovery(struct work *work, int idx);
 static void recover_timer(void *data)
 {
 	struct recovery_work *rw = (struct recovery_work *)data;
-	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
+	uint64_t oid = rw->oids[rw->done];
 
 	if (is_access_to_busy_objects(oid)) {
 		suspended_recovery_work = rw;
@@ -1441,7 +1441,7 @@ void resume_recovery_work(void)
 
 	rw = suspended_recovery_work;
 
-	oid =  *(((uint64_t *)rw->buf) + rw->done);
+	oid =  rw->oids[rw->done];
 	if (is_access_to_busy_objects(oid))
 		return;
 
@@ -1474,7 +1474,7 @@ int is_recoverying_oid(uint64_t oid)
 	}
 
 	if (recovering_hval <= hval) {
-		if (bsearch(&oid, ((uint64_t *)rw->buf) + rw->done,
+		if (bsearch(&oid, rw->oids + rw->done,
 			    rw->count - rw->done, sizeof(oid), obj_cmp)) {
 			dprintf("recover the object %" PRIx64 " first\n", oid);
 			blocking_oid = oid;
@@ -1489,7 +1489,7 @@ int is_recoverying_oid(uint64_t oid)
 static void recover_done(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-	uint64_t oid = *(((uint64_t *)rw->buf) + rw->done);
+	uint64_t oid = rw->oids[rw->done];
 
 	if (rw->retry && list_empty(&recovery_work_list)) {
 		rw->retry = 0;
@@ -1522,7 +1522,7 @@ static void recover_done(struct work *work, int idx)
 	sys->recovered_epoch = rw->epoch;
 	resume_pending_requests();
 
-	free(rw->buf);
+	free(rw->oids);
 	free(rw);
 
 	if (!list_empty(&recovery_work_list)) {
@@ -1638,7 +1638,7 @@ static int fill_obj_list(struct recovery_work *rw,
 		nr  = __fill_obj_list(cur_entry + i, rw->epoch, buf, buf_size);
 		if (nr < 0)
 			goto fail;
-		rw->count = merge_objlist(vnodes, nr_vnodes, (uint64_t *)rw->buf,
+		rw->count = merge_objlist(vnodes, nr_vnodes, rw->oids,
 					  rw->count, (uint64_t *)buf, nr, nr_objs);
 	}
 
@@ -1700,7 +1700,7 @@ static void __start_recovery(struct work *work, int idx)
 		eprintf("failed to open %s, %s, %m\n", tmp_path, strerror(errno));
 		goto fail;
 	}
-	ret = write(fd, rw->buf, sizeof(uint64_t) * rw->count);
+	ret = write(fd, rw->oids, sizeof(*rw->oids) * rw->count);
 	if (ret != sizeof(uint64_t) * rw->count) {
 		eprintf("failed to write to %s, %m\n", tmp_path);
 		close(fd);
@@ -1729,7 +1729,7 @@ int start_recovery(uint32_t epoch)
 	if (!rw)
 		return -1;
 
-	rw->buf = malloc(1 << 20); /* FIXME */
+	rw->oids = malloc(1 << 20); /* FIXME */
 	rw->epoch = epoch;
 	rw->count = 0;
 
