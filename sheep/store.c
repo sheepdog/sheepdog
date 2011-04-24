@@ -1038,7 +1038,14 @@ static int contains_node(struct sheepdog_vnode_list_entry *key,
 	return -1;
 }
 
+enum rw_state {
+	RW_INIT,
+	RW_RUN,
+};
+
 struct recovery_work {
+	enum rw_state state;
+
 	uint32_t epoch;
 	uint32_t done;
 
@@ -1407,9 +1414,6 @@ fail:
 out:
 	if (buf)
 		free(buf);
-
-	if (!rw->retry)
-		rw->done++;
 }
 
 static struct recovery_work *suspended_recovery_work;
@@ -1466,6 +1470,9 @@ int is_recoverying_oid(uint64_t oid)
 	if (before(rw->epoch, sys->epoch))
 		return 1;
 
+	if (rw->state == RW_INIT)
+		return 1;
+
 	fd = ob_open(sys->epoch, oid, 0, &ret);
 	if (fd != -1) {
 		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
@@ -1489,7 +1496,14 @@ int is_recoverying_oid(uint64_t oid)
 static void recover_done(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-	uint64_t oid = rw->oids[rw->done];
+	uint64_t oid;
+
+	if (rw->state == RW_INIT)
+		rw->state = RW_RUN;
+	else if (!rw->retry)
+		rw->done++;
+
+	oid = rw->oids[rw->done];
 
 	if (rw->retry && list_empty(&recovery_work_list)) {
 		rw->retry = 0;
@@ -1729,6 +1743,7 @@ int start_recovery(uint32_t epoch)
 	if (!rw)
 		return -1;
 
+	rw->state = RW_INIT;
 	rw->oids = malloc(1 << 20); /* FIXME */
 	rw->epoch = epoch;
 	rw->count = 0;
