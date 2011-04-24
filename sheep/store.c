@@ -357,7 +357,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 	uint64_t oid = hdr.oid;
 	int copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
-	int done, nr_fds, local = 0;
+	int nr_fds, local = 0;
 
 	dprintf("%"PRIx64"\n", oid);
 	e = req->entry;
@@ -372,7 +372,6 @@ static int forward_write_obj_req(struct request *req, int idx)
 		copies = req->nr_nodes;
 
 	nr_fds = 0;
-	done = 0;
 	memset(pfds, 0, sizeof(pfds));
 	for (i = 0; i < ARRAY_SIZE(pfds); i++)
 		pfds[i].fd = -1;
@@ -426,52 +425,50 @@ static int forward_write_obj_req(struct request *req, int idx)
 		}
 	}
 
+	ret = SD_RES_SUCCESS;
 again:
-	ret = poll(pfds, nr_fds, -1);
-
-	if (ret < 0) {
+	if (poll(pfds, nr_fds, -1) < 0) {
 		if (errno == EINTR)
 			goto again;
 
 		ret = SD_RES_EIO;
-		goto out;
 	}
 
 	for (i = 0; i < nr_fds; i++) {
 		if (pfds[i].fd < 0)
-			continue;
+			break;
 
-		if (pfds[i].revents & POLLERR || pfds[i].revents & POLLHUP) {
-			ret = SD_RES_EIO;
-			goto out;
+		if (pfds[i].revents & POLLERR || pfds[i].revents & POLLHUP || pfds[i].revents & POLLNVAL) {
+			ret = SD_RES_NETWORK_ERROR;
+			break;
 		}
 
 		if (!(pfds[i].revents & POLLIN))
 			continue;
 
-		ret = do_read(pfds[i].fd, rsp, sizeof(*rsp));
-
-		if (ret) {
+		if (do_read(pfds[i].fd, rsp, sizeof(*rsp))) {
 			eprintf("failed to get a rsp, %m\n");
 			ret = SD_RES_NETWORK_ERROR;
-			goto out;
+			break;
 		}
 
 		if (rsp->result != SD_RES_SUCCESS) {
 			eprintf("fail %"PRIu32"\n", rsp->result);
 			ret = rsp->result;
-			goto out;
 		}
 
-		done++;
+		break;
+	}
+	if (i < nr_fds) {
+		nr_fds--;
+		memmove(pfds + i, pfds + i + 1, sizeof(*pfds) * (nr_fds - i));
 	}
 
-	dprintf("%"PRIx64" %"PRIu32" %"PRIu32"\n", oid, nr_fds, done);
+	dprintf("%"PRIx64" %"PRIu32"\n", oid, nr_fds);
 
-	if (done != nr_fds)
+	if (nr_fds > 0) {
 		goto again;
-
-	ret = SD_RES_SUCCESS;
+	}
 out:
 	return ret;
 }
