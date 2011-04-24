@@ -845,10 +845,10 @@ out:
 	if (ret != SD_RES_SUCCESS) {
 		dprintf("failed, %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
 			idx, opcode, oid, epoch, ret);
-		rsp->result = ret;
 		if (!(ret == SD_RES_NO_OBJ && hdr->flags & SD_FLAG_CMD_RECOVERY))
 			rsp->data_length = 0;
 	}
+	rsp->result = ret;
 }
 
 int epoch_log_write(uint32_t epoch, char *buf, int len)
