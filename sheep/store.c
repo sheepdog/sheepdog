@@ -1638,6 +1638,8 @@ static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entri
 	return nr_list1;
 }
 
+#define MAX_RETRY_CNT  6
+
 static int fill_obj_list(struct recovery_work *rw,
 			 struct sheepdog_node_list_entry *old_entry, int old_nr,
 			 struct sheepdog_node_list_entry *cur_entry, int cur_nr,
@@ -1647,7 +1649,7 @@ static int fill_obj_list(struct recovery_work *rw,
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
 	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
-	int nr_vnodes;
+	int nr_vnodes, retry_cnt = 0;
 
 	buf = malloc(buf_size);
 	if (!buf)
@@ -1665,9 +1667,20 @@ static int fill_obj_list(struct recovery_work *rw,
 			/* cur_entry[i] doesn't have a list file */
 			continue;
 
+	retry:
 		nr  = __fill_obj_list(cur_entry + i, rw->epoch, buf, buf_size);
-		if (nr < 0)
-			goto fail;
+		if (nr < 0) {
+			retry_cnt++;
+			if (retry_cnt > MAX_RETRY_CNT) {
+				eprintf("failed to get object list\n");
+				eprintf("some objects may be lost\n");
+				continue;
+			} else {
+				dprintf("retry get object list\n");
+				sleep(1);
+				goto retry;
+			}
+		}
 		rw->count = merge_objlist(vnodes, nr_vnodes, rw->oids,
 					  rw->count, (uint64_t *)buf, nr, nr_objs);
 	}
