@@ -1342,7 +1342,10 @@ do_retry:
 
 			sys->nr_outstanding_io++;
 
-			if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
+			if (is_access_local(req->entry, req->nr_vnodes,
+					    ((struct sd_obj_req *)&req->rq)->oid, sys->nr_sobjs) ||
+			    is_access_local(req->entry, req->nr_vnodes,
+					    ((struct sd_obj_req *)&req->rq)->cow_oid, sys->nr_sobjs)) {
 				int ret = check_epoch(req);
 				if (ret != SD_RES_SUCCESS) {
 					req->rp.result = ret;
@@ -1350,7 +1353,10 @@ do_retry:
 					list_add_tail(&req->r_wlist, &failed_req_list);
 					continue;
 				}
-			} else if (req->rq.opcode == SD_OP_READ_OBJ) {
+			}
+
+			if (!(req->rq.flags & SD_FLAG_CMD_DIRECT) &&
+			    req->rq.opcode == SD_OP_READ_OBJ) {
 				struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 				uint32_t vdi_id = oid_to_vid(hdr->oid);
 				struct data_object_bmap *bmap;

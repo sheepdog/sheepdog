@@ -51,10 +51,13 @@ void resume_pending_requests(void)
 		start_cpg_event_work();
 }
 
-static int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
-			   uint64_t oid, int copies)
+int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
+		    uint64_t oid, int copies)
 {
 	int i, n;
+
+	if (oid == 0)
+		return 0;
 
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr_nodes, oid, i);
