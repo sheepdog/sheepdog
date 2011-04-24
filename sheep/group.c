@@ -1273,6 +1273,20 @@ int is_access_to_busy_objects(uint64_t oid)
 	return 0;
 }
 
+static int __is_access_to_recoverying_objects(struct request *req)
+{
+	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
+		if (req->rq.opcode != SD_OP_READ_OBJ)
+			eprintf("bug\n");
+		return 0;
+	}
+
+	if (is_recoverying_oid(req->local_oid))
+		return 1;
+
+	return 0;
+}
+
 static int __is_access_to_busy_objects(struct request *req)
 {
 	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
@@ -1282,9 +1296,6 @@ static int __is_access_to_busy_objects(struct request *req)
 	}
 
 	if (is_access_to_busy_objects(req->local_oid))
-		return 1;
-
-	if (is_recoverying_oid(req->local_oid))
 		return 1;
 
 	return 0;
@@ -1353,6 +1364,15 @@ do_retry:
 		list_del(&cevent->cpg_event_list);
 
 		if (is_io_request(req->rq.opcode)) {
+			if (__is_access_to_recoverying_objects(req)) {
+				if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
+					req->rp.result = SD_RES_NEW_NODE_VER;
+					sys->nr_outstanding_io++; /* TODO: cleanup */
+					list_add_tail(&req->r_wlist, &failed_req_list);
+				} else
+					list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
+				continue;
+			}
 			if (__is_access_to_busy_objects(req)) {
 				list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
 				continue;
