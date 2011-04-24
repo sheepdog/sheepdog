@@ -65,6 +65,10 @@ struct join_message {
 	} nodes[SD_MAX_NODES];
 };
 
+struct leave_message {
+	struct message_header header;
+};
+
 struct vdi_op_message {
 	struct message_header header;
 	struct sd_vdi_req req;
@@ -841,6 +845,9 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 	struct message_header *m;
 	char name[128];
 	int do_recovery;
+	struct node *node;
+	struct sheepdog_node_list_entry e[SD_MAX_NODES];
+	int nr;
 
 	m = w->msg;
 
@@ -849,13 +856,33 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 		case SD_MSG_JOIN:
 			update_cluster_info((struct join_message *)m);
 			break;
+		case SD_MSG_LEAVE:
+			node = find_node(&sys->sd_node_list, m->nodeid, m->pid);
+			if (node) {
+				sys->nr_vnodes = 0;
+
+				list_del(&node->list);
+				free(node);
+				if (sys->status == SD_STATUS_OK) {
+					nr = get_ordered_sd_node_list(e);
+					dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr);
+					epoch_log_write(sys->epoch + 1, (char *)e,
+							nr * sizeof(struct sheepdog_node_list_entry));
+
+					sys->epoch++;
+
+					update_epoch_store(sys->epoch);
+				}
+			}
+			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
 			break;
 		}
 	}
 
-	do_recovery = (m->state == DM_FIN && m->op == SD_MSG_JOIN);
+	do_recovery = (m->state == DM_FIN &&
+		       (m->op == SD_MSG_JOIN || m->op == SD_MSG_LEAVE));
 
 	dprintf("op: %d, state: %u, size: %d, from: %s\n",
 		m->op, m->state, m->msg_length,
@@ -1364,6 +1391,11 @@ do_retry:
 		list_del(&cevent->cpg_event_list);
 
 		if (is_io_request(req->rq.opcode)) {
+			int copies = sys->nr_sobjs;
+
+			if (copies > req->nr_nodes)
+				copies = req->nr_nodes;
+
 			if (__is_access_to_recoverying_objects(req)) {
 				if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
 					req->rp.result = SD_RES_NEW_NODE_VER;
@@ -1383,9 +1415,9 @@ do_retry:
 			sys->nr_outstanding_io++;
 
 			if (is_access_local(req->entry, req->nr_vnodes,
-					    ((struct sd_obj_req *)&req->rq)->oid, sys->nr_sobjs) ||
+					    ((struct sd_obj_req *)&req->rq)->oid, copies) ||
 			    is_access_local(req->entry, req->nr_vnodes,
-					    ((struct sd_obj_req *)&req->rq)->cow_oid, sys->nr_sobjs)) {
+					    ((struct sd_obj_req *)&req->rq)->cow_oid, copies)) {
 				int ret = check_epoch(req);
 				if (ret != SD_RES_SUCCESS) {
 					req->rp.result = ret;
@@ -1627,4 +1659,21 @@ join_retry:
 	cpg_fd_get(cpg_handle, &fd);
 	register_event(fd, group_handler, NULL);
 	return 0;
+}
+
+/* after this function is called, this node only works as a gateway */
+int leave_cluster(void)
+{
+	struct leave_message msg;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
+	msg.header.op = SD_MSG_LEAVE;
+	msg.header.state = DM_FIN;
+	msg.header.msg_length = sizeof(msg);
+	msg.header.from = sys->this_node;
+	msg.header.nodeid = sys->this_nodeid;
+	msg.header.pid = sys->this_pid;
+
+	return send_message(sys->handle, (struct message_header *)&msg);
 }

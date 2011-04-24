@@ -489,9 +489,16 @@ static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		eprintf("failed to open %s, %s\n", path, strerror(errno));
-		if (errno == ENOENT)
+		if (errno == ENOENT) {
+			struct stat s;
+
 			*ret = SD_RES_NO_OBJ;
-		else
+			if (stat(obj_path, &s) < 0) {
+				/* store directory is corrupted */
+				eprintf("corrupted\n");
+				*ret = SD_RES_EIO;
+			}
+		} else
 			*ret = SD_RES_UNKNOWN;
 	} else
 		*ret = 0;

@@ -28,6 +28,7 @@
 #define SD_MSG_JOIN             0x01
 #define SD_MSG_VDI_OP           0x02
 #define SD_MSG_MASTER_CHANGED   0x03
+#define SD_MSG_LEAVE            0x04
 
 #define SD_STATUS_OK                0x00
 #define SD_STATUS_WAIT_FOR_FORMAT   0x01
@@ -172,6 +173,7 @@ int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
 void resume_pending_requests(void);
 
 int create_cluster(int port);
+int leave_cluster(void);
 
 void start_cpg_event_work(void);
 void store_queue_request(struct work *work, int idx);

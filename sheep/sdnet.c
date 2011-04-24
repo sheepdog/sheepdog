@@ -59,6 +59,9 @@ int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
 	if (oid == 0)
 		return 0;
 
+	if (copies > nr_nodes)
+		copies = nr_nodes;
+
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr_nodes, oid, i);
 
@@ -82,6 +85,8 @@ static void setup_access_to_local_objects(struct request *req)
 	copies = hdr->copies;
 	if (!copies)
 		copies = sys->nr_sobjs;
+	if (copies > req->nr_nodes)
+		copies = req->nr_nodes;
 
 	if (is_access_local(req->entry, req->nr_vnodes, hdr->oid, copies))
 		req->local_oid = hdr->oid;
@@ -92,6 +97,10 @@ static void __done(struct work *work, int idx)
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	int again = 0;
+	int copies = sys->nr_sobjs;
+
+	if (copies > req->nr_nodes)
+		copies = req->nr_nodes;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
@@ -151,6 +160,23 @@ static void __done(struct work *work, int idx)
 			bmap->vdi_id = vdi_id;
 			list_add(&bmap->list, &sys->consistent_obj_list);
 			set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+		} else if (is_access_local(req->entry, req->nr_vnodes,
+					   ((struct sd_obj_req *)&req->rq)->oid, copies) &&
+			   req->rp.result == SD_RES_EIO) {
+			eprintf("leave from cluster\n");
+			leave_cluster();
+
+			if (req->rq.flags & SD_FLAG_CMD_DIRECT)
+				/* hack to retry */
+				req->rp.result = SD_RES_NETWORK_ERROR;
+			else {
+				req->rq.epoch = sys->epoch;
+				setup_ordered_sd_vnode_list(req);
+				setup_access_to_local_objects(req);
+
+				list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+				again = 1;
+			}
 		}
 done:
 		resume_pending_requests();
