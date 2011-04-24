@@ -823,17 +823,6 @@ static void __sd_deliver(struct cpg_event *cevent)
 			break;
 		}
 	}
-
-	if (m->state == DM_FIN) {
-		switch (m->op) {
-		case SD_MSG_JOIN:
-			update_cluster_info((struct join_message *)m);
-			break;
-		default:
-			eprintf("unknown message %d\n", m->op);
-			break;
-		}
-	}
 }
 
 static void send_join_response(struct work_deliver *w)
@@ -854,6 +843,18 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 	int do_recovery;
 
 	m = w->msg;
+
+	if (m->state == DM_FIN) {
+		switch (m->op) {
+		case SD_MSG_JOIN:
+			update_cluster_info((struct join_message *)m);
+			break;
+		default:
+			eprintf("unknown message %d\n", m->op);
+			break;
+		}
+	}
+
 	do_recovery = (m->state == DM_FIN && m->op == SD_MSG_JOIN);
 
 	dprintf("op: %d, state: %u, size: %d, from: %s\n",
