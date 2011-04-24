@@ -1227,8 +1227,13 @@ out:
 	cpg_event_free(cevent);
 	cpg_event_clear_running();
 
-	if (!list_empty(&sys->cpg_event_siblings) && !cpg_event_suspended())
-		start_cpg_event_work();
+	if (!list_empty(&sys->cpg_event_siblings)) {
+		if (cpg_event_joining())
+			/* io requests need to return SD_RES_NEW_NODE_VER */
+			start_cpg_event_work();
+		else if (!cpg_event_suspended())
+			start_cpg_event_work();
+	}
 }
 
 static int check_epoch(struct request *req)
@@ -1318,6 +1323,21 @@ void start_cpg_event_work(void)
 	if (cpg_event_joining()) {
 		if (!cpg_event_suspended())
 			panic("should not happen\n");
+
+		if (cevent->ctype == CPG_EVENT_REQUEST) {
+			struct request *req = container_of(cevent, struct request, cev);
+			if (is_io_request(req->rq.opcode) && req->rq.flags & SD_FLAG_CMD_DIRECT) {
+				list_del(&cevent->cpg_event_list);
+
+				req->rp.result = SD_RES_NEW_NODE_VER;
+
+				/* TODO: cleanup */
+				list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
+				sys->nr_outstanding_io++;
+
+				req->work.done(&req->work, 0);
+			}
+		}
 		return;
 	}
 
