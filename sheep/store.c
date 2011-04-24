@@ -1277,7 +1277,8 @@ next:
 		return 0;
 	}
 
-	if (rsp->result == SD_RES_NEW_NODE_VER || rsp->result == SD_RES_OLD_NODE_VER) {
+	if (rsp->result == SD_RES_NEW_NODE_VER || rsp->result == SD_RES_OLD_NODE_VER
+	    || rsp->result == SD_RES_NETWORK_ERROR) {
 		eprintf("try again, %"PRIu32", %"PRIx64"\n", rsp->result, oid);
 		rw->retry = 1;
 		return 0;
