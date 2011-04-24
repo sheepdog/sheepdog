@@ -256,7 +256,8 @@ static void queue_request(struct request *req)
 		hdr->epoch = sys->epoch;
 
 	setup_ordered_sd_vnode_list(req);
-	setup_access_to_local_objects(req);
+	if (is_io_request(hdr->opcode))
+		setup_access_to_local_objects(req);
 
 	cevent->ctype = CPG_EVENT_REQUEST;
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
