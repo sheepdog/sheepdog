@@ -632,7 +632,6 @@ out:
 			update_epoch_store(sys->epoch);
 		}
 		if (sys->status != SD_STATUS_OK) {
-			get_vdi_bitmap_from_all();
 			set_global_nr_copies(sys->nr_sobjs);
 			set_cluster_ctime(msg->ctime);
 		}
@@ -827,6 +826,17 @@ static void __sd_deliver(struct cpg_event *cevent)
 			break;
 		}
 	}
+
+	if (m->state == DM_FIN) {
+		switch (m->op) {
+		case SD_MSG_JOIN:
+			if (((struct join_message *)m)->cluster_status == SD_STATUS_OK)
+				if (sys->status != SD_STATUS_OK)
+					get_vdi_bitmap_from_all();
+			break;
+		}
+	}
+
 }
 
 static void send_join_response(struct work_deliver *w)
