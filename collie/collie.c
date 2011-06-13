@@ -900,7 +900,7 @@ static int vdi_setattr(int argc, char **argv)
 	}
 
 	value = argv[optind++];
-	if (!value) {
+	if (!value && !vdi_cmd_data.delete) {
 		value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
 		if (!value) {
 			fprintf(stderr, "failed to allocate memory\n");
