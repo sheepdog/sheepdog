@@ -936,6 +936,9 @@ reread:
 		return 1;
 	}
 
+	if (nr_copies > nr_nodes)
+		nr_copies = nr_nodes;
+
 	oid = attr_oid;
 	for (i = 0; i < nr_copies; i++) {
 		rlen = 0;
@@ -1016,6 +1019,9 @@ static int vdi_getattr(int argc, char **argv)
 			sd_strerror(ret));
 		return 1;
 	}
+
+	if (nr_copies > nr_nodes)
+		nr_copies = nr_nodes;
 
 	oid = attr_oid;
 	value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
