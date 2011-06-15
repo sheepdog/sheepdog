@@ -238,7 +238,7 @@ void cluster_queue_request(struct work *work, int idx)
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 	struct vdi_op_message *msg;
 	struct epoch_log *log;
-	int ret = SD_RES_SUCCESS;
+	int ret = SD_RES_SUCCESS, i, max_logs, epoch;
 
 	eprintf("%p %x\n", req, hdr->opcode);
 
@@ -248,18 +248,26 @@ void cluster_queue_request(struct work *work, int idx)
 			      (struct sd_node_rsp *)rsp, req->data);
 		break;
 	case SD_OP_STAT_CLUSTER:
-		log = (struct epoch_log *)req->data;
+		max_logs = rsp->data_length / sizeof(log->nodes[0]);
+		epoch = get_latest_epoch();
+		rsp->data_length = 0;
+		for (i = 0; i < max_logs; i++) {
+			if (epoch <= 0)
+				break;
 
-		log->ctime = get_cluster_ctime();
-		log->epoch = get_latest_epoch();
-		log->nr_nodes = epoch_log_read(log->epoch, (char *)log->nodes,
-					       sizeof(log->nodes));
-		if (log->nr_nodes == -1) {
-			rsp->data_length = 0;
-			log->nr_nodes = 0;
-		} else{
-			rsp->data_length = sizeof(*log);
-			log->nr_nodes /= sizeof(log->nodes[0]);
+			log = (struct epoch_log *)req->data + i;
+			log->epoch = epoch;
+			log->ctime = get_cluster_ctime();
+			log->nr_nodes = epoch_log_read(epoch, (char *)log->nodes,
+						       sizeof(log->nodes));
+			if (log->nr_nodes == -1)
+				i--;
+			else{
+				rsp->data_length += sizeof(*log);
+				log->nr_nodes /= sizeof(log->nodes[0]);
+			}
+
+			epoch--;
 		}
 
 		switch (sys->status) {
