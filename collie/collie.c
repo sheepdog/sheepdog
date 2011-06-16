@@ -29,6 +29,7 @@
 #include "sheep.h"
 #include "net.h"
 #include "treeview.h"
+#include "exits.h"
 
 static char program_name[] = "collie";
 static const char *sdhost = "localhost";
@@ -183,7 +184,7 @@ static int cluster_format(int argc, char **argv)
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
-		return -1;
+		return EXIT_SYSFAIL;
 
 	gettimeofday(&tv, NULL);
 
@@ -201,15 +202,15 @@ static int cluster_format(int argc, char **argv)
 
 	if (ret) {
 		fprintf(stderr, "failed to connect\n");
-		return ret;
+		return EXIT_SYSFAIL;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
-		return 1;
+		return EXIT_FAILURE;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int shutdown_sheepdog(void)
@@ -221,7 +222,7 @@ static int shutdown_sheepdog(void)
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
-		return -1;
+		return EXIT_SYSFAIL;
 
 	memset(&hdr, 0, sizeof(hdr));
 
@@ -235,15 +236,15 @@ static int shutdown_sheepdog(void)
 
 	if (ret) {
 		fprintf(stderr, "failed to connect\n");
-		return ret;
+		return EXIT_SYSFAIL;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
-		return 1;
+		return EXIT_FAILURE;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, char *tag,
@@ -615,7 +616,7 @@ static int node_list(int argc, char **argv)
 			printf("  %4d - %-20s\t%d\n", i, data, node_list_entries[i].nr_vnodes);
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int node_info(int argc, char **argv)
@@ -667,7 +668,7 @@ static int node_info(int argc, char **argv)
 
 	if (success == 0) {
 		fprintf(stderr, "cannot get information from any nodes\n");
-		return 1;
+		return EXIT_SYSFAIL;
 	}
 
 	parse_vdi(cal_total_vdi_size, SD_INODE_HEADER_SIZE, &total_vdi_size);
@@ -680,7 +681,7 @@ static int node_info(int argc, char **argv)
 	       (int)(((double)(total_size - total_avail) / total_size) * 100),
 	       vdi_size_str);
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static struct subcommand node_cmd[] = {
@@ -695,7 +696,7 @@ static int vdi_list(int argc, char **argv)
 	printf("------------------------------------------------------------------\n");
 
 	parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL);
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int vdi_tree(int argc, char **argv)
@@ -704,7 +705,7 @@ static int vdi_tree(int argc, char **argv)
 	parse_vdi(print_vdi_tree, SD_INODE_HEADER_SIZE, NULL);
 	dump_tree();
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int vdi_graph(int argc, char **argv)
@@ -719,7 +720,7 @@ static int vdi_graph(int argc, char **argv)
 	/* print a footer */
 	printf("}\n");
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int vdi_delete(int argc, char **argv)
@@ -733,7 +734,7 @@ static int vdi_delete(int argc, char **argv)
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
-		return -1;
+		return EXIT_SYSFAIL;
 
 	memset(&hdr, 0, sizeof(hdr));
 
@@ -755,15 +756,18 @@ static int vdi_delete(int argc, char **argv)
 
 	if (ret) {
 		fprintf(stderr, "failed to connect\n");
-		return ret;
+		return EXIT_SYSFAIL;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "%s: %s\n", vdiname, sd_strerror(rsp->result));
-		return 1;
+		if (rsp->result == SD_RES_NO_VDI)
+			return EXIT_MISSING;
+		else
+			return EXIT_FAILURE;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int vdi_object(int argc, char **argv)
@@ -785,7 +789,7 @@ static int vdi_object(int argc, char **argv)
 	vid = info.vid;
 	if (vid == 0) {
 		printf("No such vdi\n");
-		return 1;
+		return EXIT_MISSING;
 	}
 
 	if (idx == ~0) {
@@ -800,7 +804,7 @@ static int vdi_object(int argc, char **argv)
 
 		if (idx >= MAX_DATA_OBJS) {
 			printf("The offset is too large!\n");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 
 		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &old_info);
@@ -819,7 +823,7 @@ static int vdi_object(int argc, char **argv)
 			printf("failed to read the inode object 0x%" PRIx32 "\n", vid);
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
@@ -896,7 +900,7 @@ static int vdi_setattr(int argc, char **argv)
 	key = argv[optind++];
 	if (!key) {
 		fprintf(stderr, "please specify the name of key\n");
-		return 1;
+		return EXIT_USAGE;
 	}
 
 	value = argv[optind++];
@@ -904,7 +908,7 @@ static int vdi_setattr(int argc, char **argv)
 		value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
 		if (!value) {
 			fprintf(stderr, "failed to allocate memory\n");
-			return 1;
+			return EXIT_SYSFAIL;
 		}
 
 		offset = 0;
@@ -913,7 +917,7 @@ reread:
 			   SD_MAX_VDI_ATTR_VALUE_LEN - offset);
 		if (ret < 0) {
 			fprintf(stderr, "failed to read from stdin, %m\n");
-			return 1;
+			return EXIT_SYSFAIL;
 		}
 		if (ret > 0) {
 			offset += ret;
@@ -928,12 +932,14 @@ reread:
 	if (ret) {
 		if (ret == SD_RES_VDI_EXIST) {
 			fprintf(stderr, "the attribute already exists, %s\n", key);
+			return EXIT_EXISTS;
 		} else if (ret == SD_RES_NO_OBJ) {
 			fprintf(stderr, "no such attribute, %s\n", key);
+			return EXIT_MISSING;
 		} else
 			fprintf(stderr, "failed to find attr oid, %s\n",
 				sd_strerror(ret));
-		return 1;
+		return EXIT_FAILURE;
 	}
 
 	if (nr_copies > nr_nodes)
@@ -979,16 +985,16 @@ reread:
 
 		if (ret) {
 			fprintf(stderr, "failed to set attribute\n");
-			return 1;
+			return EXIT_FAILURE;
 		}
 		if (rsp->result != SD_RES_SUCCESS) {
 			fprintf(stderr, "failed to set attribute, %s\n",
 				sd_strerror(rsp->result));
-			return 1;
+			return EXIT_FAILURE;
 		}
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int vdi_getattr(int argc, char **argv)
@@ -1005,7 +1011,7 @@ static int vdi_getattr(int argc, char **argv)
 	key = argv[optind++];
 	if (!key) {
 		fprintf(stderr, "please specify the name of key\n");
-		return 1;
+		return EXIT_USAGE;
 	}
 
 	ret = find_vdi_attr_oid(vdiname, vdi_cmd_data.snapshot_tag,
@@ -1013,11 +1019,11 @@ static int vdi_getattr(int argc, char **argv)
 				&nr_copies, 0, 0);
 	if (ret == SD_RES_NO_OBJ) {
 		fprintf(stderr, "no such attribute, %s\n", key);
-		return 1;
+		return EXIT_MISSING;
 	} else if (ret) {
 		fprintf(stderr, "failed to find attr oid, %s\n",
 			sd_strerror(ret));
-		return 1;
+		return EXIT_MISSING;
 	}
 
 	if (nr_copies > nr_nodes)
@@ -1027,7 +1033,7 @@ static int vdi_getattr(int argc, char **argv)
 	value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
 	if (!value) {
 		fprintf(stderr, "failed to allocate memory\n");
-		return 1;
+		return EXIT_SYSFAIL;
 	}
 	for (i = 0; i < nr_copies; i++) {
 		rlen = SD_MAX_VDI_ATTR_VALUE_LEN;
@@ -1060,13 +1066,13 @@ static int vdi_getattr(int argc, char **argv)
 			if (rsp->result == SD_RES_SUCCESS) {
 				printf("%s", value);
 				free(value);
-				return 0;
+				return EXIT_SUCCESS;
 			}
 		}
 	}
 out:
 	free(value);
-	return 1;
+	return EXIT_FAILURE;
 }
 
 static struct subcommand vdi_cmd[] = {
@@ -1127,7 +1133,7 @@ static int cluster_info(int argc, char **argv)
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
-		return 1;
+		return EXIT_SYSFAIL;
 
 	memset(&hdr, 0, sizeof(hdr));
 
@@ -1141,7 +1147,7 @@ static int cluster_info(int argc, char **argv)
 	close(fd);
 
 	if (ret != 0)
-		return 1;
+		return EXIT_SYSFAIL;
 
 	if (rsp->result == SD_RES_SUCCESS)
 		printf("running\n");
@@ -1172,7 +1178,7 @@ static int cluster_info(int argc, char **argv)
 		printf("]\n");
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 static int cluster_parser(int ch, char *opt)
@@ -1188,8 +1194,7 @@ static int cluster_parser(int ch, char *opt)
 
 static int cluster_shutdown(int argc, char **argv)
 {
-	shutdown_sheepdog();
-	return 0;
+	return shutdown_sheepdog();
 }
 
 static struct subcommand cluster_cmd[] = {
@@ -1257,7 +1262,7 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 
 	if (!found) {
 		fprintf(stderr, "'%s' is not a valid command\n", cmd);
-		usage(1);
+		usage(EXIT_USAGE);
 	}
 
 	for (s = commands[i].sub; s->name; s++) {
@@ -1270,10 +1275,10 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 
 	if (!command_fn) {
 		fprintf(stderr, "'%s' is not a valid subcommand\n", subcmd);
-		fprintf(stderr, "'%s' supports the following subcommand:\n", cmd);
+		fprintf(stderr, "'%s' supports the following subcommands:\n", cmd);
 		for (s = commands[i].sub; s->name; s++)
 			fprintf(stderr, "%s\n", s->name);
-		exit(1);
+		exit(EXIT_USAGE);
 	}
 
 	return flags;
@@ -1306,13 +1311,13 @@ int main(int argc, char **argv)
 				command_help();
 			break;
 		case '?':
-			usage(1);
+			usage(EXIT_USAGE);
 			break;
 		default:
 			if (command_parser)
 				command_parser(ch, optarg);
 			else
-				usage(1);
+				usage(EXIT_USAGE);
 			break;
 		}
 	}
@@ -1324,13 +1329,13 @@ int main(int argc, char **argv)
 		ret = update_node_list(SD_MAX_NODES, 0);
 		if (ret < 0) {
 			fprintf(stderr, "failed to get node list\n");
-			exit(1);
+			exit(EXIT_SYSFAIL);
 		}
 	}
 
 	if (flags & SUBCMD_FLAG_NEED_THIRD_ARG && argc == optind) {
 		fprintf(stderr, "'%s %s' needs the third argument\n", argv[1], argv[2]);
-		exit(1);
+		exit(EXIT_USAGE);
 	}
 
 	return command_fn(argc, argv);
