@@ -1186,7 +1186,7 @@ static int cluster_parser(int ch, char *opt)
 	return 0;
 }
 
-static int cluster_shoutdown(int argc, char **argv)
+static int cluster_shutdown(int argc, char **argv)
 {
 	shutdown_sheepdog();
 	return 0;
@@ -1195,7 +1195,7 @@ static int cluster_shoutdown(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", 0, cluster_info},
 	{"format", 0, cluster_format},
-	{"shutdown", SUBCMD_FLAG_NEED_NOEDLIST, cluster_shoutdown},
+	{"shutdown", SUBCMD_FLAG_NEED_NOEDLIST, cluster_shutdown},
 	{NULL,},
 };
 
