@@ -584,7 +584,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 	free(buf);
 }
 
-#define SUBCMD_FLAG_NEED_NOEDLIST (1 << 0)
+#define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
 #define SUBCMD_FLAG_NEED_THIRD_ARG (1 << 1)
 
 struct subcommand {
@@ -684,8 +684,8 @@ static int node_info(int argc, char **argv)
 }
 
 static struct subcommand node_cmd[] = {
-	{"list", SUBCMD_FLAG_NEED_NOEDLIST, node_list},
-	{"info", SUBCMD_FLAG_NEED_NOEDLIST, node_info},
+	{"list", SUBCMD_FLAG_NEED_NODELIST, node_list},
+	{"info", SUBCMD_FLAG_NEED_NODELIST, node_info},
 	{NULL,},
 };
 
@@ -1070,13 +1070,13 @@ out:
 }
 
 static struct subcommand vdi_cmd[] = {
-	{"delete", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
-	{"list", SUBCMD_FLAG_NEED_NOEDLIST, vdi_list},
-	{"tree", SUBCMD_FLAG_NEED_NOEDLIST, vdi_tree},
-	{"graph", SUBCMD_FLAG_NEED_NOEDLIST, vdi_graph},
-	{"object", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
-	{"setattr", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
-	{"getattr", SUBCMD_FLAG_NEED_NOEDLIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
+	{"delete", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
+	{"list", SUBCMD_FLAG_NEED_NODELIST, vdi_list},
+	{"tree", SUBCMD_FLAG_NEED_NODELIST, vdi_tree},
+	{"graph", SUBCMD_FLAG_NEED_NODELIST, vdi_graph},
+	{"object", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
+	{"setattr", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
+	{"getattr", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
 	{NULL,},
 };
 
@@ -1195,7 +1195,7 @@ static int cluster_shutdown(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", 0, cluster_info},
 	{"format", 0, cluster_format},
-	{"shutdown", SUBCMD_FLAG_NEED_NOEDLIST, cluster_shutdown},
+	{"shutdown", SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
 	{NULL,},
 };
 
@@ -1320,7 +1320,7 @@ int main(int argc, char **argv)
 	if (!isatty(STDOUT_FILENO))
 		highlight = 0;
 
-	if (flags & SUBCMD_FLAG_NEED_NOEDLIST) {
+	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
 		ret = update_node_list(SD_MAX_NODES, 0);
 		if (ret < 0) {
 			fprintf(stderr, "failed to get node list\n");
