@@ -365,6 +365,13 @@ static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	return 0;
 }
 
+struct get_vid_info {
+	char *name;
+	char *tag;
+	uint32_t vid;
+	uint32_t snapid;
+};
+
 static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
@@ -374,6 +381,10 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	time_t ti;
 	struct tm tm;
 	char dbuf[128];
+	struct get_vid_info *info = data;
+
+	if (info && strcmp(name, info->name) != 0)
+		return;
 
 	ti = i->ctime >> 32;
 	if (raw_output) {
@@ -399,21 +410,19 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 
-	if (!data || strcmp(name, data) == 0) {
-		if (raw_output) {
-			printf("%c ", is_current(i) ? '=' : 's');
-			while (*name) {
-				if (isspace(*name) || *name == '\\')
-					putchar('\\');
-				putchar(*name++);
-			}
-			printf(" %d %s %s %s %s %" PRIx32 "\n", snapid,
-			       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
-		} else {
-			printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
-			       is_current(i) ? ' ' : 's', name, snapid,
-			       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+	if (raw_output) {
+		printf("%c ", is_current(i) ? '=' : 's');
+		while (*name) {
+			if (isspace(*name) || *name == '\\')
+				putchar('\\');
+			putchar(*name++);
 		}
+		printf(" %d %s %s %s %s %" PRIx32 "\n", snapid,
+				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+	} else {
+		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
+				is_current(i) ? ' ' : 's', name, snapid,
+				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
 	}
 }
 
@@ -479,13 +488,6 @@ static void cal_total_vdi_size(uint32_t vid, char *name, char * tag,
 	if (is_current(i))
 		*size += i->vdi_size;
 }
-
-struct get_vid_info {
-	char *name;
-	char *tag;
-	uint32_t vid;
-	uint32_t snapid;
-};
 
 static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
 		    uint32_t flags, struct sheepdog_inode *i, void *data)
@@ -721,13 +723,23 @@ static struct subcommand node_cmd[] = {
 
 static int vdi_list(int argc, char **argv)
 {
+	char *vdiname = argv[optind];
+
 	if (!raw_output) {
 		printf("  name        id    size    used  shared    creation time   vdi id\n");
 		printf("------------------------------------------------------------------\n");
 	}
 
-	parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL);
-	return EXIT_SUCCESS;
+	if (vdiname) {
+		struct get_vid_info info;
+		memset(&info, 0, sizeof(info));
+		info.name = vdiname;
+		parse_vdi(print_vdi_list, SD_INODE_SIZE, &info);
+		return EXIT_SUCCESS;
+	} else {
+		parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL);
+		return EXIT_SUCCESS;
+	}
 }
 
 static int vdi_tree(int argc, char **argv)
