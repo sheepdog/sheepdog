@@ -365,7 +365,7 @@ static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	return 0;
 }
 
-struct get_vid_info {
+struct get_vdi_info {
 	char *name;
 	char *tag;
 	uint32_t vid;
@@ -381,7 +381,7 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	time_t ti;
 	struct tm tm;
 	char dbuf[128];
-	struct get_vid_info *info = data;
+	struct get_vdi_info *info = data;
 
 	if (info && strcmp(name, info->name) != 0)
 		return;
@@ -492,7 +492,7 @@ static void cal_total_vdi_size(uint32_t vid, char *name, char * tag,
 static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
 		    uint32_t flags, struct sheepdog_inode *i, void *data)
 {
-	struct get_vid_info *info = data;
+	struct get_vdi_info *info = data;
 
 	if (info->name) {
 		if (info->tag) {
@@ -731,7 +731,7 @@ static int vdi_list(int argc, char **argv)
 	}
 
 	if (vdiname) {
-		struct get_vid_info info;
+		struct get_vdi_info info;
 		memset(&info, 0, sizeof(info));
 		info.name = vdiname;
 		parse_vdi(print_vdi_list, SD_INODE_SIZE, &info);
@@ -818,7 +818,7 @@ static int vdi_object(int argc, char **argv)
 	char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
 	int ret;
-	struct get_vid_info info;
+	struct get_vdi_info info;
 	uint32_t vid;
 
 	memset(&info, 0, sizeof(info));
