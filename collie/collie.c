@@ -8,6 +8,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <ctype.h>
 #include <errno.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -35,6 +36,7 @@ static char program_name[] = "collie";
 static const char *sdhost = "localhost";
 static int sdport = SD_LISTEN_PORT;
 static int highlight = 1;
+static int raw_output = 0;
 
 #define TEXT_NORMAL "\033[0m"
 #define TEXT_BOLD   "\033[1m"
@@ -42,9 +44,10 @@ static int highlight = 1;
 #define COMMON_LONG_OPTIONS				\
 	{"address", required_argument, NULL, 'a'},	\
 	{"port", required_argument, NULL, 'p'},		\
+	{"raw", no_argument, NULL, 'r'},		\
 	{"help", no_argument, NULL, 'h'},		\
 
-#define COMMON_SHORT_OPTIONS "a:p:h"
+#define COMMON_SHORT_OPTIONS "a:p:hr"
 
 static void usage(int status)
 {
@@ -62,6 +65,8 @@ Command syntax:\n\
 Common parameters:\n\
   -a, --address           specify the daemon address (default: localhost)\n\
   -p, --port              specify the daemon port\n\
+  -r, --raw               raw output mode: omit headers, separate fields with\n\
+                          single spaces and print all sizes in decimal bytes\n\
   -h, --help              display this help and exit\n\
 ");
 	}
@@ -84,12 +89,17 @@ static char *size_to_str(uint64_t _size, char *str, int str_size)
 {
 	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 	int i = 0;
-	double size = (double)_size;
+	double size;
 
+	if (raw_output) {
+		snprintf(str, str_size, "%" PRIu64, _size);
+		return str;
+	}
+
+	size = (double)_size;
 	size /= 1024 * 1024;
 	while (i < ARRAY_SIZE(units) && size >= 1024) {
 		i++;
-
 		size /= 1024;
 	}
 
@@ -360,16 +370,19 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 {
 	int idx;
 	uint64_t my_objs, cow_objs;
-	char vdi_size_str[8], my_objs_str[8], cow_objs_str[8];
+	char vdi_size_str[16], my_objs_str[16], cow_objs_str[16];
 	time_t ti;
 	struct tm tm;
 	char dbuf[128];
 
 	ti = i->ctime >> 32;
-	localtime_r(&ti, &tm);
-
-	strftime(dbuf, sizeof(dbuf),
-		 "%Y-%m-%d %H:%M", &tm);
+	if (raw_output) {
+		snprintf(dbuf, sizeof(dbuf), "%" PRIu64, (uint64_t) ti);
+	} else {
+		localtime_r(&ti, &tm);
+		strftime(dbuf, sizeof(dbuf),
+			 "%Y-%m-%d %H:%M", &tm);
+	}
 
 	my_objs = 0;
 	cow_objs = 0;
@@ -387,9 +400,20 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 
 	if (!data || strcmp(name, data) == 0) {
-		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
-		       is_current(i) ? ' ' : 's', name, snapid,
-		       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+		if (raw_output) {
+			printf("%c ", is_current(i) ? '=' : 's');
+			while (*name) {
+				if (isspace(*name) || *name == '\\')
+					putchar('\\');
+				putchar(*name++);
+			}
+			printf(" %d %s %s %s %s %" PRIx32 "\n", snapid,
+			       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+		} else {
+			printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
+			       is_current(i) ? ' ' : 's', name, snapid,
+			       vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+		}
 	}
 }
 
@@ -598,8 +622,10 @@ static int node_list(int argc, char **argv)
 {
 	int i;
 
-	printf("   Idx - Host:Port              Number of vnodes\n");
-	printf("------------------------------------------------\n");
+	if (!raw_output) {
+		printf("   Idx - Host:Port              Number of vnodes\n");
+		printf("------------------------------------------------\n");
+	}
 	for (i = 0; i < nr_nodes; i++) {
 		char data[128];
 
@@ -609,11 +635,13 @@ static int node_list(int argc, char **argv)
 		if (i == master_idx) {
 			if (highlight)
 				printf(TEXT_BOLD);
-			printf("* %4d - %-20s\t%d\n", i, data, node_list_entries[i].nr_vnodes);
+			printf(raw_output ? "* %d %s %d\n" : "* %4d - %-20s\t%d\n",
+			       i, data, node_list_entries[i].nr_vnodes);
 			if (highlight)
 				printf(TEXT_NORMAL);
 		} else
-			printf("  %4d - %-20s\t%d\n", i, data, node_list_entries[i].nr_vnodes);
+			printf(raw_output ? "- %d %s %d\n" : "  %4d - %-20s\t%d\n",
+			       i, data, node_list_entries[i].nr_vnodes);
 	}
 
 	return EXIT_SUCCESS;
@@ -625,7 +653,8 @@ static int node_info(int argc, char **argv)
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
 	char total_str[8], avail_str[8], vdi_size_str[8];
 
-	printf("Id\tSize\tUsed\tUse%%\n");
+	if (!raw_output)
+		printf("Id\tSize\tUsed\tUse%%\n");
 
 	for (i = 0; i < nr_nodes; i++) {
 		char name[128];
@@ -655,7 +684,8 @@ static int node_info(int argc, char **argv)
 		size_to_str(rsp->store_size - rsp->store_free, free_str,
 			    sizeof(free_str));
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
-			printf("%2d\t%s\t%s\t%3d%%\n", i, store_str, free_str,
+			printf(raw_output ? "%d %s %s %d%%\n" : "%2d\t%s\t%s\t%3d%%\n",
+			       i, store_str, free_str,
 			       (int)(((double)(rsp->store_size - rsp->store_free) / rsp->store_size) * 100));
 			success++;
 		}
@@ -663,8 +693,6 @@ static int node_info(int argc, char **argv)
 		total_size += rsp->store_size;
 		total_avail += rsp->store_free;
 	}
-
-	printf("\n");
 
 	if (success == 0) {
 		fprintf(stderr, "cannot get information from any nodes\n");
@@ -676,7 +704,8 @@ static int node_info(int argc, char **argv)
 	size_to_str(total_size, total_str, sizeof(total_str));
 	size_to_str(total_size - total_avail, avail_str, sizeof(avail_str));
 	size_to_str(total_vdi_size, vdi_size_str, sizeof(vdi_size_str));
-	printf("Total\t%s\t%s\t%3d%%, total virtual VDI Size\t%s\n",
+	printf(raw_output ? "Total %s %s %d%% %s\n"
+			  : "\nTotal\t%s\t%s\t%3d%%, total virtual VDI Size\t%s\n",
 	       total_str, avail_str,
 	       (int)(((double)(total_size - total_avail) / total_size) * 100),
 	       vdi_size_str);
@@ -692,8 +721,10 @@ static struct subcommand node_cmd[] = {
 
 static int vdi_list(int argc, char **argv)
 {
-	printf("  name        id    size    used  shared    creation time   vdi id\n");
-	printf("------------------------------------------------------------------\n");
+	if (!raw_output) {
+		printf("  name        id    size    used  shared    creation time   vdi id\n");
+		printf("------------------------------------------------------------------\n");
+	}
 
 	parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL);
 	return EXIT_SUCCESS;
@@ -1149,13 +1180,16 @@ static int cluster_info(int argc, char **argv)
 	if (ret != 0)
 		return EXIT_SYSFAIL;
 
+	if (!raw_output)
+		printf("Cluster status: ");
 	if (rsp->result == SD_RES_SUCCESS)
 		printf("running\n");
 	else
 		printf("%s\n", sd_strerror(rsp->result));
 
-	printf("\n");
-	printf("Ctime                Epoch Nodes\n");
+	if (!raw_output)
+		printf("\nCreation time        Epoch Nodes\n");
+
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = 0; i < nr_logs; i++) {
 		int j;
@@ -1163,10 +1197,14 @@ static int cluster_info(int argc, char **argv)
 		struct sheepdog_node_list_entry *entry;
 
 		ti = logs[i].ctime >> 32;
-		localtime_r(&ti, &tm);
-		strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm);
+		if (raw_output) {
+			snprintf(time_str, sizeof(time_str), "%" PRIu64, (uint64_t) ti);
+		} else {
+			localtime_r(&ti, &tm);
+			strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm);
+		}
 
-		printf("%s %6d", time_str, logs[i].epoch);
+		printf(raw_output ? "%s %d" : "%s %6d", time_str, logs[i].epoch);
 		printf(" [");
 		for (j = 0; j < logs[i].nr_nodes; j++) {
 			entry = logs[i].nodes + j;
@@ -1306,6 +1344,9 @@ int main(int argc, char **argv)
 		case 'p':
 			sdport = atoi(optarg);
 			break;
+		case 'r':
+			raw_output = 1;
+			break;
 		case 'h':
 			if (command_help)
 				command_help();
@@ -1322,7 +1363,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (!isatty(STDOUT_FILENO))
+	if (!isatty(STDOUT_FILENO) || raw_output)
 		highlight = 0;
 
 	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
