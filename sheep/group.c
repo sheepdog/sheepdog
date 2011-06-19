@@ -1028,8 +1028,63 @@ static int is_my_cpg_addr(struct cpg_address *addr)
 		(sys->this_pid == addr->pid);
 }
 
+/*
+ * Check whether the majority of Sheepdog nodes are still alive or not
+ */
+static int check_majority(struct cpg_address *left_list,
+			  size_t left_list_entries)
+{
+	int nr_nodes = 0, nr_majority, nr_reachable, i, fd;
+	struct node *node;
+	char name[INET6_ADDRSTRLEN];
+
+	if (left_list_entries == 0)
+		return 1; /* we don't need this check in this case */
+
+	list_for_each_entry(node, &sys->sd_node_list, list) {
+		nr_nodes++;
+	}
+	nr_majority = nr_nodes / 2 + 1;
+
+	/* we need at least 3 nodes to handle network partition
+	 * failure */
+	if (nr_nodes < 3)
+		return 1;
+
+	list_for_each_entry(node, &sys->sd_node_list, list) {
+		for (i = 0; i < left_list_entries; i++) {
+			if (left_list[i].nodeid == node->nodeid &&
+			    left_list[i].pid == node->pid)
+				break;
+		}
+		if (i != left_list_entries)
+			continue;
+
+		addr_to_str(name, sizeof(name), node->ent.addr, 0);
+		fd = connect_to(name, node->ent.port);
+		if (fd < 0)
+			continue;
+
+		close(fd);
+		nr_reachable++;
+		if (nr_reachable >= nr_majority) {
+			dprintf("majority nodes are alive\n");
+			return 1;
+		}
+	}
+	dprintf("%d, %d, %d\n", nr_nodes, nr_majority, nr_reachable);
+	eprintf("majority nodes are not alive\n");
+	return 0;
+}
+
 static void __sd_confchg(struct cpg_event *cevent)
 {
+	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
+
+	if (!check_majority(w->left_list, w->left_list_entries)) {
+		eprintf("perhaps network partition failure has occurred\n");
+		abort();
+	}
 }
 
 static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
