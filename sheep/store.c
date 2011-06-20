@@ -902,8 +902,10 @@ int get_latest_epoch(void)
 	uint32_t e, epoch = 0;
 
 	dir = opendir(epoch_path);
-	if (!dir)
-		return -1;
+	if (!dir) {
+		vprintf(SDOG_EMERG "failed to get the latest epoch, %m\n");
+		abort();
+	}
 
 	while ((d = readdir(dir))) {
 		e = atoi(d->d_name);
