@@ -1062,7 +1062,7 @@ static int is_my_cpg_addr(struct cpg_address *addr)
 static int check_majority(struct cpg_address *left_list,
 			  size_t left_list_entries)
 {
-	int nr_nodes = 0, nr_majority, nr_reachable, i, fd;
+	int nr_nodes = 0, nr_majority, nr_reachable = 0, i, fd;
 	struct node *node;
 	char name[INET6_ADDRSTRLEN];
 
