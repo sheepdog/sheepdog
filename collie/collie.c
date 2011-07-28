@@ -979,6 +979,9 @@ reread:
 		} else if (ret == SD_RES_NO_OBJ) {
 			fprintf(stderr, "no such attribute, %s\n", key);
 			return EXIT_MISSING;
+		} else if (ret == SD_RES_NO_VDI) {
+			fprintf(stderr, "vdi not found\n");
+			return EXIT_MISSING;
 		} else
 			fprintf(stderr, "failed to find attr oid, %s\n",
 				sd_strerror(ret));
@@ -1062,6 +1065,9 @@ static int vdi_getattr(int argc, char **argv)
 				&nr_copies, 0, 0);
 	if (ret == SD_RES_NO_OBJ) {
 		fprintf(stderr, "no such attribute, %s\n", key);
+		return EXIT_MISSING;
+	} else if (ret == SD_RES_NO_VDI) {
+		fprintf(stderr, "vdi not found\n");
 		return EXIT_MISSING;
 	} else if (ret) {
 		fprintf(stderr, "failed to find attr oid, %s\n",
