@@ -538,27 +538,18 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 }
 
 int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
-		 uint32_t *attrid, int creat, int excl)
+		 uint32_t *attrid, int copies, int creat, int excl)
 {
 	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
-	char attr_buf[SD_ATTR_HEADER_SIZE], inode_buf[SD_INODE_HEADER_SIZE];
+	char attr_buf[SD_ATTR_HEADER_SIZE];
 	uint64_t oid;
 	uint32_t end;
-	int ret, nr_nodes, nr_vnodes, copies;
+	int ret, nr_nodes, nr_vnodes;
 
 	if (data_len != SD_ATTR_HEADER_SIZE)
 		return SD_RES_INVALID_PARMS;
 
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_nodes);
-
-	ret = read_object(entries, nr_vnodes, nr_nodes, epoch, vid_to_vdi_oid(vid),
-			  inode_buf, sizeof(inode_buf), 0, sys->nr_sobjs);
-	if (ret != SD_INODE_HEADER_SIZE) {
-		eprintf("failed to read vdi object, %"PRIx32"\n", vid);
-		return -ret;
-	}
-
-	copies = ((struct sheepdog_inode *)inode_buf)->nr_copies;
 
 	*attrid = fnv_64a_buf(data, data_len, FNV1A_64_INIT);
 	*attrid &= (UINT64_C(1) << VDI_SPACE_SHIFT) - 1;

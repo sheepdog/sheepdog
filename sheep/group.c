@@ -686,8 +686,13 @@ static void vdi_op(struct vdi_op_message *msg)
 				 &vid, hdr->snapid, &nr_copies);
 		if (ret != SD_RES_SUCCESS)
 			break;
+		/* the curernt vdi id can change if we take the snapshot,
+		   so we use the hash value of the vdi name as the vdi id */
+		vid = fnv_64a_buf(data, strlen(data), FNV1A_64_INIT);
+		vid &= SD_NR_VDIS - 1;
 		ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,
-				   &attrid, hdr->flags & SD_FLAG_CMD_CREAT,
+				   &attrid, nr_copies,
+				   hdr->flags & SD_FLAG_CMD_CREAT,
 				   hdr->flags & SD_FLAG_CMD_EXCL);
 		break;
 	case SD_OP_RELEASE_VDI:
