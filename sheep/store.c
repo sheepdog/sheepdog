@@ -308,8 +308,8 @@ static int forward_read_obj_req(struct request *req, int idx)
 	/* temporary hack */
 	if (!copies)
 		copies = sys->nr_sobjs;
-	if (copies > req->nr_nodes)
-		copies = req->nr_nodes;
+	if (copies > req->nr_zones)
+		copies = req->nr_zones;
 
 	hdr.flags |= SD_FLAG_CMD_DIRECT;
 
@@ -368,8 +368,8 @@ static int forward_write_obj_req(struct request *req, int idx)
 	/* temporary hack */
 	if (!copies)
 		copies = sys->nr_sobjs;
-	if (copies > req->nr_nodes)
-		copies = req->nr_nodes;
+	if (copies > req->nr_zones)
+		copies = req->nr_zones;
 
 	nr_fds = 0;
 	memset(pfds, 0, sizeof(pfds));
@@ -1022,6 +1022,32 @@ uint64_t get_cluster_ctime(void)
 	return ctime;
 }
 
+static int get_max_copies(struct sheepdog_node_list_entry *entries, int nr)
+{
+	int i, j;
+	unsigned int nr_zones = 0, nr_zero_zones = 0;
+	uint16_t zones[SD_MAX_REDUNDANCY];
+
+	for (i = 0; i < nr; i++) {
+		if (nr_zones >= ARRAY_SIZE(zones))
+			break;
+
+		if (entries[i].zone == 0) {
+			nr_zero_zones++;
+			continue;
+		}
+
+		for (j = 0; j < nr_zones; j++) {
+			if (zones[j] == entries[i].zone)
+				break;
+		}
+		if (j == nr_zones)
+			zones[nr_zones++] = entries[i].zone;
+	}
+
+	return min(sys->nr_sobjs, nr_zones + nr_zero_zones);
+}
+
 /*
  * contains_node - checks that the node id is included in the target nodes
  *
@@ -1031,11 +1057,11 @@ uint64_t get_cluster_ctime(void)
  */
 static int contains_node(struct sheepdog_vnode_list_entry *key,
 			 struct sheepdog_vnode_list_entry *entry,
-			 int nr, int base_idx)
+			 int nr, int base_idx, int copies)
 {
 	int i;
 
-	for (i = 0; i < sys->nr_sobjs; i++) {
+	for (i = 0; i < copies; i++) {
 		int idx = get_nth_node(entry, nr, base_idx, i);
 		if (memcmp(key->addr, entry[idx].addr, sizeof(key->addr)) == 0
 		    && key->port == entry[idx].port)
@@ -1100,41 +1126,42 @@ static struct recovery_work *recovering_work;
  * The node D, E, F, and A can recover objects from local, and the
  * node G recovers from the node B.
  */
-static int find_tgt_node(struct sheepdog_vnode_list_entry *old_entry, int old_nr, int old_idx,
-			 struct sheepdog_vnode_list_entry *cur_entry, int cur_nr, int cur_idx,
+static int find_tgt_node(struct sheepdog_vnode_list_entry *old_entry,
+			 int old_nr, int old_idx, int old_copies,
+			 struct sheepdog_vnode_list_entry *cur_entry,
+			 int cur_nr, int cur_idx, int cur_copies,
 			 int copy_idx)
 {
 	int i, j, idx;
 
-	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", old_idx, old_nr, cur_idx, cur_nr, copy_idx);
+	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n",
+		old_idx, old_nr, old_copies, cur_idx, cur_nr, cur_copies, copy_idx);
 
-	if (copy_idx < sys->nr_sobjs) {
-		/* If the same node is in the previous target nodes, return its index */
-		idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, copy_idx),
-				    old_entry, old_nr, old_idx);
-		if (idx >= 0) {
-			dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", idx, copy_idx, cur_idx, cur_nr);
-			return idx;
-		}
+	/* If the same node is in the previous target nodes, return its index */
+	idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, copy_idx),
+			    old_entry, old_nr, old_idx, old_copies);
+	if (idx >= 0) {
+		dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", idx, copy_idx, cur_idx, cur_nr);
+		return idx;
 	}
 
 	for (i = 0, j = 0; ; i++, j++) {
 		if (i < copy_idx) {
 			/* Skip if the node can recover from its local */
 			idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, i),
-					    old_entry, old_nr, old_idx);
+					    old_entry, old_nr, old_idx, old_copies);
 			if (idx >= 0)
 				continue;
 
 			/* Find the next target which needs to recover from remote */
-			while (j < sys->nr_sobjs &&
+			while (j < old_copies &&
 			       contains_node(old_entry + get_nth_node(old_entry, old_nr, old_idx, j),
-					     cur_entry, cur_nr, cur_idx) >= 0)
+					     cur_entry, cur_nr, cur_idx, cur_copies) >= 0)
 				j++;
 		}
-		if (j == sys->nr_sobjs) {
+		if (j == old_copies) {
 			/*
-			 * Cannot find the target because the number of nodes
+			 * Cannot find the target because the number of zones
 			 * is smaller than the number of copies.  We can select
 			 * any node in this case, so select the first one.
 			 */
@@ -1155,8 +1182,10 @@ static int find_tgt_node(struct sheepdog_vnode_list_entry *old_entry, int old_nr
 }
 
 static int __recover_one(struct recovery_work *rw,
-			 struct sheepdog_vnode_list_entry *_old_entry, int old_nr,
-			 struct sheepdog_vnode_list_entry *_cur_entry, int cur_nr, int cur_idx,
+			 struct sheepdog_vnode_list_entry *_old_entry,
+			 int old_nr, int old_copies,
+			 struct sheepdog_vnode_list_entry *_cur_entry,
+			 int cur_nr, int cur_copies, int cur_idx,
 			 int copy_idx, uint32_t epoch, uint32_t tgt_epoch,
 			 uint64_t oid, char *buf, int buf_len)
 {
@@ -1168,7 +1197,7 @@ static int __recover_one(struct recovery_work *rw,
 	int fd, ret;
 	struct sheepdog_vnode_list_entry old_entry[SD_MAX_VNODES],
 		cur_entry[SD_MAX_VNODES], next_entry[SD_MAX_VNODES];
-	int next_nr;
+	int next_nr, next_copies;
 	int tgt_idx = -1;
 	int old_idx;
 
@@ -1178,7 +1207,8 @@ next:
 	dprintf("recover obj %"PRIx64" from epoch %"PRIu32"\n", oid, tgt_epoch);
 	old_idx = obj_to_sheep(old_entry, old_nr, oid, 0);
 
-	tgt_idx = find_tgt_node(old_entry, old_nr, old_idx, cur_entry, cur_nr, cur_idx, copy_idx);
+	tgt_idx = find_tgt_node(old_entry, old_nr, old_idx, old_copies,
+				cur_entry, cur_nr, cur_idx, cur_copies, copy_idx);
 	if (tgt_idx < 0) {
 		eprintf("cannot find target node, %"PRIx64"\n", oid);
 		return -1;
@@ -1202,9 +1232,11 @@ next:
 				eprintf("no previous epoch, %"PRIu32"\n", tgt_epoch - 1);
 				return -1;
 			}
+			next_nr /= sizeof(struct sheepdog_node_list_entry);
+			next_copies = get_max_copies((struct sheepdog_node_list_entry *)buf,
+						     next_nr);
 			next_nr = nodes_to_vnodes((struct sheepdog_node_list_entry *)buf,
-						  next_nr / sizeof(struct sheepdog_node_list_entry),
-						  next_entry);
+						  next_nr, next_entry);
 			goto not_found;
 		}
 
@@ -1297,15 +1329,16 @@ next:
 		eprintf("%"PRIu32"\n", rsp->result);
 		return -1;
 	}
+	next_nr = rsp->data_length / sizeof(struct sheepdog_node_list_entry);
+	next_copies = get_max_copies((struct sheepdog_node_list_entry *)buf, next_nr);
 	next_nr = nodes_to_vnodes((struct sheepdog_node_list_entry *)buf,
-				  rsp->data_length / sizeof(struct sheepdog_node_list_entry),
-				  next_entry);
+				  next_nr, next_entry);
 
 not_found:
-	for (copy_idx = 0; copy_idx < sys->nr_sobjs; copy_idx++)
+	for (copy_idx = 0; copy_idx < old_copies; copy_idx++)
 		if (get_nth_node(old_entry, old_nr, old_idx, copy_idx) == tgt_idx)
 			break;
-	if (copy_idx == sys->nr_sobjs) {
+	if (copy_idx == old_copies) {
 		eprintf("bug: cannot find the proper copy_idx\n");
 		return -1;
 	}
@@ -1313,10 +1346,12 @@ not_found:
 	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", rsp->result, rsp->data_length, tgt_idx,
 		old_idx, old_nr, copy_idx);
 	memcpy(cur_entry, old_entry, sizeof(*old_entry) * old_nr);
+	cur_copies = old_copies;
 	cur_nr = old_nr;
 	cur_idx = old_idx;
 
 	memcpy(old_entry, next_entry, next_nr * sizeof(*next_entry));
+	old_copies = next_copies;
 	old_nr = next_nr;
 
 	tgt_epoch--;
@@ -1334,10 +1369,10 @@ static void recover_one(struct work *work, int idx)
 	struct sheepdog_vnode_list_entry old_vnodes[SD_MAX_VNODES];
 	struct sheepdog_vnode_list_entry cur_vnodes[SD_MAX_VNODES];
 	int old_nr_nodes, cur_nr_nodes, old_nr_vnodes, cur_nr_vnodes;
+	int old_copies, cur_copies;
 	uint32_t epoch = rw->epoch;
 	int i, copy_idx = 0, cur_idx = -1;
 	int fd;
-	int nr_objs;
 
 	eprintf("%"PRIu32" %"PRIu32", %16"PRIx64"\n", rw->done, rw->count, oid);
 
@@ -1379,12 +1414,11 @@ static void recover_one(struct work *work, int idx)
 
 	cur_idx = obj_to_sheep(cur_vnodes, cur_nr_vnodes, oid, 0);
 
-	nr_objs = sys->nr_sobjs;
-	if (nr_objs > cur_nr_nodes)
-		nr_objs = cur_nr_nodes;
+	old_copies = get_max_copies(old_nodes, old_nr_nodes);
+	cur_copies = get_max_copies(cur_nodes, cur_nr_nodes);
 
 	copy_idx = -1;
-	for (i = 0; i < nr_objs; i++) {
+	for (i = 0; i < cur_copies; i++) {
 		int n = obj_to_sheep(cur_vnodes, cur_nr_vnodes, oid, i);
 		if (is_myself(cur_vnodes[n].addr, cur_vnodes[n].port)) {
 			copy_idx = i;
@@ -1398,17 +1432,18 @@ static void recover_one(struct work *work, int idx)
 
 	dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n", cur_idx, cur_nr_nodes, copy_idx);
 
-	ret = __recover_one(rw, old_vnodes, old_nr_vnodes, cur_vnodes, cur_nr_vnodes,
+	ret = __recover_one(rw, old_vnodes, old_nr_vnodes, old_copies,
+			    cur_vnodes, cur_nr_vnodes, cur_copies,
 			    cur_idx, copy_idx, epoch, epoch - 1, oid,
 			    buf, SD_DATA_OBJ_SIZE);
 	if (ret == 0)
 		goto out;
 
-	for (i = 0; i < sys->nr_sobjs; i++) {
+	for (i = 0; i < cur_copies; i++) {
 		if (i == copy_idx)
 			continue;
-		ret = __recover_one(rw, old_vnodes, old_nr_vnodes,
-				    cur_vnodes, cur_nr_vnodes, cur_idx, i,
+		ret = __recover_one(rw, old_vnodes, old_nr_vnodes, old_copies,
+				    cur_vnodes, cur_nr_vnodes, cur_copies, cur_idx, i,
 				    epoch, epoch - 1, oid, buf, SD_DATA_OBJ_SIZE);
 		if (ret == 0)
 			goto out;
@@ -1722,11 +1757,9 @@ static void __start_recovery(struct work *work, int idx)
 	}
 	old_nr /= sizeof(struct sheepdog_node_list_entry);
 
-	nr_objs = sys->nr_sobjs;
-	if (nr_objs > cur_nr)
-		nr_objs = cur_nr;
-	if (!nr_objs)
+	if (!sys->nr_sobjs)
 		goto fail;
+	nr_objs = get_max_copies(cur_entry, cur_nr);
 
 	if (fill_obj_list(rw, old_entry, old_nr, cur_entry, cur_nr, nr_objs) != 0) {
 		eprintf("fatal recovery error\n");

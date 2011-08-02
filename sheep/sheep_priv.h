@@ -83,7 +83,7 @@ struct request {
 
 	struct sheepdog_vnode_list_entry entry[SD_MAX_VNODES];
 	int nr_vnodes;
-	int nr_nodes;
+	int nr_zones;
 	int check_consistency;
 
 	req_end_t done;
@@ -165,7 +165,7 @@ int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 void setup_ordered_sd_vnode_list(struct request *req);
 void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
-			       int *nr_vnodes, int *nr_nodes);
+			       int *nr_vnodes, int *nr_zones);
 int is_access_to_busy_objects(uint64_t oid);
 int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
 		    uint64_t oid, int copies);
@@ -205,15 +205,15 @@ void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
 
 int write_object(struct sheepdog_vnode_list_entry *e,
-		 int vnodes, int nodes, uint32_t node_version,
+		 int vnodes, int zones, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, int nr, int create);
 int read_object(struct sheepdog_vnode_list_entry *e,
-		int vnodes, int nodes, uint32_t node_version,
+		int vnodes, int zones, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
 int remove_object(struct sheepdog_vnode_list_entry *e,
-		  int vnodes, int nodes, uint32_t node_version,
+		  int vnodes, int zones, uint32_t node_version,
 		  uint64_t oid, int nr);
 
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,

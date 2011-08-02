@@ -34,11 +34,12 @@ static struct option const long_options[] = {
 	{"loglevel", required_argument, NULL, 'l'},
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
+	{"zone", required_argument, NULL, 'z'},
 	{"help", no_argument, NULL, 'h'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "p:fl:dDh";
+static const char *short_options = "p:fl:dDz:h";
 
 static void usage(int status)
 {
@@ -54,6 +55,7 @@ Sheepdog Daemon, version %s\n\
   -l, --loglevel          specify the message level printed by default\n\
   -d, --debug             print debug messages\n\
   -D, --directio          use direct IO\n\
+  -z, --zone              specify the zone id\n\
   -h, --help              display this help and exit\n\
 ", PACKAGE_VERSION);
 	}
@@ -93,6 +95,14 @@ int main(int argc, char **argv)
 		case 'D':
 			dprintf("direct IO mode\n");
 			sys->use_directio = 1;
+			break;
+		case 'z':
+			sys->this_node.zone = atoi(optarg);
+			if (sys->this_node.zone == 0) {
+				eprintf("zone id must be between 1 and 65535\n");
+				exit(1);
+			}
+			dprintf("zone id = %d\n", sys->this_node.zone);
 			break;
 		case 'h':
 			usage(0);

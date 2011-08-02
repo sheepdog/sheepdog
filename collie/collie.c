@@ -625,8 +625,8 @@ static int node_list(int argc, char **argv)
 	int i;
 
 	if (!raw_output) {
-		printf("   Idx - Host:Port              Number of vnodes\n");
-		printf("------------------------------------------------\n");
+		printf("   Idx - Host:Port          Vnodes   Zone\n");
+		printf("-----------------------------------------\n");
 	}
 	for (i = 0; i < nr_nodes; i++) {
 		char data[128];
@@ -637,13 +637,15 @@ static int node_list(int argc, char **argv)
 		if (i == master_idx) {
 			if (highlight)
 				printf(TEXT_BOLD);
-			printf(raw_output ? "* %d %s %d\n" : "* %4d - %-20s\t%d\n",
-			       i, data, node_list_entries[i].nr_vnodes);
+			printf(raw_output ? "* %d %s %d %d\n" : "* %4d - %-20s\t%d\t%d\n",
+			       i, data, node_list_entries[i].nr_vnodes,
+			       node_list_entries[i].zone);
 			if (highlight)
 				printf(TEXT_NORMAL);
 		} else
-			printf(raw_output ? "- %d %s %d\n" : "  %4d - %-20s\t%d\n",
-			       i, data, node_list_entries[i].nr_vnodes);
+			printf(raw_output ? "- %d %s %d %d\n" : "  %4d - %-20s\t%d\t%d\n",
+			       i, data, node_list_entries[i].nr_vnodes,
+			       node_list_entries[i].zone);
 	}
 
 	return EXIT_SUCCESS;

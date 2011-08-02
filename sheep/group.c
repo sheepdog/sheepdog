@@ -168,36 +168,59 @@ static int get_node_idx(struct sheepdog_node_list_entry *ent,
 	return ent - entries;
 }
 
-static int build_node_list(struct list_head *node_list,
-			   struct sheepdog_node_list_entry *entries)
+static void build_node_list(struct list_head *node_list,
+			    struct sheepdog_node_list_entry *entries,
+			    int *nr_nodes, int *nr_zones)
 {
 	struct node *node;
-	int nr = 0;
+	int nr = 0, nr_zero_zones = 0, i;
+	uint16_t zones[SD_MAX_REDUNDANCY];
+
+	if (nr_zones)
+		*nr_zones = 0;
 
 	list_for_each_entry(node, node_list, list) {
 		if (entries)
 			memcpy(entries + nr, &node->ent, sizeof(*entries));
 		nr++;
+
+		if (nr_zones && *nr_zones < ARRAY_SIZE(zones)) {
+			if (node->ent.zone != 0) {
+				for (i = 0; i < *nr_zones; i++) {
+					if (zones[i] == node->ent.zone)
+						break;
+				}
+				if (i == *nr_zones)
+					zones[(*nr_zones)++] = node->ent.zone;
+			} else
+				nr_zero_zones++;
+		}
 	}
 	if (entries)
 		qsort(entries, nr, sizeof(*entries), node_cmp);
-
-	return nr;
+	if (nr_nodes)
+		*nr_nodes = nr;
+	if (nr_zones)
+		/* Zero zone nodes behave as if they have different zones */
+		*nr_zones += nr_zero_zones;
 }
 
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
 {
-	return build_node_list(&sys->sd_node_list, entries);
+	int nr_nodes;
+
+	build_node_list(&sys->sd_node_list, entries, &nr_nodes, NULL);
+
+	return nr_nodes;
 }
 
 void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
-			       int *nr_vnodes, int *nr_nodes)
+			       int *nr_vnodes, int *nr_zones)
 {
 	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
 	int nr;
 
-	nr = build_node_list(&sys->sd_node_list, nodes);
-	*nr_nodes = nr;
+	build_node_list(&sys->sd_node_list, nodes, &nr, nr_zones);
 
 	if (sys->nr_vnodes == 0)
 		sys->nr_vnodes = nodes_to_vnodes(nodes, nr, sys->vnodes);
@@ -209,7 +232,7 @@ void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
 
 void setup_ordered_sd_vnode_list(struct request *req)
 {
-	get_ordered_sd_vnode_list(req->entry, &req->nr_vnodes, &req->nr_nodes);
+	get_ordered_sd_vnode_list(req->entry, &req->nr_vnodes, &req->nr_zones);
 }
 
 static void get_node_list(struct sd_node_req *req,
@@ -1471,8 +1494,8 @@ do_retry:
 		if (is_io_request(req->rq.opcode)) {
 			int copies = sys->nr_sobjs;
 
-			if (copies > req->nr_nodes)
-				copies = req->nr_nodes;
+			if (copies > req->nr_zones)
+				copies = req->nr_zones;
 
 			if (__is_access_to_recoverying_objects(req)) {
 				if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
@@ -1662,7 +1685,7 @@ static void set_addr(unsigned int nodeid, int port)
 		memcpy(sys->this_node.addr, saddr, 16);
 	} else if (ss->ss_family == AF_INET) {
 		saddr = &sin->sin_addr;
-		memcpy(sys->this_node.addr + 12, saddr, 16);
+		memcpy(sys->this_node.addr + 12, saddr, 4);
 	} else {
 		vprintf(SDOG_ERR "unknown protocol %d\n", ss->ss_family);
 		exit(1);

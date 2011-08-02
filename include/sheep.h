@@ -128,7 +128,8 @@ struct sheepdog_node_list_entry {
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	nr_vnodes;
-	uint16_t	pad[2];
+	uint16_t	zone;
+	uint16_t	pad;
 };
 
 struct sheepdog_vnode_list_entry {
@@ -136,7 +137,8 @@ struct sheepdog_vnode_list_entry {
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	node_idx;
-	uint16_t	pad[2];
+	uint16_t	zone;
+	uint16_t	pad;
 };
 
 struct epoch_log {
@@ -155,6 +157,11 @@ static inline int same_node(struct sheepdog_vnode_list_entry *e, int n1, int n2)
 	return 0;
 }
 
+static inline int same_zone(struct sheepdog_vnode_list_entry *e, int n1, int n2)
+{
+	return e[n1].zone != 0 && e[n1].zone == e[n2].zone;
+}
+
 /* traverse the virtual node list and return the n'th one */
 static inline int get_nth_node(struct sheepdog_vnode_list_entry *entries,
 			       int nr_entries, int base, int n)
@@ -166,12 +173,18 @@ static inline int get_nth_node(struct sheepdog_vnode_list_entry *entries,
 		nodes[nr++] = idx;
 next:
 		idx = (idx + 1) % nr_entries;
-		if (idx == base)
+		if (idx == base) {
+			abort();
 			return -1; /* not found */
-		for (i = 0; i < nr; i++)
+		}
+		for (i = 0; i < nr; i++) {
 			if (same_node(entries, idx, nodes[i]))
 				/* this node is already selected, so skip here */
 				goto next;
+			if (same_zone(entries, idx, nodes[i]))
+				/* this node is in the same zone, so skip here */
+				goto next;
+		}
 	}
 
 	return idx;
@@ -307,6 +320,7 @@ static inline int nodes_to_vnodes(struct sheepdog_node_list_entry *nodes, int nr
 				memcpy(vnodes[nr_vnodes].addr, n->addr, sizeof(n->addr));
 				vnodes[nr_vnodes].port = n->port;
 				vnodes[nr_vnodes].node_idx = n - nodes;
+				vnodes[nr_vnodes].zone = n->zone;
 			}
 
 			nr_vnodes++;

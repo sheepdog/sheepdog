@@ -85,8 +85,8 @@ static void setup_access_to_local_objects(struct request *req)
 	copies = hdr->copies;
 	if (!copies)
 		copies = sys->nr_sobjs;
-	if (copies > req->nr_nodes)
-		copies = req->nr_nodes;
+	if (copies > req->nr_zones)
+		copies = req->nr_zones;
 
 	if (is_access_local(req->entry, req->nr_vnodes, hdr->oid, copies))
 		req->local_oid = hdr->oid;
@@ -99,8 +99,8 @@ static void __done(struct work *work, int idx)
 	int again = 0;
 	int copies = sys->nr_sobjs;
 
-	if (copies > req->nr_nodes)
-		copies = req->nr_nodes;
+	if (copies > req->nr_zones)
+		copies = req->nr_zones;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
@@ -606,7 +606,7 @@ int create_listen_port(int port, void *data)
 }
 
 int write_object(struct sheepdog_vnode_list_entry *e,
-		 int vnodes, int nodes, uint32_t node_version,
+		 int vnodes, int zones, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, int nr, int create)
 {
@@ -614,8 +614,8 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 	int i, n, fd, ret, success = 0;
 	char name[128];
 
-	if (nr > nodes)
-		nr = nodes;
+	if (nr > zones)
+		nr = zones;
 
 	for (i = 0; i < nr; i++) {
 		unsigned rlen = 0, wlen = datalen;
@@ -669,7 +669,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 }
 
 int read_object(struct sheepdog_vnode_list_entry *e,
-		int vnodes, int nodes, uint32_t node_version,
+		int vnodes, int zones, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr)
 {
@@ -678,8 +678,8 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 	char name[128];
 	int i = 0, n, fd, ret, last_error = SD_RES_SUCCESS;
 
-	if (nr > nodes)
-		nr = nodes;
+	if (nr > zones)
+		nr = zones;
 
 	/* search a local object first */
 	for (i = 0; i < nr; i++) {
@@ -741,7 +741,7 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 }
 
 int remove_object(struct sheepdog_vnode_list_entry *e,
-		  int vnodes, int nodes, uint32_t node_version,
+		  int vnodes, int zones, uint32_t node_version,
 		  uint64_t oid, int nr)
 {
 	char name[128];
@@ -749,8 +749,8 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	int i = 0, n, fd, ret;
 
-	if (nr > nodes)
-		nr = nodes;
+	if (nr > zones)
+		nr = zones;
 
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = 0;
