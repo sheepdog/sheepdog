@@ -23,19 +23,45 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 {
 	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
 	/* we are not called concurrently */
-	static struct sheepdog_inode new, base, cur;
+	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
 	struct timeval tv;
 	int ret, nr_vnodes, nr_zones;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
+
+	new = zalloc(sizeof(*new));
+	if (!new) {
+		eprintf("oom\n");
+		return SD_RES_NO_MEM;
+	}
+
+	if (base_vid) {
+		base = zalloc(sizeof(*base));
+		if (!base) {
+			eprintf("oom\n");
+			ret = SD_RES_NO_MEM;
+			goto out;
+		}
+	}
+
+	if (is_snapshot && cur_vid != base_vid) {
+		cur = zalloc(SD_INODE_HEADER_SIZE);
+		if (!cur) {
+			eprintf("oom\n");
+			ret = SD_RES_NO_MEM;
+			goto out;
+		}
+	}
 
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 
 	if (base_vid) {
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch,
-				  vid_to_vdi_oid(base_vid), (char *)&base,
-				  sizeof(base), 0, copies);
-		if (ret < 0)
-			return SD_RES_BASE_VDI_READ;
+				  vid_to_vdi_oid(base_vid), (char *)base,
+				  sizeof(*base), 0, copies);
+		if (ret < 0) {
+			ret = SD_RES_BASE_VDI_READ;
+			goto out;
+		}
 	}
 
 	gettimeofday(&tv, NULL);
@@ -46,73 +72,78 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 				name, cur_vid, base_vid);
 
 			ret = read_object(entries, nr_vnodes, nr_zones, epoch,
-					  vid_to_vdi_oid(cur_vid), (char *)&cur,
+					  vid_to_vdi_oid(cur_vid), (char *)cur,
 					  SD_INODE_HEADER_SIZE, 0, copies);
 			if (ret < 0) {
 				vprintf(SDOG_ERR "failed\n");
-				return SD_RES_BASE_VDI_READ;
+				ret = SD_RES_BASE_VDI_READ;
+				goto out;
 			}
 
-			cur.snap_ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
+			cur->snap_ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 		} else
-			base.snap_ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
+			base->snap_ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 	}
 
-	memset(&new, 0, sizeof(new));
-
-	strncpy(new.name, name, sizeof(new.name));
-	new.vdi_id = new_vid;
-	new.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
-	new.vdi_size = size;
-	new.copy_policy = 0;
-	new.nr_copies = copies;
-	new.block_size_shift = find_next_bit(&block_size, BITS_PER_LONG, 0);
-	new.snap_id = snapid;
+	strncpy(new->name, name, sizeof(new->name));
+	new->vdi_id = new_vid;
+	new->ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
+	new->vdi_size = size;
+	new->copy_policy = 0;
+	new->nr_copies = copies;
+	new->block_size_shift = find_next_bit(&block_size, BITS_PER_LONG, 0);
+	new->snap_id = snapid;
 
 	if (base_vid) {
 		int i;
 
-		new.parent_vdi_id = base_vid;
-		memcpy(new.data_vdi_id, base.data_vdi_id, sizeof(new.data_vdi_id));
+		new->parent_vdi_id = base_vid;
+		memcpy(new->data_vdi_id, base->data_vdi_id, sizeof(new->data_vdi_id));
 
-		for (i = 0; i < ARRAY_SIZE(base.child_vdi_id); i++) {
-			if (!base.child_vdi_id[i]) {
-				base.child_vdi_id[i] = new_vid;
+		for (i = 0; i < ARRAY_SIZE(base->child_vdi_id); i++) {
+			if (!base->child_vdi_id[i]) {
+				base->child_vdi_id[i] = new_vid;
 				break;
 			}
 		}
 
-		if (i == ARRAY_SIZE(base.child_vdi_id))
-			return SD_RES_NO_BASE_VDI;
-
+		if (i == ARRAY_SIZE(base->child_vdi_id)) {
+			ret = SD_RES_NO_BASE_VDI;
+			goto out;
+		}
 	}
 
 	if (is_snapshot && cur_vid != base_vid) {
 		ret = write_object(entries, nr_vnodes, nr_zones, epoch,
-				   vid_to_vdi_oid(cur_vid), (char *)&cur,
+				   vid_to_vdi_oid(cur_vid), (char *)cur,
 				   SD_INODE_HEADER_SIZE, 0, copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR "failed\n");
-			return SD_RES_BASE_VDI_READ;
+			ret = SD_RES_BASE_VDI_READ;
+			goto out;
 		}
 	}
 
 	if (base_vid) {
 		ret = write_object(entries, nr_vnodes, nr_zones, epoch,
-				   vid_to_vdi_oid(base_vid), (char *)&base,
+				   vid_to_vdi_oid(base_vid), (char *)base,
 				   SD_INODE_HEADER_SIZE, 0, copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR "failed\n");
-			return SD_RES_BASE_VDI_WRITE;
+			ret = SD_RES_BASE_VDI_WRITE;
+			goto out;
 		}
 	}
 
 	ret = write_object(entries, nr_vnodes, nr_zones, epoch,
-			   vid_to_vdi_oid(new_vid), (char *)&new, sizeof(new),
+			   vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
 			   0, copies, 1);
 	if (ret != 0)
-		return SD_RES_VDI_WRITE;
-
+		ret = SD_RES_VDI_WRITE;
+out:
+	free(new);
+	free(cur);
+	free(base);
 	return ret;
 }
 
@@ -122,10 +153,17 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 			  unsigned int *nr_copies)
 {
 	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
-	static struct sheepdog_inode inode;
+	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
 	int nr_vnodes, nr_zones, nr_reqs;
 	int ret, vdi_found = 0;
+
+	inode = malloc(SD_INODE_HEADER_SIZE);
+	if (!inode) {
+		eprintf("oom\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
 
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 
@@ -135,35 +173,42 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 
 	for (i = start; i >= end; i--) {
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch,
-				  vid_to_vdi_oid(i), (char *)&inode,
+				  vid_to_vdi_oid(i), (char *)inode,
 				  SD_INODE_HEADER_SIZE, 0, nr_reqs);
-		if (ret < 0)
-			return SD_RES_EIO;
+		if (ret < 0) {
+			ret = SD_RES_EIO;
+			goto out;
+		}
 
-		if (inode.name[0] == '\0') {
+		if (inode->name[0] == '\0') {
 			*deleted_nr = i;
 			continue; /* deleted */
 		}
 
-		if (!strncmp(inode.name, name, strlen(inode.name))) {
+		if (!strncmp(inode->name, name, strlen(inode->name))) {
 			vdi_found = 1;
 			if (tag && tag[0] &&
-			    strncmp(inode.tag, tag, sizeof(inode.tag)) != 0)
+			    strncmp(inode->tag, tag, sizeof(inode->tag)) != 0)
 				continue;
-			if (snapid && snapid != inode.snap_id)
+			if (snapid && snapid != inode->snap_id)
 				continue;
 
-			*next_snap = inode.snap_id + 1;
-			*vid = inode.vdi_id;
-			*nr_copies = inode.nr_copies;
-			return SD_RES_SUCCESS;
+			*next_snap = inode->snap_id + 1;
+			*vid = inode->vdi_id;
+			*nr_copies = inode->nr_copies;
+			ret = SD_RES_SUCCESS;
+			goto out;
 		}
 	}
 
 	if (vdi_found)
-		return SD_RES_NO_TAG;
+		ret = SD_RES_NO_TAG;
+	else
+		ret = SD_RES_NO_VDI;
+out:
+	free(inode);
 
-	return SD_RES_NO_VDI;
+	return ret;
 }
 
 
@@ -299,19 +344,28 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	int ret;
 	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
 	int nr_vnodes, nr_zones, nr_reqs;
-	static struct sheepdog_inode inode;
+	struct sheepdog_inode *inode = NULL;
+
+	inode = malloc(SD_INODE_HEADER_SIZE);
+	if (!inode) {
+		eprintf("oom\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
 
 	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
 		tag = data + SD_MAX_VDI_LEN;
 	else if (data_len == SD_MAX_VDI_LEN)
 		tag = NULL;
-	else
-		return SD_RES_INVALID_PARMS;
+	else {
+		ret = SD_RES_INVALID_PARMS;
+		goto out;
+	}
 
 	ret = do_lookup_vdi(epoch, name, strlen(name), vid, tag, snapid,
 			    &dummy0, &dummy1, &dummy2, nr_copies);
 	if (ret != SD_RES_SUCCESS)
-		return ret;
+		goto out;
 
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 	nr_reqs = sys->nr_sobjs;
@@ -319,24 +373,28 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 		nr_reqs = nr_zones;
 
 	ret = read_object(entries, nr_vnodes, nr_zones, epoch,
-			  vid_to_vdi_oid(*vid), (char *)&inode,
+			  vid_to_vdi_oid(*vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, nr_reqs);
-	if (ret < 0)
-		return SD_RES_EIO;
+	if (ret < 0) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
 
-	memset(inode.name, 0, sizeof(inode.name));
+	memset(inode->name, 0, sizeof(inode->name));
 
 	ret = write_object(entries, nr_vnodes, nr_zones, epoch,
-			   vid_to_vdi_oid(*vid), (char *)&inode,
+			   vid_to_vdi_oid(*vid), (char *)inode,
 			   SD_INODE_HEADER_SIZE, 0, nr_reqs, 0);
-	if (ret != 0)
-		return SD_RES_EIO;
+	if (ret != 0) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
 
 	ret = start_deletion(*vid, epoch);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
+out:
+	free(inode);
 
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 int read_vdis(char *data, int len, unsigned int *rsp_len)
@@ -372,9 +430,15 @@ static void delete_one(struct work *work, int idx)
 	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
 	int nr_vnodes, nr_zones;
 	int ret, i;
-	static struct sheepdog_inode inode;
+	struct sheepdog_inode *inode = NULL;
 
 	eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
+
+	inode = malloc(sizeof(*inode));
+	if (!inode) {
+		eprintf("oom\n");
+		goto out;
+	}
 
 	/*
 	 * FIXME: can't use get_ordered_sd_node_list() here since this
@@ -384,22 +448,24 @@ static void delete_one(struct work *work, int idx)
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 
 	ret = read_object(entries, nr_vnodes, nr_zones, dw->epoch,
-			  vid_to_vdi_oid(vdi_id), (void *)&inode, sizeof(inode),
+			  vid_to_vdi_oid(vdi_id), (void *)inode, sizeof(*inode),
 			  0, sys->nr_sobjs);
 
-	if (ret != sizeof(inode)) {
+	if (ret != sizeof(*inode)) {
 		eprintf("cannot find vdi object\n");
-		return;
+		goto out;
 	}
 
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
-		if (!inode.data_vdi_id[i])
+		if (!inode->data_vdi_id[i])
 			continue;
 
 		remove_object(entries, nr_vnodes, nr_zones, dw->epoch,
-			      vid_to_data_oid(inode.data_vdi_id[i], i),
-			      inode.nr_copies);
+			      vid_to_data_oid(inode->data_vdi_id[i], i),
+			      inode->nr_copies);
 	}
+out:
+	free(inode);
 }
 
 static void delete_one_done(struct work *work, int idx)
@@ -430,36 +496,46 @@ static int fill_vdi_list(struct deletion_work *dw,
 			 int nr_vnodes, int nr_zones, uint32_t root_vid)
 {
 	int ret, i;
-	static struct sheepdog_inode inode;
+	struct sheepdog_inode *inode = NULL;
 	int done = dw->count;
 	uint32_t vid;
+
+	inode = malloc(SD_INODE_HEADER_SIZE);
+	if (!inode) {
+		eprintf("oom\n");
+		goto err;
+	}
 
 	((uint32_t *)dw->buf)[dw->count++] = root_vid;
 again:
 	vid = ((uint32_t *)dw->buf)[done++];
 	ret = read_object(entries, nr_vnodes, nr_zones, dw->epoch,
-			  vid_to_vdi_oid(vid), (void *)&inode,
+			  vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
 	if (ret != SD_INODE_HEADER_SIZE) {
 		eprintf("cannot find vdi object\n");
-		return 0;
+		goto err;
 	}
 
-	if (inode.name[0] != '\0')
-		return 1;
+	if (inode->name[0] != '\0')
+		goto out;
 
-	for (i = 0; i < ARRAY_SIZE(inode.child_vdi_id); i++) {
-		if (!inode.child_vdi_id[i])
+	for (i = 0; i < ARRAY_SIZE(inode->child_vdi_id); i++) {
+		if (!inode->child_vdi_id[i])
 			continue;
 
-		((uint32_t *)dw->buf)[dw->count++] = inode.child_vdi_id[i];
+		((uint32_t *)dw->buf)[dw->count++] = inode->child_vdi_id[i];
 	}
 
 	if (((uint32_t *)dw->buf)[done])
 		goto again;
-
+err:
+	free(inode);
 	return 0;
+out:
+	free(inode);
+	return 1;
 }
 
 static uint64_t get_vdi_root(struct sheepdog_vnode_list_entry *entries,
@@ -467,24 +543,35 @@ static uint64_t get_vdi_root(struct sheepdog_vnode_list_entry *entries,
 			     uint32_t vid)
 {
 	int ret;
-	static struct sheepdog_inode inode;
+	struct sheepdog_inode *inode = NULL;
 
+	inode = malloc(SD_INODE_HEADER_SIZE);
+	if (!inode) {
+		eprintf("oom\n");
+		vid = 0;
+		goto out;
+	}
 next:
 	ret = read_object(entries, nr_vnodes, nr_zones, epoch,
-			  vid_to_vdi_oid(vid), (void *)&inode,
+			  vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
 	if (ret != SD_INODE_HEADER_SIZE) {
 		eprintf("cannot find vdi object\n");
-		return 0;
+		vid = 0;
+		goto out;
 	}
 
-	if (!inode.parent_vdi_id)
-		return vid;
+	if (!inode->parent_vdi_id)
+		goto out;
 
-	vid = inode.parent_vdi_id;
+	vid = inode->parent_vdi_id;
 
 	goto next;
+out:
+	free(inode);
+
+	return vid;
 }
 
 int start_deletion(uint32_t vid, uint32_t epoch)
