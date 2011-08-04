@@ -1340,7 +1340,7 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 	unsigned long flags = 0;
 
 	for (i = 0; i < ARRAY_SIZE(commands); i++) {
-		if (!strncmp(commands[i].name, cmd, strlen(commands[i].name))) {
+		if (!strcmp(commands[i].name, cmd)) {
 			found = 1;
 			if (commands[i].parser)
 				command_parser = commands[i].parser;
@@ -1354,7 +1354,7 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 	}
 
 	for (s = commands[i].sub; s->name; s++) {
-		if (!strncmp(s->name, subcmd, strlen(s->name))) {
+		if (!strcmp(s->name, subcmd)) {
 			command_fn = s->fn;
 			command_options = s->opts;
 			command_arg = s->arg;
