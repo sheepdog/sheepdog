@@ -289,7 +289,7 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies,
 	    int is_snapshot, unsigned int *nr_copies)
 {
-	uint32_t cur_vid;
+	uint32_t cur_vid = 0;
 	uint32_t next_snapid;
 	unsigned long nr, deleted_nr = SD_NR_VDIS, right_nr = SD_NR_VDIS;
 	int ret;
