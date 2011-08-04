@@ -90,6 +90,8 @@ struct request {
 	struct work work;
 };
 
+#define MAX_DATA_OBJECT_BMAPS 64
+
 struct data_object_bmap {
 	uint32_t vdi_id;
 	DECLARE_BITMAP(dobjs, MAX_DATA_OBJS);

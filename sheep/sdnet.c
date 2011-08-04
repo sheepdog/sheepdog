@@ -143,11 +143,15 @@ static void __done(struct work *work, int idx)
 		} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
 			struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
 			uint32_t vdi_id = oid_to_vid(obj_hdr->oid);
-			struct data_object_bmap *bmap;
+			struct data_object_bmap *bmap, *n;
+			int nr_bmaps = 0;
 
-			list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
+			list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
+				nr_bmaps++;
 				if (bmap->vdi_id == vdi_id) {
 					set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+					list_del(&bmap->list);
+					list_add_tail(&bmap->list, &sys->consistent_obj_list);
 					goto done;
 				}
 			}
@@ -158,8 +162,15 @@ static void __done(struct work *work, int idx)
 			}
 			dprintf("allocate a new object map\n");
 			bmap->vdi_id = vdi_id;
-			list_add(&bmap->list, &sys->consistent_obj_list);
+			list_add_tail(&bmap->list, &sys->consistent_obj_list);
 			set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+			if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
+				/* the first entry is the least recently used one */
+				bmap = list_first_entry(&sys->consistent_obj_list,
+							struct data_object_bmap, list);
+				list_del(&bmap->list);
+				free(bmap);
+			}
 		} else if (is_access_local(req->entry, req->nr_vnodes,
 					   ((struct sd_obj_req *)&req->rq)->oid, copies) &&
 			   req->rp.result == SD_RES_EIO) {
