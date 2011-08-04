@@ -41,37 +41,35 @@ static int raw_output = 0;
 #define TEXT_NORMAL "\033[0m"
 #define TEXT_BOLD   "\033[1m"
 
-#define COMMON_LONG_OPTIONS				\
-	{"address", required_argument, NULL, 'a'},	\
-	{"port", required_argument, NULL, 'p'},		\
-	{"raw", no_argument, NULL, 'r'},		\
-	{"help", no_argument, NULL, 'h'},		\
+struct sd_option {
+	int val;
+	const char *name;
+	int has_arg;
+	const char *desc;
+};
 
-#define COMMON_SHORT_OPTIONS "a:p:hr"
+static const struct sd_option collie_options[] = {
 
-static void usage(int status)
-{
-	if (status)
-		fprintf(stderr, "Try `%s --help' for more information.\n", program_name);
-	else {
-		printf("Usage: %s command subcommand [options]\n", program_name);
-		printf("Sheepdog Administrator Utilty\n\
-\n\
-Command syntax:\n\
-  cluster (info|format|shutdown)\n\
-  node (info|list)\n\
-  vdi (list|tree|graph|delete|object|setattr|getattr)\n\
-\n\
-Common parameters:\n\
-  -a, --address           specify the daemon address (default: localhost)\n\
-  -p, --port              specify the daemon port\n\
-  -r, --raw               raw output mode: omit headers, separate fields with\n\
-                          single spaces and print all sizes in decimal bytes\n\
-  -h, --help              display this help and exit\n\
-");
-	}
-	exit(status);
-}
+	/* common options */
+	{'a', "address", 1, "specify the daemon address (default: localhost)"},
+	{'p', "port", 1, "specify the daemon port"},
+	{'r', "raw", 0, "raw output mode: omit headers, separate fields with\n\
+                          single spaces and print all sizes in decimal bytes"},
+	{'h', "help", 0, "display this help and exit"},
+
+	/* vdi options */
+	{'i', "index", 1, "specify the index of data objects"},
+	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
+	{'x', "exclusive", 0, "write in an exclusive mode"},
+	{'d', "delete", 0, "delete a key"},
+
+	/* cluster options */
+	{'c', "copies", 1, "set the number of data redundancy"},
+
+	{ 0, NULL, 0, NULL },
+};
+
+static void usage(int status);
 
 static uint64_t node_list_version;
 
@@ -616,6 +614,9 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 
 struct subcommand {
 	const char *name;
+	const char *arg;
+	const char *opts;
+	const char *desc;
 	unsigned long flags;
 	int (*fn)(int, char **);
 };
@@ -718,8 +719,10 @@ static int node_info(int argc, char **argv)
 }
 
 static struct subcommand node_cmd[] = {
-	{"list", SUBCMD_FLAG_NEED_NODELIST, node_list},
-	{"info", SUBCMD_FLAG_NEED_NODELIST, node_info},
+	{"list", NULL, "aprh", "list nodes",
+	 SUBCMD_FLAG_NEED_NODELIST, node_list},
+	{"info", NULL, "aprh", "show each node information",
+	 SUBCMD_FLAG_NEED_NODELIST, node_info},
 	{NULL,},
 };
 
@@ -1127,24 +1130,21 @@ out:
 }
 
 static struct subcommand vdi_cmd[] = {
-	{"delete", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
-	{"list", SUBCMD_FLAG_NEED_NODELIST, vdi_list},
-	{"tree", SUBCMD_FLAG_NEED_NODELIST, vdi_tree},
-	{"graph", SUBCMD_FLAG_NEED_NODELIST, vdi_graph},
-	{"object", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
-	{"setattr", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
-	{"getattr", SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
+	{"delete", "<vdiname>", "saph", "delete a image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
+	{"list", "[vdiname]", "aprh", "list images",
+	 SUBCMD_FLAG_NEED_NODELIST, vdi_list},
+	{"tree", NULL, "aph", "show images in tree view format",
+	 SUBCMD_FLAG_NEED_NODELIST, vdi_tree},
+	{"graph", NULL, "aph", "show images with Graphviz dot format",
+	 SUBCMD_FLAG_NEED_NODELIST, vdi_graph},
+	{"object", "<vdiname>", "isaph", "show object information in the image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
+	{"setattr", "<vdiname> <key> [value]", "dxaph", "set a vdi attribute",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
+	{"getattr", "<vdiname> <key>", "aph", "get a vdi attribute",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
 	{NULL,},
-};
-
-static struct option vdi_long_options[] =
-{
-	COMMON_LONG_OPTIONS
-	{"index", required_argument, NULL, 'i'},
-	{"snapshot", required_argument, NULL, 's'},
-	{"exclusive", no_argument, NULL, 'x'},
-	{"delete", no_argument, NULL, 'd'},
-	{NULL, 0, NULL, 0},
 };
 
 static int vdi_parser(int ch, char *opt)
@@ -1256,49 +1256,82 @@ static int cluster_shutdown(int argc, char **argv)
 }
 
 static struct subcommand cluster_cmd[] = {
-	{"info", 0, cluster_info},
-	{"format", 0, cluster_format},
-	{"shutdown", SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
+	{"info", NULL, "aprh", "show cluster information",
+	 0, cluster_info},
+	{"format", NULL, "caph", "create a Sheepdog storage",
+	 0, cluster_format},
+	{"shutdown", NULL, "aph", "stop Sheepdog",
+	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
 	{NULL,},
-};
-
-static struct option cluster_long_options[] =
-{
-	COMMON_LONG_OPTIONS
-	{"copies", required_argument, NULL, 'c'},
-	{NULL, 0, NULL, 0},
 };
 
 static struct {
 	const char *name;
 	struct subcommand *sub;
-	struct option *lopts;
-	const char *sopts;
 	int (*parser)(int, char *);
-	void (*help)(void);
 } commands[] = {
 	{"vdi", vdi_cmd,
-	 vdi_long_options,
-	 COMMON_SHORT_OPTIONS "i:s:xd",
 	 vdi_parser,},
 	{"node", node_cmd,},
 	{"cluster", cluster_cmd,
-	 cluster_long_options,
-	 COMMON_SHORT_OPTIONS "c:",
 	 cluster_parser,},
 };
 
-static struct option common_long_options[] =
-{
-	COMMON_LONG_OPTIONS
-	{NULL, 0, NULL, 0},
-};
-
-static struct option *long_options = common_long_options;
-static const char *short_options = COMMON_SHORT_OPTIONS;
 static int (*command_parser)(int, char *);
 static int (*command_fn)(int, char **);
-static void (*command_help)(void);
+static const char *command_options;
+static const char *command_arg;
+static const char *command_desc;
+
+static const struct sd_option *find_opt(int ch)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(collie_options); i++) {
+		if (collie_options[i].val == ch)
+			return collie_options + i;
+	}
+	fprintf(stderr, "internal error\n");
+	exit(EXIT_SYSFAIL);
+}
+
+static char *build_short_options(const char *opts)
+{
+	static char sopts[256], *p;
+	const struct sd_option *sd_opt;
+	int i, len = strlen(opts);
+
+	p = sopts;
+	for (i = 0; i < len; i++) {
+		sd_opt = find_opt(opts[i]);
+		*p++ = sd_opt->val;
+		if (sd_opt->has_arg)
+			*p++ = ':';
+	}
+	*p = '\0';
+
+	return sopts;
+}
+
+static struct option *build_long_options(const char *opts)
+{
+	static struct option lopts[256], *p;
+	const struct sd_option *sd_opt;
+	int i, len = strlen(opts);
+
+	p = lopts;
+	for (i = 0; i < len; i++) {
+		sd_opt = find_opt(opts[i]);
+		p->name = sd_opt->name;
+		p->has_arg = sd_opt->has_arg;
+		p->flag = NULL;
+		p->val = sd_opt->val;
+		p++;
+	}
+	memset(p, 0, sizeof(struct option));
+
+	return lopts;
+}
 
 static unsigned long setup_command(char *cmd, char *subcmd)
 {
@@ -1309,11 +1342,8 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 	for (i = 0; i < ARRAY_SIZE(commands); i++) {
 		if (!strncmp(commands[i].name, cmd, strlen(commands[i].name))) {
 			found = 1;
-			if (commands[i].parser) {
+			if (commands[i].parser)
 				command_parser = commands[i].parser;
-				long_options = commands[i].lopts;
-				short_options = commands[i].sopts;
-			}
 			break;
 		}
 	}
@@ -1326,6 +1356,9 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 	for (s = commands[i].sub; s->name; s++) {
 		if (!strncmp(s->name, subcmd, strlen(s->name))) {
 			command_fn = s->fn;
+			command_options = s->opts;
+			command_arg = s->arg;
+			command_desc = s->desc;
 			flags = s->flags;
 			break;
 		}
@@ -1342,10 +1375,71 @@ static unsigned long setup_command(char *cmd, char *subcmd)
 	return flags;
 }
 
+static void usage(int status)
+{
+	int i;
+	struct subcommand *s;
+	char name[64];
+
+	if (status)
+		fprintf(stderr, "Try `%s --help' for more information.\n", program_name);
+	else {
+		printf("Usage: %s <command> <subcommand> [options]\n", program_name);
+		printf("Sheepdog Administrator Utilty\n");
+		printf("\n");
+		printf("Command syntax:\n");
+		for (i = 0; i < ARRAY_SIZE(commands); i++) {
+			for (s = commands[i].sub; s->name; s++) {
+				sprintf(name, "%s %s", commands[i].name, s->name);
+				printf("  %-24s%s\n", name, s->desc);
+			}
+		}
+		printf("\n");
+		printf("For more information, "
+		       "type \"%s <command> <subcommand> --help\".\n", program_name);
+	}
+	exit(status);
+}
+
+static void subcommand_usage(char *cmd, char *subcmd, int status)
+{
+	int i, len = strlen(command_options);
+	const struct sd_option *sd_opt;
+	char name[64];
+
+	printf("%s %s - %s\n", cmd, subcmd, command_desc);
+	printf("\n");
+	printf("Usage:\n");
+	printf("  %s %s %s", program_name, cmd, subcmd);
+	if (command_arg)
+		printf(" %s", command_arg);
+
+	for (i = 0; i < len; i++) {
+		sd_opt = find_opt(command_options[i]);
+		if (sd_opt->has_arg)
+			printf(" [-%c %s]", sd_opt->val, sd_opt->name);
+		else
+			printf(" [-%c]", sd_opt->val);
+	}
+	printf("\n");
+	printf("\n");
+
+	printf("Command parameters:\n");
+	for (i = 0; i < len; i++) {
+		sd_opt = find_opt(command_options[i]);
+		sprintf(name, "-%c, --%s", sd_opt->val, sd_opt->name);
+		printf("  %-24s%s\n", name, sd_opt->desc);
+	}
+
+	exit(status);
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret;
 	unsigned long flags;
+	struct option *long_options;
+	const char *short_options;
 
 	if (argc < 3)
 		usage(0);
@@ -1353,6 +1447,9 @@ int main(int argc, char **argv)
 	flags = setup_command(argv[1], argv[2]);
 
 	optind = 3;
+
+	long_options = build_long_options(command_options);
+	short_options = build_short_options(command_options);
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				&longindex)) >= 0) {
@@ -1368,8 +1465,7 @@ int main(int argc, char **argv)
 			raw_output = 1;
 			break;
 		case 'h':
-			if (command_help)
-				command_help();
+			subcommand_usage(argv[1], argv[2], EXIT_SUCCESS);
 			break;
 		case '?':
 			usage(EXIT_USAGE);
