@@ -146,6 +146,9 @@ static void __done(struct work *work, int idx)
 			struct data_object_bmap *bmap, *n;
 			int nr_bmaps = 0;
 
+			if (!is_data_obj(obj_hdr->oid))
+				goto done;
+
 			list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
 				nr_bmaps++;
 				if (bmap->vdi_id == vdi_id) {
