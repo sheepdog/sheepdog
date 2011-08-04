@@ -232,6 +232,7 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 /* Journal header for data object */
 struct jrnl_vdi_head {
 	uint32_t jh_type;
+	uint32_t pad;
 	uint64_t jh_offset;
 	uint64_t jh_size;
 };

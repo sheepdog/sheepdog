@@ -727,6 +727,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			jd.jdf_oid = oid;
 			jd.jdf_target_fd = fd;
 
+			memset(&jh, 0, sizeof(jh));
 			jh.jh_type = JRNL_TYPE_VDI;
 			jh.jh_offset = hdr->offset;
 			jh.jh_size = hdr->data_length;
