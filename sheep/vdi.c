@@ -21,17 +21,25 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 			  uint32_t base_vid, uint32_t cur_vid, uint32_t copies,
 			  uint32_t snapid, int is_snapshot)
 {
-	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry *entries;
 	/* we are not called concurrently */
 	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
 	struct timeval tv;
 	int ret, nr_vnodes, nr_zones;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
 
+	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
+	if (!entries) {
+		eprintf("oom\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+
 	new = zalloc(sizeof(*new));
 	if (!new) {
 		eprintf("oom\n");
-		return SD_RES_NO_MEM;
+		ret = SD_RES_NO_MEM;
+		goto out;
 	}
 
 	if (base_vid) {
@@ -141,6 +149,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (ret != 0)
 		ret = SD_RES_VDI_WRITE;
 out:
+	free(entries);
 	free(new);
 	free(cur);
 	free(base);
@@ -152,14 +161,15 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 			  unsigned long *deleted_nr, uint32_t *next_snap,
 			  unsigned int *nr_copies)
 {
-	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry *entries;
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
 	int nr_vnodes, nr_zones, nr_reqs;
 	int ret, vdi_found = 0;
 
+	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
 	inode = malloc(SD_INODE_HEADER_SIZE);
-	if (!inode) {
+	if (!inode || !entries) {
 		eprintf("oom\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
@@ -207,6 +217,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 		ret = SD_RES_NO_VDI;
 out:
 	free(inode);
+	free(entries);
 
 	return ret;
 }
@@ -342,12 +353,13 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
-	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry *entries;
 	int nr_vnodes, nr_zones, nr_reqs;
 	struct sheepdog_inode *inode = NULL;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
-	if (!inode) {
+	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
+	if (!inode || !entries) {
 		eprintf("oom\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
@@ -393,6 +405,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	ret = start_deletion(*vid, epoch);
 out:
 	free(inode);
+	free(entries);
 
 	return ret;
 }
@@ -427,15 +440,16 @@ static void delete_one(struct work *work, int idx)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(((uint32_t *)dw->buf) + dw->count - dw->done - 1);
-	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry *entries;
 	int nr_vnodes, nr_zones;
 	int ret, i;
 	struct sheepdog_inode *inode = NULL;
 
 	eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
 
+	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
 	inode = malloc(sizeof(*inode));
-	if (!inode) {
+	if (!inode || !entries) {
 		eprintf("oom\n");
 		goto out;
 	}
@@ -465,6 +479,7 @@ static void delete_one(struct work *work, int idx)
 			      inode->nr_copies);
 	}
 out:
+	free(entries);
 	free(inode);
 }
 
@@ -576,19 +591,27 @@ out:
 
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
-	struct deletion_work *dw;
-	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	struct deletion_work *dw = NULL;
+	struct sheepdog_vnode_list_entry *entries;
 	int nr_vnodes, nr_zones, ret;
 	uint32_t root_vid;
 
+	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
+	if (!entries) {
+		eprintf("oom\n");
+		ret = SD_RES_NO_MEM;
+		goto err;
+	}
 	dw = zalloc(sizeof(struct deletion_work));
-	if (!dw)
-		return SD_RES_NO_MEM;
+	if (!dw) {
+		ret = SD_RES_NO_MEM;
+		goto err;
+	}
 
 	dw->buf = zalloc(1 << 20); /* FIXME: handle larger buffer */
 	if (!dw->buf) {
-		free(dw);
-		return SD_RES_NO_MEM;
+		ret = SD_RES_NO_MEM;
+		goto err;
 	}
 
 	dw->count = 0;
@@ -601,8 +624,10 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 
 	root_vid = get_vdi_root(entries, nr_vnodes, nr_zones, dw->epoch, dw->vid);
-	if (!root_vid)
-		return SD_RES_EIO;
+	if (!root_vid) {
+		ret = SD_RES_EIO;
+		goto err;
+	}
 
 	ret = fill_vdi_list(dw, entries, nr_vnodes, nr_zones, root_vid);
 	if (ret)
@@ -611,30 +636,48 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	dprintf("%d\n", dw->count);
 
 	if (dw->count == 0)
-		return SD_RES_SUCCESS;
+		goto out;
 
 	if (!list_empty(&deletion_work_list)) {
 		list_add_tail(&dw->dw_siblings, &deletion_work_list);
-		return SD_RES_SUCCESS;
+		goto out;
 	}
 
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
 	queue_work(&dw->work);
+out:
+	free(entries);
 
 	return SD_RES_SUCCESS;
+err:
+	free(entries);
+	if (dw)
+		free(dw->buf);
+	free(dw);
+
+	return ret;
 }
 
 int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 		 uint32_t *attrid, int copies, int creat, int excl)
 {
-	struct sheepdog_vnode_list_entry entries[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry *entries;
 	char attr_buf[SD_ATTR_HEADER_SIZE];
 	uint64_t oid;
 	uint32_t end;
 	int ret, nr_zones, nr_vnodes;
 
-	if (data_len != SD_ATTR_HEADER_SIZE)
-		return SD_RES_INVALID_PARMS;
+	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
+	if (!entries) {
+		eprintf("oom\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+
+	if (data_len != SD_ATTR_HEADER_SIZE) {
+		ret = SD_RES_INVALID_PARMS;
+		goto out;
+	}
 
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 
@@ -651,9 +694,10 @@ int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 			ret = write_object(entries, nr_vnodes, nr_zones, epoch, oid, data,
 					   data_len, 0, copies, 1);
 			if (ret)
-				return SD_RES_EIO;
-
-			return SD_RES_SUCCESS;
+				ret = SD_RES_EIO;
+			else
+				ret = SD_RES_SUCCESS;
+			goto out;
 		}
 
 		if (ret < 0)
@@ -661,14 +705,19 @@ int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
 
 		if (memcmp(attr_buf, data, sizeof(attr_buf)) == 0) {
 			if (excl)
-				return SD_RES_VDI_EXIST;
+				ret = SD_RES_VDI_EXIST;
 			else
-				return SD_RES_SUCCESS;
+				ret = SD_RES_SUCCESS;
+			goto out;
 		}
 
 		(*attrid)++;
 	}
 
 	dprintf("there is no space for new vdis\n");
-	return SD_RES_FULL_VDI;
+	ret = SD_RES_FULL_VDI;
+out:
+	free(entries);
+
+	return ret;
 }
