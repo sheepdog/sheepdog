@@ -345,16 +345,18 @@ static void free_request(struct request *req)
 static void req_done(struct request *req)
 {
 	int dead = 0;
+	struct client_info *ci = req->ci;
 
-	if (conn_tx_on(&req->ci->conn)) {
+	if (conn_tx_on(&ci->conn)) {
 		dprintf("connection seems to be dead\n");
 		dead = 1;
 	} else
-		list_add(&req->r_wlist, &req->ci->done_reqs);
-	client_decref(req->ci);
+		list_add(&req->r_wlist, &ci->done_reqs);
 
 	if (dead)
 		free_request(req);
+
+	client_decref(ci);
 }
 
 static void init_rx_hdr(struct client_info *ci)
