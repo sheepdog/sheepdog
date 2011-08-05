@@ -1147,6 +1147,55 @@ out:
 	return ret;
 }
 
+static int vdi_resize(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint64_t new_size;
+	uint32_t vid;
+	int ret;
+	char buf[SD_INODE_HEADER_SIZE];
+	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "please specify a new size of vdi\n");
+		return EXIT_USAGE;
+	}
+	ret = parse_option_size(argv[optind], &new_size);
+	if (ret < 0)
+		return EXIT_USAGE;
+	if (new_size > SD_MAX_VDI_SIZE) {
+		fprintf(stderr, "too big image size, %s\n", argv[optind]);
+		return EXIT_USAGE;
+	}
+
+	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "failed to open vdi %s\n", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read an inode header\n");
+		return EXIT_FAILURE;
+	}
+
+	if (new_size < inode->vdi_size) {
+		fprintf(stderr, "shrinking is not implemented\n");
+		return EXIT_USAGE;
+	}
+	inode->vdi_size = new_size;
+
+	ret = sd_write_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE, 0,
+			      0, inode->nr_copies, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to update an inode header\n");
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int vdi_delete(int argc, char **argv)
 {
 	char *data = argv[optind];
@@ -1452,6 +1501,8 @@ static struct subcommand vdi_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
 	{"getattr", "<vdiname> <key>", "aph", "get a vdi attribute",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
+	{"resize", "<vdiname> <new size>", "aph", "resize a image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_resize},
 	{NULL,},
 };
 
