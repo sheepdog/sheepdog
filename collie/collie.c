@@ -1055,6 +1055,98 @@ static int vdi_snapshot(int argc, char **argv)
 	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, 1);
 }
 
+static int vdi_clone(int argc, char **argv)
+{
+	char *src_vdi = argv[optind++], *dst_vdi;
+	uint32_t base_vid, new_vid;
+	uint64_t oid;
+	int idx, max_idx, ret;
+	struct sheepdog_inode *inode = NULL;
+	char *buf = NULL;
+
+	dst_vdi = argv[optind];
+	if (!dst_vdi) {
+		fprintf(stderr, "a dst vdi must be specified\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
+		fprintf(stderr, "it is not supported to create a clone image of "
+			"the non-snapshot vdi\n");
+		fprintf(stderr, "please specify a '-s' option\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	ret = find_vdi_name(src_vdi, vdi_cmd_data.snapshot_id,
+			    vdi_cmd_data.snapshot_tag, &base_vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "failed to open vdi %s\n", src_vdi);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	inode = malloc(sizeof(*inode));
+	if (!inode) {
+		fprintf(stderr, "oom\n");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+	ret = sd_read_object(vid_to_vdi_oid(base_vid), inode, SD_INODE_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read a base inode\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, 0);
+	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
+		goto out;
+
+	buf = zalloc(SD_DATA_OBJ_SIZE);
+	if (!buf) {
+		fprintf(stderr, "oom\n");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+
+	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
+
+	for (idx = 0; idx < max_idx; idx++) {
+		if (inode->data_vdi_id[idx]) {
+			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+			ret = sd_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0);
+			if (ret) {
+				ret = EXIT_FAILURE;
+				goto out;
+			}
+		} else
+			memset(buf, 0, SD_DATA_OBJ_SIZE);
+
+		oid = vid_to_data_oid(new_vid, idx);
+		ret = sd_write_object(oid, buf, SD_DATA_OBJ_SIZE, 0, 0,
+				      inode->nr_copies, 1);
+		if (ret != SD_RES_SUCCESS) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+
+		ret = sd_write_object(vid_to_vdi_oid(new_vid), &new_vid, sizeof(new_vid),
+				      SD_INODE_HEADER_SIZE + sizeof(new_vid) * idx, 0,
+				      inode->nr_copies, 0);
+		if (ret) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+	}
+	ret = EXIT_SUCCESS;
+out:
+	free(inode);
+	free(buf);
+	return ret;
+}
+
 static int vdi_delete(int argc, char **argv)
 {
 	char *data = argv[optind];
@@ -1344,6 +1436,8 @@ static struct subcommand vdi_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
 	{"snapshot", "<vdiname>", "saph", "create a snapshot",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_snapshot},
+	{"clone", "<src vdi> <dst vdi>", "sPaph", "create a clone image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_clone},
 	{"delete", "<vdiname>", "saph", "delete a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", "[vdiname]", "aprh", "list images",
