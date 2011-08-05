@@ -170,6 +170,94 @@ out:
 	return ret;
 }
 
+static int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
+			  uint64_t offset)
+{
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	char name[128];
+	int n, fd, ret;
+	unsigned wlen = 0, rlen = datalen;
+
+	n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, 0);
+
+	addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
+
+	fd = connect_to(name, vnode_list_entries[n].port);
+	if (fd < 0) {
+		fprintf(stderr, "failed to connect %s:%d\n", name,
+			vnode_list_entries[n].port);
+		return SD_RES_EIO;
+	}
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.epoch = node_list_version;
+	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.oid = oid;
+	/* use direct to avoid checking consistency */
+	hdr.flags =  SD_FLAG_CMD_DIRECT;
+	hdr.data_length = rlen;
+	hdr.offset = offset;
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "failed to read object, %lx\n", oid);
+		return SD_RES_EIO;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read object, %lx %s\n", oid,
+			sd_strerror(rsp->result));
+		return rsp->result;
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+static int sd_write_object(uint64_t oid, void *data, unsigned int datalen,
+			   uint64_t offset, uint32_t flags, int copies, int create)
+{
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	int fd, ret;
+	unsigned wlen = datalen, rlen;
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0) {
+		fprintf(stderr, "failed to connect\n");
+		return SD_RES_EIO;
+	}
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.epoch = node_list_version;
+	if (create)
+		hdr.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+	else
+		hdr.opcode = SD_OP_WRITE_OBJ;
+	hdr.oid = oid;
+	hdr.copies = copies;
+	hdr.data_length = wlen;
+	hdr.flags = (flags & ~SD_FLAG_CMD_DIRECT) | SD_FLAG_CMD_WRITE;
+	hdr.offset = offset;
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "failed to write object, %lx\n", oid);
+		return SD_RES_EIO;
+	}
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to write object, %lx %s\n", oid,
+			sd_strerror(rsp->result));
+		return rsp->result;
+	}
+
+	return SD_RES_SUCCESS;
+}
+
 struct cluster_cmd_data {
 	int copies;
 } cluster_cmd_data;
@@ -287,77 +375,39 @@ static int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	close(fd);
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
-		struct sd_obj_req hdr;
-		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 		uint64_t oid;
-		int n;
-		char name[128];
 
 		if (!test_bit(nr, vdi_inuse))
 			continue;
 
 		oid = vid_to_vdi_oid(nr);
-		n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, 0);
-		addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
 
-		fd = connect_to(name, vnode_list_entries[n].port);
-		if (fd < 0) {
-			printf("failed to connect %s:%d\n", name,
-			       vnode_list_entries[n].port);
+		memset(&i, 0, sizeof(i));
+		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0);
+		if (ret != SD_RES_SUCCESS) {
+			fprintf(stderr, "failed to read a inode header\n");
 			continue;
 		}
 
-		wlen = 0;
-		rlen = SD_INODE_HEADER_SIZE;
-		memset(&i, 0, sizeof(i));
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.oid = oid;
-		hdr.data_length = rlen;
-		hdr.flags = SD_FLAG_CMD_DIRECT;
-		hdr.epoch = node_list_version;
-
-		ret = exec_req(fd, (struct sd_req *)&hdr, &i, &wlen, &rlen);
-
-		if (ret || rsp->result != SD_RES_SUCCESS) {
-			printf("failed to read a inode header %lu, %d, %x\n",
-			       nr, ret, rsp->result);
-			goto next;
-		}
-
 		if (i.name[0] == '\0') /* this vdi is deleted */
-			goto next;
+			continue;
 
 		if (size > SD_INODE_HEADER_SIZE) {
-			wlen = 0;
 			rlen = DIV_ROUND_UP(i.vdi_size, SD_DATA_OBJ_SIZE) *
 				sizeof(i.data_vdi_id[0]);
 			if (rlen > size - SD_INODE_HEADER_SIZE)
 				rlen = size - SD_INODE_HEADER_SIZE;
 
-			memset(&hdr, 0, sizeof(hdr));
-			hdr.opcode = SD_OP_READ_OBJ;
-			hdr.oid = oid;
-			hdr.offset = SD_INODE_HEADER_SIZE;
-			hdr.data_length = rlen;
-			hdr.flags = SD_FLAG_CMD_DIRECT;
-			hdr.epoch = node_list_version;
+			ret = sd_read_object(oid, ((char *)&i) + SD_INODE_HEADER_SIZE,
+					     rlen, SD_INODE_HEADER_SIZE);
 
-			ret = exec_req(fd, (struct sd_req *)&hdr,
-				       ((char *)&i) + SD_INODE_HEADER_SIZE,
-				       &wlen, &rlen);
-
-			if (ret || rsp->result != SD_RES_SUCCESS) {
-				printf("failed to read inode %lu, %d, %x\n",
-				       nr, ret, rsp->result);
-				goto next;
+			if (ret != SD_RES_SUCCESS) {
+				fprintf(stderr, "failed to read inode\n");
+				continue;
 			}
 		}
 
 		func(i.vdi_id, i.name, i.tag, i.snap_id, 0, &i, data);
-	next:
-		close(fd);
 	}
 
 	return 0;
@@ -935,14 +985,10 @@ out:
 
 static int vdi_setattr(int argc, char **argv)
 {
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	char name[128];
-	int i = 0, n, fd, ret;
+	int ret;
 	uint64_t oid, attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
 	char *vdiname = argv[optind++], *key, *value;
-	unsigned int wlen = 0, rlen = 0;
 	uint64_t offset;
 
 	key = argv[optind++];
@@ -993,56 +1039,20 @@ reread:
 		return EXIT_FAILURE;
 	}
 
-	if (nr_copies > nr_nodes)
-		nr_copies = nr_nodes;
-
 	oid = attr_oid;
-	for (i = 0; i < nr_copies; i++) {
-		rlen = 0;
-		if (vdi_cmd_data.delete)
-			wlen = 1;
-		else
-			wlen = strlen(value);
 
-		n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, i);
+	if (vdi_cmd_data.delete)
+		ret = sd_write_object(oid, (char *)"", 1,
+				      offsetof(struct sheepdog_inode, name), 0,
+				      nr_copies, 0);
+	else
+		ret = sd_write_object(oid, value, strlen(value),
+				      SD_ATTR_HEADER_SIZE, SD_FLAG_CMD_TRUNCATE,
+				      nr_copies, 0);
 
-		addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
-
-		fd = connect_to(name, vnode_list_entries[n].port);
-		if (fd < 0) {
-			printf("%s(%d): %s, %m\n", __func__, __LINE__,
-			       name);
-			break;
-		}
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.epoch = node_list_version;
-		hdr.opcode = SD_OP_WRITE_OBJ;
-		hdr.oid = oid;
-
-		hdr.data_length = wlen;
-		if (vdi_cmd_data.delete) {
-			hdr.flags =  SD_FLAG_CMD_DIRECT | SD_FLAG_CMD_WRITE;
-			hdr.offset = offsetof(struct sheepdog_inode, name);
-			value = (char *)"";
-		} else {
-			hdr.flags =  SD_FLAG_CMD_DIRECT | SD_FLAG_CMD_WRITE |
-				SD_FLAG_CMD_TRUNCATE;
-			hdr.offset = SD_ATTR_HEADER_SIZE;
-		}
-
-		ret = exec_req(fd, (struct sd_req *)&hdr, value, &wlen, &rlen);
-		close(fd);
-
-		if (ret) {
-			fprintf(stderr, "failed to set attribute\n");
-			return EXIT_FAILURE;
-		}
-		if (rsp->result != SD_RES_SUCCESS) {
-			fprintf(stderr, "failed to set attribute, %s\n",
-				sd_strerror(rsp->result));
-			return EXIT_FAILURE;
-		}
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to set attribute\n");
+		return EXIT_FAILURE;
 	}
 
 	return EXIT_SUCCESS;
@@ -1050,14 +1060,10 @@ reread:
 
 static int vdi_getattr(int argc, char **argv)
 {
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	char name[128];
-	int i = 0, n, fd, ret;
+	int ret;
 	uint64_t oid, attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
 	char *vdiname = argv[optind++], *key, *value;
-	unsigned int wlen = 0, rlen = 0;
 
 	key = argv[optind++];
 	if (!key) {
@@ -1080,51 +1086,21 @@ static int vdi_getattr(int argc, char **argv)
 		return EXIT_MISSING;
 	}
 
-	if (nr_copies > nr_nodes)
-		nr_copies = nr_nodes;
-
 	oid = attr_oid;
 	value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
 	if (!value) {
 		fprintf(stderr, "failed to allocate memory\n");
 		return EXIT_SYSFAIL;
 	}
-	for (i = 0; i < nr_copies; i++) {
-		rlen = SD_MAX_VDI_ATTR_VALUE_LEN;
-		wlen = 0;
 
-		n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, i);
-
-		addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
-
-		fd = connect_to(name, vnode_list_entries[n].port);
-		if (fd < 0) {
-			printf("%s(%d): %s, %m\n", __func__, __LINE__,
-			       name);
-			goto out;
-		}
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.epoch = node_list_version;
-		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.oid = oid;
-
-		hdr.data_length = rlen;
-		hdr.flags =  SD_FLAG_CMD_DIRECT;
-		hdr.offset = SD_ATTR_HEADER_SIZE;
-
-		ret = exec_req(fd, (struct sd_req *)&hdr, value, &wlen, &rlen);
-		close(fd);
-
-		if (!ret) {
-			if (rsp->result == SD_RES_SUCCESS) {
-				printf("%s", value);
-				free(value);
-				return EXIT_SUCCESS;
-			}
-		}
+	ret = sd_read_object(oid, value, SD_MAX_VDI_ATTR_VALUE_LEN,
+			     SD_ATTR_HEADER_SIZE);
+	if (ret) {
+		printf("%s", value);
+		free(value);
+		return EXIT_SUCCESS;
 	}
-out:
+
 	free(value);
 	return EXIT_FAILURE;
 }
