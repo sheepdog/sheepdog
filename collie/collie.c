@@ -58,6 +58,7 @@ static const struct sd_option collie_options[] = {
 	{'h', "help", 0, "display this help and exit"},
 
 	/* vdi options */
+	{'P', "prealloc", 0, "preallocate all the data objects"},
 	{'i', "index", 1, "specify the index of data objects"},
 	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
 	{'x', "exclusive", 0, "write in an exclusive mode"},
@@ -107,6 +108,36 @@ static char *size_to_str(uint64_t _size, char *str, int str_size)
 		snprintf(str, str_size, "%.1lf %s", size, units[i]);
 
 	return str;
+}
+
+static int parse_option_size(const char *value, uint64_t *ret)
+{
+	char *postfix;
+	double sizef;
+
+	sizef = strtod(value, &postfix);
+	switch (*postfix) {
+	case 'T':
+		sizef *= 1024;
+	case 'G':
+		sizef *= 1024;
+	case 'M':
+		sizef *= 1024;
+	case 'K':
+	case 'k':
+		sizef *= 1024;
+	case 'b':
+	case '\0':
+		*ret = (uint64_t) sizef;
+		break;
+	default:
+		fprintf(stderr, "invalid parameter, %s\n", value);
+		fprintf(stderr, "You may use k, M, G or T suffixes for "
+			"kilobytes, megabytes, gigabytes and terabytes.\n");
+		return -1;
+	}
+
+	return 0;
 }
 
 static int update_node_list(int max_nodes, int epoch)
@@ -268,6 +299,7 @@ struct vdi_cmd_data {
 	char snapshot_tag[SD_MAX_VDI_TAG_LEN];
 	int exclusive;
 	int delete;
+	int prealloc;
 } vdi_cmd_data = { ~0, };
 
 static int cluster_format(int argc, char **argv)
@@ -821,6 +853,124 @@ static int vdi_graph(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
+			 uint32_t *vdi_id, int snapshot)
+{
+	struct sd_vdi_req hdr;
+	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	int fd, ret;
+	unsigned int wlen, rlen = 0;
+	char buf[SD_MAX_VDI_LEN];
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0) {
+		fprintf(stderr, "failed to connect\n");
+		return EXIT_SYSFAIL;
+	}
+
+	memset(buf, 0, sizeof(buf));
+	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_NEW_VDI;
+	hdr.base_vdi_id = base_vid;
+
+	wlen = SD_MAX_VDI_LEN;
+
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.snapid = snapshot;
+
+	hdr.data_length = wlen;
+	hdr.vdi_size = vdi_size;
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "failed to send a request\n");
+		return EXIT_SYSFAIL;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "%s, %s\n", sd_strerror(rsp->result), vdiname);
+		return EXIT_FAILURE;
+	}
+
+	if (vdi_id)
+		*vdi_id = rsp->vdi_id;
+
+	return EXIT_SUCCESS;
+}
+
+static int vdi_create(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint64_t size;
+	uint32_t vid;
+	uint64_t oid;
+	int idx, max_idx, ret;
+	struct sheepdog_inode *inode = NULL;
+	char *buf = NULL;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "please specify the size of vdi\n");
+		return EXIT_USAGE;
+	}
+	ret = parse_option_size(argv[optind], &size);
+	if (ret < 0)
+		return EXIT_USAGE;
+	if (size > SD_MAX_VDI_SIZE) {
+		fprintf(stderr, "too big image size, %s\n", argv[optind]);
+		return EXIT_USAGE;
+	}
+
+	ret = do_vdi_create(vdiname, size, 0, &vid, 0);
+	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
+		goto out;
+
+	inode = malloc(sizeof(*inode));
+	buf = zalloc(SD_DATA_OBJ_SIZE);
+	if (!inode || !buf) {
+		fprintf(stderr, "oom\n");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read a newly created vdi object\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	max_idx = DIV_ROUND_UP(size, SD_DATA_OBJ_SIZE);
+
+	for (idx = 0; idx < max_idx; idx++) {
+		oid = vid_to_data_oid(vid, idx);
+
+		ret = sd_write_object(oid, buf, SD_DATA_OBJ_SIZE, 0, 0,
+				      inode->nr_copies, 1);
+		if (ret != SD_RES_SUCCESS) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+
+		inode->data_vdi_id[idx] = vid;
+		ret = sd_write_object(vid_to_vdi_oid(vid), &vid, sizeof(vid),
+				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx, 0,
+				      inode->nr_copies, 0);
+		if (ret) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+	}
+	ret = EXIT_SUCCESS;
+out:
+	free(inode);
+	free(buf);
+	return ret;
+}
+
 static int vdi_delete(int argc, char **argv)
 {
 	char *data = argv[optind];
@@ -1106,6 +1256,8 @@ static int vdi_getattr(int argc, char **argv)
 }
 
 static struct subcommand vdi_cmd[] = {
+	{"create", "<vdiname> <size>", "Paph", "create a image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
 	{"delete", "<vdiname>", "saph", "delete a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", "[vdiname]", "aprh", "list images",
@@ -1126,6 +1278,9 @@ static struct subcommand vdi_cmd[] = {
 static int vdi_parser(int ch, char *opt)
 {
 	switch (ch) {
+	case 'P':
+		vdi_cmd_data.prealloc = 1;
+		break;
 	case 'i':
 		vdi_cmd_data.index = atoi(opt);
 		break;

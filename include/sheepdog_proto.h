@@ -81,6 +81,7 @@
 #define SD_MAX_VDI_ATTR_VALUE_LEN (UINT64_C(1) << 22)
 #define SD_NR_VDIS   (1U << 24)
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
+#define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
 #define SECTOR_SIZE (1U << 9)
 
 #define SD_INODE_SIZE (sizeof(struct sheepdog_inode))
