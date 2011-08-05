@@ -853,6 +853,54 @@ static int vdi_graph(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
+			 uint32_t *vid, int for_snapshot)
+{
+	int ret, fd;
+	struct sd_vdi_req hdr;
+	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	unsigned int wlen, rlen = 0;
+	char buf[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		return -1;
+
+	memset(buf, 0, sizeof(buf));
+	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
+	strncpy(buf + SD_MAX_VDI_LEN, tag, SD_MAX_VDI_TAG_LEN);
+
+	memset(&hdr, 0, sizeof(hdr));
+	if (for_snapshot)
+		hdr.opcode = SD_OP_GET_VDI_INFO;
+	else
+		hdr.opcode = SD_OP_LOCK_VDI;
+	wlen = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
+	hdr.proto_ver = SD_PROTO_VER;
+	hdr.data_length = wlen;
+	hdr.snapid = snapid;
+	hdr.flags = SD_FLAG_CMD_WRITE;
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	if (ret) {
+		ret = -1;
+		goto out;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "cannot get vdi info, %s, %s %d %s\n",
+			sd_strerror(rsp->result), vdiname, snapid, tag);
+		ret = -1;
+		goto out;
+	}
+	*vid = rsp->vdi_id;
+
+	ret = 0;
+out:
+	close(fd);
+	return ret;
+}
+
 static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 			 uint32_t *vdi_id, int snapshot)
 {
@@ -969,6 +1017,42 @@ out:
 	free(inode);
 	free(buf);
 	return ret;
+}
+
+static int vdi_snapshot(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint32_t vid;
+	int ret;
+	char buf[SD_INODE_HEADER_SIZE];
+	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+
+	if (vdi_cmd_data.snapshot_id != 0) {
+		fprintf(stderr, "please specify a non-integer value for "
+			"a snapshot tag name\n");
+		return EXIT_USAGE;
+	}
+
+	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "failed to open vdi %s\n", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read an inode header\n");
+		return EXIT_FAILURE;
+	}
+
+	if (vdi_cmd_data.snapshot_tag[0]) {
+		ret = sd_write_object(vid_to_vdi_oid(vid), vdi_cmd_data.snapshot_tag,
+				      SD_MAX_VDI_TAG_LEN,
+				      offsetof(struct sheepdog_inode, tag),
+				      0, inode->nr_copies, 0);
+	}
+
+	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, 1);
 }
 
 static int vdi_delete(int argc, char **argv)
@@ -1258,6 +1342,8 @@ static int vdi_getattr(int argc, char **argv)
 static struct subcommand vdi_cmd[] = {
 	{"create", "<vdiname> <size>", "Paph", "create a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
+	{"snapshot", "<vdiname>", "saph", "create a snapshot",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_snapshot},
 	{"delete", "<vdiname>", "saph", "delete a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
 	{"list", "[vdiname]", "aprh", "list images",
