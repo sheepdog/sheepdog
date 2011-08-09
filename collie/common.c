@@ -88,7 +88,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	return SD_RES_SUCCESS;
 }
 
-int sd_write_object(uint64_t oid, void *data, unsigned int datalen,
+int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int datalen,
 		    uint64_t offset, uint32_t flags, int copies, int create)
 {
 	struct sd_obj_req hdr;
@@ -109,6 +109,7 @@ int sd_write_object(uint64_t oid, void *data, unsigned int datalen,
 	else
 		hdr.opcode = SD_OP_WRITE_OBJ;
 	hdr.oid = oid;
+	hdr.cow_oid = cow_oid;
 	hdr.copies = copies;
 	hdr.data_length = wlen;
 	hdr.flags = (flags & ~SD_FLAG_CMD_DIRECT) | SD_FLAG_CMD_WRITE;

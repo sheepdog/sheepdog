@@ -480,7 +480,7 @@ static int vdi_create(int argc, char **argv)
 	for (idx = 0; idx < max_idx; idx++) {
 		oid = vid_to_data_oid(vid, idx);
 
-		ret = sd_write_object(oid, buf, SD_DATA_OBJ_SIZE, 0, 0,
+		ret = sd_write_object(oid, 0, buf, SD_DATA_OBJ_SIZE, 0, 0,
 				      inode->nr_copies, 1);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
@@ -488,7 +488,7 @@ static int vdi_create(int argc, char **argv)
 		}
 
 		inode->data_vdi_id[idx] = vid;
-		ret = sd_write_object(vid_to_vdi_oid(vid), &vid, sizeof(vid),
+		ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx, 0,
 				      inode->nr_copies, 0);
 		if (ret) {
@@ -530,7 +530,7 @@ static int vdi_snapshot(int argc, char **argv)
 	}
 
 	if (vdi_cmd_data.snapshot_tag[0]) {
-		ret = sd_write_object(vid_to_vdi_oid(vid), vdi_cmd_data.snapshot_tag,
+		ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
 				      SD_MAX_VDI_TAG_LEN,
 				      offsetof(struct sheepdog_inode, tag),
 				      0, inode->nr_copies, 0);
@@ -609,14 +609,14 @@ static int vdi_clone(int argc, char **argv)
 			memset(buf, 0, SD_DATA_OBJ_SIZE);
 
 		oid = vid_to_data_oid(new_vid, idx);
-		ret = sd_write_object(oid, buf, SD_DATA_OBJ_SIZE, 0, 0,
+		ret = sd_write_object(oid, 0, buf, SD_DATA_OBJ_SIZE, 0, 0,
 				      inode->nr_copies, 1);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
 		}
 
-		ret = sd_write_object(vid_to_vdi_oid(new_vid), &new_vid, sizeof(new_vid),
+		ret = sd_write_object(vid_to_vdi_oid(new_vid), 0, &new_vid, sizeof(new_vid),
 				      SD_INODE_HEADER_SIZE + sizeof(new_vid) * idx, 0,
 				      inode->nr_copies, 0);
 		if (ret) {
@@ -670,7 +670,7 @@ static int vdi_resize(int argc, char **argv)
 	}
 	inode->vdi_size = new_size;
 
-	ret = sd_write_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE, 0,
+	ret = sd_write_object(vid_to_vdi_oid(vid), 0, inode, SD_INODE_HEADER_SIZE, 0,
 			      0, inode->nr_copies, 0);
 	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "failed to update an inode header\n");
@@ -901,11 +901,11 @@ reread:
 	oid = attr_oid;
 
 	if (vdi_cmd_data.delete)
-		ret = sd_write_object(oid, (char *)"", 1,
+		ret = sd_write_object(oid, 0, (char *)"", 1,
 				      offsetof(struct sheepdog_inode, name), 0,
 				      nr_copies, 0);
 	else
-		ret = sd_write_object(oid, value, strlen(value),
+		ret = sd_write_object(oid, 0, value, strlen(value),
 				      SD_ATTR_HEADER_SIZE, SD_FLAG_CMD_TRUNCATE,
 				      nr_copies, 0);
 
@@ -1047,6 +1047,112 @@ out:
 	return ret;
 }
 
+static int vdi_write(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint32_t vid, flags;
+	int ret, idx;
+	struct sheepdog_inode *inode = NULL;
+	uint64_t offset, oid, old_oid, done = 0, total;
+	unsigned int len;
+	char *buf = NULL;
+	int create;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "please specify a start offset\n");
+		return EXIT_USAGE;
+	}
+	ret = parse_option_size(argv[optind++], &offset);
+	if (ret < 0)
+		return EXIT_USAGE;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "please specify a length to read\n");
+		return EXIT_USAGE;
+	}
+	ret = parse_option_size(argv[optind], &total);
+	if (ret < 0)
+		return EXIT_USAGE;
+
+	inode = malloc(sizeof(*inode));
+	buf = malloc(SD_DATA_OBJ_SIZE);
+	if (!inode || !buf) {
+		fprintf(stderr, "oom\n");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+
+	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "failed to open vdi %s\n", vdiname);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read an inode\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	idx = offset / SD_DATA_OBJ_SIZE;
+	while (done != total) {
+		create = 0;
+		old_oid = 0;
+		flags = 0;
+		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
+
+		if (!inode->data_vdi_id[idx])
+			create = 1;
+		else if (!is_data_obj_writeable(inode, idx)) {
+			create = 1;
+			old_oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+			flags = SD_FLAG_CMD_COW;
+		}
+
+		ret = read(STDIN_FILENO, buf, len);
+		if (ret < 0) {
+			fprintf(stderr, "%m\n");
+			ret = EXIT_SYSFAIL;
+			goto out;
+		}
+		len = ret;
+
+		inode->data_vdi_id[idx] = inode->vdi_id;
+		oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+		ret = sd_write_object(oid, old_oid, buf, len, offset, flags,
+				      inode->nr_copies, create);
+		if (ret != SD_RES_SUCCESS) {
+			fprintf(stderr, "failed to write vdi\n");
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+
+		if (create) {
+			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
+					      SD_INODE_HEADER_SIZE + sizeof(vid) * idx, 0,
+					      inode->nr_copies, 0);
+			if (ret) {
+				ret = EXIT_FAILURE;
+				goto out;
+			}
+		}
+
+		offset += len;
+		if (offset == SD_DATA_OBJ_SIZE) {
+			offset = 0;
+			idx++;
+		}
+		done += len;
+	}
+	ret = EXIT_SUCCESS;
+out:
+	free(inode);
+	free(buf);
+
+	return ret;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"create", "<vdiname> <size>", "Paph", "create a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
@@ -1072,6 +1178,8 @@ static struct subcommand vdi_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_resize},
 	{"read", "<vdiname> <offset> <len>", "saph", "read data from a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_read},
+	{"write", "<vdiname> <offset> <len>", "aph", "write data to a image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_write},
 	{NULL,},
 };
 
