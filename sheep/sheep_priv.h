@@ -174,7 +174,7 @@ int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
 
 void resume_pending_requests(void);
 
-int create_cluster(int port);
+int create_cluster(int port, int64_t zone);
 int leave_cluster(void);
 
 void start_cpg_event_work(void);

@@ -1042,17 +1042,12 @@ uint64_t get_cluster_ctime(void)
 static int get_max_copies(struct sheepdog_node_list_entry *entries, int nr)
 {
 	int i, j;
-	unsigned int nr_zones = 0, nr_zero_zones = 0;
-	uint16_t zones[SD_MAX_REDUNDANCY];
+	unsigned int nr_zones = 0;
+	uint32_t zones[SD_MAX_REDUNDANCY];
 
 	for (i = 0; i < nr; i++) {
 		if (nr_zones >= ARRAY_SIZE(zones))
 			break;
-
-		if (entries[i].zone == 0) {
-			nr_zero_zones++;
-			continue;
-		}
 
 		for (j = 0; j < nr_zones; j++) {
 			if (zones[j] == entries[i].zone)
@@ -1062,7 +1057,7 @@ static int get_max_copies(struct sheepdog_node_list_entry *entries, int nr)
 			zones[nr_zones++] = entries[i].zone;
 	}
 
-	return min(sys->nr_sobjs, nr_zones + nr_zero_zones);
+	return min(sys->nr_sobjs, nr_zones);
 }
 
 /*

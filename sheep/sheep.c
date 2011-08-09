@@ -73,6 +73,8 @@ int main(int argc, char **argv)
 	int is_daemon = 1;
 	int log_level = LOG_INFO;
 	char path[PATH_MAX];
+	int64_t zone = -1;
+	char *p;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -97,12 +99,18 @@ int main(int argc, char **argv)
 			sys->use_directio = 1;
 			break;
 		case 'z':
-			sys->this_node.zone = atoi(optarg);
-			if (sys->this_node.zone == 0) {
-				eprintf("zone id must be between 1 and 65535\n");
+			zone = strtol(optarg, &p, 10);
+			if (optarg == p) {
+				eprintf("%s is not an integer\n", optarg);
 				exit(1);
 			}
-			dprintf("zone id = %d\n", sys->this_node.zone);
+
+			if (zone < 0 || UINT32_MAX < zone) {
+				eprintf("zone id must be between 0 and %u\n",
+					UINT32_MAX);
+				exit(1);
+			}
+			sys->this_node.zone = zone;
 			break;
 		case 'h':
 			usage(0);
@@ -145,7 +153,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = create_cluster(port);
+	ret = create_cluster(port, zone);
 	if (ret) {
 		eprintf("failed to create sheepdog cluster.\n");
 		exit(1);

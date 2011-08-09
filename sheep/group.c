@@ -173,8 +173,8 @@ static void build_node_list(struct list_head *node_list,
 			    int *nr_nodes, int *nr_zones)
 {
 	struct node *node;
-	int nr = 0, nr_zero_zones = 0, i;
-	uint16_t zones[SD_MAX_REDUNDANCY];
+	int nr = 0, i;
+	uint32_t zones[SD_MAX_REDUNDANCY];
 
 	if (nr_zones)
 		*nr_zones = 0;
@@ -192,17 +192,13 @@ static void build_node_list(struct list_head *node_list,
 				}
 				if (i == *nr_zones)
 					zones[(*nr_zones)++] = node->ent.zone;
-			} else
-				nr_zero_zones++;
+			}
 		}
 	}
 	if (entries)
 		qsort(entries, nr, sizeof(*entries), node_cmp);
 	if (nr_nodes)
 		*nr_nodes = nr;
-	if (nr_zones)
-		/* Zero zone nodes behave as if they have different zones */
-		*nr_zones += nr_zero_zones;
 }
 
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
@@ -1696,7 +1692,7 @@ static void set_addr(unsigned int nodeid, int port)
 	vprintf(SDOG_INFO "addr = %s, port = %d\n", tmp, port);
 }
 
-int create_cluster(int port)
+int create_cluster(int port, int64_t zone)
 {
 	int fd, ret;
 	cpg_handle_t cpg_handle;
@@ -1742,6 +1738,11 @@ join_retry:
 	set_addr(nodeid, port);
 	sys->this_node.port = port;
 	sys->this_node.nr_vnodes = SD_DEFAULT_VNODES;
+	if (zone == -1)
+		sys->this_node.zone = nodeid;
+	else
+		sys->this_node.zone = zone;
+	dprintf("zone id = %u\n", sys->this_node.zone);
 
 	if (get_latest_epoch() == 0)
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;

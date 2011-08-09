@@ -128,8 +128,7 @@ struct sheepdog_node_list_entry {
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	nr_vnodes;
-	uint16_t	zone;
-	uint16_t	pad;
+	uint32_t	zone;
 };
 
 struct sheepdog_vnode_list_entry {
@@ -137,8 +136,7 @@ struct sheepdog_vnode_list_entry {
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	node_idx;
-	uint16_t	zone;
-	uint16_t	pad;
+	uint32_t	zone;
 };
 
 struct epoch_log {
