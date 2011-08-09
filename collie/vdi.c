@@ -964,6 +964,89 @@ static int vdi_getattr(int argc, char **argv)
 	return EXIT_FAILURE;
 }
 
+static int vdi_read(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint32_t vid;
+	int ret, idx;
+	struct sheepdog_inode *inode = NULL;
+	uint64_t offset, oid, done = 0, total;
+	unsigned int len;
+	char *buf = NULL;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "please specify a start offset\n");
+		return EXIT_USAGE;
+	}
+	ret = parse_option_size(argv[optind++], &offset);
+	if (ret < 0)
+		return EXIT_USAGE;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "please specify a length to read\n");
+		return EXIT_USAGE;
+	}
+	ret = parse_option_size(argv[optind], &total);
+	if (ret < 0)
+		return EXIT_USAGE;
+
+	inode = malloc(sizeof(*inode));
+	buf = malloc(SD_DATA_OBJ_SIZE);
+	if (!inode || !buf) {
+		fprintf(stderr, "oom\n");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+
+	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+			    vdi_cmd_data.snapshot_tag, &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "failed to open vdi %s\n", vdiname);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read an inode\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	idx = offset / SD_DATA_OBJ_SIZE;
+	while (done != total) {
+		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
+
+		if (inode->data_vdi_id[idx]) {
+			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+			ret = sd_read_object(oid, buf, len, offset);
+			if (ret != SD_RES_SUCCESS) {
+				fprintf(stderr, "failed to read vdi\n");
+				ret = EXIT_FAILURE;
+				goto out;
+			}
+		} else
+			memset(buf, 0, len);
+
+		ret = write(STDOUT_FILENO, buf, len);
+		if (ret < 0) {
+			fprintf(stderr, "failed to output, %m\n");
+			ret = EXIT_SYSFAIL;
+			goto out;
+		}
+
+		offset = 0;
+		idx++;
+		done += len;
+	}
+	fsync(STDOUT_FILENO);
+	ret = EXIT_SUCCESS;
+out:
+	free(inode);
+	free(buf);
+
+	return ret;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"create", "<vdiname> <size>", "Paph", "create a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
@@ -987,6 +1070,8 @@ static struct subcommand vdi_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_getattr},
 	{"resize", "<vdiname> <new size>", "aph", "resize a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_resize},
+	{"read", "<vdiname> <offset> <len>", "saph", "read data from a image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_read},
 	{NULL,},
 };
 
