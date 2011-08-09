@@ -23,11 +23,11 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= collie
 
-collie_SOURCES		= collie.c treeview.c
+collie_SOURCES		= collie.c common.c treeview.c vdi.c node.c cluster.c
 collie_LDADD	  	= ../lib/libsheepdog.a
 collie_DEPENDENCIES	= ../lib/libsheepdog.a
 
-noinst_HEADERS		= treeview.h
+noinst_HEADERS		= treeview.h collie.h
 
 EXTRA_DIST		= 
 
