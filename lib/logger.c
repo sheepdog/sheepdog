@@ -45,7 +45,7 @@ static void dolog(int prio, const char *func, int line, const char *fmt,
 
 static struct logarea *la;
 static char *log_name;
-static int log_level;
+static int log_level = LOG_INFO;
 static pid_t pid;
 static key_t semkey;
 
