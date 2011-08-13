@@ -1097,8 +1097,15 @@ static int vdi_write(int argc, char **argv)
 		goto out;
 	}
 
+	if (inode->vdi_size < offset) {
+		fprintf(stderr, "offset beyond end of vdi\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	total = min(total, inode->vdi_size - offset);
 	idx = offset / SD_DATA_OBJ_SIZE;
-	while (done != total) {
+	while (done < total) {
 		create = 0;
 		old_oid = 0;
 		flags = 0;
