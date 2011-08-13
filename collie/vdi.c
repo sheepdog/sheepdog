@@ -1012,8 +1012,15 @@ static int vdi_read(int argc, char **argv)
 		goto out;
 	}
 
+	if (inode->vdi_size < offset) {
+		fprintf(stderr, "offset beyond end of vdi\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	total = min(total, inode->vdi_size - offset);
 	idx = offset / SD_DATA_OBJ_SIZE;
-	while (done != total) {
+	while (done < total) {
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
 
 		if (inode->data_vdi_id[idx]) {
