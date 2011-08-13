@@ -1113,7 +1113,9 @@ static int vdi_write(int argc, char **argv)
 		}
 
 		ret = read(STDIN_FILENO, buf, len);
-		if (ret < 0) {
+		if (ret == 0)
+			break;
+		else if (ret < 0) {
 			fprintf(stderr, "%m\n");
 			ret = EXIT_SYSFAIL;
 			goto out;
