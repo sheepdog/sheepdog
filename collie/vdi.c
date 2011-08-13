@@ -1055,26 +1055,21 @@ static int vdi_write(int argc, char **argv)
 	uint32_t vid, flags;
 	int ret, idx;
 	struct sheepdog_inode *inode = NULL;
-	uint64_t offset, oid, old_oid, done = 0, total;
+	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
 	unsigned int len;
 	char *buf = NULL;
 	int create;
 
-	if (!argv[optind]) {
-		fprintf(stderr, "please specify a start offset\n");
-		return EXIT_USAGE;
+	if (argv[optind]) {
+		ret = parse_option_size(argv[optind++], &offset);
+		if (ret < 0)
+			return EXIT_USAGE;
+		if (argv[optind]) {
+			ret = parse_option_size(argv[optind++], &total);
+			if (ret < 0)
+				return EXIT_USAGE;
+		}
 	}
-	ret = parse_option_size(argv[optind++], &offset);
-	if (ret < 0)
-		return EXIT_USAGE;
-
-	if (!argv[optind]) {
-		fprintf(stderr, "please specify a length to read\n");
-		return EXIT_USAGE;
-	}
-	ret = parse_option_size(argv[optind], &total);
-	if (ret < 0)
-		return EXIT_USAGE;
 
 	inode = malloc(sizeof(*inode));
 	buf = malloc(SD_DATA_OBJ_SIZE);
@@ -1189,7 +1184,7 @@ static struct subcommand vdi_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_resize},
 	{"read", "<vdiname> [<offset> [<len>]]", "saph", "read data from a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_read},
-	{"write", "<vdiname> <offset> <len>", "aph", "write data to a image",
+	{"write", "<vdiname> [<offset> [<len>]]", "aph", "write data to a image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_write},
 	{NULL,},
 };
