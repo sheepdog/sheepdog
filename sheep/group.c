@@ -1646,7 +1646,7 @@ oom:
 	panic("failed to allocate memory for a confchg event\n");
 }
 
-static void set_addr(unsigned int nodeid, int port)
+static int set_addr(unsigned int nodeid, int port)
 {
 	int ret, nr;
 	corosync_cfg_handle_t handle;
@@ -1662,18 +1662,18 @@ static void set_addr(unsigned int nodeid, int port)
 	ret = corosync_cfg_initialize(&handle, NULL);
 	if (ret != CS_OK) {
 		vprintf(SDOG_ERR "failed to initiazize cfg %d\n", ret);
-		exit(1);
+		return -1;
 	}
 
 	ret = corosync_cfg_get_node_addrs(handle, nodeid, 1, &nr, &addr);
 	if (ret != CS_OK) {
 		vprintf(SDOG_ERR "failed to get addr %d\n", ret);
-		exit(1);
+		return -1;
 	}
 
 	if (!nr) {
 		vprintf(SDOG_ERR "we got no address\n");
-		exit(1);
+		return -1;
 	}
 
 	if (ss->ss_family == AF_INET6) {
@@ -1684,12 +1684,13 @@ static void set_addr(unsigned int nodeid, int port)
 		memcpy(sys->this_node.addr + 12, saddr, 4);
 	} else {
 		vprintf(SDOG_ERR "unknown protocol %d\n", ss->ss_family);
-		exit(1);
+		return -1;
 	}
 
 	inet_ntop(ss->ss_family, saddr, tmp, sizeof(tmp));
 
 	vprintf(SDOG_INFO "addr = %s, port = %d\n", tmp, port);
+	return 0;
 }
 
 int create_cluster(int port, int64_t zone)
@@ -1718,24 +1719,25 @@ join_retry:
 		goto join_retry;
 	case CS_ERR_SECURITY:
 		eprintf("Permission error.\n");
-		exit(1);
+		return -1;
 	default:
 		eprintf("Failed to join the sheepdog group, %d\n", ret);
-		exit(1);
-		break;
+		return -1;
 	}
 
 	ret = cpg_local_get(cpg_handle, &nodeid);
 	if (ret != CS_OK) {
 		eprintf("Failed to get the local node's identifier, %d\n", ret);
-		exit(1);
+		return 1;
 	}
 
 	sys->handle = cpg_handle;
 	sys->this_nodeid = nodeid;
 	sys->this_pid = getpid();
 
-	set_addr(nodeid, port);
+	ret = set_addr(nodeid, port);
+	if (ret)
+		return 1;
 	sys->this_node.port = port;
 	sys->this_node.nr_vnodes = SD_DEFAULT_VNODES;
 	if (zone == -1)
