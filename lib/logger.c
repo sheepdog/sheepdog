@@ -454,6 +454,8 @@ void log_close(void)
 		la->active = 0;
 		waitpid(pid, NULL, 0);
 
+		vprintf(SDOG_WARNING "sheep logger stopped, pid:%d\n", pid);
+		log_flush();
 		closelog();
 		free_logarea();
 	}
