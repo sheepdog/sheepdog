@@ -293,7 +293,7 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 		ts.tv_nsec = 10000;
 
 		ops.sem_num = 0;
-		ops.sem_flg = 0;
+		ops.sem_flg = SEM_UNDO;
 		ops.sem_op = -1;
 		if (semop(la->semid, &ops, 1) < 0) {
 			syslog(LOG_ERR, "semop up failed %m");
@@ -344,7 +344,7 @@ static void log_flush(void)
 
 	while (!la->empty) {
 		ops.sem_num = 0;
-		ops.sem_flg = 0;
+		ops.sem_flg = SEM_UNDO;
 		ops.sem_op = -1;
 		if (semop(la->semid, &ops, 1) < 0) {
 			syslog(LOG_ERR, "semop up failed");
