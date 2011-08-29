@@ -14,6 +14,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/time.h>
+#include <sys/epoll.h>
 #include <corosync/cpg.h>
 #include <corosync/cfg.h>
 
@@ -343,6 +344,12 @@ forward:
 
 static void group_handler(int listen_fd, int events, void *data)
 {
+	if (events & EPOLLHUP) {
+		eprintf("Receive EPOLLHUP event. Is corosync stopped running?\n");
+		log_close();
+		exit(1);
+	}
+
 	cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
 }
 
