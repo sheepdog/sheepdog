@@ -2241,6 +2241,8 @@ inline int jrnl_apply_to_target_object(struct jrnl_file_desc *jfd)
 	uint32_t jrnl_type;
 
 	ret = jrnl_get_type_from_file(jfd, &jrnl_type);
+	if (ret)
+		return ret;
 
 	return jrnl_handlers[jrnl_type].apply_to_target_object(jfd);
 }
