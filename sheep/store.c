@@ -1812,9 +1812,6 @@ static void __start_recovery(struct work *work, int idx)
 		goto fail;
 	}
 
-	if (rw->retry)
-		goto fail;
-
 	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
 	snprintf(tmp_path, sizeof(tmp_path), "%s%08u/list.tmp", obj_path, epoch);
 
