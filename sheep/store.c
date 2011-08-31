@@ -595,6 +595,8 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 	struct jrnl_descriptor jd;
 	struct jrnl_vdi_head jh;
 
+	dprintf("%x, %" PRIx64" , %u\n", opcode, oid, epoch);
+
 	switch (opcode) {
 	case SD_OP_CREATE_AND_WRITE_OBJ:
 	case SD_OP_WRITE_OBJ:
