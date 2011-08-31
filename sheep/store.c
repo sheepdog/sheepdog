@@ -1959,7 +1959,7 @@ static int init_obj_path(const char *base_path)
 static int init_epoch_path(const char *base_path)
 {
 	int new, ret;
-	uint32_t epoch;
+	uint32_t epoch, latest_epoch;
 	DIR *dir;
 	char path[1024];
 	struct dirent *dent;
@@ -1972,37 +1972,38 @@ static int init_epoch_path(const char *base_path)
 	if (new || ret)
 		return ret;
 
-	epoch = get_latest_epoch();
+	latest_epoch = get_latest_epoch();
 
-	snprintf(path, sizeof(path), "%s/%08u", obj_path, epoch);
+	for (epoch = 1; epoch <= latest_epoch; epoch++) {
+		snprintf(path, sizeof(path), "%s/%08u", obj_path, epoch);
 
-	vprintf(SDOG_INFO "found the epoch dir, %s\n", path);
+		vprintf(SDOG_INFO "found the obj dir, %s\n", path);
 
-	dir = opendir(path);
-	if (!dir) {
-		if (errno == ENOENT)
-			/* probably, sheepdog is not formatted yet  */
-			return 0;
+		dir = opendir(path);
+		if (!dir) {
+			if (errno == ENOENT)
+				continue;
 
-		vprintf(SDOG_ERR "failed to open the epoch dir, %m\n");
-		return SD_RES_EIO;
+			vprintf(SDOG_ERR "failed to open the epoch dir, %m\n");
+			return SD_RES_EIO;
+		}
+
+		while ((dent = readdir(dir))) {
+			if (!strcmp(dent->d_name, ".") ||
+			    !strcmp(dent->d_name, ".."))
+				continue;
+
+			oid = strtoull(dent->d_name, NULL, 16);
+
+			if (!is_vdi_obj(oid))
+				continue;
+
+			vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 "\n", oid);
+
+			set_bit(oid_to_vid(oid), sys->vdi_inuse);
+		}
+		closedir(dir);
 	}
-
-	while ((dent = readdir(dir))) {
-		if (!strcmp(dent->d_name, ".") ||
-		    !strcmp(dent->d_name, ".."))
-			continue;
-
-		oid = strtoull(dent->d_name, NULL, 16);
-
-		if (!is_vdi_obj(oid))
-			continue;
-
-		vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 "\n", oid);
-
-		set_bit(oid_to_vid(oid), sys->vdi_inuse);
-	}
-	closedir(dir);
 
 	return 0;
 }
