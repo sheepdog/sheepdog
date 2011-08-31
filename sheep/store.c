@@ -721,8 +721,13 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		break;
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_CREATE_AND_WRITE_OBJ:
-		if (hdr->flags & SD_FLAG_CMD_TRUNCATE)
-			ftruncate(fd, hdr->offset + hdr->data_length);
+		if (hdr->flags & SD_FLAG_CMD_TRUNCATE) {
+			ret = ftruncate(fd, hdr->offset + hdr->data_length);
+			if (ret) {
+				ret = SD_RES_EIO;
+				goto out;
+			}
+		}
 
 		if (is_vdi_obj(oid)) {
 			jd.jdf_epoch = epoch;
