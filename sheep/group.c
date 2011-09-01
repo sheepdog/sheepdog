@@ -1487,7 +1487,9 @@ do_retry:
 	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
 
-		if (cevent->ctype != CPG_EVENT_REQUEST)
+		if (cevent->ctype == CPG_EVENT_DELIVER)
+			continue;
+		if (cevent->ctype == CPG_EVENT_CONCHG)
 			break;
 
 		list_del(&cevent->cpg_event_list);
