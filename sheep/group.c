@@ -1567,11 +1567,14 @@ do_retry:
 		goto do_retry;
 
 	if (cpg_event_running() || cpg_event_suspended() ||
-	    list_empty(&sys->cpg_event_siblings) || sys->nr_outstanding_io)
+	    list_empty(&sys->cpg_event_siblings))
 		return;
 
 	cevent = list_first_entry(&sys->cpg_event_siblings,
 				  struct cpg_event, cpg_event_list);
+
+	if (cevent->ctype == CPG_EVENT_CONCHG && sys->nr_outstanding_io)
+		return;
 
 	list_del(&cevent->cpg_event_list);
 	sys->cur_cevent = cevent;
