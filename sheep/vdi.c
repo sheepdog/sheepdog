@@ -489,7 +489,7 @@ static void delete_one_done(struct work *work, int idx)
 
 	dw->done++;
 	if (dw->done < dw->count) {
-		queue_work(&dw->work);
+		queue_work(sys->deletion_wqueue, &dw->work);
 		return;
 	}
 
@@ -502,7 +502,7 @@ static void delete_one_done(struct work *work, int idx)
 		dw = list_first_entry(&deletion_work_list,
 				      struct deletion_work, dw_siblings);
 
-		queue_work(&dw->work);
+		queue_work(sys->deletion_wqueue, &dw->work);
 	}
 }
 
@@ -644,7 +644,7 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	}
 
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
-	queue_work(&dw->work);
+	queue_work(sys->deletion_wqueue, &dw->work);
 out:
 	free(entries);
 

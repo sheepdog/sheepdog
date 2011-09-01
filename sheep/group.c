@@ -1547,7 +1547,10 @@ do_retry:
 				}
 			}
 		}
-		queue_work(&req->work);
+		if (req->rq.flags & SD_FLAG_CMD_DIRECT)
+			queue_work(sys->io_wqueue, &req->work);
+		else
+			queue_work(sys->gateway_wqueue, &req->work);
 	}
 
 	while (!list_empty(&failed_req_list)) {
@@ -1577,7 +1580,7 @@ do_retry:
 	cpg_event_work.fn = cpg_event_fn;
 	cpg_event_work.done = cpg_event_done;
 
-	queue_work(&cpg_event_work);
+	queue_work(sys->cpg_wqueue, &cpg_event_work);
 }
 
 static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,

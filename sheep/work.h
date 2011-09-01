@@ -2,6 +2,7 @@
 #define __WORK_H__
 
 struct work;
+struct work_queue;
 
 typedef void (*work_func_t)(struct work *, int idx);
 
@@ -17,7 +18,7 @@ struct work {
 	enum work_attr attr;
 };
 
-int init_work_queue(int nr);
-void queue_work(struct work *work);
+struct work_queue *init_work_queue(int nr);
+void queue_work(struct work_queue *q, struct work *work);
 
 #endif

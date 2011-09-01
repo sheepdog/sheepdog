@@ -126,18 +126,16 @@ static void __queue_work(struct work_queue *q, struct work *work, int enabled)
 		list_add_tail(&work->w_list, &wi->q.blocked_list);
 }
 
-static struct work_queue *wqueue;
-
-void queue_work(struct work *work)
+void queue_work(struct work_queue *q, struct work *work)
 {
 	int enabled;
 
-	if (!list_empty(&wqueue->blocked_list))
+	if (!list_empty(&q->blocked_list))
 		enabled = 0;
 	else
-		enabled = work_enabled(wqueue, work);
+		enabled = work_enabled(q, work);
 
-	__queue_work(wqueue, work, enabled);
+	__queue_work(q, work, enabled);
 }
 
 static void work_post_done(struct work_queue *q, enum work_attr attr)
@@ -258,18 +256,18 @@ static int init_eventfd(void)
 	return 0;
 }
 
-int init_work_queue(int nr)
+struct work_queue *init_work_queue(int nr)
 {
 	int i, ret;
 	struct worker_info *wi;
 
 	ret = init_eventfd();
 	if (ret)
-		return -1;
+		return NULL;
 
 	wi = zalloc(sizeof(*wi) + nr * sizeof(pthread_t));
 	if (!wi)
-		return -1;
+		return NULL;
 
 	wi->nr_threads = nr;
 
@@ -298,9 +296,8 @@ int init_work_queue(int nr)
 	pthread_mutex_unlock(&wi->startup_lock);
 
 	list_add(&wi->worker_info_siblings, &worker_info_list);
-	wqueue = &wi->q;
 
-	return 0;
+	return &wi->q;
 destroy_threads:
 
 	wi->q.wq_state |= WQ_DEAD;
@@ -316,7 +313,7 @@ destroy_threads:
 	pthread_mutex_destroy(&wi->startup_lock);
 	pthread_mutex_destroy(&wi->finished_lock);
 
-	return -1;
+	return NULL;
 }
 
 #ifdef COMPILE_UNUSED_CODE

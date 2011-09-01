@@ -140,6 +140,12 @@ struct cluster_info {
 	uint32_t recovered_epoch;
 
 	int use_directio;
+
+	struct work_queue *cpg_wqueue;
+	struct work_queue *gateway_wqueue;
+	struct work_queue *io_wqueue;
+	struct work_queue *deletion_wqueue;
+	struct work_queue *recovery_wqueue;
 };
 
 extern struct cluster_info *sys;
@@ -193,7 +199,8 @@ int update_epoch_store(uint32_t epoch);
 int set_global_nr_copies(uint32_t copies);
 int get_global_nr_copies(uint32_t *copies);
 
-#define NR_WORKER_THREAD 64
+#define NR_GW_WORKER_THREAD 4
+#define NR_IO_WORKER_THREAD 4
 
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);

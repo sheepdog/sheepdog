@@ -805,14 +805,14 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		 uint32_t epoch, int worker_idx)
 {
-	static int cached_fds[NR_WORKER_THREAD][SD_MAX_NODES];
+	static int cached_fds[NR_GW_WORKER_THREAD][SD_MAX_NODES];
 	static uint32_t cached_epoch = 0;
 	int i, j, fd, ret;
 	char name[INET6_ADDRSTRLEN];
 
 	if (cached_epoch == 0) {
 		/* initialize */
-		for (i = 0; i < NR_WORKER_THREAD; i++) {
+		for (i = 0; i < NR_GW_WORKER_THREAD; i++) {
 			for (j = 0; j < SD_MAX_NODES; j++)
 				cached_fds[i][j] = -1;
 		}
@@ -825,7 +825,7 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		return -1;
 	}
 	if (after(epoch, cached_epoch)) {
-		for (i = 0; i < NR_WORKER_THREAD; i++) {
+		for (i = 0; i < NR_GW_WORKER_THREAD; i++) {
 			for (j = 0; j < SD_MAX_NODES; j++) {
 				if (cached_fds[i][j] >= 0)
 					close(cached_fds[i][j]);

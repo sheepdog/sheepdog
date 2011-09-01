@@ -1465,7 +1465,7 @@ static void recover_timer(void *data)
 		return;
 	}
 
-	queue_work(&rw->work);
+	queue_work(sys->recovery_wqueue, &rw->work);
 }
 
 void resume_recovery_work(void)
@@ -1483,7 +1483,7 @@ void resume_recovery_work(void)
 		return;
 
 	suspended_recovery_work = NULL;
-	queue_work(&rw->work);
+	queue_work(sys->recovery_wqueue, &rw->work);
 }
 
 int is_recoverying_oid(uint64_t oid)
@@ -1575,7 +1575,7 @@ static void recover_done(struct work *work, int idx)
 			return;
 		}
 		resume_pending_requests();
-		queue_work(&rw->work);
+		queue_work(sys->recovery_wqueue, &rw->work);
 		return;
 	}
 
@@ -1595,7 +1595,7 @@ static void recover_done(struct work *work, int idx)
 		list_del(&rw->rw_siblings);
 
 		recovering_work = rw;
-		queue_work(&rw->work);
+		queue_work(sys->recovery_wqueue, &rw->work);
 	}
 }
 
@@ -1800,7 +1800,7 @@ int start_recovery(uint32_t epoch)
 		list_add_tail(&rw->rw_siblings, &recovery_work_list);
 	else {
 		recovering_work = rw;
-		queue_work(&rw->work);
+		queue_work(sys->recovery_wqueue, &rw->work);
 	}
 
 	return 0;
