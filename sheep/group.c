@@ -186,14 +186,12 @@ static void build_node_list(struct list_head *node_list,
 		nr++;
 
 		if (nr_zones && *nr_zones < ARRAY_SIZE(zones)) {
-			if (node->ent.zone != 0) {
-				for (i = 0; i < *nr_zones; i++) {
-					if (zones[i] == node->ent.zone)
-						break;
-				}
-				if (i == *nr_zones)
-					zones[(*nr_zones)++] = node->ent.zone;
+			for (i = 0; i < *nr_zones; i++) {
+				if (zones[i] == node->ent.zone)
+					break;
 			}
+			if (i == *nr_zones)
+				zones[(*nr_zones)++] = node->ent.zone;
 		}
 	}
 	if (entries)
