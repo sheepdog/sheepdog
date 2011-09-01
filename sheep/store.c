@@ -1108,6 +1108,15 @@ struct recovery_work {
 	int nr_blocking;
 	int count;
 	uint64_t *oids;
+
+	int old_nr_nodes;
+	struct sheepdog_node_list_entry old_nodes[SD_MAX_NODES];
+	int cur_nr_nodes;
+	struct sheepdog_node_list_entry cur_nodes[SD_MAX_NODES];
+	int old_nr_vnodes;
+	struct sheepdog_vnode_list_entry old_vnodes[SD_MAX_VNODES];
+	int cur_nr_vnodes;
+	struct sheepdog_vnode_list_entry cur_vnodes[SD_MAX_VNODES];
 };
 
 static LIST_HEAD(recovery_work_list);
@@ -1400,24 +1409,12 @@ static void recover_one(struct work *work, int idx)
 	char *buf = NULL;
 	int ret;
 	uint64_t oid = rw->oids[rw->done];
-	struct sheepdog_node_list_entry *old_nodes, *cur_nodes;
-	struct sheepdog_vnode_list_entry *old_vnodes, *cur_vnodes;
-	int old_nr_nodes, cur_nr_nodes, old_nr_vnodes, cur_nr_vnodes;
 	int old_copies, cur_copies;
 	uint32_t epoch = rw->epoch;
 	int i, copy_idx = 0, cur_idx = -1;
 	int fd;
 
 	eprintf("%"PRIu32" %"PRIu32", %16"PRIx64"\n", rw->done, rw->count, oid);
-
-	old_nodes = malloc(sizeof(*old_nodes) * SD_MAX_NODES);
-	cur_nodes = malloc(sizeof(*cur_nodes) * SD_MAX_NODES);
-	old_vnodes = malloc(sizeof(*old_vnodes) * SD_MAX_VNODES);
-	cur_vnodes = malloc(sizeof(*cur_vnodes) * SD_MAX_VNODES);
-	if (!old_nodes || !cur_nodes || !old_vnodes || !cur_vnodes) {
-		eprintf("oom\n");
-		goto out;
-	}
 
 	fd = ob_open(epoch, oid, 0, &ret);
 	if (fd != -1) {
@@ -1435,37 +1432,18 @@ static void recover_one(struct work *work, int idx)
 	else
 		buf = malloc(SD_DATA_OBJ_SIZE);
 
-	cur_nr_nodes = epoch_log_read(epoch, (char *)cur_nodes,
-				      sizeof(*cur_nodes) * SD_MAX_NODES);
-	if (cur_nr_nodes <= 0) {
-		eprintf("failed to read current epoch, %"PRIu32"\n", epoch);
-		goto out;
-	}
-	cur_nr_nodes /= sizeof(*cur_nodes);
-
-	old_nr_nodes = epoch_log_read(epoch - 1, (char *)old_nodes,
-				      sizeof(*old_nodes) * SD_MAX_NODES);
-	if (old_nr_nodes <= 0) {
-		eprintf("failed to read previous epoch, %"PRIu32"\n", epoch - 1);
-		goto fail;
-	}
-	old_nr_nodes /= sizeof(*old_nodes);
-
-	old_nr_vnodes = nodes_to_vnodes(old_nodes, old_nr_nodes, old_vnodes);
-	cur_nr_vnodes = nodes_to_vnodes(cur_nodes, cur_nr_nodes, cur_vnodes);
-
 	if (!sys->nr_sobjs)
 		goto fail;
 
-	cur_idx = obj_to_sheep(cur_vnodes, cur_nr_vnodes, oid, 0);
+	cur_idx = obj_to_sheep(rw->cur_vnodes, rw->cur_nr_vnodes, oid, 0);
 
-	old_copies = get_max_copies(old_nodes, old_nr_nodes);
-	cur_copies = get_max_copies(cur_nodes, cur_nr_nodes);
+	old_copies = get_max_copies(rw->old_nodes, rw->old_nr_nodes);
+	cur_copies = get_max_copies(rw->cur_nodes, rw->cur_nr_nodes);
 
 	copy_idx = -1;
 	for (i = 0; i < cur_copies; i++) {
-		int n = obj_to_sheep(cur_vnodes, cur_nr_vnodes, oid, i);
-		if (is_myself(cur_vnodes[n].addr, cur_vnodes[n].port)) {
+		int n = obj_to_sheep(rw->cur_vnodes, rw->cur_nr_vnodes, oid, i);
+		if (is_myself(rw->cur_vnodes[n].addr, rw->cur_vnodes[n].port)) {
 			copy_idx = i;
 			break;
 		}
@@ -1475,10 +1453,11 @@ static void recover_one(struct work *work, int idx)
 		goto out;
 	}
 
-	dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n", cur_idx, cur_nr_nodes, copy_idx);
+	dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n", cur_idx, rw->cur_nr_nodes,
+		copy_idx);
 
-	ret = __recover_one(rw, old_vnodes, old_nr_vnodes, old_copies,
-			    cur_vnodes, cur_nr_vnodes, cur_copies,
+	ret = __recover_one(rw, rw->old_vnodes, rw->old_nr_vnodes, old_copies,
+			    rw->cur_vnodes, rw->cur_nr_vnodes, cur_copies,
 			    cur_idx, copy_idx, epoch, epoch - 1, oid,
 			    buf, SD_DATA_OBJ_SIZE);
 	if (ret == 0)
@@ -1487,8 +1466,8 @@ static void recover_one(struct work *work, int idx)
 	for (i = 0; i < cur_copies; i++) {
 		if (i == copy_idx)
 			continue;
-		ret = __recover_one(rw, old_vnodes, old_nr_vnodes, old_copies,
-				    cur_vnodes, cur_nr_vnodes, cur_copies, cur_idx, i,
+		ret = __recover_one(rw, rw->old_vnodes, rw->old_nr_vnodes, old_copies,
+				    rw->cur_vnodes, rw->cur_nr_vnodes, cur_copies, cur_idx, i,
 				    epoch, epoch - 1, oid, buf, SD_DATA_OBJ_SIZE);
 		if (ret == 0)
 			goto out;
@@ -1496,10 +1475,6 @@ static void recover_one(struct work *work, int idx)
 fail:
 	eprintf("failed to recover object %"PRIx64"\n", oid);
 out:
-	free(old_nodes);
-	free(cur_nodes);
-	free(old_vnodes);
-	free(cur_vnodes);
 	free(buf);
 }
 
@@ -1785,34 +1760,43 @@ static void __start_recovery(struct work *work, int idx)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint32_t epoch = rw->epoch;
-	struct sheepdog_node_list_entry old_entry[SD_MAX_NODES],
-		cur_entry[SD_MAX_NODES];
-	int old_nr, cur_nr, nr_objs;
+	int nr_objs;
 	int fd;
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int ret;
 
 	dprintf("%u\n", epoch);
 
-	cur_nr = epoch_log_read(epoch, (char *)cur_entry, sizeof(cur_entry));
-	if (cur_nr <= 0) {
-		eprintf("failed to read epoch log, %"PRIu32"\n", epoch);
-		goto fail;
-	}
-	cur_nr /= sizeof(struct sheepdog_node_list_entry);
+	if (rw->cur_nr_nodes == 0) {
+		/* setup node list and virtual node list */
+		rw->cur_nr_nodes = epoch_log_read(epoch, (char *)rw->cur_nodes,
+						  sizeof(rw->cur_nodes));
+		if (rw->cur_nr_nodes <= 0) {
+			eprintf("failed to read epoch log, %"PRIu32"\n", epoch);
+			goto fail;
+		}
+		rw->cur_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
 
-	old_nr = epoch_log_read(epoch - 1, (char *)old_entry, sizeof(old_entry));
-	if (old_nr <= 0) {
-		eprintf("failed to read epoch log, %"PRIu32"\n", epoch - 1);
-		goto fail;
+		rw->old_nr_nodes = epoch_log_read(epoch - 1, (char *)rw->old_nodes,
+						  sizeof(rw->old_nodes));
+		if (rw->old_nr_nodes <= 0) {
+			eprintf("failed to read epoch log, %"PRIu32"\n", epoch - 1);
+			goto fail;
+		}
+		rw->old_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
+
+		rw->old_nr_vnodes = nodes_to_vnodes(rw->old_nodes, rw->old_nr_nodes,
+						    rw->old_vnodes);
+		rw->cur_nr_vnodes = nodes_to_vnodes(rw->cur_nodes, rw->cur_nr_nodes,
+						    rw->cur_vnodes);
 	}
-	old_nr /= sizeof(struct sheepdog_node_list_entry);
 
 	if (!sys->nr_sobjs)
 		goto fail;
-	nr_objs = get_max_copies(cur_entry, cur_nr);
+	nr_objs = get_max_copies(rw->cur_nodes, rw->cur_nr_nodes);
 
-	if (fill_obj_list(rw, old_entry, old_nr, cur_entry, cur_nr, nr_objs) != 0) {
+	if (fill_obj_list(rw, rw->old_nodes, rw->old_nr_nodes, rw->cur_nodes,
+			  rw->cur_nr_nodes, nr_objs) != 0) {
 		eprintf("fatal recovery error\n");
 		goto fail;
 	}
