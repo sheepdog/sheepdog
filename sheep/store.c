@@ -1279,7 +1279,7 @@ next:
 
 	close(fd);
 
-	if (ret < 0) {
+	if (ret != 0) {
 		eprintf("%"PRIu32"\n", rsp->result);
 		goto err;
 	}
