@@ -107,6 +107,10 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch
 	return SD_RES_SUCCESS;
 }
 
+static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entries,
+			 uint64_t *list1, int nr_list1,
+			 uint64_t *list2, int nr_list2, int nr_objs);
+
 static int get_obj_list(struct request *req)
 {
 	DIR *dir;
@@ -114,12 +118,12 @@ static int get_obj_list(struct request *req)
 	struct sd_list_req *hdr = (struct sd_list_req *)&req->rq;
 	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&req->rp;
 	uint64_t oid;
-	uint32_t epoch = hdr->tgt_epoch;
+	uint32_t epoch;
 	char path[1024];
 	uint64_t *p = (uint64_t *)req->data;
 	int nr = 0;
 	uint64_t *objlist = NULL;
-	int obj_nr = 0, fd, i;
+	int obj_nr, i;
 	int res = SD_RES_SUCCESS;
 	int buf_len;
 	char *buf;
@@ -133,65 +137,34 @@ static int get_obj_list(struct request *req)
 		goto out;
 	}
 
-	if (epoch == 1)
-		goto local;
-
-	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
-
-	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		eprintf("failed to open %s, %s\n", path, strerror(errno));
-		res = SD_RES_EIO;
-		goto out;
-	}
-	obj_nr = read(fd, buf, buf_len);
-	dprintf("read objct list from %s, %"PRIu32"\n", path, obj_nr);
-
-	obj_nr /= sizeof(uint64_t);
 	objlist = (uint64_t *)buf;
-	for (i = 0; i < obj_nr; i++) {
-		p[nr++] = objlist[i];
+	obj_nr = 0;
+	for (epoch = 1; epoch <= hdr->tgt_epoch; epoch++) {
+		snprintf(path, sizeof(path), "%s%08u/", obj_path, epoch);
 
-		if (nr * sizeof(uint64_t) >= hdr->data_length)
-			break;
-	}
-	close(fd);
+		dprintf("%"PRIu32", %s\n", sys->this_node.port, path);
 
-local:
-	snprintf(path, sizeof(path), "%s%08u/", obj_path, hdr->tgt_epoch);
-
-	dprintf("%"PRIu32", %s\n", sys->this_node.port, path);
-
-	dir = opendir(path);
-	if (!dir) {
-		eprintf("%s\n", path);
-		res = SD_RES_EIO;
-		goto out;
-	}
-
-	while ((d = readdir(dir))) {
-		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+		dir = opendir(path);
+		if (!dir) {
+			eprintf("%s\n", path);
 			continue;
+		}
 
-		oid = strtoull(d->d_name, NULL, 16);
-		if (oid == 0)
-			continue;
+		while ((d = readdir(dir))) {
+			if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+				continue;
 
-		for (i = 0; i < obj_nr; i++)
-			if (objlist[i] == oid)
-				break;
-		if (i < obj_nr)
-			continue;
+			oid = strtoull(d->d_name, NULL, 16);
+			if (oid == 0)
+				continue;
 
-		p[nr++] = oid;
+			objlist[obj_nr++] = oid;
+		}
 
-		if (nr * sizeof(uint64_t) >= hdr->data_length)
-			break;
+		closedir(dir);
+
+		nr = merge_objlist(NULL, 0, p, nr, objlist, obj_nr, 0);
 	}
-
-	eprintf("nr = %"PRIu32"\n", nr);
-
-	closedir(dir);
 out:
 	free(buf);
 	rsp->data_length = nr * sizeof(uint64_t);
@@ -1677,17 +1650,20 @@ static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entri
 			 uint64_t *list2, int nr_list2, int nr_objs)
 {
 	int i, j, idx;
+	int old_nr_list1 = nr_list1;
 
 	for (i = 0; i < nr_list2; i++) {
-		for (j = 0; j < nr_objs; j++) {
-			idx = obj_to_sheep(entries, nr_entries, list2[i], j);
-			if (is_myself(entries[idx].addr, entries[idx].port))
-				break;
+		if (entries) {
+			for (j = 0; j < nr_objs; j++) {
+				idx = obj_to_sheep(entries, nr_entries, list2[i], j);
+				if (is_myself(entries[idx].addr, entries[idx].port))
+					break;
+			}
+			if (j == nr_objs)
+				continue;
 		}
-		if (j == nr_objs)
-			continue;
 
-		if (bsearch(list2 + i, list1, nr_list1, sizeof(*list1), obj_cmp))
+		if (bsearch(list2 + i, list1, old_nr_list1, sizeof(*list1), obj_cmp))
 			continue;
 
 		list1[nr_list1++] = list2[i];
@@ -1761,9 +1737,6 @@ static void __start_recovery(struct work *work, int idx)
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint32_t epoch = rw->epoch;
 	int nr_objs;
-	int fd;
-	char path[PATH_MAX], tmp_path[PATH_MAX];
-	int ret;
 
 	dprintf("%u\n", epoch);
 
@@ -1798,30 +1771,6 @@ static void __start_recovery(struct work *work, int idx)
 	if (fill_obj_list(rw, rw->old_nodes, rw->old_nr_nodes, rw->cur_nodes,
 			  rw->cur_nr_nodes, nr_objs) != 0) {
 		eprintf("fatal recovery error\n");
-		goto fail;
-	}
-
-	snprintf(path, sizeof(path), "%s%08u/list", obj_path, epoch);
-	snprintf(tmp_path, sizeof(tmp_path), "%s%08u/list.tmp", obj_path, epoch);
-
-	dprintf("write object list to %s\n", tmp_path);
-	fd = open(tmp_path, O_RDWR | O_CREAT | O_SYNC, def_fmode);
-	if (fd < 0) {
-		eprintf("failed to open %s, %s, %m\n", tmp_path, strerror(errno));
-		goto fail;
-	}
-	ret = write(fd, rw->oids, sizeof(*rw->oids) * rw->count);
-	if (ret != sizeof(uint64_t) * rw->count) {
-		eprintf("failed to write to %s, %m\n", tmp_path);
-		close(fd);
-		goto fail;
-	}
-	close(fd);
-
-	dprintf("rename %s to %s\n", tmp_path, path);
-	ret = rename(tmp_path, path);
-	if (ret < 0) {
-		eprintf("failed to rename %s to %s, %m\n", tmp_path, path);
 		goto fail;
 	}
 
