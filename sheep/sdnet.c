@@ -208,6 +208,8 @@ static void queue_request(struct request *req)
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 
+	dprintf("%x\n", hdr->opcode);
+
 	if (hdr->opcode == SD_OP_KILL_NODE) {
 		log_close();
 		exit(1);
