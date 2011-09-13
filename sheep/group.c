@@ -879,8 +879,15 @@ static void __sd_deliver(struct cpg_event *cevent)
 		switch (m->op) {
 		case SD_MSG_JOIN:
 			if (((struct join_message *)m)->cluster_status == SD_STATUS_OK)
-				if (sys->status != SD_STATUS_OK)
+				if (sys->status != SD_STATUS_OK) {
+					struct join_message *msg = (struct join_message *)m;
+					int i;
+
 					get_vdi_bitmap_from_sd_list();
+					get_vdi_bitmap_from(&m->from);
+					for (i = 0; i < msg->nr_nodes;i++)
+						get_vdi_bitmap_from(&msg->nodes[i].ent);
+			}
 			break;
 		}
 	}
