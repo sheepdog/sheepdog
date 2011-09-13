@@ -519,56 +519,67 @@ static void join(struct join_message *msg)
 	}
 }
 
-static void get_vdi_bitmap_from_all(void)
+static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int i, j, ret, nr_nodes, fd;
-	/* fixme: we need this until starting up. */
 	static DECLARE_BITMAP(tmp_vdi_inuse, SD_NR_VDIS);
-	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	int fd, i, ret = SD_RES_SUCCESS;
 	unsigned int rlen, wlen;
 	char host[128];
+
+	if (is_myself(node->addr, node->port))
+		goto out;
+
+	addr_to_str(host, sizeof(host), node->addr, 0);
+
+	fd = connect_to(host, node->port);
+	if (fd < 0) {
+		vprintf(SDOG_ERR "can't get the vdi bitmap %s, %m\n", host);
+		ret = -SD_RES_EIO;
+		goto out;
+	}
+
+	vprintf(SDOG_ERR "get the vdi bitmap from %s\n", host);
+
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_READ_VDIS;
+	hdr.epoch = sys->epoch;
+	hdr.data_length = sizeof(tmp_vdi_inuse);
+	rlen = hdr.data_length;
+	wlen = 0;
+
+	ret = exec_req(fd, &hdr, (char *)tmp_vdi_inuse,
+			&wlen, &rlen);
+
+	close(fd);
+
+	if (ret || rsp->result != SD_RES_SUCCESS) {
+		vprintf(SDOG_ERR "can't get the vdi bitmap %d %d\n", ret,
+				rsp->result);
+		goto out;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(sys->vdi_inuse); i++)
+		sys->vdi_inuse[i] |= tmp_vdi_inuse[i];
+out:
+	return ret;
+}
+
+static void get_vdi_bitmap_from_sd_list(void)
+{
+	int i, nr_nodes;
+	/* fixme: we need this until starting up. */
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
 
 	/*
 	 * we don't need the proper order but this is the simplest
 	 * way.
 	 */
-	nr_nodes = get_ordered_sd_node_list(entry);
+	nr_nodes = get_ordered_sd_node_list(nodes);
 
-	for (i = 0; i < nr_nodes; i++) {
-		if (is_myself(entry[i].addr, entry[i].port))
-			continue;
-
-		addr_to_str(host, sizeof(host), entry[i].addr, 0);
-
-		fd = connect_to(host, entry[i].port);
-		if (fd < 0) {
-			vprintf(SDOG_ERR "can't get the vdi bitmap %s, %m\n", host);
-		}
-
-		vprintf(SDOG_ERR "get the vdi bitmap %d %s\n", i, host);
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_VDIS;
-		hdr.epoch = sys->epoch;
-		hdr.data_length = sizeof(tmp_vdi_inuse);
-		rlen = hdr.data_length;
-		wlen = 0;
-
-		ret = exec_req(fd, &hdr, (char *)tmp_vdi_inuse,
-			       &wlen, &rlen);
-
-		close(fd);
-
-		if (ret || rsp->result != SD_RES_SUCCESS) {
-			vprintf(SDOG_ERR "can't get the vdi bitmap %d %d\n", ret,
-				rsp->result);
-		}
-
-		for (j = 0; j < ARRAY_SIZE(sys->vdi_inuse); j++)
-			sys->vdi_inuse[j] |= tmp_vdi_inuse[j];
-	}
+	for (i = 0; i < nr_nodes; i++)
+		get_vdi_bitmap_from(&nodes[i]);
 }
 
 static int move_node_to_sd_list(uint32_t nodeid, uint32_t pid,
@@ -869,7 +880,7 @@ static void __sd_deliver(struct cpg_event *cevent)
 		case SD_MSG_JOIN:
 			if (((struct join_message *)m)->cluster_status == SD_STATUS_OK)
 				if (sys->status != SD_STATUS_OK)
-					get_vdi_bitmap_from_all();
+					get_vdi_bitmap_from_sd_list();
 			break;
 		}
 	}
