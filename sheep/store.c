@@ -138,7 +138,6 @@ static int get_obj_list(struct request *req)
 	}
 
 	objlist = (uint64_t *)buf;
-	obj_nr = 0;
 	for (epoch = 1; epoch <= hdr->tgt_epoch; epoch++) {
 		snprintf(path, sizeof(path), "%s%08u/", obj_path, epoch);
 
@@ -150,6 +149,7 @@ static int get_obj_list(struct request *req)
 			continue;
 		}
 
+		obj_nr = 0;
 		while ((d = readdir(dir))) {
 			if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
 				continue;
