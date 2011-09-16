@@ -981,7 +981,7 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	struct message_header *m = msg;
 	char name[128];
 
-	dprintf("op: %d, state: %u, size: %d, from: %s, nodeid: %u, pid: %u\n",
+	dprintf("op: %d, state: %u, size: %d, from: %s, nodeid: %x, pid: %u\n",
 		m->op, m->state, m->msg_length,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port),
 		nodeid, pid);
@@ -1165,7 +1165,7 @@ static void send_join_request(struct cpg_address *addr, struct work_confchg *w)
 
 	send_message(sys->handle, (struct message_header *)&msg);
 
-	vprintf(SDOG_INFO "%u %u\n", sys->this_nodeid, sys->this_pid);
+	vprintf(SDOG_INFO "%x %u\n", sys->this_nodeid, sys->this_pid);
 }
 
 static void __sd_confchg_done(struct cpg_event *cevent)
@@ -1622,7 +1622,7 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 	dprintf("%zd %zd %zd\n", member_list_entries, left_list_entries,
 		joined_list_entries);
 	for (i = 0; i < member_list_entries; i++) {
-		dprintf("[%d] node_id: %d, pid: %d, reason: %d\n", i,
+		dprintf("[%x] node_id: %x, pid: %d, reason: %d\n", i,
 			member_list[i].nodeid, member_list[i].pid,
 			member_list[i].reason);
 	}
