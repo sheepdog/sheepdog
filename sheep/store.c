@@ -1623,8 +1623,6 @@ static int __fill_obj_list(struct sheepdog_node_list_entry *e, uint32_t epoch,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_OBJ_LIST;
-	/* we don't need to set epoch */
-	hdr.epoch = epoch;
 	hdr.tgt_epoch = epoch - 1;
 	hdr.flags = 0;
 	hdr.data_length = rlen;
