@@ -556,7 +556,7 @@ static void client_handler(int fd, int events, void *data)
 	if (events & EPOLLIN)
 		client_rx_handler(ci);
 
-	if (!is_conn_dead(&ci->conn) && events & EPOLLOUT)
+	if (events & EPOLLOUT)
 		client_tx_handler(ci);
 
 	if (is_conn_dead(&ci->conn)) {
