@@ -266,7 +266,7 @@ void cluster_queue_request(struct work *work, int idx)
 			      (struct sd_node_rsp *)rsp, req->data);
 		break;
 	case SD_OP_STAT_CLUSTER:
-		max_logs = rsp->data_length / sizeof(log->nodes[0]);
+		max_logs = rsp->data_length / sizeof(*log);
 		epoch = get_latest_epoch();
 		rsp->data_length = 0;
 		for (i = 0; i < max_logs; i++) {
