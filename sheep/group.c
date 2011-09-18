@@ -376,6 +376,26 @@ static int is_master(void)
 	return 0;
 }
 
+static inline int get_nodes_nr_from(struct list_head *l)
+{
+	struct node *node;
+	int nr = 0;
+	list_for_each_entry(node, l, list) {
+		nr++;
+	}
+	return nr;
+}
+
+static int get_nodes_nr_epoch(int epoch)
+{
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	int nr;
+
+	nr = epoch_log_read(epoch, (char *)nodes, sizeof(nodes));
+	nr /= sizeof(nodes[0]);
+	return nr;
+}
+
 static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			      struct sheepdog_node_list_entry *entries,
 			      int nr_entries, uint64_t ctime, uint32_t epoch,
@@ -458,10 +478,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			return SD_RES_INVALID_EPOCH;
 		}
 
-		nr_entries = 1;
-		list_for_each_entry(node, &sys->sd_node_list, list) {
-			nr_entries++;
-		}
+		nr_entries = get_nodes_nr_from(&sys->sd_node_list) + 1;
 
 		if (nr_entries != nr_local_entries)
 			return SD_RES_SUCCESS;
@@ -1088,9 +1105,7 @@ static int check_majority(struct cpg_address *left_list,
 	if (left_list_entries == 0)
 		return 1; /* we don't need this check in this case */
 
-	list_for_each_entry(node, &sys->sd_node_list, list) {
-		nr_nodes++;
-	}
+	nr_nodes = get_nodes_nr_from(&sys->sd_node_list);
 	nr_majority = nr_nodes / 2 + 1;
 
 	/* we need at least 3 nodes to handle network partition
