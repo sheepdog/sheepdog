@@ -99,14 +99,14 @@ struct work_confchg {
 
 #define print_node_list(node_list)				\
 ({								\
-	struct node *node;					\
-	char name[128];						\
-	list_for_each_entry(node, node_list, list) {		\
+	struct node *__node;					\
+	char __name[128];						\
+	list_for_each_entry(__node, node_list, list) {		\
 		dprintf("%c nodeid: %x, pid: %d, ip: %s\n",	\
-			is_myself(node->ent.addr, node->ent.port) ? 'l' : ' ',	\
-			node->nodeid, node->pid,		\
-			addr_to_str(name, sizeof(name),		\
-			node->ent.addr, node->ent.port));	\
+			is_myself(__node->ent.addr, __node->ent.port) ? 'l' : ' ',	\
+			__node->nodeid, __node->pid,		\
+			addr_to_str(__name, sizeof(__name),	\
+			__node->ent.addr, __node->ent.port));	\
 	}							\
 })
 
