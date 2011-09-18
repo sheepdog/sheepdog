@@ -606,6 +606,7 @@ static void update_cluster_info(struct join_message *msg)
 	int ret, nr_nodes = msg->nr_nodes;
 	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
 
+	eprintf("status = %d, epoch = %d, %d, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
 	if (msg->result != SD_RES_SUCCESS) {
 		if (is_myself(msg->header.from.addr, msg->header.from.port)) {
 			eprintf("failed to join sheepdog, %d\n", msg->result);
@@ -639,7 +640,6 @@ static void update_cluster_info(struct join_message *msg)
 
 	sys->join_finished = 1;
 
-	eprintf("system status = %d, epoch = %d\n", msg->cluster_status, sys->epoch);
 	if (msg->cluster_status == SD_STATUS_OK && msg->inc_epoch) {
 		nr_nodes = get_ordered_sd_node_list(entry);
 
