@@ -753,7 +753,7 @@ out:
 
 static int fix_object_consistency(struct request *req, int idx)
 {
-	int ret;
+	int ret = SD_RES_NO_MEM;
 	unsigned int data_length;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_req req_bak = *((struct sd_obj_req *)&req->rq);
