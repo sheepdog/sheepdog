@@ -617,6 +617,22 @@ static int move_node_to_sd_list(uint32_t nodeid, uint32_t pid,
 	return 0;
 }
 
+static int update_epoch_log(int epoch)
+{
+	int ret, nr_nodes;
+	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+
+	nr_nodes = get_ordered_sd_node_list(entry);
+
+	dprintf("update epoch, %d, %d\n", epoch, nr_nodes);
+	ret = epoch_log_write(epoch, (char *)entry,
+			nr_nodes * sizeof(struct sheepdog_node_list_entry));
+	if (ret < 0)
+		eprintf("can't write epoch %u\n", epoch);
+
+	return ret;
+}
+
 static void update_cluster_info(struct join_message *msg)
 {
 	int i;
