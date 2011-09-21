@@ -117,6 +117,11 @@ struct cluster_info {
 	struct list_head cpg_node_list;
 	struct list_head sd_node_list;
 
+	/* leave list is only used to account for bad nodes when we start
+	 * up the cluster nodes after we shutdown the cluster through collie.
+	 */
+	struct list_head leave_list;
+
 	/* this array contains a list of ordered virtual nodes */
 	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
 	int nr_vnodes;
@@ -138,6 +143,7 @@ struct cluster_info {
 	int nr_outstanding_reqs;
 
 	uint32_t recovered_epoch;
+	uint32_t leave_epoch; /* The highest number in the clsuter */
 
 	int use_directio;
 
