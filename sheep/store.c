@@ -875,6 +875,50 @@ int epoch_log_write(uint32_t epoch, char *buf, int len)
 	return 0;
 }
 
+int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
+{
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	int fd, i, ret;
+	unsigned int rlen, wlen, nr, le = get_latest_epoch();
+	char host[128];
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+
+	nr = epoch_log_read(le, (char *)nodes, ARRAY_SIZE(nodes));
+	nr /= sizeof(nodes[0]);
+	for (i = 0; i < nr; i++) {
+		if (is_myself(nodes[i].addr, nodes[i].port))
+			continue;
+
+		addr_to_str(host, sizeof(host), nodes[i].addr, 0);
+		fd = connect_to(host, nodes[i].port);
+		if (fd < 0) {
+			vprintf(SDOG_ERR "can't connect to %s, %m\n", host);
+			continue;
+		}
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.opcode = SD_OP_GET_EPOCH;
+		hdr.tgt_epoch = epoch;
+		hdr.data_length = len;
+		rlen = hdr.data_length;
+		wlen = 0;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+		close(fd);
+
+		if (ret)
+			continue;
+		if (rsp->result == SD_RES_SUCCESS) {
+			ret = rsp->data_length;
+			goto out;
+		}
+	}
+	ret = 0; /* If no one has targeted epoch file, we can safely return 0 */
+out:
+	return ret;
+}
+
 int epoch_log_read(uint32_t epoch, char *buf, int len)
 {
 	int fd;

@@ -271,6 +271,7 @@ static void queue_request(struct request *req)
 	case SD_OP_SHUTDOWN:
 	case SD_OP_STAT_CLUSTER:
 	case SD_OP_GET_VDI_ATTR:
+	case SD_OP_GET_EPOCH:
 		req->work.fn = cluster_queue_request;
 		break;
 	case SD_OP_READ_VDIS:

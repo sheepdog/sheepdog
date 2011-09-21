@@ -256,6 +256,23 @@ static void get_node_list(struct sd_node_req *req,
 	rsp->master_idx = get_node_idx(&node->ent, data, nr_nodes);
 }
 
+static int get_epoch(struct sd_obj_req *req,
+		      struct sd_obj_rsp *rsp, void *data)
+{
+	int epoch = req->tgt_epoch;
+	int len, ret;
+	dprintf("%d\n", epoch);
+	len = epoch_log_read(epoch, (char *)data, req->data_length);
+	if (len == -1) {
+		ret = SD_RES_NO_TAG;
+		rsp->data_length = 0;
+	} else {
+		ret = SD_RES_SUCCESS;
+		rsp->data_length = len;
+	}
+	return ret;
+}
+
 void cluster_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -268,6 +285,10 @@ void cluster_queue_request(struct work *work, int idx)
 	eprintf("%p %x\n", req, hdr->opcode);
 
 	switch (hdr->opcode) {
+	case SD_OP_GET_EPOCH:
+		ret = get_epoch((struct sd_obj_req *)hdr,
+			  (struct sd_obj_rsp *)rsp, req->data);
+		break;
 	case SD_OP_GET_NODE_LIST:
 		get_node_list((struct sd_node_req *)hdr,
 			      (struct sd_node_rsp *)rsp, req->data);
@@ -286,12 +307,12 @@ void cluster_queue_request(struct work *work, int idx)
 			log->nr_nodes = epoch_log_read(epoch, (char *)log->nodes,
 						       sizeof(log->nodes));
 			if (log->nr_nodes == -1)
-				i--;
-			else{
-				rsp->data_length += sizeof(*log);
-				log->nr_nodes /= sizeof(log->nodes[0]);
-			}
+				log->nr_nodes = epoch_log_read_remote(epoch,
+								      (char *)log->nodes,
+								      sizeof(log->nodes));
 
+			rsp->data_length += sizeof(*log);
+			log->nr_nodes /= sizeof(log->nodes[0]);
 			epoch--;
 		}
 

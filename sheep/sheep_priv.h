@@ -24,6 +24,7 @@
 #define SD_OP_REMOVE_OBJ     0x91
 
 #define SD_OP_GET_OBJ_LIST   0xA1
+#define SD_OP_GET_EPOCH      0XA2
 
 #define SD_MSG_JOIN             0x01
 #define SD_MSG_VDI_OP           0x02
@@ -210,6 +211,7 @@ int get_global_nr_copies(uint32_t *copies);
 
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
+int epoch_log_read_remote(uint32_t epoch, char *buf, int len);
 int get_latest_epoch(void);
 int remove_epoch(int epoch);
 int set_cluster_ctime(uint64_t ctime);
