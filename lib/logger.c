@@ -387,8 +387,10 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 
 		if (outfile) {
 			fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
-			if (fd < 0)
+			if (fd < 0) {
 				syslog(LOG_ERR, "failed to open %s\n", outfile);
+				return 1;
+			}
 		} else {
 			fd = -1;
 			openlog(log_name, 0, LOG_DAEMON);
