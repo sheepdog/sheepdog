@@ -18,7 +18,13 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-AC_INIT([sheepdog], [0.2.3], [sheepdog@lists.wpkg.org])
+m4_define([sheepdog_version], [0.2.3])
+
+m4_define([git_version],
+	m4_esyscmd_s([git describe --tags --dirty 2> /dev/null | sed 's/^v//']))
+
+AC_INIT([sheepdog], m4_default(git_version, sheepdog_version),
+	[sheepdog@lists.wpkg.org])
 AM_INIT_AUTOMAKE([-Wno-portability])
 
 AC_CONFIG_SRCDIR([collie/collie.c])
