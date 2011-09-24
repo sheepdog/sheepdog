@@ -443,8 +443,7 @@ static int add_node_to_leave_list(struct message_header *msg)
 	struct node *n, *t;
 	struct join_message *jm;
 
-	switch (msg->op) {
-	case SD_MSG_LEAVE:
+	if (msg->op == SD_MSG_LEAVE ) {
 		n = zalloc(sizeof(*n));
 		if (!n) {
 			ret = SD_RES_NO_MEM;
@@ -461,35 +460,32 @@ static int add_node_to_leave_list(struct message_header *msg)
 
 		list_add_tail(&n->list, &sys->leave_list);
 		goto ret;
-	case SD_MSG_JOIN:
+	} else if (msg->op == SD_MSG_JOIN ) {
 		jm = (struct join_message *)msg;
 		nr = jm->nr_leave_nodes;
-		break;
-	default:
+		for (i = 0; i < nr; i++) {
+			n = zalloc(sizeof(*n));
+			if (!n) {
+				ret = SD_RES_NO_MEM;
+				goto free;
+			}
+
+			n->nodeid = jm->leave_nodes[i].nodeid;
+			n->pid = jm->leave_nodes[i].pid;
+			n->ent = jm->leave_nodes[i].ent;
+			if (find_leave_node(n)) {
+				free(n);
+				continue;
+			}
+
+			list_add_tail(&n->list, &tmp_list);
+		}
+		list_splice_init(&tmp_list, &sys->leave_list);
+		goto ret;
+	} else {
 		ret = SD_RES_INVALID_PARMS;
 		goto err;
 	}
-
-	for (i = 0; i < nr; i++) {
-		n = zalloc(sizeof(*n));
-		if (!n) {
-			ret = SD_RES_NO_MEM;
-			goto free;
-		}
-
-		n->nodeid = jm->leave_nodes[i].nodeid;
-		n->pid = jm->leave_nodes[i].pid;
-		n->ent = jm->leave_nodes[i].ent;
-		if (find_leave_node(n)) {
-			free(n);
-			continue;
-		}
-
-		list_add_tail(&n->list, &tmp_list);
-	}
-	list_splice_init(&tmp_list, &sys->leave_list);
-	goto ret;
-
 free:
 	list_for_each_entry_safe(n, t, &tmp_list, list) {
 		free(n);
