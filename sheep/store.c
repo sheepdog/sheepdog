@@ -1910,7 +1910,7 @@ static int attr(char *path, const char *name, void *var, int len, int set)
 	return SD_RES_SUCCESS;
 }
 
-static int init_base_path(const char *d)
+int init_base_path(const char *d)
 {
 	int new = 0;
 
@@ -2038,10 +2038,6 @@ static int init_jrnl_path(const char *base_path)
 int init_store(const char *d)
 {
 	int ret;
-
-	ret = init_base_path(d);
-	if (ret)
-		return ret;
 
 	ret = init_obj_path(d);
 	if (ret)

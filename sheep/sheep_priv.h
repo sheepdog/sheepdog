@@ -161,6 +161,7 @@ int create_listen_port(int port, void *data);
 
 int is_io_request(unsigned op);
 int init_store(const char *dir);
+int init_base_path(const char *dir);
 
 int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies,

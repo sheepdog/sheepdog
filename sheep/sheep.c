@@ -131,6 +131,10 @@ int main(int argc, char **argv)
 	if (is_daemon && daemon(0, 0))
 		exit(1);
 
+	ret = init_base_path(dir);
+	if (ret)
+		exit(1);
+
 	ret = log_init(program_name, LOG_SPACE_SIZE, is_daemon, log_level, path);
 	if (ret)
 		exit(1);
