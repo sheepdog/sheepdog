@@ -424,14 +424,14 @@ static int get_nodes_nr_epoch(int epoch)
 	return nr;
 }
 
-static struct node *find_leave_node(struct node *node)
+static struct sheepdog_node_list_entry *find_entry_list(struct sheepdog_node_list_entry *entry,
+							struct list_head *head)
 {
 	struct node *n;
-	list_for_each_entry(n, &sys->leave_list, list) {
-		if (node_cmp(&n->ent, &node->ent) == 0)
-			return n;
-		dprintf("%d\n", node_cmp(&n->ent, &node->ent));
-	}
+	list_for_each_entry(n, head, list)
+		if (node_cmp(&n->ent, entry) == 0)
+			return entry;
+
 	return NULL;
 
 }
@@ -450,13 +450,14 @@ static int add_node_to_leave_list(struct message_header *msg)
 			goto err;
 		}
 
-		n->nodeid = msg->nodeid;
-		n->pid = msg->pid;
-		n->ent = msg->from;
-		if (find_leave_node(n)) {
+		if (find_entry_list(&msg->from, &sys->leave_list)) {
 			free(n);
 			goto ret;
 		}
+
+		n->nodeid = msg->nodeid;
+		n->pid = msg->pid;
+		n->ent = msg->from;
 
 		list_add_tail(&n->list, &sys->leave_list);
 		goto ret;
@@ -470,13 +471,14 @@ static int add_node_to_leave_list(struct message_header *msg)
 				goto free;
 			}
 
-			n->nodeid = jm->leave_nodes[i].nodeid;
-			n->pid = jm->leave_nodes[i].pid;
-			n->ent = jm->leave_nodes[i].ent;
-			if (find_leave_node(n)) {
+			if (find_entry_list(&jm->leave_nodes[i].ent, &sys->leave_list)) {
 				free(n);
 				continue;
 			}
+
+			n->nodeid = jm->leave_nodes[i].nodeid;
+			n->pid = jm->leave_nodes[i].pid;
+			n->ent = jm->leave_nodes[i].ent;
 
 			list_add_tail(&n->list, &tmp_list);
 		}
