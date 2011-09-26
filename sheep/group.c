@@ -465,10 +465,27 @@ static struct sheepdog_node_list_entry *find_entry_list(struct sheepdog_node_lis
 	return NULL;
 
 }
+
+static struct sheepdog_node_list_entry *find_entry_epoch(struct sheepdog_node_list_entry *entry,
+							 int epoch)
+{
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	int nr, i;
+
+	nr = epoch_log_read(epoch, (char *)nodes, sizeof(nodes));
+	nr /= sizeof(nodes[0]);
+
+	for (i = 0; i < nr; i++)
+		if (node_cmp(&nodes[i], entry) == 0)
+			return entry;
+
+	return NULL;
+}
+
 static int add_node_to_leave_list(struct message_header *msg)
 {
 	int ret = SD_RES_SUCCESS;
-	int nr, i;
+	int nr, i, le = get_latest_epoch();
 	LIST_HEAD(tmp_list);
 	struct node *n, *t;
 	struct join_message *jm;
@@ -480,7 +497,8 @@ static int add_node_to_leave_list(struct message_header *msg)
 			goto err;
 		}
 
-		if (find_entry_list(&msg->from, &sys->leave_list)) {
+		if (find_entry_list(&msg->from, &sys->leave_list)
+		    || !find_entry_epoch(&msg->from, le)) {
 			free(n);
 			goto ret;
 		}
@@ -501,7 +519,8 @@ static int add_node_to_leave_list(struct message_header *msg)
 				goto free;
 			}
 
-			if (find_entry_list(&jm->leave_nodes[i].ent, &sys->leave_list)) {
+			if (find_entry_list(&jm->leave_nodes[i].ent, &sys->leave_list)
+			    || !find_entry_epoch(&jm->leave_nodes[i].ent, le)) {
 				free(n);
 				continue;
 			}
@@ -668,7 +687,6 @@ static void join(struct join_message *msg)
 					 msg->epoch, &msg->cluster_status,
 					 &msg->inc_epoch);
 	msg->nr_sobjs = sys->nr_sobjs;
-	msg->epoch = sys->epoch;
 	msg->ctime = get_cluster_ctime();
 	msg->nr_nodes = 0;
 	list_for_each_entry(node, &sys->sd_node_list, list) {
@@ -786,8 +804,7 @@ static void update_cluster_info(struct join_message *msg)
 		if (is_myself(msg->header.from.addr, msg->header.from.port)) {
 			eprintf("failed to join sheepdog, %d\n", msg->result);
 			leave_cluster();
-			eprintf("I am really hurt and gonna leave cluster.\n");
-			eprintf("Fix yourself and restart me later, pleaseeeee...Bye.\n");
+			eprintf("Restart me later when master is up, please.Bye.\n");
 			exit(1);
 			/* sys->status = SD_STATUS_JOIN_FAILED; */
 		}
@@ -1006,10 +1023,10 @@ static void __sd_deliver(struct cpg_event *cevent)
 		m->pid);
 
 	/*
-	 * we don't want to perform any deliver events until we
-	 * join; we wait for our JOIN message.
+	 * we don't want to perform any deliver events except mastership_tx event
+	 * until we join; we wait for our JOIN message.
 	 */
-	if (!sys->join_finished) {
+	if (!sys->join_finished && !master_tx_message(m)) {
 		if (m->pid != sys->this_pid || m->nodeid != sys->this_nodeid) {
 			cevent->skip = 1;
 			return;
@@ -1061,6 +1078,21 @@ static void __sd_deliver(struct cpg_event *cevent)
 
 }
 
+static int tx_mastership(void)
+{
+	struct mastership_tx_message msg;
+	memset(&msg, 0, sizeof(msg));
+	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
+	msg.header.op = SD_MSG_MASTER_TRANSFER;
+	msg.header.state = DM_FIN;
+	msg.header.msg_length = sizeof(msg);
+	msg.header.from = sys->this_node;
+	msg.header.nodeid = sys->this_nodeid;
+	msg.header.pid = sys->this_pid;
+
+	return send_message(sys->handle, (struct message_header *)&msg);
+}
+
 static void send_join_response(struct work_deliver *w)
 {
 	struct message_header *m;
@@ -1082,7 +1114,15 @@ static void send_join_response(struct work_deliver *w)
 			jm->nr_leave_nodes++;
 		}
 		print_node_list(&sys->leave_list);
+	} else if (jm->result != SD_RES_SUCCESS &&
+			jm->epoch > sys->epoch &&
+			jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
+		eprintf("Transfer mastership.\n");
+		tx_mastership();
+		eprintf("Restart me later when master is up, please.Bye.\n");
+		exit(1);
 	}
+	jm->epoch = sys->epoch;
 	send_message(sys->handle, m);
 }
 
@@ -1090,7 +1130,6 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 {
 	struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 	struct message_header *m;
-	struct leave_message *lm;
 	char name[128];
 	int do_recovery;
 	struct node *node, *t;
@@ -1116,19 +1155,27 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 					update_epoch_store(sys->epoch);
 				}
 			}
+		/* fall through */
+		case SD_MSG_MASTER_TRANSFER:
 			if (sys->status == SD_STATUS_WAIT_FOR_JOIN) {
-				lm = (struct leave_message *)m;
 				add_node_to_leave_list(m);
 
-				if (lm->epoch > sys->leave_epoch)
-					sys->leave_epoch = lm->epoch;
+				/* Sheep needs this to identify itself as master.
+				 * Now mastership transfer is done.
+				 */
+				if (!sys->join_finished) {
+					sys->join_finished = 1;
+					move_node_to_sd_list(sys->this_nodeid, sys->this_pid, sys->this_node);
+					sys->epoch = get_latest_epoch();
+				}
 
 				nr_local = get_nodes_nr_epoch(sys->epoch);
 				nr = get_nodes_nr_from(&sys->sd_node_list);
 				nr_leave = get_nodes_nr_from(&sys->leave_list);
+
+				dprintf("%d == %d + %d \n", nr_local, nr, nr_leave);
 				if (nr_local == nr + nr_leave) {
 					sys->status = SD_STATUS_OK;
-					sys->epoch = sys->leave_epoch + 1;
 					update_epoch_log(sys->epoch);
 					update_epoch_store(sys->epoch);
 				}
@@ -1961,7 +2008,6 @@ join_retry:
 	sys->handle = cpg_handle;
 	sys->this_nodeid = nodeid;
 	sys->this_pid = getpid();
-	sys->leave_epoch = 0;
 
 	ret = set_addr(nodeid, port);
 	if (ret)

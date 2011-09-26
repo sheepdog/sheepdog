@@ -145,7 +145,6 @@ struct cluster_info {
 	int nr_outstanding_reqs;
 
 	uint32_t recovered_epoch;
-	uint32_t leave_epoch; /* The highest number in the clsuter */
 
 	int use_directio;
 
