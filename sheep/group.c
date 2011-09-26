@@ -84,6 +84,11 @@ struct vdi_op_message {
 	uint8_t data[0];
 };
 
+struct mastership_tx_message {
+	struct message_header header;
+	uint32_t epoch;
+};
+
 struct work_deliver {
 	struct cpg_event cev;
 
@@ -160,6 +165,11 @@ static inline int master_chg_message(struct message_header *m)
 static inline int leave_message(struct message_header *m)
 {
 	return m->op == SD_MSG_LEAVE;
+}
+
+static inline int master_tx_message(struct message_header *m)
+{
+	return m->op == SD_MSG_MASTER_TRANSFER;
 }
 
 static int send_message(cpg_handle_t handle, struct message_header *msg)

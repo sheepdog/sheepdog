@@ -30,6 +30,7 @@
 #define SD_MSG_VDI_OP           0x02
 #define SD_MSG_MASTER_CHANGED   0x03
 #define SD_MSG_LEAVE            0x04
+#define SD_MSG_MASTER_TRANSFER  0x05
 
 #define SD_STATUS_OK                0x00
 #define SD_STATUS_WAIT_FOR_FORMAT   0x01
