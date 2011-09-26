@@ -142,6 +142,26 @@ CPG_EVENT_WORK_FNS(RUNNING, running)
 CPG_EVENT_WORK_FNS(SUSPENDED, suspended)
 CPG_EVENT_WORK_FNS(JOINING, joining)
 
+static inline int join_message(struct message_header *m)
+{
+	return m->op == SD_MSG_JOIN;
+}
+
+static inline int vdi_op_message(struct message_header *m)
+{
+	return m->op == SD_MSG_VDI_OP;
+}
+
+static inline int master_chg_message(struct message_header *m)
+{
+	return m->op == SD_MSG_MASTER_CHANGED;
+}
+
+static inline int leave_message(struct message_header *m)
+{
+	return m->op == SD_MSG_LEAVE;
+}
+
 static int send_message(cpg_handle_t handle, struct message_header *msg)
 {
 	struct iovec iov;
@@ -443,7 +463,7 @@ static int add_node_to_leave_list(struct message_header *msg)
 	struct node *n, *t;
 	struct join_message *jm;
 
-	if (msg->op == SD_MSG_LEAVE ) {
+	if (leave_message(msg)) {
 		n = zalloc(sizeof(*n));
 		if (!n) {
 			ret = SD_RES_NO_MEM;
@@ -461,7 +481,7 @@ static int add_node_to_leave_list(struct message_header *msg)
 
 		list_add_tail(&n->list, &sys->leave_list);
 		goto ret;
-	} else if (msg->op == SD_MSG_JOIN ) {
+	} else if (join_message(msg)) {
 		jm = (struct join_message *)msg;
 		nr = jm->nr_leave_nodes;
 		for (i = 0; i < nr; i++) {
@@ -986,7 +1006,7 @@ static void __sd_deliver(struct cpg_event *cevent)
 		}
 	}
 
-	if (m->op == SD_MSG_JOIN) {
+	if (join_message(m)) {
 		uint32_t nodeid = m->nodeid;
 		uint32_t pid = m->pid;
 
@@ -1111,7 +1131,7 @@ static void __sd_deliver_done(struct cpg_event *cevent)
 	}
 
 	do_recovery = (m->state == DM_FIN &&
-		       (m->op == SD_MSG_JOIN || m->op == SD_MSG_LEAVE));
+		       (join_message(m) || leave_message(m)));
 
 	dprintf("op: %d, state: %u, size: %d, from: %s\n",
 		m->op, m->state, m->msg_length,
@@ -1171,7 +1191,7 @@ static void sd_deliver(cpg_handle_t handle, const struct cpg_name *group_name,
 	if (cpg_event_suspended() && m->state == DM_FIN) {
 		list_add(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 		cpg_event_clear_suspended();
-		if (m->op == SD_MSG_JOIN)
+		if (join_message(m))
 			cpg_event_clear_joining();
 	} else
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
@@ -1494,7 +1514,7 @@ static void cpg_event_done(struct work *work, int idx)
 	{
 		struct work_deliver *w = container_of(cevent, struct work_deliver, cev);
 
-		if (w->msg->state == DM_FIN && w->msg->op == SD_MSG_VDI_OP)
+		if (w->msg->state == DM_FIN && vdi_op_message(w->msg))
 			vdi_op_done((struct vdi_op_message *)w->msg);
 
 		/*
@@ -1522,7 +1542,7 @@ static void cpg_event_done(struct work *work, int idx)
 				}
 			}
 			cpg_event_set_suspended();
-			if (w->msg->op == SD_MSG_JOIN)
+			if (join_message(w->msg))
 				cpg_event_set_joining();
 		}
 	got_fin:
