@@ -400,13 +400,21 @@ forward:
 
 static void group_handler(int listen_fd, int events, void *data)
 {
+	int ret;
 	if (events & EPOLLHUP) {
 		eprintf("Receive EPOLLHUP event. Is corosync stopped running?\n");
-		log_close();
-		exit(1);
+		goto out;
 	}
 
-	cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
+	ret = cpg_dispatch(sys->handle, CPG_DISPATCH_ALL);
+
+	if (ret == CPG_OK)
+		return;
+	else
+		eprintf("oops...some error occured inside corosync\n");
+out:
+	log_close();
+	exit(1);
 }
 
 static struct node *find_node(struct list_head *node_list, uint32_t nodeid, uint32_t pid)
@@ -2035,8 +2043,16 @@ join_retry:
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
 
-	cpg_fd_get(cpg_handle, &fd);
-	register_event(fd, group_handler, NULL);
+	ret = cpg_fd_get(cpg_handle, &fd);
+	if (ret != CPG_OK) {
+		eprintf("Failed to retrieve cpg file descriptor, %d\n", ret);
+		return 1;
+	}
+	ret = register_event(fd, group_handler, NULL);
+	if (ret) {
+		eprintf("Failed to register epoll events, %d\n", ret);
+		return 1;
+	}
 	return 0;
 }
 
