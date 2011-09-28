@@ -182,9 +182,9 @@ static int send_message(cpg_handle_t handle, struct message_header *msg)
 retry:
 	ret = cpg_mcast_joined(handle, CPG_TYPE_AGREED, &iov, 1);
 	switch (ret) {
-	case CS_OK:
+	case CPG_OK:
 		break;
-	case CS_ERR_TRY_AGAIN:
+	case CPG_ERR_TRY_AGAIN:
 		dprintf("failed to send message. try again\n");
 		sleep(1);
 		goto retry;
@@ -1942,13 +1942,13 @@ static int set_addr(unsigned int nodeid, int port)
 	memset(sys->this_node.addr, 0, sizeof(sys->this_node.addr));
 
 	ret = corosync_cfg_initialize(&handle, NULL);
-	if (ret != CS_OK) {
+	if (ret != CPG_OK) {
 		vprintf(SDOG_ERR "failed to initiazize cfg %d\n", ret);
 		return -1;
 	}
 
 	ret = corosync_cfg_get_node_addrs(handle, nodeid, 1, &nr, &addr);
-	if (ret != CS_OK) {
+	if (ret != CPG_OK) {
 		vprintf(SDOG_ERR "failed to get addr %d\n", ret);
 		return -1;
 	}
@@ -1984,7 +1984,7 @@ int create_cluster(int port, int64_t zone)
 	unsigned int nodeid = 0;
 
 	ret = cpg_initialize(&cpg_handle, &cb);
-	if (ret != CS_OK) {
+	if (ret != CPG_OK) {
 		eprintf("Failed to initialize cpg, %d\n", ret);
 		eprintf("Is corosync running?\n");
 		return -1;
@@ -1993,13 +1993,13 @@ int create_cluster(int port, int64_t zone)
 join_retry:
 	ret = cpg_join(cpg_handle, &group);
 	switch (ret) {
-	case CS_OK:
+	case CPG_OK:
 		break;
-	case CS_ERR_TRY_AGAIN:
+	case CPG_ERR_TRY_AGAIN:
 		dprintf("Failed to join the sheepdog group, try again\n");
 		sleep(1);
 		goto join_retry;
-	case CS_ERR_SECURITY:
+	case CPG_ERR_SECURITY:
 		eprintf("Permission error.\n");
 		return -1;
 	default:
@@ -2008,7 +2008,7 @@ join_retry:
 	}
 
 	ret = cpg_local_get(cpg_handle, &nodeid);
-	if (ret != CS_OK) {
+	if (ret != CPG_OK) {
 		eprintf("Failed to get the local node's identifier, %d\n", ret);
 		return 1;
 	}
