@@ -641,8 +641,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 
 		n = obj_to_sheep(e, vnodes, oid, i);
 
-		if (memcmp(e[n].addr, sys->this_node.addr, sizeof(e[n].addr)) == 0 &&
-		    e[n].port == sys->this_node.port) {
+		if (is_myself(e[n].addr, e[n].port)) {
 			ret = write_object_local(oid, data, datalen, offset, nr,
 						 node_version, create);
 
@@ -704,8 +703,7 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, vnodes, oid, i);
 
-		if (memcmp(e[n].addr, sys->this_node.addr, sizeof(e[n].addr)) == 0 &&
-		    e[n].port == sys->this_node.port) {
+		if (is_myself(e[n].addr, e[n].port)) {
 			ret = read_object_local(oid, data, datalen, offset, nr,
 						node_version);
 
