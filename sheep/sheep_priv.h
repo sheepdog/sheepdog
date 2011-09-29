@@ -305,10 +305,4 @@ static inline int is_myself(uint8_t *addr, uint16_t port)
 		port == sys->this_node.port;
 }
 
-#define panic(fmt, args...)			\
-({						\
-	vprintf(SDOG_EMERG fmt, ##args);	\
-	exit(1);				\
-})
-
 #endif

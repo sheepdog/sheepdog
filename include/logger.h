@@ -66,6 +66,12 @@ do {									\
 	log_write(LOG_INFO, __func__, __LINE__, fmt, ##args);		\
 } while (0)
 
+#define panic(fmt, args...)			\
+({						\
+	vprintf(SDOG_EMERG fmt, ##args);	\
+	abort();				\
+})
+
 /* don't use the following obsolete functions. use vprintf instead. */
 
 #define eprintf(fmt, args...)						\
