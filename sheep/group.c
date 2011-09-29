@@ -1873,9 +1873,8 @@ static void sd_confchg(cpg_handle_t handle, const struct cpg_name *group_name,
 	dprintf("%zd %zd %zd\n", member_list_entries, left_list_entries,
 		joined_list_entries);
 	for (i = 0; i < member_list_entries; i++) {
-		dprintf("[%x] node_id: %x, pid: %d, reason: %d\n", i,
-			member_list[i].nodeid, member_list[i].pid,
-			member_list[i].reason);
+		dprintf("[%x] node_id: %x, pid: %d\n", i,
+			member_list[i].nodeid, member_list[i].pid);
 	}
 
 	if (sys->status == SD_STATUS_SHUTDOWN)
