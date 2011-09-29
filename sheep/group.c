@@ -1990,6 +1990,12 @@ int create_cluster(int port, int64_t zone)
 		return -1;
 	}
 
+	ret = cpg_local_get(cpg_handle, &nodeid);
+	if (ret != CPG_OK) {
+		eprintf("Failed to get the local node's identifier, %d\n", ret);
+		return 1;
+	}
+
 join_retry:
 	ret = cpg_join(cpg_handle, &group);
 	switch (ret) {
@@ -2005,12 +2011,6 @@ join_retry:
 	default:
 		eprintf("Failed to join the sheepdog group, %d\n", ret);
 		return -1;
-	}
-
-	ret = cpg_local_get(cpg_handle, &nodeid);
-	if (ret != CPG_OK) {
-		eprintf("Failed to get the local node's identifier, %d\n", ret);
-		return 1;
 	}
 
 	sys->handle = cpg_handle;
