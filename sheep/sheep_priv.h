@@ -12,7 +12,6 @@
 #define __SHEEP_PRIV_H__
 
 #include <inttypes.h>
-#include <corosync/cpg.h>
 
 #include "sheepdog_proto.h"
 #include "event.h"
@@ -42,10 +41,14 @@
 #define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheeps */
 
 enum cpg_event_type {
-	CPG_EVENT_CONCHG,
-	CPG_EVENT_DELIVER,
+	CPG_EVENT_JOIN,
+	CPG_EVENT_LEAVE,
+	CPG_EVENT_NOTIFY,
 	CPG_EVENT_REQUEST,
 };
+
+#define is_membership_change_event(x) \
+	((x) == CPG_EVENT_JOIN || (x) == CPG_EVENT_LEAVE)
 
 struct cpg_event {
 	enum cpg_event_type ctype;
@@ -103,7 +106,8 @@ struct data_object_bmap {
 };
 
 struct cluster_info {
-	cpg_handle_t handle;
+	struct cluster_driver *cdrv;
+
 	/* set after finishing the JOIN procedure */
 	int join_finished;
 	struct sheepid this_sheepid;

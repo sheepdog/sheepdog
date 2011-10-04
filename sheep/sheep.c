@@ -36,11 +36,12 @@ static struct option const long_options[] = {
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
 	{"zone", required_argument, NULL, 'z'},
+	{"cluster", required_argument, NULL, 'c'},
 	{"help", no_argument, NULL, 'h'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "p:fl:dDz:h";
+static const char *short_options = "p:fl:dDz:c:h";
 
 static void usage(int status)
 {
@@ -57,6 +58,7 @@ Sheepdog Daemon, version %s\n\
   -d, --debug             print debug messages\n\
   -D, --directio          use direct IO\n\
   -z, --zone              specify the zone id\n\
+  -c, --cluster           specify the cluster driver\n\
   -h, --help              display this help and exit\n\
 ", PACKAGE_VERSION);
 	}
@@ -76,6 +78,7 @@ int main(int argc, char **argv)
 	char path[PATH_MAX];
 	int64_t zone = -1;
 	char *p;
+	struct cluster_driver *cdrv;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -112,6 +115,24 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			sys->this_node.zone = zone;
+			break;
+		case 'c':
+			FOR_EACH_CLUSTER_DRIVER(cdrv) {
+				if (strcmp(cdrv->name, optarg) == 0) {
+					sys->cdrv = cdrv;
+					break;
+				}
+			}
+
+			if (!sys->cdrv) {
+				printf("No such cluster driver, %s\n", optarg);
+				printf("Supported drivers:");
+				FOR_EACH_CLUSTER_DRIVER(cdrv) {
+					printf(" %s", cdrv->name);
+				}
+				printf("\n");
+				exit(1);
+			}
 			break;
 		case 'h':
 			usage(0);
