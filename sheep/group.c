@@ -150,7 +150,6 @@ struct work_confchg {
 	struct cpg_address *joined_list;
 	size_t joined_list_entries;
 
-	int first_cpg_node;
 	int sd_node_left;
 };
 
@@ -1464,13 +1463,14 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 {
 	struct work_confchg *w = container_of(cevent, struct work_confchg, cev);
 	int ret;
+	int first_cpg_node = 0;
 
 	if (w->member_list_entries ==
 	    w->joined_list_entries - w->left_list_entries &&
 	    is_my_cpg_addr(w->member_list)) {
 		sys->join_finished = 1;
 		get_global_nr_copies(&sys->nr_sobjs);
-		w->first_cpg_node = 1;
+		first_cpg_node = 1;
 	}
 
 	if (list_empty(&sys->cpg_node_list))
@@ -1483,7 +1483,7 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 	for_each_node_list(w->left_list, w->left_list_entries,
 			   del_node, w);
 
-	if (w->first_cpg_node) {
+	if (first_cpg_node) {
 		struct join_message msg;
 		struct sheepdog_node_list_entry entries[SD_MAX_NODES];
 		int nr_entries;
@@ -1522,7 +1522,7 @@ static void __sd_confchg_done(struct cpg_event *cevent)
 
 	print_node_list(&sys->sd_node_list);
 
-	if (w->first_cpg_node)
+	if (first_cpg_node)
 		goto skip_join;
 
 	for_each_node_list(w->joined_list, w->joined_list_entries,
