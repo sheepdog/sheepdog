@@ -26,6 +26,7 @@
 #define DEFAULT_OBJECT_DIR "/tmp"
 #define LOG_FILE_NAME "sheep.log"
 
+LIST_HEAD(cluster_drivers);
 static char program_name[] = "sheep";
 
 static struct option const long_options[] = {

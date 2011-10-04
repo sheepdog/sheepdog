@@ -23,7 +23,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include $(libcpg_CFLAGS) $
 
 sbin_PROGRAMS		= sheep
 
-sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c
+sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c cluster/corosync.c
 sheep_LDADD	  	= $(libcpg_LIBS) $(libcfg_LIBS) ../lib/libsheepdog.a -lpthread
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
