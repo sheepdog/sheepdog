@@ -20,6 +20,7 @@
 #include "work.h"
 #include "net.h"
 #include "sheep.h"
+#include "cluster.h"
 
 #define SD_OP_REMOVE_OBJ     0x91
 
@@ -105,8 +106,7 @@ struct cluster_info {
 	cpg_handle_t handle;
 	/* set after finishing the JOIN procedure */
 	int join_finished;
-	uint32_t this_nodeid;
-	uint32_t this_pid;
+	struct sheepid this_sheepid;
 	struct sheepdog_node_list_entry this_node;
 
 	uint32_t epoch;
