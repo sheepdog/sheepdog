@@ -71,11 +71,16 @@ struct cluster_driver {
 	 *
 	 * This function sends 'msg' to all the nodes.  The notified
 	 * messages can be read through notify_handler() in
-	 * cdrv_handlers.
+	 * cdrv_handlers.  If 'block_cb' is specified, block_cb() is
+	 * called before 'msg' is notified to all the nodes.  All the
+	 * cluster events including this notification are blocked
+	 * until block_cb() returns or this blocking node leaves the
+	 * cluster.  The sheep daemon can sleep in block_cb(), so this
+	 * callback must be not called from the dispatch (main) thread.
 	 *
 	 * Returns zero on success, -1 on error
 	 */
-	int (*notify)(void *msg, size_t msg_len);
+	int (*notify)(void *msg, size_t msg_len, void (*block_cb)(void *arg));
 
 	/*
 	 * Dispatch handlers

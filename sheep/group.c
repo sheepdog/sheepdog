@@ -379,7 +379,7 @@ forward:
 
 	list_add(&req->pending_list, &sys->pending_list);
 
-	sys->cdrv->notify(msg, msg->header.msg_length);
+	sys->cdrv->notify(msg, msg->header.msg_length, NULL);
 
 	free(msg);
 }
@@ -1104,7 +1104,7 @@ static int tx_mastership(void)
 	msg.header.from = sys->this_node;
 	msg.header.sheepid = sys->this_sheepid;
 
-	return sys->cdrv->notify(&msg, msg.header.msg_length);
+	return sys->cdrv->notify(&msg, msg.header.msg_length, NULL);
 }
 
 static void send_join_response(struct work_notify *w)
@@ -1137,7 +1137,7 @@ static void send_join_response(struct work_notify *w)
 		exit(1);
 	}
 	jm->epoch = sys->epoch;
-	sys->cdrv->notify(m, m->msg_length);
+	sys->cdrv->notify(m, m->msg_length, NULL);
 }
 
 static void __sd_notify_done(struct cpg_event *cevent)
@@ -1218,7 +1218,7 @@ static void __sd_notify_done(struct cpg_event *cevent)
 			break;
 		case SD_MSG_VDI_OP:
 			m->state = DM_FIN;
-			sys->cdrv->notify(m, m->msg_length);
+			sys->cdrv->notify(m, m->msg_length, NULL);
 			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
@@ -1263,10 +1263,13 @@ static void sd_notify_handler(struct sheepid *sender, void *msg, size_t msg_len)
 
 	vprintf(SDOG_DEBUG, "allow new deliver, %p\n", cevent);
 
-	w->msg = zalloc(msg_len);
-	if (!w->msg)
-		return;
-	memcpy(w->msg, msg, msg_len);
+	if (msg_len) {
+		w->msg = zalloc(msg_len);
+		if (!w->msg)
+			return;
+		memcpy(w->msg, msg, msg_len);
+	} else
+		w->msg = NULL;
 
 	if (cpg_event_suspended() && m->state == DM_FIN) {
 		list_add(&cevent->cpg_event_list, &sys->cpg_event_siblings);
@@ -1402,7 +1405,7 @@ static void send_join_request(struct sheepid *id)
 			msg.nodes[i].ent = entries[i];
 	}
 
-	sys->cdrv->notify(&msg, msg.header.msg_length);
+	sys->cdrv->notify(&msg, msg.header.msg_length, NULL);
 
 	vprintf(SDOG_INFO, "%s\n", sheepid_to_str(&sys->this_sheepid));
 }
@@ -2035,5 +2038,5 @@ int leave_cluster(void)
 	msg.epoch = get_latest_epoch();
 
 	dprintf("%d\n", msg.epoch);
-	return sys->cdrv->notify(&msg, msg.header.msg_length);
+	return sys->cdrv->notify(&msg, msg.header.msg_length, NULL);
 }

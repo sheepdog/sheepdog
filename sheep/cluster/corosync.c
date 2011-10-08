@@ -14,20 +14,33 @@
 #include <corosync/cfg.h>
 
 #include "cluster.h"
+#include "work.h"
 
 static cpg_handle_t cpg_handle;
 static struct cpg_name cpg_group = { 9, "sheepdog" };
 
 static corosync_cfg_handle_t cfg_handle;
+static struct sheepid this_sheepid;
+
+static struct work_queue *corosync_block_wq;
 
 static struct cdrv_handlers corosync_handlers;
 
 static LIST_HEAD(corosync_event_list);
+static LIST_HEAD(corosync_block_list);
 
+/* event types which are dispatched in corosync_dispatch() */
 enum corosync_event_type {
 	COROSYNC_EVENT_TYPE_JOIN,
 	COROSYNC_EVENT_TYPE_LEAVE,
 	COROSYNC_EVENT_TYPE_NOTIFY,
+};
+
+/* multicast message type */
+enum corosync_message_type {
+	COROSYNC_MSG_TYPE_NOTIFY,
+	COROSYNC_MSG_TYPE_BLOCK,
+	COROSYNC_MSG_TYPE_UNBLOCK,
 };
 
 struct corosync_event {
@@ -40,6 +53,18 @@ struct corosync_event {
 	void *msg;
 	size_t msg_len;
 
+	int blocked;
+	int callbacked;
+
+	struct list_head list;
+};
+
+struct corosync_block_msg {
+	void *msg;
+	size_t msg_len;
+	void (*cb)(void *arg);
+
+	struct work work;
 	struct list_head list;
 };
 
@@ -89,9 +114,71 @@ static void cpg_addr_to_sheepid(const struct cpg_address *cpgs,
 	}
 }
 
+static int send_message(uint64_t type, void *msg, size_t msg_len)
+{
+	struct iovec iov[2];
+	int ret, iov_cnt = 1;
+
+	iov[0].iov_base = &type;
+	iov[0].iov_len = sizeof(type);
+	if (msg) {
+		iov[1].iov_base = msg;
+		iov[1].iov_len = msg_len;
+		iov_cnt++;
+	}
+retry:
+	ret = cpg_mcast_joined(cpg_handle, CPG_TYPE_AGREED, iov, iov_cnt);
+	switch (ret) {
+	case CPG_OK:
+		break;
+	case CPG_ERR_TRY_AGAIN:
+		dprintf("failed to send message. try again\n");
+		sleep(1);
+		goto retry;
+	default:
+		eprintf("failed to send message, %d\n", ret);
+		return -1;
+	}
+	return 0;
+}
+
+static void corosync_block(struct work *work, int idx)
+{
+	struct corosync_block_msg *bm = container_of(work, typeof(*bm), work);
+
+	bm->cb(bm->msg);
+}
+
+static void corosync_block_done(struct work *work, int idx)
+{
+	struct corosync_block_msg *bm = container_of(work, typeof(*bm), work);
+
+	send_message(COROSYNC_MSG_TYPE_UNBLOCK, bm->msg, bm->msg_len);
+
+	free(bm->msg);
+	free(bm);
+}
+
+static struct corosync_event *find_block_event(struct sheepid *sender)
+{
+	struct corosync_event *cevent;
+
+	list_for_each_entry(cevent, &corosync_event_list, list) {
+		if (!cevent->blocked)
+			continue;
+
+		if (cevent->type == COROSYNC_EVENT_TYPE_NOTIFY &&
+		    sheepid_cmp(&cevent->sender, sender) == 0)
+			return cevent;
+	}
+
+	return NULL;
+}
+
 static void __corosync_dispatch(void)
 {
 	struct corosync_event *cevent;
+	struct corosync_block_msg *bm;
 
 	while (!list_empty(&corosync_event_list)) {
 		cevent = list_first_entry(&corosync_event_list, typeof(*cevent), list);
@@ -108,6 +195,28 @@ static void __corosync_dispatch(void)
 							cevent->nr_members);
 			break;
 		case COROSYNC_EVENT_TYPE_NOTIFY:
+			if (cevent->blocked) {
+				if (sheepid_cmp(&cevent->sender, &this_sheepid) == 0 &&
+				    !cevent->callbacked) {
+					/* call a block callback function from a worker thread */
+					if (list_empty(&corosync_block_list))
+						panic("cannot call block callback\n");
+
+					bm = list_first_entry(&corosync_block_list,
+							      typeof(*bm), list);
+					list_del(&bm->list);
+
+					bm->work.fn = corosync_block;
+					bm->work.done = corosync_block_done;
+					queue_work(corosync_block_wq, &bm->work);
+
+					cevent->callbacked = 1;
+				}
+
+				/* block the rest messages until unblock message comes */
+				goto out;
+			}
+
 			corosync_handlers.notify_handler(&cevent->sender,
 							 cevent->msg,
 							 cevent->msg_len);
@@ -117,6 +226,8 @@ static void __corosync_dispatch(void)
 		list_del(&cevent->list);
 		free(cevent);
 	}
+out:
+	return;
 }
 
 static void cdrv_cpg_deliver(cpg_handle_t handle,
@@ -125,21 +236,59 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 			     void *msg, size_t msg_len)
 {
 	struct corosync_event *cevent;
+	uint64_t type;
+	struct sheepid sender;
+
+	nodeid_to_addr(nodeid, sender.addr);
+	sender.pid = pid;
+
+	memcpy(&type, msg, sizeof(type));
+	msg = (uint8_t *)msg + sizeof(type);
+	msg_len -= sizeof(type);
 
 	cevent = zalloc(sizeof(*cevent));
 	if (!cevent)
 		panic("oom\n");
-	cevent->msg = zalloc(msg_len);
-	if (!cevent->msg)
-		panic("oom\n");
 
-	cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
-	nodeid_to_addr(nodeid, cevent->sender.addr);
-	cevent->sender.pid = pid;
-	memcpy(cevent->msg, msg, msg_len);
-	cevent->msg_len = msg_len;
+	switch (type) {
+	case COROSYNC_MSG_TYPE_BLOCK:
+		cevent->blocked = 1;
+		/* fall through */
+	case COROSYNC_MSG_TYPE_NOTIFY:
+		cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
+		cevent->sender = sender;
+		cevent->msg_len = msg_len;
+		if (msg_len) {
+			cevent->msg = zalloc(msg_len);
+			if (!cevent->msg)
+				panic("oom\n");
+			memcpy(cevent->msg, msg, msg_len);
+		} else
+			cevent->msg = NULL;
 
-	list_add_tail(&cevent->list, &corosync_event_list);
+		list_add_tail(&cevent->list, &corosync_event_list);
+		break;
+	case COROSYNC_MSG_TYPE_UNBLOCK:
+		free(cevent); /* we don't add a new cluster event in this case */
+
+		cevent = find_block_event(&sender);
+		if (!cevent)
+			/* block message was casted before this node joins */
+			break;
+
+		cevent->blocked = 0;
+		cevent->msg_len = msg_len;
+		if (msg_len) {
+			cevent->msg = realloc(cevent->msg, msg_len);
+			if (!cevent->msg)
+				panic("oom\n");
+			memcpy(cevent->msg, msg, msg_len);
+		} else {
+			free(cevent->msg);
+			cevent->msg = NULL;
+		}
+		break;
+	}
 
 	__corosync_dispatch();
 }
@@ -175,6 +324,13 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
+		cevent = find_block_event(left_sheeps + i);
+		if (cevent) {
+			/* the node left before sending UNBLOCK */
+			list_del(&cevent->list);
+			free(cevent);
+		}
+
 		cevent = zalloc(sizeof(*cevent));
 		if (!cevent)
 			panic("oom\n");
@@ -249,12 +405,15 @@ static int corosync_init(struct cdrv_handlers *handlers, struct sheepid *myid)
 	}
 
 	myid->pid = getpid();
+	this_sheepid = *myid;
 
 	ret = cpg_fd_get(cpg_handle, &fd);
 	if (ret != CPG_OK) {
 		eprintf("Failed to retrieve cpg file descriptor, %d\n", ret);
 		return -1;
 	}
+
+	corosync_block_wq = init_work_queue(1);
 
 	return fd;
 }
@@ -295,27 +454,29 @@ static int corosync_leave(void)
 	return 0;
 }
 
-static int corosync_notify(void *msg, size_t msg_len)
+static int corosync_notify(void *msg, size_t msg_len, void (*block_cb)(void *))
 {
-	struct iovec iov;
 	int ret;
+	struct corosync_block_msg *bm;
 
-	iov.iov_base = msg;
-	iov.iov_len = msg_len;
-retry:
-	ret = cpg_mcast_joined(cpg_handle, CPG_TYPE_AGREED, &iov, 1);
-	switch (ret) {
-	case CPG_OK:
-		break;
-	case CPG_ERR_TRY_AGAIN:
-		dprintf("failed to send message. try again\n");
-		sleep(1);
-		goto retry;
-	default:
-		eprintf("failed to send message, %d\n", ret);
-		return -1;
-	}
-	return 0;
+	if (block_cb) {
+		bm = zalloc(sizeof(*bm));
+		if (!bm)
+			panic("oom\n");
+		bm->msg = zalloc(msg_len);
+		if (!bm->msg)
+			panic("oom\n");
+
+		memcpy(bm->msg, msg, msg_len);
+		bm->msg_len = msg_len;
+		bm->cb = block_cb;
+		list_add_tail(&bm->list, &corosync_block_list);
+
+		ret = send_message(COROSYNC_MSG_TYPE_BLOCK, NULL, 0);
+	} else
+		ret = send_message(COROSYNC_MSG_TYPE_NOTIFY, msg, msg_len);
+
+	return ret;
 }
 
 static int corosync_dispatch(void)
