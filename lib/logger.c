@@ -188,7 +188,7 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 		t = time(NULL);
 		tmp = localtime(&t);
 
-		strftime(p, MAX_MSG_SIZE, "%b %2d %I:%M:%S ", tmp);
+		strftime(p, MAX_MSG_SIZE, "%b %2d %H:%M:%S ", tmp);
 		p += strlen(p);
 	}
 
