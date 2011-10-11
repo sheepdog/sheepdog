@@ -870,9 +870,11 @@ static void vdi_op(struct vdi_op_message *msg)
 {
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
-	void *data = msg->data;
+	void *data = msg->data, *tag;
 	int ret = SD_RES_SUCCESS;
+	struct sheepdog_vdi_attr *vattr;
 	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_sobjs;
+	uint64_t ctime = 0;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
@@ -890,23 +892,31 @@ static void vdi_op(struct vdi_op_message *msg)
 			ret = SD_RES_VER_MISMATCH;
 			break;
 		}
-		ret = lookup_vdi(hdr->epoch, data, hdr->data_length, &vid,
-				 hdr->snapid, &nr_copies);
+		if (hdr->data_length == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
+			tag = (char *)data + SD_MAX_VDI_LEN;
+		else if (hdr->data_length == SD_MAX_VDI_LEN)
+			tag = NULL;
+		else {
+			ret = SD_RES_INVALID_PARMS;
+			break;
+		}
+		ret = lookup_vdi(hdr->epoch, data, tag, &vid, hdr->snapid,
+				 &nr_copies, NULL);
 		if (ret != SD_RES_SUCCESS)
 			break;
 		break;
 	case SD_OP_GET_VDI_ATTR:
-		ret = lookup_vdi(hdr->epoch, data,
-				 min(SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN, hdr->data_length),
-				 &vid, hdr->snapid, &nr_copies);
+		vattr = data;
+		ret = lookup_vdi(hdr->epoch, vattr->name, vattr->tag,
+				 &vid, hdr->snapid, &nr_copies, &ctime);
 		if (ret != SD_RES_SUCCESS)
 			break;
 		/* the curernt vdi id can change if we take the snapshot,
 		   so we use the hash value of the vdi name as the vdi id */
-		vid = fnv_64a_buf(data, strlen(data), FNV1A_64_INIT);
+		vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 		vid &= SD_NR_VDIS - 1;
 		ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,
-				   &attrid, nr_copies,
+				   &attrid, nr_copies, ctime,
 				   hdr->flags & SD_FLAG_CMD_CREAT,
 				   hdr->flags & SD_FLAG_CMD_EXCL);
 		break;

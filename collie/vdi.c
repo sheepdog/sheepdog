@@ -791,16 +791,16 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
 	int fd, ret;
 	unsigned int wlen, rlen;
-	char buf[SD_ATTR_HEADER_SIZE];
+	struct sheepdog_vdi_attr *vattr;
 
-	memset(buf, 0, sizeof(buf));
-	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
-	strncpy(buf + SD_MAX_VDI_LEN, vdi_cmd_data.snapshot_tag,
-		SD_MAX_VDI_TAG_LEN);
-	memcpy(buf + SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN,
-	       &vdi_cmd_data.snapshot_id, sizeof(uint32_t));
-	strncpy(buf + SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN + sizeof(uint32_t),
-		key, SD_MAX_VDI_ATTR_KEY_LEN);
+	vattr = zalloc(SD_ATTR_HEADER_SIZE);
+	if (!vattr)
+		return SD_RES_NO_MEM;
+
+	strncpy(vattr->name, vdiname, SD_MAX_VDI_LEN);
+	strncpy(vattr->tag, vdi_cmd_data.snapshot_tag, SD_MAX_VDI_TAG_LEN);
+	vattr->snap_id = vdi_cmd_data.snapshot_id;
+	strncpy(vattr->key, key, SD_MAX_VDI_ATTR_KEY_LEN);
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -821,7 +821,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	if (excl)
 		hdr.flags |= SD_FLAG_CMD_EXCL;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, (struct sd_req *)&hdr, vattr, &wlen, &rlen);
 	if (ret) {
 		ret = SD_RES_EIO;
 		goto out;

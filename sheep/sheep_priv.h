@@ -176,13 +176,14 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	    uint32_t snapid, unsigned int *nr_copies);
 
-int lookup_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
-	       uint32_t snapid, unsigned int *nr_copies);
+int lookup_vdi(uint32_t epoch, char *name, char *tag, uint32_t *vid,
+	       uint32_t snapid, unsigned int *nr_copies, uint64_t *ctime);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
-int get_vdi_attr(uint32_t epoch, char *data, int data_len, uint32_t vid,
-		 uint32_t *attrid, int copies, int creat, int excl);
+int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
+		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
+		 int creat, int excl);
 
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 void setup_ordered_sd_vnode_list(struct request *req);
