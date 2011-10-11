@@ -21,17 +21,26 @@
 #include "sheep.h"
 #include "logger.h"
 
-struct sheepid {
-	uint8_t addr[16];
-	uint64_t pid;
+enum cluster_join_result {
+	CJ_RES_SUCCESS, /* Success */
+	CJ_RES_FAIL, /* Fail to join.  The joining node has an invalidepoch. */
+	CJ_RES_JOIN_LATER, /* Fail to join.  The joining node should
+			    * be added after the cluster start working. */
+	CJ_RES_MASTER_TRANSFER, /* Transfer mastership.  The joining
+				 * node has a newer epoch, so this node
+				 * will leave the cluster (restart later). */
 };
 
 struct cdrv_handlers {
-	void (*join_handler)(struct sheepid *joined, struct sheepid *members,
-			     size_t nr_members);
-	void (*leave_handler)(struct sheepid *left, struct sheepid *members,
+	void (*join_handler)(struct sheepdog_node_list_entry *joined,
+			     struct sheepdog_node_list_entry *members,
+			     size_t nr_members, enum cluster_join_result result,
+			     void *opaque);
+	void (*leave_handler)(struct sheepdog_node_list_entry *left,
+			      struct sheepdog_node_list_entry *members,
 			      size_t nr_members);
-	void (*notify_handler)(struct sheepid *sender, void *msg, size_t msg_len);
+	void (*notify_handler)(struct sheepdog_node_list_entry *sender,
+			       void *msg, size_t msg_len);
 };
 
 struct cluster_driver {
@@ -44,17 +53,26 @@ struct cluster_driver {
 	 * may be used with the poll(2) to monitor cluster events.  On
 	 * error, returns -1.
 	 */
-	int (*init)(struct cdrv_handlers *handlers, struct sheepid *myid);
+	int (*init)(struct cdrv_handlers *handlers, uint8_t *myaddr);
 
 	/*
 	 * Join the cluster
 	 *
 	 * This function is used to join the cluster, and notifies a
-	 * join event to all the nodes.
+	 * join event to all the nodes.  The copy of 'opaque' is
+	 * passed to check_join_cb() and join_handler().
+	 * check_join_cb() is called on one of the nodes which already
+	 * paticipate in the cluster.  If the content of 'opaque' is
+	 * changed in check_join_cb(), the updated 'opaque' must be
+	 * passed to join_handler().
 	 *
 	 * Returns zero on success, -1 on error
 	 */
-	int (*join)(void);
+	int (*join)(struct sheepdog_node_list_entry *myself,
+		    enum cluster_join_result (*check_join_cb)(
+			    struct sheepdog_node_list_entry *joining,
+			    void *opaque),
+		    void *opaque, size_t opaque_len);
 
 	/*
 	 * Leave the cluster
@@ -112,54 +130,15 @@ static void __attribute__((constructor)) regist_ ## driver(void) {	\
 	list_for_each_entry(driver, &cluster_drivers, list)
 
 
-static inline int sheepid_find(struct sheepid *sheeps, size_t nr_sheeps,
-			       struct sheepid *key)
-{
-	int i;
-
-	for (i = 0; i < nr_sheeps; i++) {
-		if (memcmp(sheeps + i, key, sizeof(*key)) == 0)
-			return i;
-	}
-	return -1;
-}
-
-static inline void sheepid_add(struct sheepid *sheeps1, size_t nr_sheeps1,
-			       struct sheepid *sheeps2, size_t nr_sheeps2)
-{
-	memcpy(sheeps1 + nr_sheeps1, sheeps2, sizeof(*sheeps2) * nr_sheeps2);
-}
-
-static inline void sheepid_del(struct sheepid *sheeps1, size_t nr_sheeps1,
-			       struct sheepid *sheeps2, size_t nr_sheeps2)
-{
-	int i, idx;
-
-	for (i = 0; i < nr_sheeps2; i++) {
-		idx = sheepid_find(sheeps1, nr_sheeps1, sheeps2 + i);
-		if (idx < 0)
-			panic("internal error: cannot find sheepid\n");
-
-		nr_sheeps1--;
-		memmove(sheeps1 + idx, sheeps1 + idx + 1,
-			sizeof(*sheeps1) * nr_sheeps1 - idx);
-	}
-}
-
-static inline char *sheepid_to_str(struct sheepid *id)
+static inline char *node_to_str(struct sheepdog_node_list_entry *id)
 {
 	static char str[256];
 	char name[256];
 
-	snprintf(str, sizeof(str), "ip: %s, pid: %" PRIu64,
-		 addr_to_str(name, sizeof(name), id->addr, 0), id->pid);
+	snprintf(str, sizeof(str), "ip: %s, port: %d",
+		 addr_to_str(name, sizeof(name), id->addr, 0), id->port);
 
 	return str;
-}
-
-static inline int sheepid_cmp(struct sheepid *id1, struct sheepid *id2)
-{
-	return memcmp(id1, id2, sizeof(*id1));
 }
 
 #endif

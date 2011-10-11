@@ -111,7 +111,6 @@ struct cluster_info {
 
 	/* set after finishing the JOIN procedure */
 	int join_finished;
-	struct sheepid this_sheepid;
 	struct sheepdog_node_list_entry this_node;
 
 	uint32_t epoch;
