@@ -48,7 +48,6 @@ enum cpg_event_type {
 struct cpg_event {
 	enum cpg_event_type ctype;
 	struct list_head cpg_event_list;
-	unsigned int skip;
 };
 
 struct client_info {
@@ -139,7 +138,6 @@ struct cluster_info {
 
 	struct list_head cpg_event_siblings;
 	struct cpg_event *cur_cevent;
-	unsigned long cpg_event_work_flags;
 	int nr_outstanding_io;
 	int nr_outstanding_reqs;
 

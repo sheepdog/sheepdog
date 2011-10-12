@@ -107,28 +107,7 @@ struct work_leave {
 	}							\
 })
 
-enum cpg_event_work_bits {
-	CPG_EVENT_WORK_RUNNING = 1,
-	CPG_EVENT_WORK_JOINING,
-};
-
-#define CPG_EVENT_WORK_FNS(bit, name)					\
-static int cpg_event_##name(void)					\
-{									\
-	return test_bit(CPG_EVENT_WORK_##bit,				\
-		&sys->cpg_event_work_flags);				\
-}									\
-static void cpg_event_clear_##name(void)				\
-{									\
-	clear_bit(CPG_EVENT_WORK_##bit, &sys->cpg_event_work_flags);	\
-}									\
-static void cpg_event_set_##name(void)					\
-{									\
-	set_bit(CPG_EVENT_WORK_##bit, &sys->cpg_event_work_flags);	\
-}
-
-CPG_EVENT_WORK_FNS(RUNNING, running)
-CPG_EVENT_WORK_FNS(JOINING, joining)
+static int cpg_event_running;
 
 static int get_node_idx(struct sheepdog_node_list_entry *ent,
 			struct sheepdog_node_list_entry *entries, int nr_nodes)
@@ -952,11 +931,7 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 	} else
 		w->msg = NULL;
 
-	if (cpg_event_joining() && m->state == DM_FIN) {
-		list_add(&cevent->cpg_event_list, &sys->cpg_event_siblings);
-		cpg_event_clear_joining();
-	} else
-		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 
 	start_cpg_event_work();
 }
@@ -1268,9 +1243,6 @@ static void cpg_event_fn(struct work *work, int idx)
 {
 	struct cpg_event *cevent = sys->cur_cevent;
 
-	vprintf(SDOG_DEBUG, "%p, %d %lx\n", cevent, cevent->ctype,
-		sys->cpg_event_work_flags);
-
 	/*
 	 * we can't touch sys->cpg_event_siblings because of a race
 	 * with sd_deliver() and sd_confchg()...
@@ -1310,12 +1282,6 @@ static void cpg_event_done(struct work *work, int idx)
 
 	vprintf(SDOG_DEBUG, "%p\n", cevent);
 
-	if (cpg_event_joining())
-		goto out;
-
-	if (cevent->skip)
-		goto out;
-
 	switch (cevent->ctype) {
 	case CPG_EVENT_JOIN:
 		__sd_join_done(cevent);
@@ -1324,15 +1290,8 @@ static void cpg_event_done(struct work *work, int idx)
 		__sd_leave_done(cevent);
 		break;
 	case CPG_EVENT_NOTIFY:
-	{
-		struct work_notify *w = container_of(cevent, struct work_notify, cev);
-
-		if (sys->join_finished && w->msg->state == DM_INIT)
-			cpg_event_set_joining();
-
 		__sd_notify_done(cevent);
 		break;
-	}
 	case CPG_EVENT_REQUEST:
 		vprintf(SDOG_ERR, "should not happen\n");
 		break;
@@ -1340,10 +1299,9 @@ static void cpg_event_done(struct work *work, int idx)
 		vprintf(SDOG_ERR, "unknown event %d\n", cevent->ctype);
 	}
 
-out:
 	vprintf(SDOG_DEBUG, "free %p\n", cevent);
 	cpg_event_free(cevent);
-	cpg_event_clear_running();
+	cpg_event_running = 0;
 
 	if (!list_empty(&sys->cpg_event_siblings))
 		start_cpg_event_work();
@@ -1426,42 +1384,13 @@ void start_cpg_event_work(void)
 
 	cevent = list_first_entry(&sys->cpg_event_siblings,
 				  struct cpg_event, cpg_event_list);
-
-	vprintf(SDOG_DEBUG, "%lx %u\n", sys->cpg_event_work_flags,
-		cevent->ctype);
-
 	/*
 	 * we need to serialize cpg events so we don't call queue_work
 	 * if a thread is still running for a cpg event; executing
-	 * cpg_event_fn() or cpg_event_done(). A exception: if a
-	 * thread is running for a deliver for VDI, then we need to
-	 * run io requests.
+	 * cpg_event_fn() or cpg_event_done().
 	 */
-	if (cpg_event_running() && is_membership_change_event(cevent->ctype))
+	if (cpg_event_running && is_membership_change_event(cevent->ctype))
 		return;
-
-	/*
-	 * we are in the processing of handling JOIN so we can't
-	 * execute requests (or cpg events).
-	 */
-	if (cpg_event_joining()) {
-		if (cevent->ctype == CPG_EVENT_REQUEST) {
-			struct request *req = container_of(cevent, struct request, cev);
-			if (is_io_request(req->rq.opcode) && req->rq.flags & SD_FLAG_CMD_DIRECT) {
-				list_del(&cevent->cpg_event_list);
-
-				req->rp.result = SD_RES_NEW_NODE_VER;
-
-				/* TODO: cleanup */
-				list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
-				sys->nr_outstanding_io++;
-
-				req->work.done(&req->work, 0);
-			}
-		}
-		return;
-	}
-
 do_retry:
 	retry = 0;
 
@@ -1547,7 +1476,7 @@ do_retry:
 	if (retry)
 		goto do_retry;
 
-	if (cpg_event_running() || list_empty(&sys->cpg_event_siblings))
+	if (cpg_event_running || list_empty(&sys->cpg_event_siblings))
 		return;
 
 	cevent = list_first_entry(&sys->cpg_event_siblings,
@@ -1559,7 +1488,7 @@ do_retry:
 	list_del(&cevent->cpg_event_list);
 	sys->cur_cevent = cevent;
 
-	cpg_event_set_running();
+	cpg_event_running = 1;
 
 	INIT_LIST_HEAD(&cpg_event_work.w_list);
 	cpg_event_work.fn = cpg_event_fn;
