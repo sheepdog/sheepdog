@@ -85,16 +85,16 @@ struct work_leave {
 	struct sheepdog_node_list_entry left;
 };
 
-#define print_node_list(node_list)				\
+#define print_node_list(nodes, nr_nodes)			\
 ({								\
-	struct node *__node;					\
 	char __name[128];					\
-	list_for_each_entry(__node, node_list, list) {		\
+	int __i;						\
+	for (__i = 0; __i < (nr_nodes); __i++) {		\
 		dprintf("%c ip: %s, port: %d\n",		\
-			is_myself(__node->ent.addr, __node->ent.port) ? 'l' : ' ',	\
+			is_myself(nodes[__i].addr, nodes[__i].port) ? 'l' : ' ', \
 			addr_to_str(__name, sizeof(__name),	\
-				    __node->ent.addr, __node->ent.port), \
-			__node->ent.port);			\
+				    nodes[__i].addr, nodes[__i].port), \
+			nodes[__i].port);			\
 	}							\
 })
 
@@ -110,65 +110,30 @@ static int get_node_idx(struct sheepdog_node_list_entry *ent,
 	return ent - entries;
 }
 
-static void build_node_list(struct list_head *node_list,
-			    struct sheepdog_node_list_entry *entries,
-			    int *nr_nodes, int *nr_zones)
+static int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 {
-	struct node *node;
-	int nr = 0, i;
+	int nr_zones = 0, i, j;
 	uint32_t zones[SD_MAX_REDUNDANCY];
 
-	if (nr_zones)
-		*nr_zones = 0;
-
-	list_for_each_entry(node, node_list, list) {
-		if (entries)
-			memcpy(entries + nr, &node->ent, sizeof(*entries));
-		nr++;
-
-		if (nr_zones && *nr_zones < ARRAY_SIZE(zones)) {
-			for (i = 0; i < *nr_zones; i++) {
-				if (zones[i] == node->ent.zone)
-					break;
-			}
-			if (i == *nr_zones)
-				zones[(*nr_zones)++] = node->ent.zone;
+	for (i = 0; i < nr_nodes; i++) {
+		for (j = 0; j < nr_zones; j++) {
+			if (nodes[i].zone == zones[j])
+				break;
 		}
+		if (j == nr_zones)
+			zones[nr_zones++] = nodes[i].zone;
+
+		if (nr_zones == ARRAY_SIZE(zones))
+			break;
 	}
-	if (entries)
-		qsort(entries, nr, sizeof(*entries), node_cmp);
-	if (nr_nodes)
-		*nr_nodes = nr;
-}
 
-static int get_zones_nr_from(struct list_head *list)
-{
-	int nr_dummpy, nr_zones;
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
-
-	build_node_list(list, nodes, &nr_dummpy, &nr_zones);
 	return nr_zones;
-}
-
-int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
-{
-	int nr_nodes;
-
-	build_node_list(&sys->sd_node_list, entries, &nr_nodes, NULL);
-
-	return nr_nodes;
 }
 
 void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
 			       int *nr_vnodes, int *nr_zones)
 {
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
-	int nr;
-
-	build_node_list(&sys->sd_node_list, nodes, &nr, nr_zones);
-
-	if (sys->nr_vnodes == 0)
-		sys->nr_vnodes = nodes_to_vnodes(nodes, nr, sys->vnodes);
+	*nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 	memcpy(entries, sys->vnodes, sizeof(*entries) * sys->nr_vnodes);
 
@@ -184,19 +149,13 @@ static void get_node_list(struct sd_node_req *req,
 			  struct sd_node_rsp *rsp, void *data)
 {
 	int nr_nodes;
-	struct node *node;
 
-	nr_nodes = get_ordered_sd_node_list(data);
+	nr_nodes = sys->nr_nodes;
+	memcpy(data, sys->nodes, sizeof(*sys->nodes) * nr_nodes);
 	rsp->data_length = nr_nodes * sizeof(struct sheepdog_node_list_entry);
 	rsp->nr_nodes = nr_nodes;
 	rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
-
-	if (!nr_nodes) {
-		rsp->master_idx = -1;
-		return;
-	}
-	node = list_first_entry(&sys->sd_node_list, struct node, list);
-	rsp->master_idx = get_node_idx(&node->ent, data, nr_nodes);
+	rsp->master_idx = -1;
 }
 
 static int get_epoch(struct sd_obj_req *req,
@@ -332,19 +291,6 @@ out:
 	exit(1);
 }
 
-static struct node *find_node(struct list_head *node_list,
-			      struct sheepdog_node_list_entry *ent)
-{
-	struct node *node;
-
-	list_for_each_entry(node, node_list, list) {
-		if (node_cmp(&node->ent, ent) == 0)
-			return node;
-	}
-
-	return NULL;
-}
-
 static inline int get_nodes_nr_from(struct list_head *l)
 {
 	struct node *node;
@@ -443,10 +389,9 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			      int nr_entries, uint64_t ctime, uint32_t epoch,
 			      uint32_t *status, uint8_t *inc_epoch)
 {
-	int i, ret = SD_RES_SUCCESS;
+	int i, j, ret = SD_RES_SUCCESS;
 	int nr, nr_local_entries, nr_leave_entries;
 	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
-	struct node *node;
 	char str[256];
 
 	*status = sys->status;
@@ -468,7 +413,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			ret = SD_RES_NOT_FORMATTED;
 		break;
 	case SD_STATUS_WAIT_FOR_JOIN:
-		nr = get_nodes_nr_from(&sys->sd_node_list) + 1;
+		nr = sys->nr_nodes + 1;
 		nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
 						  sizeof(local_entries));
 
@@ -488,8 +433,8 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		for (i = 0; i < nr_local_entries; i++) {
 			if (node_cmp(local_entries + i, from) == 0)
 				goto next;
-			list_for_each_entry(node, &sys->sd_node_list, list) {
-				if (node_cmp(local_entries + i, &node->ent) == 0)
+			for (j = 0; j < sys->nr_nodes; j++) {
+				if (node_cmp(local_entries + i, sys->nodes + j) == 0)
 					goto next;
 			}
 			break;
@@ -579,46 +524,20 @@ out:
 
 static void get_vdi_bitmap_from_sd_list(void)
 {
-	int i, nr_nodes;
+	int i;
 	/* fixme: we need this until starting up. */
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
 
-	/*
-	 * we don't need the proper order but this is the simplest
-	 * way.
-	 */
-	nr_nodes = get_ordered_sd_node_list(nodes);
-
-	for (i = 0; i < nr_nodes; i++)
-		get_vdi_bitmap_from(&nodes[i]);
-}
-
-static int move_node_to_sd_list(struct sheepdog_node_list_entry ent)
-{
-	struct node *node;
-
-	node = zalloc(sizeof(*node));
-	if (!node)
-		panic("failed to alloc memory for a new node\n");
-
-	node->ent = ent;
-
-	list_add_tail(&node->list, &sys->sd_node_list);
-	sys->nr_vnodes = 0;
-
-	return 0;
+	for (i = 0; i < sys->nr_nodes; i++)
+		get_vdi_bitmap_from(sys->nodes + i);
 }
 
 static int update_epoch_log(int epoch)
 {
-	int ret, nr_nodes;
-	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	int ret;
 
-	nr_nodes = get_ordered_sd_node_list(entry);
-
-	dprintf("update epoch, %d, %d\n", epoch, nr_nodes);
-	ret = epoch_log_write(epoch, (char *)entry,
-			nr_nodes * sizeof(struct sheepdog_node_list_entry));
+	dprintf("update epoch, %d, %d\n", epoch, sys->nr_nodes);
+	ret = epoch_log_write(epoch, (char *)sys->nodes,
+			      sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
 	if (ret < 0)
 		eprintf("can't write epoch %u\n", epoch);
 
@@ -630,7 +549,7 @@ static void update_cluster_info(struct join_message *msg,
 				size_t nr_nodes)
 {
 	int i, le;
-	int ret, nr_leave_nodes;
+	int nr_leave_nodes;
 	struct node *n;
 
 	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
@@ -643,20 +562,15 @@ static void update_cluster_info(struct join_message *msg,
 
 	sys->nr_sobjs = msg->nr_sobjs;
 	sys->epoch = msg->epoch;
-	sys->flags = msg->cluster_status;
 
+	/* add nodes execept for newly joined one */
 	for (i = 0; i < nr_nodes; i++) {
 		if (node_cmp(nodes + i, &msg->header.from) == 0)
 			continue;
-		ret = move_node_to_sd_list(nodes[i]);
-		/*
-		 * the node belonged to sheepdog when the master build
-		 * the JOIN response however it has gone.
-		 */
-		if (ret)
-			vprintf(SDOG_INFO, "%s has gone\n",
-				node_to_str(&nodes[i]));
+
+		sys->nodes[sys->nr_nodes++] = nodes[i];
 	}
+	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 
 	if (msg->cluster_status != SD_STATUS_OK) {
 		nr_leave_nodes = msg->nr_leave_nodes;
@@ -685,15 +599,10 @@ static void update_cluster_info(struct join_message *msg,
 		update_epoch_log(sys->epoch);
 
 join_finished:
-	ret = move_node_to_sd_list(msg->header.from);
-	/*
-	 * this should not happen since __sd_deliver() checks if the
-	 * host from msg on cpg_node_list.
-	 */
-	if (ret)
-		vprintf(SDOG_ERR, "%s has gone\n",
-			node_to_str(&msg->header.from));
-
+	sys->nodes[sys->nr_nodes++] = msg->header.from;
+	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
+					 sys->vnodes);
 	if (msg->cluster_status == SD_STATUS_OK ||
 	    msg->cluster_status == SD_STATUS_HALT) {
 		if (msg->inc_epoch) {
@@ -710,7 +619,7 @@ join_finished:
 		}
 	}
 
-	print_node_list(&sys->sd_node_list);
+	print_node_list(sys->nodes, sys->nr_nodes);
 
 	sys->status = msg->cluster_status;
 	return;
@@ -804,8 +713,7 @@ static void __sd_notify_done(struct cpg_event *cevent)
 	void *data = msg->data;
 	struct request *req;
 	int ret = msg->rsp.result;
-	int i, latest_epoch, nr_nodes;
-	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
+	int i, latest_epoch;
 	uint64_t ctime;
 
 	if (ret != SD_RES_SUCCESS)
@@ -842,11 +750,10 @@ static void __sd_notify_done(struct cpg_event *cevent)
 
 		sys->epoch = 1;
 		sys->recovered_epoch = 1;
-		nr_nodes = get_ordered_sd_node_list(entry);
 
-		dprintf("write epoch log, %d, %d\n", sys->epoch, nr_nodes);
-		ret = epoch_log_write(sys->epoch, (char *)entry,
-				      nr_nodes * sizeof(struct sheepdog_node_list_entry));
+		dprintf("write epoch log, %d, %d\n", sys->epoch, sys->nr_nodes);
+		ret = epoch_log_write(sys->epoch, (char *)sys->nodes,
+				      sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
 		if (ret < 0)
 			eprintf("can't write epoch %u\n", sys->epoch);
 		update_epoch_store(sys->epoch);
@@ -857,7 +764,7 @@ static void __sd_notify_done(struct cpg_event *cevent)
 		if (sys_flag_nohalt())
 			sys->status = SD_STATUS_OK;
 		else {
-			int nr_zones = get_zones_nr_from(&sys->sd_node_list);
+			int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 			if (nr_zones >= sys->nr_sobjs)
 				sys->status = SD_STATUS_OK;
@@ -920,66 +827,14 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 	start_cpg_event_work();
 }
 
-static void add_node(struct sheepdog_node_list_entry *ent)
-{
-	struct node *node;
-
-	node = zalloc(sizeof(*node));
-	if (!node)
-		panic("failed to alloc memory for a new node\n");
-
-	node->ent = *ent;
-
-	list_add_tail(&node->list, &sys->cpg_node_list);
-}
-
-static int del_node(struct sheepdog_node_list_entry *ent)
-{
-	struct node *node;
-
-	node = find_node(&sys->sd_node_list, ent);
-	if (node) {
-		int nr;
-		struct sheepdog_node_list_entry e[SD_MAX_NODES];
-
-		sys->nr_vnodes = 0;
-
-		list_del(&node->list);
-		free(node);
-
-		if (sys->status == SD_STATUS_OK ||
-		    sys->status == SD_STATUS_HALT) {
-			nr = get_ordered_sd_node_list(e);
-			dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr);
-			epoch_log_write(sys->epoch + 1, (char *)e,
-					nr * sizeof(struct sheepdog_node_list_entry));
-
-			sys->epoch++;
-
-			update_epoch_store(sys->epoch);
-		}
-		return 1;
-	}
-
-	node = find_node(&sys->cpg_node_list, ent);
-	if (node) {
-		list_del(&node->list);
-		free(node);
-	}
-
-	return 0;
-}
-
 /*
  * Check whether the majority of Sheepdog nodes are still alive or not
  */
-static int check_majority(struct sheepdog_node_list_entry *left)
+static int check_majority(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 {
-	int nr_nodes = 0, nr_majority, nr_reachable = 0, fd;
-	struct node *node;
+	int nr_majority, nr_reachable = 0, fd, i;
 	char name[INET6_ADDRSTRLEN];
 
-	nr_nodes = get_nodes_nr_from(&sys->sd_node_list);
 	nr_majority = nr_nodes / 2 + 1;
 
 	/* we need at least 3 nodes to handle network partition
@@ -987,12 +842,9 @@ static int check_majority(struct sheepdog_node_list_entry *left)
 	if (nr_nodes < 3)
 		return 1;
 
-	list_for_each_entry(node, &sys->sd_node_list, list) {
-		if (node_cmp(&node->ent, left) == 0)
-			continue;
-
-		addr_to_str(name, sizeof(name), node->ent.addr, 0);
-		fd = connect_to(name, node->ent.port);
+	for (i = 0; i < nr_nodes; i++) {
+		addr_to_str(name, sizeof(name), nodes[i].addr, 0);
+		fd = connect_to(name, nodes[i].port);
 		if (fd < 0)
 			continue;
 
@@ -1029,7 +881,7 @@ static void __sd_leave(struct cpg_event *cevent)
 {
 	struct work_leave *w = container_of(cevent, struct work_leave, cev);
 
-	if (!check_majority(&w->left)) {
+	if (!check_majority(w->member_list, w->member_list_entries)) {
 		eprintf("perhaps network partition failure has occurred\n");
 		abort();
 	}
@@ -1082,7 +934,6 @@ static enum cluster_join_result sd_check_join_cb(
 			jm->leave_nodes[jm->nr_leave_nodes] = node->ent;
 			jm->nr_leave_nodes++;
 		}
-		print_node_list(&sys->leave_list);
 	} else if (jm->result != SD_RES_SUCCESS &&
 			jm->epoch > sys->epoch &&
 			jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
@@ -1130,7 +981,6 @@ static void __sd_join_done(struct cpg_event *cevent)
 	struct work_join *w = container_of(cevent, struct work_join, cev);
 	struct join_message *jm = &w->jm;
 	struct node *node, *t;
-	int i;
 
 	if (w->member_list_entries == 1 &&
 	    node_cmp(&w->joined, &sys->this_node) == 0) {
@@ -1138,13 +988,7 @@ static void __sd_join_done(struct cpg_event *cevent)
 		get_global_nr_copies(&sys->nr_sobjs);
 	}
 
-	if (list_empty(&sys->cpg_node_list)) {
-		for (i = 0; i < w->member_list_entries; i++)
-			add_node(w->member_list + i);
-	} else
-		add_node(&w->joined);
-
-	print_node_list(&sys->sd_node_list);
+	print_node_list(sys->nodes, sys->nr_nodes);
 
 	update_cluster_info(jm, w->member_list, w->member_list_entries);
 
@@ -1156,7 +1000,7 @@ static void __sd_join_done(struct cpg_event *cevent)
 	}
 
 	if (sys->status == SD_STATUS_HALT) {
-		int nr_zones = get_zones_nr_from(&sys->sd_node_list);
+		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 		if (nr_zones >= sys->nr_sobjs)
 			sys->status = SD_STATUS_OK;
@@ -1171,18 +1015,30 @@ int sys_flag_nohalt()
 static void __sd_leave_done(struct cpg_event *cevent)
 {
 	struct work_leave *w = container_of(cevent, struct work_leave, cev);
-	int node_left;
 
-	node_left = del_node(&w->left);
+	sys->nr_nodes = w->member_list_entries;
+	memcpy(sys->nodes, w->member_list, sizeof(*sys->nodes) * sys->nr_nodes);
+	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
+					 sys->vnodes);
+	if (sys->status == SD_STATUS_OK ||
+	    sys->status == SD_STATUS_HALT) {
+		dprintf("update epoch, %d, %d\n", sys->epoch + 1, sys->nr_nodes);
+		epoch_log_write(sys->epoch + 1, (char *)sys->nodes,
+				sizeof(*sys->nodes) * sys->nr_nodes);
 
-	print_node_list(&sys->sd_node_list);
+		sys->epoch++;
 
-	if (node_left &&
-	    (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT))
+		update_epoch_store(sys->epoch);
+	}
+
+	print_node_list(sys->nodes, sys->nr_nodes);
+
+	if (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT)
 		start_recovery(sys->epoch);
 
 	if (sys->status == SD_STATUS_OK && !sys_flag_nohalt()) {
-		int nr_zones = get_zones_nr_from(&sys->sd_node_list);
+		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 		if (nr_zones < sys->nr_sobjs)
 			sys->status = SD_STATUS_HALT;
@@ -1583,7 +1439,10 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		 */
 		if (!sys->join_finished) {
 			sys->join_finished = 1;
-			move_node_to_sd_list(sys->this_node);
+			sys->nodes[sys->nr_nodes++] = sys->this_node;
+			qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+			sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
+							 sys->vnodes);
 			sys->epoch = get_latest_epoch();
 		}
 
@@ -1686,8 +1545,6 @@ int create_cluster(int port, int64_t zone)
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	else
 		sys->status = SD_STATUS_WAIT_FOR_JOIN;
-	INIT_LIST_HEAD(&sys->sd_node_list);
-	INIT_LIST_HEAD(&sys->cpg_node_list);
 	INIT_LIST_HEAD(&sys->pending_list);
 	INIT_LIST_HEAD(&sys->leave_list);
 

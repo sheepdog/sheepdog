@@ -110,17 +110,13 @@ struct cluster_info {
 	uint32_t status;
 	uint16_t flags;
 
-	/*
-	 * we add a node to cpg_node_list in confchg then move it to
-	 * sd_node_list when the node joins sheepdog.
-	 */
-	struct list_head cpg_node_list;
-	struct list_head sd_node_list;
-
 	/* leave list is only used to account for bad nodes when we start
 	 * up the cluster nodes after we shutdown the cluster through collie.
 	 */
 	struct list_head leave_list;
+
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	int nr_nodes;
 
 	/* this array contains a list of ordered virtual nodes */
 	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
@@ -176,7 +172,6 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
 		 int write, int excl, int delete);
 
-int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 void setup_ordered_sd_vnode_list(struct request *req);
 void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
 			       int *nr_vnodes, int *nr_zones);
