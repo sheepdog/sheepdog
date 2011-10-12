@@ -29,16 +29,9 @@ struct node {
 	struct list_head list;
 };
 
-enum deliver_msg_state {
-	DM_INIT = 1,
-	DM_CONT,
-	DM_FIN,
-};
-
 struct message_header {
 	uint8_t proto_ver;
-	uint8_t state;
-	uint8_t pad[2];
+	uint8_t pad[3];
 	uint32_t msg_length;
 	struct sheepdog_node_list_entry from;
 };
@@ -307,7 +300,6 @@ forward:
 		return;
 	}
 
-	msg->header.state = DM_FIN;
 	msg->header.msg_length = sizeof(*msg) + hdr->data_length;
 	msg->header.from = sys->this_node;
 	msg->req = *((struct sd_vdi_req *)&req->rq);
@@ -901,8 +893,8 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 	struct message_header *m = msg;
 	char name[128];
 
-	dprintf("state: %u, size: %d, from: %s, pid: %u\n",
-		m->state, m->msg_length,
+	dprintf("size: %d, from: %s, pid: %u\n",
+		m->msg_length,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port),
 		sender->port);
 
@@ -1082,7 +1074,6 @@ static enum cluster_join_result sd_check_join_cb(
 	}
 
 	join(jm);
-	m->state = DM_FIN;
 
 	dprintf("%d, %d\n", jm->result, jm->cluster_status);
 	if (jm->result == SD_RES_SUCCESS && jm->cluster_status != SD_STATUS_OK) {
@@ -1116,7 +1107,6 @@ static int send_join_request(struct sheepdog_node_list_entry *ent)
 
 	memset(&msg, 0, sizeof(msg));
 	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
-	msg.header.state = DM_INIT;
 	msg.header.msg_length = sizeof(msg);
 	msg.header.from = *ent;
 
@@ -1244,12 +1234,8 @@ static void cpg_event_fn(struct work *work, int idx)
 		__sd_leave(cevent);
 		break;
 	case CPG_EVENT_NOTIFY:
-	{
-		struct work_notify *w = container_of(cevent, struct work_notify, cev);
-		vprintf(SDOG_DEBUG, "%d\n", w->msg->state);
 		__sd_notify(cevent);
 		break;
-	}
 	case CPG_EVENT_REQUEST:
 		vprintf(SDOG_ERR, "should not happen\n");
 		break;
