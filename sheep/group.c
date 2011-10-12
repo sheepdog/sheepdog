@@ -45,7 +45,8 @@ struct message_header {
 
 struct join_message {
 	struct message_header header;
-	uint32_t nr_nodes;
+	uint16_t nr_nodes;
+	uint16_t nr_leave_nodes;
 	uint32_t nr_sobjs;
 	uint32_t cluster_status;
 	uint16_t cluster_flags;
@@ -54,13 +55,10 @@ struct join_message {
 	uint32_t result;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
 	uint8_t pad[3];
-	struct {
-		struct sheepdog_node_list_entry ent;
-	} nodes[SD_MAX_NODES];
-	uint32_t nr_leave_nodes;
-	struct {
-		struct sheepdog_node_list_entry ent;
-	} leave_nodes[SD_MAX_NODES];
+	union {
+		struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+		struct sheepdog_node_list_entry leave_nodes[SD_MAX_NODES];
+	};
 };
 
 struct vdi_op_message {
@@ -525,19 +523,13 @@ out:
 
 static void join(struct join_message *msg)
 {
-	struct sheepdog_node_list_entry entry[SD_MAX_NODES];
-	int i;
-
 	if (msg->header.proto_ver != SD_SHEEP_PROTO_VER) {
 		eprintf("joining node send a wrong version message\n");
 		msg->result = SD_RES_VER_MISMATCH;
 		return;
 	}
 
-	for (i = 0; i < msg->nr_nodes; i++)
-		entry[i] = msg->nodes[i].ent;
-
-	msg->result = get_cluster_status(&msg->header.from, entry,
+	msg->result = get_cluster_status(&msg->header.from, msg->nodes,
 					 msg->nr_nodes, msg->ctime,
 					 msg->epoch, &msg->cluster_status,
 					 &msg->inc_epoch);
@@ -682,13 +674,13 @@ static void update_cluster_info(struct join_message *msg,
 			if (!n)
 				panic("oom\n");
 
-			if (find_entry_list(&msg->leave_nodes[i].ent, &sys->leave_list)
-			    || !find_entry_epoch(&msg->leave_nodes[i].ent, le)) {
+			if (find_entry_list(&msg->leave_nodes[i], &sys->leave_list)
+			    || !find_entry_epoch(&msg->leave_nodes[i], le)) {
 				free(n);
 				continue;
 			}
 
-			n->ent = msg->leave_nodes[i].ent;
+			n->ent = msg->leave_nodes[i];
 
 			list_add_tail(&n->list, &sys->leave_list);
 		}
@@ -1096,7 +1088,7 @@ static enum cluster_join_result sd_check_join_cb(
 	if (jm->result == SD_RES_SUCCESS && jm->cluster_status != SD_STATUS_OK) {
 		jm->nr_leave_nodes = 0;
 		list_for_each_entry(node, &sys->leave_list, list) {
-			jm->leave_nodes[jm->nr_leave_nodes].ent = node->ent;
+			jm->leave_nodes[jm->nr_leave_nodes] = node->ent;
 			jm->nr_leave_nodes++;
 		}
 		print_node_list(&sys->leave_list);
@@ -1120,8 +1112,7 @@ static enum cluster_join_result sd_check_join_cb(
 static int send_join_request(struct sheepdog_node_list_entry *ent)
 {
 	struct join_message msg;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
-	int nr_entries, i, ret;
+	int nr_entries, ret;
 
 	memset(&msg, 0, sizeof(msg));
 	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
@@ -1132,13 +1123,10 @@ static int send_join_request(struct sheepdog_node_list_entry *ent)
 	get_global_nr_copies(&msg.nr_sobjs);
 	get_cluster_flags(&msg.cluster_flags);
 
-	nr_entries = ARRAY_SIZE(entries);
-	ret = read_epoch(&msg.epoch, &msg.ctime, entries, &nr_entries);
-	if (ret == SD_RES_SUCCESS) {
+	nr_entries = ARRAY_SIZE(msg.nodes);
+	ret = read_epoch(&msg.epoch, &msg.ctime, msg.nodes, &nr_entries);
+	if (ret == SD_RES_SUCCESS)
 		msg.nr_nodes = nr_entries;
-		for (i = 0; i < nr_entries; i++)
-			msg.nodes[i].ent = entries[i];
-	}
 
 	ret = sys->cdrv->join(ent, sd_check_join_cb, &msg, msg.header.msg_length);
 
@@ -1593,13 +1581,13 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 			if (!n)
 				panic("oom\n");
 
-			if (find_entry_list(&jm->leave_nodes[i].ent, &sys->leave_list)
-			    || !find_entry_epoch(&jm->leave_nodes[i].ent, le)) {
+			if (find_entry_list(&jm->leave_nodes[i], &sys->leave_list)
+			    || !find_entry_epoch(&jm->leave_nodes[i], le)) {
 				free(n);
 				continue;
 			}
 
-			n->ent = jm->leave_nodes[i].ent;
+			n->ent = jm->leave_nodes[i];
 
 			list_add_tail(&n->list, &sys->leave_list);
 		}
