@@ -982,12 +982,6 @@ static void __sd_join_done(struct cpg_event *cevent)
 	struct join_message *jm = &w->jm;
 	struct node *node, *t;
 
-	if (w->member_list_entries == 1 &&
-	    node_cmp(&w->joined, &sys->this_node) == 0) {
-		sys->join_finished = 1;
-		get_global_nr_copies(&sys->nr_sobjs);
-	}
-
 	print_node_list(sys->nodes, sys->nr_nodes);
 
 	update_cluster_info(jm, w->member_list, w->member_list_entries);
