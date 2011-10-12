@@ -37,9 +37,8 @@ enum deliver_msg_state {
 
 struct message_header {
 	uint8_t proto_ver;
-	uint8_t pad;
-	uint8_t op;
 	uint8_t state;
+	uint8_t pad[2];
 	uint32_t msg_length;
 	struct sheepdog_node_list_entry from;
 };
@@ -64,21 +63,11 @@ struct join_message {
 	} leave_nodes[SD_MAX_NODES];
 };
 
-struct leave_message {
-	struct message_header header;
-	uint32_t epoch;
-};
-
 struct vdi_op_message {
 	struct message_header header;
 	struct sd_vdi_req req;
 	struct sd_vdi_rsp rsp;
 	uint8_t data[0];
-};
-
-struct mastership_tx_message {
-	struct message_header header;
-	uint32_t epoch;
 };
 
 struct work_notify {
@@ -140,31 +129,6 @@ static void cpg_event_set_##name(void)					\
 
 CPG_EVENT_WORK_FNS(RUNNING, running)
 CPG_EVENT_WORK_FNS(JOINING, joining)
-
-static inline int join_message(struct message_header *m)
-{
-	return m->op == SD_MSG_JOIN;
-}
-
-static inline int vdi_op_message(struct message_header *m)
-{
-	return m->op == SD_MSG_VDI_OP;
-}
-
-static inline int master_chg_message(struct message_header *m)
-{
-	return m->op == SD_MSG_MASTER_CHANGED;
-}
-
-static inline int leave_message(struct message_header *m)
-{
-	return m->op == SD_MSG_LEAVE;
-}
-
-static inline int master_tx_message(struct message_header *m)
-{
-	return m->op == SD_MSG_MASTER_TRANSFER;
-}
 
 static int get_node_idx(struct sheepdog_node_list_entry *ent,
 			struct sheepdog_node_list_entry *entries, int nr_nodes)
@@ -366,7 +330,6 @@ forward:
 		return;
 	}
 
-	msg->header.op = SD_MSG_VDI_OP;
 	msg->header.state = DM_FIN;
 	msg->header.msg_length = sizeof(*msg) + hdr->data_length;
 	msg->header.from = sys->this_node;
@@ -411,19 +374,6 @@ static struct node *find_node(struct list_head *node_list,
 	}
 
 	return NULL;
-}
-
-static int is_master(void)
-{
-	struct node *node;
-
-	if (!sys->join_finished)
-		return 0;
-
-	node = list_first_entry(&sys->sd_node_list, struct node, list);
-	if (is_myself(node->ent.addr, node->ent.port))
-		return 1;
-	return 0;
 }
 
 static inline int get_nodes_nr_from(struct list_head *l)
@@ -471,68 +421,6 @@ static struct sheepdog_node_list_entry *find_entry_epoch(struct sheepdog_node_li
 			return entry;
 
 	return NULL;
-}
-
-static int add_node_to_leave_list(struct message_header *msg)
-{
-	int ret = SD_RES_SUCCESS;
-	int nr, i, le = get_latest_epoch();
-	LIST_HEAD(tmp_list);
-	struct node *n, *t;
-	struct join_message *jm;
-
-	if (leave_message(msg)) {
-		n = zalloc(sizeof(*n));
-		if (!n) {
-			ret = SD_RES_NO_MEM;
-			goto err;
-		}
-
-		if (find_entry_list(&msg->from, &sys->leave_list)
-		    || !find_entry_epoch(&msg->from, le)) {
-			free(n);
-			goto ret;
-		}
-
-		n->ent = msg->from;
-
-		list_add_tail(&n->list, &sys->leave_list);
-		goto ret;
-	} else if (join_message(msg)) {
-		jm = (struct join_message *)msg;
-		nr = jm->nr_leave_nodes;
-		for (i = 0; i < nr; i++) {
-			n = zalloc(sizeof(*n));
-			if (!n) {
-				ret = SD_RES_NO_MEM;
-				goto free;
-			}
-
-			if (find_entry_list(&jm->leave_nodes[i].ent, &sys->leave_list)
-			    || !find_entry_epoch(&jm->leave_nodes[i].ent, le)) {
-				free(n);
-				continue;
-			}
-
-			n->ent = jm->leave_nodes[i].ent;
-
-			list_add_tail(&n->list, &tmp_list);
-		}
-		list_splice_init(&tmp_list, &sys->leave_list);
-		goto ret;
-	} else {
-		ret = SD_RES_INVALID_PARMS;
-		goto err;
-	}
-free:
-	list_for_each_entry_safe(n, t, &tmp_list, list) {
-		free(n);
-	}
-ret:
-	dprintf("%d\n", get_nodes_nr_from(&sys->leave_list));
-	print_node_list(&sys->leave_list);
-err:
-	return ret;
 }
 
 static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
@@ -778,8 +666,9 @@ static void update_cluster_info(struct join_message *msg,
 				struct sheepdog_node_list_entry *nodes,
 				size_t nr_nodes)
 {
-	int i;
-	int ret;
+	int i, le;
+	int ret, nr_leave_nodes;
+	struct node *n;
 
 	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
 
@@ -806,8 +695,25 @@ static void update_cluster_info(struct join_message *msg,
 				node_to_str(&nodes[i]));
 	}
 
-	if (msg->cluster_status == SD_STATUS_WAIT_FOR_JOIN)
-		add_node_to_leave_list((struct message_header *)msg);
+	if (msg->cluster_status != SD_STATUS_OK) {
+		nr_leave_nodes = msg->nr_leave_nodes;
+		le = get_latest_epoch();
+		for (i = 0; i < nr_leave_nodes; i++) {
+			n = zalloc(sizeof(*n));
+			if (!n)
+				panic("oom\n");
+
+			if (find_entry_list(&msg->leave_nodes[i].ent, &sys->leave_list)
+			    || !find_entry_epoch(&msg->leave_nodes[i].ent, le)) {
+				free(n);
+				continue;
+			}
+
+			n->ent = msg->leave_nodes[i].ent;
+
+			list_add_tail(&n->list, &sys->leave_list);
+		}
+	}
 
 	sys->join_finished = 1;
 
@@ -922,8 +828,14 @@ static void vdi_op(void *arg)
 	rsp->result = ret;
 }
 
-static void vdi_op_done(struct vdi_op_message *msg)
+static void __sd_notify(struct cpg_event *cevent)
 {
+}
+
+static void __sd_notify_done(struct cpg_event *cevent)
+{
+	struct work_notify *w = container_of(cevent, struct work_notify, cev);
+	struct vdi_op_message *msg = (struct vdi_op_message *)w->msg;
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
 	void *data = msg->data;
@@ -1010,136 +922,6 @@ out:
 	req->done(req);
 }
 
-static void __sd_notify(struct cpg_event *cevent)
-{
-	struct work_notify *w = container_of(cevent, struct work_notify, cev);
-	struct message_header *m = w->msg;
-	char name[128];
-	struct node *node;
-
-	dprintf("op: %d, state: %u, size: %d, from: %s, port: %d\n",
-		m->op, m->state, m->msg_length,
-		addr_to_str(name, sizeof(name), m->from.addr, m->from.port),
-		m->from.port);
-
-	/*
-	 * we don't want to perform any deliver events except mastership_tx event
-	 * until we join; we wait for our JOIN message.
-	 */
-	if (!sys->join_finished && !master_tx_message(m)) {
-		if (node_cmp(&m->from, &sys->this_node) != 0) {
-			cevent->skip = 1;
-			return;
-		}
-	}
-
-	if (join_message(m)) {
-		node = find_node(&sys->cpg_node_list, &m->from);
-		if (!node) {
-			dprintf("the node was left before join operation is finished\n");
-			return;
-		}
-
-		node->ent = m->from;
-	}
-}
-
-static void __sd_notify_done(struct cpg_event *cevent)
-{
-	struct work_notify *w = container_of(cevent, struct work_notify, cev);
-	struct message_header *m;
-	char name[128];
-	int do_recovery;
-	struct node *node, *t;
-	int nr, nr_local, nr_leave;
-
-	m = w->msg;
-
-	if (m->state == DM_FIN) {
-		switch (m->op) {
-		case SD_MSG_JOIN:
-			break;
-		case SD_MSG_LEAVE:
-			node = find_node(&sys->sd_node_list, &m->from);
-			if (node) {
-				sys->nr_vnodes = 0;
-
-				list_del(&node->list);
-				free(node);
-				if (sys->status == SD_STATUS_OK) {
-					sys->epoch++;
-					update_epoch_log(sys->epoch);
-					update_epoch_store(sys->epoch);
-				}
-			}
-		/* fall through */
-		case SD_MSG_MASTER_TRANSFER:
-			if (sys->status == SD_STATUS_WAIT_FOR_JOIN) {
-				add_node_to_leave_list(m);
-
-				/* Sheep needs this to identify itself as master.
-				 * Now mastership transfer is done.
-				 */
-				if (!sys->join_finished) {
-					sys->join_finished = 1;
-					move_node_to_sd_list(sys->this_node);
-					sys->epoch = get_latest_epoch();
-				}
-
-				nr_local = get_nodes_nr_epoch(sys->epoch);
-				nr = get_nodes_nr_from(&sys->sd_node_list);
-				nr_leave = get_nodes_nr_from(&sys->leave_list);
-
-				dprintf("%d == %d + %d \n", nr_local, nr, nr_leave);
-				if (nr_local == nr + nr_leave) {
-					sys->status = SD_STATUS_OK;
-					update_epoch_log(sys->epoch);
-					update_epoch_store(sys->epoch);
-				}
-			}
-			break;
-		case SD_MSG_VDI_OP:
-			break;
-		default:
-			eprintf("unknown message %d\n", m->op);
-			break;
-		}
-	}
-
-	do_recovery = (m->state == DM_FIN &&
-		       (join_message(m) || leave_message(m)));
-
-	dprintf("op: %d, state: %u, size: %d, from: %s\n",
-		m->op, m->state, m->msg_length,
-		addr_to_str(name, sizeof(name), m->from.addr,
-			    m->from.port));
-
-	if (m->state == DM_INIT && is_master()) {
-		switch (m->op) {
-		case SD_MSG_JOIN:
-			break;
-		default:
-			eprintf("unknown message %d\n", m->op);
-			break;
-		}
-	}
-
-	if (do_recovery &&
-	    (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT)) {
-		list_for_each_entry_safe(node, t, &sys->leave_list, list) {
-			list_del(&node->list);
-		}
-		start_recovery(sys->epoch);
-	}
-
-	if (sys->status == SD_STATUS_HALT) {
-		int nr_zones = get_zones_nr_from(&sys->sd_node_list);
-
-		if (nr_zones >= sys->nr_sobjs)
-			sys->status = SD_STATUS_OK;
-	}
-}
-
 static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 			      void *msg, size_t msg_len)
 {
@@ -1148,8 +930,8 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 	struct message_header *m = msg;
 	char name[128];
 
-	dprintf("op: %d, state: %u, size: %d, from: %s, pid: %u\n",
-		m->op, m->state, m->msg_length,
+	dprintf("state: %u, size: %d, from: %s, pid: %u\n",
+		m->state, m->msg_length,
 		addr_to_str(name, sizeof(name), m->from.addr, m->from.port),
 		sender->port);
 
@@ -1368,7 +1150,6 @@ static int send_join_request(struct sheepdog_node_list_entry *ent)
 
 	memset(&msg, 0, sizeof(msg));
 	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
-	msg.header.op = SD_MSG_JOIN;
 	msg.header.state = DM_INIT;
 	msg.header.msg_length = sizeof(msg);
 	msg.header.from = *ent;
@@ -1549,10 +1330,7 @@ static void cpg_event_done(struct work *work, int idx)
 		if (sys->join_finished && w->msg->state == DM_INIT)
 			cpg_event_set_joining();
 
-		if (vdi_op_message(w->msg))
-			vdi_op_done((struct vdi_op_message *)w->msg);
-		else
-			__sd_notify_done(cevent);
+		__sd_notify_done(cevent);
 		break;
 	}
 	case CPG_EVENT_REQUEST:
@@ -2032,16 +1810,5 @@ int create_cluster(int port, int64_t zone)
 /* after this function is called, this node only works as a gateway */
 int leave_cluster(void)
 {
-	struct leave_message msg;
-
-	memset(&msg, 0, sizeof(msg));
-	msg.header.proto_ver = SD_SHEEP_PROTO_VER;
-	msg.header.op = SD_MSG_LEAVE;
-	msg.header.state = DM_FIN;
-	msg.header.msg_length = sizeof(msg);
-	msg.header.from = sys->this_node;
-	msg.epoch = get_latest_epoch();
-
-	dprintf("%d\n", msg.epoch);
-	return sys->cdrv->notify(&msg, msg.header.msg_length, NULL);
+	return sys->cdrv->leave();
 }
