@@ -192,15 +192,6 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	sys->cpg_wqueue = init_work_queue(1);
-	sys->gateway_wqueue = init_work_queue(NR_GW_WORKER_THREAD);
-	sys->io_wqueue = init_work_queue(NR_IO_WORKER_THREAD);
-	sys->recovery_wqueue = init_work_queue(1);
-	sys->deletion_wqueue = init_work_queue(1);
-	if (!sys->cpg_wqueue || !sys->gateway_wqueue || !sys->io_wqueue ||
-	    !sys->recovery_wqueue || !sys->deletion_wqueue)
-		exit(1);
-
 	ret = create_listen_port(port, sys);
 	if (ret)
 		exit(1);
@@ -210,6 +201,15 @@ int main(int argc, char **argv)
 		eprintf("failed to create sheepdog cluster\n");
 		exit(1);
 	}
+
+	sys->cpg_wqueue = init_work_queue(1);
+	sys->gateway_wqueue = init_work_queue(NR_GW_WORKER_THREAD);
+	sys->io_wqueue = init_work_queue(NR_IO_WORKER_THREAD);
+	sys->recovery_wqueue = init_work_queue(1);
+	sys->deletion_wqueue = init_work_queue(1);
+	if (!sys->cpg_wqueue || !sys->gateway_wqueue || !sys->io_wqueue ||
+	    !sys->recovery_wqueue || !sys->deletion_wqueue)
+		exit(1);
 
 	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
 
