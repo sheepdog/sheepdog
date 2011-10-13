@@ -183,7 +183,7 @@ int read_vdis(char *data, int len, unsigned int *rsp_len);
 
 int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
-		 int creat, int excl);
+		 int write, int excl, int delete);
 
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries);
 void setup_ordered_sd_vnode_list(struct request *req);
@@ -201,7 +201,8 @@ int leave_cluster(void);
 void start_cpg_event_work(void);
 void store_queue_request(struct work *work, int idx);
 int write_object_local(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, int copies, uint32_t epoch, int create);
+		       uint64_t offset, uint16_t flags, int copies,
+		       uint32_t epoch, int create);
 int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset, int copies, uint32_t epoch);
 
@@ -237,7 +238,7 @@ int is_recoverying_oid(uint64_t oid);
 int write_object(struct sheepdog_vnode_list_entry *e,
 		 int vnodes, int zones, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, int nr, int create);
+		 uint64_t offset, uint16_t flags, int nr, int create);
 int read_object(struct sheepdog_vnode_list_entry *e,
 		int vnodes, int zones, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,

@@ -629,7 +629,7 @@ int create_listen_port(int port, void *data)
 int write_object(struct sheepdog_vnode_list_entry *e,
 		 int vnodes, int zones, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, int nr, int create)
+		 uint64_t offset, uint16_t flags, int nr, int create)
 {
 	struct sd_obj_req hdr;
 	int i, n, fd, ret, success = 0;
@@ -644,8 +644,8 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 		n = obj_to_sheep(e, vnodes, oid, i);
 
 		if (is_myself(e[n].addr, e[n].port)) {
-			ret = write_object_local(oid, data, datalen, offset, nr,
-						 node_version, create);
+			ret = write_object_local(oid, data, datalen, offset,
+						 flags, nr, node_version, create);
 
 			if (ret != 0)
 				eprintf("fail %"PRIx64" %"PRIx32"\n", oid, ret);
@@ -673,7 +673,8 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 		hdr.oid = oid;
 		hdr.copies = nr;
 
-		hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
+		hdr.flags = flags;
+		hdr.flags |= SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
 		hdr.data_length = wlen;
 		hdr.offset = offset;
 

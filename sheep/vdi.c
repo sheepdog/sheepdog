@@ -124,7 +124,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (is_snapshot && cur_vid != base_vid) {
 		ret = write_object(entries, nr_vnodes, nr_zones, epoch,
 				   vid_to_vdi_oid(cur_vid), (char *)cur,
-				   SD_INODE_HEADER_SIZE, 0, copies, 0);
+				   SD_INODE_HEADER_SIZE, 0, 0, copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_READ;
@@ -135,7 +135,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (base_vid) {
 		ret = write_object(entries, nr_vnodes, nr_zones, epoch,
 				   vid_to_vdi_oid(base_vid), (char *)base,
-				   SD_INODE_HEADER_SIZE, 0, copies, 0);
+				   SD_INODE_HEADER_SIZE, 0, 0, copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_WRITE;
@@ -145,7 +145,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 	ret = write_object(entries, nr_vnodes, nr_zones, epoch,
 			   vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, copies, 1);
+			   0, 0, copies, 1);
 	if (ret != 0)
 		ret = SD_RES_VDI_WRITE;
 out:
@@ -390,7 +390,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 
 	ret = write_object(entries, nr_vnodes, nr_zones, epoch,
 			   vid_to_vdi_oid(*vid), (char *)inode,
-			   SD_INODE_HEADER_SIZE, 0, nr_reqs, 0);
+			   SD_INODE_HEADER_SIZE, 0, 0, nr_reqs, 0);
 	if (ret != 0) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -654,13 +654,14 @@ err:
 
 int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
-		 int creat, int excl)
+		 int write, int excl, int delete)
 {
 	struct sheepdog_vnode_list_entry *entries;
 	struct sheepdog_vdi_attr tmp_attr;
 	uint64_t oid;
 	uint32_t end;
 	int ret, nr_zones, nr_vnodes;
+	int value_len;
 
 	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
 	if (!entries) {
@@ -669,16 +670,13 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		goto out;
 	}
 
-	if (data_len != SD_ATTR_HEADER_SIZE) {
-		ret = SD_RES_INVALID_PARMS;
-		goto out;
-	}
+	value_len = data_len - SD_ATTR_HEADER_SIZE;
 
 	vattr->ctime = ctime;
 
 	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
 
-	*attrid = fnv_64a_buf(vattr, data_len, FNV1A_64_INIT);
+	*attrid = fnv_64a_buf(vattr, SD_ATTR_HEADER_SIZE, FNV1A_64_INIT);
 	*attrid &= (UINT64_C(1) << VDI_SPACE_SHIFT) - 1;
 
 	end = *attrid - 1;
@@ -687,9 +685,9 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch, oid, (char *)&tmp_attr,
 				  sizeof(tmp_attr), 0, copies);
 
-		if (ret == -SD_RES_NO_OBJ && creat) {
+		if (ret == -SD_RES_NO_OBJ && write) {
 			ret = write_object(entries, nr_vnodes, nr_zones, epoch, oid,
-					   (char *)vattr, data_len, 0, copies, 1);
+					   (char *)vattr, data_len, 0, 0, copies, 1);
 			if (ret)
 				ret = SD_RES_EIO;
 			else
@@ -703,7 +701,26 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		if (memcmp(&tmp_attr, vattr, sizeof(tmp_attr)) == 0) {
 			if (excl)
 				ret = SD_RES_VDI_EXIST;
-			else
+			else if (delete) {
+				ret = write_object(entries, nr_vnodes, nr_zones,
+						   epoch, oid, (char *)"", 1,
+						   offsetof(struct sheepdog_vdi_attr, name),
+						   0, copies, 0);
+				if (ret)
+					ret = SD_RES_EIO;
+				else
+					ret = SD_RES_SUCCESS;
+			} else if (write) {
+				ret = write_object(entries, nr_vnodes, nr_zones,
+						   epoch, oid, vattr->value,
+						   value_len, SD_ATTR_HEADER_SIZE,
+						   SD_FLAG_CMD_TRUNCATE, copies, 0);
+
+				if (ret)
+					ret = SD_RES_EIO;
+				else
+					ret = SD_RES_SUCCESS;
+			} else
 				ret = SD_RES_SUCCESS;
 			goto out;
 		}

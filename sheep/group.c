@@ -918,7 +918,8 @@ static void vdi_op(struct vdi_op_message *msg)
 		ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,
 				   &attrid, nr_copies, ctime,
 				   hdr->flags & SD_FLAG_CMD_CREAT,
-				   hdr->flags & SD_FLAG_CMD_EXCL);
+				   hdr->flags & SD_FLAG_CMD_EXCL,
+				   hdr->flags & SD_FLAG_CMD_DEL);
 		break;
 	case SD_OP_RELEASE_VDI:
 		break;

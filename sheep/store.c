@@ -474,7 +474,8 @@ int update_epoch_store(uint32_t epoch)
 }
 
 int write_object_local(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, int copies, uint32_t epoch, int create)
+		       uint64_t offset, uint16_t flags, int copies,
+		       uint32_t epoch, int create)
 {
 	int ret;
 	struct request *req;
@@ -491,7 +492,7 @@ int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 	else
 		hdr->opcode = SD_OP_WRITE_OBJ;
 	hdr->copies = copies;
-	hdr->flags = SD_FLAG_CMD_WRITE;
+	hdr->flags = flags | SD_FLAG_CMD_WRITE;
 	hdr->offset = offset;
 	hdr->data_length = datalen;
 	req->data = data;

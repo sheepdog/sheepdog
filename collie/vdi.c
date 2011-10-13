@@ -784,8 +784,9 @@ static int vdi_object(int argc, char **argv)
 }
 
 static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
-			     char *key, uint32_t *vid, uint64_t *oid,
-			     unsigned int *nr_copies, int creat, int excl)
+			     char *key, void *value, unsigned int value_len,
+			     uint32_t *vid, uint64_t *oid, unsigned int *nr_copies,
+			     int creat, int excl, int delete)
 {
 	struct sd_vdi_req hdr;
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
@@ -793,7 +794,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	unsigned int wlen, rlen;
 	struct sheepdog_vdi_attr *vattr;
 
-	vattr = zalloc(SD_ATTR_HEADER_SIZE);
+	vattr = zalloc(SD_ATTR_HEADER_SIZE + value_len);
 	if (!vattr)
 		return SD_RES_NO_MEM;
 
@@ -801,6 +802,8 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	strncpy(vattr->tag, vdi_cmd_data.snapshot_tag, SD_MAX_VDI_TAG_LEN);
 	vattr->snap_id = vdi_cmd_data.snapshot_id;
 	strncpy(vattr->key, key, SD_MAX_VDI_ATTR_KEY_LEN);
+	if (value && value_len)
+		memcpy(vattr->value, value, value_len);
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -810,7 +813,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_VDI_ATTR;
-	wlen = SD_ATTR_HEADER_SIZE;
+	wlen = SD_ATTR_HEADER_SIZE + value_len;
 	rlen = 0;
 	hdr.proto_ver = SD_PROTO_VER;
 	hdr.data_length = wlen;
@@ -820,6 +823,8 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 		hdr.flags |= SD_FLAG_CMD_CREAT;
 	if (excl)
 		hdr.flags |= SD_FLAG_CMD_EXCL;
+	if (delete)
+		hdr.flags |= SD_FLAG_CMD_DEL;
 
 	ret = exec_req(fd, (struct sd_req *)&hdr, vattr, &wlen, &rlen);
 	if (ret) {
@@ -844,8 +849,8 @@ out:
 
 static int vdi_setattr(int argc, char **argv)
 {
-	int ret;
-	uint64_t oid, attr_oid = 0;
+	int ret, value_len = 0;
+	uint64_t attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
 	char *vdiname = argv[optind++], *key, *value;
 	uint64_t offset;
@@ -878,10 +883,14 @@ reread:
 		}
 	}
 
+	if (value)
+		value_len = strlen(value);
+
 	ret = find_vdi_attr_oid(vdiname, vdi_cmd_data.snapshot_tag,
-				vdi_cmd_data.snapshot_id, key, &vid, &attr_oid,
+				vdi_cmd_data.snapshot_id, key, value,
+				value_len, &vid, &attr_oid,
 				&nr_copies, !vdi_cmd_data.delete,
-				vdi_cmd_data.exclusive);
+				vdi_cmd_data.exclusive, vdi_cmd_data.delete);
 	if (ret) {
 		if (ret == SD_RES_VDI_EXIST) {
 			fprintf(stderr, "the attribute already exists, %s\n", key);
@@ -893,24 +902,8 @@ reread:
 			fprintf(stderr, "vdi not found\n");
 			return EXIT_MISSING;
 		} else
-			fprintf(stderr, "failed to find attr oid, %s\n",
+			fprintf(stderr, "failed to set attr, %s\n",
 				sd_strerror(ret));
-		return EXIT_FAILURE;
-	}
-
-	oid = attr_oid;
-
-	if (vdi_cmd_data.delete)
-		ret = sd_write_object(oid, 0, (char *)"", 1,
-				      offsetof(struct sheepdog_inode, name), 0,
-				      nr_copies, 0);
-	else
-		ret = sd_write_object(oid, 0, value, strlen(value),
-				      SD_ATTR_HEADER_SIZE, SD_FLAG_CMD_TRUNCATE,
-				      nr_copies, 0);
-
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to set attribute\n");
 		return EXIT_FAILURE;
 	}
 
@@ -931,8 +924,8 @@ static int vdi_getattr(int argc, char **argv)
 	}
 
 	ret = find_vdi_attr_oid(vdiname, vdi_cmd_data.snapshot_tag,
-				vdi_cmd_data.snapshot_id, key, &vid, &attr_oid,
-				&nr_copies, 0, 0);
+				vdi_cmd_data.snapshot_id, key, NULL, 0,
+				&vid, &attr_oid, &nr_copies, 0, 0, 0);
 	if (ret == SD_RES_NO_OBJ) {
 		fprintf(stderr, "no such attribute, %s\n", key);
 		return EXIT_MISSING;

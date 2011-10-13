@@ -37,10 +37,13 @@
 #define SD_OP_KILL_NODE      0x88
 #define SD_OP_GET_VDI_ATTR   0x89
 
-#define SD_FLAG_CMD_DIRECT   0x10
-#define SD_FLAG_CMD_RECOVERY 0x20
-#define SD_FLAG_CMD_CREAT    0x40
-#define SD_FLAG_CMD_EXCL     0x80
+#define SD_FLAG_CMD_DIRECT   0x0010
+#define SD_FLAG_CMD_RECOVERY 0x0020
+
+/* flags for vdi attribute operations */
+#define SD_FLAG_CMD_CREAT    0x0100
+#define SD_FLAG_CMD_EXCL     0x0200
+#define SD_FLAG_CMD_DEL      0x0400
 
 #define SD_RES_OLD_NODE_VER  0x41 /* Remote node has an old epoch */
 #define SD_RES_NEW_NODE_VER  0x42 /* Remote node has a new epoch */
