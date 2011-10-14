@@ -65,6 +65,21 @@ Sheepdog Daemon, version %s\n\
 	exit(status);
 }
 
+static void sdlog_help(void)
+{
+	printf("Supported sheep log levels:\n");
+	printf("digit  level           meaning\n");
+	printf("\
+  0    SDOG_EMERG      system is unusable\n\
+  1    SDOG_ALERT      action must be taken immediately\n\
+  2    SDOG_CRIT       critical conditions\n\
+  3    SDOG_ERR        error conditions\n\
+  4    SDOG_WARNING    warning conditions\n\
+  5    SDOG_NOTICE     normal but signifiant condition\n\
+  6    SDOG_INFO       informational\n\
+  7    SDOG_DEBUG      debug-level messages\n");
+}
+
 static struct cluster_info __sys;
 struct cluster_info *sys = &__sys;
 
@@ -74,7 +89,7 @@ int main(int argc, char **argv)
 	int ret, port = SD_LISTEN_PORT;
 	const char *dir = DEFAULT_OBJECT_DIR;
 	int is_daemon = 1;
-	int log_level = LOG_INFO;
+	int log_level = SDOG_INFO;
 	char path[PATH_MAX];
 	int64_t zone = -1;
 	char *p;
@@ -93,6 +108,11 @@ int main(int argc, char **argv)
 			break;
 		case 'l':
 			log_level = atoi(optarg);
+			if ((log_level < SDOG_EMERG) || (log_level > SDOG_DEBUG)) {
+				printf("Invalid log level: %d\n", log_level);
+				sdlog_help();
+				exit(1);
+			}
 			break;
 		case 'd':
 			/* removed soon. use loglevel instead */
