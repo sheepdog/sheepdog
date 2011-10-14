@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 			break;
 		case 'd':
 			/* removed soon. use loglevel instead */
-			log_level = LOG_DEBUG;
+			log_level = SDOG_DEBUG;
 			break;
 		case 'D':
 			dprintf("direct IO mode\n");
