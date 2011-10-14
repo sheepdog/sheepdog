@@ -318,9 +318,6 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 			p += 3;
 		}
 
-		if (prio > log_level)
-			return;
-
 		if (log_name)
 			fprintf(stderr, "%s: %s(%d) %s", log_name, func, line, p);
 		else
@@ -333,6 +330,10 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 void log_write(int prio, const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
+
+	if (prio > log_level)
+		return;
+
 	va_start(ap, fmt);
 	dolog(prio, func, line, fmt, ap);
 	va_end(ap);
