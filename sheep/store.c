@@ -893,7 +893,7 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 		addr_to_str(host, sizeof(host), nodes[i].addr, 0);
 		fd = connect_to(host, nodes[i].port);
 		if (fd < 0) {
-			vprintf(SDOG_ERR "can't connect to %s, %m\n", host);
+			vprintf(SDOG_ERR, "can't connect to %s, %m\n", host);
 			continue;
 		}
 
@@ -944,7 +944,7 @@ int get_latest_epoch(void)
 
 	dir = opendir(epoch_path);
 	if (!dir) {
-		vprintf(SDOG_EMERG "failed to get the latest epoch, %m\n");
+		vprintf(SDOG_EMERG, "failed to get the latest epoch, %m\n");
 		abort();
 	}
 
@@ -1952,14 +1952,14 @@ static int init_epoch_path(const char *base_path)
 	for (epoch = 1; epoch <= latest_epoch; epoch++) {
 		snprintf(path, sizeof(path), "%s/%08u", obj_path, epoch);
 
-		vprintf(SDOG_INFO "found the obj dir, %s\n", path);
+		vprintf(SDOG_INFO, "found the obj dir, %s\n", path);
 
 		dir = opendir(path);
 		if (!dir) {
 			if (errno == ENOENT)
 				continue;
 
-			vprintf(SDOG_ERR "failed to open the epoch dir, %m\n");
+			vprintf(SDOG_ERR, "failed to open the epoch dir, %m\n");
 			return SD_RES_EIO;
 		}
 
@@ -1973,7 +1973,7 @@ static int init_epoch_path(const char *base_path)
 			if (!is_vdi_obj(oid))
 				continue;
 
-			vprintf(SDOG_DEBUG "found the vdi obj, %" PRIx64 "\n", oid);
+			vprintf(SDOG_DEBUG, "found the vdi obj, %" PRIx64 "\n", oid);
 
 			set_bit(oid_to_vid(oid), sys->vdi_inuse);
 		}
@@ -2280,7 +2280,7 @@ int jrnl_recover(void)
 	if (!dir)
 		return -1;
 
-	vprintf(SDOG_NOTICE "start jrnl_recovery.\n");
+	vprintf(SDOG_NOTICE, "start jrnl_recovery.\n");
 	while ((d = readdir(dir))) {
 		int ret;
 		struct jrnl_file_desc jfd;
@@ -2316,12 +2316,12 @@ int jrnl_recover(void)
 end_while_2:
 		jrnl_close(&jfd);
 end_while_3:
-		vprintf(SDOG_INFO "recovered the object in journal, %s\n",
+		vprintf(SDOG_INFO, "recovered the object in journal, %s\n",
 			jrnl_file_path);
 		jrnl_remove(&jfd);
 	}
 	closedir(dir);
-	vprintf(SDOG_NOTICE "end jrnl_recovery.\n");
+	vprintf(SDOG_NOTICE, "end jrnl_recovery.\n");
 
 	return 0;
 }

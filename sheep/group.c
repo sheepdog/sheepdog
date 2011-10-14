@@ -690,12 +690,12 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 
 	fd = connect_to(host, node->port);
 	if (fd < 0) {
-		vprintf(SDOG_ERR "can't get the vdi bitmap %s, %m\n", host);
+		vprintf(SDOG_ERR, "can't get the vdi bitmap %s, %m\n", host);
 		ret = -SD_RES_EIO;
 		goto out;
 	}
 
-	vprintf(SDOG_ERR "get the vdi bitmap from %s\n", host);
+	vprintf(SDOG_ERR, "get the vdi bitmap from %s\n", host);
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_VDIS;
@@ -710,7 +710,7 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 	close(fd);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		vprintf(SDOG_ERR "can't get the vdi bitmap %d %d\n", ret,
+		vprintf(SDOG_ERR, "can't get the vdi bitmap %d %d\n", ret,
 				rsp->result);
 		goto out;
 	}
@@ -806,7 +806,7 @@ static void update_cluster_info(struct join_message *msg)
 		 * the JOIN response however it has gone.
 		 */
 		if (ret)
-			vprintf(SDOG_INFO "%s has gone\n",
+			vprintf(SDOG_INFO, "%s has gone\n",
 				sheepid_to_str(&msg->nodes[i].sheepid));
 	}
 
@@ -825,7 +825,7 @@ join_finished:
 	 * host from msg on cpg_node_list.
 	 */
 	if (ret)
-		vprintf(SDOG_ERR "%s has gone\n",
+		vprintf(SDOG_ERR, "%s has gone\n",
 			sheepid_to_str(&msg->header.sheepid));
 
 	if (msg->cluster_status == SD_STATUS_OK) {
@@ -927,7 +927,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 	case SD_OP_NEW_VDI:
 	{
 		unsigned long nr = rsp->vdi_id;
-		vprintf(SDOG_INFO "done %d %ld\n", ret, nr);
+		vprintf(SDOG_INFO, "done %d %ld\n", ret, nr);
 		set_bit(nr, sys->vdi_inuse);
 		break;
 	}
@@ -1208,7 +1208,7 @@ static void sd_notify_handler(struct sheepid *sender, void *msg, size_t msg_len)
 	cevent = &w->cev;
 	cevent->ctype = CPG_EVENT_NOTIFY;
 
-	vprintf(SDOG_DEBUG "allow new deliver, %p\n", cevent);
+	vprintf(SDOG_DEBUG, "allow new deliver, %p\n", cevent);
 
 	w->msg = zalloc(msg_len);
 	if (!w->msg)
@@ -1349,7 +1349,7 @@ static void send_join_request(struct sheepid *id)
 
 	sys->cdrv->notify(&msg, msg.header.msg_length);
 
-	vprintf(SDOG_INFO "%s\n", sheepid_to_str(&sys->this_sheepid));
+	vprintf(SDOG_INFO, "%s\n", sheepid_to_str(&sys->this_sheepid));
 }
 
 static void __sd_join_done(struct cpg_event *cevent)
@@ -1383,7 +1383,7 @@ static void __sd_join_done(struct cpg_event *cevent)
 		 * becomes the master without sending JOIN.
 		 */
 
-		vprintf(SDOG_DEBUG "%s\n", sheepid_to_str(&sys->this_sheepid));
+		vprintf(SDOG_DEBUG, "%s\n", sheepid_to_str(&sys->this_sheepid));
 
 		memset(&msg, 0, sizeof(msg));
 
@@ -1459,7 +1459,7 @@ static void cpg_event_fn(struct work *work, int idx)
 {
 	struct cpg_event *cevent = sys->cur_cevent;
 
-	vprintf(SDOG_DEBUG "%p, %d %lx\n", cevent, cevent->ctype,
+	vprintf(SDOG_DEBUG, "%p, %d %lx\n", cevent, cevent->ctype,
 		sys->cpg_event_work_flags);
 
 	/*
@@ -1476,15 +1476,15 @@ static void cpg_event_fn(struct work *work, int idx)
 	case CPG_EVENT_NOTIFY:
 	{
 		struct work_notify *w = container_of(cevent, struct work_notify, cev);
-		vprintf(SDOG_DEBUG "%d\n", w->msg->state);
+		vprintf(SDOG_DEBUG, "%d\n", w->msg->state);
 		__sd_notify(cevent);
 		break;
 	}
 	case CPG_EVENT_REQUEST:
-		vprintf(SDOG_ERR "should not happen\n");
+		vprintf(SDOG_ERR, "should not happen\n");
 		break;
 	default:
-		vprintf(SDOG_ERR "unknown event %d\n", cevent->ctype);
+		vprintf(SDOG_ERR, "unknown event %d\n", cevent->ctype);
 	}
 }
 
@@ -1493,12 +1493,12 @@ static void cpg_event_done(struct work *work, int idx)
 	struct cpg_event *cevent;
 
 	if (!sys->cur_cevent)
-		vprintf(SDOG_ERR "bug\n");
+		vprintf(SDOG_ERR, "bug\n");
 
 	cevent = sys->cur_cevent;
 	sys->cur_cevent = NULL;
 
-	vprintf(SDOG_DEBUG "%p\n", cevent);
+	vprintf(SDOG_DEBUG, "%p\n", cevent);
 
 	if (cpg_event_suspended())
 		goto out;
@@ -1535,7 +1535,7 @@ static void cpg_event_done(struct work *work, int idx)
 					container_of(f_cevent, struct work_notify, cev);
 				if (f_cevent->ctype == CPG_EVENT_NOTIFY &&
 				    fw->msg->state == DM_FIN) {
-					vprintf("already got fin %p\n",
+					vprintf(SDOG_INFO, "already got fin %p\n",
 						f_cevent);
 
 					list_del(&f_cevent->cpg_event_list);
@@ -1553,13 +1553,14 @@ static void cpg_event_done(struct work *work, int idx)
 		break;
 	}
 	case CPG_EVENT_REQUEST:
-		vprintf(SDOG_ERR "should not happen\n");
+		vprintf(SDOG_ERR, "should not happen\n");
+		break;
 	default:
-		vprintf(SDOG_ERR "unknown event %d\n", cevent->ctype);
+		vprintf(SDOG_ERR, "unknown event %d\n", cevent->ctype);
 	}
 
 out:
-	vprintf(SDOG_DEBUG "free %p\n", cevent);
+	vprintf(SDOG_DEBUG, "free %p\n", cevent);
 	cpg_event_free(cevent);
 	cpg_event_clear_running();
 
@@ -1645,12 +1646,12 @@ void start_cpg_event_work(void)
 	int retry;
 
 	if (list_empty(&sys->cpg_event_siblings))
-		vprintf(SDOG_ERR "bug\n");
+		vprintf(SDOG_ERR, "bug\n");
 
 	cevent = list_first_entry(&sys->cpg_event_siblings,
 				  struct cpg_event, cpg_event_list);
 
-	vprintf(SDOG_DEBUG "%lx %u\n", sys->cpg_event_work_flags,
+	vprintf(SDOG_DEBUG, "%lx %u\n", sys->cpg_event_work_flags,
 		cevent->ctype);
 
 	/*
@@ -1817,7 +1818,7 @@ static void sd_join_handler(struct sheepid *joined, struct sheepid *members,
 	cevent->ctype = CPG_EVENT_JOIN;
 
 
-	vprintf(SDOG_DEBUG "allow new confchg, %p\n", cevent);
+	vprintf(SDOG_DEBUG, "allow new confchg, %p\n", cevent);
 
 	size = sizeof(struct sheepid) * nr_members;
 	w->member_list = zalloc(size);
@@ -1863,7 +1864,7 @@ static void sd_leave_handler(struct sheepid *left, struct sheepid *members,
 	cevent->ctype = CPG_EVENT_LEAVE;
 
 
-	vprintf(SDOG_DEBUG "allow new confchg, %p\n", cevent);
+	vprintf(SDOG_DEBUG, "allow new confchg, %p\n", cevent);
 
 	size = sizeof(struct sheepid) * nr_members;
 	w->member_list = zalloc(size);

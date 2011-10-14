@@ -33,12 +33,12 @@ static int nodeid_to_addr(uint32_t nodeid, uint8_t *addr)
 
 	ret = corosync_cfg_get_node_addrs(cfg_handle, nodeid, 1, &nr, &caddr);
 	if (ret != CS_OK) {
-		vprintf(SDOG_ERR "failed to get addr %d\n", ret);
+		vprintf(SDOG_ERR, "failed to get addr %d\n", ret);
 		return -1;
 	}
 
 	if (!nr) {
-		vprintf(SDOG_ERR "we got no address\n");
+		vprintf(SDOG_ERR, "we got no address\n");
 		return -1;
 	}
 
@@ -50,7 +50,7 @@ static int nodeid_to_addr(uint32_t nodeid, uint8_t *addr)
 		memset(addr, 0, 16);
 		memcpy(addr + 12, saddr, 4);
 	} else {
-		vprintf(SDOG_ERR "unknown protocol %d\n", ss->ss_family);
+		vprintf(SDOG_ERR, "unknown protocol %d\n", ss->ss_family);
 		return -1;
 	}
 
@@ -150,13 +150,13 @@ static int corosync_init(struct cdrv_handlers *handlers, struct sheepid *myid)
 
 	ret = corosync_cfg_initialize(&cfg_handle, NULL);
 	if (ret != CS_OK) {
-		vprintf(SDOG_ERR "failed to initiazize cfg %d\n", ret);
+		vprintf(SDOG_ERR, "failed to initiazize cfg %d\n", ret);
 		return -1;
 	}
 
 	ret = corosync_cfg_local_get(cfg_handle, &nodeid);
 	if (ret != CS_OK) {
-		vprintf(SDOG_ERR "failed to get nodeid %d\n", ret);
+		vprintf(SDOG_ERR, "failed to get nodeid %d\n", ret);
 		return -1;
 	}
 

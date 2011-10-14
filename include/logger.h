@@ -64,14 +64,14 @@ extern void log_write(int prio, const char *func, int line, const char *fmt, ...
 #define	SDOG_INFO		LOG_INFO
 #define	SDOG_DEBUG		LOG_DEBUG
 
-#define vprintf(fmt, args...)						\
+#define vprintf(level, fmt, args...)						\
 do {									\
-	log_write(LOG_INFO, __func__, __LINE__, fmt, ##args);		\
+	log_write(level, __func__, __LINE__, fmt, ##args);		\
 } while (0)
 
 #define panic(fmt, args...)			\
 ({						\
-	vprintf(SDOG_EMERG fmt, ##args);	\
+	vprintf(SDOG_EMERG, fmt, ##args);	\
 	abort();				\
 })
 
