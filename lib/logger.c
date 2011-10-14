@@ -393,7 +393,7 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 			}
 		} else {
 			fd = -1;
-			openlog(log_name, 0, LOG_DAEMON);
+			openlog(log_name, LOG_CONS | LOG_PID, LOG_DAEMON);
 			setlogmask (LOG_UPTO (LOG_DEBUG));
 		}
 
