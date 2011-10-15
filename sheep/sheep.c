@@ -101,15 +101,20 @@ int main(int argc, char **argv)
 				 &longindex)) >= 0) {
 		switch (ch) {
 		case 'p':
-			port = atoi(optarg);
+			port = strtol(optarg, &p, 10);
+			if (optarg == p || port < 1 || port > UINT16_MAX) {
+				eprintf("invalid port number: %s\n", optarg);
+				exit(1);
+			}
 			break;
 		case 'f':
 			is_daemon = 0;
 			break;
 		case 'l':
-			log_level = atoi(optarg);
-			if ((log_level < SDOG_EMERG) || (log_level > SDOG_DEBUG)) {
-				printf("Invalid log level: %d\n", log_level);
+			log_level = strtol(optarg, &p, 10);
+			if (optarg == p || log_level < SDOG_EMERG ||
+			    log_level > SDOG_DEBUG) {
+				printf("Invalid log level: %s\n", optarg);
 				sdlog_help();
 				exit(1);
 			}

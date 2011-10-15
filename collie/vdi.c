@@ -1191,18 +1191,26 @@ static struct subcommand vdi_cmd[] = {
 
 static int vdi_parser(int ch, char *opt)
 {
+	char *p;
+
 	switch (ch) {
 	case 'P':
 		vdi_cmd_data.prealloc = 1;
 		break;
 	case 'i':
-		vdi_cmd_data.index = atoi(opt);
+		vdi_cmd_data.index = strtol(opt, &p, 10);
+		if (opt == p) {
+			fprintf(stderr, "the index must be an integer\n");
+			exit(EXIT_FAILURE);
+		}
 		break;
 	case 's':
-		vdi_cmd_data.snapshot_id = atoi(opt);
-		if (vdi_cmd_data.snapshot_id == 0)
+		vdi_cmd_data.snapshot_id = strtol(opt, &p, 10);
+		if (opt == p) {
+			vdi_cmd_data.snapshot_id = 0;
 			strncpy(vdi_cmd_data.snapshot_tag, opt,
 				sizeof(vdi_cmd_data.snapshot_tag));
+		}
 		break;
 	case 'x':
 		vdi_cmd_data.exclusive = 1;

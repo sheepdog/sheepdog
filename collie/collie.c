@@ -282,6 +282,7 @@ int main(int argc, char **argv)
 	unsigned long flags;
 	struct option *long_options;
 	const char *short_options;
+	char *p;
 	struct command commands[] = {
 		vdi_command,
 		node_command,
@@ -308,7 +309,11 @@ int main(int argc, char **argv)
 			sdhost = optarg;
 			break;
 		case 'p':
-			sdport = atoi(optarg);
+			sdport = strtol(optarg, &p, 10);
+			if (optarg == p || sdport < 1 || sdport > UINT16_MAX) {
+				fprintf(stderr, "invalid port number: %s\n", optarg);
+				exit(EXIT_USAGE);
+			}
 			break;
 		case 'r':
 			raw_output = 1;

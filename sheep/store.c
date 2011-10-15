@@ -894,6 +894,7 @@ int get_latest_epoch(void)
 	DIR *dir;
 	struct dirent *d;
 	uint32_t e, epoch = 0;
+	char *p;
 
 	dir = opendir(epoch_path);
 	if (!dir) {
@@ -902,7 +903,10 @@ int get_latest_epoch(void)
 	}
 
 	while ((d = readdir(dir))) {
-		e = atoi(d->d_name);
+		e = strtol(d->d_name, &p, 10);
+		if (d->d_name == p)
+			continue;
+
 		if (e > epoch)
 			epoch = e;
 	}

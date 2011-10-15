@@ -172,9 +172,18 @@ static struct subcommand cluster_cmd[] = {
 
 static int cluster_parser(int ch, char *opt)
 {
+	int copies;
+	char *p;
+
 	switch (ch) {
 	case 'c':
-		cluster_cmd_data.copies = atoi(opt);
+		copies = strtol(opt, &p, 10);
+		if (opt == p || copies < 1 || copies > SD_MAX_REDUNDANCY) {
+			fprintf(stderr, "copies must be from 1 through %d\n",
+				SD_MAX_REDUNDANCY);
+			exit(EXIT_FAILURE);
+		}
+		cluster_cmd_data.copies = copies;
 		break;
 	}
 
