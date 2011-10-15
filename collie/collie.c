@@ -95,6 +95,10 @@ static int update_node_list(int max_nodes, int epoch)
 	}
 
 	nr_nodes = size / sizeof(*ent);
+	if (nr_nodes == 0) {
+		fprintf(stderr, "there is no active sheep daemons\n");
+		exit(EXIT_FAILURE);
+	}
 
 	/* FIXME */
 	if (nr_nodes > max_nodes) {
