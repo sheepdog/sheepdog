@@ -198,11 +198,6 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 
 	vsnprintf(p, MAX_MSG_SIZE - strlen(p), fmt, ap);
 
-	if (p[0] == '<' && p[2] == '>') {
-		prio = atoi(p + 1);
-		memmove(p, p + 3, strlen(p) - 3 + 1);
-	}
-
 	len = strlen(buff) * sizeof(char) + 1;
 
 	/* not enough space on tail : rewind */
@@ -308,15 +303,9 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 			return;
 		}
 	} else {
-		char *p, q[MAX_MSG_SIZE];
+		char p[MAX_MSG_SIZE];
 
-		p = q;
 		vsnprintf(p, MAX_MSG_SIZE, fmt, ap);
-
-		if (p[0] == '<' && p[2] == '>') {
-			prio = atoi(p + 1);
-			p += 3;
-		}
 
 		if (log_name)
 			fprintf(stderr, "%s: %s(%d) %s", log_name, func, line, p);
