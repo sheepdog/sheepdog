@@ -185,8 +185,6 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	jrnl_recover();
-
 	ret = init_event(EPOLL_SIZE);
 	if (ret)
 		exit(1);

@@ -242,65 +242,9 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		 uint32_t epoch, int worker_idx);
 
 /* Journal */
-#define JRNL_TYPE_VDI        0
-#define JRNL_MAX_TYPES       1
-
-#define SET_END_MARK            1UL
-#define UNSET_END_MARK          0UL
-#define IS_END_MARK_SET(var)    (var == 1UL)
-
-/* Journal header for data object */
-struct jrnl_vdi_head {
-	uint32_t jh_type;
-	uint32_t pad;
-	uint64_t jh_offset;
-	uint64_t jh_size;
-};
-
-struct jrnl_file_desc {
-	uint32_t  jf_epoch;   /* epoch */
-	uint64_t  jf_oid;     /* Object id */
-	int       jf_fd;      /* Open file fd */
-	int       jf_target_fd;
-} jrnl_file_desc_t;
-
-struct jrnl_descriptor {
-	void                    *jd_head;
-	void                    *jd_data;
-	int                     jd_end_mark;
-	struct jrnl_file_desc   jd_jfd;
-#define jdf_epoch               jd_jfd.jf_epoch
-#define jdf_oid                 jd_jfd.jf_oid
-#define jdf_fd                  jd_jfd.jf_fd
-#define jdf_target_fd           jd_jfd.jf_target_fd
-} jrnl_desc_t;
-
-struct jrnl_handler {
-	int (*has_end_mark)(struct jrnl_descriptor *jd);
-	int (*write_header)(struct jrnl_descriptor *jd);
-	int (*write_data)(struct jrnl_descriptor *jd);
-	int (*write_end_mark)(struct jrnl_descriptor *jd);
-	int (*apply_to_target_object)(struct jrnl_file_desc *jfd);
-	int (*commit_data)(struct jrnl_descriptor *jd);
-};
-
-inline uint32_t jrnl_get_type(struct jrnl_descriptor *jd);
-int jrnl_get_type_from_file(struct jrnl_file_desc *jfd, uint32_t *jrnl_type);
-int jrnl_exists(struct jrnl_file_desc *jfd);
-int jrnl_update_epoch_store(uint32_t epoch);
-int jrnl_open(struct jrnl_file_desc *jfd, int aflags);
-int jrnl_create(struct jrnl_file_desc *jfd);
-int jrnl_remove(struct jrnl_file_desc *jfd);
-inline int jrnl_close(struct jrnl_file_desc *jfd);
-
-inline int jrnl_has_end_mark(struct jrnl_descriptor *jd);
-inline int jrnl_write_header(struct jrnl_descriptor *jd);
-inline int jrnl_write_data(struct jrnl_descriptor *jd);
-inline int jrnl_write_end_mark(struct jrnl_descriptor *jd);
-inline int jrnl_apply_to_target_object(struct jrnl_file_desc *jfd);
-inline int jrnl_commit_data(struct jrnl_descriptor *jd);
-int jrnl_perform(struct jrnl_descriptor *jd);
-int jrnl_recover(void);
+int jrnl_perform(int fd, void *buf, size_t count, off_t offset,
+		 const char *path, const char *jrnl_dir);
+int jrnl_recover(const char *jrnl_dir);
 
 static inline int is_myself(uint8_t *addr, uint16_t port)
 {
