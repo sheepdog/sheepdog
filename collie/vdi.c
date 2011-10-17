@@ -971,10 +971,18 @@ static int vdi_read(int argc, char **argv)
 		ret = parse_option_size(argv[optind++], &offset);
 		if (ret < 0)
 			return EXIT_USAGE;
+		if (offset % 512 != 0) {
+			fprintf(stderr, "offset must be block-aligned\n");
+			return EXIT_USAGE;
+		}
 		if (argv[optind]) {
 			ret = parse_option_size(argv[optind++], &total);
 			if (ret < 0)
 				return EXIT_USAGE;
+			if (total % 512 != 0) {
+				fprintf(stderr, "len must be block-aligned\n");
+				return EXIT_USAGE;
+			}
 		}
 	}
 
@@ -1007,6 +1015,7 @@ static int vdi_read(int argc, char **argv)
 	}
 
 	total = min(total, inode->vdi_size - offset);
+	total = roundup(total, 512);
 	idx = offset / SD_DATA_OBJ_SIZE;
 	while (done < total) {
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
@@ -1057,10 +1066,18 @@ static int vdi_write(int argc, char **argv)
 		ret = parse_option_size(argv[optind++], &offset);
 		if (ret < 0)
 			return EXIT_USAGE;
+		if (offset % 512 != 0) {
+			fprintf(stderr, "offset must be block-aligned\n");
+			return EXIT_USAGE;
+		}
 		if (argv[optind]) {
 			ret = parse_option_size(argv[optind++], &total);
 			if (ret < 0)
 				return EXIT_USAGE;
+			if (total % 512 != 0) {
+				fprintf(stderr, "len must be block-aligned\n");
+				return EXIT_USAGE;
+			}
 		}
 	}
 
@@ -1092,6 +1109,7 @@ static int vdi_write(int argc, char **argv)
 	}
 
 	total = min(total, inode->vdi_size - offset);
+	total = roundup(total, 512);
 	idx = offset / SD_DATA_OBJ_SIZE;
 	while (done < total) {
 		create = 0;
