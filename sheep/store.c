@@ -24,13 +24,17 @@
 
 #include "sheep_priv.h"
 
-#define ANAME_CTIME "user.sheepdog.ctime"
-#define ANAME_COPIES "user.sheepdog.copies"
+struct sheepdog_config {
+	uint64_t ctime;
+	uint32_t copies;
+	uint32_t flags;
+};
 
 static char *obj_path;
 static char *epoch_path;
 static char *mnt_path;
 static char *jrnl_path;
+static char *config_path;
 
 static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 static mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
@@ -538,7 +542,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 
 static int store_queue_request_local(struct request *req, uint32_t epoch)
 {
-	int fd = -1, copies;
+	int fd = -1;
 	int ret = SD_RES_SUCCESS;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
@@ -572,14 +576,6 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		ret = ftruncate(fd, 0);
 		if (ret) {
 			ret = SD_RES_EIO;
-			goto out;
-		}
-
-		ret = fsetxattr(fd, ANAME_COPIES, &hdr->copies,
-				sizeof(hdr->copies), 0);
-		if (ret) {
-			eprintf("use 'user_xattr' option?\n");
-			ret = SD_RES_SYSTEM_ERROR;
 			goto out;
 		}
 
@@ -648,17 +644,6 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		}
 		break;
 	case SD_OP_READ_OBJ:
-		/*
-		 * TODO: should be optional (we can use the flags) for
-		 * performance; qemu doesn't always need the copies.
-		 */
-		copies = 0;
-		ret = fgetxattr(fd, ANAME_COPIES, &copies, sizeof(copies));
-		if (ret != sizeof(copies)) {
-			ret = SD_RES_SYSTEM_ERROR;
-			goto out;
-		}
-
 		ret = pread64(fd, req->data, hdr->data_length, hdr->offset);
 		if (ret < 0) {
 			ret = SD_RES_EIO;
@@ -666,7 +651,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		}
 
 		rsp->data_length = ret;
-		rsp->copies = copies;
+		rsp->copies = sys->nr_sobjs;
 
 		ret = SD_RES_SUCCESS;
 		break;
@@ -1002,15 +987,18 @@ int set_cluster_ctime(uint64_t ctime)
 {
 	int fd, ret;
 
-	fd = open(epoch_path, O_RDONLY);
+	fd = open(config_path, O_SYNC | O_WRONLY);
 	if (fd < 0)
 		return -1;
 
-	ret = fsetxattr(fd, ANAME_CTIME, &ctime, sizeof(ctime), 0);
+	ret = jrnl_perform(fd, &ctime, sizeof(ctime),
+			   offsetof(struct sheepdog_config, ctime),
+			   config_path, jrnl_path);
 	close(fd);
 
 	if (ret)
 		return -1;
+
 	return 0;
 }
 
@@ -1019,11 +1007,12 @@ uint64_t get_cluster_ctime(void)
 	int fd, ret;
 	uint64_t ctime;
 
-	fd = open(epoch_path, O_RDONLY);
+	fd = open(config_path, O_RDONLY);
 	if (fd < 0)
 		return 0;
 
-	ret = fgetxattr(fd, ANAME_CTIME, &ctime, sizeof(ctime));
+	ret = pread64(fd, &ctime, sizeof(ctime),
+		      offsetof(struct sheepdog_config, ctime));
 	close(fd);
 
 	if (ret != sizeof(ctime))
@@ -1316,13 +1305,6 @@ next:
 		ret = write(fd, buf, rlen);
 		if (ret != rlen) {
 			eprintf("failed to write object\n");
-			goto err;
-		}
-
-		ret = fsetxattr(fd, ANAME_COPIES, &rsp->copies,
-				sizeof(rsp->copies), 0);
-		if (ret) {
-			eprintf("couldn't set xattr\n");
 			goto err;
 		}
 
@@ -1849,35 +1831,6 @@ again:
 	return 0;
 }
 
-
-static int attr(char *path, const char *name, void *var, int len, int set)
-{
-	int ret, fd;
-
-	fd = open(path, O_RDONLY);
-	if (fd < 0)
-		return SD_RES_EIO;
-
-	if (set)
-		ret = fsetxattr(fd, name, var, len, 0);
-	else
-		ret = fgetxattr(fd, name, var, len);
-
-	close(fd);
-
-	if (set) {
-		if (ret) {
-			eprintf("use 'user_xattr' option?, %s\n", name);
-			return SD_RES_SYSTEM_ERROR;
-		}
-	} else {
-		if (ret != len)
-			return SD_RES_SYSTEM_ERROR;
-	}
-
-	return SD_RES_SUCCESS;
-}
-
 int init_base_path(const char *d)
 {
 	int new = 0;
@@ -2006,6 +1959,18 @@ static int init_jrnl_path(const char *base_path)
 	return 0;
 }
 
+#define CONFIG_PATH "/config"
+
+static int init_config_path(const char *base_path)
+{
+	config_path = zalloc(strlen(base_path) + strlen(CONFIG_PATH) + 1);
+	sprintf(config_path, "%s" CONFIG_PATH, base_path);
+
+	mknod(config_path, def_fmode, S_IFREG);
+
+	return 0;
+}
+
 int init_store(const char *d)
 {
 	int ret;
@@ -2023,6 +1988,10 @@ int init_store(const char *d)
 		return ret;
 
 	ret = init_jrnl_path(d);
+	if (ret)
+		return ret;
+
+	ret = init_config_path(d);
 	if (ret)
 		return ret;
 
@@ -2051,10 +2020,37 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 
 int set_global_nr_copies(uint32_t copies)
 {
-	return attr(epoch_path, ANAME_COPIES, &copies, sizeof(copies), 1);
+	int fd, ret;
+
+	fd = open(config_path, O_SYNC | O_WRONLY);
+	if (fd < 0)
+		return SD_RES_EIO;
+
+	ret = jrnl_perform(fd, &copies, sizeof(copies),
+			   offsetof(struct sheepdog_config, copies),
+			   config_path, jrnl_path);
+	close(fd);
+
+	if (ret != 0)
+		return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
 }
 
 int get_global_nr_copies(uint32_t *copies)
 {
-	return attr(epoch_path, ANAME_COPIES, copies, sizeof(*copies), 0);
+	int fd, ret;
+
+	fd = open(config_path, O_RDONLY);
+	if (fd < 0)
+		return SD_RES_EIO;
+
+	ret = pread64(fd, copies, sizeof(*copies),
+		      offsetof(struct sheepdog_config, copies));
+	close(fd);
+
+	if (ret != sizeof(*copies))
+		return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
 }
