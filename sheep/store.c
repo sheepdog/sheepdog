@@ -576,6 +576,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 
 		ret = ftruncate(fd, 0);
 		if (ret) {
+			eprintf("%m\n");
 			ret = SD_RES_EIO;
 			goto out;
 		}
@@ -600,8 +601,10 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			if (ret != SD_DATA_OBJ_SIZE) {
 				if (errno == ENOSPC)
 					ret = SD_RES_NO_SPACE;
-				else
+				else {
+					eprintf("%m\n");
 					ret = SD_RES_EIO;
+				}
 				goto out;
 			}
 			free(buf);
@@ -622,8 +625,10 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			if (ret != size) {
 				if (errno == ENOSPC)
 					ret = SD_RES_NO_SPACE;
-				else
+				else {
+					eprintf("%m\n");
 					ret = SD_RES_EIO;
+				}
 				goto out;
 			}
 		}
@@ -640,13 +645,16 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		if (ret) {
 			if (errno == ENOENT)
 				ret = SD_RES_NO_OBJ;
-			else
+			else {
+				eprintf("%m\n");
 				ret = SD_RES_EIO;
+			}
 		}
 		break;
 	case SD_OP_READ_OBJ:
 		ret = pread64(fd, req->data, hdr->data_length, hdr->offset);
 		if (ret < 0) {
+			eprintf("%m\n");
 			ret = SD_RES_EIO;
 			goto out;
 		}
@@ -661,6 +669,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		if (hdr->flags & SD_FLAG_CMD_TRUNCATE) {
 			ret = ftruncate(fd, hdr->offset + hdr->data_length);
 			if (ret) {
+				eprintf("%m\n");
 				ret = SD_RES_EIO;
 				goto out;
 			}
@@ -679,8 +688,10 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			if (ret != hdr->data_length) {
 				if (errno == ENOSPC)
 					ret = SD_RES_NO_SPACE;
-				else
+				else {
+					eprintf("%m\n");
 					ret = SD_RES_EIO;
+				}
 				goto out;
 			}
 		}
