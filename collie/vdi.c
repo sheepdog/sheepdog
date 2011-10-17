@@ -964,7 +964,7 @@ static int vdi_read(int argc, char **argv)
 	int ret, idx;
 	struct sheepdog_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
-	unsigned int len;
+	unsigned int len, remain;
 	char *buf = NULL;
 
 	if (argv[optind]) {
@@ -1031,11 +1031,15 @@ static int vdi_read(int argc, char **argv)
 		} else
 			memset(buf, 0, len);
 
-		ret = write(STDOUT_FILENO, buf, len);
-		if (ret < 0) {
-			fprintf(stderr, "failed to output, %m\n");
-			ret = EXIT_SYSFAIL;
-			goto out;
+		remain = len;
+		while (remain) {
+			ret = write(STDOUT_FILENO, buf + (len - remain), len);
+			if (ret < 0) {
+				fprintf(stderr, "failed to output, %m\n");
+				ret = EXIT_SYSFAIL;
+				goto out;
+			}
+			remain -= ret;
 		}
 
 		offset = 0;
@@ -1058,7 +1062,7 @@ static int vdi_write(int argc, char **argv)
 	int ret, idx;
 	struct sheepdog_inode *inode = NULL;
 	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
-	unsigned int len;
+	unsigned int len, remain;
 	char *buf = NULL;
 	int create;
 
@@ -1125,15 +1129,26 @@ static int vdi_write(int argc, char **argv)
 			flags = SD_FLAG_CMD_COW;
 		}
 
-		ret = read(STDIN_FILENO, buf, len);
-		if (ret == 0)
-			break;
-		else if (ret < 0) {
-			fprintf(stderr, "%m\n");
-			ret = EXIT_SYSFAIL;
-			goto out;
+		remain = len;
+		while (remain > 0) {
+			ret = read(STDIN_FILENO, buf + (len - remain), remain);
+			if (ret == 0) {
+				if (len == remain) {
+					ret = EXIT_SUCCESS;
+					goto out;
+				}
+				/* exit after this buffer is sent */
+				memset(buf + (len - remain), 0, remain);
+				total = done + len;
+				break;
+			}
+			else if (ret < 0) {
+				fprintf(stderr, "%m\n");
+				ret = EXIT_SYSFAIL;
+				goto out;
+			}
+			remain -= ret;
 		}
-		len = ret;
 
 		inode->data_vdi_id[idx] = inode->vdi_id;
 		oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
