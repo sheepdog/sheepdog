@@ -210,6 +210,15 @@ static void build_node_list(struct list_head *node_list,
 		*nr_nodes = nr;
 }
 
+static int get_zones_nr_from(struct list_head *list)
+{
+	int nr_dummpy, nr_zones;
+	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+
+	build_node_list(list, nodes, &nr_dummpy, &nr_zones);
+	return nr_zones;
+}
+
 int get_ordered_sd_node_list(struct sheepdog_node_list_entry *entries)
 {
 	int nr_nodes;
