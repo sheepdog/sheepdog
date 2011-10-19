@@ -525,100 +525,96 @@ err:
 	return ret;
 }
 
+static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
+			     int nr_entries, uint64_t ctime, uint32_t epoch)
+{
+	int ret = SD_RES_SUCCESS, nr_local_entries;
+	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
+	uint32_t lepoch;
+
+	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
+	    sys->status == SD_STATUS_SHUTDOWN)
+		goto out;
+	/* When the joinning node is newly created, we need to check nothing. */
+	if (nr_entries == 0)
+		goto out;
+
+	if (ctime != get_cluster_ctime()) {
+		ret = SD_RES_INVALID_CTIME;
+		goto out;
+	}
+
+	lepoch = get_latest_epoch();
+	if (epoch > lepoch) {
+		ret = SD_RES_OLD_NODE_VER;
+		goto out;
+	}
+
+	if (sys->status == SD_STATUS_OK)
+		goto out;
+
+	if (epoch < lepoch) {
+		ret = SD_RES_NEW_NODE_VER;
+		goto out;
+	}
+
+	nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
+			sizeof(local_entries));
+
+	if (nr_entries != nr_local_entries ||
+	    memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0) {
+		ret = SD_RES_INVALID_EPOCH;
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
 static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			      struct sheepdog_node_list_entry *entries,
 			      int nr_entries, uint64_t ctime, uint32_t epoch,
 			      uint32_t *status, uint8_t *inc_epoch)
 {
-	int i;
-	int nr_local_entries, nr_leave_entries;
+	int i, ret = SD_RES_SUCCESS;
+	int nr, nr_local_entries, nr_leave_entries;
 	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
 	struct node *node;
-	uint32_t local_epoch;
 	char str[256];
 
 	*status = sys->status;
 	if (inc_epoch)
 		*inc_epoch = 0;
 
+	ret = cluster_sanity_check(entries, nr_entries, ctime, epoch);
+	if (ret)
+		goto out;
+
 	switch (sys->status) {
 	case SD_STATUS_OK:
 		if (inc_epoch)
 			*inc_epoch = 1;
-
-		if (nr_entries == 0)
-			break;
-
-		if (ctime != get_cluster_ctime()) {
-			eprintf("joining node has invalid ctime, %s\n",
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_INVALID_CTIME;
-		}
-
-		local_epoch = get_latest_epoch();
-		if (epoch > local_epoch) {
-			eprintf("sheepdog is running with older epoch, %"PRIu32" %"PRIu32" %s\n",
-				epoch, local_epoch,
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_OLD_NODE_VER;
-		}
 		break;
 	case SD_STATUS_WAIT_FOR_FORMAT:
-		if (nr_entries != 0) {
-			eprintf("joining node is not clean, %s\n",
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_NOT_FORMATTED;
-		}
+		if (nr_entries != 0)
+			ret = SD_RES_NOT_FORMATTED;
 		break;
 	case SD_STATUS_WAIT_FOR_JOIN:
-		if (ctime != get_cluster_ctime()) {
-			eprintf("joining node has invalid ctime, %s\n",
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_INVALID_CTIME;
-		}
-
-		local_epoch = get_latest_epoch();
-		if (epoch > local_epoch) {
-			eprintf("sheepdog is waiting with older epoch, %"PRIu32" %"PRIu32" %s\n",
-				epoch, local_epoch,
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_OLD_NODE_VER;
-		} else if (epoch < local_epoch) {
-			eprintf("sheepdog is waiting with newer epoch, %"PRIu32" %"PRIu32" %s\n",
-				epoch, local_epoch,
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_NEW_NODE_VER;
-		}
-
+		nr = get_nodes_nr_from(&sys->sd_node_list) + 1;
 		nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
 						  sizeof(local_entries));
 
-		if (nr_entries != nr_local_entries) {
-			eprintf("joining node has invalid epoch, %"PRIu32" %s\n",
-				epoch,
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_INVALID_EPOCH;
-		}
-
-		if (memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0) {
-			eprintf("joining node has invalid epoch, %s\n",
-				addr_to_str(str, sizeof(str), from->addr, from->port));
-			return SD_RES_INVALID_EPOCH;
-		}
-
-		nr_entries = get_nodes_nr_from(&sys->sd_node_list) + 1;
-
-		if (nr_entries != nr_local_entries) {
+		if (nr != nr_local_entries) {
 			nr_leave_entries = get_nodes_nr_from(&sys->leave_list);
-			if (nr_local_entries == nr_entries + nr_leave_entries) {
+			if (nr_local_entries == nr + nr_leave_entries) {
 				/* Even though some nodes leave, we can make do with it.
 				 * Order cluster to do recovery right now.
 				 */
-				*inc_epoch = 1;
+				if (inc_epoch)
+					*inc_epoch = 1;
 				*status = SD_STATUS_OK;
-				return SD_RES_SUCCESS;
 			}
-			return SD_RES_SUCCESS;
+			break;
 		}
 
 		for (i = 0; i < nr_local_entries; i++) {
@@ -628,7 +624,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 				if (node_cmp(local_entries + i, &node->ent) == 0)
 					goto next;
 			}
-			return SD_RES_SUCCESS;
+			break;
 		next:
 			;
 		}
@@ -636,11 +632,17 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		*status = SD_STATUS_OK;
 		break;
 	case SD_STATUS_SHUTDOWN:
-		return SD_RES_SHUTDOWN;
+		ret = SD_RES_SHUTDOWN;
+		break;
 	default:
 		break;
 	}
-	return SD_RES_SUCCESS;
+out:
+	if (ret)
+		eprintf("%x, %s\n", ret,
+			addr_to_str(str, sizeof(str), from->addr, from->port));
+
+	return ret;
 }
 
 static void join(struct join_message *msg)
