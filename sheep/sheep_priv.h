@@ -211,6 +211,8 @@ int update_epoch_store(uint32_t epoch);
 
 int set_global_nr_copies(uint32_t copies);
 int get_global_nr_copies(uint32_t *copies);
+int set_cluster_flags(uint16_t flags);
+int get_cluster_flags(uint16_t *flags);
 
 #define NR_GW_WORKER_THREAD 4
 #define NR_IO_WORKER_THREAD 4

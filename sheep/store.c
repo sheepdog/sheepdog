@@ -2067,3 +2067,42 @@ int get_global_nr_copies(uint32_t *copies)
 
 	return SD_RES_SUCCESS;
 }
+
+int set_cluster_flags(uint16_t flags)
+{
+	int fd, ret = SD_RES_EIO;
+
+	fd = open(config_path, O_SYNC | O_WRONLY);
+	if (fd < 0)
+		goto out;
+
+	ret = jrnl_perform(fd, &flags, sizeof(flags),
+			offsetof(struct sheepdog_config, flags),
+			config_path, jrnl_path);
+	if (ret != 0)
+		ret = SD_RES_EIO;
+
+	close(fd);
+out:
+	return ret;
+}
+
+int get_cluster_flags(uint16_t *flags)
+{
+	int fd, ret = SD_RES_EIO;
+
+	fd = open(config_path, O_RDONLY);
+	if (fd < 0)
+		goto out;
+
+	ret = pread64(fd, flags, sizeof(*flags),
+			offsetof(struct sheepdog_config, flags));
+	if (ret != sizeof(*flags))
+		ret = SD_RES_EIO;
+	else
+		ret = SD_RES_SUCCESS;
+
+	close(fd);
+out:
+	return ret;
+}
