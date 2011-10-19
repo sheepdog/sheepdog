@@ -1152,6 +1152,8 @@ static void __sd_notify_done(struct cpg_event *cevent)
 				}
 			}
 			break;
+		case SD_MSG_VDI_OP:
+			break;
 		default:
 			eprintf("unknown message %d\n", m->op);
 			break;
