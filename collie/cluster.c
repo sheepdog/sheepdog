@@ -16,7 +16,14 @@
 
 struct cluster_cmd_data {
 	int copies;
+	int nohalt;
 } cluster_cmd_data;
+
+static void set_nohalt(uint16_t *p)
+{
+	if (p)
+		*p |= SD_FLAG_NOHALT;
+}
 
 static int cluster_format(int argc, char **argv)
 {
@@ -36,6 +43,8 @@ static int cluster_format(int argc, char **argv)
 
 	hdr.opcode = SD_OP_MAKE_FS;
 	hdr.copies = cluster_cmd_data.copies;
+	if (cluster_cmd_data.nohalt)
+		set_nohalt(&hdr.flags);
 	hdr.epoch = node_list_version;
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
@@ -163,7 +172,7 @@ static int cluster_shutdown(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 0, cluster_info},
-	{"format", NULL, "caph", "create a Sheepdog storage",
+	{"format", NULL, "cHaph", "create a Sheepdog storage",
 	 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
@@ -184,6 +193,9 @@ static int cluster_parser(int ch, char *opt)
 			exit(EXIT_FAILURE);
 		}
 		cluster_cmd_data.copies = copies;
+		break;
+	case 'H':
+		cluster_cmd_data.nohalt = 1;
 		break;
 	}
 

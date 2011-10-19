@@ -51,6 +51,7 @@ struct join_message {
 	uint32_t nr_nodes;
 	uint32_t nr_sobjs;
 	uint32_t cluster_status;
+	uint16_t cluster_flags;
 	uint32_t epoch;
 	uint64_t ctime;
 	uint32_t result;
@@ -678,6 +679,7 @@ static void join(struct join_message *msg)
 					 msg->epoch, &msg->cluster_status,
 					 &msg->inc_epoch);
 	msg->nr_sobjs = sys->nr_sobjs;
+	msg->cluster_flags = sys->flags;
 	msg->ctime = get_cluster_ctime();
 	msg->nr_nodes = 0;
 	list_for_each_entry(node, &sys->sd_node_list, list) {
@@ -792,7 +794,7 @@ static void update_cluster_info(struct join_message *msg)
 	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
 	if (msg->result != SD_RES_SUCCESS) {
 		if (is_myself(msg->header.from.addr, msg->header.from.port)) {
-			eprintf("failed to join sheepdog, %d\n", msg->result);
+			eprintf("failed to join sheepdog, %x\n", msg->result);
 			leave_cluster();
 			eprintf("Restart me later when master is up, please.Bye.\n");
 			exit(1);
@@ -804,13 +806,13 @@ static void update_cluster_info(struct join_message *msg)
 	if (sys->status == SD_STATUS_JOIN_FAILED)
 		return;
 
-	if (!sys->nr_sobjs)
-		sys->nr_sobjs = msg->nr_sobjs;
-
 	if (sys->join_finished)
 		goto join_finished;
 
+	sys->nr_sobjs = msg->nr_sobjs;
 	sys->epoch = msg->epoch;
+	sys->flags = msg->cluster_status;
+
 	for (i = 0; i < nr_nodes; i++) {
 		ret = move_node_to_sd_list(&msg->nodes[i].sheepid,
 					   msg->nodes[i].ent);
@@ -853,6 +855,7 @@ join_finished:
 		if (sys->status != SD_STATUS_OK ||
 		    sys->status != SD_STATUS_HALT) {
 			set_global_nr_copies(sys->nr_sobjs);
+			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
 		}
 	}
@@ -957,6 +960,7 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		break;
 	case SD_OP_MAKE_FS:
 		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
+		sys->flags = ((struct sd_so_req *)hdr)->flags;
 		if (!sys->nr_sobjs)
 			sys->nr_sobjs = SD_DEFAULT_REDUNDANCY;
 
@@ -980,8 +984,18 @@ static void vdi_op_done(struct vdi_op_message *msg)
 		update_epoch_store(sys->epoch);
 
 		set_global_nr_copies(sys->nr_sobjs);
+		set_cluster_flags(sys->flags);
 
-		sys->status = SD_STATUS_OK;
+		if (sys_flag_nohalt())
+			sys->status = SD_STATUS_OK;
+		else {
+			int nr_zones = get_zones_nr_from(&sys->sd_node_list);
+
+			if (nr_zones >= sys->nr_sobjs)
+				sys->status = SD_STATUS_OK;
+			else
+				sys->status = SD_STATUS_HALT;
+		}
 		break;
 	case SD_OP_SHUTDOWN:
 		sys->status = SD_STATUS_SHUTDOWN;
@@ -1208,6 +1222,13 @@ static void __sd_notify_done(struct cpg_event *cevent)
 		}
 		start_recovery(sys->epoch);
 	}
+
+	if (sys->status == SD_STATUS_HALT) {
+		int nr_zones = get_zones_nr_from(&sys->sd_node_list);
+
+		if (nr_zones >= sys->nr_sobjs)
+			sys->status = SD_STATUS_OK;
+	}
 }
 
 static void sd_notify_handler(struct sheepid *sender, void *msg, size_t msg_len)
@@ -1360,6 +1381,7 @@ static void send_join_request(struct sheepid *id)
 	msg.header.sheepid = sys->this_sheepid;
 
 	get_global_nr_copies(&msg.nr_sobjs);
+	get_cluster_flags(&msg.cluster_flags);
 
 	nr_entries = ARRAY_SIZE(entries);
 	ret = read_epoch(&msg.epoch, &msg.ctime, entries, &nr_entries);
@@ -1384,6 +1406,7 @@ static void __sd_join_done(struct cpg_event *cevent)
 	    sheepid_cmp(&w->joined, &sys->this_sheepid) == 0) {
 		sys->join_finished = 1;
 		get_global_nr_copies(&sys->nr_sobjs);
+		get_cluster_flags(&sys->flags);
 		first_cpg_node = 1;
 	}
 
@@ -1436,6 +1459,11 @@ static void __sd_join_done(struct cpg_event *cevent)
 		send_join_request(&w->joined);
 }
 
+int sys_flag_nohalt()
+{
+	return sys->flags & SD_FLAG_NOHALT;
+}
+
 static void __sd_leave_done(struct cpg_event *cevent)
 {
 	struct work_leave *w = container_of(cevent, struct work_leave, cev);
@@ -1448,6 +1476,13 @@ static void __sd_leave_done(struct cpg_event *cevent)
 	if (node_left &&
 	    (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT))
 		start_recovery(sys->epoch);
+
+	if (sys->status == SD_STATUS_OK && !sys_flag_nohalt()) {
+		int nr_zones = get_zones_nr_from(&sys->sd_node_list);
+
+		if (nr_zones < sys->nr_sobjs)
+			sys->status = SD_STATUS_HALT;
+	}
 }
 
 static void cpg_event_free(struct cpg_event *cevent)

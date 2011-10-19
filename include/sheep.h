@@ -48,6 +48,8 @@
 #define SD_RES_INVALID_CTIME 0x44 /* Creation time of sheepdog is different */
 #define SD_RES_INVALID_EPOCH 0x45 /* Invalid epoch */
 
+#define SD_FLAG_NOHALT       0x0001 /* Server the IO rquest even lack of nodes */
+
 struct sd_so_req {
 	uint8_t		proto_ver;
 	uint8_t		opcode;

@@ -116,6 +116,7 @@ struct cluster_info {
 
 	uint32_t epoch;
 	uint32_t status;
+	uint16_t flags;
 
 	/*
 	 * we add a node to cpg_node_list in confchg then move it to
@@ -213,6 +214,8 @@ int set_global_nr_copies(uint32_t copies);
 int get_global_nr_copies(uint32_t *copies);
 int set_cluster_flags(uint16_t flags);
 int get_cluster_flags(uint16_t *flags);
+
+int sys_flag_nohalt(void);
 
 #define NR_GW_WORKER_THREAD 4
 #define NR_IO_WORKER_THREAD 4
