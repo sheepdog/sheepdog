@@ -452,8 +452,7 @@ static struct sheepdog_node_list_entry *find_entry_epoch(struct sheepdog_node_li
 	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
 	int nr, i;
 
-	nr = epoch_log_read(epoch, (char *)nodes, sizeof(nodes));
-	nr /= sizeof(nodes[0]);
+	nr = epoch_log_read_nr(epoch, (char *)nodes, sizeof(nodes));
 
 	for (i = 0; i < nr; i++)
 		if (node_cmp(&nodes[i], entry) == 0)
@@ -591,9 +590,8 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 			return SD_RES_NEW_NODE_VER;
 		}
 
-		nr_local_entries = epoch_log_read(epoch, (char *)local_entries,
+		nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
 						  sizeof(local_entries));
-		nr_local_entries /= sizeof(local_entries[0]);
 
 		if (nr_entries != nr_local_entries) {
 			eprintf("joining node has invalid epoch, %"PRIu32" %s\n",

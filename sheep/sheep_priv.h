@@ -216,6 +216,7 @@ int get_global_nr_copies(uint32_t *copies);
 
 int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
+int epoch_log_read_nr(uint32_t epoch, char *buf, int len);
 int epoch_log_read_remote(uint32_t epoch, char *buf, int len);
 int get_latest_epoch(void);
 int remove_epoch(int epoch);
