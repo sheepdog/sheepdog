@@ -37,6 +37,7 @@
 #define SD_STATUS_WAIT_FOR_JOIN     0x02
 #define SD_STATUS_SHUTDOWN          0x03
 #define SD_STATUS_JOIN_FAILED       0x04
+#define SD_STATUS_HALT              0x05
 
 #define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheeps */
 

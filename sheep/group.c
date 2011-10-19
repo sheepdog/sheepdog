@@ -335,6 +335,9 @@ void cluster_queue_request(struct work *work, int idx)
 		case SD_STATUS_JOIN_FAILED:
 			ret = SD_RES_JOIN_FAILED;
 			break;
+		case SD_STATUS_HALT:
+			ret = SD_RES_HALT;
+			break;
 		default:
 			ret = SD_RES_SYSTEM_ERROR;
 			break;
@@ -550,7 +553,7 @@ static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
 		goto out;
 	}
 
-	if (sys->status == SD_STATUS_OK)
+	if (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT)
 		goto out;
 
 	if (epoch < lepoch) {
@@ -591,6 +594,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		goto out;
 
 	switch (sys->status) {
+	case SD_STATUS_HALT:
 	case SD_STATUS_OK:
 		if (inc_epoch)
 			*inc_epoch = 1;
@@ -776,7 +780,7 @@ static void update_cluster_info(struct join_message *msg)
 	int i;
 	int ret, nr_nodes = msg->nr_nodes;
 
-	eprintf("status = %d, epoch = %d, %d, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
+	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
 	if (msg->result != SD_RES_SUCCESS) {
 		if (is_myself(msg->header.from.addr, msg->header.from.port)) {
 			eprintf("failed to join sheepdog, %d\n", msg->result);
@@ -810,12 +814,13 @@ static void update_cluster_info(struct join_message *msg)
 				sheepid_to_str(&msg->nodes[i].sheepid));
 	}
 
-	if (msg->cluster_status != SD_STATUS_OK)
+	if (msg->cluster_status == SD_STATUS_WAIT_FOR_JOIN)
 		add_node_to_leave_list((struct message_header *)msg);
 
 	sys->join_finished = 1;
 
-	if (msg->cluster_status == SD_STATUS_OK && msg->inc_epoch)
+	if ((msg->cluster_status == SD_STATUS_OK || msg->cluster_status == SD_STATUS_HALT)
+	     && msg->inc_epoch)
 		update_epoch_log(sys->epoch);
 
 join_finished:
@@ -828,13 +833,16 @@ join_finished:
 		vprintf(SDOG_ERR, "%s has gone\n",
 			sheepid_to_str(&msg->header.sheepid));
 
-	if (msg->cluster_status == SD_STATUS_OK) {
+	if (msg->cluster_status == SD_STATUS_OK ||
+	    msg->cluster_status == SD_STATUS_HALT) {
 		if (msg->inc_epoch) {
 			sys->epoch++;
 			update_epoch_log(sys->epoch);
 			update_epoch_store(sys->epoch);
 		}
-		if (sys->status != SD_STATUS_OK) {
+
+		if (sys->status != SD_STATUS_OK ||
+		    sys->status != SD_STATUS_HALT) {
 			set_global_nr_copies(sys->nr_sobjs);
 			set_cluster_ctime(msg->ctime);
 		}
@@ -1077,7 +1085,8 @@ static void send_join_response(struct work_notify *w)
 	m->state = DM_FIN;
 
 	dprintf("%d, %d\n", jm->result, jm->cluster_status);
-	if (jm->result == SD_RES_SUCCESS && jm->cluster_status != SD_STATUS_OK) {
+	if (jm->result == SD_RES_SUCCESS &&
+	    jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
 		jm->nr_leave_nodes = 0;
 		list_for_each_entry(node, &sys->leave_list, list) {
 			jm->leave_nodes[jm->nr_leave_nodes].sheepid = node->sheepid;
@@ -1183,7 +1192,8 @@ static void __sd_notify_done(struct cpg_event *cevent)
 		}
 	}
 
-	if (do_recovery && sys->status == SD_STATUS_OK) {
+	if (do_recovery &&
+	    (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT)) {
 		list_for_each_entry_safe(node, t, &sys->leave_list, list) {
 			list_del(&node->list);
 		}
@@ -1255,7 +1265,8 @@ static int del_node(struct sheepid *id)
 		list_del(&node->list);
 		free(node);
 
-		if (sys->status == SD_STATUS_OK) {
+		if (sys->status == SD_STATUS_OK ||
+		    sys->status == SD_STATUS_HALT) {
 			nr = get_ordered_sd_node_list(e);
 			dprintf("update epoch, %d, %d\n", sys->epoch + 1, nr);
 			epoch_log_write(sys->epoch + 1, (char *)e,
@@ -1425,7 +1436,8 @@ static void __sd_leave_done(struct cpg_event *cevent)
 
 	print_node_list(&sys->sd_node_list);
 
-	if (node_left && sys->status == SD_STATUS_OK)
+	if (node_left &&
+	    (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT))
 		start_recovery(sys->epoch);
 }
 

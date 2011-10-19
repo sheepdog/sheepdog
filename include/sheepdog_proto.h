@@ -58,6 +58,7 @@
 #define SD_RES_WAIT_FOR_FORMAT  0x16 /* Sheepdog is waiting for a format operation */
 #define SD_RES_WAIT_FOR_JOIN    0x17 /* Sheepdog is waiting for other nodes joining */
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
+#define SD_RES_HALT 0x19 /* Sheepdog is stopped doing IO */
 
 /*
  * Object ID rules
