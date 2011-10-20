@@ -42,8 +42,8 @@ struct join_message {
 	uint8_t proto_ver;
 	uint8_t pad[2];
 	union {
-		struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
-		struct sheepdog_node_list_entry leave_nodes[SD_MAX_NODES];
+		struct sheepdog_node_list_entry nodes[0];
+		struct sheepdog_node_list_entry leave_nodes[0];
 	};
 };
 
@@ -68,7 +68,7 @@ struct work_join {
 	size_t member_list_entries;
 	struct sheepdog_node_list_entry joined;
 
-	struct join_message jm;
+	struct join_message *jm;
 };
 
 struct work_leave {
@@ -93,6 +93,13 @@ struct work_leave {
 })
 
 static int cpg_event_running;
+
+static size_t get_join_message_size(struct join_message *jm)
+{
+	/* jm->nr_nodes is always larger than jm->nr_leave_nodes, so
+	 * it is safe to use jm->nr_nodes. */
+	return sizeof(*jm) + jm->nr_nodes * sizeof(jm->nodes[0]);
+}
 
 static int get_node_idx(struct sheepdog_node_list_entry *ent,
 			struct sheepdog_node_list_entry *entries, int nr_nodes)
@@ -851,7 +858,7 @@ static int check_majority(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 static void __sd_join(struct cpg_event *cevent)
 {
 	struct work_join *w = container_of(cevent, struct work_join, cev);
-	struct join_message *msg = &w->jm;
+	struct join_message *msg = w->jm;
 	int i;
 
 	if (msg->cluster_status != SD_STATUS_OK)
@@ -939,23 +946,28 @@ static enum cluster_join_result sd_check_join_cb(
 
 static int send_join_request(struct sheepdog_node_list_entry *ent)
 {
-	struct join_message msg;
+	struct join_message *msg;
 	int nr_entries, ret;
 
-	memset(&msg, 0, sizeof(msg));
-	msg.proto_ver = SD_SHEEP_PROTO_VER;
+	msg = zalloc(sizeof(*msg) + SD_MAX_NODES * sizeof(msg->nodes[0]));
+	if (!msg)
+		panic("oom\n");
+	msg->proto_ver = SD_SHEEP_PROTO_VER;
 
-	get_cluster_copies(&msg.nr_sobjs);
-	get_cluster_flags(&msg.cluster_flags);
+	get_cluster_copies(&msg->nr_sobjs);
+	get_cluster_flags(&msg->cluster_flags);
 
-	nr_entries = ARRAY_SIZE(msg.nodes);
-	ret = read_epoch(&msg.epoch, &msg.ctime, msg.nodes, &nr_entries);
+	nr_entries = SD_MAX_NODES;
+	ret = read_epoch(&msg->epoch, &msg->ctime, msg->nodes, &nr_entries);
 	if (ret == SD_RES_SUCCESS)
-		msg.nr_nodes = nr_entries;
+		msg->nr_nodes = nr_entries;
 
-	ret = sys->cdrv->join(ent, sd_check_join_cb, &msg, sizeof(msg));
+	ret = sys->cdrv->join(ent, sd_check_join_cb, msg,
+			      get_join_message_size(msg));
 
 	vprintf(SDOG_INFO, "%s\n", node_to_str(&sys->this_node));
+
+	free(msg);
 
 	return ret;
 }
@@ -963,7 +975,7 @@ static int send_join_request(struct sheepdog_node_list_entry *ent)
 static void __sd_join_done(struct cpg_event *cevent)
 {
 	struct work_join *w = container_of(cevent, struct work_join, cev);
-	struct join_message *jm = &w->jm;
+	struct join_message *jm = w->jm;
 	struct node *node, *t;
 
 	print_node_list(sys->nodes, sys->nr_nodes);
@@ -1352,7 +1364,11 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		w->joined = *joined;
 
-		memcpy(&w->jm, opaque, sizeof(w->jm));
+		size = get_join_message_size(opaque);
+		w->jm = zalloc(size);
+		if (!w->jm)
+			panic("oom\n");
+		memcpy(w->jm, opaque, size);
 
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 		start_cpg_event_work();
