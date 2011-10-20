@@ -187,6 +187,7 @@ void cluster_queue_request(struct work *work, int idx)
 	struct epoch_log *log;
 	int ret = SD_RES_SUCCESS, i, max_logs, epoch;
 	uint32_t sys_stat = sys_stat_get();
+	size_t size;
 
 	eprintf("%p %x\n", req, hdr->opcode);
 
@@ -255,7 +256,12 @@ void cluster_queue_request(struct work *work, int idx)
 	return;
 
 forward:
-	msg = zalloc(sizeof(*msg) + hdr->data_length);
+	if (hdr->flags & SD_FLAG_CMD_WRITE)
+		size = sizeof(*msg);
+	else
+		size = sizeof(*msg) + hdr->data_length;
+
+	msg = zalloc(size);
 	if (!msg) {
 		eprintf("out of memory\n");
 		return;
@@ -263,12 +269,10 @@ forward:
 
 	msg->req = *((struct sd_vdi_req *)&req->rq);
 	msg->rsp = *((struct sd_vdi_rsp *)&req->rp);
-	if (hdr->flags & SD_FLAG_CMD_WRITE)
-		memcpy(msg->data, req->data, hdr->data_length);
 
 	list_add(&req->pending_list, &sys->pending_list);
 
-	sys->cdrv->notify(msg, sizeof(*msg) + hdr->data_length, vdi_op);
+	sys->cdrv->notify(msg, size, vdi_op);
 
 	free(msg);
 }
@@ -629,11 +633,15 @@ static void vdi_op(void *arg)
 	struct vdi_op_message *msg = arg;
 	const struct sd_vdi_req *hdr = &msg->req;
 	struct sd_vdi_rsp *rsp = &msg->rsp;
-	void *data = msg->data, *tag;
+	void *data, *tag;
 	int ret = SD_RES_SUCCESS;
 	struct sheepdog_vdi_attr *vattr;
 	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_sobjs;
 	uint64_t ctime = 0;
+	struct request *req;
+
+	req = list_first_entry(&sys->pending_list, struct request, pending_list);
+	data = req->data;
 
 	switch (hdr->opcode) {
 	case SD_OP_NEW_VDI:
