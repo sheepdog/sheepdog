@@ -52,7 +52,7 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
+int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
 	int ret;
@@ -96,16 +96,14 @@ static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entri
 			 uint64_t *list1, int nr_list1,
 			 uint64_t *list2, int nr_list2, int nr_objs);
 
-static int get_obj_list(struct request *req)
+int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data)
 {
 	DIR *dir;
 	struct dirent *d;
-	struct sd_list_req *hdr = (struct sd_list_req *)&req->rq;
-	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&req->rp;
 	uint64_t oid;
 	uint32_t epoch;
 	char path[1024];
-	uint64_t *p = (uint64_t *)req->data;
+	uint64_t *p = (uint64_t *)data;
 	int nr = 0;
 	uint64_t *objlist = NULL;
 	int obj_nr, i;
@@ -778,20 +776,16 @@ void store_queue_request(struct work *work, int idx)
 	uint64_t oid = hdr->oid;
 	uint32_t opcode = hdr->opcode;
 	uint32_t epoch = hdr->epoch;
-	struct sd_node_rsp *nrsp = (struct sd_node_rsp *)&req->rp;
 
 	dprintf("%"PRIu32", %x, %" PRIx64" , %u\n", idx, opcode, oid, epoch);
 
 	if (hdr->flags & SD_FLAG_CMD_RECOVERY)
 		epoch = hdr->tgt_epoch;
 
-	if (opcode == SD_OP_STAT_SHEEP) {
-		ret = stat_sheep(&nrsp->store_size, &nrsp->store_free, epoch);
-		goto out;
-	}
-
-	if (opcode == SD_OP_GET_OBJ_LIST) {
-		ret = get_obj_list(req);
+	if (is_local_op(req->op)) {
+		if (has_process_work(req->op))
+			ret = do_process_work(req->op, &req->rq,
+					      &req->rp, req->data);
 		goto out;
 	}
 
@@ -812,12 +806,10 @@ void store_queue_request(struct work *work, int idx)
 
 	ret = store_queue_request_local(req, epoch);
 out:
-	if (ret != SD_RES_SUCCESS) {
+	if (ret != SD_RES_SUCCESS)
 		dprintf("failed, %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
 			idx, opcode, oid, epoch, ret);
-		if (!(ret == SD_RES_NO_OBJ && hdr->flags & SD_FLAG_CMD_RECOVERY))
-			rsp->data_length = 0;
-	}
+
 	rsp->result = ret;
 }
 

@@ -101,17 +101,7 @@ static size_t get_join_message_size(struct join_message *jm)
 	return sizeof(*jm) + jm->nr_nodes * sizeof(jm->nodes[0]);
 }
 
-static int get_node_idx(struct sheepdog_node_list_entry *ent,
-			struct sheepdog_node_list_entry *entries, int nr_nodes)
-{
-	ent = bsearch(ent, entries, nr_nodes, sizeof(*ent), node_cmp);
-	if (!ent)
-		return -1;
-
-	return ent - entries;
-}
-
-static int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes)
+int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 {
 	int nr_zones = 0, i, j;
 	uint32_t zones[SD_MAX_REDUNDANCY];
@@ -146,116 +136,28 @@ void setup_ordered_sd_vnode_list(struct request *req)
 	get_ordered_sd_vnode_list(req->entry, &req->nr_vnodes, &req->nr_zones);
 }
 
-static void get_node_list(struct sd_node_req *req,
-			  struct sd_node_rsp *rsp, void *data)
+static void do_cluster_op(void *arg)
 {
-	int nr_nodes;
+	struct vdi_op_message *msg = arg;
+	int ret;
+	struct request *req;
 
-	nr_nodes = sys->nr_nodes;
-	memcpy(data, sys->nodes, sizeof(*sys->nodes) * nr_nodes);
-	rsp->data_length = nr_nodes * sizeof(struct sheepdog_node_list_entry);
-	rsp->nr_nodes = nr_nodes;
-	rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
-	rsp->master_idx = -1;
+	req = list_first_entry(&sys->pending_list, struct request, pending_list);
+	ret = do_process_work(req->op, (const struct sd_req *)&msg->req,
+			      (struct sd_rsp *)&msg->rsp, req->data);
+
+	msg->rsp.result = ret;
 }
-
-static int get_epoch(struct sd_obj_req *req,
-		      struct sd_obj_rsp *rsp, void *data)
-{
-	int epoch = req->tgt_epoch;
-	int len, ret;
-	dprintf("%d\n", epoch);
-	len = epoch_log_read(epoch, (char *)data, req->data_length);
-	if (len == -1) {
-		ret = SD_RES_NO_TAG;
-		rsp->data_length = 0;
-	} else {
-		ret = SD_RES_SUCCESS;
-		rsp->data_length = len;
-	}
-	return ret;
-}
-
-static void vdi_op(void *arg);
 
 void cluster_queue_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 	struct vdi_op_message *msg;
-	struct epoch_log *log;
-	int ret = SD_RES_SUCCESS, i, max_logs, epoch;
-	uint32_t sys_stat = sys_stat_get();
 	size_t size;
 
 	eprintf("%p %x\n", req, hdr->opcode);
 
-	switch (hdr->opcode) {
-	case SD_OP_GET_EPOCH:
-		ret = get_epoch((struct sd_obj_req *)hdr,
-			  (struct sd_obj_rsp *)rsp, req->data);
-		break;
-	case SD_OP_GET_NODE_LIST:
-		get_node_list((struct sd_node_req *)hdr,
-			      (struct sd_node_rsp *)rsp, req->data);
-		break;
-	case SD_OP_STAT_CLUSTER:
-		max_logs = rsp->data_length / sizeof(*log);
-		epoch = get_latest_epoch();
-		rsp->data_length = 0;
-		for (i = 0; i < max_logs; i++) {
-			if (epoch <= 0)
-				break;
-
-			log = (struct epoch_log *)req->data + i;
-			log->epoch = epoch;
-			log->ctime = get_cluster_ctime();
-			log->nr_nodes = epoch_log_read(epoch, (char *)log->nodes,
-						       sizeof(log->nodes));
-			if (log->nr_nodes == -1)
-				log->nr_nodes = epoch_log_read_remote(epoch,
-								      (char *)log->nodes,
-								      sizeof(log->nodes));
-
-			rsp->data_length += sizeof(*log);
-			log->nr_nodes /= sizeof(log->nodes[0]);
-			epoch--;
-		}
-
-		switch (sys_stat) {
-		case SD_STATUS_OK:
-			ret = SD_RES_SUCCESS;
-			break;
-		case SD_STATUS_WAIT_FOR_FORMAT:
-			ret = SD_RES_WAIT_FOR_FORMAT;
-			break;
-		case SD_STATUS_WAIT_FOR_JOIN:
-			ret = SD_RES_WAIT_FOR_JOIN;
-			break;
-		case SD_STATUS_SHUTDOWN:
-			ret = SD_RES_SHUTDOWN;
-			break;
-		case SD_STATUS_JOIN_FAILED:
-			ret = SD_RES_JOIN_FAILED;
-			break;
-		case SD_STATUS_HALT:
-			ret = SD_RES_HALT;
-			break;
-		default:
-			ret = SD_RES_SYSTEM_ERROR;
-			break;
-		}
-		break;
-	default:
-		/* forward request to group */
-		goto forward;
-	}
-
-	rsp->result = ret;
-	return;
-
-forward:
 	if (hdr->flags & SD_FLAG_CMD_WRITE)
 		size = sizeof(*msg);
 	else
@@ -272,7 +174,12 @@ forward:
 
 	list_add(&req->pending_list, &sys->pending_list);
 
-	sys->cdrv->notify(msg, size, vdi_op);
+	if (has_process_work(req->op))
+		sys->cdrv->notify(msg, size, do_cluster_op);
+	else {
+		msg->rsp.result = SD_RES_SUCCESS;
+		sys->cdrv->notify(msg, size, NULL);
+	}
 
 	free(msg);
 }
@@ -628,85 +535,6 @@ join_finished:
 	return;
 }
 
-static void vdi_op(void *arg)
-{
-	struct vdi_op_message *msg = arg;
-	const struct sd_vdi_req *hdr = &msg->req;
-	struct sd_vdi_rsp *rsp = &msg->rsp;
-	void *data, *tag;
-	int ret = SD_RES_SUCCESS;
-	struct sheepdog_vdi_attr *vattr;
-	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_sobjs;
-	uint64_t ctime = 0;
-	struct request *req;
-
-	req = list_first_entry(&sys->pending_list, struct request, pending_list);
-	data = req->data;
-
-	switch (hdr->opcode) {
-	case SD_OP_NEW_VDI:
-		ret = add_vdi(hdr->epoch, data, hdr->data_length, hdr->vdi_size, &vid,
-			      hdr->base_vdi_id, hdr->copies,
-			      hdr->snapid, &nr_copies);
-		break;
-	case SD_OP_DEL_VDI:
-		ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid,
-			      hdr->snapid, &nr_copies);
-		break;
-	case SD_OP_LOCK_VDI:
-	case SD_OP_GET_VDI_INFO:
-		if (hdr->proto_ver != SD_PROTO_VER) {
-			ret = SD_RES_VER_MISMATCH;
-			break;
-		}
-		if (hdr->data_length == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
-			tag = (char *)data + SD_MAX_VDI_LEN;
-		else if (hdr->data_length == SD_MAX_VDI_LEN)
-			tag = NULL;
-		else {
-			ret = SD_RES_INVALID_PARMS;
-			break;
-		}
-		ret = lookup_vdi(hdr->epoch, data, tag, &vid, hdr->snapid,
-				 &nr_copies, NULL);
-		if (ret != SD_RES_SUCCESS)
-			break;
-		break;
-	case SD_OP_GET_VDI_ATTR:
-		vattr = data;
-		ret = lookup_vdi(hdr->epoch, vattr->name, vattr->tag,
-				 &vid, hdr->snapid, &nr_copies, &ctime);
-		if (ret != SD_RES_SUCCESS)
-			break;
-		/* the curernt vdi id can change if we take the snapshot,
-		   so we use the hash value of the vdi name as the vdi id */
-		vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
-		vid &= SD_NR_VDIS - 1;
-		ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,
-				   &attrid, nr_copies, ctime,
-				   hdr->flags & SD_FLAG_CMD_CREAT,
-				   hdr->flags & SD_FLAG_CMD_EXCL,
-				   hdr->flags & SD_FLAG_CMD_DEL);
-		break;
-	case SD_OP_RELEASE_VDI:
-		break;
-	case SD_OP_MAKE_FS:
-		ret = SD_RES_SUCCESS;
-		break;
-	case SD_OP_SHUTDOWN:
-		break;
-	default:
-		ret = SD_RES_SYSTEM_ERROR;
-		eprintf("opcode %d is not implemented\n", hdr->opcode);
-		break;
-	}
-
-	rsp->vdi_id = vid;
-	rsp->attr_id = attrid;
-	rsp->copies = nr_copies;
-	rsp->result = ret;
-}
-
 static void __sd_notify(struct cpg_event *cevent)
 {
 }
@@ -715,86 +543,22 @@ static void __sd_notify_done(struct cpg_event *cevent)
 {
 	struct work_notify *w = container_of(cevent, struct work_notify, cev);
 	struct vdi_op_message *msg = (struct vdi_op_message *)w->msg;
-	const struct sd_vdi_req *hdr = &msg->req;
-	struct sd_vdi_rsp *rsp = &msg->rsp;
-	void *data = msg->data;
 	struct request *req;
 	int ret = msg->rsp.result;
-	int i, latest_epoch;
-	uint64_t ctime;
+	struct sd_op_template *op = get_sd_op(msg->req.opcode);
 
-	if (ret != SD_RES_SUCCESS)
-		goto out;
+	if (ret == SD_RES_SUCCESS && has_process_main(op))
+		ret = do_process_main(op, (const struct sd_req *)&msg->req,
+				      (struct sd_rsp *)&msg->rsp, msg->data);
 
-	switch (hdr->opcode) {
-	case SD_OP_NEW_VDI:
-	{
-		unsigned long nr = rsp->vdi_id;
-		vprintf(SDOG_INFO, "done %d %ld\n", ret, nr);
-		set_bit(nr, sys->vdi_inuse);
-		break;
-	}
-	case SD_OP_DEL_VDI:
-		break;
-	case SD_OP_LOCK_VDI:
-	case SD_OP_RELEASE_VDI:
-	case SD_OP_GET_VDI_INFO:
-	case SD_OP_GET_VDI_ATTR:
-		break;
-	case SD_OP_MAKE_FS:
-		sys->nr_sobjs = ((struct sd_so_req *)hdr)->copies;
-		sys->flags = ((struct sd_so_req *)hdr)->flags;
-		if (!sys->nr_sobjs)
-			sys->nr_sobjs = SD_DEFAULT_REDUNDANCY;
-
-		ctime = ((struct sd_so_req *)hdr)->ctime;
-		set_cluster_ctime(ctime);
-
-		latest_epoch = get_latest_epoch();
-		for (i = 1; i <= latest_epoch; i++)
-			remove_epoch(i);
-		memset(sys->vdi_inuse, 0, sizeof(sys->vdi_inuse));
-
-		sys->epoch = 1;
-		sys->recovered_epoch = 1;
-
-		dprintf("write epoch log, %d, %d\n", sys->epoch, sys->nr_nodes);
-		ret = epoch_log_write(sys->epoch, (char *)sys->nodes,
-				      sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
-		if (ret < 0)
-			eprintf("can't write epoch %u\n", sys->epoch);
-		update_epoch_store(sys->epoch);
-
-		set_cluster_copies(sys->nr_sobjs);
-		set_cluster_flags(sys->flags);
-
-		if (sys_flag_nohalt())
-			sys_stat_set(SD_STATUS_OK);
-		else {
-			int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-
-			if (nr_zones >= sys->nr_sobjs)
-				sys_stat_set(SD_STATUS_OK);
-			else
-				sys_stat_set(SD_STATUS_HALT);
-		}
-		break;
-	case SD_OP_SHUTDOWN:
-		sys_stat_set(SD_STATUS_SHUTDOWN);
-		break;
-	default:
-		eprintf("unknown operation %d\n", hdr->opcode);
-		ret = SD_RES_UNKNOWN;
-	}
-out:
 	if (!is_myself(w->sender.addr, w->sender.port))
 		return;
 
 	req = list_first_entry(&sys->pending_list, struct request, pending_list);
 
-	rsp->result = ret;
-	memcpy(req->data, data, rsp->data_length);
-	memcpy(&req->rp, rsp, sizeof(req->rp));
+	msg->rsp.result = ret;
+	memcpy(req->data, msg->data, msg->rsp.data_length);
+	memcpy(&req->rp, &msg->rsp, sizeof(req->rp));
 	list_del(&req->pending_list);
 	req->done(req);
 }
@@ -1226,7 +990,7 @@ do_retry:
 
 		list_del(&cevent->cpg_event_list);
 
-		if (is_io_request(req->rq.opcode)) {
+		if (is_io_op(req->op)) {
 			int copies = sys->nr_sobjs;
 
 			if (copies > req->nr_zones)
@@ -1282,7 +1046,7 @@ do_retry:
 			}
 		}
 
-		if (is_cluster_request(req->rq.opcode))
+		if (is_cluster_op(req->op))
 			queue_work(sys->cpg_wqueue, &req->work);
 		else if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 			queue_work(sys->io_wqueue, &req->work);

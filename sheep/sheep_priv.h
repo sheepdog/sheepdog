@@ -72,6 +72,8 @@ struct request {
 	struct sd_req rq;
 	struct sd_rsp rp;
 
+	struct sd_op_template *op;
+
 	void *data;
 
 	struct client_info *ci;
@@ -152,8 +154,6 @@ extern struct cluster_info *sys;
 
 int create_listen_port(int port, void *data);
 
-int is_io_request(unsigned op);
-int is_cluster_request(unsigned op);
 int init_store(const char *dir);
 int init_base_path(const char *dir);
 
@@ -173,6 +173,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
 		 int write, int excl, int delete);
 
+int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes);
 void setup_ordered_sd_vnode_list(struct request *req);
 void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
 			       int *nr_vnodes, int *nr_zones);
@@ -215,6 +216,8 @@ int get_latest_epoch(void);
 int remove_epoch(int epoch);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
+int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch);
+int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data);
 
 int start_recovery(uint32_t epoch);
 void resume_recovery_work(void);
@@ -234,6 +237,20 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		 uint32_t epoch, int worker_idx);
+
+/* Operations */
+
+struct sd_op_template *get_sd_op(uint8_t opcode);
+int is_cluster_op(struct sd_op_template *op);
+int is_local_op(struct sd_op_template *op);
+int is_io_op(struct sd_op_template *op);
+int is_force_op(struct sd_op_template *op);
+int has_process_work(struct sd_op_template *op);
+int has_process_main(struct sd_op_template *op);
+int do_process_work(struct sd_op_template *op, const struct sd_req *req,
+		    struct sd_rsp *rsp, void *data);
+int do_process_main(struct sd_op_template *op, const struct sd_req *req,
+		    struct sd_rsp *rsp, void *data);
 
 /* Journal */
 int jrnl_perform(int fd, void *buf, size_t count, off_t offset,

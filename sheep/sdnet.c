@@ -19,46 +19,6 @@
 
 #include "sheep_priv.h"
 
-int is_io_request(unsigned op)
-{
-	int ret = 0;
-
-	switch (op) {
-	case SD_OP_CREATE_AND_WRITE_OBJ:
-	case SD_OP_REMOVE_OBJ:
-	case SD_OP_READ_OBJ:
-	case SD_OP_WRITE_OBJ:
-		ret = 1;
-		break;
-	default:
-		break;
-	}
-
-	return ret;
-}
-
-int is_cluster_request(unsigned op)
-{
-	int ret = 0;
-
-	switch (op) {
-	case SD_OP_NEW_VDI:
-	case SD_OP_DEL_VDI:
-	case SD_OP_LOCK_VDI:
-	case SD_OP_RELEASE_VDI:
-	case SD_OP_GET_VDI_INFO:
-	case SD_OP_MAKE_FS:
-	case SD_OP_SHUTDOWN:
-	case SD_OP_GET_VDI_ATTR:
-		ret = 1;
-		break;
-	default:
-		break;
-	}
-
-	return ret;
-}
-
 void resume_pending_requests(void)
 {
 	struct request *next, *tmp;
@@ -119,18 +79,21 @@ static void setup_access_to_local_objects(struct request *req)
 static void __done(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
-	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	int again = 0;
 	int copies = sys->nr_sobjs;
 
 	if (copies > req->nr_zones)
 		copies = req->nr_zones;
 
-	if (is_cluster_request(hdr->opcode))
+	if (is_cluster_op(req->op))
 		/* request is forwarded to cpg group */
 		return;
 
-	if (is_io_request(hdr->opcode)) {
+	if (is_local_op(req->op) && has_process_main(req->op))
+		req->rp.result = do_process_main(req->op, &req->rq,
+						 &req->rp, req->data);
+
+	if (is_io_op(req->op)) {
 		struct cpg_event *cevent = &req->cev;
 
 		list_del(&req->r_wlist);
@@ -223,12 +186,15 @@ static void queue_request(struct request *req)
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 
-	dprintf("%x\n", hdr->opcode);
-
-	if (hdr->opcode == SD_OP_KILL_NODE) {
-		log_close();
-		exit(1);
+	req->op = get_sd_op(hdr->opcode);
+	if (!req->op) {
+		eprintf("invalid opcode, %d\n", hdr->opcode);
+		rsp->result = SD_RES_INVALID_PARMS;
+		req->done(req);
+		return;
 	}
+
+	dprintf("%x\n", hdr->opcode);
 
 	if (sys->status == SD_STATUS_SHUTDOWN) {
 		rsp->result = SD_RES_SHUTDOWN;
@@ -236,28 +202,9 @@ static void queue_request(struct request *req)
 		return;
 	}
 
-	/*
-	 * we can know why this node failed to join with
-	 * SD_OP_STAT_CLUSTER, so the request should be handled even
-	 * when the cluster status is SD_STATUS_JOIN_FAILED
-	 */
-	if (sys->status == SD_STATUS_JOIN_FAILED &&
-	    hdr->opcode != SD_OP_STAT_CLUSTER) {
-		rsp->result = SD_RES_JOIN_FAILED;
-		req->done(req);
-		return;
-	}
-
 	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
 	    sys->status == SD_STATUS_WAIT_FOR_JOIN) {
-		/* TODO: cleanup */
-		switch (hdr->opcode) {
-		case SD_OP_STAT_CLUSTER:
-		case SD_OP_MAKE_FS:
-		case SD_OP_GET_NODE_LIST:
-		case SD_OP_READ_VDIS:
-			break;
-		default:
+		if (!is_force_op(req->op)) {
 			if (sys->status == SD_STATUS_WAIT_FOR_FORMAT)
 				rsp->result = SD_RES_WAIT_FOR_FORMAT;
 			else
@@ -267,33 +214,11 @@ static void queue_request(struct request *req)
 		}
 	}
 
-	switch (hdr->opcode) {
-	case SD_OP_CREATE_AND_WRITE_OBJ:
-	case SD_OP_REMOVE_OBJ:
-	case SD_OP_READ_OBJ:
-	case SD_OP_WRITE_OBJ:
-	case SD_OP_STAT_SHEEP:
-	case SD_OP_GET_OBJ_LIST:
+	if (is_io_op(req->op) || is_local_op(req->op))
 		req->work.fn = store_queue_request;
-		break;
-	case SD_OP_GET_NODE_LIST:
-	case SD_OP_NEW_VDI:
-	case SD_OP_DEL_VDI:
-	case SD_OP_LOCK_VDI:
-	case SD_OP_RELEASE_VDI:
-	case SD_OP_GET_VDI_INFO:
-	case SD_OP_MAKE_FS:
-	case SD_OP_SHUTDOWN:
-	case SD_OP_STAT_CLUSTER:
-	case SD_OP_GET_VDI_ATTR:
-	case SD_OP_GET_EPOCH:
+	else if (is_cluster_op(req->op))
 		req->work.fn = cluster_queue_request;
-		break;
-	case SD_OP_READ_VDIS:
-		rsp->result = read_vdis(req->data, hdr->data_length, &rsp->data_length);
-		req->done(req);
-		return;
-	default:
+	else {
 		eprintf("unknown operation %d\n", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;
 		req->done(req);
@@ -314,7 +239,7 @@ static void queue_request(struct request *req)
 		hdr->epoch = sys->epoch;
 
 	setup_ordered_sd_vnode_list(req);
-	if (is_io_request(hdr->opcode))
+	if (is_io_op(req->op))
 		setup_access_to_local_objects(req);
 
 	cevent->ctype = CPG_EVENT_REQUEST;
