@@ -1001,11 +1001,6 @@ static void __sd_join_done(struct cpg_event *cevent)
 	}
 }
 
-int sys_flag_nohalt()
-{
-	return sys->flags & SD_FLAG_NOHALT;
-}
-
 static void __sd_leave_done(struct cpg_event *cevent)
 {
 	struct work_leave *w = container_of(cevent, struct work_leave, cev);

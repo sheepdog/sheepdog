@@ -26,12 +26,12 @@
 #define SD_OP_GET_OBJ_LIST   0xA1
 #define SD_OP_GET_EPOCH      0XA2
 
-#define SD_STATUS_OK                0x00
-#define SD_STATUS_WAIT_FOR_FORMAT   0x01
-#define SD_STATUS_WAIT_FOR_JOIN     0x02
-#define SD_STATUS_SHUTDOWN          0x03
-#define SD_STATUS_JOIN_FAILED       0x04
-#define SD_STATUS_HALT              0x05
+#define SD_STATUS_OK                0x00000001
+#define SD_STATUS_WAIT_FOR_FORMAT   0x00000002
+#define SD_STATUS_WAIT_FOR_JOIN     0x00000004
+#define SD_STATUS_SHUTDOWN          0x00000008
+#define SD_STATUS_JOIN_FAILED       0x00000010
+#define SD_STATUS_HALT              0x00000020
 
 #define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheeps */
 
@@ -203,8 +203,6 @@ int get_global_nr_copies(uint32_t *copies);
 int set_cluster_flags(uint16_t flags);
 int get_cluster_flags(uint16_t *flags);
 
-int sys_flag_nohalt(void);
-
 #define NR_GW_WORKER_THREAD 4
 #define NR_IO_WORKER_THREAD 4
 
@@ -246,6 +244,63 @@ static inline int is_myself(uint8_t *addr, uint16_t port)
 	return (memcmp(addr, sys->this_node.addr,
 		       sizeof(sys->this_node.addr)) == 0) &&
 		port == sys->this_node.port;
+}
+
+/* Cluster status/flag helper */
+
+static inline int sys_flag_nohalt(void)
+{
+	return sys->flags & SD_FLAG_NOHALT;
+}
+
+static inline int sys_stat_ok(void)
+{
+	return sys->status & SD_STATUS_OK;
+}
+
+static inline int sys_stat_wait_format(void)
+{
+	return sys->status & SD_STATUS_WAIT_FOR_FORMAT;
+}
+
+static inline int sys_stat_wait_join(void)
+{
+	return sys->status & SD_STATUS_WAIT_FOR_JOIN;
+}
+
+static inline int sys_stat_join_failed(void)
+{
+	return sys->status & SD_STATUS_JOIN_FAILED;
+}
+
+static inline int sys_stat_shutdown(void)
+{
+	return sys->status & SD_STATUS_SHUTDOWN;
+}
+
+static inline int sys_stat_halt(void)
+{
+	return sys->status & SD_STATUS_HALT;
+}
+
+static inline void sys_stat_set(uint32_t s)
+{
+	sys->status = s;
+}
+
+static inline uint32_t sys_stat_get(void)
+{
+	return sys->status;
+}
+
+static inline int sys_can_recover(void)
+{
+	return sys_stat_ok() || sys_stat_halt();
+}
+
+static inline int sys_can_halt(void)
+{
+	return sys_stat_ok() && !sys_flag_nohalt();
 }
 
 #endif
