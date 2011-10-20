@@ -2043,7 +2043,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	return SD_RES_SUCCESS;
 }
 
-int set_global_nr_copies(uint32_t copies)
+int set_cluster_copies(uint32_t copies)
 {
 	int fd, ret;
 
@@ -2062,7 +2062,7 @@ int set_global_nr_copies(uint32_t copies)
 	return SD_RES_SUCCESS;
 }
 
-int get_global_nr_copies(uint32_t *copies)
+int get_cluster_copies(uint32_t *copies)
 {
 	int fd, ret;
 

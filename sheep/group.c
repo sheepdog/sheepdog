@@ -613,7 +613,7 @@ join_finished:
 		}
 		/* Fresh node */
 		if (!sys_stat_ok() && !sys_stat_halt()) {
-			set_global_nr_copies(sys->nr_sobjs);
+			set_cluster_copies(sys->nr_sobjs);
 			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
 		}
@@ -758,7 +758,7 @@ static void __sd_notify_done(struct cpg_event *cevent)
 			eprintf("can't write epoch %u\n", sys->epoch);
 		update_epoch_store(sys->epoch);
 
-		set_global_nr_copies(sys->nr_sobjs);
+		set_cluster_copies(sys->nr_sobjs);
 		set_cluster_flags(sys->flags);
 
 		if (sys_flag_nohalt())
@@ -961,7 +961,7 @@ static int send_join_request(struct sheepdog_node_list_entry *ent)
 	msg.header.msg_length = sizeof(msg);
 	msg.header.from = *ent;
 
-	get_global_nr_copies(&msg.nr_sobjs);
+	get_cluster_copies(&msg.nr_sobjs);
 	get_cluster_flags(&msg.cluster_flags);
 
 	nr_entries = ARRAY_SIZE(msg.nodes);
