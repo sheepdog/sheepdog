@@ -185,6 +185,7 @@ void cluster_queue_request(struct work *work, int idx)
 	struct vdi_op_message *msg;
 	struct epoch_log *log;
 	int ret = SD_RES_SUCCESS, i, max_logs, epoch;
+	uint32_t sys_stat = sys_stat_get();
 
 	eprintf("%p %x\n", req, hdr->opcode);
 
@@ -220,7 +221,7 @@ void cluster_queue_request(struct work *work, int idx)
 			epoch--;
 		}
 
-		switch (sys->status) {
+		switch (sys_stat) {
 		case SD_STATUS_OK:
 			ret = SD_RES_SUCCESS;
 			break;
@@ -345,8 +346,7 @@ static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
 	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
 	uint32_t lepoch;
 
-	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
-	    sys->status == SD_STATUS_SHUTDOWN)
+	if (sys_stat_wait_format() || sys_stat_shutdown())
 		goto out;
 	/* When the joinning node is newly created, we need to check nothing. */
 	if (nr_entries == 0)
@@ -363,7 +363,7 @@ static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
 		goto out;
 	}
 
-	if (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT)
+	if (sys_can_recover())
 		goto out;
 
 	if (epoch < lepoch) {
@@ -393,8 +393,9 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 	int nr, nr_local_entries, nr_leave_entries;
 	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
 	char str[256];
+	uint32_t sys_stat = sys_stat_get();
 
-	*status = sys->status;
+	*status = sys_stat;
 	if (inc_epoch)
 		*inc_epoch = 0;
 
@@ -402,7 +403,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 	if (ret)
 		goto out;
 
-	switch (sys->status) {
+	switch (sys_stat) {
 	case SD_STATUS_HALT:
 	case SD_STATUS_OK:
 		if (inc_epoch)
@@ -554,7 +555,7 @@ static void update_cluster_info(struct join_message *msg,
 
 	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
 
-	if (sys->status == SD_STATUS_JOIN_FAILED)
+	if (sys_stat_join_failed())
 		return;
 
 	if (sys->join_finished)
@@ -610,9 +611,8 @@ join_finished:
 			update_epoch_log(sys->epoch);
 			update_epoch_store(sys->epoch);
 		}
-
-		if (sys->status != SD_STATUS_OK ||
-		    sys->status != SD_STATUS_HALT) {
+		/* Fresh node */
+		if (!sys_stat_ok() && !sys_stat_halt()) {
 			set_global_nr_copies(sys->nr_sobjs);
 			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
@@ -621,7 +621,7 @@ join_finished:
 
 	print_node_list(sys->nodes, sys->nr_nodes);
 
-	sys->status = msg->cluster_status;
+	sys_stat_set(msg->cluster_status);
 	return;
 }
 
@@ -762,18 +762,18 @@ static void __sd_notify_done(struct cpg_event *cevent)
 		set_cluster_flags(sys->flags);
 
 		if (sys_flag_nohalt())
-			sys->status = SD_STATUS_OK;
+			sys_stat_set(SD_STATUS_OK);
 		else {
 			int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 			if (nr_zones >= sys->nr_sobjs)
-				sys->status = SD_STATUS_OK;
+				sys_stat_set(SD_STATUS_OK);
 			else
-				sys->status = SD_STATUS_HALT;
+				sys_stat_set(SD_STATUS_HALT);
 		}
 		break;
 	case SD_OP_SHUTDOWN:
-		sys->status = SD_STATUS_SHUTDOWN;
+		sys_stat_set(SD_STATUS_SHUTDOWN);
 		break;
 	default:
 		eprintf("unknown operation %d\n", hdr->opcode);
@@ -869,7 +869,7 @@ static void __sd_join(struct cpg_event *cevent)
 	if (msg->cluster_status != SD_STATUS_OK)
 		return;
 
-	if (sys->status == SD_STATUS_OK)
+	if (sys_stat_ok())
 		return;
 
 	get_vdi_bitmap_from_sd_list();
@@ -986,18 +986,18 @@ static void __sd_join_done(struct cpg_event *cevent)
 
 	update_cluster_info(jm, w->member_list, w->member_list_entries);
 
-	if (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT) {
+	if (sys_can_recover()) {
 		list_for_each_entry_safe(node, t, &sys->leave_list, list) {
 			list_del(&node->list);
 		}
 		start_recovery(sys->epoch);
 	}
 
-	if (sys->status == SD_STATUS_HALT) {
+	if (sys_stat_halt()) {
 		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 		if (nr_zones >= sys->nr_sobjs)
-			sys->status = SD_STATUS_OK;
+			sys_stat_set(SD_STATUS_OK);
 	}
 }
 
@@ -1010,8 +1010,7 @@ static void __sd_leave_done(struct cpg_event *cevent)
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
 					 sys->vnodes);
-	if (sys->status == SD_STATUS_OK ||
-	    sys->status == SD_STATUS_HALT) {
+	if (sys_can_recover()) {
 		dprintf("update epoch, %d, %d\n", sys->epoch + 1, sys->nr_nodes);
 		epoch_log_write(sys->epoch + 1, (char *)sys->nodes,
 				sizeof(*sys->nodes) * sys->nr_nodes);
@@ -1023,14 +1022,14 @@ static void __sd_leave_done(struct cpg_event *cevent)
 
 	print_node_list(sys->nodes, sys->nr_nodes);
 
-	if (sys->status == SD_STATUS_OK || sys->status == SD_STATUS_HALT)
+	if (sys_can_recover())
 		start_recovery(sys->epoch);
 
-	if (sys->status == SD_STATUS_OK && !sys_flag_nohalt()) {
+	if (sys_can_halt()) {
 		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 		if (nr_zones < sys->nr_sobjs)
-			sys->status = SD_STATUS_HALT;
+			sys_stat_set(SD_STATUS_HALT);
 	}
 }
 
@@ -1347,7 +1346,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		for (i = 0; i < nr_members; i++)
 			dprintf("[%x] %s\n", i, node_to_str(members + i));
 
-		if (sys->status == SD_STATUS_SHUTDOWN)
+		if (sys_stat_shutdown())
 			break;
 
 		w = zalloc(sizeof(*w));
@@ -1376,7 +1375,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		break;
 	case CJ_RES_FAIL:
 	case CJ_RES_JOIN_LATER:
-		if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
+		if (!sys_stat_wait_join())
 			break;
 
 		n = zalloc(sizeof(*n));
@@ -1399,7 +1398,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		dprintf("%d == %d + %d \n", nr_local, nr, nr_leave);
 		if (nr_local == nr + nr_leave) {
-			sys->status = SD_STATUS_OK;
+			sys_stat_set(SD_STATUS_OK);
 			update_epoch_log(sys->epoch);
 			update_epoch_store(sys->epoch);
 		}
@@ -1441,7 +1440,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		dprintf("%d == %d + %d \n", nr_local, nr, nr_leave);
 		if (nr_local == nr + nr_leave) {
-			sys->status = SD_STATUS_OK;
+			sys_stat_set(SD_STATUS_OK);
 			update_epoch_log(sys->epoch);
 			update_epoch_store(sys->epoch);
 		}
@@ -1461,7 +1460,7 @@ static void sd_leave_handler(struct sheepdog_node_list_entry *left,
 	for (i = 0; i < nr_members; i++)
 		dprintf("[%x] %s\n", i, node_to_str(members + i));
 
-	if (sys->status == SD_STATUS_SHUTDOWN)
+	if (sys_stat_shutdown())
 		return;
 
 	w = zalloc(sizeof(*w));
@@ -1531,9 +1530,9 @@ int create_cluster(int port, int64_t zone)
 	dprintf("zone id = %u\n", sys->this_node.zone);
 
 	if (get_latest_epoch() == 0)
-		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
+		sys_stat_set(SD_STATUS_WAIT_FOR_FORMAT);
 	else
-		sys->status = SD_STATUS_WAIT_FOR_JOIN;
+		sys_stat_set(SD_STATUS_WAIT_FOR_JOIN);
 	INIT_LIST_HEAD(&sys->pending_list);
 	INIT_LIST_HEAD(&sys->leave_list);
 
