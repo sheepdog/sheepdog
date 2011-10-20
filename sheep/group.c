@@ -30,17 +30,17 @@ struct node {
 };
 
 struct join_message {
+	uint8_t proto_ver;
+	uint8_t nr_sobjs;
 	uint16_t nr_nodes;
 	uint16_t nr_leave_nodes;
-	uint32_t nr_sobjs;
-	uint32_t cluster_status;
 	uint16_t cluster_flags;
+	uint32_t cluster_status;
 	uint32_t epoch;
 	uint64_t ctime;
 	uint32_t result;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
-	uint8_t proto_ver;
-	uint8_t pad[2];
+	uint8_t pad[3];
 	union {
 		struct sheepdog_node_list_entry nodes[0];
 		struct sheepdog_node_list_entry leave_nodes[0];

@@ -198,8 +198,8 @@ void cluster_queue_request(struct work *work, int idx);
 
 int update_epoch_store(uint32_t epoch);
 
-int set_cluster_copies(uint32_t copies);
-int get_cluster_copies(uint32_t *copies);
+int set_cluster_copies(uint8_t copies);
+int get_cluster_copies(uint8_t *copies);
 int set_cluster_flags(uint16_t flags);
 int get_cluster_flags(uint16_t *flags);
 

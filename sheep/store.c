@@ -26,8 +26,9 @@
 
 struct sheepdog_config {
 	uint64_t ctime;
-	uint32_t copies;
 	uint32_t flags;
+	uint8_t copies;
+	uint8_t pad[3];
 };
 
 static char *obj_path;
@@ -2043,7 +2044,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	return SD_RES_SUCCESS;
 }
 
-int set_cluster_copies(uint32_t copies)
+int set_cluster_copies(uint8_t copies)
 {
 	int fd, ret;
 
@@ -2062,7 +2063,7 @@ int set_cluster_copies(uint32_t copies)
 	return SD_RES_SUCCESS;
 }
 
-int get_cluster_copies(uint32_t *copies)
+int get_cluster_copies(uint8_t *copies)
 {
 	int fd, ret;
 
