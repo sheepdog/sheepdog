@@ -26,7 +26,7 @@
 
 struct sheepdog_config {
 	uint64_t ctime;
-	uint32_t flags;
+	uint16_t flags;
 	uint8_t copies;
 	uint8_t pad[3];
 };
