@@ -153,6 +153,7 @@ extern struct cluster_info *sys;
 int create_listen_port(int port, void *data);
 
 int is_io_request(unsigned op);
+int is_cluster_request(unsigned op);
 int init_store(const char *dir);
 int init_base_path(const char *dir);
 

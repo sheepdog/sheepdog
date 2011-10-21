@@ -1281,7 +1281,10 @@ do_retry:
 				}
 			}
 		}
-		if (req->rq.flags & SD_FLAG_CMD_DIRECT)
+
+		if (is_cluster_request(req->rq.opcode))
+			queue_work(sys->cpg_wqueue, &req->work);
+		else if (req->rq.flags & SD_FLAG_CMD_DIRECT)
 			queue_work(sys->io_wqueue, &req->work);
 		else
 			queue_work(sys->gateway_wqueue, &req->work);

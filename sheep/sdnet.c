@@ -37,6 +37,28 @@ int is_io_request(unsigned op)
 	return ret;
 }
 
+int is_cluster_request(unsigned op)
+{
+	int ret = 0;
+
+	switch (op) {
+	case SD_OP_NEW_VDI:
+	case SD_OP_DEL_VDI:
+	case SD_OP_LOCK_VDI:
+	case SD_OP_RELEASE_VDI:
+	case SD_OP_GET_VDI_INFO:
+	case SD_OP_MAKE_FS:
+	case SD_OP_SHUTDOWN:
+	case SD_OP_GET_VDI_ATTR:
+		ret = 1;
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
+
 void resume_pending_requests(void)
 {
 	struct request *next, *tmp;
@@ -104,18 +126,9 @@ static void __done(struct work *work, int idx)
 	if (copies > req->nr_zones)
 		copies = req->nr_zones;
 
-	switch (hdr->opcode) {
-	case SD_OP_NEW_VDI:
-	case SD_OP_DEL_VDI:
-	case SD_OP_LOCK_VDI:
-	case SD_OP_RELEASE_VDI:
-	case SD_OP_GET_VDI_INFO:
-	case SD_OP_MAKE_FS:
-	case SD_OP_SHUTDOWN:
-	case SD_OP_GET_VDI_ATTR:
+	if (is_cluster_request(hdr->opcode))
 		/* request is forwarded to cpg group */
 		return;
-	}
 
 	if (is_io_request(hdr->opcode)) {
 		struct cpg_event *cevent = &req->cev;
