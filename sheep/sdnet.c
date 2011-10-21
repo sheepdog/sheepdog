@@ -101,7 +101,7 @@ static void setup_access_to_local_objects(struct request *req)
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	int copies;
 
-	if (hdr->flags & SD_FLAG_CMD_DIRECT) {
+	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
 		req->local_oid = hdr->oid;
 		return;
 	}
@@ -142,7 +142,7 @@ static void __done(struct work *work, int idx)
 		 * of sys->cpg_event_siblings.
 		 */
 
-		if (!(req->rq.flags & SD_FLAG_CMD_DIRECT) &&
+		if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
 		    (req->rp.result == SD_RES_OLD_NODE_VER ||
 		     req->rp.result == SD_RES_NEW_NODE_VER ||
 		     req->rp.result == SD_RES_NETWORK_ERROR ||
@@ -195,7 +195,7 @@ static void __done(struct work *work, int idx)
 			eprintf("leave from cluster\n");
 			leave_cluster();
 
-			if (req->rq.flags & SD_FLAG_CMD_DIRECT)
+			if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 				/* hack to retry */
 				req->rp.result = SD_RES_NETWORK_ERROR;
 			else {
@@ -310,7 +310,7 @@ static void queue_request(struct request *req)
 	 * start_cpg_event_work(that is, passing requests to work
 	 * threads).
 	 */
-	if (!(hdr->flags & SD_FLAG_CMD_DIRECT))
+	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL))
 		hdr->epoch = sys->epoch;
 
 	setup_ordered_sd_vnode_list(req);
@@ -687,7 +687,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 		hdr.copies = nr;
 
 		hdr.flags = flags;
-		hdr.flags |= SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
+		hdr.flags |= SD_FLAG_CMD_WRITE | SD_FLAG_CMD_IO_LOCAL;
 		hdr.data_length = wlen;
 		hdr.offset = offset;
 
@@ -752,7 +752,7 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.oid = oid;
 
-		hdr.flags =  SD_FLAG_CMD_DIRECT;
+		hdr.flags =  SD_FLAG_CMD_IO_LOCAL;
 		hdr.data_length = rlen;
 		hdr.offset = offset;
 

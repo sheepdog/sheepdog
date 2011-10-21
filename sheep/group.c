@@ -1233,7 +1233,7 @@ do_retry:
 				copies = req->nr_zones;
 
 			if (__is_access_to_recoverying_objects(req)) {
-				if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
+				if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
 					req->rp.result = SD_RES_NEW_NODE_VER;
 					sys->nr_outstanding_io++; /* TODO: cleanup */
 					list_add_tail(&req->r_wlist, &failed_req_list);
@@ -1263,7 +1263,7 @@ do_retry:
 				}
 			}
 
-			if (!(req->rq.flags & SD_FLAG_CMD_DIRECT) &&
+			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
 			    req->rq.opcode == SD_OP_READ_OBJ) {
 				struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 				uint32_t vdi_id = oid_to_vid(hdr->oid);
@@ -1284,7 +1284,7 @@ do_retry:
 
 		if (is_cluster_request(req->rq.opcode))
 			queue_work(sys->cpg_wqueue, &req->work);
-		else if (req->rq.flags & SD_FLAG_CMD_DIRECT)
+		else if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 			queue_work(sys->io_wqueue, &req->work);
 		else
 			queue_work(sys->gateway_wqueue, &req->work);

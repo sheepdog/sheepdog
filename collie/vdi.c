@@ -273,7 +273,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
 
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.data_length = rlen;
-		hdr.flags = SD_FLAG_CMD_DIRECT;
+		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 		hdr.oid = oid;
 		hdr.epoch = node_list_version;
 

@@ -203,7 +203,7 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 
 		rlen = *ori_rlen;
 		wlen = 0;
-		hdr.flags = SD_FLAG_CMD_DIRECT;
+		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 		hdr.data_length = rlen;
 		hdr.offset = offset;
 
@@ -269,7 +269,7 @@ static int forward_read_obj_req(struct request *req, int idx)
 	if (copies > req->nr_zones)
 		copies = req->nr_zones;
 
-	hdr.flags |= SD_FLAG_CMD_DIRECT;
+	hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
 	/* TODO: we can do better; we need to check this first */
 	for (i = 0; i < copies; i++) {
@@ -334,7 +334,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 	for (i = 0; i < ARRAY_SIZE(pfds); i++)
 		pfds[i].fd = -1;
 
-	hdr.flags |= SD_FLAG_CMD_DIRECT;
+	hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
 	wlen = hdr.data_length;
 	rlen = 0;
@@ -795,7 +795,7 @@ void store_queue_request(struct work *work, int idx)
 		goto out;
 	}
 
-	if (!(hdr->flags & SD_FLAG_CMD_DIRECT)) {
+	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL)) {
 		/* fix object consistency when we read the object for the first time */
 		if (req->check_consistency) {
 			ret = fix_object_consistency(req, idx);
@@ -1298,7 +1298,7 @@ next:
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.oid = oid;
 	hdr.epoch = epoch;
-	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_DIRECT;
+	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_IO_LOCAL;
 	hdr.tgt_epoch = tgt_epoch;
 	hdr.data_length = rlen;
 
