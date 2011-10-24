@@ -199,6 +199,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 void cluster_queue_request(struct work *work, int idx);
 
 int update_epoch_store(uint32_t epoch);
+int update_epoch_log(int epoch);
 
 int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);

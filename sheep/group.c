@@ -441,19 +441,6 @@ static void get_vdi_bitmap_from_sd_list(void)
 		get_vdi_bitmap_from(sys->nodes + i);
 }
 
-static int update_epoch_log(int epoch)
-{
-	int ret;
-
-	dprintf("update epoch, %d, %d\n", epoch, sys->nr_nodes);
-	ret = epoch_log_write(epoch, (char *)sys->nodes,
-			      sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
-	if (ret < 0)
-		eprintf("can't write epoch %u\n", epoch);
-
-	return ret;
-}
-
 static void update_cluster_info(struct join_message *msg,
 				struct sheepdog_node_list_entry *joined,
 				struct sheepdog_node_list_entry *nodes,

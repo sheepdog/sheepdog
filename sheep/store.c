@@ -472,6 +472,20 @@ int update_epoch_store(uint32_t epoch)
 	return 0;
 }
 
+int update_epoch_log(int epoch)
+{
+        int ret;
+
+        dprintf("update epoch, %d, %d\n", epoch, sys->nr_nodes);
+        ret = epoch_log_write(epoch, (char *)sys->nodes,
+                              sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
+        if (ret < 0)
+                eprintf("can't write epoch %u\n", epoch);
+
+        return ret;
+}
+
+
 int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, int copies,
 		       uint32_t epoch, int create)
