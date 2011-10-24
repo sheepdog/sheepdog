@@ -10,6 +10,8 @@
  */
 
 #include <time.h>
+#include <string.h>
+#include <ctype.h>
 #include <sys/time.h>
 
 #include "collie.h"
@@ -17,6 +19,7 @@
 struct cluster_cmd_data {
 	int copies;
 	int nohalt;
+	int force;
 } cluster_cmd_data;
 
 static void set_nohalt(uint16_t *p)
@@ -169,6 +172,62 @@ static int cluster_shutdown(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+#define RECOVER_PRINT \
+"CAUTION!Please assure me that you have tried booting up all the\n\
+cluster nodes before you run this command.\n\n\
+In two cases you need to recover the cluster manually:\n\
+\t1) The master node is failed to boot in different epoch condition.\n\
+\t2) Some nodes are failed to boot after the cluster is shutdown-ed.\n\
+\nPlease type to continue [Yes/No]: "
+
+static int cluster_recover(int argc, char **argv)
+{
+	int fd, ret;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	unsigned rlen, wlen;
+	char str[123] = {'\0'};
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		return EXIT_SYSFAIL;
+
+	if (!cluster_cmd_data.force) {
+		int i, l;
+		printf(RECOVER_PRINT);
+		ret = scanf("%s", str);
+		if (ret < 0)
+			return EXIT_SYSFAIL;
+		l = strlen(str);
+		for (i = 0; i < l; i++)
+			str[i] = tolower(str[i]);
+		if (strncmp(str, "yes", 3) !=0)
+			return EXIT_SUCCESS;
+	}
+
+	memset(&hdr, 0, sizeof(hdr));
+
+	hdr.opcode = SD_OP_RECOVER;
+	hdr.epoch = node_list_version;
+
+	rlen = 0;
+	wlen = 0;
+	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "failed to connect\n");
+		return EXIT_SYSFAIL;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 0, cluster_info},
@@ -176,6 +235,8 @@ static struct subcommand cluster_cmd[] = {
 	 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
+	{"recover", NULL, "afph", "manually recover the cluster",
+	0, cluster_recover},
 	{NULL,},
 };
 
@@ -196,6 +257,9 @@ static int cluster_parser(int ch, char *opt)
 		break;
 	case 'H':
 		cluster_cmd_data.nohalt = 1;
+		break;
+	case 'f':
+		cluster_cmd_data.force = 1;
 		break;
 	}
 

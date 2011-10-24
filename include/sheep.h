@@ -36,6 +36,7 @@
 #define SD_OP_STAT_CLUSTER   0x87
 #define SD_OP_KILL_NODE      0x88
 #define SD_OP_GET_VDI_ATTR   0x89
+#define SD_OP_RECOVER	     0x8A
 
 #define SD_FLAG_CMD_IO_LOCAL   0x0010
 #define SD_FLAG_CMD_RECOVERY 0x0020

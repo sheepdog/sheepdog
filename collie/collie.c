@@ -42,6 +42,7 @@ static const struct sd_option collie_options[] = {
 	/* cluster options */
 	{'c', "copies", 1, "set the number of data redundancy"},
 	{'H', "nohalt", 0, "serve the IO rquests even lack of enough redundant nodes"},
+	{'f', "force", 0, "never promt, you know well what you are doing"},
 
 	{ 0, NULL, 0, NULL },
 };
