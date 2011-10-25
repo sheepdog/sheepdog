@@ -1218,6 +1218,9 @@ static void sd_leave_handler(struct sheepdog_node_list_entry *left,
 	struct work_leave *w = NULL;
 	int i, size;
 
+	if (node_cmp(left, &sys->this_node) == 0)
+		panic("Network Patition Bug: I should have exited.\n");
+
 	dprintf("leave %s\n", node_to_str(left));
 	for (i = 0; i < nr_members; i++)
 		dprintf("[%x] %s\n", i, node_to_str(members + i));
