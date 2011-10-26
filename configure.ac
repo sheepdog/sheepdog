@@ -21,7 +21,8 @@ AC_PREREQ([2.61])
 m4_define([sheepdog_version], [0.2.4])
 
 m4_define([git_version],
-	m4_esyscmd_s([git describe --tags --dirty 2> /dev/null | sed 's/^v//']))
+	m4_esyscmd([git describe --tags --dirty 2> /dev/null | sed 's/^v//' \
+| tr '-' '_' | tr -d '\n']))
 
 AC_INIT([sheepdog], m4_default(git_version, sheepdog_version),
 	[sheepdog@lists.wpkg.org])
