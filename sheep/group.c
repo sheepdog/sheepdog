@@ -58,6 +58,7 @@ struct work_notify {
 
 	struct sheepdog_node_list_entry sender;
 
+	struct request *req;
 	struct message_header *msg;
 };
 
@@ -530,7 +531,7 @@ static void __sd_notify_done(struct cpg_event *cevent)
 {
 	struct work_notify *w = container_of(cevent, struct work_notify, cev);
 	struct vdi_op_message *msg = (struct vdi_op_message *)w->msg;
-	struct request *req;
+	struct request *req = w->req;
 	int ret = msg->rsp.result;
 	struct sd_op_template *op = get_sd_op(msg->req.opcode);
 
@@ -538,15 +539,12 @@ static void __sd_notify_done(struct cpg_event *cevent)
 		ret = do_process_main(op, (const struct sd_req *)&msg->req,
 				      (struct sd_rsp *)&msg->rsp, msg->data);
 
-	if (!is_myself(w->sender.addr, w->sender.port))
+	if (!req)
 		return;
-
-	req = list_first_entry(&sys->pending_list, struct request, pending_list);
 
 	msg->rsp.result = ret;
 	memcpy(req->data, msg->data, msg->rsp.data_length);
 	memcpy(&req->rp, &msg->rsp, sizeof(req->rp));
-	list_del(&req->pending_list);
 	req->done(req);
 }
 
@@ -575,6 +573,12 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 		memcpy(w->msg, msg, msg_len);
 	} else
 		w->msg = NULL;
+
+	if (is_myself(sender->addr, sender->port)) {
+		w->req = list_first_entry(&sys->pending_list, struct request,
+					  pending_list);
+		list_del(&w->req->pending_list);
+	}
 
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 
