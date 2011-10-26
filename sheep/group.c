@@ -172,7 +172,7 @@ void cluster_queue_request(struct work *work, int idx)
 	msg->req = *((struct sd_vdi_req *)&req->rq);
 	msg->rsp = *((struct sd_vdi_rsp *)&req->rp);
 
-	list_add(&req->pending_list, &sys->pending_list);
+	list_add_tail(&req->pending_list, &sys->pending_list);
 
 	if (has_process_work(req->op))
 		sys->cdrv->notify(msg, size, do_cluster_op);
