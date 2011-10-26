@@ -29,7 +29,7 @@ sheep_LDADD	  	= $(libcpg_LIBS) $(libcfg_LIBS) ../lib/libsheepdog.a -lpthread
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= work.h sheep_priv.h
+noinst_HEADERS		= work.h sheep_priv.h cluster.h
 
 EXTRA_DIST		= 
 
