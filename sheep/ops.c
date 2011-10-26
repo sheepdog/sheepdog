@@ -279,6 +279,8 @@ static int local_stat_cluster(const struct sd_req *req, struct sd_rsp *rsp,
 
 		rsp->data_length += sizeof(*log);
 		log->nr_nodes /= sizeof(log->nodes[0]);
+		/* FIXME: this hack would require sizeof(time_t) < sizeof(log->nodes[0]) */
+		log->time = *(uint64_t *)(&log->nodes[log->nr_nodes]);
 		epoch--;
 	}
 

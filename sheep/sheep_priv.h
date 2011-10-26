@@ -209,7 +209,6 @@ int get_cluster_flags(uint16_t *flags);
 #define NR_GW_WORKER_THREAD 4
 #define NR_IO_WORKER_THREAD 4
 
-int epoch_log_write(uint32_t epoch, char *buf, int len);
 int epoch_log_read(uint32_t epoch, char *buf, int len);
 int epoch_log_read_nr(uint32_t epoch, char *buf, int len);
 int epoch_log_read_remote(uint32_t epoch, char *buf, int len);

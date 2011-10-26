@@ -147,6 +147,7 @@ struct sheepdog_vnode_list_entry {
 
 struct epoch_log {
 	uint64_t ctime;
+	uint64_t time;
 	uint32_t epoch;
 	uint32_t nr_nodes;
 	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];

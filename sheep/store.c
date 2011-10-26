@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "sheep_priv.h"
 
@@ -474,17 +475,38 @@ int update_epoch_store(uint32_t epoch)
 
 int update_epoch_log(int epoch)
 {
-        int ret;
+	int fd, ret, len;
+	time_t t;
+	char path[PATH_MAX];
 
-        dprintf("update epoch, %d, %d\n", epoch, sys->nr_nodes);
-        ret = epoch_log_write(epoch, (char *)sys->nodes,
-                              sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
-        if (ret < 0)
-                eprintf("can't write epoch %u\n", epoch);
+	dprintf("update epoch, %d, %d\n", epoch, sys->nr_nodes);
 
-        return ret;
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	fd = open(path, O_RDWR | O_CREAT | O_SYNC, def_fmode);
+	if (fd < 0) {
+		ret = fd;
+		goto err_open;
+	}
+
+	len = sys->nr_nodes * sizeof(struct sheepdog_node_list_entry);
+	ret = write(fd, (char *)sys->nodes, len);
+	if (ret != len)
+		goto err;
+
+	time(&t);
+	len = sizeof(t);
+	ret = write(fd, (char *)&t, len);
+	if (ret != len)
+		goto err;
+
+	close(fd);
+	return 0;
+err:
+	close(fd);
+err_open:
+	dprintf("%s\n", strerror(errno));
+	return -1;
 }
-
 
 int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, int copies,
@@ -825,26 +847,6 @@ out:
 			idx, opcode, oid, epoch, ret);
 
 	rsp->result = ret;
-}
-
-int epoch_log_write(uint32_t epoch, char *buf, int len)
-{
-	int fd, ret;
-	char path[PATH_MAX];
-
-	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
-	fd = open(path, O_RDWR | O_CREAT |O_SYNC, def_fmode);
-	if (fd < 0)
-		return -1;
-
-	ret = write(fd, buf, len);
-
-	close(fd);
-
-	if (ret != len)
-		return -1;
-
-	return 0;
 }
 
 int epoch_log_read_remote(uint32_t epoch, char *buf, int len)

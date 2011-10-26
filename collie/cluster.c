@@ -77,7 +77,7 @@ static int cluster_info(int argc, char **argv)
 	unsigned rlen, wlen;
 	struct epoch_log logs[8];
 	int nr_logs;
-	time_t ti;
+	time_t ti, ct;
 	struct tm tm;
 	char time_str[128];
 
@@ -106,8 +106,11 @@ static int cluster_info(int argc, char **argv)
 	else
 		printf("%s\n", sd_strerror(rsp->result));
 
-	if (!raw_output)
-		printf("\nCreation time        Epoch Nodes\n");
+	if (!raw_output) {
+		ct = logs[0].ctime >> 32;
+		printf("\nCluster created at %s\n", ctime(&ct));
+		printf("Epoch Time           Version\n");
+	}
 
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = 0; i < nr_logs; i++) {
@@ -115,7 +118,7 @@ static int cluster_info(int argc, char **argv)
 		char name[128];
 		struct sheepdog_node_list_entry *entry;
 
-		ti = logs[i].ctime >> 32;
+		ti = logs[i].time;
 		if (raw_output) {
 			snprintf(time_str, sizeof(time_str), "%" PRIu64, (uint64_t) ti);
 		} else {
