@@ -766,13 +766,9 @@ static void __sd_leave_done(struct cpg_event *cevent)
 	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
 					 sys->vnodes);
 	if (sys_can_recover()) {
-		dprintf("update epoch, %d, %d\n", sys->epoch + 1, sys->nr_nodes);
-		epoch_log_write(sys->epoch + 1, (char *)sys->nodes,
-				sizeof(*sys->nodes) * sys->nr_nodes);
-
 		sys->epoch++;
-
 		update_epoch_store(sys->epoch);
+		update_epoch_log(sys->epoch);
 	}
 
 	print_node_list(sys->nodes, sys->nr_nodes);

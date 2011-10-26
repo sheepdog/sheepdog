@@ -148,13 +148,10 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->epoch = 1;
 	sys->recovered_epoch = 1;
 
-	dprintf("write epoch log, %d, %d\n", sys->epoch, sys->nr_nodes);
-	ret = epoch_log_write(sys->epoch, (char *)sys->nodes,
-			      sys->nr_nodes * sizeof(struct sheepdog_node_list_entry));
-	if (ret < 0) {
-		eprintf("can't write epoch %u\n", sys->epoch);
+	ret = update_epoch_log(sys->epoch);
+	if (ret)
 		return SD_RES_EIO;
-	}
+
 	update_epoch_store(sys->epoch);
 
 	set_cluster_copies(sys->nr_sobjs);
