@@ -1017,7 +1017,7 @@ int remove_epoch(int epoch)
 	return 0;
 }
 
-int set_cluster_ctime(uint64_t ctime)
+int set_cluster_ctime(uint64_t ct)
 {
 	int fd, ret;
 
@@ -1025,7 +1025,7 @@ int set_cluster_ctime(uint64_t ctime)
 	if (fd < 0)
 		return -1;
 
-	ret = jrnl_perform(fd, &ctime, sizeof(ctime),
+	ret = jrnl_perform(fd, &ct, sizeof(ct),
 			   offsetof(struct sheepdog_config, ctime),
 			   config_path, jrnl_path);
 	close(fd);
@@ -1039,19 +1039,19 @@ int set_cluster_ctime(uint64_t ctime)
 uint64_t get_cluster_ctime(void)
 {
 	int fd, ret;
-	uint64_t ctime;
+	uint64_t ct;
 
 	fd = open(config_path, O_RDONLY);
 	if (fd < 0)
 		return 0;
 
-	ret = pread64(fd, &ctime, sizeof(ctime),
+	ret = pread64(fd, &ct, sizeof(ct),
 		      offsetof(struct sheepdog_config, ctime));
 	close(fd);
 
-	if (ret != sizeof(ctime))
+	if (ret != sizeof(ct))
 		return 0;
-	return ctime;
+	return ct;
 }
 
 static int get_max_copies(struct sheepdog_node_list_entry *entries, int nr)
@@ -2032,7 +2032,7 @@ int init_store(const char *d)
 	return ret;
 }
 
-int read_epoch(uint32_t *epoch, uint64_t *ctime,
+int read_epoch(uint32_t *epoch, uint64_t *ct,
 	       struct sheepdog_node_list_entry *entries, int *nr_entries)
 {
 	int ret;
@@ -2047,7 +2047,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	}
 	*nr_entries = ret / sizeof(*entries);
 
-	*ctime = get_cluster_ctime();
+	*ct = get_cluster_ctime();
 
 	return SD_RES_SUCCESS;
 }
