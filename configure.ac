@@ -30,6 +30,7 @@ AM_INIT_AUTOMAKE([-Wno-portability])
 
 AC_CONFIG_SRCDIR([collie/collie.c])
 AC_CONFIG_HEADER([include/config.h])
+AC_CONFIG_TESTDIR([tests])
 
 AC_CANONICAL_HOST
 
@@ -68,6 +69,8 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AC_CHECK_PROGS([GROFF], [groff])
+
+AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
@@ -122,7 +125,8 @@ AC_CONFIG_FILES([Makefile
 		include/Makefile
 		script/Makefile
 		lib/Makefile
-		man/Makefile])
+		man/Makefile
+		tests/Makefile])
 
 ### Local business
 
