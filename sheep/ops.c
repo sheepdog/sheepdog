@@ -335,6 +335,55 @@ static int local_get_epoch(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
+static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
+				void *data)
+{
+	int s, nr_zones = 0, ret = SD_RES_SUCCESS;
+	uint8_t c;
+	uint16_t f;
+
+	/* We should manually recover the cluster when
+	 * 1) the master is physically down (different epoch condition).
+	 * 2) some nodes are physically down (same epoch condition).
+	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
+	 */
+	if (!sys_stat_wait_join()) {
+		ret = SD_RES_MANUAL_RECOVER;
+		goto out;
+	}
+
+	ret = get_cluster_copies(&c);
+	if (ret)
+		goto out;
+	ret = get_cluster_flags(&f);
+	if (ret)
+		goto out;
+
+	sys->nr_sobjs = c;
+	sys->flags = f;
+
+	s = SD_STATUS_OK;
+	if (!sys_flag_nohalt()) {
+		nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+		if (nr_zones < sys->nr_sobjs)
+			s = SD_STATUS_HALT;
+	}
+
+	dprintf("flags %d, nr_zones %d, copies %d\n", sys->flags, nr_zones, sys->nr_sobjs);
+
+	sys->epoch++; /* some nodes are left, so we get a new epoch */
+	ret = update_epoch_log(sys->epoch);
+	if (ret) {
+		ret = SD_RES_EIO;
+		sys->epoch--;
+		goto out;
+	}
+	update_epoch_store(sys->epoch);
+	sys_stat_set(s);
+out:
+	return ret;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -377,6 +426,12 @@ static struct sd_op_template sd_ops[] = {
 
 	[SD_OP_RELEASE_VDI] = {
 		.type = SD_OP_TYPE_CLUSTER,
+	},
+
+	[SD_OP_RECOVER] = {
+		.type = SD_OP_TYPE_CLUSTER,
+		.force = 1,
+		.process_main = cluster_manual_recover,
 	},
 
 	/* local operations */

@@ -261,6 +261,7 @@ static inline const char *sd_strerror(int err)
 		{SD_RES_WAIT_FOR_JOIN, "Waiting for other nodes joining"},
 		{SD_RES_JOIN_FAILED, "The node had failed to join sheepdog"},
 		{SD_RES_HALT, "The sheepdog is stopped doing IO, short of living nodes"},
+		{SD_RES_MANUAL_RECOVER, "We should not maunally recover the running/halted cluster"},
 
 		{SD_RES_OLD_NODE_VER, "Remote node has an old epoch"},
 		{SD_RES_NEW_NODE_VER, "Remote node has a new epoch"},

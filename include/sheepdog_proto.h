@@ -59,6 +59,7 @@
 #define SD_RES_WAIT_FOR_JOIN    0x17 /* Sheepdog is waiting for other nodes joining */
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 #define SD_RES_HALT 0x19 /* Sheepdog is stopped doing IO */
+#define SD_RES_MANUAL_RECOVER   0x1A /* Users should not manually recover this cluster */
 
 /*
  * Object ID rules
