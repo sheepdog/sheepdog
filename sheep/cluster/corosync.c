@@ -23,7 +23,7 @@ struct cpg_node {
 };
 
 static cpg_handle_t cpg_handle;
-static struct cpg_name cpg_group = { 9, "sheepdog" };
+static struct cpg_name cpg_group = { 8, "sheepdog" };
 
 static corosync_cfg_handle_t cfg_handle;
 static struct cpg_node this_node;
