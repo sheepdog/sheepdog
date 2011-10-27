@@ -819,6 +819,10 @@ static void __sd_join_done(struct cpg_event *cevent)
 		if (nr_zones >= sys->nr_sobjs)
 			sys_stat_set(SD_STATUS_OK);
 	}
+
+	if (node_cmp(&w->joined, &sys->this_node) == 0)
+		/* this output is used for testing */
+		vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
 }
 
 static void __sd_leave_done(struct cpg_event *cevent)
@@ -1267,6 +1271,10 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 			update_epoch_log(sys->epoch);
 			update_epoch_store(sys->epoch);
 		}
+
+		if (node_cmp(&w->joined, &sys->this_node) == 0)
+			/* this output is used for testing */
+			vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;
 	}
 }
