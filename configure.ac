@@ -171,6 +171,11 @@ AC_ARG_ENABLE([coverage],
 	[  --enable-coverage       : coverage analysis of the codebase. ],
 	[ default="no" ])
 
+AC_ARG_ENABLE([corosync],
+	[  --enable-corosync       : build corosync cluster driver ],,
+	[ enable_corosync="yes" ],)
+AM_CONDITIONAL(BUILD_COROSYNC, test x$enable_corosync = xyes)
+
 AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR     : path to init script directory. ],
 	[ INITDDIR="$withval" ],
@@ -214,9 +219,13 @@ else
 	GDB_FLAGS="-g"
 fi
 
-PKG_CHECK_MODULES([corosync],[corosync])
-PKG_CHECK_MODULES([libcpg],[libcpg])
-PKG_CHECK_MODULES([libcfg],[libcfg])
+if test "x${enable_corosync}" = xyes; then
+	PKG_CHECK_MODULES([corosync],[corosync])
+	PKG_CHECK_MODULES([libcpg],[libcpg])
+	PKG_CHECK_MODULES([libcfg],[libcfg])
+	AC_DEFINE_UNQUOTED([HAVE_COROSYNC], 1, [have corosync])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES corosync"
+fi
 
 # extra warnings
 EXTRA_WARNINGS=""
