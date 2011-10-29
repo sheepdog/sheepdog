@@ -140,13 +140,7 @@ int main(int argc, char **argv)
 			sys->this_node.zone = zone;
 			break;
 		case 'c':
-			FOR_EACH_CLUSTER_DRIVER(cdrv) {
-				if (strcmp(cdrv->name, optarg) == 0) {
-					sys->cdrv = cdrv;
-					break;
-				}
-			}
-
+			sys->cdrv = find_cdrv(optarg);
 			if (!sys->cdrv) {
 				fprintf(stderr, "Invalid cluster driver '%s'\n", optarg);
 				fprintf(stderr, "Supported drivers:");
@@ -156,6 +150,8 @@ int main(int argc, char **argv)
 				fprintf(stderr, "\n");
 				exit(1);
 			}
+
+			sys->cdrv_option = get_cdrv_option(sys->cdrv, optarg);
 			break;
 		case 'h':
 			usage(0);

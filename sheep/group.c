@@ -1324,7 +1324,6 @@ oom:
 int create_cluster(int port, int64_t zone)
 {
 	int fd, ret;
-	struct cluster_driver *cdrv;
 	struct cdrv_handlers handlers = {
 		.join_handler = sd_join_handler,
 		.leave_handler = sd_leave_handler,
@@ -1332,16 +1331,11 @@ int create_cluster(int port, int64_t zone)
 	};
 
 	if (!sys->cdrv) {
-		FOR_EACH_CLUSTER_DRIVER(cdrv) {
-			if (strcmp(cdrv->name, "corosync") == 0) {
-				dprintf("use corosync driver as default\n");
-				sys->cdrv = cdrv;
-				break;
-			}
-		}
+		sys->cdrv = find_cdrv("corosync");
+		dprintf("use corosync cluster driver as default\n");
 	}
 
-	fd = sys->cdrv->init(&handlers, sys->this_node.addr);
+	fd = sys->cdrv->init(&handlers, sys->cdrv_option, sys->this_node.addr);
 	if (fd < 0)
 		return -1;
 

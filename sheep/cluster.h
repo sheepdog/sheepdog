@@ -53,7 +53,8 @@ struct cluster_driver {
 	 * may be used with the poll(2) to monitor cluster events.  On
 	 * error, returns -1.
 	 */
-	int (*init)(struct cdrv_handlers *handlers, uint8_t *myaddr);
+	int (*init)(struct cdrv_handlers *handlers, const char *option,
+		    uint8_t *myaddr);
 
 	/*
 	 * Join the cluster
@@ -129,6 +130,32 @@ static void __attribute__((constructor)) regist_ ## driver(void) {	\
 #define FOR_EACH_CLUSTER_DRIVER(driver) \
 	list_for_each_entry(driver, &cluster_drivers, list)
 
+static inline struct cluster_driver *find_cdrv(const char *name)
+{
+	struct cluster_driver *cdrv;
+	int len;
+
+	FOR_EACH_CLUSTER_DRIVER(cdrv) {
+		len = strlen(cdrv->name);
+
+		if (strncmp(cdrv->name, name, len) == 0 &&
+		    (name[len] == ':' || name[len] == '\0'))
+			return cdrv;
+	}
+
+	return NULL;
+}
+
+static inline const char *get_cdrv_option(struct cluster_driver *cdrv,
+					  const char *arg)
+{
+	int len = strlen(cdrv->name);
+
+	if (arg[len] == ':')
+		return strdup(arg + len + 1);
+	else
+		return NULL;
+}
 
 static inline char *node_to_str(struct sheepdog_node_list_entry *id)
 {

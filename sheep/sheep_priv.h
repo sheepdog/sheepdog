@@ -106,6 +106,7 @@ struct data_object_bmap {
 
 struct cluster_info {
 	struct cluster_driver *cdrv;
+	const char *cdrv_option;
 
 	/* set after finishing the JOIN procedure */
 	int join_finished;

@@ -571,7 +571,8 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	__corosync_dispatch();
 }
 
-static int corosync_init(struct cdrv_handlers *handlers, uint8_t *myaddr)
+static int corosync_init(struct cdrv_handlers *handlers, const char *option,
+			 uint8_t *myaddr)
 {
 	int ret, fd;
 	uint32_t nodeid;
