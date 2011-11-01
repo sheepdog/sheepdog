@@ -570,7 +570,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 		 uint64_t offset, uint16_t flags, int nr, int create)
 {
 	struct sd_obj_req hdr;
-	int i, n, fd, ret, success = 0;
+	int i, n, fd, ret;
 	char name[128];
 
 	if (nr > zones)
@@ -585,10 +585,10 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 			ret = write_object_local(oid, data, datalen, offset,
 						 flags, nr, node_version, create);
 
-			if (ret != 0)
+			if (ret != 0) {
 				eprintf("fail %"PRIx64" %"PRIx32"\n", oid, ret);
-			else
-				success++;
+				return -1;
+			}
 
 			continue;
 		}
@@ -598,7 +598,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 		fd = connect_to(name, e[n].port);
 		if (fd < 0) {
 			eprintf("can't connect to vost %s\n", name);
-			continue;
+			return -1;
 		}
 
 		memset(&hdr, 0, sizeof(hdr));
@@ -618,13 +618,13 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 
 		ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
 		close(fd);
-		if (ret)
+		if (ret) {
 			eprintf("can't update vost %s\n", name);
-		else
-			success++;
+			return -1;
+		}
 	}
 
-	return !success;
+	return 0;
 }
 
 int read_object(struct sheepdog_vnode_list_entry *e,
