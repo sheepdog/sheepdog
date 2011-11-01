@@ -394,6 +394,7 @@ static void __corosync_dispatch(void)
 			break;
 
 		list_del(&cevent->list);
+		free(cevent->msg);
 		free(cevent);
 	}
 }
@@ -527,6 +528,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		if (cevent) {
 			/* the node left before joining */
 			list_del(&cevent->list);
+			free(cevent->msg);
 			free(cevent);
 			continue;
 		}
@@ -536,6 +538,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		if (cevent) {
 			/* the node left before sending UNBLOCK */
 			list_del(&cevent->list);
+			free(cevent->msg);
 			free(cevent);
 		}
 
