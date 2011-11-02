@@ -31,12 +31,30 @@
 
 int conn_tx_off(struct connection *conn)
 {
-	return modify_event(conn->fd, EPOLLIN);
+	conn->events &= ~EPOLLOUT;
+
+	return modify_event(conn->fd, conn->events);
 }
 
 int conn_tx_on(struct connection *conn)
 {
-	return modify_event(conn->fd, EPOLLIN|EPOLLOUT);
+	conn->events |= EPOLLOUT;
+
+	return modify_event(conn->fd, conn->events);
+}
+
+int conn_rx_off(struct connection *conn)
+{
+	conn->events &= ~EPOLLIN;
+
+	return modify_event(conn->fd, conn->events);
+}
+
+int conn_rx_on(struct connection *conn)
+{
+	conn->events |= EPOLLIN;
+
+	return modify_event(conn->fd, conn->events);
 }
 
 int is_conn_dead(struct connection *conn)

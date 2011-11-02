@@ -75,6 +75,7 @@ struct request {
 	struct sd_op_template *op;
 
 	void *data;
+	unsigned int data_length;
 
 	struct client_info *ci;
 	struct list_head r_siblings;
@@ -100,6 +101,8 @@ struct data_object_bmap {
 
 	struct list_head list;
 };
+
+#define MAX_OUTSTANDING_DATA_SIZE (256 * 1024 * 1024)
 
 struct cluster_info {
 	struct cluster_driver *cdrv;
@@ -131,6 +134,7 @@ struct cluster_info {
 	struct list_head outstanding_req_list;
 	struct list_head req_wait_for_obj_list;
 	struct list_head consistent_obj_list;
+	struct list_head blocking_conn_list;
 
 	uint32_t nr_sobjs;
 
@@ -138,6 +142,7 @@ struct cluster_info {
 	struct cpg_event *cur_cevent;
 	int nr_outstanding_io;
 	int nr_outstanding_reqs;
+	unsigned int outstanding_data_size;
 
 	uint32_t recovered_epoch;
 

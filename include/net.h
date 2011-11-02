@@ -13,6 +13,7 @@ enum conn_state {
 
 struct connection {
 	int fd;
+	unsigned int events;
 
 	enum conn_state c_rx_state;
 	int rx_length;
@@ -23,10 +24,14 @@ struct connection {
 	int tx_length;
 	void *tx_buf;
 	struct sd_rsp tx_hdr;
+
+	struct list_head blocking_siblings;
 };
 
 int conn_tx_off(struct connection *conn);
 int conn_tx_on(struct connection *conn);
+int conn_rx_off(struct connection *conn);
+int conn_rx_on(struct connection *conn);
 int is_conn_dead(struct connection *conn);
 int do_read(int sockfd, void *buf, int len);
 int rx(struct connection *conn, enum conn_state next_state);

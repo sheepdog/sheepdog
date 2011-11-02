@@ -1304,6 +1304,7 @@ int create_cluster(int port, int64_t zone)
 	INIT_LIST_HEAD(&sys->outstanding_req_list);
 	INIT_LIST_HEAD(&sys->req_wait_for_obj_list);
 	INIT_LIST_HEAD(&sys->consistent_obj_list);
+	INIT_LIST_HEAD(&sys->blocking_conn_list);
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
 
