@@ -84,7 +84,7 @@ struct request {
 
 	uint64_t local_oid;
 
-	struct sheepdog_vnode_list_entry entry[SD_MAX_VNODES];
+	struct sheepdog_vnode_list_entry *entry;
 	int nr_vnodes;
 	int nr_zones;
 	int check_consistency;
@@ -180,8 +180,9 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 
 int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes);
 void setup_ordered_sd_vnode_list(struct request *req);
-void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
-			       int *nr_vnodes, int *nr_zones);
+int get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry **entries,
+			      int *nr_vnodes, int *nr_zones);
+void free_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries);
 int is_access_to_busy_objects(uint64_t oid);
 int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
 		    uint64_t oid, int copies);

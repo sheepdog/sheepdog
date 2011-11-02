@@ -122,19 +122,80 @@ int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 	return nr_zones;
 }
 
-void get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries,
-			       int *nr_vnodes, int *nr_zones)
+struct vnodes_cache {
+	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
+	int nr_vnodes;
+	int nr_zones;
+	uint32_t epoch;
+
+	int refcnt;
+	struct list_head list;
+};
+
+int get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry **entries,
+			      int *nr_vnodes, int *nr_zones)
 {
-	*nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+	static LIST_HEAD(vnodes_list);
+	struct vnodes_cache *cache;
 
-	memcpy(entries, sys->vnodes, sizeof(*entries) * sys->nr_vnodes);
+	list_for_each_entry(cache, &vnodes_list, list) {
+		if (cache->epoch == sys->epoch) {
+			*entries = cache->vnodes;
+			*nr_vnodes = cache->nr_vnodes;
+			*nr_zones = cache->nr_zones;
+			cache->refcnt++;
 
-	*nr_vnodes = sys->nr_vnodes;
+			return SD_RES_SUCCESS;
+		}
+	}
+
+	cache = zalloc(sizeof(*cache));
+	if (!cache) {
+		eprintf("oom\n");
+		*entries = NULL;
+		return SD_RES_NO_MEM;
+	}
+
+	cache->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+	memcpy(cache->vnodes, sys->vnodes, sizeof(sys->vnodes[0]) * sys->nr_vnodes);
+	cache->nr_vnodes = sys->nr_vnodes;
+	cache->epoch = sys->epoch;
+	cache->refcnt++;
+
+	*entries = cache->vnodes;
+	*nr_vnodes = cache->nr_vnodes;
+	*nr_zones = cache->nr_zones;
+
+	list_add(&cache->list, &vnodes_list);
+
+	return SD_RES_SUCCESS;
+}
+
+void free_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries)
+{
+	struct vnodes_cache *cache;
+
+	if (!entries)
+		return;
+
+	cache = container_of(entries, struct vnodes_cache, vnodes[0]);
+	if (--cache->refcnt == 0) {
+		list_del(&cache->list);
+		free(cache);
+	}
 }
 
 void setup_ordered_sd_vnode_list(struct request *req)
 {
-	get_ordered_sd_vnode_list(req->entry, &req->nr_vnodes, &req->nr_zones);
+	int res;
+
+	if (req->entry)
+		free_ordered_sd_vnode_list(req->entry);
+
+	res = get_ordered_sd_vnode_list(&req->entry, &req->nr_vnodes,
+					&req->nr_zones);
+	if (res != SD_RES_SUCCESS)
+		panic("unrecoverable error\n");
 }
 
 static void do_cluster_op(void *arg)

@@ -21,19 +21,12 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 			  uint32_t base_vid, uint32_t cur_vid, uint32_t copies,
 			  uint32_t snapid, int is_snapshot)
 {
-	struct sheepdog_vnode_list_entry *entries;
+	struct sheepdog_vnode_list_entry *entries = NULL;
 	/* we are not called concurrently */
 	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
 	struct timeval tv;
 	int ret, nr_vnodes, nr_zones;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
-
-	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
-	if (!entries) {
-		eprintf("oom\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
-	}
 
 	new = zalloc(sizeof(*new));
 	if (!new) {
@@ -60,7 +53,9 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 		}
 	}
 
-	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
+	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
 	if (base_vid) {
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch,
@@ -149,7 +144,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (ret != 0)
 		ret = SD_RES_VDI_WRITE;
 out:
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 	free(new);
 	free(cur);
 	free(base);
@@ -161,21 +156,22 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 			  unsigned long *deleted_nr, uint32_t *next_snap,
 			  unsigned int *nr_copies, uint64_t *ctime)
 {
-	struct sheepdog_vnode_list_entry *entries;
+	struct sheepdog_vnode_list_entry *entries = NULL;
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
 	int nr_vnodes, nr_zones, nr_reqs;
 	int ret, vdi_found = 0;
 
-	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
 	inode = malloc(SD_INODE_HEADER_SIZE);
-	if (!inode || !entries) {
+	if (!inode) {
 		eprintf("oom\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
 
-	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
+	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
 	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_zones)
@@ -219,7 +215,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 		ret = SD_RES_NO_VDI;
 out:
 	free(inode);
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 
 	return ret;
 }
@@ -347,13 +343,12 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
-	struct sheepdog_vnode_list_entry *entries;
+	struct sheepdog_vnode_list_entry *entries = NULL;
 	int nr_vnodes, nr_zones, nr_reqs;
 	struct sheepdog_inode *inode = NULL;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
-	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
-	if (!inode || !entries) {
+	if (!inode) {
 		eprintf("oom\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
@@ -373,7 +368,10 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
+	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
 	nr_reqs = sys->nr_sobjs;
 	if (nr_reqs > nr_zones)
 		nr_reqs = nr_zones;
@@ -399,7 +397,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	ret = start_deletion(*vid, epoch);
 out:
 	free(inode);
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 
 	return ret;
 }
@@ -434,16 +432,15 @@ static void delete_one(struct work *work, int idx)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(((uint32_t *)dw->buf) + dw->count - dw->done - 1);
-	struct sheepdog_vnode_list_entry *entries;
+	struct sheepdog_vnode_list_entry *entries = NULL;
 	int nr_vnodes, nr_zones;
 	int ret, i;
 	struct sheepdog_inode *inode = NULL;
 
 	eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
 
-	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
 	inode = malloc(sizeof(*inode));
-	if (!inode || !entries) {
+	if (!inode) {
 		eprintf("oom\n");
 		goto out;
 	}
@@ -453,7 +450,9 @@ static void delete_one(struct work *work, int idx)
 	 * is called in threads and not serialized with cpg_event so
 	 * we can't access to epoch and sd_node_list safely.
 	 */
-	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
+	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
 	ret = read_object(entries, nr_vnodes, nr_zones, dw->epoch,
 			  vid_to_vdi_oid(vdi_id), (void *)inode, sizeof(*inode),
@@ -473,7 +472,7 @@ static void delete_one(struct work *work, int idx)
 			      inode->nr_copies);
 	}
 out:
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 	free(inode);
 }
 
@@ -586,16 +585,10 @@ out:
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw = NULL;
-	struct sheepdog_vnode_list_entry *entries;
+	struct sheepdog_vnode_list_entry *entries = NULL;
 	int nr_vnodes, nr_zones, ret;
 	uint32_t root_vid;
 
-	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
-	if (!entries) {
-		eprintf("oom\n");
-		ret = SD_RES_NO_MEM;
-		goto err;
-	}
 	dw = zalloc(sizeof(struct deletion_work));
 	if (!dw) {
 		ret = SD_RES_NO_MEM;
@@ -615,7 +608,9 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	dw->work.fn = delete_one;
 	dw->work.done = delete_one_done;
 
-	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
+	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
+	if (ret != SD_RES_SUCCESS)
+		goto err;
 
 	root_vid = get_vdi_root(entries, nr_vnodes, nr_zones, dw->epoch, dw->vid);
 	if (!root_vid) {
@@ -640,11 +635,11 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
 	queue_work(sys->deletion_wqueue, &dw->work);
 out:
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 
 	return SD_RES_SUCCESS;
 err:
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 	if (dw)
 		free(dw->buf);
 	free(dw);
@@ -656,25 +651,20 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
 		 int write, int excl, int delete)
 {
-	struct sheepdog_vnode_list_entry *entries;
+	struct sheepdog_vnode_list_entry *entries = NULL;
 	struct sheepdog_vdi_attr tmp_attr;
 	uint64_t oid;
 	uint32_t end;
 	int ret, nr_zones, nr_vnodes;
 	int value_len;
 
-	entries = malloc(sizeof(*entries) * SD_MAX_VNODES);
-	if (!entries) {
-		eprintf("oom\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
-	}
-
 	value_len = data_len - SD_ATTR_HEADER_SIZE;
 
 	vattr->ctime = ctime;
 
-	get_ordered_sd_vnode_list(entries, &nr_vnodes, &nr_zones);
+	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
 	*attrid = fnv_64a_buf(vattr, SD_ATTR_HEADER_SIZE, FNV1A_64_INIT);
 	*attrid &= (UINT64_C(1) << VDI_SPACE_SHIFT) - 1;
@@ -731,7 +721,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 	dprintf("there is no space for new vdis\n");
 	ret = SD_RES_FULL_VDI;
 out:
-	free(entries);
+	free_ordered_sd_vnode_list(entries);
 
 	return ret;
 }

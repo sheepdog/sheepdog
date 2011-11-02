@@ -284,6 +284,7 @@ static void free_request(struct request *req)
 	sys->outstanding_data_size -= req->data_length;
 
 	list_del(&req->r_siblings);
+	free_ordered_sd_vnode_list(req->entry);
 	free(req->data);
 	free(req);
 }
