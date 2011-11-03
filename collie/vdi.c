@@ -1017,8 +1017,9 @@ static int vdi_read(int argc, char **argv)
 	total = min(total, inode->vdi_size - offset);
 	total = roundup(total, 512);
 	idx = offset / SD_DATA_OBJ_SIZE;
+	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
-		len = min(total - done, SD_DATA_OBJ_SIZE - offset % SD_DATA_OBJ_SIZE);
+		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
 
 		if (inode->data_vdi_id[idx]) {
 			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
@@ -1115,11 +1116,12 @@ static int vdi_write(int argc, char **argv)
 	total = min(total, inode->vdi_size - offset);
 	total = roundup(total, 512);
 	idx = offset / SD_DATA_OBJ_SIZE;
+	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
 		create = 0;
 		old_oid = 0;
 		flags = 0;
-		len = min(total - done, SD_DATA_OBJ_SIZE - offset % SD_DATA_OBJ_SIZE);
+		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
 
 		if (!inode->data_vdi_id[idx])
 			create = 1;
