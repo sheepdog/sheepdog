@@ -47,8 +47,8 @@ struct logarea {
 };
 
 extern int log_init(char * progname, int size, int daemon, int level, char *outfile);
-extern void log_close (void);
-extern void dump_logmsg (void *);
+extern void log_close(void);
+extern void dump_logmsg(void *);
 extern void log_write(int prio, const char *func, int line, const char *fmt, ...)
 	__attribute__ ((format (printf, 4, 5)));
 

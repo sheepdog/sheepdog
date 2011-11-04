@@ -50,7 +50,7 @@ static int log_level = SDOG_INFO;
 static pid_t pid;
 static key_t semkey;
 
-static int logarea_init (int size)
+static int logarea_init(int size)
 {
 	int shmid;
 
@@ -132,7 +132,7 @@ static int logarea_init (int size)
 	return 0;
 }
 
-static void free_logarea (void)
+static void free_logarea(void)
 {
 	if (la->fd >= 0)
 		close(la->fd);
@@ -143,7 +143,7 @@ static void free_logarea (void)
 }
 
 #if LOGDBG
-static void dump_logarea (void)
+static void dump_logarea(void)
 {
 	struct logmsg * msg;
 
@@ -268,7 +268,7 @@ static int log_dequeue(void *buff)
 /*
  * this one can block under memory pressure
  */
-static void log_syslog (void * buff)
+static void log_syslog(void * buff)
 {
 	struct logmsg * msg = (struct logmsg *)buff;
 
