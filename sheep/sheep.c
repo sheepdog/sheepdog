@@ -48,36 +48,36 @@ static void usage(int status)
 	if (status)
 		fprintf(stderr, "Try `%s --help' for more information.\n",
 			program_name);
-	else {
-		printf("Usage: %s [OPTION] [PATH]\n", program_name);
+	else
 		printf("\
-Sheepdog Daemon, version %s\n\
-  -p, --port              specify the listen port number\n\
+Sheepdog daemon (version %s)\n\
+Usage: %s [OPTION]... [PATH]\n\
+Options:\n\
+  -p, --port              specify the TCP port on which to listen\n\
   -f, --foreground        make the program run in the foreground\n\
-  -l, --loglevel          specify the message level printed by default\n\
-  -d, --debug             print debug messages\n\
-  -D, --directio          use direct IO\n\
+  -l, --loglevel          specify the level of logging detail\n\
+  -d, --debug             include debug messages in the log\n\
+  -D, --directio          use direct IO when accessing the object store\n\
   -z, --zone              specify the zone id\n\
   -c, --cluster           specify the cluster driver\n\
   -h, --help              display this help and exit\n\
-", PACKAGE_VERSION);
-	}
+", PACKAGE_VERSION, program_name);
 	exit(status);
 }
 
 static void sdlog_help(void)
 {
-	printf("Supported sheep log levels:\n");
-	printf("digit  level           meaning\n");
 	printf("\
-  0    SDOG_EMERG      system is unusable\n\
+Available log levels:\n\
+  #    Level           Description\n\
+  0    SDOG_EMERG      system has failed and is unusable\n\
   1    SDOG_ALERT      action must be taken immediately\n\
   2    SDOG_CRIT       critical conditions\n\
   3    SDOG_ERR        error conditions\n\
   4    SDOG_WARNING    warning conditions\n\
-  5    SDOG_NOTICE     normal but signifiant condition\n\
-  6    SDOG_INFO       informational\n\
-  7    SDOG_DEBUG      debug-level messages\n");
+  5    SDOG_NOTICE     normal but significant conditions\n\
+  6    SDOG_INFO       informational notices\n\
+  7    SDOG_DEBUG      debugging messages\n");
 }
 
 static struct cluster_info __sys;
@@ -103,7 +103,8 @@ int main(int argc, char **argv)
 		case 'p':
 			port = strtol(optarg, &p, 10);
 			if (optarg == p || port < 1 || port > UINT16_MAX) {
-				eprintf("invalid port number: %s\n", optarg);
+				fprintf(stderr, "Invalid port number '%s'\n",
+					optarg);
 				exit(1);
 			}
 			break;
@@ -114,7 +115,8 @@ int main(int argc, char **argv)
 			log_level = strtol(optarg, &p, 10);
 			if (optarg == p || log_level < SDOG_EMERG ||
 			    log_level > SDOG_DEBUG) {
-				printf("Invalid log level: %s\n", optarg);
+				fprintf(stderr, "Invalid log level '%s'\n",
+					optarg);
 				sdlog_help();
 				exit(1);
 			}
@@ -129,14 +131,10 @@ int main(int argc, char **argv)
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
-			if (optarg == p) {
-				eprintf("%s is not an integer\n", optarg);
-				exit(1);
-			}
-
-			if (zone < 0 || UINT32_MAX < zone) {
-				eprintf("zone id must be between 0 and %u\n",
-					UINT32_MAX);
+			if (optarg == p || zone < 0 || UINT32_MAX < zone) {
+				fprintf(stderr, "Invalid zone id '%s': "
+					"must be an integer between 0 and %u\n",
+					optarg, UINT32_MAX);
 				exit(1);
 			}
 			sys->this_node.zone = zone;
@@ -150,12 +148,12 @@ int main(int argc, char **argv)
 			}
 
 			if (!sys->cdrv) {
-				printf("No such cluster driver, %s\n", optarg);
-				printf("Supported drivers:");
+				fprintf(stderr, "Invalid cluster driver '%s'\n", optarg);
+				fprintf(stderr, "Supported drivers:");
 				FOR_EACH_CLUSTER_DRIVER(cdrv) {
-					printf(" %s", cdrv->name);
+					fprintf(stderr, " %s", cdrv->name);
 				}
-				printf("\n");
+				fprintf(stderr, "\n");
 				exit(1);
 			}
 			break;
