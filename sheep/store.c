@@ -232,7 +232,7 @@ out:
 	return ret;
 }
 
-static int read_from_other_sheeps(struct request *req, uint32_t epoch,
+static int read_from_other_sheep(struct request *req, uint32_t epoch,
 				  uint64_t oid, char *buf, int copies)
 {
 	int ret;
@@ -625,7 +625,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 				ret = SD_RES_NO_MEM;
 				goto out;
 			}
-			ret = read_from_other_sheeps(req, hdr->epoch, hdr->cow_oid, buf,
+			ret = read_from_other_sheep(req, hdr->epoch, hdr->cow_oid, buf,
 						     hdr->copies);
 			if (ret) {
 				eprintf("failed to read old object\n");

@@ -33,7 +33,7 @@
 #define SD_STATUS_JOIN_FAILED       0x00000010
 #define SD_STATUS_HALT              0x00000020
 
-#define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheeps */
+#define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheep */
 
 enum cpg_event_type {
 	CPG_EVENT_JOIN,

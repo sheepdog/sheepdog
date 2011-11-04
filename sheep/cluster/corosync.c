@@ -508,23 +508,23 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 {
 	struct corosync_event *cevent;
 	int i;
-	struct cpg_node joined_sheeps[SD_MAX_NODES];
-	struct cpg_node left_sheeps[SD_MAX_NODES];
+	struct cpg_node joined_sheep[SD_MAX_NODES];
+	struct cpg_node left_sheep[SD_MAX_NODES];
 
 	/* convert cpg_address to cpg_node */
 	for (i = 0; i < left_list_entries; i++) {
-		left_sheeps[i].nodeid = left_list[i].nodeid;
-		left_sheeps[i].pid = left_list[i].pid;
+		left_sheep[i].nodeid = left_list[i].nodeid;
+		left_sheep[i].pid = left_list[i].pid;
 	}
 	for (i = 0; i < joined_list_entries; i++) {
-		joined_sheeps[i].nodeid = joined_list[i].nodeid;
-		joined_sheeps[i].pid = joined_list[i].pid;
+		joined_sheep[i].nodeid = joined_list[i].nodeid;
+		joined_sheep[i].pid = joined_list[i].pid;
 	}
 
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
 		cevent = find_block_event(COROSYNC_EVENT_TYPE_JOIN,
-					  left_sheeps + i);
+					  left_sheep + i);
 		if (cevent) {
 			/* the node left before joining */
 			list_del(&cevent->list);
@@ -534,7 +534,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		}
 
 		cevent = find_block_event(COROSYNC_EVENT_TYPE_NOTIFY,
-					  left_sheeps + i);
+					  left_sheep + i);
 		if (cevent) {
 			/* the node left before sending UNBLOCK */
 			list_del(&cevent->list);
@@ -547,7 +547,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 			panic("failed to allocate memory\n");
 
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
-		cevent->sender = left_sheeps[i];
+		cevent->sender = left_sheep[i];
 
 		list_add_tail(&cevent->list, &corosync_event_list);
 	}
@@ -559,10 +559,10 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 			panic("failed to allocate memory\n");
 
 		cevent->type = COROSYNC_EVENT_TYPE_JOIN;
-		cevent->sender = joined_sheeps[i];
+		cevent->sender = joined_sheep[i];
 		cevent->blocked = 1; /* FIXME: add explanation */
 		if (member_list_entries == joined_list_entries - left_list_entries &&
-		    cpg_node_equal(&joined_sheeps[0], &this_node))
+		    cpg_node_equal(&joined_sheep[0], &this_node))
 			cevent->first_node = 1;
 
 		list_add_tail(&cevent->list, &corosync_event_list);
