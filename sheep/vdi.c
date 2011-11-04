@@ -30,7 +30,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 	new = zalloc(sizeof(*new));
 	if (!new) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
@@ -38,7 +38,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (base_vid) {
 		base = zalloc(sizeof(*base));
 		if (!base) {
-			eprintf("oom\n");
+			eprintf("failed to allocate memory\n");
 			ret = SD_RES_NO_MEM;
 			goto out;
 		}
@@ -47,7 +47,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (is_snapshot && cur_vid != base_vid) {
 		cur = zalloc(SD_INODE_HEADER_SIZE);
 		if (!cur) {
-			eprintf("oom\n");
+			eprintf("failed to allocate memory\n");
 			ret = SD_RES_NO_MEM;
 			goto out;
 		}
@@ -164,7 +164,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
@@ -349,7 +349,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
@@ -441,7 +441,7 @@ static void delete_one(struct work *work, int idx)
 
 	inode = malloc(sizeof(*inode));
 	if (!inode) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		goto out;
 	}
 
@@ -510,7 +510,7 @@ static int fill_vdi_list(struct deletion_work *dw,
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		goto err;
 	}
 
@@ -555,7 +555,7 @@ static uint64_t get_vdi_root(struct sheepdog_vnode_list_entry *entries,
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		vid = 0;
 		goto out;
 	}

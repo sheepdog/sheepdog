@@ -414,7 +414,7 @@ static struct corosync_event *update_block_event(enum corosync_event_type type,
 	if (msg_len) {
 		cevent->msg = realloc(cevent->msg, msg_len);
 		if (!cevent->msg)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 		memcpy(cevent->msg, msg, msg_len);
 	} else {
 		free(cevent->msg);
@@ -434,7 +434,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 	cevent = zalloc(sizeof(*cevent));
 	if (!cevent)
-		panic("oom\n");
+		panic("failed to allocate memory\n");
 
 	switch (cmsg->type) {
 	case COROSYNC_MSG_TYPE_JOIN_REQUEST:
@@ -459,7 +459,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		if (cmsg->msg_len) {
 			cevent->msg = zalloc(cmsg->msg_len);
 			if (!cevent->msg)
-				panic("oom\n");
+				panic("failed to allocate memory\n");
 			memcpy(cevent->msg, cmsg->msg, cmsg->msg_len);
 		} else
 			cevent->msg = NULL;
@@ -544,7 +544,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 
 		cevent = zalloc(sizeof(*cevent));
 		if (!cevent)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
 		cevent->sender = left_sheeps[i];
@@ -556,7 +556,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	for (i = 0; i < joined_list_entries; i++) {
 		cevent = zalloc(sizeof(*cevent));
 		if (!cevent)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 
 		cevent->type = COROSYNC_EVENT_TYPE_JOIN;
 		cevent->sender = joined_sheeps[i];
@@ -676,10 +676,10 @@ static int corosync_notify(void *msg, size_t msg_len, void (*block_cb)(void *))
 	if (block_cb) {
 		bm = zalloc(sizeof(*bm));
 		if (!bm)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 		bm->msg = zalloc(msg_len);
 		if (!bm->msg)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 
 		memcpy(bm->msg, msg, msg_len);
 		bm->msg_len = msg_len;

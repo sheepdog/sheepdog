@@ -151,7 +151,7 @@ int get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry **entries,
 
 	cache = zalloc(sizeof(*cache));
 	if (!cache) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		*entries = NULL;
 		return SD_RES_NO_MEM;
 	}
@@ -227,7 +227,7 @@ void cluster_queue_request(struct work *work, int idx)
 
 	msg = zalloc(size);
 	if (!msg) {
-		eprintf("out of memory\n");
+		eprintf("failed to allocate memory\n");
 		return;
 	}
 
@@ -538,7 +538,7 @@ static void update_cluster_info(struct join_message *msg,
 		for (i = 0; i < nr_leave_nodes; i++) {
 			n = zalloc(sizeof(*n));
 			if (!n)
-				panic("oom\n");
+				panic("failed to allocate memory\n");
 
 			if (find_entry_list(&msg->leave_nodes[i], &sys->leave_list)
 			    || !find_entry_epoch(&msg->leave_nodes[i], le)) {
@@ -775,7 +775,7 @@ static int send_join_request(struct sheepdog_node_list_entry *ent)
 
 	msg = zalloc(sizeof(*msg) + SD_MAX_NODES * sizeof(msg->nodes[0]));
 	if (!msg)
-		panic("oom\n");
+		panic("failed to allocate memory\n");
 	msg->proto_ver = SD_SHEEP_PROTO_VER;
 
 	get_cluster_copies(&msg->nr_sobjs);
@@ -1170,7 +1170,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		w = zalloc(sizeof(*w));
 		if (!w)
-			panic("oom");
+			panic("failed to allocate memory");
 
 		cevent = &w->cev;
 		cevent->ctype = CPG_EVENT_JOIN;
@@ -1180,7 +1180,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		size = sizeof(struct sheepdog_node_list_entry) * nr_members;
 		w->member_list = zalloc(size);
 		if (!w->member_list)
-			panic("oom");
+			panic("failed to allocate memory");
 
 		memcpy(w->member_list, members, size);
 		w->member_list_entries = nr_members;
@@ -1190,7 +1190,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		size = get_join_message_size(opaque);
 		w->jm = zalloc(size);
 		if (!w->jm)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 		memcpy(w->jm, opaque, size);
 
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
@@ -1203,7 +1203,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		n = zalloc(sizeof(*n));
 		if (!n)
-			panic("oom\n");
+			panic("failed to allocate memory\n");
 
 		if (find_entry_list(joined, &sys->leave_list)
 		    || !find_entry_epoch(joined, le)) {
@@ -1232,7 +1232,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		for (i = 0; i < nr; i++) {
 			n = zalloc(sizeof(*n));
 			if (!n)
-				panic("oom\n");
+				panic("failed to allocate memory\n");
 
 			if (find_entry_list(&jm->leave_nodes[i], &sys->leave_list)
 			    || !find_entry_epoch(&jm->leave_nodes[i], le)) {

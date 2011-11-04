@@ -770,7 +770,7 @@ static int fix_object_consistency(struct request *req, int idx)
 
 	buf = valloc(data_length);
 	if (buf == NULL) {
-		eprintf("out of memory\n");
+		eprintf("failed to allocate memory\n");
 		goto out;
 	}
 	memset(buf, 0, data_length);
@@ -1240,7 +1240,7 @@ static int __recover_one(struct recovery_work *rw,
 	cur_entry = malloc(sizeof(*cur_entry) * SD_MAX_VNODES);
 	next_entry = malloc(sizeof(*next_entry) * SD_MAX_VNODES);
 	if (!old_entry || !cur_entry || !next_entry) {
-		eprintf("oom\n");
+		eprintf("failed to allocate memory\n");
 		goto err;
 	}
 

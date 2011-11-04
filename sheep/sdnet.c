@@ -138,7 +138,7 @@ static void __done(struct work *work, int idx)
 			}
 			bmap = zalloc(sizeof(*bmap));
 			if (bmap == NULL) {
-				eprintf("out of memory\n");
+				eprintf("failed to allocate memory\n");
 				goto done;
 			}
 			dprintf("allocate a new object map\n");
