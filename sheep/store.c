@@ -479,7 +479,7 @@ int update_epoch_log(int epoch)
 	time_t t;
 	char path[PATH_MAX];
 
-	dprintf("update epoch, %d, %d\n", epoch, sys->nr_nodes);
+	dprintf("update epoch: %d, %d\n", epoch, sys->nr_nodes);
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDWR | O_CREAT | O_SYNC, def_fmode);
@@ -604,7 +604,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 			break;
 
 		if (!hdr->copies) {
-			eprintf("zero copies is invalid\n");
+			eprintf("the number of copies cannot be zero\n");
 			ret = SD_RES_INVALID_PARMS;
 			goto out;
 		}
@@ -782,7 +782,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->flags = 0;
 	ret = forward_read_obj_req(req, idx);
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to read object, %d\n", ret);
+		eprintf("failed to read object %d\n", ret);
 		goto out;
 	}
 
@@ -791,7 +791,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->oid = oid;
 	ret = forward_write_obj_req(req, idx);
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to write object, %d\n", ret);
+		eprintf("failed to write object %d\n", ret);
 		goto out;
 	}
 out:
@@ -843,7 +843,7 @@ void store_queue_request(struct work *work, int idx)
 	ret = store_queue_request_local(req, epoch);
 out:
 	if (ret != SD_RES_SUCCESS)
-		dprintf("failed, %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
+		dprintf("failed: %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
 			idx, opcode, oid, epoch, ret);
 
 	rsp->result = ret;
@@ -1249,13 +1249,13 @@ static int __recover_one(struct recovery_work *rw,
 	memcpy(old_entry, _old_entry, sizeof(*old_entry) * old_nr);
 	memcpy(cur_entry, _cur_entry, sizeof(*cur_entry) * cur_nr);
 next:
-	dprintf("recover obj %"PRIx64" from epoch %"PRIu32"\n", oid, tgt_epoch);
+	dprintf("recover object %"PRIx64" from epoch %"PRIu32"\n", oid, tgt_epoch);
 	old_idx = obj_to_sheep(old_entry, old_nr, oid, 0);
 
 	tgt_idx = find_tgt_node(old_entry, old_nr, old_idx, old_copies,
 				cur_entry, cur_nr, cur_idx, cur_copies, copy_idx);
 	if (tgt_idx < 0) {
-		eprintf("cannot find target node, %"PRIx64"\n", oid);
+		eprintf("cannot find target node %"PRIx64"\n", oid);
 		goto err;
 	}
 	e = old_entry + tgt_idx;
@@ -1274,7 +1274,7 @@ next:
 		if (errno == ENOENT) {
 			next_nr = epoch_log_read(tgt_epoch - 1, buf, buf_len);
 			if (next_nr <= 0) {
-				eprintf("no previous epoch, %"PRIu32"\n", tgt_epoch - 1);
+				eprintf("no previous epoch: %"PRIu32"\n", tgt_epoch - 1);
 				goto err;
 			}
 			next_nr /= sizeof(struct sheepdog_node_list_entry);
@@ -1285,7 +1285,7 @@ next:
 			goto not_found;
 		}
 
-		eprintf("cannot recover from local, %s, %s\n", old, new);
+		eprintf("cannot recover from local %s to %s\n", old, new);
 		goto err;
 	}
 
@@ -1358,7 +1358,7 @@ next:
 
 	if (rsp->result == SD_RES_NEW_NODE_VER || rsp->result == SD_RES_OLD_NODE_VER
 	    || rsp->result == SD_RES_NETWORK_ERROR) {
-		eprintf("try again, %"PRIu32", %"PRIx64"\n", rsp->result, oid);
+		eprintf("retrying: %"PRIu32", %"PRIx64"\n", rsp->result, oid);
 		rw->retry = 1;
 		goto out;
 	}
@@ -1452,7 +1452,7 @@ static void recover_one(struct work *work, int idx)
 		}
 	}
 	if (copy_idx < 0) {
-		eprintf("shouldn't happen\n");
+		eprintf("bug: copy_idx < 0\n");
 		goto out;
 	}
 
@@ -1609,7 +1609,7 @@ static void recover_done(struct work *work, int idx)
 		return;
 	}
 
-	dprintf("recovery done, %"PRIu32"\n", rw->epoch);
+	dprintf("recovery complete: new epoch %"PRIu32"\n", rw->epoch);
 	recovering_work = NULL;
 
 	sys->recovered_epoch = rw->epoch;
@@ -1664,7 +1664,7 @@ static int __fill_obj_list(struct sheepdog_node_list_entry *e, uint32_t epoch,
 	rsp = (struct sd_list_rsp *)&hdr;
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		eprintf("try again, %"PRIu32", %"PRIu32"\n", ret, rsp->result);
+		eprintf("retrying: %"PRIu32", %"PRIu32"\n", ret, rsp->result);
 		return -1;
 	}
 
@@ -1741,7 +1741,7 @@ static int fill_obj_list(struct recovery_work *rw,
 				eprintf("some objects may be lost\n");
 				continue;
 			} else {
-				dprintf("retry get object list\n");
+				dprintf("trying to get object list again\n");
 				sleep(1);
 				goto retry;
 			}
@@ -1773,7 +1773,7 @@ static void __start_recovery(struct work *work, int idx)
 		rw->cur_nr_nodes = epoch_log_read(epoch, (char *)rw->cur_nodes,
 						  sizeof(rw->cur_nodes));
 		if (rw->cur_nr_nodes <= 0) {
-			eprintf("failed to read epoch log, %"PRIu32"\n", epoch);
+			eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch);
 			goto fail;
 		}
 		rw->cur_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
@@ -1781,7 +1781,7 @@ static void __start_recovery(struct work *work, int idx)
 		rw->old_nr_nodes = epoch_log_read(epoch - 1, (char *)rw->old_nodes,
 						  sizeof(rw->old_nodes));
 		if (rw->old_nr_nodes <= 0) {
-			eprintf("failed to read epoch log, %"PRIu32"\n", epoch - 1);
+			eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch - 1);
 			goto fail;
 		}
 		rw->old_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
@@ -1909,7 +1909,7 @@ static int init_epoch_path(const char *base_path)
 	for (epoch = 1; epoch <= latest_epoch; epoch++) {
 		snprintf(path, sizeof(path), "%s/%08u", obj_path, epoch);
 
-		vprintf(SDOG_INFO, "found the obj dir, %s\n", path);
+		vprintf(SDOG_INFO, "found the object directory %s\n", path);
 
 		dir = opendir(path);
 		if (!dir) {
@@ -1930,7 +1930,7 @@ static int init_epoch_path(const char *base_path)
 			if (!is_vdi_obj(oid))
 				continue;
 
-			vprintf(SDOG_DEBUG, "found the vdi obj, %" PRIx64 "\n", oid);
+			vprintf(SDOG_DEBUG, "found the vdi object %" PRIx64 "\n", oid);
 
 			set_bit(oid_to_vid(oid), sys->vdi_inuse);
 		}

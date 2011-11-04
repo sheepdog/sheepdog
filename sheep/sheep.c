@@ -207,11 +207,11 @@ int main(int argc, char **argv)
 
 	ret = create_cluster(port, zone);
 	if (ret) {
-		eprintf("failed to create sheepdog cluster.\n");
+		eprintf("failed to create sheepdog cluster\n");
 		exit(1);
 	}
 
-	vprintf(SDOG_NOTICE, "Sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
+	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
 
 	while (sys->status != SD_STATUS_SHUTDOWN || sys->nr_outstanding_reqs != 0)
 		event_loop(-1);

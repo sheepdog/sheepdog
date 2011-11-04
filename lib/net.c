@@ -178,7 +178,7 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 	freeaddrinfo(res0);
 
 	if (!success)
-		eprintf("can't create a listen fd\n");
+		eprintf("failed to create a listening port\n");
 
 	return !success;
 }

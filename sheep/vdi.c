@@ -231,7 +231,7 @@ static int do_lookup_vdi(uint32_t epoch, char *name, int namelen, uint32_t *vid,
 
 	start_nr = fnv_64a_buf(name, namelen, FNV1A_64_INIT) & (SD_NR_VDIS - 1);
 
-	vprintf(SDOG_INFO, "looking for %s %d, %lx\n", name, namelen, start_nr);
+	vprintf(SDOG_INFO, "looking for %s (%lx)\n", name, start_nr);
 
 	/* bitmap search from the hash point */
 	nr = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, start_nr);
@@ -296,7 +296,7 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	if (is_snapshot) {
 		if (ret != SD_RES_SUCCESS) {
 			if (ret == SD_RES_NO_VDI)
-				vprintf(SDOG_CRIT, "we dont's have %s\n", name);
+				vprintf(SDOG_CRIT, "vdi %s does not exist\n", name);
 			return ret;
 		}
 		nr = right_nr;
@@ -318,12 +318,14 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 
 	*new_vid = nr;
 
-	vprintf(SDOG_INFO, "we create a new vdi, %d %s (%zd) %" PRIu64 ", vid: %"
-		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 " \n",
-		is_snapshot, name, strlen(name), size, *new_vid, base_vid, cur_vid);
+	vprintf(SDOG_INFO, "creating new %s %s: size %" PRIu64 ", vid %"
+		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 "\n",
+		is_snapshot ? "snapshot" : "vdi", name, size, *new_vid,
+		base_vid, cur_vid);
 
 	if (!copies) {
-		vprintf(SDOG_WARNING, "qemu doesn't specify the copies... %d\n",
+		vprintf(SDOG_WARNING,
+			"using default replication level of %d copies\n",
 			sys->nr_sobjs);
 		copies = sys->nr_sobjs;
 	}

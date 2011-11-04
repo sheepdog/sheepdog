@@ -75,7 +75,7 @@ int init_event(int nr)
 {
 	efd = epoll_create(nr);
 	if (efd < 0) {
-		eprintf("can't create epoll fd\n");
+		eprintf("failed to create epoll fd\n");
 		return -1;
 	}
 	return 0;
@@ -146,7 +146,7 @@ int modify_event(int fd, unsigned int events)
 
 	ei = lookup_event(fd);
 	if (!ei) {
-		eprintf("can't find event info %d\n", fd);
+		eprintf("event info for fd %d not found\n", fd);
 		return 1;
 	}
 

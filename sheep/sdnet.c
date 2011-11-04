@@ -141,7 +141,7 @@ static void __done(struct work *work, int idx)
 				eprintf("failed to allocate memory\n");
 				goto done;
 			}
-			dprintf("allocate a new object map\n");
+			dprintf("allocating a new object map\n");
 			bmap->vdi_id = vdi_id;
 			list_add_tail(&bmap->list, &sys->consistent_obj_list);
 			set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
@@ -155,7 +155,7 @@ static void __done(struct work *work, int idx)
 		} else if (is_access_local(req->entry, req->nr_vnodes,
 					   ((struct sd_obj_req *)&req->rq)->oid, copies) &&
 			   req->rp.result == SD_RES_EIO) {
-			eprintf("leave from cluster\n");
+			eprintf("leaving sheepdog cluster\n");
 			leave_cluster();
 
 			if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
@@ -188,7 +188,7 @@ static void queue_request(struct request *req)
 
 	req->op = get_sd_op(hdr->opcode);
 	if (!req->op) {
-		eprintf("invalid opcode, %d\n", hdr->opcode);
+		eprintf("invalid opcode %d\n", hdr->opcode);
 		rsp->result = SD_RES_INVALID_PARMS;
 		req->done(req);
 		return;
@@ -323,7 +323,7 @@ static void client_rx_handler(struct client_info *ci)
 	struct request *req;
 
 	if (!ci->rx_req && sys->outstanding_data_size > MAX_OUTSTANDING_DATA_SIZE) {
-		dprintf("too many requests, %p\n", &ci->conn);
+		dprintf("too many requests (%p)\n", &ci->conn);
 		conn_rx_off(&ci->conn);
 		list_add(&ci->conn.blocking_siblings, &sys->blocking_conn_list);
 		return;
@@ -359,7 +359,7 @@ static void client_rx_handler(struct client_info *ci)
 		ret = rx(conn, C_IO_END);
 		break;
 	default:
-		eprintf("BUG: unknown state %d\n", conn->c_rx_state);
+		eprintf("bug: unknown state %d\n", conn->c_rx_state);
 	}
 
 	if (is_conn_dead(conn) && ci->rx_req) {
@@ -424,7 +424,7 @@ again:
 		if (sys->outstanding_data_size < MAX_OUTSTANDING_DATA_SIZE) {
 			list_for_each_entry_safe(conn, n, &sys->blocking_conn_list,
 						 blocking_siblings) {
-				dprintf("rx on, %p\n", conn);
+				dprintf("rx on %p\n", conn);
 				list_del(&conn->blocking_siblings);
 				conn_rx_on(conn);
 			}
@@ -524,7 +524,7 @@ static void client_handler(int fd, int events, void *data)
 		if (!(ci->conn.events & EPOLLIN))
 			list_del(&ci->conn.blocking_siblings);
 
-		dprintf("closed a connection, %d\n", fd);
+		dprintf("closed connection %d\n", fd);
 		unregister_event(fd);
 		client_decref(ci);
 	}
@@ -538,7 +538,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 	struct client_info *ci;
 
 	if (sys->status == SD_STATUS_SHUTDOWN) {
-		dprintf("unregister %d\n", listen_fd);
+		dprintf("unregistering connection %d\n", listen_fd);
 		unregister_event(listen_fd);
 		return;
 	}
@@ -574,7 +574,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 		return;
 	}
 
-	dprintf("accepted a new connection, %d\n", fd);
+	dprintf("accepted a new connection: %d\n", fd);
 }
 
 static int create_listen_port_fn(int fd, void *data)
@@ -620,7 +620,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 
 		fd = connect_to(name, e[n].port);
 		if (fd < 0) {
-			eprintf("can't connect to vost %s\n", name);
+			eprintf("failed to connect to host %s\n", name);
 			return -1;
 		}
 
@@ -642,7 +642,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 		ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
 		close(fd);
 		if (ret) {
-			eprintf("can't update vost %s\n", name);
+			eprintf("failed to update host %s\n", name);
 			return -1;
 		}
 	}
@@ -785,8 +785,8 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 	}
 
 	if (before(epoch, cached_epoch)) {
-		eprintf("requested epoch is smaller than the previous one, %d %d\n",
-			cached_epoch, epoch);
+		eprintf("requested epoch is smaller than the previous one: %d < %d\n",
+			epoch, cached_epoch);
 		return -1;
 	}
 	if (after(epoch, cached_epoch)) {
@@ -805,7 +805,7 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 	dprintf("%d, %d\n", epoch, fd);
 
 	if (cached_epoch == epoch && fd >= 0) {
-		dprintf("use a cached fd %d\n", fd);
+		dprintf("using the cached fd %d\n", fd);
 		return fd;
 	}
 

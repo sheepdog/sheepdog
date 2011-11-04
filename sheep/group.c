@@ -250,7 +250,7 @@ static void group_handler(int listen_fd, int events, void *data)
 {
 	int ret;
 	if (events & EPOLLHUP) {
-		eprintf("Receive EPOLLHUP event. Is corosync stopped running?\n");
+		eprintf("received EPOLLHUP event: has corosync exited?\n");
 		goto out;
 	}
 
@@ -258,7 +258,7 @@ static void group_handler(int listen_fd, int events, void *data)
 	if (ret == 0)
 		return;
 	else
-		eprintf("oops...some error occured inside corosync\n");
+		eprintf("oops... an error occurred inside corosync\n");
 out:
 	log_close();
 	exit(1);
@@ -320,7 +320,7 @@ static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
 
 	if (sys_stat_wait_format() || sys_stat_shutdown())
 		goto out;
-	/* When the joinning node is newly created, we need to check nothing. */
+	/* When the joining node is newly created, we need not check anything. */
 	if (nr_entries == 0)
 		goto out;
 
@@ -393,7 +393,7 @@ static int get_cluster_status(struct sheepdog_node_list_entry *from,
 		if (nr != nr_local_entries) {
 			nr_leave_entries = get_nodes_nr_from(&sys->leave_list);
 			if (nr_local_entries == nr + nr_leave_entries) {
-				/* Even though some nodes leave, we can make do with it.
+				/* Even though some nodes have left, we can make do without them.
 				 * Order cluster to do recovery right now.
 				 */
 				if (inc_epoch)
@@ -434,7 +434,7 @@ out:
 static void join(struct sheepdog_node_list_entry *joining, struct join_message *msg)
 {
 	if (msg->proto_ver != SD_SHEEP_PROTO_VER) {
-		eprintf("joining node send a wrong version message\n");
+		eprintf("joining node sent a message with the wrong protocol version\n");
 		msg->result = SD_RES_VER_MISMATCH;
 		return;
 	}
@@ -468,7 +468,7 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 		goto out;
 	}
 
-	vprintf(SDOG_ERR, "get the vdi bitmap from %s\n", host);
+	vprintf(SDOG_ERR, "getting the vdi bitmap from %s\n", host);
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_VDIS;
@@ -483,7 +483,7 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 	close(fd);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		vprintf(SDOG_ERR, "can't get the vdi bitmap %d %d\n", ret,
+		vprintf(SDOG_ERR, "unable to get the vdi bitmap (%d, %d)\n", ret,
 				rsp->result);
 		goto out;
 	}
@@ -624,7 +624,7 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 	cevent = &w->cev;
 	cevent->ctype = CPG_EVENT_NOTIFY;
 
-	vprintf(SDOG_DEBUG, "allow new deliver, %p\n", cevent);
+	vprintf(SDOG_DEBUG, "allow new deliver %p\n", cevent);
 
 	w->sender = *sender;
 	if (msg_len) {
@@ -670,12 +670,12 @@ static int check_majority(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 		close(fd);
 		nr_reachable++;
 		if (nr_reachable >= nr_majority) {
-			dprintf("majority nodes are alive\n");
+			dprintf("the majority of nodes are alive\n");
 			return 1;
 		}
 	}
 	dprintf("%d, %d, %d\n", nr_nodes, nr_majority, nr_reachable);
-	eprintf("majority nodes are not alive\n");
+	eprintf("the majority of nodes are not alive\n");
 	return 0;
 }
 
@@ -701,7 +701,7 @@ static void __sd_leave(struct cpg_event *cevent)
 	struct work_leave *w = container_of(cevent, struct work_leave, cev);
 
 	if (!check_majority(w->member_list, w->member_list_entries)) {
-		eprintf("perhaps network partition failure has occurred\n");
+		eprintf("perhaps a network partition has occurred?\n");
 		abort();
 	}
 }
@@ -754,7 +754,7 @@ static enum cluster_join_result sd_check_join_cb(
 	} else if (jm->result != SD_RES_SUCCESS &&
 			jm->epoch > sys->epoch &&
 			jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
-		eprintf("Transfer mastership. %d, %d\n", jm->epoch, sys->epoch);
+		eprintf("transfer mastership (%d, %d)\n", jm->epoch, sys->epoch);
 		return CJ_RES_MASTER_TRANSFER;
 	}
 	jm->epoch = sys->epoch;
@@ -949,11 +949,11 @@ static int check_epoch(struct request *req)
 
 	if (before(req_epoch, sys->epoch)) {
 		ret = SD_RES_OLD_NODE_VER;
-		eprintf("old node version %u %u, %x\n",
+		eprintf("old node version %u, %u, %x\n",
 			sys->epoch, req_epoch, opcode);
 	} else if (after(req_epoch, sys->epoch)) {
 		ret = SD_RES_NEW_NODE_VER;
-			eprintf("new node version %u %u %x\n",
+			eprintf("new node version %u, %u, %x\n",
 				sys->epoch, req_epoch, opcode);
 	}
 	return ret;
@@ -1149,11 +1149,11 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 	if (node_cmp(joined, &sys->this_node) == 0) {
 		if (result == CJ_RES_FAIL) {
-			eprintf("failed to join sheepdog\n");
+			eprintf("failed to join sheepdog cluster\n");
 			sys->cdrv->leave();
 			exit(1);
 		} else if (result == CJ_RES_JOIN_LATER) {
-			eprintf("Restart me later when master is up, please .Bye.\n");
+			eprintf("failed to join sheepdog cluster: please retry when master is up\n");
 			sys->cdrv->leave();
 			exit(1);
 		}
@@ -1175,7 +1175,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 		cevent = &w->cev;
 		cevent->ctype = CPG_EVENT_JOIN;
 
-		vprintf(SDOG_DEBUG, "allow new confchg, %p\n", cevent);
+		vprintf(SDOG_DEBUG, "allow new confchg %p\n", cevent);
 
 		size = sizeof(struct sheepdog_node_list_entry) * nr_members;
 		w->member_list = zalloc(size);
@@ -1280,7 +1280,7 @@ static void sd_leave_handler(struct sheepdog_node_list_entry *left,
 	int i, size;
 
 	if (node_cmp(left, &sys->this_node) == 0)
-		panic("Network Patition Bug: I should have exited.\n");
+		panic("network partition bug: this sheep should have exited\n");
 
 	dprintf("leave %s\n", node_to_str(left));
 	for (i = 0; i < nr_members; i++)
@@ -1297,7 +1297,7 @@ static void sd_leave_handler(struct sheepdog_node_list_entry *left,
 	cevent->ctype = CPG_EVENT_LEAVE;
 
 
-	vprintf(SDOG_DEBUG, "allow new confchg, %p\n", cevent);
+	vprintf(SDOG_DEBUG, "allow new confchg %p\n", cevent);
 
 	size = sizeof(struct sheepdog_node_list_entry) * nr_members;
 	w->member_list = zalloc(size);
@@ -1371,7 +1371,7 @@ int create_cluster(int port, int64_t zone)
 
 	ret = register_event(fd, group_handler, NULL);
 	if (ret) {
-		eprintf("Failed to register epoll events, %d\n", ret);
+		eprintf("failed to register epoll events (%d)\n", ret);
 		return 1;
 	}
 

@@ -54,7 +54,7 @@ static int logarea_init (int size)
 {
 	int shmid;
 
-	logdbg(stderr,"enter logarea_init\n");
+	logdbg(stderr, "entering logarea_init\n");
 
 	if ((shmid = shmget(IPC_PRIVATE, sizeof(struct logarea),
 			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
@@ -210,7 +210,7 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 	/* not enough space on head : drop msg */
 	if (la->head > la->tail &&
 	    (len + sizeof(struct logmsg)) > ((char *)la->head - (char *)la->tail)) {
-		logdbg(stderr, "enqueue: log area overrun, drop msg\n");
+		logdbg(stderr, "enqueue: log area overrun, dropping message\n");
 
 		if (!la->empty)
 			la->tail = lastmsg;
@@ -354,7 +354,7 @@ static void log_flush(void)
 
 static void log_sigsegv(void)
 {
-	vprintf(SDOG_ERR, "sheep logger exits abnormally, pid:%d\n", getpid());
+	vprintf(SDOG_ERR, "logger pid %d exiting abnormally\n", getpid());
 	log_flush();
 	closelog();
 	free_logarea();
@@ -365,7 +365,7 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 {
 	log_level = level;
 
-	logdbg(stderr,"enter log_init\n");
+	logdbg(stderr, "entering log_init\n");
 	log_name = program_name;
 
 	semkey = random();
@@ -396,11 +396,10 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 		la->fd = fd;
 		pid = fork();
 		if (pid < 0) {
-			syslog(LOG_ERR, "fail to fork the logger\n");
+			syslog(LOG_ERR, "failed to fork the logger process: %m\n");
 			return 1;
 		} else if (pid) {
-			syslog(LOG_WARNING,
-			       "Target daemon logger with pid=%d started!\n", pid);
+			syslog(LOG_WARNING, "logger pid %d starting\n", pid);
 			return 0;
 		}
 
@@ -444,7 +443,7 @@ void log_close(void)
 		la->active = 0;
 		waitpid(pid, NULL, 0);
 
-		vprintf(SDOG_WARNING, "sheep logger stopped, pid:%d\n", pid);
+		vprintf(SDOG_WARNING, "logger pid %d stopped\n", pid);
 		log_flush();
 		closelog();
 		free_logarea();

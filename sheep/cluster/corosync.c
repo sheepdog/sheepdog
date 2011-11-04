@@ -142,12 +142,12 @@ static int nodeid_to_addr(uint32_t nodeid, uint8_t *addr)
 
 	ret = corosync_cfg_get_node_addrs(cfg_handle, nodeid, 1, &nr, &caddr);
 	if (ret != CS_OK) {
-		vprintf(SDOG_ERR, "failed to get addr %d\n", ret);
+		vprintf(SDOG_ERR, "failed to get node addresses (%d)\n", ret);
 		return -1;
 	}
 
 	if (!nr) {
-		vprintf(SDOG_ERR, "we got no address\n");
+		vprintf(SDOG_ERR, "no node addresses found\n");
 		return -1;
 	}
 
@@ -197,11 +197,11 @@ retry:
 	case CPG_OK:
 		break;
 	case CPG_ERR_TRY_AGAIN:
-		dprintf("failed to send message. try again\n");
+		dprintf("failed to send message: retrying\n");
 		sleep(1);
 		goto retry;
 	default:
-		eprintf("failed to send message, %d\n", ret);
+		eprintf("failed to send message (%d)\n", ret);
 		return -1;
 	}
 	return 0;
@@ -296,7 +296,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 				     cevent->msg, cevent->msg_len);
 
 			if (res == CJ_RES_MASTER_TRANSFER) {
-				eprintf("Restart me later when master is up, please. Bye.\n");
+				eprintf("failed to join sheepdog cluster: please retry when master is up\n");
 				exit(1);
 			}
 
@@ -584,20 +584,19 @@ static int corosync_init(struct cdrv_handlers *handlers, uint8_t *myaddr)
 
 	ret = cpg_initialize(&cpg_handle, &cb);
 	if (ret != CPG_OK) {
-		eprintf("Failed to initialize cpg, %d\n", ret);
-		eprintf("Is corosync running?\n");
+		eprintf("failed to initialize cpg (%d) - is corosync running?\n", ret);
 		return -1;
 	}
 
 	ret = corosync_cfg_initialize(&cfg_handle, NULL);
 	if (ret != CS_OK) {
-		vprintf(SDOG_ERR, "failed to initiazize cfg %d\n", ret);
+		vprintf(SDOG_ERR, "failed to initialize cfg (%d)\n", ret);
 		return -1;
 	}
 
 	ret = corosync_cfg_local_get(cfg_handle, &nodeid);
 	if (ret != CS_OK) {
-		vprintf(SDOG_ERR, "failed to get nodeid %d\n", ret);
+		vprintf(SDOG_ERR, "failed to get node id (%d)\n", ret);
 		return -1;
 	}
 
@@ -612,7 +611,7 @@ static int corosync_init(struct cdrv_handlers *handlers, uint8_t *myaddr)
 
 	ret = cpg_fd_get(cpg_handle, &fd);
 	if (ret != CPG_OK) {
-		eprintf("Failed to retrieve cpg file descriptor, %d\n", ret);
+		eprintf("failed to get cpg file descriptor (%d)\n", ret);
 		return -1;
 	}
 
@@ -636,14 +635,14 @@ retry:
 	case CPG_OK:
 		break;
 	case CPG_ERR_TRY_AGAIN:
-		dprintf("Failed to join the sheepdog group, try again\n");
+		dprintf("failed to join the sheepdog group: retrying\n");
 		sleep(1);
 		goto retry;
 	case CPG_ERR_SECURITY:
-		eprintf("Permission error.\n");
+		eprintf("permission denied to join the sheepdog group\n");
 		return -1;
 	default:
-		eprintf("Failed to join the sheepdog group, %d\n", ret);
+		eprintf("failed to join the sheepdog group (%d)\n", ret);
 		return -1;
 	}
 
@@ -661,7 +660,7 @@ static int corosync_leave(void)
 
 	ret = cpg_leave(cpg_handle, &cpg_group);
 	if (ret != CPG_OK) {
-		eprintf("failed to leave the sheepdog group\n, %d", ret);
+		eprintf("failed to leave the sheepdog group (%d)\n", ret);
 		return -1;
 	}
 

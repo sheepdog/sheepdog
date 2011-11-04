@@ -260,12 +260,12 @@ int jrnl_recover(const char *jrnl_dir)
 	struct dirent *d;
 	char jrnl_file_path[PATH_MAX];
 
-	eprintf("Openning the directory %s.\n", jrnl_dir);
+	eprintf("opening the directory %s\n", jrnl_dir);
 	dir = opendir(jrnl_dir);
 	if (!dir)
 		return -1;
 
-	vprintf(SDOG_NOTICE, "start jrnl_recovery.\n");
+	vprintf(SDOG_NOTICE, "starting journal recovery\n");
 	while ((d = readdir(dir))) {
 		int ret;
 		struct jrnl_descriptor jd;
@@ -277,7 +277,7 @@ int jrnl_recover(const char *jrnl_dir)
 			 jrnl_dir, d->d_name);
 		ret = jrnl_open(&jd, jrnl_file_path);
 		if (ret) {
-			eprintf("Unable to open the journal file, %s, for reading.\n",
+			eprintf("unable to open the journal file %s for reading\n",
 				jrnl_file_path);
 			goto end_while_3;
 		}
@@ -285,13 +285,13 @@ int jrnl_recover(const char *jrnl_dir)
 			goto end_while_2;
 		jd.target_fd = open(jd.head.target_path, O_SYNC | O_RDWR);
 		if (ret) {
-			eprintf("Unable to open the object file, %s, to recover.\n",
+			eprintf("unable to open the object file %s for recovery\n",
 				jd.head.target_path);
 			goto end_while_2;
 		}
 		ret = jrnl_apply_to_target_object(&jd);
 		if (ret)
-			eprintf("Unable to recover the object, %s.\n",
+			eprintf("unable to recover the object %s\n",
 				jd.head.target_path);
 
 		close(jd.target_fd);
@@ -299,12 +299,12 @@ int jrnl_recover(const char *jrnl_dir)
 end_while_2:
 		jrnl_close(&jd);
 end_while_3:
-		vprintf(SDOG_INFO, "recovered the object in journal, %s\n",
+		vprintf(SDOG_INFO, "recovered the object %s from the journal\n",
 			jrnl_file_path);
 		jrnl_remove(&jd);
 	}
 	closedir(dir);
-	vprintf(SDOG_NOTICE, "end jrnl_recovery.\n");
+	vprintf(SDOG_NOTICE, "journal recovery complete\n");
 
 	return 0;
 }
