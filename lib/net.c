@@ -121,7 +121,7 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 
 	ret = getaddrinfo(NULL, servname, &hints, &res0);
 	if (ret) {
-		eprintf("unable to get address info, %m\n");
+		eprintf("failed to get address info: %m\n");
 		return 1;
 	}
 
@@ -134,7 +134,7 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 		ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt,
 				 sizeof(opt));
 		if (ret)
-			eprintf("can't set SO_REUSEADDR, %m\n");
+			eprintf("failed to set SO_REUSEADDR: %m\n");
 
 		opt = 1;
 		if (res->ai_family == AF_INET6) {
@@ -148,14 +148,14 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 
 		ret = bind(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
-			fprintf(stderr, "can't bind server socket, %m\n");
+			fprintf(stderr, "failed to bind server socket: %m\n");
 			close(fd);
 			continue;
 		}
 
 		ret = listen(fd, SOMAXCONN);
 		if (ret) {
-			eprintf("can't listen to server socket, %m\n");
+			eprintf("failed to listen on server socket: %m\n");
 			close(fd);
 			continue;
 		}
@@ -198,7 +198,7 @@ int connect_to(const char *name, int port)
 
 	ret = getaddrinfo(name, buf, &hints, &res0);
 	if (ret) {
-		fprintf(stderr, "unable to get address info, %m\n");
+		fprintf(stderr, "failed to get address info: %m\n");
 		return -1;
 	}
 
@@ -216,15 +216,15 @@ int connect_to(const char *name, int port)
 		ret = setsockopt(fd, SOL_SOCKET, SO_LINGER, &linger_opt,
 				 sizeof(linger_opt));
 		if (ret) {
-			eprintf("can't set SO_LINGER, %m\n");
+			eprintf("failed to set SO_LINGER: %m\n");
 			close(fd);
 			continue;
 		}
 
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret)
-			fprintf(stderr, "failed to connect to %s:%d, %s\n",
-				name, port, strerror(errno));
+			fprintf(stderr, "failed to connect to %s:%d: %m\n",
+				name, port);
 		else
 			goto success;
 
@@ -244,7 +244,7 @@ reread:
 	if (ret < 0 || !ret) {
 		if (errno == EINTR || errno == EAGAIN)
 			goto reread;
-		fprintf(stderr, "failed to send a req, %m\n");
+		fprintf(stderr, "failed to read from socket: %m\n");
 		return 1;
 	}
 
@@ -277,7 +277,7 @@ rewrite:
 	if (ret < 0) {
 		if (errno == EINTR || errno == EAGAIN)
 			goto rewrite;
-		fprintf(stderr, "failed to send a req, %m\n");
+		fprintf(stderr, "failed to write to socket: %m\n");
 		return 1;
 	}
 
@@ -312,7 +312,7 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int *wlen)
 
 	ret = do_write(sockfd, &msg, sizeof(*hdr) + *wlen);
 	if (ret) {
-		eprintf("failed to send a req, %x %d, %m\n", hdr->opcode,
+		eprintf("failed to send request %x, %d: %m\n", hdr->opcode,
 			*wlen);
 		ret = -1;
 	}
@@ -326,15 +326,12 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	int ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 
-	ret = send_req(sockfd, hdr, data, wlen);
-	if (ret) {
-		fprintf(stderr, "failed to send a req, %m\n");
+	if (send_req(sockfd, hdr, data, wlen))
 		return 1;
-	}
 
 	ret = do_read(sockfd, rsp, sizeof(*rsp));
 	if (ret) {
-		fprintf(stderr, "failed to get a rsp, %m\n");
+		fprintf(stderr, "failed to read a response: %m\n");
 		return 1;
 	}
 
@@ -344,7 +341,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	if (*rlen) {
 		ret = do_read(sockfd, data, *rlen);
 		if (ret) {
-			fprintf(stderr, "failed to get the data, %m\n");
+			fprintf(stderr, "failed to read the response data: %m\n");
 			return 1;
 		}
 	}
@@ -381,12 +378,12 @@ int set_nonblocking(int fd)
 
 	ret = fcntl(fd, F_GETFL);
 	if (ret < 0) {
-		eprintf("can't fcntl (F_GETFL), %m\n");
+		eprintf("fcntl F_GETFL failed: %m\n");
 		close(fd);
 	} else {
 		ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
 		if (ret < 0)
-			eprintf("can't fcntl (O_NONBLOCK), %m\n");
+			eprintf("fcntl O_NONBLOCK failed: %m\n");
 	}
 
 	return ret;

@@ -463,7 +463,7 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 
 	fd = connect_to(host, node->port);
 	if (fd < 0) {
-		vprintf(SDOG_ERR, "can't get the vdi bitmap %s, %m\n", host);
+		vprintf(SDOG_ERR, "unable to get the vdi bitmap from %s: %m\n", host);
 		ret = -SD_RES_EIO;
 		goto out;
 	}

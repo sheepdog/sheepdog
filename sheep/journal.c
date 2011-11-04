@@ -44,7 +44,7 @@ static int jrnl_open(struct jrnl_descriptor *jd, const char *path)
 	jd->fd = open(path, O_RDONLY);
 
 	if (jd->fd < 0) {
-		eprintf("failed to open %s, %s\n", jd->path, strerror(errno));
+		eprintf("failed to open %s: %m\n", jd->path);
 		if (errno == ENOENT)
 			return SD_RES_NO_OBJ;
 		else
@@ -68,7 +68,7 @@ static int jrnl_create(struct jrnl_descriptor *jd, const char *jrnl_dir)
 	jd->fd = mkostemp(jd->path, O_SYNC);
 
 	if (jd->fd < 0) {
-		eprintf("failed to create %s, %s\n", jd->path, strerror(errno));
+		eprintf("failed to create %s: %m\n", jd->path);
 		return SD_RES_UNKNOWN;
 	}
 
@@ -81,7 +81,7 @@ static int jrnl_remove(struct jrnl_descriptor *jd)
 
 	ret = unlink(jd->path);
 	if (ret) {
-		eprintf("failed to remove %s, %m\n", jd->path);
+		eprintf("failed to remove %s: %m\n", jd->path);
 		ret = SD_RES_EIO;
 	} else
 		ret = SD_RES_SUCCESS;

@@ -546,7 +546,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 	namesize = sizeof(from);
 	fd = accept(listen_fd, (struct sockaddr *)&from, &namesize);
 	if (fd < 0) {
-		eprintf("can't accept a new connection, %m\n");
+		eprintf("failed to accept a new connection: %m\n");
 		return;
 	}
 

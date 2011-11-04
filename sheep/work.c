@@ -247,7 +247,7 @@ static int init_eventfd(void)
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
-		eprintf("failed to create an event fd, %m\n");
+		eprintf("failed to create an event fd: %m\n");
 		return 1;
 	}
 
@@ -287,7 +287,7 @@ struct work_queue *init_work_queue(int nr)
 				     worker_routine, wi);
 
 		if (ret) {
-			eprintf("failed to create a worker thread, %d %s\n",
+			eprintf("failed to create worker thread #%d: %s\n",
 				i, strerror(ret));
 			if (ret)
 				goto destroy_threads;
@@ -304,7 +304,7 @@ destroy_threads:
 	pthread_mutex_unlock(&wi->startup_lock);
 	for (; i > 0; i--) {
 		pthread_join(wi->worker_thread[i - 1], NULL);
-		eprintf("stopped the worker thread %d\n", i - 1);
+		eprintf("stopped worker thread #%d\n", i - 1);
 	}
 
 /* destroy_cond_mutex: */

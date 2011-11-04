@@ -58,13 +58,13 @@ static int logarea_init (int size)
 
 	if ((shmid = shmget(IPC_PRIVATE, sizeof(struct logarea),
 			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
-		syslog(LOG_ERR, "shmget logarea failed %d", errno);
+		syslog(LOG_ERR, "shmget logarea failed: %m");
 		return 1;
 	}
 
 	la = shmat(shmid, NULL, 0);
 	if (!la) {
-		syslog(LOG_ERR, "shmat logarea failed %d", errno);
+		syslog(LOG_ERR, "shmat logarea failed: %m");
 		return 1;
 	}
 
@@ -75,14 +75,14 @@ static int logarea_init (int size)
 
 	if ((shmid = shmget(IPC_PRIVATE, size,
 			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
-		syslog(LOG_ERR, "shmget msg failed %d", errno);
+		syslog(LOG_ERR, "shmget msg failed: %m");
 		shmdt(la);
 		return 1;
 	}
 
 	la->start = shmat(shmid, NULL, 0);
 	if (!la->start) {
-		syslog(LOG_ERR, "shmat msg failed %d", errno);
+		syslog(LOG_ERR, "shmat msg failed: %m");
 		shmdt(la);
 		return 1;
 	}
@@ -97,14 +97,14 @@ static int logarea_init (int size)
 
 	if ((shmid = shmget(IPC_PRIVATE, MAX_MSG_SIZE + sizeof(struct logmsg),
 			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
-		syslog(LOG_ERR, "shmget logmsg failed %d", errno);
+		syslog(LOG_ERR, "shmget logmsg failed: %m");
 		shmdt(la->start);
 		shmdt(la);
 		return 1;
 	}
 	la->buff = shmat(shmid, NULL, 0);
 	if (!la->buff) {
-		syslog(LOG_ERR, "shmat logmsgfailed %d", errno);
+		syslog(LOG_ERR, "shmat logmsg failed: %m");
 		shmdt(la->start);
 		shmdt(la);
 		return 1;
@@ -113,7 +113,7 @@ static int logarea_init (int size)
 	shmctl(shmid, IPC_RMID, NULL);
 
 	if ((la->semid = semget(semkey, 1, 0666 | IPC_CREAT)) < 0) {
-		syslog(LOG_ERR, "semget failed %d", errno);
+		syslog(LOG_ERR, "semget failed: %m");
 		shmdt(la->buff);
 		shmdt(la->start);
 		shmdt(la);
@@ -122,7 +122,7 @@ static int logarea_init (int size)
 
 	la->semarg.val=1;
 	if (semctl(la->semid, 0, SETVAL, la->semarg) < 0) {
-		syslog(LOG_ERR, "semctl failed %d", errno);
+		syslog(LOG_ERR, "semctl failed: %m");
 		shmdt(la->buff);
 		shmdt(la->start);
 		shmdt(la);
@@ -291,7 +291,7 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 		ops.sem_flg = SEM_UNDO;
 		ops.sem_op = -1;
 		if (semop(la->semid, &ops, 1) < 0) {
-			syslog(LOG_ERR, "semop up failed %m");
+			syslog(LOG_ERR, "semop up failed: %m");
 			return;
 		}
 
@@ -299,7 +299,7 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 
 		ops.sem_op = 1;
 		if (semop(la->semid, &ops, 1) < 0) {
-			syslog(LOG_ERR, "semop down failed");
+			syslog(LOG_ERR, "semop down failed: %m");
 			return;
 		}
 	} else {
@@ -337,7 +337,7 @@ static void log_flush(void)
 		ops.sem_flg = SEM_UNDO;
 		ops.sem_op = -1;
 		if (semop(la->semid, &ops, 1) < 0) {
-			syslog(LOG_ERR, "semop up failed");
+			syslog(LOG_ERR, "semop up failed: %m");
 			exit(1);
 		}
 
@@ -345,7 +345,7 @@ static void log_flush(void)
 
 		ops.sem_op = 1;
 		if (semop(la->semid, &ops, 1) < 0) {
-			syslog(LOG_ERR, "semop down failed");
+			syslog(LOG_ERR, "semop down failed: %m");
 			exit(1);
 		}
 		log_syslog(la->buff);
@@ -406,8 +406,7 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 
 		fd = open("/dev/null", O_RDWR);
 		if (fd < 0) {
-			syslog(LOG_ERR, "failed to open /dev/null: %s\n",
-			       strerror(errno));
+			syslog(LOG_ERR, "failed to open /dev/null: %m\n");
 			exit(1);
 		}
 
@@ -416,8 +415,7 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 		dup2(fd, 2);
 		setsid();
 		if (chdir("/") < 0) {
-			syslog(LOG_ERR, "failed to chdir to '/': %s\n",
-			       strerror(errno));
+			syslog(LOG_ERR, "failed to chdir to /: %m\n");
 			exit(1);
 		}
 

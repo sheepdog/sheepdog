@@ -47,7 +47,7 @@ void add_timer(struct timer *t, unsigned int seconds)
 
 	tfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 	if (tfd < 0) {
-		eprintf("timerfd_create, %m\n");
+		eprintf("timerfd_create: %m\n");
 		return;
 	}
 
@@ -55,7 +55,7 @@ void add_timer(struct timer *t, unsigned int seconds)
 	it.it_value.tv_sec = seconds;
 
 	if (timerfd_settime(tfd, 0, &it, NULL) < 0) {
-		eprintf("timerfd_settime, %m\n");
+		eprintf("timerfd_settime: %m\n");
 		return;
 	}
 
@@ -111,7 +111,7 @@ int register_event(int fd, event_handler_t h, void *data)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev);
 	if (ret) {
-		eprintf("can't add epoll event, %m\n");
+		eprintf("failed to add epoll event: %m\n");
 		free(ei);
 	} else
 		list_add(&ei->ei_list, &events_list);
@@ -126,13 +126,13 @@ void unregister_event(int fd)
 
 	ei = lookup_event(fd);
 	if (!ei) {
-		eprintf("can't find a event\n");
+		eprintf("event info for fd %d not found\n", fd);
 		return;
 	}
 
 	ret = epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
 	if (ret)
-		eprintf("can't del epoll event, %m\n");
+		eprintf("failed to delete epoll event for fd %d: %m\n", fd);
 
 	list_del(&ei->ei_list);
 	free(ei);
@@ -156,7 +156,7 @@ int modify_event(int fd, unsigned int events)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
 	if (ret) {
-		eprintf("can't del epoll event, %m\n");
+		eprintf("failed to delete epoll event for fd %d: %m\n", fd);
 		return 1;
 	}
 	return 0;
@@ -171,7 +171,7 @@ void event_loop(int timeout)
 	if (nr < 0) {
 		if (errno == EINTR)
 			return;
-		eprintf("epoll_wait failed, %m\n");
+		eprintf("epoll_wait failed: %m\n");
 		exit(1);
 	} else if (nr) {
 		for (i = 0; i < nr; i++) {

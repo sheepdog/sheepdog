@@ -404,7 +404,7 @@ again:
 			continue;
 
 		if (do_read(pfds[i].fd, rsp, sizeof(*rsp))) {
-			eprintf("failed to get a rsp, %m\n");
+			eprintf("failed to read a response: %m\n");
 			ret = SD_RES_NETWORK_ERROR;
 			break;
 		}
@@ -445,7 +445,7 @@ static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
-		eprintf("failed to open %s, %s\n", path, strerror(errno));
+		eprintf("failed to open %s: %m\n", path);
 		if (errno == ENOENT) {
 			struct stat s;
 
@@ -867,7 +867,7 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 		addr_to_str(host, sizeof(host), nodes[i].addr, 0);
 		fd = connect_to(host, nodes[i].port);
 		if (fd < 0) {
-			vprintf(SDOG_ERR, "can't connect to %s, %m\n", host);
+			vprintf(SDOG_ERR, "failed to connect to %s: %m\n", host);
 			continue;
 		}
 
@@ -928,7 +928,7 @@ int get_latest_epoch(void)
 
 	dir = opendir(epoch_path);
 	if (!dir) {
-		vprintf(SDOG_EMERG, "failed to get the latest epoch, %m\n");
+		vprintf(SDOG_EMERG, "failed to get the latest epoch: %m\n");
 		abort();
 	}
 
@@ -957,7 +957,7 @@ static int rmdir_r(char *dir_path)
 	dir = opendir(dir_path);
 	if (!dir) {
 		if (errno != ENOENT)
-			eprintf("failed, %s, %"PRIu32"\n", dir_path, errno);
+			eprintf("failed to open %s: %m\n", dir_path);
 		return -errno;
 	}
 
@@ -968,7 +968,7 @@ static int rmdir_r(char *dir_path)
 		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
 		ret = stat(path, &s);
 		if (ret) {
-			eprintf("cannot remove directory %s\n", path);
+			eprintf("failed to stat %s: %m\n", path);
 			goto out;
 		}
 		if (S_ISDIR(s.st_mode))
@@ -977,7 +977,9 @@ static int rmdir_r(char *dir_path)
 			ret = unlink(path);
 
 		if (ret != 0) {
-			eprintf("failed, %s, %"PRIu32", %"PRIu32"\n", path, S_ISDIR(s.st_mode), errno);
+			eprintf("failed to remove %s %s: %m\n",
+				S_ISDIR(s.st_mode) ? "directory" : "file",
+				path);
 			goto out;
 		}
 	}
@@ -997,21 +999,21 @@ int remove_epoch(int epoch)
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	ret = unlink(path);
 	if (ret && ret != -ENOENT) {
-		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
+		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
 		return SD_RES_EIO;
 	}
 
 	snprintf(path, sizeof(path), "%s%08u", obj_path, epoch);
 	ret = rmdir_r(path);
 	if (ret && ret != -ENOENT) {
-		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
+		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
 		return SD_RES_EIO;
 	}
 
 	snprintf(path, sizeof(path), "%s%08u/", jrnl_path, epoch);
 	ret = rmdir_r(path);
 	if (ret && ret != -ENOENT) {
-		eprintf("failed to remove %s, %s\n", path, strerror(-ret));
+		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
 		return SD_RES_EIO;
 	}
 	return 0;
@@ -1332,7 +1334,7 @@ next:
 
 		fd = open(tmp_path, flags, def_fmode);
 		if (fd < 0) {
-			eprintf("failed to open %s, %s\n", tmp_path, strerror(errno));
+			eprintf("failed to open %s: %m\n", tmp_path);
 			goto err;
 		}
 
@@ -1347,7 +1349,7 @@ next:
 		dprintf("rename %s to %s\n", tmp_path, path);
 		ret = rename(tmp_path, path);
 		if (ret < 0) {
-			eprintf("failed to rename %s to %s, %m\n", tmp_path, path);
+			eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
 			goto err;
 		}
 		dprintf("recovered oid %"PRIx64" to epoch %"PRIu32"\n", oid, epoch);
@@ -1842,13 +1844,13 @@ again:
 	ret = stat(d, &s);
 	if (ret) {
 		if (retry || errno != ENOENT) {
-			eprintf("can't handle the dir %s, %m\n", d);
+			eprintf("cannot handle the directory %s: %m\n", d);
 			return 1;
 		}
 
 		ret = mkdir(d, def_dmode);
 		if (ret) {
-			eprintf("can't create the dir %s, %m\n", d);
+			eprintf("cannot create the directory %s: %m\n", d);
 			return 1;
 		} else {
 			*new = 1;
@@ -1914,7 +1916,7 @@ static int init_epoch_path(const char *base_path)
 			if (errno == ENOENT)
 				continue;
 
-			vprintf(SDOG_ERR, "failed to open the epoch dir, %m\n");
+			vprintf(SDOG_ERR, "failed to open the epoch directory: %m\n");
 			return SD_RES_EIO;
 		}
 
