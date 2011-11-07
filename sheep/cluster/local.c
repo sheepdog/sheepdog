@@ -314,7 +314,7 @@ static int local_init(struct cdrv_handlers *handlers, const char *option,
 	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
 	if (sigfd < 0) {
 		eprintf("failed to create a signal fd: %m\n");
-		return 1;
+		return -1;
 	}
 
 	add_timer(&t, 1);
