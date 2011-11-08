@@ -180,6 +180,11 @@ AC_ARG_ENABLE([corosync],
 	[ enable_corosync="yes" ],)
 AM_CONDITIONAL(BUILD_COROSYNC, test x$enable_corosync = xyes)
 
+AC_ARG_ENABLE([zookeeper],
+	[  --enable-zookeeper      : build zookeeper cluster driver ],,
+	[ enable_zookeeper="no" ],)
+AM_CONDITIONAL(BUILD_ZOOKEEPER, test x$enable_zookeeper = xyes)
+
 AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR     : path to init script directory. ],
 	[ INITDDIR="$withval" ],
@@ -229,6 +234,15 @@ if test "x${enable_corosync}" = xyes; then
 	PKG_CHECK_MODULES([libcfg],[libcfg])
 	AC_DEFINE_UNQUOTED([HAVE_COROSYNC], 1, [have corosync])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES corosync"
+fi
+
+if test "x${enable_zookeeper}" = xyes; then
+	AC_CHECK_LIB([zookeeper_mt], [zookeeper_init],,
+		AC_MSG_ERROR(libzookeeper not found))
+	AC_CHECK_HEADERS([zookeeper/zookeeper.h],,
+		AC_MSG_ERROR(zookeeper.h header missing))
+	AC_DEFINE_UNQUOTED([HAVE_ZOOKEEPER], 1, [have zookeeper])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES zookeeper"
 fi
 
 # extra warnings
