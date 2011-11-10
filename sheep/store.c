@@ -439,7 +439,7 @@ static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
 	if (sys->use_directio && is_data_obj(oid))
 		flags = O_DIRECT | O_RDWR | aflags;
 	else
-		flags = O_SYNC | O_RDWR | aflags;
+		flags = O_DSYNC | O_RDWR | aflags;
 
 	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path, epoch, oid);
 
@@ -482,7 +482,7 @@ int update_epoch_log(int epoch)
 	dprintf("update epoch: %d, %d\n", epoch, sys->nr_nodes);
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
-	fd = open(path, O_RDWR | O_CREAT | O_SYNC, def_fmode);
+	fd = open(path, O_RDWR | O_CREAT | O_DSYNC, def_fmode);
 	if (fd < 0) {
 		ret = fd;
 		goto err_open;
@@ -1017,7 +1017,7 @@ int set_cluster_ctime(uint64_t ct)
 {
 	int fd, ret;
 
-	fd = open(config_path, O_SYNC | O_WRONLY);
+	fd = open(config_path, O_DSYNC | O_WRONLY);
 	if (fd < 0)
 		return -1;
 
@@ -1319,7 +1319,7 @@ next:
 
 	if (rsp->result == SD_RES_SUCCESS) {
 		char path[PATH_MAX], tmp_path[PATH_MAX];
-		int flags = O_SYNC | O_RDWR | O_CREAT;
+		int flags = O_DSYNC | O_RDWR | O_CREAT;
 
 		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
 			 epoch, oid);
@@ -2052,7 +2052,7 @@ int set_cluster_copies(uint8_t copies)
 {
 	int fd, ret;
 
-	fd = open(config_path, O_SYNC | O_WRONLY);
+	fd = open(config_path, O_DSYNC | O_WRONLY);
 	if (fd < 0)
 		return SD_RES_EIO;
 
@@ -2089,7 +2089,7 @@ int set_cluster_flags(uint16_t flags)
 {
 	int fd, ret = SD_RES_EIO;
 
-	fd = open(config_path, O_SYNC | O_WRONLY);
+	fd = open(config_path, O_DSYNC | O_WRONLY);
 	if (fd < 0)
 		goto out;
 

@@ -65,7 +65,7 @@ static int jrnl_close(struct jrnl_descriptor *jd)
 static int jrnl_create(struct jrnl_descriptor *jd, const char *jrnl_dir)
 {
 	snprintf(jd->path, sizeof(jd->path), "%sXXXXXX", jrnl_dir);
-	jd->fd = mkostemp(jd->path, O_SYNC);
+	jd->fd = mkostemp(jd->path, O_DSYNC);
 
 	if (jd->fd < 0) {
 		eprintf("failed to create %s: %m\n", jd->path);
@@ -283,7 +283,7 @@ int jrnl_recover(const char *jrnl_dir)
 		}
 		if (!jrnl_has_end_mark(&jd))
 			goto end_while_2;
-		jd.target_fd = open(jd.head.target_path, O_SYNC | O_RDWR);
+		jd.target_fd = open(jd.head.target_path, O_DSYNC | O_RDWR);
 		if (ret) {
 			eprintf("unable to open the object file %s for recovery\n",
 				jd.head.target_path);
