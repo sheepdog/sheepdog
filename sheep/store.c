@@ -589,31 +589,23 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 	dprintf("%x, %" PRIx64" , %u\n", opcode, oid, epoch);
 
 	switch (opcode) {
-	case SD_OP_CREATE_AND_WRITE_OBJ:
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_READ_OBJ:
-		if (opcode == SD_OP_CREATE_AND_WRITE_OBJ)
-			fd = ob_open(epoch, oid, O_CREAT, &ret);
-		else
-			fd = ob_open(epoch, oid, 0, &ret);
-
+		fd = ob_open(epoch, oid, 0, &ret);
 		if (fd < 0) {
 			ret = SD_RES_EIO;
 			goto out;
 		}
-
-		if (opcode != SD_OP_CREATE_AND_WRITE_OBJ)
-			break;
-
+		break;
+	case SD_OP_CREATE_AND_WRITE_OBJ:
 		if (!hdr->copies) {
 			eprintf("the number of copies cannot be zero\n");
 			ret = SD_RES_INVALID_PARMS;
 			goto out;
 		}
 
-		ret = ftruncate(fd, 0);
-		if (ret) {
-			eprintf("%m\n");
+		fd = ob_open(epoch, oid, O_CREAT|O_TRUNC, &ret);
+		if (fd < 0) {
 			ret = SD_RES_EIO;
 			goto out;
 		}
