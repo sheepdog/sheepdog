@@ -158,7 +158,7 @@ out:
 	return res;
 }
 
-static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret);
+static int ob_open(uint32_t epoch, uint64_t oid, int flags, int *ret);
 
 static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 			 unsigned *ori_rlen, void *buf, uint64_t offset)
@@ -430,16 +430,14 @@ out:
 	return ret;
 }
 
-static int ob_open(uint32_t epoch, uint64_t oid, int aflags, int *ret)
+static int ob_open(uint32_t epoch, uint64_t oid, int flags, int *ret)
 {
 	char path[1024];
-	int flags;
 	int fd;
 
+	flags |= O_DSYNC | O_RDWR;
 	if (sys->use_directio && is_data_obj(oid))
-		flags = O_DIRECT | O_RDWR | aflags;
-	else
-		flags = O_DSYNC | O_RDWR | aflags;
+		flags |= O_DIRECT;
 
 	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path, epoch, oid);
 
