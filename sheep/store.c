@@ -597,8 +597,10 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		else
 			fd = ob_open(epoch, oid, 0, &ret);
 
-		if (fd < 0)
+		if (fd < 0) {
+			ret = SD_RES_EIO;
 			goto out;
+		}
 
 		if (opcode != SD_OP_CREATE_AND_WRITE_OBJ)
 			break;
