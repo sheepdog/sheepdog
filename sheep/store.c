@@ -590,10 +590,8 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 	case SD_OP_WRITE_OBJ:
 	case SD_OP_READ_OBJ:
 		fd = ob_open(epoch, oid, 0, &ret);
-		if (fd < 0) {
-			ret = SD_RES_EIO;
+		if (fd < 0)
 			goto out;
-		}
 		break;
 	case SD_OP_CREATE_AND_WRITE_OBJ:
 		if (!hdr->copies) {
@@ -603,10 +601,8 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		}
 
 		fd = ob_open(epoch, oid, O_CREAT|O_TRUNC, &ret);
-		if (fd < 0) {
-			ret = SD_RES_EIO;
+		if (fd < 0)
 			goto out;
-		}
 
 		if (hdr->flags & SD_FLAG_CMD_COW) {
 			dprintf("%" PRIu64 ", %" PRIx64 "\n", oid, hdr->cow_oid);
