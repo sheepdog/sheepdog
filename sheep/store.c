@@ -723,14 +723,37 @@ out:
 	return ret;
 }
 
+static int store_write_last_sector(int fd)
+{
+	const int size = SECTOR_SIZE;
+	char *buf = NULL;
+	int ret;
+
+	buf = valloc(size);
+	if (!buf) {
+		eprintf("failed to allocate memory\n");
+		return SD_RES_NO_MEM;
+	}
+
+	memset(buf, 0, size);
+	ret = pwrite64(fd, buf, size, SD_DATA_OBJ_SIZE - size);
+	free(buf);
+
+	if (ret != size) {
+		if (errno == ENOSPC)
+			return SD_RES_NO_SPACE;
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	return SD_RES_SUCCESS;
+}
 
 static int store_create_and_write_obj(struct request *req, uint32_t epoch)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	const int size = SECTOR_SIZE;
 	int ret = SD_RES_SUCCESS;
 	int fd = -1;
-	char *buf = NULL;
 
 	if (!hdr->copies) {
 		eprintf("the number of copies cannot be zero\n");
@@ -741,24 +764,17 @@ static int store_create_and_write_obj(struct request *req, uint32_t epoch)
 	if (fd < 0)
 		return ret;
 
-	buf = valloc(size);
-	if (!buf) {
-		eprintf("failed to allocate memory\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
-	}
-	memset(buf, 0, size);
-	ret = pwrite64(fd, buf, size, SD_DATA_OBJ_SIZE - size);
-	free(buf);
-
-	if (ret != size) {
-		if (errno == ENOSPC)
-			ret = SD_RES_NO_SPACE;
-		else {
-			eprintf("%m\n");
+	/*
+	 * Preallocate the whole object to get a better filesystem layout.
+	 */
+	ret = fallocate(fd, 0, 0, SD_DATA_OBJ_SIZE);
+	if (ret < 0) {
+		if (errno != ENOSYS && errno != EOPNOTSUPP) {
 			ret = SD_RES_EIO;
+			goto out;
 		}
-		goto out;
+
+		ret = store_write_last_sector(fd);
 	}
 
 	ret = store_write_obj_fd(fd, req, epoch);
