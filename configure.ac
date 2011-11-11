@@ -36,6 +36,8 @@ AC_CANONICAL_HOST
 
 AC_LANG([C])
 
+AM_SILENT_RULES([yes])
+
 dnl Fix default variables - "prefix" variable if not specified
 if test "$prefix" = "NONE"; then
 	prefix="/usr"
