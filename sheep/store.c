@@ -574,163 +574,227 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	return rsp_data_length;
 }
 
-static int store_queue_request_local(struct request *req, uint32_t epoch)
+static int store_remove_obj(struct request *req, uint32_t epoch)
 {
-	int fd = -1;
-	int ret = SD_RES_SUCCESS;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	char path[1024];
+
+	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
+		 epoch, hdr->oid);
+
+	if (unlink(path) < 0) {
+		if (errno == ENOENT)
+			return SD_RES_NO_OBJ;
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+static int store_read_obj(struct request *req, uint32_t epoch)
+{
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
-	uint64_t oid = hdr->oid;
-	uint32_t opcode = hdr->opcode;
-	char path[1024], *buf = NULL;
+	int ret = SD_RES_SUCCESS;
+	int fd = -1;
 
-	dprintf("%x, %" PRIx64" , %u\n", opcode, oid, epoch);
+	fd = ob_open(epoch, hdr->oid, 0, &ret);
+	if (fd < 0)
+		return ret;
 
-	switch (opcode) {
-	case SD_OP_WRITE_OBJ:
-	case SD_OP_READ_OBJ:
-		fd = ob_open(epoch, oid, 0, &ret);
-		if (fd < 0)
-			goto out;
-		break;
-	case SD_OP_CREATE_AND_WRITE_OBJ:
-		if (!hdr->copies) {
-			eprintf("the number of copies cannot be zero\n");
-			ret = SD_RES_INVALID_PARMS;
-			goto out;
-		}
-
-		fd = ob_open(epoch, oid, O_CREAT|O_TRUNC, &ret);
-		if (fd < 0)
-			goto out;
-
-		if (hdr->flags & SD_FLAG_CMD_COW) {
-			dprintf("%" PRIu64 ", %" PRIx64 "\n", oid, hdr->cow_oid);
-
-			buf = valloc(SD_DATA_OBJ_SIZE);
-			if (!buf) {
-				eprintf("failed to allocate memory\n");
-				ret = SD_RES_NO_MEM;
-				goto out;
-			}
-			ret = read_from_other_sheep(req, hdr->epoch, hdr->cow_oid, buf,
-						     hdr->copies);
-			if (ret) {
-				eprintf("failed to read old object\n");
-				ret = SD_RES_EIO;
-				goto out;
-			}
-			ret = pwrite64(fd, buf, SD_DATA_OBJ_SIZE, 0);
-			if (ret != SD_DATA_OBJ_SIZE) {
-				if (errno == ENOSPC)
-					ret = SD_RES_NO_SPACE;
-				else {
-					eprintf("%m\n");
-					ret = SD_RES_EIO;
-				}
-				goto out;
-			}
-			free(buf);
-			buf = NULL;
-		} else {
-			int size = SECTOR_SIZE;
-			buf = valloc(size);
-			if (!buf) {
-				eprintf("failed to allocate memory\n");
-				ret = SD_RES_NO_MEM;
-				goto out;
-			}
-			memset(buf, 0, size);
-			ret = pwrite64(fd, buf, size, SD_DATA_OBJ_SIZE - size);
-			free(buf);
-			buf = NULL;
-
-			if (ret != size) {
-				if (errno == ENOSPC)
-					ret = SD_RES_NO_SPACE;
-				else {
-					eprintf("%m\n");
-					ret = SD_RES_EIO;
-				}
-				goto out;
-			}
-		}
-
-	default:
-		break;
+	ret = pread64(fd, req->data, hdr->data_length, hdr->offset);
+	if (ret < 0) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out;
 	}
 
-	switch (opcode) {
-	case SD_OP_REMOVE_OBJ:
+	rsp->data_length = ret;
+	rsp->copies = sys->nr_sobjs;
+
+	ret = SD_RES_SUCCESS;
+out:
+	close(fd);
+	return ret;
+}
+
+static int store_write_obj_fd(int fd, struct request *req, uint32_t epoch)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	uint64_t oid = hdr->oid;
+	int ret = SD_RES_SUCCESS;
+
+	if (hdr->flags & SD_FLAG_CMD_TRUNCATE) {
+		ret = ftruncate(fd, hdr->offset + hdr->data_length);
+		if (ret) {
+			eprintf("%m\n");
+			return SD_RES_EIO;
+		}
+	}
+
+	if (is_vdi_obj(oid)) {
+		char path[1024];
+
 		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
 			 epoch, oid);
-		ret = unlink(path);
-		if (ret) {
-			if (errno == ENOENT)
-				ret = SD_RES_NO_OBJ;
-			else {
-				eprintf("%m\n");
-				ret = SD_RES_EIO;
-			}
+		ret = jrnl_perform(fd, req->data, hdr->data_length,
+				   hdr->offset, path, jrnl_path);
+		if (ret)
+			return ret;
+	} else {
+		ret = pwrite64(fd, req->data, hdr->data_length, hdr->offset);
+		if (ret != hdr->data_length) {
+			if (errno == ENOSPC)
+				return SD_RES_NO_SPACE;
+			eprintf("%m\n");
+			return SD_RES_EIO;
 		}
-		break;
-	case SD_OP_READ_OBJ:
-		ret = pread64(fd, req->data, hdr->data_length, hdr->offset);
-		if (ret < 0) {
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+static int store_write_obj(struct request *req, uint32_t epoch)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	int ret = SD_RES_SUCCESS;
+	int fd = -1;
+
+	fd = ob_open(epoch, hdr->oid, 0, &ret);
+	if (fd < 0)
+		return ret;
+
+	ret = store_write_obj_fd(fd, req, epoch);
+
+	close(fd);
+	return ret;
+}
+
+static int store_create_and_write_obj_cow(struct request *req, uint32_t epoch)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	int ret = SD_RES_SUCCESS;
+	int fd = -1;
+	char *buf = NULL;
+
+	if (!hdr->copies) {
+		eprintf("the number of copies cannot be zero\n");
+		return SD_RES_INVALID_PARMS;
+	}
+
+	fd = ob_open(epoch, hdr->oid, O_CREAT|O_TRUNC, &ret);
+	if (fd < 0)
+		return ret;
+
+	dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
+
+	buf = valloc(SD_DATA_OBJ_SIZE);
+	if (!buf) {
+		eprintf("failed to allocate memory\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+	ret = read_from_other_sheep(req, hdr->epoch, hdr->cow_oid, buf,
+				     hdr->copies);
+	if (ret) {
+		eprintf("failed to read old object\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
+	ret = pwrite64(fd, buf, SD_DATA_OBJ_SIZE, 0);
+	if (ret != SD_DATA_OBJ_SIZE) {
+		if (errno == ENOSPC)
+			ret = SD_RES_NO_SPACE;
+		else {
 			eprintf("%m\n");
 			ret = SD_RES_EIO;
-			goto out;
 		}
-
-		rsp->data_length = ret;
-		rsp->copies = sys->nr_sobjs;
-
-		ret = SD_RES_SUCCESS;
-		break;
-	case SD_OP_WRITE_OBJ:
-	case SD_OP_CREATE_AND_WRITE_OBJ:
-		if (hdr->flags & SD_FLAG_CMD_TRUNCATE) {
-			ret = ftruncate(fd, hdr->offset + hdr->data_length);
-			if (ret) {
-				eprintf("%m\n");
-				ret = SD_RES_EIO;
-				goto out;
-			}
-		}
-
-		if (is_vdi_obj(oid)) {
-			snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
-				 epoch, oid);
-			ret = jrnl_perform(fd, req->data, hdr->data_length,
-					   hdr->offset, path, jrnl_path);
-			if (ret)
-				goto out;
-		} else {
-			ret = pwrite64(fd, req->data, hdr->data_length,
-				       hdr->offset);
-			if (ret != hdr->data_length) {
-				if (errno == ENOSPC)
-					ret = SD_RES_NO_SPACE;
-				else {
-					eprintf("%m\n");
-					ret = SD_RES_EIO;
-				}
-				goto out;
-			}
-		}
-
-		ret = SD_RES_SUCCESS;
-		break;
+		goto out;
 	}
+	free(buf);
+	buf = NULL;
+
+	ret = store_write_obj_fd(fd, req, epoch);
 out:
 	if (buf)
 		free(buf);
+	close(fd);
+	return ret;
+}
 
-	if (fd != -1)
-		close(fd);
+
+static int store_create_and_write_obj(struct request *req, uint32_t epoch)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	const int size = SECTOR_SIZE;
+	int ret = SD_RES_SUCCESS;
+	int fd = -1;
+	char *buf = NULL;
+
+	if (!hdr->copies) {
+		eprintf("the number of copies cannot be zero\n");
+		return SD_RES_INVALID_PARMS;
+	}
+
+	fd = ob_open(epoch, hdr->oid, O_CREAT|O_TRUNC, &ret);
+	if (fd < 0)
+		return ret;
+
+	buf = valloc(size);
+	if (!buf) {
+		eprintf("failed to allocate memory\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+	memset(buf, 0, size);
+	ret = pwrite64(fd, buf, size, SD_DATA_OBJ_SIZE - size);
+	free(buf);
+
+	if (ret != size) {
+		if (errno == ENOSPC)
+			ret = SD_RES_NO_SPACE;
+		else {
+			eprintf("%m\n");
+			ret = SD_RES_EIO;
+		}
+		goto out;
+	}
+
+	ret = store_write_obj_fd(fd, req, epoch);
+out:
+	close(fd);
+	return ret;
+}
+
+static int store_queue_request_local(struct request *req, uint32_t epoch)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	int ret = SD_RES_SUCCESS;
+
+	dprintf("%x, %" PRIx64" , %u\n", hdr->opcode, hdr->oid, epoch);
+
+	switch (hdr->opcode) {
+	case SD_OP_WRITE_OBJ:
+		ret = store_write_obj(req, epoch);
+		break;
+	case SD_OP_REMOVE_OBJ:
+		ret = store_remove_obj(req, epoch);
+		break;
+	case SD_OP_READ_OBJ:
+		ret = store_read_obj(req, epoch);
+		break;
+	case SD_OP_CREATE_AND_WRITE_OBJ:
+		if (hdr->flags & SD_FLAG_CMD_COW)
+			ret = store_create_and_write_obj_cow(req, epoch);
+		else
+			ret = store_create_and_write_obj(req, epoch);
+		break;
+	}
 
 	if (ret == SD_RES_NO_OBJ && hdr->flags & SD_FLAG_CMD_RECOVERY) {
-		int len  = epoch_log_read(epoch - 1, req->data, hdr->data_length);
+		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+		int len = epoch_log_read(epoch - 1, req->data, hdr->data_length);
 		if (len < 0)
 			len = 0;
 		rsp->data_length = len;
