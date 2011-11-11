@@ -24,16 +24,39 @@ class VirtualMachine:
 
     def read(self, offset, size):
         """Emulate read requests."""
-        vdiname = 'sheepdog:localhost:' + str(node.get_port()) + ':' + vdi.name
+        vdiname = 'sheepdog:localhost:' + str(self.node.get_port()) \
+                  + ':' + self.vdi.name
         p = Popen(['qemu-io', vdiname, 'read', str(offset), str(size)], stdout=PIPE)
         return p
 
     def write(self, offset, size):
         """Emulate write requests."""
-        vdiname = 'sheepdog:localhost:' + str(node.get_port()) + ':' + vdi.name
+        vdiname = 'sheepdog:localhost:' + str(self.node.get_port()) \
+                  + ':' + self.vdi.name
         p = Popen(['qemu-io', vdiname, 'write', str(offset), str(size)], stdout=PIPE)
         return p
 
+    def test_io(self, cmd, case, async=False):
+        sed_pattern = "s/[0-9]* ops\; [0-9/:. sec]* ([0-9/.inf]* " \
+              + "[EPTGMKiBbytes]*\/sec and [0-9/.inf]* ops\/sec)/" \
+              + "X ops\; XX:XX:XX.X (XXX YYY\/sec and XXX ops\/sec)/"
+        aio_pattern = "s/bytes at offset [0-9]*/bytes at offset XXX/g"
+
+        vdiname = 'sheepdog:localhost:' + str(self.node.get_port()) \
+                  + ':' + self.vdi.name
+
+        p = Popen(cmd + [vdiname], stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        (out, err) = p.communicate(case)
+
+        out = re.sub("qemu-io>[\ \n]", "", out).strip()
+        p = Popen(["sed", "-e", sed_pattern],  stdin=PIPE, stdout=PIPE)
+        (out, _) = p.communicate(out)
+
+        if async:
+            p = Popen(["sed", "-e", aio_pattern], stdin=PIPE, stdout=PIPE)
+            (out, _) = p.communicate(out.strip())
+
+        return (out.strip(), err.strip())
 
 class VirtualDiskImage:
     def __init__(self, name, size):
@@ -90,6 +113,7 @@ class Node:
             match = re.search(r'join Sheepdog cluster', line)
             if match:
                 self.started = True
+                self.p.stderr=None
                 break
 
     def stop(self):
