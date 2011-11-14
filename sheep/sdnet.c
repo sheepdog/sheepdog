@@ -76,107 +76,112 @@ static void setup_access_to_local_objects(struct request *req)
 		req->local_oid = hdr->oid;
 }
 
-static void __done(struct work *work, int idx)
+static void io_op_done(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
+	struct cpg_event *cevent = &req->cev;
 	int again = 0;
 	int copies = sys->nr_sobjs;
 
 	if (copies > req->nr_zones)
 		copies = req->nr_zones;
 
-	if (is_cluster_op(req->op))
-		/* request is forwarded to cpg group */
-		return;
+	list_del(&req->r_wlist);
 
-	if (is_local_op(req->op) && has_process_main(req->op))
-		req->rp.result = do_process_main(req->op, &req->rq,
-						 &req->rp, req->data);
+	sys->nr_outstanding_io--;
+	/*
+	 * TODO: if the request failed due to epoch unmatch,
+	 * we should retry here (adds this request to the tail
+	 * of sys->cpg_event_siblings.
+	 */
+	if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
+	    (req->rp.result == SD_RES_OLD_NODE_VER ||
+	     req->rp.result == SD_RES_NEW_NODE_VER ||
+	     req->rp.result == SD_RES_NETWORK_ERROR ||
+	     req->rp.result == SD_RES_WAIT_FOR_JOIN ||
+	     req->rp.result == SD_RES_WAIT_FOR_FORMAT)) {
 
-	if (is_io_op(req->op)) {
-		struct cpg_event *cevent = &req->cev;
+		req->rq.epoch = sys->epoch;
+		setup_ordered_sd_vnode_list(req);
+		setup_access_to_local_objects(req);
 
-		list_del(&req->r_wlist);
+		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+		again = 1;
+	} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
+		struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
+		uint32_t vdi_id = oid_to_vid(obj_hdr->oid);
+		struct data_object_bmap *bmap, *n;
+		int nr_bmaps = 0;
 
-		sys->nr_outstanding_io--;
-		/*
-		 * TODO: if the request failed due to epoch unmatch,
-		 * we should retry here (adds this request to the tail
-		 * of sys->cpg_event_siblings.
-		 */
+		if (!is_data_obj(obj_hdr->oid))
+			goto done;
 
-		if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
-		    (req->rp.result == SD_RES_OLD_NODE_VER ||
-		     req->rp.result == SD_RES_NEW_NODE_VER ||
-		     req->rp.result == SD_RES_NETWORK_ERROR ||
-		     req->rp.result == SD_RES_WAIT_FOR_JOIN ||
-		     req->rp.result == SD_RES_WAIT_FOR_FORMAT)) {
+		list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
+			nr_bmaps++;
+			if (bmap->vdi_id == vdi_id) {
+				set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+				list_del(&bmap->list);
+				list_add_tail(&bmap->list, &sys->consistent_obj_list);
+				goto done;
+			}
+		}
+		bmap = zalloc(sizeof(*bmap));
+		if (bmap == NULL) {
+			eprintf("failed to allocate memory\n");
+			goto done;
+		}
+		dprintf("allocating a new object map\n");
+		bmap->vdi_id = vdi_id;
+		list_add_tail(&bmap->list, &sys->consistent_obj_list);
+		set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
+		if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
+			/* the first entry is the least recently used one */
+			bmap = list_first_entry(&sys->consistent_obj_list,
+						struct data_object_bmap, list);
+			list_del(&bmap->list);
+			free(bmap);
+		}
+	} else if (is_access_local(req->entry, req->nr_vnodes,
+				   ((struct sd_obj_req *)&req->rq)->oid, copies) &&
+		   req->rp.result == SD_RES_EIO) {
+		eprintf("leaving sheepdog cluster\n");
+		leave_cluster();
 
+		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
+			/* hack to retry */
+			req->rp.result = SD_RES_NETWORK_ERROR;
+		else {
 			req->rq.epoch = sys->epoch;
 			setup_ordered_sd_vnode_list(req);
 			setup_access_to_local_objects(req);
 
 			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 			again = 1;
-		} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
-			struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
-			uint32_t vdi_id = oid_to_vid(obj_hdr->oid);
-			struct data_object_bmap *bmap, *n;
-			int nr_bmaps = 0;
-
-			if (!is_data_obj(obj_hdr->oid))
-				goto done;
-
-			list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
-				nr_bmaps++;
-				if (bmap->vdi_id == vdi_id) {
-					set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
-					list_del(&bmap->list);
-					list_add_tail(&bmap->list, &sys->consistent_obj_list);
-					goto done;
-				}
-			}
-			bmap = zalloc(sizeof(*bmap));
-			if (bmap == NULL) {
-				eprintf("failed to allocate memory\n");
-				goto done;
-			}
-			dprintf("allocating a new object map\n");
-			bmap->vdi_id = vdi_id;
-			list_add_tail(&bmap->list, &sys->consistent_obj_list);
-			set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
-			if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
-				/* the first entry is the least recently used one */
-				bmap = list_first_entry(&sys->consistent_obj_list,
-							struct data_object_bmap, list);
-				list_del(&bmap->list);
-				free(bmap);
-			}
-		} else if (is_access_local(req->entry, req->nr_vnodes,
-					   ((struct sd_obj_req *)&req->rq)->oid, copies) &&
-			   req->rp.result == SD_RES_EIO) {
-			eprintf("leaving sheepdog cluster\n");
-			leave_cluster();
-
-			if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
-				/* hack to retry */
-				req->rp.result = SD_RES_NETWORK_ERROR;
-			else {
-				req->rq.epoch = sys->epoch;
-				setup_ordered_sd_vnode_list(req);
-				setup_access_to_local_objects(req);
-
-				list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
-				again = 1;
-			}
 		}
-done:
-		resume_pending_requests();
-		resume_recovery_work();
 	}
+done:
+	resume_pending_requests();
+	resume_recovery_work();
 
 	if (!again)
 		req->done(req);
+}
+
+static void local_op_done(struct work *work, int idx)
+{
+	struct request *req = container_of(work, struct request, work);
+
+	if (has_process_main(req->op)) {
+		req->rp.result = do_process_main(req->op, &req->rq,
+						 &req->rp, req->data);
+	}
+
+	req->done(req);
+}
+
+static void cluster_op_done(struct work *work, int idx)
+{
+	/* request is forwarded to cpg group */
 }
 
 static void queue_request(struct request *req)
@@ -214,18 +219,21 @@ static void queue_request(struct request *req)
 		}
 	}
 
-	if (is_io_op(req->op) || is_local_op(req->op))
+	if (is_io_op(req->op)) {
 		req->work.fn = store_queue_request;
-	else if (is_cluster_op(req->op))
+		req->work.done = io_op_done;
+	} else if (is_local_op(req->op)) {
+		req->work.fn = store_queue_request;
+		req->work.done = local_op_done;
+	} else if (is_cluster_op(req->op)) {
 		req->work.fn = cluster_queue_request;
-	else {
+		req->work.done = cluster_op_done;
+	} else {
 		eprintf("unknown operation %d\n", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;
 		req->done(req);
 		return;
 	}
-
-	req->work.done = __done;
 
 	list_del(&req->r_wlist);
 
