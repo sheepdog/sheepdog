@@ -306,7 +306,7 @@ out:
 static int forward_write_obj_req(struct request *req, int idx)
 {
 	int i, n, nr, fd, ret;
-	unsigned wlen, rlen;
+	unsigned wlen;
 	char name[128];
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
@@ -336,7 +336,6 @@ static int forward_write_obj_req(struct request *req, int idx)
 	hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
 	wlen = hdr.data_length;
-	rlen = 0;
 
 	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
