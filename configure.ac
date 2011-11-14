@@ -187,6 +187,11 @@ AC_ARG_ENABLE([zookeeper],
 	[ enable_zookeeper="no" ],)
 AM_CONDITIONAL(BUILD_ZOOKEEPER, test x$enable_zookeeper = xyes)
 
+AC_ARG_ENABLE([accord],
+	[  --enable-accord         : build accord cluster driver ],,
+	[ enable_accord="no" ],)
+AM_CONDITIONAL(BUILD_ACCORD, test x$enable_accord = xyes)
+
 AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR     : path to init script directory. ],
 	[ INITDDIR="$withval" ],
@@ -245,6 +250,12 @@ if test "x${enable_zookeeper}" = xyes; then
 		AC_MSG_ERROR(zookeeper.h header missing))
 	AC_DEFINE_UNQUOTED([HAVE_ZOOKEEPER], 1, [have zookeeper])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES zookeeper"
+fi
+
+if test "x${enable_accord}" = xyes; then
+	PKG_CHECK_MODULES([libacrd],[libacrd])
+	AC_DEFINE_UNQUOTED([HAVE_ACCORD], 1, [have accord])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES accord"
 fi
 
 # extra warnings

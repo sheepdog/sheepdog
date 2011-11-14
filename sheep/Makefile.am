@@ -19,7 +19,8 @@ MAINTAINERCLEANFILES	= Makefile.in
 
 AM_CFLAGS		=
 
-INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include $(libcpg_CFLAGS) $(libcfg_CFLAGS)
+INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
+			  $(libcpg_CFLAGS) $(libcfg_CFLAGS) $(libacrd_CFLAGS)
 
 sbin_PROGRAMS		= sheep
 
@@ -31,8 +32,12 @@ endif
 if BUILD_ZOOKEEPER
 sheep_SOURCES		+= cluster/zookeeper.c
 endif
+if BUILD_ACCORD
+sheep_SOURCES		+= cluster/accord.c
+endif
 
-sheep_LDADD	  	= $(libcpg_LIBS) $(libcfg_LIBS) ../lib/libsheepdog.a -lpthread
+sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread \
+			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS)
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
