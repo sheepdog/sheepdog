@@ -187,7 +187,6 @@ static void cluster_op_done(struct work *work, int idx)
 static void queue_request(struct request *req)
 {
 	struct cpg_event *cevent = &req->cev;
-
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 
@@ -201,22 +200,24 @@ static void queue_request(struct request *req)
 
 	dprintf("%x\n", hdr->opcode);
 
-	if (sys->status == SD_STATUS_SHUTDOWN) {
+	switch (sys->status) {
+	case SD_STATUS_SHUTDOWN:
 		rsp->result = SD_RES_SHUTDOWN;
-		req->done(req);
-		return;
-	}
-
-	if (sys->status == SD_STATUS_WAIT_FOR_FORMAT ||
-	    sys->status == SD_STATUS_WAIT_FOR_JOIN) {
+		goto done;
+	case SD_STATUS_WAIT_FOR_FORMAT:
 		if (!is_force_op(req->op)) {
-			if (sys->status == SD_STATUS_WAIT_FOR_FORMAT)
-				rsp->result = SD_RES_WAIT_FOR_FORMAT;
-			else
-				rsp->result = SD_RES_WAIT_FOR_JOIN;
-			req->done(req);
-			return;
+			rsp->result = SD_RES_WAIT_FOR_FORMAT;
+			goto done;
 		}
+		break;
+	case SD_STATUS_WAIT_FOR_JOIN:
+		if (!is_force_op(req->op)) {
+			rsp->result = SD_RES_WAIT_FOR_JOIN;
+			goto done;
+		}
+		break;
+	default:
+		break;
 	}
 
 	if (is_io_op(req->op)) {
@@ -253,6 +254,9 @@ static void queue_request(struct request *req)
 	cevent->ctype = CPG_EVENT_REQUEST;
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 	start_cpg_event_work();
+	return;
+done:
+	req->done(req);
 }
 
 static void client_incref(struct client_info *ci);
