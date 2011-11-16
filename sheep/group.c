@@ -1272,7 +1272,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 			update_epoch_store(sys->epoch);
 		}
 
-		if (node_cmp(&w->joined, &sys->this_node) == 0)
+		if (node_cmp(joined, &sys->this_node) == 0)
 			/* this output is used for testing */
 			vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;
