@@ -25,7 +25,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 sbin_PROGRAMS		= sheep
 
 sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c journal.c ops.c \
-			  cluster/local.c
+			  cluster/local.c strbuf.c
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c
 endif
@@ -41,7 +41,7 @@ sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread \
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= work.h sheep_priv.h cluster.h
+noinst_HEADERS		= work.h sheep_priv.h cluster.h strbuf.h
 
 EXTRA_DIST		= 
 
