@@ -30,6 +30,7 @@
 #include <sys/prctl.h>
 
 #include "logger.h"
+#include "util.h"
 
 #define LOGDBG 0
 
@@ -273,7 +274,7 @@ static void log_syslog(void * buff)
 	struct logmsg * msg = (struct logmsg *)buff;
 
 	if (la->fd >= 0)
-		write(la->fd, (char *)&msg->str, strlen((char *)&msg->str));
+		xwrite(la->fd, (char *)&msg->str, strlen((char *)&msg->str));
 	else
 		syslog(msg->prio, "%s", (char *)&msg->str);
 }
