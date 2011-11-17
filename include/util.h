@@ -2,6 +2,8 @@
 #define __UTIL_H__
 
 #include <string.h>
+#include <limits.h>
+#include <stdint.h>
 
 #include "bitops.h"
 
@@ -52,5 +54,17 @@ static inline void *zalloc(size_t size)
 {
 	return calloc(1, size);
 }
+
+typedef void (*try_to_free_t)(size_t);
+extern try_to_free_t set_try_to_free_routine(try_to_free_t);
+
+extern void *xmalloc(size_t size);
+extern void *xzalloc(size_t size);
+extern void *xrealloc(void *ptr, size_t size);
+extern void *xcalloc(size_t nmemb, size_t size);
+extern ssize_t xread(int fd, void *buf, size_t len);
+extern ssize_t xwrite(int fd, const void *buf, size_t len);
+extern ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
+extern ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 
 #endif

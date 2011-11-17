@@ -216,6 +216,13 @@ static inline uint64_t fnv_64a_buf(void *buf, size_t len, uint64_t hval)
 	return hval;
 }
 
+static inline uint64_t hash_64(uint64_t val, unsigned int bits)
+{
+	uint64_t hash = fnv_64a_buf(&val, sizeof(uint64_t), FNV1A_64_INIT);
+
+	return hash & ((1 << bits) - 1);
+}
+
 static inline int is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
 {
 	return inode->vdi_id == inode->data_vdi_id[idx];
