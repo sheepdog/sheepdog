@@ -156,6 +156,27 @@ struct cluster_info {
 	struct work_queue *recovery_wqueue;
 };
 
+struct siocb {
+	int fd;
+	uint16_t flags;
+	uint32_t epoch;
+	void *buf;
+	uint32_t length;
+	uint64_t offset;
+	size_t rw_size;
+};
+
+struct store_driver {
+	const char *driver_name;
+	int (*init)(char *path);
+	int (*open)(uint64_t oid, struct siocb *, int create);
+	int (*write)(uint64_t oid, struct siocb *);
+	int (*read)(uint64_t oid, struct siocb *);
+	int (*close)(uint64_t oid, struct siocb *);
+};
+
+extern void register_store_driver(struct store_driver *);
+
 extern struct cluster_info *sys;
 
 int create_listen_port(int port, void *data);
