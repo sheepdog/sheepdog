@@ -189,68 +189,54 @@ static int jrnl_apply_to_target_object(struct jrnl_descriptor *jd)
 	return res;
 }
 
-static int jrnl_commit_data(struct jrnl_descriptor *jd)
-{
-	int ret = 0;
-	ssize_t retsize;
-	struct jrnl_head *head = (struct jrnl_head *) &jd->head;
-
-	retsize = pwrite64(jd->target_fd, jd->data, head->size, head->offset);
-	if (retsize != head->size) {
-		if (errno == ENOSPC)
-			ret = SD_RES_NO_SPACE;
-		else
-			ret = SD_RES_EIO;
-	}
-
-	return ret;
-}
-
 /*
  * We cannot use this function for concurrent write operations
  */
-int jrnl_perform(int fd, void *buf, size_t count, off_t offset,
+struct jrnl_descriptor *jrnl_begin(void *buf, size_t count, off_t offset,
 		 const char *path, const char *jrnl_dir)
 {
 	int ret;
-	struct jrnl_descriptor jd;
+	struct jrnl_descriptor *jd = xzalloc(sizeof(*jd));
 
-	memset(&jd, 0, sizeof(jd));
-	jd.target_fd = fd;
+	jd->head.offset = offset;
+	jd->head.size = count;
+	strcpy(jd->head.target_path, path);
 
-	jd.head.offset = offset;
-	jd.head.size = count;
-	strcpy(jd.head.target_path, path);
+	jd->data = buf;
 
-	jd.data = buf;
-
-	ret = jrnl_create(&jd, jrnl_dir);
+	ret = jrnl_create(jd, jrnl_dir);
 	if (ret)
-		goto out;
+		goto err;
 
-	ret = jrnl_write_header(&jd);
+	ret = jrnl_write_header(jd);
 	if (ret)
-		goto out;
+		goto err;
 
-	ret = jrnl_write_data(&jd);
+	ret = jrnl_write_data(jd);
 	if (ret)
-		goto out;
+		goto err;
 
-	ret = jrnl_write_end_mark(&jd);
+	ret = jrnl_write_end_mark(jd);
 	if (ret)
-		goto out;
+		goto err;
+	return jd;
+err:
+	free(jd);
+	return NULL;
+}
 
-	ret = jrnl_commit_data(&jd);
+int jrnl_end(struct jrnl_descriptor * jd)
+{
+	int ret = 0;
+	if (!jd)
+		return ret;
+
+	ret = jrnl_close(jd);
 	if (ret)
-		goto out;
+		goto err;
 
-	ret = jrnl_close(&jd);
-	if (ret)
-		goto out;
-
-	ret = jrnl_remove(&jd);
-
-out:
+	ret = jrnl_remove(jd);
+err:
 	return ret;
 }
 

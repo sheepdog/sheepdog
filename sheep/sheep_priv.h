@@ -260,8 +260,9 @@ int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
 
 /* Journal */
-int jrnl_perform(int fd, void *buf, size_t count, off_t offset,
-		 const char *path, const char *jrnl_dir);
+struct jrnl_descriptor *jrnl_begin(void *buf, size_t count, off_t offset,
+				   const char *path, const char *jrnl_dir);
+int jrnl_end(struct jrnl_descriptor * jd);
 int jrnl_recover(const char *jrnl_dir);
 
 static inline int is_myself(uint8_t *addr, uint16_t port)
