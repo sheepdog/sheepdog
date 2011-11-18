@@ -655,12 +655,9 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 {
 	struct sheepdog_vnode_list_entry *entries = NULL;
 	struct sheepdog_vdi_attr tmp_attr;
-	uint64_t oid;
+	uint64_t oid, hval;
 	uint32_t end;
 	int ret, nr_zones, nr_vnodes;
-	int value_len;
-
-	value_len = data_len - SD_ATTR_HEADER_SIZE;
 
 	vattr->ctime = ctime;
 
@@ -668,8 +665,12 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	*attrid = fnv_64a_buf(vattr, SD_ATTR_HEADER_SIZE, FNV1A_64_INIT);
-	*attrid &= (UINT64_C(1) << VDI_SPACE_SHIFT) - 1;
+	/* we cannot include value_len for calculating the hash value */
+	hval = fnv_64a_buf(vattr->name, sizeof(vattr->name), FNV1A_64_INIT);
+	hval = fnv_64a_buf(vattr->tag, sizeof(vattr->tag), hval);
+	hval = fnv_64a_buf(&vattr->snap_id, sizeof(vattr->snap_id), hval);
+	hval = fnv_64a_buf(vattr->key, sizeof(vattr->key), hval);
+	*attrid = hval & ((UINT64_C(1) << VDI_SPACE_SHIFT) - 1);
 
 	end = *attrid - 1;
 	while (*attrid != end) {
@@ -690,7 +691,11 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		if (ret < 0)
 			return -ret;
 
-		if (memcmp(&tmp_attr, vattr, sizeof(tmp_attr)) == 0) {
+		/* compare attribute header */
+		if (strcmp(tmp_attr.name, vattr->name) == 0 &&
+		    strcmp(tmp_attr.tag, vattr->tag) == 0 &&
+		    tmp_attr.snap_id == vattr->snap_id &&
+		    strcmp(tmp_attr.key, vattr->key) == 0) {
 			if (excl)
 				ret = SD_RES_VDI_EXIST;
 			else if (delete) {
@@ -704,9 +709,8 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 					ret = SD_RES_SUCCESS;
 			} else if (write) {
 				ret = write_object(entries, nr_vnodes, nr_zones,
-						   epoch, oid, vattr->value,
-						   value_len, SD_ATTR_HEADER_SIZE,
-						   SD_FLAG_CMD_TRUNCATE, copies, 0);
+						   epoch, oid, (char *)vattr,
+						   SD_ATTR_OBJ_SIZE, 0, 0, copies, 0);
 
 				if (ret)
 					ret = SD_RES_EIO;

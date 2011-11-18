@@ -31,7 +31,6 @@
 
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
-#define SD_FLAG_CMD_TRUNCATE 0x04
 
 #define SD_RES_SUCCESS       0x00 /* Success */
 #define SD_RES_UNKNOWN       0x01 /* Unknown error */
@@ -80,7 +79,7 @@
 #define SD_MAX_VDI_LEN 256U
 #define SD_MAX_VDI_TAG_LEN 256U
 #define SD_MAX_VDI_ATTR_KEY_LEN 256U
-#define SD_MAX_VDI_ATTR_VALUE_LEN (UINT64_C(1) << 22)
+#define SD_MAX_VDI_ATTR_VALUE_LEN 65536U
 #define SD_NR_VDIS   (1U << 24)
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
@@ -89,7 +88,7 @@
 #define SD_INODE_SIZE (sizeof(struct sheepdog_inode))
 #define SD_INODE_HEADER_SIZE (sizeof(struct sheepdog_inode) - \
 			      sizeof(uint32_t) * MAX_DATA_OBJS)
-#define SD_ATTR_HEADER_SIZE (sizeof(struct sheepdog_vdi_attr))
+#define SD_ATTR_OBJ_SIZE (sizeof(struct sheepdog_vdi_attr))
 #define CURRENT_VDI_ID 0
 
 struct sd_req {
@@ -191,9 +190,9 @@ struct sheepdog_vdi_attr {
 	char tag[SD_MAX_VDI_TAG_LEN];
 	uint64_t ctime;
 	uint32_t snap_id;
-	uint32_t pad;
+	uint32_t value_len;
 	char key[SD_MAX_VDI_ATTR_KEY_LEN];
-	char value[0];
+	char value[SD_MAX_VDI_ATTR_VALUE_LEN];
 };
 
 /*

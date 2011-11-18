@@ -792,18 +792,16 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
 	int fd, ret;
 	unsigned int wlen, rlen;
-	struct sheepdog_vdi_attr *vattr;
+	struct sheepdog_vdi_attr vattr;
 
-	vattr = zalloc(SD_ATTR_HEADER_SIZE + value_len);
-	if (!vattr)
-		return SD_RES_NO_MEM;
-
-	strncpy(vattr->name, vdiname, SD_MAX_VDI_LEN);
-	strncpy(vattr->tag, vdi_cmd_data.snapshot_tag, SD_MAX_VDI_TAG_LEN);
-	vattr->snap_id = vdi_cmd_data.snapshot_id;
-	strncpy(vattr->key, key, SD_MAX_VDI_ATTR_KEY_LEN);
-	if (value && value_len)
-		memcpy(vattr->value, value, value_len);
+	strncpy(vattr.name, vdiname, SD_MAX_VDI_LEN);
+	strncpy(vattr.tag, vdi_cmd_data.snapshot_tag, SD_MAX_VDI_TAG_LEN);
+	vattr.snap_id = vdi_cmd_data.snapshot_id;
+	strncpy(vattr.key, key, SD_MAX_VDI_ATTR_KEY_LEN);
+	if (value && value_len) {
+		vattr.value_len = value_len;
+		memcpy(vattr.value, value, value_len);
+	}
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -813,7 +811,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_GET_VDI_ATTR;
-	wlen = SD_ATTR_HEADER_SIZE + value_len;
+	wlen = SD_ATTR_OBJ_SIZE;
 	rlen = 0;
 	hdr.proto_ver = SD_PROTO_VER;
 	hdr.data_length = wlen;
@@ -826,7 +824,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	if (delete)
 		hdr.flags |= SD_FLAG_CMD_DEL;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, vattr, &wlen, &rlen);
+	ret = exec_req(fd, (struct sd_req *)&hdr, &vattr, &wlen, &rlen);
 	if (ret) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -915,7 +913,8 @@ static int vdi_getattr(int argc, char **argv)
 	int ret;
 	uint64_t oid, attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
-	char *vdiname = argv[optind++], *key, *value;
+	char *vdiname = argv[optind++], *key;
+	struct sheepdog_vdi_attr vattr;
 
 	key = argv[optind++];
 	if (!key) {
@@ -939,22 +938,16 @@ static int vdi_getattr(int argc, char **argv)
 	}
 
 	oid = attr_oid;
-	value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
-	if (!value) {
-		fprintf(stderr, "failed to allocate memory\n");
+
+	ret = sd_read_object(oid, &vattr, SD_ATTR_OBJ_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to read attr oid, %s\n",
+			sd_strerror(ret));
 		return EXIT_SYSFAIL;
 	}
 
-	ret = sd_read_object(oid, value, SD_MAX_VDI_ATTR_VALUE_LEN,
-			     SD_ATTR_HEADER_SIZE);
-	if (ret == SD_RES_SUCCESS) {
-		printf("%s", value);
-		free(value);
-		return EXIT_SUCCESS;
-	}
-
-	free(value);
-	return EXIT_FAILURE;
+	xwrite(STDOUT_FILENO, vattr.value, vattr.value_len);
+	return EXIT_SUCCESS;
 }
 
 static int vdi_read(int argc, char **argv)

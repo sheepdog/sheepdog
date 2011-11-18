@@ -106,15 +106,6 @@ static int simple_store_open(uint64_t oid, struct siocb *iocb, int create)
 			}
 		}
 	}
-	if (iocb->flags & SD_FLAG_CMD_TRUNCATE) {
-		ret = ftruncate(iocb->fd, iocb->offset + iocb->length);
-		if (ret) {
-			eprintf("%m\n");
-			ret = SD_RES_EIO;
-			close(iocb->fd);
-			goto out;
-		}
-	}
 
 	ret = SD_RES_SUCCESS;
 out:
