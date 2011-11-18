@@ -61,7 +61,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch,
 				  vid_to_vdi_oid(base_vid), (char *)base,
 				  sizeof(*base), 0, copies);
-		if (ret < 0) {
+		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_BASE_VDI_READ;
 			goto out;
 		}
@@ -77,7 +77,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 			ret = read_object(entries, nr_vnodes, nr_zones, epoch,
 					  vid_to_vdi_oid(cur_vid), (char *)cur,
 					  SD_INODE_HEADER_SIZE, 0, copies);
-			if (ret < 0) {
+			if (ret != SD_RES_SUCCESS) {
 				vprintf(SDOG_ERR, "failed\n");
 				ret = SD_RES_BASE_VDI_READ;
 				goto out;
@@ -181,7 +181,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch,
 				  vid_to_vdi_oid(i), (char *)inode,
 				  SD_INODE_HEADER_SIZE, 0, nr_reqs);
-		if (ret < 0) {
+		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_EIO;
 			goto out;
 		}
@@ -381,7 +381,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	ret = read_object(entries, nr_vnodes, nr_zones, epoch,
 			  vid_to_vdi_oid(*vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, nr_reqs);
-	if (ret < 0) {
+	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_EIO;
 		goto out;
 	}
@@ -460,7 +460,7 @@ static void delete_one(struct work *work, int idx)
 			  vid_to_vdi_oid(vdi_id), (void *)inode, sizeof(*inode),
 			  0, sys->nr_sobjs);
 
-	if (ret != sizeof(*inode)) {
+	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find vdi object\n");
 		goto out;
 	}
@@ -523,7 +523,7 @@ again:
 			  vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
-	if (ret != SD_INODE_HEADER_SIZE) {
+	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find vdi object\n");
 		goto err;
 	}
@@ -566,7 +566,7 @@ next:
 			  vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
-	if (ret != SD_INODE_HEADER_SIZE) {
+	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find vdi object\n");
 		vid = 0;
 		goto out;
@@ -678,7 +678,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch, oid, (char *)&tmp_attr,
 				  sizeof(tmp_attr), 0, copies);
 
-		if (ret == -SD_RES_NO_OBJ && write) {
+		if (ret == SD_RES_NO_OBJ && write) {
 			ret = write_object(entries, nr_vnodes, nr_zones, epoch, oid,
 					   (char *)vattr, data_len, 0, 0, copies, 1);
 			if (ret)
@@ -688,8 +688,8 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 			goto out;
 		}
 
-		if (ret < 0)
-			return -ret;
+		if (ret != SD_RES_SUCCESS)
+			return ret;
 
 		/* compare attribute header */
 		if (strcmp(tmp_attr.name, vattr->name) == 0 &&

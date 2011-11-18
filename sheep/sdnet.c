@@ -683,12 +683,12 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 			ret = read_object_local(oid, data, datalen, offset, nr,
 						node_version);
 
-			if (ret < 0) {
+			if (ret != SD_RES_SUCCESS) {
 				eprintf("fail %"PRIx64" %"PRId32"\n", oid, ret);
 				return ret;
 			}
 
-			return ret;
+			return SD_RES_SUCCESS;
 		}
 
 	}
@@ -704,7 +704,7 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 		if (fd < 0) {
 			printf("%s(%d): %s, %m\n", __func__, __LINE__,
 			       name);
-			return -SD_RES_EIO;
+			return SD_RES_EIO;
 		}
 
 		memset(&hdr, 0, sizeof(hdr));
@@ -725,12 +725,12 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 		}
 
 		if (rsp->result == SD_RES_SUCCESS)
-			return rsp->data_length;
+			return SD_RES_SUCCESS;
 
 		last_error = rsp->result;
 	}
 
-	return -last_error;
+	return last_error;
 }
 
 int remove_object(struct sheepdog_vnode_list_entry *e,

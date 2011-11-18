@@ -115,16 +115,16 @@ out:
 
 static int simple_store_write(uint64_t oid, struct siocb *iocb)
 {
-	iocb->rw_size = xpwrite(iocb->fd, iocb->buf, iocb->length, iocb->offset);
-	if (iocb->rw_size < 0)
+	int size = xpwrite(iocb->fd, iocb->buf, iocb->length, iocb->offset);
+	if (size != iocb->length)
 		return SD_RES_EIO;
 	return SD_RES_SUCCESS;
 }
 
 static int simple_store_read(uint64_t oid, struct siocb *iocb)
 {
-	iocb->rw_size = xpread(iocb->fd, iocb->buf, iocb->length, iocb->offset);
-	if (iocb->rw_size < 0)
+	int size = xpread(iocb->fd, iocb->buf, iocb->length, iocb->offset);
+	if (size != iocb->length)
 		return SD_RES_EIO;
 	return SD_RES_SUCCESS;
 }

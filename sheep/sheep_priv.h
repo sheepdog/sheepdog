@@ -163,7 +163,6 @@ struct siocb {
 	void *buf;
 	uint32_t length;
 	uint64_t offset;
-	size_t rw_size;
 };
 
 struct store_driver {

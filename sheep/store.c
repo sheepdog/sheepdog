@@ -163,7 +163,7 @@ out:
 }
 
 static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
-			 unsigned *ori_rlen, void *buf, uint64_t offset)
+			 unsigned ori_rlen, void *buf, uint64_t offset)
 {
 	int i, n, nr, ret;
 	unsigned wlen, rlen;
@@ -190,12 +190,11 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 				continue;
 
 			iocb.buf = buf;
-			iocb.length = *ori_rlen;
+			iocb.length = ori_rlen;
 			iocb.offset = offset;
 			ret = store.read(oid, &iocb);
 			if (ret != SD_RES_SUCCESS)
 				continue;
-			*ori_rlen = iocb.rw_size;
 			ret = 0;
 			store.close(oid, &iocb);
 			goto out;
@@ -210,7 +209,7 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 		hdr.oid = oid;
 		hdr.epoch = epoch;
 
-		rlen = *ori_rlen;
+		rlen = ori_rlen;
 		wlen = 0;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 		hdr.data_length = rlen;
@@ -225,7 +224,6 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 
 		switch (rsp->result) {
 		case SD_RES_SUCCESS:
-			*ori_rlen = rlen;
 			ret = 0;
 			goto out;
 		case SD_RES_OLD_NODE_VER:
@@ -250,7 +248,7 @@ static int read_from_other_sheep(struct request *req, uint32_t epoch,
 
 	rlen = SD_DATA_OBJ_SIZE;
 
-	ret = read_from_one(req, epoch, oid, &rlen, buf, 0);
+	ret = read_from_one(req, epoch, oid, rlen, buf, 0);
 
 	return ret;
 }
@@ -526,7 +524,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 
 	req = zalloc(sizeof(*req));
 	if (!req)
-		return -SD_RES_NO_MEM;
+		return SD_RES_NO_MEM;
 	hdr = (struct sd_obj_req *)&req->rq;
 	rsp = (struct sd_obj_rsp *)&req->rp;
 
@@ -543,13 +541,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	rsp_data_length = rsp->data_length;
 	free(req);
 
-	if (ret != 0)
-		return -ret;
-
-	if (rsp_data_length != datalen)
-		return -SD_RES_EIO;
-
-	return rsp_data_length;
+	return ret;
 }
 
 static int store_remove_obj(struct request *req, uint32_t epoch)
@@ -591,18 +583,11 @@ static int store_read_obj(struct request *req, uint32_t epoch)
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	rsp->data_length = iocb.rw_size;
+	rsp->data_length = hdr->data_length;
 	rsp->copies = sys->nr_sobjs;
 out:
 	store.close(hdr->oid, &iocb);
 	return ret;
-}
-
-static inline int write_object_in_full(uint64_t oid, struct siocb *iocb)
-{
-	if (!store.write(oid, iocb) && iocb->rw_size != iocb->length)
-		return SD_RES_EIO;
-	return SD_RES_SUCCESS;
 }
 
 static int do_write_obj(struct siocb *iocb, struct request *req, uint32_t epoch)
@@ -624,11 +609,11 @@ static int do_write_obj(struct siocb *iocb, struct request *req, uint32_t epoch)
 				   hdr->offset, path, jrnl_path);
 		if (!jd)
 			return SD_RES_EIO;
-		ret = write_object_in_full(oid, iocb);
+		ret = store.write(oid, iocb);
 		jrnl_end(jd);
-	} else {
-		ret = write_object_in_full(oid, iocb);
-	}
+	} else
+		ret = store.write(oid, iocb);
+
 	return ret;
 }
 
