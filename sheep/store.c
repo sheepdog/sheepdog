@@ -1664,7 +1664,7 @@ static int fill_obj_list(struct recovery_work *rw,
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
 	struct sheepdog_vnode_list_entry *vnodes;
-	int nr_vnodes, retry_cnt = 0;
+	int nr_vnodes, retry_cnt;
 
 	vnodes = malloc(sizeof(*vnodes) * SD_MAX_VNODES);
 	buf = malloc(buf_size);
@@ -1683,6 +1683,7 @@ static int fill_obj_list(struct recovery_work *rw,
 			/* cur_entry[i] doesn't have a list file */
 			continue;
 
+		retry_cnt = 0;
 	retry:
 		nr  = __fill_obj_list(cur_entry + i, rw->epoch, buf, buf_size);
 		if (nr < 0) {
