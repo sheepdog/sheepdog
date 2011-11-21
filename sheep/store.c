@@ -1059,7 +1059,6 @@ struct recovery_work {
 	struct timer timer;
 	int retry;
 	struct work work;
-	struct list_head rw_siblings;
 
 	int nr_blocking;
 	int count;
@@ -1075,7 +1074,7 @@ struct recovery_work {
 	struct sheepdog_vnode_list_entry cur_vnodes[SD_MAX_VNODES];
 };
 
-static LIST_HEAD(recovery_work_list);
+static struct recovery_work *next_rw;
 static struct recovery_work *recovering_work;
 
 /*
@@ -1539,7 +1538,7 @@ static void recover_done(struct work *work, int idx)
 
 	oid = rw->oids[rw->done];
 
-	if (rw->retry && list_empty(&recovery_work_list)) {
+	if (rw->retry && !next_rw) {
 		rw->retry = 0;
 
 		rw->timer.callback = recover_timer;
@@ -1548,7 +1547,7 @@ static void recover_done(struct work *work, int idx)
 		return;
 	}
 
-	if (rw->done < rw->count && list_empty(&recovery_work_list)) {
+	if (rw->done < rw->count && !next_rw) {
 		rw->work.fn = recover_one;
 
 		if (is_access_to_busy_objects(oid)) {
@@ -1569,11 +1568,9 @@ static void recover_done(struct work *work, int idx)
 	free(rw->oids);
 	free(rw);
 
-	if (!list_empty(&recovery_work_list)) {
-		rw = list_first_entry(&recovery_work_list,
-				      struct recovery_work, rw_siblings);
-
-		list_del(&rw->rw_siblings);
+	if (next_rw) {
+		rw = next_rw;
+		next_rw = NULL;
 
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);
@@ -1776,9 +1773,14 @@ int start_recovery(uint32_t epoch)
 	rw->work.fn = __start_recovery;
 	rw->work.done = recover_done;
 
-	if (recovering_work != NULL)
-		list_add_tail(&rw->rw_siblings, &recovery_work_list);
-	else {
+	if (recovering_work != NULL) {
+		if (next_rw) {
+			/* skip the previous epoch recovery */
+			free(next_rw->oids);
+			free(next_rw);
+		}
+		next_rw = rw;
+	} else {
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);
 	}
