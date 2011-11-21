@@ -1690,6 +1690,10 @@ static int fill_obj_list(struct recovery_work *rw,
 				eprintf("some objects may be lost\n");
 				continue;
 			} else {
+				if (next_rw) {
+					dprintf("go to the next recovery\n");
+					break;
+				}
 				dprintf("trying to get object list again\n");
 				sleep(1);
 				goto retry;
