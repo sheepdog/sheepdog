@@ -233,6 +233,11 @@ int get_cluster_copies(uint8_t *copies);
 int set_cluster_flags(uint16_t flags);
 int get_cluster_flags(uint16_t *flags);
 
+int store_create_and_write_obj(const struct sd_req *, struct sd_rsp *, void *);
+int store_write_obj(const struct sd_req *, struct sd_rsp *, void *);
+int store_read_obj(const struct sd_req *, struct sd_rsp *, void *);
+int store_remove_obj(const struct sd_req *, struct sd_rsp *, void *);
+
 #define NR_GW_WORKER_THREAD 4
 #define NR_IO_WORKER_THREAD 4
 

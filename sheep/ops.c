@@ -476,18 +476,22 @@ static struct sd_op_template sd_ops[] = {
 	/* I/O operations */
 	[SD_OP_CREATE_AND_WRITE_OBJ] = {
 		.type = SD_OP_TYPE_IO,
+		.process_work = store_create_and_write_obj,
 	},
 
 	[SD_OP_READ_OBJ] = {
 		.type = SD_OP_TYPE_IO,
+		.process_work = store_read_obj,
 	},
 
 	[SD_OP_WRITE_OBJ] = {
 		.type = SD_OP_TYPE_IO,
+		.process_work = store_write_obj,
 	},
 
 	[SD_OP_REMOVE_OBJ] = {
 		.type = SD_OP_TYPE_IO,
+		.process_work = store_remove_obj,
 	},
 };
 

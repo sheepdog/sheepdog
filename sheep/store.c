@@ -491,6 +491,7 @@ int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 	hdr->offset = offset;
 	hdr->data_length = datalen;
 	req->data = data;
+	req->op = get_sd_op(hdr->opcode);
 
 	ret = do_local_io(req, epoch);
 
@@ -521,6 +522,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	hdr->offset = offset;
 	hdr->data_length = datalen;
 	req->data = data;
+	req->op = get_sd_op(hdr->opcode);
 
 	ret = do_local_io(req, epoch);
 
@@ -530,9 +532,10 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	return ret;
 }
 
-static int store_remove_obj(struct request *req, uint32_t epoch)
+int store_remove_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	uint32_t epoch = hdr->epoch;
 	char path[1024];
 
 	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
@@ -548,11 +551,13 @@ static int store_remove_obj(struct request *req, uint32_t epoch)
 	return SD_RES_SUCCESS;
 }
 
-static int store_read_obj(struct request *req, uint32_t epoch)
+int store_read_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	struct sd_obj_rsp *rsps = (struct sd_obj_rsp *)rsp;
+	struct request *request = (struct request *)data;
 	int ret;
+	uint32_t epoch = hdr->epoch;
 	struct siocb iocb;
 
 	memset(&iocb, 0, sizeof(iocb));
@@ -562,28 +567,28 @@ static int store_read_obj(struct request *req, uint32_t epoch)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	iocb.buf = req->data;
+	iocb.buf = request->data;
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->offset;
 	ret = store.read(hdr->oid, &iocb);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	rsp->data_length = hdr->data_length;
-	rsp->copies = sys->nr_sobjs;
+	rsps->data_length = hdr->data_length;
+	rsps->copies = sys->nr_sobjs;
 out:
 	store.close(hdr->oid, &iocb);
 	return ret;
 }
 
-static int do_write_obj(struct siocb *iocb, struct request *req, uint32_t epoch)
+static int do_write_obj(struct siocb *iocb, struct sd_obj_req *req, uint32_t epoch, void *data)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
 	uint64_t oid = hdr->oid;
 	int ret = SD_RES_SUCCESS;
 	void *jd = NULL;
 
-	iocb->buf = req->data;
+	iocb->buf = data;
 	iocb->length = hdr->data_length;
 	iocb->offset = hdr->offset;
 	if (is_vdi_obj(oid)) {
@@ -591,7 +596,7 @@ static int do_write_obj(struct siocb *iocb, struct request *req, uint32_t epoch)
 
 		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
 			 epoch, oid);
-		jd = jrnl_begin(req->data, hdr->data_length,
+		jd = jrnl_begin(data, hdr->data_length,
 				   hdr->offset, path, jrnl_path);
 		if (!jd)
 			return SD_RES_EIO;
@@ -603,10 +608,12 @@ static int do_write_obj(struct siocb *iocb, struct request *req, uint32_t epoch)
 	return ret;
 }
 
-static int store_write_obj(struct request *req, uint32_t epoch)
+int store_write_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	struct request *request = (struct request *)data;
 	int ret;
+	uint32_t epoch = hdr->epoch;
 	struct siocb iocb;
 
 	memset(&iocb, 0, sizeof(iocb));
@@ -616,16 +623,18 @@ static int store_write_obj(struct request *req, uint32_t epoch)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	ret = do_write_obj(&iocb, req, epoch);
+	ret = do_write_obj(&iocb, hdr, epoch, request->data);
 
 	store.close(hdr->oid, &iocb);
 	return ret;
 }
 
-static int store_create_and_write_obj(struct request *req, uint32_t epoch)
+int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	struct request *request = (struct request *)data;
 	int ret;
+	uint32_t epoch = hdr->epoch;
 	char *buf = NULL;
 	struct siocb iocb;
 
@@ -644,7 +653,7 @@ static int store_create_and_write_obj(struct request *req, uint32_t epoch)
 		dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
 
 		buf = xzalloc(SD_DATA_OBJ_SIZE);
-		ret = read_copy_from_cluster(req, hdr->epoch, hdr->cow_oid, buf);
+		ret = read_copy_from_cluster(request, hdr->epoch, hdr->cow_oid, buf);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("failed to read cow object\n");
 			goto out;
@@ -656,7 +665,7 @@ static int store_create_and_write_obj(struct request *req, uint32_t epoch)
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 	}
-	ret = do_write_obj(&iocb, req, epoch);
+	ret = do_write_obj(&iocb, hdr, epoch, request->data);
 out:
 	free(buf);
 	store.close(hdr->oid, &iocb);
@@ -668,22 +677,10 @@ static int do_local_io(struct request *req, uint32_t epoch)
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	int ret = SD_RES_SUCCESS;
 
+	hdr->epoch = epoch;
 	dprintf("%x, %" PRIx64" , %u\n", hdr->opcode, hdr->oid, epoch);
 
-	switch (hdr->opcode) {
-	case SD_OP_WRITE_OBJ:
-		ret = store_write_obj(req, epoch);
-		break;
-	case SD_OP_REMOVE_OBJ:
-		ret = store_remove_obj(req, epoch);
-		break;
-	case SD_OP_READ_OBJ:
-		ret = store_read_obj(req, epoch);
-		break;
-	case SD_OP_CREATE_AND_WRITE_OBJ:
-		ret = store_create_and_write_obj(req, epoch);
-		break;
-	}
+	ret = do_process_work(req->op, &req->rq, &req->rp, req);
 
 	if (ret == SD_RES_NO_OBJ && hdr->flags & SD_FLAG_CMD_RECOVERY) {
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
@@ -705,6 +702,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	struct sd_obj_rsp rsp_bak = *((struct sd_obj_rsp *)&req->rp);
 	void *data = req->data, *buf;
 	uint64_t oid = hdr->oid;
+	int old_opcode = hdr->opcode;
 
 	if (is_vdi_obj(hdr->oid))
 		data_length = sizeof(struct sheepdog_inode);
@@ -725,6 +723,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->data_length = data_length;
 	hdr->opcode = SD_OP_READ_OBJ;
 	hdr->flags = 0;
+	req->op = get_sd_op(SD_OP_READ_OBJ);
 	ret = forward_read_obj_req(req, idx);
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to read object %d\n", ret);
@@ -734,6 +733,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->opcode = SD_OP_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->oid = oid;
+	req->op = get_sd_op(SD_OP_WRITE_OBJ);
 	ret = forward_write_obj_req(req, idx);
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to write object %d\n", ret);
@@ -742,6 +742,7 @@ static int fix_object_consistency(struct request *req, int idx)
 out:
 	free(buf);
 	req->data = data;
+	req->op = get_sd_op(old_opcode);
 	*((struct sd_obj_req *)&req->rq) = req_bak;
 	*((struct sd_obj_rsp *)&req->rp) = rsp_bak;
 
