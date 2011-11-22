@@ -184,6 +184,20 @@ static void cluster_op_done(struct work *work, int idx)
 	/* request is forwarded to cpg group */
 }
 
+static void do_local_request(struct work *work, int idx)
+{
+	struct request *req = container_of(work, struct request, work);
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+	int ret = SD_RES_SUCCESS;
+
+	dprintf("%d\n", idx);
+
+	if (has_process_work(req->op))
+		ret = do_process_work(req->op, &req->rq, &req->rp, req->data);
+
+	rsp->result = ret;
+}
+
 static void queue_request(struct request *req)
 {
 	struct cpg_event *cevent = &req->cev;
@@ -221,13 +235,13 @@ static void queue_request(struct request *req)
 	}
 
 	if (is_io_op(req->op)) {
-		req->work.fn = store_queue_request;
+		req->work.fn = do_io_request;
 		req->work.done = io_op_done;
 	} else if (is_local_op(req->op)) {
-		req->work.fn = store_queue_request;
+		req->work.fn = do_local_request;
 		req->work.done = local_op_done;
 	} else if (is_cluster_op(req->op)) {
-		req->work.fn = cluster_queue_request;
+		req->work.fn = do_cluster_request;
 		req->work.done = cluster_op_done;
 	} else {
 		eprintf("unknown operation %d\n", hdr->opcode);

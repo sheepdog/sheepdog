@@ -239,7 +239,7 @@ out:
 	return ret;
 }
 
-static int store_queue_request_local(struct request *req, uint32_t epoch);
+static int do_local_io(struct request *req, uint32_t epoch);
 
 static int forward_read_obj_req(struct request *req, int idx)
 {
@@ -269,7 +269,7 @@ static int forward_read_obj_req(struct request *req, int idx)
 		n = obj_to_sheep(e, nr, oid, i);
 
 		if (is_myself(e[n].addr, e[n].port)) {
-			ret = store_queue_request_local(req, hdr.epoch);
+			ret = do_local_io(req, hdr.epoch);
 			goto out;
 		}
 	}
@@ -361,7 +361,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 	}
 
 	if (local) {
-		ret = store_queue_request_local(req, hdr.epoch);
+		ret = do_local_io(req, hdr.epoch);
 		rsp->result = ret;
 
 		if (nr_fds == 0) {
@@ -492,7 +492,7 @@ int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 	hdr->data_length = datalen;
 	req->data = data;
 
-	ret = store_queue_request_local(req, epoch);
+	ret = do_local_io(req, epoch);
 
 	free(req);
 
@@ -522,7 +522,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	hdr->data_length = datalen;
 	req->data = data;
 
-	ret = store_queue_request_local(req, epoch);
+	ret = do_local_io(req, epoch);
 
 	rsp_data_length = rsp->data_length;
 	free(req);
@@ -663,7 +663,7 @@ out:
 	return ret;
 }
 
-static int store_queue_request_local(struct request *req, uint32_t epoch)
+static int do_local_io(struct request *req, uint32_t epoch)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	int ret = SD_RES_SUCCESS;
@@ -748,7 +748,7 @@ out:
 	return ret;
 }
 
-void store_queue_request(struct work *work, int idx)
+void do_io_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
 	int ret = SD_RES_SUCCESS;
@@ -763,14 +763,9 @@ void store_queue_request(struct work *work, int idx)
 	if (hdr->flags & SD_FLAG_CMD_RECOVERY)
 		epoch = hdr->tgt_epoch;
 
-	if (is_local_op(req->op)) {
-		if (has_process_work(req->op))
-			ret = do_process_work(req->op, &req->rq,
-					      &req->rp, req->data);
-		goto out;
-	}
-
-	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL)) {
+	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
+		ret = do_local_io(req, epoch);
+	} else {
 		/* fix object consistency when we read the object for the first time */
 		if (req->check_consistency) {
 			ret = fix_object_consistency(req, idx);
@@ -782,15 +777,11 @@ void store_queue_request(struct work *work, int idx)
 			ret = forward_write_obj_req(req, idx);
 		else
 			ret = forward_read_obj_req(req, idx);
-		goto out;
 	}
-
-	ret = store_queue_request_local(req, epoch);
 out:
 	if (ret != SD_RES_SUCCESS)
 		dprintf("failed: %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
 			idx, opcode, oid, epoch, ret);
-
 	rsp->result = ret;
 }
 

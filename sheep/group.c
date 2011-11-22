@@ -211,7 +211,7 @@ static void do_cluster_op(void *arg)
 	msg->rsp.result = ret;
 }
 
-void cluster_queue_request(struct work *work, int idx)
+void do_cluster_request(struct work *work, int idx)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
