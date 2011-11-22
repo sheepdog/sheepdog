@@ -162,8 +162,8 @@ out:
 	return res;
 }
 
-static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
-			 unsigned ori_rlen, void *buf, uint64_t offset)
+static int read_copy_from_cluster(struct request *req, uint32_t epoch,
+				  uint64_t oid, char *buf)
 {
 	int i, n, nr, ret;
 	unsigned wlen, rlen;
@@ -190,12 +190,11 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 				continue;
 
 			iocb.buf = buf;
-			iocb.length = ori_rlen;
-			iocb.offset = offset;
+			iocb.length = SD_DATA_OBJ_SIZE;
+			iocb.offset = 0;
 			ret = store.read(oid, &iocb);
 			if (ret != SD_RES_SUCCESS)
 				continue;
-			ret = 0;
 			store.close(oid, &iocb);
 			goto out;
 		}
@@ -209,11 +208,11 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 		hdr.oid = oid;
 		hdr.epoch = epoch;
 
-		rlen = ori_rlen;
+		rlen = SD_DATA_OBJ_SIZE;
 		wlen = 0;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 		hdr.data_length = rlen;
-		hdr.offset = offset;
+		hdr.offset = 0;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
@@ -224,7 +223,7 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 
 		switch (rsp->result) {
 		case SD_RES_SUCCESS:
-			ret = 0;
+			ret = SD_RES_SUCCESS;
 			goto out;
 		case SD_RES_OLD_NODE_VER:
 		case SD_RES_NEW_NODE_VER:
@@ -235,21 +234,8 @@ static int read_from_one(struct request *req, uint32_t epoch, uint64_t oid,
 		}
 	}
 
-	ret = -1;
+	ret = SD_RES_EIO;
 out:
-	return ret;
-}
-
-static int read_from_other_sheep(struct request *req, uint32_t epoch,
-				  uint64_t oid, char *buf, int copies)
-{
-	int ret;
-	unsigned int rlen;
-
-	rlen = SD_DATA_OBJ_SIZE;
-
-	ret = read_from_one(req, epoch, oid, rlen, buf, 0);
-
 	return ret;
 }
 
@@ -636,7 +622,7 @@ static int store_write_obj(struct request *req, uint32_t epoch)
 	return ret;
 }
 
-static int store_create_and_write_obj_cow(struct request *req, uint32_t epoch)
+static int store_create_and_write_obj(struct request *req, uint32_t epoch)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	int ret;
@@ -654,56 +640,25 @@ static int store_create_and_write_obj_cow(struct request *req, uint32_t epoch)
 	ret = store.open(hdr->oid, &iocb, 1);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
+	if (hdr->flags & SD_FLAG_CMD_COW) {
+		dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
 
-	dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
-
-	buf = valloc(SD_DATA_OBJ_SIZE);
-	if (!buf) {
-		eprintf("failed to allocate memory\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
+		buf = xzalloc(SD_DATA_OBJ_SIZE);
+		ret = read_copy_from_cluster(req, hdr->epoch, hdr->cow_oid, buf);
+		if (ret != SD_RES_SUCCESS) {
+			eprintf("failed to read cow object\n");
+			goto out;
+		}
+		iocb.buf = buf;
+		iocb.length = SD_DATA_OBJ_SIZE;
+		iocb.offset = 0;
+		ret = store.write(hdr->oid, &iocb);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
 	}
-	ret = read_from_other_sheep(req, hdr->epoch, hdr->cow_oid, buf,
-				     hdr->copies);
-	if (ret) {
-		eprintf("failed to read old object\n");
-		ret = SD_RES_EIO;
-		goto out;
-	}
-	iocb.buf = buf;
-	iocb.length = SD_DATA_OBJ_SIZE;
-	iocb.offset = 0;
-	ret = store.write(hdr->oid, &iocb);
-	if (ret != SD_RES_SUCCESS) {
-		goto out;
-	}
-
 	ret = do_write_obj(&iocb, req, epoch);
 out:
 	free(buf);
-	store.close(hdr->oid, &iocb);
-	return ret;
-}
-
-static int store_create_and_write_obj(struct request *req, uint32_t epoch)
-{
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	int ret;
-	struct siocb iocb;
-
-	if (!hdr->copies) {
-		eprintf("the number of copies cannot be zero\n");
-		return SD_RES_INVALID_PARMS;
-	}
-
-	memset(&iocb, 0, sizeof(iocb));
-	iocb.epoch = epoch;
-	iocb.flags = hdr->flags;
-	ret = store.open(hdr->oid, &iocb, 1);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
-	ret = do_write_obj(&iocb, req, epoch);
 	store.close(hdr->oid, &iocb);
 	return ret;
 }
@@ -726,10 +681,7 @@ static int store_queue_request_local(struct request *req, uint32_t epoch)
 		ret = store_read_obj(req, epoch);
 		break;
 	case SD_OP_CREATE_AND_WRITE_OBJ:
-		if (hdr->flags & SD_FLAG_CMD_COW)
-			ret = store_create_and_write_obj_cow(req, epoch);
-		else
-			ret = store_create_and_write_obj(req, epoch);
+		ret = store_create_and_write_obj(req, epoch);
 		break;
 	}
 
