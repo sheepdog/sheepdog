@@ -23,6 +23,10 @@
 #include "logger.h"
 #include "work.h"
 #include "cluster.h"
+#include "coroutine.h"
+
+static int cdrv_fd;
+static struct coroutine *cdrv_co;
 
 struct node {
 	struct sheepdog_node_list_entry ent;
@@ -246,22 +250,21 @@ void do_cluster_request(struct work *work, int idx)
 	free(msg);
 }
 
+static void group_handler(int listen_fd, int events, void *data);
+
+static void cluster_dispatch(void *opaque)
+{
+	if (sys->cdrv->dispatch() != 0)
+		panic("oops... an error occurred inside corosync\n");
+}
+
 static void group_handler(int listen_fd, int events, void *data)
 {
-	int ret;
-	if (events & EPOLLHUP) {
-		eprintf("received EPOLLHUP event: has corosync exited?\n");
-		goto out;
-	}
+	if (events & EPOLLHUP)
+		panic("received EPOLLHUP event: has corosync exited?\n");
 
-	ret = sys->cdrv->dispatch();
-	if (ret == 0)
-		return;
-	else
-		eprintf("oops... an error occurred inside corosync\n");
-out:
-	log_close();
-	exit(1);
+	cdrv_co = coroutine_create(cluster_dispatch);
+	coroutine_enter(cdrv_co, NULL);
 }
 
 static inline int get_nodes_nr_from(struct list_head *l)
@@ -644,6 +647,10 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 
 	start_cpg_event_work();
+
+	unregister_event(cdrv_fd);
+	coroutine_yield();
+	register_event(cdrv_fd, group_handler, NULL);
 }
 
 /*
@@ -942,6 +949,8 @@ static void cpg_event_done(struct work *work, int idx)
 	cpg_event_free(cevent);
 	cpg_event_running = 0;
 
+	coroutine_enter(cdrv_co, NULL);
+
 	if (!list_empty(&sys->cpg_event_siblings))
 		start_cpg_event_work();
 }
@@ -1200,6 +1209,11 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 		start_cpg_event_work();
+
+		unregister_event(cdrv_fd);
+		coroutine_yield();
+		register_event(cdrv_fd, group_handler, NULL);
+
 		break;
 	case CJ_RES_FAIL:
 	case CJ_RES_JOIN_LATER:
@@ -1317,6 +1331,10 @@ static void sd_leave_handler(struct sheepdog_node_list_entry *left,
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 	start_cpg_event_work();
 
+	unregister_event(cdrv_fd);
+	coroutine_yield();
+	register_event(cdrv_fd, group_handler, NULL);
+
 	return;
 oom:
 	if (w) {
@@ -1329,7 +1347,7 @@ oom:
 
 int create_cluster(int port, int64_t zone)
 {
-	int fd, ret;
+	int ret;
 	struct cdrv_handlers handlers = {
 		.join_handler = sd_join_handler,
 		.leave_handler = sd_leave_handler,
@@ -1347,8 +1365,8 @@ int create_cluster(int port, int64_t zone)
 		}
 	}
 
-	fd = sys->cdrv->init(&handlers, sys->cdrv_option, sys->this_node.addr);
-	if (fd < 0)
+	cdrv_fd = sys->cdrv->init(&handlers, sys->cdrv_option, sys->this_node.addr);
+	if (cdrv_fd < 0)
 		return -1;
 
 	sys->this_node.port = port;
@@ -1375,7 +1393,7 @@ int create_cluster(int port, int64_t zone)
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
 
-	ret = register_event(fd, group_handler, NULL);
+	ret = register_event(cdrv_fd, group_handler, NULL);
 	if (ret) {
 		eprintf("failed to register epoll events (%d)\n", ret);
 		return 1;
