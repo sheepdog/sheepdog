@@ -246,20 +246,20 @@ static void get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 	}
 }
 
-static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data)
+static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigned size)
 {
 	char name[128];
 	int i, fd, ret;
 	char *buf;
 
-	buf = zalloc(sizeof(struct sheepdog_inode));
+	buf = zalloc(size);
 	if (!buf) {
 		fprintf(stderr, "out of memory\n");
 		return;
 	}
 
 	for (i = 0; i < nr_nodes; i++) {
-		unsigned wlen = 0, rlen = sizeof(struct sheepdog_inode);
+		unsigned wlen = 0, rlen = size;
 		struct sd_obj_req hdr;
 		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 
@@ -752,7 +752,7 @@ static int vdi_object(int argc, char **argv)
 	if (idx == ~0) {
 		printf("Looking for the inode object 0x%" PRIx32 " with %d nodes\n\n",
 		       vid, nr_nodes);
-		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL);
+		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL, SD_INODE_SIZE);
 	} else {
 		struct get_data_oid_info old_info;
 
@@ -764,7 +764,7 @@ static int vdi_object(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
-		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &old_info);
+		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &old_info, SD_DATA_OBJ_SIZE);
 
 		if (old_info.success) {
 			if (old_info.data_oid) {
@@ -772,7 +772,7 @@ static int vdi_object(int argc, char **argv)
 				       " (the inode vid 0x%" PRIx32 " idx %u) with %d nodes\n\n",
 				       old_info.data_oid, vid, idx, nr_nodes);
 
-				parse_objs(old_info.data_oid, do_print_obj, NULL);
+				parse_objs(old_info.data_oid, do_print_obj, NULL, SD_DATA_OBJ_SIZE);
 			} else
 				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
 				       vid, idx);
