@@ -207,7 +207,7 @@ static void do_print_obj(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 		printf("the node list has changed, try again\n");
 		break;
 	default:
-		printf("%s: hit an expected error, %d\n",
+		printf("%s: hit an unexpected error, %d\n",
 		       sheep, rsp->result);
 		break;
 	}
