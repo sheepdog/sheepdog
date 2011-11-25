@@ -685,7 +685,8 @@ static void __sd_join(struct cpg_event *cevent)
 	struct join_message *msg = w->jm;
 	int i;
 
-	if (msg->cluster_status != SD_STATUS_OK)
+	if (msg->cluster_status != SD_STATUS_OK &&
+	    msg->cluster_status != SD_STATUS_HALT)
 		return;
 
 	if (sys_stat_ok())
