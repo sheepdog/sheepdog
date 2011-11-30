@@ -19,6 +19,7 @@
 struct cpg_node {
 	uint32_t nodeid;
 	uint32_t pid;
+	uint32_t gone;
 	struct sheepdog_node_list_entry ent;
 };
 
@@ -242,13 +243,24 @@ static struct corosync_event *find_block_event(enum corosync_event_type type,
 	return NULL;
 }
 
-static int is_master(void)
+static int is_master(struct cpg_node *node)
 {
+	int i;
+	struct cpg_node *n = node;
+	if (!n)
+		n = &this_node;
 	if (nr_cpg_nodes == 0)
 		/* this node should be the first cpg node */
-		return 1;
+		return 0;
 
-	return cpg_node_equal(&cpg_nodes[0], &this_node);
+	for (i = 0; i < SD_MAX_NODES; i++) {
+		if (!cpg_nodes[i].gone)
+			break;
+	}
+
+	if (cpg_node_equal(&cpg_nodes[i], n))
+		return i;
+	return -1;
 }
 
 static void build_node_list(struct cpg_node *nodes, size_t nr_nodes,
@@ -275,7 +287,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN:
 		if (cevent->blocked) {
-			if (!is_master())
+			if (is_master(&this_node) < 0)
 				return 0;
 
 			if (!cevent->msg)
