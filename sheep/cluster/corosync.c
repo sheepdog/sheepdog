@@ -541,6 +541,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
+		int master;
 		cevent = find_block_event(COROSYNC_EVENT_TYPE_JOIN,
 					  left_sheep + i);
 		if (cevent) {
@@ -563,6 +564,13 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		cevent = zalloc(sizeof(*cevent));
 		if (!cevent)
 			panic("failed to allocate memory\n");
+
+		master = is_master(&left_sheep[i]);
+		if (master >= 0)
+		/* Master is down before new nodes finish joining.
+		 * We have to revoke its mastership to avoid cluster hanging
+		 */
+			cpg_nodes[master].gone = 1;
 
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
 		cevent->sender = left_sheep[i];
