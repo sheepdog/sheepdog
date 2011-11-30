@@ -432,6 +432,8 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 	struct corosync_event *cevent;
 	struct corosync_message *cmsg = msg;
 
+	dprintf("%d\n", cmsg->type);
+
 	cevent = zalloc(sizeof(*cevent));
 	if (!cevent)
 		panic("failed to allocate memory\n");
@@ -510,6 +512,10 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	int i;
 	struct cpg_node joined_sheep[SD_MAX_NODES];
 	struct cpg_node left_sheep[SD_MAX_NODES];
+
+	dprintf("mem:%zu, joined:%zu, left:%zu\n",
+		member_list_entries, joined_list_entries,
+		left_list_entries);
 
 	/* convert cpg_address to cpg_node */
 	for (i = 0; i < left_list_entries; i++) {
