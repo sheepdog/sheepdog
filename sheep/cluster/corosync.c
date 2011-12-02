@@ -52,6 +52,7 @@ enum corosync_event_type {
 enum corosync_message_type {
 	COROSYNC_MSG_TYPE_JOIN_REQUEST,
 	COROSYNC_MSG_TYPE_JOIN_RESPONSE,
+	COROSYNC_MSG_TYPE_LEAVE,
 	COROSYNC_MSG_TYPE_NOTIFY,
 	COROSYNC_MSG_TYPE_BLOCK,
 	COROSYNC_MSG_TYPE_UNBLOCK,
@@ -443,6 +444,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 {
 	struct corosync_event *cevent;
 	struct corosync_message *cmsg = msg;
+	int master;
 
 	dprintf("%d\n", cmsg->type);
 
@@ -474,6 +476,26 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 			cevent->msg = zalloc(cmsg->msg_len);
 			if (!cevent->msg)
 				panic("failed to allocate memory\n");
+			memcpy(cevent->msg, cmsg->msg, cmsg->msg_len);
+		} else
+			cevent->msg = NULL;
+
+		list_add_tail(&cevent->list, &corosync_event_list);
+		break;
+	case COROSYNC_MSG_TYPE_LEAVE:
+		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
+
+		master = is_master(&cmsg->sender);
+		if (master >= 0)
+		/* Master is down before new nodes finish joining.
+		 * We have to revoke its mastership to avoid cluster hanging
+		 */
+			cpg_nodes[master].gone = 1;
+
+		cevent->sender = cmsg->sender;
+		cevent->msg_len = cmsg->msg_len;
+		if (cmsg->msg_len) {
+			cevent->msg = xzalloc(cmsg->msg_len);
 			memcpy(cevent->msg, cmsg->msg, cmsg->msg_len);
 		} else
 			cevent->msg = NULL;
@@ -683,15 +705,8 @@ retry:
 
 static int corosync_leave(void)
 {
-	int ret;
-
-	ret = cpg_leave(cpg_handle, &cpg_group);
-	if (ret != CPG_OK) {
-		eprintf("failed to leave the sheepdog group (%d)\n", ret);
-		return -1;
-	}
-
-	return 0;
+	return send_message(COROSYNC_MSG_TYPE_LEAVE, 0, &this_node, NULL, 0,
+			    NULL, 0);
 }
 
 static int corosync_notify(void *msg, size_t msg_len, void (*block_cb)(void *))
