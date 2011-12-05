@@ -157,7 +157,7 @@ out:
 	free(buf);
 	rsp->data_length = nr * sizeof(uint64_t);
 	for (i = 0; i < nr; i++) {
-		eprintf("oid %"PRIx64", %"PRIx64"\n", *(p + i), p[i]);
+		dprintf("oid %"PRIx64"\n", p[i]);
 	}
 	return res;
 }
@@ -1660,15 +1660,12 @@ static int fill_obj_list(struct recovery_work *rw,
 	int i, j;
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
-	struct sheepdog_vnode_list_entry *vnodes;
-	int nr_vnodes, retry_cnt;
+	int retry_cnt;
 
-	vnodes = malloc(sizeof(*vnodes) * SD_MAX_VNODES);
 	buf = malloc(buf_size);
-	if (!buf || !vnodes)
+	if (!buf)
 		goto fail;
 
-	nr_vnodes = nodes_to_vnodes(cur_entry, cur_nr, vnodes);
 	for (i = 0; i < cur_nr; i++) {
 		int nr;
 
@@ -1699,15 +1696,13 @@ static int fill_obj_list(struct recovery_work *rw,
 				goto retry;
 			}
 		}
-		rw->count = merge_objlist(vnodes, nr_vnodes, rw->oids,
+		rw->count = merge_objlist(rw->cur_vnodes, rw->cur_nr_vnodes, rw->oids,
 					  rw->count, (uint64_t *)buf, nr, nr_objs);
 	}
 
-	free(vnodes);
 	free(buf);
 	return 0;
 fail:
-	free(vnodes);
 	free(buf);
 	rw->retry = 1;
 	return -1;
