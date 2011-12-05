@@ -97,9 +97,8 @@ int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 	return SD_RES_SUCCESS;
 }
 
-static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entries,
-			 uint64_t *list1, int nr_list1,
-			 uint64_t *list2, int nr_list2, int nr_objs);
+static int merge_objlist(uint64_t *list1, int nr_list1,
+			 uint64_t *list2, int nr_list2);
 
 int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data)
 {
@@ -151,7 +150,7 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 
 		closedir(dir);
 
-		nr = merge_objlist(NULL, 0, p, nr, objlist, obj_nr, 0);
+		nr = merge_objlist(p, nr, objlist, obj_nr);
 	}
 out:
 	free(buf);
@@ -1616,29 +1615,17 @@ static int __fill_obj_list(struct sheepdog_node_list_entry *e, uint32_t epoch,
 		return -1;
 	}
 
-	dprintf("%"PRIu32"\n", rsp->data_length);
+	dprintf("%lu\n", rsp->data_length / sizeof(uint64_t));
 
 	return rsp->data_length / sizeof(uint64_t);
 }
 
-static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entries,
-			 uint64_t *list1, int nr_list1,
-			 uint64_t *list2, int nr_list2, int nr_objs)
+static int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2)
 {
-	int i, j, idx;
+	int i;
 	int old_nr_list1 = nr_list1;
 
 	for (i = 0; i < nr_list2; i++) {
-		if (entries) {
-			for (j = 0; j < nr_objs; j++) {
-				idx = obj_to_sheep(entries, nr_entries, list2[i], j);
-				if (is_myself(entries[idx].addr, entries[idx].port))
-					break;
-			}
-			if (j == nr_objs)
-				continue;
-		}
-
 		if (bsearch(list2 + i, list1, old_nr_list1, sizeof(*list1), obj_cmp))
 			continue;
 
@@ -1648,6 +1635,31 @@ static int merge_objlist(struct sheepdog_vnode_list_entry *entries, int nr_entri
 	qsort(list1, nr_list1, sizeof(*list1), obj_cmp);
 
 	return nr_list1;
+}
+
+static int screen_obj_list(struct sheepdog_vnode_list_entry *nodes, int nodes_nr,
+			   uint64_t *list, int list_nr, int nr_objs)
+{
+	int ret, i, cp, idx;
+	struct strbuf buf = STRBUF_INIT;
+
+	for (i = 0; i < list_nr; i++) {
+		for (cp = 0; cp < nr_objs; cp++) {
+			idx = obj_to_sheep(nodes, nodes_nr, list[i], cp);
+			if (is_myself(nodes[idx].addr, nodes[idx].port))
+				break;
+		}
+		if (cp == nr_objs)
+			continue;
+		strbuf_add(&buf, &list[i], sizeof(uint64_t));
+	}
+	memcpy(list, buf.buf, buf.len);
+
+	ret = buf.len / sizeof(uint64_t);
+	dprintf("%d\n", ret);
+	strbuf_release(&buf);
+
+	return ret;
 }
 
 #define MAX_RETRY_CNT  6
@@ -1696,10 +1708,13 @@ static int fill_obj_list(struct recovery_work *rw,
 				goto retry;
 			}
 		}
-		rw->count = merge_objlist(rw->cur_vnodes, rw->cur_nr_vnodes, rw->oids,
-					  rw->count, (uint64_t *)buf, nr, nr_objs);
+		nr = screen_obj_list(rw->cur_vnodes, rw->cur_nr_vnodes, (uint64_t *)buf,
+				     nr, nr_objs);
+		if (nr)
+			rw->count = merge_objlist(rw->oids, rw->count, (uint64_t *)buf, nr);
 	}
 
+	dprintf("%d\n", rw->count);
 	free(buf);
 	return 0;
 fail:
