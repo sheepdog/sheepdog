@@ -15,6 +15,7 @@
 #include "util.h"
 #include "list.h"
 #include "net.h"
+#include "logger.h"
 
 #define SD_SHEEP_PROTO_VER 0x03
 
@@ -179,8 +180,7 @@ static inline int get_nth_node(struct sheepdog_vnode_list_entry *entries,
 next:
 		idx = (idx + 1) % nr_entries;
 		if (idx == base) {
-			abort();
-			return -1; /* not found */
+			panic("bug"); /* not found */
 		}
 		for (i = 0; i < nr; i++) {
 			if (same_node(entries, idx, nodes[i]))
@@ -198,7 +198,7 @@ next:
 static inline int hval_to_sheep(struct sheepdog_vnode_list_entry *entries,
 				int nr_entries, uint64_t id, int idx)
 {
-	int i, ret;
+	int i;
 	struct sheepdog_vnode_list_entry *e = entries, *n;
 
 	for (i = 0; i < nr_entries - 1; i++, e++) {
@@ -206,13 +206,7 @@ static inline int hval_to_sheep(struct sheepdog_vnode_list_entry *entries,
 		if (id > e->id && id <= n->id)
 			break;
 	}
-	ret = get_nth_node(entries, nr_entries, (i + 1) % nr_entries, idx);
-	if (ret < 0) {
-		printf("bug\n");
-		abort();
-	}
-
-	return ret;
+	return get_nth_node(entries, nr_entries, (i + 1) % nr_entries, idx);
 }
 
 static inline int obj_to_sheep(struct sheepdog_vnode_list_entry *entries,
