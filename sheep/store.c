@@ -1536,7 +1536,6 @@ static void recover_done(struct work *work, int idx)
 	recovering_work = NULL;
 
 	sys->recovered_epoch = rw->epoch;
-	resume_pending_requests();
 
 	free(rw->oids);
 	free(rw);
@@ -1548,6 +1547,8 @@ static void recover_done(struct work *work, int idx)
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);
 	}
+
+	resume_pending_requests();
 }
 
 static int __fill_obj_list(struct sheepdog_node_list_entry *e, uint32_t epoch,
