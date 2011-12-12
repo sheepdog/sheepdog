@@ -47,18 +47,12 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 {
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	char name[128];
-	int n, fd, ret;
+	int fd, ret;
 	unsigned wlen = 0, rlen = datalen;
 
-	n = obj_to_sheep(vnode_list_entries, nr_vnodes, oid, 0);
-
-	addr_to_str(name, sizeof(name), vnode_list_entries[n].addr, 0);
-
-	fd = connect_to(name, vnode_list_entries[n].port);
+	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
-		fprintf(stderr, "failed to connect %s:%d\n", name,
-			vnode_list_entries[n].port);
+		fprintf(stderr, "failed to connect\n");
 		return SD_RES_EIO;
 	}
 
@@ -66,8 +60,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	hdr.epoch = node_list_version;
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.oid = oid;
-	/* use direct to avoid checking consistency */
-	hdr.flags =  SD_FLAG_CMD_IO_LOCAL;
+	hdr.flags = SD_FLAG_CMD_WEAK_CONSISTENCY;
 	hdr.data_length = rlen;
 	hdr.offset = offset;
 
