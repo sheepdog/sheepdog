@@ -3,6 +3,8 @@
 
 #include <sys/socket.h>
 
+#define DEFAULT_SOCKET_TIMEOUT 5 /* seconds */
+
 enum conn_state {
 	C_IO_HEADER = 0,
 	C_IO_DATA_INIT,
@@ -45,5 +47,6 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data);
 char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port);
 int set_nonblocking(int fd);
 int set_nodelay(int fd);
+int set_timeout(int fd);
 
 #endif

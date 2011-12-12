@@ -242,7 +242,7 @@ int do_read(int sockfd, void *buf, int len)
 reread:
 	ret = read(sockfd, buf, len);
 	if (ret < 0 || !ret) {
-		if (errno == EINTR || errno == EAGAIN)
+		if (errno == EINTR)
 			goto reread;
 		fprintf(stderr, "failed to read from socket: %m\n");
 		return 1;
@@ -275,7 +275,7 @@ static int do_write(int sockfd, struct msghdr *msg, int len)
 rewrite:
 	ret = sendmsg(sockfd, msg, 0);
 	if (ret < 0) {
-		if (errno == EINTR || errno == EAGAIN)
+		if (errno == EINTR)
 			goto rewrite;
 		fprintf(stderr, "failed to write to socket: %m\n");
 		return 1;
@@ -396,4 +396,27 @@ int set_nodelay(int fd)
 	opt = 1;
 	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 	return ret;
+}
+
+int set_timeout(int fd)
+{
+	int ret;
+	const struct timeval tv = {
+		.tv_sec = DEFAULT_SOCKET_TIMEOUT,
+		.tv_usec = 0,
+	};
+
+	ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+	if (ret) {
+		eprintf("failed to set send timeout\n");
+		return ret;
+	}
+
+	ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+	if (ret) {
+		eprintf("failed to set recv timeout\n");
+		return ret;
+	}
+
+	return 0;
 }
