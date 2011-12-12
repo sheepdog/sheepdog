@@ -1020,6 +1020,23 @@ static int __is_access_to_busy_objects(struct request *req)
 	return 0;
 }
 
+static int need_consistency_check(uint8_t opcode, uint16_t flags)
+{
+	if (flags & SD_FLAG_CMD_IO_LOCAL)
+		/* only gateway fixes data consistency */
+		return 0;
+
+	if (opcode != SD_OP_READ_OBJ)
+		/* consistency is fixed when clients read data for the
+		 * first time */
+		return 0;
+
+	if (flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
+		return 0;
+
+	return 1;
+}
+
 /* can be called only by the main process */
 void start_cpg_event_work(void)
 {
@@ -1089,8 +1106,7 @@ do_retry:
 				}
 			}
 
-			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
-			    req->rq.opcode == SD_OP_READ_OBJ) {
+			if (need_consistency_check(req->rq.opcode, req->rq.flags)) {
 				struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 				uint32_t vdi_id = oid_to_vid(hdr->oid);
 				struct data_object_bmap *bmap;

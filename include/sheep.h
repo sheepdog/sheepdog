@@ -42,6 +42,12 @@
 #define SD_FLAG_CMD_IO_LOCAL   0x0010
 #define SD_FLAG_CMD_RECOVERY 0x0020
 
+/* set this flag when you want to read a VDI which is opened by
+   another client.  Note that the obtained data may not be the latest
+   one because Sheepdog cannot ensure strong consistency against
+   concurrent accesses to non-snapshot VDIs. */
+#define SD_FLAG_CMD_WEAK_CONSISTENCY 0x0040
+
 /* flags for vdi attribute operations */
 #define SD_FLAG_CMD_CREAT    0x0100
 #define SD_FLAG_CMD_EXCL     0x0200
