@@ -15,6 +15,81 @@ _collie_cluster_format()
     esac
 }
 
+_collie_cluster_recover()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-f --force" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_vdi_create()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-P --prealloc" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_vdi_snapshot()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-s --snapshot" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_vdi_clone()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-P --prealloc -s --snapshot" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
+_collie_vdi_read()
+{
+    local cur
+    cur="${COMP_WORDS[COMP_CWORD]}"
+
+    case "$cur" in
+        -*)
+            COMPREPLY=(${COMPREPLY[@]} \
+                $( compgen \
+                -W "-s --snapshot" \
+                -- ${cur} ))
+            ;;
+    esac
+}
+
 _collie_vdi_delete()
 {
     local cur collie vdilist
@@ -73,7 +148,7 @@ _collie_vdi_setattr()
 _collie_cluster()
 {
     local opts
-    opts="info format shutdown"
+    opts="info format shutdown recover"
 
     case "$1" in
         info)
@@ -82,6 +157,9 @@ _collie_cluster()
             _collie_cluster_format
             ;;
         shutdown)
+            ;;
+        recover)
+            _collie_cluster_recover
             ;;
         "")
             COMPREPLY=($( compgen \
@@ -118,9 +196,26 @@ _collie_node()
 _collie_vdi()
 {
     local opts
-    opts="list tree graph delete object setattr getattr"
+    opts="create snapshot clone resize read write \
+list tree graph delete object setattr getattr"
 
     case "$1" in
+	create)
+	    _collie_vdi_create
+	    ;;
+	snapshot)
+	    _collie_vdi_snapshot
+	    ;;
+	clone)
+	    _collie_vdi_clone
+	    ;;
+	resize)
+	    ;;
+	read)
+	    _collie_vdi_read
+	    ;;
+	write)
+	    ;;
         list)
             ;;
         tree)
