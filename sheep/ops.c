@@ -195,8 +195,8 @@ static int cluster_get_vdi_attr(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	/* the curernt vdi id can change if we take the snapshot,
-	   so we use the hash value of the vdi name as the vdi id */
+	/* the current VDI id can change if we take a snapshot,
+	   so we use the hash value of the VDI name as the VDI id */
 	vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 	vid &= SD_NR_VDIS - 1;
 	ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,

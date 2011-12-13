@@ -52,7 +52,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
-		fprintf(stderr, "failed to connect\n");
+		fprintf(stderr, "Failed to connect\n");
 		return SD_RES_EIO;
 	}
 
@@ -68,12 +68,12 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "failed to read object, %lx\n", oid);
+		fprintf(stderr, "Failed to read object %lx\n", oid);
 		return SD_RES_EIO;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to read object, %lx %s\n", oid,
+		fprintf(stderr, "Failed to read object %lx %s\n", oid,
 			sd_strerror(rsp->result));
 		return rsp->result;
 	}
@@ -91,7 +91,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
-		fprintf(stderr, "failed to connect\n");
+		fprintf(stderr, "Failed to connect\n");
 		return SD_RES_EIO;
 	}
 
@@ -112,12 +112,12 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "failed to write object, %lx\n", oid);
+		fprintf(stderr, "Failed to write object %lx\n", oid);
 		return SD_RES_EIO;
 	}
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to write object, %lx %s\n", oid,
-			sd_strerror(rsp->result));
+		fprintf(stderr, "Failed to write object %lx: %s\n", oid,
+				sd_strerror(rsp->result));
 		return rsp->result;
 	}
 
@@ -162,11 +162,11 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 		memset(&i, 0, sizeof(i));
 		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0);
 		if (ret != SD_RES_SUCCESS) {
-			fprintf(stderr, "failed to read a inode header\n");
+			fprintf(stderr, "Failed to read inode header\n");
 			continue;
 		}
 
-		if (i.name[0] == '\0') /* this vdi is deleted */
+		if (i.name[0] == '\0') /* this VDI has been deleted */
 			continue;
 
 		if (size > SD_INODE_HEADER_SIZE) {
@@ -179,7 +179,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 					     rlen, SD_INODE_HEADER_SIZE);
 
 			if (ret != SD_RES_SUCCESS) {
-				fprintf(stderr, "failed to read inode\n");
+				fprintf(stderr, "Failed to read inode\n");
 				continue;
 			}
 		}

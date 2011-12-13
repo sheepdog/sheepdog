@@ -25,10 +25,8 @@ static int node_list(int argc, char **argv)
 {
 	int i;
 
-	if (!raw_output) {
-		printf("   Idx - Host:Port          Vnodes       Zone\n");
-		printf("---------------------------------------------\n");
-	}
+	if (!raw_output)
+		printf("M   Id   Host:Port         V-Nodes       Zone\n");
 	for (i = 0; i < nr_nodes; i++) {
 		char data[128];
 
@@ -38,13 +36,13 @@ static int node_list(int argc, char **argv)
 		if (i == master_idx) {
 			if (highlight)
 				printf(TEXT_BOLD);
-			printf(raw_output ? "* %d %s %d %d\n" : "* %4d - %-20s\t%d%11d\n",
+			printf(raw_output ? "* %d %s %d %d\n" : "* %4d   %-20s\t%2d%11d\n",
 			       i, data, node_list_entries[i].nr_vnodes,
 			       node_list_entries[i].zone);
 			if (highlight)
 				printf(TEXT_NORMAL);
 		} else
-			printf(raw_output ? "- %d %s %d %d\n" : "  %4d - %-20s\t%d%11d\n",
+			printf(raw_output ? "- %d %s %d %d\n" : "- %4d   %-20s\t%2d%11d\n",
 			       i, data, node_list_entries[i].nr_vnodes,
 			       node_list_entries[i].zone);
 	}
@@ -100,7 +98,7 @@ static int node_info(int argc, char **argv)
 	}
 
 	if (success == 0) {
-		fprintf(stderr, "cannot get information from any nodes\n");
+		fprintf(stderr, "Cannot get information from any nodes\n");
 		return EXIT_SYSFAIL;
 	}
 
@@ -110,7 +108,7 @@ static int node_info(int argc, char **argv)
 	size_to_str(total_size - total_avail, avail_str, sizeof(avail_str));
 	size_to_str(total_vdi_size, vdi_size_str, sizeof(vdi_size_str));
 	printf(raw_output ? "Total %s %s %d%% %s\n"
-			  : "\nTotal\t%s\t%s\t%3d%%, total virtual VDI Size\t%s\n",
+			  : "Total\t%s\t%s\t%3d%%\n\nTotal virtual image size\t%s\n",
 	       total_str, avail_str,
 	       (int)(((double)(total_size - total_avail) / total_size) * 100),
 	       vdi_size_str);
@@ -121,7 +119,7 @@ static int node_info(int argc, char **argv)
 static struct subcommand node_cmd[] = {
 	{"list", NULL, "aprh", "list nodes",
 	 SUBCMD_FLAG_NEED_NODELIST, node_list},
-	{"info", NULL, "aprh", "show each node information",
+	{"info", NULL, "aprh", "show information about each node",
 	 SUBCMD_FLAG_NEED_NODELIST, node_info},
 	{NULL,},
 };

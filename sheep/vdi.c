@@ -296,12 +296,12 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	if (is_snapshot) {
 		if (ret != SD_RES_SUCCESS) {
 			if (ret == SD_RES_NO_VDI)
-				vprintf(SDOG_CRIT, "vdi %s does not exist\n", name);
+				vprintf(SDOG_CRIT, "VDI %s does not exist\n", name);
 			return ret;
 		}
 		nr = right_nr;
 	} else {
-		/* we already have the same vdi or met other errors. */
+		/* we already have the same VDI or met other errors. */
 		if (ret != SD_RES_NO_VDI) {
 			if (ret == SD_RES_SUCCESS)
 				ret = SD_RES_VDI_EXIST;
@@ -311,7 +311,7 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 		if (deleted_nr == SD_NR_VDIS)
 			nr = right_nr;
 		else
-			nr = deleted_nr; /* we can recycle a deleted vdi */
+			nr = deleted_nr; /* we can recycle a deleted VDI */
 
 		next_snapid = 1;
 	}
@@ -461,7 +461,7 @@ static void delete_one(struct work *work, int idx)
 			  0, sys->nr_sobjs);
 
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("cannot find vdi object\n");
+		eprintf("cannot find VDI object\n");
 		goto out;
 	}
 
@@ -524,7 +524,7 @@ again:
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("cannot find vdi object\n");
+		eprintf("cannot find VDI object\n");
 		goto err;
 	}
 
@@ -567,7 +567,7 @@ next:
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
 
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("cannot find vdi object\n");
+		eprintf("cannot find VDI object\n");
 		vid = 0;
 		goto out;
 	}
@@ -724,7 +724,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		(*attrid)++;
 	}
 
-	dprintf("there is no space for new vdis\n");
+	dprintf("there is no space for new VDIs\n");
 	ret = SD_RES_FULL_VDI;
 out:
 	free_ordered_sd_vnode_list(entries);

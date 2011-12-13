@@ -32,7 +32,7 @@ static const struct sd_option collie_options[] = {
                           single spaces and print all sizes in decimal bytes"},
 	{'h', "help", 0, "display this help and exit"},
 
-	/* vdi options */
+	/* VDI options */
 	{'P', "prealloc", 0, "preallocate all the data objects"},
 	{'i', "index", 1, "specify the index of data objects"},
 	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
@@ -40,9 +40,10 @@ static const struct sd_option collie_options[] = {
 	{'d', "delete", 0, "delete a key"},
 
 	/* cluster options */
-	{'c', "copies", 1, "set the number of data redundancy"},
-	{'H', "nohalt", 0, "serve the IO rquests even lack of enough redundant nodes"},
-	{'f', "force", 0, "never promt, you know well what you are doing"},
+	{'c', "copies", 1, "specify the data redundancy (number of copies)"},
+	{'H', "nohalt", 0, "serve IO requests even if there are too few\n\
+                          nodes for the configured redundancy"},
+	{'f', "force", 0, "do not prompt for confirmation"},
 
 	{ 0, NULL, 0, NULL },
 };
@@ -91,14 +92,15 @@ static int update_node_list(int max_nodes, int epoch)
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		fprintf(stderr, "Failed to update node list: %s\n",
+				sd_strerror(rsp->result));
 		ret = -1;
 		goto out;
 	}
 
 	nr_nodes = size / sizeof(*ent);
 	if (nr_nodes == 0) {
-		fprintf(stderr, "there is no active sheep daemons\n");
+		fprintf(stderr, "There are no active sheep daemons\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -135,7 +137,7 @@ static const struct sd_option *find_opt(int ch)
 		if (collie_options[i].val == ch)
 			return collie_options + i;
 	}
-	fprintf(stderr, "internal error\n");
+	fprintf(stderr, "Internal error\n");
 	exit(EXIT_SYSFAIL);
 }
 
@@ -193,7 +195,7 @@ static unsigned long setup_command(struct command *commands, char *cmd, char *su
 	}
 
 	if (!found) {
-		fprintf(stderr, "'%s' is not a valid command\n", cmd);
+		fprintf(stderr, "Invalid command '%s'\n", cmd);
 		usage(commands, EXIT_USAGE);
 	}
 
@@ -209,10 +211,11 @@ static unsigned long setup_command(struct command *commands, char *cmd, char *su
 	}
 
 	if (!command_fn) {
-		fprintf(stderr, "'%s' is not a valid subcommand\n", subcmd);
-		fprintf(stderr, "'%s' supports the following subcommands:\n", cmd);
+		if (strcmp(subcmd, "help") && strcmp(subcmd, "--help"))
+			fprintf(stderr, "Invalid command '%s %s'\n", cmd, subcmd);
+		fprintf(stderr, "Available %s commands:\n", cmd);
 		for (s = commands[i].sub; s->name; s++)
-			fprintf(stderr, "%s\n", s->name);
+			fprintf(stderr, "  %s %s\n", cmd, s->name);
 		exit(EXIT_USAGE);
 	}
 
@@ -226,12 +229,11 @@ static void usage(struct command *commands, int status)
 	char name[64];
 
 	if (status)
-		fprintf(stderr, "Try `%s --help' for more information.\n", program_name);
+		fprintf(stderr, "Try '%s --help' for more information.\n", program_name);
 	else {
+		printf("Sheepdog administrator utility\n");
 		printf("Usage: %s <command> <subcommand> [options]\n", program_name);
-		printf("Sheepdog Administrator Utilty\n");
-		printf("\n");
-		printf("Command syntax:\n");
+		printf("\nAvailable commands:\n");
 		for (i = 0; commands[i].name; i++) {
 			for (s = commands[i].sub; s->name; s++) {
 				sprintf(name, "%s %s", commands[i].name, s->name);
@@ -239,8 +241,8 @@ static void usage(struct command *commands, int status)
 			}
 		}
 		printf("\n");
-		printf("For more information, "
-		       "type \"%s <command> <subcommand> --help\".\n", program_name);
+		printf("For more information, run "
+		       "'%s <command> <subcommand> --help'.\n", program_name);
 	}
 	exit(status);
 }
@@ -251,13 +253,7 @@ static void subcommand_usage(char *cmd, char *subcmd, int status)
 	const struct sd_option *sd_opt;
 	char name[64];
 
-	printf("%s %s - %s\n", cmd, subcmd, command_desc);
-	printf("\n");
-	printf("Usage:\n");
-	printf("  %s %s %s", program_name, cmd, subcmd);
-	if (command_arg)
-		printf(" %s", command_arg);
-
+	printf("Usage: %s %s %s", program_name, cmd, subcmd);
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_options[i]);
 		if (sd_opt->has_arg)
@@ -265,10 +261,9 @@ static void subcommand_usage(char *cmd, char *subcmd, int status)
 		else
 			printf(" [-%c]", sd_opt->val);
 	}
-	printf("\n");
-	printf("\n");
-
-	printf("Command parameters:\n");
+	if (command_arg)
+		printf(" %s", command_arg);
+	printf("\nOptions:\n");
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_options[i]);
 		sprintf(name, "-%c, --%s", sd_opt->val, sd_opt->name);
@@ -313,7 +308,7 @@ int main(int argc, char **argv)
 		case 'p':
 			sdport = strtol(optarg, &p, 10);
 			if (optarg == p || sdport < 1 || sdport > UINT16_MAX) {
-				fprintf(stderr, "invalid port number: %s\n", optarg);
+				fprintf(stderr, "Invalid port number '%s'\n", optarg);
 				exit(EXIT_USAGE);
 			}
 			break;
@@ -341,15 +336,13 @@ int main(int argc, char **argv)
 	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
 		ret = update_node_list(SD_MAX_NODES, 0);
 		if (ret < 0) {
-			fprintf(stderr, "failed to get node list\n");
+			fprintf(stderr, "Failed to get node list\n");
 			exit(EXIT_SYSFAIL);
 		}
 	}
 
-	if (flags & SUBCMD_FLAG_NEED_THIRD_ARG && argc == optind) {
-		fprintf(stderr, "'%s %s' needs the third argument\n", argv[1], argv[2]);
-		exit(EXIT_USAGE);
-	}
+	if (flags & SUBCMD_FLAG_NEED_THIRD_ARG && argc == optind)
+		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 
 	return command_fn(argc, argv);
 }

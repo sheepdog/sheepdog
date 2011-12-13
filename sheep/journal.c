@@ -172,7 +172,7 @@ static int jrnl_apply_to_target_object(struct jrnl_descriptor *jd)
 		return SD_RES_NO_MEM;
 	}
 
-	/* Flush out journal to disk (vdi object) */
+	/* Flush out journal to disk (VDI object) */
 	retsize = pread64(jd->fd, &jd->head, sizeof(jd->head), 0);
 	retsize = pread64(jd->fd, buf, jd->head.size, sizeof(jd->head));
 	retsize = pwrite64(jd->target_fd, buf, jd->head.size, jd->head.offset);

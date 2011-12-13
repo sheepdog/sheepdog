@@ -48,7 +48,7 @@
    concurrent accesses to non-snapshot VDIs. */
 #define SD_FLAG_CMD_WEAK_CONSISTENCY 0x0040
 
-/* flags for vdi attribute operations */
+/* flags for VDI attribute operations */
 #define SD_FLAG_CMD_CREAT    0x0100
 #define SD_FLAG_CMD_EXCL     0x0200
 #define SD_FLAG_CMD_DEL      0x0400

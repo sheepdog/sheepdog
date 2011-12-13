@@ -1873,7 +1873,7 @@ static int init_epoch_path(const char *base_path)
 			if (!is_vdi_obj(oid))
 				continue;
 
-			vprintf(SDOG_DEBUG, "found the vdi object %" PRIx64 "\n", oid);
+			vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
 
 			set_bit(oid_to_vid(oid), sys->vdi_inuse);
 		}

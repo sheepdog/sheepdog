@@ -59,7 +59,7 @@ static struct vdi_tree *new_vdi(const char *name, const char *label,
 
 	vdi = malloc(sizeof(struct vdi_tree));
 	if (!vdi) {
-		fprintf(stderr, "malloc\n");
+		fprintf(stderr, "Failed to allocate memory\n");
 		return NULL;
 	}
 	strcpy(vdi->name, name);
@@ -184,7 +184,7 @@ void dump_tree(void)
 	width = malloc(sizeof(int) * depth);
 	more = malloc(sizeof(int) * depth);
 	if (!width || !more) {
-		fprintf(stderr, "out of memory\n");
+		fprintf(stderr, "Failed to allocate memory\n");
 		return;
 	}
 

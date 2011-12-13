@@ -57,12 +57,13 @@ static int cluster_format(int argc, char **argv)
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "failed to connect\n");
+		fprintf(stderr, "Failed to connect\n");
 		return EXIT_SYSFAIL;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		fprintf(stderr, "Format failed: %s\n",
+				sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -163,12 +164,13 @@ static int cluster_shutdown(int argc, char **argv)
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "failed to connect\n");
+		fprintf(stderr, "Failed to connect\n");
 		return EXIT_SYSFAIL;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		fprintf(stderr, "Shutdown failed: %s\n",
+				sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -176,12 +178,12 @@ static int cluster_shutdown(int argc, char **argv)
 }
 
 #define RECOVER_PRINT \
-"CAUTION!Please assure me that you have tried booting up all the\n\
-cluster nodes before you run this command.\n\n\
-In two cases you need to recover the cluster manually:\n\
-\t1) The master node is failed to boot in different epoch condition.\n\
-\t2) Some nodes are failed to boot after the cluster is shutdown-ed.\n\
-\nPlease type to continue [Yes/No]: "
+"Caution! Please try starting all the cluster nodes normally before\n\
+running this command.\n\n\
+The cluster may need to be recovered manually if:\n\
+  - the master node fails to start because of epoch mismatch; or\n\
+  - some nodes fail to start after a cluster shutdown.\n\n\
+Are you sure you want to continue? [yes/no]: "
 
 static int cluster_recover(int argc, char **argv)
 {
@@ -219,12 +221,13 @@ static int cluster_recover(int argc, char **argv)
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "failed to connect\n");
+		fprintf(stderr, "Failed to connect\n");
 		return EXIT_SYSFAIL;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "%s\n", sd_strerror(rsp->result));
+		fprintf(stderr, "Recovery failed: %s\n",
+				sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -234,7 +237,7 @@ static int cluster_recover(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 0, cluster_info},
-	{"format", NULL, "cHaph", "create a Sheepdog storage",
+	{"format", NULL, "cHaph", "create a Sheepdog store",
 	 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
@@ -251,8 +254,11 @@ static int cluster_parser(int ch, char *opt)
 	switch (ch) {
 	case 'c':
 		copies = strtol(opt, &p, 10);
-		if (opt == p || copies < 1 || copies > SD_MAX_REDUNDANCY) {
-			fprintf(stderr, "copies must be from 1 through %d\n",
+		if (opt == p || copies < 1) {
+			fprintf(stderr, "There must be at least one copy of data\n");
+			exit(EXIT_FAILURE);
+		} else if (copies > SD_MAX_REDUNDANCY) {
+			fprintf(stderr, "Redundancy may not exceed %d copies\n",
 				SD_MAX_REDUNDANCY);
 			exit(EXIT_FAILURE);
 		}

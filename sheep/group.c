@@ -466,7 +466,7 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 
 	fd = connect_to(host, node->port);
 	if (fd < 0) {
-		vprintf(SDOG_ERR, "%s:%d. Failed: %m\n", host, node->port);
+		vprintf(SDOG_ERR, "unable to get the VDI bitmap from %s: %m\n", host);
 		ret = -SD_RES_EIO;
 		goto out;
 	}
@@ -486,7 +486,7 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 	close(fd);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		vprintf(SDOG_ERR, "unable to get the vdi bitmap (%d, %d)\n", ret,
+		vprintf(SDOG_ERR, "unable to get the VDI bitmap (%d, %d)\n", ret,
 				rsp->result);
 		goto out;
 	}
