@@ -40,7 +40,7 @@ struct acrd_event {
 	size_t buf_len;
 	uint8_t buf[MAX_EVENT_BUF_SIZE];
 
-	size_t nr_nodes; /* the number of sheeps */
+	size_t nr_nodes; /* the number of sheep */
 	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
 	uint64_t ids[SD_MAX_NODES];
 
