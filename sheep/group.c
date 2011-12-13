@@ -466,12 +466,12 @@ static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
 
 	fd = connect_to(host, node->port);
 	if (fd < 0) {
-		vprintf(SDOG_ERR, "unable to get the vdi bitmap from %s: %m\n", host);
+		vprintf(SDOG_ERR, "%s:%d. Failed: %m\n", host, node->port);
 		ret = -SD_RES_EIO;
 		goto out;
 	}
 
-	vprintf(SDOG_ERR, "getting the vdi bitmap from %s\n", host);
+	vprintf(SDOG_ERR, "%s:%d\n", host, node->port);
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_VDIS;
