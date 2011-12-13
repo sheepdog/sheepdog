@@ -63,7 +63,7 @@ struct work_notify {
 	struct sheepdog_node_list_entry sender;
 
 	struct request *req;
-	struct message_header *msg;
+	void *msg;
 };
 
 struct work_join {
@@ -594,7 +594,7 @@ static void __sd_notify(struct cpg_event *cevent)
 static void __sd_notify_done(struct cpg_event *cevent)
 {
 	struct work_notify *w = container_of(cevent, struct work_notify, cev);
-	struct vdi_op_message *msg = (struct vdi_op_message *)w->msg;
+	struct vdi_op_message *msg = w->msg;
 	struct request *req = w->req;
 	int ret = msg->rsp.result;
 	struct sd_op_template *op = get_sd_op(msg->req.opcode);
@@ -717,11 +717,8 @@ static void __sd_leave(struct cpg_event *cevent)
 static enum cluster_join_result sd_check_join_cb(
 	struct sheepdog_node_list_entry *joining, void *opaque)
 {
-	struct message_header *m = opaque;
-	struct join_message *jm;
+	struct join_message *jm = opaque;
 	struct node *node;
-
-	jm = (struct join_message *)m;
 
 	if (node_cmp(joining, &sys->this_node) == 0) {
 		struct sheepdog_node_list_entry entries[SD_MAX_NODES];
