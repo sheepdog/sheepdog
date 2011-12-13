@@ -102,15 +102,8 @@ static int merge_objlist(uint64_t *list1, int nr_list1,
 
 int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data)
 {
-	DIR *dir;
-	struct dirent *d;
-	uint64_t oid;
-	uint32_t epoch;
-	char path[1024];
-	uint64_t *p = (uint64_t *)data;
-	int nr = 0;
-	uint64_t *objlist = NULL;
-	int obj_nr, i;
+	uint64_t *list = (uint64_t *)data;
+	int i, nr = 0;
 	int res = SD_RES_SUCCESS;
 	int buf_len;
 	char *buf;
@@ -124,39 +117,20 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 		goto out;
 	}
 
-	objlist = (uint64_t *)buf;
-	for (epoch = 1; epoch <= hdr->tgt_epoch; epoch++) {
-		snprintf(path, sizeof(path), "%s%08u/", obj_path, epoch);
+	for (i = 1; i <= hdr->tgt_epoch; i++) {
+		struct siocb iocb = { 0 };
 
-		dprintf("%"PRIu32", %s\n", sys->this_node.port, path);
-
-		dir = opendir(path);
-		if (!dir) {
-			eprintf("%s\n", path);
-			continue;
-		}
-
-		obj_nr = 0;
-		while ((d = readdir(dir))) {
-			if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
-				continue;
-
-			oid = strtoull(d->d_name, NULL, 16);
-			if (oid == 0)
-				continue;
-
-			objlist[obj_nr++] = oid;
-		}
-
-		closedir(dir);
-
-		nr = merge_objlist(p, nr, objlist, obj_nr);
+		iocb.buf = buf;
+		iocb.length = 0;
+		iocb.epoch = i;
+		store.get_objlist(&iocb);
+		nr = merge_objlist(list, nr, (uint64_t *)iocb.buf, iocb.length);
 	}
 out:
 	free(buf);
 	rsp->data_length = nr * sizeof(uint64_t);
 	for (i = 0; i < nr; i++) {
-		dprintf("oid %"PRIx64"\n", p[i]);
+		dprintf("oid %"PRIx64"\n", list[i]);
 	}
 	return res;
 }

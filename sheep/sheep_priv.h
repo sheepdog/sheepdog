@@ -172,6 +172,7 @@ struct store_driver {
 	int (*write)(uint64_t oid, struct siocb *);
 	int (*read)(uint64_t oid, struct siocb *);
 	int (*close)(uint64_t oid, struct siocb *);
+	int (*get_objlist)(struct siocb *);
 };
 
 extern void register_store_driver(struct store_driver *);

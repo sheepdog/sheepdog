@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #include "sheep_priv.h"
 #include "strbuf.h"
@@ -141,13 +142,50 @@ static int simple_store_close(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
+static int simple_store_get_objlist(struct siocb *siocb)
+{
+	struct strbuf buf = STRBUF_INIT;
+	int epoch = siocb->epoch;
+	uint64_t *objlist = (uint64_t *)siocb->buf;
+	DIR *dir;
+	struct dirent *d;
+	int ret = SD_RES_SUCCESS;
+
+	strbuf_addf(&buf, "%s%08u/", obj_path, epoch);
+
+	dprintf("%s\n", buf.buf);
+
+	dir = opendir(buf.buf);
+	if (!dir) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	while ((d = readdir(dir))) {
+		uint64_t oid;
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		oid = strtoull(d->d_name, NULL, 16);
+		if (oid == 0)
+			continue;
+
+		objlist[siocb->length++] = oid;
+	}
+	closedir(dir);
+out:
+	strbuf_release(&buf);
+	return ret;
+}
+
 struct store_driver store = {
 	.driver_name = "simple",
 	.init = simple_store_init,
 	.open = simple_store_open,
 	.write = simple_store_write,
 	.read = simple_store_read,
-	.close = simple_store_close
+	.close = simple_store_close,
+	.get_objlist = simple_store_get_objlist
 };
 
 void register_store_driver(struct store_driver *driver)
