@@ -51,6 +51,7 @@ static int store_write_last_sector(uint64_t oid, struct siocb *iocb)
 		eprintf("failed to allocate memory\n");
 		return SD_RES_NO_MEM;
 	}
+	memset(buf, 0, size);
 
 	iocb->buf = buf;
 	iocb->length = size;
