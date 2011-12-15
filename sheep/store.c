@@ -352,11 +352,20 @@ static int forward_write_obj_req(struct request *req)
 
 	ret = SD_RES_SUCCESS;
 again:
-	if (poll(pfds, nr_fds, -1) < 0) {
+	pollret = poll(pfds, nr_fds, DEFAULT_SOCKET_TIMEOUT * 1000);
+	if (pollret < 0) {
 		if (errno == EINTR)
 			goto again;
 
 		ret = SD_RES_EIO;
+	} else if (pollret == 0) { /* poll time out */
+		eprintf("timeout\n");
+
+		for (i = 0; i < nr_fds; i++)
+			del_sheep_fd(pfds[i].fd);
+
+		ret = SD_RES_NETWORK_ERROR;
+		goto out;
 	}
 
 	for (i = 0; i < nr_fds; i++) {
