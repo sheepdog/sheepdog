@@ -391,7 +391,7 @@ struct acrd_leave_info {
 	struct work work;
 };
 
-static void __acrd_leave(struct work *work, int idx)
+static void __acrd_leave(struct work *work)
 {
 	struct acrd_leave_info *info = container_of(work, typeof(*info), work);
 	struct acrd_handle *ah = info->ah;
@@ -425,7 +425,7 @@ static void __acrd_leave(struct work *work, int idx)
 	pthread_mutex_unlock(&queue_lock);
 }
 
-static void __acrd_leave_done(struct work *work, int idx)
+static void __acrd_leave_done(struct work *work)
 {
 	struct acrd_leave_info *info = container_of(work, typeof(*info), work);
 
@@ -536,7 +536,7 @@ static int accord_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
 	return add_event(ahandle, EVENT_NOTIFY, &this_node, msg, msg_len, block_cb);
 }
 
-static void acrd_block(struct work *work, int idx)
+static void acrd_block(struct work *work)
 {
 	struct acrd_event ev;
 
@@ -552,7 +552,7 @@ static void acrd_block(struct work *work, int idx)
 	pthread_mutex_unlock(&queue_lock);
 }
 
-static void acrd_block_done(struct work *work, int idx)
+static void acrd_block_done(struct work *work)
 {
 }
 

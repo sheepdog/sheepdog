@@ -29,7 +29,6 @@
 #include <stdlib.h>
 #include <setjmp.h>
 #include <stdint.h>
-#include <pthread.h>
 #include <ucontext.h>
 #include <errno.h>
 #include <assert.h>
@@ -72,7 +71,7 @@ struct co_ucontext {
 /**
  * Per-thread coroutine bookkeeping
  */
-struct co_thread_state{
+__thread struct co_thread_state{
 	/** Currently executing coroutine */
 	struct coroutine *current;
 
@@ -82,9 +81,7 @@ struct co_thread_state{
 
 	/** The default coroutine */
 	struct co_ucontext leader;
-};
-
-static pthread_key_t thread_state_key;
+} co_ts;
 
 static enum co_action coroutine_switch(struct coroutine *from,
 				       struct coroutine *to,
@@ -102,41 +99,13 @@ union cc_arg {
 
 static struct co_thread_state *coroutine_get_thread_state(void)
 {
-	struct co_thread_state *s = pthread_getspecific(thread_state_key);
+	struct co_thread_state *s = &co_ts;
 
-	if (!s) {
-		s = zalloc(sizeof(*s));
-		if (!s)
-			abort();
+	if (!s->current) {
 		s->current = &s->leader.base;
 		INIT_LIST_HEAD(&s->pool);
-		pthread_setspecific(thread_state_key, s);
 	}
 	return s;
-}
-
-static void coroutine_thread_cleanup(void *opaque)
-{
-	struct co_thread_state *s = opaque;
-	struct coroutine *co;
-	struct coroutine *tmp;
-
-	list_for_each_entry_safe(co, tmp, &s->pool, pool_next) {
-		free(container_of(co, struct co_ucontext, base)->stack);
-		free(co);
-	}
-	free(s);
-}
-
-static void __attribute__((constructor)) coroutine_init(void)
-{
-	int ret;
-
-	ret = pthread_key_create(&thread_state_key, coroutine_thread_cleanup);
-	if (ret != 0) {
-		fprintf(stderr, "unable to create leader key: %m\n");
-		abort();
-	}
 }
 
 static void coroutine_trampoline(int i0, int i1)
@@ -302,9 +271,9 @@ struct coroutine *coroutine_self(void)
 
 int in_coroutine(void)
 {
-	struct co_thread_state *s = pthread_getspecific(thread_state_key);
+	struct co_thread_state *s = &co_ts;
 
-	return s && s->current->caller;
+	return s->current && s->current->caller;
 }
 
 

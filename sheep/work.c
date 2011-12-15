@@ -182,7 +182,7 @@ static void bs_thread_request_done(int fd, int events, void *data)
 			 * save its attr for qork_post_done().
 			 */
 			attr = work->attr;
-			work->done(work, 0);
+			work->done(work);
 			work_post_done(&wi->q, attr);
 		}
 	}
@@ -192,18 +192,10 @@ static void *worker_routine(void *arg)
 {
 	struct worker_info *wi = arg;
 	struct work *work;
-	int i, idx = 0;
 	eventfd_t value = 1;
 
-	for (i = 0; i < wi->nr_threads; i++) {
-		if (wi->worker_thread[i] == pthread_self()) {
-			idx = i;
-			break;
-		}
-	}
-
 	pthread_mutex_lock(&wi->startup_lock);
-	dprintf("started this thread %d\n", idx);
+	/* started this thread */
 	pthread_mutex_unlock(&wi->startup_lock);
 
 	while (!(wi->q.wq_state & WQ_DEAD)) {
@@ -225,7 +217,7 @@ retest:
 		list_del(&work->w_list);
 		pthread_mutex_unlock(&wi->pending_lock);
 
-		work->fn(work, idx);
+		work->fn(work);
 
 		pthread_mutex_lock(&wi->finished_lock);
 		list_add_tail(&work->w_list, &wi->finished_list);

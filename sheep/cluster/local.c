@@ -364,7 +364,7 @@ static int local_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
 	return 0;
 }
 
-static void local_block(struct work *work, int idx)
+static void local_block(struct work *work)
 {
 	struct local_event *ev;
 
@@ -381,7 +381,7 @@ static void local_block(struct work *work, int idx)
 	shm_queue_unlock();
 }
 
-static void local_block_done(struct work *work, int idx)
+static void local_block_done(struct work *work)
 {
 }
 

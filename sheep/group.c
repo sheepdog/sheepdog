@@ -215,7 +215,7 @@ static void do_cluster_op(void *arg)
 	msg->rsp.result = ret;
 }
 
-void do_cluster_request(struct work *work, int idx)
+void do_cluster_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
@@ -886,7 +886,7 @@ static void cpg_event_free(struct cpg_event *cevent)
 
 static struct work cpg_event_work;
 
-static void cpg_event_fn(struct work *work, int idx)
+static void cpg_event_fn(struct work *work)
 {
 	struct cpg_event *cevent = sys->cur_cevent;
 
@@ -913,7 +913,7 @@ static void cpg_event_fn(struct work *work, int idx)
 	}
 }
 
-static void cpg_event_done(struct work *work, int idx)
+static void cpg_event_done(struct work *work)
 {
 	struct cpg_event *cevent;
 
@@ -1132,7 +1132,7 @@ do_retry:
 	while (!list_empty(&failed_req_list)) {
 		struct request *req = list_first_entry(&failed_req_list,
 						       struct request, r_wlist);
-		req->work.done(&req->work, 0);
+		req->work.done(&req->work);
 
 		retry = 1;
 	}

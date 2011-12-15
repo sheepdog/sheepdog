@@ -209,14 +209,14 @@ retry:
 	return 0;
 }
 
-static void corosync_block(struct work *work, int idx)
+static void corosync_block(struct work *work)
 {
 	struct corosync_block_msg *bm = container_of(work, typeof(*bm), work);
 
 	bm->cb(bm->msg);
 }
 
-static void corosync_block_done(struct work *work, int idx)
+static void corosync_block_done(struct work *work)
 {
 	struct corosync_block_msg *bm = container_of(work, typeof(*bm), work);
 

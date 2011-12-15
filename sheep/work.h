@@ -4,7 +4,7 @@
 struct work;
 struct work_queue;
 
-typedef void (*work_func_t)(struct work *, int idx);
+typedef void (*work_func_t)(struct work *);
 
 enum work_attr {
 	WORK_SIMPLE,

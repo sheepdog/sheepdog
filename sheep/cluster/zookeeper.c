@@ -441,7 +441,7 @@ static int zk_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
 	return add_event(zhandle, EVENT_NOTIFY, &this_node, msg, msg_len, block_cb);
 }
 
-static void zk_block(struct work *work, int idx)
+static void zk_block(struct work *work)
 {
 	struct zk_event ev;
 
@@ -453,7 +453,7 @@ static void zk_block(struct work *work, int idx)
 	zk_queue_push_back(zhandle, &ev);
 }
 
-static void zk_block_done(struct work *work, int idx)
+static void zk_block_done(struct work *work)
 {
 }
 

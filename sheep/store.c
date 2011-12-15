@@ -214,7 +214,7 @@ out:
 
 static int do_local_io(struct request *req, uint32_t epoch);
 
-static int forward_read_obj_req(struct request *req, int idx)
+static int forward_read_obj_req(struct request *req)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen, rlen;
@@ -249,7 +249,7 @@ static int forward_read_obj_req(struct request *req, int idx)
 
 	n = obj_to_sheep(e, nr, oid, 0);
 
-	fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch, idx);
+	fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch);
 	if (fd < 0) {
 		ret = SD_RES_NETWORK_ERROR;
 		goto out;
@@ -270,7 +270,7 @@ out:
 	return ret;
 }
 
-static int forward_write_obj_req(struct request *req, int idx)
+static int forward_write_obj_req(struct request *req)
 {
 	int i, n, nr, fd, ret;
 	unsigned wlen;
@@ -314,7 +314,7 @@ static int forward_write_obj_req(struct request *req, int idx)
 			continue;
 		}
 
-		fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch, idx);
+		fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch);
 		if (fd < 0) {
 			eprintf("failed to connect to %s:%"PRIu32"\n", name, e[n].port);
 			ret = SD_RES_NETWORK_ERROR;
@@ -666,7 +666,7 @@ static int do_local_io(struct request *req, uint32_t epoch)
 	return ret;
 }
 
-static int fix_object_consistency(struct request *req, int idx)
+static int fix_object_consistency(struct request *req)
 {
 	int ret = SD_RES_NO_MEM;
 	unsigned int data_length;
@@ -697,7 +697,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->opcode = SD_OP_READ_OBJ;
 	hdr->flags = 0;
 	req->op = get_sd_op(SD_OP_READ_OBJ);
-	ret = forward_read_obj_req(req, idx);
+	ret = forward_read_obj_req(req);
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to read object %d\n", ret);
 		goto out;
@@ -707,7 +707,7 @@ static int fix_object_consistency(struct request *req, int idx)
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->oid = oid;
 	req->op = get_sd_op(SD_OP_WRITE_OBJ);
-	ret = forward_write_obj_req(req, idx);
+	ret = forward_write_obj_req(req);
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to write object %d\n", ret);
 		goto out;
@@ -722,7 +722,7 @@ out:
 	return ret;
 }
 
-void do_io_request(struct work *work, int idx)
+void do_io_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	int ret = SD_RES_SUCCESS;
@@ -732,7 +732,7 @@ void do_io_request(struct work *work, int idx)
 	uint32_t opcode = hdr->opcode;
 	uint32_t epoch = hdr->epoch;
 
-	dprintf("%"PRIu32", %x, %" PRIx64" , %u\n", idx, opcode, oid, epoch);
+	dprintf("%x, %" PRIx64" , %u\n", opcode, oid, epoch);
 
 	if (hdr->flags & SD_FLAG_CMD_RECOVERY)
 		epoch = hdr->tgt_epoch;
@@ -742,20 +742,20 @@ void do_io_request(struct work *work, int idx)
 	} else {
 		/* fix object consistency when we read the object for the first time */
 		if (req->check_consistency) {
-			ret = fix_object_consistency(req, idx);
+			ret = fix_object_consistency(req);
 			if (ret != SD_RES_SUCCESS)
 				goto out;
 		}
 
 		if (hdr->flags & SD_FLAG_CMD_WRITE)
-			ret = forward_write_obj_req(req, idx);
+			ret = forward_write_obj_req(req);
 		else
-			ret = forward_read_obj_req(req, idx);
+			ret = forward_read_obj_req(req);
 	}
 out:
 	if (ret != SD_RES_SUCCESS)
-		dprintf("failed: %"PRIu32", %x, %" PRIx64" , %u, %"PRIu32"\n",
-			idx, opcode, oid, epoch, ret);
+		dprintf("failed: %x, %" PRIx64" , %u, %"PRIu32"\n",
+			opcode, oid, epoch, ret);
 	rsp->result = ret;
 }
 
@@ -1323,7 +1323,7 @@ err:
 	return -1;
 }
 
-static void recover_one(struct work *work, int idx)
+static void recover_one(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	char *buf = NULL;
@@ -1401,8 +1401,6 @@ out:
 }
 
 static struct recovery_work *suspended_recovery_work;
-
-static void __start_recovery(struct work *work, int idx);
 
 static void recover_timer(void *data)
 {
@@ -1495,7 +1493,7 @@ int is_recoverying_oid(uint64_t oid)
 	return 0;
 }
 
-static void recover_done(struct work *work, int idx)
+static void recover_done(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint64_t oid;
@@ -1697,7 +1695,7 @@ fail:
 	return -1;
 }
 
-static void __start_recovery(struct work *work, int idx)
+static void __start_recovery(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint32_t epoch = rw->epoch;

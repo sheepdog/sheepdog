@@ -76,7 +76,7 @@ static void setup_access_to_local_objects(struct request *req)
 		req->local_oid = hdr->oid;
 }
 
-static void io_op_done(struct work *work, int idx)
+static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct cpg_event *cevent = &req->cev;
@@ -167,7 +167,7 @@ done:
 		req->done(req);
 }
 
-static void local_op_done(struct work *work, int idx)
+static void local_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 
@@ -179,18 +179,16 @@ static void local_op_done(struct work *work, int idx)
 	req->done(req);
 }
 
-static void cluster_op_done(struct work *work, int idx)
+static void cluster_op_done(struct work *work)
 {
 	/* request is forwarded to cpg group */
 }
 
-static void do_local_request(struct work *work, int idx)
+static void do_local_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	int ret = SD_RES_SUCCESS;
-
-	dprintf("%d\n", idx);
 
 	if (has_process_work(req->op))
 		ret = do_process_work(req->op, &req->rq, &req->rp, req->data);
@@ -793,20 +791,18 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 	return 0;
 }
 
-int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
-		 uint32_t epoch, int worker_idx)
+int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch)
 {
-	static int cached_fds[NR_GW_WORKER_THREAD][SD_MAX_NODES];
-	static uint32_t cached_epoch = 0;
-	int i, j, fd, ret;
+	static __thread int cached_fds[SD_MAX_NODES];
+	static __thread uint32_t cached_epoch = 0;
+	int i, fd, ret;
 	char name[INET6_ADDRSTRLEN];
 
 	if (cached_epoch == 0) {
 		/* initialize */
-		for (i = 0; i < NR_GW_WORKER_THREAD; i++) {
-			for (j = 0; j < SD_MAX_NODES; j++)
-				cached_fds[i][j] = -1;
-		}
+		for (i = 0; i < SD_MAX_NODES; i++)
+			cached_fds[i] = -1;
+
 		cached_epoch = epoch;
 	}
 
@@ -816,18 +812,16 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		return -1;
 	}
 	if (after(epoch, cached_epoch)) {
-		for (i = 0; i < NR_GW_WORKER_THREAD; i++) {
-			for (j = 0; j < SD_MAX_NODES; j++) {
-				if (cached_fds[i][j] >= 0)
-					close(cached_fds[i][j]);
+		for (i = 0; i < SD_MAX_NODES; i++) {
+			if (cached_fds[i] >= 0)
+				close(cached_fds[i]);
 
-				cached_fds[i][j] = -1;
-			}
+			cached_fds[i] = -1;
 		}
 		cached_epoch = epoch;
 	}
 
-	fd = cached_fds[worker_idx][node_idx];
+	fd = cached_fds[node_idx];
 	dprintf("%d, %d\n", epoch, fd);
 
 	if (cached_epoch == epoch && fd >= 0) {
@@ -855,7 +849,7 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx,
 		return -1;
 	}
 
-	cached_fds[worker_idx][node_idx] = fd;
+	cached_fds[node_idx] = fd;
 
 	return fd;
 }
