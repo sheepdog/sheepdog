@@ -270,6 +270,7 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 		  int vnodes, int zones, uint32_t node_version,
 		  uint64_t oid, int nr);
 
+void del_sheep_fd(int fd);
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 
 /* Operations */

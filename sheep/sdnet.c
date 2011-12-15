@@ -791,10 +791,27 @@ int remove_object(struct sheepdog_vnode_list_entry *e,
 	return 0;
 }
 
+static __thread int cached_fds[SD_MAX_NODES];
+static __thread uint32_t cached_epoch = 0;
+
+void del_sheep_fd(int fd)
+{
+	int i;
+
+	for (i = 0; i < SD_MAX_NODES; i++) {
+		if (cached_fds[i] == fd) {
+			if (fd >= 0)
+				close(fd);
+
+			cached_fds[i] = -1;
+
+			return;
+		}
+	}
+}
+
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch)
 {
-	static __thread int cached_fds[SD_MAX_NODES];
-	static __thread uint32_t cached_epoch = 0;
 	int i, fd, ret;
 	char name[INET6_ADDRSTRLEN];
 

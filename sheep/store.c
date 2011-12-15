@@ -260,9 +260,10 @@ static int forward_read_obj_req(struct request *req)
 
 	ret = exec_req(fd, (struct sd_req *)&hdr, req->data, &wlen, &rlen);
 
-	if (ret) /* network errors */
+	if (ret) { /* network errors */
+		del_sheep_fd(fd);
 		ret = SD_RES_NETWORK_ERROR;
-	else {
+	} else {
 		memcpy(&req->rp, rsp, sizeof(*rsp));
 		ret = rsp->result;
 	}
@@ -272,7 +273,7 @@ out:
 
 static int forward_write_obj_req(struct request *req)
 {
-	int i, n, nr, fd, ret;
+	int i, n, nr, fd, ret, pollret;
 	unsigned wlen;
 	char name[128];
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
@@ -323,6 +324,7 @@ static int forward_write_obj_req(struct request *req)
 
 		ret = send_req(fd, (struct sd_req *)&hdr, req->data, &wlen);
 		if (ret) { /* network errors */
+			del_sheep_fd(fd);
 			ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %"PRIu32"\n", ret);
 			goto out;
@@ -362,6 +364,7 @@ again:
 			break;
 
 		if (pfds[i].revents & POLLERR || pfds[i].revents & POLLHUP || pfds[i].revents & POLLNVAL) {
+			del_sheep_fd(pfds[i].fd);
 			ret = SD_RES_NETWORK_ERROR;
 			break;
 		}
@@ -371,6 +374,7 @@ again:
 
 		if (do_read(pfds[i].fd, rsp, sizeof(*rsp))) {
 			eprintf("failed to read a response: %m\n");
+			del_sheep_fd(pfds[i].fd);
 			ret = SD_RES_NETWORK_ERROR;
 			break;
 		}
