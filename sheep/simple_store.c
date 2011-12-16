@@ -180,6 +180,24 @@ out:
 	return ret;
 }
 
+static int simple_store_link(uint64_t oid, struct siocb *iocb, int tgt_epoch)
+{
+       char old[PATH_MAX], new[PATH_MAX];
+
+       snprintf(old, sizeof(old), "%s%08u/%016" PRIx64, obj_path,
+                tgt_epoch, oid);
+       snprintf(new, sizeof(new), "%s%08u/%016" PRIx64, obj_path,
+                iocb->epoch, oid);
+       dprintf("link from %s to %s\n", old, new);
+       if (link(old, new) == 0)
+               return SD_RES_SUCCESS;
+
+       if (errno == ENOENT)
+               return SD_RES_NO_OBJ;
+
+       return SD_RES_EIO;
+}
+
 struct store_driver store = {
 	.driver_name = "simple",
 	.init = simple_store_init,
@@ -187,7 +205,8 @@ struct store_driver store = {
 	.write = simple_store_write,
 	.read = simple_store_read,
 	.close = simple_store_close,
-	.get_objlist = simple_store_get_objlist
+	.get_objlist = simple_store_get_objlist,
+	.link = simple_store_link,
 };
 
 void register_store_driver(struct store_driver *driver)

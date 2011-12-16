@@ -1179,17 +1179,14 @@ next:
 	e = old_entry + tgt_idx;
 
 	if (is_myself(e->addr, e->port)) {
-		char old[PATH_MAX], new[PATH_MAX];
+		struct siocb iocb = { 0 };
 
-		snprintf(old, sizeof(old), "%s%08u/%016" PRIx64, obj_path,
-			 tgt_epoch, oid);
-		snprintf(new, sizeof(new), "%s%08u/%016" PRIx64, obj_path,
-			 epoch, oid);
-		dprintf("link from %s to %s\n", old, new);
-		if (link(old, new) == 0)
+		iocb.epoch = epoch;
+		ret = store.link(oid, &iocb, tgt_epoch);
+		if (ret == SD_RES_SUCCESS)
 			goto out;
 
-		if (errno == ENOENT) {
+		if (ret == SD_RES_NO_OBJ) {
 			next_nr = epoch_log_read(tgt_epoch - 1, buf, buf_len);
 			if (next_nr <= 0) {
 				eprintf("no previous epoch: %"PRIu32"\n", tgt_epoch - 1);
@@ -1203,7 +1200,7 @@ next:
 			goto not_found;
 		}
 
-		eprintf("cannot recover from local %s to %s\n", old, new);
+		eprintf("Cannot recover from local store for %"PRIx64"\n", oid);
 		goto err;
 	}
 
