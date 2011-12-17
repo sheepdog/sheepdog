@@ -77,18 +77,20 @@ static int simple_store_open(uint64_t oid, struct siocb *iocb, int create)
 
 	ret = open(path.buf, flags, def_fmode);
 	if (ret < 0) {
-		eprintf("failed to open %s: %m\n", path.buf);
 		if (errno == ENOENT) {
 			struct stat s;
 
-			ret = SD_RES_NO_OBJ;
 			if (stat(obj_path, &s) < 0) {
-				/* store directory is corrupted */
-				eprintf("corrupted\n");
+				eprintf("store directory corrupted: %m\n");
 				ret = SD_RES_EIO;
+			} else {
+				dprintf("object %08u/%016" PRIx64 " not found locally\n", iocb->epoch, oid);
+				ret = SD_RES_NO_OBJ;
 			}
-		} else
+		} else {
+			eprintf("failed to open %s: %m\n", path.buf);
 			ret = SD_RES_UNKNOWN;
+		}
 		goto out;
 	}
 
