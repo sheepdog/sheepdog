@@ -805,11 +805,13 @@ out:
 
 int epoch_log_read_nr(uint32_t epoch, char *buf, int len)
 {
-        int nr;
+	int nr;
 
-        nr = epoch_log_read(epoch, buf, len);
-        nr /= sizeof(struct sheepdog_node_list_entry);
-        return nr;
+	nr = epoch_log_read(epoch, buf, len);
+	if (nr < 0)
+		return nr;
+	nr /= sizeof(struct sheepdog_node_list_entry);
+	return nr;
 }
 
 int epoch_log_read(uint32_t epoch, char *buf, int len)
