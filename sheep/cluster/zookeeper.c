@@ -44,13 +44,13 @@ enum zk_event_type {
 
 struct zk_event {
 	enum zk_event_type type;
-	struct sheepdog_node_list_entry sender;
+	struct sd_node sender;
 
 	size_t buf_len;
 	uint8_t buf[MAX_EVENT_BUF_SIZE];
 
 	size_t nr_nodes; /* the number of sheep */
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 
 	enum cluster_join_result join_result;
 
@@ -220,14 +220,14 @@ static int efd;
 
 static struct work_queue *zk_block_wq;
 
-static struct sheepdog_node_list_entry this_node;
+static struct sd_node this_node;
 
 static struct cdrv_handlers zk_hdlrs;
 static enum cluster_join_result (*zk_check_join_cb)(
-	struct sheepdog_node_list_entry *joining, void *opaque);
+	struct sd_node *joining, void *opaque);
 
 /* get node list from the last pushed data */
-static size_t get_nodes(zhandle_t *zh, struct sheepdog_node_list_entry *nodes)
+static size_t get_nodes(zhandle_t *zh, struct sd_node *nodes)
 {
 	int rc, len;
 	struct zk_event ev;
@@ -252,11 +252,11 @@ static size_t get_nodes(zhandle_t *zh, struct sheepdog_node_list_entry *nodes)
 }
 
 static int add_event(zhandle_t *zh, enum zk_event_type type,
-		     struct sheepdog_node_list_entry *node, void *buf,
+		     struct sd_node *node, void *buf,
 		     size_t buf_len, void (*block_cb)(void *arg))
 {
 	int idx;
-	struct sheepdog_node_list_entry *n;
+	struct sd_node *n;
 	struct zk_event ev;
 
 	zk_lock(zh);
@@ -303,7 +303,7 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path, void* 
 	char str[256];
 	int ret, i;
 	size_t nr_nodes;
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 
 	if (type == ZOO_DELETED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%[^\n]", str);
@@ -408,9 +408,9 @@ static int zk_init(struct cdrv_handlers *handlers, const char *option,
 	return efd;
 }
 
-static int zk_join(struct sheepdog_node_list_entry *myself,
+static int zk_join(struct sd_node *myself,
 		   enum cluster_join_result (*check_join_cb)(
-			   struct sheepdog_node_list_entry *joining,
+			   struct sd_node *joining,
 			   void *opaque),
 		   void *opaque, size_t opaque_len)
 {

@@ -84,7 +84,7 @@ struct request {
 
 	uint64_t local_oid;
 
-	struct sheepdog_vnode_list_entry *entry;
+	struct sd_vnode *entry;
 	int nr_vnodes;
 	int nr_zones;
 	int check_consistency;
@@ -110,7 +110,7 @@ struct cluster_info {
 
 	/* set after finishing the JOIN procedure */
 	int join_finished;
-	struct sheepdog_node_list_entry this_node;
+	struct sd_node this_node;
 
 	uint32_t epoch;
 	uint32_t status;
@@ -121,11 +121,11 @@ struct cluster_info {
 	 */
 	struct list_head leave_list;
 
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
 
 	/* this array contains a list of ordered virtual nodes */
-	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
+	struct sd_vnode vnodes[SD_MAX_VNODES];
 	int nr_vnodes;
 
 	struct list_head pending_list;
@@ -202,13 +202,13 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
 		 int write, int excl, int delete);
 
-int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes);
+int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
 void setup_ordered_sd_vnode_list(struct request *req);
-int get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry **entries,
+int get_ordered_sd_vnode_list(struct sd_vnode **entries,
 			      int *nr_vnodes, int *nr_zones);
-void free_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries);
+void free_ordered_sd_vnode_list(struct sd_vnode *entries);
 int is_access_to_busy_objects(uint64_t oid);
-int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
+int is_access_local(struct sd_vnode *e, int nr_nodes,
 		    uint64_t oid, int copies);
 
 void resume_pending_requests(void);
@@ -225,7 +225,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset, int copies, uint32_t epoch);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
-	       struct sheepdog_node_list_entry *entries, int *nr_entries);
+	       struct sd_node *entries, int *nr_entries);
 void do_cluster_request(struct work *work);
 
 int update_epoch_store(uint32_t epoch);
@@ -258,15 +258,15 @@ int start_recovery(uint32_t epoch);
 void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
 
-int write_object(struct sheepdog_vnode_list_entry *e,
+int write_object(struct sd_vnode *e,
 		 int vnodes, int zones, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr, int create);
-int read_object(struct sheepdog_vnode_list_entry *e,
+int read_object(struct sd_vnode *e,
 		int vnodes, int zones, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
-int remove_object(struct sheepdog_vnode_list_entry *e,
+int remove_object(struct sd_vnode *e,
 		  int vnodes, int zones, uint32_t node_version,
 		  uint64_t oid, int nr);
 

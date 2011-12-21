@@ -21,7 +21,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 			  uint32_t base_vid, uint32_t cur_vid, uint32_t copies,
 			  uint32_t snapid, int is_snapshot)
 {
-	struct sheepdog_vnode_list_entry *entries = NULL;
+	struct sd_vnode *entries = NULL;
 	/* we are not called concurrently */
 	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
 	struct timeval tv;
@@ -156,7 +156,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 			  unsigned long *deleted_nr, uint32_t *next_snap,
 			  unsigned int *nr_copies, uint64_t *ctime)
 {
-	struct sheepdog_vnode_list_entry *entries = NULL;
+	struct sd_vnode *entries = NULL;
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
 	int nr_vnodes, nr_zones, nr_reqs;
@@ -345,7 +345,7 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
-	struct sheepdog_vnode_list_entry *entries = NULL;
+	struct sd_vnode *entries = NULL;
 	int nr_vnodes, nr_zones, nr_reqs;
 	struct sheepdog_inode *inode = NULL;
 
@@ -434,7 +434,7 @@ static void delete_one(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(((uint32_t *)dw->buf) + dw->count - dw->done - 1);
-	struct sheepdog_vnode_list_entry *entries = NULL;
+	struct sd_vnode *entries = NULL;
 	int nr_vnodes, nr_zones;
 	int ret, i;
 	struct sheepdog_inode *inode = NULL;
@@ -502,7 +502,7 @@ static void delete_one_done(struct work *work)
 }
 
 static int fill_vdi_list(struct deletion_work *dw,
-			 struct sheepdog_vnode_list_entry *entries,
+			 struct sd_vnode *entries,
 			 int nr_vnodes, int nr_zones, uint32_t root_vid)
 {
 	int ret, i;
@@ -548,7 +548,7 @@ out:
 	return 1;
 }
 
-static uint64_t get_vdi_root(struct sheepdog_vnode_list_entry *entries,
+static uint64_t get_vdi_root(struct sd_vnode *entries,
 			     int nr_vnodes, int nr_zones, uint32_t epoch,
 			     uint32_t vid)
 {
@@ -587,7 +587,7 @@ out:
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw = NULL;
-	struct sheepdog_vnode_list_entry *entries = NULL;
+	struct sd_vnode *entries = NULL;
 	int nr_vnodes, nr_zones, ret;
 	uint32_t root_vid;
 
@@ -653,7 +653,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
 		 int write, int excl, int delete)
 {
-	struct sheepdog_vnode_list_entry *entries = NULL;
+	struct sd_vnode *entries = NULL;
 	struct sheepdog_vdi_attr tmp_attr;
 	uint64_t oid, hval;
 	uint32_t end;

@@ -52,8 +52,8 @@ static void usage(struct command *commands, int status);
 
 uint64_t node_list_version;
 
-struct sheepdog_node_list_entry node_list_entries[SD_MAX_NODES];
-struct sheepdog_vnode_list_entry vnode_list_entries[SD_MAX_VNODES];
+struct sd_node node_list_entries[SD_MAX_NODES];
+struct sd_vnode vnode_list_entries[SD_MAX_VNODES];
 int nr_nodes, nr_vnodes;
 unsigned master_idx;
 
@@ -62,7 +62,7 @@ static int update_node_list(int max_nodes, int epoch)
 	int fd, ret;
 	unsigned int size, wlen;
 	char *buf = NULL;
-	struct sheepdog_node_list_entry *ent;
+	struct sd_node *ent;
 	struct sd_node_req hdr;
 	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&hdr;
 

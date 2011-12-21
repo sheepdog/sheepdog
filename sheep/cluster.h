@@ -32,14 +32,14 @@ enum cluster_join_result {
 };
 
 struct cdrv_handlers {
-	void (*join_handler)(struct sheepdog_node_list_entry *joined,
-			     struct sheepdog_node_list_entry *members,
+	void (*join_handler)(struct sd_node *joined,
+			     struct sd_node *members,
 			     size_t nr_members, enum cluster_join_result result,
 			     void *opaque);
-	void (*leave_handler)(struct sheepdog_node_list_entry *left,
-			      struct sheepdog_node_list_entry *members,
+	void (*leave_handler)(struct sd_node *left,
+			      struct sd_node *members,
 			      size_t nr_members);
-	void (*notify_handler)(struct sheepdog_node_list_entry *sender,
+	void (*notify_handler)(struct sd_node *sender,
 			       void *msg, size_t msg_len);
 };
 
@@ -69,9 +69,9 @@ struct cluster_driver {
 	 *
 	 * Returns zero on success, -1 on error
 	 */
-	int (*join)(struct sheepdog_node_list_entry *myself,
+	int (*join)(struct sd_node *myself,
 		    enum cluster_join_result (*check_join_cb)(
-			    struct sheepdog_node_list_entry *joining,
+			    struct sd_node *joining,
 			    void *opaque),
 		    void *opaque, size_t opaque_len);
 
@@ -157,7 +157,7 @@ static inline const char *get_cdrv_option(struct cluster_driver *cdrv,
 		return NULL;
 }
 
-static inline char *node_to_str(struct sheepdog_node_list_entry *id)
+static inline char *node_to_str(struct sd_node *id)
 {
 	static char str[256];
 	char name[256];

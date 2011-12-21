@@ -30,13 +30,13 @@ const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
 static int sigfd;
 static int event_pos;
-static struct sheepdog_node_list_entry this_node;
+static struct sd_node this_node;
 
 static struct work_queue *local_block_wq;
 
 static struct cdrv_handlers lhdlrs;
 static enum cluster_join_result (*local_check_join_cb)(
-	struct sheepdog_node_list_entry *joining, void *opaque);
+	struct sd_node *joining, void *opaque);
 
 enum local_event_type {
 	EVENT_JOIN = 1,
@@ -46,13 +46,13 @@ enum local_event_type {
 
 struct local_event {
 	enum local_event_type type;
-	struct sheepdog_node_list_entry sender;
+	struct sd_node sender;
 
 	size_t buf_len;
 	uint8_t buf[MAX_EVENT_BUF_SIZE];
 
 	size_t nr_nodes; /* the number of sheep processes */
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	pid_t pids[SD_MAX_NODES];
 
 	enum cluster_join_result join_result;
@@ -88,7 +88,7 @@ static int shm_queue_empty(void)
 	return event_pos == shm_queue->pos;
 }
 
-static size_t get_nodes(struct sheepdog_node_list_entry *n, pid_t *p)
+static size_t get_nodes(struct sd_node *n, pid_t *p)
 {
 	struct local_event *ev;
 
@@ -218,11 +218,11 @@ static void shm_queue_init(void)
 }
 
 static void add_event(enum local_event_type type,
-		      struct sheepdog_node_list_entry *node, void *buf,
+		      struct sd_node *node, void *buf,
 		      size_t buf_len, void (*block_cb)(void *arg))
 {
 	int idx;
-	struct sheepdog_node_list_entry *n;
+	struct sd_node *n;
 	pid_t *p;
 	struct local_event ev = {
 		.type = type,
@@ -268,7 +268,7 @@ static void check_pids(void *arg)
 {
 	int i;
 	size_t nr;
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	pid_t pids[SD_MAX_NODES];
 
 	shm_queue_lock();
@@ -324,9 +324,9 @@ static int local_init(struct cdrv_handlers *handlers, const char *option,
 	return sigfd;
 }
 
-static int local_join(struct sheepdog_node_list_entry *myself,
+static int local_join(struct sd_node *myself,
 		      enum cluster_join_result (*check_join_cb)(
-			      struct sheepdog_node_list_entry *joining,
+			      struct sd_node *joining,
 			      void *opaque),
 		      void *opaque, size_t opaque_len)
 {

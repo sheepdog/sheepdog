@@ -29,7 +29,7 @@ static int cdrv_fd;
 static struct coroutine *cdrv_co;
 
 struct node {
-	struct sheepdog_node_list_entry ent;
+	struct sd_node ent;
 	struct list_head list;
 };
 
@@ -46,8 +46,8 @@ struct join_message {
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
 	uint8_t pad[3];
 	union {
-		struct sheepdog_node_list_entry nodes[0];
-		struct sheepdog_node_list_entry leave_nodes[0];
+		struct sd_node nodes[0];
+		struct sd_node leave_nodes[0];
 	};
 };
 
@@ -60,7 +60,7 @@ struct vdi_op_message {
 struct work_notify {
 	struct cpg_event cev;
 
-	struct sheepdog_node_list_entry sender;
+	struct sd_node sender;
 
 	struct request *req;
 	void *msg;
@@ -69,9 +69,9 @@ struct work_notify {
 struct work_join {
 	struct cpg_event cev;
 
-	struct sheepdog_node_list_entry *member_list;
+	struct sd_node *member_list;
 	size_t member_list_entries;
-	struct sheepdog_node_list_entry joined;
+	struct sd_node joined;
 
 	struct join_message *jm;
 };
@@ -79,9 +79,9 @@ struct work_join {
 struct work_leave {
 	struct cpg_event cev;
 
-	struct sheepdog_node_list_entry *member_list;
+	struct sd_node *member_list;
 	size_t member_list_entries;
-	struct sheepdog_node_list_entry left;
+	struct sd_node left;
 };
 
 #define print_node_list(nodes, nr_nodes)			\
@@ -106,7 +106,7 @@ static size_t get_join_message_size(struct join_message *jm)
 	return sizeof(*jm) + jm->nr_nodes * sizeof(jm->nodes[0]);
 }
 
-int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes)
+int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 {
 	int nr_zones = 0, i, j;
 	uint32_t zones[SD_MAX_REDUNDANCY];
@@ -127,7 +127,7 @@ int get_zones_nr_from(struct sheepdog_node_list_entry *nodes, int nr_nodes)
 }
 
 struct vnodes_cache {
-	struct sheepdog_vnode_list_entry vnodes[SD_MAX_VNODES];
+	struct sd_vnode vnodes[SD_MAX_VNODES];
 	int nr_vnodes;
 	int nr_zones;
 	uint32_t epoch;
@@ -136,7 +136,7 @@ struct vnodes_cache {
 	struct list_head list;
 };
 
-int get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry **entries,
+int get_ordered_sd_vnode_list(struct sd_vnode **entries,
 			      int *nr_vnodes, int *nr_zones)
 {
 	static LIST_HEAD(vnodes_list);
@@ -175,7 +175,7 @@ int get_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry **entries,
 	return SD_RES_SUCCESS;
 }
 
-void free_ordered_sd_vnode_list(struct sheepdog_vnode_list_entry *entries)
+void free_ordered_sd_vnode_list(struct sd_vnode *entries)
 {
 	struct vnodes_cache *cache;
 
@@ -279,7 +279,7 @@ static inline int get_nodes_nr_from(struct list_head *l)
 
 static int get_nodes_nr_epoch(int epoch)
 {
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	int nr;
 
 	nr = epoch_log_read(epoch, (char *)nodes, sizeof(nodes));
@@ -287,7 +287,7 @@ static int get_nodes_nr_epoch(int epoch)
 	return nr;
 }
 
-static struct sheepdog_node_list_entry *find_entry_list(struct sheepdog_node_list_entry *entry,
+static struct sd_node *find_entry_list(struct sd_node *entry,
 							struct list_head *head)
 {
 	struct node *n;
@@ -299,10 +299,10 @@ static struct sheepdog_node_list_entry *find_entry_list(struct sheepdog_node_lis
 
 }
 
-static struct sheepdog_node_list_entry *find_entry_epoch(struct sheepdog_node_list_entry *entry,
+static struct sd_node *find_entry_epoch(struct sd_node *entry,
 							 int epoch)
 {
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	int nr, i;
 
 	nr = epoch_log_read_nr(epoch, (char *)nodes, sizeof(nodes));
@@ -314,11 +314,11 @@ static struct sheepdog_node_list_entry *find_entry_epoch(struct sheepdog_node_li
 	return NULL;
 }
 
-static int cluster_sanity_check(struct sheepdog_node_list_entry *entries,
+static int cluster_sanity_check(struct sd_node *entries,
 			     int nr_entries, uint64_t ctime, uint32_t epoch)
 {
 	int ret = SD_RES_SUCCESS, nr_local_entries;
-	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
+	struct sd_node local_entries[SD_MAX_NODES];
 	uint32_t lepoch;
 
 	if (sys_stat_wait_format() || sys_stat_shutdown())
@@ -359,14 +359,14 @@ out:
 	return ret;
 }
 
-static int get_cluster_status(struct sheepdog_node_list_entry *from,
-			      struct sheepdog_node_list_entry *entries,
+static int get_cluster_status(struct sd_node *from,
+			      struct sd_node *entries,
 			      int nr_entries, uint64_t ctime, uint32_t epoch,
 			      uint32_t *status, uint8_t *inc_epoch)
 {
 	int i, j, ret = SD_RES_SUCCESS;
 	int nr, nr_local_entries, nr_leave_entries;
-	struct sheepdog_node_list_entry local_entries[SD_MAX_NODES];
+	struct sd_node local_entries[SD_MAX_NODES];
 	char str[256];
 	uint32_t sys_stat = sys_stat_get();
 
@@ -434,7 +434,7 @@ out:
 	return ret;
 }
 
-static void join(struct sheepdog_node_list_entry *joining, struct join_message *msg)
+static void join(struct sd_node *joining, struct join_message *msg)
 {
 	if (msg->proto_ver != SD_SHEEP_PROTO_VER) {
 		eprintf("joining node sent a message with the wrong protocol version\n");
@@ -450,7 +450,7 @@ static void join(struct sheepdog_node_list_entry *joining, struct join_message *
 	msg->ctime = get_cluster_ctime();
 }
 
-static int get_vdi_bitmap_from(struct sheepdog_node_list_entry *node)
+static int get_vdi_bitmap_from(struct sd_node *node)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -507,8 +507,8 @@ static void get_vdi_bitmap_from_sd_list(void)
 }
 
 static void update_cluster_info(struct join_message *msg,
-				struct sheepdog_node_list_entry *joined,
-				struct sheepdog_node_list_entry *nodes,
+				struct sd_node *joined,
+				struct sd_node *nodes,
 				size_t nr_nodes)
 {
 	int i, le;
@@ -612,7 +612,7 @@ static void __sd_notify_done(struct cpg_event *cevent)
 	req->done(req);
 }
 
-static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
+static void sd_notify_handler(struct sd_node *sender,
 			      void *msg, size_t msg_len)
 {
 	struct cpg_event *cevent;
@@ -656,7 +656,7 @@ static void sd_notify_handler(struct sheepdog_node_list_entry *sender,
 /*
  * Check whether the majority of Sheepdog nodes are still alive or not
  */
-static int check_majority(struct sheepdog_node_list_entry *nodes, int nr_nodes)
+static int check_majority(struct sd_node *nodes, int nr_nodes)
 {
 	int nr_majority, nr_reachable = 0, fd, i;
 	char name[INET6_ADDRSTRLEN];
@@ -715,13 +715,13 @@ static void __sd_leave(struct cpg_event *cevent)
 }
 
 static enum cluster_join_result sd_check_join_cb(
-	struct sheepdog_node_list_entry *joining, void *opaque)
+	struct sd_node *joining, void *opaque)
 {
 	struct join_message *jm = opaque;
 	struct node *node;
 
 	if (node_cmp(joining, &sys->this_node) == 0) {
-		struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+		struct sd_node entries[SD_MAX_NODES];
 		int nr_entries;
 		uint64_t ctime;
 		uint32_t epoch;
@@ -773,7 +773,7 @@ static enum cluster_join_result sd_check_join_cb(
 		return CJ_RES_FAIL;
 }
 
-static int send_join_request(struct sheepdog_node_list_entry *ent)
+static int send_join_request(struct sd_node *ent)
 {
 	struct join_message *msg;
 	int nr_entries, ret;
@@ -1161,8 +1161,8 @@ do_retry:
 	queue_work(sys->cpg_wqueue, &cpg_event_work);
 }
 
-static void sd_join_handler(struct sheepdog_node_list_entry *joined,
-			    struct sheepdog_node_list_entry *members,
+static void sd_join_handler(struct sd_node *joined,
+			    struct sd_node *members,
 			    size_t nr_members, enum cluster_join_result result,
 			    void *opaque)
 {
@@ -1204,7 +1204,7 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 
 		vprintf(SDOG_DEBUG, "allow new confchg %p\n", cevent);
 
-		size = sizeof(struct sheepdog_node_list_entry) * nr_members;
+		size = sizeof(struct sd_node) * nr_members;
 		w->member_list = zalloc(size);
 		if (!w->member_list)
 			panic("failed to allocate memory");
@@ -1307,8 +1307,8 @@ static void sd_join_handler(struct sheepdog_node_list_entry *joined,
 	}
 }
 
-static void sd_leave_handler(struct sheepdog_node_list_entry *left,
-			     struct sheepdog_node_list_entry *members,
+static void sd_leave_handler(struct sd_node *left,
+			     struct sd_node *members,
 			     size_t nr_members)
 {
 	struct cpg_event *cevent;
@@ -1332,7 +1332,7 @@ static void sd_leave_handler(struct sheepdog_node_list_entry *left,
 
 	vprintf(SDOG_DEBUG, "allow new confchg %p\n", cevent);
 
-	size = sizeof(struct sheepdog_node_list_entry) * nr_members;
+	size = sizeof(struct sd_node) * nr_members;
 	w->member_list = zalloc(size);
 	if (!w->member_list)
 		goto oom;

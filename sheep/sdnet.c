@@ -35,7 +35,7 @@ void resume_pending_requests(void)
 		start_cpg_event_work();
 }
 
-int is_access_local(struct sheepdog_vnode_list_entry *e, int nr_nodes,
+int is_access_local(struct sd_vnode *e, int nr_nodes,
 		    uint64_t oid, int copies)
 {
 	int i, n;
@@ -611,7 +611,7 @@ int create_listen_port(int port, void *data)
 	return create_listen_ports(port, create_listen_port_fn, data);
 }
 
-int write_object(struct sheepdog_vnode_list_entry *e,
+int write_object(struct sd_vnode *e,
 		 int vnodes, int zones, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr, int create)
@@ -674,7 +674,7 @@ int write_object(struct sheepdog_vnode_list_entry *e,
 	return 0;
 }
 
-int read_object(struct sheepdog_vnode_list_entry *e,
+int read_object(struct sd_vnode *e,
 		int vnodes, int zones, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr)
@@ -745,7 +745,7 @@ int read_object(struct sheepdog_vnode_list_entry *e,
 	return last_error;
 }
 
-int remove_object(struct sheepdog_vnode_list_entry *e,
+int remove_object(struct sd_vnode *e,
 		  int vnodes, int zones, uint32_t node_version,
 		  uint64_t oid, int nr)
 {

@@ -218,8 +218,8 @@ static int local_read_vdis(const struct sd_req *req, struct sd_rsp *rsp,
 	return read_vdis(data, req->data_length, &rsp->data_length);
 }
 
-static int get_node_idx(struct sheepdog_node_list_entry *ent,
-			struct sheepdog_node_list_entry *entries, int nr_nodes)
+static int get_node_idx(struct sd_node *ent,
+			struct sd_node *entries, int nr_nodes)
 {
 	ent = bsearch(ent, entries, nr_nodes, sizeof(*ent), node_cmp);
 	if (!ent)
@@ -236,7 +236,7 @@ static int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 
 	nr_nodes = sys->nr_nodes;
 	memcpy(data, sys->nodes, sizeof(*sys->nodes) * nr_nodes);
-	node_rsp->data_length = nr_nodes * sizeof(struct sheepdog_node_list_entry);
+	node_rsp->data_length = nr_nodes * sizeof(struct sd_node);
 	node_rsp->nr_nodes = nr_nodes;
 	node_rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
 	node_rsp->master_idx = -1;

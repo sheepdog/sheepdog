@@ -141,7 +141,7 @@ static int read_copy_from_cluster(struct request *req, uint32_t epoch,
 	int i, n, nr, ret;
 	unsigned wlen, rlen;
 	char name[128];
-	struct sheepdog_vnode_list_entry *e;
+	struct sd_vnode *e;
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct siocb iocb;
@@ -220,7 +220,7 @@ static int forward_read_obj_req(struct request *req)
 	unsigned wlen, rlen;
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	struct sheepdog_vnode_list_entry *e;
+	struct sd_vnode *e;
 	uint64_t oid = hdr.oid;
 	int copies;
 
@@ -278,7 +278,7 @@ static int forward_write_obj_req(struct request *req)
 	char name[128];
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
-	struct sheepdog_vnode_list_entry *e;
+	struct sd_vnode *e;
 	uint64_t oid = hdr.oid;
 	int copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
@@ -434,7 +434,7 @@ int update_epoch_log(int epoch)
 		goto err_open;
 	}
 
-	len = sys->nr_nodes * sizeof(struct sheepdog_node_list_entry);
+	len = sys->nr_nodes * sizeof(struct sd_node);
 	ret = write(fd, (char *)sys->nodes, len);
 	if (ret != len)
 		goto err;
@@ -779,7 +779,7 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 	int fd, i, ret;
 	unsigned int rlen, wlen, nr, le = get_latest_epoch();
 	char host[128];
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 
 	nr = epoch_log_read(le, (char *)nodes, ARRAY_SIZE(nodes));
 	nr /= sizeof(nodes[0]);
@@ -823,7 +823,7 @@ int epoch_log_read_nr(uint32_t epoch, char *buf, int len)
 	nr = epoch_log_read(epoch, buf, len);
 	if (nr < 0)
 		return nr;
-	nr /= sizeof(struct sheepdog_node_list_entry);
+	nr /= sizeof(struct sd_node);
 	return nr;
 }
 
@@ -990,7 +990,7 @@ uint64_t get_cluster_ctime(void)
 	return ct;
 }
 
-static int get_max_copies(struct sheepdog_node_list_entry *entries, int nr)
+static int get_max_copies(struct sd_node *entries, int nr)
 {
 	int i, j;
 	unsigned int nr_zones = 0;
@@ -1018,8 +1018,8 @@ static int get_max_copies(struct sheepdog_node_list_entry *entries, int nr)
  * from the base_idx'th on the consistent hash ring, where N is the
  * number of copies of objects.
  */
-static int contains_node(struct sheepdog_vnode_list_entry *key,
-			 struct sheepdog_vnode_list_entry *entry,
+static int contains_node(struct sd_vnode *key,
+			 struct sd_vnode *entry,
 			 int nr, int base_idx, int copies)
 {
 	int i;
@@ -1053,13 +1053,13 @@ struct recovery_work {
 	uint64_t *oids;
 
 	int old_nr_nodes;
-	struct sheepdog_node_list_entry old_nodes[SD_MAX_NODES];
+	struct sd_node old_nodes[SD_MAX_NODES];
 	int cur_nr_nodes;
-	struct sheepdog_node_list_entry cur_nodes[SD_MAX_NODES];
+	struct sd_node cur_nodes[SD_MAX_NODES];
 	int old_nr_vnodes;
-	struct sheepdog_vnode_list_entry old_vnodes[SD_MAX_VNODES];
+	struct sd_vnode old_vnodes[SD_MAX_VNODES];
 	int cur_nr_vnodes;
-	struct sheepdog_vnode_list_entry cur_vnodes[SD_MAX_VNODES];
+	struct sd_vnode cur_vnodes[SD_MAX_VNODES];
 };
 
 static struct recovery_work *next_rw;
@@ -1097,9 +1097,9 @@ static struct recovery_work *recovering_work;
  * The node D, E, F, and A can recover objects from local, and the
  * node G recovers from the node B.
  */
-static int find_tgt_node(struct sheepdog_vnode_list_entry *old_entry,
+static int find_tgt_node(struct sd_vnode *old_entry,
 			 int old_nr, int old_idx, int old_copies,
-			 struct sheepdog_vnode_list_entry *cur_entry,
+			 struct sd_vnode *cur_entry,
 			 int cur_nr, int cur_idx, int cur_copies,
 			 int copy_idx)
 {
@@ -1170,8 +1170,8 @@ static void *alloc_buffer_for(uint64_t oid)
 
 static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
 {
-	int nodes_nr, len = sizeof(struct sheepdog_vnode_list_entry) * SD_MAX_VNODES;
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	int nodes_nr, len = sizeof(struct sd_vnode) * SD_MAX_VNODES;
+	struct sd_node nodes[SD_MAX_NODES];
 	void *buf = xmalloc(len);
 
 	nodes_nr = epoch_log_read_nr(epoch, (void *)nodes, ARRAY_SIZE(nodes));
@@ -1190,7 +1190,7 @@ static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
 }
 
 static int recover_object_from_replica(uint64_t oid,
-				       struct sheepdog_vnode_list_entry *entry,
+				       struct sd_vnode *entry,
 				       int epoch, int tgt_epoch)
 {
 	struct sd_obj_req hdr;
@@ -1305,9 +1305,9 @@ out:
 	return ret;
 }
 
-static void rollback_old_cur(struct sheepdog_vnode_list_entry *old, int *old_nr, int *old_copies,
-			     struct sheepdog_vnode_list_entry *cur, int *cur_nr, int *cur_copies,
-			     struct sheepdog_vnode_list_entry *new_old, int new_old_nr, int new_old_copies)
+static void rollback_old_cur(struct sd_vnode *old, int *old_nr, int *old_copies,
+			     struct sd_vnode *cur, int *cur_nr, int *cur_copies,
+			     struct sd_vnode *new_old, int new_old_nr, int new_old_copies)
 {
 	int nr_old = *old_nr;
 	int copies_old = *old_copies;
@@ -1327,11 +1327,11 @@ static void rollback_old_cur(struct sheepdog_vnode_list_entry *old, int *old_nr,
  */
 static int do_recover_object(struct recovery_work *rw, int copy_idx)
 {
-	struct sheepdog_vnode_list_entry *old, *cur;
+	struct sd_vnode *old, *cur;
 	uint64_t oid = rw->oids[rw->done];
 	int old_nr = rw->old_nr_vnodes, cur_nr = rw->cur_nr_vnodes;
 	int epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
-	struct sheepdog_vnode_list_entry *tgt_entry;
+	struct sd_vnode *tgt_entry;
 	int old_idx, cur_idx, tgt_idx, old_copies, cur_copies, ret;
 
 	old = xmalloc(sizeof(*old) * SD_MAX_VNODES);
@@ -1358,7 +1358,7 @@ again:
 
 	ret = recover_object_from_replica(oid, tgt_entry, epoch, tgt_epoch);
 	if (ret < 0) {
-		struct sheepdog_vnode_list_entry *new_old;
+		struct sd_vnode *new_old;
 		int new_old_nr, new_old_copies;
 
 		tgt_epoch--;
@@ -1590,7 +1590,7 @@ static void recover_done(struct work *work)
 	resume_pending_requests();
 }
 
-static int __fill_obj_list(struct sheepdog_node_list_entry *e, uint32_t epoch,
+static int __fill_obj_list(struct sd_node *e, uint32_t epoch,
 			   uint8_t *buf, size_t buf_size)
 {
 	int fd, ret;
@@ -1651,7 +1651,7 @@ static int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_
 	return nr_list1;
 }
 
-static int screen_obj_list(struct sheepdog_vnode_list_entry *nodes, int nodes_nr,
+static int screen_obj_list(struct sd_vnode *nodes, int nodes_nr,
 			   uint64_t *list, int list_nr, int nr_objs)
 {
 	int ret, i, cp, idx;
@@ -1679,8 +1679,8 @@ static int screen_obj_list(struct sheepdog_vnode_list_entry *nodes, int nodes_nr
 #define MAX_RETRY_CNT  6
 
 static int fill_obj_list(struct recovery_work *rw,
-			 struct sheepdog_node_list_entry *old_entry, int old_nr,
-			 struct sheepdog_node_list_entry *cur_entry, int cur_nr,
+			 struct sd_node *old_entry, int old_nr,
+			 struct sd_node *cur_entry, int cur_nr,
 			 int nr_objs)
 {
 	int i, j;
@@ -1753,7 +1753,7 @@ static void __start_recovery(struct work *work)
 			eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch);
 			goto fail;
 		}
-		rw->cur_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
+		rw->cur_nr_nodes /= sizeof(struct sd_node);
 
 		rw->old_nr_nodes = epoch_log_read(epoch - 1, (char *)rw->old_nodes,
 						  sizeof(rw->old_nodes));
@@ -1761,7 +1761,7 @@ static void __start_recovery(struct work *work)
 			eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch - 1);
 			goto fail;
 		}
-		rw->old_nr_nodes /= sizeof(struct sheepdog_node_list_entry);
+		rw->old_nr_nodes /= sizeof(struct sd_node);
 
 		rw->old_nr_vnodes = nodes_to_vnodes(rw->old_nodes, rw->old_nr_nodes,
 						    rw->old_vnodes);
@@ -2021,7 +2021,7 @@ int init_store(const char *d)
 }
 
 int read_epoch(uint32_t *epoch, uint64_t *ct,
-	       struct sheepdog_node_list_entry *entries, int *nr_entries)
+	       struct sd_node *entries, int *nr_entries)
 {
 	int ret;
 

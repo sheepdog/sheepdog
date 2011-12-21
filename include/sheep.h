@@ -137,14 +137,14 @@ struct sd_node_rsp {
 	uint64_t	store_free;
 };
 
-struct sheepdog_node_list_entry {
+struct sd_node {
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	nr_vnodes;
 	uint32_t	zone;
 };
 
-struct sheepdog_vnode_list_entry {
+struct sd_vnode {
 	uint64_t        id;
 	uint8_t         addr[16];
 	uint16_t        port;
@@ -157,10 +157,10 @@ struct epoch_log {
 	uint64_t time;
 	uint32_t epoch;
 	uint32_t nr_nodes;
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 };
 
-static inline int same_node(struct sheepdog_vnode_list_entry *e, int n1, int n2)
+static inline int same_node(struct sd_vnode *e, int n1, int n2)
 {
 	if (memcmp(e[n1].addr, e[n2].addr, sizeof(e->addr)) == 0 &&
 	    e[n1].port == e[n2].port)
@@ -169,13 +169,13 @@ static inline int same_node(struct sheepdog_vnode_list_entry *e, int n1, int n2)
 	return 0;
 }
 
-static inline int same_zone(struct sheepdog_vnode_list_entry *e, int n1, int n2)
+static inline int same_zone(struct sd_vnode *e, int n1, int n2)
 {
 	return e[n1].zone != 0 && e[n1].zone == e[n2].zone;
 }
 
 /* traverse the virtual node list and return the n'th one */
-static inline int get_nth_node(struct sheepdog_vnode_list_entry *entries,
+static inline int get_nth_node(struct sd_vnode *entries,
 			       int nr_entries, int base, int n)
 {
 	int nodes[SD_MAX_REDUNDANCY];
@@ -201,11 +201,11 @@ next:
 	return idx;
 }
 
-static inline int hval_to_sheep(struct sheepdog_vnode_list_entry *entries,
+static inline int hval_to_sheep(struct sd_vnode *entries,
 				int nr_entries, uint64_t id, int idx)
 {
 	int i;
-	struct sheepdog_vnode_list_entry *e = entries, *n;
+	struct sd_vnode *e = entries, *n;
 
 	for (i = 0; i < nr_entries - 1; i++, e++) {
 		n = e + 1;
@@ -215,7 +215,7 @@ static inline int hval_to_sheep(struct sheepdog_vnode_list_entry *entries,
 	return get_nth_node(entries, nr_entries, (i + 1) % nr_entries, idx);
 }
 
-static inline int obj_to_sheep(struct sheepdog_vnode_list_entry *entries,
+static inline int obj_to_sheep(struct sd_vnode *entries,
 			       int nr_entries, uint64_t oid, int idx)
 {
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
@@ -280,8 +280,8 @@ static inline const char *sd_strerror(int err)
 
 static inline int node_cmp(const void *a, const void *b)
 {
-	const struct sheepdog_node_list_entry *node1 = a;
-	const struct sheepdog_node_list_entry *node2 = b;
+	const struct sd_node *node1 = a;
+	const struct sd_node *node2 = b;
 	int cmp;
 
 	cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
@@ -297,8 +297,8 @@ static inline int node_cmp(const void *a, const void *b)
 
 static inline int vnode_cmp(const void *a, const void *b)
 {
-	const struct sheepdog_vnode_list_entry *node1 = a;
-	const struct sheepdog_vnode_list_entry *node2 = b;
+	const struct sd_vnode *node1 = a;
+	const struct sd_vnode *node2 = b;
 
 	if (node1->id < node2->id)
 		return -1;
@@ -307,10 +307,10 @@ static inline int vnode_cmp(const void *a, const void *b)
 	return 0;
 }
 
-static inline int nodes_to_vnodes(struct sheepdog_node_list_entry *nodes, int nr,
-				  struct sheepdog_vnode_list_entry *vnodes)
+static inline int nodes_to_vnodes(struct sd_node *nodes, int nr,
+				  struct sd_vnode *vnodes)
 {
-	struct sheepdog_node_list_entry *n = nodes;
+	struct sd_node *n = nodes;
 	int i, j, nr_vnodes = 0;
 	uint64_t hval;
 

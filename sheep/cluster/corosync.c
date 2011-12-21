@@ -20,7 +20,7 @@ struct cpg_node {
 	uint32_t nodeid;
 	uint32_t pid;
 	uint32_t gone;
-	struct sheepdog_node_list_entry ent;
+	struct sd_node ent;
 };
 
 static cpg_handle_t cpg_handle;
@@ -33,7 +33,7 @@ static struct work_queue *corosync_block_wq;
 
 static struct cdrv_handlers corosync_handlers;
 static enum cluster_join_result (*corosync_check_join_cb)(
-	struct sheepdog_node_list_entry *joining, void *opaque);
+	struct sd_node *joining, void *opaque);
 
 static LIST_HEAD(corosync_event_list);
 static LIST_HEAD(corosync_block_list);
@@ -265,7 +265,7 @@ static int is_master(struct cpg_node *node)
 }
 
 static void build_node_list(struct cpg_node *nodes, size_t nr_nodes,
-			    struct sheepdog_node_list_entry *entries)
+			    struct sd_node *entries)
 {
 	int i;
 
@@ -282,7 +282,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 {
 	struct corosync_block_msg *bm;
 	enum cluster_join_result res;
-	struct sheepdog_node_list_entry entries[SD_MAX_NODES];
+	struct sd_node entries[SD_MAX_NODES];
 	int idx;
 
 	switch (cevent->type) {
@@ -669,9 +669,9 @@ static int corosync_init(struct cdrv_handlers *handlers, const char *option,
 	return fd;
 }
 
-static int corosync_join(struct sheepdog_node_list_entry *myself,
+static int corosync_join(struct sd_node *myself,
 			 enum cluster_join_result (*check_join_cb)(
-				 struct sheepdog_node_list_entry *joining,
+				 struct sd_node *joining,
 				 void *opaque),
 			 void *opaque, size_t opaque_len)
 {

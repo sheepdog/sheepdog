@@ -35,13 +35,13 @@ enum acrd_event_type {
 
 struct acrd_event {
 	enum acrd_event_type type;
-	struct sheepdog_node_list_entry sender;
+	struct sd_node sender;
 
 	size_t buf_len;
 	uint8_t buf[MAX_EVENT_BUF_SIZE];
 
 	size_t nr_nodes; /* the number of sheep */
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	uint64_t ids[SD_MAX_NODES];
 
 	enum cluster_join_result join_result;
@@ -52,7 +52,7 @@ struct acrd_event {
 	int callbacked; /* set non-zero if sheep already called block_cb() */
 };
 
-static struct sheepdog_node_list_entry this_node;
+static struct sd_node this_node;
 static uint64_t this_id;
 
 
@@ -219,11 +219,11 @@ static struct work_queue *acrd_wq;
 
 static struct cdrv_handlers acrd_hdlrs;
 static enum cluster_join_result (*acrd_check_join_cb)(
-	struct sheepdog_node_list_entry *joining, void *opaque);
+	struct sd_node *joining, void *opaque);
 
 /* get node list from the last pushed data */
 static size_t get_nodes(struct acrd_handle *ah,
-			struct sheepdog_node_list_entry *nodes,
+			struct sd_node *nodes,
 			uint64_t *ids)
 {
 	int rc;
@@ -249,11 +249,11 @@ again:
 }
 
 static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
-		     struct sheepdog_node_list_entry *node, void *buf,
+		     struct sd_node *node, void *buf,
 		     size_t buf_len, void (*block_cb)(void *arg))
 {
 	int idx;
-	struct sheepdog_node_list_entry *n;
+	struct sd_node *n;
 	uint64_t *i;
 	struct acrd_event ev;
 
@@ -398,7 +398,7 @@ static void __acrd_leave(struct work *work)
 	int i;
 	size_t nr_nodes;
 	uint64_t ids[SD_MAX_NODES];
-	struct sheepdog_node_list_entry nodes[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 	struct acrd_tx *atx;
 
 	pthread_mutex_lock(&queue_lock);
@@ -514,9 +514,9 @@ static int accord_init(struct cdrv_handlers *handlers, const char *option,
 	return efd;
 }
 
-static int accord_join(struct sheepdog_node_list_entry *myself,
+static int accord_join(struct sd_node *myself,
 		       enum cluster_join_result (*check_join_cb)(
-			       struct sheepdog_node_list_entry *joining,
+			       struct sd_node *joining,
 			       void *opaque),
 		       void *opaque, size_t opaque_len)
 {

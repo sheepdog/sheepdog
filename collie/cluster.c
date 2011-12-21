@@ -117,7 +117,7 @@ static int cluster_info(int argc, char **argv)
 	for (i = 0; i < nr_logs; i++) {
 		int j;
 		char name[128];
-		struct sheepdog_node_list_entry *entry;
+		struct sd_node *entry;
 
 		ti = logs[i].time;
 		if (raw_output) {

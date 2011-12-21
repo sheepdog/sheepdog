@@ -54,8 +54,8 @@ extern int highlight;
 extern int raw_output;
 
 extern uint64_t node_list_version;
-extern struct sheepdog_node_list_entry node_list_entries[SD_MAX_NODES];
-extern struct sheepdog_vnode_list_entry vnode_list_entries[SD_MAX_VNODES];
+extern struct sd_node node_list_entries[SD_MAX_NODES];
+extern struct sd_vnode vnode_list_entries[SD_MAX_VNODES];
 extern int nr_nodes, nr_vnodes;
 extern unsigned master_idx;
 
