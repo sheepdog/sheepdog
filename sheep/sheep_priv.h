@@ -175,6 +175,7 @@ struct store_driver {
 	/* Operations in recovery */
 	int (*get_objlist)(struct siocb *);
 	int (*link)(uint64_t oid, struct siocb *, int tgt_epoch);
+	int (*atomic_put)(uint64_t oid, struct siocb *);
 };
 
 extern void register_store_driver(struct store_driver *);

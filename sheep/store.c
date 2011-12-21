@@ -1199,6 +1199,7 @@ static int recover_object_from_replica(uint64_t oid,
 	unsigned wlen = 0, rlen;
 	int fd, ret;
 	void *buf;
+	struct siocb iocb = { 0 };
 
 	buf = alloc_buffer_for(oid);
 	if (!buf) {
@@ -1207,8 +1208,6 @@ static int recover_object_from_replica(uint64_t oid,
 	}
 
 	if (is_myself(entry->addr, entry->port)) {
-		struct siocb iocb = { 0 };
-
 		iocb.epoch = epoch;
 		ret = store.link(oid, &iocb, tgt_epoch);
 		if (ret == SD_RES_SUCCESS) {
@@ -1256,34 +1255,11 @@ static int recover_object_from_replica(uint64_t oid,
 	rsp = (struct sd_obj_rsp *)&hdr;
 
 	if (rsp->result == SD_RES_SUCCESS) {
-		char path[PATH_MAX], tmp_path[PATH_MAX];
-		int flags = O_DSYNC | O_RDWR | O_CREAT;
-
-		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
-				epoch, oid);
-		snprintf(tmp_path, sizeof(tmp_path), "%s%08u/%016" PRIx64 ".tmp",
-				obj_path, epoch, oid);
-
-		fd = open(tmp_path, flags, def_fmode);
-		if (fd < 0) {
-			eprintf("failed to open %s: %m\n", tmp_path);
-			ret = -1;
-			goto out;
-		}
-
-		ret = write(fd, buf, rlen);
-		if (ret != rlen) {
-			eprintf("failed to write object\n");
-			ret = -1;
-			goto out;
-		}
-
-		close(fd);
-
-		dprintf("rename %s to %s\n", tmp_path, path);
-		ret = rename(tmp_path, path);
-		if (ret < 0) {
-			eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
+		iocb.epoch = epoch;
+		iocb.length = rlen;
+		iocb.buf = buf;
+		ret = store.atomic_put(oid, &iocb);
+		if (ret != SD_RES_SUCCESS) {
 			ret = -1;
 			goto out;
 		}

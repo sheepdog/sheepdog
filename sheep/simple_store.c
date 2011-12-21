@@ -199,6 +199,46 @@ static int simple_store_link(uint64_t oid, struct siocb *iocb, int tgt_epoch)
        return SD_RES_EIO;
 }
 
+static int simple_store_atomic_put(uint64_t oid, struct siocb *iocb)
+{
+	char path[PATH_MAX], tmp_path[PATH_MAX];
+	int flags = O_DSYNC | O_RDWR | O_CREAT;
+	int ret = SD_RES_EIO, epoch = iocb->epoch, fd;
+	uint32_t len = iocb->length;
+
+	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
+		 epoch, oid);
+	snprintf(tmp_path, sizeof(tmp_path), "%s%08u/%016" PRIx64 ".tmp",
+		 obj_path, epoch, oid);
+
+	fd = open(tmp_path, flags, def_fmode);
+	if (fd < 0) {
+		eprintf("failed to open %s: %m\n", tmp_path);
+		goto out;
+	}
+
+	ret = write(fd, iocb->buf, len);
+	if (ret != len) {
+		eprintf("failed to write object. %m\n");
+		ret = SD_RES_EIO;
+		goto out_close;
+	}
+
+
+	ret = rename(tmp_path, path);
+	if (ret < 0) {
+		eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
+		ret = SD_RES_EIO;
+		goto out_close;
+	}
+	dprintf("%"PRIx64"\n", oid);
+	ret = SD_RES_SUCCESS;
+out_close:
+	close(fd);
+out:
+	return ret;
+}
+
 struct store_driver store = {
 	.driver_name = "simple",
 	.init = simple_store_init,
@@ -208,6 +248,7 @@ struct store_driver store = {
 	.close = simple_store_close,
 	.get_objlist = simple_store_get_objlist,
 	.link = simple_store_link,
+	.atomic_put = simple_store_atomic_put,
 };
 
 void register_store_driver(struct store_driver *driver)
