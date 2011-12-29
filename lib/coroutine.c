@@ -39,6 +39,7 @@
 
 #include "util.h"
 #include "coroutine.h"
+#include "logger.h"
 
 enum co_action {
 	COROUTINE_YIELD = 1,
@@ -151,11 +152,8 @@ static int get_stack_size(struct co_ucontext *co)
 		if (stack[i] != MAGIC_NUMBER)
 			break;
 
-	if (i == 0) {
-		fprintf(stderr, "stack overflow\n");
-		fflush(stderr);
-		abort();
-	}
+	if (i == 0)
+		panic("stack overflow\n");
 
 	return STACK_MAX_SIZE - i * sizeof(stack[0]);
 }
@@ -305,10 +303,8 @@ void coroutine_enter(struct coroutine *co, void *opaque)
 {
 	struct coroutine *self = coroutine_self();
 
-	if (co->caller) {
-		fprintf(stderr, "Co-routine re-entered recursively\n");
-		abort();
-	}
+	if (co->caller)
+		panic("Co-routine re-entered recursively\n");
 
 	co->caller = self;
 	co->entry_arg = opaque;
@@ -320,10 +316,8 @@ void coroutine_yield(void)
 	struct coroutine *self = coroutine_self();
 	struct coroutine *to = self->caller;
 
-	if (!to) {
-		fprintf(stderr, "Co-routine is yielding to no one\n");
-		abort();
-	}
+	if (!to)
+		panic("Co-routine is yielding to no one\n");
 
 	self->caller = NULL;
 	coroutine_swap(self, to);

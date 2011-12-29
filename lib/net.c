@@ -148,7 +148,7 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 
 		ret = bind(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
-			fprintf(stderr, "failed to bind server socket: %m\n");
+			eprintf("failed to bind server socket: %m\n");
 			close(fd);
 			continue;
 		}
@@ -198,7 +198,7 @@ int connect_to(const char *name, int port)
 
 	ret = getaddrinfo(name, buf, &hints, &res0);
 	if (ret) {
-		fprintf(stderr, "failed to get address info: %m\n");
+		eprintf("failed to get address info: %m\n");
 		return -1;
 	}
 
@@ -223,7 +223,7 @@ int connect_to(const char *name, int port)
 
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret)
-			fprintf(stderr, "failed to connect to %s:%d: %m\n",
+			eprintf("failed to connect to %s:%d: %m\n",
 				name, port);
 		else
 			goto success;
@@ -244,7 +244,7 @@ reread:
 	if (ret < 0 || !ret) {
 		if (errno == EINTR)
 			goto reread;
-		fprintf(stderr, "failed to read from socket: %m\n");
+		eprintf("failed to read from socket: %m\n");
 		return 1;
 	}
 
@@ -277,7 +277,7 @@ rewrite:
 	if (ret < 0) {
 		if (errno == EINTR)
 			goto rewrite;
-		fprintf(stderr, "failed to write to socket: %m\n");
+		eprintf("failed to write to socket: %m\n");
 		return 1;
 	}
 
@@ -331,7 +331,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 
 	ret = do_read(sockfd, rsp, sizeof(*rsp));
 	if (ret) {
-		fprintf(stderr, "failed to read a response: %m\n");
+		eprintf("failed to read a response: %m\n");
 		return 1;
 	}
 
@@ -341,7 +341,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	if (*rlen) {
 		ret = do_read(sockfd, data, *rlen);
 		if (ret) {
-			fprintf(stderr, "failed to read the response data: %m\n");
+			eprintf("failed to read the response data: %m\n");
 			return 1;
 		}
 	}
