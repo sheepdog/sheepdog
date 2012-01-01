@@ -29,7 +29,12 @@ dist-clean-local:
 	rm -f autoconf automake autoheader
 
 clean-generic:
-	rm -rf $(SPEC) $(TARFILE)
+	rm -rf $(SPEC) $(TARFILE) cscope*
+
+cscope:
+	@echo create cscope.out
+	@find -name '*.[ch]' > cscope.files
+	@cscope -bq
 
 $(SPEC): $(SPEC).in
 	rm -f $@-t $@
