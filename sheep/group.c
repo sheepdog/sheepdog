@@ -207,10 +207,16 @@ static void do_cluster_op(void *arg)
 	struct vdi_op_message *msg = arg;
 	int ret;
 	struct request *req;
+	void *data;
 
 	req = list_first_entry(&sys->pending_list, struct request, pending_list);
+
+	if (has_process_main(req->op))
+		data = msg->data;
+	else
+		data = req->data;
 	ret = do_process_work(req->op, (const struct sd_req *)&msg->req,
-			      (struct sd_rsp *)&msg->rsp, req->data);
+			      (struct sd_rsp *)&msg->rsp, data);
 
 	msg->rsp.result = ret;
 }
@@ -224,10 +230,10 @@ void do_cluster_request(struct work *work)
 
 	eprintf("%p %x\n", req, hdr->opcode);
 
-	if (hdr->flags & SD_FLAG_CMD_WRITE)
-		size = sizeof(*msg);
-	else
+	if (has_process_main(req->op))
 		size = sizeof(*msg) + hdr->data_length;
+	else
+		size = sizeof(*msg);
 
 	msg = zalloc(size);
 	if (!msg) {
@@ -237,6 +243,8 @@ void do_cluster_request(struct work *work)
 
 	msg->req = *((struct sd_vdi_req *)&req->rq);
 	msg->rsp = *((struct sd_vdi_rsp *)&req->rp);
+	if (has_process_main(req->op))
+		memcpy(msg->data, req->data, hdr->data_length);
 
 	list_add_tail(&req->pending_list, &sys->pending_list);
 
@@ -607,7 +615,8 @@ static void __sd_notify_done(struct cpg_event *cevent)
 		return;
 
 	msg->rsp.result = ret;
-	memcpy(req->data, msg->data, msg->rsp.data_length);
+	if (has_process_main(req->op))
+		memcpy(req->data, msg->data, msg->rsp.data_length);
 	memcpy(&req->rp, &msg->rsp, sizeof(req->rp));
 	req->done(req);
 }
