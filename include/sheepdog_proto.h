@@ -59,6 +59,7 @@
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 #define SD_RES_HALT 0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_MANUAL_RECOVER   0x1A /* Users should not manually recover this cluster */
+#define SD_RES_NO_STORE         0x20 /* No targeted backend store */
 
 /*
  * Object ID rules
@@ -90,6 +91,8 @@
 			      sizeof(uint32_t) * MAX_DATA_OBJS)
 #define SD_ATTR_OBJ_SIZE (sizeof(struct sheepdog_vdi_attr))
 #define CURRENT_VDI_ID 0
+
+#define STORE_LEN 16
 
 struct sd_req {
 	uint8_t		proto_ver;

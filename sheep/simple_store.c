@@ -239,8 +239,8 @@ out:
 	return ret;
 }
 
-struct store_driver store = {
-	.driver_name = "simple",
+struct store_driver simple_store = {
+	.name = "simple",
 	.init = simple_store_init,
 	.open = simple_store_open,
 	.write = simple_store_write,
@@ -251,8 +251,4 @@ struct store_driver store = {
 	.atomic_put = simple_store_atomic_put,
 };
 
-void register_store_driver(struct store_driver *driver)
-{
-	store = *driver;
-	eprintf("Register %s store driver\n", store.driver_name);
-}
+add_store_driver(simple_store);

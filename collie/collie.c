@@ -40,6 +40,7 @@ static const struct sd_option collie_options[] = {
 	{'d', "delete", 0, "delete a key"},
 
 	/* cluster options */
+	{'b', "store", 1, "specify backend store"},
 	{'c', "copies", 1, "specify the data redundancy (number of copies)"},
 	{'H', "nohalt", 0, "serve IO requests even if there are too few\n\
                           nodes for the configured redundancy"},

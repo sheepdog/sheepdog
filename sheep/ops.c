@@ -12,6 +12,10 @@
 #include <stdlib.h>
 
 #include "sheep_priv.h"
+#include "strbuf.h"
+
+extern char *obj_path;
+extern struct store_driver *sd_store;
 
 enum sd_op_type {
 	SD_OP_TYPE_CLUSTER = 1, /* cluster operations */
@@ -132,6 +136,11 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	int i, latest_epoch, ret;
 	uint64_t ctime;
 
+	sd_store = find_store_driver(data);
+	if (!sd_store)
+		return SD_RES_NO_STORE;
+
+	sd_store->init(obj_path);
 	sys->nr_sobjs = hdr->copies;
 	sys->flags = hdr->flags;
 	if (!sys->nr_sobjs)
@@ -210,6 +219,21 @@ static int cluster_get_vdi_attr(const struct sd_req *req, struct sd_rsp *rsp,
 	vdi_rsp->copies = nr_copies;
 
 	return ret;
+}
+
+static int local_get_store_list(const struct sd_req *req, struct sd_rsp *rsp,
+				void *data)
+{
+	struct strbuf buf = STRBUF_INIT;
+	struct store_driver *driver;
+
+	list_for_each_entry(driver, &store_drivers, list) {
+		strbuf_addf(&buf, "%s ", driver->name);
+	}
+	memcpy(data, buf.buf, buf.len);
+
+	strbuf_release(&buf);
+	return SD_RES_SUCCESS;
 }
 
 static int local_read_vdis(const struct sd_req *req, struct sd_rsp *rsp,
@@ -434,6 +458,12 @@ static struct sd_op_template sd_ops[] = {
 	},
 
 	/* local operations */
+	[SD_OP_GET_STORE_LIST] = {
+		.type = SD_OP_TYPE_LOCAL,
+		.force = 1,
+		.process_work = local_get_store_list,
+	},
+
 	[SD_OP_READ_VDIS] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,

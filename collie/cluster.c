@@ -20,12 +20,54 @@ struct cluster_cmd_data {
 	int copies;
 	int nohalt;
 	int force;
+	char name[STORE_LEN];
 } cluster_cmd_data;
+
+#define DEFAULT_STORE	"simple"
 
 static void set_nohalt(uint16_t *p)
 {
 	if (p)
 		*p |= SD_FLAG_NOHALT;
+}
+
+static int list_store(void)
+{
+	int fd, ret;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	unsigned rlen, wlen;
+	char buf[512] = { 0 };
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		return EXIT_SYSFAIL;
+
+	memset(&hdr, 0, sizeof(hdr));
+
+	wlen = 0;
+	rlen = 512;
+	hdr.opcode = SD_OP_GET_STORE_LIST;
+	hdr.data_length = rlen;
+
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "Failed to connect\n");
+		return EXIT_SYSFAIL;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Restore failed: %s\n",
+				sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	printf("Available stores:\n");
+	printf("---------------------------------------\n");
+	printf("%s\n", buf);
+	return EXIT_SYSFAIL;
 }
 
 static int cluster_format(int argc, char **argv)
@@ -35,6 +77,7 @@ static int cluster_format(int argc, char **argv)
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
 	unsigned rlen, wlen;
 	struct timeval tv;
+	char store_name[STORE_LEN];
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
@@ -51,9 +94,15 @@ static int cluster_format(int argc, char **argv)
 	hdr.epoch = node_list_version;
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+	if (strlen(cluster_cmd_data.name))
+		strncpy(store_name, cluster_cmd_data.name, STORE_LEN);
+	else
+		strcpy(store_name, DEFAULT_STORE);
+	hdr.data_length = wlen = strlen(store_name) + 1;
+	hdr.flags |= SD_FLAG_CMD_WRITE;
+
+	printf("using backend %s store\n", store_name);
+	ret = exec_req(fd, (struct sd_req *)&hdr, store_name, &wlen, &rlen);
 	close(fd);
 
 	if (ret) {
@@ -64,7 +113,7 @@ static int cluster_format(int argc, char **argv)
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Format failed: %s\n",
 				sd_strerror(rsp->result));
-		return EXIT_FAILURE;
+		return list_store();
 	}
 
 	return EXIT_SUCCESS;
@@ -237,7 +286,7 @@ static int cluster_recover(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 0, cluster_info},
-	{"format", NULL, "cHaph", "create a Sheepdog store",
+	{"format", NULL, "bcHaph", "create a Sheepdog store",
 	 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
@@ -252,6 +301,9 @@ static int cluster_parser(int ch, char *opt)
 	char *p;
 
 	switch (ch) {
+	case 'b':
+		strncpy(cluster_cmd_data.name, opt, 10);
+		break;
 	case 'c':
 		copies = strtol(opt, &p, 10);
 		if (opt == p || copies < 1) {
