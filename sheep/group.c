@@ -27,6 +27,8 @@
 
 static int cdrv_fd;
 static struct coroutine *cdrv_co;
+extern struct store_driver *sd_store;
+extern char *obj_path;
 
 struct node {
 	struct sd_node ent;
@@ -44,7 +46,7 @@ struct join_message {
 	uint64_t ctime;
 	uint32_t result;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
-	uint8_t pad[3];
+	uint8_t store[STORE_LEN];
 	union {
 		struct sd_node nodes[0];
 		struct sd_node leave_nodes[0];
@@ -456,6 +458,8 @@ static void join(struct sd_node *joining, struct join_message *msg)
 	msg->nr_sobjs = sys->nr_sobjs;
 	msg->cluster_flags = sys->flags;
 	msg->ctime = get_cluster_ctime();
+	if (sd_store)
+		strcpy((char *)msg->store, sd_store->name);
 }
 
 static int get_vdi_bitmap_from(struct sd_node *node)
@@ -568,6 +572,12 @@ static void update_cluster_info(struct join_message *msg,
 	if ((msg->cluster_status == SD_STATUS_OK || msg->cluster_status == SD_STATUS_HALT)
 	     && msg->inc_epoch)
 		update_epoch_log(sys->epoch);
+
+	if (!sd_store && strlen((char *)msg->store)) {
+		sd_store = find_store_driver((char *)msg->store);
+		if (sd_store)
+			sd_store->init(obj_path);
+	}
 
 join_finished:
 	sys->nodes[sys->nr_nodes++] = *joined;

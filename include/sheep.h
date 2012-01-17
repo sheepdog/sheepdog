@@ -17,7 +17,7 @@
 #include "net.h"
 #include "logger.h"
 
-#define SD_SHEEP_PROTO_VER 0x03
+#define SD_SHEEP_PROTO_VER 0x04
 
 #define SD_DEFAULT_REDUNDANCY 3
 #define SD_MAX_REDUNDANCY 8
