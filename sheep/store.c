@@ -1582,6 +1582,12 @@ static void do_recover_main(struct work *work)
 
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);
+	} else {
+		if (sd_store->end_recover) {
+			struct siocb iocb = { 0 };
+			iocb.epoch = sys->epoch;
+			sd_store->end_recover(&iocb);
+		}
 	}
 
 	resume_pending_requests();

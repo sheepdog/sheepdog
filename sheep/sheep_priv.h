@@ -178,6 +178,7 @@ struct store_driver {
 	int (*link)(uint64_t oid, struct siocb *, int tgt_epoch);
 	int (*atomic_put)(uint64_t oid, struct siocb *);
 	int (*begin_recover)(struct siocb *);
+	int (*end_recover)(struct siocb *);
 };
 
 extern struct list_head store_drivers;
