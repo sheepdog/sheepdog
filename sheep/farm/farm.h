@@ -62,5 +62,7 @@ extern int trunk_file_write(unsigned char *outsha1, int user);
 extern void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
 extern int trunk_update_entry(uint64_t oid);
 extern void trunk_reset(void);
+extern void trunk_put_entry(uint64_t oid);
+extern void trunk_get_entry(uint64_t oid);
 
 #endif
