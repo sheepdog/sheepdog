@@ -179,6 +179,10 @@ struct store_driver {
 	int (*atomic_put)(uint64_t oid, struct siocb *);
 	int (*begin_recover)(struct siocb *);
 	int (*end_recover)(struct siocb *);
+	/* Operations for snapshot */
+	int (*snapshot)(struct siocb *);
+	int (*restore)(struct siocb *);
+	int (*get_snap_file)(struct siocb *);
 };
 
 extern struct list_head store_drivers;

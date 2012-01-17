@@ -407,6 +407,49 @@ out:
 	return ret;
 }
 
+static int cluster_snapshot(const struct sd_req *req, struct sd_rsp *rsp,
+			    void *data)
+{
+	int ret;
+	struct siocb iocb = { 0 };
+
+	if (sd_store->snapshot)
+		ret = sd_store->snapshot(&iocb);
+	else
+		ret = SD_RES_NO_SUPPORT;
+
+	return ret;
+}
+
+static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
+			   void *data)
+{
+	const struct sd_obj_req *hdr = (const struct sd_obj_req *)req;
+	int ret;
+	struct siocb iocb = { .epoch = hdr->tgt_epoch };
+
+	if (sd_store->restore)
+		ret = sd_store->restore(&iocb);
+	else
+		ret = SD_RES_NO_SUPPORT;
+	return ret;
+}
+
+static int local_get_snap_file(const struct sd_req *req, struct sd_rsp *rsp,
+			    void *data)
+{
+	int ret;
+	struct siocb iocb = { .buf = data };
+
+	if (sd_store->get_snap_file) {
+		ret = sd_store->get_snap_file(&iocb);
+		rsp->data_length = iocb.length;
+	} else
+		ret = SD_RES_NO_SUPPORT;
+
+	return ret;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -457,6 +500,18 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = cluster_manual_recover,
 	},
 
+	[SD_OP_SNAPSHOT] = {
+		.type = SD_OP_TYPE_CLUSTER,
+		.force = 1,
+		.process_main = cluster_snapshot,
+	},
+
+	[SD_OP_RESTORE] = {
+		.type = SD_OP_TYPE_CLUSTER,
+		.force = 1,
+		.process_main = cluster_restore,
+	},
+
 	/* local operations */
 	[SD_OP_GET_STORE_LIST] = {
 		.type = SD_OP_TYPE_LOCAL,
@@ -501,6 +556,12 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_GET_EPOCH] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_epoch,
+	},
+
+	[SD_OP_GET_SNAP_FILE] = {
+		.type = SD_OP_TYPE_LOCAL,
+		.force = 1,
+		.process_work = local_get_snap_file,
 	},
 
 	/* I/O operations */

@@ -427,6 +427,138 @@ out:
 	return ret;
 }
 
+static int farm_snapshot(struct siocb *iocb)
+{
+	unsigned char snap_sha1[SHA1_LEN];
+	void *buffer;
+	int log_nr, ret = SD_RES_EIO, epoch;
+
+	buffer = snap_log_read(&log_nr, 1);
+	if (!buffer)
+		goto out;
+
+	epoch = log_nr + 1;
+	dprintf("user epoch %d\n", epoch);
+	if (snap_file_write(epoch, snap_sha1, 1) < 0)
+		goto out;
+
+	if (snap_log_write(epoch, snap_sha1, 1) < 0)
+		goto out;
+
+	ret = SD_RES_SUCCESS;
+out:
+	free(buffer);
+	return ret;
+}
+
+static int cleanup_working_dir(void)
+{
+	DIR *dir;
+	struct dirent *d;
+
+	dprintf("try clean up working dir\n");
+	dir = opendir(obj_path);
+	if (!dir)
+		return -1;
+
+	while ((d = readdir(dir))) {
+		char p[PATH_MAX];
+		if (!strncmp(d->d_name, ".", 1))
+			continue;
+		snprintf(p, sizeof(p), "%s%s", obj_path, d->d_name);
+		if (unlink(p) < 0) {
+			eprintf("%s:%m\n", p);
+			continue;
+		}
+		dprintf("remove file %s\n", d->d_name);
+	}
+	closedir(dir);
+	return 0;
+}
+
+static int restore_objects_from_snap(int epoch)
+{
+	struct sha1_file_hdr hdr;
+	struct trunk_entry *trunk_buf, *trunk_free = NULL;
+	unsigned char trunk_sha1[SHA1_LEN];
+	uint64_t nr_trunks, i;
+	int ret = SD_RES_EIO;
+
+	if (get_trunk_sha1(epoch, trunk_sha1, 1) < 0)
+		goto out;
+
+	trunk_free = trunk_buf = trunk_file_read(trunk_sha1, &hdr);
+	if (!trunk_buf)
+		goto out;
+
+	nr_trunks = hdr.priv;
+	ret = SD_RES_SUCCESS;
+	for (i = 0; i < nr_trunks; i++, trunk_buf++) {
+		struct sha1_file_hdr h;
+		struct siocb io = { 0 };
+		uint64_t oid;
+		void *buffer = NULL;
+
+		oid = trunk_buf->oid;
+		buffer = sha1_file_read(trunk_buf->sha1, &h);
+		if (!buffer) {
+			eprintf("oid %"PRIx64" not restored\n", oid);
+			goto out;
+		}
+		io.length = h.size;
+		io.buf = buffer;
+		ret = farm_atomic_put(oid, &io);
+		if (ret != SD_RES_SUCCESS) {
+			eprintf("oid %"PRIx64" not restored\n", oid);
+			goto out;
+		} else
+			dprintf("oid %"PRIx64" restored\n", oid);
+
+		free(buffer);
+	}
+out:
+	free(trunk_free);
+	return ret;
+}
+
+static int farm_restore(struct siocb *iocb)
+{
+	int ret = SD_RES_EIO, epoch = iocb->epoch;
+
+	dprintf("try recover user epoch %d\n", epoch);
+
+	if (cleanup_working_dir() < 0) {
+		eprintf("failed to clean up the working dir %m\n");
+		goto out;
+	}
+
+	ret = restore_objects_from_snap(epoch);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+out:
+	return ret;
+}
+
+static int farm_get_snap_file(struct siocb *iocb)
+{
+	int ret = SD_RES_EIO;
+	void *buffer = NULL;
+	size_t size;
+	int nr;
+
+	dprintf("try get snap file\n");
+	buffer = snap_log_read(&nr, 1);
+	if (!buffer)
+		goto out;
+	size = nr * sizeof(struct snap_log);
+	memcpy(iocb->buf, buffer, size);
+	iocb->length = size;
+	ret = SD_RES_SUCCESS;
+out:
+	free(buffer);
+	return ret;
+}
+
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
@@ -439,6 +571,9 @@ struct store_driver farm = {
 	.atomic_put = farm_atomic_put,
 	.begin_recover = farm_begin_recover,
 	.end_recover = farm_end_recover,
+	.snapshot = farm_snapshot,
+	.restore = farm_restore,
+	.get_snap_file = farm_get_snap_file,
 };
 
 add_store_driver(farm);

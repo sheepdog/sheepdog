@@ -60,6 +60,7 @@
 #define SD_RES_HALT 0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_MANUAL_RECOVER   0x1A /* Users should not manually recover this cluster */
 #define SD_RES_NO_STORE         0x20 /* No targeted backend store */
+#define SD_RES_NO_SUPPORT       0x21 /* Operation is not supported by backend store */
 
 /*
  * Object ID rules
