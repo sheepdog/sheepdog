@@ -45,6 +45,8 @@ static const struct sd_option collie_options[] = {
 	{'H', "nohalt", 0, "serve IO requests even if there are too few\n\
                           nodes for the configured redundancy"},
 	{'f', "force", 0, "do not prompt for confirmation"},
+	{'R', "restore", 1, "restore the cluster"},
+	{'l', "list", 0, "list the user epoch information"},
 
 	{ 0, NULL, 0, NULL },
 };

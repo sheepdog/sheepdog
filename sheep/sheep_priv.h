@@ -21,8 +21,6 @@
 #include "sheep.h"
 #include "cluster.h"
 
-#define SD_OP_REMOVE_OBJ     0x91
-
 #define SD_OP_GET_OBJ_LIST   0xA1
 #define SD_OP_GET_EPOCH      0XA2
 
