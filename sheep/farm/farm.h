@@ -47,6 +47,11 @@ struct trunk_entry_incore {
 	struct hlist_node hash;
 };
 
+extern char *obj_path;
+
+/* farm.c */
+extern char farm_dir[PATH_MAX];
+extern char farm_obj_dir[PATH_MAX];
 /* sha1_file.c */
 extern char *sha1_to_path(const unsigned char *sha1);
 extern int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *outsha1);
