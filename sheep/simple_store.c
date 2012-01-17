@@ -239,6 +239,28 @@ out:
 	return ret;
 }
 
+static int simple_store_format(struct siocb *iocb)
+{
+	char path[PATH_MAX];
+	unsigned epoch = iocb->epoch, ret, i;
+	const uint8_t name[] = "simple";
+
+	dprintf("epoch %u\n", epoch);
+	for (i = 1; i <= epoch; i++) {
+		snprintf(path, sizeof(path), "%s%08u", obj_path, i);
+		ret = rmdir_r(path);
+		if (ret && ret != -ENOENT) {
+			eprintf("failed to remove %s: %s\n", path, strerror(-ret));
+			return SD_RES_EIO;
+		}
+	}
+
+	if (set_cluster_store(name) < 0)
+		return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
+}
+
 struct store_driver simple_store = {
 	.name = "simple",
 	.init = simple_store_init,
@@ -249,6 +271,7 @@ struct store_driver simple_store = {
 	.get_objlist = simple_store_get_objlist,
 	.link = simple_store_link,
 	.atomic_put = simple_store_atomic_put,
+	.format = simple_store_format,
 };
 
 add_store_driver(simple_store);

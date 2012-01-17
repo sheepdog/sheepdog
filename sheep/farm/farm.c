@@ -22,6 +22,7 @@ char farm_dir[PATH_MAX];
 static int def_open_flags = O_DSYNC | O_RDWR;
 extern char *obj_path;
 extern mode_t def_fmode;
+extern mode_t def_dmode;
 
 static int create_directory(char *p)
 {
@@ -559,6 +560,32 @@ out:
 	return ret;
 }
 
+static int farm_format(struct siocb *iocb)
+{
+	char path[PATH_MAX];
+	unsigned ret;
+	const uint8_t name[] = "farm";
+
+	dprintf("try get a clean store\n");
+	snprintf(path, sizeof(path), "%s", obj_path);
+	ret = rmdir_r(path);
+	if (ret && ret != -ENOENT) {
+		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
+		return SD_RES_EIO;
+	}
+	if (mkdir(path, def_dmode) < 0) {
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	if (set_cluster_store(name) < 0)
+		return SD_RES_EIO;
+
+	trunk_reset();
+
+	return SD_RES_SUCCESS;
+}
+
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
@@ -574,6 +601,7 @@ struct store_driver farm = {
 	.snapshot = farm_snapshot,
 	.restore = farm_restore,
 	.get_snap_file = farm_get_snap_file,
+	.format = farm_format,
 };
 
 add_store_driver(farm);

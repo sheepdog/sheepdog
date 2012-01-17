@@ -135,11 +135,15 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	const struct sd_so_req *hdr = (const struct sd_so_req *)req;
 	int i, latest_epoch, ret;
 	uint64_t ctime;
+	struct siocb iocb = { 0 };
 
 	sd_store = find_store_driver(data);
 	if (!sd_store)
 		return SD_RES_NO_STORE;
 
+	latest_epoch = get_latest_epoch();
+	iocb.epoch = latest_epoch;
+	sd_store->format(&iocb);
 	sd_store->init(obj_path);
 	sys->nr_sobjs = hdr->copies;
 	sys->flags = hdr->flags;
@@ -149,9 +153,9 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	ctime = hdr->ctime;
 	set_cluster_ctime(ctime);
 
-	latest_epoch = get_latest_epoch();
 	for (i = 1; i <= latest_epoch; i++)
 		remove_epoch(i);
+
 	memset(sys->vdi_inuse, 0, sizeof(sys->vdi_inuse));
 
 	sys->epoch = 1;

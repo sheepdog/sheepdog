@@ -41,7 +41,7 @@ static char *mnt_path;
 static char *jrnl_path;
 static char *config_path;
 
-static mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
+mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 struct store_driver *sd_store;
@@ -892,7 +892,7 @@ int get_latest_epoch(void)
 }
 
 /* remove directory recursively */
-static int rmdir_r(char *dir_path)
+int rmdir_r(char *dir_path)
 {
 	int ret;
 	struct stat s;
@@ -944,13 +944,6 @@ int remove_epoch(int epoch)
 	dprintf("remove epoch %"PRIu32"\n", epoch);
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	ret = unlink(path);
-	if (ret && ret != -ENOENT) {
-		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
-		return SD_RES_EIO;
-	}
-
-	snprintf(path, sizeof(path), "%s%08u", obj_path, epoch);
-	ret = rmdir_r(path);
 	if (ret && ret != -ENOENT) {
 		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
 		return SD_RES_EIO;

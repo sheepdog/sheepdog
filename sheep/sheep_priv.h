@@ -171,6 +171,7 @@ struct store_driver {
 	int (*write)(uint64_t oid, struct siocb *);
 	int (*read)(uint64_t oid, struct siocb *);
 	int (*close)(uint64_t oid, struct siocb *);
+	int (*format)(struct siocb *);
 	/* Operations in recovery */
 	int (*get_objlist)(struct siocb *);
 	int (*link)(uint64_t oid, struct siocb *, int tgt_epoch);
@@ -298,6 +299,8 @@ int remove_object(struct sd_vnode *e,
 
 void del_sheep_fd(int fd);
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
+
+int rmdir_r(char *dir_path);
 
 /* Operations */
 
