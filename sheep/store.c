@@ -1804,6 +1804,12 @@ int start_recovery(uint32_t epoch)
 	rw->work.fn = do_recovery_work;
 	rw->work.done = do_recover_main;
 
+	if (sd_store->begin_recover) {
+		struct siocb iocb = { 0 };
+		iocb.epoch = epoch;
+		sd_store->begin_recover(&iocb);
+	}
+
 	if (recovering_work != NULL) {
 		if (next_rw) {
 			/* skip the previous epoch recovery */
