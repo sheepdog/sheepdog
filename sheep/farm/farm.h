@@ -20,7 +20,6 @@
 #include "logger.h"
 #include "strbuf.h"
 
-#define SHA1_LEN        20
 #define HEX_LEN         40
 #define NAME_LEN        HEX_LEN
 
@@ -64,5 +63,12 @@ extern int trunk_update_entry(uint64_t oid);
 extern void trunk_reset(void);
 extern void trunk_put_entry(uint64_t oid);
 extern void trunk_get_entry(uint64_t oid);
+
+/* snap.c */
+extern int snap_init(void);
+extern void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
+extern int snap_file_write(int epoch, unsigned char *outsha1, int user);
+extern void *snap_log_read(int *, int user);
+extern int snap_log_write(int epoch, unsigned char *sha1, int user);
 
 #endif

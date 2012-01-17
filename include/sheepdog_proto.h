@@ -198,6 +198,14 @@ struct sheepdog_vdi_attr {
 	char value[SD_MAX_VDI_ATTR_VALUE_LEN];
 };
 
+#define SHA1_LEN        20
+
+struct snap_log {
+	int epoch;
+	uint64_t time;
+	unsigned char sha1[SHA1_LEN];
+};
+
 /*
  * 64 bit FNV-1a non-zero initial basis
  */
