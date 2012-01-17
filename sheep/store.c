@@ -26,6 +26,7 @@
 #include "sheep_priv.h"
 #include "strbuf.h"
 #include "util.h"
+#include "farm/farm.h"
 
 struct sheepdog_config {
 	uint64_t ctime;
@@ -1862,7 +1863,16 @@ int init_base_path(const char *d)
 
 static int init_obj_path(const char *base_path)
 {
-	int new;
+	int new, len;
+
+	len = strlen(base_path);
+	/* farm needs extra HEX_LEN + 3 chars to store snapshot objects.
+	 * HEX_LEN + 3 = '/' + hex(2) + '/' + hex(38) + '\0'
+	 */
+	if (len + HEX_LEN + 3 > PATH_MAX) {
+		eprintf("insanely long object directory %s", base_path);
+		return -1;
+	}
 
 	obj_path = zalloc(strlen(base_path) + strlen(OBJ_PATH) + 1);
 	sprintf(obj_path, "%s" OBJ_PATH, base_path);
