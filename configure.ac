@@ -197,6 +197,11 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
+AC_ARG_ENABLE([farm],
+	[  --enable-farm           : build farm store driver ],,
+	[ enable_farm="yes" ],)
+AM_CONDITIONAL(BUILD_FARM, test x$enable_farm = xyes)
+
 CP=cp
 OS_LDL="-ldl"
 case "$host_os" in
@@ -256,6 +261,15 @@ if test "x${enable_accord}" = xyes; then
 	PKG_CHECK_MODULES([libacrd],[libacrd])
 	AC_DEFINE_UNQUOTED([HAVE_ACCORD], 1, [have accord])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES accord"
+fi
+
+if test "x${enable_farm}" = xyes; then
+	AC_CHECK_LIB([crypto], [SHA1_Init],,
+		AC_MSG_ERROR(libcrypto not found))
+	AC_CHECK_HEADERS([openssl/sha.h],,
+		AC_MSG_ERROR(sha.h header missing))
+	AC_DEFINE_UNQUOTED([HAVE_FARM], 1, [have farm])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES farm"
 fi
 
 # extra warnings

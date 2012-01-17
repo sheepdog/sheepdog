@@ -36,12 +36,16 @@ if BUILD_ACCORD
 sheep_SOURCES		+= cluster/accord.c
 endif
 
+if BUILD_FARM
+sheep_SOURCES		+= farm/sha1_file.c farm/trunk.c farm/snap.c farm/farm.c
+endif
+
 sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread \
-			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS)
+			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS) $(LIBS)
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= work.h sheep_priv.h cluster.h strbuf.h
+noinst_HEADERS		= work.h sheep_priv.h cluster.h strbuf.h farm/farm.h
 
 EXTRA_DIST		= 
 
