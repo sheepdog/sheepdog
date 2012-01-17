@@ -57,6 +57,14 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
+static void get_store_dir(struct strbuf *buf, int epoch)
+{
+	if (!strcmp(store.name, "simple"))
+		strbuf_addf(buf, "%s%08u", obj_path, epoch);
+	else /* XXX assume other store doesn't need epoch/obj pattern */
+		strbuf_addf(buf, "%s", obj_path);
+}
+
 int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
@@ -65,22 +73,27 @@ int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 	struct dirent *d;
 	uint64_t used = 0;
 	struct stat s;
-	char path[1024], store_dir[1024];
+	char path[1024];
+	struct strbuf store_dir = STRBUF_INIT;
 
 	ret = statvfs(mnt_path, &vs);
-	if (ret)
-		return SD_RES_EIO;
+	if (ret) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
 
-	snprintf(store_dir, sizeof(store_dir), "%s%08u", obj_path, epoch);
-	dir = opendir(store_dir);
-	if (!dir)
-		return SD_RES_EIO;
+	get_store_dir(&store_dir, epoch);
+	dir = opendir(store_dir.buf);
+	if (!dir) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
 
 	while ((d = readdir(dir))) {
 		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
 			continue;
 
-		snprintf(path, sizeof(path), "%s/%s", store_dir, d->d_name);
+		snprintf(path, sizeof(path), "%s/%s", store_dir.buf, d->d_name);
 
 		ret = stat(path, &s);
 		if (ret)
@@ -90,11 +103,13 @@ int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 	}
 
 	closedir(dir);
+	ret = SD_RES_SUCCESS;
 
 	*store_size = (uint64_t)vs.f_frsize * vs.f_bfree + used;
 	*store_free = (uint64_t)vs.f_frsize * vs.f_bfree;
-
-	return SD_RES_SUCCESS;
+out:
+	strbuf_release(&store_dir);
+	return ret;
 }
 
 static int merge_objlist(uint64_t *list1, int nr_list1,
@@ -411,11 +426,12 @@ out:
 
 int update_epoch_store(uint32_t epoch)
 {
-	char new[1024];
+	if (!strcmp(store.name, "simple")) {
+		char new[1024];
 
-	snprintf(new, sizeof(new), "%s%08u/", obj_path, epoch);
-	mkdir(new, def_dmode);
-
+		snprintf(new, sizeof(new), "%s%08u/", obj_path, epoch);
+		mkdir(new, def_dmode);
+	}
 	return 0;
 }
 
@@ -578,16 +594,19 @@ static int do_write_obj(struct siocb *iocb, struct sd_obj_req *req, uint32_t epo
 	iocb->length = hdr->data_length;
 	iocb->offset = hdr->offset;
 	if (is_vdi_obj(oid)) {
-		char path[1024];
+		struct strbuf buf = STRBUF_INIT;
 
-		snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
-			 epoch, oid);
+		get_store_dir(&buf, epoch);
+		strbuf_addf(&buf, "%016" PRIx64, oid);
 		jd = jrnl_begin(data, hdr->data_length,
-				   hdr->offset, path, jrnl_path);
-		if (!jd)
+				   hdr->offset, buf.buf, jrnl_path);
+		if (!jd) {
+			strbuf_release(&buf);
 			return SD_RES_EIO;
+		}
 		ret = store.write(oid, iocb);
 		jrnl_end(jd);
+		strbuf_release(&buf);
 	} else
 		ret = store.write(oid, iocb);
 
