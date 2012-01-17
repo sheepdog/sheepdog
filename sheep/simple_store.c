@@ -36,8 +36,47 @@ struct store_driver store;
 
 static int simple_store_init(char *path)
 {
-	eprintf("Use simple store driver\n");
-	return 0;
+	int epoch, latest_epoch;
+	DIR *dir;
+	struct dirent *dent;
+	char p[PATH_MAX];
+
+	eprintf("use simple store driver\n");
+	strcpy(p, path);
+	latest_epoch = get_latest_epoch();
+	for (epoch = 1; epoch <= latest_epoch; epoch++) {
+		snprintf(p, PATH_MAX, "%s/%08u", path, epoch);
+		dir = opendir(p);
+		if (!dir) {
+			if (errno == ENOENT)
+				continue;
+
+			vprintf(SDOG_ERR, "failed to open the epoch directory: %m\n");
+			return SD_RES_EIO;
+		}
+
+		vprintf(SDOG_INFO, "found the object directory %s\n", path);
+		while ((dent = readdir(dir))) {
+			uint64_t oid;
+
+			if (!strcmp(dent->d_name, ".") ||
+					!strcmp(dent->d_name, ".."))
+				continue;
+
+			oid = strtoull(dent->d_name, NULL, 16);
+			if (oid == 0 || oid == ULLONG_MAX)
+				continue;
+
+			if (!is_vdi_obj(oid))
+				continue;
+
+			vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
+
+			set_bit(oid_to_vid(oid), sys->vdi_inuse);
+		}
+		closedir(dir);
+	}
+	return SD_RES_SUCCESS;
 }
 
 static int store_write_last_sector(uint64_t oid, struct siocb *iocb)

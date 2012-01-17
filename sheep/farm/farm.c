@@ -185,6 +185,40 @@ static int farm_close(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
+static int init_sys_vdi_bitmap(char *path)
+{
+	DIR *dir;
+	struct dirent *dent;
+
+	dir = opendir(path);
+	if (!dir) {
+		vprintf(SDOG_ERR, "failed to open the working directory: %m\n");
+		return -1;
+	}
+
+	vprintf(SDOG_INFO, "found the working directory %s\n", path);
+	while ((dent = readdir(dir))) {
+		uint64_t oid;
+
+		if (!strcmp(dent->d_name, "."))
+			continue;
+
+		oid = strtoull(dent->d_name, NULL, 16);
+		if (oid == 0 || oid == ULLONG_MAX)
+			continue;
+
+		if (!is_vdi_obj(oid))
+			continue;
+
+		vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
+
+		set_bit(oid_to_vid(oid), sys->vdi_inuse);
+	}
+	closedir(dir);
+
+	return 0;
+}
+
 static int farm_init(char *p)
 {
 	dprintf("use farm store driver\n");
@@ -195,6 +229,9 @@ static int farm_init(char *p)
 		goto err;
 
 	if (snap_init() < 0)
+		goto err;
+
+	if (init_sys_vdi_bitmap(p) < 0)
 		goto err;
 
 	return SD_RES_SUCCESS;

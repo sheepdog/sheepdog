@@ -1889,54 +1889,12 @@ static int init_obj_path(const char *base_path)
 
 static int init_epoch_path(const char *base_path)
 {
-	int new, ret;
-	uint32_t epoch, latest_epoch;
-	DIR *dir;
-	char path[1024];
-	struct dirent *dent;
-	uint64_t oid;
+	int new;
 
 	epoch_path = zalloc(strlen(base_path) + strlen(EPOCH_PATH) + 1);
 	sprintf(epoch_path, "%s" EPOCH_PATH, base_path);
 
-	ret = init_path(epoch_path, &new);
-	if (new || ret)
-		return ret;
-
-	latest_epoch = get_latest_epoch();
-
-	for (epoch = 1; epoch <= latest_epoch; epoch++) {
-		snprintf(path, sizeof(path), "%s/%08u", obj_path, epoch);
-
-		vprintf(SDOG_INFO, "found the object directory %s\n", path);
-
-		dir = opendir(path);
-		if (!dir) {
-			if (errno == ENOENT)
-				continue;
-
-			vprintf(SDOG_ERR, "failed to open the epoch directory: %m\n");
-			return SD_RES_EIO;
-		}
-
-		while ((dent = readdir(dir))) {
-			if (!strcmp(dent->d_name, ".") ||
-			    !strcmp(dent->d_name, ".."))
-				continue;
-
-			oid = strtoull(dent->d_name, NULL, 16);
-
-			if (!is_vdi_obj(oid))
-				continue;
-
-			vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
-
-			set_bit(oid_to_vid(oid), sys->vdi_inuse);
-		}
-		closedir(dir);
-	}
-
-	return 0;
+	return init_path(epoch_path, &new);
 }
 
 static int init_mnt_path(const char *base_path)
