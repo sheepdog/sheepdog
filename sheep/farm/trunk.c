@@ -163,19 +163,19 @@ static int fill_entry_new_sha1(struct trunk_entry_incore *entry)
 	}
 	if (!strbuf_read(&buf, fd, SD_DATA_OBJ_SIZE) == SD_DATA_OBJ_SIZE) {
 		ret = -1;
-		close(fd);
-		goto out;
+		goto out_close;
 	}
 	hdr.size = buf.len;
 	strbuf_insert(&buf, 0, &hdr, sizeof(hdr));
 
 	if (sha1_file_write((void *)buf.buf, buf.len, entry->raw.sha1) < 0) {
 		ret = -1;
-		close(fd);
-		goto out;
+		goto out_close;
 	}
 	dprintf("data sha1:%s, %"PRIx64"\n", sha1_to_hex(entry->raw.sha1),
 		entry->raw.oid);
+out_close:
+	close(fd);
 out:
 	strbuf_release(&buf);
 	return ret;
