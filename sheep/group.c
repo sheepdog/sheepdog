@@ -820,7 +820,7 @@ static void __sd_join_done(struct cpg_event *cevent)
 
 	update_cluster_info(jm, &w->joined, w->member_list, w->member_list_entries);
 
-	if (sys_can_recover()) {
+	if (sys_can_recover() && jm->inc_epoch) {
 		list_for_each_entry_safe(node, t, &sys->leave_list, list) {
 			list_del(&node->list);
 		}
