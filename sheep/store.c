@@ -682,22 +682,11 @@ out:
 static int do_local_io(struct request *req, uint32_t epoch)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	int ret = SD_RES_SUCCESS;
 
 	hdr->epoch = epoch;
 	dprintf("%x, %" PRIx64" , %u\n", hdr->opcode, hdr->oid, epoch);
 
-	ret = do_process_work(req->op, &req->rq, &req->rp, req);
-
-	if (ret == SD_RES_NO_OBJ && hdr->flags & SD_FLAG_CMD_RECOVERY) {
-		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
-		int len = epoch_log_read(epoch - 1, req->data, hdr->data_length);
-		if (len < 0)
-			len = 0;
-		rsp->data_length = len;
-	}
-
-	return ret;
+	return do_process_work(req->op, &req->rq, &req->rp, req);
 }
 
 static int fix_object_consistency(struct request *req)
