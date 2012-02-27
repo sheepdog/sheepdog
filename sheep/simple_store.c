@@ -32,7 +32,7 @@ extern mode_t def_fmode;
 
 static int def_store_flags = O_DSYNC | O_RDWR;
 
-struct store_driver store;
+static int simple_store_write(uint64_t oid, struct siocb *iocb);
 
 static int simple_store_init(char *path)
 {
@@ -95,7 +95,7 @@ static int store_write_last_sector(uint64_t oid, struct siocb *iocb)
 	iocb->buf = buf;
 	iocb->length = size;
 	iocb->offset = SD_DATA_OBJ_SIZE - size;
-	ret = store.write(oid, iocb);
+	ret = simple_store_write(oid, iocb);
 	free(buf);
 
 	return ret;
