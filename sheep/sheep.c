@@ -36,12 +36,13 @@ static struct option const long_options[] = {
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
 	{"zone", required_argument, NULL, 'z'},
+	{"vnodes", required_argument, NULL, 'v'},
 	{"cluster", required_argument, NULL, 'c'},
 	{"help", no_argument, NULL, 'h'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "p:fl:dDz:c:h";
+static const char *short_options = "p:fl:dDz:v:c:h";
 
 static void usage(int status)
 {
@@ -59,6 +60,7 @@ Options:\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object store\n\
   -z, --zone              specify the zone id\n\
+  -v, --vnodes            specify the number of virtual nodes\n\
   -c, --cluster           specify the cluster driver\n\
   -h, --help              display this help and exit\n\
 ", PACKAGE_VERSION, program_name);
@@ -92,6 +94,7 @@ int main(int argc, char **argv)
 	int log_level = SDOG_INFO;
 	char path[PATH_MAX];
 	int64_t zone = -1;
+	int nr_vnodes = SD_DEFAULT_VNODES;
 	char *p;
 	struct cluster_driver *cdrv;
 
@@ -138,6 +141,15 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			sys->this_node.zone = zone;
+			break;
+		case 'v':
+			nr_vnodes = strtol(optarg, &p, 10);
+			if (optarg == p || nr_vnodes < 0 || SD_MAX_VNODES < nr_vnodes) {
+				fprintf(stderr, "Invalid number of virtual nodes '%s': "
+					"must be an integer between 0 and %u\n",
+					optarg, SD_MAX_VNODES);
+				exit(1);
+			}
 			break;
 		case 'c':
 			sys->cdrv = find_cdrv(optarg);
@@ -192,7 +204,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = create_cluster(port, zone);
+	ret = create_cluster(port, zone, nr_vnodes);
 	if (ret) {
 		eprintf("failed to create sheepdog cluster\n");
 		exit(1);

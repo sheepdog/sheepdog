@@ -1382,7 +1382,7 @@ oom:
 	panic("failed to allocate memory for a confchg event\n");
 }
 
-int create_cluster(int port, int64_t zone)
+int create_cluster(int port, int64_t zone, int nr_vnodes)
 {
 	int ret;
 	struct cdrv_handlers handlers = {
@@ -1407,7 +1407,7 @@ int create_cluster(int port, int64_t zone)
 		return -1;
 
 	sys->this_node.port = port;
-	sys->this_node.nr_vnodes = SD_DEFAULT_VNODES;
+	sys->this_node.nr_vnodes = nr_vnodes;
 	if (zone == -1) {
 		/* use last 4 bytes as zone id */
 		uint8_t *b = sys->this_node.addr + 12;

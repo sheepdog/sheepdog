@@ -235,7 +235,7 @@ int is_access_local(struct sd_vnode *e, int nr_nodes,
 
 void resume_pending_requests(void);
 
-int create_cluster(int port, int64_t zone);
+int create_cluster(int port, int64_t zone, int nr_vnodes);
 int leave_cluster(void);
 
 void start_cpg_event_work(void);
