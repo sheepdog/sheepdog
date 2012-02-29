@@ -68,12 +68,12 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "Failed to read object %lx\n", oid);
+		fprintf(stderr, "Failed to read object %" PRIx64 "\n", oid);
 		return SD_RES_EIO;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read object %lx %s\n", oid,
+		fprintf(stderr, "Failed to read object %" PRIx64 " %s\n", oid,
 			sd_strerror(rsp->result));
 		return rsp->result;
 	}
@@ -112,11 +112,11 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "Failed to write object %lx\n", oid);
+		fprintf(stderr, "Failed to write object %" PRIx64 "\n", oid);
 		return SD_RES_EIO;
 	}
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to write object %lx: %s\n", oid,
+		fprintf(stderr, "Failed to write object %" PRIx64 ": %s\n", oid,
 				sd_strerror(rsp->result));
 		return rsp->result;
 	}
