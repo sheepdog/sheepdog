@@ -130,7 +130,7 @@ static inline void del_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 	}
 
 	nr_nodes--;
-	memmove(nodes + idx, nodes + idx + 1, sizeof(*nodes) * nr_nodes - idx);
+	memmove(nodes + idx, nodes + idx + 1, sizeof(*nodes) * (nr_nodes - idx));
 }
 
 static int nodeid_to_addr(uint32_t nodeid, uint8_t *addr)
