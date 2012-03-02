@@ -92,7 +92,8 @@ not_found:
 		entry = xzalloc(sizeof(*entry));
 		entry->raw.oid = oid;
 		get_entry(entry, head);
-	}
+	} else
+		entry = NULL;
 out:
 	pthread_mutex_unlock(&hashtable_lock[h]);
 	return entry;
