@@ -1200,11 +1200,11 @@ static void sd_join_handler(struct sd_node *joined,
 
 	if (node_cmp(joined, &sys->this_node) == 0) {
 		if (result == CJ_RES_FAIL) {
-			eprintf("failed to join sheepdog cluster\n");
+			eprintf("Fail to join. The joining node has an invalid epoch.\n");
 			sys->cdrv->leave();
 			exit(1);
 		} else if (result == CJ_RES_JOIN_LATER) {
-			eprintf("failed to join sheepdog cluster: please retry when master is up\n");
+			eprintf("Fail to join. The joining node should be added after the cluster start working.\n");
 			sys->cdrv->leave();
 			exit(1);
 		}
