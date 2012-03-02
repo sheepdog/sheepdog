@@ -88,8 +88,15 @@ static int put_sha1_file(char *name)
 {
 	uint32_t count;
 
-	if (getxattr(name, CNAME, &count, CSIZE) < 0)
+	if (getxattr(name, CNAME, &count, CSIZE) < 0) {
+		if (errno == ENOENT) {
+			dprintf("sha1 file doesn't exist\n");
+			return -1;
+		} else {
 			panic("%m\n");
+		}
+	}
+
 	count--;
 	if (count == 0) {
 		if (unlink(name) < 0) {
