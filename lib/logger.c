@@ -353,9 +353,14 @@ static void log_flush(void)
 	}
 }
 
-static void log_sigsegv(void)
+static void log_sigexit(int signo)
 {
-	vprintf(SDOG_ERR, "logger pid %d exiting abnormally\n", getpid());
+	if (signo == SIGSEGV)
+		vprintf(SDOG_ERR, "logger pid %d exiting abnormally\n", getpid());
+	else if (signo == SIGHUP)
+		vprintf(SDOG_ERR, "sheep pid %d exiting.\n", pid);
+	else
+		vprintf(SDOG_ERR, "something wrong.\n");
 	log_flush();
 	closelog();
 	free_logarea();
@@ -419,13 +424,15 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 			exit(1);
 		}
 
+		pid = getppid();
 		/* flush on daemon's crash */
-		sa_new.sa_handler = (void*)log_sigsegv;
+		sa_new.sa_handler = (void*)log_sigexit;
 		sigemptyset(&sa_new.sa_mask);
 		sa_new.sa_flags = 0;
 		sigaction(SIGSEGV, &sa_new, &sa_old );
+		sigaction(SIGHUP, &sa_new, &sa_old );
 
-		prctl(PR_SET_PDEATHSIG, SIGSEGV);
+		prctl(PR_SET_PDEATHSIG, SIGHUP);
 
 		while (la->active) {
 			log_flush();
