@@ -645,11 +645,6 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 	char *buf = NULL;
 	struct siocb iocb;
 
-	if (!hdr->copies) {
-		eprintf("the number of copies cannot be zero\n");
-		return SD_RES_INVALID_PARMS;
-	}
-
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
