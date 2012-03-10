@@ -648,6 +648,7 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
+	iocb.length = hdr->data_length;
 	ret = sd_store->open(hdr->oid, &iocb, 1);
 	if (ret != SD_RES_SUCCESS)
 		return ret;

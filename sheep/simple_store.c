@@ -84,6 +84,7 @@ static int store_write_last_sector(uint64_t oid, struct siocb *iocb)
 	const int size = SECTOR_SIZE;
 	char *buf = NULL;
 	int ret;
+	uint32_t length = iocb->length;
 
 	buf = valloc(size);
 	if (!buf) {
@@ -94,7 +95,7 @@ static int store_write_last_sector(uint64_t oid, struct siocb *iocb)
 
 	iocb->buf = buf;
 	iocb->length = size;
-	iocb->offset = SD_DATA_OBJ_SIZE - size;
+	iocb->offset = length - size;
 	ret = simple_store_write(oid, iocb);
 	free(buf);
 
@@ -139,7 +140,7 @@ static int simple_store_open(uint64_t oid, struct siocb *iocb, int create)
 		/*
 		 * Preallocate the whole object to get a better filesystem layout.
 		 */
-		ret = fallocate(iocb->fd, 0, 0, SD_DATA_OBJ_SIZE);
+		ret = fallocate(iocb->fd, 0, 0, iocb->length);
 		if (ret < 0) {
 			if (errno != ENOSYS && errno != EOPNOTSUPP) {
 				ret = SD_RES_EIO;
