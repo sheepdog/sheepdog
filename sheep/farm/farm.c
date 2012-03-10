@@ -80,12 +80,12 @@ static int farm_write(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
-static int write_last_sector(int fd)
+static int write_last_sector(int fd, uint32_t length)
 {
 	const int size = SECTOR_SIZE;
 	char *buf;
 	int ret;
-	off_t off = SD_DATA_OBJ_SIZE - size;
+	off_t off = length - size;
 
 	buf = valloc(size);
 	if (!buf) {
@@ -127,14 +127,14 @@ static int err_to_sderr(uint64_t oid, int err)
 /*
  * Preallocate the whole object to get a better filesystem layout.
  */
-static int prealloc(int fd)
+static int prealloc(int fd, uint32_t size)
 {
-	int ret = fallocate(fd, 0, 0, SD_DATA_OBJ_SIZE);
+	int ret = fallocate(fd, 0, 0, size);
 	if (ret < 0) {
 		if (errno != ENOSYS && errno != EOPNOTSUPP)
 			ret = SD_RES_SYSTEM_ERROR;
 		else
-			ret = write_last_sector(fd);
+			ret = write_last_sector(fd, size);
 	} else
 		ret = SD_RES_SUCCESS;
 	return ret;
@@ -165,7 +165,7 @@ static int farm_open(uint64_t oid, struct siocb *iocb, int create)
 	iocb->fd = fd;
 	ret = SD_RES_SUCCESS;
 	if (!(iocb->flags & SD_FLAG_CMD_COW) && create) {
-		ret = prealloc(fd);
+		ret = prealloc(fd, iocb->length);
 		if (ret != SD_RES_SUCCESS)
 			close(fd);
 	}
