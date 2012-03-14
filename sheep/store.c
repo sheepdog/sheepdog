@@ -644,11 +644,19 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 	uint32_t epoch = hdr->epoch;
 	char *buf = NULL;
 	struct siocb iocb;
+	unsigned data_length;
+
+	if (is_vdi_obj(hdr->oid))
+		data_length = SD_INODE_SIZE;
+	else if (is_vdi_attr_obj(hdr->oid))
+		data_length = SD_ATTR_OBJ_SIZE;
+	else
+		data_length = SD_DATA_OBJ_SIZE;
 
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	iocb.length = hdr->data_length;
+	iocb.length = data_length;
 	ret = sd_store->open(hdr->oid, &iocb, 1);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -697,9 +705,9 @@ static int fix_object_consistency(struct request *req)
 	int old_opcode = hdr->opcode;
 
 	if (is_vdi_obj(hdr->oid))
-		data_length = sizeof(struct sheepdog_inode);
+		data_length = SD_INODE_SIZE;
 	else if (is_vdi_attr_obj(hdr->oid))
-		data_length = SD_MAX_VDI_ATTR_VALUE_LEN;
+		data_length = SD_ATTR_OBJ_SIZE;
 	else
 		data_length = SD_DATA_OBJ_SIZE;
 
@@ -1156,11 +1164,9 @@ static void *alloc_buffer_for(uint64_t oid)
 	void *buf = NULL;
 
 	if (is_vdi_obj(oid))
-		buf = xmalloc(sizeof(struct sheepdog_inode));
+		buf = xmalloc(SD_INODE_SIZE);
 	else if (is_vdi_attr_obj(oid))
-		buf = xmalloc(SD_MAX_VDI_ATTR_VALUE_LEN);
-	else if (is_data_obj(oid))
-		buf = valloc(SD_DATA_OBJ_SIZE);
+		buf = xmalloc(SD_ATTR_OBJ_SIZE);
 	else
 		buf = xmalloc(SD_DATA_OBJ_SIZE);
 
@@ -1227,9 +1233,9 @@ static int recover_object_from_replica(uint64_t oid,
 		goto out;
 	}
 	if (is_vdi_obj(oid))
-		rlen = sizeof(struct sheepdog_inode);
+		rlen = SD_INODE_SIZE;
 	else if (is_vdi_attr_obj(oid))
-		rlen = SD_MAX_VDI_ATTR_VALUE_LEN;
+		rlen = SD_ATTR_OBJ_SIZE;
 	else
 		rlen = SD_DATA_OBJ_SIZE;
 
