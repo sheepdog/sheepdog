@@ -425,7 +425,7 @@ struct deletion_work {
 	uint32_t vid;
 
 	int count;
-	char *buf;
+	uint32_t *buf;
 };
 
 static LIST_HEAD(deletion_work_list);
@@ -433,7 +433,7 @@ static LIST_HEAD(deletion_work_list);
 static void delete_one(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
-	uint32_t vdi_id = *(((uint32_t *)dw->buf) + dw->count - dw->done - 1);
+	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
 	struct sd_vnode *entries = NULL;
 	int nr_vnodes, nr_zones;
 	int ret, i;
@@ -516,9 +516,9 @@ static int fill_vdi_list(struct deletion_work *dw,
 		goto err;
 	}
 
-	((uint32_t *)dw->buf)[dw->count++] = root_vid;
+	dw->buf[dw->count++] = root_vid;
 again:
-	vid = ((uint32_t *)dw->buf)[done++];
+	vid = dw->buf[done++];
 	ret = read_object(entries, nr_vnodes, nr_zones, dw->epoch,
 			  vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
@@ -535,10 +535,10 @@ again:
 		if (!inode->child_vdi_id[i])
 			continue;
 
-		((uint32_t *)dw->buf)[dw->count++] = inode->child_vdi_id[i];
+		dw->buf[dw->count++] = inode->child_vdi_id[i];
 	}
 
-	if (((uint32_t *)dw->buf)[done])
+	if (dw->buf[done])
 		goto again;
 err:
 	free(inode);
@@ -597,7 +597,8 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 		goto err;
 	}
 
-	dw->buf = zalloc(1 << 20); /* FIXME: handle larger buffer */
+	/* buf is to store vdi id of every object */
+	dw->buf = zalloc(SD_INODE_SIZE - SD_INODE_HEADER_SIZE);
 	if (!dw->buf) {
 		ret = SD_RES_NO_MEM;
 		goto err;
