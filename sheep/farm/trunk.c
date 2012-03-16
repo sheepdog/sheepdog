@@ -189,7 +189,12 @@ static inline int trunk_entry_no_sha1(struct trunk_entry_incore *entry)
 
 static inline void put_entry(struct trunk_entry_incore *entry)
 {
+	int h = hash(entry->raw.oid);
+
+	pthread_mutex_lock(&hashtable_lock[h]);
 	hlist_del(&entry->hash);
+	pthread_mutex_unlock(&hashtable_lock[h]);
+
 	pthread_mutex_lock(&active_list_lock);
 	list_del(&entry->active_list);
 	trunk_entry_active_nr--;
@@ -360,7 +365,6 @@ void trunk_put_entry(uint64_t oid)
 
 	entry = lookup_trunk_entry(oid, 0);
 	if (entry)
-	/* When it is supposed to be put, no IO requests for it */
 		put_entry(entry);
 }
 
@@ -373,7 +377,6 @@ void trunk_reset(void)
 {
 	struct trunk_entry_incore *entry, *t;
 	list_for_each_entry_safe(entry, t, &trunk_active_list, active_list) {
-	/* This is supposed to be called by format operation, so no lock needed */
 		put_entry(entry);
 	}
 	eprintf("%s\n", trunk_entry_active_nr ? "WARN: active_list not clean" :
