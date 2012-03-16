@@ -1328,6 +1328,13 @@ again:
 
 	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n", oid, tgt_epoch);
 
+	if (cur_copies <= copy_idx) {
+		eprintf("epoch (%"PRIu32") has less copies (%d) than requested copy_idx: %d\n",
+		tgt_epoch, cur_copies, copy_idx);
+		ret = -1;
+		goto err;
+	}
+
 	tgt_idx = find_tgt_node(old, old_nr, old_idx, old_copies,
 			cur, cur_nr, cur_idx, cur_copies, copy_idx);
 	if (tgt_idx < 0) {
