@@ -382,3 +382,17 @@ void trunk_reset(void)
 	eprintf("%s\n", trunk_entry_active_nr ? "WARN: active_list not clean" :
 						"clean");
 }
+
+int trunk_get_working_objlist(uint64_t *list)
+{
+	int nr = 0;
+	struct trunk_entry_incore *entry;
+
+	pthread_mutex_lock(&active_list_lock);
+	list_for_each_entry(entry, &trunk_active_list, active_list) {
+		list[nr++] = entry->raw.oid;
+	}
+	pthread_mutex_unlock(&active_list_lock);
+
+	return nr;
+}

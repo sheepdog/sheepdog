@@ -177,41 +177,23 @@ out:
 	return ret;
 }
 
-static int merge_objlist(uint64_t *list1, int nr_list1,
-			 uint64_t *list2, int nr_list2);
-
 int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data)
 {
 	uint64_t *list = (uint64_t *)data;
-	int i, nr = 0;
+	int nr = 0;
 	int res = SD_RES_SUCCESS;
-	int buf_len;
-	char *buf;
+	struct objlist_cache_entry *entry;
+	struct rb_node *p;
 
-	/* FIXME: handle larger size */
-	buf_len = (1 << 22);
-	buf = zalloc(buf_len);
-	if (!buf) {
-		eprintf("failed to allocate memory\n");
-		res = SD_RES_NO_MEM;
-		goto out;
+	pthread_rwlock_rdlock(&obj_list_cache.lock);
+	for (p = rb_first(&obj_list_cache.root); p; p = rb_next(p)) {
+		entry = rb_entry(p, struct objlist_cache_entry, node);
+		list[nr++] = entry->oid;
 	}
+	pthread_rwlock_unlock(&obj_list_cache.lock);
 
-	for (i = 1; i <= hdr->tgt_epoch; i++) {
-		struct siocb iocb = { 0 };
-
-		iocb.buf = buf;
-		iocb.length = 0;
-		iocb.epoch = i;
-		sd_store->get_objlist(&iocb);
-		nr = merge_objlist(list, nr, (uint64_t *)iocb.buf, iocb.length);
-	}
-out:
-	free(buf);
 	rsp->data_length = nr * sizeof(uint64_t);
-	for (i = 0; i < nr; i++) {
-		dprintf("oid %"PRIx64"\n", list[i]);
-	}
+
 	return res;
 }
 
@@ -1756,7 +1738,7 @@ static int request_obj_list(struct sd_node *e, uint32_t epoch,
 	return rsp->data_length / sizeof(uint64_t);
 }
 
-static int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2)
+int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2)
 {
 	int i;
 	int old_nr_list1 = nr_list1;

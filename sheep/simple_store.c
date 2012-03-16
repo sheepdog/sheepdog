@@ -185,13 +185,12 @@ static int simple_store_close(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
-static int simple_store_get_objlist(struct siocb *siocb)
+static int get_epoch_obj_list(int epoch, uint64_t *objlist, int *nr)
 {
 	struct strbuf buf = STRBUF_INIT;
-	int epoch = siocb->epoch;
-	uint64_t *objlist = (uint64_t *)siocb->buf;
 	DIR *dir;
 	struct dirent *d;
+	int length = 0;
 	int ret = SD_RES_SUCCESS;
 
 	strbuf_addf(&buf, "%s%08u/", obj_path, epoch);
@@ -203,7 +202,6 @@ static int simple_store_get_objlist(struct siocb *siocb)
 		ret = SD_RES_EIO;
 		goto out;
 	}
-
 	while ((d = readdir(dir))) {
 		uint64_t oid;
 		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
@@ -213,11 +211,53 @@ static int simple_store_get_objlist(struct siocb *siocb)
 		if (oid == 0)
 			continue;
 
-		objlist[siocb->length++] = oid;
+		objlist[length++] = oid;
 	}
 	closedir(dir);
+	*nr = length;
 out:
 	strbuf_release(&buf);
+	return ret;
+}
+
+static int simple_store_get_objlist(struct siocb *siocb)
+{
+	uint64_t *objlist = (uint64_t*)siocb->buf;
+	uint64_t *buf;
+	int epoch, nr = 0, obj_nr = 0;
+	DIR *dir;
+	struct dirent *d;
+	int ret = SD_RES_SUCCESS, r;
+
+	dir = opendir(obj_path);
+	if (!dir) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	buf = zalloc(1 << 22);
+	if (!buf) {
+		dprintf("no memory to allocate.\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+		epoch = strtoul(d->d_name, NULL, 16);
+		if (epoch == 0)
+			continue;
+
+		r = get_epoch_obj_list(epoch, buf, &obj_nr);
+		if (SD_RES_SUCCESS == r)
+			nr = merge_objlist(objlist, nr, buf, obj_nr);
+	}
+	closedir(dir);
+
+	siocb->length = nr;
+	free(buf);
+out:
 	return ret;
 }
 

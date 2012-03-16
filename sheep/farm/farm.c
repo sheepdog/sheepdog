@@ -12,6 +12,7 @@
  */
 
 #include <dirent.h>
+#include <pthread.h>
 
 #include "farm.h"
 #include "sheep_priv.h"
@@ -269,29 +270,13 @@ out:
 
 static int farm_get_objlist(struct siocb *iocb)
 {
-	struct sha1_file_hdr hdr;
-	struct trunk_entry *trunk_buf, *trunk_free = NULL;
-	unsigned char trunk_sha1[SHA1_LEN];
-	uint64_t nr_trunks, i;
 	uint64_t *objlist = (uint64_t *)iocb->buf;
-	int ret = SD_RES_NO_TAG;
 
-	if (get_trunk_sha1(iocb->epoch, trunk_sha1, 0) < 0)
-		goto out;
-
-	trunk_free = trunk_buf = trunk_file_read(trunk_sha1, &hdr);
-	if (!trunk_buf)
-		goto out;
-
-	nr_trunks = hdr.priv;
-	for (i = 0; i < nr_trunks; i++, trunk_buf++)
-		objlist[iocb->length++] = trunk_buf->oid;
+	iocb->length = trunk_get_working_objlist(objlist);
 
 	dprintf("%"PRIu32"\n", iocb->length);
-	ret = SD_RES_SUCCESS;
-out:
-	free(trunk_free);
-	return ret;
+
+	return SD_RES_SUCCESS;
 }
 
 static void *retrieve_object_from_snap(uint64_t oid, int epoch)
