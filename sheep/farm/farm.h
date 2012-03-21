@@ -62,6 +62,7 @@ extern int sha1_file_try_delete(const unsigned char *sha1);
 
 /* trunk.c */
 extern int trunk_init(void);
+extern int trunk_file_write_recovery(unsigned char *outsha1);
 extern int trunk_file_write(unsigned char *outsha1, int user);
 extern void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
 extern int trunk_update_entry(uint64_t oid);
@@ -73,7 +74,7 @@ extern int trunk_get_working_objlist(uint64_t *list);
 /* snap.c */
 extern int snap_init(void);
 extern void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
-extern int snap_file_write(int epoch, unsigned char *outsha1, int user);
+extern int snap_file_write(int epoch, unsigned char *trunksha1, unsigned char *outsha1, int user);
 extern void *snap_log_read(int *, int user);
 extern int snap_log_write(int epoch, unsigned char *sha1, int user);
 

@@ -26,6 +26,7 @@
 #include "list.h"
 #include "util.h"
 #include "sheepdog_proto.h"
+#include "sheep_priv.h"
 
 #define TRUNK_ENTRY_DIRTY	0x00000001
 
@@ -282,6 +283,72 @@ static struct omap_entry *omap_file_insert(struct strbuf *buf, struct omap_entry
 	dprintf("oid, %"PRIx64"\n", new->oid);
 	strbuf_add(buf, new, sizeof(*new));
 	return NULL;
+}
+
+static int oid_stale(uint64_t oid)
+{
+	int i, vidx;
+	struct sd_vnode *vnodes = sys->vnodes;
+
+	for (i = 0; i < sys->nr_sobjs; i++) {
+		vidx = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
+		if (is_myself(vnodes[vidx].addr, vnodes[vidx].port))
+			return 0;
+	}
+	return 1;
+}
+
+int trunk_file_write_recovery(unsigned char *outsha1)
+{
+	struct trunk_entry_incore *entry, *t;
+	struct strbuf buf;
+	char p[PATH_MAX];
+	uint64_t data_size = sizeof(struct trunk_entry) * trunk_entry_active_nr;
+	struct sha1_file_hdr hdr, *h;
+	int ret = -1, active_nr = 0;
+	uint64_t oid;
+
+	memcpy(hdr.tag, TAG_TRUNK, TAG_LEN);
+	strbuf_init(&buf, sizeof(hdr) + data_size);
+	strbuf_add(&buf, &hdr, sizeof(hdr));
+
+	list_for_each_entry_safe(entry, t, &trunk_active_list, active_list) {
+		oid = entry->raw.oid;
+		if (oid_stale(oid)) {
+			dprintf("stale oid %"PRIx64"\n", oid);
+			if (trunk_entry_no_sha1(entry) || trunk_entry_is_dirty(entry)) {
+				if (fill_entry_new_sha1(entry) < 0) {
+					eprintf("write sha1 object fail.\n");
+					goto out;
+				}
+			}
+
+			strbuf_add(&buf, &entry->raw, sizeof(struct trunk_entry));
+			active_nr++;
+
+			snprintf(p, sizeof(p), "%s%016"PRIx64, obj_path, entry->raw.oid);
+			if (unlink(p) < 0) {
+				eprintf("%s:%m\n", p);
+				goto out;
+			}
+			dprintf("remove file %"PRIx64"\n", entry->raw.oid);
+			put_entry(entry);
+		}
+	}
+
+	h = (struct sha1_file_hdr*)buf.buf;
+	h->size = sizeof(struct trunk_entry) * active_nr;
+	h->priv = active_nr;
+
+	if (sha1_file_write((void *)buf.buf, buf.len, outsha1) < 0) {
+		dprintf("sha1 file write fail.\n");
+		goto out;
+	}
+
+	ret = SD_RES_SUCCESS;
+out:
+	strbuf_release(&buf);
+	return ret;
 }
 
 int trunk_file_write(unsigned char *outsha1, int user)

@@ -280,6 +280,40 @@ static int farm_get_objlist(struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
+
+static void *read_working_object(uint64_t oid, int length)
+{
+	void *buf = NULL;
+	char path[PATH_MAX];
+	int fd, ret;
+
+	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
+
+	fd = open(path, O_RDONLY, def_fmode);
+	if (fd < 0) {
+		eprintf("failed to open %s: %m\n", path);
+		goto out;
+	}
+
+	buf = malloc(length);
+	if (!buf) {
+		eprintf("no memory to allocate buffer.\n");
+		goto out;
+	}
+
+	ret = xread(fd, buf, length);
+	if (length != ret) {
+		eprintf("object read error.\n");
+		free(buf);
+		buf = NULL;
+		goto out;
+	}
+	close(fd);
+
+out:
+	return buf;
+}
+
 static void *retrieve_object_from_snap(uint64_t oid, int epoch)
 {
 	struct sha1_file_hdr hdr;
@@ -300,11 +334,11 @@ static void *retrieve_object_from_snap(uint64_t oid, int epoch)
 		struct sha1_file_hdr h;
 		if (trunk_buf->oid != oid)
 			continue;
+
 		buffer = sha1_file_read(trunk_buf->sha1, &h);
-		if (!buffer)
-			goto out;
 		break;
 	}
+
 out:
 	dprintf("oid %"PRIx64", epoch %d, %s\n", oid, epoch, buffer ? "succeed" : "fail");
 	free(trunk_free);
@@ -313,8 +347,26 @@ out:
 
 static int farm_read(uint64_t oid, struct siocb *iocb)
 {
+	int i;
+
 	if (iocb->epoch < sys->epoch) {
-		void *buffer = retrieve_object_from_snap(oid, iocb->epoch);
+		void *buffer;
+		buffer = read_working_object(oid, iocb->length);
+		if (!buffer) {
+			/* Here if read the object from the targeted epoch failed,
+			 * we need to read from the later epoch, because at some epoch
+			 * we doesn't write the object to the snapshot, we assume
+			 * it in the current local object directory, but maybe
+			 * in the next epoch we removed it from the local directory.
+			 * in this case, we should try to retrieve object upwards, since.
+			 * when the object is to be removed, it will get written to the
+			 * snapshot at later epoch. */
+			for (i = iocb->epoch; i < sys->epoch; i++) {
+				buffer = retrieve_object_from_snap(oid, i);
+				if (buffer)
+					break;
+			}
+		}
 		if (!buffer)
 			return SD_RES_NO_OBJ;
 		memcpy(iocb->buf, buffer, iocb->length);
@@ -369,31 +421,41 @@ out:
 static int farm_link(uint64_t oid, struct siocb *iocb, int tgt_epoch)
 {
 	int ret = SD_RES_EIO;
-	void *buf;
+	void *buf = NULL;
 	struct siocb io = { 0 };
+	int i;
 
 	dprintf("try link %"PRIx64" from snapshot with epoch %d\n", oid, tgt_epoch);
-	buf = retrieve_object_from_snap(oid, tgt_epoch);
+
+	for (i = tgt_epoch; i < sys->epoch; i++) {
+		buf = retrieve_object_from_snap(oid, i);
+		if (buf)
+			break;
+	}
 	if (!buf)
-		goto fail;
+		goto out;
 
 	io.length = SD_DATA_OBJ_SIZE;
 	io.buf = buf;
 	ret = farm_atomic_put(oid, &io);
-fail:
+out:
 	free(buf);
 	return ret;
 }
 
-static int farm_begin_recover(struct siocb *iocb)
+static int farm_end_recover(struct siocb *iocb)
 {
 	unsigned char snap_sha1[SHA1_LEN];
+	unsigned char trunk_sha1[SHA1_LEN];
 	int epoch = iocb->epoch - 1;
 
 	if (epoch == 0)
 		return SD_RES_SUCCESS;
 	dprintf("epoch %d\n", epoch);
-	if (snap_file_write(epoch, snap_sha1, 0) < 0)
+	if (trunk_file_write_recovery(trunk_sha1) < 0)
+		return SD_RES_EIO;
+
+	if (snap_file_write(epoch, trunk_sha1, snap_sha1, 0) < 0)
 		return SD_RES_EIO;
 
 	if (snap_log_write(iocb->epoch - 1, snap_sha1, 0) < 0)
@@ -402,58 +464,10 @@ static int farm_begin_recover(struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
-static int oid_stale(uint64_t oid)
-{
-	int i, vidx;
-	struct sd_vnode *vnodes = sys->vnodes;
-
-	for (i = 0; i < sys->nr_sobjs; i++) {
-		vidx = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
-		if (is_myself(vnodes[vidx].addr, vnodes[vidx].port))
-			return 0;
-	}
-	return 1;
-}
-
-static int farm_end_recover(struct siocb *iocb)
-{
-	DIR *dir;
-	struct dirent *d;
-	uint64_t oid;
-	int ret = SD_RES_EIO;
-
-	dprintf("%d\n", iocb->epoch);
-	dir = opendir(obj_path);
-	if (!dir)
-		goto out;
-
-	while ((d = readdir(dir))) {
-		if (!strncmp(d->d_name, ".", 1))
-			continue;
-		oid = strtoull(d->d_name, NULL, 16);
-		if (oid == 0 || oid == ULLONG_MAX)
-			continue;
-		if (oid_stale(oid)) {
-			char p[PATH_MAX];
-			snprintf(p, sizeof(p), "%s%s", obj_path, d->d_name);
-			if (unlink(p) < 0) {
-				eprintf("%s:%m\n", p);
-				goto out_close;
-			}
-			trunk_put_entry(oid);
-			dprintf("remove oid %s\n", d->d_name);
-		}
-	}
-	ret = SD_RES_SUCCESS;
-out_close:
-	closedir(dir);
-out:
-	return ret;
-}
-
 static int farm_snapshot(struct siocb *iocb)
 {
 	unsigned char snap_sha1[SHA1_LEN];
+	unsigned char trunk_sha1[SHA1_LEN];
 	void *buffer;
 	int log_nr, ret = SD_RES_EIO, epoch;
 
@@ -463,7 +477,10 @@ static int farm_snapshot(struct siocb *iocb)
 
 	epoch = log_nr + 1;
 	dprintf("user epoch %d\n", epoch);
-	if (snap_file_write(epoch, snap_sha1, 1) < 0)
+	if (trunk_file_write(trunk_sha1, 1) < 0)
+		goto out;
+
+	if (snap_file_write(epoch, trunk_sha1, snap_sha1, 1) < 0)
 		goto out;
 
 	if (snap_log_write(epoch, snap_sha1, 1) < 0)
@@ -619,7 +636,6 @@ struct store_driver farm = {
 	.get_objlist = farm_get_objlist,
 	.link = farm_link,
 	.atomic_put = farm_atomic_put,
-	.begin_recover = farm_begin_recover,
 	.end_recover = farm_end_recover,
 	.snapshot = farm_snapshot,
 	.restore = farm_restore,

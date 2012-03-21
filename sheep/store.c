@@ -1320,8 +1320,16 @@ static int recover_object_from_replica(uint64_t oid,
 		return -1;
 	}
 
+	if (is_vdi_obj(oid))
+		rlen = SD_INODE_SIZE;
+	else if (is_vdi_attr_obj(oid))
+		rlen = SD_ATTR_OBJ_SIZE;
+	else
+		rlen = SD_DATA_OBJ_SIZE;
+
 	if (is_myself(entry->addr, entry->port)) {
 		iocb.epoch = epoch;
+		iocb.length = rlen;
 		ret = sd_store->link(oid, &iocb, tgt_epoch);
 		if (ret == SD_RES_SUCCESS) {
 			ret = 0;
@@ -1340,12 +1348,6 @@ static int recover_object_from_replica(uint64_t oid,
 		ret = -1;
 		goto out;
 	}
-	if (is_vdi_obj(oid))
-		rlen = SD_INODE_SIZE;
-	else if (is_vdi_attr_obj(oid))
-		rlen = SD_ATTR_OBJ_SIZE;
-	else
-		rlen = SD_DATA_OBJ_SIZE;
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
