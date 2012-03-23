@@ -640,6 +640,7 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
 	struct request *request = (struct request *)data;
+	struct sd_obj_req cow_hdr;
 	int ret;
 	uint32_t epoch = hdr->epoch;
 	char *buf = NULL;
@@ -663,22 +664,30 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
 
-		buf = xzalloc(SD_DATA_OBJ_SIZE);
-		ret = read_copy_from_cluster(request, hdr->epoch, hdr->cow_oid, buf);
-		if (ret != SD_RES_SUCCESS) {
-			eprintf("failed to read cow object\n");
+		buf = zalloc(SD_DATA_OBJ_SIZE);
+		if (!buf) {
+			eprintf("can not allocate memory\n");
 			goto out;
 		}
-		iocb.buf = buf;
-		iocb.length = SD_DATA_OBJ_SIZE;
-		iocb.offset = 0;
-		ret = sd_store->write(hdr->oid, &iocb);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-	}
-	ret = do_write_obj(&iocb, hdr, epoch, request->data);
+		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
+			ret = read_copy_from_cluster(request, hdr->epoch, hdr->cow_oid, buf);
+			if (ret != SD_RES_SUCCESS) {
+				eprintf("failed to read cow object\n");
+				goto out;
+			}
+		}
+
+		memcpy(buf + hdr->offset, request->data, hdr->data_length);
+		memcpy(&cow_hdr, hdr, sizeof(cow_hdr));
+		cow_hdr.offset = 0;
+		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
+
+		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf);
+	} else
+		ret = do_write_obj(&iocb, hdr, epoch, request->data);
 out:
-	free(buf);
+	if (buf)
+		free(buf);
 	sd_store->close(hdr->oid, &iocb);
 	return ret;
 }
