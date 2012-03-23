@@ -25,7 +25,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 sbin_PROGRAMS		= sheep
 
 sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c journal.c ops.c \
-			  cluster/local.c strbuf.c simple_store.c
+			  cluster/local.c strbuf.c simple_store.c object_cache.c
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c
 endif
