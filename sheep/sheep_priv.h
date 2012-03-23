@@ -20,6 +20,7 @@
 #include "net.h"
 #include "sheep.h"
 #include "cluster.h"
+#include "rbtree.h"
 
 #define SD_OP_GET_OBJ_LIST   0xA1
 #define SD_OP_GET_EPOCH      0XA2
