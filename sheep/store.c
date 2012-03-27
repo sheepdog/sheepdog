@@ -784,6 +784,14 @@ static int bypass_object_cache(struct sd_obj_req *hdr)
 {
 	uint64_t oid = hdr->oid;
 
+	/*
+	 * We assume the cached object is freshest, donot break it ever.
+	 * This assumption is useful for non-cache requests from collie,
+	 * which tries hard to get the newest data.
+	 */
+	if (object_is_cached(oid))
+		return 0;
+
 	if (!(hdr->flags & SD_FLAG_CMD_CACHE))
 		return 1;
 
