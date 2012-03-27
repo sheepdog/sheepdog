@@ -422,5 +422,6 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *);
 int object_cache_pull(struct object_cache *oc, uint32_t index);
 int object_cache_push(struct object_cache *oc);
 int object_cache_init(const char *p);
+int object_is_cached(uint64_t oid);
 
 #endif

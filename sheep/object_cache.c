@@ -416,6 +416,26 @@ out:
 	return ret;
 }
 
+int object_is_cached(uint64_t oid)
+{
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *cache;
+
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+
+	cache = find_object_cache(vid, 0);
+	if (!cache)
+		return 0;
+
+	cache->oid = oid;
+	if (object_cache_lookup(cache, idx) < 0)
+		return 0;
+	else
+		return 1; /* found it */
+}
+
 int object_cache_init(const char *p)
 {
 	int ret = 0;

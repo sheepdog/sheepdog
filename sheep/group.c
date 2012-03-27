@@ -1082,6 +1082,7 @@ do_retry:
 
 	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
+		struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 
 		if (cevent->ctype == CPG_EVENT_NOTIFY)
 			continue;
@@ -1095,6 +1096,13 @@ do_retry:
 
 			if (copies > req->nr_zones)
 				copies = req->nr_zones;
+
+			if (object_is_cached(hdr->oid)) {
+				/* If we have cache of it we are at its service. */
+				list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
+				sys->nr_outstanding_io++;
+				goto gateway_work;
+			}
 
 			if (__is_access_to_recoverying_objects(req)) {
 				if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
@@ -1128,7 +1136,6 @@ do_retry:
 			}
 
 			if (need_consistency_check(req->rq.opcode, req->rq.flags)) {
-				struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 				uint32_t vdi_id = oid_to_vid(hdr->oid);
 				struct data_object_bmap *bmap;
 
@@ -1150,6 +1157,7 @@ do_retry:
 		else if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 			queue_work(sys->io_wqueue, &req->work);
 		else
+gateway_work:
 			queue_work(sys->gateway_wqueue, &req->work);
 	}
 
