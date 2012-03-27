@@ -93,6 +93,8 @@ static int cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid,
 		      hdr->snapid, &nr_copies);
 
+	if (ret == SD_RES_SUCCESS)
+		object_cache_delete(vid);
 	vdi_rsp->vdi_id = vid;
 	vdi_rsp->copies = nr_copies;
 

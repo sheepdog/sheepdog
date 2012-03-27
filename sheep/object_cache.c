@@ -436,6 +436,35 @@ int object_is_cached(uint64_t oid)
 		return 1; /* found it */
 }
 
+void object_cache_delete(uint32_t vid)
+{
+	struct object_cache *cache;
+
+	cache = find_object_cache(vid, 0);
+	if (cache) {
+		int h = hash(vid);
+		struct object_cache_entry *entry, *t;
+		struct strbuf buf = STRBUF_INIT;
+
+		/* Firstly we free memeory */
+		pthread_mutex_lock(&hashtable_lock[h]);
+		hlist_del(&cache->hash);
+		pthread_mutex_unlock(&hashtable_lock[h]);
+
+		list_for_each_entry_safe(entry, t, &cache->dirty_list, list) {
+			free(entry);
+		}
+		free(cache);
+
+		/* Then we free disk */
+		strbuf_addf(&buf, "%s/%06"PRIx32, cache_dir, vid);
+		rmdir_r(buf.buf);
+
+		strbuf_release(&buf);
+	}
+
+}
+
 int object_cache_init(const char *p)
 {
 	int ret = 0;
