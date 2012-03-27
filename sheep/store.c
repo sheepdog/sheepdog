@@ -288,7 +288,7 @@ out:
 	return ret;
 }
 
-static int forward_write_obj_req(struct request *req)
+int forward_write_obj_req(struct request *req)
 {
 	int i, n, nr, fd, ret, pollret;
 	unsigned wlen;
@@ -1510,6 +1510,11 @@ void resume_recovery_work(void)
 
 	suspended_recovery_work = NULL;
 	queue_work(sys->recovery_wqueue, &rw->work);
+}
+
+int node_in_recovery(void)
+{
+	return !!recovering_work;
 }
 
 int is_recoverying_oid(uint64_t oid)

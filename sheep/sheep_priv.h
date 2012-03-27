@@ -246,6 +246,7 @@ int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 		       uint32_t epoch, int create);
 int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset, int copies, uint32_t epoch);
+int forward_write_obj_req(struct request *req);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	       struct sd_node *entries, int *nr_entries);
@@ -285,6 +286,7 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 int start_recovery(uint32_t epoch);
 void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
+int node_in_recovery(void);
 
 int write_object(struct sd_vnode *e,
 		 int vnodes, int zones, uint32_t node_version,

@@ -342,10 +342,54 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int push_cache_object(int fd, uint64_t oid)
+static int push_cache_object(uint32_t vid, uint32_t idx)
 {
+	struct request fake_req;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&fake_req.rq;
+	void *buf;
+	unsigned data_length;
+	int ret = SD_RES_NO_MEM;
+	uint64_t oid = idx_to_oid(vid, idx);
+
 	dprintf("%"PRIx64"\n", oid);
-	return 0;
+
+	memset(&fake_req, 0, sizeof(fake_req));
+	if (is_vdi_obj(oid))
+		data_length = sizeof(struct sheepdog_inode);
+	else
+		data_length = SD_DATA_OBJ_SIZE;
+
+	buf = valloc(data_length);
+	if (buf == NULL) {
+		eprintf("failed to allocate memory\n");
+		goto out;
+	}
+
+	ret = read_cache_object(vid, idx, buf, data_length, 0);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	hdr->offset = 0;
+	hdr->data_length = data_length;
+	hdr->opcode = SD_OP_WRITE_OBJ;
+	hdr->flags = SD_FLAG_CMD_WRITE;
+	hdr->oid = oid;
+	hdr->copies = sys->nr_sobjs;
+	hdr->epoch = sys->epoch;
+	fake_req.data = buf;
+	fake_req.op = get_sd_op(SD_OP_WRITE_OBJ);
+	fake_req.entry = sys->vnodes;
+	fake_req.nr_vnodes = sys->nr_vnodes;
+	fake_req.nr_zones = get_zones_nr_from(sys->nodes, sys->nr_vnodes);
+
+	ret = forward_write_obj_req(&fake_req);
+	if (ret != SD_RES_SUCCESS) {
+		eprintf("failed to push object %x\n", ret);
+		goto out;
+	}
+out:
+	free(buf);
+	return ret;
 }
 
 /* Push back all the dirty objects to sheep cluster storage */
