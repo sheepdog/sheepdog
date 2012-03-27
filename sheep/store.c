@@ -22,6 +22,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "sheep_priv.h"
 #include "strbuf.h"
@@ -41,11 +42,73 @@ static char *mnt_path;
 static char *jrnl_path;
 static char *config_path;
 
+struct objlist_cache {
+	struct rb_root root;
+	int cache_size;
+	pthread_rwlock_t lock;
+};
+
+struct objlist_cache_entry {
+	uint64_t oid;
+	struct rb_node node;
+};
+
+static struct objlist_cache obj_list_cache;
+
 mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
 struct store_driver *sd_store;
 LIST_HEAD(store_drivers);
+
+static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
+			struct objlist_cache_entry *new)
+{
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct objlist_cache_entry *entry;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct objlist_cache_entry, node);
+
+		if (new->oid < entry->oid)
+			p = &(*p)->rb_left;
+		else if (new->oid > entry->oid)
+			p = &(*p)->rb_right;
+		else
+			return entry; /* already has this entry */
+	}
+	rb_link_node(&new->node, parent, p);
+	rb_insert_color(&new->node, root);
+
+	return NULL; /* insert successfully */
+}
+
+static int check_and_insert_objlist_cache(uint64_t oid)
+{
+	struct objlist_cache_entry *entry, *p;
+
+	entry = zalloc(sizeof(*entry));
+
+	if (!entry) {
+		eprintf("no memory to allocate cache entry.\n");
+		return -1;
+	}
+
+	entry->oid = oid;
+	rb_init_node(&entry->node);
+
+	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	p = objlist_cache_rb_insert(&obj_list_cache.root, entry);
+	if (p)
+		free(entry);
+	else
+		obj_list_cache.cache_size++;
+	pthread_rwlock_unlock(&obj_list_cache.lock);
+
+	return 0;
+}
 
 static int obj_cmp(const void *oid1, const void *oid2)
 {
@@ -685,6 +748,9 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf);
 	} else
 		ret = do_write_obj(&iocb, hdr, epoch, request->data);
+
+	if (SD_RES_SUCCESS == ret)
+		check_and_insert_objlist_cache(hdr->oid);
 out:
 	if (buf)
 		free(buf);
@@ -2024,6 +2090,36 @@ static int init_config_path(const char *base_path)
 	return 0;
 }
 
+static int init_objlist_cache(void)
+{
+	int i;
+	struct siocb iocb = { 0 };
+	uint64_t *buf;
+
+	pthread_rwlock_init(&obj_list_cache.lock, NULL);
+	obj_list_cache.root = RB_ROOT;
+	obj_list_cache.cache_size = 0;
+
+	if (sd_store) {
+		buf = zalloc(1 << 22);
+		if (!buf) {
+			eprintf("no memory to allocate.\n");
+			return -1;
+		}
+
+		iocb.length = 0;
+		iocb.buf = buf;
+		sd_store->get_objlist(&iocb);
+
+		for (i = 0; i < iocb.length; i++)
+			check_and_insert_objlist_cache(buf[i]);
+
+		free(buf);
+	}
+
+	return 0;
+}
+
 int init_store(const char *d)
 {
 	int ret;
@@ -2062,6 +2158,10 @@ int init_store(const char *d)
 			return ret;
 	} else
 		dprintf("no store found\n");
+
+	ret = init_objlist_cache();
+	if (ret)
+		return ret;
 
 	ret = object_cache_init(d);
 	if (ret)
