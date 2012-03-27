@@ -387,4 +387,38 @@ static inline int sys_can_halt(void)
 	return sys_stat_ok() && !sys_flag_nohalt();
 }
 
+/* object_cache */
+/*
+ * Object Cache ID
+ *
+ *  0 - 19 (20 bits): data object space
+ *  20 - 27 (8 bits): reserved
+ *  28 - 31 (4 bits): object type indentifier space
+ */
+
+#define CACHE_VDI_SHIFT       31
+#define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
+
+struct object_cache {
+	uint32_t vid;
+	uint64_t oid;
+	struct list_head dirty_list;
+	struct hlist_node hash;
+	struct rb_root dirty_rb;
+	pthread_mutex_t lock;
+};
+
+struct object_cache_entry {
+	uint32_t idx;
+	struct rb_node rb;
+	struct list_head list;
+};
+
+struct object_cache *find_object_cache(uint32_t vid, int create);
+int object_cache_lookup(struct object_cache *oc, uint32_t index);
+int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *);
+int object_cache_pull(struct object_cache *oc, uint32_t index);
+int object_cache_push(struct object_cache *oc);
+int object_cache_init(const char *p);
+
 #endif
