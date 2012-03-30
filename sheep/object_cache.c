@@ -291,15 +291,15 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 			iocb.epoch = sys->epoch;
 			ret = sd_store->open(oid, &iocb, 0);
 			if (ret != SD_RES_SUCCESS)
-				goto out;
+				goto pull_remote;
 
 			iocb.buf = buf;
 			iocb.length = data_length;
 			iocb.offset = 0;
 			ret = sd_store->read(oid, &iocb);
-			if (ret != SD_RES_SUCCESS)
-				goto out;
 			sd_store->close(oid, &iocb);
+			if (ret != SD_RES_SUCCESS)
+				goto pull_remote;
 			/* read succeed */
 			read_len = iocb.length;
 			dprintf("[local] %08"PRIx32"\n", idx);
@@ -307,26 +307,37 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		}
 	}
 
+pull_remote:
 	/* Okay, no luck, let's read remotely */
-	hdr.opcode = SD_OP_READ_OBJ;
-	hdr.oid = oid;
-	hdr.epoch = sys->epoch;
-	hdr.data_length = rlen = data_length;
-	hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+	for (i = 0; i < sys->nr_sobjs; i++) {
+		n = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
+		if (is_myself(vnodes[n].addr, vnodes[n].port))
+			continue;
 
-	fd = get_sheep_fd(vnodes[n].addr, vnodes[n].port, vnodes[n].node_idx, hdr.epoch);
-	if (fd < 0) {
-		ret = SD_RES_NETWORK_ERROR;
-		goto out;
+		hdr.opcode = SD_OP_READ_OBJ;
+		hdr.oid = oid;
+		hdr.epoch = sys->epoch;
+		hdr.data_length = rlen = data_length;
+		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+
+		fd = get_sheep_fd(vnodes[n].addr, vnodes[n].port, vnodes[n].node_idx, hdr.epoch);
+		if (fd < 0)
+			continue;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+		if (ret) { /* network errors */
+			del_sheep_fd(fd);
+			ret = SD_RES_NETWORK_ERROR;
+		} else
+			ret = rsp->result;
+		read_len = rlen;
+
+		dprintf("[remote] %08"PRIx32", res:%"PRIx32"\n", idx, ret);
+		if (ret != SD_RES_SUCCESS)
+			continue;
+		else
+			break;
 	}
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
-	if (ret) { /* network errors */
-		del_sheep_fd(fd);
-		ret = SD_RES_NETWORK_ERROR;
-	} else
-		ret = rsp->result;
-	read_len = rlen;
-	dprintf("[remote] %08"PRIx32", res:%"PRIx32"\n", idx, ret);
 out:
 	if (ret == SD_RES_SUCCESS)
 		ret = create_cache_object(oc, idx, buf, read_len);
