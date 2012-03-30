@@ -137,19 +137,51 @@ out:
 	return cache;
 }
 
-int object_cache_lookup(struct object_cache *oc, uint32_t idx)
+static void add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx, int create)
+{
+	struct object_cache_entry *entry = xzalloc(sizeof(*entry));
+
+	entry->idx = idx;
+	pthread_mutex_lock(&oc->lock);
+	if (!dirty_tree_insert(&oc->dirty_rb, entry)) {
+		if (create)
+			entry->create = 1;
+		list_add(&entry->list, &oc->dirty_list);
+	} else
+		free(entry);
+	pthread_mutex_unlock(&oc->lock);
+}
+
+int object_cache_lookup(struct object_cache *oc, uint32_t idx, int create)
 {
 	struct strbuf buf;
-	int fd, ret = 0;
+	int fd, ret = 0, flags = def_open_flags;
 
 	strbuf_init(&buf, PATH_MAX);
 	strbuf_addstr(&buf, cache_dir);
 	strbuf_addf(&buf, "/%06"PRIx32"/%08"PRIx32, oc->vid, idx);
 
-	fd = open(buf.buf, def_open_flags, def_fmode);
+	if (create)
+		flags |= O_CREAT | O_TRUNC;
+
+	fd = open(buf.buf, flags, def_fmode);
 	if (fd < 0) {
 		ret = -1;
 		goto out;
+	}
+
+	if (create) {
+		unsigned data_length;
+		uint64_t oid = oc->oid;
+		if (is_vdi_obj(oid))
+			data_length = SD_INODE_SIZE;
+		else
+			data_length = SD_DATA_OBJ_SIZE;
+		ret = prealloc(fd, data_length);
+		if (ret != SD_RES_SUCCESS)
+			ret = -1;
+		else
+			add_to_dirty_tree_and_list(oc, idx, 1);
 	}
 	close(fd);
 out:
@@ -195,19 +227,6 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 	return ret;
 }
 
-static void add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx)
-{
-	struct object_cache_entry *entry = xzalloc(sizeof(*entry));
-
-	entry->idx = idx;
-	pthread_mutex_lock(&oc->lock);
-	if (!dirty_tree_insert(&oc->dirty_rb, entry))
-		list_add(&entry->list, &oc->dirty_list);
-	else
-		free(entry);
-	pthread_mutex_unlock(&oc->lock);
-}
-
 int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
@@ -219,7 +238,7 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 		ret = write_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		add_to_dirty_tree_and_list(oc, idx);
+		add_to_dirty_tree_and_list(oc, idx, 0);
 	} else {
 		ret = read_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
 		if (ret != SD_RES_SUCCESS)
@@ -353,7 +372,7 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int push_cache_object(uint32_t vid, uint32_t idx)
+static int push_cache_object(uint32_t vid, uint32_t idx, int create)
 {
 	struct request fake_req;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&fake_req.rq;
@@ -362,7 +381,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx)
 	int ret = SD_RES_NO_MEM;
 	uint64_t oid = idx_to_oid(vid, idx);
 
-	dprintf("%"PRIx64"\n", oid);
+	dprintf("%"PRIx64", create %d\n", oid, create);
 
 	memset(&fake_req, 0, sizeof(fake_req));
 	if (is_vdi_obj(oid))
@@ -382,13 +401,13 @@ static int push_cache_object(uint32_t vid, uint32_t idx)
 
 	hdr->offset = 0;
 	hdr->data_length = data_length;
-	hdr->opcode = SD_OP_WRITE_OBJ;
+	hdr->opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->oid = oid;
 	hdr->copies = sys->nr_sobjs;
 	hdr->epoch = sys->epoch;
 	fake_req.data = buf;
-	fake_req.op = get_sd_op(SD_OP_WRITE_OBJ);
+	fake_req.op = get_sd_op(hdr->opcode);
 	fake_req.entry = sys->vnodes;
 	fake_req.nr_vnodes = sys->nr_vnodes;
 	fake_req.nr_zones = get_zones_nr_from(sys->nodes, sys->nr_vnodes);
@@ -414,7 +433,7 @@ int object_cache_push(struct object_cache *oc)
 		return SD_RES_SUCCESS;
 
 	list_for_each_entry_safe(entry, t, &oc->dirty_list, list) {
-		ret = push_cache_object(oc->vid, entry->idx);
+		ret = push_cache_object(oc->vid, entry->idx, entry->create);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		pthread_mutex_lock(&oc->lock);
@@ -441,7 +460,7 @@ int object_is_cached(uint64_t oid)
 		return 0;
 
 	cache->oid = oid;
-	if (object_cache_lookup(cache, idx) < 0)
+	if (object_cache_lookup(cache, idx, 0) < 0)
 		return 0;
 	else
 		return 1; /* found it */

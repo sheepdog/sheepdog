@@ -813,14 +813,18 @@ static int handle_gateway_request(struct request *req)
 	uint32_t vid = oid_to_vid(oid);
 	uint32_t idx = data_oid_to_idx(oid);
 	struct object_cache *cache;
-	int ret;
+	int ret, create = 0;
 
 	if (is_vdi_obj(oid))
 		idx |= 1 << CACHE_VDI_SHIFT;
 
 	cache = find_object_cache(vid, 1);
 	cache->oid = oid;
-	if (object_cache_lookup(cache, idx) < 0) {
+
+	if (hdr->opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+		create = 1;
+
+	if (object_cache_lookup(cache, idx, create) < 0) {
 		ret = object_cache_pull(cache, idx);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
@@ -843,11 +847,10 @@ static int bypass_object_cache(struct sd_obj_req *hdr)
 	if (!(hdr->flags & SD_FLAG_CMD_CACHE))
 		return 1;
 
-	/* For create, we skip the cache because of consistency check.
+	/*
 	 * For vmstate && vdi_attr object, we don't do caching
 	 */
-	if (hdr->opcode == SD_OP_CREATE_AND_WRITE_OBJ || is_vmstate_obj(oid)
-			|| is_vdi_attr_obj(oid))
+	if (is_vmstate_obj(oid) || is_vdi_attr_obj(oid))
 		return 1;
 	return 0;
 }
@@ -870,13 +873,13 @@ void do_io_request(struct work *work)
 	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
 		ret = do_local_io(req, epoch);
 	} else {
-		/* fix object consistency when we read the object for the first time */
-		if (req->check_consistency) {
-			ret = fix_object_consistency(req);
-			if (ret != SD_RES_SUCCESS)
-				goto out;
-		}
 		if (bypass_object_cache(hdr)) {
+			/* fix object consistency when we read the object for the first time */
+			if (req->check_consistency) {
+				ret = fix_object_consistency(req);
+				if (ret != SD_RES_SUCCESS)
+					goto out;
+			}
 			if (hdr->flags & SD_FLAG_CMD_WRITE)
 				ret = forward_write_obj_req(req);
 			else

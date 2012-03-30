@@ -306,6 +306,8 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 
 int rmdir_r(char *dir_path);
 
+int prealloc(int fd, uint32_t size);
+
 /* Operations */
 
 struct sd_op_template *get_sd_op(uint8_t opcode);
@@ -415,10 +417,11 @@ struct object_cache_entry {
 	uint32_t idx;
 	struct rb_node rb;
 	struct list_head list;
+	int create;
 };
 
 struct object_cache *find_object_cache(uint32_t vid, int create);
-int object_cache_lookup(struct object_cache *oc, uint32_t index);
+int object_cache_lookup(struct object_cache *oc, uint32_t index, int create);
 int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *);
 int object_cache_pull(struct object_cache *oc, uint32_t index);
 int object_cache_push(struct object_cache *oc);

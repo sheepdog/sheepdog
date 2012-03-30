@@ -128,13 +128,14 @@ static int err_to_sderr(uint64_t oid, int err)
 /*
  * Preallocate the whole object to get a better filesystem layout.
  */
-static int prealloc(int fd, uint32_t size)
+int prealloc(int fd, uint32_t size)
 {
 	int ret = fallocate(fd, 0, 0, size);
 	if (ret < 0) {
-		if (errno != ENOSYS && errno != EOPNOTSUPP)
+		if (errno != ENOSYS && errno != EOPNOTSUPP) {
+			dprintf("%m\n");
 			ret = SD_RES_SYSTEM_ERROR;
-		else
+		} else
 			ret = write_last_sector(fd, size);
 	} else
 		ret = SD_RES_SUCCESS;
