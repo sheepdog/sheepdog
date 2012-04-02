@@ -408,7 +408,6 @@ static inline int sys_can_halt(void)
 
 struct object_cache {
 	uint32_t vid;
-	uint64_t oid;
 	struct list_head dirty_list;
 	struct hlist_node hash;
 	struct rb_root dirty_rb;

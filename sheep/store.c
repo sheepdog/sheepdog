@@ -819,7 +819,6 @@ static int handle_gateway_request(struct request *req)
 		idx |= 1 << CACHE_VDI_SHIFT;
 
 	cache = find_object_cache(vid, 1);
-	cache->oid = oid;
 
 	if (hdr->opcode == SD_OP_CREATE_AND_WRITE_OBJ)
 		create = 1;

@@ -172,11 +172,11 @@ int object_cache_lookup(struct object_cache *oc, uint32_t idx, int create)
 
 	if (create) {
 		unsigned data_length;
-		uint64_t oid = oc->oid;
-		if (is_vdi_obj(oid))
+		if (idx & CACHE_VDI_BIT)
 			data_length = SD_INODE_SIZE;
 		else
 			data_length = SD_DATA_OBJ_SIZE;
+
 		ret = prealloc(fd, data_length);
 		if (ret != SD_RES_SUCCESS)
 			ret = -1;
@@ -262,7 +262,7 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	int ret;
 
-	dprintf("%"PRIx64", len %"PRIu32", off %"PRIu64"\n", oc->oid, hdr->data_length, hdr->offset);
+	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx, hdr->data_length, hdr->offset);
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
 		ret = write_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
 		if (ret != SD_RES_SUCCESS)
@@ -314,16 +314,19 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
 	int i, n = 0, fd, ret = SD_RES_NO_MEM;
 	unsigned wlen = 0, rlen, data_length, read_len;
-	uint64_t oid = oc->oid;
+	uint64_t oid;
 	struct sd_obj_req hdr = { 0 };
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *vnodes = sys->vnodes;
 	void *buf;
 
-	if (is_vdi_obj(oid))
+	if (idx & CACHE_VDI_BIT) {
+		oid = vid_to_vdi_oid(oc->vid);
 		data_length = SD_INODE_SIZE;
-	else
+	} else {
+		oid = vid_to_data_oid(oc->vid, idx);
 		data_length = SD_DATA_OBJ_SIZE;
+	}
 
 	buf = valloc(data_length);
 	if (buf == NULL) {
@@ -488,7 +491,6 @@ int object_is_cached(uint64_t oid)
 	if (!cache)
 		return 0;
 
-	cache->oid = oid;
 	if (object_cache_lookup(cache, idx, 0) < 0)
 		return 0;
 	else
