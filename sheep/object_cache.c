@@ -30,7 +30,7 @@
 #define HASH_SIZE	(1 << HASH_BITS)
 
 static char cache_dir[PATH_MAX];
-static int def_open_flags = O_DSYNC | O_RDWR;
+static int def_open_flags = O_RDWR;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
 extern struct store_driver *sd_store;
@@ -192,14 +192,17 @@ out:
 static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count, off_t offset)
 {
 	size_t size;
-	int fd, ret = SD_RES_SUCCESS;
+	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
 	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
 
-	fd = open(p.buf, def_open_flags, def_fmode);
+	if (sys->use_directio && !(idx & CACHE_VDI_BIT))
+		flags |= O_DIRECT;
+
+	fd = open(p.buf, flags, def_fmode);
 	size = xpwrite(fd, buf, count, offset);
 	if (size != count)
 		ret = SD_RES_EIO;
@@ -211,14 +214,17 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count, off_t offset)
 {
 	size_t size;
-	int fd, ret = SD_RES_SUCCESS;
+	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
 	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
 
-	fd = open(p.buf, def_open_flags, def_fmode);
+	if (sys->use_directio && !(idx & CACHE_VDI_BIT))
+		flags |= O_DIRECT;
+
+	fd = open(p.buf, flags, def_fmode);
 	size = xpread(fd, buf, count, offset);
 	if (size != count)
 		ret = SD_RES_EIO;
@@ -292,7 +298,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	void *buf;
 
 	if (is_vdi_obj(oid))
-		data_length = sizeof(struct sheepdog_inode);
+		data_length = SD_INODE_SIZE;
 	else
 		data_length = SD_DATA_OBJ_SIZE;
 
@@ -385,7 +391,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx, int create)
 
 	memset(&fake_req, 0, sizeof(fake_req));
 	if (is_vdi_obj(oid))
-		data_length = sizeof(struct sheepdog_inode);
+		data_length = SD_INODE_SIZE;
 	else
 		data_length = SD_DATA_OBJ_SIZE;
 

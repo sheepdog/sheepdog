@@ -1267,20 +1267,6 @@ static int find_tgt_node(struct sd_vnode *old_entry,
 	return -1;
 }
 
-static void *alloc_buffer_for(uint64_t oid)
-{
-	void *buf = NULL;
-
-	if (is_vdi_obj(oid))
-		buf = xmalloc(SD_INODE_SIZE);
-	else if (is_vdi_attr_obj(oid))
-		buf = xmalloc(SD_ATTR_OBJ_SIZE);
-	else
-		buf = xmalloc(SD_DATA_OBJ_SIZE);
-
-	return buf;
-}
-
 static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
 {
 	int nodes_nr, len = sizeof(struct sd_vnode) * SD_MAX_VNODES;
@@ -1310,15 +1296,9 @@ static int recover_object_from_replica(uint64_t oid,
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	char name[128];
 	unsigned wlen = 0, rlen;
-	int fd, ret;
+	int fd, ret = -1;
 	void *buf;
 	struct siocb iocb = { 0 };
-
-	buf = alloc_buffer_for(oid);
-	if (!buf) {
-		eprintf("out of memory\n");
-		return -1;
-	}
 
 	if (is_vdi_obj(oid))
 		rlen = SD_INODE_SIZE;
@@ -1326,6 +1306,12 @@ static int recover_object_from_replica(uint64_t oid,
 		rlen = SD_ATTR_OBJ_SIZE;
 	else
 		rlen = SD_DATA_OBJ_SIZE;
+
+	buf = valloc(rlen);
+	if (!buf) {
+		eprintf("%m\n");
+		goto out;
+	}
 
 	if (is_myself(entry->addr, entry->port)) {
 		iocb.epoch = epoch;
