@@ -51,6 +51,11 @@ struct sd_op_template {
 	int (*process_main)(const struct sd_req *req, struct sd_rsp *rsp, void *data);
 };
 
+struct flush_work {
+	struct object_cache *cache;
+	struct work work;
+};
+
 static int cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
@@ -456,6 +461,22 @@ static int local_get_snap_file(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
+static void flush_vdi_fn(struct work *work)
+{
+	struct flush_work *fw = container_of(work, struct flush_work, work);
+
+	dprintf("flush vdi %"PRIx32"\n", fw->cache->vid);
+	if (object_cache_push(fw->cache) != SD_RES_SUCCESS)
+		eprintf("failed to flush vdi %"PRIx32"\n", fw->cache->vid);
+}
+
+static void flush_vdi_done(struct work *work)
+{
+	struct flush_work *fw = container_of(work, struct flush_work, work);
+	dprintf("flush vdi %"PRIx32" done\n", fw->cache->vid);
+	free(fw);
+}
+
 static int local_flush_vdi(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
@@ -463,8 +484,17 @@ static int local_flush_vdi(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	uint32_t vid = oid_to_vid(oid);
 	struct object_cache *cache = find_object_cache(vid, 0);
 
-	if (cache)
-		return object_cache_push(cache);
+	if (cache) {
+		if (sys->sync_flush)
+			return object_cache_push(cache);
+		else {
+			struct flush_work *fw = xmalloc(sizeof(*fw));
+			fw->work.fn = flush_vdi_fn;
+			fw->work.done = flush_vdi_done;
+			fw->cache = cache;
+			queue_work(sys->flush_wqueue, &fw->work);
+		}
+	}
 
 	return SD_RES_SUCCESS;
 }

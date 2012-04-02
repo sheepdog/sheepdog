@@ -147,12 +147,14 @@ struct cluster_info {
 	uint32_t recovered_epoch;
 
 	int use_directio;
+	uint8_t sync_flush;
 
 	struct work_queue *cpg_wqueue;
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
 	struct work_queue *deletion_wqueue;
 	struct work_queue *recovery_wqueue;
+	struct work_queue *flush_wqueue;
 };
 
 struct siocb {

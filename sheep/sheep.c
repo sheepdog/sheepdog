@@ -59,6 +59,7 @@ Options:\n\
   -l, --loglevel          specify the level of logging detail\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object from cache or backend store\n\
+  -S, --sync              flush the object cache synchronously\n\
   -z, --zone              specify the zone id\n\
   -v, --vnodes            specify the number of virtual nodes\n\
   -c, --cluster           specify the cluster driver\n\
@@ -131,6 +132,10 @@ int main(int argc, char **argv)
 		case 'D':
 			dprintf("direct IO mode\n");
 			sys->use_directio = 1;
+			break;
+		case 'S':
+			dprintf("sync flush\n");
+			sys->sync_flush = 1;
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
@@ -215,8 +220,10 @@ int main(int argc, char **argv)
 	sys->io_wqueue = init_work_queue(NR_IO_WORKER_THREAD);
 	sys->recovery_wqueue = init_work_queue(1);
 	sys->deletion_wqueue = init_work_queue(1);
+	sys->flush_wqueue = init_work_queue(1);
 	if (!sys->cpg_wqueue || !sys->gateway_wqueue || !sys->io_wqueue ||
-	    !sys->recovery_wqueue || !sys->deletion_wqueue)
+	    !sys->recovery_wqueue || !sys->deletion_wqueue ||
+	    !sys->flush_wqueue)
 		exit(1);
 
 	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);

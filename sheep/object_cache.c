@@ -203,9 +203,20 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
+	if (flock(fd, LOCK_EX) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	size = xpwrite(fd, buf, count, offset);
+	if (flock(fd, LOCK_UN) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	if (size != count)
 		ret = SD_RES_EIO;
+out:
 	close(fd);
 	strbuf_release(&p);
 	return ret;
@@ -225,9 +236,21 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
+	if (flock(fd, LOCK_SH) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
+
 	size = xpread(fd, buf, count, offset);
+	if (flock(fd, LOCK_UN) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	if (size != count)
 		ret = SD_RES_EIO;
+out:
 	close(fd);
 	strbuf_release(&p);
 	return ret;
