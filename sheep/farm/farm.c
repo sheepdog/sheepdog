@@ -20,7 +20,7 @@
 char farm_obj_dir[PATH_MAX];
 char farm_dir[PATH_MAX];
 
-static int def_open_flags = O_DSYNC | O_RDWR;
+static int def_open_flags = O_DIRECT | O_DSYNC | O_RDWR;
 extern char *obj_path;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
@@ -151,8 +151,8 @@ static int farm_open(uint64_t oid, struct siocb *iocb, int create)
 	if (iocb->epoch < sys->epoch)
 		goto out;
 
-	if (sys->use_directio && is_data_obj(oid))
-		flags |= O_DIRECT;
+	if (is_vdi_obj(oid))
+		flags &= ~O_DIRECT;
 
 	if (create)
 		flags |= O_CREAT | O_TRUNC;
@@ -390,6 +390,9 @@ static int farm_atomic_put(uint64_t oid, struct siocb *iocb)
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
 	snprintf(tmp_path, sizeof(tmp_path), "%s%016" PRIx64 ".tmp",
 		 obj_path, oid);
+
+	if (is_vdi_obj(oid))
+		flags &= ~O_DIRECT;
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
 		eprintf("failed to open %s: %m\n", tmp_path);

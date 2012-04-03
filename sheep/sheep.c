@@ -58,7 +58,7 @@ Options:\n\
   -f, --foreground        make the program run in the foreground\n\
   -l, --loglevel          specify the level of logging detail\n\
   -d, --debug             include debug messages in the log\n\
-  -D, --directio          use direct IO when accessing the object from cache or backend store\n\
+  -D, --directio          use direct IO when accessing the object from object cache\n\
   -S, --sync              flush the object cache synchronously\n\
   -z, --zone              specify the zone id\n\
   -v, --vnodes            specify the number of virtual nodes\n\

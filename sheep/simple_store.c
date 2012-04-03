@@ -30,7 +30,7 @@ extern char *obj_path;
 
 extern mode_t def_fmode;
 
-static int def_store_flags = O_DSYNC | O_RDWR;
+static int def_store_flags = O_DIRECT | O_DSYNC | O_RDWR;
 
 static int simple_store_write(uint64_t oid, struct siocb *iocb);
 
@@ -108,8 +108,8 @@ static int simple_store_open(uint64_t oid, struct siocb *iocb, int create)
 	int ret;
 	int flags = def_store_flags;
 
-	if (sys->use_directio && is_data_obj(oid))
-		flags |= O_DIRECT;
+	if (is_vdi_obj(oid))
+		flags &= ~O_DIRECT;
 
 	if (create)
 		flags |= O_CREAT | O_TRUNC;
