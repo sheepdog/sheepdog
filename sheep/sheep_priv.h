@@ -429,5 +429,6 @@ int object_cache_push(struct object_cache *oc);
 int object_cache_init(const char *p);
 int object_is_cached(uint64_t oid);
 void object_cache_delete(uint32_t vid);
+int object_cache_flush_and_delete(struct object_cache *oc);
 
 #endif

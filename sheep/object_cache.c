@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/file.h>
+#include <dirent.h>
 
 #include "sheep_priv.h"
 #include "util.h"
@@ -524,6 +525,47 @@ void object_cache_delete(uint32_t vid)
 		strbuf_release(&buf);
 	}
 
+}
+
+int object_cache_flush_and_delete(struct object_cache *oc)
+{
+	DIR *dir;
+	struct dirent *d;
+	uint32_t vid = oc->vid;
+	uint32_t idx;
+	struct strbuf p;
+	int ret = 0;
+
+	strbuf_init(&p, PATH_MAX);
+	strbuf_addstr(&p, cache_dir);
+	strbuf_addf(&p, "/%06"PRIx32, vid);
+
+	dprintf("%"PRIx32"\n", vid);
+	dir = opendir(p.buf);
+	if (!dir) {
+		dprintf("%m\n");
+		ret = -1;
+		goto out;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strncmp(d->d_name, ".", 1))
+			continue;
+		idx = strtoul(d->d_name, NULL, 16);
+		if (idx == ULLONG_MAX)
+			continue;
+		if (push_cache_object(vid, idx, 1) != SD_RES_SUCCESS) {
+			dprintf("failed to push %"PRIx64"\n",
+				idx_to_oid(vid, idx));
+			ret = -1;
+			goto out;
+		}
+	}
+
+	object_cache_delete(vid);
+out:
+	strbuf_release(&p);
+	return ret;
 }
 
 int object_cache_init(const char *p)

@@ -835,16 +835,28 @@ static int bypass_object_cache(struct sd_obj_req *hdr)
 {
 	uint64_t oid = hdr->oid;
 
-	/*
-	 * We assume the cached object is freshest, donot break it ever.
-	 * This assumption is useful for non-cache requests from collie,
-	 * which tries hard to get the newest data.
-	 */
-	if (object_is_cached(oid))
-		return 0;
+	if (!(hdr->flags & SD_FLAG_CMD_CACHE)) {
+		uint32_t vid = oid_to_vid(oid);
+		struct object_cache *cache;
 
-	if (!(hdr->flags & SD_FLAG_CMD_CACHE))
-		return 1;
+		cache = find_object_cache(vid, 0);
+		if (!cache)
+			return 1;
+		if (hdr->flags & SD_FLAG_CMD_WRITE) {
+			object_cache_flush_and_delete(cache);
+			return 1;
+		} else  {
+			/* For read requet, we can read cache if any */
+			uint32_t idx = data_oid_to_idx(oid);
+			if (is_vdi_obj(oid))
+				idx |= 1 << CACHE_VDI_SHIFT;
+
+			if (object_cache_lookup(cache, idx, 0) < 0)
+				return 1;
+			else
+				return 0;
+		}
+	}
 
 	/*
 	 * For vmstate && vdi_attr object, we don't do caching
