@@ -376,9 +376,10 @@ static void *read_working_object(uint64_t oid, int length)
 		buf = NULL;
 		goto out;
 	}
-	close(fd);
 
 out:
+	if (fd > 0)
+		close(fd);
 	return buf;
 }
 
