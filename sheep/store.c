@@ -210,7 +210,9 @@ static int read_copy_from_cluster(struct request *req, uint32_t epoch,
 	int fd;
 
 	e = req->entry;
-	nr = req->nr_vnodes;
+	nr = sys->nr_sobjs;
+	if (nr > req->nr_zones)
+		nr = req->nr_zones;
 
 	for (i = 0; i < nr; i++) {
 		n = obj_to_sheep(e, nr, oid, i);
