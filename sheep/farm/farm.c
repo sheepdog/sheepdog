@@ -314,6 +314,8 @@ static int init_sys_vdi_bitmap(char *path)
 
 static int farm_init(char *p)
 {
+	struct siocb iocb;
+
 	dprintf("use farm store driver\n");
 	if (create_directory(p) < 0)
 		goto err;
@@ -326,6 +328,9 @@ static int farm_init(char *p)
 
 	if (init_sys_vdi_bitmap(p) < 0)
 		goto err;
+
+	iocb.epoch = sys->epoch - 1;
+	farm_cleanup_sys_obj(&iocb);
 
 	return SD_RES_SUCCESS;
 err:

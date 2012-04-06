@@ -42,7 +42,10 @@ static unsigned int trunk_entry_active_nr;
 struct omap_entry {
 	uint64_t oid;
 	unsigned char sha1[SHA1_LEN];
+	struct rb_node node;
 };
+
+struct rb_root omap_tree;
 
 static inline int trunk_entry_is_dirty(struct trunk_entry_incore *entry)
 {
@@ -100,27 +103,6 @@ out:
 	return entry;
 }
 
-static int create_files(void)
-{
-	int fd, ret = 0;
-	struct strbuf buf = STRBUF_INIT;
-
-	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", "sys_omap");
-
-	fd = open(buf.buf, O_CREAT | O_EXCL, 0666);
-	if (fd < 0) {
-		if (errno != EEXIST) {
-			ret = -1;
-			goto out;
-		}
-	}
-	close(fd);
-out:
-	strbuf_release(&buf);
-	return ret;
-}
-
 int trunk_init(void)
 {
 	DIR *dir;
@@ -140,8 +122,7 @@ int trunk_init(void)
 		lookup_trunk_entry(oid, 1);
 	}
 
-	if (create_files() < 0)
-		return -1;
+	omap_tree = RB_ROOT;
 
 	closedir(dir);
 	return 0;
@@ -203,85 +184,52 @@ static inline void put_entry(struct trunk_entry_incore *entry)
 	free(entry);
 }
 
-static int omap_file_init(struct strbuf *outbuf)
+static struct omap_entry *omap_tree_rb_insert(struct rb_root *root,
+			struct omap_entry *new)
 {
-	int fd;
-	int len = -1;
-	void *buffer = NULL;
-	struct strbuf buf = STRBUF_INIT;
-	struct stat st;
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct omap_entry *entry;
 
-	strbuf_addf(&buf, "%s/%s", farm_dir, "sys_omap");
-	fd = open(buf.buf, O_RDONLY);
-	if (fd < 0)
-		goto out;
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct omap_entry, node);
 
-	if (fstat(fd, &st) < 0) {
-		dprintf("%m\n");
-		goto out_close;
+		if (new->oid < entry->oid)
+			p = &(*p)->rb_left;
+		else if (new->oid > entry->oid)
+			p = &(*p)->rb_right;
+		else
+			return entry; /* already has this entry */
 	}
+	rb_link_node(&new->node, parent, p);
+	rb_insert_color(&new->node, root);
 
-	len = st.st_size;
-	if (len == 0)
-		goto out_close;
-
-	buffer = xmalloc(len);
-	len = xread(fd, buffer, len);
-	if (len != st.st_size) {
-		len = -1;
-		goto out_close;
-	}
-	strbuf_add(outbuf, buffer, len);
-out_close:
-	close(fd);
-out:
-	strbuf_release(&buf);
-	free(buffer);
-	return len;
+	return NULL; /* insert successfully */
 }
 
-static int omap_file_final(struct strbuf *omap_buf)
+static unsigned char *omap_tree_insert(uint64_t oid, unsigned char *sha1)
 {
-	int fd, ret = -1;
-	struct strbuf buf = STRBUF_INIT;
+	struct omap_entry *existing_entry, *new;
+	static unsigned char old_sha1[SHA1_LEN];
 
-	if (omap_buf->len == 0)
-		return 0;
+	new = xmalloc(sizeof(*new));
+	new->oid = oid;
+	memcpy(new->sha1, sha1, SHA1_LEN);
+	rb_init_node(&new->node);
 
-	strbuf_addf(&buf, "%s/%s", farm_dir, "sys_omap");
-	fd = open(buf.buf, O_WRONLY | O_TRUNC);
-	if (fd < 0) {
-		dprintf("%m\n");
-		goto out;
-	}
-
-	ret = xwrite(fd, omap_buf->buf, omap_buf->len);
-	if (ret != omap_buf->len)
-		ret = -1;
-
-	close(fd);
-out:
-	strbuf_release(&buf);
-	return ret;
-}
-
-static struct omap_entry *omap_file_insert(struct strbuf *buf, struct omap_entry *new)
-{
-	unsigned i, nr = buf->len / sizeof(struct omap_entry);
-	struct omap_entry *omap_buf = (struct omap_entry *)buf->buf;
-	for (i = 0; i < nr; i++, omap_buf++)
-		if (omap_buf->oid == new->oid) {
-			if (memcmp(omap_buf->sha1, new->sha1, SHA1_LEN) == 0)
-				return NULL;
-			else {
-				struct omap_entry *old = xmalloc(sizeof(*old));
-				memcpy(old, omap_buf, sizeof(*old));
-				memcpy(omap_buf->sha1, new->sha1, SHA1_LEN);
-				return old;
-			}
+	existing_entry = omap_tree_rb_insert(&omap_tree, new);
+	if (existing_entry) {
+		free(new);
+		if (memcmp(existing_entry->sha1, sha1, SHA1_LEN) == 0) {
+			return NULL;
+		} else {
+			memcpy(old_sha1, existing_entry->sha1, SHA1_LEN);
+			memcpy(existing_entry->sha1, sha1, SHA1_LEN);
+			return old_sha1;
 		}
-	dprintf("oid, %"PRIx64"\n", new->oid);
-	strbuf_add(buf, new, sizeof(*new));
+	}
+
 	return NULL;
 }
 
@@ -305,15 +253,14 @@ static int oid_stale(uint64_t oid)
 int trunk_file_write_recovery(unsigned char *outsha1)
 {
 	struct trunk_entry_incore *entry, *t;
-	struct strbuf buf;
+	struct strbuf buf = STRBUF_INIT;
 	char p[PATH_MAX];
-	uint64_t data_size = sizeof(struct trunk_entry) * trunk_entry_active_nr;
 	struct sha1_file_hdr hdr, *h;
 	int ret = -1, active_nr = 0;
 	uint64_t oid;
+	unsigned char *old_sha1;
 
 	memcpy(hdr.tag, TAG_TRUNK, TAG_LEN);
-	strbuf_init(&buf, sizeof(hdr) + data_size);
 	strbuf_add(&buf, &hdr, sizeof(hdr));
 
 	list_for_each_entry_safe(entry, t, &trunk_active_list, active_list) {
@@ -326,6 +273,10 @@ int trunk_file_write_recovery(unsigned char *outsha1)
 					goto out;
 				}
 			}
+
+			old_sha1 = omap_tree_insert(oid, entry->raw.sha1);
+			if (old_sha1)
+				sha1_file_try_delete(old_sha1);
 
 			strbuf_add(&buf, &entry->raw, sizeof(struct trunk_entry));
 			active_nr++;
@@ -357,7 +308,7 @@ out:
 
 int trunk_file_write(unsigned char *outsha1, int user)
 {
-	struct strbuf buf, omap_buf = STRBUF_INIT;
+	struct strbuf buf;
 	uint64_t data_size = sizeof(struct trunk_entry) * trunk_entry_active_nr;
 	struct sha1_file_hdr hdr = { .size = data_size,
 				     .priv = trunk_entry_active_nr };
@@ -366,7 +317,6 @@ int trunk_file_write(unsigned char *outsha1, int user)
 
 	memcpy(hdr.tag, TAG_TRUNK, TAG_LEN);
 	strbuf_init(&buf, sizeof(hdr) + data_size);
-	omap_file_init(&omap_buf);
 
 	strbuf_add(&buf, &hdr, sizeof(hdr));
 	list_for_each_entry_safe(entry, t, &trunk_active_list, active_list) {
@@ -377,20 +327,9 @@ int trunk_file_write(unsigned char *outsha1, int user)
 			}
 		}
 		strbuf_add(&buf, &entry->raw, sizeof(struct trunk_entry));
-		if (!user) {
-			struct omap_entry new = { .oid = entry->raw.oid }, *old;
-			memcpy(new.sha1, entry->raw.sha1, SHA1_LEN);
-			old = omap_file_insert(&omap_buf, &new);
-			if (old) {
-				dprintf("try delete stale snapshot object %"PRIx64"\n", old->oid);
-				sha1_file_try_delete(old->sha1);
-				free(old);
-			}
-		}
+
 		undirty_trunk_entry(entry);
 	}
-	if (omap_file_final(&omap_buf) < 0)
-		eprintf("omap_file_final failed\n");
 
 	if (sha1_file_write((void *)buf.buf, buf.len, outsha1) < 0) {
 		ret = -1;
@@ -399,7 +338,6 @@ int trunk_file_write(unsigned char *outsha1, int user)
 	dprintf("trunk sha1: %s\n", sha1_to_hex(outsha1));
 out:
 	strbuf_release(&buf);
-	strbuf_release(&omap_buf);
 	return ret;
 }
 
