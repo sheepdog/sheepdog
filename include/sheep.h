@@ -42,6 +42,7 @@
 #define SD_OP_SNAPSHOT       0x91
 #define SD_OP_RESTORE        0x92
 #define SD_OP_GET_SNAP_FILE  0x93
+#define SD_OP_CLEANUP        0x94
 
 #define SD_FLAG_CMD_IO_LOCAL   0x0010
 #define SD_FLAG_CMD_RECOVERY 0x0020
@@ -269,6 +270,7 @@ static inline const char *sd_strerror(int err)
 		{SD_RES_MANUAL_RECOVER, "Cluster is running/halted and cannot be manually recovered"},
 		{SD_RES_NO_STORE, "Targeted backend store is not found"},
 		{SD_RES_NO_SUPPORT, "Operation is not supported"},
+		{SD_RES_CLUSTER_RECOVERING, "Cluster is recovering"},
 
 		{SD_RES_OLD_NODE_VER, "Remote node has an old epoch"},
 		{SD_RES_NEW_NODE_VER, "Remote node has a new epoch"},

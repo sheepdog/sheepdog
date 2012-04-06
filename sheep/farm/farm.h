@@ -75,6 +75,7 @@ extern int trunk_get_working_objlist(uint64_t *list);
 extern int snap_init(void);
 extern void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
 extern int snap_file_write(int epoch, unsigned char *trunksha1, unsigned char *outsha1, int user);
+extern int snap_log_truncate(void);
 extern void *snap_log_read(int *, int user);
 extern int snap_log_write(int epoch, unsigned char *sha1, int user);
 

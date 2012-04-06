@@ -57,6 +57,23 @@ out:
 	return ret;
 }
 
+int snap_log_truncate(void)
+{
+	int ret = 0;
+	struct strbuf buf = STRBUF_INIT;
+
+	strbuf_addstr(&buf, farm_dir);
+	strbuf_addf(&buf, "/%s", "sys_snap");
+
+	if (truncate(buf.buf, 0) < 0) {
+		dprintf("truncate snapshot log file fail:%m.\n");
+		ret = -1;
+	}
+
+	strbuf_release(&buf);
+	return ret;
+}
+
 int snap_log_write(int epoch, unsigned char *sha1, int user)
 {
 	int fd, ret = -1;

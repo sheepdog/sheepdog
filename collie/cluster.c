@@ -367,6 +367,40 @@ static int cluster_snapshot(int argc, char **argv)
 	return ret;
 }
 
+static int cluster_cleanup(int argc, char **argv)
+{
+	int fd, ret;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	unsigned rlen, wlen;
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		return EXIT_SYSFAIL;
+
+	memset(&hdr, 0, sizeof(hdr));
+
+	hdr.opcode = SD_OP_CLEANUP;
+
+	rlen = 0;
+	wlen = 0;
+	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "Failed to connect\n");
+		return EXIT_SYSFAIL;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Cleanup failed: %s\n",
+				sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 #define RECOVER_PRINT \
 "Caution! Please try starting all the cluster nodes normally before\n\
 running this command.\n\n\
@@ -435,6 +469,8 @@ static struct subcommand cluster_cmd[] = {
 	0, cluster_recover},
 	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
 	0, cluster_snapshot},
+	{"cleanup", NULL, "aph", "cleanup the useless snapshot data from recovery",
+	0, cluster_cleanup},
 	{NULL,},
 };
 

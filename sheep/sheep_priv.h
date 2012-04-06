@@ -184,6 +184,7 @@ struct store_driver {
 	int (*end_recover)(struct siocb *);
 	/* Operations for snapshot */
 	int (*snapshot)(struct siocb *);
+	int (*cleanup)(struct siocb *);
 	int (*restore)(struct siocb *);
 	int (*get_snap_file)(struct siocb *);
 };

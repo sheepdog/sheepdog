@@ -187,6 +187,97 @@ static int farm_close(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
+static int get_trunk_sha1(int epoch, unsigned char *outsha1, int user)
+{
+	int i, nr_logs = -1, ret = -1;
+	struct snap_log *log_buf, *log_free = NULL;
+	void *snap_buf = NULL;
+	struct sha1_file_hdr hdr;
+
+	log_free = log_buf = snap_log_read(&nr_logs, user);
+	dprintf("%d\n", nr_logs);
+	if (nr_logs < 0)
+		goto out;
+
+	for (i = 0; i < nr_logs; i++, log_buf++) {
+		if (log_buf->epoch != epoch)
+			continue;
+		snap_buf = snap_file_read(log_buf->sha1, &hdr);
+		if (!snap_buf)
+			goto out;
+		memcpy(outsha1, snap_buf, SHA1_LEN);
+		ret = 0;
+		break;
+	}
+out:
+	free(log_free);
+	free(snap_buf);
+	return ret;
+}
+
+static int cleanup_trunk(int epoch)
+{
+	struct sha1_file_hdr hdr;
+	struct trunk_entry *trunk_buf, *trunk_free = NULL;
+	unsigned char trunk_sha1[SHA1_LEN];
+	uint64_t nr_trunks, i;
+	int ret = SD_RES_EIO;
+
+	if (get_trunk_sha1(epoch, trunk_sha1, 0) < 0)
+		goto out;
+
+	trunk_free = trunk_buf = trunk_file_read(trunk_sha1, &hdr);
+	if (!trunk_buf)
+		goto out;
+
+	nr_trunks = hdr.priv;
+	for (i = 0; i < nr_trunks; i++, trunk_buf++)
+		sha1_file_try_delete(trunk_buf->sha1);
+
+	if (sha1_file_try_delete(trunk_sha1) < 0)
+		goto out;
+
+	ret = SD_RES_SUCCESS;
+
+out:
+	free(trunk_free);
+	return ret;
+}
+
+static int farm_cleanup_sys_obj(struct siocb *iocb)
+{
+	int i, ret = SD_RES_SUCCESS;
+	int epoch = iocb->epoch;
+	struct snap_log *log_pos, *log_free = NULL;
+	int nr_logs;
+
+	if (iocb->epoch <= 0)
+		return ret;
+
+	for (i = 1; i <= epoch; i++)
+		cleanup_trunk(i);
+
+	log_free = log_pos = snap_log_read(&nr_logs, 0);
+	if (snap_log_truncate() < 0) {
+		dprintf("snap reset fail\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	for (i = epoch + 1; i < nr_logs; i++, log_pos++) {
+		if (snap_log_write(log_pos->epoch, log_pos->sha1, 0) < 0) {
+			dprintf("snap write fail %d, %s\n",
+					log_pos->epoch, sha1_to_hex(log_pos->sha1));
+			ret = SD_RES_EIO;
+			goto out;
+		}
+	}
+
+out:
+	free(log_free);
+	return ret;
+}
+
 static int init_sys_vdi_bitmap(char *path)
 {
 	DIR *dir;
@@ -239,34 +330,6 @@ static int farm_init(char *p)
 	return SD_RES_SUCCESS;
 err:
 	return SD_RES_EIO;
-}
-
-static int get_trunk_sha1(int epoch, unsigned char *outsha1, int user)
-{
-	int i, nr_logs = -1, ret = -1;
-	struct snap_log *log_buf, *log_free = NULL;
-	void *snap_buf = NULL;
-	struct sha1_file_hdr hdr;
-
-	log_free = log_buf = snap_log_read(&nr_logs, user);
-	dprintf("%d\n", nr_logs);
-	if (nr_logs < 0)
-		goto out;
-
-	for (i = 0; i < nr_logs; i++, log_buf++) {
-		if (log_buf->epoch != epoch)
-			continue;
-		snap_buf = snap_file_read(log_buf->sha1, &hdr);
-		if (!snap_buf)
-			goto out;
-		memcpy(outsha1, snap_buf, SHA1_LEN);
-		ret = 0;
-		break;
-	}
-out:
-	free(log_free);
-	free(snap_buf);
-	return ret;
 }
 
 static int farm_get_objlist(struct siocb *iocb)
@@ -641,6 +704,7 @@ struct store_driver farm = {
 	.atomic_put = farm_atomic_put,
 	.end_recover = farm_end_recover,
 	.snapshot = farm_snapshot,
+	.cleanup = farm_cleanup_sys_obj,
 	.restore = farm_restore,
 	.get_snap_file = farm_get_snap_file,
 	.format = farm_format,

@@ -432,6 +432,24 @@ static int cluster_snapshot(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
+static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
+				void *data)
+{
+	int ret;
+	struct siocb iocb = { 0 };
+	iocb.epoch = sys->epoch;
+
+	if (node_in_recovery())
+		return SD_RES_CLUSTER_RECOVERING;
+
+	if (sd_store->cleanup)
+		ret = sd_store->cleanup(&iocb);
+	else
+		ret = SD_RES_NO_SUPPORT;
+
+	return ret;
+}
+
 static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
@@ -559,6 +577,12 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_restore,
+	},
+
+	[SD_OP_CLEANUP] = {
+		.type = SD_OP_TYPE_CLUSTER,
+		.force = 1,
+		.process_main = cluster_cleanup,
 	},
 
 	/* local operations */
