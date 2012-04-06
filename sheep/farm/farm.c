@@ -507,7 +507,7 @@ static int farm_link(uint64_t oid, struct siocb *iocb, int tgt_epoch)
 	if (!buf)
 		goto out;
 
-	io.length = SD_DATA_OBJ_SIZE;
+	io.length = iocb->length;
 	io.buf = buf;
 	ret = farm_atomic_put(oid, &io);
 out:
