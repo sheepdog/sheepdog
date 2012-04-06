@@ -137,6 +137,7 @@ struct cluster_info {
 	struct list_head blocking_conn_list;
 
 	uint32_t nr_sobjs;
+	int nr_zones;
 
 	struct list_head cpg_event_siblings;
 	struct cpg_event *cur_cevent;

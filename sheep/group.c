@@ -162,7 +162,7 @@ int get_ordered_sd_vnode_list(struct sd_vnode **entries,
 		return SD_RES_NO_MEM;
 	}
 
-	cache->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+	cache->nr_zones = sys->nr_zones;
 	memcpy(cache->vnodes, sys->vnodes, sizeof(sys->vnodes[0]) * sys->nr_vnodes);
 	cache->nr_vnodes = sys->nr_vnodes;
 	cache->epoch = sys->epoch;
@@ -589,6 +589,8 @@ join_finished:
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
 					 sys->vnodes);
+	sys->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+
 	if (msg->cluster_status == SD_STATUS_OK ||
 	    msg->cluster_status == SD_STATUS_HALT) {
 		if (msg->inc_epoch) {
@@ -843,9 +845,7 @@ static void __sd_join_done(struct cpg_event *cevent)
 	}
 
 	if (sys_stat_halt()) {
-		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-
-		if (nr_zones >= sys->nr_sobjs)
+		if (sys->nr_zones >= sys->nr_sobjs)
 			sys_stat_set(SD_STATUS_OK);
 	}
 
@@ -863,6 +863,8 @@ static void __sd_leave_done(struct cpg_event *cevent)
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
 					 sys->vnodes);
+	sys->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+
 	if (sys_can_recover()) {
 		sys->epoch++;
 		update_epoch_store(sys->epoch);
@@ -875,9 +877,7 @@ static void __sd_leave_done(struct cpg_event *cevent)
 		start_recovery(sys->epoch);
 
 	if (sys_can_halt()) {
-		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-
-		if (nr_zones < sys->nr_sobjs)
+		if (sys->nr_zones < sys->nr_sobjs)
 			sys_stat_set(SD_STATUS_HALT);
 	}
 }
@@ -1008,7 +1008,7 @@ int is_access_to_busy_objects(uint64_t oid)
 			continue;
 		}
 		if (oid == req->local_oid)
-				return 1;
+			return 1;
 	}
 	return 0;
 }

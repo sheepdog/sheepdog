@@ -320,6 +320,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *vnodes = sys->vnodes;
 	void *buf;
+	int copies;
 
 	if (idx & CACHE_VDI_BIT) {
 		oid = vid_to_vdi_oid(oc->vid);
@@ -335,8 +336,12 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		goto out;
 	}
 
+	copies = sys->nr_sobjs;
+	if (sys->nr_zones < copies)
+		copies = sys->nr_zones;
+
 	/* Check if we can read locally */
-	for (i = 0; i < sys->nr_sobjs; i++) {
+	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
 		if (is_myself(vnodes[n].addr, vnodes[n].port)) {
 			struct siocb iocb = { 0 };
@@ -361,7 +366,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 
 pull_remote:
 	/* Okay, no luck, let's read remotely */
-	for (i = 0; i < sys->nr_sobjs; i++) {
+	for (i = 0; i < copies; i++) {
 		n = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
 		if (is_myself(vnodes[n].addr, vnodes[n].port))
 			continue;

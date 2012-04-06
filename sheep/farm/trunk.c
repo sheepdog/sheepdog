@@ -287,10 +287,14 @@ static struct omap_entry *omap_file_insert(struct strbuf *buf, struct omap_entry
 
 static int oid_stale(uint64_t oid)
 {
-	int i, vidx;
+	int i, vidx, copies;
 	struct sd_vnode *vnodes = sys->vnodes;
 
-	for (i = 0; i < sys->nr_sobjs; i++) {
+	copies = sys->nr_sobjs;
+	if (copies > sys->nr_zones)
+		copies = sys->nr_zones;
+
+	for (i = 0; i < copies; i++) {
 		vidx = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
 		if (is_myself(vnodes[vidx].addr, vnodes[vidx].port))
 			return 0;
