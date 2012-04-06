@@ -711,7 +711,7 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
 
-		buf = zalloc(SD_DATA_OBJ_SIZE);
+		buf = valloc(SD_DATA_OBJ_SIZE);
 		if (!buf) {
 			eprintf("can not allocate memory\n");
 			goto out;
