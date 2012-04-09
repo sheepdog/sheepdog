@@ -669,7 +669,7 @@ static void sd_notify_handler(struct sd_node *sender,
 		list_del(&w->req->pending_list);
 	}
 
-	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_queue);
 
 	start_cpg_event_work();
 	unregister_event(cdrv_fd);
@@ -967,7 +967,7 @@ static void cpg_event_done(struct work *work)
 	cpg_event_running = 0;
 	register_event(cdrv_fd, group_handler, NULL);
 
-	if (!list_empty(&sys->cpg_event_siblings))
+	if (!list_empty(&sys->cpg_event_queue))
 		start_cpg_event_work();
 }
 
@@ -1053,36 +1053,15 @@ static int need_consistency_check(uint8_t opcode, uint16_t flags)
 	return 1;
 }
 
-/* can be called only by the main process */
-void start_cpg_event_work(void)
+static void process_request_queue(void)
 {
 	struct cpg_event *cevent, *n;
 	LIST_HEAD(failed_req_list);
-	int retry;
 
-	if (list_empty(&sys->cpg_event_siblings))
-		vprintf(SDOG_ERR, "bug\n");
-
-	cevent = list_first_entry(&sys->cpg_event_siblings,
-				  struct cpg_event, cpg_event_list);
-	/*
-	 * we need to serialize cpg events so we don't call queue_work
-	 * if a thread is still running for a cpg event; executing
-	 * cpg_event_fn() or cpg_event_done().
-	 */
-	if (cpg_event_running && is_membership_change_event(cevent->ctype))
-		return;
-do_retry:
-	retry = 0;
-
-	list_for_each_entry_safe(cevent, n, &sys->cpg_event_siblings, cpg_event_list) {
+retry:
+	list_for_each_entry_safe(cevent, n, &sys->cpg_request_queue, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
 		struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-
-		if (cevent->ctype == CPG_EVENT_NOTIFY)
-			continue;
-		if (is_membership_change_event(cevent->ctype))
-			break;
 
 		list_del(&cevent->cpg_event_list);
 
@@ -1097,7 +1076,8 @@ do_retry:
 				/* If we have cache of it we are at its service. */
 				list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
 				sys->nr_outstanding_io++;
-				goto gateway_work;
+				queue_work(sys->gateway_wqueue, &req->work);
+				continue;
 			}
 
 			if (__is_access_to_recoverying_objects(req)) {
@@ -1153,40 +1133,43 @@ do_retry:
 		else if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 			queue_work(sys->io_wqueue, &req->work);
 		else
-gateway_work:
 			queue_work(sys->gateway_wqueue, &req->work);
 	}
-
 	while (!list_empty(&failed_req_list)) {
 		struct request *req = list_first_entry(&failed_req_list,
 						       struct request, r_wlist);
 		req->work.done(&req->work);
-
-		retry = 1;
+		goto retry;
 	}
+}
 
-	if (retry)
-		goto do_retry;
+/* can be called only by the main process */
+void start_cpg_event_work(void)
+{
 
-	if (cpg_event_running || list_empty(&sys->cpg_event_siblings))
-		return;
+	if (!list_empty(&sys->cpg_event_queue)) {
+		struct cpg_event *cevent;
+		/*
+		 * we need to serialize cpg events so we don't call queue_work
+		 * if a thread is still running for a cpg event; executing
+		 * cpg_event_fn() or cpg_event_done().
+		 */
+		if (cpg_event_running || sys->nr_outstanding_io)
+			return;
 
-	cevent = list_first_entry(&sys->cpg_event_siblings,
-				  struct cpg_event, cpg_event_list);
+		cevent = list_first_entry(&sys->cpg_event_queue,
+				struct cpg_event, cpg_event_list);
+		list_del(&cevent->cpg_event_list);
+		sys->cur_cevent = cevent;
 
-	if (is_membership_change_event(cevent->ctype) && sys->nr_outstanding_io)
-		return;
+		cpg_event_running = 1;
 
-	list_del(&cevent->cpg_event_list);
-	sys->cur_cevent = cevent;
+		cpg_event_work.fn = cpg_event_fn;
+		cpg_event_work.done = cpg_event_done;
 
-	cpg_event_running = 1;
-
-	INIT_LIST_HEAD(&cpg_event_work.w_list);
-	cpg_event_work.fn = cpg_event_fn;
-	cpg_event_work.done = cpg_event_done;
-
-	queue_work(sys->cpg_wqueue, &cpg_event_work);
+		queue_work(sys->cpg_wqueue, &cpg_event_work);
+	} else
+		process_request_queue();
 }
 
 static void sd_join_handler(struct sd_node *joined,
@@ -1248,7 +1231,7 @@ static void sd_join_handler(struct sd_node *joined,
 			panic("failed to allocate memory\n");
 		memcpy(w->jm, opaque, size);
 
-		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_queue);
 		start_cpg_event_work();
 		unregister_event(cdrv_fd);
 		break;
@@ -1365,7 +1348,7 @@ static void sd_leave_handler(struct sd_node *left,
 
 	w->left = *left;
 
-	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_queue);
 	start_cpg_event_work();
 	unregister_event(cdrv_fd);
 
@@ -1425,7 +1408,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 	INIT_LIST_HEAD(&sys->consistent_obj_list);
 	INIT_LIST_HEAD(&sys->blocking_conn_list);
 
-	INIT_LIST_HEAD(&sys->cpg_event_siblings);
+	INIT_LIST_HEAD(&sys->cpg_request_queue);
+	INIT_LIST_HEAD(&sys->cpg_event_queue);
 
 	ret = register_event(cdrv_fd, group_handler, NULL);
 	if (ret) {

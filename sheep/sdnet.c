@@ -28,10 +28,10 @@ void resume_pending_requests(void)
 		struct cpg_event *cevent = &next->cev;
 
 		list_del(&next->r_wlist);
-		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+		list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
 	}
 
-	if (!list_empty(&sys->cpg_event_siblings))
+	if (!list_empty(&sys->cpg_request_queue))
 		start_cpg_event_work();
 }
 
@@ -105,7 +105,7 @@ static void io_op_done(struct work *work)
 		setup_ordered_sd_vnode_list(req);
 		setup_access_to_local_objects(req);
 
-		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+		list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
 		again = 1;
 	} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
 		struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
@@ -155,7 +155,7 @@ static void io_op_done(struct work *work)
 			setup_ordered_sd_vnode_list(req);
 			setup_access_to_local_objects(req);
 
-			list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+			list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
 			again = 1;
 		}
 	}
@@ -270,7 +270,7 @@ static void queue_request(struct request *req)
 		setup_access_to_local_objects(req);
 
 	cevent->ctype = CPG_EVENT_REQUEST;
-	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
+	list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
 	start_cpg_event_work();
 	return;
 done:

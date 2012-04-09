@@ -139,7 +139,8 @@ struct cluster_info {
 	uint32_t nr_sobjs;
 	int nr_zones;
 
-	struct list_head cpg_event_siblings;
+	struct list_head cpg_request_queue;
+	struct list_head cpg_event_queue;
 	struct cpg_event *cur_cevent;
 	int nr_outstanding_io;
 	int nr_outstanding_reqs;
