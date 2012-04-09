@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <pthread.h>
 
 #include "logger.h"
 #include "util.h"
@@ -47,9 +48,14 @@ static void dolog(int prio, const char *func, int line, const char *fmt,
 
 static struct logarea *la;
 static char *log_name;
+static char *log_nowname;
 static int log_level = SDOG_INFO;
 static pid_t pid;
 static key_t semkey;
+
+static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
+
+pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static notrace int logarea_init(int size)
 {
@@ -317,6 +323,29 @@ static notrace void dolog(int prio, const char *func, int line, const char *fmt,
 	}
 }
 
+static notrace void rotate_log(void)
+{
+	int new_fd;
+
+	if (access(log_nowname, R_OK) == 0) {
+		char old_logfile[256];
+		time_t t;
+		struct tm tm;
+		time(&t);
+		localtime_r((const time_t *)&t, &tm);
+		sprintf(old_logfile, "%s.%04d-%02d-%02d-%02d-%02d",
+				log_nowname, tm.tm_year + 1900, tm.tm_mon + 1,
+				tm.tm_mday, tm.tm_hour, tm.tm_min);
+		rename(log_nowname, old_logfile);
+	}
+	new_fd = open(log_nowname, O_RDWR | O_CREAT | O_APPEND, 0644);
+	if (new_fd < 0)
+		syslog(LOG_ERR, "fail to create new log file\n");
+
+	dup2(new_fd, la->fd);
+	la->fd = new_fd;
+}
+
 notrace void log_write(int prio, const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
@@ -369,10 +398,14 @@ static notrace void log_sigexit(int signo)
 
 notrace int log_init(char *program_name, int size, int is_daemon, int level, char *outfile)
 {
+	off_t offset;
+	size_t log_size;
+
 	log_level = level;
 
 	logdbg(stderr, "entering log_init\n");
 	log_name = program_name;
+	log_nowname = outfile;
 
 	semkey = random();
 
@@ -436,6 +469,20 @@ notrace int log_init(char *program_name, int size, int is_daemon, int level, cha
 
 		while (la->active) {
 			log_flush();
+
+			if (max_logsize) {
+				pthread_mutex_lock(&logsize_lock);
+				offset = lseek(la->fd, 0, SEEK_END);
+				if (offset < 0) {
+					syslog(LOG_ERR, "sheep log error\n");
+				} else {
+					log_size = (size_t)offset;
+					if (log_size >= max_logsize)
+						rotate_log();
+				}
+				pthread_mutex_unlock(&logsize_lock);
+			}
+
 			sleep(1);
 		}
 
