@@ -1092,7 +1092,8 @@ do_retry:
 			if (copies > req->nr_zones)
 				copies = req->nr_zones;
 
-			if (object_is_cached(hdr->oid)) {
+			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
+			    object_is_cached(hdr->oid)) {
 				/* If we have cache of it we are at its service. */
 				list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
 				sys->nr_outstanding_io++;
