@@ -40,12 +40,16 @@ if BUILD_FARM
 sheep_SOURCES		+= farm/sha1_file.c farm/trunk.c farm/snap.c farm/farm.c
 endif
 
+if BUILD_TRACE
+sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/stabs.c trace/graph.c
+endif
+
 sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread \
 			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS) $(LIBS)
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= work.h sheep_priv.h cluster.h strbuf.h farm/farm.h
+noinst_HEADERS		= work.h sheep_priv.h cluster.h strbuf.h farm/farm.h trace/trace.h
 
 EXTRA_DIST		= 
 

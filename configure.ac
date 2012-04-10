@@ -66,6 +66,7 @@ if ! ${MAKE-make} --version /cannot/make/this >/dev/null 2>&1; then
 fi
 
 AC_PROG_CC
+AM_PROG_AS
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
@@ -202,6 +203,11 @@ AC_ARG_ENABLE([farm],
 	[ enable_farm="yes" ],)
 AM_CONDITIONAL(BUILD_FARM, test x$enable_farm = xyes)
 
+AC_ARG_ENABLE([trace],
+	[  --enable-trace           : enable trace],,
+	[ enable_trace="no" ],)
+AM_CONDITIONAL(BUILD_TRACE, test x$enable_trace = xyes)
+
 CP=cp
 OS_LDL="-ldl"
 case "$host_os" in
@@ -272,6 +278,13 @@ if test "x${enable_farm}" = xyes; then
 	PACKAGE_FEATURES="$PACKAGE_FEATURES farm"
 fi
 
+if test "x${enable_trace}" = xyes; then
+	AC_CHECK_LIB([rt], [clock_gettime],,
+		AC_MSG_ERROR(librt not found))
+	AC_DEFINE_UNQUOTED([HAVE_TRACE], 1, [have trace])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
+fi
+
 # extra warnings
 EXTRA_WARNINGS=""
 
@@ -325,11 +338,23 @@ else
 	WERROR_CFLAGS=""
 fi
 
+if test "x${enable_trace}" = xyes && \
+		cc_supports_flag -pg && \
+		cc_supports_flag -gstabs ; then
+	AC_MSG_NOTICE([Enabling trace (-pg -gstabs)])
+	TRACE_CFLAGS="-pg -gstabs"
+	TRACE_LDFLAGS="-T$(pwd)/sheep/trace/trace.ld"
+	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
+else
+	TRACE_CFLAGS=""
+fi
+
 # final build of *FLAGS
 CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
-	$COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS $NSS_CFLAGS -D_GNU_SOURCE"
+	$TRACE_CFLAGS $COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS $NSS_CFLAGS \
+	-D_GNU_SOURCE"
 CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS"
-LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
+LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS $TRACE_LDFLAGS"
 
 # substitute what we need:
 AC_SUBST([OS_DYFLAGS])
@@ -383,6 +408,7 @@ AC_MSG_RESULT([  ANSI defined CPPFLAGS    = ${ANSI_CPPFLAGS}])
 AC_MSG_RESULT([  Coverage     CFLAGS      = ${COVERAGE_CFLAGS}])
 AC_MSG_RESULT([  Coverage     LDFLAGS     = ${COVERAGE_LDFLAGS}])
 AC_MSG_RESULT([  Fatal War.   CFLAGS      = ${WERROR_CFLAGS}])
+AC_MSG_RESULT([  Trace        CFLAGS      = ${TRACE_CFLAGS}])
 AC_MSG_RESULT([  Final        CFLAGS      = ${CFLAGS}])
 AC_MSG_RESULT([  Final        CPPFLAGS    = ${CPPFLAGS}])
 AC_MSG_RESULT([  Final        LDFLAGS     = ${LDFLAGS}])
