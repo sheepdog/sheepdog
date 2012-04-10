@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "bitops.h"
+#include "list.h"
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define roundup(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
@@ -68,5 +69,28 @@ extern ssize_t xread(int fd, void *buf, size_t len);
 extern ssize_t xwrite(int fd, const void *buf, size_t len);
 extern ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
 extern ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
+
+/* ring_buffer.c */
+struct rbuffer {
+	struct list_head list;
+	char *buffer;           /* data buffer */
+	char *buffer_end;
+	size_t capacity;        /* initial maximum number of items in the buffer */
+	size_t count;           /* number of items in the buffer */
+	size_t sz;              /* size of each item in the buffer */
+	char *head;
+	char *tail;
+};
+
+static inline size_t rbuffer_size(struct rbuffer *rbuf)
+{
+	return rbuf->count * rbuf->sz;
+}
+
+void rbuffer_push(struct rbuffer *rbuf, const void *item);
+void rbuffer_pop(struct rbuffer *rbuf, void *item);
+void rbuffer_destroy(struct rbuffer *rbuf);
+void rbuffer_create(struct rbuffer *rbuf, size_t capacity, size_t item_size);
+void rbuffer_reset(struct rbuffer *rbuf);
 
 #endif

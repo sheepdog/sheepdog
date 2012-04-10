@@ -12,6 +12,8 @@ static __thread struct trace_ret_stack {
 	unsigned long long entry_time;
 } trace_ret_stack[100]; /* FIXME: consider stack overrun */
 
+static __thread struct rbuffer rbuf;
+
 static void push_return_trace(unsigned long ret, unsigned long long etime,
 		unsigned long func, int *depth)
 {
