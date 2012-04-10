@@ -24,6 +24,7 @@
 #include "work.h"
 #include "cluster.h"
 
+static int cdrv_fd;
 extern struct store_driver *sd_store;
 extern char *obj_path;
 
@@ -671,6 +672,7 @@ static void sd_notify_handler(struct sd_node *sender,
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 
 	start_cpg_event_work();
+	unregister_event(cdrv_fd);
 }
 
 /*
@@ -963,6 +965,7 @@ static void cpg_event_done(struct work *work)
 	vprintf(SDOG_DEBUG, "free %p\n", cevent);
 	cpg_event_free(cevent);
 	cpg_event_running = 0;
+	register_event(cdrv_fd, group_handler, NULL);
 
 	if (!list_empty(&sys->cpg_event_siblings))
 		start_cpg_event_work();
@@ -1246,6 +1249,7 @@ static void sd_join_handler(struct sd_node *joined,
 
 		list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 		start_cpg_event_work();
+		unregister_event(cdrv_fd);
 		break;
 	case CJ_RES_FAIL:
 	case CJ_RES_JOIN_LATER:
@@ -1362,6 +1366,7 @@ static void sd_leave_handler(struct sd_node *left,
 
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_event_siblings);
 	start_cpg_event_work();
+	unregister_event(cdrv_fd);
 
 	return;
 oom:
@@ -1375,7 +1380,7 @@ oom:
 
 int create_cluster(int port, int64_t zone, int nr_vnodes)
 {
-	int fd, ret;
+	int ret;
 	struct cdrv_handlers handlers = {
 		.join_handler = sd_join_handler,
 		.leave_handler = sd_leave_handler,
@@ -1393,8 +1398,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 		}
 	}
 
-	fd = sys->cdrv->init(&handlers, sys->cdrv_option, sys->this_node.addr);
-	if (fd < 0)
+	cdrv_fd = sys->cdrv->init(&handlers, sys->cdrv_option, sys->this_node.addr);
+	if (cdrv_fd < 0)
 		return -1;
 
 	sys->this_node.port = port;
@@ -1421,7 +1426,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 
 	INIT_LIST_HEAD(&sys->cpg_event_siblings);
 
-	ret = register_event(fd, group_handler, NULL);
+	ret = register_event(cdrv_fd, group_handler, NULL);
 	if (ret) {
 		eprintf("failed to register epoll events (%d)\n", ret);
 		return 1;
