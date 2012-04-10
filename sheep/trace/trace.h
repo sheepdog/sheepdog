@@ -6,6 +6,8 @@
 #ifndef __ASSEMBLY__
 #include <stdlib.h>
 
+#include "sheepdog_proto.h"
+#include "sheep.h"
 #include "list.h"
 #include "util.h"
 
@@ -27,6 +29,12 @@ struct caller {
 };
 
 typedef void (*trace_func_t)(unsigned long ip, unsigned long *parent_ip);
+/* Type of the callback handlers for function entry and return */
+typedef void (*trace_func_graph_ret_t)(struct trace_graph_item *);
+typedef void (*trace_func_graph_ent_t)(struct trace_graph_item *);
+
+/* graph.c */
+extern void trace_init_buffer(struct list_head *list);
 
 /* stabs.c */
 extern int get_ipinfo(unsigned long ip, struct ipinfo *info);
@@ -37,6 +45,8 @@ extern void mcount_call(void);
 extern void trace_caller(void);
 extern void trace_call(unsigned long, unsigned long *);
 extern const unsigned char NOP5[];
+extern void trace_return_caller(void);
+extern unsigned long trace_return_call(void);
 
 /* trace.c */
 extern pthread_cond_t trace_cond;

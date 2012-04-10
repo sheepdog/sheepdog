@@ -45,7 +45,7 @@ ENTRY(trace_caller)
 	movq %r9, 48(%rsp)
 
 	movq 0x38(%rsp), %rdi
-	movq 8(%rbp), %rsi
+	leaq 8(%rbp), %rsi
 	subq $INSN_SIZE, %rdi
 
 .globl trace_call
@@ -64,6 +64,20 @@ trace_call:
 .globl trace_stub
 trace_stub:
 	retq
+
+ENTRY(trace_return_caller)
+	subq  $24, %rsp
+
+	movq %rax, (%rsp)
+	movq %rdx, 8(%rsp)
+
+	call trace_return_call
+
+	movq %rax, %rdi
+	movq 8(%rsp), %rdx
+	movq (%rsp), %rax
+	addq $24, %rsp
+	jmp *%rdi
 
 .globl NOP5
 NOP5:

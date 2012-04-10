@@ -165,6 +165,20 @@ struct epoch_log {
 	struct sd_node nodes[SD_MAX_NODES];
 };
 
+#define TRACE_GRAPH_ENTRY  0x01
+#define TRACE_GRAPH_RETURN 0x02
+
+#define TRACE_BUF_LEN      (1024 * 1024 * 8)
+#define TRACE_FNAME_LEN    36
+
+struct trace_graph_item {
+	int type;
+	char fname[TRACE_FNAME_LEN];
+	int depth;
+	unsigned long long entry_time;
+	unsigned long long return_time;
+};
+
 static inline int same_node(struct sd_vnode *e, int n1, int n2)
 {
 	if (memcmp(e[n1].addr, e[n2].addr, sizeof(e->addr)) == 0 &&
