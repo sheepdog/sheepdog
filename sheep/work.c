@@ -32,38 +32,12 @@
 #include "event.h"
 
 static int efd;
-static LIST_HEAD(worker_info_list);
-
-struct work_queue {
-	int wq_state;
-	int nr_active;
-	struct list_head pending_list;
-	struct list_head blocked_list;
-};
+int total_nr_workers;
+LIST_HEAD(worker_info_list);
 
 enum wq_state {
 	WQ_BLOCKED = (1U << 0),
 	WQ_DEAD = (1U << 1),
-};
-
-struct worker_info {
-	struct list_head worker_info_siblings;
-
-	int nr_threads;
-
-	pthread_mutex_t finished_lock;
-	struct list_head finished_list;
-
-	/* wokers sleep on this and signaled by tgtd */
-	pthread_cond_t pending_cond;
-	/* locked by tgtd and workers */
-	pthread_mutex_t pending_lock;
-	/* protected by pending_lock */
-	struct work_queue q;
-
-	pthread_mutex_t startup_lock;
-
-	pthread_t worker_thread[0];
 };
 
 static void work_queue_set_blocked(struct work_queue *q)
@@ -289,6 +263,7 @@ struct work_queue *init_work_queue(int nr)
 
 	list_add(&wi->worker_info_siblings, &worker_info_list);
 
+	total_nr_workers += nr;
 	return &wi->q;
 destroy_threads:
 

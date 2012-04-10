@@ -226,6 +226,9 @@ int main(int argc, char **argv)
 	    !sys->flush_wqueue)
 		exit(1);
 
+	ret = init_signal();
+	if (ret)
+		exit(1);
 	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
 
 	while (!sys_stat_shutdown() || sys->nr_outstanding_reqs != 0)
