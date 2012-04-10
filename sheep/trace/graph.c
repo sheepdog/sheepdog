@@ -68,6 +68,8 @@ notrace unsigned long trace_return_call(void)
 
 notrace void trace_init_buffer(struct list_head *list)
 {
+	int sz = sizeof(struct trace_graph_item);
+	rbuffer_create(&rbuf, TRACE_BUF_LEN / sz, sz);
 	list_add(&rbuf.list, list);
 }
 

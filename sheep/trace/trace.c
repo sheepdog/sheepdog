@@ -19,7 +19,9 @@ static pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static trace_func_t trace_func = trace_call;
 static int trace_count;
+static int trace_buffer_inited;
 
+static LIST_HEAD(buffer_list);
 pthread_cond_t trace_cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t trace_mux = PTHREAD_MUTEX_INITIALIZER;
 
@@ -37,6 +39,8 @@ static notrace void suspend(int num)
 
 	pthread_mutex_lock(&trace_mux);
 	trace_count--;
+	if (!trace_buffer_inited)
+		trace_init_buffer(&buffer_list); /* init worker threads rbuffer */
 	pthread_cond_wait(&trace_cond, &trace_mux);
 	pthread_mutex_unlock(&trace_mux);
 	dprintf("worker thread going to resume\n");
@@ -176,6 +180,7 @@ wait_for_worker_suspend:
 		goto wait_for_worker_suspend;
 	}
 	pthread_mutex_unlock(&trace_mux);
+	trace_buffer_inited = 1;
 }
 
 static notrace void resume_worker_threads(void)
@@ -246,6 +251,30 @@ int init_signal(void)
 	return 0;
 }
 
+notrace int trace_copy_buffer(void *buf)
+{
+	struct rbuffer *rbuf;
+	int total = 0;
+
+	list_for_each_entry(rbuf, &buffer_list, list) {
+		int rbuf_size = rbuffer_size(rbuf);
+		if (rbuf_size) {
+			memcpy((char *)buf + total, rbuf->buffer, rbuf_size);
+			total += rbuf_size;
+		}
+	}
+	return total;
+}
+
+notrace void trace_reset_buffer(void)
+{
+	struct rbuffer *rbuf;
+
+	list_for_each_entry(rbuf, &buffer_list, list) {
+		rbuffer_reset(rbuf);
+	}
+}
+
 notrace int trace_init()
 {
 	sigset_t block;
@@ -262,6 +291,7 @@ notrace int trace_init()
 		return -1;
 	}
 
+	trace_init_buffer(&buffer_list); /* init main thread ring buffer */
 	replace_mcount_call((unsigned long)do_trace_init);
 	dprintf("main thread %u\n", (int)pthread_self());
 	dprintf("trace support enabled.\n");

@@ -49,14 +49,26 @@ extern void trace_return_caller(void);
 extern unsigned long trace_return_call(void);
 
 /* trace.c */
-extern pthread_cond_t trace_cond;
-extern pthread_mutex_t trace_mux;
+#ifdef ENABLE_TRACE
+  extern pthread_cond_t trace_cond;
+  extern pthread_mutex_t trace_mux;
 
-extern int trace_init(void);
-extern int register_trace_function(trace_func_t func);
-extern int trace_enable(void);
-extern int trace_disable(void);
-extern struct caller *trace_lookup_ip(unsigned long ip, int create);
+  extern int init_signal(void);
+  extern int trace_init(void);
+  extern int register_trace_function(trace_func_t func);
+  extern int trace_enable(void);
+  extern int trace_disable(void);
+  extern struct caller *trace_lookup_ip(unsigned long ip, int create);
+  extern int trace_copy_buffer(void *buf);
+  extern void trace_reset_buffer(void);
+#else
+  static inline int init_signal(void) { return 0; }
+  static inline int trace_init(void) { return 0; }
+  static inline int trace_enable(void) { return 0; }
+  static inline int trace_disable(void) { return 0; }
+  static inline int trace_copy_buffer(void *buf) { return 0; }
+  static inline void trace_reset_buffer(void) {}
+#endif /* ENABLE_TRACE */
 
 #define register_tracer(new)			\
 static void __attribute__((constructor))	\

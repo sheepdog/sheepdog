@@ -530,6 +530,14 @@ static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	return ret;
 }
 
+static int local_trace_cat_ops(const struct sd_req *req, struct sd_rsp *rsp, void *data)
+{
+	rsp->data_length = trace_copy_buffer(data);
+	dprintf("%u\n", rsp->data_length);
+	trace_reset_buffer();
+	return SD_RES_SUCCESS;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -659,6 +667,12 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_trace_ops,
+	},
+
+	[SD_OP_TRACE_CAT] = {
+		.type = SD_OP_TYPE_LOCAL,
+		.force = 1,
+		.process_main = local_trace_cat_ops,
 	},
 
 	/* I/O operations */
