@@ -21,6 +21,7 @@
 #include <sys/syslog.h>
 
 #include "sheep_priv.h"
+#include "trace/trace.h"
 
 #define EPOLL_SIZE 4096
 #define DEFAULT_OBJECT_DIR "/tmp"
@@ -227,6 +228,10 @@ int main(int argc, char **argv)
 		exit(1);
 
 	ret = init_signal();
+	if (ret)
+		exit(1);
+
+	ret = trace_init();
 	if (ret)
 		exit(1);
 	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);

@@ -64,3 +64,7 @@ trace_call:
 .globl trace_stub
 trace_stub:
 	retq
+
+.globl NOP5
+NOP5:
+	.byte 0x0f,0x1f,0x44,0x00,0x00 # Intel recommended one for 5 bytes nops
