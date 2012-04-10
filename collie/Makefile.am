@@ -24,6 +24,12 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 sbin_PROGRAMS		= collie
 
 collie_SOURCES		= collie.c common.c treeview.c vdi.c node.c cluster.c
+
+if BUILD_TRACE
+collie_SOURCES          += debug.c
+override CFLAGS         := $(subst -pg -gstabs,,$(CFLAGS))
+endif
+
 collie_LDADD	  	= ../lib/libsheepdog.a
 collie_DEPENDENCIES	= ../lib/libsheepdog.a
 

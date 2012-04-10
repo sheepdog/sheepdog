@@ -13,6 +13,7 @@
 
 #include "sheep_priv.h"
 #include "strbuf.h"
+#include "trace/trace.h"
 
 extern char *obj_path;
 extern struct store_driver *sd_store;
@@ -517,6 +518,18 @@ static int local_flush_vdi(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	return SD_RES_SUCCESS;
 }
 
+static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *data)
+{
+	int enable = req->data_length, ret;
+
+	if (enable)
+		ret = trace_enable();
+	else
+		ret = trace_disable();
+
+	return ret;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -640,6 +653,12 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_FLUSH_VDI] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_flush_vdi,
+	},
+
+	[SD_OP_TRACE] = {
+		.type = SD_OP_TYPE_LOCAL,
+		.force = 1,
+		.process_main = local_trace_ops,
 	},
 
 	/* I/O operations */

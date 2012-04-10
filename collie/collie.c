@@ -287,6 +287,7 @@ int main(int argc, char **argv)
 		vdi_command,
 		node_command,
 		cluster_command,
+		debug_command,
 		{NULL,}
 	};
 

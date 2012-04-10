@@ -43,6 +43,7 @@
 #define SD_OP_RESTORE        0x92
 #define SD_OP_GET_SNAP_FILE  0x93
 #define SD_OP_CLEANUP        0x94
+#define SD_OP_TRACE          0x95
 
 #define SD_FLAG_CMD_IO_LOCAL   0x0010
 #define SD_FLAG_CMD_RECOVERY 0x0020

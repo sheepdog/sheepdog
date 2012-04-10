@@ -73,5 +73,6 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 extern struct command vdi_command;
 extern struct command node_command;
 extern struct command cluster_command;
+extern struct command debug_command;
 
 #endif
