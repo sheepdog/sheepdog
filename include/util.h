@@ -28,6 +28,8 @@
 #define __cpu_to_le32(x) bswap_32(x)
 #endif
 
+#define notrace __attribute__((no_instrument_function))
+
 static inline int before(uint32_t seq1, uint32_t seq2)
 {
         return (int32_t)(seq1 - seq2) < 0;
