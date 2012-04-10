@@ -51,7 +51,7 @@ static int log_level = SDOG_INFO;
 static pid_t pid;
 static key_t semkey;
 
-static int logarea_init(int size)
+static notrace int logarea_init(int size)
 {
 	int shmid;
 
@@ -133,7 +133,7 @@ static int logarea_init(int size)
 	return 0;
 }
 
-static void free_logarea(void)
+static void notrace free_logarea(void)
 {
 	if (la->fd >= 0)
 		close(la->fd);
@@ -164,7 +164,7 @@ static void dump_logarea(void)
 }
 #endif
 
-static int log_enqueue(int prio, const char *func, int line, const char *fmt,
+static notrace int log_enqueue(int prio, const char *func, int line, const char *fmt,
 		       va_list ap)
 {
 	int len, fwd;
@@ -236,7 +236,7 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 	return 0;
 }
 
-static int log_dequeue(void *buff)
+static notrace int log_dequeue(void *buff)
 {
 	struct logmsg * src = (struct logmsg *)la->head;
 	struct logmsg * dst = (struct logmsg *)buff;
@@ -269,7 +269,7 @@ static int log_dequeue(void *buff)
 /*
  * this one can block under memory pressure
  */
-static void log_syslog(void * buff)
+static notrace void log_syslog(void *buff)
 {
 	struct logmsg * msg = (struct logmsg *)buff;
 
@@ -279,7 +279,7 @@ static void log_syslog(void * buff)
 		syslog(msg->prio, "%s", (char *)&msg->str);
 }
 
-static void dolog(int prio, const char *func, int line, const char *fmt, va_list ap)
+static notrace void dolog(int prio, const char *func, int line, const char *fmt, va_list ap)
 {
 	struct timespec ts;
 	struct sembuf ops;
@@ -317,7 +317,7 @@ static void dolog(int prio, const char *func, int line, const char *fmt, va_list
 	}
 }
 
-void log_write(int prio, const char *func, int line, const char *fmt, ...)
+notrace void log_write(int prio, const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -329,7 +329,7 @@ void log_write(int prio, const char *func, int line, const char *fmt, ...)
 	va_end(ap);
 }
 
-static void log_flush(void)
+static notrace void log_flush(void)
 {
 	struct sembuf ops;
 
@@ -353,7 +353,7 @@ static void log_flush(void)
 	}
 }
 
-static void log_sigexit(int signo)
+static notrace void log_sigexit(int signo)
 {
 	if (signo == SIGSEGV)
 		vprintf(SDOG_ERR, "logger pid %d exiting abnormally\n", getpid());
@@ -367,7 +367,7 @@ static void log_sigexit(int signo)
 	exit(1);
 }
 
-int log_init(char *program_name, int size, int is_daemon, int level, char *outfile)
+notrace int log_init(char *program_name, int size, int is_daemon, int level, char *outfile)
 {
 	log_level = level;
 
@@ -445,7 +445,7 @@ int log_init(char *program_name, int size, int is_daemon, int level, char *outfi
 	return 0;
 }
 
-void log_close(void)
+notrace void log_close(void)
 {
 	if (la) {
 		la->active = 0;
