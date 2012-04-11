@@ -916,7 +916,7 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 	char host[128];
 	struct sd_node nodes[SD_MAX_NODES];
 
-	nr = epoch_log_read(le, (char *)nodes, ARRAY_SIZE(nodes));
+	nr = epoch_log_read(le, (char *)nodes, sizeof(nodes));
 	nr /= sizeof(nodes[0]);
 	for (i = 0; i < nr; i++) {
 		if (is_myself(nodes[i].addr, nodes[i].port))
@@ -1286,9 +1286,9 @@ static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
 	struct sd_node nodes[SD_MAX_NODES];
 	void *buf = xmalloc(len);
 
-	nodes_nr = epoch_log_read_nr(epoch, (void *)nodes, ARRAY_SIZE(nodes));
+	nodes_nr = epoch_log_read_nr(epoch, (void *)nodes, sizeof(nodes));
 	if (nodes_nr < 0) {
-		nodes_nr = epoch_log_read_remote(epoch, (void *)nodes, ARRAY_SIZE(nodes));
+		nodes_nr = epoch_log_read_remote(epoch, (void *)nodes, sizeof(nodes));
 		if (nodes_nr == 0) {
 			free(buf);
 			return NULL;
