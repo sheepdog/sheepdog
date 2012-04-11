@@ -971,24 +971,6 @@ static void cpg_event_done(struct work *work)
 		start_cpg_event_work();
 }
 
-static int check_epoch(struct request *req)
-{
-	uint32_t req_epoch = req->rq.epoch;
-	uint32_t opcode = req->rq.opcode;
-	int ret = SD_RES_SUCCESS;
-
-	if (before(req_epoch, sys->epoch)) {
-		ret = SD_RES_OLD_NODE_VER;
-		eprintf("old node version %u, %u, %x\n",
-			sys->epoch, req_epoch, opcode);
-	} else if (after(req_epoch, sys->epoch)) {
-		ret = SD_RES_NEW_NODE_VER;
-			eprintf("new node version %u, %u, %x\n",
-				sys->epoch, req_epoch, opcode);
-	}
-	return ret;
-}
-
 int is_access_to_busy_objects(uint64_t oid)
 {
 	struct request *req;
@@ -1005,34 +987,6 @@ int is_access_to_busy_objects(uint64_t oid)
 		if (oid == req->local_oid)
 			return 1;
 	}
-	return 0;
-}
-
-static int __is_access_to_recoverying_objects(struct request *req)
-{
-	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
-		if (req->rq.opcode != SD_OP_READ_OBJ)
-			eprintf("bug\n");
-		return 0;
-	}
-
-	if (is_recoverying_oid(req->local_oid))
-		return 1;
-
-	return 0;
-}
-
-static int __is_access_to_busy_objects(struct request *req)
-{
-	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
-		if (req->rq.opcode != SD_OP_READ_OBJ)
-			eprintf("bug\n");
-		return 0;
-	}
-
-	if (is_access_to_busy_objects(req->local_oid))
-		return 1;
-
 	return 0;
 }
 
@@ -1056,9 +1010,7 @@ static int need_consistency_check(uint8_t opcode, uint16_t flags)
 static void process_request_queue(void)
 {
 	struct cpg_event *cevent, *n;
-	LIST_HEAD(failed_req_list);
 
-retry:
 	list_for_each_entry_safe(cevent, n, &sys->cpg_request_queue, cpg_event_list) {
 		struct request *req = container_of(cevent, struct request, cev);
 		struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
@@ -1080,36 +1032,8 @@ retry:
 				continue;
 			}
 
-			if (__is_access_to_recoverying_objects(req)) {
-				if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-					req->rp.result = SD_RES_NEW_NODE_VER;
-					sys->nr_outstanding_io++; /* TODO: cleanup */
-					list_add_tail(&req->r_wlist, &failed_req_list);
-				} else
-					list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
-				continue;
-			}
-			if (__is_access_to_busy_objects(req)) {
-				list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
-				continue;
-			}
-
 			list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
-
 			sys->nr_outstanding_io++;
-
-			if (is_access_local(req->entry, req->nr_vnodes,
-					    ((struct sd_obj_req *)&req->rq)->oid, copies) ||
-			    is_access_local(req->entry, req->nr_vnodes,
-					    ((struct sd_obj_req *)&req->rq)->cow_oid, copies)) {
-				int ret = check_epoch(req);
-				if (ret != SD_RES_SUCCESS) {
-					req->rp.result = ret;
-					list_del(&req->r_wlist);
-					list_add_tail(&req->r_wlist, &failed_req_list);
-					continue;
-				}
-			}
 
 			if (need_consistency_check(req->rq.opcode, req->rq.flags)) {
 				uint32_t vdi_id = oid_to_vid(hdr->oid);
@@ -1134,12 +1058,6 @@ retry:
 			queue_work(sys->io_wqueue, &req->work);
 		else
 			queue_work(sys->gateway_wqueue, &req->work);
-	}
-	while (!list_empty(&failed_req_list)) {
-		struct request *req = list_first_entry(&failed_req_list,
-						       struct request, r_wlist);
-		req->work.done(&req->work);
-		goto retry;
 	}
 }
 

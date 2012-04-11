@@ -74,6 +74,10 @@ static void setup_access_to_local_objects(struct request *req)
 
 	if (is_access_local(req->entry, req->nr_vnodes, hdr->oid, copies))
 		req->local_oid = hdr->oid;
+
+	if (hdr->cow_oid)
+		if (is_access_local(req->entry, req->nr_vnodes, hdr->cow_oid, copies))
+			req->local_cow_oid = hdr->cow_oid;
 }
 
 static void io_op_done(struct work *work)
@@ -196,6 +200,89 @@ static void do_local_request(struct work *work)
 	rsp->result = ret;
 }
 
+static int check_epoch(struct request *req)
+{
+	uint32_t req_epoch = req->rq.epoch;
+	uint32_t opcode = req->rq.opcode;
+	int ret = SD_RES_SUCCESS;
+
+	if (before(req_epoch, sys->epoch)) {
+		ret = SD_RES_OLD_NODE_VER;
+		eprintf("old node version %u, %u, %x\n",
+				sys->epoch, req_epoch, opcode);
+	} else if (after(req_epoch, sys->epoch)) {
+		ret = SD_RES_NEW_NODE_VER;
+		eprintf("new node version %u, %u, %x\n",
+				sys->epoch, req_epoch, opcode);
+	}
+	return ret;
+}
+
+static int __is_access_to_recoverying_objects(struct request *req)
+{
+	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
+		if (req->rq.opcode != SD_OP_READ_OBJ)
+			eprintf("bug\n");
+		return 0;
+	}
+
+	if (is_recoverying_oid(req->local_oid))
+		return 1;
+
+	return 0;
+}
+
+static int __is_access_to_busy_objects(struct request *req)
+{
+	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
+		if (req->rq.opcode != SD_OP_READ_OBJ)
+			eprintf("bug\n");
+		return 0;
+	}
+
+	if (is_access_to_busy_objects(req->local_oid))
+		return 1;
+
+	return 0;
+}
+static int check_request(struct request *req)
+{
+	if (!req->local_oid && !req->local_cow_oid)
+		return 0;
+	else {
+		int ret = check_epoch(req);
+		if (ret != SD_RES_SUCCESS) {
+			req->rp.result = ret;
+			sys->nr_outstanding_io++;
+			req->work.done(&req->work);
+			return -1;
+		}
+	}
+
+	if (!req->local_oid)
+		return 0;
+
+	if (__is_access_to_recoverying_objects(req)) {
+		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
+			req->rp.result = SD_RES_NEW_NODE_VER;
+			sys->nr_outstanding_io++;
+			req->work.done(&req->work);
+		} else {
+			list_del(&req->r_wlist);
+			list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
+		}
+		return -1;
+	}
+
+	if (__is_access_to_busy_objects(req)) {
+		list_del(&req->r_wlist);
+		list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
+		return -1;
+	}
+
+	return 0;
+}
+
 static void queue_request(struct request *req)
 {
 	struct cpg_event *cevent = &req->cev;
@@ -241,6 +328,7 @@ static void queue_request(struct request *req)
 	if (is_io_op(req->op)) {
 		req->work.fn = do_io_request;
 		req->work.done = io_op_done;
+		setup_access_to_local_objects(req);
 	} else if (is_local_op(req->op)) {
 		req->work.fn = do_local_request;
 		req->work.done = local_op_done;
@@ -253,9 +341,6 @@ static void queue_request(struct request *req)
 		req->done(req);
 		return;
 	}
-
-	list_del(&req->r_wlist);
-
 	/*
 	 * we set epoch for non direct requests here. Note that we
 	 * can't access to sys->epoch after calling
@@ -265,9 +350,12 @@ static void queue_request(struct request *req)
 	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL))
 		hdr->epoch = sys->epoch;
 
+	if (check_request(req) < 0)
+		return;
+
+	list_del(&req->r_wlist);
+
 	setup_ordered_sd_vnode_list(req);
-	if (is_io_op(req->op))
-		setup_access_to_local_objects(req);
 
 	cevent->ctype = CPG_EVENT_REQUEST;
 	list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
