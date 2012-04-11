@@ -1007,6 +1007,24 @@ static int need_consistency_check(uint8_t opcode, uint16_t flags)
 	return 1;
 }
 
+static inline void set_consistency_check(struct request *req, uint64_t oid)
+{
+	uint32_t vdi_id = oid_to_vid(oid);
+	struct data_object_bmap *bmap;
+
+	if (is_vdi_obj(oid))
+		return;
+
+	req->check_consistency = 1;
+	list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
+		if (bmap->vdi_id == vdi_id) {
+			if (test_bit(data_oid_to_idx(oid), bmap->dobjs))
+				req->check_consistency = 0;
+			break;
+		}
+	}
+}
+
 static void process_request_queue(void)
 {
 	struct cpg_event *cevent, *n;
@@ -1035,29 +1053,15 @@ static void process_request_queue(void)
 			list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
 			sys->nr_outstanding_io++;
 
-			if (need_consistency_check(req->rq.opcode, req->rq.flags)) {
-				uint32_t vdi_id = oid_to_vid(hdr->oid);
-				struct data_object_bmap *bmap;
+			if (need_consistency_check(req->rq.opcode, req->rq.flags))
+				set_consistency_check(req, hdr->oid);
 
-				req->check_consistency = 1;
-				if (!is_vdi_obj(hdr->oid)) {
-					list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
-						if (bmap->vdi_id == vdi_id) {
-							if (test_bit(data_oid_to_idx(hdr->oid), bmap->dobjs))
-								req->check_consistency = 0;
-							break;
-						}
-					}
-				}
-			}
-		}
-
-		if (is_cluster_op(req->op))
-			queue_work(sys->cpg_wqueue, &req->work);
-		else if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
+			if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
+				queue_work(sys->io_wqueue, &req->work);
+			else
+				queue_work(sys->gateway_wqueue, &req->work);
+		} else /* (is_cluster_op(req->op) || is_local_op(req->op)) */
 			queue_work(sys->io_wqueue, &req->work);
-		else
-			queue_work(sys->gateway_wqueue, &req->work);
 	}
 }
 
