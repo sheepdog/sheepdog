@@ -34,19 +34,19 @@
 
 #define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheep */
 
-enum cpg_event_type {
-	CPG_EVENT_JOIN,
-	CPG_EVENT_LEAVE,
-	CPG_EVENT_NOTIFY,
-	CPG_EVENT_REQUEST,
+enum event_type {
+	EVENT_JOIN,
+	EVENT_LEAVE,
+	EVENT_NOTIFY,
+	EVENT_REQUEST,
 };
 
 #define is_membership_change_event(x) \
-	((x) == CPG_EVENT_JOIN || (x) == CPG_EVENT_LEAVE)
+	((x) == EVENT_JOIN || (x) == EVENT_LEAVE)
 
-struct cpg_event {
-	enum cpg_event_type ctype;
-	struct list_head cpg_event_list;
+struct event_struct {
+	enum event_type ctype;
+	struct list_head event_list;
 };
 
 struct client_info {
@@ -67,7 +67,7 @@ struct request;
 typedef void (*req_end_t) (struct request *);
 
 struct request {
-	struct cpg_event cev;
+	struct event_struct cev;
 	struct sd_req rq;
 	struct sd_rsp rp;
 
@@ -140,9 +140,9 @@ struct cluster_info {
 	uint32_t nr_sobjs;
 	int nr_zones;
 
-	struct list_head cpg_request_queue;
-	struct list_head cpg_event_queue;
-	struct cpg_event *cur_cevent;
+	struct list_head request_queue;
+	struct list_head event_queue;
+	struct event_struct *cur_cevent;
 	int nr_outstanding_io;
 	int nr_outstanding_reqs;
 	unsigned int outstanding_data_size;
@@ -152,7 +152,7 @@ struct cluster_info {
 	int use_directio;
 	uint8_t sync_flush;
 
-	struct work_queue *cpg_wqueue;
+	struct work_queue *event_wqueue;
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
 	struct work_queue *deletion_wqueue;
@@ -245,7 +245,7 @@ void resume_pending_requests(void);
 int create_cluster(int port, int64_t zone, int nr_vnodes);
 int leave_cluster(void);
 
-void start_cpg_event_work(void);
+void process_request_event_queues(void);
 void do_io_request(struct work *work);
 int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, int copies,

@@ -25,14 +25,14 @@ void resume_pending_requests(void)
 
 	list_for_each_entry_safe(next, tmp, &sys->req_wait_for_obj_list,
 				 r_wlist) {
-		struct cpg_event *cevent = &next->cev;
+		struct event_struct *cevent = &next->cev;
 
 		list_del(&next->r_wlist);
-		list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
+		list_add_tail(&cevent->event_list, &sys->request_queue);
 	}
 
-	if (!list_empty(&sys->cpg_request_queue))
-		start_cpg_event_work();
+	if (!list_empty(&sys->request_queue))
+		process_request_event_queues();
 }
 
 int is_access_local(struct sd_vnode *e, int nr_nodes,
@@ -83,7 +83,7 @@ static void setup_access_to_local_objects(struct request *req)
 static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	struct cpg_event *cevent = &req->cev;
+	struct event_struct *cevent = &req->cev;
 	int again = 0;
 	int copies = sys->nr_sobjs;
 
@@ -96,7 +96,7 @@ static void io_op_done(struct work *work)
 	/*
 	 * TODO: if the request failed due to epoch unmatch,
 	 * we should retry here (adds this request to the tail
-	 * of sys->cpg_event_siblings.
+	 * of sys->request_queue.
 	 */
 	if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
 	    (req->rp.result == SD_RES_OLD_NODE_VER ||
@@ -109,7 +109,7 @@ static void io_op_done(struct work *work)
 		setup_ordered_sd_vnode_list(req);
 		setup_access_to_local_objects(req);
 
-		list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
+		list_add_tail(&cevent->event_list, &sys->request_queue);
 		again = 1;
 	} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
 		struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
@@ -159,7 +159,7 @@ static void io_op_done(struct work *work)
 			setup_ordered_sd_vnode_list(req);
 			setup_access_to_local_objects(req);
 
-			list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
+			list_add_tail(&cevent->event_list, &sys->request_queue);
 			again = 1;
 		}
 	}
@@ -260,7 +260,7 @@ static int check_request(struct request *req)
 
 static void queue_request(struct request *req)
 {
-	struct cpg_event *cevent = &req->cev;
+	struct event_struct *cevent = &req->cev;
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 
@@ -319,7 +319,7 @@ static void queue_request(struct request *req)
 	/*
 	 * we set epoch for non direct requests here. Note that we
 	 * can't access to sys->epoch after calling
-	 * start_cpg_event_work(that is, passing requests to work
+	 * process_request_event_queues(that is, passing requests to work
 	 * threads).
 	 */
 	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL))
@@ -332,9 +332,9 @@ static void queue_request(struct request *req)
 
 	setup_ordered_sd_vnode_list(req);
 
-	cevent->ctype = CPG_EVENT_REQUEST;
-	list_add_tail(&cevent->cpg_event_list, &sys->cpg_request_queue);
-	start_cpg_event_work();
+	cevent->ctype = EVENT_REQUEST;
+	list_add_tail(&cevent->event_list, &sys->request_queue);
+	process_request_event_queues();
 	return;
 done:
 	req->done(req);
