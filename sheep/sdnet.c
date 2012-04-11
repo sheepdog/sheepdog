@@ -218,33 +218,6 @@ static int check_epoch(struct request *req)
 	return ret;
 }
 
-static int __is_access_to_recoverying_objects(struct request *req)
-{
-	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
-		if (req->rq.opcode != SD_OP_READ_OBJ)
-			eprintf("bug\n");
-		return 0;
-	}
-
-	if (is_recoverying_oid(req->local_oid))
-		return 1;
-
-	return 0;
-}
-
-static int __is_access_to_busy_objects(struct request *req)
-{
-	if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
-		if (req->rq.opcode != SD_OP_READ_OBJ)
-			eprintf("bug\n");
-		return 0;
-	}
-
-	if (is_access_to_busy_objects(req->local_oid))
-		return 1;
-
-	return 0;
-}
 static int check_request(struct request *req)
 {
 	if (!req->local_oid && !req->local_cow_oid)
@@ -262,19 +235,21 @@ static int check_request(struct request *req)
 	if (!req->local_oid)
 		return 0;
 
-	if (__is_access_to_recoverying_objects(req)) {
+	if (is_recoverying_oid(req->local_oid)) {
 		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
+			/* Sheep peer request */
 			req->rp.result = SD_RES_NEW_NODE_VER;
 			sys->nr_outstanding_io++;
 			req->work.done(&req->work);
 		} else {
+			/* Gateway request */
 			list_del(&req->r_wlist);
 			list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
 		}
 		return -1;
 	}
 
-	if (__is_access_to_busy_objects(req)) {
+	if (is_access_to_busy_objects(req->local_oid)) {
 		list_del(&req->r_wlist);
 		list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
 		return -1;
