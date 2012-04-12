@@ -150,7 +150,7 @@ struct cluster_info {
 	uint32_t recovered_epoch;
 
 	int use_directio;
-	uint8_t sync_flush;
+	uint8_t async_flush;
 
 	struct work_queue *event_wqueue;
 	struct work_queue *gateway_wqueue;

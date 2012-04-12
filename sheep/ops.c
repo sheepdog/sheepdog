@@ -504,7 +504,7 @@ static int local_flush_vdi(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	struct object_cache *cache = find_object_cache(vid, 0);
 
 	if (cache) {
-		if (sys->sync_flush)
+		if (!sys->async_flush)
 			return object_cache_push(cache);
 		else {
 			struct flush_work *fw = xmalloc(sizeof(*fw));

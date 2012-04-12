@@ -36,6 +36,7 @@ static struct option const long_options[] = {
 	{"loglevel", required_argument, NULL, 'l'},
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
+	{"asyncflush", no_argument, NULL, 'a'},
 	{"zone", required_argument, NULL, 'z'},
 	{"vnodes", required_argument, NULL, 'v'},
 	{"cluster", required_argument, NULL, 'c'},
@@ -43,7 +44,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "p:fl:dDz:v:c:h";
+static const char *short_options = "p:fl:dDaz:v:c:h";
 
 static void usage(int status)
 {
@@ -60,7 +61,7 @@ Options:\n\
   -l, --loglevel          specify the level of logging detail\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object from object cache\n\
-  -S, --sync              flush the object cache synchronously\n\
+  -a, --asyncflush        flush the object cache asynchronously\n\
   -z, --zone              specify the zone id\n\
   -v, --vnodes            specify the number of virtual nodes\n\
   -c, --cluster           specify the cluster driver\n\
@@ -134,9 +135,8 @@ int main(int argc, char **argv)
 			dprintf("direct IO mode\n");
 			sys->use_directio = 1;
 			break;
-		case 'S':
-			dprintf("sync flush\n");
-			sys->sync_flush = 1;
+		case 'a':
+			sys->async_flush = 1;
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
