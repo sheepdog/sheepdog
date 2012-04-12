@@ -587,19 +587,22 @@ int store_remove_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
 	uint32_t epoch = hdr->epoch;
-	char path[1024];
+	struct strbuf buf = STRBUF_INIT;
+	int ret = SD_RES_SUCCESS;
 
-	snprintf(path, sizeof(path), "%s%08u/%016" PRIx64, obj_path,
-		 epoch, hdr->oid);
-
-	if (unlink(path) < 0) {
-		if (errno == ENOENT)
-			return SD_RES_NO_OBJ;
+	get_store_dir(&buf, epoch);
+	strbuf_addf(&buf, "%016" PRIx64, hdr->oid);
+	if (unlink(buf.buf) < 0) {
+		if (errno == ENOENT) {
+			ret = SD_RES_NO_OBJ;
+			goto out;
+		}
 		eprintf("%m\n");
-		return SD_RES_EIO;
+		ret =  SD_RES_EIO;
 	}
-
-	return SD_RES_SUCCESS;
+ out:
+	strbuf_release(&buf);
+	return ret;
 }
 
 int store_read_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
