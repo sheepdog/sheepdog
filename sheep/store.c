@@ -197,10 +197,10 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 	return res;
 }
 
-static int read_copy_from_cluster(struct request *req, uint32_t epoch,
+static int read_copy_from_replica(struct request *req, uint32_t epoch,
 				  uint64_t oid, char *buf)
 {
-	int i, n, nr, ret;
+	int i, n, nr, nr_vnodes, ret;
 	unsigned wlen, rlen;
 	char name[128];
 	struct sd_vnode *e;
@@ -210,12 +210,14 @@ static int read_copy_from_cluster(struct request *req, uint32_t epoch,
 	int fd;
 
 	e = req->entry;
+	nr_vnodes = req->nr_vnodes;
+
 	nr = sys->nr_sobjs;
 	if (nr > req->nr_zones)
 		nr = req->nr_zones;
 
 	for (i = 0; i < nr; i++) {
-		n = obj_to_sheep(e, nr, oid, i);
+		n = obj_to_sheep(e, nr_vnodes, oid, i);
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
@@ -255,6 +257,7 @@ static int read_copy_from_cluster(struct request *req, uint32_t epoch,
 
 		close(fd);
 
+		dprintf("%x, %x\n", ret, rsp->result);
 		if (ret)
 			continue;
 
@@ -712,7 +715,7 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 	if (hdr->flags & SD_FLAG_CMD_COW) {
-		dprintf("%" PRIu64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
+		dprintf("%" PRIx64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
 
 		buf = valloc(SD_DATA_OBJ_SIZE);
 		if (!buf) {
@@ -720,7 +723,7 @@ int store_create_and_write_obj(const struct sd_req *req, struct sd_rsp *rsp, voi
 			goto out;
 		}
 		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
-			ret = read_copy_from_cluster(request, hdr->epoch, hdr->cow_oid, buf);
+			ret = read_copy_from_replica(request, hdr->epoch, hdr->cow_oid, buf);
 			if (ret != SD_RES_SUCCESS) {
 				eprintf("failed to read cow object\n");
 				goto out;
