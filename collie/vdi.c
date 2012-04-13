@@ -32,6 +32,9 @@ struct get_vdi_info {
 	uint32_t snapid;
 };
 
+struct sd_node latest_node_list[SD_MAX_NODES];
+int nr_latest_node_list;
+
 static int parse_option_size(const char *value, uint64_t *ret)
 {
 	char *postfix;
@@ -791,6 +794,129 @@ static int vdi_object(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int print_obj_epoch(uint64_t oid)
+{
+	int i, j, fd, ret, idx;
+	struct sd_vdi_req hdr;
+	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	unsigned rlen, wlen;
+	struct sd_vnode vnodes[SD_MAX_VNODES];
+	struct epoch_log *logs;
+	int vnodes_nr, nr_logs, log_length;
+	char host[128];
+
+	log_length = node_list_version * sizeof(struct epoch_log);
+again:
+	logs = malloc(log_length);
+	if (!logs) {
+		if (log_length < 10) {
+			fprintf(stderr, "No memory to allocate.\n");
+			return EXIT_SYSFAIL;
+		}
+		log_length /= 2;
+		goto again;
+	}
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		goto error;
+
+	memset(&hdr, 0, sizeof(hdr));
+
+	hdr.opcode = SD_OP_STAT_CLUSTER;
+	hdr.epoch = node_list_version;
+	hdr.data_length = log_length;
+
+	rlen = hdr.data_length;
+	wlen = 0;
+	ret = exec_req(fd, (struct sd_req *)&hdr, logs, &wlen, &rlen);
+	close(fd);
+
+	if (ret != 0)
+		goto error;
+
+	if (rsp->result != SD_RES_SUCCESS)
+		printf("%s\n", sd_strerror(rsp->result));
+
+	nr_logs = rsp->data_length / sizeof(struct epoch_log);
+	for (i = nr_logs - 1; i >= 0; i--) {
+		vnodes_nr = nodes_to_vnodes(logs[i].nodes, logs[i].nr_nodes, vnodes);
+		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
+				oid, logs[i].epoch, logs[i].nr_copies);
+		printf("---------------------------------------------------\n");
+		for (j = 0; j < logs[i].nr_copies; j++) {
+			idx = obj_to_sheep(vnodes, vnodes_nr, oid, j);
+			addr_to_str(host, sizeof(host), vnodes[idx].addr,
+						vnodes[idx].port);
+			printf("%s\n", host);
+		}
+	}
+
+	free(logs);
+	return EXIT_SUCCESS;
+error:
+	free(logs);
+	return EXIT_SYSFAIL;
+}
+
+static int vdi_track(int argc, char **argv)
+{
+	char *vdiname = argv[optind];
+	unsigned idx = vdi_cmd_data.index;
+	int ret;
+	struct get_vdi_info info;
+	uint32_t vid;
+
+	memset(&info, 0, sizeof(info));
+	info.name = vdiname;
+	info.tag = vdi_cmd_data.snapshot_tag;
+	info.vid = 0;
+	info.snapid = vdi_cmd_data.snapshot_id;
+
+	ret = parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info);
+
+	vid = info.vid;
+	if (vid == 0) {
+		fprintf(stderr, "VDI not found\n");
+		return EXIT_MISSING;
+	}
+
+	if (idx == ~0) {
+		printf("Tracking the inode object 0x%" PRIx32 " with %d nodes\n",
+		       vid, nr_nodes);
+		print_obj_epoch(vid_to_vdi_oid(vid));
+	} else {
+		struct get_data_oid_info oid_info;
+
+		oid_info.success = 0;
+		oid_info.idx = idx;
+
+		if (idx >= MAX_DATA_OBJS) {
+			printf("The offset is too large!\n");
+			exit(EXIT_FAILURE);
+		}
+
+		parse_objs(vid_to_vdi_oid(vid), get_data_oid,
+					&oid_info, SD_DATA_OBJ_SIZE);
+
+		if (oid_info.success) {
+			if (oid_info.data_oid) {
+				printf("Tracking the object 0x%" PRIx64
+				       " (the inode vid 0x%" PRIx32 " idx %u)"
+					   " with %d nodes\n",
+				       oid_info.data_oid, vid, idx, nr_nodes);
+				print_obj_epoch(oid_info.data_oid);
+
+			} else
+				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
+				       vid, idx);
+		} else
+			fprintf(stderr, "Failed to read the inode object 0x%"PRIx32"\n", vid);
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 			     char *key, void *value, unsigned int value_len,
 			     uint32_t *vid, uint64_t *oid, unsigned int *nr_copies,
@@ -1205,6 +1331,8 @@ static struct subcommand vdi_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, vdi_graph},
 	{"object", "<vdiname>", "isaph", "show object information in the image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_object},
+	{"track", "<vdiname>", "isaph", "show the object epoch trace in the image",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_track},
 	{"setattr", "<vdiname> <key> [value]", "dxaph", "set a VDI attribute",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_setattr},
 	{"getattr", "<vdiname> <key>", "aph", "get a VDI attribute",

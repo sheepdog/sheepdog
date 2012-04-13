@@ -164,6 +164,7 @@ struct epoch_log {
 	uint64_t time;
 	uint32_t epoch;
 	uint32_t nr_nodes;
+	uint32_t nr_copies;
 	struct sd_node nodes[SD_MAX_NODES];
 };
 

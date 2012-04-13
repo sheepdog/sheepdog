@@ -1121,7 +1121,7 @@ uint64_t get_cluster_ctime(void)
 	return ct;
 }
 
-static int get_max_copies(struct sd_node *entries, int nr)
+int get_max_copies(struct sd_node *entries, int nr)
 {
 	int i, j;
 	unsigned int nr_zones = 0;
