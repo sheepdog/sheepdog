@@ -127,21 +127,33 @@ static int cluster_info(int argc, char **argv)
 	struct sd_vdi_req hdr;
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
 	unsigned rlen, wlen;
-	struct epoch_log logs[8];
-	int nr_logs;
+	struct epoch_log *logs;
+	int nr_logs, log_length;
 	time_t ti, ct;
 	struct tm tm;
 	char time_str[128];
 
+	log_length = node_list_version * sizeof(struct epoch_log);
+again:
+	logs = malloc(log_length);
+	if (!logs) {
+		if (log_length < 10) {
+			fprintf(stderr, "No memory to allocate.\n");
+			return EXIT_SYSFAIL;
+		}
+		log_length /= 2;
+		goto again;
+	}
+
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
-		return EXIT_SYSFAIL;
+		goto error;
 
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_STAT_CLUSTER;
 	hdr.epoch = node_list_version;
-	hdr.data_length = sizeof(logs);
+	hdr.data_length = log_length;
 
 	rlen = hdr.data_length;
 	wlen = 0;
@@ -149,7 +161,7 @@ static int cluster_info(int argc, char **argv)
 	close(fd);
 
 	if (ret != 0)
-		return EXIT_SYSFAIL;
+		goto error;
 
 	if (!raw_output)
 		printf("Cluster status: ");
@@ -190,7 +202,11 @@ static int cluster_info(int argc, char **argv)
 		printf("]\n");
 	}
 
+	free(logs);
 	return EXIT_SUCCESS;
+error:
+	free(logs);
+	return EXIT_SYSFAIL;
 }
 
 static int cluster_shutdown(int argc, char **argv)
@@ -460,7 +476,7 @@ static int cluster_recover(int argc, char **argv)
 
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
-	 0, cluster_info},
+	 SUBCMD_FLAG_NEED_NODELIST, cluster_info},
 	{"format", NULL, "bcHaph", "create a Sheepdog store",
 	 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
