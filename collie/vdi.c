@@ -188,10 +188,10 @@ static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	}
 }
 
-typedef void (*obj_parser_func_t)(char *sheep, uint64_t oid,
+typedef int (*obj_parser_func_t)(char *sheep, uint64_t oid,
 				  struct sd_obj_rsp *rsp, char *buf, void *data);
 
-static void do_print_obj(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
+static int do_print_obj(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 			 char *buf, void *data)
 {
 	switch (rsp->result) {
@@ -211,6 +211,8 @@ static void do_print_obj(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 		       sheep, rsp->result);
 		break;
 	}
+
+	return 0;
 }
 
 struct get_data_oid_info {
@@ -219,7 +221,7 @@ struct get_data_oid_info {
 	unsigned idx;
 };
 
-static void get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
+static int get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 			 char *buf, void *data)
 {
 	struct get_data_oid_info *info = data;
@@ -230,8 +232,10 @@ static void get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 		if (info->success)
 			break;
 		info->success = 1;
-		if (inode->data_vdi_id[info->idx])
+		if (inode->data_vdi_id[info->idx]) {
 			info->data_oid = vid_to_data_oid(inode->data_vdi_id[info->idx], info->idx);
+			return 1;
+		}
 		break;
 	case SD_RES_NO_OBJ:
 		break;
@@ -244,12 +248,14 @@ static void get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
 		       sheep, rsp->result);
 		break;
 	}
+
+	return 0;
 }
 
 static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigned size)
 {
 	char name[128];
-	int i, fd, ret;
+	int i, fd, ret, cb_ret;
 	char *buf;
 
 	buf = zalloc(size);
@@ -284,8 +290,11 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 		if (ret)
 			fprintf(stderr, "Failed to connect to %s\n", name);
-		else
-			func(name, oid, rsp, buf, data);
+		else {
+			cb_ret = func(name, oid, rsp, buf, data);
+			if (cb_ret)
+				break;
+		}
 	}
 
 	free(buf);
