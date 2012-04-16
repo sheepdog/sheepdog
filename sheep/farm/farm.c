@@ -359,7 +359,7 @@ static void *read_working_object(uint64_t oid, int length)
 
 	fd = open(path, O_RDONLY, def_fmode);
 	if (fd < 0) {
-		eprintf("failed to open %s: %m\n", path);
+		dprintf("object %"PRIx64" not found\n", oid);
 		goto out;
 	}
 
