@@ -869,7 +869,8 @@ static int bypass_object_cache(struct sd_obj_req *hdr)
 	/*
 	 * For vmstate && vdi_attr object, we don't do caching
 	 */
-	if (is_vmstate_obj(oid) || is_vdi_attr_obj(oid))
+	if (is_vmstate_obj(oid) || is_vdi_attr_obj(oid) ||
+	    hdr->flags & SD_FLAG_CMD_COW)
 		return 1;
 	return 0;
 }
