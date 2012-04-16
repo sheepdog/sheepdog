@@ -410,9 +410,14 @@ static inline int sys_can_halt(void)
 
 struct object_cache {
 	uint32_t vid;
-	struct list_head dirty_list;
 	struct hlist_node hash;
-	struct rb_root dirty_rb;
+
+	struct list_head dirty_lists[2];
+	struct list_head *active_dirty_list;
+
+	struct rb_root dirty_trees[2];
+	struct rb_root *active_dirty_tree;
+
 	pthread_mutex_t lock;
 };
 

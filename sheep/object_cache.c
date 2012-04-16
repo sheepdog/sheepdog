@@ -127,9 +127,16 @@ not_found:
 		cache = xzalloc(sizeof(*cache));
 		cache->vid = vid;
 		create_dir_for(vid);
-		cache->dirty_rb = RB_ROOT;
+
+		cache->dirty_trees[0] = RB_ROOT;
+		cache->dirty_trees[1] = RB_ROOT;
+		cache->active_dirty_tree = &cache->dirty_trees[0];
+
+		INIT_LIST_HEAD(&cache->dirty_lists[0]);
+		INIT_LIST_HEAD(&cache->dirty_lists[1]);
+		cache->active_dirty_list = &cache->dirty_lists[0];
+
 		pthread_mutex_init(&cache->lock, NULL);
-		INIT_LIST_HEAD(&cache->dirty_list);
 		hlist_add_head(&cache->hash, head);
 	} else
 		cache = NULL;
@@ -138,18 +145,61 @@ out:
 	return cache;
 }
 
-static void add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx, int create)
+static void add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
+		struct object_cache_entry *entry, int create)
 {
-	struct object_cache_entry *entry = xzalloc(sizeof(*entry));
-
-	entry->idx = idx;
-	pthread_mutex_lock(&oc->lock);
-	if (!dirty_tree_insert(&oc->dirty_rb, entry)) {
-		if (create)
-			entry->create = 1;
-		list_add(&entry->list, &oc->dirty_list);
-	} else
+	if (!entry) {
+		entry = xzalloc(sizeof(*entry));
+		entry->idx = idx;
+		entry->create = create;
+	}
+	if (!dirty_tree_insert(oc->active_dirty_tree, entry))
+		list_add(&entry->list, oc->active_dirty_list);
+	else
 		free(entry);
+}
+
+static inline void del_from_dirty_tree_and_list(
+		struct object_cache_entry *entry,
+		struct rb_root *dirty_tree)
+{
+	rb_erase(&entry->rb, dirty_tree);
+	list_del(&entry->list);
+}
+
+static void switch_dirty_tree_and_list(struct object_cache *oc,
+		struct rb_root ** inactive_dirty_tree,
+		struct list_head **inactive_dirty_list)
+{
+	pthread_mutex_lock(&oc->lock);
+
+	*inactive_dirty_list = oc->active_dirty_list;
+	*inactive_dirty_tree = oc->active_dirty_tree;
+
+	if (oc->active_dirty_tree == &oc->dirty_trees[0]) {
+		oc->active_dirty_list = &oc->dirty_lists[1];
+		oc->active_dirty_tree = &oc->dirty_trees[1];
+	} else {
+		oc->active_dirty_list = &oc->dirty_lists[0];
+		oc->active_dirty_tree = &oc->dirty_trees[0];
+	}
+
+	pthread_mutex_unlock(&oc->lock);
+}
+
+static void merge_dirty_tree_and_list(struct object_cache *oc,
+		struct rb_root *inactive_dirty_tree,
+		struct list_head *inactive_dirty_list)
+{
+	struct object_cache_entry *entry, *t;
+
+	pthread_mutex_lock(&oc->lock);
+
+	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
+		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
+		add_to_dirty_tree_and_list(oc, entry->idx, entry, 0);
+	}
+
 	pthread_mutex_unlock(&oc->lock);
 }
 
@@ -181,8 +231,11 @@ int object_cache_lookup(struct object_cache *oc, uint32_t idx, int create)
 		ret = prealloc(fd, data_length);
 		if (ret != SD_RES_SUCCESS)
 			ret = -1;
-		else
-			add_to_dirty_tree_and_list(oc, idx, 1);
+		else {
+			pthread_mutex_lock(&oc->lock);
+			add_to_dirty_tree_and_list(oc, idx, NULL, 1);
+			pthread_mutex_unlock(&oc->lock);
+		}
 	}
 	close(fd);
 out:
@@ -268,7 +321,9 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 		ret = write_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		add_to_dirty_tree_and_list(oc, idx, 0);
+		pthread_mutex_lock(&oc->lock);
+		add_to_dirty_tree_and_list(oc, idx, NULL, 0);
+		pthread_mutex_unlock(&oc->lock);
 	} else {
 		ret = read_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
 		if (ret != SD_RES_SUCCESS)
@@ -464,23 +519,34 @@ out:
 int object_cache_push(struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
+	struct rb_root *inactive_dirty_tree;
+	struct list_head *inactive_dirty_list;
 	int ret = SD_RES_SUCCESS;
 
 	if (node_in_recovery())
 		/* We don't do flushing in recovery */
 		return SD_RES_SUCCESS;
 
-	list_for_each_entry_safe(entry, t, &oc->dirty_list, list) {
+	switch_dirty_tree_and_list(oc,
+			&inactive_dirty_tree,
+			&inactive_dirty_list);
+
+	/* 1. for async flush, there is only one worker
+	 * 2. for sync flush, Guest assure us of that only one sync
+	 * request is issued in one of gateway worker threads
+	 * So we need not to protect inactive dirty tree and list */
+	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
 		ret = push_cache_object(oc->vid, entry->idx, entry->create);
 		if (ret != SD_RES_SUCCESS)
-			goto out;
-		pthread_mutex_lock(&oc->lock);
-		rb_erase(&entry->rb, &oc->dirty_rb);
-		list_del(&entry->list);
-		pthread_mutex_unlock(&oc->lock);
+			goto push_failed;
+		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
 		free(entry);
 	}
-out:
+	return ret;
+push_failed:
+	merge_dirty_tree_and_list(oc,
+			inactive_dirty_tree,
+			inactive_dirty_list);
 	return ret;
 }
 
@@ -518,7 +584,7 @@ void object_cache_delete(uint32_t vid)
 		hlist_del(&cache->hash);
 		pthread_mutex_unlock(&hashtable_lock[h]);
 
-		list_for_each_entry_safe(entry, t, &cache->dirty_list, list) {
+		list_for_each_entry_safe(entry, t, cache->active_dirty_list, list) {
 			free(entry);
 		}
 		free(cache);
