@@ -27,6 +27,9 @@
 #define DEFAULT_OBJECT_DIR "/tmp"
 #define LOG_FILE_NAME "sheep.log"
 
+static unsigned nr_io_worker = 4;
+static unsigned nr_gateway_worker = 4;
+
 LIST_HEAD(cluster_drivers);
 static char program_name[] = "sheep";
 
@@ -37,6 +40,8 @@ static struct option const long_options[] = {
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
 	{"asyncflush", no_argument, NULL, 'a'},
+	{"nr_gateway_worker", required_argument, NULL, 'g'},
+	{"nr_io_worker", required_argument, NULL, 'i'},
 	{"zone", required_argument, NULL, 'z'},
 	{"vnodes", required_argument, NULL, 'v'},
 	{"cluster", required_argument, NULL, 'c'},
@@ -44,7 +49,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "p:fl:dDaz:v:c:h";
+static const char *short_options = "p:fl:dDag:i:z:v:c:h";
 
 static void usage(int status)
 {
@@ -62,6 +67,8 @@ Options:\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object from object cache\n\
   -a, --asyncflush        flush the object cache asynchronously\n\
+  -g, --nr_gateway_worker set the number of workers for Guests' requests (default 4)\n\
+  -i, --nr_io_worker      set the number of workers for sheep internal requests (default 4)\n\
   -z, --zone              specify the zone id\n\
   -v, --vnodes            specify the number of virtual nodes\n\
   -c, --cluster           specify the cluster driver\n\
@@ -137,6 +144,24 @@ int main(int argc, char **argv)
 			break;
 		case 'a':
 			sys->async_flush = 1;
+			break;
+		case 'g':
+			nr_gateway_worker = strtol(optarg, &p, 10);
+			if (optarg == p || nr_gateway_worker < 4 || nr_gateway_worker > UINT32_MAX) {
+				fprintf(stderr, "Invalid number of gateway workers '%s': "
+					"must be an integer between 4 and %u\n",
+					optarg, UINT32_MAX);
+				exit(1);
+			}
+			break;
+		case 'i':
+			nr_io_worker = strtol(optarg, &p, 10);
+			if (optarg == p || nr_io_worker < 4 || nr_io_worker > UINT32_MAX) {
+				fprintf(stderr, "Invalid number of internal IO workers '%s': "
+					"must be an integer between 4 and %u\n",
+					optarg, UINT32_MAX);
+				exit(1);
+			}
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
@@ -217,8 +242,8 @@ int main(int argc, char **argv)
 	}
 
 	sys->event_wqueue = init_work_queue(1);
-	sys->gateway_wqueue = init_work_queue(NR_GW_WORKER_THREAD);
-	sys->io_wqueue = init_work_queue(NR_IO_WORKER_THREAD);
+	sys->gateway_wqueue = init_work_queue(nr_gateway_worker);
+	sys->io_wqueue = init_work_queue(nr_io_worker);
 	sys->recovery_wqueue = init_work_queue(1);
 	sys->deletion_wqueue = init_work_queue(1);
 	sys->flush_wqueue = init_work_queue(1);

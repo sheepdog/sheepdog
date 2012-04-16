@@ -276,9 +276,6 @@ int store_remove_obj(const struct sd_req *, struct sd_rsp *, void *);
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
 
-#define NR_GW_WORKER_THREAD 4
-#define NR_IO_WORKER_THREAD 4
-
 int epoch_log_read(uint32_t epoch, char *buf, int len);
 int epoch_log_read_nr(uint32_t epoch, char *buf, int len);
 int epoch_log_read_remote(uint32_t epoch, char *buf, int len);
