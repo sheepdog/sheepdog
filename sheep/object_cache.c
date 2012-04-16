@@ -337,7 +337,7 @@ out:
 static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buffer,
 		size_t buf_size)
 {
-	int flags = def_open_flags | O_CREAT | O_TRUNC, fd, ret;
+	int flags = def_open_flags | O_CREAT | O_EXCL, fd, ret = SD_RES_SUCCESS;
 	struct strbuf buf;
 
 	strbuf_init(&buf, PATH_MAX);
@@ -346,6 +346,10 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buff
 
 	fd = open(buf.buf, flags, def_fmode);
 	if (fd < 0) {
+		if (errno == EEXIST) {
+			dprintf("%08"PRIx32" already created\n", idx);
+			goto out;
+		}
 		ret = SD_RES_EIO;
 		goto out;
 	}
