@@ -85,6 +85,29 @@ static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
 	return NULL; /* insert successfully */
 }
 
+static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
+{
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct objlist_cache_entry *entry;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct objlist_cache_entry, node);
+
+		if (oid < entry->oid)
+			p = &(*p)->rb_left;
+		else if (oid > entry->oid)
+			p = &(*p)->rb_right;
+		else {
+			rb_erase(parent, root);
+			return 0;
+		}
+	}
+
+	return -1; /* fail to remove */
+}
+
 static int check_and_insert_objlist_cache(uint64_t oid)
 {
 	struct objlist_cache_entry *entry, *p;
@@ -603,6 +626,10 @@ int store_remove_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 		eprintf("%m\n");
 		ret =  SD_RES_EIO;
 	}
+	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	if (!objlist_cache_rb_remove(&obj_list_cache.root, hdr->oid))
+		obj_list_cache.cache_size--;
+	pthread_rwlock_unlock(&obj_list_cache.lock);
  out:
 	strbuf_release(&buf);
 	return ret;

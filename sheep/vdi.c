@@ -473,6 +473,7 @@ static void delete_one(struct work *work)
 			      vid_to_data_oid(inode->data_vdi_id[i], i),
 			      inode->nr_copies);
 	}
+
 out:
 	free_ordered_sd_vnode_list(entries);
 	free(inode);
