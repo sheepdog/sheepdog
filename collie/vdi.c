@@ -68,7 +68,7 @@ static int parse_option_size(const char *value, uint64_t *ret)
 static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
-	int idx;
+	int idx, is_clone = 0;
 	uint64_t my_objs, cow_objs;
 	char vdi_size_str[16], my_objs_str[16], cow_objs_str[16];
 	time_t ti;
@@ -103,19 +103,24 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 
+	if (i->snap_id == 1 && i->parent_vdi_id != 0)
+		is_clone = 1;
+
 	if (raw_output) {
-		printf("%c ", is_current(i) ? '=' : 's');
+		printf("%c ", is_current(i) ? (is_clone ? 'c' : '=') : 's');
 		while (*name) {
 			if (isspace(*name) || *name == '\\')
 				putchar('\\');
 			putchar(*name++);
 		}
-		printf(" %d %s %s %s %s %" PRIx32 "\n", snapid,
-				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+		printf(" %d %s %s %s %s %" PRIx32 " %s\n", snapid,
+				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid,
+				i->tag);
 	} else {
-		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "\n",
-				is_current(i) ? ' ' : 's', name, snapid,
-				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid);
+		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "  %s\n",
+				is_current(i) ? (is_clone ? 'c' : ' ') : 's',
+				name, snapid, vdi_size_str, my_objs_str, cow_objs_str,
+				dbuf, vid, i->tag);
 	}
 }
 
@@ -309,7 +314,7 @@ static int vdi_list(int argc, char **argv)
 	char *vdiname = argv[optind];
 
 	if (!raw_output)
-		printf("  Name        Id    Size    Used  Shared    Creation time   VDI id\n");
+		printf("  Name        Id    Size    Used  Shared    Creation time   VDI id  Tag\n");
 
 	if (vdiname) {
 		struct get_vdi_info info;
