@@ -306,7 +306,7 @@ static int do_local_io(struct request *req, uint32_t epoch);
 
 static int forward_read_obj_req(struct request *req)
 {
-	int i, n, nr, fd, ret;
+	int i, n, nr, fd, ret = SD_RES_SUCCESS;
 	unsigned wlen, rlen;
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
@@ -333,31 +333,39 @@ static int forward_read_obj_req(struct request *req)
 
 		if (is_myself(e[n].addr, e[n].port)) {
 			ret = do_local_io(req, hdr.epoch);
-			goto out;
+			if (ret != SD_RES_SUCCESS)
+				goto read_remote;
+			return ret;
 		}
 	}
 
-	n = obj_to_sheep(e, nr, oid, 0);
+read_remote:
+	for (i = 0; i < copies; i++) {
+		n = obj_to_sheep(e, nr, oid, i);
+		if (is_myself(e[n].addr, e[n].port))
+			continue;
 
-	fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch);
-	if (fd < 0) {
-		ret = SD_RES_NETWORK_ERROR;
-		goto out;
+		fd = get_sheep_fd(e[n].addr, e[n].port, e[n].node_idx, hdr.epoch);
+		if (fd < 0) {
+			ret = SD_RES_NETWORK_ERROR;
+			continue;
+		}
+
+		wlen = 0;
+		rlen = hdr.data_length;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, req->data, &wlen, &rlen);
+
+		if (ret) { /* network errors */
+			del_sheep_fd(fd);
+			ret = SD_RES_NETWORK_ERROR;
+			continue;
+		} else {
+			memcpy(&req->rp, rsp, sizeof(*rsp));
+			ret = rsp->result;
+			break;
+		}
 	}
-
-	wlen = 0;
-	rlen = hdr.data_length;
-
-	ret = exec_req(fd, (struct sd_req *)&hdr, req->data, &wlen, &rlen);
-
-	if (ret) { /* network errors */
-		del_sheep_fd(fd);
-		ret = SD_RES_NETWORK_ERROR;
-	} else {
-		memcpy(&req->rp, rsp, sizeof(*rsp));
-		ret = rsp->result;
-	}
-out:
 	return ret;
 }
 
@@ -822,10 +830,10 @@ static int fix_object_consistency(struct request *req)
 		goto out;
 	}
 
-	hdr->opcode = SD_OP_WRITE_OBJ;
+	hdr->opcode = SD_OP_CREATE_AND_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->oid = oid;
-	req->op = get_sd_op(SD_OP_WRITE_OBJ);
+	req->op = get_sd_op(hdr->opcode);
 	ret = forward_write_obj_req(req);
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("failed to write object %d\n", ret);
