@@ -826,7 +826,7 @@ static int fix_object_consistency(struct request *req)
 	req->op = get_sd_op(SD_OP_READ_OBJ);
 	ret = forward_read_obj_req(req);
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to read object %d\n", ret);
+		eprintf("failed to read object %x\n", ret);
 		goto out;
 	}
 
@@ -836,7 +836,7 @@ static int fix_object_consistency(struct request *req)
 	req->op = get_sd_op(hdr->opcode);
 	ret = forward_write_obj_req(req);
 	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to write object %d\n", ret);
+		eprintf("failed to write object %x\n", ret);
 		goto out;
 	}
 out:
@@ -944,7 +944,7 @@ void do_io_request(struct work *work)
 	}
 out:
 	if (ret != SD_RES_SUCCESS)
-		dprintf("failed: %x, %" PRIx64" , %u, %"PRIu32"\n",
+		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
 			opcode, oid, epoch, ret);
 	rsp->result = ret;
 }
