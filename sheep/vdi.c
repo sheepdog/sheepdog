@@ -478,6 +478,12 @@ static void delete_one(struct work *work)
 		if (!inode->data_vdi_id[i])
 			continue;
 
+		if (inode->data_vdi_id[i] != inode->vdi_id) {
+			dprintf("object %" PRIx64 " is base's data, would not be deleted.\n",
+					vid_to_data_oid(inode->data_vdi_id[i], i));
+			continue;
+		}
+
 		ret = remove_object(dw->entries, dw->nr_vnodes, dw->nr_zones, dw->epoch,
 			      vid_to_data_oid(inode->data_vdi_id[i], i),
 			      inode->nr_copies);
@@ -586,6 +592,14 @@ next:
 	ret = read_object(entries, nr_vnodes, nr_zones, epoch,
 			  vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
+
+	if (vid == inode->vdi_id && inode->snap_id == 1
+			&& inode->parent_vdi_id != 0
+			&& !inode->snap_ctime) {
+		dprintf("vdi %" PRIx32 " is a cloned vdi.\n", vid);
+		/* current vdi is a cloned vdi */
+		goto out;
+	}
 
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find VDI object\n");
