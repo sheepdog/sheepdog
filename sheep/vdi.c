@@ -346,7 +346,6 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	unsigned long dummy1, dummy2;
 	int ret;
 	struct sd_vnode *entries = NULL;
-	int nr_vnodes, nr_zones, nr_reqs;
 	struct sheepdog_inode *inode = NULL;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
@@ -369,32 +368,6 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 			    &dummy0, &dummy1, &dummy2, nr_copies, NULL);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
-
-	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
-	if (ret != SD_RES_SUCCESS)
-		goto out;
-
-	nr_reqs = sys->nr_sobjs;
-	if (nr_reqs > nr_zones)
-		nr_reqs = nr_zones;
-
-	ret = read_object(entries, nr_vnodes, nr_zones, epoch,
-			  vid_to_vdi_oid(*vid), (char *)inode,
-			  SD_INODE_HEADER_SIZE, 0, nr_reqs);
-	if (ret != SD_RES_SUCCESS) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	memset(inode->name, 0, sizeof(inode->name));
-
-	ret = write_object(entries, nr_vnodes, nr_zones, epoch,
-			   vid_to_vdi_oid(*vid), (char *)inode,
-			   SD_INODE_HEADER_SIZE, 0, 0, nr_reqs, 0);
-	if (ret != 0) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
 
 	ret = start_deletion(*vid, epoch);
 out:
@@ -426,16 +399,61 @@ struct deletion_work {
 
 	int count;
 	uint32_t *buf;
+
+	struct sd_vnode entries[SD_MAX_VNODES];
+	int nr_vnodes;
+	int nr_zones;
+	int delete_error;
 };
 
 static LIST_HEAD(deletion_work_list);
+
+static int delete_inode(struct deletion_work *dw)
+{
+	int nr_reqs, ret = SD_RES_SUCCESS;
+	struct sheepdog_inode *inode = NULL;
+
+	inode = zalloc(sizeof(*inode));
+	if (!inode) {
+		eprintf("no memory to allocate inode.\n");
+		goto out;
+	}
+
+	nr_reqs = sys->nr_sobjs;
+	if (nr_reqs > dw->nr_zones)
+		nr_reqs = dw->nr_zones;
+
+	ret = read_object(dw->entries, dw->nr_vnodes, dw->nr_zones, dw->epoch,
+			  vid_to_vdi_oid(dw->vid), (char *)inode,
+			  SD_INODE_HEADER_SIZE, 0, nr_reqs);
+	if (ret != SD_RES_SUCCESS) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	if (dw->delete_error)
+		inode->vdi_size = 0;
+	else
+		memset(inode->name, 0, sizeof(inode->name));
+
+	ret = write_object(dw->entries, dw->nr_vnodes, dw->nr_zones, dw->epoch,
+			   vid_to_vdi_oid(dw->vid), (char *)inode,
+			   SD_INODE_HEADER_SIZE, 0, 0, nr_reqs, 0);
+	if (ret != 0) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+out:
+	free(inode);
+	return ret;
+}
+
 
 static void delete_one(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
-	struct sd_vnode *entries = NULL;
-	int nr_vnodes, nr_zones;
 	int ret, i;
 	struct sheepdog_inode *inode = NULL;
 
@@ -447,16 +465,7 @@ static void delete_one(struct work *work)
 		goto out;
 	}
 
-	/*
-	 * FIXME: can't use get_ordered_sd_node_list() here since this
-	 * is called in threads and not serialized with cpg_event so
-	 * we can't access to epoch and sd_node_list safely.
-	 */
-	ret = get_ordered_sd_vnode_list(&entries, &nr_vnodes, &nr_zones);
-	if (ret != SD_RES_SUCCESS)
-		goto out;
-
-	ret = read_object(entries, nr_vnodes, nr_zones, dw->epoch,
+	ret = read_object(dw->entries, dw->nr_vnodes, dw->nr_zones, dw->epoch,
 			  vid_to_vdi_oid(vdi_id), (void *)inode, sizeof(*inode),
 			  0, sys->nr_sobjs);
 
@@ -469,13 +478,22 @@ static void delete_one(struct work *work)
 		if (!inode->data_vdi_id[i])
 			continue;
 
-		remove_object(entries, nr_vnodes, nr_zones, dw->epoch,
+		ret = remove_object(dw->entries, dw->nr_vnodes, dw->nr_zones, dw->epoch,
 			      vid_to_data_oid(inode->data_vdi_id[i], i),
 			      inode->nr_copies);
+
+		if (ret != SD_RES_SUCCESS)
+			dw->delete_error = 1;
+		else
+			inode->data_vdi_id[i] = 0;
 	}
 
+	if (dw->delete_error)
+		write_object(dw->entries, dw->nr_vnodes, dw->nr_zones, dw->epoch,
+				vid_to_vdi_oid(vdi_id), (void *)inode, sizeof(*inode),
+				0, 0, inode->nr_copies, 0);
+
 out:
-	free_ordered_sd_vnode_list(entries);
 	free(inode);
 }
 
@@ -488,6 +506,8 @@ static void delete_one_done(struct work *work)
 		queue_work(sys->deletion_wqueue, &dw->work);
 		return;
 	}
+
+	delete_inode(dw);
 
 	list_del(&dw->dw_siblings);
 
@@ -529,7 +549,7 @@ again:
 		goto err;
 	}
 
-	if (inode->name[0] != '\0')
+	if (inode->name[0] != '\0' && vid != dw->vid)
 		goto out;
 
 	for (i = 0; i < ARRAY_SIZE(inode->child_vdi_id); i++) {
@@ -616,6 +636,10 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	if (ret != SD_RES_SUCCESS)
 		goto err;
 
+	memcpy(dw->entries, entries, nr_vnodes * sizeof(struct sd_vnode));
+	dw->nr_vnodes = nr_vnodes;
+	dw->nr_zones = nr_zones;
+
 	root_vid = get_vdi_root(entries, nr_vnodes, nr_zones, dw->epoch, dw->vid);
 	if (!root_vid) {
 		ret = SD_RES_EIO;
@@ -623,8 +647,12 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	}
 
 	ret = fill_vdi_list(dw, entries, nr_vnodes, nr_zones, root_vid);
-	if (ret)
+	if (ret) {
+		dprintf("snapshot chain has valid vdi, "
+				"just mark vdi %" PRIx32 " as deleted.\n", dw->vid);
+		delete_inode(dw);
 		return SD_RES_SUCCESS;
+	}
 
 	dprintf("%d\n", dw->count);
 
