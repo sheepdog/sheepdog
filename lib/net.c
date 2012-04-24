@@ -70,7 +70,12 @@ int rx(struct connection *conn, enum conn_state next_state)
 	int ret;
 
 	ret = read(conn->fd, conn->rx_buf, conn->rx_length);
-	if (!ret || ret < 0) {
+	if (!ret) {
+		conn->c_rx_state = C_IO_CLOSED;
+		return 0;
+	}
+
+	if (ret < 0) {
 		if (errno != EAGAIN)
 			conn->c_rx_state = C_IO_CLOSED;
 		return 0;
