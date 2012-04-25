@@ -397,7 +397,8 @@ static notrace void crash_handler(int signo)
 	exit(1);
 }
 
-notrace int log_init(char *program_name, int size, int is_daemon, int level, char *outfile)
+notrace int log_init(char *program_name, int size, int to_stdout, int level,
+		char *outfile)
 {
 	off_t offset;
 	size_t log_size;
@@ -410,7 +411,7 @@ notrace int log_init(char *program_name, int size, int is_daemon, int level, cha
 
 	semkey = random();
 
-	if (is_daemon) {
+	if (!to_stdout) {
 		struct sigaction sa_old;
 		struct sigaction sa_new;
 		int fd;
