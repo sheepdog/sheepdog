@@ -2143,10 +2143,45 @@ static int init_objlist_cache(void)
 	return 0;
 }
 
+static int init_store_driver(void)
+{
+	char driver_name[STORE_LEN], *p;
+	int ret;
+
+	memset(driver_name, '\0', sizeof(driver_name));
+	ret = get_cluster_store(driver_name);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	p = memchr(driver_name, '\0', STORE_LEN);
+	if (!p) {
+		/*
+		 * If the driver name is not NUL terminated we are in deep
+		 * trouble, let's get out here.
+		 */
+		dprintf("store name not NUL terminated\n");
+		return SD_RES_NO_STORE;
+	}
+
+	/*
+	 * The store file might not exist in case this is a new sheep that
+	 * never joined a cluster before.
+	 */
+	if (p == driver_name)
+		return 0;
+
+	sd_store = find_store_driver(driver_name);
+	if (!sd_store) {
+		dprintf("store %s not found\n", driver_name);
+		return SD_RES_NO_STORE;
+	}
+
+	return sd_store->init(obj_path);
+}
+
 int init_store(const char *d)
 {
 	int ret;
-	char driver_name[STORE_LEN];
 
 	ret = init_obj_path(d);
 	if (ret)
@@ -2168,19 +2203,9 @@ int init_store(const char *d)
 	if (ret)
 		return ret;
 
-	ret = get_cluster_store(driver_name);
-	if (ret != SD_RES_SUCCESS)
-		return 1;
-
-	if (strlen(driver_name))
-		sd_store = find_store_driver(driver_name);
-
-	if (sd_store) {
-		ret = sd_store->init(obj_path);
-		if (ret != SD_RES_SUCCESS)
-			return ret;
-	} else
-		dprintf("no store found\n");
+	ret = init_store_driver();
+	if (ret)
+		return ret;
 
 	ret = init_objlist_cache();
 	if (ret)
