@@ -102,7 +102,9 @@ static int node_info(int argc, char **argv)
 		return EXIT_SYSFAIL;
 	}
 
-	parse_vdi(cal_total_vdi_size, SD_INODE_HEADER_SIZE, &total_vdi_size);
+	if (parse_vdi(cal_total_vdi_size, SD_INODE_HEADER_SIZE,
+			&total_vdi_size) < 0)
+		return EXIT_SYSFAIL;
 
 	size_to_str(total_size, total_str, sizeof(total_str));
 	size_to_str(total_size - total_avail, avail_str, sizeof(avail_str));

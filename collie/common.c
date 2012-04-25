@@ -134,8 +134,10 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	unsigned int rlen, wlen = 0;
 
 	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
+	if (fd < 0) {
+		fprintf(stderr, "Failed to connect to %s:%d\n", sdhost, sdport);
 		return fd;
+	}
 
 	memset(&req, 0, sizeof(req));
 
@@ -146,6 +148,8 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	rlen = sizeof(vdi_inuse);
 	ret = exec_req(fd, &req, vdi_inuse, &wlen, &rlen);
 	if (ret < 0) {
+		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
+			sdhost, sdport);
 		close(fd);
 		return ret;
 	}

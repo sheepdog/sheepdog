@@ -320,10 +320,12 @@ static int vdi_list(int argc, char **argv)
 		struct get_vdi_info info;
 		memset(&info, 0, sizeof(info));
 		info.name = vdiname;
-		parse_vdi(print_vdi_list, SD_INODE_SIZE, &info);
+		if (parse_vdi(print_vdi_list, SD_INODE_SIZE, &info) < 0)
+			return EXIT_SYSFAIL;
 		return EXIT_SUCCESS;
 	} else {
-		parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL);
+		if (parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL) < 0)
+			return EXIT_SYSFAIL;
 		return EXIT_SUCCESS;
 	}
 }
@@ -331,7 +333,8 @@ static int vdi_list(int argc, char **argv)
 static int vdi_tree(int argc, char **argv)
 {
 	init_tree();
-	parse_vdi(print_vdi_tree, SD_INODE_HEADER_SIZE, NULL);
+	if (parse_vdi(print_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
 	dump_tree();
 
 	return EXIT_SUCCESS;
@@ -344,7 +347,8 @@ static int vdi_graph(int argc, char **argv)
 	printf("  node [shape = \"box\", fontname = \"Courier\"];\n\n");
 	printf("  \"0\" [shape = \"ellipse\", label = \"root\"];\n\n");
 
-	parse_vdi(print_vdi_graph, SD_INODE_HEADER_SIZE, NULL);
+	if (parse_vdi(print_vdi_graph, SD_INODE_HEADER_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
 
 	/* print a footer */
 	printf("}\n");
@@ -747,7 +751,6 @@ static int vdi_object(int argc, char **argv)
 {
 	char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
-	int ret;
 	struct get_vdi_info info;
 	uint32_t vid;
 
@@ -757,7 +760,8 @@ static int vdi_object(int argc, char **argv)
 	info.vid = 0;
 	info.snapid = vdi_cmd_data.snapshot_id;
 
-	ret = parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info);
+	if (parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info) < 0)
+		return EXIT_SYSFAIL;
 
 	vid = info.vid;
 	if (vid == 0) {
@@ -868,7 +872,6 @@ static int vdi_track(int argc, char **argv)
 {
 	char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
-	int ret;
 	struct get_vdi_info info;
 	uint32_t vid;
 
@@ -878,7 +881,8 @@ static int vdi_track(int argc, char **argv)
 	info.vid = 0;
 	info.snapid = vdi_cmd_data.snapshot_id;
 
-	ret = parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info);
+	if (parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info) < 0)
+		return EXIT_SYSFAIL;
 
 	vid = info.vid;
 	if (vid == 0) {
