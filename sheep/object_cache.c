@@ -32,9 +32,6 @@
 
 static char cache_dir[PATH_MAX];
 static int def_open_flags = O_RDWR;
-extern mode_t def_fmode;
-extern mode_t def_dmode;
-extern struct store_driver *sd_store;
 
 static pthread_mutex_t hashtable_lock[HASH_SIZE] = { [0 ... HASH_SIZE - 1] = PTHREAD_MUTEX_INITIALIZER };
 static struct hlist_head cache_hashtable[HASH_SIZE];

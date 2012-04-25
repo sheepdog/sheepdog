@@ -25,8 +25,6 @@
 #include "cluster.h"
 
 static int cdrv_fd;
-extern struct store_driver *sd_store;
-extern char *obj_path;
 
 struct node {
 	struct sd_node ent;

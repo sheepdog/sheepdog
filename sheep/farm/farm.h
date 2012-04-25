@@ -47,8 +47,6 @@ struct trunk_entry_incore {
 	struct hlist_node hash;
 };
 
-extern char *obj_path;
-
 /* farm.c */
 extern char farm_dir[PATH_MAX];
 extern char farm_obj_dir[PATH_MAX];

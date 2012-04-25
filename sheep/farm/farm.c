@@ -21,9 +21,6 @@ char farm_obj_dir[PATH_MAX];
 char farm_dir[PATH_MAX];
 
 static int def_open_flags = O_DIRECT | O_DSYNC | O_RDWR;
-extern char *obj_path;
-extern mode_t def_fmode;
-extern mode_t def_dmode;
 
 static int create_directory(char *p)
 {

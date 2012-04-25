@@ -15,9 +15,6 @@
 #include "strbuf.h"
 #include "trace/trace.h"
 
-extern char *obj_path;
-extern struct store_driver *sd_store;
-
 enum sd_op_type {
 	SD_OP_TYPE_CLUSTER = 1, /* cluster operations */
 	SD_OP_TYPE_LOCAL,       /* local operations */

@@ -209,6 +209,10 @@ static inline struct store_driver *find_store_driver(const char *name)
 }
 
 extern struct cluster_info *sys;
+extern struct store_driver *sd_store;
+extern char *obj_path;
+extern mode_t def_fmode;
+extern mode_t def_dmode;
 
 int create_listen_port(int port, void *data);
 

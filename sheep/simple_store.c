@@ -26,10 +26,6 @@
 #include "util.h"
 
 
-extern char *obj_path;
-
-extern mode_t def_fmode;
-
 static int def_store_flags = O_DIRECT | O_DSYNC | O_RDWR;
 
 static int simple_store_write(uint64_t oid, struct siocb *iocb);
