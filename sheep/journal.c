@@ -30,7 +30,7 @@ struct jrnl_head {
 
 struct jrnl_descriptor {
 	struct jrnl_head head;
-	void *data;
+	const void *data;
 	int fd;      /* Open file fd */
 	int target_fd;
 	char path[256];
@@ -179,7 +179,7 @@ static int jrnl_apply_to_target_object(struct jrnl_descriptor *jd)
 /*
  * We cannot use this function for concurrent write operations
  */
-struct jrnl_descriptor *jrnl_begin(void *buf, size_t count, off_t offset,
+struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
 		 const char *path, const char *jrnl_dir)
 {
 	int ret;

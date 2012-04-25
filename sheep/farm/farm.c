@@ -673,7 +673,7 @@ static int farm_format(struct siocb *iocb)
 {
 	char path[PATH_MAX];
 	unsigned ret;
-	const uint8_t name[] = "farm";
+	const char name[] = "farm";
 
 	dprintf("try get a clean store\n");
 	snprintf(path, sizeof(path), "%s", obj_path);

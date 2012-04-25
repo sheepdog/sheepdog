@@ -319,7 +319,7 @@ static int simple_store_format(struct siocb *iocb)
 {
 	char path[PATH_MAX];
 	unsigned epoch = iocb->epoch, ret, i;
-	const uint8_t name[] = "simple";
+	const char name[] = "simple";
 
 	dprintf("epoch %u\n", epoch);
 	for (i = 1; i <= epoch; i++) {

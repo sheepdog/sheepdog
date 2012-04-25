@@ -269,8 +269,8 @@ int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);
 int set_cluster_flags(uint16_t flags);
 int get_cluster_flags(uint16_t *flags);
-int set_cluster_store(const uint8_t *name);
-int get_cluster_store(uint8_t *buf);
+int set_cluster_store(const char *name);
+int get_cluster_store(char *buf);
 
 int store_create_and_write_obj(const struct sd_req *, struct sd_rsp *, void *);
 int store_write_obj(const struct sd_req *, struct sd_rsp *, void *);
@@ -331,7 +331,7 @@ int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
 
 /* Journal */
-struct jrnl_descriptor *jrnl_begin(void *buf, size_t count, off_t offset,
+struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
 				   const char *path, const char *jrnl_dir);
 int jrnl_end(struct jrnl_descriptor * jd);
 int jrnl_recover(const char *jrnl_dir);

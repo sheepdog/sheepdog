@@ -2146,7 +2146,7 @@ static int init_objlist_cache(void)
 int init_store(const char *d)
 {
 	int ret;
-	uint8_t driver_name[STORE_LEN];
+	char driver_name[STORE_LEN];
 
 	ret = init_obj_path(d);
 	if (ret)
@@ -2172,8 +2172,8 @@ int init_store(const char *d)
 	if (ret != SD_RES_SUCCESS)
 		return 1;
 
-	if (strlen((char *)driver_name))
-		sd_store = find_store_driver((char *)driver_name);
+	if (strlen(driver_name))
+		sd_store = find_store_driver(driver_name);
 
 	if (sd_store) {
 		ret = sd_store->init(obj_path);
@@ -2306,7 +2306,7 @@ out:
 	return ret;
 }
 
-int set_cluster_store(const uint8_t *name)
+int set_cluster_store(const char *name)
 {
 	int fd, ret = SD_RES_EIO, len;
 	void *jd;
@@ -2315,8 +2315,10 @@ int set_cluster_store(const uint8_t *name)
 	if (fd < 0)
 		goto out;
 
-	len = strlen((char *)name) + 1;
-	jd = jrnl_begin((void *)name, len,
+	len = strlen(name) + 1;
+	if (len > STORE_LEN)
+		goto err;
+	jd = jrnl_begin(name, len,
 			offsetof(struct sheepdog_config, store),
 			config_path, jrnl_path);
 	if (!jd) {
@@ -2335,7 +2337,7 @@ out:
 	return ret;
 }
 
-int get_cluster_store(uint8_t *buf)
+int get_cluster_store(char *buf)
 {
 	int fd, ret = SD_RES_EIO;
 
