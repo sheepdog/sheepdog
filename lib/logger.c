@@ -285,14 +285,11 @@ static notrace void log_syslog(void *buff)
 		syslog(msg->prio, "%s", (char *)&msg->str);
 }
 
-static notrace void dolog(int prio, const char *func, int line, const char *fmt, va_list ap)
+static notrace void dolog(int prio, const char *func, int line,
+		const char *fmt, va_list ap)
 {
-	struct timespec ts;
-	struct sembuf ops;
-
 	if (la) {
-		ts.tv_sec = 0;
-		ts.tv_nsec = 10000;
+		struct sembuf ops;
 
 		ops.sem_num = 0;
 		ops.sem_flg = SEM_UNDO;
