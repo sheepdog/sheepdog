@@ -591,14 +591,11 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	int ret;
 	struct request *req;
 	struct sd_obj_req *hdr;
-	struct sd_obj_rsp *rsp;
-	unsigned int rsp_data_length;
 
 	req = zalloc(sizeof(*req));
 	if (!req)
 		return SD_RES_NO_MEM;
 	hdr = (struct sd_obj_req *)&req->rq;
-	rsp = (struct sd_obj_rsp *)&req->rp;
 
 	hdr->oid = oid;
 	hdr->opcode = SD_OP_READ_OBJ;
@@ -611,9 +608,7 @@ int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 
 	ret = do_local_io(req, epoch);
 
-	rsp_data_length = rsp->data_length;
 	free(req);
-
 	return ret;
 }
 
