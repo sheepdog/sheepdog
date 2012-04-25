@@ -613,7 +613,8 @@ static void client_handler(int fd, int events, void *data)
 	if (events & EPOLLOUT)
 		client_tx_handler(ci);
 
-	if (is_conn_dead(&ci->conn)) {
+	if ((events & (EPOLLERR | EPOLLHUP))
+		|| is_conn_dead(&ci->conn)) {
 		if (!(ci->conn.events & EPOLLIN))
 			list_del(&ci->conn.blocking_siblings);
 
