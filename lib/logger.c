@@ -382,14 +382,18 @@ static notrace void log_flush(void)
 	}
 }
 
-static notrace void log_sigexit(int signo)
+static notrace void crash_handler(int signo)
 {
-	if (signo == SIGSEGV)
-		vprintf(SDOG_ERR, "logger pid %d exiting abnormally\n", getpid());
-	else if (signo == SIGHUP)
-		vprintf(SDOG_ERR, "sheep pid %d exiting.\n", pid);
-	else
-		vprintf(SDOG_ERR, "something wrong.\n");
+	if (signo == SIGSEGV) {
+		vprintf(SDOG_ERR, "logger pid %d segfaulted.\n",
+			getpid());
+	} else if (signo == SIGHUP) {
+		vprintf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n", pid);
+	} else {
+		vprintf(SDOG_ERR, "logger pid %d got unexpected signal %d.\n",
+			pid, signo);
+	}
+
 	log_flush();
 	closelog();
 	free_logarea();
@@ -457,13 +461,13 @@ notrace int log_init(char *program_name, int size, int is_daemon, int level, cha
 			exit(1);
 		}
 
-		pid = getppid();
-		/* flush on daemon's crash */
-		sa_new.sa_handler = (void*)log_sigexit;
-		sigemptyset(&sa_new.sa_mask);
+		/* flush when either the logger or its parent dies */
+		sa_new.sa_handler = crash_handler;
 		sa_new.sa_flags = 0;
-		sigaction(SIGSEGV, &sa_new, &sa_old );
-		sigaction(SIGHUP, &sa_new, &sa_old );
+		sigemptyset(&sa_new.sa_mask);
+
+		sigaction(SIGSEGV, &sa_new, &sa_old);
+		sigaction(SIGHUP, &sa_new, &sa_old);
 
 		prctl(PR_SET_PDEATHSIG, SIGHUP);
 
