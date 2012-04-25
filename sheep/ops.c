@@ -289,6 +289,17 @@ static int local_stat_sheep(const struct sd_req *req, struct sd_rsp *rsp,
 	return stat_sheep(&node_rsp->store_size, &node_rsp->store_free, epoch);
 }
 
+static int local_stat_recovery(const struct sd_req *req, struct sd_rsp *rsp,
+					void *data)
+{
+	if (node_in_recovery())
+		return SD_RES_SUCCESS;
+	else
+		return SD_RES_UNKNOWN;
+
+	return SD_RES_UNKNOWN;
+}
+
 static int local_stat_cluster(const struct sd_req *req, struct sd_rsp *rsp,
 			      void *data)
 {
@@ -629,6 +640,11 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_STAT_SHEEP] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_stat_sheep,
+	},
+
+	[SD_OP_STAT_RECOVERY] = {
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_stat_recovery,
 	},
 
 	[SD_OP_STAT_CLUSTER] = {
