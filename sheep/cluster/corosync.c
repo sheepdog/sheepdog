@@ -31,10 +31,6 @@ static struct cpg_node this_node;
 
 static struct work_queue *corosync_block_wq;
 
-static struct cdrv_handlers corosync_handlers;
-static enum cluster_join_result (*corosync_check_join_cb)(
-	struct sd_node *joining, void *opaque);
-
 static LIST_HEAD(corosync_event_list);
 static LIST_HEAD(corosync_block_list);
 
@@ -299,7 +295,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 				/* check_join() must be called only once */
 				return 0;
 
-			res = corosync_check_join_cb(&cevent->sender.ent,
+			res = sd_check_join_cb(&cevent->sender.ent,
 						     cevent->msg);
 			if (res == CJ_RES_MASTER_TRANSFER)
 				nr_cpg_nodes = 0;
@@ -326,7 +322,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		case CJ_RES_FAIL:
 		case CJ_RES_JOIN_LATER:
 			build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-			corosync_handlers.join_handler(&cevent->sender.ent, entries,
+			sd_join_handler(&cevent->sender.ent, entries,
 						       nr_cpg_nodes, cevent->result,
 						       cevent->msg);
 			break;
@@ -341,8 +337,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		del_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 		nr_cpg_nodes--;
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		corosync_handlers.leave_handler(&cevent->sender.ent,
-						entries, nr_cpg_nodes);
+		sd_leave_handler(&cevent->sender.ent, entries, nr_cpg_nodes);
 		break;
 	case COROSYNC_EVENT_TYPE_NOTIFY:
 		if (cevent->blocked) {
@@ -367,7 +362,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 			return 0;
 		}
 
-		corosync_handlers.notify_handler(&cevent->sender.ent, cevent->msg,
+		sd_notify_handler(&cevent->sender.ent, cevent->msg,
 						 cevent->msg_len);
 		break;
 	}
@@ -619,8 +614,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	__corosync_dispatch();
 }
 
-static int corosync_init(struct cdrv_handlers *handlers, const char *option,
-			 uint8_t *myaddr)
+static int corosync_init(const char *option, uint8_t *myaddr)
 {
 	int ret, fd;
 	uint32_t nodeid;
@@ -628,8 +622,6 @@ static int corosync_init(struct cdrv_handlers *handlers, const char *option,
 		.cpg_deliver_fn = cdrv_cpg_deliver,
 		.cpg_confchg_fn = cdrv_cpg_confchg
 	};
-
-	corosync_handlers = *handlers;
 
 	ret = cpg_initialize(&cpg_handle, &cb);
 	if (ret != CPG_OK) {
@@ -670,14 +662,10 @@ static int corosync_init(struct cdrv_handlers *handlers, const char *option,
 }
 
 static int corosync_join(struct sd_node *myself,
-			 enum cluster_join_result (*check_join_cb)(
-				 struct sd_node *joining,
-				 void *opaque),
 			 void *opaque, size_t opaque_len)
 {
 	int ret;
 
-	corosync_check_join_cb = check_join_cb;
 retry:
 	ret = cpg_join(cpg_handle, &cpg_group);
 	switch (ret) {

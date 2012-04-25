@@ -34,10 +34,6 @@ static struct sd_node this_node;
 
 static struct work_queue *local_block_wq;
 
-static struct cdrv_handlers lhdlrs;
-static enum cluster_join_result (*local_check_join_cb)(
-	struct sd_node *joining, void *opaque);
-
 enum local_event_type {
 	EVENT_JOIN = 1,
 	EVENT_LEAVE,
@@ -287,8 +283,7 @@ static void check_pids(void *arg)
 
 /* Local driver APIs */
 
-static int local_init(struct cdrv_handlers *handlers, const char *option,
-		      uint8_t *myaddr)
+static int local_init(const char *option, uint8_t *myaddr)
 {
 	sigset_t mask;
 	static struct timer t = {
@@ -296,7 +291,6 @@ static int local_init(struct cdrv_handlers *handlers, const char *option,
 		.data = &t,
 	};
 
-	lhdlrs = *handlers;
 	if (option)
 		shmfile = option;
 
@@ -325,13 +319,9 @@ static int local_init(struct cdrv_handlers *handlers, const char *option,
 }
 
 static int local_join(struct sd_node *myself,
-		      enum cluster_join_result (*check_join_cb)(
-			      struct sd_node *joining,
-			      void *opaque),
 		      void *opaque, size_t opaque_len)
 {
 	this_node = *myself;
-	local_check_join_cb = check_join_cb;
 
 	shm_queue_lock();
 
@@ -410,7 +400,7 @@ static int local_dispatch(void)
 	case EVENT_JOIN:
 		if (ev->blocked) {
 			if (node_cmp(&ev->nodes[0], &this_node) == 0) {
-				res = local_check_join_cb(&ev->sender, ev->buf);
+				res = sd_check_join_cb(&ev->sender, ev->buf);
 				ev->join_result = res;
 				ev->blocked = 0;
 				msync(ev, sizeof(*ev), MS_SYNC);
@@ -436,11 +426,11 @@ static int local_dispatch(void)
 			shm_queue_set_chksum();
 		}
 
-		lhdlrs.join_handler(&ev->sender, ev->nodes, ev->nr_nodes,
+		sd_join_handler(&ev->sender, ev->nodes, ev->nr_nodes,
 				    ev->join_result, ev->buf);
 		break;
 	case EVENT_LEAVE:
-		lhdlrs.leave_handler(&ev->sender, ev->nodes, ev->nr_nodes);
+		sd_leave_handler(&ev->sender, ev->nodes, ev->nr_nodes);
 		break;
 	case EVENT_NOTIFY:
 		if (ev->blocked) {
@@ -454,7 +444,7 @@ static int local_dispatch(void)
 			goto out;
 		}
 
-		lhdlrs.notify_handler(&ev->sender, ev->buf, ev->buf_len);
+		sd_notify_handler(&ev->sender, ev->buf, ev->buf_len);
 		break;
 	}
 

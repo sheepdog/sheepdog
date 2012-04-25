@@ -31,18 +31,6 @@ enum cluster_join_result {
 				 * will leave the cluster (restart later). */
 };
 
-struct cdrv_handlers {
-	void (*join_handler)(struct sd_node *joined,
-			     struct sd_node *members,
-			     size_t nr_members, enum cluster_join_result result,
-			     void *opaque);
-	void (*leave_handler)(struct sd_node *left,
-			      struct sd_node *members,
-			      size_t nr_members);
-	void (*notify_handler)(struct sd_node *sender,
-			       void *msg, size_t msg_len);
-};
-
 struct cluster_driver {
 	const char *name;
 
@@ -53,27 +41,23 @@ struct cluster_driver {
 	 * may be used with the poll(2) to monitor cluster events.  On
 	 * error, returns -1.
 	 */
-	int (*init)(struct cdrv_handlers *handlers, const char *option,
-		    uint8_t *myaddr);
+	int (*init)(const char *option, uint8_t *myaddr);
 
 	/*
 	 * Join the cluster
 	 *
-	 * This function is used to join the cluster, and notifies a
-	 * join event to all the nodes.  The copy of 'opaque' is
-	 * passed to check_join_cb() and join_handler().
-	 * check_join_cb() is called on one of the nodes which already
+	 * This function is used to join the cluster, and notifies a join
+	 * event to all the nodes.  The copy of 'opaque' is passed to
+	 * sd_check_join_cb() and sd_join_handler().
+	 *
+	 * sd_check_join_cb() is called on one of the nodes which already
 	 * paticipate in the cluster.  If the content of 'opaque' is
-	 * changed in check_join_cb(), the updated 'opaque' must be
-	 * passed to join_handler().
+	 * changed in sd_check_join_cb(), the updated 'opaque' must be
+	 * passed to sd_join_handler().
 	 *
 	 * Returns zero on success, -1 on error
 	 */
-	int (*join)(struct sd_node *myself,
-		    enum cluster_join_result (*check_join_cb)(
-			    struct sd_node *joining,
-			    void *opaque),
-		    void *opaque, size_t opaque_len);
+	int (*join)(struct sd_node *myself, void *opaque, size_t opaque_len);
 
 	/*
 	 * Leave the cluster
@@ -88,14 +72,14 @@ struct cluster_driver {
 	/*
 	 * Notify a message to all nodes in the cluster
 	 *
-	 * This function sends 'msg' to all the nodes.  The notified
-	 * messages can be read through notify_handler() in
-	 * cdrv_handlers.  If 'block_cb' is specified, block_cb() is
-	 * called before 'msg' is notified to all the nodes.  All the
-	 * cluster events including this notification are blocked
-	 * until block_cb() returns or this blocking node leaves the
-	 * cluster.  The sheep daemon can sleep in block_cb(), so this
-	 * callback must be not called from the dispatch (main) thread.
+	 * This function sends 'msg' to all the nodes.  The notified messages
+	 * can be read through sd_notify_handler().
+	 *
+	 * If 'block_cb' is specified, block_cb() is called before 'msg' is
+	 * notified to all the nodes.  All the cluster events including this
+	 * notification are blocked until block_cb() returns or this blocking
+	 * node leaves the cluster.  The sheep daemon can sleep in block_cb(),
+	 * so this callback must be not called from the dispatch (main) thread.
 	 *
 	 * Returns zero on success, -1 on error
 	 */
@@ -167,5 +151,15 @@ static inline char *node_to_str(struct sd_node *id)
 
 	return str;
 }
+
+/* callbacks back into sheepdog from the cluster drivers */
+void sd_join_handler(struct sd_node *joined, struct sd_node *members,
+		size_t nr_members, enum cluster_join_result result,
+		void *opaque);
+void sd_leave_handler(struct sd_node *left, struct sd_node *members,
+		size_t nr_members);
+void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len);
+enum cluster_join_result sd_check_join_cb(struct sd_node *joining,
+		void *opaque);
 
 #endif

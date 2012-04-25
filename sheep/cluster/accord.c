@@ -217,10 +217,6 @@ static int efd;
 
 static struct work_queue *acrd_wq;
 
-static struct cdrv_handlers acrd_hdlrs;
-static enum cluster_join_result (*acrd_check_join_cb)(
-	struct sd_node *joining, void *opaque);
-
 /* get node list from the last pushed data */
 static size_t get_nodes(struct acrd_handle *ah,
 			struct sd_node *nodes,
@@ -467,10 +463,8 @@ static void acrd_watch_fn(struct acrd_handle *ah, struct acrd_watch_info *info,
 	eventfd_write(efd, value);
 }
 
-static int accord_init(struct cdrv_handlers *handlers, const char *option,
-		       uint8_t *myaddr)
+static int accord_init(const char *option, uint8_t *myaddr)
 {
-	acrd_hdlrs = *handlers;
 	if (!option) {
 		eprintf("specify one of the accord servers.\n");
 		eprintf("e.g. sheep /store -c accord:127.0.0.1\n");
@@ -515,13 +509,9 @@ static int accord_init(struct cdrv_handlers *handlers, const char *option,
 }
 
 static int accord_join(struct sd_node *myself,
-		       enum cluster_join_result (*check_join_cb)(
-			       struct sd_node *joining,
-			       void *opaque),
 		       void *opaque, size_t opaque_len)
 {
 	this_node = *myself;
-	acrd_check_join_cb = check_join_cb;
 
 	return add_event(ahandle, EVENT_JOIN, &this_node, opaque, opaque_len, NULL);
 }
@@ -582,7 +572,7 @@ static int accord_dispatch(void)
 	case EVENT_JOIN:
 		if (ev.blocked) {
 			if (node_cmp(&ev.nodes[0], &this_node) == 0) {
-				res = acrd_check_join_cb(&ev.sender, ev.buf);
+				res = sd_check_join_cb(&ev.sender, ev.buf);
 				ev.join_result = res;
 				ev.blocked = 0;
 
@@ -609,11 +599,11 @@ static int accord_dispatch(void)
 			acrd_queue_pop(ahandle, &ev);
 		}
 
-		acrd_hdlrs.join_handler(&ev.sender, ev.nodes, ev.nr_nodes,
+		sd_join_handler(&ev.sender, ev.nodes, ev.nr_nodes,
 				    ev.join_result, ev.buf);
 		break;
 	case EVENT_LEAVE:
-		acrd_hdlrs.leave_handler(&ev.sender, ev.nodes, ev.nr_nodes);
+		sd_leave_handler(&ev.sender, ev.nodes, ev.nr_nodes);
 		break;
 	case EVENT_NOTIFY:
 		if (ev.blocked) {
@@ -629,7 +619,7 @@ static int accord_dispatch(void)
 			goto out;
 		}
 
-		acrd_hdlrs.notify_handler(&ev.sender, ev.buf, ev.buf_len);
+		sd_notify_handler(&ev.sender, ev.buf, ev.buf_len);
 		break;
 	}
 out:

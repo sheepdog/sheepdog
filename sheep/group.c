@@ -637,8 +637,7 @@ static void __sd_notify_done(struct event_struct *cevent)
 	req->done(req);
 }
 
-static void sd_notify_handler(struct sd_node *sender,
-			      void *msg, size_t msg_len)
+void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len)
 {
 	struct event_struct *cevent;
 	struct work_notify *w;
@@ -736,8 +735,7 @@ static void __sd_leave(struct event_struct *cevent)
 	}
 }
 
-static enum cluster_join_result sd_check_join_cb(
-	struct sd_node *joining, void *opaque)
+enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 {
 	struct join_message *jm = opaque;
 	struct node *node;
@@ -813,8 +811,7 @@ static int send_join_request(struct sd_node *ent)
 	if (ret == SD_RES_SUCCESS)
 		msg->nr_nodes = nr_entries;
 
-	ret = sys->cdrv->join(ent, sd_check_join_cb, msg,
-			      get_join_message_size(msg));
+	ret = sys->cdrv->join(ent, msg, get_join_message_size(msg));
 
 	vprintf(SDOG_INFO, "%s\n", node_to_str(&sys->this_node));
 
@@ -1098,10 +1095,9 @@ void process_request_event_queues(void)
 		process_request_queue();
 }
 
-static void sd_join_handler(struct sd_node *joined,
-			    struct sd_node *members,
-			    size_t nr_members, enum cluster_join_result result,
-			    void *opaque)
+void sd_join_handler(struct sd_node *joined, struct sd_node *members,
+		size_t nr_members, enum cluster_join_result result,
+		void *opaque)
 {
 	struct event_struct *cevent;
 	struct work_join *w = NULL;
@@ -1240,9 +1236,8 @@ static void sd_join_handler(struct sd_node *joined,
 	}
 }
 
-static void sd_leave_handler(struct sd_node *left,
-			     struct sd_node *members,
-			     size_t nr_members)
+void sd_leave_handler(struct sd_node *left, struct sd_node *members,
+		size_t nr_members)
 {
 	struct event_struct *cevent;
 	struct work_leave *w = NULL;
@@ -1291,11 +1286,6 @@ oom:
 int create_cluster(int port, int64_t zone, int nr_vnodes)
 {
 	int ret;
-	struct cdrv_handlers handlers = {
-		.join_handler = sd_join_handler,
-		.leave_handler = sd_leave_handler,
-		.notify_handler = sd_notify_handler,
-	};
 
 	if (!sys->cdrv) {
 		sys->cdrv = find_cdrv("corosync");
@@ -1308,7 +1298,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 		}
 	}
 
-	cdrv_fd = sys->cdrv->init(&handlers, sys->cdrv_option, sys->this_node.addr);
+	cdrv_fd = sys->cdrv->init(sys->cdrv_option, sys->this_node.addr);
 	if (cdrv_fd < 0)
 		return -1;
 
