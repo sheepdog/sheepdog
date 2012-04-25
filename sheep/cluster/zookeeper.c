@@ -398,6 +398,10 @@ static int zk_init(const char *option, uint8_t *myaddr)
 	}
 
 	zk_block_wq = init_work_queue(1);
+	if (!zk_block_wq) {
+		eprintf("failed to create zookeeper workqueue: %m\n");
+		return -1;
+	}
 
 	return efd;
 }

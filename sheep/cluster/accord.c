@@ -489,6 +489,10 @@ static int accord_init(const char *option, uint8_t *myaddr)
 	}
 
 	acrd_wq = init_work_queue(1);
+	if (!acrd_wq)
+		eprintf("failed to create accord workqueue: %m\n");
+		return -1;
+	}
 
 	pthread_cond_wait(&start_cond, &start_lock);
 	pthread_mutex_unlock(&start_lock);

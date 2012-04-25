@@ -657,6 +657,10 @@ static int corosync_init(const char *option, uint8_t *myaddr)
 	}
 
 	corosync_block_wq = init_work_queue(1);
+	if (!corosync_block_wq) {
+		eprintf("failed to create corosync workqueue: %m\n");
+		return -1;
+	}
 
 	return fd;
 }

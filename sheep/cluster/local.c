@@ -314,6 +314,10 @@ static int local_init(const char *option, uint8_t *myaddr)
 	add_timer(&t, 1);
 
 	local_block_wq = init_work_queue(1);
+	if (!local_block_wq) {
+		eprintf("failed to create local workqueue: %m\n");
+		return -1;
+	}
 
 	return sigfd;
 }
