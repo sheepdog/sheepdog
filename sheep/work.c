@@ -218,6 +218,11 @@ static int init_eventfd(void)
 	}
 
 	ret = register_event(efd, bs_thread_request_done, NULL);
+	if (ret) {
+		eprintf("failed to register event fd %m\n");
+		close(efd);
+		return 1;
+	}
 
 	return 0;
 }

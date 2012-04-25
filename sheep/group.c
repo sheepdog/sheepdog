@@ -933,6 +933,7 @@ static void event_fn(struct work *work)
 static void event_done(struct work *work)
 {
 	struct event_struct *cevent;
+	int ret;
 
 	if (!sys->cur_cevent)
 		vprintf(SDOG_ERR, "bug\n");
@@ -962,7 +963,9 @@ static void event_done(struct work *work)
 	vprintf(SDOG_DEBUG, "free %p\n", cevent);
 	event_free(cevent);
 	event_running = 0;
-	register_event(cdrv_fd, group_handler, NULL);
+	ret = register_event(cdrv_fd, group_handler, NULL);
+	if (ret)
+		panic("failed to register event fd");
 
 	if (!list_empty(&sys->event_queue))
 		process_request_event_queues();
