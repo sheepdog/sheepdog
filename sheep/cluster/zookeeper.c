@@ -758,7 +758,10 @@ static int zk_join(struct sd_node *myself,
 
 static int zk_leave(void)
 {
-	return add_event(zhandle, EVENT_LEAVE, &this_node, NULL, 0, NULL);
+	char path[256];
+	sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&this_node.node));
+	dprintf("try to delete member path:%s\n", path);
+	return zk_delete(zhandle, path, -1);
 }
 
 static int zk_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
