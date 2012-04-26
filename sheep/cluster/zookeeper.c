@@ -579,7 +579,7 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path, void* 
 	eventfd_t value = 1;
 	const clientid_t *cid;
 	char str[256], *p;
-	int ret, i;
+	int ret, rc, i;
 
 	dprintf("path:%s, type:%d\n", path, type);
 
@@ -592,6 +592,14 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path, void* 
 	/* discard useless event */
 	if (type < 0 || type == ZOO_CHILD_EVENT)
 		return;
+
+	if (type == ZOO_CHANGED_EVENT) {
+		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
+		if (ret == 1) {
+			rc = zk_exists(zh, path, 1, NULL);
+			dprintf("watch path:%s, exists:%d\n", path, (rc == ZOK));
+		}
+	}
 
 	if (type == ZOO_DELETED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
