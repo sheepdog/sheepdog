@@ -695,7 +695,7 @@ err:
 
 int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
-		 int write, int excl, int delete)
+		 int wr, int excl, int delete)
 {
 	struct sd_vnode *entries = NULL;
 	struct sheepdog_vdi_attr tmp_attr;
@@ -722,7 +722,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		ret = read_object(entries, nr_vnodes, nr_zones, epoch, oid, (char *)&tmp_attr,
 				  sizeof(tmp_attr), 0, copies);
 
-		if (ret == SD_RES_NO_OBJ && write) {
+		if (ret == SD_RES_NO_OBJ && wr) {
 			ret = write_object(entries, nr_vnodes, nr_zones, epoch, oid,
 					   (char *)vattr, data_len, 0, 0, copies, 1);
 			if (ret)
@@ -751,7 +751,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 					ret = SD_RES_EIO;
 				else
 					ret = SD_RES_SUCCESS;
-			} else if (write) {
+			} else if (wr) {
 				ret = write_object(entries, nr_vnodes, nr_zones,
 						   epoch, oid, (char *)vattr,
 						   SD_ATTR_OBJ_SIZE, 0, 0, copies, 0);
