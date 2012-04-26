@@ -14,7 +14,6 @@
 #include <netdb.h>
 #include <search.h>
 #include <assert.h>
-#include <pthread.h>
 #include <sys/eventfd.h>
 #include <zookeeper/zookeeper.h>
 
@@ -874,9 +873,15 @@ static int zk_dispatch(void)
 		dprintf("one sheep joined[down], nr_nodes:%ld, sender:%s, joined:%d\n",
 				nr_zk_nodes, node_to_str(&ev.sender.node), ev.sender.joined);
 
-		sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&ev.sender.node));
-		rc = zk_exists(zhandle, path, 1, NULL);
-		dprintf("watch path:%s, exists:%d\n", path, (rc == ZOK));
+		if (ev.join_result == CJ_RES_SUCCESS) {
+			sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&ev.sender.node));
+			rc = zk_exists(zhandle, path, 1, NULL);
+			dprintf("watch path:%s, exists:%d\n", path, (rc == ZOK));
+			if (rc != ZOK) {
+				dprintf("sender have left:%s\n", node_to_str(&ev.sender.node));
+				add_event(zhandle, EVENT_LEAVE, &ev.sender, NULL, 0, NULL);
+			}
+		}
 
 		build_node_list(zk_nodes, nr_zk_nodes, entries);
 		sd_join_handler(&ev.sender.node, entries, nr_zk_nodes,
