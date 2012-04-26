@@ -716,6 +716,7 @@ static int zk_join(struct sd_node *myself,
 {
 	int rc;
 	char path[256];
+	struct zk_node *znode;
 	const clientid_t *cid;
 
 	zk_lock(zhandle);
@@ -723,6 +724,11 @@ static int zk_join(struct sd_node *myself,
 	zk_data_init(zhandle);
 
 	this_node.node = *myself;
+
+	znode = find_node(zk_nodes, nr_zk_nodes, &this_node);
+	if (znode)
+		panic("previous zookeeper session exist, shutdown\n");
+
 	this_node.seq = zk_queue_seq(zhandle);
 	this_node.joined = 0;
 
