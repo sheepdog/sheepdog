@@ -54,9 +54,6 @@ struct zk_event {
 	enum zk_event_type type;
 	struct zk_node sender;
 
-	size_t buf_len;
-	uint8_t buf[MAX_EVENT_BUF_SIZE];
-
 	enum cluster_join_result join_result;
 
 	void (*block_cb)(void *arg);
@@ -65,6 +62,9 @@ struct zk_event {
 	int callbacked; /* set non-zero if sheep already called block_cb() */
 
 	struct list_head list; /* only used for leave event */
+
+	size_t buf_len;
+	uint8_t buf[MAX_EVENT_BUF_SIZE];
 };
 
 /* leave event list */
@@ -127,16 +127,17 @@ static int zk_queue_empty(zhandle_t *zh)
 
 static int zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 {
-	int rc, seq;
+	int rc, seq, len;
 	char path[256], buf[256];
 	eventfd_t value = 1;
 
+	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
 	sprintf(path, "%s/", QUEUE_ZNODE);
 	do {
 		dprintf("zoo_create ...\n");
-		rc = zoo_create(zh, path, (char *)ev, sizeof(*ev),
+		rc = zoo_create(zh, path, (char *)ev, len,
 			&ZOO_OPEN_ACL_UNSAFE, ZOO_SEQUENCE, buf, sizeof(buf));
-		dprintf("create path:%s, nr_nodes:%ld, queue_pos:%d, rc:%d\n", buf, nr_zk_nodes, queue_pos, rc);
+		dprintf("create path:%s, nr_nodes:%ld, queue_pos:%d, len:%d, rc:%d\n", buf, nr_zk_nodes, queue_pos, len, rc);
 	} while (rc == ZOPERATIONTIMEOUT);
 	if (rc != ZOK)
 		panic("failed to zoo_create path:%s, rc:%d\n", path, rc);
@@ -161,7 +162,7 @@ static int zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 
 static int zk_queue_push_back(zhandle_t *zh, struct zk_event *ev)
 {
-	int rc;
+	int rc, len;
 	char path[256];
 
 	queue_pos--;
@@ -170,9 +171,10 @@ static int zk_queue_push_back(zhandle_t *zh, struct zk_event *ev)
 
 	if (ev) {
 		/* update the last popped data */
+		len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
 		sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
-		rc = zoo_set(zh, path, (char *)ev, sizeof(*ev), -1);
-		dprintf("update path:%s, queue_pos:%d, rc:%d\n", path, queue_pos, rc);
+		rc = zoo_set(zh, path, (char *)ev, len, -1);
+		dprintf("update path:%s, queue_pos:%d, len:%d, rc:%d\n", path, queue_pos, len, rc);
 		if (rc != ZOK)
 			panic("failed to zk_set path:%s, rc:%d\n", path, rc);
 	}
@@ -204,7 +206,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
 	do {
 		rc = zoo_get(zh, path, 1, (char *)ev, &len, NULL);
-		dprintf("read path:%s, nr_nodes:%ld, type:%d, rc:%d\n", path, nr_zk_nodes, ev->type, rc);
+		dprintf("read path:%s, nr_nodes:%ld, type:%d, len:%d, rc:%d\n", path, nr_zk_nodes, ev->type, len, rc);
 	} while (rc == ZOPERATIONTIMEOUT);
 	if (rc != ZOK)
 		panic("failed to zk_set path:%s, rc:%d\n", path, rc);
