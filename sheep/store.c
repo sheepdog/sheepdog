@@ -223,7 +223,7 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 static int read_copy_from_replica(struct request *req, uint32_t epoch,
 				  uint64_t oid, char *buf)
 {
-	int i, nr, ret;
+	int i, nr_copies, ret;
 	unsigned wlen, rlen;
 	char name[128];
 	struct sd_vnode *v;
@@ -232,11 +232,8 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	struct siocb iocb;
 	int fd;
 
-	nr = sys->nr_sobjs;
-	if (nr > req->vnodes->nr_zones)
-		nr = req->vnodes->nr_zones;
-
-	for (i = 0; i < nr; i++) {
+	nr_copies = get_nr_copies(req->vnodes);
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
 
 		addr_to_str(name, sizeof(name), v->addr, 0);
@@ -305,20 +302,17 @@ static int forward_read_obj_req(struct request *req)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *v;
 	uint64_t oid = hdr.oid;
-	int copies;
-
-	copies = hdr.copies;
-
-	/* temporary hack */
-	if (!copies)
-		copies = sys->nr_sobjs;
-	if (copies > req->vnodes->nr_zones)
-		copies = req->vnodes->nr_zones;
+	int nr_copies;
 
 	hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
+	if (hdr.copies)
+		nr_copies = hdr.copies;
+	else
+		nr_copies = get_nr_copies(req->vnodes);
+
 	/* TODO: we can do better; we need to check this first */
-	for (i = 0; i < copies; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
 		if (vnode_is_local(v)) {
 			ret = do_local_io(req, hdr.epoch);
@@ -329,7 +323,7 @@ static int forward_read_obj_req(struct request *req)
 	}
 
 read_remote:
-	for (i = 0; i < copies; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
 		if (vnode_is_local(v))
 			continue;
@@ -367,19 +361,11 @@ int forward_write_obj_req(struct request *req)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	struct sd_vnode *v;
 	uint64_t oid = hdr.oid;
-	int copies;
+	int nr_copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
 	int nr_fds, local = 0;
 
 	dprintf("%"PRIx64"\n", oid);
-
-	copies = hdr.copies;
-
-	/* temporary hack */
-	if (!copies)
-		copies = sys->nr_sobjs;
-	if (copies > req->vnodes->nr_zones)
-		copies = req->vnodes->nr_zones;
 
 	nr_fds = 0;
 	memset(pfds, 0, sizeof(pfds));
@@ -390,7 +376,8 @@ int forward_write_obj_req(struct request *req)
 
 	wlen = hdr.data_length;
 
-	for (i = 0; i < copies; i++) {
+	nr_copies = get_nr_copies(req->vnodes);
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
 
 		addr_to_str(name, sizeof(name), v->addr, 0);

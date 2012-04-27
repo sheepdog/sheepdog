@@ -32,6 +32,13 @@ struct node {
 	struct list_head list;
 };
 
+struct vnode_info {
+	struct sd_vnode entries[SD_MAX_VNODES];
+	int nr_vnodes;
+	int nr_zones;
+	int refcnt;
+};
+
 struct join_message {
 	uint8_t proto_ver;
 	uint8_t nr_sobjs;
@@ -168,6 +175,18 @@ static int update_vnode_info(void)
 	put_vnode_info(current_vnode_info);
 	current_vnode_info = vnode_info;
 	return 0;
+}
+
+/*
+ * If we have less zones available than the desired redundancy we have to do
+ * with nr_zones copies, sorry.
+ */
+int get_nr_copies(struct vnode_info *vnode_info)
+{
+	int nr_copies = vnode_info->nr_zones;
+	if (nr_copies < sys->nr_sobjs)
+		nr_copies = sys->nr_sobjs;
+	return nr_copies;
 }
 
 static void do_cluster_op(void *arg)

@@ -377,7 +377,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	struct vnode_info *vnodes = get_vnode_info();
 	struct sd_vnode *v;
 	void *buf;
-	int copies;
+	int nr_copies;
 
 	if (idx & CACHE_VDI_BIT) {
 		oid = vid_to_vdi_oid(oc->vid);
@@ -393,12 +393,9 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		goto out;
 	}
 
-	copies = sys->nr_sobjs;
-	if (vnodes->nr_zones < copies)
-		copies = vnodes->nr_zones;
-
 	/* Check if we can read locally */
-	for (i = 0; i < copies; i++) {
+	nr_copies = get_nr_copies(vnodes);
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
 		if (vnode_is_local(v)) {
 			struct siocb iocb = { 0 };
@@ -423,7 +420,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 
 pull_remote:
 	/* Okay, no luck, let's read remotely */
-	for (i = 0; i < copies; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
 
 		if (vnode_is_local(v))

@@ -27,6 +27,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	struct timeval tv;
 	int ret = SD_RES_NO_MEM;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
+	int nr_copies;
 
 	new = zalloc(sizeof(*new));
 	if (!new) {
@@ -52,10 +53,14 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 	vnode_info = get_vnode_info();
 
+	nr_copies = get_nr_copies(vnode_info);
+	if (nr_copies > copies)
+		nr_copies = copies;
+
 	if (base_vid) {
 		ret = read_object(vnode_info, epoch,
 				  vid_to_vdi_oid(base_vid), (char *)base,
-				  sizeof(*base), 0, copies);
+				  sizeof(*base), 0, nr_copies);
 		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_BASE_VDI_READ;
 			goto out_put_vnode_info;
@@ -71,7 +76,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 			ret = read_object(vnode_info, epoch,
 					  vid_to_vdi_oid(cur_vid), (char *)cur,
-					  SD_INODE_HEADER_SIZE, 0, copies);
+					  SD_INODE_HEADER_SIZE, 0, nr_copies);
 			if (ret != SD_RES_SUCCESS) {
 				vprintf(SDOG_ERR, "failed\n");
 				ret = SD_RES_BASE_VDI_READ;
@@ -114,7 +119,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (is_snapshot && cur_vid != base_vid) {
 		ret = write_object(vnode_info, epoch,
 				   vid_to_vdi_oid(cur_vid), (char *)cur,
-				   SD_INODE_HEADER_SIZE, 0, 0, copies, 0);
+				   SD_INODE_HEADER_SIZE, 0, 0, nr_copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_READ;
@@ -125,7 +130,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 	if (base_vid) {
 		ret = write_object(vnode_info, epoch,
 				   vid_to_vdi_oid(base_vid), (char *)base,
-				   SD_INODE_HEADER_SIZE, 0, 0, copies, 0);
+				   SD_INODE_HEADER_SIZE, 0, 0, nr_copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_WRITE;
@@ -135,7 +140,7 @@ static int create_vdi_obj(uint32_t epoch, char *name, uint32_t new_vid, uint64_t
 
 	ret = write_object(vnode_info, epoch,
 			   vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, 0, copies, 1);
+			   0, 0, nr_copies, 1);
 	if (ret != 0)
 		ret = SD_RES_VDI_WRITE;
 
@@ -151,12 +156,12 @@ out:
 static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end,
 			  char *name, char *tag, uint32_t snapid, uint32_t *vid,
 			  unsigned long *deleted_nr, uint32_t *next_snap,
-			  unsigned int *nr_copies, uint64_t *ctime)
+			  unsigned int *inode_nr_copies, uint64_t *ctime)
 {
 	struct vnode_info *vnode_info;
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
-	int nr_reqs;
+	int nr_copies;
 	int ret = SD_RES_NO_MEM;
 	int vdi_found = 0;
 
@@ -167,15 +172,12 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 	}
 
 	vnode_info = get_vnode_info();
-
-	nr_reqs = sys->nr_sobjs;
-	if (nr_reqs > vnode_info->nr_zones)
-		nr_reqs = vnode_info->nr_zones;
+	nr_copies = get_nr_copies(vnode_info);
 
 	for (i = start; i >= end; i--) {
 		ret = read_object(vnode_info, epoch,
 				  vid_to_vdi_oid(i), (char *)inode,
-				  SD_INODE_HEADER_SIZE, 0, nr_reqs);
+				  SD_INODE_HEADER_SIZE, 0, nr_copies);
 		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_EIO;
 			goto out_put_vnode_info;
@@ -196,7 +198,7 @@ static int find_first_vdi(uint32_t epoch, unsigned long start, unsigned long end
 
 			*next_snap = inode->snap_id + 1;
 			*vid = inode->vdi_id;
-			*nr_copies = inode->nr_copies;
+			*inode_nr_copies = inode->nr_copies;
 			if (ctime)
 				*ctime = inode->ctime;
 			ret = SD_RES_SUCCESS;
@@ -400,8 +402,9 @@ static LIST_HEAD(deletion_work_list);
 
 static int delete_inode(struct deletion_work *dw)
 {
-	int nr_reqs, ret = SD_RES_SUCCESS;
 	struct sheepdog_inode *inode = NULL;
+	int ret = SD_RES_SUCCESS;
+	int nr_copies;
 
 	inode = zalloc(sizeof(*inode));
 	if (!inode) {
@@ -409,12 +412,10 @@ static int delete_inode(struct deletion_work *dw)
 		goto out;
 	}
 
-	nr_reqs = sys->nr_sobjs;
-	if (nr_reqs > dw->vnodes->nr_zones)
-		nr_reqs = dw->vnodes->nr_zones;
+	nr_copies = get_nr_copies(dw->vnodes);
 
 	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(dw->vid),
-			  (char *)inode, SD_INODE_HEADER_SIZE, 0, nr_reqs);
+			  (char *)inode, SD_INODE_HEADER_SIZE, 0, nr_copies);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -427,7 +428,7 @@ static int delete_inode(struct deletion_work *dw)
 
 	ret = write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(dw->vid),
 			   (char *)inode, SD_INODE_HEADER_SIZE, 0, 0,
-			   nr_reqs, 0);
+			   nr_copies, 0);
 	if (ret != 0) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -445,6 +446,7 @@ static void delete_one(struct work *work)
 	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
 	int ret, i;
 	struct sheepdog_inode *inode = NULL;
+	int nr_copies;
 
 	eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
 
@@ -454,9 +456,13 @@ static void delete_one(struct work *work)
 		goto out;
 	}
 
+	nr_copies = get_nr_copies(dw->vnodes);
+	if (nr_copies > inode->nr_copies)
+		nr_copies = inode->nr_copies;
+
 	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
 			  (void *)inode, sizeof(*inode),
-			  0, sys->nr_sobjs);
+			  0, nr_copies);
 
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find VDI object\n");
@@ -475,7 +481,7 @@ static void delete_one(struct work *work)
 
 		ret = remove_object(dw->vnodes, dw->epoch,
 			      vid_to_data_oid(inode->data_vdi_id[i], i),
-			      inode->nr_copies);
+			      nr_copies);
 
 		if (ret != SD_RES_SUCCESS)
 			dw->delete_error = 1;
@@ -485,8 +491,7 @@ static void delete_one(struct work *work)
 
 	if (dw->delete_error) {
 		write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
-			     (void *)inode, sizeof(*inode), 0, 0,
-			     inode->nr_copies, 0);
+			     (void *)inode, sizeof(*inode), 0, 0, nr_copies, 0);
 	}
 
 out:
@@ -525,6 +530,9 @@ static int fill_vdi_list(struct deletion_work *dw, uint32_t root_vid)
 	struct sheepdog_inode *inode = NULL;
 	int done = dw->count;
 	uint32_t vid;
+	int nr_copies;
+
+	nr_copies = get_nr_copies(dw->vnodes);
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
@@ -537,7 +545,7 @@ again:
 	vid = dw->buf[done++];
 	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vid),
 			  (char *)inode, SD_INODE_HEADER_SIZE, 0,
-			  sys->nr_sobjs);
+			  nr_copies);
 
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find VDI object\n");
@@ -569,6 +577,7 @@ static uint64_t get_vdi_root(struct vnode_info *vnode_info, uint32_t epoch,
 {
 	int ret;
 	struct sheepdog_inode *inode = NULL;
+	int nr_copies = get_nr_copies(vnode_info);
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
@@ -578,7 +587,7 @@ static uint64_t get_vdi_root(struct vnode_info *vnode_info, uint32_t epoch,
 	}
 next:
 	ret = read_object(vnode_info, epoch, vid_to_vdi_oid(vid), (char *)inode,
-			  SD_INODE_HEADER_SIZE, 0, sys->nr_sobjs);
+			  SD_INODE_HEADER_SIZE, 0, nr_copies);
 
 	if (vid == inode->vdi_id && inode->snap_id == 1
 			&& inode->parent_vdi_id != 0
@@ -677,11 +686,16 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 	struct sheepdog_vdi_attr tmp_attr;
 	uint64_t oid, hval;
 	uint32_t end;
+	int nr_copies;
 	int ret;
 
 	vattr->ctime = ctime;
 
 	vnode_info = get_vnode_info();
+
+	nr_copies = get_nr_copies(vnode_info);
+	if (nr_copies > copies)
+		nr_copies = copies;
 
 	/* we cannot include value_len for calculating the hash value */
 	hval = fnv_64a_buf(vattr->name, sizeof(vattr->name), FNV1A_64_INIT);
@@ -694,11 +708,12 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 	while (*attrid != end) {
 		oid = vid_to_attr_oid(vid, *attrid);
 		ret = read_object(vnode_info, epoch, oid, (char *)&tmp_attr,
-				  sizeof(tmp_attr), 0, copies);
+				  sizeof(tmp_attr), 0, nr_copies);
 
 		if (ret == SD_RES_NO_OBJ && wr) {
 			ret = write_object(vnode_info, epoch, oid,
-					   (char *)vattr, data_len, 0, 0, copies, 1);
+					   (char *)vattr, data_len, 0, 0,
+					   nr_copies, 1);
 			if (ret)
 				ret = SD_RES_EIO;
 			else
@@ -720,7 +735,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 				ret = write_object(vnode_info,
 						   epoch, oid, (char *)"", 1,
 						   offsetof(struct sheepdog_vdi_attr, name),
-						   0, copies, 0);
+						   0, nr_copies, 0);
 				if (ret)
 					ret = SD_RES_EIO;
 				else
@@ -728,7 +743,8 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 			} else if (wr) {
 				ret = write_object(vnode_info,
 						   epoch, oid, (char *)vattr,
-						   SD_ATTR_OBJ_SIZE, 0, 0, copies, 0);
+						   SD_ATTR_OBJ_SIZE, 0, 0,
+						   nr_copies, 0);
 
 				if (ret)
 					ret = SD_RES_EIO;

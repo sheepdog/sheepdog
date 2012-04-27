@@ -62,14 +62,8 @@ struct client_info {
 	int refcnt;
 };
 
-struct vnode_info {
-	struct sd_vnode entries[SD_MAX_VNODES];
-	int nr_vnodes;
-	int nr_zones;
-	int refcnt;
-};
-
 struct request;
+struct vnode_info;
 
 typedef void (*req_end_t) (struct request *);
 
@@ -245,6 +239,7 @@ void put_vnode_info(struct vnode_info *vnodes);
 
 struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
 		int copy_idx);
+int get_nr_copies(struct vnode_info *vnode_info);
 
 int is_access_to_busy_objects(uint64_t oid);
 

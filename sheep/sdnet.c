@@ -38,20 +38,19 @@ void resume_pending_requests(void)
 
 static int is_access_local(struct request *req, uint64_t oid, int copies)
 {
-	struct vnode_info *vnodes = req->vnodes;
 	struct sd_vnode *v;
+	int nr_copies;
 	int i;
 
 	if (oid == 0)
 		return 0;
 
-	if (copies)
-		copies = sys->nr_sobjs;
-	if (copies > vnodes->nr_zones)
-		copies = vnodes->nr_zones;
+	nr_copies = get_nr_copies(req->vnodes);
+	if (copies < nr_copies)
+		nr_copies = copies;
 
 	for (i = 0; i < copies; i++) {
-		v = oid_to_vnode(vnodes, oid, i);
+		v = oid_to_vnode(req->vnodes, oid, i);
 		if (vnode_is_local(v))
 			return 1;
 	}
@@ -677,23 +676,21 @@ int create_listen_port(int port, void *data)
 
 int write_object(struct vnode_info *vnodes, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, int nr, int create)
+		 uint64_t offset, uint16_t flags, int nr_copies, int create)
 {
 	struct sd_obj_req hdr;
 	struct sd_vnode *v;
 	int i, fd, ret;
 	char name[128];
 
-	if (nr > vnodes->nr_zones)
-		nr = vnodes->nr_zones;
-
-	for (i = 0; i < nr; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
 		v = oid_to_vnode(vnodes, oid, i);
 		if (vnode_is_local(v)) {
 			ret = write_object_local(oid, data, datalen, offset,
-						 flags, nr, node_version, create);
+						 flags, nr_copies, node_version,
+						 create);
 
 			if (ret != 0) {
 				eprintf("fail %"PRIx64" %"PRIx32"\n", oid, ret);
@@ -719,7 +716,7 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 			hdr.opcode = SD_OP_WRITE_OBJ;
 
 		hdr.oid = oid;
-		hdr.copies = nr;
+		hdr.copies = nr_copies;
 
 		hdr.flags = flags;
 		hdr.flags |= SD_FLAG_CMD_WRITE | SD_FLAG_CMD_IO_LOCAL;
@@ -739,7 +736,7 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 
 int read_object(struct vnode_info *vnodes, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int nr)
+		uint64_t offset, int nr_copies)
 {
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
@@ -747,15 +744,12 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 	char name[128];
 	int i = 0, fd, ret, last_error = SD_RES_SUCCESS;
 
-	if (nr > vnodes->nr_zones)
-		nr = vnodes->nr_zones;
-
 	/* search a local object first */
-	for (i = 0; i < nr; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
 		if (vnode_is_local(v)) {
-			ret = read_object_local(oid, data, datalen, offset, nr,
-						node_version);
+			ret = read_object_local(oid, data, datalen, offset,
+						nr_copies, node_version);
 
 			if (ret != SD_RES_SUCCESS) {
 				eprintf("fail %"PRIx64" %"PRId32"\n", oid, ret);
@@ -767,7 +761,7 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 
 	}
 
-	for (i = 0; i < nr; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		unsigned wlen = 0, rlen = datalen;
 
 		v = oid_to_vnode(vnodes, oid, i);
@@ -815,9 +809,6 @@ int remove_object(struct vnode_info *vnodes, uint32_t node_version,
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *v;
 	int i = 0, fd, ret, err = 0;
-
-	if (nr > vnodes->nr_zones)
-		nr = vnodes->nr_zones;
 
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = 0;

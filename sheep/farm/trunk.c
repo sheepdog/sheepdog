@@ -235,16 +235,14 @@ static unsigned char *omap_tree_insert(uint64_t oid, unsigned char *sha1)
 
 static int oid_stale(uint64_t oid)
 {
-	int i, copies;
-	struct vnode_info *vnodes = get_vnode_info();
+	int i, nr_copies;
+	struct vnode_info *vnodes;
 	struct sd_vnode *v;
 	int ret = 1;
 
-	copies = sys->nr_sobjs;
-	if (copies > vnodes->nr_zones)
-		copies = vnodes->nr_zones;
-
-	for (i = 0; i < copies; i++) {
+	vnodes = get_vnode_info();
+	nr_copies = get_nr_copies(vnodes);
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
 		if (vnode_is_local(v)) {
 			ret = 0;
