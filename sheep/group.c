@@ -524,22 +524,10 @@ static void get_vdi_bitmap_from_sd_list(void)
 		get_vdi_bitmap_from(sys->nodes + i);
 }
 
-static void update_cluster_info(struct join_message *msg,
-				struct sd_node *joined,
-				struct sd_node *nodes,
-				size_t nr_nodes)
+static void finish_join(struct join_message *msg, struct sd_node *joined,
+		struct sd_node *nodes, size_t nr_nodes)
 {
-	int i, le;
-	int nr_leave_nodes;
-	struct node *n;
-
-	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status, msg->epoch, msg->result, sys->join_finished);
-
-	if (sys_stat_join_failed())
-		return;
-
-	if (sys->join_finished)
-		goto join_finished;
+	int i;
 
 	sys->nr_copies = msg->nr_copies;
 	sys->epoch = msg->epoch;
@@ -554,29 +542,30 @@ static void update_cluster_info(struct join_message *msg,
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 
 	if (msg->cluster_status != SD_STATUS_OK) {
+		int nr_leave_nodes, le;
+
 		nr_leave_nodes = msg->nr_leave_nodes;
 		le = get_latest_epoch();
 		for (i = 0; i < nr_leave_nodes; i++) {
-			n = zalloc(sizeof(*n));
-			if (!n)
-				panic("failed to allocate memory\n");
+			struct node *n;
 
-			if (find_entry_list(&msg->leave_nodes[i], &sys->leave_list)
-			    || !find_entry_epoch(&msg->leave_nodes[i], le)) {
-				free(n);
+			if (find_entry_list(&msg->leave_nodes[i], &sys->leave_list) ||
+			    !find_entry_epoch(&msg->leave_nodes[i], le)) {
 				continue;
 			}
 
+			n = zalloc(sizeof(*n));
+			if (!n)
+				panic("failed to allocate memory\n");
 			n->ent = msg->leave_nodes[i];
-
 			list_add_tail(&n->list, &sys->leave_list);
 		}
 	}
 
 	sys->join_finished = 1;
 
-	if ((msg->cluster_status == SD_STATUS_OK || msg->cluster_status == SD_STATUS_HALT)
-	     && msg->inc_epoch)
+	if ((msg->cluster_status == SD_STATUS_OK ||
+	     msg->cluster_status == SD_STATUS_HALT) && msg->inc_epoch)
 		update_epoch_log(sys->epoch);
 
 	if (!sd_store && strlen((char *)msg->store)) {
@@ -588,8 +577,20 @@ static void update_cluster_info(struct join_message *msg,
 		} else
 				panic("backend store %s not supported\n", msg->store);
 	}
+}
 
-join_finished:
+static void update_cluster_info(struct join_message *msg,
+		struct sd_node *joined, struct sd_node *nodes, size_t nr_nodes)
+{
+	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status,
+		msg->epoch, msg->result, sys->join_finished);
+
+	if (sys_stat_join_failed())
+		return;
+
+	if (!sys->join_finished)
+		finish_join(msg, joined, nodes, nr_nodes);
+
 	sys->nodes[sys->nr_nodes++] = *joined;
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 
@@ -608,11 +609,9 @@ join_finished:
 		}
 	}
 	update_vnode_info();
+	sys_stat_set(msg->cluster_status);
 
 	print_node_list(sys->nodes, sys->nr_nodes);
-
-	sys_stat_set(msg->cluster_status);
-	return;
 }
 
 static void __sd_notify(struct event_struct *cevent)
@@ -831,7 +830,10 @@ static void __sd_join_done(struct event_struct *cevent)
 
 	print_node_list(sys->nodes, sys->nr_nodes);
 
-	update_cluster_info(jm, &w->joined, w->member_list, w->member_list_entries);
+	if (!sys_stat_join_failed()) {
+		update_cluster_info(jm, &w->joined, w->member_list,
+				    w->member_list_entries);
+	}
 
 	if (sys_can_recover() && jm->inc_epoch) {
 		list_for_each_entry_safe(node, t, &sys->leave_list, list) {
