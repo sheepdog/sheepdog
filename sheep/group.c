@@ -119,15 +119,23 @@ int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 	uint32_t zones[SD_MAX_REDUNDANCY];
 
 	for (i = 0; i < nr_nodes; i++) {
+		/*
+		 * Only count zones that actually store data, pure gateways
+		 * don't contribute to the redundancy level.
+		 */
+		if (!nodes[i].nr_vnodes)
+			continue;
+
 		for (j = 0; j < nr_zones; j++) {
 			if (nodes[i].zone == zones[j])
 				break;
 		}
-		if (j == nr_zones)
-			zones[nr_zones++] = nodes[i].zone;
 
-		if (nr_zones == ARRAY_SIZE(zones))
-			break;
+		if (j == nr_zones) {
+			zones[nr_zones] = nodes[i].zone;
+			if (++nr_zones == ARRAY_SIZE(zones))
+				break;
+		}
 	}
 
 	return nr_zones;
