@@ -822,7 +822,7 @@ int remove_object(struct sd_vnode *e,
 	char name[128];
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	int i = 0, n, fd, ret;
+	int i = 0, n, fd, ret, err = 0;
 
 	if (nr > zones)
 		nr = zones;
@@ -853,9 +853,12 @@ int remove_object(struct sd_vnode *e,
 
 		if (ret)
 			return -1;
+
+		if (rsp->result != SD_RES_SUCCESS)
+			err = 1;
 	}
 
-	if (rsp->result != SD_RES_SUCCESS)
+	if (err)
 		return -1;
 
 	return 0;
