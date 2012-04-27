@@ -668,7 +668,6 @@ void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len)
 	list_add_tail(&cevent->event_list, &sys->event_queue);
 
 	process_request_event_queues();
-	unregister_event(cdrv_fd);
 }
 
 /*
@@ -1082,16 +1081,16 @@ static inline void process_event_queue(void)
 	event_work.fn = event_fn;
 	event_work.done = event_done;
 
+	unregister_event(cdrv_fd);
 	queue_work(sys->event_wqueue, &event_work);
 }
 
 /* can be called only by the main process */
 void process_request_event_queues(void)
 {
-
-	if (!list_empty(&sys->event_queue)) {
+	if (!list_empty(&sys->event_queue))
 		process_event_queue();
-	} else
+	else
 		process_request_queue();
 }
 
@@ -1155,7 +1154,6 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 
 		list_add_tail(&cevent->event_list, &sys->event_queue);
 		process_request_event_queues();
-		unregister_event(cdrv_fd);
 		break;
 	case CJ_RES_FAIL:
 	case CJ_RES_JOIN_LATER:
@@ -1269,7 +1267,6 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 
 	list_add_tail(&cevent->event_list, &sys->event_queue);
 	process_request_event_queues();
-	unregister_event(cdrv_fd);
 
 	return;
 oom:
