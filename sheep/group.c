@@ -963,8 +963,7 @@ static void event_done(struct work *work)
 	if (ret)
 		panic("failed to register event fd");
 
-	if (!list_empty(&sys->event_queue))
-		process_request_event_queues();
+	process_request_event_queues();
 }
 
 int is_access_to_busy_objects(uint64_t oid)
