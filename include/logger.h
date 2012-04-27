@@ -72,7 +72,7 @@ do {									\
 
 #define panic(fmt, args...)			\
 ({						\
-	vprintf(SDOG_EMERG, fmt, ##args);	\
+	vprintf(SDOG_EMERG, "PANIC: " fmt, ##args);	\
 	abort();				\
 })
 
