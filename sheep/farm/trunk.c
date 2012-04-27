@@ -246,7 +246,7 @@ static int oid_stale(uint64_t oid)
 
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			ret = 0;
 			break;
 		}

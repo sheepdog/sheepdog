@@ -52,7 +52,7 @@ static int is_access_local(struct request *req, uint64_t oid, int copies)
 
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
-		if (is_myself(v->addr, v->port))
+		if (vnode_is_local(v))
 			return 1;
 	}
 
@@ -691,7 +691,7 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 		unsigned rlen = 0, wlen = datalen;
 
 		v = oid_to_vnode(vnodes, oid, i);
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			ret = write_object_local(oid, data, datalen, offset,
 						 flags, nr, node_version, create);
 
@@ -753,7 +753,7 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 	/* search a local object first */
 	for (i = 0; i < nr; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			ret = read_object_local(oid, data, datalen, offset, nr,
 						node_version);
 

@@ -241,7 +241,7 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 
 		addr_to_str(name, sizeof(name), v->addr, 0);
 
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			memset(&iocb, 0, sizeof(iocb));
 			iocb.epoch = epoch;
 			ret = sd_store->open(oid, &iocb, 0);
@@ -320,7 +320,7 @@ static int forward_read_obj_req(struct request *req)
 	/* TODO: we can do better; we need to check this first */
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			ret = do_local_io(req, hdr.epoch);
 			if (ret != SD_RES_SUCCESS)
 				goto read_remote;
@@ -331,7 +331,7 @@ static int forward_read_obj_req(struct request *req)
 read_remote:
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
-		if (is_myself(v->addr, v->port))
+		if (vnode_is_local(v))
 			continue;
 
 		fd = get_sheep_fd(v->addr, v->port, v->node_idx, hdr.epoch);
@@ -360,7 +360,7 @@ read_remote:
 
 int forward_write_obj_req(struct request *req)
 {
-	int i, n, fd, ret, pollret;
+	int i, fd, ret, pollret;
 	unsigned wlen;
 	char name[128];
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
@@ -393,9 +393,9 @@ int forward_write_obj_req(struct request *req)
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
 
-		addr_to_str(name, sizeof(name), req->vnodes->entries[n].addr, 0);
+		addr_to_str(name, sizeof(name), v->addr, 0);
 
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			local = 1;
 			continue;
 		}
@@ -1350,7 +1350,7 @@ static int recover_object_from_replica(uint64_t oid,
 		goto out;
 	}
 
-	if (is_myself(entry->addr, entry->port)) {
+	if (vnode_is_local(entry)) {
 		iocb.epoch = epoch;
 		iocb.length = rlen;
 		ret = sd_store->link(oid, &iocb, tgt_epoch);
@@ -1514,7 +1514,7 @@ static int get_replica_idx(struct recovery_work *rw, uint64_t oid, int *copy_nr)
 	*copy_nr = get_max_copies(rw->cur_nodes, rw->cur_nr_nodes);
 	for (i = 0; i < *copy_nr; i++) {
 		int n = obj_to_sheep(rw->cur_vnodes, rw->cur_nr_vnodes, oid, i);
-		if (is_myself(rw->cur_vnodes[n].addr, rw->cur_vnodes[n].port)) {
+		if (vnode_is_local(&rw->cur_vnodes[n])) {
 			ret = i;
 			break;
 		}
@@ -1794,7 +1794,7 @@ static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_n
 	for (i = 0; i < list_nr; i++) {
 		for (cp = 0; cp < nr_objs; cp++) {
 			idx = obj_to_sheep(nodes, nodes_nr, list[i], cp);
-			if (is_myself(nodes[idx].addr, nodes[idx].port))
+			if (vnode_is_local(&nodes[idx]))
 				break;
 		}
 		if (cp == nr_objs)

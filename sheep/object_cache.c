@@ -400,7 +400,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	/* Check if we can read locally */
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
-		if (is_myself(v->addr, v->port)) {
+		if (vnode_is_local(v)) {
 			struct siocb iocb = { 0 };
 			iocb.epoch = sys->epoch;
 			ret = sd_store->open(oid, &iocb, 0);
@@ -426,7 +426,7 @@ pull_remote:
 	for (i = 0; i < copies; i++) {
 		v = oid_to_vnode(vnodes, oid, i);
 
-		if (is_myself(v->addr, v->port))
+		if (vnode_is_local(v))
 			continue;
 
 		hdr.opcode = SD_OP_READ_OBJ;

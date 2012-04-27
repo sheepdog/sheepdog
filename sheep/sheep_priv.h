@@ -344,6 +344,11 @@ static inline int is_myself(uint8_t *addr, uint16_t port)
 		port == sys->this_node.port;
 }
 
+static inline int vnode_is_local(struct sd_vnode *v)
+{
+	return is_myself(v->addr, v->port);
+}
+
 /* Cluster status/flag helper */
 
 static inline int sys_flag_nohalt(void)
