@@ -278,7 +278,7 @@ int store_remove_obj(const struct sd_req *, struct sd_rsp *, void *);
 
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
-int get_max_copies(struct sd_node *entries, int nr);
+int get_max_nr_copies_from(struct sd_node *entries, int nr);
 
 int epoch_log_read(uint32_t epoch, char *buf, int len);
 int epoch_log_read_nr(uint32_t epoch, char *buf, int len);

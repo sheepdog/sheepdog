@@ -1129,27 +1129,6 @@ uint64_t get_cluster_ctime(void)
 	return ct;
 }
 
-int get_max_copies(struct sd_node *entries, int nr)
-{
-	int i, j;
-	unsigned int nr_zones = 0;
-	uint32_t zones[SD_MAX_REDUNDANCY];
-
-	for (i = 0; i < nr; i++) {
-		if (nr_zones >= ARRAY_SIZE(zones))
-			break;
-
-		for (j = 0; j < nr_zones; j++) {
-			if (zones[j] == entries[i].zone)
-				break;
-		}
-		if (j == nr_zones)
-			zones[nr_zones++] = entries[i].zone;
-	}
-
-	return min(sys->nr_copies, nr_zones);
-}
-
 /*
  * contains_node - checks that the node id is included in the target nodes
  *
@@ -1307,7 +1286,7 @@ static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
 		nodes_nr /= sizeof(nodes[0]);
 	}
 	*nr = nodes_to_vnodes(nodes, nodes_nr, buf);
-	*copies = get_max_copies(nodes, nodes_nr);
+	*copies = get_max_nr_copies_from(nodes, nodes_nr);
 
 	return buf;
 }
@@ -1439,8 +1418,8 @@ static int do_recover_object(struct recovery_work *rw, int copy_idx)
 	cur = xmalloc(sizeof(*cur) * SD_MAX_VNODES);
 	memcpy(old, rw->old_vnodes, sizeof(*old) * old_nr);
 	memcpy(cur, rw->cur_vnodes, sizeof(*cur) * cur_nr);
-	old_copies = get_max_copies(rw->old_nodes, rw->old_nr_nodes);
-	cur_copies = get_max_copies(rw->cur_nodes, rw->cur_nr_nodes);
+	old_copies = get_max_nr_copies_from(rw->old_nodes, rw->old_nr_nodes);
+	cur_copies = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
 
 again:
 	old_idx = obj_to_sheep(old, old_nr, oid, 0);
@@ -1498,7 +1477,7 @@ err:
 static int get_replica_idx(struct recovery_work *rw, uint64_t oid, int *copy_nr)
 {
 	int i, ret = -1;
-	*copy_nr = get_max_copies(rw->cur_nodes, rw->cur_nr_nodes);
+	*copy_nr = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
 	for (i = 0; i < *copy_nr; i++) {
 		int n = obj_to_sheep(rw->cur_vnodes, rw->cur_nr_vnodes, oid, i);
 		if (vnode_is_local(&rw->cur_vnodes[n])) {
@@ -1776,7 +1755,7 @@ static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_n
 	struct strbuf buf = STRBUF_INIT;
 	struct sd_vnode *nodes = rw->cur_vnodes;
 	int nodes_nr = rw->cur_nr_vnodes;
-	int nr_objs = get_max_copies(rw->cur_nodes, rw->cur_nr_nodes);
+	int nr_objs = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
 
 	for (i = 0; i < list_nr; i++) {
 		for (cp = 0; cp < nr_objs; cp++) {

@@ -133,6 +133,18 @@ int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 	return nr_zones;
 }
 
+/*
+ * If we have less zones available than the desired redundancy we have to do
+ * with nr_zones copies, sorry.
+ *
+ * Note that you generally want to use get_nr_copies below, as it uses the
+ * current vnode state snapshot instead of global data.
+ */
+int get_max_nr_copies_from(struct sd_node *nodes, int nr_nodes)
+{
+	return min((int)sys->nr_copies, get_zones_nr_from(nodes, nr_nodes));
+}
+
 struct vnode_info *get_vnode_info(void)
 {
 	assert(current_vnode_info);

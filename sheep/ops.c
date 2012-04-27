@@ -320,7 +320,7 @@ static int local_stat_cluster(const struct sd_req *req, struct sd_rsp *rsp,
 			log->nr_nodes = epoch_log_read_remote(epoch,
 							      (char *)log->nodes,
 							      sizeof(log->nodes));
-		log->nr_copies = get_max_copies(log->nodes, log->nr_nodes);
+		log->nr_copies = get_max_nr_copies_from(log->nodes, log->nr_nodes);
 
 		rsp->data_length += sizeof(*log);
 		log->nr_nodes /= sizeof(log->nodes[0]);
