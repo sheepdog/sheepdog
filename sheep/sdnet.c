@@ -74,90 +74,91 @@ static void setup_access_to_local_objects(struct request *req)
 			req->local_cow_oid = hdr->cow_oid;
 }
 
+static void check_object_consistency(struct sd_obj_req *hdr)
+{
+	uint32_t vdi_id = oid_to_vid(hdr->oid);
+	struct data_object_bmap *bmap, *n;
+	int nr_bmaps = 0;
+
+	list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
+		nr_bmaps++;
+		if (bmap->vdi_id == vdi_id) {
+			set_bit(data_oid_to_idx(hdr->oid), bmap->dobjs);
+			list_del(&bmap->list);
+			list_add_tail(&bmap->list, &sys->consistent_obj_list);
+			return;
+		}
+	}
+
+	bmap = zalloc(sizeof(*bmap));
+	if (bmap == NULL) {
+		eprintf("failed to allocate memory\n");
+		return;
+	}
+
+	dprintf("allocating a new object map\n");
+
+	bmap->vdi_id = vdi_id;
+	list_add_tail(&bmap->list, &sys->consistent_obj_list);
+	set_bit(data_oid_to_idx(hdr->oid), bmap->dobjs);
+	if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
+		/* the first entry is the least recently used one */
+		bmap = list_first_entry(&sys->consistent_obj_list,
+					struct data_object_bmap, list);
+		list_del(&bmap->list);
+		free(bmap);
+	}
+}
+
 static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	struct event_struct *cevent = &req->cev;
-	int again = 0;
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 
 	list_del(&req->r_wlist);
-
 	sys->nr_outstanding_io--;
-	/*
-	 * TODO: if the request failed due to epoch unmatch,
-	 * we should retry here (adds this request to the tail
-	 * of sys->request_queue.
-	 */
-	if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
-	    (req->rp.result == SD_RES_OLD_NODE_VER ||
-	     req->rp.result == SD_RES_NEW_NODE_VER ||
-	     req->rp.result == SD_RES_NETWORK_ERROR ||
-	     req->rp.result == SD_RES_WAIT_FOR_JOIN ||
-	     req->rp.result == SD_RES_WAIT_FOR_FORMAT)) {
 
-		req->rq.epoch = sys->epoch;
-		setup_ordered_sd_vnode_list(req);
-		setup_access_to_local_objects(req);
+	switch (req->rp.result) {
+	case SD_RES_OLD_NODE_VER:
+	case SD_RES_NEW_NODE_VER:
+	case SD_RES_NETWORK_ERROR:
+	case SD_RES_WAIT_FOR_JOIN:
+	case SD_RES_WAIT_FOR_FORMAT:
+		if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL))
+			goto retry;
+		break;
+	case SD_RES_EIO:
+		if (is_access_local(req, hdr->oid, 0)) {
+			eprintf("leaving sheepdog cluster\n");
+			leave_cluster();
 
-		list_add_tail(&cevent->event_list, &sys->request_queue);
-		again = 1;
-	} else if (req->rp.result == SD_RES_SUCCESS && req->check_consistency) {
-		struct sd_obj_req *obj_hdr = (struct sd_obj_req *)&req->rq;
-		uint32_t vdi_id = oid_to_vid(obj_hdr->oid);
-		struct data_object_bmap *bmap, *n;
-		int nr_bmaps = 0;
+			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL))
+				goto retry;
 
-		if (!is_data_obj(obj_hdr->oid))
-			goto done;
-
-		list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
-			nr_bmaps++;
-			if (bmap->vdi_id == vdi_id) {
-				set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
-				list_del(&bmap->list);
-				list_add_tail(&bmap->list, &sys->consistent_obj_list);
-				goto done;
-			}
-		}
-		bmap = zalloc(sizeof(*bmap));
-		if (bmap == NULL) {
-			eprintf("failed to allocate memory\n");
-			goto done;
-		}
-		dprintf("allocating a new object map\n");
-		bmap->vdi_id = vdi_id;
-		list_add_tail(&bmap->list, &sys->consistent_obj_list);
-		set_bit(data_oid_to_idx(obj_hdr->oid), bmap->dobjs);
-		if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
-			/* the first entry is the least recently used one */
-			bmap = list_first_entry(&sys->consistent_obj_list,
-						struct data_object_bmap, list);
-			list_del(&bmap->list);
-			free(bmap);
-		}
-	} else if (is_access_local(req, ((struct sd_obj_req *)&req->rq)->oid, 0) &&
-		   req->rp.result == SD_RES_EIO) {
-		eprintf("leaving sheepdog cluster\n");
-		leave_cluster();
-
-		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 			/* hack to retry */
 			req->rp.result = SD_RES_NETWORK_ERROR;
-		else {
-			req->rq.epoch = sys->epoch;
-			setup_ordered_sd_vnode_list(req);
-			setup_access_to_local_objects(req);
-
-			list_add_tail(&cevent->event_list, &sys->request_queue);
-			again = 1;
 		}
+		break;
+	case SD_RES_SUCCESS:
+		if (req->check_consistency && is_data_obj(hdr->oid))
+			check_object_consistency(hdr);
+		break;
 	}
-done:
+
 	resume_pending_requests();
 	resume_recovery_work();
 
-	if (!again)
-		req->done(req);
+	req->done(req);
+	return;
+
+retry:
+	req->rq.epoch = sys->epoch;
+	setup_ordered_sd_vnode_list(req);
+	setup_access_to_local_objects(req);
+	list_add_tail(&req->cev.event_list, &sys->request_queue);
+
+	resume_pending_requests();
+	resume_recovery_work();
 }
 
 static void local_op_done(struct work *work)
