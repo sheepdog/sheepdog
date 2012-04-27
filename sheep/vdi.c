@@ -323,8 +323,8 @@ int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
 	if (!copies) {
 		vprintf(SDOG_WARNING,
 			"using default replication level of %d copies\n",
-			sys->nr_sobjs);
-		copies = sys->nr_sobjs;
+			sys->nr_copies);
+		copies = sys->nr_copies;
 	}
 
 	ret = create_vdi_obj(epoch, name, *new_vid, size, base_vid, cur_vid, copies,

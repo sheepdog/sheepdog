@@ -136,7 +136,7 @@ struct cluster_info {
 	struct list_head consistent_obj_list;
 	struct list_head blocking_conn_list;
 
-	uint32_t nr_sobjs;
+	uint32_t nr_copies;
 
 	struct list_head request_queue;
 	struct list_head event_queue;

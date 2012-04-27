@@ -41,7 +41,7 @@ struct vnode_info {
 
 struct join_message {
 	uint8_t proto_ver;
-	uint8_t nr_sobjs;
+	uint8_t nr_copies;
 	uint16_t nr_nodes;
 	uint16_t nr_leave_nodes;
 	uint16_t cluster_flags;
@@ -184,8 +184,8 @@ static int update_vnode_info(void)
 int get_nr_copies(struct vnode_info *vnode_info)
 {
 	int nr_copies = vnode_info->nr_zones;
-	if (nr_copies < sys->nr_sobjs)
-		nr_copies = sys->nr_sobjs;
+	if (nr_copies < sys->nr_copies)
+		nr_copies = sys->nr_copies;
 	return nr_copies;
 }
 
@@ -441,7 +441,7 @@ static void join(struct sd_node *joining, struct join_message *msg)
 	msg->result = get_cluster_status(joining, msg->nodes, msg->nr_nodes,
 					 msg->ctime, msg->epoch,
 					 &msg->cluster_status, &msg->inc_epoch);
-	msg->nr_sobjs = sys->nr_sobjs;
+	msg->nr_copies = sys->nr_copies;
 	msg->cluster_flags = sys->flags;
 	msg->ctime = get_cluster_ctime();
 	if (sd_store)
@@ -521,7 +521,7 @@ static void update_cluster_info(struct join_message *msg,
 	if (sys->join_finished)
 		goto join_finished;
 
-	sys->nr_sobjs = msg->nr_sobjs;
+	sys->nr_copies = msg->nr_copies;
 	sys->epoch = msg->epoch;
 
 	/* add nodes execept for newly joined one */
@@ -582,7 +582,7 @@ join_finished:
 		}
 		/* Fresh node */
 		if (!sys_stat_ok() && !sys_stat_halt()) {
-			set_cluster_copies(sys->nr_sobjs);
+			set_cluster_copies(sys->nr_copies);
 			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
 		}
@@ -786,7 +786,7 @@ static int send_join_request(struct sd_node *ent)
 		panic("failed to allocate memory\n");
 	msg->proto_ver = SD_SHEEP_PROTO_VER;
 
-	get_cluster_copies(&msg->nr_sobjs);
+	get_cluster_copies(&msg->nr_copies);
 	get_cluster_flags(&msg->cluster_flags);
 
 	nr_entries = SD_MAX_NODES;
@@ -821,7 +821,7 @@ static void __sd_join_done(struct event_struct *cevent)
 	}
 
 	if (sys_stat_halt()) {
-		if (current_vnode_info->nr_zones >= sys->nr_sobjs)
+		if (current_vnode_info->nr_zones >= sys->nr_copies)
 			sys_stat_set(SD_STATUS_OK);
 	}
 
@@ -851,7 +851,7 @@ static void __sd_leave_done(struct event_struct *cevent)
 		start_recovery(sys->epoch);
 
 	if (sys_can_halt()) {
-		if (current_vnode_info->nr_zones < sys->nr_sobjs)
+		if (current_vnode_info->nr_zones < sys->nr_copies)
 			sys_stat_set(SD_STATUS_HALT);
 	}
 }
@@ -1016,7 +1016,7 @@ static void process_request_queue(void)
 		list_del(&cevent->event_list);
 
 		if (is_io_op(req->op)) {
-			int copies = sys->nr_sobjs;
+			int copies = sys->nr_copies;
 
 			if (copies > req->vnodes->nr_zones)
 				copies = req->vnodes->nr_zones;

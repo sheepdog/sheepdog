@@ -636,7 +636,7 @@ int store_read_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 		goto out;
 
 	rsps->data_length = hdr->data_length;
-	rsps->copies = sys->nr_sobjs;
+	rsps->copies = sys->nr_copies;
 out:
 	sd_store->close(hdr->oid, &iocb);
 	return ret;
@@ -1147,7 +1147,7 @@ int get_max_copies(struct sd_node *entries, int nr)
 			zones[nr_zones++] = entries[i].zone;
 	}
 
-	return min(sys->nr_sobjs, nr_zones);
+	return min(sys->nr_copies, nr_zones);
 }
 
 /*
@@ -1517,7 +1517,7 @@ static void recover_object(struct work *work)
 	int i, copy_idx, copy_nr, ret;
 	struct siocb iocb = { 0 };
 
-	if (!sys->nr_sobjs)
+	if (!sys->nr_copies)
 		return;
 
 	eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n", rw->done, rw->count, oid);
@@ -1897,7 +1897,7 @@ static void do_recovery_work(struct work *work)
 
 	dprintf("%u\n", rw->epoch);
 
-	if (!sys->nr_sobjs)
+	if (!sys->nr_copies)
 		return;
 
 	if (rw->cur_nr_nodes == 0)

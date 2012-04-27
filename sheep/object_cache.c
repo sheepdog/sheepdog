@@ -499,7 +499,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx, int create)
 	hdr->opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->oid = oid;
-	hdr->copies = sys->nr_sobjs;
+	hdr->copies = sys->nr_copies;
 	hdr->epoch = sys->epoch;
 	fake_req.data = buf;
 	fake_req.op = get_sd_op(hdr->opcode);

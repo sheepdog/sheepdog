@@ -59,7 +59,7 @@ static int cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)req;
 	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
-	uint32_t vid = 0, nr_copies = sys->nr_sobjs;
+	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
 	ret = add_vdi(hdr->epoch, data, hdr->data_length, hdr->vdi_size, &vid,
@@ -90,7 +90,7 @@ static int cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)req;
 	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
-	uint32_t vid = 0, nr_copies = sys->nr_sobjs;
+	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
 	ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid,
@@ -109,7 +109,7 @@ static int cluster_get_vdi_info(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)req;
 	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
-	uint32_t vid = 0, nr_copies = sys->nr_sobjs;
+	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	void *tag;
 	int ret;
 
@@ -150,10 +150,10 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	iocb.epoch = latest_epoch;
 	sd_store->format(&iocb);
 	sd_store->init(obj_path);
-	sys->nr_sobjs = hdr->copies;
+	sys->nr_copies = hdr->copies;
 	sys->flags = hdr->flags;
-	if (!sys->nr_sobjs)
-		sys->nr_sobjs = SD_DEFAULT_REDUNDANCY;
+	if (!sys->nr_copies)
+		sys->nr_copies = SD_DEFAULT_REDUNDANCY;
 
 	ctime = hdr->ctime;
 	set_cluster_ctime(ctime);
@@ -172,7 +172,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	update_epoch_store(sys->epoch);
 
-	set_cluster_copies(sys->nr_sobjs);
+	set_cluster_copies(sys->nr_copies);
 	set_cluster_flags(sys->flags);
 
 	if (sys_flag_nohalt())
@@ -180,7 +180,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	else {
 		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
-		if (nr_zones >= sys->nr_sobjs)
+		if (nr_zones >= sys->nr_copies)
 			sys_stat_set(SD_STATUS_OK);
 		else
 			sys_stat_set(SD_STATUS_HALT);
@@ -202,7 +202,7 @@ static int cluster_get_vdi_attr(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)req;
 	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
-	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_sobjs;
+	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_copies;
 	uint64_t ctime = 0;
 	int ret;
 	struct sheepdog_vdi_attr *vattr;
@@ -403,17 +403,18 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret)
 		goto out;
 
-	sys->nr_sobjs = c;
+	sys->nr_copies = c;
 	sys->flags = f;
 
 	s = SD_STATUS_OK;
 	if (!sys_flag_nohalt()) {
 		nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-		if (nr_zones < sys->nr_sobjs)
+		if (nr_zones < sys->nr_copies)
 			s = SD_STATUS_HALT;
 	}
 
-	dprintf("flags %d, nr_zones %d, copies %d\n", sys->flags, nr_zones, sys->nr_sobjs);
+	dprintf("flags %d, nr_zones %d, copies %d\n", sys->flags, nr_zones,
+		sys->nr_copies);
 
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
 	ret = update_epoch_log(sys->epoch);
