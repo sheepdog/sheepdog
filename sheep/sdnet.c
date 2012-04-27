@@ -38,6 +38,7 @@ void resume_pending_requests(void)
 
 static int is_access_local(struct request *req, uint64_t oid, int copies)
 {
+	struct vnode_info *vnodes = req->vnodes;
 	int i, n;
 
 	if (oid == 0)
@@ -45,13 +46,13 @@ static int is_access_local(struct request *req, uint64_t oid, int copies)
 
 	if (copies)
 		copies = sys->nr_sobjs;
-	if (copies > req->nr_zones)
-		copies = req->nr_zones;
+	if (copies > vnodes->nr_zones)
+		copies = vnodes->nr_zones;
 
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(req->entry, req->nr_vnodes, oid, i);
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
 
-		if (is_myself(req->entry[n].addr, req->entry[n].port))
+		if (is_myself(vnodes->entries[n].addr, vnodes->entries[n].port))
 			return 1;
 	}
 
@@ -155,12 +156,8 @@ static void io_op_done(struct work *work)
 retry:
 	req->rq.epoch = sys->epoch;
 
-	if (req->entry)
-		free_ordered_sd_vnode_list(req->entry);
-	if (get_ordered_sd_vnode_list(&req->entry, &req->nr_vnodes,
-				      &req->nr_zones) != SD_RES_SUCCESS)
-		panic("failed to setup vnode list\n");
-
+	put_vnode_info(req->vnodes);
+	req->vnodes = get_vnode_info();
 	setup_access_to_local_objects(req);
 	list_add_tail(&req->cev.event_list, &sys->request_queue);
 
@@ -300,7 +297,6 @@ static void queue_request(struct request *req)
 	if (is_io_op(req->op)) {
 		req->work.fn = do_io_request;
 		req->work.done = io_op_done;
-		setup_access_to_local_objects(req);
 	} else if (is_local_op(req->op)) {
 		req->work.fn = do_local_request;
 		req->work.done = local_op_done;
@@ -327,11 +323,9 @@ static void queue_request(struct request *req)
 
 	list_del(&req->r_wlist);
 
-	assert(req->entry == NULL);
-	if (get_ordered_sd_vnode_list(&req->entry, &req->nr_vnodes,
-				      &req->nr_zones) != SD_RES_SUCCESS)
-		panic("failed to setup vnode list\n");
-
+	req->vnodes = get_vnode_info();
+	if (is_io_op(req->op))
+		setup_access_to_local_objects(req);
 	cevent->ctype = EVENT_REQUEST;
 	list_add_tail(&cevent->event_list, &sys->request_queue);
 	process_request_event_queues();
@@ -377,7 +371,7 @@ static void free_request(struct request *req)
 	sys->outstanding_data_size -= req->data_length;
 
 	list_del(&req->r_siblings);
-	free_ordered_sd_vnode_list(req->entry);
+	put_vnode_info(req->vnodes);
 	free(req->data);
 	free(req);
 }
@@ -681,8 +675,7 @@ int create_listen_port(int port, void *data)
 	return create_listen_ports(port, create_listen_port_fn, data);
 }
 
-int write_object(struct sd_vnode *e,
-		 int vnodes, int zones, uint32_t node_version,
+int write_object(struct vnode_info *vnodes, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr, int create)
 {
@@ -690,15 +683,15 @@ int write_object(struct sd_vnode *e,
 	int i, n, fd, ret;
 	char name[128];
 
-	if (nr > zones)
-		nr = zones;
+	if (nr > vnodes->nr_zones)
+		nr = vnodes->nr_zones;
 
 	for (i = 0; i < nr; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
-		n = obj_to_sheep(e, vnodes, oid, i);
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
 
-		if (is_myself(e[n].addr, e[n].port)) {
+		if (is_myself(vnodes->entries[n].addr, vnodes->entries[n].port)) {
 			ret = write_object_local(oid, data, datalen, offset,
 						 flags, nr, node_version, create);
 
@@ -710,9 +703,9 @@ int write_object(struct sd_vnode *e,
 			continue;
 		}
 
-		addr_to_str(name, sizeof(name), e[n].addr, 0);
+		addr_to_str(name, sizeof(name), vnodes->entries[n].addr, 0);
 
-		fd = connect_to(name, e[n].port);
+		fd = connect_to(name, vnodes->entries[n].port);
 		if (fd < 0) {
 			eprintf("failed to connect to host %s\n", name);
 			return -1;
@@ -744,8 +737,7 @@ int write_object(struct sd_vnode *e,
 	return 0;
 }
 
-int read_object(struct sd_vnode *e,
-		int vnodes, int zones, uint32_t node_version,
+int read_object(struct vnode_info *vnodes, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr)
 {
@@ -754,14 +746,14 @@ int read_object(struct sd_vnode *e,
 	char name[128];
 	int i = 0, n, fd, ret, last_error = SD_RES_SUCCESS;
 
-	if (nr > zones)
-		nr = zones;
+	if (nr > vnodes->nr_zones)
+		nr = vnodes->nr_zones;
 
 	/* search a local object first */
 	for (i = 0; i < nr; i++) {
-		n = obj_to_sheep(e, vnodes, oid, i);
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
 
-		if (is_myself(e[n].addr, e[n].port)) {
+		if (is_myself(vnodes->entries[n].addr, vnodes->entries[n].port)) {
 			ret = read_object_local(oid, data, datalen, offset, nr,
 						node_version);
 
@@ -778,11 +770,11 @@ int read_object(struct sd_vnode *e,
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = datalen;
 
-		n = obj_to_sheep(e, vnodes, oid, i);
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
 
-		addr_to_str(name, sizeof(name), e[n].addr, 0);
+		addr_to_str(name, sizeof(name), vnodes->entries[n].addr, 0);
 
-		fd = connect_to(name, e[n].port);
+		fd = connect_to(name, vnodes->entries[n].port);
 		if (fd < 0) {
 			printf("%s(%d): %s, %m\n", __func__, __LINE__,
 			       name);
@@ -815,8 +807,7 @@ int read_object(struct sd_vnode *e,
 	return last_error;
 }
 
-int remove_object(struct sd_vnode *e,
-		  int vnodes, int zones, uint32_t node_version,
+int remove_object(struct vnode_info *vnodes, uint32_t node_version,
 		  uint64_t oid, int nr)
 {
 	char name[128];
@@ -824,17 +815,17 @@ int remove_object(struct sd_vnode *e,
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	int i = 0, n, fd, ret, err = 0;
 
-	if (nr > zones)
-		nr = zones;
+	if (nr > vnodes->nr_zones)
+		nr = vnodes->nr_zones;
 
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = 0;
 
-		n = obj_to_sheep(e, vnodes, oid, i);
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
 
-		addr_to_str(name, sizeof(name), e[n].addr, 0);
+		addr_to_str(name, sizeof(name), vnodes->entries[n].addr, 0);
 
-		fd = connect_to(name, e[n].port);
+		fd = connect_to(name, vnodes->entries[n].port);
 		if (fd < 0) {
 			rsp->result = SD_RES_EIO;
 			return -1;

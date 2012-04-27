@@ -62,6 +62,13 @@ struct client_info {
 	int refcnt;
 };
 
+struct vnode_info {
+	struct sd_vnode entries[SD_MAX_VNODES];
+	int nr_vnodes;
+	int nr_zones;
+	int refcnt;
+};
+
 struct request;
 
 typedef void (*req_end_t) (struct request *);
@@ -84,9 +91,7 @@ struct request {
 	uint64_t local_oid;
 	uint64_t local_cow_oid;
 
-	struct sd_vnode *entry;
-	int nr_vnodes;
-	int nr_zones;
+	struct vnode_info *vnodes;
 	int check_consistency;
 
 	req_end_t done;
@@ -138,7 +143,6 @@ struct cluster_info {
 	struct list_head blocking_conn_list;
 
 	uint32_t nr_sobjs;
-	int nr_zones;
 
 	struct list_head request_queue;
 	struct list_head event_queue;
@@ -236,9 +240,8 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 int write, int excl, int delete);
 
 int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
-int get_ordered_sd_vnode_list(struct sd_vnode **entries,
-			      int *nr_vnodes, int *nr_zones);
-void free_ordered_sd_vnode_list(struct sd_vnode *entries);
+struct vnode_info *get_vnode_info(void);
+void put_vnode_info(struct vnode_info *vnodes);
 int is_access_to_busy_objects(uint64_t oid);
 
 void resume_pending_requests(void);
@@ -293,16 +296,13 @@ void resume_recovery_work(void);
 int is_recoverying_oid(uint64_t oid);
 int node_in_recovery(void);
 
-int write_object(struct sd_vnode *e,
-		 int vnodes, int zones, uint32_t node_version,
+int write_object(struct vnode_info *vnodes, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr, int create);
-int read_object(struct sd_vnode *e,
-		int vnodes, int zones, uint32_t node_version,
+int read_object(struct vnode_info *vnodes, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
-int remove_object(struct sd_vnode *e,
-		  int vnodes, int zones, uint32_t node_version,
+int remove_object(struct vnode_info *vnodes, uint32_t node_version,
 		  uint64_t oid, int nr);
 int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2);
 

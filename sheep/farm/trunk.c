@@ -236,18 +236,24 @@ static unsigned char *omap_tree_insert(uint64_t oid, unsigned char *sha1)
 static int oid_stale(uint64_t oid)
 {
 	int i, vidx, copies;
-	struct sd_vnode *vnodes = sys->vnodes;
+	struct vnode_info *vnodes = get_vnode_info();
+	int ret = 1;
 
 	copies = sys->nr_sobjs;
-	if (copies > sys->nr_zones)
-		copies = sys->nr_zones;
+	if (copies > vnodes->nr_zones)
+		copies = vnodes->nr_zones;
 
 	for (i = 0; i < copies; i++) {
-		vidx = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
-		if (is_myself(vnodes[vidx].addr, vnodes[vidx].port))
-			return 0;
+		vidx = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
+		if (is_myself(vnodes->entries[vidx].addr,
+			      vnodes->entries[vidx].port)) {
+			ret = 0;
+			break;
+		}
 	}
-	return 1;
+
+	put_vnode_info(vnodes);
+	return ret;
 }
 
 int trunk_file_write_recovery(unsigned char *outsha1)

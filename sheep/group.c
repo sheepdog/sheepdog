@@ -8,6 +8,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -96,6 +97,7 @@ struct work_leave {
 })
 
 static int event_running;
+static struct vnode_info *current_vnode_info;
 
 static size_t get_join_message_size(struct join_message *jm)
 {
@@ -124,67 +126,37 @@ int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 	return nr_zones;
 }
 
-struct vnodes_cache {
-	struct sd_vnode vnodes[SD_MAX_VNODES];
-	int nr_vnodes;
-	int nr_zones;
-	uint32_t epoch;
-
-	int refcnt;
-	struct list_head list;
-};
-
-int get_ordered_sd_vnode_list(struct sd_vnode **entries,
-			      int *nr_vnodes, int *nr_zones)
+struct vnode_info *get_vnode_info(void)
 {
-	static LIST_HEAD(vnodes_list);
-	struct vnodes_cache *cache;
-
-	list_for_each_entry(cache, &vnodes_list, list) {
-		if (cache->epoch == sys->epoch) {
-			*entries = cache->vnodes;
-			*nr_vnodes = cache->nr_vnodes;
-			*nr_zones = cache->nr_zones;
-			cache->refcnt++;
-
-			return SD_RES_SUCCESS;
-		}
-	}
-
-	cache = zalloc(sizeof(*cache));
-	if (!cache) {
-		eprintf("failed to allocate memory\n");
-		*entries = NULL;
-		return SD_RES_NO_MEM;
-	}
-
-	cache->nr_zones = sys->nr_zones;
-	memcpy(cache->vnodes, sys->vnodes, sizeof(sys->vnodes[0]) * sys->nr_vnodes);
-	cache->nr_vnodes = sys->nr_vnodes;
-	cache->epoch = sys->epoch;
-	cache->refcnt++;
-
-	*entries = cache->vnodes;
-	*nr_vnodes = cache->nr_vnodes;
-	*nr_zones = cache->nr_zones;
-
-	list_add(&cache->list, &vnodes_list);
-
-	return SD_RES_SUCCESS;
+	assert(current_vnode_info);
+	current_vnode_info->refcnt++;
+	return current_vnode_info;
 }
 
-void free_ordered_sd_vnode_list(struct sd_vnode *entries)
+void put_vnode_info(struct vnode_info *vnodes)
 {
-	struct vnodes_cache *cache;
+	if (vnodes && --vnodes->refcnt == 0)
+		free(vnodes);
+}
 
-	if (!entries)
-		return;
+static int update_vnode_info(void)
+{
+	struct vnode_info *vnode_info;
 
-	cache = container_of(entries, struct vnodes_cache, vnodes[0]);
-	if (--cache->refcnt == 0) {
-		list_del(&cache->list);
-		free(cache);
+	vnode_info = zalloc(sizeof(*vnode_info));
+	if (!vnode_info) {
+		eprintf("failed to allocate memory\n");
+		return 1;
 	}
+
+	vnode_info->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
+						vnode_info->entries);
+	vnode_info->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+	vnode_info->refcnt = 1;
+
+	put_vnode_info(current_vnode_info);
+	current_vnode_info = vnode_info;
+	return 0;
 }
 
 static void do_cluster_op(void *arg)
@@ -570,9 +542,6 @@ static void update_cluster_info(struct join_message *msg,
 join_finished:
 	sys->nodes[sys->nr_nodes++] = *joined;
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
-	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
-					 sys->vnodes);
-	sys->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 	if (msg->cluster_status == SD_STATUS_OK ||
 	    msg->cluster_status == SD_STATUS_HALT) {
@@ -588,6 +557,7 @@ join_finished:
 			set_cluster_ctime(msg->ctime);
 		}
 	}
+	update_vnode_info();
 
 	print_node_list(sys->nodes, sys->nr_nodes);
 
@@ -821,7 +791,7 @@ static void __sd_join_done(struct event_struct *cevent)
 	}
 
 	if (sys_stat_halt()) {
-		if (sys->nr_zones >= sys->nr_sobjs)
+		if (current_vnode_info->nr_zones >= sys->nr_sobjs)
 			sys_stat_set(SD_STATUS_OK);
 	}
 
@@ -837,15 +807,13 @@ static void __sd_leave_done(struct event_struct *cevent)
 	sys->nr_nodes = w->member_list_entries;
 	memcpy(sys->nodes, w->member_list, sizeof(*sys->nodes) * sys->nr_nodes);
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
-	sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
-					 sys->vnodes);
-	sys->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
 
 	if (sys_can_recover()) {
 		sys->epoch++;
 		update_epoch_store(sys->epoch);
 		update_epoch_log(sys->epoch);
 	}
+	update_vnode_info();
 
 	print_node_list(sys->nodes, sys->nr_nodes);
 
@@ -853,7 +821,7 @@ static void __sd_leave_done(struct event_struct *cevent)
 		start_recovery(sys->epoch);
 
 	if (sys_can_halt()) {
-		if (sys->nr_zones < sys->nr_sobjs)
+		if (current_vnode_info->nr_zones < sys->nr_sobjs)
 			sys_stat_set(SD_STATUS_HALT);
 	}
 }
@@ -1020,8 +988,8 @@ static void process_request_queue(void)
 		if (is_io_op(req->op)) {
 			int copies = sys->nr_sobjs;
 
-			if (copies > req->nr_zones)
-				copies = req->nr_zones;
+			if (copies > req->vnodes->nr_zones)
+				copies = req->vnodes->nr_zones;
 
 			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
 			    object_is_cached(hdr->oid)) {
@@ -1195,9 +1163,9 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 			sys->join_finished = 1;
 			sys->nodes[sys->nr_nodes++] = sys->this_node;
 			qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
-			sys->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
-							 sys->vnodes);
 			sys->epoch = get_latest_epoch();
+
+			update_vnode_info();
 		}
 
 		nr_local = get_nodes_nr_epoch(sys->epoch);

@@ -223,7 +223,7 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 static int read_copy_from_replica(struct request *req, uint32_t epoch,
 				  uint64_t oid, char *buf)
 {
-	int i, n, nr, nr_vnodes, ret;
+	int i, n, nr, ret;
 	unsigned wlen, rlen;
 	char name[128];
 	struct sd_vnode *e;
@@ -232,15 +232,14 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	struct siocb iocb;
 	int fd;
 
-	e = req->entry;
-	nr_vnodes = req->nr_vnodes;
+	e = req->vnodes->entries;
 
 	nr = sys->nr_sobjs;
-	if (nr > req->nr_zones)
-		nr = req->nr_zones;
+	if (nr > req->vnodes->nr_zones)
+		nr = req->vnodes->nr_zones;
 
 	for (i = 0; i < nr; i++) {
-		n = obj_to_sheep(e, nr_vnodes, oid, i);
+		n = obj_to_sheep(e, req->vnodes->nr_vnodes, oid, i);
 
 		addr_to_str(name, sizeof(name), e[n].addr, 0);
 
@@ -302,7 +301,7 @@ static int do_local_io(struct request *req, uint32_t epoch);
 
 static int forward_read_obj_req(struct request *req)
 {
-	int i, n, nr, fd, ret = SD_RES_SUCCESS;
+	int i, n, fd, ret = SD_RES_SUCCESS;
 	unsigned wlen, rlen;
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
@@ -310,22 +309,21 @@ static int forward_read_obj_req(struct request *req)
 	uint64_t oid = hdr.oid;
 	int copies;
 
-	e = req->entry;
-	nr = req->nr_vnodes;
+	e = req->vnodes->entries;
 
 	copies = hdr.copies;
 
 	/* temporary hack */
 	if (!copies)
 		copies = sys->nr_sobjs;
-	if (copies > req->nr_zones)
-		copies = req->nr_zones;
+	if (copies > req->vnodes->nr_zones)
+		copies = req->vnodes->nr_zones;
 
 	hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
 	/* TODO: we can do better; we need to check this first */
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(e, nr, oid, i);
+		n = obj_to_sheep(e, req->vnodes->nr_vnodes, oid, i);
 
 		if (is_myself(e[n].addr, e[n].port)) {
 			ret = do_local_io(req, hdr.epoch);
@@ -337,7 +335,7 @@ static int forward_read_obj_req(struct request *req)
 
 read_remote:
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(e, nr, oid, i);
+		n = obj_to_sheep(e, req->vnodes->nr_vnodes, oid, i);
 		if (is_myself(e[n].addr, e[n].port))
 			continue;
 
@@ -367,28 +365,26 @@ read_remote:
 
 int forward_write_obj_req(struct request *req)
 {
-	int i, n, nr, fd, ret, pollret;
+	int i, n, fd, ret, pollret;
 	unsigned wlen;
 	char name[128];
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
-	struct sd_vnode *e;
+	struct sd_vnode *e = req->vnodes->entries;
 	uint64_t oid = hdr.oid;
 	int copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
 	int nr_fds, local = 0;
 
 	dprintf("%"PRIx64"\n", oid);
-	e = req->entry;
-	nr = req->nr_vnodes;
 
 	copies = hdr.copies;
 
 	/* temporary hack */
 	if (!copies)
 		copies = sys->nr_sobjs;
-	if (copies > req->nr_zones)
-		copies = req->nr_zones;
+	if (copies > req->vnodes->nr_zones)
+		copies = req->vnodes->nr_zones;
 
 	nr_fds = 0;
 	memset(pfds, 0, sizeof(pfds));
@@ -400,9 +396,9 @@ int forward_write_obj_req(struct request *req)
 	wlen = hdr.data_length;
 
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(e, nr, oid, i);
+		n = obj_to_sheep(req->vnodes->entries, req->vnodes->nr_vnodes, oid, i);
 
-		addr_to_str(name, sizeof(name), e[n].addr, 0);
+		addr_to_str(name, sizeof(name), req->vnodes->entries[n].addr, 0);
 
 		if (is_myself(e[n].addr, e[n].port)) {
 			local = 1;

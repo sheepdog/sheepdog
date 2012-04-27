@@ -374,7 +374,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	uint64_t oid;
 	struct sd_obj_req hdr = { 0 };
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	struct sd_vnode *vnodes = sys->vnodes;
+	struct vnode_info *vnodes = get_vnode_info();
 	void *buf;
 	int copies;
 
@@ -393,13 +393,14 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	}
 
 	copies = sys->nr_sobjs;
-	if (sys->nr_zones < copies)
-		copies = sys->nr_zones;
+	if (vnodes->nr_zones < copies)
+		copies = vnodes->nr_zones;
 
 	/* Check if we can read locally */
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
-		if (is_myself(vnodes[n].addr, vnodes[n].port)) {
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
+		if (is_myself(vnodes->entries[n].addr,
+			      vnodes->entries[n].port)) {
 			struct siocb iocb = { 0 };
 			iocb.epoch = sys->epoch;
 			ret = sd_store->open(oid, &iocb, 0);
@@ -423,8 +424,8 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 pull_remote:
 	/* Okay, no luck, let's read remotely */
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(vnodes, sys->nr_vnodes, oid, i);
-		if (is_myself(vnodes[n].addr, vnodes[n].port))
+		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
+		if (is_myself(vnodes->entries[n].addr, vnodes->entries[n].port))
 			continue;
 
 		hdr.opcode = SD_OP_READ_OBJ;
@@ -433,7 +434,10 @@ pull_remote:
 		hdr.data_length = rlen = data_length;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 
-		fd = get_sheep_fd(vnodes[n].addr, vnodes[n].port, vnodes[n].node_idx, hdr.epoch);
+		fd = get_sheep_fd(vnodes->entries[n].addr,
+				  vnodes->entries[n].port,
+				  vnodes->entries[n].node_idx,
+				  hdr.epoch);
 		if (fd < 0)
 			continue;
 
@@ -455,6 +459,7 @@ out:
 	if (ret == SD_RES_SUCCESS)
 		ret = create_cache_object(oc, idx, buf, read_len);
 	free(buf);
+	put_vnode_info(vnodes);
 	return ret;
 }
 
@@ -502,15 +507,14 @@ static int push_cache_object(uint32_t vid, uint32_t idx, int create)
 	hdr->epoch = sys->epoch;
 	fake_req.data = buf;
 	fake_req.op = get_sd_op(hdr->opcode);
-	fake_req.entry = sys->vnodes;
-	fake_req.nr_vnodes = sys->nr_vnodes;
-	fake_req.nr_zones = get_zones_nr_from(sys->nodes, sys->nr_vnodes);
+	fake_req.vnodes = get_vnode_info();
 
 	ret = forward_write_obj_req(&fake_req);
-	if (ret != SD_RES_SUCCESS) {
+	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to push object %x\n", ret);
-		goto out;
-	}
+
+	put_vnode_info(fake_req.vnodes);
+
 out:
 	free(buf);
 	return ret;
