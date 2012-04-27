@@ -235,8 +235,9 @@ static unsigned char *omap_tree_insert(uint64_t oid, unsigned char *sha1)
 
 static int oid_stale(uint64_t oid)
 {
-	int i, vidx, copies;
+	int i, copies;
 	struct vnode_info *vnodes = get_vnode_info();
+	struct sd_vnode *v;
 	int ret = 1;
 
 	copies = sys->nr_sobjs;
@@ -244,9 +245,8 @@ static int oid_stale(uint64_t oid)
 		copies = vnodes->nr_zones;
 
 	for (i = 0; i < copies; i++) {
-		vidx = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
-		if (is_myself(vnodes->entries[vidx].addr,
-			      vnodes->entries[vidx].port)) {
+		v = oid_to_vnode(vnodes, oid, i);
+		if (is_myself(v->addr, v->port)) {
 			ret = 0;
 			break;
 		}

@@ -139,6 +139,17 @@ void put_vnode_info(struct vnode_info *vnodes)
 		free(vnodes);
 }
 
+struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
+		int copy_idx)
+{
+	int n;
+
+	n = obj_to_sheep(vnode_info->entries, vnode_info->nr_vnodes,
+			 oid, copy_idx);
+	return &vnode_info->entries[n];
+}
+
+
 static int update_vnode_info(void)
 {
 	struct vnode_info *vnode_info;

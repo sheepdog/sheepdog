@@ -369,12 +369,13 @@ out:
 /* Fetch the object, cache it in success */
 int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
-	int i, n = 0, fd, ret = SD_RES_NO_MEM;
+	int i, fd, ret = SD_RES_NO_MEM;
 	unsigned wlen = 0, rlen, data_length, read_len;
 	uint64_t oid;
 	struct sd_obj_req hdr = { 0 };
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct vnode_info *vnodes = get_vnode_info();
+	struct sd_vnode *v;
 	void *buf;
 	int copies;
 
@@ -398,9 +399,8 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 
 	/* Check if we can read locally */
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
-		if (is_myself(vnodes->entries[n].addr,
-			      vnodes->entries[n].port)) {
+		v = oid_to_vnode(vnodes, oid, i);
+		if (is_myself(v->addr, v->port)) {
 			struct siocb iocb = { 0 };
 			iocb.epoch = sys->epoch;
 			ret = sd_store->open(oid, &iocb, 0);
@@ -424,8 +424,9 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 pull_remote:
 	/* Okay, no luck, let's read remotely */
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(vnodes->entries, vnodes->nr_vnodes, oid, i);
-		if (is_myself(vnodes->entries[n].addr, vnodes->entries[n].port))
+		v = oid_to_vnode(vnodes, oid, i);
+
+		if (is_myself(v->addr, v->port))
 			continue;
 
 		hdr.opcode = SD_OP_READ_OBJ;
@@ -434,9 +435,7 @@ pull_remote:
 		hdr.data_length = rlen = data_length;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 
-		fd = get_sheep_fd(vnodes->entries[n].addr,
-				  vnodes->entries[n].port,
-				  vnodes->entries[n].node_idx,
+		fd = get_sheep_fd(v->addr, v->port, v->node_idx,
 				  hdr.epoch);
 		if (fd < 0)
 			continue;

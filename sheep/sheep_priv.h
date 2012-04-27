@@ -242,6 +242,10 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vnodes);
+
+struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
+		int copy_idx);
+
 int is_access_to_busy_objects(uint64_t oid);
 
 void resume_pending_requests(void);
