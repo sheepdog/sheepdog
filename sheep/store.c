@@ -288,16 +288,12 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 		case SD_RES_SUCCESS:
 			ret = SD_RES_SUCCESS;
 			goto out;
-		case SD_RES_OLD_NODE_VER:
-		case SD_RES_NEW_NODE_VER:
-			/* waits for the node list timer */
-			break;
 		default:
 			;
 		}
 	}
 
-	ret = SD_RES_EIO;
+	ret = rsp->result;
 out:
 	return ret;
 }
