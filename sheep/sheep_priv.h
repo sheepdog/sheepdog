@@ -241,8 +241,6 @@ int get_ordered_sd_vnode_list(struct sd_vnode **entries,
 			      int *nr_vnodes, int *nr_zones);
 void free_ordered_sd_vnode_list(struct sd_vnode *entries);
 int is_access_to_busy_objects(uint64_t oid);
-int is_access_local(struct sd_vnode *e, int nr_nodes,
-		    uint64_t oid, int copies);
 
 void resume_pending_requests(void);
 

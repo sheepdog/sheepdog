@@ -35,21 +35,22 @@ void resume_pending_requests(void)
 		process_request_event_queues();
 }
 
-int is_access_local(struct sd_vnode *e, int nr_nodes,
-		    uint64_t oid, int copies)
+static int is_access_local(struct request *req, uint64_t oid, int copies)
 {
 	int i, n;
 
 	if (oid == 0)
 		return 0;
 
-	if (copies > nr_nodes)
-		copies = nr_nodes;
+	if (copies)
+		copies = sys->nr_sobjs;
+	if (copies > req->nr_zones)
+		copies = req->nr_zones;
 
 	for (i = 0; i < copies; i++) {
-		n = obj_to_sheep(e, nr_nodes, oid, i);
+		n = obj_to_sheep(req->entry, req->nr_vnodes, oid, i);
 
-		if (is_myself(e[n].addr, e[n].port))
+		if (is_myself(req->entry[n].addr, req->entry[n].port))
 			return 1;
 	}
 
@@ -59,24 +60,17 @@ int is_access_local(struct sd_vnode *e, int nr_nodes,
 static void setup_access_to_local_objects(struct request *req)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	int copies;
 
 	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
 		req->local_oid = hdr->oid;
 		return;
 	}
 
-	copies = hdr->copies;
-	if (!copies)
-		copies = sys->nr_sobjs;
-	if (copies > req->nr_zones)
-		copies = req->nr_zones;
-
-	if (is_access_local(req->entry, req->nr_vnodes, hdr->oid, copies))
+	if (is_access_local(req, hdr->oid, hdr->copies))
 		req->local_oid = hdr->oid;
 
 	if (hdr->cow_oid)
-		if (is_access_local(req->entry, req->nr_vnodes, hdr->cow_oid, copies))
+		if (is_access_local(req, hdr->cow_oid, hdr->copies))
 			req->local_cow_oid = hdr->cow_oid;
 }
 
@@ -85,10 +79,6 @@ static void io_op_done(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	struct event_struct *cevent = &req->cev;
 	int again = 0;
-	int copies = sys->nr_sobjs;
-
-	if (copies > req->nr_zones)
-		copies = req->nr_zones;
 
 	list_del(&req->r_wlist);
 
@@ -145,8 +135,7 @@ static void io_op_done(struct work *work)
 			list_del(&bmap->list);
 			free(bmap);
 		}
-	} else if (is_access_local(req->entry, req->nr_vnodes,
-				   ((struct sd_obj_req *)&req->rq)->oid, copies) &&
+	} else if (is_access_local(req, ((struct sd_obj_req *)&req->rq)->oid, 0) &&
 		   req->rp.result == SD_RES_EIO) {
 		eprintf("leaving sheepdog cluster\n");
 		leave_cluster();
