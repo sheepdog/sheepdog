@@ -1162,15 +1162,14 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		if (!sys_stat_wait_join())
 			break;
 
+		if (find_entry_list(joined, &sys->leave_list)
+		    || !find_entry_epoch(joined, le)) {
+			break;
+		}
+
 		n = zalloc(sizeof(*n));
 		if (!n)
 			panic("failed to allocate memory\n");
-
-		if (find_entry_list(joined, &sys->leave_list)
-		    || !find_entry_epoch(joined, le)) {
-			free(n);
-			break;
-		}
 
 		n->ent = *joined;
 
@@ -1191,15 +1190,14 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		jm = (struct join_message *)opaque;
 		nr = jm->nr_leave_nodes;
 		for (i = 0; i < nr; i++) {
+			if (find_entry_list(&jm->leave_nodes[i], &sys->leave_list)
+			    || !find_entry_epoch(&jm->leave_nodes[i], le)) {
+				continue;
+			}
+
 			n = zalloc(sizeof(*n));
 			if (!n)
 				panic("failed to allocate memory\n");
-
-			if (find_entry_list(&jm->leave_nodes[i], &sys->leave_list)
-			    || !find_entry_epoch(&jm->leave_nodes[i], le)) {
-				free(n);
-				continue;
-			}
 
 			n->ent = jm->leave_nodes[i];
 
