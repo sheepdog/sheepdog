@@ -236,7 +236,6 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 int write, int excl, int delete);
 
 int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
-void setup_ordered_sd_vnode_list(struct request *req);
 int get_ordered_sd_vnode_list(struct sd_vnode **entries,
 			      int *nr_vnodes, int *nr_zones);
 void free_ordered_sd_vnode_list(struct sd_vnode *entries);

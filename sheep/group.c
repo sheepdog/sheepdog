@@ -187,19 +187,6 @@ void free_ordered_sd_vnode_list(struct sd_vnode *entries)
 	}
 }
 
-void setup_ordered_sd_vnode_list(struct request *req)
-{
-	int res;
-
-	if (req->entry)
-		free_ordered_sd_vnode_list(req->entry);
-
-	res = get_ordered_sd_vnode_list(&req->entry, &req->nr_vnodes,
-					&req->nr_zones);
-	if (res != SD_RES_SUCCESS)
-		panic("unrecoverable error\n");
-}
-
 static void do_cluster_op(void *arg)
 {
 	struct vdi_op_message *msg = arg;

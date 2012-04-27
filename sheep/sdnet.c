@@ -8,6 +8,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -153,7 +154,13 @@ static void io_op_done(struct work *work)
 
 retry:
 	req->rq.epoch = sys->epoch;
-	setup_ordered_sd_vnode_list(req);
+
+	if (req->entry)
+		free_ordered_sd_vnode_list(req->entry);
+	if (get_ordered_sd_vnode_list(&req->entry, &req->nr_vnodes,
+				      &req->nr_zones) != SD_RES_SUCCESS)
+		panic("failed to setup vnode list\n");
+
 	setup_access_to_local_objects(req);
 	list_add_tail(&req->cev.event_list, &sys->request_queue);
 
@@ -320,7 +327,10 @@ static void queue_request(struct request *req)
 
 	list_del(&req->r_wlist);
 
-	setup_ordered_sd_vnode_list(req);
+	assert(req->entry == NULL);
+	if (get_ordered_sd_vnode_list(&req->entry, &req->nr_vnodes,
+				      &req->nr_zones) != SD_RES_SUCCESS)
+		panic("failed to setup vnode list\n");
 
 	cevent->ctype = EVENT_REQUEST;
 	list_add_tail(&cevent->event_list, &sys->request_queue);
