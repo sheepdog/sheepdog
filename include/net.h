@@ -2,6 +2,7 @@
 #define __NET_H__
 
 #include <sys/socket.h>
+#include <arpa/inet.h>
 
 #define DEFAULT_SOCKET_TIMEOUT 5 /* seconds */
 
@@ -16,6 +17,9 @@ enum conn_state {
 struct connection {
 	int fd;
 	unsigned int events;
+
+	uint16_t port;
+	char ipstr[INET6_ADDRSTRLEN];
 
 	enum conn_state c_rx_state;
 	int rx_length;

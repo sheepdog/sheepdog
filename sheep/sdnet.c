@@ -408,6 +408,8 @@ static void client_rx_handler(struct client_info *ci)
 	struct sd_req *hdr = &conn->rx_hdr;
 	struct request *req;
 
+	dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
+
 	if (!ci->rx_req && sys->outstanding_data_size > MAX_OUTSTANDING_DATA_SIZE) {
 		dprintf("too many requests (%p)\n", &ci->conn);
 		conn_rx_off(&ci->conn);
@@ -560,6 +562,7 @@ again:
 
 static void destroy_client(struct client_info *ci)
 {
+	dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
 	close(ci->conn.fd);
 	free(ci);
 }
@@ -579,10 +582,28 @@ static void client_decref(struct client_info *ci)
 static struct client_info *create_client(int fd, struct cluster_info *cluster)
 {
 	struct client_info *ci;
+	struct sockaddr_storage from;
+	socklen_t namesize = sizeof(from);
 
 	ci = zalloc(sizeof(*ci));
 	if (!ci)
 		return NULL;
+
+	if (getpeername(fd, (struct sockaddr *)&from, &namesize))
+		return NULL;
+
+	switch (from.ss_family) {
+	case AF_INET:
+		ci->conn.port = ntohs(((struct sockaddr_in *)&from)->sin_port);
+		inet_ntop(AF_INET, &((struct sockaddr_in *)&from)->sin_addr,
+				ci->conn.ipstr, sizeof(ci->conn.ipstr));
+		break;
+	case AF_INET6:
+		ci->conn.port = ntohs(((struct sockaddr_in6 *)&from)->sin6_port);
+		inet_ntop(AF_INET6, &((struct sockaddr_in6 *)&from)->sin6_addr,
+				ci->conn.ipstr, sizeof(ci->conn.ipstr));
+		break;
+	}
 
 	ci->conn.fd = fd;
 	ci->conn.events = EPOLLIN;
