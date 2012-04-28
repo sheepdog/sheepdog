@@ -350,10 +350,20 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buff
 		ret = SD_RES_EIO;
 		goto out;
 	}
+	if (flock(fd, LOCK_EX) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out_close;
+	}
 	ret = xpwrite(fd, buffer, buf_size, 0);
 	if (ret != buf_size) {
 		ret = SD_RES_EIO;
 		eprintf("failed, vid %"PRIx32", idx %"PRIx32"\n", oc->vid, idx);
+		goto out_close;
+	}
+	if (flock(fd, LOCK_UN) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
 		goto out_close;
 	}
 
