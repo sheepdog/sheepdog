@@ -50,7 +50,8 @@ static struct logarea *la;
 static char *log_name;
 static char *log_nowname;
 static int log_level = SDOG_INFO;
-static pid_t pid;
+static pid_t sheep_pid;
+static pid_t logger_pid;
 static key_t semkey;
 
 static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
@@ -385,10 +386,11 @@ static notrace void crash_handler(int signo)
 		vprintf(SDOG_ERR, "logger pid %d segfaulted.\n",
 			getpid());
 	} else if (signo == SIGHUP) {
-		vprintf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n", pid);
+		vprintf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n",
+			sheep_pid);
 	} else {
 		vprintf(SDOG_ERR, "logger pid %d got unexpected signal %d.\n",
-			pid, signo);
+			getpid(), signo);
 	}
 
 	log_flush();
@@ -435,12 +437,21 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 
 		la->active = 1;
 		la->fd = fd;
-		pid = fork();
-		if (pid < 0) {
+
+		/*
+		 * Store the pid of the sheep process for use by the death
+		 * signal handler.  By the time the child is notified of
+		 * the parents death the parent has been reparanted to init
+		 * and getppid() will always return 1.
+		 */
+		sheep_pid = getpid();
+
+		logger_pid = fork();
+		if (logger_pid < 0) {
 			syslog(LOG_ERR, "failed to fork the logger process: %m\n");
 			return 1;
-		} else if (pid) {
-			syslog(LOG_WARNING, "logger pid %d starting\n", pid);
+		} else if (logger_pid) {
+			syslog(LOG_WARNING, "logger pid %d starting\n", logger_pid);
 			return 0;
 		}
 
@@ -498,9 +509,9 @@ notrace void log_close(void)
 {
 	if (la) {
 		la->active = 0;
-		waitpid(pid, NULL, 0);
+		waitpid(logger_pid, NULL, 0);
 
-		vprintf(SDOG_WARNING, "logger pid %d stopped\n", pid);
+		vprintf(SDOG_WARNING, "logger pid %d stopped\n", logger_pid);
 		log_flush();
 		closelog();
 		free_logarea();
