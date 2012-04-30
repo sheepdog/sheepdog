@@ -520,14 +520,14 @@ static int farm_end_recover(struct siocb *iocb)
 
 	if (epoch == 0)
 		return SD_RES_SUCCESS;
-	dprintf("epoch %d\n", epoch);
+	dprintf("epoch %d\n", iocb->epoch);
 	if (trunk_file_write_recovery(trunk_sha1) < 0)
 		return SD_RES_EIO;
 
 	if (snap_file_write(epoch, trunk_sha1, snap_sha1, 0) < 0)
 		return SD_RES_EIO;
 
-	if (snap_log_write(iocb->epoch - 1, snap_sha1, 0) < 0)
+	if (snap_log_write(epoch, snap_sha1, 0) < 0)
 		return SD_RES_EIO;
 
 	return SD_RES_SUCCESS;
