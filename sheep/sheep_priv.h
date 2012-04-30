@@ -250,11 +250,6 @@ int leave_cluster(void);
 
 void process_request_event_queues(void);
 void do_io_request(struct work *work);
-int write_object_local(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, uint16_t flags, int copies,
-		       uint32_t epoch, int create);
-int read_object_local(uint64_t oid, char *data, unsigned int datalen,
-		      uint64_t offset, int copies, uint32_t epoch);
 int forward_write_obj_req(struct request *req);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
