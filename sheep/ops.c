@@ -10,6 +10,17 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <mntent.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/statvfs.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <pthread.h>
 
 #include "sheep_priv.h"
 #include "strbuf.h"
@@ -53,6 +64,61 @@ struct flush_work {
 	struct object_cache *cache;
 	struct work work;
 };
+
+static void get_store_dir(struct strbuf *buf, int epoch)
+{
+	if (!strcmp(sd_store->name, "simple"))
+		strbuf_addf(buf, "%s%08u", obj_path, epoch);
+	else /* XXX assume other store doesn't need epoch/obj pattern */
+		strbuf_addf(buf, "%s", obj_path);
+}
+
+static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
+{
+	struct statvfs vs;
+	int ret;
+	DIR *dir;
+	struct dirent *d;
+	uint64_t used = 0;
+	struct stat s;
+	char path[1024];
+	struct strbuf store_dir = STRBUF_INIT;
+
+	ret = statvfs(mnt_path, &vs);
+	if (ret) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	get_store_dir(&store_dir, epoch);
+	dir = opendir(store_dir.buf);
+	if (!dir) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		snprintf(path, sizeof(path), "%s/%s", store_dir.buf, d->d_name);
+
+		ret = stat(path, &s);
+		if (ret)
+			continue;
+
+		used += s.st_size;
+	}
+
+	closedir(dir);
+	ret = SD_RES_SUCCESS;
+
+	*store_size = (uint64_t)vs.f_frsize * vs.f_bfree + used;
+	*store_free = (uint64_t)vs.f_frsize * vs.f_bfree;
+out:
+	strbuf_release(&store_dir);
+	return ret;
+}
 
 static int cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
@@ -132,6 +198,28 @@ static int cluster_get_vdi_info(const struct sd_req *req, struct sd_rsp *rsp,
 	vdi_rsp->copies = nr_copies;
 
 	return ret;
+}
+
+static int remove_epoch(int epoch)
+{
+	int ret;
+	char path[PATH_MAX];
+
+	dprintf("remove epoch %"PRIu32"\n", epoch);
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	ret = unlink(path);
+	if (ret && ret != -ENOENT) {
+		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
+		return SD_RES_EIO;
+	}
+
+	snprintf(path, sizeof(path), "%s%08u/", jrnl_path, epoch);
+	ret = rmdir_r(path);
+	if (ret && ret != -ENOENT) {
+		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
+		return SD_RES_EIO;
+	}
+	return 0;
 }
 
 static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
@@ -546,6 +634,246 @@ static int local_trace_cat_ops(const struct sd_req *req, struct sd_rsp *rsp, voi
 	dprintf("%u\n", rsp->data_length);
 	trace_reset_buffer();
 	return SD_RES_SUCCESS;
+}
+
+static int read_copy_from_replica(struct request *req, uint32_t epoch,
+				  uint64_t oid, char *buf)
+{
+	int i, nr_copies, ret;
+	unsigned wlen, rlen;
+	char name[128];
+	struct sd_vnode *v;
+	struct sd_obj_req hdr;
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct siocb iocb;
+	int fd;
+
+	nr_copies = get_nr_copies(req->vnodes);
+	for (i = 0; i < nr_copies; i++) {
+		v = oid_to_vnode(req->vnodes, oid, i);
+
+		addr_to_str(name, sizeof(name), v->addr, 0);
+
+		if (vnode_is_local(v)) {
+			memset(&iocb, 0, sizeof(iocb));
+			iocb.epoch = epoch;
+			ret = sd_store->open(oid, &iocb, 0);
+			if (ret != SD_RES_SUCCESS)
+				continue;
+
+			iocb.buf = buf;
+			iocb.length = SD_DATA_OBJ_SIZE;
+			iocb.offset = 0;
+			ret = sd_store->read(oid, &iocb);
+			if (ret != SD_RES_SUCCESS)
+				continue;
+			sd_store->close(oid, &iocb);
+			goto out;
+		}
+
+		fd = connect_to(name, v->port);
+		if (fd < 0)
+			continue;
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.opcode = SD_OP_READ_OBJ;
+		hdr.oid = oid;
+		hdr.epoch = epoch;
+
+		rlen = SD_DATA_OBJ_SIZE;
+		wlen = 0;
+		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+		hdr.data_length = rlen;
+		hdr.offset = 0;
+
+		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+
+		close(fd);
+
+		dprintf("%x, %x\n", ret, rsp->result);
+		if (ret)
+			continue;
+
+		switch (rsp->result) {
+		case SD_RES_SUCCESS:
+			ret = SD_RES_SUCCESS;
+			goto out;
+		default:
+			;
+		}
+	}
+
+	ret = rsp->result;
+out:
+	return ret;
+}
+
+static int store_remove_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	uint32_t epoch = hdr->epoch;
+	struct strbuf buf = STRBUF_INIT;
+	int ret = SD_RES_SUCCESS;
+
+	get_store_dir(&buf, epoch);
+	strbuf_addf(&buf, "%016" PRIx64, hdr->oid);
+	if (unlink(buf.buf) < 0) {
+		if (errno == ENOENT) {
+			ret = SD_RES_NO_OBJ;
+			goto out;
+		}
+		eprintf("%m\n");
+		ret =  SD_RES_EIO;
+	}
+	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	if (!objlist_cache_rb_remove(&obj_list_cache.root, hdr->oid))
+		obj_list_cache.cache_size--;
+	pthread_rwlock_unlock(&obj_list_cache.lock);
+ out:
+	strbuf_release(&buf);
+	return ret;
+}
+
+static int store_read_obj(const struct sd_req *req, struct sd_rsp *rsp, void *data)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	struct sd_obj_rsp *rsps = (struct sd_obj_rsp *)rsp;
+	struct request *request = (struct request *)data;
+	int ret;
+	uint32_t epoch = hdr->epoch;
+	struct siocb iocb;
+
+	memset(&iocb, 0, sizeof(iocb));
+	iocb.epoch = epoch;
+	iocb.flags = hdr->flags;
+	ret = sd_store->open(hdr->oid, &iocb, 0);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	iocb.buf = request->data;
+	iocb.length = hdr->data_length;
+	iocb.offset = hdr->offset;
+	ret = sd_store->read(hdr->oid, &iocb);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	rsps->data_length = hdr->data_length;
+	rsps->copies = sys->nr_copies;
+out:
+	sd_store->close(hdr->oid, &iocb);
+	return ret;
+}
+
+static int do_write_obj(struct siocb *iocb, struct sd_obj_req *req, uint32_t epoch, void *data)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	uint64_t oid = hdr->oid;
+	int ret = SD_RES_SUCCESS;
+	void *jd = NULL;
+
+	iocb->buf = data;
+	iocb->length = hdr->data_length;
+	iocb->offset = hdr->offset;
+	if (is_vdi_obj(oid)) {
+		struct strbuf buf = STRBUF_INIT;
+
+		get_store_dir(&buf, epoch);
+		strbuf_addf(&buf, "%016" PRIx64, oid);
+		jd = jrnl_begin(data, hdr->data_length,
+				   hdr->offset, buf.buf, jrnl_path);
+		if (!jd) {
+			strbuf_release(&buf);
+			return SD_RES_EIO;
+		}
+		ret = sd_store->write(oid, iocb);
+		jrnl_end(jd);
+		strbuf_release(&buf);
+	} else
+		ret = sd_store->write(oid, iocb);
+
+	return ret;
+}
+
+static int store_write_obj(const struct sd_req *req, struct sd_rsp *rsp,
+			   void *data)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	struct request *request = (struct request *)data;
+	int ret;
+	uint32_t epoch = hdr->epoch;
+	struct siocb iocb;
+
+	memset(&iocb, 0, sizeof(iocb));
+	iocb.epoch = epoch;
+	iocb.flags = hdr->flags;
+	ret = sd_store->open(hdr->oid, &iocb, 0);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	ret = do_write_obj(&iocb, hdr, epoch, request->data);
+
+	sd_store->close(hdr->oid, &iocb);
+	return ret;
+}
+
+static int store_create_and_write_obj(const struct sd_req *req,
+				struct sd_rsp *rsp, void *data)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	struct request *request = (struct request *)data;
+	struct sd_obj_req cow_hdr;
+	int ret;
+	uint32_t epoch = hdr->epoch;
+	char *buf = NULL;
+	struct siocb iocb;
+	unsigned data_length;
+
+	if (is_vdi_obj(hdr->oid))
+		data_length = SD_INODE_SIZE;
+	else if (is_vdi_attr_obj(hdr->oid))
+		data_length = SD_ATTR_OBJ_SIZE;
+	else
+		data_length = SD_DATA_OBJ_SIZE;
+
+	memset(&iocb, 0, sizeof(iocb));
+	iocb.epoch = epoch;
+	iocb.flags = hdr->flags;
+	iocb.length = data_length;
+	ret = sd_store->open(hdr->oid, &iocb, 1);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+	if (hdr->flags & SD_FLAG_CMD_COW) {
+		dprintf("%" PRIx64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
+
+		buf = valloc(SD_DATA_OBJ_SIZE);
+		if (!buf) {
+			eprintf("can not allocate memory\n");
+			goto out;
+		}
+		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
+			ret = read_copy_from_replica(request, hdr->epoch, hdr->cow_oid, buf);
+			if (ret != SD_RES_SUCCESS) {
+				eprintf("failed to read cow object\n");
+				goto out;
+			}
+		}
+
+		memcpy(buf + hdr->offset, request->data, hdr->data_length);
+		memcpy(&cow_hdr, hdr, sizeof(cow_hdr));
+		cow_hdr.offset = 0;
+		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
+
+		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf);
+	} else
+		ret = do_write_obj(&iocb, hdr, epoch, request->data);
+
+	if (SD_RES_SUCCESS == ret)
+		check_and_insert_objlist_cache(hdr->oid);
+out:
+	if (buf)
+		free(buf);
+	sd_store->close(hdr->oid, &iocb);
+	return ret;
 }
 
 static struct sd_op_template sd_ops[] = {

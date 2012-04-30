@@ -206,11 +206,21 @@ static inline struct store_driver *find_store_driver(const char *name)
 	return NULL;
 }
 
+struct objlist_cache {
+	struct rb_root root;
+	int cache_size;
+	pthread_rwlock_t lock;
+};
+
 extern struct cluster_info *sys;
 extern struct store_driver *sd_store;
 extern char *obj_path;
+extern char *mnt_path;
+extern char *jrnl_path;
+extern char *epoch_path;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
+extern struct objlist_cache obj_list_cache;
 
 int create_listen_port(int port, void *data);
 
@@ -266,11 +276,6 @@ int get_cluster_flags(uint16_t *flags);
 int set_cluster_store(const char *name);
 int get_cluster_store(char *buf);
 
-int store_create_and_write_obj(const struct sd_req *, struct sd_rsp *, void *);
-int store_write_obj(const struct sd_req *, struct sd_rsp *, void *);
-int store_read_obj(const struct sd_req *, struct sd_rsp *, void *);
-int store_remove_obj(const struct sd_req *, struct sd_rsp *, void *);
-
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
 int get_max_nr_copies_from(struct sd_node *entries, int nr);
@@ -279,11 +284,9 @@ int epoch_log_read(uint32_t epoch, char *buf, int len);
 int epoch_log_read_nr(uint32_t epoch, char *buf, int len);
 int epoch_log_read_remote(uint32_t epoch, char *buf, int len);
 int get_latest_epoch(void);
-int remove_epoch(int epoch);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
-int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch);
-int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data);
+int get_obj_list(const struct sd_list_req *, struct sd_list_rsp *, void *);
 
 int start_recovery(uint32_t epoch);
 void resume_recovery_work(void);
@@ -306,6 +309,10 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 int rmdir_r(char *dir_path);
 
 int prealloc(int fd, uint32_t size);
+
+int init_objlist_cache(void);
+int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid);
+int check_and_insert_objlist_cache(uint64_t oid);
 
 /* Operations */
 
