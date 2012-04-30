@@ -310,7 +310,7 @@ out:
 	return ret;
 }
 
-int trunk_file_write(unsigned char *outsha1, int user)
+int trunk_file_write_user(unsigned char *outsha1)
 {
 	struct strbuf buf;
 	uint64_t data_size = sizeof(struct trunk_entry) * trunk_entry_active_nr;

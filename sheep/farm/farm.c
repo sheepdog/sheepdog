@@ -546,7 +546,7 @@ static int farm_snapshot(struct siocb *iocb)
 
 	epoch = log_nr + 1;
 	dprintf("user epoch %d\n", epoch);
-	if (trunk_file_write(trunk_sha1, 1) < 0)
+	if (trunk_file_write_user(trunk_sha1) < 0)
 		goto out;
 
 	if (snap_file_write(epoch, trunk_sha1, snap_sha1, 1) < 0)

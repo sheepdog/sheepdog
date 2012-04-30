@@ -61,7 +61,7 @@ extern int sha1_file_try_delete(const unsigned char *sha1);
 /* trunk.c */
 extern int trunk_init(void);
 extern int trunk_file_write_recovery(unsigned char *outsha1);
-extern int trunk_file_write(unsigned char *outsha1, int user);
+extern int trunk_file_write_user(unsigned char *outsha1);
 extern void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
 extern int trunk_update_entry(uint64_t oid);
 extern void trunk_reset(void);
