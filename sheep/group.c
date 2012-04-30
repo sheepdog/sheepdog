@@ -203,10 +203,7 @@ static int update_vnode_info(void)
  */
 int get_nr_copies(struct vnode_info *vnode_info)
 {
-	int nr_copies = vnode_info->nr_zones;
-	if (nr_copies < sys->nr_copies)
-		nr_copies = sys->nr_copies;
-	return nr_copies;
+	return min(vnode_info->nr_zones, sys->nr_copies);
 }
 
 static void do_cluster_op(void *arg)
