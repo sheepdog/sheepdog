@@ -377,6 +377,20 @@ char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
 	return str;
 }
 
+uint8_t *str_to_addr(int af, const char *ipstr, uint8_t *addr)
+{
+	int addr_start_idx = 0;
+
+	if (af == AF_INET)
+		addr_start_idx = 12;
+
+	memset(addr, 0, addr_start_idx);
+	if (!inet_pton(af, ipstr, addr + addr_start_idx))
+		return NULL;
+
+	return addr;
+}
+
 int set_nonblocking(int fd)
 {
 	int ret;

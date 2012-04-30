@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <arpa/inet.h>
 #include <memory.h>
 
 #include "sheepdog_proto.h"
@@ -145,11 +146,40 @@ static inline char *node_to_str(struct sd_node *id)
 {
 	static char str[256];
 	char name[256];
+	int af = AF_INET6;
+	uint8_t *addr = id->addr;
 
-	snprintf(str, sizeof(str), "ip: %s, port: %d",
-		 addr_to_str(name, sizeof(name), id->addr, 0), id->port);
+	/* Find address family type */
+	if (addr[12]) {
+		int  oct_no = 0;
+		while (!addr[oct_no] && oct_no++ < 12)
+			;
+		if (oct_no == 12)
+			af = AF_INET;
+	}
+
+	snprintf(str, sizeof(str), "%s ip:%s port:%d",
+		(af == AF_INET) ? "IPv4" : "IPv6",
+		addr_to_str(name, sizeof(name), id->addr, 0), id->port);
 
 	return str;
+}
+
+static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
+{
+	int port, af = AF_INET6;
+	char v[8], ip[256];
+
+	sscanf(str, "%s ip:%s port:%d", v, ip, &port);
+	id->port = port;
+
+	if (strcmp(v, "IPv4") == 0)
+		af = AF_INET;
+
+	if (!str_to_addr(af, ip, id->addr))
+		return NULL;
+
+	return id;
 }
 
 /* callbacks back into sheepdog from the cluster drivers */
