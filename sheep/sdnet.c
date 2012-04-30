@@ -36,20 +36,15 @@ void resume_pending_requests(void)
 		process_request_event_queues();
 }
 
-static int is_access_local(struct request *req, uint64_t oid, int copies)
+static int is_access_local(struct request *req, uint64_t oid)
 {
 	struct sd_vnode *v;
 	int nr_copies;
 	int i;
 
-	if (oid == 0)
-		return 0;
-
 	nr_copies = get_nr_copies(req->vnodes);
-	if (copies < nr_copies)
-		nr_copies = copies;
 
-	for (i = 0; i < copies; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		v = oid_to_vnode(req->vnodes, oid, i);
 		if (vnode_is_local(v))
 			return 1;
@@ -67,11 +62,11 @@ static void setup_access_to_local_objects(struct request *req)
 		return;
 	}
 
-	if (is_access_local(req, hdr->oid, hdr->copies))
+	if (is_access_local(req, hdr->oid))
 		req->local_oid = hdr->oid;
 
 	if (hdr->cow_oid)
-		if (is_access_local(req, hdr->cow_oid, hdr->copies))
+		if (is_access_local(req, hdr->cow_oid))
 			req->local_cow_oid = hdr->cow_oid;
 }
 
@@ -129,7 +124,7 @@ static void io_op_done(struct work *work)
 			goto retry;
 		break;
 	case SD_RES_EIO:
-		if (is_access_local(req, hdr->oid, 0)) {
+		if (is_access_local(req, hdr->oid)) {
 			eprintf("leaving sheepdog cluster\n");
 			leave_cluster();
 
