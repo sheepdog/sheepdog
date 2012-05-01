@@ -227,7 +227,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	const struct sd_so_req *hdr = (const struct sd_so_req *)req;
 	int i, latest_epoch, ret;
-	uint64_t ctime;
+	uint64_t created_time;
 	struct siocb iocb = { 0 };
 
 	sd_store = find_store_driver(data);
@@ -243,8 +243,8 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (!sys->nr_copies)
 		sys->nr_copies = SD_DEFAULT_REDUNDANCY;
 
-	ctime = hdr->ctime;
-	set_cluster_ctime(ctime);
+	created_time = hdr->ctime;
+	set_cluster_ctime(created_time);
 
 	for (i = 1; i <= latest_epoch; i++)
 		remove_epoch(i);
@@ -291,13 +291,13 @@ static int cluster_get_vdi_attr(const struct sd_req *req, struct sd_rsp *rsp,
 	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)req;
 	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
 	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_copies;
-	uint64_t ctime = 0;
+	uint64_t created_time = 0;
 	int ret;
 	struct sheepdog_vdi_attr *vattr;
 
 	vattr = data;
 	ret = lookup_vdi(hdr->epoch, vattr->name, vattr->tag,
-			 &vid, hdr->snapid, &nr_copies, &ctime);
+			 &vid, hdr->snapid, &nr_copies, &created_time);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -306,7 +306,7 @@ static int cluster_get_vdi_attr(const struct sd_req *req, struct sd_rsp *rsp,
 	vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 	vid &= SD_NR_VDIS - 1;
 	ret = get_vdi_attr(hdr->epoch, data, hdr->data_length, vid,
-			   &attrid, nr_copies, ctime,
+			   &attrid, nr_copies, created_time,
 			   hdr->flags & SD_FLAG_CMD_CREAT,
 			   hdr->flags & SD_FLAG_CMD_EXCL,
 			   hdr->flags & SD_FLAG_CMD_DEL);
