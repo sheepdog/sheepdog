@@ -68,7 +68,7 @@ struct flush_work {
 static void get_store_dir(struct strbuf *buf, int epoch)
 {
 	if (!strcmp(sd_store->name, "simple"))
-		strbuf_addf(buf, "%s%08u", obj_path, epoch);
+		strbuf_addf(buf, "%s%08u/", obj_path, epoch);
 	else /* XXX assume other store doesn't need epoch/obj pattern */
 		strbuf_addf(buf, "%s", obj_path);
 }
