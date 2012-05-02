@@ -178,7 +178,7 @@ struct store_driver {
 	int (*format)(struct siocb *);
 	/* Operations in recovery */
 	int (*get_objlist)(struct siocb *);
-	int (*link)(uint64_t oid, struct siocb *, int tgt_epoch);
+	int (*link)(uint64_t oid, struct siocb *, uint32_t tgt_epoch);
 	int (*atomic_put)(uint64_t oid, struct siocb *);
 	int (*begin_recover)(struct siocb *);
 	int (*end_recover)(struct siocb *);
@@ -267,7 +267,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 void do_cluster_request(struct work *work);
 
 int update_epoch_store(uint32_t epoch);
-int update_epoch_log(int epoch);
+int update_epoch_log(uint32_t epoch);
 
 int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);

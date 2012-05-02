@@ -254,7 +254,7 @@ int update_epoch_store(uint32_t epoch)
 	return 0;
 }
 
-int update_epoch_log(int epoch)
+int update_epoch_log(uint32_t epoch)
 {
 	int fd, ret, len;
 	time_t t;

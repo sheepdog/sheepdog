@@ -32,7 +32,7 @@ static int simple_store_write(uint64_t oid, struct siocb *iocb);
 
 static int simple_store_init(char *path)
 {
-	int epoch, latest_epoch;
+	uint32_t epoch, latest_epoch;
 	DIR *dir;
 	struct dirent *dent;
 	char p[PATH_MAX];
@@ -181,7 +181,7 @@ static int simple_store_close(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
-static int get_epoch_obj_list(int epoch, uint64_t *objlist, int *nr)
+static int get_epoch_obj_list(uint32_t epoch, uint64_t *objlist, int *nr)
 {
 	struct strbuf buf = STRBUF_INIT;
 	DIR *dir;
@@ -220,7 +220,8 @@ static int simple_store_get_objlist(struct siocb *siocb)
 {
 	uint64_t *objlist = (uint64_t*)siocb->buf;
 	uint64_t *buf;
-	int epoch, nr = 0, obj_nr = 0;
+	uint32_t epoch;
+	int nr = 0, obj_nr = 0;
 	DIR *dir;
 	struct dirent *d;
 	int ret = SD_RES_SUCCESS, r;
@@ -257,7 +258,7 @@ out:
 	return ret;
 }
 
-static int simple_store_link(uint64_t oid, struct siocb *iocb, int tgt_epoch)
+static int simple_store_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 {
        char old[PATH_MAX], new[PATH_MAX];
 

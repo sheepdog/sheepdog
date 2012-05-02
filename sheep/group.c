@@ -290,7 +290,7 @@ static inline int get_nodes_nr_from(struct list_head *l)
 	return nr;
 }
 
-static int get_nodes_nr_epoch(int epoch)
+static int get_nodes_nr_epoch(uint32_t epoch)
 {
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr;
@@ -301,7 +301,7 @@ static int get_nodes_nr_epoch(int epoch)
 }
 
 static struct sd_node *find_entry_list(struct sd_node *entry,
-							struct list_head *head)
+					struct list_head *head)
 {
 	struct node *n;
 	list_for_each_entry(n, head, list)
@@ -313,7 +313,7 @@ static struct sd_node *find_entry_list(struct sd_node *entry,
 }
 
 static struct sd_node *find_entry_epoch(struct sd_node *entry,
-							 int epoch)
+					uint32_t epoch)
 {
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr, i;

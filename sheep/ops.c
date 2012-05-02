@@ -65,7 +65,7 @@ struct flush_work {
 	struct work work;
 };
 
-static void get_store_dir(struct strbuf *buf, int epoch)
+static void get_store_dir(struct strbuf *buf, uint32_t epoch)
 {
 	if (!strcmp(sd_store->name, "simple"))
 		strbuf_addf(buf, "%s%08u/", obj_path, epoch);
@@ -200,7 +200,7 @@ static int cluster_get_vdi_info(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
-static int remove_epoch(int epoch)
+static int remove_epoch(uint32_t epoch)
 {
 	int ret;
 	char path[PATH_MAX];
@@ -453,7 +453,7 @@ static int local_get_epoch(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	const struct sd_obj_req *obj_req = (const struct sd_obj_req *)req;
 	struct sd_obj_rsp *obj_rsp = (struct sd_obj_rsp *)rsp;
-	int epoch = obj_req->tgt_epoch;
+	uint32_t epoch = obj_req->tgt_epoch;
 	int len, ret;
 	dprintf("%d\n", epoch);
 	len = epoch_log_read(epoch, (char *)data, obj_req->data_length);

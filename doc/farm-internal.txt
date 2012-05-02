@@ -71,7 +71,7 @@ As for snap operations, besides snap object, Farm has two log files with the bel
 structure
 
     struct snap_log {
-            int epoch;
+            uint32_t epoch;
             uint64_t time;
             unsigned char sha1[SHA1_LEN];
     };

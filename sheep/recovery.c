@@ -171,7 +171,7 @@ static int find_tgt_node(struct sd_vnode *old_entry,
 	return -1;
 }
 
-static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
+static void *get_vnodes_from_epoch(uint32_t epoch, int *nr, int *copies)
 {
 	int nodes_nr, len = sizeof(struct sd_vnode) * SD_MAX_VNODES;
 	struct sd_node nodes[SD_MAX_NODES];
@@ -194,7 +194,7 @@ static void *get_vnodes_from_epoch(int epoch, int *nr, int *copies)
 
 static int recover_object_from_replica(uint64_t oid,
 				       struct sd_vnode *entry,
-				       int epoch, int tgt_epoch)
+				       uint32_t epoch, uint32_t tgt_epoch)
 {
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
@@ -311,7 +311,7 @@ static int do_recover_object(struct recovery_work *rw, int copy_idx)
 	struct sd_vnode *old, *cur;
 	uint64_t oid = rw->oids[rw->done];
 	int old_nr = rw->old_nr_vnodes, cur_nr = rw->cur_nr_vnodes;
-	int epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
+	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
 	struct sd_vnode *tgt_entry;
 	int old_idx, cur_idx, tgt_idx, old_copies, cur_copies, ret;
 
@@ -748,7 +748,7 @@ static int fill_obj_list(struct recovery_work *rw)
 /* setup node list and virtual node list */
 static int init_rw(struct recovery_work *rw)
 {
-	int epoch = rw->epoch;
+	uint32_t epoch = rw->epoch;
 
 	rw->cur_nr_nodes = epoch_log_read_nr(epoch, (char *)rw->cur_nodes,
 					     sizeof(rw->cur_nodes));

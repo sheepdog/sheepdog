@@ -206,7 +206,7 @@ struct sheepdog_vdi_attr {
 #define SHA1_LEN        20
 
 struct snap_log {
-	int epoch;
+	uint32_t epoch;
 	uint64_t time;
 	unsigned char sha1[SHA1_LEN];
 };

@@ -53,14 +53,14 @@ static const struct sd_option collie_options[] = {
 
 static void usage(struct command *commands, int status);
 
-uint64_t node_list_version;
+uint32_t node_list_version;
 
 struct sd_node node_list_entries[SD_MAX_NODES];
 struct sd_vnode vnode_list_entries[SD_MAX_VNODES];
 int nr_nodes, nr_vnodes;
 unsigned master_idx;
 
-static int update_node_list(int max_nodes, int epoch)
+static int update_node_list(int max_nodes, uint32_t epoch)
 {
 	int fd, ret;
 	unsigned int size, wlen;

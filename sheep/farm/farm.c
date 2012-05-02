@@ -184,7 +184,7 @@ static int farm_close(uint64_t oid, struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
-static int get_trunk_sha1(int epoch, unsigned char *outsha1, int user)
+static int get_trunk_sha1(uint32_t epoch, unsigned char *outsha1, int user)
 {
 	int i, nr_logs = -1, ret = -1;
 	struct snap_log *log_buf, *log_free = NULL;
@@ -212,7 +212,7 @@ out:
 	return ret;
 }
 
-static int cleanup_trunk(int epoch)
+static int cleanup_trunk(uint32_t epoch)
 {
 	struct sha1_file_hdr hdr;
 	struct trunk_entry *trunk_buf, *trunk_free = NULL;
@@ -244,11 +244,11 @@ out:
 static int farm_cleanup_sys_obj(struct siocb *iocb)
 {
 	int i, ret = SD_RES_SUCCESS;
-	int epoch = iocb->epoch;
+	uint32_t epoch = iocb->epoch;
 	struct snap_log *log_pos, *log_free = NULL;
 	int nr_logs;
 
-	if (iocb->epoch <= 0)
+	if (iocb->epoch == 0)
 		return ret;
 
 	for (i = 1; i <= epoch; i++)
@@ -326,7 +326,7 @@ static int farm_init(char *p)
 	if (init_sys_vdi_bitmap(p) < 0)
 		goto err;
 
-	iocb.epoch = sys->epoch - 1;
+	iocb.epoch = sys->epoch ? sys->epoch - 1 : 0;
 	farm_cleanup_sys_obj(&iocb);
 
 	return SD_RES_SUCCESS;
@@ -380,7 +380,7 @@ out:
 	return buf;
 }
 
-static void *retrieve_object_from_snap(uint64_t oid, int epoch)
+static void *retrieve_object_from_snap(uint64_t oid, uint32_t epoch)
 {
 	struct sha1_file_hdr hdr;
 	struct trunk_entry *trunk_buf, *trunk_free = NULL;
@@ -487,7 +487,7 @@ out:
 	return ret;
 }
 
-static int farm_link(uint64_t oid, struct siocb *iocb, int tgt_epoch)
+static int farm_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 {
 	int ret = SD_RES_EIO;
 	void *buf = NULL;
@@ -516,7 +516,7 @@ static int farm_end_recover(struct siocb *iocb)
 {
 	unsigned char snap_sha1[SHA1_LEN];
 	unsigned char trunk_sha1[SHA1_LEN];
-	int epoch = iocb->epoch - 1;
+	uint32_t epoch = iocb->epoch - 1;
 
 	if (epoch == 0)
 		return SD_RES_SUCCESS;
@@ -586,7 +586,7 @@ static int cleanup_working_dir(void)
 	return 0;
 }
 
-static int restore_objects_from_snap(int epoch)
+static int restore_objects_from_snap(uint32_t epoch)
 {
 	struct sha1_file_hdr hdr;
 	struct trunk_entry *trunk_buf, *trunk_free = NULL;

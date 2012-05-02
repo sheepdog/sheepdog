@@ -74,7 +74,7 @@ int snap_log_truncate(void)
 	return ret;
 }
 
-int snap_log_write(int epoch, unsigned char *sha1, int user)
+int snap_log_write(uint32_t epoch, unsigned char *sha1, int user)
 {
 	int fd, ret = -1;
 	struct strbuf buf = STRBUF_INIT;
@@ -155,7 +155,7 @@ void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 	return buffer;
 }
 
-int snap_file_write(int epoch, unsigned char *trunksha1, unsigned char *outsha1, int user)
+int snap_file_write(uint32_t epoch, unsigned char *trunksha1, unsigned char *outsha1, int user)
 {
 	int ret = 0;
 	struct strbuf buf = STRBUF_INIT;

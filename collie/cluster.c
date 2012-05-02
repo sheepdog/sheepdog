@@ -17,7 +17,7 @@
 #include "collie.h"
 
 struct cluster_cmd_data {
-	int epoch;
+	uint32_t epoch;
 	int list;
 	int copies;
 	int nohalt;
@@ -244,7 +244,7 @@ static int cluster_shutdown(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int restore_snap(int epoch)
+static int restore_snap(uint32_t epoch)
 {
 	int fd, ret;
 	struct sd_obj_req hdr;
