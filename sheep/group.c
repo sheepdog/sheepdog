@@ -974,15 +974,7 @@ int is_access_to_busy_objects(uint64_t oid)
 {
 	struct request *req;
 
-	if (!oid)
-		return 0;
-
 	list_for_each_entry(req, &sys->outstanding_req_list, r_wlist) {
-		if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
-			if (req->rq.opcode != SD_OP_READ_OBJ)
-				eprintf("bug\n");
-			continue;
-		}
 		if (oid == req->local_oid)
 			return 1;
 	}
