@@ -618,7 +618,6 @@ out:
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw = NULL;
-	struct vnode_info *vnode_info = NULL;
 	int ret = SD_RES_NO_MEM;
 	uint32_t root_vid;
 
@@ -667,10 +666,8 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
 	queue_work(sys->deletion_wqueue, &dw->work);
 out:
-	put_vnode_info(vnode_info);
 	return SD_RES_SUCCESS;
 err:
-	put_vnode_info(vnode_info);
 	if (dw)
 		free(dw->buf);
 	free(dw);
