@@ -403,8 +403,6 @@ static void client_rx_handler(struct client_info *ci)
 	struct sd_req *hdr = &conn->rx_hdr;
 	struct request *req;
 
-	dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
-
 	if (!ci->rx_req && sys->outstanding_data_size > MAX_OUTSTANDING_DATA_SIZE) {
 		dprintf("too many requests (%p)\n", &ci->conn);
 		conn_rx_off(&ci->conn);
@@ -466,6 +464,7 @@ static void client_rx_handler(struct client_info *ci)
 
 	req->done = req_done;
 
+	dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
 	queue_request(req);
 }
 
