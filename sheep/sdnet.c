@@ -288,9 +288,13 @@ static void queue_request(struct request *req)
 		break;
 	}
 
+	req->vnodes = get_vnode_info();
 	if (is_io_op(req->op)) {
 		req->work.fn = do_io_request;
 		req->work.done = io_op_done;
+		setup_access_to_local_objects(req);
+		if (check_request(req) < 0)
+			return;
 	} else if (is_local_op(req->op)) {
 		req->work.fn = do_local_request;
 		req->work.done = local_op_done;
@@ -312,14 +316,8 @@ static void queue_request(struct request *req)
 	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL))
 		hdr->epoch = sys->epoch;
 
-	if (check_request(req) < 0)
-		return;
-
 	list_del(&req->r_wlist);
 
-	req->vnodes = get_vnode_info();
-	if (is_io_op(req->op))
-		setup_access_to_local_objects(req);
 	cevent->ctype = EVENT_REQUEST;
 	list_add_tail(&cevent->event_list, &sys->request_queue);
 	process_request_event_queues();
