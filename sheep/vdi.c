@@ -448,8 +448,6 @@ static void delete_one(struct work *work)
 	}
 
 	nr_copies = get_nr_copies(dw->vnodes);
-	if (nr_copies > inode->nr_copies)
-		nr_copies = inode->nr_copies;
 
 	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
 			  (void *)inode, sizeof(*inode),
