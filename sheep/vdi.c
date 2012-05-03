@@ -342,14 +342,6 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
-	struct sheepdog_inode *inode = NULL;
-
-	inode = malloc(SD_INODE_HEADER_SIZE);
-	if (!inode) {
-		eprintf("failed to allocate memory\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
-	}
 
 	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
 		tag = data + SD_MAX_VDI_LEN;
@@ -367,7 +359,6 @@ int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
 
 	ret = start_deletion(*vid, epoch);
 out:
-	free(inode);
 	return ret;
 }
 
