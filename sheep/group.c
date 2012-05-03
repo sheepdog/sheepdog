@@ -539,7 +539,8 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 
 	if (msg->cluster_status != SD_STATUS_OK) {
-		int nr_leave_nodes, le;
+		int nr_leave_nodes;
+		uint32_t le;
 
 		nr_leave_nodes = msg->nr_leave_nodes;
 		le = get_latest_epoch();
@@ -1099,7 +1100,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 	int nr, nr_local, nr_leave;
 	struct node *n;
 	struct join_message *jm;
-	int le = get_latest_epoch();
+	uint32_t le = get_latest_epoch();
 
 	if (node_cmp(joined, &sys->this_node) == 0) {
 		if (result == CJ_RES_FAIL) {

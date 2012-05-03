@@ -517,7 +517,7 @@ int epoch_log_read(uint32_t epoch, char *buf, int len)
 	return len;
 }
 
-int get_latest_epoch(void)
+uint32_t get_latest_epoch(void)
 {
 	DIR *dir;
 	struct dirent *d;

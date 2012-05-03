@@ -226,7 +226,8 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
 	const struct sd_so_req *hdr = (const struct sd_so_req *)req;
-	int i, latest_epoch, ret;
+	int i, ret;
+	uint32_t latest_epoch;
 	uint64_t created_time;
 	struct siocb iocb = { 0 };
 
@@ -389,8 +390,8 @@ static int local_stat_cluster(const struct sd_req *req, struct sd_rsp *rsp,
 			      void *data)
 {
 	struct epoch_log *log;
-	int i, max_logs, epoch;
-	uint32_t sys_stat = sys_stat_get();
+	int i, max_logs;
+	uint32_t sys_stat = sys_stat_get(), epoch;
 
 	max_logs = rsp->data_length / sizeof(*log);
 	epoch = get_latest_epoch();
