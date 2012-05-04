@@ -40,6 +40,7 @@ static struct option const long_options[] = {
 	{"directio", no_argument, NULL, 'D'},
 	{"foreground", no_argument, NULL, 'f'},
 	{"nr_gateway_worker", required_argument, NULL, 'g'},
+	{"gateway", no_argument, NULL, 'G'},
 	{"help", no_argument, NULL, 'h'},
 	{"nr_io_worker", required_argument, NULL, 'i'},
 	{"loglevel", required_argument, NULL, 'l'},
@@ -50,7 +51,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "ac:dDfg:hi:l:op:v:z:";
+static const char *short_options = "ac:dDfg:Ghi:l:op:v:z:";
 
 static void usage(int status)
 {
@@ -68,6 +69,7 @@ Options:\n\
   -D, --directio          use direct IO when accessing the object from object cache\n\
   -f, --foreground        make the program run in the foreground\n\
   -g, --nr_gateway_worker set the number of workers for Guests' requests (default 4)\n\
+  -G, --gateway           make the progam run as a gateway mode (same as '-v 0')\n\
   -h, --help              display this help and exit\n\
   -i, --nr_io_worker      set the number of workers for sheep internal requests (default 4)\n\
   -l, --loglevel          specify the level of logging detail\n\
@@ -155,6 +157,10 @@ int main(int argc, char **argv)
 					optarg, UINT32_MAX);
 				exit(1);
 			}
+			break;
+		case 'G':
+			/* same as '-v 0' */
+			nr_vnodes = 0;
 			break;
 		case 'i':
 			nr_io_worker = strtol(optarg, &p, 10);
