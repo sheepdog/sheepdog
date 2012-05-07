@@ -562,11 +562,13 @@ out:
 }
 
 static uint64_t get_vdi_root(struct vnode_info *vnode_info, uint32_t epoch,
-		uint32_t vid)
+		uint32_t vid, int *cloned)
 {
 	int ret;
 	struct sheepdog_inode *inode = NULL;
 	int nr_copies = get_nr_copies(vnode_info);
+
+	*cloned = 0;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
@@ -583,7 +585,7 @@ next:
 			&& !inode->snap_ctime) {
 		dprintf("vdi %" PRIx32 " is a cloned vdi.\n", vid);
 		/* current vdi is a cloned vdi */
-		goto out;
+		*cloned = 1;
 	}
 
 	if (ret != SD_RES_SUCCESS) {
@@ -607,7 +609,7 @@ out:
 int start_deletion(uint32_t vid, uint32_t epoch)
 {
 	struct deletion_work *dw = NULL;
-	int ret = SD_RES_NO_MEM;
+	int ret = SD_RES_NO_MEM, cloned;
 	uint32_t root_vid;
 
 	dw = zalloc(sizeof(struct deletion_work));
@@ -628,7 +630,7 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 
 	dw->vnodes = get_vnode_info();
 
-	root_vid = get_vdi_root(dw->vnodes, dw->epoch, dw->vid);
+	root_vid = get_vdi_root(dw->vnodes, dw->epoch, dw->vid, &cloned);
 	if (!root_vid) {
 		ret = SD_RES_EIO;
 		goto err;
@@ -636,10 +638,18 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 
 	ret = fill_vdi_list(dw, root_vid);
 	if (ret) {
-		dprintf("snapshot chain has valid vdi, "
-				"just mark vdi %" PRIx32 " as deleted.\n", dw->vid);
-		delete_inode(dw);
-		return SD_RES_SUCCESS;
+		/* if the VDI is a cloned VDI, delete its objects
+		 * no matter whether the VDI tree is clear. */
+		if (cloned) {
+			dw->buf[0] = vid;
+			dw->count = 1;
+		} else {
+			dprintf("snapshot chain has valid vdi, "
+				"just mark vdi %" PRIx32 " as deleted.\n",
+				dw->vid);
+			delete_inode(dw);
+			return SD_RES_SUCCESS;
+		}
 	}
 
 	dprintf("%d\n", dw->count);
