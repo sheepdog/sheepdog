@@ -391,7 +391,7 @@ struct deletion_work {
 
 static LIST_HEAD(deletion_work_list);
 
-static int delete_inode(struct deletion_work *dw)
+static int delete_inode(struct deletion_work *dw, int objs_deleted)
 {
 	struct sheepdog_inode *inode = NULL;
 	int ret = SD_RES_SUCCESS;
@@ -414,8 +414,11 @@ static int delete_inode(struct deletion_work *dw)
 
 	if (dw->delete_error)
 		inode->vdi_size = 0;
-	else
+	else {
 		memset(inode->name, 0, sizeof(inode->name));
+		if (objs_deleted)
+			inode->vdi_size = 0;
+	}
 
 	ret = write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(dw->vid),
 			   (char *)inode, SD_INODE_HEADER_SIZE, 0, 0,
@@ -458,6 +461,9 @@ static void delete_one(struct work *work)
 		goto out;
 	}
 
+	if (inode->vdi_size == 0 && inode->name[0] == '\0')
+		goto out;
+
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
 		if (!inode->data_vdi_id[i])
 			continue;
@@ -497,7 +503,7 @@ static void delete_one_done(struct work *work)
 		return;
 	}
 
-	delete_inode(dw);
+	delete_inode(dw, 1);
 
 	list_del(&dw->dw_siblings);
 
@@ -647,7 +653,7 @@ int start_deletion(uint32_t vid, uint32_t epoch)
 			dprintf("snapshot chain has valid vdi, "
 				"just mark vdi %" PRIx32 " as deleted.\n",
 				dw->vid);
-			delete_inode(dw);
+			delete_inode(dw, 0);
 			return SD_RES_SUCCESS;
 		}
 	}
