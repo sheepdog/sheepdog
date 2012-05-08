@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <sys/eventfd.h>
 #include <zookeeper/zookeeper.h>
+#include <urcu/uatomic.h>
 
 #include "cluster.h"
 #include "work.h"
@@ -254,9 +255,9 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	eventfd_t value = 1;
 
 	/* process leave event */
-	if (!__sync_add_and_fetch(&zk_notify_blocked, 0)
-		&& __sync_add_and_fetch(&nr_zk_levents, 0)) {
-		nr_levents = __sync_sub_and_fetch(&nr_zk_levents, 1) + 1;
+	if (!uatomic_read(&zk_notify_blocked) &&
+	     uatomic_read(&nr_zk_levents)) {
+		nr_levents = uatomic_sub_return(&nr_zk_levents, 1) + 1;
 		dprintf("nr_zk_levents:%d, head:%u\n", nr_levents, zk_levent_head);
 
 		lev = &zk_levents[zk_levent_head%SD_MAX_NODES];
@@ -284,7 +285,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 		memcpy(ev, lev, sizeof(*ev));
 		zk_levent_head++;
 
-		if (__sync_add_and_fetch(&nr_zk_levents, 0) || rc == ZOK) {
+		if (uatomic_read(&nr_zk_levents) || rc == ZOK) {
 			/* we have pending leave events
 			 * or queue nodes, manual notify */
 			dprintf("write event to efd:%d\n", efd);
@@ -525,7 +526,7 @@ static int add_event(zhandle_t *zh, enum zk_event_type type,
 
 		memcpy(lev, &ev, sizeof(ev));
 
-		nr_levents = __sync_add_and_fetch(&nr_zk_levents, 1);
+		nr_levents = uatomic_add_return(&nr_zk_levents, 1);
 		dprintf("nr_zk_levents:%d, tail:%u\n", nr_levents, zk_levent_tail);
 
 		zk_levent_tail++;
@@ -733,7 +734,7 @@ static void zk_block(struct work *work)
 
 	zk_queue_push_back(zhandle, &ev);
 
-	__sync_sub_and_fetch(&zk_notify_blocked, 1);
+	uatomic_dec(&zk_notify_blocked);
 
 	/* this notify is necessary */
 	dprintf("write event to efd:%d\n", efd);
@@ -762,7 +763,7 @@ static int zk_dispatch(void)
 	if (ret < 0)
 		return 0;
 
-	if (__sync_add_and_fetch(&zk_notify_blocked, 0))
+	if (uatomic_read(&zk_notify_blocked))
 		return 0;
 
 	ret = zk_queue_pop(zhandle, &ev);
@@ -864,7 +865,7 @@ static int zk_dispatch(void)
 			if (node_cmp(&ev.sender.node, &this_node.node) == 0 && !ev.callbacked) {
 				ev.callbacked = 1;
 
-				__sync_add_and_fetch(&zk_notify_blocked, 1);
+				uatomic_inc(&zk_notify_blocked);
 
 				zk_queue_push_back(zhandle, &ev);
 
