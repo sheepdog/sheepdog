@@ -77,6 +77,7 @@ AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
+PKG_CHECK_MODULES([liburcu],[liburcu])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -86,7 +87,7 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdint.h \
 		  stdlib.h string.h sys/ioctl.h sys/param.h sys/socket.h \
 		  sys/time.h syslog.h unistd.h sys/types.h getopt.h malloc.h \
-		  sys/sockio.h utmpx.h])
+		  sys/sockio.h utmpx.h urcu.h urcu/uatomic.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
