@@ -899,6 +899,46 @@ static int write_object_local(uint64_t oid, char *data, unsigned int datalen,
 
 	return ret;
 }
+
+static int write_inode_cache(uint64_t oid, char *data, unsigned int datalen,
+				uint64_t offset, uint16_t flags, int copies,
+				uint32_t epoch, int create)
+{
+	int ret;
+	struct request *req;
+	struct sd_obj_req *hdr;
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *cache;
+
+	idx |= 1 << CACHE_VDI_SHIFT;
+
+	cache = find_object_cache(vid, 0);
+
+	req = zalloc(sizeof(*req));
+	if (!req)
+		return SD_RES_NO_MEM;
+	hdr = (struct sd_obj_req *)&req->rq;
+
+	hdr->oid = oid;
+	if (create)
+		hdr->opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+	else
+		hdr->opcode = SD_OP_WRITE_OBJ;
+	hdr->copies = copies;
+	hdr->flags = flags | SD_FLAG_CMD_WRITE;
+	hdr->offset = offset;
+	hdr->data_length = datalen;
+	req->data = data;
+	req->op = get_sd_op(hdr->opcode);
+
+	ret = object_cache_rw(cache, idx, req);
+
+	free(req);
+
+	return ret;
+}
+
 int write_object(struct vnode_info *vnodes, uint32_t node_version,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr_copies, int create)
@@ -907,6 +947,15 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 	struct sd_vnode *v;
 	int i, fd, ret;
 	char name[128];
+
+	if (object_is_cached(oid)) {
+		ret = write_inode_cache(oid, data, datalen, offset,
+			flags, nr_copies, node_version, create);
+		if (ret != 0) {
+			eprintf("fail %"PRIx64" %"PRIx32"\n", oid, ret);
+			return -1;
+		}
+	}
 
 	for (i = 0; i < nr_copies; i++) {
 		unsigned rlen = 0, wlen = datalen;
