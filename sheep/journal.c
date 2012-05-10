@@ -224,6 +224,7 @@ int jrnl_end(struct jrnl_descriptor * jd)
 
 	ret = jrnl_remove(jd);
 err:
+	free(jd);
 	return ret;
 }
 

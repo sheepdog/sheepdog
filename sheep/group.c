@@ -882,6 +882,7 @@ static void event_free(struct event_struct *cevent)
 	case EVENT_JOIN: {
 		struct work_join *w = container_of(cevent, struct work_join, cev);
 		free(w->member_list);
+		free(w->jm);
 		free(w);
 		break;
 	}
