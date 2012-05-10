@@ -77,7 +77,6 @@ AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
-PKG_CHECK_MODULES([liburcu],[liburcu])
 
 # Checks for header files.
 AC_FUNC_ALLOCA
