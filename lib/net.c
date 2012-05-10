@@ -238,6 +238,7 @@ int connect_to(const char *name, int port)
 	fd = -1;
 success:
 	freeaddrinfo(res0);
+	dprintf("%d, %s:%d\n", fd, name, port);
 	return fd;
 }
 
