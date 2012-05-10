@@ -720,9 +720,17 @@ static void __sd_join(struct event_struct *cevent)
 	if (sys_stat_ok())
 		return;
 
-	get_vdi_bitmap_from_sd_list();
-	for (i = 0; i < w->member_list_entries; i++)
-		get_vdi_bitmap_from(w->member_list + i);
+	/*
+	* If a new comer try to join the running cluster, it only need read
+	* one copy of bitmap from the first member.
+	*/
+	if (sys_stat_wait_format())
+		get_vdi_bitmap_from(w->member_list);
+	else {
+		get_vdi_bitmap_from_sd_list();
+		for (i = 0; i < w->member_list_entries; i++)
+			get_vdi_bitmap_from(w->member_list + i);
+	}
 }
 
 static void __sd_leave(struct event_struct *cevent)
