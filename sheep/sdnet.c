@@ -22,14 +22,12 @@
 
 void resume_pending_requests(void)
 {
-	struct request *next, *tmp;
+	struct request *req, *n;
 
-	list_for_each_entry_safe(next, tmp, &sys->req_wait_for_obj_list,
-				 r_wlist) {
-		struct event_struct *cevent = &next->cev;
-
-		list_del(&next->r_wlist);
-		list_add_tail(&cevent->event_list, &sys->request_queue);
+	list_for_each_entry_safe(req, n, &sys->req_wait_for_obj_list,
+				 request_list) {
+		list_del(&req->request_list);
+		list_add_tail(&req->request_list, &sys->request_queue);
 	}
 
 	if (!list_empty(&sys->request_queue))
@@ -111,7 +109,7 @@ static void io_op_done(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 
-	list_del(&req->r_wlist);
+	list_del(&req->request_list);
 	sys->nr_outstanding_io--;
 
 	switch (req->rp.result) {
@@ -153,7 +151,7 @@ retry:
 	put_vnode_info(req->vnodes);
 	req->vnodes = get_vnode_info();
 	setup_access_to_local_objects(req);
-	list_add_tail(&req->cev.event_list, &sys->request_queue);
+	list_add_tail(&req->request_list, &sys->request_queue);
 
 	resume_pending_requests();
 	resume_recovery_work();
@@ -240,15 +238,13 @@ static int check_request(struct request *req)
 			req->work.done(&req->work);
 		} else {
 			/* Gateway request */
-			list_del(&req->r_wlist);
-			list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
+			list_add_tail(&req->request_list, &sys->req_wait_for_obj_list);
 		}
 		return -1;
 	}
 
 	if (is_access_to_busy_objects(req->local_oid)) {
-		list_del(&req->r_wlist);
-		list_add_tail(&req->r_wlist, &sys->req_wait_for_obj_list);
+		list_add_tail(&req->request_list, &sys->req_wait_for_obj_list);
 		return -1;
 	}
 
@@ -257,7 +253,6 @@ static int check_request(struct request *req)
 
 static void queue_request(struct request *req)
 {
-	struct event_struct *cevent = &req->cev;
 	struct sd_req *hdr = (struct sd_req *)&req->rq;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 
@@ -331,10 +326,9 @@ static void queue_request(struct request *req)
 		req->done(req);
 		return;
 	}
-	list_del(&req->r_wlist);
 
-	cevent->ctype = EVENT_REQUEST;
-	list_add_tail(&cevent->event_list, &sys->request_queue);
+	list_add_tail(&req->request_list, &sys->request_queue);
+
 	process_request_event_queues();
 	return;
 done:
@@ -363,8 +357,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 		}
 	}
 
-	list_add(&req->r_siblings, &ci->reqs);
-	INIT_LIST_HEAD(&req->r_wlist);
+	INIT_LIST_HEAD(&req->request_list);
 
 	sys->nr_outstanding_reqs++;
 	sys->outstanding_data_size += data_length;
@@ -377,7 +370,6 @@ static void free_request(struct request *req)
 	sys->nr_outstanding_reqs--;
 	sys->outstanding_data_size -= req->data_length;
 
-	list_del(&req->r_siblings);
 	put_vnode_info(req->vnodes);
 	free(req->data);
 	free(req);
@@ -385,17 +377,14 @@ static void free_request(struct request *req)
 
 static void req_done(struct request *req)
 {
-	int dead = 0;
 	struct client_info *ci = req->ci;
 
 	if (conn_tx_on(&ci->conn)) {
 		dprintf("connection seems to be dead\n");
-		dead = 1;
-	} else
-		list_add(&req->r_wlist, &ci->done_reqs);
-
-	if (dead)
 		free_request(req);
+	} else {
+		list_add(&req->request_list, &ci->done_reqs);
+	}
 
 	client_decref(ci);
 }
@@ -491,8 +480,8 @@ static void init_tx_hdr(struct client_info *ci)
 
 	memset(rsp, 0, sizeof(*rsp));
 
-	req = list_first_entry(&ci->done_reqs, struct request, r_wlist);
-	list_del(&req->r_wlist);
+	req = list_first_entry(&ci->done_reqs, struct request, request_list);
+	list_del(&req->request_list);
 
 	ci->tx_req = req;
 	ci->conn.tx_length = sizeof(*rsp);
@@ -616,7 +605,6 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 	ci->conn.events = EPOLLIN;
 	ci->refcnt = 1;
 
-	INIT_LIST_HEAD(&ci->reqs);
 	INIT_LIST_HEAD(&ci->done_reqs);
 
 	init_rx_hdr(ci);

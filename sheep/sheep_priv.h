@@ -38,7 +38,6 @@ enum event_type {
 	EVENT_JOIN,
 	EVENT_LEAVE,
 	EVENT_NOTIFY,
-	EVENT_REQUEST,
 };
 
 #define is_membership_change_event(x) \
@@ -56,7 +55,6 @@ struct client_info {
 
 	struct request *tx_req;
 
-	struct list_head reqs;
 	struct list_head done_reqs;
 
 	int refcnt;
@@ -68,7 +66,6 @@ struct vnode_info;
 typedef void (*req_end_t) (struct request *);
 
 struct request {
-	struct event_struct cev;
 	struct sd_req rq;
 	struct sd_rsp rp;
 
@@ -78,8 +75,7 @@ struct request {
 	unsigned int data_length;
 
 	struct client_info *ci;
-	struct list_head r_siblings;
-	struct list_head r_wlist;
+	struct list_head request_list;
 	struct list_head pending_list;
 
 	uint64_t local_oid;

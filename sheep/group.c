@@ -932,9 +932,6 @@ static void event_fn(struct work *work)
 	case EVENT_NOTIFY:
 		__sd_notify(cevent);
 		break;
-	case EVENT_REQUEST:
-		vprintf(SDOG_ERR, "should not happen\n");
-		break;
 	default:
 		vprintf(SDOG_ERR, "unknown event %d\n", cevent->ctype);
 	}
@@ -963,9 +960,6 @@ static void event_done(struct work *work)
 	case EVENT_NOTIFY:
 		__sd_notify_done(cevent);
 		break;
-	case EVENT_REQUEST:
-		vprintf(SDOG_ERR, "should not happen\n");
-		break;
 	default:
 		vprintf(SDOG_ERR, "unknown event %d\n", cevent->ctype);
 	}
@@ -984,7 +978,7 @@ int is_access_to_busy_objects(uint64_t oid)
 {
 	struct request *req;
 
-	list_for_each_entry(req, &sys->outstanding_req_list, r_wlist) {
+	list_for_each_entry(req, &sys->outstanding_req_list, request_list) {
 		if (oid == req->local_oid)
 			return 1;
 	}
@@ -1028,30 +1022,29 @@ static inline void set_consistency_check(struct request *req, uint64_t oid)
 
 static void process_request_queue(void)
 {
-	struct event_struct *cevent, *n;
+	struct request *req, *n;
 
-	list_for_each_entry_safe(cevent, n, &sys->request_queue, event_list) {
-		struct request *req = container_of(cevent, struct request, cev);
-		struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-
-		list_del(&cevent->event_list);
+	list_for_each_entry_safe(req, n, &sys->request_queue, request_list) {
+		list_del(&req->request_list);
 
 		if (is_io_op(req->op)) {
+			struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 			int copies = sys->nr_copies;
 
 			if (copies > req->vnodes->nr_zones)
 				copies = req->vnodes->nr_zones;
 
+			list_add_tail(&req->request_list,
+				      &sys->outstanding_req_list);
+
 			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
 			    object_is_cached(hdr->oid)) {
 				/* If we have cache of it we are at its service. */
-				list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
 				sys->nr_outstanding_io++;
 				queue_work(sys->gateway_wqueue, &req->work);
 				continue;
 			}
 
-			list_add_tail(&req->r_wlist, &sys->outstanding_req_list);
 			sys->nr_outstanding_io++;
 
 			if (need_consistency_check(req->rq.opcode, req->rq.flags))
