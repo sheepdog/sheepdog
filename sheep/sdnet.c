@@ -20,19 +20,6 @@
 
 #include "sheep_priv.h"
 
-void resume_pending_requests(void)
-{
-	struct request *req, *n;
-
-	list_for_each_entry_safe(req, n, &sys->req_wait_for_obj_list,
-				 request_list) {
-		list_del(&req->request_list);
-		list_add_tail(&req->request_list, &sys->request_queue);
-	}
-
-	if (!list_empty(&sys->request_queue))
-		process_request_event_queues();
-}
 
 static int is_access_local(struct request *req, uint64_t oid)
 {
@@ -249,6 +236,25 @@ static int check_request(struct request *req)
 	}
 
 	return 0;
+}
+
+void resume_pending_requests(void)
+{
+	struct request *req, *n;
+	LIST_HEAD(pending_list);
+
+	list_splice_init(&sys->req_wait_for_obj_list, &pending_list);
+
+	list_for_each_entry_safe(req, n, &pending_list, request_list) {
+		list_del(&req->request_list);
+
+		if (check_request(req) < 0)
+			continue;
+		list_add_tail(&req->request_list, &sys->request_queue);
+	}
+
+	if (!list_empty(&sys->request_queue))
+		process_request_event_queues();
 }
 
 static void queue_request(struct request *req)
