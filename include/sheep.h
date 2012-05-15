@@ -225,50 +225,49 @@ next:
 	return idx;
 }
 
-static inline int hval_to_sheep(struct sd_vnode *entries,
-				int nr_entries, uint64_t id, int idx)
+static inline int get_vnode_pos(struct sd_vnode *entries,
+			int nr_entries, uint64_t id)
 {
-	int i;
-	struct sd_vnode *e = entries, *n;
+	int start, end, pos;
 
-	for (i = 0; i < nr_entries - 1; i++, e++) {
-		n = e + 1;
-		if (id > e->id && id <= n->id)
-			break;
+	start = 0;
+	end = nr_entries - 1;
+
+	if (id > entries[end].id)
+		return end;
+
+	for (;;) {
+		pos = (end - start) / 2 + start;
+		if (entries[pos].id < id) {
+			if (entries[pos + 1].id >= id)
+				return pos;
+			start = pos;
+		} else
+			end = pos;
 	}
-	return get_nth_node(entries, nr_entries, (i + 1) % nr_entries, idx);
+
+	return pos;
 }
 
 static inline int obj_to_sheep(struct sd_vnode *entries,
 			       int nr_entries, uint64_t oid, int idx)
 {
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+	int pos = get_vnode_pos(entries, nr_entries, id);
 
-	return hval_to_sheep(entries, nr_entries, id, idx);
-}
-
-static inline void hval_to_sheeps(struct sd_vnode *entries,
-			int nr_entries, uint64_t id, int nr_copies, int *idxs)
-{
-	int i, idx;
-	struct sd_vnode *e = entries, *n;
-
-	for (i = 0; i < nr_entries - 1; i++, e++) {
-		n = e + 1;
-		if (id > e->id && id <= n->id)
-			break;
-	}
-	for (idx = 0; idx < nr_copies; idx++)
-		idxs[idx] = get_nth_node(entries, nr_entries,
-				(i + 1) % nr_entries, idx);
+	return get_nth_node(entries, nr_entries, (pos + 1) % nr_entries, idx);
 }
 
 static inline void obj_to_sheeps(struct sd_vnode *entries,
 		  int nr_entries, uint64_t oid, int nr_copies, int *idxs)
 {
+	int idx;
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+	int pos = get_vnode_pos(entries, nr_entries, id);
 
-	hval_to_sheeps(entries, nr_entries, id, nr_copies, idxs);
+	for (idx = 0; idx < nr_copies; idx++)
+		idxs[idx] = get_nth_node(entries, nr_entries,
+				(pos + 1) % nr_entries, idx);
 }
 
 static inline int is_sheep_op(uint8_t op)
