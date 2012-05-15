@@ -988,35 +988,44 @@ int is_access_to_busy_objects(uint64_t oid)
 	return 0;
 }
 
-static int need_consistency_check(uint8_t opcode, uint16_t flags)
+static int need_consistency_check(struct request *req)
 {
-	if (flags & SD_FLAG_CMD_IO_LOCAL)
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+
+	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL)
 		/* only gateway fixes data consistency */
 		return 0;
 
-	if (opcode != SD_OP_READ_OBJ)
+	if (hdr->opcode != SD_OP_READ_OBJ)
 		/* consistency is fixed when clients read data for the
 		 * first time */
 		return 0;
 
-	if (flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
+	if (hdr->flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
+		return 0;
+
+	if (is_vdi_obj(hdr->oid))
+		/* only check consistency for data objects */
+		return 0;
+
+	if (object_is_cached(hdr->oid))
+		/* we don't check consistency for cached objects */
 		return 0;
 
 	return 1;
 }
 
-static inline void set_consistency_check(struct request *req, uint64_t oid)
+static inline void set_consistency_check(struct request *req)
 {
-	uint32_t vdi_id = oid_to_vid(oid);
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	uint32_t vdi_id = oid_to_vid(hdr->oid);
+	uint32_t idx = data_oid_to_idx(hdr->oid);
 	struct data_object_bmap *bmap;
-
-	if (is_vdi_obj(oid))
-		return;
 
 	req->check_consistency = 1;
 	list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
 		if (bmap->vdi_id == vdi_id) {
-			if (test_bit(data_oid_to_idx(oid), bmap->dobjs))
+			if (test_bit(idx, bmap->dobjs))
 				req->check_consistency = 0;
 			break;
 		}
@@ -1031,27 +1040,12 @@ static void process_request_queue(void)
 		list_del(&req->request_list);
 
 		if (is_io_op(req->op)) {
-			struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-			int copies = sys->nr_copies;
-
-			if (copies > req->vnodes->nr_zones)
-				copies = req->vnodes->nr_zones;
-
 			list_add_tail(&req->request_list,
 				      &sys->outstanding_req_list);
-
-			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL) &&
-			    object_is_cached(hdr->oid)) {
-				/* If we have cache of it we are at its service. */
-				sys->nr_outstanding_io++;
-				queue_work(sys->gateway_wqueue, &req->work);
-				continue;
-			}
-
 			sys->nr_outstanding_io++;
 
-			if (need_consistency_check(req->rq.opcode, req->rq.flags))
-				set_consistency_check(req, hdr->oid);
+			if (need_consistency_check(req))
+				set_consistency_check(req);
 
 			if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 				queue_work(sys->io_wqueue, &req->work);
