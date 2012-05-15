@@ -129,7 +129,7 @@ static void io_op_done(struct work *work)
 	resume_pending_requests();
 	resume_recovery_work();
 
-	req->done(req);
+	req_done(req);
 	return;
 
 retry:
@@ -153,7 +153,7 @@ static void local_op_done(struct work *work)
 						 &req->rp, req->data);
 	}
 
-	req->done(req);
+	req_done(req);
 }
 
 static void cluster_op_done(struct work *work)
@@ -266,8 +266,7 @@ static void queue_request(struct request *req)
 	if (!req->op) {
 		eprintf("invalid opcode %d\n", hdr->opcode);
 		rsp->result = SD_RES_INVALID_PARMS;
-		req->done(req);
-		return;
+		goto done;
 	}
 
 	dprintf("%x\n", hdr->opcode);
@@ -329,8 +328,7 @@ static void queue_request(struct request *req)
 	} else {
 		eprintf("unknown operation %d\n", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;
-		req->done(req);
-		return;
+		goto done;
 	}
 
 	list_add_tail(&req->request_list, &sys->request_queue);
@@ -338,7 +336,7 @@ static void queue_request(struct request *req)
 	process_request_event_queues();
 	return;
 done:
-	req->done(req);
+	req_done(req);
 }
 
 static void client_incref(struct client_info *ci);
@@ -381,7 +379,7 @@ static void free_request(struct request *req)
 	free(req);
 }
 
-static void req_done(struct request *req)
+void req_done(struct request *req)
 {
 	struct client_info *ci = req->ci;
 
@@ -469,8 +467,6 @@ static void client_rx_handler(struct client_info *ci)
 		req->rp.data_length = 0;
 	else
 		req->rp.data_length = hdr->data_length;
-
-	req->done = req_done;
 
 	dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
 	queue_request(req);

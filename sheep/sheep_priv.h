@@ -63,8 +63,6 @@ struct client_info {
 struct request;
 struct vnode_info;
 
-typedef void (*req_end_t) (struct request *);
-
 struct request {
 	struct sd_req rq;
 	struct sd_rsp rp;
@@ -84,7 +82,6 @@ struct request {
 	struct vnode_info *vnodes;
 	int check_consistency;
 
-	req_end_t done;
 	struct work work;
 };
 
@@ -311,6 +308,8 @@ int prealloc(int fd, uint32_t size);
 int init_objlist_cache(void);
 int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid);
 int check_and_insert_objlist_cache(uint64_t oid);
+
+void req_done(struct request *req);
 
 /* Operations */
 

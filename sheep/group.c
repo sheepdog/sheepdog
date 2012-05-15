@@ -638,7 +638,7 @@ static void __sd_notify_done(struct event_struct *cevent)
 	if (has_process_main(req->op))
 		memcpy(req->data, msg->data, msg->rsp.data_length);
 	memcpy(&req->rp, &msg->rsp, sizeof(req->rp));
-	req->done(req);
+	req_done(req);
 }
 
 void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len)
