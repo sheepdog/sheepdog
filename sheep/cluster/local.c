@@ -403,7 +403,7 @@ static int local_dispatch(void)
 	switch (ev->type) {
 	case EVENT_JOIN:
 		if (ev->blocked) {
-			if (node_cmp(&ev->nodes[0], &this_node) == 0) {
+			if (node_eq(&ev->nodes[0], &this_node)) {
 				res = sd_check_join_cb(&ev->sender, ev->buf);
 				ev->join_result = res;
 				ev->blocked = 0;
@@ -438,7 +438,7 @@ static int local_dispatch(void)
 		break;
 	case EVENT_NOTIFY:
 		if (ev->blocked) {
-			if (node_cmp(&ev->sender, &this_node) == 0) {
+			if (node_eq(&ev->sender, &this_node)) {
 				if (!ev->callbacked) {
 					queue_work(local_block_wq, &work);
 

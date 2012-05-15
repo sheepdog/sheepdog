@@ -267,7 +267,9 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 		len = sizeof(*ev);
 		sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
 		rc = zk_get(zh, path, 1, (char *)ev, &len, NULL);
-		if (rc == ZOK && node_cmp(&ev->sender.node, &lev->sender.node) == 0 && ev->blocked) {
+		if (rc == ZOK &&
+		    node_eq(&ev->sender.node, &lev->sender.node) &&
+		    ev->blocked) {
 			dprintf("this queue_pos:%010d have blocked whole cluster, ignore it\n", queue_pos);
 			queue_pos++;
 
@@ -446,7 +448,7 @@ static int is_master(zhandle_t *zh, struct zk_node *znode)
 	}
 
 	twalk(zk_node_btroot, node_btree_find_master_fn);
-	if (node_cmp(&zk_master->node, &znode->node) == 0)
+	if (node_eq(&zk_master->node, &znode->node))
 		return 1;
 
 	return 0;
@@ -795,7 +797,7 @@ static int zk_dispatch(void)
 
 			goto out;
 		} else if (is_master(zhandle, &this_node)
-			&& node_cmp(&ev.sender.node, &this_node.node) != 0) {
+			&& !node_eq(&ev.sender.node, &this_node.node)) {
 			/* wait util member have been created */
 			sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&ev.sender.node));
 			retry = MEMBER_CREATE_TIMEOUT/MEMBER_CREATE_INTERVAL;
@@ -810,7 +812,7 @@ static int zk_dispatch(void)
 			}
 		}
 
-		if (node_cmp(&ev.sender.node, &this_node.node) == 0)
+		if (node_eq(&ev.sender.node, &this_node.node))
 			zk_member_init(zhandle);
 
 		if (ev.join_result == CJ_RES_MASTER_TRANSFER) {
@@ -829,7 +831,7 @@ static int zk_dispatch(void)
 
 		if (ev.join_result == CJ_RES_SUCCESS) {
 			sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&ev.sender.node));
-			if (node_cmp(&ev.sender.node, &this_node.node) == 0) {
+			if (node_eq(&ev.sender.node, &this_node.node)) {
 				dprintf("create path:%s\n", path);
 				rc = zk_create(zhandle, path, (char *)&ev.sender, sizeof(ev.sender),
 					&ZOO_OPEN_ACL_UNSAFE, ZOO_EPHEMERAL, NULL, 0);
@@ -862,7 +864,8 @@ static int zk_dispatch(void)
 	case EVENT_NOTIFY:
 		dprintf("NOTIFY, blocked:%d\n", ev.blocked);
 		if (ev.blocked) {
-			if (node_cmp(&ev.sender.node, &this_node.node) == 0 && !ev.callbacked) {
+			if (node_eq(&ev.sender.node, &this_node.node)
+					&& !ev.callbacked) {
 				ev.callbacked = 1;
 
 				uatomic_inc(&zk_notify_blocked);

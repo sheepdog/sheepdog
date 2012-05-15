@@ -305,7 +305,7 @@ static struct sd_node *find_entry_list(struct sd_node *entry,
 {
 	struct node *n;
 	list_for_each_entry(n, head, list)
-		if (node_cmp(&n->ent, entry) == 0)
+		if (node_eq(&n->ent, entry))
 			return entry;
 
 	return NULL;
@@ -321,7 +321,7 @@ static struct sd_node *find_entry_epoch(struct sd_node *entry,
 	nr = epoch_log_read_nr(epoch, (char *)nodes, sizeof(nodes));
 
 	for (i = 0; i < nr; i++)
-		if (node_cmp(&nodes[i], entry) == 0)
+		if (node_eq(&nodes[i], entry))
 			return entry;
 
 	return NULL;
@@ -420,10 +420,10 @@ static int get_cluster_status(struct sd_node *from,
 		}
 
 		for (i = 0; i < nr_local_entries; i++) {
-			if (node_cmp(local_entries + i, from) == 0)
+			if (node_eq(local_entries + i, from))
 				goto next;
 			for (j = 0; j < sys->nr_nodes; j++) {
-				if (node_cmp(local_entries + i, sys->nodes + j) == 0)
+				if (node_eq(local_entries + i, sys->nodes + j))
 					goto next;
 			}
 			break;
@@ -531,7 +531,7 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 
 	/* add nodes execept for newly joined one */
 	for (i = 0; i < nr_nodes; i++) {
-		if (node_cmp(nodes + i, joined) == 0)
+		if (node_eq(nodes + i, joined))
 			continue;
 
 		sys->nodes[sys->nr_nodes++] = nodes[i];
@@ -748,7 +748,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 	struct join_message *jm = opaque;
 	struct node *node;
 
-	if (node_cmp(joining, &sys->this_node) == 0) {
+	if (node_eq(joining, &sys->this_node)) {
 		struct sd_node entries[SD_MAX_NODES];
 		int nr_entries;
 		uint64_t ctime;
@@ -853,7 +853,7 @@ static void __sd_join_done(struct event_struct *cevent)
 			sys_stat_set(SD_STATUS_OK);
 	}
 
-	if (node_cmp(&w->joined, &sys->this_node) == 0)
+	if (node_eq(&w->joined, &sys->this_node))
 		/* this output is used for testing */
 		vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
 }
@@ -1111,7 +1111,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 	struct join_message *jm;
 	uint32_t le = get_latest_epoch();
 
-	if (node_cmp(joined, &sys->this_node) == 0) {
+	if (node_eq(joined, &sys->this_node)) {
 		if (result == CJ_RES_FAIL) {
 			eprintf("Fail to join. The joining node has an invalid epoch.\n");
 			sys->cdrv->leave();
@@ -1230,7 +1230,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 			update_epoch_store(sys->epoch);
 		}
 
-		if (node_cmp(joined, &sys->this_node) == 0)
+		if (node_eq(joined, &sys->this_node))
 			/* this output is used for testing */
 			vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;

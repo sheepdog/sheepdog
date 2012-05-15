@@ -321,6 +321,11 @@ static inline int node_cmp(const void *a, const void *b)
 	return 0;
 }
 
+static inline int node_eq(const struct sd_node *a, const struct sd_node *b)
+{
+	return node_cmp(a, b) == 0;
+}
+
 static inline int vnode_cmp(const void *a, const void *b)
 {
 	const struct sd_vnode *node1 = a;
