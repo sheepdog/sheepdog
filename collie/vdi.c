@@ -1218,10 +1218,6 @@ static int vdi_write(int argc, char **argv)
 			ret = parse_option_size(argv[optind++], &total);
 			if (ret < 0)
 				return EXIT_USAGE;
-			if (total % 512 != 0) {
-				fprintf(stderr, "Write length must be block-aligned\n");
-				return EXIT_USAGE;
-			}
 		}
 	}
 
