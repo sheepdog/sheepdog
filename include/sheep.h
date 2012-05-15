@@ -226,8 +226,9 @@ next:
 }
 
 static inline int get_vnode_pos(struct sd_vnode *entries,
-			int nr_entries, uint64_t id)
+			int nr_entries, uint64_t oid)
 {
+	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 	int start, end, pos;
 
 	start = 0;
@@ -245,15 +246,12 @@ static inline int get_vnode_pos(struct sd_vnode *entries,
 		} else
 			end = pos;
 	}
-
-	return pos;
 }
 
 static inline int obj_to_sheep(struct sd_vnode *entries,
 			       int nr_entries, uint64_t oid, int idx)
 {
-	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
-	int pos = get_vnode_pos(entries, nr_entries, id);
+	int pos = get_vnode_pos(entries, nr_entries, oid);
 
 	return get_nth_node(entries, nr_entries, (pos + 1) % nr_entries, idx);
 }
@@ -261,9 +259,8 @@ static inline int obj_to_sheep(struct sd_vnode *entries,
 static inline void obj_to_sheeps(struct sd_vnode *entries,
 		  int nr_entries, uint64_t oid, int nr_copies, int *idxs)
 {
+	int pos = get_vnode_pos(entries, nr_entries, oid);
 	int idx;
-	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
-	int pos = get_vnode_pos(entries, nr_entries, id);
 
 	for (idx = 0; idx < nr_copies; idx++)
 		idxs[idx] = get_nth_node(entries, nr_entries,
