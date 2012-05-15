@@ -234,7 +234,7 @@ static inline int get_vnode_pos(struct sd_vnode *entries,
 	start = 0;
 	end = nr_entries - 1;
 
-	if (id > entries[end].id)
+	if (id > entries[end].id || id < entries[start].id)
 		return end;
 
 	for (;;) {
