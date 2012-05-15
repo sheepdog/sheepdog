@@ -4,6 +4,7 @@
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include "bitops.h"
 #include "list.h"
@@ -57,6 +58,15 @@ static inline void *zalloc(size_t size)
 {
 	return calloc(1, size);
 }
+
+static inline int xlockf(int fd, int cmd, off_t offset, off_t len)
+{
+	if (lseek(fd, offset, SEEK_SET) < 0)
+		return -1;
+
+	return lockf(fd, cmd, len);
+}
+
 
 typedef void (*try_to_free_t)(size_t);
 extern try_to_free_t set_try_to_free_routine(try_to_free_t);

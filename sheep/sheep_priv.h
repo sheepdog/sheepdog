@@ -411,6 +411,7 @@ static inline int sys_can_halt(void)
 
 #define CACHE_VDI_SHIFT       31
 #define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
+#define CACHE_BLOCK_SIZE      (UINT32_C(128) << 10) /* 128 KB */
 
 struct object_cache {
 	uint32_t vid;
@@ -427,6 +428,8 @@ struct object_cache {
 
 struct object_cache_entry {
 	uint32_t idx;
+	uint64_t bmap; /* each bit represents one dirty
+			* block which should be flushed */
 	struct rb_node rb;
 	struct list_head list;
 	int create;

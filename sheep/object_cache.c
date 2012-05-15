@@ -41,6 +41,24 @@ static inline int hash(uint64_t vid)
 	return hash_64(vid, HASH_BITS);
 }
 
+static uint64_t calc_object_bmap(size_t len, off_t offset)
+{
+	int i, j;
+	uint64_t bmap, shift = 1;
+
+	if (!len)
+		return 0;
+
+	i = offset / CACHE_BLOCK_SIZE;
+	j = (offset + len - 1) / CACHE_BLOCK_SIZE;
+
+	bmap = (shift <<= i);
+	while (j - i++)
+		bmap |= (shift <<= 1);
+
+	return bmap;
+}
+
 static struct object_cache_entry *dirty_tree_insert(struct rb_root *root,
 		struct object_cache_entry *new)
 {
@@ -56,8 +74,11 @@ static struct object_cache_entry *dirty_tree_insert(struct rb_root *root,
 			p = &(*p)->rb_left;
 		else if (new->idx > entry->idx)
 			p = &(*p)->rb_right;
-		else
-			return entry; /* already has this entry */
+		else {
+			/* already has this entry, merge bmap */
+			entry->bmap |= new->bmap;
+			return entry;
+		}
 	}
 	rb_link_node(&new->rb, parent, p);
 	rb_insert_color(&new->rb, root);
@@ -143,11 +164,12 @@ out:
 }
 
 static void add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
-		struct object_cache_entry *entry, int create)
+		uint64_t bmap, struct object_cache_entry *entry, int create)
 {
 	if (!entry) {
 		entry = xzalloc(sizeof(*entry));
 		entry->idx = idx;
+		entry->bmap = bmap;
 		entry->create = create;
 	}
 	if (!dirty_tree_insert(oc->active_dirty_tree, entry))
@@ -194,7 +216,7 @@ static void merge_dirty_tree_and_list(struct object_cache *oc,
 
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
 		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
-		add_to_dirty_tree_and_list(oc, entry->idx, entry, 0);
+		add_to_dirty_tree_and_list(oc, entry->idx, 0, entry, 0);
 	}
 
 	pthread_mutex_unlock(&oc->lock);
@@ -230,7 +252,7 @@ int object_cache_lookup(struct object_cache *oc, uint32_t idx, int create)
 			ret = -1;
 		else {
 			pthread_mutex_lock(&oc->lock);
-			add_to_dirty_tree_and_list(oc, idx, NULL, 1);
+			add_to_dirty_tree_and_list(oc, idx, 0, NULL, 1);
 			pthread_mutex_unlock(&oc->lock);
 		}
 	}
@@ -254,13 +276,13 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
-	if (flock(fd, LOCK_EX) < 0) {
+	if (xlockf(fd, F_LOCK, offset, count) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out;
 	}
 	size = xpwrite(fd, buf, count, offset);
-	if (flock(fd, LOCK_UN) < 0) {
+	if (xlockf(fd, F_UNLCK, offset, count) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out;
@@ -287,14 +309,14 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
-	if (flock(fd, LOCK_SH) < 0) {
+	if (xlockf(fd, F_LOCK, offset, count) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out;
 	}
 
 	size = xpread(fd, buf, count, offset);
-	if (flock(fd, LOCK_UN) < 0) {
+	if (xlockf(fd, F_UNLCK, offset, count) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out;
@@ -311,6 +333,7 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 {
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+	uint64_t bmap = 0;
 	int ret;
 
 	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx, hdr->data_length, hdr->offset);
@@ -319,7 +342,8 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		pthread_mutex_lock(&oc->lock);
-		add_to_dirty_tree_and_list(oc, idx, NULL, 0);
+		bmap = calc_object_bmap(hdr->data_length, hdr->offset);
+		add_to_dirty_tree_and_list(oc, idx, bmap, NULL, 0);
 		pthread_mutex_unlock(&oc->lock);
 	} else {
 		ret = read_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
@@ -479,22 +503,59 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int push_cache_object(uint32_t vid, uint32_t idx, int create)
+static int push_cache_object(uint32_t vid, uint32_t idx,
+		uint64_t bmap, int create)
 {
 	struct request fake_req;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&fake_req.rq;
 	void *buf;
+	off_t offset;
 	unsigned data_length;
 	int ret = SD_RES_NO_MEM;
-	uint64_t oid = idx_to_oid(vid, idx);
+	uint64_t shift, oid = idx_to_oid(vid, idx);
+	int i, nbits, first_dirty_bit, last_dirty_bit;
 
 	dprintf("%"PRIx64", create %d\n", oid, create);
 
+	if (!bmap)
+		return SD_RES_SUCCESS;
+
 	memset(&fake_req, 0, sizeof(fake_req));
 	if (is_vdi_obj(oid))
-		data_length = SD_INODE_SIZE;
+		nbits = DIV_ROUND_UP(SD_INODE_SIZE, CACHE_BLOCK_SIZE);
 	else
-		data_length = SD_DATA_OBJ_SIZE;
+		nbits = DIV_ROUND_UP(SD_DATA_OBJ_SIZE, CACHE_BLOCK_SIZE);
+
+	shift = 1;
+	first_dirty_bit = 0;
+
+	for (i = 0; i < nbits; i++) {
+		if (bmap & (shift << i)) {
+			first_dirty_bit = i;
+			break;
+		}
+	}
+
+	shift =  (UINT64_C(1) << (nbits - 1));
+	last_dirty_bit = 0;
+	for (i = 0; i < nbits; i++) {
+		if (bmap & (shift >> i)) {
+			last_dirty_bit = nbits - i - 1 ;
+			break;
+		}
+	}
+
+	dprintf("bmap:0x%"PRIx64", first_dirty_bit:%d, last_dirty_bit:%d\n",
+			bmap, first_dirty_bit, last_dirty_bit);
+	offset = first_dirty_bit * CACHE_BLOCK_SIZE;
+	data_length = (last_dirty_bit - first_dirty_bit + 1) * CACHE_BLOCK_SIZE;
+
+	/*
+	 * CACHE_BLOCK_SIZE may not be divisible by SD_INODE_SIZE,
+	 * so (offset + data_length) could larger than SD_INODE_SIZE
+	 */
+	if (is_vdi_obj(oid) && (offset + data_length) > SD_INODE_SIZE)
+		data_length = SD_INODE_SIZE - offset;
 
 	buf = valloc(data_length);
 	if (buf == NULL) {
@@ -502,7 +563,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx, int create)
 		goto out;
 	}
 
-	ret = read_cache_object(vid, idx, buf, data_length, 0);
+	ret = read_cache_object(vid, idx, buf, data_length, offset);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
@@ -549,7 +610,8 @@ int object_cache_push(struct object_cache *oc)
 	 * request is issued in one of gateway worker threads
 	 * So we need not to protect inactive dirty tree and list */
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
-		ret = push_cache_object(oc->vid, entry->idx, entry->create);
+		ret = push_cache_object(oc->vid, entry->idx,
+				entry->bmap, entry->create);
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
 		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
@@ -617,6 +679,7 @@ int object_cache_flush_and_delete(struct object_cache *oc)
 	struct dirent *d;
 	uint32_t vid = oc->vid;
 	uint32_t idx;
+	uint64_t all = UINT64_MAX;
 	struct strbuf p;
 	int ret = 0;
 
@@ -638,7 +701,7 @@ int object_cache_flush_and_delete(struct object_cache *oc)
 		idx = strtoul(d->d_name, NULL, 16);
 		if (idx == ULLONG_MAX)
 			continue;
-		if (push_cache_object(vid, idx, 1) != SD_RES_SUCCESS) {
+		if (push_cache_object(vid, idx, all, 1) != SD_RES_SUCCESS) {
 			dprintf("failed to push %"PRIx64"\n",
 				idx_to_oid(vid, idx));
 			ret = -1;
