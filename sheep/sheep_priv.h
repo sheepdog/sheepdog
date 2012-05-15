@@ -245,6 +245,8 @@ void put_vnode_info(struct vnode_info *vnodes);
 
 struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
 		int copy_idx);
+void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
+		struct sd_vnode **vnodes);
 int get_nr_copies(struct vnode_info *vnode_info);
 
 int is_access_to_busy_objects(uint64_t oid);

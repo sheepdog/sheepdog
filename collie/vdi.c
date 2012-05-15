@@ -810,6 +810,7 @@ static int print_obj_epoch(uint64_t oid)
 	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
 	unsigned rlen, wlen;
 	struct sd_vnode vnodes[SD_MAX_VNODES];
+	int idx_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
 	int vnodes_nr, nr_logs, log_length;
 	char host[128];
@@ -853,10 +854,12 @@ again:
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
 				oid, logs[i].epoch, logs[i].nr_copies);
 		printf("---------------------------------------------------\n");
+		obj_to_sheeps(vnodes, vnodes_nr, oid,
+				logs[i].nr_copies, idx_buf);
 		for (j = 0; j < logs[i].nr_copies; j++) {
-			idx = obj_to_sheep(vnodes, vnodes_nr, oid, j);
+			idx = idx_buf[j];
 			addr_to_str(host, sizeof(host), vnodes[idx].addr,
-						vnodes[idx].port);
+					vnodes[idx].port);
 			printf("%s\n", host);
 		}
 	}

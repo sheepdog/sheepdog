@@ -22,6 +22,7 @@
 #define SD_DEFAULT_REDUNDANCY 3
 #define SD_MAX_REDUNDANCY 8
 
+#define SD_MAX_COPIES 16
 #define SD_MAX_NODES 1024
 #define SD_DEFAULT_VNODES 64
 #define SD_MAX_VNODES 65536
@@ -244,6 +245,30 @@ static inline int obj_to_sheep(struct sd_vnode *entries,
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 
 	return hval_to_sheep(entries, nr_entries, id, idx);
+}
+
+static inline void hval_to_sheeps(struct sd_vnode *entries,
+			int nr_entries, uint64_t id, int nr_copies, int *idxs)
+{
+	int i, idx;
+	struct sd_vnode *e = entries, *n;
+
+	for (i = 0; i < nr_entries - 1; i++, e++) {
+		n = e + 1;
+		if (id > e->id && id <= n->id)
+			break;
+	}
+	for (idx = 0; idx < nr_copies; idx++)
+		idxs[idx] = get_nth_node(entries, nr_entries,
+				(i + 1) % nr_entries, idx);
+}
+
+static inline void obj_to_sheeps(struct sd_vnode *entries,
+		  int nr_entries, uint64_t oid, int nr_copies, int *idxs)
+{
+	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+
+	hval_to_sheeps(entries, nr_entries, id, nr_copies, idxs);
 }
 
 static inline int is_sheep_op(uint8_t op)

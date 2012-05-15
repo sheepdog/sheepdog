@@ -23,15 +23,15 @@
 
 static int is_access_local(struct request *req, uint64_t oid)
 {
-	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	int nr_copies;
 	int i;
 
 	nr_copies = get_nr_copies(req->vnodes);
+	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(req->vnodes, oid, i);
-		if (vnode_is_local(v))
+		if (vnode_is_local(obj_vnodes[i]))
 			return 1;
 	}
 

@@ -385,6 +385,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct vnode_info *vnodes = get_vnode_info();
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	void *buf;
 	int nr_copies;
 
@@ -404,8 +405,10 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 
 	/* Check if we can read locally */
 	nr_copies = get_nr_copies(vnodes);
+	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
+
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(vnodes, oid, i);
+		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			struct siocb iocb = { 0 };
 			iocb.epoch = sys->epoch;
@@ -430,7 +433,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 pull_remote:
 	/* Okay, no luck, let's read remotely */
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(vnodes, oid, i);
+		v = obj_vnodes[i];
 
 		if (vnode_is_local(v))
 			continue;

@@ -239,11 +239,14 @@ static int oid_stale(uint64_t oid)
 	struct vnode_info *vnodes;
 	struct sd_vnode *v;
 	int ret = 1;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 
 	vnodes = get_vnode_info();
 	nr_copies = get_nr_copies(vnodes);
+
+	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(vnodes, oid, i);
+		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			ret = 0;
 			break;

@@ -63,6 +63,7 @@ static int forward_read_obj_req(struct request *req)
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	uint64_t oid = hdr.oid;
 	int nr_copies;
 
@@ -74,8 +75,9 @@ static int forward_read_obj_req(struct request *req)
 		nr_copies = get_nr_copies(req->vnodes);
 
 	/* TODO: we can do better; we need to check this first */
+	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(req->vnodes, oid, i);
+		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			ret = do_local_io(req, hdr.epoch);
 			if (ret != SD_RES_SUCCESS)
@@ -86,7 +88,7 @@ static int forward_read_obj_req(struct request *req)
 
 read_remote:
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(req->vnodes, oid, i);
+		v = obj_vnodes[i];
 		if (vnode_is_local(v))
 			continue;
 
@@ -122,6 +124,7 @@ int forward_write_obj_req(struct request *req)
 	struct sd_obj_req hdr = *(struct sd_obj_req *)&req->rq;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	uint64_t oid = hdr.oid;
 	int nr_copies;
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
@@ -139,8 +142,9 @@ int forward_write_obj_req(struct request *req)
 	wlen = hdr.data_length;
 
 	nr_copies = get_nr_copies(req->vnodes);
+	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(req->vnodes, oid, i);
+		v = obj_vnodes[i];
 
 		addr_to_str(name, sizeof(name), v->addr, 0);
 
@@ -945,6 +949,7 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 {
 	struct sd_obj_req hdr;
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	int i, fd, ret;
 	char name[128];
 
@@ -957,10 +962,11 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 		}
 	}
 
+	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		unsigned rlen = 0, wlen = datalen;
 
-		v = oid_to_vnode(vnodes, oid, i);
+		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			ret = write_object_local(oid, data, datalen, offset,
 						 flags, nr_copies, node_version,
@@ -1041,12 +1047,14 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	char name[128];
 	int i = 0, fd, ret, last_error = SD_RES_SUCCESS;
 
 	/* search a local object first */
+	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(vnodes, oid, i);
+		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			ret = read_object_local(oid, data, datalen, offset,
 						nr_copies, node_version);
@@ -1064,8 +1072,7 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 	for (i = 0; i < nr_copies; i++) {
 		unsigned wlen = 0, rlen = datalen;
 
-		v = oid_to_vnode(vnodes, oid, i);
-
+		v = obj_vnodes[i];
 		addr_to_str(name, sizeof(name), v->addr, 0);
 
 		fd = connect_to(name, v->port);
@@ -1108,13 +1115,14 @@ int remove_object(struct vnode_info *vnodes, uint32_t node_version,
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	int i = 0, fd, ret, err = 0;
 
+	oid_to_vnodes(vnodes, oid, nr, obj_vnodes);
 	for (i = 0; i < nr; i++) {
 		unsigned wlen = 0, rlen = 0;
 
-		v = oid_to_vnode(vnodes, oid, i);
-
+		v = obj_vnodes[i];
 		addr_to_str(name, sizeof(name), v->addr, 0);
 
 		fd = connect_to(name, v->port);

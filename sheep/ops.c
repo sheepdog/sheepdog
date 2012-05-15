@@ -644,15 +644,17 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	unsigned wlen, rlen;
 	char name[128];
 	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	struct sd_obj_req hdr;
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
 	struct siocb iocb;
 	int fd;
 
 	nr_copies = get_nr_copies(req->vnodes);
-	for (i = 0; i < nr_copies; i++) {
-		v = oid_to_vnode(req->vnodes, oid, i);
+	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
+	for (i = 0; i < nr_copies; i++) {
+		v = obj_vnodes[i];
 		addr_to_str(name, sizeof(name), v->addr, 0);
 
 		if (vnode_is_local(v)) {

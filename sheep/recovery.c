@@ -378,9 +378,14 @@ err:
 static int get_replica_idx(struct recovery_work *rw, uint64_t oid, int *copy_nr)
 {
 	int i, ret = -1;
+	int idx_buf[SD_MAX_COPIES];
+
 	*copy_nr = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
+	obj_to_sheeps(rw->cur_vnodes, rw->cur_nr_vnodes, oid,
+				*copy_nr, idx_buf);
+
 	for (i = 0; i < *copy_nr; i++) {
-		int n = obj_to_sheep(rw->cur_vnodes, rw->cur_nr_vnodes, oid, i);
+		int n = idx_buf[i];
 		if (vnode_is_local(&rw->cur_vnodes[n])) {
 			ret = i;
 			break;
@@ -657,10 +662,12 @@ static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_n
 	struct sd_vnode *nodes = rw->cur_vnodes;
 	int nodes_nr = rw->cur_nr_vnodes;
 	int nr_objs = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
+	int idx_buf[SD_MAX_COPIES];
 
 	for (i = 0; i < list_nr; i++) {
+		obj_to_sheeps(nodes, nodes_nr, list[i], nr_objs, idx_buf);
 		for (cp = 0; cp < nr_objs; cp++) {
-			idx = obj_to_sheep(nodes, nodes_nr, list[i], cp);
+			idx = idx_buf[cp];
 			if (vnode_is_local(&nodes[idx]))
 				break;
 		}
