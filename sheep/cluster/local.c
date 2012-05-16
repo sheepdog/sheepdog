@@ -53,10 +53,8 @@ struct local_event {
 
 	enum cluster_join_result join_result;
 
-	void (*block_cb)(void *arg);
-
 	int blocked; /* set non-zero when sheep must block this event */
-	int callbacked; /* set non-zero if sheep already called block_cb() */
+	int callbacked; /* set non-zero after sd_block_handler() was called */
 };
 
 
@@ -215,7 +213,7 @@ static void shm_queue_init(void)
 
 static void add_event(enum local_event_type type,
 		      struct sd_node *node, void *buf,
-		      size_t buf_len, void (*block_cb)(void *arg))
+		      size_t buf_len, int blocked)
 {
 	int idx;
 	struct sd_node *n;
@@ -250,8 +248,7 @@ static void add_event(enum local_event_type type,
 		memmove(p, p + 1, sizeof(*p) * (ev.nr_nodes - idx));
 		break;
 	case EVENT_NOTIFY:
-		ev.blocked = !!block_cb;
-		ev.block_cb = block_cb;
+		ev.blocked = blocked;
 		break;
 	}
 
@@ -273,7 +270,7 @@ static void check_pids(void *arg)
 
 	for (i = 0; i < nr; i++)
 		if (!process_exists(pids[i]))
-			add_event(EVENT_LEAVE, nodes + i, NULL, 0, NULL);
+			add_event(EVENT_LEAVE, nodes + i, NULL, 0, 0);
 
 	shm_queue_unlock();
 
@@ -329,7 +326,7 @@ static int local_join(struct sd_node *myself,
 
 	shm_queue_lock();
 
-	add_event(EVENT_JOIN, &this_node, opaque, opaque_len, NULL);
+	add_event(EVENT_JOIN, &this_node, opaque, opaque_len, 0);
 
 	shm_queue_unlock();
 
@@ -340,25 +337,34 @@ static int local_leave(void)
 {
 	shm_queue_lock();
 
-	add_event(EVENT_LEAVE, &this_node, NULL, 0, NULL);
+	add_event(EVENT_LEAVE, &this_node, NULL, 0, 0);
 
 	shm_queue_unlock();
 
 	return 0;
 }
 
-static int local_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
+static int local_notify(void *msg, size_t msg_len)
 {
 	shm_queue_lock();
 
-	add_event(EVENT_NOTIFY, &this_node, msg, msg_len, block_cb);
+	add_event(EVENT_NOTIFY, &this_node, msg, msg_len, 0);
 
 	shm_queue_unlock();
 
 	return 0;
 }
 
-static void local_block(struct work *work)
+static void local_block(void)
+{
+	shm_queue_lock();
+
+	add_event(EVENT_NOTIFY, &this_node, NULL, 0, 1);
+
+	shm_queue_unlock();
+}
+
+static void local_unblock(void *msg, size_t msg_len)
 {
 	struct local_event *ev;
 
@@ -366,17 +372,15 @@ static void local_block(struct work *work)
 
 	ev = shm_queue_peek();
 
-	ev->block_cb(ev->buf);
 	ev->blocked = 0;
+	ev->buf_len = msg_len;
+	if (msg)
+		memcpy(ev->buf, msg, msg_len);
 	msync(ev, sizeof(*ev), MS_SYNC);
 
 	shm_queue_notify();
 
 	shm_queue_unlock();
-}
-
-static void local_block_done(struct work *work)
-{
 }
 
 static int local_dispatch(void)
@@ -385,10 +389,6 @@ static int local_dispatch(void)
 	struct signalfd_siginfo siginfo;
 	struct local_event *ev;
 	enum cluster_join_result res;
-	static struct work work = {
-		.fn = local_block,
-		.done = local_block_done,
-	};
 
 	dprintf("read siginfo\n");
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
@@ -438,12 +438,10 @@ static int local_dispatch(void)
 		break;
 	case EVENT_NOTIFY:
 		if (ev->blocked) {
-			if (node_eq(&ev->sender, &this_node)) {
-				if (!ev->callbacked) {
-					queue_work(local_block_wq, &work);
-
-					ev->callbacked = 1;
-				}
+			if (node_eq(&ev->sender, &this_node) &&
+			    !ev->callbacked) {
+				sd_block_handler();
+				ev->callbacked = 1;
 			}
 			goto out;
 		}
@@ -466,6 +464,8 @@ struct cluster_driver cdrv_local = {
 	.join       = local_join,
 	.leave      = local_leave,
 	.notify     = local_notify,
+	.block      = local_block,
+	.unblock    = local_unblock,
 	.dispatch   = local_dispatch,
 };
 

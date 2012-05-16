@@ -29,10 +29,7 @@ static struct cpg_name cpg_group = { 8, "sheepdog" };
 static corosync_cfg_handle_t cfg_handle;
 static struct cpg_node this_node;
 
-static struct work_queue *corosync_block_wq;
-
 static LIST_HEAD(corosync_event_list);
-static LIST_HEAD(corosync_block_list);
 
 static struct cpg_node cpg_nodes[SD_MAX_NODES];
 static size_t nr_cpg_nodes;
@@ -206,24 +203,6 @@ retry:
 	return 0;
 }
 
-static void corosync_block(struct work *work)
-{
-	struct corosync_block_msg *bm = container_of(work, typeof(*bm), work);
-
-	bm->cb(bm->msg);
-}
-
-static void corosync_block_done(struct work *work)
-{
-	struct corosync_block_msg *bm = container_of(work, typeof(*bm), work);
-
-	send_message(COROSYNC_MSG_TYPE_UNBLOCK, 0, &this_node, NULL, 0,
-		     bm->msg, bm->msg_len);
-
-	free(bm->msg);
-	free(bm);
-}
-
 static struct corosync_event *find_block_event(enum corosync_event_type type,
 					       struct cpg_node *sender)
 {
@@ -277,7 +256,6 @@ static void build_node_list(struct cpg_node *nodes, size_t nr_nodes,
  */
 static int __corosync_dispatch_one(struct corosync_event *cevent)
 {
-	struct corosync_block_msg *bm;
 	enum cluster_join_result res;
 	struct sd_node entries[SD_MAX_NODES];
 	int idx;
@@ -344,18 +322,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		if (cevent->blocked) {
 			if (cpg_node_equal(&cevent->sender, &this_node) &&
 			    !cevent->callbacked) {
-				/* call a block callback function from a worker thread */
-				if (list_empty(&corosync_block_list))
-					panic("cannot call block callback\n");
-
-				bm = list_first_entry(&corosync_block_list,
-						      typeof(*bm), list);
-				list_del(&bm->list);
-
-				bm->work.fn = corosync_block;
-				bm->work.done = corosync_block_done;
-				queue_work(corosync_block_wq, &bm->work);
-
+				sd_block_handler();
 				cevent->callbacked = 1;
 			}
 
@@ -680,12 +647,6 @@ static int corosync_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	corosync_block_wq = init_work_queue(1);
-	if (!corosync_block_wq) {
-		eprintf("failed to create corosync workqueue: %m\n");
-		return -1;
-	}
-
 	return fd;
 }
 
@@ -725,31 +686,22 @@ static int corosync_leave(void)
 			    NULL, 0);
 }
 
-static int corosync_notify(void *msg, size_t msg_len, void (*block_cb)(void *))
+static void corosync_block(void)
 {
-	int ret;
-	struct corosync_block_msg *bm;
+	send_message(COROSYNC_MSG_TYPE_BLOCK, 0, &this_node, NULL, 0,
+			    NULL, 0);
+}
 
-	if (block_cb) {
-		bm = zalloc(sizeof(*bm));
-		if (!bm)
-			panic("failed to allocate memory\n");
-		bm->msg = zalloc(msg_len);
-		if (!bm->msg)
-			panic("failed to allocate memory\n");
+static void corosync_unblock(void *msg, size_t msg_len)
+{
+	send_message(COROSYNC_MSG_TYPE_UNBLOCK, 0, &this_node, NULL, 0,
+		     msg, msg_len);
+}
 
-		memcpy(bm->msg, msg, msg_len);
-		bm->msg_len = msg_len;
-		bm->cb = block_cb;
-		list_add_tail(&bm->list, &corosync_block_list);
-
-		ret = send_message(COROSYNC_MSG_TYPE_BLOCK, 0, &this_node,
-				   NULL, 0, NULL, 0);
-	} else
-		ret = send_message(COROSYNC_MSG_TYPE_NOTIFY, 0, &this_node,
-				   NULL, 0, msg, msg_len);
-
-	return ret;
+static int corosync_notify(void *msg, size_t msg_len)
+{
+	return send_message(COROSYNC_MSG_TYPE_NOTIFY, 0, &this_node,
+			   NULL, 0, msg, msg_len);
 }
 
 static int corosync_dispatch(void)
@@ -770,6 +722,8 @@ struct cluster_driver cdrv_corosync = {
 	.join       = corosync_join,
 	.leave      = corosync_leave,
 	.notify     = corosync_notify,
+	.block      = corosync_block,
+	.unblock    = corosync_unblock,
 	.dispatch   = corosync_dispatch,
 };
 

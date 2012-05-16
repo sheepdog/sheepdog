@@ -265,9 +265,10 @@ int main(int argc, char **argv)
 	sys->recovery_wqueue = init_work_queue(1);
 	sys->deletion_wqueue = init_work_queue(1);
 	sys->flush_wqueue = init_work_queue(1);
+	sys->block_wqueue = init_work_queue(1);
 	if (!sys->event_wqueue || !sys->gateway_wqueue || !sys->io_wqueue ||
 	    !sys->recovery_wqueue || !sys->deletion_wqueue ||
-	    !sys->flush_wqueue)
+	    !sys->flush_wqueue || !sys->block_wqueue)
 		exit(1);
 
 	ret = init_signal();

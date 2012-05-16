@@ -46,10 +46,8 @@ struct acrd_event {
 
 	enum cluster_join_result join_result;
 
-	void (*block_cb)(void *arg);
-
 	int blocked; /* set non-zero when sheep must block this event */
-	int callbacked; /* set non-zero if sheep already called block_cb() */
+	int callbacked; /* set non-zero after sd_block_handler() was called */
 };
 
 static struct sd_node this_node;
@@ -246,7 +244,7 @@ again:
 
 static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 		     struct sd_node *node, void *buf,
-		     size_t buf_len, void (*block_cb)(void *arg))
+		     size_t buf_len, int blocked)
 {
 	int idx;
 	struct sd_node *n;
@@ -257,6 +255,7 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 
 	ev.type = type;
 	ev.sender = *node;
+	ev.blocked = blocked;
 	ev.buf_len = buf_len;
 	if (buf)
 		memcpy(ev.buf, buf, buf_len);
@@ -265,7 +264,6 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 
 	switch (type) {
 	case EVENT_JOIN:
-		ev.blocked = 1;
 		ev.nodes[ev.nr_nodes] = *node;
 		ev.ids[ev.nr_nodes] = this_id; /* must be local node */
 		ev.nr_nodes++;
@@ -282,8 +280,6 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 		memmove(i, i + 1, sizeof(*i) * (ev.nr_nodes - idx));
 		break;
 	case EVENT_NOTIFY:
-		ev.blocked = !!block_cb;
-		ev.block_cb = block_cb;
 		break;
 	}
 
@@ -412,8 +408,7 @@ static void __acrd_leave(struct work *work)
 
 	for (i = 0; i < nr_nodes; i++) {
 		if (ids[i] == info->left_nodeid) {
-			add_event(ah, EVENT_LEAVE, nodes + i, NULL, 0,
-				  NULL);
+			add_event(ah, EVENT_LEAVE, nodes + i, NULL, 0, 0);
 			break;
 		}
 	}
@@ -517,20 +512,26 @@ static int accord_join(struct sd_node *myself,
 {
 	this_node = *myself;
 
-	return add_event(ahandle, EVENT_JOIN, &this_node, opaque, opaque_len, NULL);
+	return add_event(ahandle, EVENT_JOIN, &this_node,
+			 opaque, opaque_len, 1);
 }
 
 static int accord_leave(void)
 {
-	return add_event(ahandle, EVENT_LEAVE, &this_node, NULL, 0, NULL);
+	return add_event(ahandle, EVENT_LEAVE, &this_node, NULL, 0, 0);
 }
 
-static int accord_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
+static int accord_notify(void *msg, size_t msg_len)
 {
-	return add_event(ahandle, EVENT_NOTIFY, &this_node, msg, msg_len, block_cb);
+	return add_event(ahandle, EVENT_NOTIFY, &this_node, msg, msg_len, 0);
 }
 
-static void acrd_block(struct work *work)
+static void accord_block(void)
+{
+	return add_event(ahandle, EVENT_NOTIFY, &this_node, NULL, 0, 1);
+}
+
+static void acrd_unblock(void *msg, size_t msg_len)
 {
 	struct acrd_event ev;
 
@@ -538,16 +539,14 @@ static void acrd_block(struct work *work)
 
 	acrd_queue_pop(ahandle, &ev);
 
-	ev.block_cb(ev.buf);
 	ev.blocked = 0;
+	ev.buf_len = msg_len;
+	if (msg)
+		memcpy(ev.buf, msg, msg_len);
 
 	acrd_queue_push_back(ahandle, &ev);
 
 	pthread_mutex_unlock(&queue_lock);
-}
-
-static void acrd_block_done(struct work *work)
-{
 }
 
 static int accord_dispatch(void)
@@ -556,10 +555,6 @@ static int accord_dispatch(void)
 	eventfd_t value;
 	struct acrd_event ev;
 	enum cluster_join_result res;
-	static struct work work = {
-		.fn = acrd_block,
-		.done = acrd_block_done,
-	};
 
 	dprintf("read event\n");
 	ret = eventfd_read(efd, &value);
@@ -612,11 +607,10 @@ static int accord_dispatch(void)
 	case EVENT_NOTIFY:
 		if (ev.blocked) {
 			if (node_cmp(&ev.sender, &this_node) == 0 && !ev.callbacked) {
-				queue_work(acrd_wq, &work);
-
 				ev.callbacked = 1;
 
 				acrd_queue_push_back(ahandle, &ev);
+				sd_block_handler();
 			} else
 				acrd_queue_push_back(ahandle, NULL);
 
@@ -639,6 +633,8 @@ struct cluster_driver cdrv_accord = {
 	.join       = accord_join,
 	.leave      = accord_leave,
 	.notify     = accord_notify,
+	.block      = accord_block,
+	.unblock    = accord_unblock,
 	.dispatch   = accord_dispatch,
 };
 

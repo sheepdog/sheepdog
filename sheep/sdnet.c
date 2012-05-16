@@ -319,7 +319,7 @@ static void queue_request(struct request *req)
 		req->work.fn = do_local_request;
 		req->work.done = local_op_done;
 	} else if (is_cluster_op(req->op)) {
-		/* directly executed in the main thread */;
+		;
 	} else {
 		eprintf("unknown operation %d\n", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;

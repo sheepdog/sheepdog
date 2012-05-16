@@ -209,29 +209,70 @@ int get_nr_copies(struct vnode_info *vnode_info)
 	return min(vnode_info->nr_zones, sys->nr_copies);
 }
 
+static struct vdi_op_message *prepare_cluster_msg(struct request *req,
+		size_t *sizep)
+{
+	struct vdi_op_message *msg;
+	size_t size;
+
+	if (has_process_main(req->op))
+		size = sizeof(*msg) + req->rq.data_length;
+	else
+		size = sizeof(*msg);
+
+	msg = zalloc(size);
+	if (!msg) {
+		eprintf("failed to allocate memory\n");
+		return NULL;
+	}
+
+	memcpy(&msg->req, &req->rq, sizeof(struct sd_req));
+	memcpy(&msg->rsp, &req->rp, sizeof(struct sd_rsp));
+
+	if (has_process_main(req->op))
+		memcpy(msg->data, req->data, req->rq.data_length);
+
+	*sizep = size;
+	return msg;
+}
+
+static void do_cluster_request(struct work *work)
+{
+	struct request *req = container_of(work, struct request, work);
+	int ret;
+
+	ret = do_process_work(req->op, &req->rq, &req->rp, req->data);
+	req->rp.result = ret;
+}
+
+static void cluster_op_done(struct work *work)
+{
+	struct request *req = container_of(work, struct request, work);
+	struct vdi_op_message *msg;
+	size_t size;
+
+	msg = prepare_cluster_msg(req, &size);
+	if (!msg)
+		panic();
+
+	sys->cdrv->unblock(msg, size);
+}
+
 /*
  * Perform a blocked cluster operation.
  *
  * Must run in the main thread as it access unlocked state like
  * sys->pending_list.
  */
-static void do_cluster_op(void *arg)
+void sd_block_handler(void)
 {
-	struct vdi_op_message *msg = arg;
-	int ret;
-	struct request *req;
-	void *data;
+	struct request *req = list_first_entry(&sys->pending_list,
+						struct request, pending_list);
 
-	req = list_first_entry(&sys->pending_list, struct request, pending_list);
+	req->work.fn = do_cluster_request;
+	req->work.done = cluster_op_done;
 
-	if (has_process_main(req->op))
-		data = msg->data;
-	else
-		data = req->data;
-	ret = do_process_work(req->op, (const struct sd_req *)&msg->req,
-			      (struct sd_rsp *)&msg->rsp, data);
-
-	msg->rsp.result = ret;
+	queue_work(sys->block_wqueue, &req->work);
 }
 
 /*
@@ -241,40 +282,28 @@ static void do_cluster_op(void *arg)
  * Must run in the main thread as it access unlocked state like
  * sys->pending_list.
  */
-static void do_cluster_request(struct request *req)
+static void queue_cluster_request(struct request *req)
 {
-	struct sd_req *hdr = &req->rq;
-	struct vdi_op_message *msg;
-	size_t size;
+	eprintf("%p %x\n", req, req->rq.opcode);
 
-	eprintf("%p %x\n", req, hdr->opcode);
+	if (has_process_work(req->op)) {
+		list_add_tail(&req->pending_list, &sys->pending_list);
+		sys->cdrv->block();
+	} else {
+		struct vdi_op_message *msg;
+		size_t size;
 
-	if (has_process_main(req->op))
-		size = sizeof(*msg) + hdr->data_length;
-	else
-		size = sizeof(*msg);
+		msg = prepare_cluster_msg(req, &size);
+		if (!msg)
+			return;
 
-	msg = zalloc(size);
-	if (!msg) {
-		eprintf("failed to allocate memory\n");
-		return;
-	}
+		list_add_tail(&req->pending_list, &sys->pending_list);
 
-	msg->req = *((struct sd_vdi_req *)&req->rq);
-	msg->rsp = *((struct sd_vdi_rsp *)&req->rp);
-	if (has_process_main(req->op))
-		memcpy(msg->data, req->data, hdr->data_length);
-
-	list_add_tail(&req->pending_list, &sys->pending_list);
-
-	if (has_process_work(req->op))
-		sys->cdrv->notify(msg, size, do_cluster_op);
-	else {
 		msg->rsp.result = SD_RES_SUCCESS;
-		sys->cdrv->notify(msg, size, NULL);
-	}
+		sys->cdrv->notify(msg, size);
 
-	free(msg);
+		free(msg);
+	}
 }
 
 static void group_handler(int listen_fd, int events, void *data)
@@ -1066,7 +1095,7 @@ static void process_request_queue(void)
 			 * directly from the main thread.  It's the cluster
 			 * drivers job to ensure we avoid blocking on I/O here.
 			 */
-			do_cluster_request(req);
+			queue_cluster_request(req);
 		} else { /* is_local_op(req->op) */
 			queue_work(sys->io_wqueue, &req->work);
 		}

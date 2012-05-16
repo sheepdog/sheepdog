@@ -76,10 +76,8 @@ struct zk_event {
 
 	enum cluster_join_result join_result;
 
-	void (*block_cb)(void *arg);
-
 	int blocked; /* set non-zero when sheep must block this event */
-	int callbacked; /* set non-zero if sheep already called block_cb() */
+	int callbacked; /* set non-zero after sd_block_handler() was called */
 
 	size_t buf_len;
 	uint8_t buf[MAX_EVENT_BUF_SIZE];
@@ -498,53 +496,46 @@ static void zk_member_init(zhandle_t *zh)
 /* ZooKeeper driver APIs */
 
 static zhandle_t *zhandle;
-
-static struct work_queue *zk_block_wq;
-
 static struct zk_node this_node;
 
 static int add_event(zhandle_t *zh, enum zk_event_type type,
 		     struct zk_node *znode, void *buf,
-		     size_t buf_len, void (*block_cb)(void *arg))
+		     size_t buf_len, int blocked)
 {
-	int nr_levents;
-	struct zk_event ev, *lev;
-	eventfd_t value = 1;
+	struct zk_event ev;
 
 	ev.type = type;
 	ev.sender = *znode;
 	ev.buf_len = buf_len;
 	ev.callbacked = 0;
-	ev.blocked = 0;
+	ev.blocked = blocked;
 	if (buf)
 		memcpy(ev.buf, buf, buf_len);
-
-	switch (type) {
-	case EVENT_JOIN:
-		ev.blocked = 1;
-		break;
-	case EVENT_LEAVE:
-		lev = &zk_levents[zk_levent_tail%SD_MAX_NODES];
-
-		memcpy(lev, &ev, sizeof(ev));
-
-		nr_levents = uatomic_add_return(&nr_zk_levents, 1);
-		dprintf("nr_zk_levents:%d, tail:%u\n", nr_levents, zk_levent_tail);
-
-		zk_levent_tail++;
-
-		/* manual notify */
-		dprintf("write event to efd:%d\n", efd);
-		eventfd_write(efd, value);
-		goto out;
-	case EVENT_NOTIFY:
-		ev.blocked = !!block_cb;
-		ev.block_cb = block_cb;
-		break;
-	}
-
 	zk_queue_push(zh, &ev);
-out:
+	return 0;
+}
+
+static int leave_event(zhandle_t *zh, struct zk_node *znode)
+{
+	int nr_levents;
+	struct zk_event *ev;
+	const eventfd_t value = 1;
+
+	ev = &zk_levents[zk_levent_tail % SD_MAX_NODES];
+	ev->type = EVENT_LEAVE;
+	ev->sender = *znode;
+	ev->buf_len = 0;
+	ev->callbacked = 0;
+	ev->blocked = 0;
+
+	nr_levents = uatomic_add_return(&nr_zk_levents, 1);
+	dprintf("nr_zk_levents:%d, tail:%u\n", nr_levents, zk_levent_tail);
+
+	zk_levent_tail++;
+
+	/* manual notify */
+	dprintf("write event to efd:%d\n", efd);
+	eventfd_write(efd, value);
 	return 0;
 }
 
@@ -586,7 +577,7 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path, void* 
 		str_to_node(p, &znode.node);
 		dprintf("zk_nodes leave:%s\n", node_to_str(&znode.node));
 
-		add_event(zh, EVENT_LEAVE, &znode, NULL, 0, NULL);
+		leave_event(zh, &znode);
 		return;
 	}
 
@@ -674,12 +665,6 @@ static int zk_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	zk_block_wq = init_work_queue(1);
-	if (!zk_block_wq) {
-		eprintf("failed to create zookeeper workqueue: %m\n");
-		return -1;
-	}
-
 	return efd;
 }
 
@@ -704,7 +689,7 @@ static int zk_join(struct sd_node *myself,
 
 	dprintf("clientid:%ld\n", cid->client_id);
 
-	rc = add_event(zhandle, EVENT_JOIN, &this_node, opaque, opaque_len, NULL);
+	rc = add_event(zhandle, EVENT_JOIN, &this_node, opaque, opaque_len, 1);
 
 	return rc;
 }
@@ -717,12 +702,17 @@ static int zk_leave(void)
 	return zk_delete(zhandle, path, -1);
 }
 
-static int zk_notify(void *msg, size_t msg_len, void (*block_cb)(void *arg))
+static int zk_notify(void *msg, size_t msg_len)
 {
-	return add_event(zhandle, EVENT_NOTIFY, &this_node, msg, msg_len, block_cb);
+	return add_event(zhandle, EVENT_NOTIFY, &this_node, msg, msg_len, 0);
 }
 
-static void zk_block(struct work *work)
+static void zk_block(void)
+{
+	add_event(zhandle, EVENT_NOTIFY, &this_node, NULL, 0, 1);
+}
+
+static void zk_unblock(void *msg, size_t msg_len)
 {
 	int rc;
 	struct zk_event ev;
@@ -731,8 +721,10 @@ static void zk_block(struct work *work)
 	rc = zk_queue_pop(zhandle, &ev);
 	assert(rc == 0);
 
-	ev.block_cb(ev.buf);
 	ev.blocked = 0;
+	ev.buf_len = msg_len;
+	if (msg)
+		memcpy(ev.buf, msg, msg_len);
 
 	zk_queue_push_back(zhandle, &ev);
 
@@ -743,10 +735,6 @@ static void zk_block(struct work *work)
 	eventfd_write(efd, value);
 }
 
-static void zk_block_done(struct work *work)
-{
-}
-
 static int zk_dispatch(void)
 {
 	int ret, rc, retry;
@@ -755,10 +743,6 @@ static int zk_dispatch(void)
 	struct zk_event ev;
 	struct zk_node *n;
 	enum cluster_join_result res;
-	static struct work work = {
-		.fn = zk_block,
-		.done = zk_block_done,
-	};
 
 	dprintf("read event\n");
 	ret = eventfd_read(efd, &value);
@@ -866,13 +850,10 @@ static int zk_dispatch(void)
 		if (ev.blocked) {
 			if (node_eq(&ev.sender.node, &this_node.node)
 					&& !ev.callbacked) {
-				ev.callbacked = 1;
-
 				uatomic_inc(&zk_notify_blocked);
-
+				ev.callbacked = 1;
 				zk_queue_push_back(zhandle, &ev);
-
-				queue_work(zk_block_wq, &work);
+				sd_block_handler();
 			} else
 				zk_queue_push_back(zhandle, NULL);
 
@@ -893,6 +874,8 @@ struct cluster_driver cdrv_zookeeper = {
 	.join       = zk_join,
 	.leave      = zk_leave,
 	.notify     = zk_notify,
+	.block      = zk_block,
+	.unblock    = zk_unblock,
 	.dispatch   = zk_dispatch,
 };
 

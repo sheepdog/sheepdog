@@ -76,15 +76,23 @@ struct cluster_driver {
 	 * This function sends 'msg' to all the nodes.  The notified messages
 	 * can be read through sd_notify_handler().
 	 *
-	 * If 'block_cb' is specified, block_cb() is called before 'msg' is
-	 * notified to all the nodes.  All the cluster events including this
-	 * notification are blocked until block_cb() returns or this blocking
-	 * node leaves the cluster.  The sheep daemon can sleep in block_cb(),
-	 * so this callback must be not called from the dispatch (main) thread.
-	 *
 	 * Returns zero on success, -1 on error
 	 */
-	int (*notify)(void *msg, size_t msg_len, void (*block_cb)(void *arg));
+	int (*notify)(void *msg, size_t msg_len);
+
+	/*
+	 * Send a message to all nodes to block further events.
+	 *
+	 * Once the cluster driver has ensured that events are blocked on all
+	 * nodes it needs to call sd_block_handler() on the node where ->block
+	 * was called.
+	 */
+	void (*block)(void);
+
+	/*
+	 * Unblock events on all nodes, and send a a message to all nodes.
+	 */
+	void (*unblock)(void *msg, size_t msg_len);
 
 	/*
 	 * Dispatch handlers
@@ -189,6 +197,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 		size_t nr_members);
 void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len);
+void sd_block_handler(void);
 enum cluster_join_result sd_check_join_cb(struct sd_node *joining,
 		void *opaque);
 
