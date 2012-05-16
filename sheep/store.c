@@ -428,7 +428,7 @@ void do_io_request(struct work *work)
 	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
 		ret = do_local_io(req, epoch);
 	} else {
-		if (bypass_object_cache(hdr)) {
+		if (!sys->enable_write_cache || bypass_object_cache(hdr)) {
 			/* fix object consistency when we read the object for the first time */
 			if (req->check_consistency) {
 				ret = fix_object_consistency(req);
@@ -814,7 +814,7 @@ static int init_store_driver(void)
 	return sd_store->init(obj_path);
 }
 
-int init_store(const char *d)
+int init_store(const char *d, int enable_write_cache)
 {
 	int ret;
 
@@ -846,9 +846,13 @@ int init_store(const char *d)
 	if (ret)
 		return ret;
 
-	ret = object_cache_init(d);
-	if (ret)
-		return 1;
+	if (enable_write_cache) {
+		sys->enable_write_cache = 1;
+		ret = object_cache_init(d);
+		if (ret)
+			return 1;
+	}
+
 	return ret;
 }
 
@@ -953,7 +957,7 @@ int write_object(struct vnode_info *vnodes, uint32_t node_version,
 	int i, fd, ret;
 	char name[128];
 
-	if (object_is_cached(oid)) {
+	if (sys->enable_write_cache && object_is_cached(oid)) {
 		ret = write_inode_cache(oid, data, datalen, offset,
 			flags, nr_copies, node_version, create);
 		if (ret != 0) {
@@ -1087,7 +1091,7 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 	char name[128];
 	int i = 0, fd, ret, last_error = SD_RES_SUCCESS;
 
-	if (object_is_cached(oid)) {
+	if (sys->enable_write_cache && object_is_cached(oid)) {
 		ret = read_object_cache(oid, data, datalen, offset,
 					nr_copies, node_version);
 		if (ret != SD_RES_SUCCESS)

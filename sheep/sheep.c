@@ -47,11 +47,12 @@ static struct option const long_options[] = {
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"vnodes", required_argument, NULL, 'v'},
+	{"disable-cache", no_argument, NULL, 'W'},
 	{"zone", required_argument, NULL, 'z'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "ac:dDfg:Ghi:l:op:v:z:";
+static const char *short_options = "ac:dDfg:Ghi:l:op:v:Wz:";
 
 static void usage(int status)
 {
@@ -75,6 +76,7 @@ Options:\n\
   -l, --loglevel          specify the level of logging detail\n\
   -p, --port              specify the TCP port on which to listen\n\
   -v, --vnodes            specify the number of virtual nodes\n\
+  -W, --disable-cache     disable writecache\n\
   -z, --zone              specify the zone id\n\
 ", PACKAGE_VERSION, program_name);
 	exit(status);
@@ -111,6 +113,7 @@ int main(int argc, char **argv)
 	int nr_vnodes = SD_DEFAULT_VNODES;
 	char *p;
 	struct cluster_driver *cdrv;
+	int enable_write_cache = 1; /* enabled by default */
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -184,6 +187,10 @@ int main(int argc, char **argv)
 			}
 			sys->this_node.zone = zone;
 			break;
+		case 'W':
+			vprintf(SDOG_INFO, "disable write cache\n");
+			enable_write_cache = 0;
+			break;
 		case 'v':
 			nr_vnodes = strtol(optarg, &p, 10);
 			if (optarg == p || nr_vnodes < 0 || SD_MAX_VNODES < nr_vnodes) {
@@ -234,7 +241,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_store(dir);
+	ret = init_store(dir, enable_write_cache);
 	if (ret)
 		exit(1);
 

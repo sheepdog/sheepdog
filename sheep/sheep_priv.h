@@ -100,6 +100,8 @@ struct cluster_info {
 	struct cluster_driver *cdrv;
 	const char *cdrv_option;
 
+	int enable_write_cache;
+
 	/* set after finishing the JOIN procedure */
 	int join_finished;
 	struct sd_node this_node;
@@ -217,7 +219,7 @@ extern struct objlist_cache obj_list_cache;
 
 int create_listen_port(int port, void *data);
 
-int init_store(const char *dir);
+int init_store(const char *dir, int enable_write_cache);
 int init_base_path(const char *dir);
 
 int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,

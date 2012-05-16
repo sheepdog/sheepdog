@@ -1017,7 +1017,7 @@ static int need_consistency_check(struct request *req)
 		/* only check consistency for data objects */
 		return 0;
 
-	if (object_is_cached(hdr->oid))
+	if (sys->enable_write_cache && object_is_cached(hdr->oid))
 		/* we don't check consistency for cached objects */
 		return 0;
 

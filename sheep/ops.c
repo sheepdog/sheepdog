@@ -162,7 +162,7 @@ static int cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	ret = del_vdi(hdr->epoch, data, hdr->data_length, &vid,
 		      hdr->snapid, &nr_copies);
 
-	if (ret == SD_RES_SUCCESS)
+	if (sys->enable_write_cache && ret == SD_RES_SUCCESS)
 		object_cache_delete(vid);
 	vdi_rsp->vdi_id = vid;
 	vdi_rsp->copies = nr_copies;
@@ -600,8 +600,12 @@ static int local_flush_vdi(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
 	uint64_t oid = hdr->oid;
 	uint32_t vid = oid_to_vid(oid);
-	struct object_cache *cache = find_object_cache(vid, 0);
+	struct object_cache *cache;
 
+	if (!sys->enable_write_cache)
+		return SD_RES_SUCCESS;
+
+	cache = find_object_cache(vid, 0);
 	if (cache) {
 		if (!sys->async_flush)
 			return object_cache_push(cache);

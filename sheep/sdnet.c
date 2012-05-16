@@ -194,7 +194,8 @@ static int check_request(struct request *req)
 	 * if we go for a cached object, we don't care if it is busy
 	 * or being recovered.
 	 */
-	if ((hdr->flags & SD_FLAG_CMD_CACHE) && object_is_cached(hdr->oid))
+	if (sys->enable_write_cache && (hdr->flags & SD_FLAG_CMD_CACHE) &&
+	    object_is_cached(hdr->oid))
 		return 0;
 
 	if (!req->local_oid && !req->local_cow_oid)
