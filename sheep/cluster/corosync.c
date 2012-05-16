@@ -36,6 +36,8 @@ static LIST_HEAD(corosync_block_list);
 
 static struct cpg_node cpg_nodes[SD_MAX_NODES];
 static size_t nr_cpg_nodes;
+static int self_elect;
+static int join_finished;
 
 /* event types which are dispatched in corosync_dispatch() */
 enum corosync_event_type {
@@ -67,7 +69,6 @@ struct corosync_event {
 
 	int blocked;
 	int callbacked;
-	int first_node;
 
 	struct list_head list;
 };
@@ -373,7 +374,6 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 static void __corosync_dispatch(void)
 {
 	struct corosync_event *cevent;
-	static int join_finished;
 	int done;
 
 	while (!list_empty(&corosync_event_list)) {
@@ -381,7 +381,7 @@ static void __corosync_dispatch(void)
 
 		/* update join status */
 		if (!join_finished && cevent->type == COROSYNC_EVENT_TYPE_JOIN) {
-			if (cevent->first_node) {
+			if (cevent->blocked && self_elect) {
 				join_finished = 1;
 				nr_cpg_nodes = 0;
 			}
@@ -528,6 +528,17 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 	__corosync_dispatch();
 }
 
+static void build_cpg_node_list(struct cpg_node *nodes,
+		const struct cpg_address *list, size_t nr)
+{
+	int i;
+
+	for (i = 0; i < nr; i++) {
+		nodes[i].nodeid = list[i].nodeid;
+		nodes[i].pid = list[i].pid;
+	}
+}
+
 static void cdrv_cpg_confchg(cpg_handle_t handle,
 			     const struct cpg_name *group_name,
 			     const struct cpg_address *member_list,
@@ -539,22 +550,19 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 {
 	struct corosync_event *cevent;
 	int i;
+	struct cpg_node member_sheep[SD_MAX_NODES];
 	struct cpg_node joined_sheep[SD_MAX_NODES];
 	struct cpg_node left_sheep[SD_MAX_NODES];
+	int promote = 1;
 
 	dprintf("mem:%zu, joined:%zu, left:%zu\n",
 		member_list_entries, joined_list_entries,
 		left_list_entries);
 
 	/* convert cpg_address to cpg_node */
-	for (i = 0; i < left_list_entries; i++) {
-		left_sheep[i].nodeid = left_list[i].nodeid;
-		left_sheep[i].pid = left_list[i].pid;
-	}
-	for (i = 0; i < joined_list_entries; i++) {
-		joined_sheep[i].nodeid = joined_list[i].nodeid;
-		joined_sheep[i].pid = joined_list[i].pid;
-	}
+	build_cpg_node_list(member_sheep, member_list, member_list_entries);
+	build_cpg_node_list(left_sheep, left_list, left_list_entries);
+	build_cpg_node_list(joined_sheep, joined_list, joined_list_entries);
 
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
@@ -604,13 +612,32 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		cevent->type = COROSYNC_EVENT_TYPE_JOIN;
 		cevent->sender = joined_sheep[i];
 		cevent->blocked = 1; /* FIXME: add explanation */
-		if (member_list_entries == joined_list_entries - left_list_entries &&
-		    cpg_node_equal(&joined_sheep[0], &this_node))
-			cevent->first_node = 1;
-
 		list_add_tail(&cevent->list, &corosync_event_list);
 	}
 
+	if (!join_finished) {
+		/*
+		 * Exactly one non-master member has seen join events for
+		 * all other members, because events are ordered.
+		 */
+		for (i = 0; i < member_list_entries; i++) {
+			cevent = find_block_event(COROSYNC_EVENT_TYPE_JOIN,
+					&member_sheep[i]);
+			if (!cevent) {
+				dprintf("Not promoting because member is "
+					"not in our event list.\n");
+				promote = 0;
+				break;
+			}
+		}
+
+		/*
+		 * If we see the join events for all nodes promote ourself to
+		 * master right here.
+		 */
+		if (promote)
+			self_elect = 1;
+	}
 	__corosync_dispatch();
 }
 
