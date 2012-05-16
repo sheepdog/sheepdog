@@ -29,7 +29,7 @@ dist-clean-local:
 	rm -f autoconf automake autoheader
 
 clean-generic:
-	rm -rf $(SPEC) $(TARFILE) cscope*
+	rm -rf $(SPEC) $(TARFILE) cscope* *.orig *.rej
 
 cscope:
 	@echo create cscope.out
