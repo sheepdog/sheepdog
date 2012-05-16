@@ -54,7 +54,7 @@ static int node_info(int argc, char **argv)
 {
 	int i, ret, success = 0;
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
-	char total_str[21], avail_str[21], vdi_size_str[21];
+	char total_str[UINT64_DECIMAL_SIZE], avail_str[UINT64_DECIMAL_SIZE], vdi_size_str[UINT64_DECIMAL_SIZE];
 
 	if (!raw_output)
 		printf("Id\tSize\tUsed\tUse%%\n");
@@ -65,7 +65,7 @@ static int node_info(int argc, char **argv)
 		unsigned wlen, rlen;
 		struct sd_node_req req;
 		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
-		char store_str[21], free_str[21];
+		char store_str[UINT64_DECIMAL_SIZE], free_str[UINT64_DECIMAL_SIZE];
 
 		addr_to_str(name, sizeof(name), node_list_entries[i].addr, 0);
 

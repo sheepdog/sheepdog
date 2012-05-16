@@ -26,6 +26,8 @@
 #define TEXT_NORMAL "\033[0m"
 #define TEXT_BOLD   "\033[1m"
 
+#define UINT64_DECIMAL_SIZE 21
+
 struct sd_option {
 	int val;
 	const char *name;
