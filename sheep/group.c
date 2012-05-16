@@ -732,39 +732,6 @@ void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len)
 	process_request_event_queues();
 }
 
-/*
- * Check whether the majority of Sheepdog nodes are still alive or not
- */
-static int check_majority(struct sd_node *nodes, int nr_nodes)
-{
-	int nr_majority, nr_reachable = 0, fd, i;
-	char name[INET6_ADDRSTRLEN];
-
-	nr_majority = nr_nodes / 2 + 1;
-
-	/* we need at least 3 nodes to handle network partition
-	 * failure */
-	if (nr_nodes < 3)
-		return 1;
-
-	for (i = 0; i < nr_nodes; i++) {
-		addr_to_str(name, sizeof(name), nodes[i].addr, 0);
-		fd = connect_to(name, nodes[i].port);
-		if (fd < 0)
-			continue;
-
-		close(fd);
-		nr_reachable++;
-		if (nr_reachable >= nr_majority) {
-			dprintf("the majority of nodes are alive\n");
-			return 1;
-		}
-	}
-	dprintf("%d, %d, %d\n", nr_nodes, nr_majority, nr_reachable);
-	eprintf("the majority of nodes are not alive\n");
-	return 0;
-}
-
 static void __sd_join(struct event_struct *cevent)
 {
 	struct work_join *w = container_of(cevent, struct work_join, cev);
@@ -796,12 +763,6 @@ static void __sd_join(struct event_struct *cevent)
 
 static void __sd_leave(struct event_struct *cevent)
 {
-	struct work_leave *w = container_of(cevent, struct work_leave, cev);
-
-	if (!check_majority(w->member_list, w->member_list_entries)) {
-		eprintf("perhaps a network partition has occurred?\n");
-		abort();
-	}
 }
 
 enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
