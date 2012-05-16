@@ -259,7 +259,6 @@ int forward_write_obj_req(struct request *req);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	       struct sd_node *entries, int *nr_entries);
-void do_cluster_request(struct work *work);
 
 int update_epoch_store(uint32_t epoch);
 int update_epoch_log(uint32_t epoch);

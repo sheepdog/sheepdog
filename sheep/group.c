@@ -209,6 +209,12 @@ int get_nr_copies(struct vnode_info *vnode_info)
 	return min(vnode_info->nr_zones, sys->nr_copies);
 }
 
+/*
+ * Perform a blocked cluster operation.
+ *
+ * Must run in the main thread as it access unlocked state like
+ * sys->pending_list.
+ */
 static void do_cluster_op(void *arg)
 {
 	struct vdi_op_message *msg = arg;
@@ -228,10 +234,16 @@ static void do_cluster_op(void *arg)
 	msg->rsp.result = ret;
 }
 
-void do_cluster_request(struct work *work)
+/*
+ * Execute a cluster operation by letting the cluster driver send it to all
+ * nodes in the cluster.
+ *
+ * Must run in the main thread as it access unlocked state like
+ * sys->pending_list.
+ */
+static void do_cluster_request(struct request *req)
 {
-	struct request *req = container_of(work, struct request, work);
-	struct sd_req *hdr = (struct sd_req *)&req->rq;
+	struct sd_req *hdr = &req->rq;
 	struct vdi_op_message *msg;
 	size_t size;
 
@@ -641,6 +653,12 @@ static void __sd_notify_done(struct event_struct *cevent)
 	req_done(req);
 }
 
+/*
+ * Pass on a notification message from the cluster driver.
+ *
+ * Must run in the main thread as it access unlocked state like
+ * sys->pending_list.
+ */
 void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len)
 {
 	struct event_struct *cevent;
@@ -1051,8 +1069,16 @@ static void process_request_queue(void)
 				queue_work(sys->io_wqueue, &req->work);
 			else
 				queue_work(sys->gateway_wqueue, &req->work);
-		} else /* (is_cluster_op(req->op) || is_local_op(req->op)) */
+		} else if (is_cluster_op(req->op)) {
+			/*
+			 * Cluster requests are handed off to the cluster driver
+			 * directly from the main thread.  It's the cluster
+			 * drivers job to ensure we avoid blocking on I/O here.
+			 */
+			do_cluster_request(req);
+		} else { /* is_local_op(req->op) */
 			queue_work(sys->io_wqueue, &req->work);
+		}
 	}
 }
 
