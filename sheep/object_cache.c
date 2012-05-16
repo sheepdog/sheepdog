@@ -43,18 +43,18 @@ static inline int hash(uint64_t vid)
 
 static uint64_t calc_object_bmap(size_t len, off_t offset)
 {
-	int i, j;
-	uint64_t bmap, shift = 1;
+	int start, end, nr;
+	uint64_t bmap = 0;
 
 	if (!len)
 		return 0;
 
-	i = offset / CACHE_BLOCK_SIZE;
-	j = (offset + len - 1) / CACHE_BLOCK_SIZE;
+	start = offset / CACHE_BLOCK_SIZE;
+	end = (offset + len - 1) / CACHE_BLOCK_SIZE;
 
-	bmap = (shift <<= i);
-	while (j - i++)
-		bmap |= (shift <<= 1);
+	nr = end - start + 1;
+	while (nr--)
+		set_bit(start + nr, &bmap);
 
 	return bmap;
 }
@@ -512,8 +512,8 @@ static int push_cache_object(uint32_t vid, uint32_t idx,
 	off_t offset;
 	unsigned data_length;
 	int ret = SD_RES_NO_MEM;
-	uint64_t shift, oid = idx_to_oid(vid, idx);
-	int i, nbits, first_dirty_bit, last_dirty_bit;
+	uint64_t oid = idx_to_oid(vid, idx);
+	int first_bit, last_bit;
 
 	dprintf("%"PRIx64", create %d\n", oid, create);
 
@@ -521,34 +521,14 @@ static int push_cache_object(uint32_t vid, uint32_t idx,
 		return SD_RES_SUCCESS;
 
 	memset(&fake_req, 0, sizeof(fake_req));
-	if (is_vdi_obj(oid))
-		nbits = DIV_ROUND_UP(SD_INODE_SIZE, CACHE_BLOCK_SIZE);
-	else
-		nbits = DIV_ROUND_UP(SD_DATA_OBJ_SIZE, CACHE_BLOCK_SIZE);
 
-	shift = 1;
-	first_dirty_bit = 0;
+	first_bit = ffsll(bmap) - 1;
+	last_bit = fls64(bmap) - 1;
 
-	for (i = 0; i < nbits; i++) {
-		if (bmap & (shift << i)) {
-			first_dirty_bit = i;
-			break;
-		}
-	}
-
-	shift =  (UINT64_C(1) << (nbits - 1));
-	last_dirty_bit = 0;
-	for (i = 0; i < nbits; i++) {
-		if (bmap & (shift >> i)) {
-			last_dirty_bit = nbits - i - 1 ;
-			break;
-		}
-	}
-
-	dprintf("bmap:0x%"PRIx64", first_dirty_bit:%d, last_dirty_bit:%d\n",
-			bmap, first_dirty_bit, last_dirty_bit);
-	offset = first_dirty_bit * CACHE_BLOCK_SIZE;
-	data_length = (last_dirty_bit - first_dirty_bit + 1) * CACHE_BLOCK_SIZE;
+	dprintf("bmap:0x%"PRIx64", first_bit:%d, last_bit:%d\n",
+			bmap, first_bit, last_bit);
+	offset = first_bit * CACHE_BLOCK_SIZE;
+	data_length = (last_bit - first_bit + 1) * CACHE_BLOCK_SIZE;
 
 	/*
 	 * CACHE_BLOCK_SIZE may not be divisible by SD_INODE_SIZE,
