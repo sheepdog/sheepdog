@@ -1040,6 +1040,42 @@ static int read_object_local(uint64_t oid, char *data, unsigned int datalen,
 	free(req);
 	return ret;
 }
+
+static int read_object_cache(uint64_t oid, char *data, unsigned int datalen,
+			     uint64_t offset, int copies, uint32_t epoch)
+{
+	int ret;
+	struct request *req;
+	struct sd_obj_req *hdr;
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *cache;
+
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+
+	cache = find_object_cache(vid, 0);
+
+	req = zalloc(sizeof(*req));
+	if (!req)
+		return SD_RES_NO_MEM;
+	hdr = (struct sd_obj_req *)&req->rq;
+
+	hdr->oid = oid;
+	hdr->opcode = SD_OP_READ_OBJ;
+	hdr->copies = copies;
+	hdr->offset = offset;
+	hdr->data_length = datalen;
+	req->data = data;
+	req->op = get_sd_op(hdr->opcode);
+
+	ret = object_cache_rw(cache, idx, req);
+
+	free(req);
+
+	return ret;
+}
+
 int read_object(struct vnode_info *vnodes, uint32_t node_version,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr_copies)
@@ -1050,6 +1086,15 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	char name[128];
 	int i = 0, fd, ret, last_error = SD_RES_SUCCESS;
+
+	if (object_is_cached(oid)) {
+		ret = read_object_cache(oid, data, datalen, offset,
+					nr_copies, node_version);
+		if (ret != SD_RES_SUCCESS)
+			eprintf("fail %"PRIx64" %"PRIx32"\n", oid, ret);
+
+		return ret;
+	}
 
 	/* search a local object first */
 	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
