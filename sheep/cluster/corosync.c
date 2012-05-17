@@ -80,15 +80,6 @@ struct corosync_message {
 	uint8_t msg[0];
 };
 
-struct corosync_block_msg {
-	void *msg;
-	size_t msg_len;
-	void (*cb)(void *arg);
-
-	struct work work;
-	struct list_head list;
-};
-
 static int cpg_node_equal(struct cpg_node *a, struct cpg_node *b)
 {
 	return (a->nodeid == b->nodeid && a->pid == b->pid);
