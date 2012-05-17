@@ -240,6 +240,7 @@ int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
 		 int write, int excl, int delete);
 
 int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
+struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vnodes);
 

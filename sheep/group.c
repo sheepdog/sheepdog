@@ -16,6 +16,7 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <sys/epoll.h>
+#include <urcu/uatomic.h>
 
 #include "sheepdog_proto.h"
 #include "sheep_priv.h"
@@ -153,17 +154,45 @@ int get_max_nr_copies_from(struct sd_node *nodes, int nr_nodes)
 	return min((int)sys->nr_copies, get_zones_nr_from(nodes, nr_nodes));
 }
 
+/*
+ * Grab an additional reference to the passed in vnode info.
+ *
+ * The caller must already hold a reference to vnode_info, this function must
+ * only be used to grab an additional reference from code that wants the
+ * vnode information to outlive the request structure.
+ */
+struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info)
+{
+	assert(uatomic_read(&vnode_info->refcnt) > 0);
+
+	uatomic_inc(&vnode_info->refcnt);
+	return vnode_info;
+}
+
+/*
+ * Get a reference to the currently active vnode information structure,
+ * this must only be called from the main thread.
+ */
 struct vnode_info *get_vnode_info(void)
 {
 	assert(current_vnode_info);
-	current_vnode_info->refcnt++;
-	return current_vnode_info;
+
+	return grab_vnode_info(current_vnode_info);
 }
 
-void put_vnode_info(struct vnode_info *vnodes)
+/*
+ * Release a reference to the current vnode information.
+ *
+ * Must be called from the main thread.
+ */
+void put_vnode_info(struct vnode_info *vnode_info)
 {
-	if (vnodes && --vnodes->refcnt == 0)
-		free(vnodes);
+	if (vnode_info) {
+		assert(uatomic_read(&vnode_info->refcnt) > 0);
+
+		if (uatomic_sub_return(&vnode_info->refcnt, 1) == 0)
+			free(vnode_info);
+	}
 }
 
 void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
@@ -193,7 +222,7 @@ static int update_vnode_info(void)
 	vnode_info->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
 						vnode_info->entries);
 	vnode_info->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-	vnode_info->refcnt = 1;
+	uatomic_set(&vnode_info->refcnt, 1);
 
 	put_vnode_info(current_vnode_info);
 	current_vnode_info = vnode_info;
