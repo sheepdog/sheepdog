@@ -241,7 +241,7 @@ static void do_cluster_request(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	int ret;
 
-	ret = do_process_work(req->op, &req->rq, &req->rp, req->data);
+	ret = do_process_work(req);
 	req->rp.result = ret;
 }
 

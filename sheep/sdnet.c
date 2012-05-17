@@ -163,7 +163,7 @@ static void do_local_request(struct work *work)
 	int ret = SD_RES_SUCCESS;
 
 	if (has_process_work(req->op))
-		ret = do_process_work(req->op, &req->rq, &req->rp, req->data);
+		ret = do_process_work(req);
 
 	rsp->result = ret;
 }

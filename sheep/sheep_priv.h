@@ -322,8 +322,7 @@ int is_io_op(struct sd_op_template *op);
 int is_force_op(struct sd_op_template *op);
 int has_process_work(struct sd_op_template *op);
 int has_process_main(struct sd_op_template *op);
-int do_process_work(struct sd_op_template *op, const struct sd_req *req,
-		    struct sd_rsp *rsp, void *data);
+int do_process_work(struct request *req);
 int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
 

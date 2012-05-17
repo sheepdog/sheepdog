@@ -53,7 +53,7 @@ static int do_local_io(struct request *req, uint32_t epoch)
 	hdr->epoch = epoch;
 	dprintf("%x, %" PRIx64" , %u\n", hdr->opcode, hdr->oid, epoch);
 
-	return do_process_work(req->op, &req->rq, &req->rp, req);
+	return do_process_work(req);
 }
 
 static int forward_read_obj_req(struct request *req)
