@@ -567,22 +567,50 @@ out:
 	return ret;
 }
 
+static void update_node_info(struct sd_node *nodes, size_t nr_nodes)
+{
+	print_node_list(nodes, nr_nodes);
+
+	sys->nr_nodes = nr_nodes;
+	memcpy(sys->nodes, nodes, sizeof(*sys->nodes) * sys->nr_nodes);
+	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+
+	update_vnode_info();
+}
+
+static void log_last_epoch(struct join_message *msg, struct sd_node *joined,
+		struct sd_node *nodes, size_t nr_nodes)
+{
+	if ((msg->cluster_status == SD_STATUS_OK ||
+	     msg->cluster_status == SD_STATUS_HALT) && msg->inc_epoch) {
+		struct sd_node old_nodes[SD_MAX_NODES];
+		size_t count = 0, i;
+
+		/* exclude the newly added one */
+		for (i = 0; i < nr_nodes; i++) {
+			if (node_eq(nodes + i, joined))
+				old_nodes[count++] = nodes[i];
+		}
+		qsort(old_nodes, count, sizeof(struct sd_node), node_cmp);
+
+		update_epoch_log(sys->epoch, old_nodes, count);
+	}
+}
+
 static void finish_join(struct join_message *msg, struct sd_node *joined,
 		struct sd_node *nodes, size_t nr_nodes)
 {
 	int i;
 
+	sys->join_finished = 1;
 	sys->nr_copies = msg->nr_copies;
 	sys->epoch = msg->epoch;
 
-	/* add nodes execept for newly joined one */
-	for (i = 0; i < nr_nodes; i++) {
-		if (node_eq(nodes + i, joined))
-			continue;
-
-		sys->nodes[sys->nr_nodes++] = nodes[i];
-	}
-	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+	/*
+	 * Make sure we have an epoch log record for the epoch before
+	 * this node joins, as recovery expects this record to exist.
+	 */
+	log_last_epoch(msg, joined, nodes, nr_nodes);
 
 	if (msg->cluster_status != SD_STATUS_OK) {
 		int nr_leave_nodes;
@@ -605,12 +633,6 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 			list_add_tail(&n->list, &sys->leave_list);
 		}
 	}
-
-	sys->join_finished = 1;
-
-	if ((msg->cluster_status == SD_STATUS_OK ||
-	     msg->cluster_status == SD_STATUS_HALT) && msg->inc_epoch)
-		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 
 	if (!sd_store && strlen((char *)msg->store)) {
 		sd_store = find_store_driver((char *)msg->store);
@@ -635,8 +657,7 @@ static void update_cluster_info(struct join_message *msg,
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 
-	sys->nodes[sys->nr_nodes++] = *joined;
-	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+	update_node_info(nodes, nr_nodes);
 
 	if (msg->cluster_status == SD_STATUS_OK ||
 	    msg->cluster_status == SD_STATUS_HALT) {
@@ -652,10 +673,7 @@ static void update_cluster_info(struct join_message *msg,
 			set_cluster_ctime(msg->ctime);
 		}
 	}
-	update_vnode_info();
 	sys_stat_set(msg->cluster_status);
-
-	print_node_list(sys->nodes, sys->nr_nodes);
 }
 
 static void __sd_notify(struct event_struct *cevent)
@@ -933,21 +951,15 @@ static void __sd_leave_done(struct event_struct *cevent)
 {
 	struct work_leave *w = container_of(cevent, struct work_leave, cev);
 
-	sys->nr_nodes = w->member_list_entries;
-	memcpy(sys->nodes, w->member_list, sizeof(*sys->nodes) * sys->nr_nodes);
-	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
+	update_node_info(w->member_list, w->member_list_entries);
 
 	if (sys_can_recover()) {
 		sys->epoch++;
 		update_epoch_store(sys->epoch);
 		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
-	}
-	update_vnode_info();
 
-	print_node_list(sys->nodes, sys->nr_nodes);
-
-	if (sys_can_recover())
 		start_recovery(sys->epoch);
+	}
 
 	if (sys_can_halt()) {
 		if (current_vnode_info->nr_zones < sys->nr_copies)
@@ -1278,11 +1290,8 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		 */
 		if (!sys->join_finished) {
 			sys->join_finished = 1;
-			sys->nodes[sys->nr_nodes++] = sys->this_node;
-			qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
-			sys->epoch = get_latest_epoch();
-
-			update_vnode_info();
+			assert(sys->nr_nodes == 0);
+			update_node_info(&sys->this_node, 1);
 		}
 
 		nr_local = get_nodes_nr_epoch(sys->epoch);
