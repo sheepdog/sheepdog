@@ -46,9 +46,6 @@ static uint64_t calc_object_bmap(size_t len, off_t offset)
 	int start, end, nr;
 	uint64_t bmap = 0;
 
-	if (!len)
-		return 0;
-
 	start = offset / CACHE_BLOCK_SIZE;
 	end = (offset + len - 1) / CACHE_BLOCK_SIZE;
 
@@ -341,8 +338,8 @@ int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 		ret = write_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		pthread_mutex_lock(&oc->lock);
 		bmap = calc_object_bmap(hdr->data_length, hdr->offset);
+		pthread_mutex_lock(&oc->lock);
 		add_to_dirty_tree_and_list(oc, idx, bmap, NULL, 0);
 		pthread_mutex_unlock(&oc->lock);
 	} else {
@@ -517,8 +514,10 @@ static int push_cache_object(uint32_t vid, uint32_t idx,
 
 	dprintf("%"PRIx64", create %d\n", oid, create);
 
-	if (!bmap)
+	if (!bmap) {
+		dprintf("WARN: nothing to flush\n");
 		return SD_RES_SUCCESS;
+	}
 
 	memset(&fake_req, 0, sizeof(fake_req));
 
