@@ -444,11 +444,13 @@ struct object_cache_entry {
 struct object_cache *find_object_cache(uint32_t vid, int create);
 int object_cache_lookup(struct object_cache *oc, uint32_t index, int create);
 int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *);
-int object_cache_pull(struct object_cache *oc, uint32_t index);
-int object_cache_push(struct object_cache *oc);
+int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
+		uint32_t index);
+int object_cache_push(struct vnode_info *vnode_info, struct object_cache *oc);
 int object_cache_init(const char *p);
 int object_is_cached(uint64_t oid);
 void object_cache_delete(uint32_t vid);
-int object_cache_flush_and_delete(struct object_cache *oc);
+int object_cache_flush_and_delete(struct vnode_info *vnode_info,
+		struct object_cache *oc);
 
 #endif

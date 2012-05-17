@@ -367,15 +367,16 @@ static int handle_gateway_request(struct request *req)
 		create = 1;
 
 	if (object_cache_lookup(cache, idx, create) < 0) {
-		ret = object_cache_pull(cache, idx);
+		ret = object_cache_pull(req->vnodes, cache, idx);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
 	return object_cache_rw(cache, idx, req);
 }
 
-static int bypass_object_cache(struct sd_obj_req *hdr)
+static int bypass_object_cache(struct request *req)
 {
+	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
 	uint64_t oid = hdr->oid;
 
 	if (!(hdr->flags & SD_FLAG_CMD_CACHE)) {
@@ -386,7 +387,7 @@ static int bypass_object_cache(struct sd_obj_req *hdr)
 		if (!cache)
 			return 1;
 		if (hdr->flags & SD_FLAG_CMD_WRITE) {
-			object_cache_flush_and_delete(cache);
+			object_cache_flush_and_delete(req->vnodes, cache);
 			return 1;
 		} else  {
 			/* For read requet, we can read cache if any */
@@ -428,7 +429,7 @@ void do_io_request(struct work *work)
 	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
 		ret = do_local_io(req, epoch);
 	} else {
-		if (!sys->enable_write_cache || bypass_object_cache(hdr)) {
+		if (!sys->enable_write_cache || bypass_object_cache(req)) {
 			/* fix object consistency when we read the object for the first time */
 			if (req->check_consistency) {
 				ret = fix_object_consistency(req);

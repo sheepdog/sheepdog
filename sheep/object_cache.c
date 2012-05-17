@@ -397,16 +397,16 @@ out:
 }
 
 /* Fetch the object, cache it in success */
-int object_cache_pull(struct object_cache *oc, uint32_t idx)
+int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
+		uint32_t idx)
 {
 	int i, fd, ret = SD_RES_NO_MEM;
 	unsigned wlen = 0, rlen, data_length, read_len;
 	uint64_t oid;
 	struct sd_obj_req hdr = { 0 };
 	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	struct vnode_info *vnodes = get_vnode_info();
 	struct sd_vnode *v;
-	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
+	struct sd_vnode *vnodes[SD_MAX_COPIES];
 	void *buf;
 	int nr_copies;
 
@@ -425,11 +425,11 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	}
 
 	/* Check if we can read locally */
-	nr_copies = get_nr_copies(vnodes);
-	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
+	nr_copies = get_nr_copies(vnode_info);
+	oid_to_vnodes(vnode_info, oid, nr_copies, vnodes);
 
 	for (i = 0; i < nr_copies; i++) {
-		v = obj_vnodes[i];
+		v = vnodes[i];
 		if (vnode_is_local(v)) {
 			struct siocb iocb = { 0 };
 			iocb.epoch = sys->epoch;
@@ -454,7 +454,7 @@ int object_cache_pull(struct object_cache *oc, uint32_t idx)
 pull_remote:
 	/* Okay, no luck, let's read remotely */
 	for (i = 0; i < nr_copies; i++) {
-		v = obj_vnodes[i];
+		v = vnodes[i];
 
 		if (vnode_is_local(v))
 			continue;
@@ -488,7 +488,6 @@ out:
 	if (ret == SD_RES_SUCCESS)
 		ret = create_cache_object(oc, idx, buf, read_len);
 	free(buf);
-	put_vnode_info(vnodes);
 	return ret;
 }
 
@@ -500,8 +499,8 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int push_cache_object(uint32_t vid, uint32_t idx,
-		uint64_t bmap, int create)
+static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
+		uint32_t idx, uint64_t bmap, int create)
 {
 	struct request fake_req;
 	struct sd_obj_req *hdr = (struct sd_obj_req *)&fake_req.rq;
@@ -555,13 +554,11 @@ static int push_cache_object(uint32_t vid, uint32_t idx,
 	hdr->epoch = sys->epoch;
 	fake_req.data = buf;
 	fake_req.op = get_sd_op(hdr->opcode);
-	fake_req.vnodes = get_vnode_info();
+	fake_req.vnodes = vnode_info;
 
 	ret = forward_write_obj_req(&fake_req);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to push object %x\n", ret);
-
-	put_vnode_info(fake_req.vnodes);
 
 out:
 	free(buf);
@@ -569,7 +566,7 @@ out:
 }
 
 /* Push back all the dirty objects to sheep cluster storage */
-int object_cache_push(struct object_cache *oc)
+int object_cache_push(struct vnode_info *vnode_info, struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
 	struct rb_root *inactive_dirty_tree;
@@ -589,7 +586,7 @@ int object_cache_push(struct object_cache *oc)
 	 * request is issued in one of gateway worker threads
 	 * So we need not to protect inactive dirty tree and list */
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
-		ret = push_cache_object(oc->vid, entry->idx,
+		ret = push_cache_object(vnode_info, oc->vid, entry->idx,
 				entry->bmap, entry->create);
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
@@ -652,7 +649,8 @@ void object_cache_delete(uint32_t vid)
 
 }
 
-int object_cache_flush_and_delete(struct object_cache *oc)
+int object_cache_flush_and_delete(struct vnode_info *vnode_info,
+		struct object_cache *oc)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -680,7 +678,8 @@ int object_cache_flush_and_delete(struct object_cache *oc)
 		idx = strtoul(d->d_name, NULL, 16);
 		if (idx == ULLONG_MAX)
 			continue;
-		if (push_cache_object(vid, idx, all, 1) != SD_RES_SUCCESS) {
+		if (push_cache_object(vnode_info, vid, idx, all, 1) !=
+				SD_RES_SUCCESS) {
 			dprintf("failed to push %"PRIx64"\n",
 				idx_to_oid(vid, idx));
 			ret = -1;

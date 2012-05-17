@@ -60,6 +60,7 @@ struct sd_op_template {
 
 struct flush_work {
 	struct object_cache *cache;
+	struct vnode_info *vnode_info;
 	struct work work;
 };
 
@@ -574,14 +575,17 @@ static void flush_vdi_fn(struct work *work)
 	struct flush_work *fw = container_of(work, struct flush_work, work);
 
 	dprintf("flush vdi %"PRIx32"\n", fw->cache->vid);
-	if (object_cache_push(fw->cache) != SD_RES_SUCCESS)
+	if (object_cache_push(fw->vnode_info, fw->cache) != SD_RES_SUCCESS)
 		eprintf("failed to flush vdi %"PRIx32"\n", fw->cache->vid);
 }
 
 static void flush_vdi_done(struct work *work)
 {
 	struct flush_work *fw = container_of(work, struct flush_work, work);
+
 	dprintf("flush vdi %"PRIx32" done\n", fw->cache->vid);
+
+	put_vnode_info(fw->vnode_info);
 	free(fw);
 }
 
@@ -598,12 +602,15 @@ static int local_flush_vdi(struct request *req)
 	cache = find_object_cache(vid, 0);
 	if (cache) {
 		if (!sys->async_flush)
-			return object_cache_push(cache);
+			return object_cache_push(req->vnodes, cache);
 		else {
 			struct flush_work *fw = xmalloc(sizeof(*fw));
+
 			fw->work.fn = flush_vdi_fn;
 			fw->work.done = flush_vdi_done;
 			fw->cache = cache;
+			fw->vnode_info = grab_vnode_info(req->vnodes);
+
 			queue_work(sys->flush_wqueue, &fw->work);
 		}
 	}
