@@ -673,7 +673,6 @@ static void update_cluster_info(struct join_message *msg,
 			set_cluster_ctime(msg->ctime);
 		}
 	}
-	sys_stat_set(msg->cluster_status);
 }
 
 static void __sd_notify(struct event_struct *cevent)
@@ -791,12 +790,15 @@ static void __sd_join(struct event_struct *cevent)
 		return;
 
 	for (i = 0; i < w->member_list_entries; i++) {
+		/* We should not fetch vdi_bitmap from myself */
+		if (node_eq(w->member_list + i, &sys->this_node))
+			continue;
 
 		get_vdi_bitmap_from(w->member_list + i);
 
 		/*
 		 * If a new comer try to join the running cluster, it only
-		 * need read one copy of bitmap from the first member.
+		 * need read one copy of bitmap from one of other members.
 		 */
 		if (sys_stat_wait_format())
 			break;
@@ -925,10 +927,7 @@ static void __sd_join_done(struct event_struct *cevent)
 
 	print_node_list(sys->nodes, sys->nr_nodes);
 
-	if (!sys_stat_join_failed()) {
-		update_cluster_info(jm, &w->joined, w->member_list,
-				    w->member_list_entries);
-	}
+	sys_stat_set(jm->cluster_status);
 
 	if (sys_can_recover() && jm->inc_epoch) {
 		list_for_each_entry_safe(node, t, &sys->leave_list, list) {
@@ -949,17 +948,8 @@ static void __sd_join_done(struct event_struct *cevent)
 
 static void __sd_leave_done(struct event_struct *cevent)
 {
-	struct work_leave *w = container_of(cevent, struct work_leave, cev);
-
-	update_node_info(w->member_list, w->member_list_entries);
-
-	if (sys_can_recover()) {
-		sys->epoch++;
-		update_epoch_store(sys->epoch);
-		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
-
+	if (sys_can_recover())
 		start_recovery(sys->epoch);
-	}
 
 	if (sys_can_halt()) {
 		if (current_vnode_info->nr_zones < sys->nr_copies)
@@ -1023,7 +1013,6 @@ static void event_fn(struct work *work)
 static void event_done(struct work *work)
 {
 	struct event_struct *cevent;
-	int ret;
 
 	if (!sys->cur_cevent)
 		vprintf(SDOG_ERR, "bug\n");
@@ -1050,9 +1039,6 @@ static void event_done(struct work *work)
 	vprintf(SDOG_DEBUG, "free %p\n", cevent);
 	event_free(cevent);
 	event_running = 0;
-	ret = register_event(cdrv_fd, group_handler, NULL);
-	if (ret)
-		panic("failed to register event fd");
 
 	process_request_event_queues();
 }
@@ -1163,7 +1149,6 @@ static inline void process_event_queue(void)
 	event_work.fn = event_fn;
 	event_work.done = event_done;
 
-	unregister_event(cdrv_fd);
 	queue_work(sys->event_wqueue, &event_work);
 }
 
@@ -1185,7 +1170,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 	int i, size;
 	int nr, nr_local, nr_leave;
 	struct node *n;
-	struct join_message *jm;
+	struct join_message *jm = opaque;
 	uint32_t le = get_latest_epoch();
 
 	if (node_eq(joined, &sys->this_node)) {
@@ -1208,6 +1193,8 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 
 		if (sys_stat_shutdown())
 			break;
+
+		update_cluster_info(jm, joined, members, nr_members);
 
 		w = zalloc(sizeof(*w));
 		if (!w)
@@ -1267,7 +1254,6 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		}
 		break;
 	case CJ_RES_MASTER_TRANSFER:
-		jm = (struct join_message *)opaque;
 		nr = jm->nr_leave_nodes;
 		for (i = 0; i < nr; i++) {
 			if (find_entry_list(&jm->leave_nodes[i], &sys->leave_list)
@@ -1324,6 +1310,14 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 
 	if (sys_stat_shutdown())
 		return;
+
+	update_node_info(members, nr_members);
+
+	if (sys_can_recover()) {
+		sys->epoch++;
+		update_epoch_store(sys->epoch);
+		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+	}
 
 	w = zalloc(sizeof(*w));
 	if (!w)
