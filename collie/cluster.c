@@ -124,8 +124,8 @@ static int cluster_format(int argc, char **argv)
 static int cluster_info(int argc, char **argv)
 {
 	int i, fd, ret;
-	struct sd_vdi_req hdr;
-	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 	struct epoch_log *logs;
 	int nr_logs, log_length;
@@ -157,7 +157,7 @@ again:
 
 	rlen = hdr.data_length;
 	wlen = 0;
-	ret = exec_req(fd, (struct sd_req *)&hdr, logs, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, logs, &wlen, &rlen);
 	close(fd);
 
 	if (ret != 0)
@@ -247,8 +247,8 @@ static int cluster_shutdown(int argc, char **argv)
 static int restore_snap(uint32_t epoch)
 {
 	int fd, ret;
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 
 	fd = connect_to(sdhost, sdport);
@@ -258,11 +258,11 @@ static int restore_snap(uint32_t epoch)
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_RESTORE;
-	hdr.tgt_epoch = epoch;
+	hdr.obj.tgt_epoch = epoch;
 
 	rlen = 0;
 	wlen = 0;
-	ret = exec_req(fd, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
 	close(fd);
 
 	if (ret) {

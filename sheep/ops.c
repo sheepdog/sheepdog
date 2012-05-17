@@ -121,17 +121,17 @@ out:
 
 static int cluster_new_vdi(struct request *req)
 {
-	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)&req->rq;
-	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)&req->rp;
+	const struct sd_req *hdr = &req->rq;
+	struct sd_rsp *rsp = &req->rp;
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
 	ret = add_vdi(req->vnodes, hdr->epoch, req->data, hdr->data_length,
-		      hdr->vdi_size, &vid, hdr->base_vdi_id, hdr->copies,
-		      hdr->snapid, &nr_copies);
+		      hdr->vdi.vdi_size, &vid, hdr->vdi.base_vdi_id,
+		      hdr->vdi.copies, hdr->vdi.snapid, &nr_copies);
 
-	vdi_rsp->vdi_id = vid;
-	vdi_rsp->copies = nr_copies;
+	rsp->vdi.vdi_id = vid;
+	rsp->vdi.copies = nr_copies;
 
 	return ret;
 }
@@ -139,9 +139,8 @@ static int cluster_new_vdi(struct request *req)
 static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data)
 {
-	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)rsp;
-	unsigned long nr = vdi_rsp->vdi_id;
-	int ret = vdi_rsp->result;
+	unsigned long nr = rsp->vdi.vdi_id;
+	int ret = rsp->result;
 
 	vprintf(SDOG_INFO, "done %d %ld\n", ret, nr);
 	set_bit(nr, sys->vdi_inuse);
@@ -151,26 +150,27 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 
 static int cluster_del_vdi(struct request *req)
 {
-	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)&req->rq;
-	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)&req->rp;
+	const struct sd_req *hdr = &req->rq;
+	struct sd_rsp *rsp = &req->rp;
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
 	ret = del_vdi(req->vnodes, hdr->epoch, req->data, hdr->data_length,
-		      &vid, hdr->snapid, &nr_copies);
+		      &vid, hdr->vdi.snapid, &nr_copies);
 
 	if (sys->enable_write_cache && ret == SD_RES_SUCCESS)
 		object_cache_delete(vid);
-	vdi_rsp->vdi_id = vid;
-	vdi_rsp->copies = nr_copies;
+
+	rsp->vdi.vdi_id = vid;
+	rsp->vdi.copies = nr_copies;
 
 	return ret;
 }
 
 static int cluster_get_vdi_info(struct request *req)
 {
-	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)&req->rq;
-	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)&req->rp;
+	const struct sd_req *hdr = &req->rq;
+	struct sd_rsp *rsp = &req->rp;
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	void *tag;
 	int ret;
@@ -186,12 +186,12 @@ static int cluster_get_vdi_info(struct request *req)
 		return SD_RES_INVALID_PARMS;
 
 	ret = lookup_vdi(req->vnodes, hdr->epoch, req->data, tag, &vid,
-			 hdr->snapid, &nr_copies, NULL);
+			 hdr->vdi.snapid, &nr_copies, NULL);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	vdi_rsp->vdi_id = vid;
-	vdi_rsp->copies = nr_copies;
+	rsp->vdi.vdi_id = vid;
+	rsp->vdi.copies = nr_copies;
 
 	return ret;
 }
@@ -284,8 +284,8 @@ static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 
 static int cluster_get_vdi_attr(struct request *req)
 {
-	const struct sd_vdi_req *hdr = (const struct sd_vdi_req *)&req->rq;
-	struct sd_vdi_rsp *vdi_rsp = (struct sd_vdi_rsp *)&req->rp;
+	const struct sd_req *hdr = &req->rq;
+	struct sd_rsp *rsp = &req->rp;
 	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_copies;
 	uint64_t created_time = 0;
 	int ret;
@@ -293,7 +293,7 @@ static int cluster_get_vdi_attr(struct request *req)
 
 	vattr = req->data;
 	ret = lookup_vdi(req->vnodes, hdr->epoch, vattr->name, vattr->tag,
-			 &vid, hdr->snapid, &nr_copies, &created_time);
+			 &vid, hdr->vdi.snapid, &nr_copies, &created_time);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -307,9 +307,9 @@ static int cluster_get_vdi_attr(struct request *req)
 			   hdr->flags & SD_FLAG_CMD_EXCL,
 			   hdr->flags & SD_FLAG_CMD_DEL);
 
-	vdi_rsp->vdi_id = vid;
-	vdi_rsp->attr_id = attrid;
-	vdi_rsp->copies = nr_copies;
+	rsp->vdi.vdi_id = vid;
+	rsp->vdi.attr_id = attrid;
+	rsp->vdi.copies = nr_copies;
 
 	return ret;
 }
@@ -442,20 +442,18 @@ static int local_get_obj_list(struct request *req)
 
 static int local_get_epoch(struct request *req)
 {
-	const struct sd_obj_req *obj_req = (const struct sd_obj_req *)&req->rq;
-	struct sd_obj_rsp *obj_rsp = (struct sd_obj_rsp *)&req->rp;
-	uint32_t epoch = obj_req->tgt_epoch;
+	uint32_t epoch = req->rq.obj.tgt_epoch;
 	int len, ret;
 
 	dprintf("%d\n", epoch);
 
-	len = epoch_log_read(epoch, req->data, obj_req->data_length);
+	len = epoch_log_read(epoch, req->data, req->rq.data_length);
 	if (len == -1) {
 		ret = SD_RES_NO_TAG;
-		obj_rsp->data_length = 0;
+		req->rp.data_length = 0;
 	} else {
 		ret = SD_RES_SUCCESS;
-		obj_rsp->data_length = len;
+		req->rp.data_length = len;
 	}
 	return ret;
 }
@@ -545,9 +543,8 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
-	const struct sd_obj_req *hdr = (const struct sd_obj_req *)req;
 	int ret;
-	struct siocb iocb = { .epoch = hdr->tgt_epoch };
+	struct siocb iocb = { .epoch = req->obj.tgt_epoch };
 
 	if (sd_store->restore)
 		ret = sd_store->restore(&iocb);
@@ -591,8 +588,7 @@ static void flush_vdi_done(struct work *work)
 
 static int local_flush_vdi(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	uint64_t oid = hdr->oid;
+	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid);
 	struct object_cache *cache;
 
@@ -642,19 +638,20 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 				  uint64_t oid, char *buf)
 {
 	int i, nr_copies, ret;
-	unsigned wlen, rlen;
-	char name[128];
-	struct sd_vnode *v;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
-	struct siocb iocb;
-	int fd;
 
 	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
 	for (i = 0; i < nr_copies; i++) {
+		struct sd_vnode *v;
+		struct siocb iocb;
+		char name[128];
+		unsigned wlen, rlen;
+		int fd;
+
 		v = obj_vnodes[i];
 		addr_to_str(name, sizeof(name), v->addr, 0);
 
@@ -679,16 +676,17 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 		if (fd < 0)
 			continue;
 
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.oid = oid;
-		hdr.epoch = epoch;
-
 		rlen = SD_DATA_OBJ_SIZE;
 		wlen = 0;
+
+		memset(&hdr, 0, sizeof(hdr));
+		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+		hdr.epoch = epoch;
 		hdr.data_length = rlen;
-		hdr.offset = 0;
+
+		hdr.obj.oid = oid;
+		hdr.obj.offset = 0;
 
 		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
@@ -714,13 +712,13 @@ out:
 
 static int store_remove_obj(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	uint32_t epoch = hdr->epoch;
+	uint32_t epoch = req->rq.epoch;
+	uint64_t oid = req->rq.obj.oid;
 	struct strbuf buf = STRBUF_INIT;
 	int ret = SD_RES_SUCCESS;
 
 	get_store_dir(&buf, epoch);
-	strbuf_addf(&buf, "%016" PRIx64, hdr->oid);
+	strbuf_addf(&buf, "%016" PRIx64, oid);
 	if (unlink(buf.buf) < 0) {
 		if (errno == ENOENT) {
 			ret = SD_RES_NO_OBJ;
@@ -730,7 +728,7 @@ static int store_remove_obj(struct request *req)
 		ret =  SD_RES_EIO;
 	}
 	pthread_rwlock_wrlock(&obj_list_cache.lock);
-	if (!objlist_cache_rb_remove(&obj_list_cache.root, hdr->oid))
+	if (!objlist_cache_rb_remove(&obj_list_cache.root, oid))
 		obj_list_cache.cache_size--;
 	pthread_rwlock_unlock(&obj_list_cache.lock);
  out:
@@ -740,8 +738,8 @@ static int store_remove_obj(struct request *req)
 
 static int store_read_obj(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	struct sd_obj_rsp *rsps = (struct sd_obj_rsp *)&req->rp;
+	struct sd_req *hdr = &req->rq;
+	struct sd_rsp *rsp = &req->rp;
 	int ret;
 	uint32_t epoch = hdr->epoch;
 	struct siocb iocb;
@@ -749,41 +747,41 @@ static int store_read_obj(struct request *req)
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	ret = sd_store->open(hdr->oid, &iocb, 0);
+	ret = sd_store->open(hdr->obj.oid, &iocb, 0);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
-	iocb.offset = hdr->offset;
-	ret = sd_store->read(hdr->oid, &iocb);
+	iocb.offset = hdr->obj.offset;
+	ret = sd_store->read(hdr->obj.oid, &iocb);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	rsps->data_length = hdr->data_length;
-	rsps->copies = sys->nr_copies;
+	rsp->data_length = hdr->data_length;
+	rsp->obj.copies = sys->nr_copies;
 out:
-	sd_store->close(hdr->oid, &iocb);
+	sd_store->close(hdr->obj.oid, &iocb);
 	return ret;
 }
 
-static int do_write_obj(struct siocb *iocb, struct sd_obj_req *req, uint32_t epoch, void *data)
+static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
+		void *data)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
-	uint64_t oid = hdr->oid;
+	uint64_t oid = hdr->obj.oid;
 	int ret = SD_RES_SUCCESS;
 	void *jd = NULL;
 
 	iocb->buf = data;
 	iocb->length = hdr->data_length;
-	iocb->offset = hdr->offset;
+	iocb->offset = hdr->obj.offset;
 	if (is_vdi_obj(oid)) {
 		struct strbuf buf = STRBUF_INIT;
 
 		get_store_dir(&buf, epoch);
 		strbuf_addf(&buf, "%016" PRIx64, oid);
-		jd = jrnl_begin(data, hdr->data_length,
-				   hdr->offset, buf.buf, jrnl_path);
+		jd = jrnl_begin(data, hdr->data_length, hdr->obj.offset,
+				buf.buf, jrnl_path);
 		if (!jd) {
 			strbuf_release(&buf);
 			return SD_RES_EIO;
@@ -799,7 +797,7 @@ static int do_write_obj(struct siocb *iocb, struct sd_obj_req *req, uint32_t epo
 
 static int store_write_obj(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_req *hdr = &req->rq;
 	int ret;
 	uint32_t epoch = hdr->epoch;
 	struct siocb iocb;
@@ -807,29 +805,30 @@ static int store_write_obj(struct request *req)
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	ret = sd_store->open(hdr->oid, &iocb, 0);
+	ret = sd_store->open(hdr->obj.oid, &iocb, 0);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	ret = do_write_obj(&iocb, hdr, epoch, req->data);
 
-	sd_store->close(hdr->oid, &iocb);
+	sd_store->close(hdr->obj.oid, &iocb);
 	return ret;
 }
 
 static int store_create_and_write_obj(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	struct sd_obj_req cow_hdr;
-	int ret;
+	struct sd_req *hdr = &req->rq;
+	struct sd_req cow_hdr;
 	uint32_t epoch = hdr->epoch;
+	uint64_t oid = hdr->obj.oid;
+	int ret;
 	char *buf = NULL;
 	struct siocb iocb;
 	unsigned data_length;
 
-	if (is_vdi_obj(hdr->oid))
+	if (is_vdi_obj(oid))
 		data_length = SD_INODE_SIZE;
-	else if (is_vdi_attr_obj(hdr->oid))
+	else if (is_vdi_attr_obj(oid))
 		data_length = SD_ATTR_OBJ_SIZE;
 	else
 		data_length = SD_DATA_OBJ_SIZE;
@@ -838,11 +837,12 @@ static int store_create_and_write_obj(struct request *req)
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
 	iocb.length = data_length;
-	ret = sd_store->open(hdr->oid, &iocb, 1);
+	ret = sd_store->open(oid, &iocb, 1);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
+
 	if (hdr->flags & SD_FLAG_CMD_COW) {
-		dprintf("%" PRIx64 ", %" PRIx64 "\n", hdr->oid, hdr->cow_oid);
+		dprintf("%" PRIx64 ", %" PRIx64 "\n", oid, hdr->obj.cow_oid);
 
 		buf = valloc(SD_DATA_OBJ_SIZE);
 		if (!buf) {
@@ -851,28 +851,28 @@ static int store_create_and_write_obj(struct request *req)
 		}
 		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
 			ret = read_copy_from_replica(req, hdr->epoch,
-						     hdr->cow_oid, buf);
+						     hdr->obj.cow_oid, buf);
 			if (ret != SD_RES_SUCCESS) {
 				eprintf("failed to read cow object\n");
 				goto out;
 			}
 		}
 
-		memcpy(buf + hdr->offset, req->data, hdr->data_length);
+		memcpy(buf + hdr->obj.offset, req->data, hdr->data_length);
 		memcpy(&cow_hdr, hdr, sizeof(cow_hdr));
-		cow_hdr.offset = 0;
 		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
+		cow_hdr.obj.offset = 0;
 
 		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf);
 	} else
 		ret = do_write_obj(&iocb, hdr, epoch, req->data);
 
 	if (SD_RES_SUCCESS == ret)
-		check_and_insert_objlist_cache(hdr->oid);
+		check_and_insert_objlist_cache(oid);
 out:
 	if (buf)
 		free(buf);
-	sd_store->close(hdr->oid, &iocb);
+	sd_store->close(oid, &iocb);
 	return ret;
 }
 

@@ -196,8 +196,8 @@ static int recover_object_from_replica(uint64_t oid,
 				       struct sd_vnode *entry,
 				       uint32_t epoch, uint32_t tgt_epoch)
 {
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char name[128];
 	unsigned wlen = 0, rlen;
 	int fd, ret = -1;
@@ -241,11 +241,12 @@ static int recover_object_from_replica(uint64_t oid,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
-	hdr.oid = oid;
 	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_IO_LOCAL;
-	hdr.tgt_epoch = tgt_epoch;
 	hdr.data_length = rlen;
+
+	hdr.obj.oid = oid;
+	hdr.obj.tgt_epoch = tgt_epoch;
 
 	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
@@ -257,7 +258,7 @@ static int recover_object_from_replica(uint64_t oid,
 		goto out;
 	}
 
-	rsp = (struct sd_obj_rsp *)&hdr;
+	rsp = (struct sd_rsp *)&hdr;
 
 	if (rsp->result == SD_RES_SUCCESS) {
 		iocb.epoch = epoch;

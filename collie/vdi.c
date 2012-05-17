@@ -197,15 +197,15 @@ static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
 }
 
 typedef int (*obj_parser_func_t)(char *sheep, uint64_t oid,
-				  struct sd_obj_rsp *rsp, char *buf, void *data);
+				  struct sd_rsp *rsp, char *buf, void *data);
 
-static int do_print_obj(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
+static int do_print_obj(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 			 char *buf, void *data)
 {
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		printf("%s has the object (should be %d copies)\n",
-		       sheep, rsp->copies);
+		       sheep, rsp->obj.copies);
 		break;
 	case SD_RES_NO_OBJ:
 		printf("%s doesn't have the object\n", sheep);
@@ -229,7 +229,7 @@ struct get_data_oid_info {
 	unsigned idx;
 };
 
-static int get_data_oid(char *sheep, uint64_t oid, struct sd_obj_rsp *rsp,
+static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 			 char *buf, void *data)
 {
 	struct get_data_oid_info *info = data;
@@ -274,8 +274,8 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 	for (i = 0; i < nr_nodes; i++) {
 		unsigned wlen = 0, rlen = size;
-		struct sd_obj_req hdr;
-		struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+		struct sd_req hdr;
+		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
 		addr_to_str(name, sizeof(name), node_list_entries[i].addr, 0);
 
@@ -288,10 +288,11 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.data_length = rlen;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
-		hdr.oid = oid;
 		hdr.epoch = node_list_version;
 
-		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+		hdr.obj.oid = oid;
+
+		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 		close(fd);
 
 		sprintf(name + strlen(name), ":%d", node_list_entries[i].port);
@@ -360,8 +361,8 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 			 uint32_t *vid, int for_snapshot)
 {
 	int ret, fd;
-	struct sd_vdi_req hdr;
-	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned int wlen, rlen = 0;
 	char buf[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 
@@ -381,10 +382,10 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 	wlen = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
 	hdr.proto_ver = SD_PROTO_VER;
 	hdr.data_length = wlen;
-	hdr.snapid = snapid;
 	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.vdi.snapid = snapid;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 	if (ret) {
 		ret = -1;
 		goto out;
@@ -396,7 +397,7 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 		ret = -1;
 		goto out;
 	}
-	*vid = rsp->vdi_id;
+	*vid = rsp->vdi.vdi_id;
 
 	ret = 0;
 out:
@@ -407,8 +408,8 @@ out:
 static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 			 uint32_t *vdi_id, int snapshot)
 {
-	struct sd_vdi_req hdr;
-	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
 	unsigned int wlen, rlen = 0;
 	char buf[SD_MAX_VDI_LEN];
@@ -422,19 +423,18 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 	memset(buf, 0, sizeof(buf));
 	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_NEW_VDI;
-	hdr.base_vdi_id = base_vid;
-
 	wlen = SD_MAX_VDI_LEN;
 
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_NEW_VDI;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.snapid = snapshot;
-
 	hdr.data_length = wlen;
-	hdr.vdi_size = vdi_size;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	hdr.vdi.base_vdi_id = base_vid;
+	hdr.vdi.snapid = snapshot;
+	hdr.vdi.vdi_size = vdi_size;
+
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 
 	close(fd);
 
@@ -450,7 +450,7 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 	}
 
 	if (vdi_id)
-		*vdi_id = rsp->vdi_id;
+		*vdi_id = rsp->vdi.vdi_id;
 
 	return EXIT_SUCCESS;
 }
@@ -703,8 +703,8 @@ static int vdi_delete(int argc, char **argv)
 {
 	char *data = argv[optind];
 	int fd, ret;
-	struct sd_vdi_req hdr;
-	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 	char vdiname[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 
@@ -718,16 +718,16 @@ static int vdi_delete(int argc, char **argv)
 	wlen = sizeof(vdiname);
 
 	hdr.opcode = SD_OP_DEL_VDI;
-	hdr.snapid = vdi_cmd_data.snapshot_id;
 	hdr.epoch = node_list_version;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
+	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
 	memset(vdiname, 0, sizeof(vdiname));
 	strncpy(vdiname, data, SD_MAX_VDI_LEN);
 	strncpy(vdiname + SD_MAX_VDI_LEN, vdi_cmd_data.snapshot_tag,
 		SD_MAX_VDI_TAG_LEN);
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, vdiname, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, vdiname, &wlen, &rlen);
 	close(fd);
 
 	if (ret) {
@@ -806,8 +806,8 @@ static int vdi_object(int argc, char **argv)
 static int print_obj_epoch(uint64_t oid)
 {
 	int i, j, fd, ret, idx;
-	struct sd_vdi_req hdr;
-	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 	struct sd_vnode vnodes[SD_MAX_VNODES];
 	int idx_buf[SD_MAX_COPIES];
@@ -839,7 +839,7 @@ again:
 
 	rlen = hdr.data_length;
 	wlen = 0;
-	ret = exec_req(fd, (struct sd_req *)&hdr, logs, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, logs, &wlen, &rlen);
 	close(fd);
 
 	if (ret != 0)
@@ -934,8 +934,8 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 			     uint32_t *vid, uint64_t *oid, unsigned int *nr_copies,
 			     int creat, int excl, int delete)
 {
-	struct sd_vdi_req hdr;
-	struct sd_vdi_rsp *rsp = (struct sd_vdi_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
 	unsigned int wlen, rlen;
 	struct sheepdog_vdi_attr vattr;
@@ -960,9 +960,10 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	wlen = SD_ATTR_OBJ_SIZE;
 	rlen = 0;
 	hdr.proto_ver = SD_PROTO_VER;
-	hdr.data_length = wlen;
-	hdr.snapid = vdi_cmd_data.snapshot_id;
 	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = wlen;
+	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
+
 	if (creat)
 		hdr.flags |= SD_FLAG_CMD_CREAT;
 	if (excl)
@@ -970,7 +971,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	if (delete)
 		hdr.flags |= SD_FLAG_CMD_DEL;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, &vattr, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, &vattr, &wlen, &rlen);
 	if (ret) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -981,9 +982,9 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 		goto out;
 	}
 
-	*vid = rsp->vdi_id;
-	*oid = vid_to_attr_oid(rsp->vdi_id, rsp->attr_id);
-	*nr_copies = rsp->copies;
+	*vid = rsp->vdi.vdi_id;
+	*oid = vid_to_attr_oid(rsp->vdi.vdi_id, rsp->vdi.attr_id);
+	*nr_copies = rsp->vdi.copies;
 
 	ret = SD_RES_SUCCESS;
 out:

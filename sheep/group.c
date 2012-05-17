@@ -59,8 +59,8 @@ struct join_message {
 };
 
 struct vdi_op_message {
-	struct sd_vdi_req req;
-	struct sd_vdi_rsp rsp;
+	struct sd_req req;
+	struct sd_rsp rsp;
 	uint8_t data[0];
 };
 
@@ -1070,7 +1070,7 @@ int is_access_to_busy_objects(uint64_t oid)
 
 static int need_consistency_check(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_req *hdr = &req->rq;
 
 	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL)
 		/* only gateway fixes data consistency */
@@ -1084,11 +1084,11 @@ static int need_consistency_check(struct request *req)
 	if (hdr->flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
 		return 0;
 
-	if (is_vdi_obj(hdr->oid))
+	if (is_vdi_obj(hdr->obj.oid))
 		/* only check consistency for data objects */
 		return 0;
 
-	if (sys->enable_write_cache && object_is_cached(hdr->oid))
+	if (sys->enable_write_cache && object_is_cached(hdr->obj.oid))
 		/* we don't check consistency for cached objects */
 		return 0;
 
@@ -1097,9 +1097,8 @@ static int need_consistency_check(struct request *req)
 
 static inline void set_consistency_check(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	uint32_t vdi_id = oid_to_vid(hdr->oid);
-	uint32_t idx = data_oid_to_idx(hdr->oid);
+	uint32_t vdi_id = oid_to_vid(req->rq.obj.oid);
+	uint32_t idx = data_oid_to_idx(req->rq.obj.oid);
 	struct data_object_bmap *bmap;
 
 	req->check_consistency = 1;

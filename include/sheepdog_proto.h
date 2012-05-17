@@ -106,7 +106,22 @@ struct sd_req {
 	uint32_t	epoch;
 	uint32_t        id;
 	uint32_t        data_length;
-	uint32_t	opcode_specific[8];
+	union {
+		struct {
+			uint64_t	oid;
+			uint64_t	cow_oid;
+			uint32_t	copies;
+			uint32_t	tgt_epoch;
+			uint64_t	offset;
+		} obj;
+		struct {
+			uint64_t	vdi_size;
+			uint32_t	base_vdi_id;
+			uint32_t	copies;
+			uint32_t	snapid;
+		} vdi;
+		uint32_t		__pad[8];
+	};
 };
 
 struct sd_rsp {
@@ -117,62 +132,18 @@ struct sd_rsp {
 	uint32_t        id;
 	uint32_t        data_length;
 	uint32_t        result;
-	uint32_t	opcode_specific[7];
-};
-
-struct sd_obj_req {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint64_t        oid;
-	uint64_t        cow_oid;
-	uint32_t        copies;
-	uint32_t        tgt_epoch;
-	uint64_t        offset;
-};
-
-struct sd_obj_rsp {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        result;
-	uint32_t        copies;
-	uint32_t        pad[6];
-};
-
-struct sd_vdi_req {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint64_t	vdi_size;
-	uint32_t        base_vdi_id;
-	uint32_t	copies;
-	uint32_t        snapid;
-	uint32_t        pad[3];
-};
-
-struct sd_vdi_rsp {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        result;
-	uint32_t        rsvd;
-	uint32_t        vdi_id;
-	uint32_t        attr_id;
-	uint32_t        copies;
-	uint32_t        pad[3];
+	union {
+		struct {
+			uint32_t	copies;
+		} obj;
+		struct {
+			uint32_t	rsvd;
+			uint32_t	vdi_id;
+			uint32_t	attr_id;
+			uint32_t	copies;
+		} vdi;
+		uint32_t		__pad[7];
+	};
 };
 
 struct sheepdog_inode {

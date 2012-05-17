@@ -328,25 +328,28 @@ out:
 
 int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
+	struct sd_req *hdr = &req->rq;
 	uint64_t bmap = 0;
 	int ret;
 
-	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx, hdr->data_length, hdr->offset);
+	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx,
+		hdr->data_length, hdr->obj.offset);
+
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
-		ret = write_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
+		ret = write_cache_object(oc->vid, idx, req->data,
+					 hdr->data_length, hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		bmap = calc_object_bmap(hdr->data_length, hdr->offset);
+		bmap = calc_object_bmap(hdr->data_length, hdr->obj.offset);
 		pthread_mutex_lock(&oc->lock);
 		add_to_dirty_tree_and_list(oc, idx, bmap, NULL, 0);
 		pthread_mutex_unlock(&oc->lock);
 	} else {
-		ret = read_cache_object(oc->vid, idx, req->data, hdr->data_length, hdr->offset);
+		ret = read_cache_object(oc->vid, idx, req->data,
+					hdr->data_length, hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		rsp->data_length = hdr->data_length;
+		req->rp.data_length = hdr->data_length;
 	}
 out:
 	return ret;
@@ -403,8 +406,8 @@ int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
 	int i, fd, ret = SD_RES_NO_MEM;
 	unsigned wlen = 0, rlen, data_length, read_len;
 	uint64_t oid;
-	struct sd_obj_req hdr = { 0 };
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr = { 0 };
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct sd_vnode *v;
 	struct sd_vnode *vnodes[SD_MAX_COPIES];
 	void *buf;
@@ -460,10 +463,10 @@ pull_remote:
 			continue;
 
 		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.oid = oid;
 		hdr.epoch = sys->epoch;
 		hdr.data_length = rlen = data_length;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+		hdr.obj.oid = oid;
 
 		fd = get_sheep_fd(v->addr, v->port, v->node_idx,
 				  hdr.epoch);
@@ -503,7 +506,7 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 		uint32_t idx, uint64_t bmap, int create)
 {
 	struct request fake_req;
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&fake_req.rq;
+	struct sd_req *hdr = &fake_req.rq;
 	void *buf;
 	off_t offset;
 	unsigned data_length;
@@ -545,13 +548,15 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	hdr->offset = 0;
-	hdr->data_length = data_length;
 	hdr->opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
-	hdr->oid = oid;
-	hdr->copies = sys->nr_copies;
+	hdr->data_length = data_length;
 	hdr->epoch = sys->epoch;
+
+	hdr->obj.oid = oid;
+	hdr->obj.offset = 0;
+	hdr->obj.copies = sys->nr_copies;
+
 	fake_req.data = buf;
 	fake_req.op = get_sd_op(hdr->opcode);
 	fake_req.vnodes = vnode_info;

@@ -40,31 +40,31 @@ static int is_access_local(struct request *req, uint64_t oid)
 
 static void setup_access_to_local_objects(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_req *hdr = &req->rq;
 
 	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
-		req->local_oid = hdr->oid;
+		req->local_oid = hdr->obj.oid;
 		return;
 	}
 
-	if (is_access_local(req, hdr->oid))
-		req->local_oid = hdr->oid;
+	if (is_access_local(req, hdr->obj.oid))
+		req->local_oid = hdr->obj.oid;
 
-	if (hdr->cow_oid)
-		if (is_access_local(req, hdr->cow_oid))
-			req->local_cow_oid = hdr->cow_oid;
+	if (hdr->obj.cow_oid)
+		if (is_access_local(req, hdr->obj.cow_oid))
+			req->local_cow_oid = hdr->obj.cow_oid;
 }
 
-static void check_object_consistency(struct sd_obj_req *hdr)
+static void check_object_consistency(struct sd_req *hdr)
 {
-	uint32_t vdi_id = oid_to_vid(hdr->oid);
+	uint32_t vdi_id = oid_to_vid(hdr->obj.oid);
 	struct data_object_bmap *bmap, *n;
 	int nr_bmaps = 0;
 
 	list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
 		nr_bmaps++;
 		if (bmap->vdi_id == vdi_id) {
-			set_bit(data_oid_to_idx(hdr->oid), bmap->dobjs);
+			set_bit(data_oid_to_idx(hdr->obj.oid), bmap->dobjs);
 			list_del(&bmap->list);
 			list_add_tail(&bmap->list, &sys->consistent_obj_list);
 			return;
@@ -81,7 +81,7 @@ static void check_object_consistency(struct sd_obj_req *hdr)
 
 	bmap->vdi_id = vdi_id;
 	list_add_tail(&bmap->list, &sys->consistent_obj_list);
-	set_bit(data_oid_to_idx(hdr->oid), bmap->dobjs);
+	set_bit(data_oid_to_idx(hdr->obj.oid), bmap->dobjs);
 	if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
 		/* the first entry is the least recently used one */
 		bmap = list_first_entry(&sys->consistent_obj_list,
@@ -94,7 +94,7 @@ static void check_object_consistency(struct sd_obj_req *hdr)
 static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
+	struct sd_req *hdr = &req->rq;
 
 	list_del(&req->request_list);
 	sys->nr_outstanding_io--;
@@ -109,7 +109,7 @@ static void io_op_done(struct work *work)
 			goto retry;
 		break;
 	case SD_RES_EIO:
-		if (is_access_local(req, hdr->oid)) {
+		if (is_access_local(req, hdr->obj.oid)) {
 			eprintf("leaving sheepdog cluster\n");
 			leave_cluster();
 
@@ -121,7 +121,7 @@ static void io_op_done(struct work *work)
 		}
 		break;
 	case SD_RES_SUCCESS:
-		if (req->check_consistency && is_data_obj(hdr->oid))
+		if (req->check_consistency && is_data_obj(hdr->obj.oid))
 			check_object_consistency(hdr);
 		break;
 	}
@@ -159,13 +159,12 @@ static void local_op_done(struct work *work)
 static void do_local_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&req->rp;
 	int ret = SD_RES_SUCCESS;
 
 	if (has_process_work(req->op))
 		ret = do_process_work(req);
 
-	rsp->result = ret;
+	req->rp.result = ret;
 }
 
 static int check_epoch(struct request *req)
@@ -188,14 +187,13 @@ static int check_epoch(struct request *req)
 
 static int check_request(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)&req->rq;
-
 	/*
 	 * if we go for a cached object, we don't care if it is busy
 	 * or being recovered.
 	 */
-	if (sys->enable_write_cache && (hdr->flags & SD_FLAG_CMD_CACHE) &&
-	    object_is_cached(hdr->oid))
+	if (sys->enable_write_cache &&
+	    (req->rq.flags & SD_FLAG_CMD_CACHE) &&
+	    object_is_cached(req->rq.obj.oid))
 		return 0;
 
 	if (!req->local_oid && !req->local_cow_oid)
@@ -255,8 +253,8 @@ void resume_pending_requests(void)
 
 static void queue_request(struct request *req)
 {
-	struct sd_req *hdr = (struct sd_req *)&req->rq;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
+	struct sd_req *hdr = &req->rq;
+	struct sd_rsp *rsp = &req->rp;
 
 	req->op = get_sd_op(hdr->opcode);
 	if (!req->op) {

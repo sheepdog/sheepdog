@@ -45,8 +45,8 @@ char *size_to_str(uint64_t _size, char *str, int str_size)
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		   uint64_t offset)
 {
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
 	unsigned wlen = 0, rlen = datalen;
 
@@ -59,12 +59,13 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.epoch = node_list_version;
 	hdr.opcode = SD_OP_READ_OBJ;
-	hdr.oid = oid;
 	hdr.flags = SD_FLAG_CMD_WEAK_CONSISTENCY;
 	hdr.data_length = rlen;
-	hdr.offset = offset;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
+	hdr.obj.oid = oid;
+	hdr.obj.offset = offset;
+
+	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
 	close(fd);
 
 	if (ret) {
@@ -84,8 +85,8 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int datalen,
 		    uint64_t offset, uint32_t flags, int copies, int create)
 {
-	struct sd_obj_req hdr;
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
 	unsigned wlen = datalen, rlen;
 
@@ -101,14 +102,15 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 		hdr.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
 	else
 		hdr.opcode = SD_OP_WRITE_OBJ;
-	hdr.oid = oid;
-	hdr.cow_oid = cow_oid;
-	hdr.copies = copies;
 	hdr.data_length = wlen;
 	hdr.flags = (flags & ~SD_FLAG_CMD_IO_LOCAL) | SD_FLAG_CMD_WRITE;
-	hdr.offset = offset;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, data, &wlen, &rlen);
+	hdr.obj.copies = copies;
+	hdr.obj.oid = oid;
+	hdr.obj.cow_oid = cow_oid;
+	hdr.obj.offset = offset;
+
+	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
 	close(fd);
 
 	if (ret) {
