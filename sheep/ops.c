@@ -125,9 +125,9 @@ static int cluster_new_vdi(struct request *req)
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
-	ret = add_vdi(hdr->epoch, req->data, hdr->data_length, hdr->vdi_size,
-		      &vid, hdr->base_vdi_id, hdr->copies, hdr->snapid,
-		      &nr_copies);
+	ret = add_vdi(req->vnodes, hdr->epoch, req->data, hdr->data_length,
+		      hdr->vdi_size, &vid, hdr->base_vdi_id, hdr->copies,
+		      hdr->snapid, &nr_copies);
 
 	vdi_rsp->vdi_id = vid;
 	vdi_rsp->copies = nr_copies;
@@ -155,8 +155,8 @@ static int cluster_del_vdi(struct request *req)
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
-	ret = del_vdi(hdr->epoch, req->data, hdr->data_length, &vid,
-		      hdr->snapid, &nr_copies);
+	ret = del_vdi(req->vnodes, hdr->epoch, req->data, hdr->data_length,
+		      &vid, hdr->snapid, &nr_copies);
 
 	if (sys->enable_write_cache && ret == SD_RES_SUCCESS)
 		object_cache_delete(vid);
@@ -184,8 +184,8 @@ static int cluster_get_vdi_info(struct request *req)
 	else
 		return SD_RES_INVALID_PARMS;
 
-	ret = lookup_vdi(hdr->epoch, req->data, tag, &vid, hdr->snapid,
-			 &nr_copies, NULL);
+	ret = lookup_vdi(req->vnodes, hdr->epoch, req->data, tag, &vid,
+			 hdr->snapid, &nr_copies, NULL);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -291,7 +291,7 @@ static int cluster_get_vdi_attr(struct request *req)
 	struct sheepdog_vdi_attr *vattr;
 
 	vattr = req->data;
-	ret = lookup_vdi(hdr->epoch, vattr->name, vattr->tag,
+	ret = lookup_vdi(req->vnodes, hdr->epoch, vattr->name, vattr->tag,
 			 &vid, hdr->snapid, &nr_copies, &created_time);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -300,8 +300,8 @@ static int cluster_get_vdi_attr(struct request *req)
 	   so we use the hash value of the VDI name as the VDI id */
 	vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 	vid &= SD_NR_VDIS - 1;
-	ret = get_vdi_attr(hdr->epoch, req->data, hdr->data_length, vid,
-			   &attrid, nr_copies, created_time,
+	ret = get_vdi_attr(req->vnodes, hdr->epoch, req->data, hdr->data_length,
+			   vid, &attrid, nr_copies, created_time,
 			   hdr->flags & SD_FLAG_CMD_CREAT,
 			   hdr->flags & SD_FLAG_CMD_EXCL,
 			   hdr->flags & SD_FLAG_CMD_DEL);

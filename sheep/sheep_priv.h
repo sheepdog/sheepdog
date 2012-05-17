@@ -223,21 +223,25 @@ int create_listen_port(int port, void *data);
 int init_store(const char *dir, int enable_write_cache);
 int init_base_path(const char *dir);
 
-int add_vdi(uint32_t epoch, char *data, int data_len, uint64_t size,
-	    uint32_t *new_vid, uint32_t base_vid, uint32_t copies,
-	    int is_snapshot, unsigned int *nr_copies);
+int add_vdi(struct vnode_info *vnode_info, uint32_t epoch, char *data,
+		int data_len, uint64_t size, uint32_t *new_vid,
+		uint32_t base_vid, uint32_t copies, int is_snapshot,
+		unsigned int *nr_copies);
 
-int del_vdi(uint32_t epoch, char *data, int data_len, uint32_t *vid,
-	    uint32_t snapid, unsigned int *nr_copies);
+int del_vdi(struct vnode_info *vnode_info, uint32_t epoch, char *data,
+		int data_len, uint32_t *vid, uint32_t snapid,
+		unsigned int *nr_copies);
 
-int lookup_vdi(uint32_t epoch, char *name, char *tag, uint32_t *vid,
-	       uint32_t snapid, unsigned int *nr_copies, uint64_t *ctime);
+int lookup_vdi(struct vnode_info *vnode_info, uint32_t epoch, char *name,
+		char *tag, uint32_t *vid, uint32_t snapid,
+		unsigned int *nr_copies, uint64_t *ctime);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
-int get_vdi_attr(uint32_t epoch, struct sheepdog_vdi_attr *vattr, int data_len,
-		 uint32_t vid, uint32_t *attrid, int copies, uint64_t ctime,
-		 int write, int excl, int delete);
+int get_vdi_attr(struct vnode_info *vnode_info, uint32_t epoch,
+		struct sheepdog_vdi_attr *vattr, int data_len, uint32_t vid,
+		uint32_t *attrid, int copies, uint64_t ctime, int write,
+		int excl, int delete);
 
 int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
