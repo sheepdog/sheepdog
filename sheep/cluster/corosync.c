@@ -443,14 +443,8 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 	dprintf("%d\n", cmsg->type);
 
-	cevent = zalloc(sizeof(*cevent));
-	if (!cevent)
-		panic("failed to allocate memory\n");
-
 	switch (cmsg->type) {
 	case COROSYNC_MSG_TYPE_JOIN_REQUEST:
-		free(cevent); /* we don't add a new cluster event in this case */
-
 		cevent = update_block_event(COROSYNC_EVENT_TYPE_JOIN, &cmsg->sender,
 					    cmsg->msg, cmsg->msg_len);
 		if (!cevent)
@@ -460,11 +454,12 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		cevent->msg_len = cmsg->msg_len;
 		break;
 	case COROSYNC_MSG_TYPE_BLOCK:
-		cevent->blocked = 1;
-		/* fall through */
 	case COROSYNC_MSG_TYPE_NOTIFY:
-		cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
+		cevent = zalloc(sizeof(*cevent));
+		if (!cevent)
+			panic("failed to allocate memory\n");
 
+		cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
 		cevent->sender = cmsg->sender;
 		cevent->msg_len = cmsg->msg_len;
 		if (cmsg->msg_len) {
@@ -475,9 +470,15 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		} else
 			cevent->msg = NULL;
 
+		if (cmsg->type == COROSYNC_MSG_TYPE_BLOCK)
+			cevent->blocked = 1;
+
 		list_add_tail(&cevent->list, &corosync_event_list);
 		break;
 	case COROSYNC_MSG_TYPE_LEAVE:
+		cevent = zalloc(sizeof(*cevent));
+		if (!cevent)
+			panic("failed to allocate memory\n");
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
 
 		master = is_master(&cmsg->sender);
@@ -498,8 +499,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		list_add_tail(&cevent->list, &corosync_event_list);
 		break;
 	case COROSYNC_MSG_TYPE_JOIN_RESPONSE:
-		free(cevent); /* we don't add a new cluster event in this case */
-
 		cevent = update_block_event(COROSYNC_EVENT_TYPE_JOIN, &cmsg->sender,
 					    cmsg->msg, cmsg->msg_len);
 		if (!cevent)
@@ -514,8 +513,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 		break;
 	case COROSYNC_MSG_TYPE_UNBLOCK:
-		free(cevent); /* we don't add a new cluster event in this case */
-
 		cevent = update_block_event(COROSYNC_EVENT_TYPE_NOTIFY,
 					    &cmsg->sender, cmsg->msg, cmsg->msg_len);
 		if (!cevent)
