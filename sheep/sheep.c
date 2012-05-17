@@ -74,6 +74,7 @@ Options:\n\
   -h, --help              display this help and exit\n\
   -i, --nr_io_worker      set the number of workers for sheep internal requests (default 4)\n\
   -l, --loglevel          specify the level of logging detail\n\
+  -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
   -v, --vnodes            specify the number of virtual nodes\n\
   -W, --disable-cache     disable writecache\n\
