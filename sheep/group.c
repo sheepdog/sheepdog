@@ -520,24 +520,6 @@ out:
 	return ret;
 }
 
-static void join(struct sd_node *joining, struct join_message *msg)
-{
-	if (msg->proto_ver != SD_SHEEP_PROTO_VER) {
-		eprintf("joining node sent a message with the wrong protocol version\n");
-		msg->result = SD_RES_VER_MISMATCH;
-		return;
-	}
-
-	msg->result = get_cluster_status(joining, msg->nodes, msg->nr_nodes,
-					 msg->ctime, msg->epoch,
-					 &msg->cluster_status, &msg->inc_epoch);
-	msg->nr_copies = sys->nr_copies;
-	msg->cluster_flags = sys->flags;
-	msg->ctime = get_cluster_ctime();
-	if (sd_store)
-		strcpy((char *)msg->store, sd_store->name);
-}
-
 static int get_vdi_bitmap_from(struct sd_node *node)
 {
 	struct sd_req hdr;
@@ -816,7 +798,13 @@ static void __sd_leave(struct event_struct *cevent)
 enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 {
 	struct join_message *jm = opaque;
-	struct node *node;
+
+	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
+		eprintf("%s: invalid protocol version: %d\n", __func__,
+			jm->proto_ver);
+		jm->result = SD_RES_VER_MISMATCH;
+		return CJ_RES_FAIL;
+	}
 
 	if (node_eq(joining, &sys->this_node)) {
 		struct sd_node entries[SD_MAX_NODES];
@@ -845,30 +833,43 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 		return CJ_RES_SUCCESS;
 	}
 
-	join(joining, jm);
-
+	jm->result = get_cluster_status(joining, jm->nodes, jm->nr_nodes,
+					jm->ctime, jm->epoch,
+					&jm->cluster_status, &jm->inc_epoch);
 	dprintf("%d, %d\n", jm->result, jm->cluster_status);
+
+	jm->nr_copies = sys->nr_copies;
+	jm->cluster_flags = sys->flags;
+	jm->ctime = get_cluster_ctime();
+	jm->nr_leave_nodes = 0;
+
+	if (sd_store)
+		strcpy((char *)jm->store, sd_store->name);
+
 	if (jm->result == SD_RES_SUCCESS && jm->cluster_status != SD_STATUS_OK) {
-		jm->nr_leave_nodes = 0;
+		struct node *node;
+
 		list_for_each_entry(node, &sys->leave_list, list) {
 			jm->leave_nodes[jm->nr_leave_nodes] = node->ent;
 			jm->nr_leave_nodes++;
 		}
 	} else if (jm->result != SD_RES_SUCCESS &&
-			jm->epoch > sys->epoch &&
-			jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
+		   jm->epoch > sys->epoch &&
+		   jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
 		eprintf("transfer mastership (%d, %d)\n", jm->epoch, sys->epoch);
 		return CJ_RES_MASTER_TRANSFER;
 	}
 	jm->epoch = sys->epoch;
 
-	if (jm->result == SD_RES_SUCCESS)
+	switch (jm->result) {
+	case SD_RES_SUCCESS:
 		return CJ_RES_SUCCESS;
-	else if (jm->result == SD_RES_OLD_NODE_VER ||
-		 jm->result == SD_RES_NEW_NODE_VER)
+	case SD_RES_OLD_NODE_VER:
+	case SD_RES_NEW_NODE_VER:
 		return CJ_RES_JOIN_LATER;
-	else
+	default:
 		return CJ_RES_FAIL;
+	}
 }
 
 static int send_join_request(struct sd_node *ent)
