@@ -258,13 +258,13 @@ int update_epoch_store(uint32_t epoch)
 	return 0;
 }
 
-int update_epoch_log(uint32_t epoch)
+int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 {
 	int fd, ret, len;
 	time_t t;
 	char path[PATH_MAX];
 
-	dprintf("update epoch: %d, %d\n", epoch, sys->nr_nodes);
+	dprintf("update epoch: %d, %zd\n", epoch, nr_nodes);
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDWR | O_CREAT | O_DSYNC, def_fmode);
@@ -273,8 +273,8 @@ int update_epoch_log(uint32_t epoch)
 		goto err_open;
 	}
 
-	len = sys->nr_nodes * sizeof(struct sd_node);
-	ret = write(fd, (char *)sys->nodes, len);
+	len = nr_nodes * sizeof(struct sd_node);
+	ret = write(fd, (char *)nodes, len);
 	if (ret != len)
 		goto err;
 

@@ -269,7 +269,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	       struct sd_node *entries, int *nr_entries);
 
 int update_epoch_store(uint32_t epoch);
-int update_epoch_log(uint32_t epoch);
+int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 
 int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);

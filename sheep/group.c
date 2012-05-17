@@ -610,7 +610,7 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 
 	if ((msg->cluster_status == SD_STATUS_OK ||
 	     msg->cluster_status == SD_STATUS_HALT) && msg->inc_epoch)
-		update_epoch_log(sys->epoch);
+		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 
 	if (!sd_store && strlen((char *)msg->store)) {
 		sd_store = find_store_driver((char *)msg->store);
@@ -642,7 +642,7 @@ static void update_cluster_info(struct join_message *msg,
 	    msg->cluster_status == SD_STATUS_HALT) {
 		if (msg->inc_epoch) {
 			sys->epoch++;
-			update_epoch_log(sys->epoch);
+			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 			update_epoch_store(sys->epoch);
 		}
 		/* Fresh node */
@@ -940,7 +940,7 @@ static void __sd_leave_done(struct event_struct *cevent)
 	if (sys_can_recover()) {
 		sys->epoch++;
 		update_epoch_store(sys->epoch);
-		update_epoch_log(sys->epoch);
+		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	}
 	update_vnode_info();
 
@@ -1248,10 +1248,10 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		nr = nr_members;
 		nr_leave = get_nodes_nr_from(&sys->leave_list);
 
-		dprintf("%d == %d + %d \n", nr_local, nr, nr_leave);
+		dprintf("%d == %d + %d\n", nr_local, nr, nr_leave);
 		if (nr_local == nr + nr_leave) {
 			sys_stat_set(SD_STATUS_OK);
-			update_epoch_log(sys->epoch);
+			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 			update_epoch_store(sys->epoch);
 		}
 		break;
@@ -1289,10 +1289,10 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		nr = nr_members;
 		nr_leave = get_nodes_nr_from(&sys->leave_list);
 
-		dprintf("%d == %d + %d \n", nr_local, nr, nr_leave);
+		dprintf("%d == %d + %d\n", nr_local, nr, nr_leave);
 		if (nr_local == nr + nr_leave) {
 			sys_stat_set(SD_STATUS_OK);
-			update_epoch_log(sys->epoch);
+			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 			update_epoch_store(sys->epoch);
 		}
 

@@ -251,7 +251,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->epoch = 1;
 	sys->recovered_epoch = 1;
 
-	ret = update_epoch_log(sys->epoch);
+	ret = update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	if (ret)
 		return SD_RES_EIO;
 
@@ -498,7 +498,7 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 		sys->nr_copies);
 
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
-	ret = update_epoch_log(sys->epoch);
+	ret = update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	if (ret) {
 		ret = SD_RES_EIO;
 		sys->epoch--;
