@@ -379,6 +379,7 @@ static inline void node_btree_clear(void **btroot)
 {
 	tdestroy(*btroot, free);
 	*btroot = NULL;
+	nr_zk_nodes = 0;
 }
 
 static struct zk_node *node_btree_find(void **btroot, struct zk_node *znode)
