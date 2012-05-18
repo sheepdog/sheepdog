@@ -26,8 +26,6 @@
 #include "work.h"
 #include "cluster.h"
 
-static int cdrv_fd;
-
 struct node {
 	struct sd_node ent;
 	struct list_head list;
@@ -333,24 +331,6 @@ static void queue_cluster_request(struct request *req)
 
 		free(msg);
 	}
-}
-
-static void group_handler(int listen_fd, int events, void *data)
-{
-	int ret;
-	if (events & EPOLLHUP) {
-		eprintf("received EPOLLHUP event: has corosync exited?\n");
-		goto out;
-	}
-
-	ret = sys->cdrv->dispatch();
-	if (ret == 0)
-		return;
-	else
-		eprintf("oops... an error occurred inside corosync\n");
-out:
-	log_close();
-	exit(1);
 }
 
 static inline int get_nodes_nr_from(struct list_head *l)
@@ -1370,8 +1350,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 		}
 	}
 
-	cdrv_fd = sys->cdrv->init(sys->cdrv_option, sys->this_node.addr);
-	if (cdrv_fd < 0)
+	ret = sys->cdrv->init(sys->cdrv_option, sys->this_node.addr);
+	if (ret < 0)
 		return -1;
 
 	sys->this_node.port = port;
@@ -1398,12 +1378,6 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 
 	INIT_LIST_HEAD(&sys->request_queue);
 	INIT_LIST_HEAD(&sys->event_queue);
-
-	ret = register_event(cdrv_fd, group_handler, NULL);
-	if (ret) {
-		eprintf("failed to register epoll events (%d)\n", ret);
-		return 1;
-	}
 
 	ret = send_join_request(&sys->this_node);
 	if (ret != 0)

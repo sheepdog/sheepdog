@@ -14,11 +14,13 @@
 #include <netdb.h>
 #include <search.h>
 #include <assert.h>
+#include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <zookeeper/zookeeper.h>
 #include <urcu/uatomic.h>
 
 #include "cluster.h"
+#include "event.h"
 #include "work.h"
 
 #define MAX_EVENT_BUF_SIZE (64 * 1024)
@@ -638,36 +640,6 @@ static int get_addr(uint8_t *bytes)
 	return 0;
 }
 
-static int zk_init(const char *option, uint8_t *myaddr)
-{
-	if (!option) {
-		eprintf("specify comma separated host:port pairs, each corresponding to a zk server.\n");
-		eprintf("e.g. sheep /store -c zookeeper:127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002\n");
-		return -1;
-	}
-
-	zhandle = zookeeper_init(option, watcher, SESSION_TIMEOUT, 0, NULL, 0);
-	if (!zhandle) {
-		eprintf("failed to connect to zk server %s\n", option);
-		return -1;
-	}
-	dprintf("request session timeout:%dms, negotiated session timeout:%dms\n",
-			SESSION_TIMEOUT, zoo_recv_timeout(zhandle));
-
-	if (get_addr(myaddr) < 0)
-		return -1;
-
-	zk_queue_init(zhandle);
-
-	efd = eventfd(0, EFD_NONBLOCK);
-	if (efd < 0) {
-		eprintf("failed to create an event fd: %m\n");
-		return -1;
-	}
-
-	return efd;
-}
-
 static int zk_join(struct sd_node *myself,
 		   void *opaque, size_t opaque_len)
 {
@@ -735,7 +707,7 @@ static void zk_unblock(void *msg, size_t msg_len)
 	eventfd_write(efd, value);
 }
 
-static int zk_dispatch(void)
+static void zk_handler(int listen_fd, int events, void *data)
 {
 	int ret, rc, retry;
 	char path[256];
@@ -744,13 +716,20 @@ static int zk_dispatch(void)
 	struct zk_node *n;
 	enum cluster_join_result res;
 
+	if (events & EPOLLHUP) {
+		eprintf("zookeeper driver received EPOLLHUP event, exiting.\n");
+		log_close();
+		exit(1);
+	}
+
 	dprintf("read event\n");
+
 	ret = eventfd_read(efd, &value);
 	if (ret < 0)
-		return 0;
+		return;
 
 	if (uatomic_read(&zk_notify_blocked))
-		return 0;
+		return;
 
 	ret = zk_queue_pop(zhandle, &ev);
 	if (ret < 0)
@@ -864,7 +843,49 @@ static int zk_dispatch(void)
 		break;
 	}
 out:
-	return 0;
+	return;
+}
+
+static int zk_init(const char *option, uint8_t *myaddr)
+{
+	int ret;
+
+	if (!option) {
+		eprintf("specify comma separated host:port pairs, "
+			"each corresponding to a zk server.\n");
+		eprintf("e.g. sheep /store -c zookeeper:127.0.0.1:"
+			"3000,127.0.0.1:3001,127.0.0.1:3002\n");
+		return -1;
+	}
+
+	zhandle = zookeeper_init(option, watcher, SESSION_TIMEOUT, 0, NULL, 0);
+	if (!zhandle) {
+		eprintf("failed to connect to zk server %s\n", option);
+		return -1;
+	}
+	dprintf("request session timeout:%dms, "
+		"negotiated session timeout:%dms\n",
+		SESSION_TIMEOUT, zoo_recv_timeout(zhandle));
+
+	if (get_addr(myaddr) < 0)
+		return -1;
+
+	zk_queue_init(zhandle);
+
+	efd = eventfd(0, EFD_NONBLOCK);
+	if (efd < 0) {
+		eprintf("failed to create an event fd: %m\n");
+		return -1;
+	}
+
+	ret = register_event(efd, zk_handler, NULL);
+	if (ret) {
+		eprintf("failed to register zookeeper event handler (%d)\n",
+			ret);
+		return -1;
+	}
+
+	return efd;
 }
 
 struct cluster_driver cdrv_zookeeper = {
@@ -876,7 +897,6 @@ struct cluster_driver cdrv_zookeeper = {
 	.notify     = zk_notify,
 	.block      = zk_block,
 	.unblock    = zk_unblock,
-	.dispatch   = zk_dispatch,
 };
 
 cdrv_register(cdrv_zookeeper);

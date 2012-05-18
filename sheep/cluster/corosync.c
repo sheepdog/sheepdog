@@ -10,10 +10,12 @@
  */
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/epoll.h>
 #include <corosync/cpg.h>
 #include <corosync/cfg.h>
 
 #include "cluster.h"
+#include "event.h"
 #include "work.h"
 
 struct cpg_node {
@@ -596,51 +598,6 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	__corosync_dispatch();
 }
 
-static int corosync_init(const char *option, uint8_t *myaddr)
-{
-	int ret, fd;
-	uint32_t nodeid;
-	cpg_callbacks_t cb = {
-		.cpg_deliver_fn = cdrv_cpg_deliver,
-		.cpg_confchg_fn = cdrv_cpg_confchg
-	};
-
-	ret = cpg_initialize(&cpg_handle, &cb);
-	if (ret != CPG_OK) {
-		eprintf("failed to initialize cpg (%d) - is corosync running?\n", ret);
-		return -1;
-	}
-
-	ret = corosync_cfg_initialize(&cfg_handle, NULL);
-	if (ret != CS_OK) {
-		vprintf(SDOG_ERR, "failed to initialize cfg (%d)\n", ret);
-		return -1;
-	}
-
-	ret = corosync_cfg_local_get(cfg_handle, &nodeid);
-	if (ret != CS_OK) {
-		vprintf(SDOG_ERR, "failed to get node id (%d)\n", ret);
-		return -1;
-	}
-
-	ret = nodeid_to_addr(nodeid, myaddr);
-	if (ret < 0) {
-		eprintf("failed to get local address\n");
-		return -1;
-	}
-
-	this_node.nodeid = nodeid;
-	this_node.pid = getpid();
-
-	ret = cpg_fd_get(cpg_handle, &fd);
-	if (ret != CPG_OK) {
-		eprintf("failed to get cpg file descriptor (%d)\n", ret);
-		return -1;
-	}
-
-	return fd;
-}
-
 static int corosync_join(struct sd_node *myself,
 			 void *opaque, size_t opaque_len)
 {
@@ -695,15 +652,78 @@ static int corosync_notify(void *msg, size_t msg_len)
 			   NULL, 0, msg, msg_len);
 }
 
-static int corosync_dispatch(void)
+static void corosync_handler(int listen_fd, int events, void *data)
 {
 	int ret;
 
-	ret = cpg_dispatch(cpg_handle, CPG_DISPATCH_ALL);
-	if (ret != CPG_OK)
-		return -1;
+	if (events & EPOLLHUP) {
+		eprintf("corosync driver received EPOLLHUP event, exiting.\n");
+		goto out;
+	}
 
-	return 0;
+	ret = cpg_dispatch(cpg_handle, CPG_DISPATCH_ALL);
+	if (ret != CPG_OK) {
+		eprintf("cpg_dispatch returned %d\n", ret);
+		goto out;
+	}
+
+	return;
+out:
+	log_close();
+	exit(1);
+}
+
+static int corosync_init(const char *option, uint8_t *myaddr)
+{
+	int ret, fd;
+	uint32_t nodeid;
+	cpg_callbacks_t cb = {
+		.cpg_deliver_fn = cdrv_cpg_deliver,
+		.cpg_confchg_fn = cdrv_cpg_confchg
+	};
+
+	ret = cpg_initialize(&cpg_handle, &cb);
+	if (ret != CPG_OK) {
+		eprintf("failed to initialize cpg (%d) - "
+			"is corosync running?\n", ret);
+		return -1;
+	}
+
+	ret = corosync_cfg_initialize(&cfg_handle, NULL);
+	if (ret != CS_OK) {
+		vprintf(SDOG_ERR, "failed to initialize cfg (%d)\n", ret);
+		return -1;
+	}
+
+	ret = corosync_cfg_local_get(cfg_handle, &nodeid);
+	if (ret != CS_OK) {
+		vprintf(SDOG_ERR, "failed to get node id (%d)\n", ret);
+		return -1;
+	}
+
+	ret = nodeid_to_addr(nodeid, myaddr);
+	if (ret < 0) {
+		eprintf("failed to get local address\n");
+		return -1;
+	}
+
+	this_node.nodeid = nodeid;
+	this_node.pid = getpid();
+
+	ret = cpg_fd_get(cpg_handle, &fd);
+	if (ret != CPG_OK) {
+		eprintf("failed to get cpg file descriptor (%d)\n", ret);
+		return -1;
+	}
+
+	ret = register_event(fd, corosync_handler, NULL);
+	if (ret) {
+		eprintf("failed to register corosync event handler (%d)\n",
+			ret);
+		return -1;
+	}
+
+	return fd;
 }
 
 struct cluster_driver cdrv_corosync = {
@@ -715,7 +735,6 @@ struct cluster_driver cdrv_corosync = {
 	.notify     = corosync_notify,
 	.block      = corosync_block,
 	.unblock    = corosync_unblock,
-	.dispatch   = corosync_dispatch,
 };
 
 cdrv_register(cdrv_corosync);

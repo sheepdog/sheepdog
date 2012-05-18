@@ -15,10 +15,12 @@
 #include <search.h>
 #include <assert.h>
 #include <pthread.h>
+#include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <accord/accord.h>
 
 #include "cluster.h"
+#include "event.h"
 #include "work.h"
 
 #define MAX_EVENT_BUF_SIZE (64 * 1024)
@@ -458,55 +460,6 @@ static void acrd_watch_fn(struct acrd_handle *ah, struct acrd_watch_info *info,
 	eventfd_write(efd, value);
 }
 
-static int accord_init(const char *option, uint8_t *myaddr)
-{
-	if (!option) {
-		eprintf("specify one of the accord servers.\n");
-		eprintf("e.g. sheep /store -c accord:127.0.0.1\n");
-		return -1;
-	}
-
-	pthread_mutex_lock(&start_lock);
-
-	ahandle = acrd_init(option, 9090, acrd_join_fn, acrd_leave_fn, NULL);
-	if (!ahandle) {
-		eprintf("failed to connect to accrd server %s\n", option);
-		return -1;
-	}
-
-	if (get_addr(myaddr) < 0)
-		return -1;
-
-	efd = eventfd(0, EFD_NONBLOCK);
-	if (efd < 0) {
-		eprintf("failed to create an event fd: %m\n");
-		return -1;
-	}
-
-	acrd_wq = init_work_queue(1);
-	if (!acrd_wq)
-		eprintf("failed to create accord workqueue: %m\n");
-		return -1;
-	}
-
-	pthread_cond_wait(&start_cond, &start_lock);
-	pthread_mutex_unlock(&start_lock);
-
-	if (need_cleanup)
-		for_each_acrd_file(ahandle, BASE_FILE, __acrd_del, NULL);
-	else {
-		queue_start_pos = -1;
-		queue_end_pos = -1;
-		for_each_acrd_file(ahandle, QUEUE_FILE, find_queue_end,
-				   &queue_end_pos);
-	}
-
-	acrd_add_watch(ahandle, QUEUE_FILE, ACRD_EVENT_PREFIX | ACRD_EVENT_ALL,
-		       acrd_watch_fn, NULL);
-
-	return efd;
-}
-
 static int accord_join(struct sd_node *myself,
 		       void *opaque, size_t opaque_len)
 {
@@ -549,17 +502,24 @@ static void acrd_unblock(void *msg, size_t msg_len)
 	pthread_mutex_unlock(&queue_lock);
 }
 
-static int accord_dispatch(void)
+static void acrd_handler(int listen_fd, int events, void *data)
 {
 	int ret;
 	eventfd_t value;
 	struct acrd_event ev;
 	enum cluster_join_result res;
 
+	if (events & EPOLLHUP) {
+		eprintf("accord driver received EPOLLHUP event, exiting.\n");
+		log_close();
+		exit(1);
+	}
+
 	dprintf("read event\n");
+
 	ret = eventfd_read(efd, &value);
 	if (ret < 0)
-		return 0;
+		return;
 
 	pthread_mutex_lock(&queue_lock);
 
@@ -623,7 +583,64 @@ static int accord_dispatch(void)
 out:
 	pthread_mutex_unlock(&queue_lock);
 
-	return 0;
+	return;
+}
+
+static int accord_init(const char *option, uint8_t *myaddr)
+{
+	int ret;
+
+	if (!option) {
+		eprintf("specify one of the accord servers.\n");
+		eprintf("e.g. sheep /store -c accord:127.0.0.1\n");
+		return -1;
+	}
+
+	pthread_mutex_lock(&start_lock);
+
+	ahandle = acrd_init(option, 9090, acrd_join_fn, acrd_leave_fn, NULL);
+	if (!ahandle) {
+		eprintf("failed to connect to accrd server %s\n", option);
+		return -1;
+	}
+
+	if (get_addr(myaddr) < 0)
+		return -1;
+
+	efd = eventfd(0, EFD_NONBLOCK);
+	if (efd < 0) {
+		eprintf("failed to create an event fd: %m\n");
+		return -1;
+	}
+
+	acrd_wq = init_work_queue(1);
+	if (!acrd_wq)
+		eprintf("failed to create accord workqueue: %m\n");
+		return -1;
+	}
+
+	pthread_cond_wait(&start_cond, &start_lock);
+	pthread_mutex_unlock(&start_lock);
+
+	if (need_cleanup)
+		for_each_acrd_file(ahandle, BASE_FILE, __acrd_del, NULL);
+	else {
+		queue_start_pos = -1;
+		queue_end_pos = -1;
+		for_each_acrd_file(ahandle, QUEUE_FILE, find_queue_end,
+				   &queue_end_pos);
+	}
+
+	acrd_add_watch(ahandle, QUEUE_FILE, ACRD_EVENT_PREFIX | ACRD_EVENT_ALL,
+		       acrd_watch_fn, NULL);
+
+	ret = register_event(efd, acrd_handler, NULL);
+	if (ret) {
+		eprintf("failed to register accord event handler (%d)\n", ret);
+		return -1;
+	}
+
+	return efd;
 }
 
 struct cluster_driver cdrv_accord = {
@@ -635,7 +652,6 @@ struct cluster_driver cdrv_accord = {
 	.notify     = accord_notify,
 	.block      = accord_block,
 	.unblock    = accord_unblock,
-	.dispatch   = accord_dispatch,
 };
 
 cdrv_register(cdrv_accord);

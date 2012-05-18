@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/epoll.h>
 #include <sys/mman.h>
 #include <sys/signalfd.h>
 #include <sys/file.h>
@@ -280,45 +281,6 @@ static void check_pids(void *arg)
 
 /* Local driver APIs */
 
-static int local_init(const char *option, uint8_t *myaddr)
-{
-	sigset_t mask;
-	static struct timer t = {
-		.callback = check_pids,
-		.data = &t,
-	};
-
-	if (option)
-		shmfile = option;
-
-	/* set 127.0.0.1 */
-	memset(myaddr, 0, 16);
-	myaddr[12] = 127;
-	myaddr[15] = 1;
-
-	shm_queue_init();
-
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGUSR1);
-	sigprocmask(SIG_BLOCK, &mask, NULL);
-
-	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
-	if (sigfd < 0) {
-		eprintf("failed to create a signal fd: %m\n");
-		return -1;
-	}
-
-	add_timer(&t, 1);
-
-	local_block_wq = init_work_queue(1);
-	if (!local_block_wq) {
-		eprintf("failed to create local workqueue: %m\n");
-		return -1;
-	}
-
-	return sigfd;
-}
-
 static int local_join(struct sd_node *myself,
 		      void *opaque, size_t opaque_len)
 {
@@ -383,14 +345,21 @@ static void local_unblock(void *msg, size_t msg_len)
 	shm_queue_unlock();
 }
 
-static int local_dispatch(void)
+static void local_handler(int listen_fd, int events, void *data)
 {
-	int ret;
 	struct signalfd_siginfo siginfo;
 	struct local_event *ev;
 	enum cluster_join_result res;
+	int ret;
+
+	if (events & EPOLLHUP) {
+		eprintf("local driver received EPOLLHUP event, exiting.\n");
+		log_close();
+		exit(1);
+	}
 
 	dprintf("read siginfo\n");
+
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));
 
@@ -454,7 +423,53 @@ static int local_dispatch(void)
 out:
 	shm_queue_unlock();
 
-	return 0;
+	return;
+}
+
+static int local_init(const char *option, uint8_t *myaddr)
+{
+	sigset_t mask;
+	int ret;
+	static struct timer t = {
+		.callback = check_pids,
+		.data = &t,
+	};
+
+	if (option)
+		shmfile = option;
+
+	/* set 127.0.0.1 */
+	memset(myaddr, 0, 16);
+	myaddr[12] = 127;
+	myaddr[15] = 1;
+
+	shm_queue_init();
+
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGUSR1);
+	sigprocmask(SIG_BLOCK, &mask, NULL);
+
+	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
+	if (sigfd < 0) {
+		eprintf("failed to create a signal fd: %m\n");
+		return -1;
+	}
+
+	add_timer(&t, 1);
+
+	local_block_wq = init_work_queue(1);
+	if (!local_block_wq) {
+		eprintf("failed to create local workqueue: %m\n");
+		return -1;
+	}
+
+	ret = register_event(sigfd, local_handler, NULL);
+	if (ret) {
+		eprintf("failed to register local event handler (%d)\n", ret);
+		return -1;
+	}
+
+	return sigfd;
 }
 
 struct cluster_driver cdrv_local = {
@@ -466,7 +481,6 @@ struct cluster_driver cdrv_local = {
 	.notify     = local_notify,
 	.block      = local_block,
 	.unblock    = local_unblock,
-	.dispatch   = local_dispatch,
 };
 
 cdrv_register(cdrv_local);

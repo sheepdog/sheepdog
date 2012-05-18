@@ -94,19 +94,6 @@ struct cluster_driver {
 	 */
 	void (*unblock)(void *msg, size_t msg_len);
 
-	/*
-	 * Dispatch handlers
-	 *
-	 * This function dispatches handlers according to the
-	 * delivered events (join/leave/notify) in the cluster.
-	 *
-	 * Note that the events sequence is totally ordered; all nodes
-	 * call the handlers in the same sequence.
-	 *
-	 * Returns zero on success, -1 on error
-	 */
-	int (*dispatch)(void);
-
 	struct list_head list;
 };
 
@@ -114,8 +101,7 @@ extern struct list_head cluster_drivers;
 
 #define cdrv_register(driver)						\
 static void __attribute__((constructor)) regist_ ## driver(void) {	\
-	if (!driver.init || !driver.join || !driver.leave ||		\
-	    !driver.notify || !driver.dispatch)				\
+	if (!driver.init || !driver.join || !driver.leave || !driver.notify) \
 		panic("the driver '%s' is incomplete\n", driver.name);	\
 	list_add(&driver.list, &cluster_drivers);			\
 }
