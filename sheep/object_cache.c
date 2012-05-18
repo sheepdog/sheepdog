@@ -279,7 +279,7 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 		goto out;
 	}
 	size = xpwrite(fd, buf, count, offset);
-	if (xlockf(fd, F_UNLCK, offset, count) < 0) {
+	if (xlockf(fd, F_ULOCK, offset, count) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out;
@@ -313,7 +313,7 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 	}
 
 	size = xpread(fd, buf, count, offset);
-	if (xlockf(fd, F_UNLCK, offset, count) < 0) {
+	if (xlockf(fd, F_ULOCK, offset, count) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out;
