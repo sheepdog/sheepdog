@@ -754,6 +754,7 @@ static void zk_handler(int listen_fd, int events, void *data)
 				if (res == CJ_RES_MASTER_TRANSFER) {
 					eprintf("failed to join sheepdog cluster: "
 						"please retry when master is up\n");
+					zk_leave();
 					exit(1);
 				}
 			} else
@@ -779,15 +780,13 @@ static void zk_handler(int listen_fd, int events, void *data)
 		if (node_eq(&ev.sender.node, &this_node.node))
 			zk_member_init(zhandle);
 
-		if (ev.join_result == CJ_RES_MASTER_TRANSFER) {
-			/* FIXME: This code is tricky, but Sheepdog assumes that
-			 * nr_nodes = 1 when join_result = MASTER_TRANSFER... */
+		if (ev.join_result == CJ_RES_MASTER_TRANSFER)
+			/*
+			 * Sheepdog assumes that only one sheep(master will kill
+			 * itself) is alive in MASTER_TRANSFER scenario. So only
+			 * the joining sheep will run into here.
+			 */
 			node_btree_clear(&zk_node_btroot);
-			node_btree_add(&zk_node_btroot, &this_node);
-
-			zk_queue_push_back(zhandle, &ev);
-			zk_queue_pop(zhandle, &ev);
-		}
 
 		node_btree_add(&zk_node_btroot, &ev.sender);
 		dprintf("one sheep joined[down], nr_nodes:%ld, sender:%s, joined:%d\n",
