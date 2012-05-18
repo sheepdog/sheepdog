@@ -670,11 +670,50 @@ again:
 	return 0;
 }
 
+#define LOCK_PATH "/lock"
+
+static int lock_base_dir(const char *d)
+{
+	char *lock_path;
+	int ret = 0;
+	int fd;
+
+	lock_path = zalloc(strlen(d) + strlen(LOCK_PATH) + 1);
+	sprintf(lock_path, "%s" LOCK_PATH, d);
+
+	fd = open(lock_path, O_WRONLY|O_CREAT, def_fmode);
+	if (fd < 0) {
+		eprintf("failed to open lock file %s (%s)\n",
+			lock_path, strerror(errno));
+		ret = -1;
+		goto out;
+	}
+
+	if (lockf(fd, F_TLOCK, 1) < 0) {
+		if (errno == EACCES || errno == EAGAIN) {
+			eprintf("another sheep daemon is using %s\n", d);
+		} else {
+			eprintf("unable to get base dir lock (%s)\n",
+				strerror(errno));
+		}
+		ret = -1;
+		goto out;
+	}
+
+out:
+	free(lock_path);
+	return ret;
+}
+
 int init_base_path(const char *d)
 {
 	int new = 0;
+	int ret;
 
-	return init_path(d, &new);
+	ret = init_path(d, &new);
+	if (ret)
+		return ret;
+	return lock_base_dir(d);
 }
 
 #define OBJ_PATH "/obj/"
