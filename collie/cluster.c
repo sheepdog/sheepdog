@@ -25,7 +25,7 @@ struct cluster_cmd_data {
 	char name[STORE_LEN];
 } cluster_cmd_data;
 
-#define DEFAULT_STORE	"simple"
+#define DEFAULT_STORE	"farm"
 
 static void set_nohalt(uint16_t *p)
 {
