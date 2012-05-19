@@ -44,7 +44,7 @@ all-local:
 	@echo Built collie
 
 clean-local:
-	rm -f collie *.o gmon.out *.da *.bb *.bbg *.orig *.rej
+	rm -f collie *.o gmon.out *.da *.bb *.bbg
 
 # support for GNU Flymake
 check-syntax:

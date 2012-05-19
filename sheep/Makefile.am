@@ -62,7 +62,7 @@ all-local:
 	@echo Built sheep
 
 clean-local:
-	rm -f sheep *.o gmon.out *.da *.bb *.bbg *.orig *.rej
+	rm -f sheep *.o gmon.out *.da *.bb *.bbg
 
 # support for GNU Flymake
 check-syntax:

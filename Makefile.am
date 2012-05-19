@@ -29,7 +29,8 @@ dist-clean-local:
 	rm -f autoconf automake autoheader
 
 clean-generic:
-	rm -rf $(SPEC) $(TARFILE) cscope* *.orig *.rej
+	rm -rf $(SPEC) $(TARFILE) cscope*
+	find -name '*.orig' -or -name '*.rej' | xargs rm
 
 cscope:
 	@echo create cscope.out
