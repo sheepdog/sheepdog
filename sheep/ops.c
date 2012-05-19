@@ -64,14 +64,6 @@ struct flush_work {
 	struct work work;
 };
 
-static void get_store_dir(struct strbuf *buf, uint32_t epoch)
-{
-	if (!strcmp(sd_store->name, "simple"))
-		strbuf_addf(buf, "%s%08u/", obj_path, epoch);
-	else /* XXX assume other store doesn't need epoch/obj pattern */
-		strbuf_addf(buf, "%s", obj_path);
-}
-
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
@@ -89,7 +81,7 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch
 		goto out;
 	}
 
-	get_store_dir(&store_dir, epoch);
+	strbuf_addf(&store_dir, "%s", obj_path);
 	dir = opendir(store_dir.buf);
 	if (!dir) {
 		ret = SD_RES_EIO;
@@ -704,13 +696,11 @@ out:
 
 static int store_remove_obj(struct request *req)
 {
-	uint32_t epoch = req->rq.epoch;
 	uint64_t oid = req->rq.obj.oid;
 	struct strbuf buf = STRBUF_INIT;
 	int ret = SD_RES_SUCCESS;
 
-	get_store_dir(&buf, epoch);
-	strbuf_addf(&buf, "%016" PRIx64, oid);
+	strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
 	if (unlink(buf.buf) < 0) {
 		if (errno == ENOENT) {
 			ret = SD_RES_NO_OBJ;
@@ -765,8 +755,7 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 	if (is_vdi_obj(oid)) {
 		struct strbuf buf = STRBUF_INIT;
 
-		get_store_dir(&buf, epoch);
-		strbuf_addf(&buf, "%016" PRIx64, oid);
+		strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
 		jd = jrnl_begin(data, hdr->data_length, hdr->obj.offset,
 				buf.buf, jrnl_path);
 		if (!jd) {
