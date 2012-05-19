@@ -672,7 +672,6 @@ static void update_cluster_info(struct join_message *msg,
 		if (msg->inc_epoch) {
 			uatomic_inc(&sys->epoch);
 			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
-			update_epoch_store(sys->epoch);
 		}
 		/* Fresh node */
 		if (!sys_stat_ok() && !sys_stat_halt()) {
@@ -1258,7 +1257,6 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		if (nr_local == nr + nr_leave) {
 			sys_stat_set(SD_STATUS_OK);
 			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
-			update_epoch_store(sys->epoch);
 		}
 		break;
 	case CJ_RES_MASTER_TRANSFER:
@@ -1295,7 +1293,6 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		if (nr_local == nr + nr_leave) {
 			sys_stat_set(SD_STATUS_OK);
 			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
-			update_epoch_store(sys->epoch);
 		}
 
 		if (node_eq(joined, &sys->this_node))
@@ -1323,7 +1320,6 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 
 	if (sys_can_recover()) {
 		uatomic_inc(&sys->epoch);
-		update_epoch_store(sys->epoch);
 		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	}
 

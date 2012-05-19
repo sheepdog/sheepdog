@@ -255,8 +255,6 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret)
 		return SD_RES_EIO;
 
-	update_epoch_store(sys->epoch);
-
 	set_cluster_copies(sys->nr_copies);
 	set_cluster_flags(sys->flags);
 
@@ -502,7 +500,6 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 		sys->epoch--;
 		goto out;
 	}
-	update_epoch_store(sys->epoch);
 	sys_stat_set(s);
 out:
 	return ret;

@@ -248,17 +248,6 @@ out:
 	return ret;
 }
 
-int update_epoch_store(uint32_t epoch)
-{
-	if (!strcmp(sd_store->name, "simple")) {
-		char new[1024];
-
-		snprintf(new, sizeof(new), "%s%08u/", obj_path, epoch);
-		mkdir(new, def_dmode);
-	}
-	return 0;
-}
-
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 {
 	int fd, ret, len;
