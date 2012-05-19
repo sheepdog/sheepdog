@@ -643,6 +643,14 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 		} else
 				panic("backend store %s not supported\n", msg->store);
 	}
+
+	/* We need to purge the stale objects for sheep joining back
+	 * after crash
+	 */
+	if (msg->inc_epoch)
+		if (sd_store->purge_obj &&
+		    sd_store->purge_obj() != SD_RES_SUCCESS)
+			eprintf("WARN: may have stale objects\n");
 }
 
 static void update_cluster_info(struct join_message *msg,

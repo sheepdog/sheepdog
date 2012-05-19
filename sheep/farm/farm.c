@@ -695,6 +695,14 @@ static int farm_format(struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
+static int farm_purge_obj(void)
+{
+	if (cleanup_working_dir() < 0)
+		return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
+}
+
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
@@ -711,6 +719,7 @@ struct store_driver farm = {
 	.restore = farm_restore,
 	.get_snap_file = farm_get_snap_file,
 	.format = farm_format,
+	.purge_obj = farm_purge_obj,
 };
 
 add_store_driver(farm);
