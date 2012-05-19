@@ -12,6 +12,7 @@
 #define __SHEEP_PRIV_H__
 
 #include <inttypes.h>
+#include <urcu/uatomic.h>
 
 #include "sheepdog_proto.h"
 #include "event.h"
@@ -216,6 +217,12 @@ extern char *epoch_path;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
 extern struct objlist_cache obj_list_cache;
+
+/* One should call this function to get sys->epoch outside main thread */
+static inline uint32_t sys_epoch(void)
+{
+	return uatomic_read(&sys->epoch);
+}
 
 int create_listen_port(int port, void *data);
 

@@ -414,8 +414,9 @@ out:
 static int farm_read(uint64_t oid, struct siocb *iocb)
 {
 	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
+	uint32_t epoch = sys_epoch();
 
-	if (iocb->epoch < sys->epoch) {
+	if (iocb->epoch < epoch) {
 		int i;
 		void *buffer;
 
@@ -429,7 +430,7 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 			 * in this case, we should try to retrieve object upwards, since.
 			 * when the object is to be removed, it will get written to the
 			 * snapshot at later epoch. */
-			for (i = iocb->epoch; i < sys->epoch; i++) {
+			for (i = iocb->epoch; i < epoch; i++) {
 				buffer = retrieve_object_from_snap(oid, i);
 				if (buffer)
 					break;
@@ -512,10 +513,11 @@ static int farm_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 	void *buf = NULL;
 	struct siocb io = { 0 };
 	int i;
+	uint32_t epoch = sys_epoch();
 
 	dprintf("try link %"PRIx64" from snapshot with epoch %d\n", oid, tgt_epoch);
 
-	for (i = tgt_epoch; i < sys->epoch; i++) {
+	for (i = tgt_epoch; i < epoch; i++) {
 		buf = retrieve_object_from_snap(oid, i);
 		if (buf)
 			break;

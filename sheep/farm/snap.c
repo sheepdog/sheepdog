@@ -160,7 +160,7 @@ int snap_file_write(uint32_t epoch, unsigned char *trunksha1, unsigned char *out
 	int ret = 0;
 	struct strbuf buf = STRBUF_INIT;
 	struct sd_node nodes[SD_MAX_NODES];
-	int tgt_epoch = user ? sys->epoch : epoch;
+	int tgt_epoch = user ? sys_epoch() : epoch;
 	uint64_t epoch_size = epoch_log_read(tgt_epoch, (char *)nodes, sizeof(nodes));
 	struct sha1_file_hdr hdr = { .size = epoch_size + SHA1_LEN,
 				     .priv = tgt_epoch };

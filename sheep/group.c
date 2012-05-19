@@ -670,7 +670,7 @@ static void update_cluster_info(struct join_message *msg,
 	if (msg->cluster_status == SD_STATUS_OK ||
 	    msg->cluster_status == SD_STATUS_HALT) {
 		if (msg->inc_epoch) {
-			sys->epoch++;
+			uatomic_inc(&sys->epoch);
 			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 			update_epoch_store(sys->epoch);
 		}
@@ -1322,7 +1322,7 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 	update_node_info(members, nr_members);
 
 	if (sys_can_recover()) {
-		sys->epoch++;
+		uatomic_inc(&sys->epoch);
 		update_epoch_store(sys->epoch);
 		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	}

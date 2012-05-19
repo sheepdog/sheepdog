@@ -435,7 +435,7 @@ int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
 		v = vnodes[i];
 		if (vnode_is_local(v)) {
 			struct siocb iocb = { 0 };
-			iocb.epoch = sys->epoch;
+			iocb.epoch = sys_epoch();
 			iocb.buf = buf;
 			iocb.length = data_length;
 			iocb.offset = 0;
@@ -458,7 +458,7 @@ pull_remote:
 			continue;
 
 		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.epoch = sys->epoch;
+		hdr.epoch = sys_epoch();
 		hdr.data_length = rlen = data_length;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 		hdr.obj.oid = oid;
@@ -546,7 +546,7 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 	hdr->opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr->flags = SD_FLAG_CMD_WRITE;
 	hdr->data_length = data_length;
-	hdr->epoch = sys->epoch;
+	hdr->epoch = sys_epoch();
 
 	hdr->obj.oid = oid;
 	hdr->obj.offset = 0;
