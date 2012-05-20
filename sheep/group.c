@@ -1265,6 +1265,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 			sys->join_finished = 1;
 			assert(sys->nr_nodes == 0);
 			update_node_info(&sys->this_node, 1);
+			sys->epoch = get_latest_epoch();
 		}
 
 		nr_local = get_nodes_nr_epoch(sys->epoch);
