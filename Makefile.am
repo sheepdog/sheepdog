@@ -30,7 +30,7 @@ dist-clean-local:
 
 clean-generic:
 	rm -rf $(SPEC) $(TARFILE) cscope*
-	find -name '*.orig' -or -name '*.rej' | xargs rm
+	find -name '*.orig' -or -name '*.rej' | xargs rm -f
 
 cscope:
 	@echo create cscope.out
