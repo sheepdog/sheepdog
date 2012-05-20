@@ -23,8 +23,6 @@
 #include "event.h"
 #include "work.h"
 
-#define MAX_EVENT_BUF_SIZE (64 * 1024)
-
 #define BASE_FILE "/sheepdog"
 #define LOCK_FILE BASE_FILE "/lock"
 #define QUEUE_FILE BASE_FILE "/queue"
@@ -40,7 +38,7 @@ struct acrd_event {
 	struct sd_node sender;
 
 	size_t buf_len;
-	uint8_t buf[MAX_EVENT_BUF_SIZE];
+	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
 
 	size_t nr_nodes; /* the number of sheep */
 	struct sd_node nodes[SD_MAX_NODES];

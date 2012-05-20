@@ -247,6 +247,8 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 	else
 		size = sizeof(*msg);
 
+	assert(size <= SD_MAX_EVENT_BUF_SIZE);
+
 	msg = zalloc(size);
 	if (!msg) {
 		eprintf("failed to allocate memory\n");

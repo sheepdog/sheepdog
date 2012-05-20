@@ -22,6 +22,9 @@
 #include "sheep.h"
 #include "logger.h"
 
+/* maximum payload size sent in ->notify and ->unblock */
+#define SD_MAX_EVENT_BUF_SIZE (64 * 1024)
+
 enum cluster_join_result {
 	CJ_RES_SUCCESS, /* Success */
 	CJ_RES_FAIL, /* Fail to join.  The joining node has an invalidepoch. */

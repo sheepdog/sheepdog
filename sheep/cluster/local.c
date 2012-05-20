@@ -25,7 +25,6 @@
 #include "work.h"
 
 #define MAX_EVENTS 500
-#define MAX_EVENT_BUF_SIZE (64 * 1024)
 
 const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
@@ -46,7 +45,7 @@ struct local_event {
 	struct sd_node sender;
 
 	size_t buf_len;
-	uint8_t buf[MAX_EVENT_BUF_SIZE];
+	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
 
 	size_t nr_nodes; /* the number of sheep processes */
 	struct sd_node nodes[SD_MAX_NODES];

@@ -23,7 +23,6 @@
 #include "event.h"
 #include "work.h"
 
-#define MAX_EVENT_BUF_SIZE (64 * 1024)
 #define SESSION_TIMEOUT 30000		/* millisecond */
 #define MEMBER_CREATE_TIMEOUT SESSION_TIMEOUT
 #define MEMBER_CREATE_INTERVAL 10	/* millisecond */
@@ -82,7 +81,7 @@ struct zk_event {
 	int callbacked; /* set non-zero after sd_block_handler() was called */
 
 	size_t buf_len;
-	uint8_t buf[MAX_EVENT_BUF_SIZE];
+	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
 };
 
 static int zk_notify_blocked;
