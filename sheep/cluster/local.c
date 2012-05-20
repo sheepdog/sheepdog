@@ -200,7 +200,6 @@ static void shm_queue_init(void)
 	else {
 		/* initialize shared memory */
 		event_pos = 0;
-		memset(shm_queue, 0, sizeof(*shm_queue));
 		ret = ftruncate(shmfd, 0);
 		assert(ret == 0);
 		ret = ftruncate(shmfd, sizeof(*shm_queue));
