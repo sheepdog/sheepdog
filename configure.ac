@@ -86,7 +86,10 @@ AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netdb.h netinet/in.h stdint.h \
 		  stdlib.h string.h sys/ioctl.h sys/param.h sys/socket.h \
 		  sys/time.h syslog.h unistd.h sys/types.h getopt.h malloc.h \
-		  sys/sockio.h utmpx.h urcu.h urcu/uatomic.h])
+		  sys/sockio.h utmpx.h])
+
+AC_CHECK_HEADERS([urcu.h urcu/uatomic.h],,
+	AC_MSG_ERROR(liburcu 0.6.0 or later is required))
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
