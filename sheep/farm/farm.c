@@ -73,10 +73,9 @@ err:
 static int farm_exist(uint64_t oid)
 {
 	char path[PATH_MAX];
-	struct stat s;
 
 	sprintf(path, "%s%016"PRIx64, obj_path, oid);
-	if (stat(path, &s) < 0) {
+	if (access(path, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
 			eprintf("%m\n");
 		return 0;
