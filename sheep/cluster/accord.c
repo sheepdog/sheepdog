@@ -479,10 +479,10 @@ static int accord_notify(void *msg, size_t msg_len)
 
 static void accord_block(void)
 {
-	return add_event(ahandle, EVENT_NOTIFY, &this_node, NULL, 0, 1);
+	add_event(ahandle, EVENT_NOTIFY, &this_node, NULL, 0, 1);
 }
 
-static void acrd_unblock(void *msg, size_t msg_len)
+static void accord_unblock(void *msg, size_t msg_len)
 {
 	struct acrd_event ev;
 
@@ -612,7 +612,7 @@ static int accord_init(const char *option, uint8_t *myaddr)
 	}
 
 	acrd_wq = init_work_queue(1);
-	if (!acrd_wq)
+	if (!acrd_wq) {
 		eprintf("failed to create accord workqueue: %m\n");
 		return -1;
 	}
