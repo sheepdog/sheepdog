@@ -436,15 +436,10 @@ int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
 		if (vnode_is_local(v)) {
 			struct siocb iocb = { 0 };
 			iocb.epoch = sys->epoch;
-			ret = sd_store->open(oid, &iocb, 0);
-			if (ret != SD_RES_SUCCESS)
-				goto pull_remote;
-
 			iocb.buf = buf;
 			iocb.length = data_length;
 			iocb.offset = 0;
 			ret = sd_store->read(oid, &iocb);
-			sd_store->close(oid, &iocb);
 			if (ret != SD_RES_SUCCESS)
 				goto pull_remote;
 			/* read succeed */

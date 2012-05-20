@@ -13,9 +13,12 @@
 
 #include <dirent.h>
 #include <pthread.h>
+#include <linux/limits.h>
 
 #include "farm.h"
 #include "sheep_priv.h"
+#include "sheepdog_proto.h"
+#include "sheep.h"
 
 char farm_obj_dir[PATH_MAX];
 char farm_dir[PATH_MAX];
@@ -67,15 +70,75 @@ err:
 	return ret;
 }
 
-static int farm_write(uint64_t oid, struct siocb *iocb)
+static int farm_exist(uint64_t oid)
 {
-	ssize_t size = xpwrite(iocb->fd, iocb->buf, iocb->length, iocb->offset);
+	char path[PATH_MAX];
+	struct stat s;
 
-	if (size != iocb->length)
-		return SD_RES_EIO;
+	sprintf(path, "%s%016"PRIx64, obj_path, oid);
+	if (stat(path, &s) < 0) {
+		if (errno != ENOENT)
+			eprintf("%m\n");
+		return 0;
+	}
+
+	return 1;
+}
+
+static int err_to_sderr(uint64_t oid, int err)
+{
+	int ret;
+	if (err == ENOENT) {
+		struct stat s;
+
+		if (stat(obj_path, &s) < 0) {
+			eprintf("corrupted\n");
+			ret = SD_RES_EIO;
+		} else {
+			dprintf("object %016" PRIx64 " not found locally\n", oid);
+			ret = SD_RES_NO_OBJ;
+		}
+	} else {
+		eprintf("%m\n");
+		ret = SD_RES_UNKNOWN;
+	}
+	return ret;
+}
+
+static int farm_write(uint64_t oid, struct siocb *iocb, int create)
+{
+	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
+	char path[PATH_MAX];
+	ssize_t size;
+
+	if (is_vdi_obj(oid))
+		flags &= ~O_DIRECT;
+
+	if (create)
+		flags |= O_CREAT | O_TRUNC;
+
+	sprintf(path, "%s%016"PRIx64, obj_path, oid);
+	fd = open(path, flags, def_fmode);
+	if (fd < 0)
+		return err_to_sderr(oid, errno);
+
+	if (create && !(iocb->flags & SD_FLAG_CMD_COW)) {
+		ret = prealloc(fd, is_vdi_obj(oid) ?
+			       SD_INODE_SIZE : SD_DATA_OBJ_SIZE);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+	}
+	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
+	if (size != iocb->length) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
 
 	trunk_update_entry(oid);
-	return SD_RES_SUCCESS;
+out:
+	close(fd);
+	return ret;
 }
 
 static int write_last_sector(int fd, uint32_t length)
@@ -102,26 +165,6 @@ static int write_last_sector(int fd, uint32_t length)
 	return ret;
 }
 
-static int err_to_sderr(uint64_t oid, int err)
-{
-	int ret;
-	if (err == ENOENT) {
-		struct stat s;
-
-		if (stat(obj_path, &s) < 0) {
-			eprintf("corrupted\n");
-			ret = SD_RES_EIO;
-		} else {
-			dprintf("object %016" PRIx64 " not found locally\n", oid);
-			ret = SD_RES_NO_OBJ;
-		}
-	} else {
-		eprintf("%m\n");
-		ret = SD_RES_UNKNOWN;
-	}
-	return ret;
-}
-
 /*
  * Preallocate the whole object to get a better filesystem layout.
  */
@@ -137,51 +180,6 @@ int prealloc(int fd, uint32_t size)
 	} else
 		ret = SD_RES_SUCCESS;
 	return ret;
-}
-
-static int farm_open(uint64_t oid, struct siocb *iocb, int create)
-{
-	struct strbuf buf = STRBUF_INIT;
-	int ret = SD_RES_SUCCESS, fd;
-	int flags = def_open_flags;
-
-	if (iocb->epoch < sys->epoch)
-		goto out;
-
-	if (is_vdi_obj(oid))
-		flags &= ~O_DIRECT;
-
-	if (create)
-		flags |= O_CREAT | O_TRUNC;
-
-	strbuf_addstr(&buf, obj_path);
-	strbuf_addf(&buf, "%016" PRIx64, oid);
-	fd = open(buf.buf, flags, def_fmode);
-	if (fd < 0) {
-		ret = err_to_sderr(oid, errno);
-		goto out;
-	}
-	iocb->fd = fd;
-	ret = SD_RES_SUCCESS;
-	if (!(iocb->flags & SD_FLAG_CMD_COW) && create) {
-		ret = prealloc(fd, iocb->length);
-		if (ret != SD_RES_SUCCESS)
-			close(fd);
-	}
-out:
-	strbuf_release(&buf);
-	return ret;
-}
-
-static int farm_close(uint64_t oid, struct siocb *iocb)
-{
-	if (iocb->epoch < sys->epoch)
-		return SD_RES_SUCCESS;
-
-	if (close(iocb->fd) < 0)
-		return SD_RES_EIO;
-
-	return SD_RES_SUCCESS;
 }
 
 static int get_trunk_sha1(uint32_t epoch, unsigned char *outsha1, int user)
@@ -346,29 +344,31 @@ static int farm_get_objlist(struct siocb *iocb)
 }
 
 
-static void *read_working_object(uint64_t oid, int length)
+static void *read_working_object(uint64_t oid, uint64_t offset,
+				 uint32_t length)
 {
 	void *buf = NULL;
 	char path[PATH_MAX];
-	int fd, ret;
+	int fd;
+	size_t size;
 
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
 
-	fd = open(path, O_RDONLY, def_fmode);
+	fd = open(path, def_open_flags);
 	if (fd < 0) {
 		dprintf("object %"PRIx64" not found\n", oid);
 		goto out;
 	}
 
-	buf = malloc(length);
+	buf = valloc(length);
 	if (!buf) {
 		eprintf("no memory to allocate buffer.\n");
 		goto out;
 	}
 
-	ret = xread(fd, buf, length);
-	if (length != ret) {
-		eprintf("object read error.\n");
+	size = xpread(fd, buf, length, offset);
+	if (length != size) {
+		eprintf("object read error. %m\n");
 		free(buf);
 		buf = NULL;
 		goto out;
@@ -413,11 +413,13 @@ out:
 
 static int farm_read(uint64_t oid, struct siocb *iocb)
 {
-	int i;
+	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
 
 	if (iocb->epoch < sys->epoch) {
+		int i;
 		void *buffer;
-		buffer = read_working_object(oid, iocb->length);
+
+		buffer = read_working_object(oid, iocb->offset, iocb->length);
 		if (!buffer) {
 			/* Here if read the object from the targeted epoch failed,
 			 * we need to read from the later epoch, because at some epoch
@@ -437,13 +439,30 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 			return SD_RES_NO_OBJ;
 		memcpy(iocb->buf, buffer, iocb->length);
 		free(buffer);
-	} else {
-		ssize_t size = xpread(iocb->fd, iocb->buf, iocb->length, iocb->offset);
 
-		if (size != iocb->length)
-			return SD_RES_EIO;
+		return SD_RES_SUCCESS;
+	} else {
+		char path[PATH_MAX];
+		ssize_t size;
+
+		if (is_vdi_obj(oid))
+			flags &= ~O_DIRECT;
+
+		sprintf(path, "%s%016"PRIx64, obj_path, oid);
+		fd = open(path, flags);
+
+		if (fd < 0)
+			return err_to_sderr(oid, errno);
+
+		size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
+		if (size != iocb->length) {
+			ret = SD_RES_EIO;
+			goto out;
+		}
 	}
-	return SD_RES_SUCCESS;
+out:
+	close(fd);
+	return ret;
 }
 
 static int farm_atomic_put(uint64_t oid, struct siocb *iocb)
@@ -706,10 +725,9 @@ static int farm_purge_obj(void)
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
-	.open = farm_open,
+	.exist = farm_exist,
 	.write = farm_write,
 	.read = farm_read,
-	.close = farm_close,
 	.get_objlist = farm_get_objlist,
 	.link = farm_link,
 	.atomic_put = farm_atomic_put,

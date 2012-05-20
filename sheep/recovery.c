@@ -399,19 +399,14 @@ static void recover_object(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint64_t oid = rw->oids[rw->done];
-	uint32_t epoch = rw->epoch;
 	int i, copy_idx, copy_nr, ret;
-	struct siocb iocb = { 0 };
 
 	if (!sys->nr_copies)
 		return;
 
 	eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n", rw->done, rw->count, oid);
 
-	iocb.epoch = epoch;
-	ret = sd_store->open(oid, &iocb, 0);
-	if (ret == SD_RES_SUCCESS) {
-		sd_store->close(oid, &iocb);
+	if (sd_store->exist(oid)) {
 		dprintf("the object is already recovered\n");
 		return;
 	}
@@ -479,8 +474,7 @@ int is_recoverying_oid(uint64_t oid)
 	uint64_t hval = fnv_64a_buf(&oid, sizeof(uint64_t), FNV1A_64_INIT);
 	uint64_t min_hval;
 	struct recovery_work *rw = recovering_work;
-	int ret, i;
-	struct siocb iocb;
+	int i;
 
 	if (oid == 0)
 		return 0;
@@ -496,12 +490,8 @@ int is_recoverying_oid(uint64_t oid)
 	if (rw->state == RW_INIT)
 		return 1;
 
-	memset(&iocb, 0, sizeof(iocb));
-	iocb.epoch = sys->epoch;
-	ret = sd_store->open(oid, &iocb, 0);
-	if (ret == SD_RES_SUCCESS) {
+	if (sd_store->exist(oid)) {
 		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
-		sd_store->close(oid, &iocb);
 		return 0;
 	}
 

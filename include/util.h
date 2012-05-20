@@ -8,6 +8,7 @@
 
 #include "bitops.h"
 #include "list.h"
+#include "logger.h"
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define roundup(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
@@ -61,8 +62,10 @@ static inline void *zalloc(size_t size)
 
 static inline int xlockf(int fd, int cmd, off_t offset, off_t len)
 {
-	if (lseek(fd, offset, SEEK_SET) < 0)
+	if (lseek(fd, offset, SEEK_SET) < 0) {
+		eprintf("%m\n");
 		return -1;
+	}
 
 	return lockf(fd, cmd, len);
 }

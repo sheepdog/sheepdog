@@ -155,7 +155,6 @@ struct cluster_info {
 };
 
 struct siocb {
-	int fd;
 	uint16_t flags;
 	uint32_t epoch;
 	void *buf;
@@ -167,10 +166,9 @@ struct store_driver {
 	struct list_head list;
 	const char *name;
 	int (*init)(char *path);
-	int (*open)(uint64_t oid, struct siocb *, int create);
-	int (*write)(uint64_t oid, struct siocb *);
+	int (*exist)(uint64_t oid);
+	int (*write)(uint64_t oid, struct siocb *, int create);
 	int (*read)(uint64_t oid, struct siocb *);
-	int (*close)(uint64_t oid, struct siocb *);
 	int (*format)(struct siocb *);
 	/* Operations in recovery */
 	int (*get_objlist)(struct siocb *);

@@ -658,17 +658,12 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 		if (vnode_is_local(v)) {
 			memset(&iocb, 0, sizeof(iocb));
 			iocb.epoch = epoch;
-			ret = sd_store->open(oid, &iocb, 0);
-			if (ret != SD_RES_SUCCESS)
-				continue;
-
 			iocb.buf = buf;
 			iocb.length = SD_DATA_OBJ_SIZE;
 			iocb.offset = 0;
 			ret = sd_store->read(oid, &iocb);
 			if (ret != SD_RES_SUCCESS)
 				continue;
-			sd_store->close(oid, &iocb);
 			goto out;
 		}
 
@@ -747,10 +742,6 @@ static int store_read_obj(struct request *req)
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	ret = sd_store->open(hdr->obj.oid, &iocb, 0);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
@@ -761,12 +752,11 @@ static int store_read_obj(struct request *req)
 	rsp->data_length = hdr->data_length;
 	rsp->obj.copies = sys->nr_copies;
 out:
-	sd_store->close(hdr->obj.oid, &iocb);
 	return ret;
 }
 
 static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
-		void *data)
+		void *data, int create)
 {
 	uint64_t oid = hdr->obj.oid;
 	int ret = SD_RES_SUCCESS;
@@ -786,11 +776,11 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 			strbuf_release(&buf);
 			return SD_RES_EIO;
 		}
-		ret = sd_store->write(oid, iocb);
+		ret = sd_store->write(oid, iocb, create);
 		jrnl_end(jd);
 		strbuf_release(&buf);
 	} else
-		ret = sd_store->write(oid, iocb);
+		ret = sd_store->write(oid, iocb, create);
 
 	return ret;
 }
@@ -798,21 +788,13 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 static int store_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
-	int ret;
 	uint32_t epoch = hdr->epoch;
 	struct siocb iocb;
 
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	ret = sd_store->open(hdr->obj.oid, &iocb, 0);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
-	ret = do_write_obj(&iocb, hdr, epoch, req->data);
-
-	sd_store->close(hdr->obj.oid, &iocb);
-	return ret;
+	return do_write_obj(&iocb, hdr, epoch, req->data, 0);
 }
 
 static int store_create_and_write_obj(struct request *req)
@@ -821,10 +803,10 @@ static int store_create_and_write_obj(struct request *req)
 	struct sd_req cow_hdr;
 	uint32_t epoch = hdr->epoch;
 	uint64_t oid = hdr->obj.oid;
-	int ret;
 	char *buf = NULL;
 	struct siocb iocb;
 	unsigned data_length;
+	int ret = SD_RES_SUCCESS;
 
 	if (is_vdi_obj(oid))
 		data_length = SD_INODE_SIZE;
@@ -837,10 +819,6 @@ static int store_create_and_write_obj(struct request *req)
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
 	iocb.length = data_length;
-	ret = sd_store->open(oid, &iocb, 1);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		dprintf("%" PRIx64 ", %" PRIx64 "\n", oid, hdr->obj.cow_oid);
 
@@ -863,16 +841,15 @@ static int store_create_and_write_obj(struct request *req)
 		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
 		cow_hdr.obj.offset = 0;
 
-		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf);
+		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf, 1);
 	} else
-		ret = do_write_obj(&iocb, hdr, epoch, req->data);
+		ret = do_write_obj(&iocb, hdr, epoch, req->data, 1);
 
 	if (SD_RES_SUCCESS == ret)
 		check_and_insert_objlist_cache(oid);
 out:
 	if (buf)
 		free(buf);
-	sd_store->close(oid, &iocb);
 	return ret;
 }
 
