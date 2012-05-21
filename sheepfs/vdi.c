@@ -27,6 +27,7 @@
 #define PATH_VDI	"/vdi"
 #define PATH_VDI_LIST	"/vdi/list"
 #define PATH_VDI_MOUNT	"/vdi/mount"
+#define PATH_VDI_UNMOUNT  "/vdi/unmount"
 
 int create_vdi_layout(void)
 {
@@ -41,6 +42,11 @@ int create_vdi_layout(void)
 	if (shadow_file_create(PATH_VDI_MOUNT) < 0)
 		return -1;
 	if (sheepfs_set_op(PATH_VDI_MOUNT, OP_VDI_MOUNT) < 0)
+		return -1;
+
+	if (shadow_file_create(PATH_VDI_UNMOUNT) < 0)
+		return -1;
+	if (sheepfs_set_op(PATH_VDI_UNMOUNT, OP_VDI_UNMOUNT) < 0)
 		return -1;
 
 	return 0;
@@ -68,6 +74,14 @@ int vdi_mount_write(const char *path, const char *buf, size_t size,
 		    off_t ignore)
 {
 	if (volume_create_entry(buf) < 0)
+		return -EINVAL;
+	return size;
+}
+
+int vdi_unmount_write(const char *path, const char *buf, size_t size,
+		      off_t ignore)
+{
+	if (volume_remove_entry(buf) < 0)
 		return -EINVAL;
 	return size;
 }

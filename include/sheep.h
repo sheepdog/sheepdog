@@ -47,6 +47,7 @@
 #define SD_OP_TRACE          0x95
 #define SD_OP_TRACE_CAT      0x96
 #define SD_OP_STAT_RECOVERY  0x97
+#define SD_OP_FLUSH_DEL_CACHE  0x98
 
 #define SD_FLAG_CMD_IO_LOCAL   0x0010
 #define SD_FLAG_CMD_RECOVERY 0x0020

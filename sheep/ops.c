@@ -605,6 +605,21 @@ static int local_flush_vdi(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
+static int local_flush_and_del(const struct sd_req *req, struct sd_rsp *rsp,
+				void *data)
+{
+	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
+	uint64_t oid = hdr->oid;
+	uint32_t vid = oid_to_vid(oid);
+	struct object_cache *cache = find_object_cache(vid, 0);
+
+	if (cache)
+		if (object_cache_flush_and_delete(cache) < 0)
+			return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
+}
+
 static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *data)
 {
 	int enable = req->data_length, ret;
@@ -971,6 +986,11 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_FLUSH_VDI] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_flush_vdi,
+	},
+
+	[SD_OP_FLUSH_DEL_CACHE] = {
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_flush_and_del,
 	},
 
 	[SD_OP_TRACE] = {

@@ -51,7 +51,8 @@ static struct sheepfs_file_operation {
 	[OP_NULL]         = { NULL, NULL, NULL },
 	[OP_CLUSTER_INFO] = { cluster_info_read, NULL, cluster_info_get_size },
 	[OP_VDI_LIST]     = { vdi_list_read, NULL, vdi_list_get_size },
-	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write, NULL },
+	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write },
+	[OP_VDI_UNMOUNT]  = { NULL, vdi_unmount_write },
 	[OP_VOLUME]       = { volume_read, volume_write, volume_get_size,
 			      volume_sync, volume_open },
 };

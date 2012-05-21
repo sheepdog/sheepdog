@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <syslog.h>
 
+#include "sheep.h"
 #include "strbuf.h"
 #include "sheepfs.h"
 #include "net.h"
@@ -237,7 +238,7 @@ static int volume_do_sync(uint32_t vid)
 	hdr.opcode = SD_OP_FLUSH_VDI;
 	hdr.oid = vid_to_vdi_oid(vid);
 
-	ret = exec_req(sheep_fd, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+	ret = exec_req(0, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
 		syslog(LOG_ERR, "[%s] failed to flush vdi %"PRIx32"\n",
@@ -339,6 +340,51 @@ int volume_create_entry(const char *entry)
 	}
 	if (sheepfs_set_op(path, OP_VOLUME) < 0)
 		return -1;
+
+	return 0;
+}
+
+static int volume_sync_and_delete(uint32_t vid)
+{
+	struct sd_obj_req hdr = { 0 };
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	int ret;
+	unsigned wlen = 0, rlen = 0;
+
+	hdr.opcode = SD_OP_FLUSH_DEL_CACHE;
+	hdr.oid = vid_to_vdi_oid(vid);
+
+	ret = exec_req(0, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+
+	if (ret || rsp->result != SD_RES_SUCCESS) {
+		syslog(LOG_ERR, "[%s] failed to flush vdi %" PRIx32 "\n",
+			__func__, vid);
+		return -1;
+	}
+
+	return 0;
+}
+
+int volume_remove_entry(const char *entry)
+{
+	char path[PATH_MAX], *ch;
+	uint32_t vid;
+
+	ch = strchr(entry, '\n');
+	if (ch != NULL)
+		*ch = '\0';
+
+	sprintf(path, "%s/%s", PATH_VOLUME, entry);
+	if (!shadow_file_exsit(path))
+		return -1;
+
+	if (shadow_file_getxattr(path, SH_VID_NAME, &vid, SH_VID_SIZE) < 0)
+		return -1;
+
+	if (volume_sync_and_delete(vid) < 0)
+		return -1;
+
+	shadow_file_delete(path);
 
 	return 0;
 }

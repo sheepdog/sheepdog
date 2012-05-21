@@ -8,6 +8,7 @@ enum sheepfs_opcode {
 	OP_CLUSTER_INFO,
 	OP_VDI_LIST,
 	OP_VDI_MOUNT,
+	OP_VDI_UNMOUNT,
 	OP_VOLUME,
 };
 
@@ -34,6 +35,7 @@ extern int volume_read(const char *path, char *buf, size_t size, off_t offset);
 extern int volume_write(const char *, const char *buf, size_t size, off_t);
 extern size_t volume_get_size(const char *);
 extern int volume_create_entry(const char *entry);
+extern int volume_remove_entry(const char *entry);
 extern int volume_sync(const char *path);
 extern int volume_open(const char *path, struct fuse_file_info *);
 
@@ -48,5 +50,6 @@ extern int vdi_list_read(const char *path, char *buf, size_t size, off_t);
 extern size_t vdi_list_get_size(const char *path);
 
 extern int vdi_mount_write(const char *, const char *buf, size_t size, off_t);
+extern int vdi_unmount_write(const char *, const char *buf, size_t, off_t);
 
 #endif
