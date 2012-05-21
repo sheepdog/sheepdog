@@ -49,6 +49,8 @@ static struct sheepfs_file_operation {
 	[OP_NULL]         = { NULL, NULL, NULL },
 	[OP_CLUSTER_INFO] = { cluster_info_read, NULL,
 				cluster_info_get_size },
+	[OP_VDI_LIST]     = { vdi_list_read, NULL, vdi_list_get_size },
+	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write, NULL },
 };
 
 int sheepfs_set_op(const char *path, unsigned opcode)
@@ -198,6 +200,8 @@ static int sheepfs_main_loop(char *mountpoint)
 static int create_sheepfs_layout(void)
 {
 	if (create_cluster_layout() < 0)
+		return -1;
+	if (create_vdi_layout() < 0)
 		return -1;
 
 	return 0;
