@@ -422,7 +422,7 @@ static inline int sys_can_halt(void)
 
 #define CACHE_VDI_SHIFT       31
 #define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
-#define CACHE_BLOCK_SIZE      (UINT32_C(128) << 10) /* 128 KB */
+#define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
 
 struct object_cache {
 	uint32_t vid;

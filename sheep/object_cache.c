@@ -284,8 +284,11 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 		eprintf("%m\n");
 		goto out;
 	}
-	if (size != count)
+	if (size != count) {
+		eprintf("size %zu, count:%zu, offset %zu %m\n",
+			size, count, offset);
 		ret = SD_RES_EIO;
+	}
 out:
 	close(fd);
 	strbuf_release(&p);
@@ -318,8 +321,11 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 		eprintf("%m\n");
 		goto out;
 	}
-	if (size != count)
+	if (size != count) {
+		eprintf("size %zu, count:%zu, offset %zu %m\n",
+			size, count, offset);
 		ret = SD_RES_EIO;
+	}
 out:
 	close(fd);
 	strbuf_release(&p);
