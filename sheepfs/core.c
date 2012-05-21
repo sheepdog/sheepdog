@@ -53,6 +53,8 @@ static struct sheepfs_file_operation {
 	[OP_VDI_LIST]     = { vdi_list_read, NULL, vdi_list_get_size },
 	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write },
 	[OP_VDI_UNMOUNT]  = { NULL, vdi_unmount_write },
+	[OP_NODE_INFO]    = { node_info_read, NULL, node_info_get_size },
+	[OP_NODE_LIST]    = { node_list_read, NULL, node_list_get_size },
 	[OP_VOLUME]       = { volume_read, volume_write, volume_get_size,
 			      volume_sync, volume_open },
 };
@@ -235,6 +237,8 @@ static int create_sheepfs_layout(void)
 	if (create_vdi_layout() < 0)
 		return -1;
 	if (create_volume_layout() < 0)
+		return -1;
+	if (create_node_layout() < 0)
 		return -1;
 
 	return 0;

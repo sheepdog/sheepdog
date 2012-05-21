@@ -9,6 +9,8 @@ enum sheepfs_opcode {
 	OP_VDI_LIST,
 	OP_VDI_MOUNT,
 	OP_VDI_UNMOUNT,
+	OP_NODE_INFO,
+	OP_NODE_LIST,
 	OP_VOLUME,
 };
 
@@ -51,5 +53,12 @@ extern size_t vdi_list_get_size(const char *path);
 
 extern int vdi_mount_write(const char *, const char *buf, size_t size, off_t);
 extern int vdi_unmount_write(const char *, const char *buf, size_t, off_t);
+
+/* node.c */
+extern int node_list_read(const char *path, char *buf, size_t size, off_t);
+extern size_t node_list_get_size(const char *path);
+extern int node_info_read(const char *path, char *buf, size_t size, off_t);
+extern size_t node_info_get_size(const char *path);
+extern int create_node_layout(void);
 
 #endif

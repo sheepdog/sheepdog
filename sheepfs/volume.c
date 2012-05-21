@@ -184,7 +184,7 @@ static int volume_do_rw(const char *path, char *buf, size_t size,
 		len = size;
 
 	do {
-		syslog(LOG_ERR, "%s oid %"PRIx64", off %ju, len %zu,"
+		syslog(LOG_INFO, "%s oid %"PRIx64", off %ju, len %zu,"
 			" size %zu\n",
 			rw == VOLUME_READ ? "read" : "write",
 			oid, start, len, size);
@@ -230,15 +230,15 @@ size_t volume_get_size(const char *path)
 
 static int volume_do_sync(uint32_t vid)
 {
-	struct sd_obj_req hdr = { 0 };
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr = { 0 };
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
 	unsigned wlen = 0, rlen = 0;
 
 	hdr.opcode = SD_OP_FLUSH_VDI;
-	hdr.oid = vid_to_vdi_oid(vid);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
 
-	ret = exec_req(0, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+	ret = exec_req(0, &hdr, NULL, &wlen, &rlen);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
 		syslog(LOG_ERR, "[%s] failed to flush vdi %"PRIx32"\n",
@@ -346,15 +346,15 @@ int volume_create_entry(const char *entry)
 
 static int volume_sync_and_delete(uint32_t vid)
 {
-	struct sd_obj_req hdr = { 0 };
-	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	struct sd_req hdr = { 0 };
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
 	unsigned wlen = 0, rlen = 0;
 
 	hdr.opcode = SD_OP_FLUSH_DEL_CACHE;
-	hdr.oid = vid_to_vdi_oid(vid);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
 
-	ret = exec_req(0, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+	ret = exec_req(0, &hdr, NULL, &wlen, &rlen);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
 		syslog(LOG_ERR, "[%s] failed to flush vdi %" PRIx32 "\n",

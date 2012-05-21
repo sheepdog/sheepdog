@@ -605,16 +605,14 @@ static int local_flush_vdi(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
-static int local_flush_and_del(const struct sd_req *req, struct sd_rsp *rsp,
-				void *data)
+static int local_flush_and_del(struct request *req)
 {
-	struct sd_obj_req *hdr = (struct sd_obj_req *)req;
-	uint64_t oid = hdr->oid;
+	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid);
 	struct object_cache *cache = find_object_cache(vid, 0);
 
 	if (cache)
-		if (object_cache_flush_and_delete(cache) < 0)
+		if (object_cache_flush_and_delete(req->vnodes, cache) < 0)
 			return SD_RES_EIO;
 
 	return SD_RES_SUCCESS;
