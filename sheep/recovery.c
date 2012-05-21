@@ -699,6 +699,8 @@ static int fill_obj_list(struct recovery_work *rw)
 	int retry_cnt;
 	struct sd_node *cur = rw->cur_nodes;
 	int cur_nr = rw->cur_nr_nodes;
+	int start = random() % cur_nr;
+	int end = cur_nr;
 
 	buf = malloc(buf_size);
 	if (!buf) {
@@ -706,7 +708,9 @@ static int fill_obj_list(struct recovery_work *rw)
 		rw->retry = 1;
 		return -1;
 	}
-	for (i = 0; i < cur_nr; i++) {
+
+again:
+	for (i = start; i < end; i++) {
 		int buf_nr;
 		struct sd_node *node = cur + i;
 
@@ -736,6 +740,12 @@ static int fill_obj_list(struct recovery_work *rw)
 		buf_nr = screen_obj_list(rw, (uint64_t *)buf, buf_nr);
 		if (buf_nr)
 			rw->count = merge_objlist(rw->oids, rw->count, (uint64_t *)buf, buf_nr);
+	}
+
+	if (start != 0 && !next_rw) {
+		end = start;
+		start = 0;
+		goto again;
 	}
 
 	dprintf("%d\n", rw->count);
