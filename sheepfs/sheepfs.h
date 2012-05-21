@@ -1,6 +1,8 @@
 #ifndef SHEEPFS_H
 #define SHEEPFS_H
 
+#include <fuse.h>
+
 enum sheepfs_opcode {
 	OP_NULL = 0,
 	OP_CLUSTER_INFO,
@@ -33,6 +35,7 @@ extern int volume_write(const char *, const char *buf, size_t size, off_t);
 extern size_t volume_get_size(const char *);
 extern int volume_create_entry(const char *entry);
 extern int volume_sync(const char *path);
+extern int volume_open(const char *path, struct fuse_file_info *);
 
 /* cluster.c */
 extern int cluster_info_read(const char *path, char *buf, size_t size, off_t);
