@@ -15,6 +15,7 @@ enum sheepfs_opcode {
 };
 
 extern char sheepfs_shadow[];
+extern int sheepfs_page_cache;
 
 extern struct strbuf *sheepfs_run_cmd(const char *command);
 extern int sheepfs_set_op(const char *path, unsigned opcode);

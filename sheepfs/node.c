@@ -62,6 +62,7 @@ size_t node_info_get_size(const char *path)
 
 	len = shadow_file_write(path, buf->buf, buf->len);
 	strbuf_release(buf);
+	free(buf);
 	return len;
 }
 

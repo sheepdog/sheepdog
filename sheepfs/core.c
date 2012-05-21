@@ -31,15 +31,17 @@ char sheepfs_shadow[PATH_MAX];
 
 static int sheepfs_debug;
 static int sheepfs_fg;
+int sheepfs_page_cache = 0;
 
 static struct option const long_options[] = {
 	{"debug", no_argument, NULL, 'd'},
 	{"help", no_argument, NULL, 'h'},
 	{"foreground", no_argument, NULL, 'f'},
+	{"pagecache", no_argument, NULL, 'k'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "dhf";
+static const char *short_options = "dfhk";
 
 static struct sheepfs_file_operation {
 	int (*read)(const char *path, char *buf, size_t size, off_t);
@@ -254,6 +256,7 @@ Usage: sheepfs [OPTION]... MOUNTPOINT\n\
 Options:\n\
   -d, --debug             enable debug output (implies -f)\n\
   -f, --foreground        sheepfs run in the foreground\n\
+  -k, --pagecache         use local kernel's page cache to access volume\n\
   -h, --help              display this help and exit\n\
 ");
 	exit(inval);
@@ -277,6 +280,9 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			sheepfs_fg = 1;
+			break;
+		case 'k':
+			sheepfs_page_cache = 1;
 			break;
 		default:
 			usage(1);
