@@ -125,6 +125,7 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 AC_CONFIG_FILES([Makefile
 		collie/Makefile
 		sheep/Makefile
+		sheepfs/Makefile
 		include/Makefile
 		script/Makefile
 		lib/Makefile
@@ -208,6 +209,11 @@ AC_ARG_ENABLE([trace],
 	[ enable_trace="no" ],)
 AM_CONDITIONAL(BUILD_TRACE, test x$enable_trace = xyes)
 
+AC_ARG_ENABLE([sheepfs],
+	[  --enable-sheepfs         : enable sheepfs],,
+	[ enable_sheepfs="yes" ],)
+AM_CONDITIONAL(BUILD_SHEEPFS, test x$enable_sheepfs = xyes)
+
 CP=cp
 OS_LDL="-ldl"
 case "$host_os" in
@@ -284,6 +290,13 @@ if test "x${enable_trace}" = xyes; then
 	AC_DEFINE_UNQUOTED([HAVE_TRACE], 1, [have trace])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
 fi
+
+if test "x${enable_sheepfs}" = xyes; then
+	PKG_CHECK_MODULES([fuse],[fuse])
+	AC_DEFINE_UNQUOTED([HAVE_SHEEPFS], 1, [have sheepfs])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES sheepfs"
+fi
+
 
 # extra warnings
 EXTRA_WARNINGS=""
