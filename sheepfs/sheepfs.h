@@ -11,6 +11,9 @@ enum sheepfs_opcode {
 	OP_VDI_UNMOUNT,
 	OP_NODE_INFO,
 	OP_NODE_LIST,
+	OP_CONFIG_PCACHE,
+	OP_CONFIG_OCACHE,
+	OP_CONFIG_SHEEP,
 	OP_VOLUME,
 };
 
@@ -19,7 +22,7 @@ enum sheepfs_opcode {
 extern char sheepfs_shadow[];
 extern int sheepfs_page_cache;
 extern int sheepfs_object_cache;
-extern const char *sdhost;
+extern char sdhost[];
 extern int sdport;
 
 extern struct strbuf *sheepfs_run_cmd(const char *command);
@@ -46,6 +49,7 @@ extern int volume_create_entry(const char *entry);
 extern int volume_remove_entry(const char *entry);
 extern int volume_sync(const char *path);
 extern int volume_open(const char *path, struct fuse_file_info *);
+extern int reset_socket_pool(void);
 
 /* cluster.c */
 extern int cluster_info_read(const char *path, char *buf, size_t size, off_t);
@@ -66,5 +70,20 @@ extern size_t node_list_get_size(const char *path);
 extern int node_info_read(const char *path, char *buf, size_t size, off_t);
 extern size_t node_info_get_size(const char *path);
 extern int create_node_layout(void);
+
+/* config.c */
+extern int create_config_layout(void);
+
+extern int config_pcache_read(const char *path, char *buf, size_t size, off_t);
+extern int config_pcache_write(const char *path, const char *, size_t, off_t);
+extern size_t config_pcache_get_size(const char *path);
+
+extern int config_ocache_read(const char *path, char *buf, size_t size, off_t);
+extern int config_ocache_write(const char *path, const char *, size_t, off_t);
+extern size_t config_ocache_get_size(const char *path);
+
+extern int config_sheep_info_read(const char *path, char *, size_t size, off_t);
+extern int config_sheep_info_write(const char *, const char *, size_t, off_t);
+extern size_t config_sheep_info_get_size(const char *path);
 
 #endif

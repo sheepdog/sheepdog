@@ -372,6 +372,27 @@ static int setup_socket_pool(int array[], int len)
 	return 0;
 }
 
+int reset_socket_pool(void)
+{
+	struct rb_node *node;
+	struct vdi_inode *vdi;
+	int ret = 0;
+
+	pthread_rwlock_rdlock(&vdi_inode_tree_lock);
+	for (node = rb_first(&vdi_inode_tree); node; node = rb_next(node)) {
+		vdi = rb_entry(node, struct vdi_inode, rb);
+		destroy_socket_pool(vdi->socket_pool, SOCKET_POOL_SIZE);
+		if (setup_socket_pool(vdi->socket_pool,
+			SOCKET_POOL_SIZE) < 0) {
+			ret = -1;
+			goto out;
+		}
+	}
+out:
+	pthread_rwlock_unlock(&vdi_inode_tree_lock);
+	return ret;
+}
+
 static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 {
 	struct strbuf *buf;

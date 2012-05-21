@@ -35,7 +35,7 @@ static int sheepfs_debug;
 static int sheepfs_fg;
 int sheepfs_page_cache = 0;
 int sheepfs_object_cache = 1;
-const char *sdhost = "localhost";
+char sdhost[32] = "localhost";
 int sdport = SD_LISTEN_PORT;
 
 static struct option const long_options[] = {
@@ -58,15 +58,23 @@ static struct sheepfs_file_operation {
 	int (*sync)(const char *path);
 	int (*open)(const char *paht, struct fuse_file_info *);
 } sheepfs_file_ops[] = {
-	[OP_NULL]         = { NULL, NULL, NULL },
-	[OP_CLUSTER_INFO] = { cluster_info_read, NULL, cluster_info_get_size },
-	[OP_VDI_LIST]     = { vdi_list_read, NULL, vdi_list_get_size },
-	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write },
-	[OP_VDI_UNMOUNT]  = { NULL, vdi_unmount_write },
-	[OP_NODE_INFO]    = { node_info_read, NULL, node_info_get_size },
-	[OP_NODE_LIST]    = { node_list_read, NULL, node_list_get_size },
-	[OP_VOLUME]       = { volume_read, volume_write, volume_get_size,
-			      volume_sync, volume_open },
+	[OP_NULL]           = { NULL, NULL, NULL },
+	[OP_CLUSTER_INFO]   = { cluster_info_read, NULL,
+				cluster_info_get_size },
+	[OP_VDI_LIST]       = { vdi_list_read, NULL, vdi_list_get_size },
+	[OP_VDI_MOUNT]      = { NULL, vdi_mount_write },
+	[OP_VDI_UNMOUNT]    = { NULL, vdi_unmount_write },
+	[OP_NODE_INFO]      = { node_info_read, NULL, node_info_get_size },
+	[OP_NODE_LIST]      = { node_list_read, NULL, node_list_get_size },
+	[OP_CONFIG_PCACHE]  = { config_pcache_read, config_pcache_write,
+				config_pcache_get_size },
+	[OP_CONFIG_OCACHE]  = { config_ocache_read, config_ocache_write,
+				config_ocache_get_size },
+	[OP_CONFIG_SHEEP]   = { config_sheep_info_read,
+				config_sheep_info_write,
+				config_sheep_info_get_size },
+	[OP_VOLUME]         = { volume_read, volume_write, volume_get_size,
+				volume_sync, volume_open },
 };
 
 int sheepfs_set_op(const char *path, unsigned opcode)
@@ -250,6 +258,8 @@ static int create_sheepfs_layout(void)
 		return -1;
 	if (create_node_layout() < 0)
 		return -1;
+	if (create_config_layout() < 0)
+		return -1;
 
 	return 0;
 }
@@ -284,7 +294,7 @@ int main(int argc, char **argv)
 				 &longindex)) >= 0) {
 		switch (ch) {
 		case 'a':
-			sdhost = optarg;
+			memcpy(sdhost, optarg, strlen(optarg));
 			break;
 		case 'd':
 			sheepfs_debug = 1;
