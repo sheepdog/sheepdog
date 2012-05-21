@@ -4,6 +4,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include "sheepdog_proto.h"
+
 #define DEFAULT_SOCKET_TIMEOUT 5 /* seconds */
 
 enum conn_state {

@@ -34,20 +34,21 @@ static int sheepfs_fg;
 
 static struct option const long_options[] = {
 	{"debug", no_argument, NULL, 'd'},
-	{"directio", no_argument, NULL, 'D'},
 	{"help", no_argument, NULL, 'h'},
 	{"foreground", no_argument, NULL, 'f'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "dDhf";
+static const char *short_options = "dhf";
 
 static struct sheepfs_file_operation {
 	int (*read)(const char *path, char *buf, size_t size, off_t);
 	int (*write)(const char *path, const char *buf, size_t size, off_t);
 	size_t (*get_size)(const char *path);
 } sheepfs_file_ops[] = {
-	[OP_NULL] = { NULL, NULL, NULL },
+	[OP_NULL]         = { NULL, NULL, NULL },
+	[OP_CLUSTER_INFO] = { cluster_info_read, NULL,
+				cluster_info_get_size },
 };
 
 int sheepfs_set_op(const char *path, unsigned opcode)
@@ -196,6 +197,9 @@ static int sheepfs_main_loop(char *mountpoint)
 
 static int create_sheepfs_layout(void)
 {
+	if (create_cluster_layout() < 0)
+		return -1;
+
 	return 0;
 }
 
