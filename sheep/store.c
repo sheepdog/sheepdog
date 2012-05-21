@@ -214,51 +214,6 @@ uint32_t get_latest_epoch(void)
 	return epoch;
 }
 
-/* remove directory recursively */
-int rmdir_r(char *dir_path)
-{
-	int ret;
-	struct stat s;
-	DIR *dir;
-	struct dirent *d;
-	char path[PATH_MAX];
-
-	dir = opendir(dir_path);
-	if (!dir) {
-		if (errno != ENOENT)
-			eprintf("failed to open %s: %m\n", dir_path);
-		return -errno;
-	}
-
-	while ((d = readdir(dir))) {
-		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
-			continue;
-
-		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
-		ret = stat(path, &s);
-		if (ret) {
-			eprintf("failed to stat %s: %m\n", path);
-			goto out;
-		}
-		if (S_ISDIR(s.st_mode))
-			ret = rmdir_r(path);
-		else
-			ret = unlink(path);
-
-		if (ret != 0) {
-			eprintf("failed to remove %s %s: %m\n",
-				S_ISDIR(s.st_mode) ? "directory" : "file",
-				path);
-			goto out;
-		}
-	}
-
-	ret = rmdir(dir_path);
-out:
-	closedir(dir);
-	return ret;
-}
-
 int set_cluster_ctime(uint64_t ct)
 {
 	int fd, ret;

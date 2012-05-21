@@ -318,8 +318,6 @@ int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2);
 void del_sheep_fd(int fd);
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 
-int rmdir_r(char *dir_path);
-
 int prealloc(int fd, uint32_t size);
 
 int init_objlist_cache(void);

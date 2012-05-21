@@ -30,12 +30,12 @@ struct strbuf {
 	do { \
 		if ((nr) > alloc) { \
 			if (alloc_nr(alloc) < (nr)) \
-			alloc = (nr); \
+				alloc = (nr); \
 			else \
-			alloc = alloc_nr(alloc); \
+				alloc = alloc_nr(alloc); \
 			x = xrealloc((x), alloc * sizeof(*(x))); \
 		} \
-	} while(0)
+	} while (0)
 
 #define STRBUF_INIT  { 0, 0, 0, NULL }
 
@@ -47,11 +47,13 @@ extern char *strbuf_detach(struct strbuf *);
 extern void strbuf_attach(struct strbuf *, void *, size_t, size_t);
 
 /*----- strbuf size related -----*/
-static inline size_t strbuf_avail(struct strbuf *sb) {
+static inline size_t strbuf_avail(struct strbuf *sb)
+{
 	return sb->alloc ? sb->alloc - sb->len - 1 : 0;
 }
-static inline void strbuf_setlen(struct strbuf *sb, size_t len) {
-	assert (len < sb->alloc);
+static inline void strbuf_setlen(struct strbuf *sb, size_t len)
+{
+	assert(len < sb->alloc);
 	sb->len = len;
 	sb->buf[len] = '\0';
 }
@@ -62,7 +64,8 @@ extern void strbuf_grow(struct strbuf *, size_t);
 extern void strbuf_rtrim(struct strbuf *);
 
 /*----- add data in your buffer -----*/
-static inline void strbuf_addch(struct strbuf *sb, int c) {
+static inline void strbuf_addch(struct strbuf *sb, int c)
+{
 	strbuf_grow(sb, 1);
 	sb->buf[sb->len++] = c;
 	sb->buf[sb->len] = '\0';
@@ -77,14 +80,16 @@ extern void strbuf_splice(struct strbuf *, size_t pos, size_t len,
 		const void *, size_t);
 
 extern void strbuf_add(struct strbuf *, const void *, size_t);
-static inline void strbuf_addstr(struct strbuf *sb, const char *s) {
+static inline void strbuf_addstr(struct strbuf *sb, const char *s)
+{
 	strbuf_add(sb, s, strlen(s));
 }
-static inline void strbuf_addbuf(struct strbuf *sb, struct strbuf *sb2) {
+static inline void strbuf_addbuf(struct strbuf *sb, struct strbuf *sb2)
+{
 	strbuf_add(sb, sb2->buf, sb2->len);
 }
 
-__attribute__((format(printf,2,3)))
+__attribute__((format(printf, 2, 3)))
 extern void strbuf_addf(struct strbuf *sb, const char *fmt, ...);
 
 extern size_t strbuf_fread(struct strbuf *, size_t, FILE *);

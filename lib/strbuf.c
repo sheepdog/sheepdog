@@ -111,17 +111,15 @@ void strbuf_addf(struct strbuf *sb, const char *fmt, ...)
 	va_start(ap, fmt);
 	len = vsnprintf(sb->buf + sb->len, sb->alloc - sb->len, fmt, ap);
 	va_end(ap);
-	if (len < 0) {
+	if (len < 0)
 		len = 0;
-	}
 	if (len > strbuf_avail(sb)) {
 		strbuf_grow(sb, len);
 		va_start(ap, fmt);
 		len = vsnprintf(sb->buf + sb->len, sb->alloc - sb->len, fmt, ap);
 		va_end(ap);
-		if (len > strbuf_avail(sb)) {
+		if (len > strbuf_avail(sb))
 			panic("this should not happen, your snprintf is broken");
-		}
 	}
 	strbuf_setlen(sb, sb->len + len);
 }
@@ -132,9 +130,8 @@ size_t strbuf_fread(struct strbuf *sb, size_t size, FILE *f)
 
 	strbuf_grow(sb, size);
 	res = fread(sb->buf + sb->len, 1, size, f);
-	if (res > 0) {
+	if (res > 0)
 		strbuf_setlen(sb, sb->len + res);
-	}
 	return res;
 }
 

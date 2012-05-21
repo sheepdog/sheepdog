@@ -12,6 +12,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
 
 #include "util.h"
 #include "logger.h"
@@ -211,4 +216,49 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset)
 	}
 
 	return total;
+}
+
+/* remove directory recursively */
+int rmdir_r(char *dir_path)
+{
+	int ret;
+	struct stat s;
+	DIR *dir;
+	struct dirent *d;
+	char path[PATH_MAX];
+
+	dir = opendir(dir_path);
+	if (!dir) {
+		if (errno != ENOENT)
+			eprintf("failed to open %s: %m\n", dir_path);
+		return -errno;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
+			continue;
+
+		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
+		ret = stat(path, &s);
+		if (ret) {
+			eprintf("failed to stat %s: %m\n", path);
+			goto out;
+		}
+		if (S_ISDIR(s.st_mode))
+			ret = rmdir_r(path);
+		else
+			ret = unlink(path);
+
+		if (ret != 0) {
+			eprintf("failed to remove %s %s: %m\n",
+					S_ISDIR(s.st_mode) ? "directory" : "file",
+					path);
+			goto out;
+		}
+	}
+
+	ret = rmdir(dir_path);
+out:
+	closedir(dir);
+	return ret;
 }
