@@ -18,6 +18,7 @@ enum sheepfs_opcode {
 
 extern char sheepfs_shadow[];
 extern int sheepfs_page_cache;
+extern int sheepfs_object_cache;
 extern const char *sdhost;
 extern int sdport;
 

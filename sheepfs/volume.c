@@ -145,6 +145,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	uint32_t vid = oid_to_vid(oid);
 	struct vdi_inode *vdi;
 	unsigned long idx = 0;
+	uint64_t cow_oid = 0;
 
 	pthread_rwlock_rdlock(&vdi_inode_tree_lock);
 	vdi = vdi_inode_tree_search(vid);
@@ -165,6 +166,19 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 				goto done;
 			}
 			create = 1;
+		} else {
+			if (rw == VOLUME_READ) {
+				oid = vid_to_data_oid(
+					vdi->inode->data_vdi_id[idx],
+					idx);
+			/* in case we are writing a COW object */
+			} else if (!is_data_obj_writeable(vdi->inode, idx)) {
+				cow_oid = vid_to_data_oid(
+						vdi->inode->data_vdi_id[idx],
+						idx);
+				hdr.flags |= SD_FLAG_CMD_COW;
+				create = 1;
+			}
 		}
 	}
 
@@ -180,8 +194,10 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = off;
+	hdr.obj.cow_oid = cow_oid;
 	hdr.data_length = size;
-	hdr.flags |= SD_FLAG_CMD_CACHE;
+	if (sheepfs_object_cache)
+		hdr.flags |= SD_FLAG_CMD_CACHE;
 
 	fd = get_socket_fd(vdi, &sock_idx);
 	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
@@ -311,7 +327,7 @@ int volume_sync(const char *path)
 	if (shadow_file_getxattr(path, SH_VID_NAME, &vid, SH_VID_SIZE) < 0)
 		return -EIO;
 
-	if (volume_do_sync(vid) < 0)
+	if (sheepfs_object_cache && volume_do_sync(vid) < 0)
 		return -EIO;
 
 	return 0;
@@ -491,7 +507,7 @@ int volume_remove_entry(const char *entry)
 	if (shadow_file_getxattr(path, SH_VID_NAME, &vid, SH_VID_SIZE) < 0)
 		return -1;
 
-	if (volume_sync_and_delete(vid) < 0)
+	if (sheepfs_object_cache && volume_sync_and_delete(vid) < 0)
 		return -1;
 
 	pthread_rwlock_rdlock(&vdi_inode_tree_lock);
