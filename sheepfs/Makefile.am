@@ -17,18 +17,18 @@
 
 MAINTAINERCLEANFILES	= Makefile.in
 
-AM_CFLAGS		=
+AM_CFLAGS		= $(fuse_CFLAGS) -DFUSE_USE_VERSION=26
 
 INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= sheepfs
 
-sheepfs_SOURCES		=
+sheepfs_SOURCES		= core.c
 
-sheepfs_LDADD	  	= ../lib/libsheepdog.a
+sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS)
 sheepfs_DEPENDENCIES	= ../lib/libsheepdog.a
 
-noinst_HEADERS		=
+noinst_HEADERS		= sheepfs.h
 
 EXTRA_DIST		=
 
