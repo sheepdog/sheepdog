@@ -227,6 +227,40 @@ size_t volume_get_size(const char *path)
 	return size;
 }
 
+static int volume_do_sync(uint32_t vid)
+{
+	struct sd_obj_req hdr = { 0 };
+	struct sd_obj_rsp *rsp = (struct sd_obj_rsp *)&hdr;
+	int ret;
+	unsigned wlen = 0, rlen = 0;
+
+	hdr.opcode = SD_OP_FLUSH_VDI;
+	hdr.oid = vid_to_vdi_oid(vid);
+
+	ret = exec_req(sheep_fd, (struct sd_req *)&hdr, NULL, &wlen, &rlen);
+
+	if (ret || rsp->result != SD_RES_SUCCESS) {
+		syslog(LOG_ERR, "[%s] failed to flush vdi %"PRIx32"\n",
+			__func__, vid);
+		return -1;
+	}
+
+	return 0;
+}
+
+int volume_sync(const char *path)
+{
+	uint32_t vid;
+
+	if (shadow_file_getxattr(path, SH_VID_NAME, &vid, SH_VID_SIZE) < 0)
+		return -EIO;
+
+	if (volume_do_sync(vid) < 0)
+		return -EIO;
+
+	return 0;
+}
+
 static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 {
 	struct strbuf *buf;

@@ -32,6 +32,7 @@ extern int volume_read(const char *path, char *buf, size_t size, off_t offset);
 extern int volume_write(const char *, const char *buf, size_t size, off_t);
 extern size_t volume_get_size(const char *);
 extern int volume_create_entry(const char *entry);
+extern int volume_sync(const char *path);
 
 /* cluster.c */
 extern int cluster_info_read(const char *path, char *buf, size_t size, off_t);

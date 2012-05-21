@@ -45,12 +45,14 @@ static struct sheepfs_file_operation {
 	int (*read)(const char *path, char *buf, size_t size, off_t);
 	int (*write)(const char *path, const char *buf, size_t size, off_t);
 	size_t (*get_size)(const char *path);
+	int (*sync)(const char *path);
 } sheepfs_file_ops[] = {
 	[OP_NULL]         = { NULL, NULL, NULL },
 	[OP_CLUSTER_INFO] = { cluster_info_read, NULL, cluster_info_get_size },
 	[OP_VDI_LIST]     = { vdi_list_read, NULL, vdi_list_get_size },
 	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write, NULL },
-	[OP_VOLUME]       = { volume_read, volume_write, volume_get_size },
+	[OP_VOLUME]       = { volume_read, volume_write, volume_get_size,
+			      volume_sync },
 };
 
 int sheepfs_set_op(const char *path, unsigned opcode)
@@ -169,12 +171,25 @@ static int sheepfs_truncate(const char *path, off_t size)
 	return ret;
 }
 
+static int sheepfs_fsync(const char *path, int datasync,
+			 struct fuse_file_info *fi)
+{
+	int ret = 0;
+	unsigned op = sheepfs_get_op(path);
+
+	if (sheepfs_file_ops[op].sync)
+		ret = sheepfs_file_ops[op].sync(path);
+
+	return ret;
+}
+
 struct fuse_operations sheepfs_ops =  {
 	.getattr  = sheepfs_getattr,
 	.readdir  = sheepfs_readdir,
 	.truncate = sheepfs_truncate,
 	.read     = sheepfs_read,
 	.write    = sheepfs_write,
+	.fsync    = sheepfs_fsync,
 };
 
 static int sheepfs_main_loop(char *mountpoint)
