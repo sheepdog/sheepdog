@@ -23,7 +23,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= sheepfs
 
-sheepfs_SOURCES		= core.c cluster.c vdi.c shadow_file.c
+sheepfs_SOURCES		= core.c cluster.c vdi.c shadow_file.c volume.c
 
 sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS)
 sheepfs_DEPENDENCIES	= ../lib/libsheepdog.a

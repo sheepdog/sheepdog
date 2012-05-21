@@ -6,6 +6,7 @@ enum sheepfs_opcode {
 	OP_CLUSTER_INFO,
 	OP_VDI_LIST,
 	OP_VDI_MOUNT,
+	OP_VOLUME,
 };
 
 extern char sheepfs_shadow[];
@@ -24,6 +25,13 @@ extern int shadow_file_getxattr(const char *path, const char *name,
 				void *value, size_t size);
 extern int shadow_file_delete(const char *path);
 extern int shadow_file_exsit(const char *path);
+
+/* volume.c */
+extern int create_volume_layout(void);
+extern int volume_read(const char *path, char *buf, size_t size, off_t offset);
+extern int volume_write(const char *, const char *buf, size_t size, off_t);
+extern size_t volume_get_size(const char *);
+extern int volume_create_entry(const char *entry);
 
 /* cluster.c */
 extern int cluster_info_read(const char *path, char *buf, size_t size, off_t);

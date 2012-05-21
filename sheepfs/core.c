@@ -47,10 +47,10 @@ static struct sheepfs_file_operation {
 	size_t (*get_size)(const char *path);
 } sheepfs_file_ops[] = {
 	[OP_NULL]         = { NULL, NULL, NULL },
-	[OP_CLUSTER_INFO] = { cluster_info_read, NULL,
-				cluster_info_get_size },
+	[OP_CLUSTER_INFO] = { cluster_info_read, NULL, cluster_info_get_size },
 	[OP_VDI_LIST]     = { vdi_list_read, NULL, vdi_list_get_size },
 	[OP_VDI_MOUNT]    = { NULL, vdi_mount_write, NULL },
+	[OP_VOLUME]       = { volume_read, volume_write, volume_get_size },
 };
 
 int sheepfs_set_op(const char *path, unsigned opcode)
@@ -183,6 +183,8 @@ static int sheepfs_main_loop(char *mountpoint)
 	int ret = -1;
 
 	fuse_opt_add_arg(&args, "sheepfs"); /* placeholder for argv[0] */
+	fuse_opt_add_arg(&args, "-oallow_root");
+	fuse_opt_add_arg(&args, "-obig_writes");
 	fuse_opt_add_arg(&args, "-ofsname=sheepfs");
 	fuse_opt_add_arg(&args, mountpoint);
 	if (sheepfs_debug)
@@ -202,6 +204,8 @@ static int create_sheepfs_layout(void)
 	if (create_cluster_layout() < 0)
 		return -1;
 	if (create_vdi_layout() < 0)
+		return -1;
+	if (create_volume_layout() < 0)
 		return -1;
 
 	return 0;
