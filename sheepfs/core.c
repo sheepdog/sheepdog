@@ -19,10 +19,12 @@
 #include <pthread.h>
 #include <getopt.h>
 #include <syslog.h>
+#include <stdlib.h>
 
 #include "strbuf.h"
 #include "util.h"
 #include "sheepfs.h"
+#include "sheepdog_proto.h"
 
 #define SH_OP_NAME   "user.sheepfs.opcode"
 #define SH_OP_SIZE   sizeof(uint32_t)
@@ -32,16 +34,20 @@ char sheepfs_shadow[PATH_MAX];
 static int sheepfs_debug;
 static int sheepfs_fg;
 int sheepfs_page_cache = 0;
+const char *sdhost = "localhost";
+int sdport = SD_LISTEN_PORT;
 
 static struct option const long_options[] = {
+	{"address", required_argument, NULL, 'a'},
 	{"debug", no_argument, NULL, 'd'},
 	{"help", no_argument, NULL, 'h'},
 	{"foreground", no_argument, NULL, 'f'},
 	{"pagecache", no_argument, NULL, 'k'},
+	{"port", required_argument, NULL, 'p'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "dfhk";
+static const char *short_options = "a:dfhkp:";
 
 static struct sheepfs_file_operation {
 	int (*read)(const char *path, char *buf, size_t size, off_t);
@@ -254,9 +260,11 @@ static void usage(int inval)
 		printf("\
 Usage: sheepfs [OPTION]... MOUNTPOINT\n\
 Options:\n\
+  -a  --address           specify the sheep address (default: localhost)\n\
   -d, --debug             enable debug output (implies -f)\n\
   -f, --foreground        sheepfs run in the foreground\n\
   -k, --pagecache         use local kernel's page cache to access volume\n\
+  -p  --port              specify the sheep port (default: 7000)\n\
   -h, --help              display this help and exit\n\
 ");
 	exit(inval);
@@ -272,6 +280,9 @@ int main(int argc, char **argv)
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
 		switch (ch) {
+		case 'a':
+			sdhost = optarg;
+			break;
 		case 'd':
 			sheepfs_debug = 1;
 			break;
@@ -283,6 +294,14 @@ int main(int argc, char **argv)
 			break;
 		case 'k':
 			sheepfs_page_cache = 1;
+			break;
+		case 'p':
+			sdport = strtol(optarg, NULL, 10);
+			if (sdport < 1 || sdport > UINT16_MAX) {
+				fprintf(stderr,
+				"Invalid port number '%s'\n", optarg);
+				exit(1);
+			}
 			break;
 		default:
 			usage(1);

@@ -336,7 +336,7 @@ static int setup_socket_pool(int array[], int len)
 	int fd, i, ret;
 
 	for (i = 0; i < len; i++) {
-		fd = connect_to("localhost", 7000);
+		fd = connect_to(sdhost, sdport);
 		if (fd < 0) {
 			syslog(LOG_ERR, "[%s] connect_to %m\n", __func__);
 			destroy_socket_pool(array, --i);
@@ -361,9 +361,10 @@ static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 	struct strbuf *buf;
 	void *inode_buf = NULL;
 	struct vdi_inode *inode = NULL, *dummy;
-	char command[256] = { 0 };
+	char command[COMMAND_LEN];
 
-	sprintf(command, "%s %s\n", "collie vdi list -r", entry);
+	sprintf(command, "collie vdi list -r %s -a %s -p %d",
+		entry, sdhost, sdport);
 	buf = sheepfs_run_cmd(command);
 	if (!buf)
 		return -1;

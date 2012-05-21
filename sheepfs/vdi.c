@@ -59,9 +59,12 @@ int vdi_list_read(const char *path, char *buf, size_t size, off_t ignore)
 
 size_t vdi_list_get_size(const char *path)
 {
-	struct strbuf *buf = sheepfs_run_cmd("collie vdi list");
+	struct strbuf *buf;
 	size_t len;
+	char cmd[COMMAND_LEN];
 
+	sprintf(cmd, "collie vdi list -a %s -p %d", sdhost, sdport);
+	buf = sheepfs_run_cmd(cmd);
 	if (!buf)
 		return 0;
 
