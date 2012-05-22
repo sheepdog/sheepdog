@@ -1,0 +1,51 @@
+#!/bin/bash
+
+# This script is used to translate simple store backend into Farm.
+# Usage: simple2farm /path/to/store/obj
+
+set -e
+
+E_BADARGS=65
+
+if [ $# -ne 1 ]; then
+	echo "Usage: `basename $0` /path/to/store/obj"
+	exit $E_BADARGS
+fi
+
+if [ `basename $1` != "obj" ]; then
+	echo "You should specify path to store/obj"
+	exit $E_BADARGS
+fi
+
+if [ "$(pgrep sheep)" ]; then
+	echo "You need to shutdown cluster first"
+	exit 1
+fi
+
+cd $1
+
+config_offset=11
+# Get the backend store from config file
+echo "Read config file"
+store=$(od --skip-bytes=$config_offset -An -c ../config | sed 's/ //g' | sed 's/\\0//g')
+if [ $store == "farm" ]; then
+	echo "It's already the farm store, we'er done"
+	exit 0
+fi
+
+# find the highest numbered directory, remove older ones
+max=00000001
+for i in *; do
+	if [ $i -gt $max ]; then
+		rm -rf $max
+		max=$i
+	fi
+done
+
+echo "Find the highest numbered directory $max"
+echo "Try to move the objects..."
+mv $max/* .
+rmdir $max
+echo "Update config file"
+echo -en 'farm\0' | dd of=../config seek=$config_offset bs=1 2> /dev/null
+echo "Now simple store has been tranformed into Farm"
