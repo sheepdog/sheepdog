@@ -248,7 +248,7 @@ static int recover_object_from_replica(uint64_t oid,
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 
 	close(fd);
 

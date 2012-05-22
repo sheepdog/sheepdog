@@ -674,7 +674,7 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 		hdr.obj.oid = oid;
 		hdr.obj.offset = 0;
 
-		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 
 		close(fd);
 

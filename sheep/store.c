@@ -477,7 +477,7 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 
 		wlen = 0;
 
-		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 		close(fd);
 
 		if (ret)

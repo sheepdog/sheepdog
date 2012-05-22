@@ -468,7 +468,7 @@ pull_remote:
 		if (fd < 0)
 			continue;
 
-		ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 		if (ret) { /* network errors */
 			del_sheep_fd(fd);
 			ret = SD_RES_NETWORK_ERROR;
