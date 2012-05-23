@@ -273,6 +273,7 @@ int leave_cluster(void);
 
 void process_request_event_queues(void);
 void do_io_request(struct work *work);
+void do_gateway_request(struct work *work);
 int forward_write_obj_req(struct request *req);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,

@@ -410,7 +410,7 @@ void do_io_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	uint32_t epoch;
-	int ret = SD_RES_SUCCESS;
+	int ret;
 
 	if (req->rq.flags & SD_FLAG_CMD_RECOVERY)
 		epoch = req->rq.obj.tgt_epoch;
@@ -420,27 +420,41 @@ void do_io_request(struct work *work)
 	dprintf("%x, %" PRIx64" , %u\n",
 		req->rq.opcode, req->rq.obj.oid, epoch);
 
-	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-		ret = do_local_io(req, epoch);
-	} else {
-		if (!sys->enable_write_cache || bypass_object_cache(req)) {
-			/* fix object consistency when we read the object for the first time */
-			if (req->check_consistency) {
-				ret = fix_object_consistency(req);
-				if (ret != SD_RES_SUCCESS)
-					goto out;
-			}
-			if (req->rq.flags & SD_FLAG_CMD_WRITE)
-				ret = forward_write_obj_req(req);
-			else
-				ret = forward_read_obj_req(req);
-		} else
-			ret = handle_gateway_request(req);
-	}
-out:
+	ret = do_local_io(req, epoch);
+
 	if (ret != SD_RES_SUCCESS)
 		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
 			req->rq.opcode, req->rq.obj.oid, epoch, ret);
+	req->rp.result = ret;
+}
+
+void do_gateway_request(struct work *work)
+{
+	struct request *req = container_of(work, struct request, work);
+	int ret = SD_RES_SUCCESS;
+
+	dprintf("%x, %" PRIx64" , %u\n",
+		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
+
+	if (!sys->enable_write_cache || bypass_object_cache(req)) {
+		/* fix object consistency when we read the object for the first time */
+		if (req->check_consistency) {
+			ret = fix_object_consistency(req);
+			if (ret != SD_RES_SUCCESS)
+				goto out;
+		}
+		if (req->rq.flags & SD_FLAG_CMD_WRITE)
+			ret = forward_write_obj_req(req);
+		else
+			ret = forward_read_obj_req(req);
+	} else {
+		ret = handle_gateway_request(req);
+	}
+
+out:
+	if (ret != SD_RES_SUCCESS)
+		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
+			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
 	req->rp.result = ret;
 }
 

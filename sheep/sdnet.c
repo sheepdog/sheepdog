@@ -308,8 +308,13 @@ static void queue_request(struct request *req)
 		req->vnodes = get_vnode_info();
 
 	if (is_io_op(req->op)) {
-		req->work.fn = do_io_request;
-		req->work.done = io_op_done;
+		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
+			req->work.fn = do_io_request;
+			req->work.done = io_op_done;
+		} else {
+			req->work.fn = do_gateway_request;
+			req->work.done = io_op_done;
+		}
 		setup_access_to_local_objects(req);
 		if (check_request(req) < 0)
 			return;
