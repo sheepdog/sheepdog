@@ -32,24 +32,6 @@
 #define MEMBER_ZNODE BASE_ZNODE "/member"
 
 
-/* zookeeper API wrapper prototypes */
-ZOOAPI int zk_create(zhandle_t *zh, const char *path, const char *value,
-	int valuelen, const struct ACL_vector *acl, int flags,
-	char *path_buffer, int path_buffer_len);
-
-ZOOAPI int zk_delete(zhandle_t *zh, const char *path, int version);
-
-ZOOAPI int zk_get(zhandle_t *zh, const char *path, int watch, char *buffer,
-		   int *buffer_len, struct Stat *stat);
-
-ZOOAPI int zk_set(zhandle_t *zh, const char *path, const char *buffer,
-		   int buflen, int version);
-
-ZOOAPI int zk_exists(zhandle_t *zh, const char *path, int watch, struct Stat *stat);
-
-ZOOAPI int zk_get_children(zhandle_t *zh, const char *path, int watch,
-			    struct String_vector *strings);
-
 /* iterate child znodes */
 #define FOR_EACH_ZNODE(zh, parent, path, strs)			       \
 	for (zk_get_children(zh, parent, 1, strs),		       \
@@ -99,9 +81,9 @@ static size_t nr_sd_nodes;
 static size_t nr_zk_nodes;
 
 /* zookeeper API wrapper */
-inline ZOOAPI int zk_create(zhandle_t *zh, const char *path, const char *value,
-	int valuelen, const struct ACL_vector *acl, int flags,
-	char *path_buffer, int path_buffer_len)
+static inline ZOOAPI int zk_create(zhandle_t *zh, const char *path,
+		const char *value, int valuelen, const struct ACL_vector *acl,
+		int flags, char *path_buffer, int path_buffer_len)
 {
 	int rc;
 	do {
@@ -113,7 +95,7 @@ inline ZOOAPI int zk_create(zhandle_t *zh, const char *path, const char *value,
 	return rc;
 }
 
-inline ZOOAPI int zk_delete(zhandle_t *zh, const char *path, int version)
+static inline ZOOAPI int zk_delete(zhandle_t *zh, const char *path, int version)
 {
 	int rc;
 	do {
@@ -124,8 +106,8 @@ inline ZOOAPI int zk_delete(zhandle_t *zh, const char *path, int version)
 	return rc;
 }
 
-inline ZOOAPI int zk_get(zhandle_t *zh, const char *path, int watch, char *buffer,
-		   int *buffer_len, struct Stat *stat)
+static inline ZOOAPI int zk_get(zhandle_t *zh, const char *path, int watch,
+		char *buffer, int *buffer_len, struct Stat *stat)
 {
 	int rc;
 	do {
@@ -136,8 +118,8 @@ inline ZOOAPI int zk_get(zhandle_t *zh, const char *path, int watch, char *buffe
 	return rc;
 }
 
-inline ZOOAPI int zk_set(zhandle_t *zh, const char *path, const char *buffer,
-		   int buflen, int version)
+static inline ZOOAPI int zk_set(zhandle_t *zh, const char *path,
+		const char *buffer, int buflen, int version)
 {
 	int rc;
 	do {
@@ -148,7 +130,8 @@ inline ZOOAPI int zk_set(zhandle_t *zh, const char *path, const char *buffer,
 	return rc;
 }
 
-inline ZOOAPI int zk_exists(zhandle_t *zh, const char *path, int watch, struct Stat *stat)
+static inline ZOOAPI int zk_exists(zhandle_t *zh, const char *path, int watch,
+		struct Stat *stat)
 {
 	int rc;
 	do {
@@ -159,8 +142,8 @@ inline ZOOAPI int zk_exists(zhandle_t *zh, const char *path, int watch, struct S
 	return rc;
 }
 
-inline ZOOAPI int zk_get_children(zhandle_t *zh, const char *path, int watch,
-			    struct String_vector *strings)
+static inline ZOOAPI int zk_get_children(zhandle_t *zh, const char *path,
+		int watch, struct String_vector *strings)
 {
 	int rc;
 	do {
