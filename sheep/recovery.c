@@ -62,115 +62,6 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-/*
- * contains_node - checks that the node id is included in the target nodes
- *
- * The target nodes to store replicated objects are the first N nodes
- * from the base_idx'th on the consistent hash ring, where N is the
- * number of copies of objects.
- */
-static int contains_node(struct sd_vnode *key,
-			 struct sd_vnode *entry,
-			 int nr, int base_idx, int copies)
-{
-	int i;
-
-	for (i = 0; i < copies; i++) {
-		int idx = get_nth_node(entry, nr, base_idx, i);
-		if (memcmp(key->addr, entry[idx].addr, sizeof(key->addr)) == 0
-		    && key->port == entry[idx].port)
-			return idx;
-	}
-	return -1;
-}
-
-/*
- * find_tgt_node - find the node from which we should recover objects
- *
- * This function compares two node lists, the current target nodes and
- * the previous target nodes, and finds the node from the previous
- * target nodes which corresponds to the copy_idx'th node of the
- * current target nodes.  The correspondence is injective and
- * maximizes the number of nodes which can recover objects locally.
- *
- * For example, consider the number of redundancy is 5, the consistent
- * hash ring is {A, B, C, D, E, F}, and the node G is newly added.
- * The parameters of this function are
- *   old_entry = {A, B, C, D, E, F},    old_nr = 6, old_idx = 3
- *   cur_entry = {A, B, C, D, E, F, G}, cur_nr = 7, cur_idx = 3
- *
- * In this case:
- *   the previous target nodes: {D, E, F, A, B}
- *     (the first 5 nodes from the 3rd node on the previous hash ring)
- *   the current target nodes : {D, E, F, G, A}
- *     (the first 5 nodes from the 3rd node on the current hash ring)
- *
- * The correspondence between copy_idx and return value are as follows:
- * ----------------------------
- * copy_idx       0  1  2  3  4
- * src_node       D  E  F  G  A
- * tgt_node       D  E  F  B  A
- * return value   0  1  2  4  3
- * ----------------------------
- *
- * The node D, E, F, and A can recover objects from local, and the
- * node G recovers from the node B.
- */
-static int find_tgt_node(struct sd_vnode *old_entry,
-			 int old_nr, int old_idx, int old_copies,
-			 struct sd_vnode *cur_entry,
-			 int cur_nr, int cur_idx, int cur_copies,
-			 int copy_idx)
-{
-	int i, j, idx;
-
-	dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n",
-		old_idx, old_nr, old_copies, cur_idx, cur_nr, cur_copies, copy_idx);
-
-	/* If the same node is in the previous target nodes, return its index */
-	idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, copy_idx),
-			    old_entry, old_nr, old_idx, old_copies);
-	if (idx >= 0) {
-		dprintf("%"PRIu32", %"PRIu32", %"PRIu32", %"PRIu32"\n", idx, copy_idx, cur_idx, cur_nr);
-		return idx;
-	}
-
-	for (i = 0, j = 0; ; i++, j++) {
-		if (i < copy_idx) {
-			/* Skip if the node can recover from its local */
-			idx = contains_node(cur_entry + get_nth_node(cur_entry, cur_nr, cur_idx, i),
-					    old_entry, old_nr, old_idx, old_copies);
-			if (idx >= 0)
-				continue;
-
-			/* Find the next target which needs to recover from remote */
-			while (j < old_copies &&
-			       contains_node(old_entry + get_nth_node(old_entry, old_nr, old_idx, j),
-					     cur_entry, cur_nr, cur_idx, cur_copies) >= 0)
-				j++;
-		}
-		if (j == old_copies) {
-			/*
-			 * Cannot find the target because the number of zones
-			 * is smaller than the number of copies.  We can select
-			 * any node in this case, so select the first one.
-			 */
-			return old_idx;
-		}
-
-		if (i == copy_idx) {
-			/* Found the target node correspoinding to copy_idx */
-			dprintf("%"PRIu32", %"PRIu32", %"PRIu32"\n",
-				get_nth_node(old_entry, old_nr, old_idx, j),
-				copy_idx, (cur_idx + i) % cur_nr);
-			return get_nth_node(old_entry, old_nr, old_idx, j);
-		}
-
-	}
-
-	return -1;
-}
-
 static void *get_vnodes_from_epoch(uint32_t epoch, int *nr, int *copies)
 {
 	int nodes_nr, len = sizeof(struct sd_vnode) * SD_MAX_VNODES;
@@ -307,14 +198,14 @@ static void rollback_old_cur(struct sd_vnode *old, int *old_nr, int *old_copies,
  * the routine will try to recovery it from the nodes it has stayed,
  * at least, *theoretically* on consistent hash ring.
  */
-static int do_recover_object(struct recovery_work *rw, int copy_idx)
+static int do_recover_object(struct recovery_work *rw)
 {
 	struct sd_vnode *old, *cur;
 	uint64_t oid = rw->oids[rw->done];
 	int old_nr = rw->old_nr_vnodes, cur_nr = rw->cur_nr_vnodes;
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
 	struct sd_vnode *tgt_entry;
-	int old_idx, cur_idx, tgt_idx, old_copies, cur_copies, ret;
+	int old_copies, cur_copies, ret, i, retry;
 
 	old = xmalloc(sizeof(*old) * SD_MAX_VNODES);
 	cur = xmalloc(sizeof(*cur) * SD_MAX_VNODES);
@@ -324,28 +215,32 @@ static int do_recover_object(struct recovery_work *rw, int copy_idx)
 	cur_copies = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
 
 again:
-	old_idx = obj_to_sheep(old, old_nr, oid, 0);
-	cur_idx = obj_to_sheep(cur, cur_nr, oid, 0);
-
-	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n", oid, tgt_epoch);
-
-	if (cur_copies <= copy_idx) {
-		eprintf("epoch (%"PRIu32") has less copies (%d) than requested copy_idx: %d\n",
-		tgt_epoch, cur_copies, copy_idx);
-		ret = -1;
+	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n",
+		oid, tgt_epoch);
+	retry = 0;
+	/* Let's do a breadth-first search */
+	for (i = 0; i < old_copies; i++) {
+		int idx;
+		idx = obj_to_sheep(old, old_nr, oid, i);
+		tgt_entry = old + idx;
+		ret = recover_object_from_replica(oid, tgt_entry,
+						  epoch, tgt_epoch);
+		if (ret == 0) {
+			/* Succeed */
+			break;
+		} else if (ret > 0) {
+			retry = 1;
+			/* Try our best to recover from peers */
+			continue;
+		}
+	}
+	/* If not succeed but someone orders us to retry it, serve the order */
+	if (ret != 0 && retry == 1) {
+		ret = 0;
+		rw->retry = 1;
 		goto err;
 	}
-
-	tgt_idx = find_tgt_node(old, old_nr, old_idx, old_copies,
-			cur, cur_nr, cur_idx, cur_copies, copy_idx);
-	if (tgt_idx < 0) {
-		eprintf("cannot find target node %"PRIx64"\n", oid);
-		ret = -1;
-		goto err;
-	}
-	tgt_entry = old + tgt_idx;
-
-	ret = recover_object_from_replica(oid, tgt_entry, epoch, tgt_epoch);
+	/* No luck, roll back to an older configuration and try again */
 	if (ret < 0) {
 		struct sd_vnode *new_old;
 		int new_old_nr, new_old_copies;
@@ -366,9 +261,6 @@ again:
 				new_old, new_old_nr, new_old_copies);
 		free(new_old);
 		goto again;
-	} else if (ret > 0) {
-		ret = 0;
-		rw->retry = 1;
 	}
 err:
 	free(old);
@@ -376,57 +268,25 @@ err:
 	return ret;
 }
 
-static int get_replica_idx(struct recovery_work *rw, uint64_t oid, int *copy_nr)
-{
-	int i, ret = -1;
-	int idx_buf[SD_MAX_COPIES];
-
-	*copy_nr = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
-	obj_to_sheeps(rw->cur_vnodes, rw->cur_nr_vnodes, oid,
-				*copy_nr, idx_buf);
-
-	for (i = 0; i < *copy_nr; i++) {
-		int n = idx_buf[i];
-		if (vnode_is_local(&rw->cur_vnodes[n])) {
-			ret = i;
-			break;
-		}
-	}
-	return ret;
-}
-
 static void recover_object(struct work *work)
 {
-	struct recovery_work *rw = container_of(work, struct recovery_work, work);
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
 	uint64_t oid = rw->oids[rw->done];
-	int i, copy_idx, copy_nr, ret;
+	int ret;
 
 	if (!sys->nr_copies)
 		return;
 
-	eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n", rw->done, rw->count, oid);
+	eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n",
+		rw->done, rw->count, oid);
 
 	if (sd_store->exist(oid)) {
 		dprintf("the object is already recovered\n");
 		return;
 	}
 
-	copy_idx = get_replica_idx(rw, oid, &copy_nr);
-	if (copy_idx < 0) {
-		ret = -1;
-		goto err;
-	}
-	ret = do_recover_object(rw, copy_idx);
-	if (ret < 0) {
-		for (i = 0; i < copy_nr; i++) {
-			if (i == copy_idx)
-				continue;
-			ret = do_recover_object(rw, i);
-			if (ret == 0)
-				break;
-		}
-	}
-err:
+	ret = do_recover_object(rw);
 	if (ret < 0)
 		eprintf("failed to recover object %"PRIx64"\n", oid);
 }
