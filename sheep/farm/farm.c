@@ -348,12 +348,15 @@ static void *read_working_object(uint64_t oid, uint64_t offset,
 {
 	void *buf = NULL;
 	char path[PATH_MAX];
-	int fd;
+	int fd, flags = def_open_flags;
 	size_t size;
 
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
 
-	fd = open(path, def_open_flags);
+	if (is_vdi_obj(oid))
+		flags &= ~O_DIRECT;
+
+	fd = open(path, flags);
 	if (fd < 0) {
 		dprintf("object %"PRIx64" not found\n", oid);
 		goto out;
@@ -367,7 +370,8 @@ static void *read_working_object(uint64_t oid, uint64_t offset,
 
 	size = xpread(fd, buf, length, offset);
 	if (length != size) {
-		eprintf("object read error. %m\n");
+		eprintf("size %zu len %"PRIu32" off %"PRIu64" %m\n", size,
+			length, offset);
 		free(buf);
 		buf = NULL;
 		goto out;
