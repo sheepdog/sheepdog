@@ -24,7 +24,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 sbin_PROGRAMS		= sheep
 
-sheep_SOURCES		= sheep.c group.c sdnet.c store.c vdi.c work.c \
+sheep_SOURCES		= sheep.c group.c sdnet.c gateway.c store.c vdi.c work.c \
 			  journal.c ops.c recovery.c cluster/local.c strbuf.c \
 			  object_cache.c object_list_cache.c
 
