@@ -22,6 +22,7 @@
 #include "sheep.h"
 #include "cluster.h"
 #include "rbtree.h"
+#include "strbuf.h"
 
 #define SD_OP_GET_OBJ_LIST   0xA1
 #define SD_OP_GET_EPOCH      0XA2
@@ -203,8 +204,11 @@ static inline struct store_driver *find_store_driver(const char *name)
 }
 
 struct objlist_cache {
-	struct rb_root root;
+	int tree_version;
+	int buf_version;
 	int cache_size;
+	struct strbuf buffer;
+	struct rb_root root;
 	pthread_rwlock_t lock;
 };
 

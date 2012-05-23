@@ -712,8 +712,10 @@ static int store_remove_obj(struct request *req)
 		ret =  SD_RES_EIO;
 	}
 	pthread_rwlock_wrlock(&obj_list_cache.lock);
-	if (!objlist_cache_rb_remove(&obj_list_cache.root, oid))
+	if (!objlist_cache_rb_remove(&obj_list_cache.root, oid)) {
 		obj_list_cache.cache_size--;
+		obj_list_cache.tree_version++;
+	}
 	pthread_rwlock_unlock(&obj_list_cache.lock);
  out:
 	strbuf_release(&buf);
