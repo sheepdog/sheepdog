@@ -217,11 +217,9 @@ static int check_request(struct request *req)
 				req->rp.result = SD_RES_OBJ_RECOVERING;
 				list_add_tail(&req->request_list,
 						&sys->wait_rw_queue);
-			} else {
-				req->rp.result = SD_RES_NEW_NODE_VER;
-				sys->nr_outstanding_io++;
-				req->work.done(&req->work);
-			}
+			} else
+				list_add_tail(&req->request_list,
+						&sys->wait_obj_queue);
 		} else {
 			/* Gateway request */
 			list_add_tail(&req->request_list, &sys->req_wait_for_obj_list);
@@ -277,6 +275,23 @@ void resume_wait_epoch_requests(void)
 			break;
 		default:
 			break;
+		}
+	}
+	process_request_event_queues();
+}
+
+void resume_retry_requests(uint64_t oid)
+{
+	struct request *req, *t;
+
+	list_for_each_entry_safe(req, t, &sys->wait_obj_queue,
+			request_list) {
+		/* the object requested by a pending request has been
+		 * recovered, notify the pending request. */
+		if (req->local_oid == oid) {
+			dprintf("retry %" PRIx64 "\n", req->local_oid);
+			list_del(&req->request_list);
+			list_add_tail(&req->request_list, &sys->request_queue);
 		}
 	}
 	process_request_event_queues();

@@ -429,10 +429,11 @@ static void resume_wait_recovery_requests(void)
 static void do_recover_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-	uint64_t oid;
+	uint64_t oid, recovered_oid = rw->oids[rw->done];
 
 	if (rw->state == RW_INIT) {
 		rw->state = RW_RUN;
+		recovered_oid = 0;
 		resume_wait_recovery_requests();
 	} else if (!rw->retry) {
 		rw->done++;
@@ -441,6 +442,9 @@ static void do_recover_main(struct work *work)
 	}
 
 	oid = rw->oids[rw->done];
+
+	if (recovered_oid)
+		resume_retry_requests(recovered_oid);
 
 	if (rw->retry && !next_rw) {
 		rw->retry = 0;
