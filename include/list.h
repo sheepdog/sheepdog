@@ -115,6 +115,15 @@ static inline void list_splice_init(struct list_head *list,
 	}
 }
 
+static inline void list_splice_tail_init(struct list_head *list,
+					 struct list_head *head)
+{
+	if (!list_empty(list)) {
+		__list_splice(list, head->prev, head);
+		INIT_LIST_HEAD(list);
+	}
+}
+
 /* hlist, mostly useful for hash tables */
 
 #define LIST_POISON1 ((void *) 0x00100100)
