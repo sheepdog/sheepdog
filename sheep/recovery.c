@@ -193,6 +193,20 @@ static void rollback_old_cur(struct sd_vnode *old, int *old_nr, int *old_copies,
 	*old_copies = new_old_copies;
 }
 
+
+/*
+ * A virtual node that does not match any node in current node list
+ * means the node has left the cluster, then it's an invalid virtual node.
+ */
+static int is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
+				int nr_nodes)
+{
+	if (bsearch(entry, nodes, nr_nodes, sizeof(struct sd_node),
+		    vnode_node_cmp))
+		return 0;
+	return 1;
+}
+
 /*
  * Recover the object from its track in epoch history. That is,
  * the routine will try to recovery it from the nodes it has stayed,
@@ -223,6 +237,9 @@ again:
 		int idx;
 		idx = obj_to_sheep(old, old_nr, oid, i);
 		tgt_entry = old + idx;
+		if (is_invalid_vnode(tgt_entry, rw->cur_nodes,
+				     rw->cur_nr_nodes))
+			continue;
 		ret = recover_object_from_replica(oid, tgt_entry,
 						  epoch, tgt_epoch);
 		if (ret == 0) {
@@ -620,6 +637,9 @@ static int init_rw(struct recovery_work *rw)
 
 	rw->cur_nr_nodes = epoch_log_read_nr(epoch, (char *)rw->cur_nodes,
 					     sizeof(rw->cur_nodes));
+	qsort(rw->cur_nodes, rw->cur_nr_nodes, sizeof(struct sd_node),
+		  node_cmp);
+
 	if (rw->cur_nr_nodes <= 0) {
 		eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch);
 		return -1;

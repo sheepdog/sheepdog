@@ -326,6 +326,23 @@ static inline const char *sd_strerror(int err)
 	return "Invalid error code";
 }
 
+static inline int vnode_node_cmp(const void *a, const void *b)
+{
+	const struct sd_vnode *node1 = a;
+	const struct sd_node *node2 = b;
+	int cmp;
+
+	cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
+	if (cmp != 0)
+		return cmp;
+
+	if (node1->port < node2->port)
+		return -1;
+	if (node1->port > node2->port)
+		return 1;
+	return 0;
+}
+
 static inline int node_cmp(const void *a, const void *b)
 {
 	const struct sd_node *node1 = a;
