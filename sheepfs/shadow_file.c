@@ -21,7 +21,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <syslog.h>
 #include <stdlib.h>
 

@@ -14,7 +14,7 @@
 #include <fuse.h>
 #include <errno.h>
 #include <sys/types.h>
-#include <attr/xattr.h>
+#include <sys/xattr.h>
 #include <dirent.h>
 #include <pthread.h>
 #include <getopt.h>
