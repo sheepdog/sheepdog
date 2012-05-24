@@ -426,6 +426,12 @@ static void resume_wait_recovery_requests(void)
 	process_request_event_queues();
 }
 
+static void flush_wait_obj_requests(void)
+{
+	list_splice_tail_init(&sys->wait_obj_queue, &sys->request_queue);
+	process_request_event_queues();
+}
+
 static void do_recover_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
@@ -444,7 +450,7 @@ static void do_recover_main(struct work *work)
 	oid = rw->oids[rw->done];
 
 	if (recovered_oid)
-		resume_retry_requests(recovered_oid);
+		resume_wait_obj_requests(recovered_oid);
 
 	if (rw->retry && !next_rw) {
 		rw->retry = 0;
@@ -478,6 +484,8 @@ static void do_recover_main(struct work *work)
 	if (next_rw) {
 		rw = next_rw;
 		next_rw = NULL;
+
+		flush_wait_obj_requests();
 
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);

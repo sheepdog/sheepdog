@@ -270,7 +270,7 @@ int is_access_to_busy_objects(uint64_t oid);
 
 void resume_pending_requests(void);
 void resume_wait_epoch_requests(void);
-void resume_retry_requests(uint64_t oid);
+void resume_wait_obj_requests(uint64_t oid);
 
 int create_cluster(int port, int64_t zone, int nr_vnodes);
 int leave_cluster(void);

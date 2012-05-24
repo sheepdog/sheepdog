@@ -280,7 +280,7 @@ void resume_wait_epoch_requests(void)
 	process_request_event_queues();
 }
 
-void resume_retry_requests(uint64_t oid)
+void resume_wait_obj_requests(uint64_t oid)
 {
 	struct request *req, *t;
 
