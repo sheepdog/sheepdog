@@ -209,9 +209,10 @@ AC_ARG_ENABLE([trace],
 	[ enable_trace="no" ],)
 AM_CONDITIONAL(BUILD_TRACE, test x$enable_trace = xyes)
 
+PKG_CHECK_MODULES([fuse],[fuse], HAVE_FUSE="yes", HAVE_FUSE="no")
 AC_ARG_ENABLE([sheepfs],
 	[  --enable-sheepfs         : enable sheepfs],,
-	[ enable_sheepfs="yes" ],)
+	[ enable_sheepfs=$HAVE_FUSE ],)
 AM_CONDITIONAL(BUILD_SHEEPFS, test x$enable_sheepfs = xyes)
 
 CP=cp
@@ -292,7 +293,9 @@ if test "x${enable_trace}" = xyes; then
 fi
 
 if test "x${enable_sheepfs}" = xyes; then
-	PKG_CHECK_MODULES([fuse],[fuse])
+	AC_CHECK_HEADERS([fuse.h],,
+		AC_MSG_ERROR(fuse.h header missing),
+		[#define _FILE_OFFSET_BITS 64])
 	AC_DEFINE_UNQUOTED([HAVE_SHEEPFS], 1, [have sheepfs])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES sheepfs"
 fi
