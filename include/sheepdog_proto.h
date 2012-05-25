@@ -65,6 +65,7 @@
 #define SD_RES_NO_STORE         0x20 /* No targeted backend store */
 #define SD_RES_NO_SUPPORT       0x21 /* Operation is not supported by backend store */
 #define SD_RES_CLUSTER_RECOVERING 0x22 /* Cluster is recovering. */
+#define SD_RES_OBJ_RECOVERING     0x23 /* Object is recovering */
 
 /*
  * Object ID rules

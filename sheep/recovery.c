@@ -348,6 +348,13 @@ int node_in_recovery(void)
 	return !!recovering_work;
 }
 
+int is_recovery_init(void)
+{
+	struct recovery_work *rw = recovering_work;
+
+	return rw->state == RW_INIT;
+}
+
 int is_recoverying_oid(uint64_t oid)
 {
 	uint64_t hval = fnv_64a_buf(&oid, sizeof(uint64_t), FNV1A_64_INIT);
@@ -366,13 +373,13 @@ int is_recoverying_oid(uint64_t oid)
 	if (before(rw->epoch, sys->epoch))
 		return 1;
 
-	if (rw->state == RW_INIT)
-		return 1;
-
 	if (sd_store->exist(oid)) {
 		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
 		return 0;
 	}
+
+	if (rw->state == RW_INIT)
+		return 1;
 
 	/* the first 'rw->nr_blocking' objects were already scheduled to be done earlier */
 	for (i = 0; i < rw->nr_blocking; i++)
@@ -403,14 +410,31 @@ int is_recoverying_oid(uint64_t oid)
 	return 0;
 }
 
+static void resume_wait_recovery_requests(void)
+{
+	struct request *req, *t;
+
+	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
+				 request_list) {
+		dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
+		if (req->rp.result == SD_RES_OBJ_RECOVERING) {
+			list_del(&req->request_list);
+			list_add_tail(&req->request_list, &sys->request_queue);
+		}
+	}
+
+	process_request_event_queues();
+}
+
 static void do_recover_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 	uint64_t oid;
 
-	if (rw->state == RW_INIT)
+	if (rw->state == RW_INIT) {
 		rw->state = RW_RUN;
-	else if (!rw->retry) {
+		resume_wait_recovery_requests();
+	} else if (!rw->retry) {
 		rw->done++;
 		if (rw->nr_blocking > 0)
 			rw->nr_blocking--;

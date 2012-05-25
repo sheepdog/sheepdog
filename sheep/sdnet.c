@@ -213,9 +213,15 @@ static int check_request(struct request *req)
 	if (is_recoverying_oid(req->local_oid)) {
 		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
 			/* Sheep peer request */
-			req->rp.result = SD_RES_NEW_NODE_VER;
-			sys->nr_outstanding_io++;
-			req->work.done(&req->work);
+			if (is_recovery_init()) {
+				req->rp.result = SD_RES_OBJ_RECOVERING;
+				list_add_tail(&req->request_list,
+						&sys->wait_rw_queue);
+			} else {
+				req->rp.result = SD_RES_NEW_NODE_VER;
+				sys->nr_outstanding_io++;
+				req->work.done(&req->work);
+			}
 		} else {
 			/* Gateway request */
 			list_add_tail(&req->request_list, &sys->req_wait_for_obj_list);
