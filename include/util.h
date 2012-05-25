@@ -60,17 +60,6 @@ static inline void *zalloc(size_t size)
 	return calloc(1, size);
 }
 
-static inline int xlockf(int fd, int cmd, off_t offset, off_t len)
-{
-	if (lseek(fd, offset, SEEK_SET) < 0) {
-		eprintf("%m\n");
-		return -1;
-	}
-
-	return lockf(fd, cmd, len);
-}
-
-
 typedef void (*try_to_free_t)(size_t);
 extern try_to_free_t set_try_to_free_routine(try_to_free_t);
 

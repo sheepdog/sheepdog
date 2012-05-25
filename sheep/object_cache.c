@@ -264,6 +264,7 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
+	struct flock fl;
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
@@ -273,24 +274,38 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
-	if (xlockf(fd, F_LOCK, offset, count) < 0) {
-		ret = SD_RES_EIO;
+	if (fd < 0) {
 		eprintf("%m\n");
+		ret = SD_RES_EIO;
 		goto out;
 	}
+
+	fl.l_type = F_WRLCK;
+	fl.l_whence = SEEK_SET;
+	fl.l_start = offset;
+	fl.l_len = count;
+	fl.l_pid = getpid();
+	if (fcntl(fd, F_SETLKW, &fl) < 0) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out_close;
+	}
 	size = xpwrite(fd, buf, count, offset);
-	if (xlockf(fd, F_ULOCK, offset, count) < 0) {
+
+	fl.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &fl) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
-		goto out;
+		goto out_close;
 	}
 	if (size != count) {
 		eprintf("size %zu, count:%zu, offset %zu %m\n",
 			size, count, offset);
 		ret = SD_RES_EIO;
 	}
-out:
+out_close:
 	close(fd);
+out:
 	strbuf_release(&p);
 	return ret;
 }
@@ -300,6 +315,7 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
+	struct flock fl;
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
@@ -309,25 +325,41 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
-	if (xlockf(fd, F_LOCK, offset, count) < 0) {
-		ret = SD_RES_EIO;
+	if (fd < 0) {
 		eprintf("%m\n");
+		ret = SD_RES_EIO;
 		goto out;
 	}
 
+	fl.l_type = F_RDLCK;
+	fl.l_whence = SEEK_SET;
+	fl.l_start = offset;
+	fl.l_len = count;
+	fl.l_pid = getpid();
+	if (fcntl(fd, F_SETLKW, &fl) < 0) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out_close;
+	}
+
 	size = xpread(fd, buf, count, offset);
-	if (xlockf(fd, F_ULOCK, offset, count) < 0) {
+
+	fl.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &fl) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
-		goto out;
+		goto out_close;
 	}
+
 	if (size != count) {
 		eprintf("size %zu, count:%zu, offset %zu %m\n",
 			size, count, offset);
 		ret = SD_RES_EIO;
 	}
-out:
+
+out_close:
 	close(fd);
+out:
 	strbuf_release(&p);
 	return ret;
 }
