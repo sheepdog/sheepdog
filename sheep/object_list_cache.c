@@ -143,22 +143,27 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 	struct objlist_cache_entry *entry;
 	struct rb_node *p;
 
-	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
-
 	pthread_rwlock_rdlock(&obj_list_cache.lock);
-	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
+	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
+	if (obj_list_cache.tree_version == obj_list_cache.buf_version) {
 		memcpy(list, obj_list_cache.buffer.buf, rsp->data_length);
-	else {
+		pthread_rwlock_unlock(&obj_list_cache.lock);
+	} else {
 		for (p = rb_first(&obj_list_cache.root); p; p = rb_next(p)) {
 			entry = rb_entry(p, struct objlist_cache_entry, node);
 			list[nr++] = entry->oid;
 		}
+		pthread_rwlock_unlock(&obj_list_cache.lock);
 
+		pthread_rwlock_wrlock(&obj_list_cache.lock);
+		if (obj_list_cache.tree_version == obj_list_cache.buf_version)
+			goto unlock;
 		strbuf_reset(&obj_list_cache.buffer);
 		strbuf_add(&obj_list_cache.buffer, list, nr * sizeof(uint64_t));
 		obj_list_cache.buf_version = obj_list_cache.tree_version;
+unlock:
+		pthread_rwlock_unlock(&obj_list_cache.lock);
 	}
-	pthread_rwlock_unlock(&obj_list_cache.lock);
 
 	return SD_RES_SUCCESS;
 }
