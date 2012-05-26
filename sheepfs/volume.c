@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <time.h>
 #include <assert.h>
-#include <syslog.h>
 #include <urcu/uatomic.h>
 #include <pthread.h>
 
@@ -153,7 +152,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 
 	if (is_data_obj(oid)) {
 		if (off % SECTOR_SIZE || size % SECTOR_SIZE) {
-			syslog(LOG_ERR, "offset or size not aligned\n");
+			sheepfs_pr("offset or size not aligned\n");
 			return -1;
 		}
 
@@ -204,7 +203,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	put_socket_fd(vdi, sock_idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		syslog(LOG_ERR,
+		sheepfs_pr(
 			"[%s] failed to %s object %" PRIx64 " ret %d, res %u\n",
 			__func__, rw == VOLUME_READ ? "read" : "write",
 			oid, ret, rsp->result);
@@ -247,10 +246,10 @@ static int volume_do_rw(const char *path, char *buf, size_t size,
 
 	do {
 #ifdef DEBUG
-		syslog(LOG_INFO, "%s oid %"PRIx64", off %ju, len %zu,"
-			" size %zu\n",
-			rw == VOLUME_READ ? "read" : "write",
-			oid, start, len, size);
+		sheepfs_pr("%s oid %"PRIx64", off %ju, len %zu,"
+			   " size %zu\n",
+			   rw == VOLUME_READ ? "read" : "write",
+			   oid, start, len, size);
 #endif
 		ret = volume_rw_object(buf, oid, len, start, rw);
 
@@ -312,8 +311,7 @@ static int volume_do_sync(uint32_t vid)
 	put_socket_fd(vdi, idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		syslog(LOG_ERR, "[%s] failed to flush vdi %"PRIx32"\n",
-			__func__, vid);
+		sheepfs_pr("failed to flush vdi %"PRIx32"\n", vid);
 		return -1;
 	}
 
@@ -354,14 +352,14 @@ static int setup_socket_pool(int array[], int len)
 	for (i = 0; i < len; i++) {
 		fd = connect_to(sdhost, sdport);
 		if (fd < 0) {
-			syslog(LOG_ERR, "[%s] connect_to %m\n", __func__);
+			sheepfs_pr("connect_to %m\n");
 			destroy_socket_pool(array, --i);
 			return -1;
 		}
 
 		ret = set_nodelay(fd);
 		if (ret) {
-			syslog(LOG_ERR, "[%s] %m\n", __func__);
+			sheepfs_pr("%m\n");
 			destroy_socket_pool(array, i);
 			return -1;
 		}
@@ -407,21 +405,20 @@ static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 		return -1;
 	if (sscanf(buf->buf, "%*s %*s %*d %zu %*s %*s %*s %"PRIx32,
 	    size, vid) < 2) {
-		syslog(LOG_ERR, "[%s] failed to sscanf %s\n", __func__, entry);
+		sheepfs_pr("failed to sscanf %s\n", entry);
 		goto err;
 	}
 
 	inode_buf = malloc(SD_INODE_SIZE);
 	if (!inode_buf) {
-		syslog(LOG_ERR, "[%s] %m\n", __func__);
+		sheepfs_pr("%m\n");
 		goto err;
 	}
 
 	inode = xzalloc(sizeof(*inode));
 	inode->vid = *vid;
 	if (setup_socket_pool(inode->socket_pool, SOCKET_POOL_SIZE) < 0) {
-		syslog(LOG_ERR, "[%s] failed to setup socket pool\n",
-			__func__);
+		sheepfs_pr("failed to setup socket pool\n");
 		goto err;
 	}
 	/* we need insert inode before calling volume_rw_object */
@@ -433,8 +430,7 @@ static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 	if (volume_rw_object(inode_buf, vid_to_vdi_oid(*vid), SD_INODE_SIZE,
 			     0, VOLUME_READ) < 0) {
 		rb_erase(&inode->rb, &vdi_inode_tree);
-		syslog(LOG_ERR, "[%s] failed to read inode for %"PRIx32"\n",
-			__func__, *vid);
+		sheepfs_pr("failed to read inode for %"PRIx32"\n", *vid);
 		goto err;
 	}
 	inode->inode = inode_buf;
@@ -503,8 +499,7 @@ static int volume_sync_and_delete(uint32_t vid)
 	put_socket_fd(vdi, idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		syslog(LOG_ERR, "[%s] failed to flush vdi %" PRIx32 "\n",
-			__func__, vid);
+		sheepfs_pr("failed to flush vdi %" PRIx32 "\n", vid);
 		return -1;
 	}
 

@@ -20,6 +20,7 @@
 #include <getopt.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include "strbuf.h"
 #include "util.h"
@@ -76,6 +77,30 @@ static struct sheepfs_file_operation {
 	[OP_VOLUME]         = { volume_read, volume_write, volume_get_size,
 				volume_sync, volume_open },
 };
+
+__attribute__ ((format (__printf__, 3, 4)))
+static void fg_printf(const char *func, int line, const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stderr, "%s(%d): ", func, line);
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+__attribute__ ((format (__printf__, 3, 4)))
+static void bg_printf(const char *func, int line, const char *fmt, ...)
+{
+	va_list ap;
+
+	syslog(LOG_ERR, "%s(%d)", func, line);
+	va_start(ap, fmt);
+	vsyslog(LOG_ERR, fmt, ap);
+	va_end(ap);
+}
+
+printf_fn fs_printf = bg_printf;
 
 int sheepfs_set_op(const char *path, unsigned opcode)
 {
@@ -136,13 +161,13 @@ static int sheepfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	dir = opendir(p.buf);
 	if (!dir) {
 		ret = -errno;
-		syslog(LOG_ERR, "[%s] %m\n", __func__);
+		sheepfs_pr("%m\n");
 		goto out;
 	}
 
 	while ((dentry = readdir(dir))) {
 		if (filler(buf, dentry->d_name, NULL, 0) != 0) {
-			syslog(LOG_ERR, "[%s] out of memory\n", __func__);
+			sheepfs_pr("out of memory\n");
 			ret = -ENOMEM;
 			goto out;
 		}
@@ -241,10 +266,10 @@ static int sheepfs_main_loop(char *mountpoint)
 	if (sheepfs_fg)
 		fuse_opt_add_arg(&args, "-f");
 
-	syslog(LOG_INFO, "sheepfs daemon started\n");
+	sheepfs_pr("sheepfs daemon started\n");
 	ret = fuse_main(args.argc, args.argv, &sheepfs_ops, NULL);
 	rmdir_r(sheepfs_shadow);
-	syslog(LOG_INFO, "sheepfs daemon exited %d\n", ret);
+	sheepfs_pr("sheepfs daemon exited %d\n", ret);
 	return ret;
 }
 
@@ -304,6 +329,7 @@ int main(int argc, char **argv)
 			break;
 		case 'f':
 			sheepfs_fg = 1;
+			fs_printf = fg_printf;
 			break;
 		case 'k':
 			sheepfs_page_cache = 1;
@@ -315,7 +341,7 @@ int main(int argc, char **argv)
 			sdport = strtol(optarg, NULL, 10);
 			if (sdport < 1 || sdport > UINT16_MAX) {
 				fprintf(stderr,
-				"Invalid port number '%s'\n", optarg);
+					"Invalid port number '%s'\n", optarg);
 				exit(1);
 			}
 			break;
@@ -348,7 +374,8 @@ int main(int argc, char **argv)
 	if (create_sheepfs_layout() < 0)
 		fprintf(stderr, "failed to create sheepfs layout\n");
 
-	openlog("sheepfs", LOG_CONS | LOG_PID, LOG_DAEMON);
+	if (!sheepfs_fg)
+		openlog("sheepfs", LOG_CONS | LOG_PID, LOG_DAEMON);
 
 	return sheepfs_main_loop(dir);
 }
@@ -359,7 +386,7 @@ struct strbuf *sheepfs_run_cmd(const char *command)
 	FILE *f = popen(command, "re");
 
 	if (!f) {
-		syslog(LOG_ERR, "[%s] popen failed\n", __func__);
+		sheepfs_pr("popen failed\n");
 		goto err;
 	}
 

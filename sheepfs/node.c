@@ -18,7 +18,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
-#include <syslog.h>
 
 #include "strbuf.h"
 #include "sheepfs.h"

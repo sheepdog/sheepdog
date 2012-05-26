@@ -22,7 +22,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <sys/xattr.h>
-#include <syslog.h>
 #include <stdlib.h>
 
 #include "util.h"
@@ -36,7 +35,7 @@ int shadow_file_read(const char *path, char *buf, size_t size, off_t offset)
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	fd = open(p, O_RDONLY);
 	if (fd < 0) {
-		syslog(LOG_ERR, "[%s] %m\n", __func__);
+		sheepfs_pr("%m\n");
 		return -errno;
 	}
 	len = xpread(fd, buf, size, offset);
@@ -53,12 +52,12 @@ size_t shadow_file_write(const char *path, char *buf, size_t size)
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	fd = open(p, O_WRONLY | O_TRUNC);
 	if (fd < 0) {
-		syslog(LOG_ERR, "[%s] %m\n", __func__);
+		sheepfs_pr("%m\n");
 		return 0;
 	}
 	len = xwrite(fd, buf, size);
 	if (len != size) {
-		syslog(LOG_ERR, "[%s] failed to write\n", __func__);
+		sheepfs_pr("failed to write\n");
 		len = 0;
 	}
 	close(fd);
@@ -73,7 +72,7 @@ int shadow_file_create(const char *path)
 	fd = creat(p, 0644);
 	if (fd < 0) {
 		if (errno != EEXIST) {
-			syslog(LOG_ERR, "[%s] %m\n", __func__);
+			sheepfs_pr("%m\n");
 			return -1;
 		}
 	}
@@ -88,7 +87,7 @@ int shadow_dir_create(const char *path)
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	if (mkdir(p, 0755) < 0) {
 		if (errno != EEXIST) {
-			syslog(LOG_ERR, "[%s] %m\n", __func__);
+			sheepfs_pr("%m\n");
 			return -1;
 		}
 	}
@@ -102,7 +101,7 @@ int shadow_file_setxattr(const char *path, const char *name,
 
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	if (setxattr(p, name, value, size, 0) < 0) {
-		syslog(LOG_ERR, "[%s] %m\n", __func__);
+		sheepfs_pr("%m\n");
 		return -1;
 	}
 	return 0;
@@ -115,7 +114,7 @@ int shadow_file_getxattr(const char *path, const char *name,
 
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	if (getxattr(p, name, value, size) < 0) {
-		syslog(LOG_ERR, "[%s] %m\n", __func__);
+		sheepfs_pr("%m\n");
 		return -1;
 	}
 	return 0;
@@ -128,7 +127,7 @@ int shadow_file_delete(const char *path)
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	if (unlink(p) < 0) {
 		if (errno != ENOENT) {
-			syslog(LOG_ERR, "[%s] %m\n", __func__);
+			sheepfs_pr("%m\n");
 			return -1;
 		}
 	}
@@ -142,7 +141,7 @@ int shadow_file_exsit(const char *path)
 	sprintf(p, "%s%s", sheepfs_shadow, path);
 	if (access(p, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
-			syslog(LOG_ERR, "[%s] %m\n", __func__);
+			sheepfs_pr("%m\n");
 		return 0;
 	}
 

@@ -28,6 +28,16 @@ extern int sdport;
 extern struct strbuf *sheepfs_run_cmd(const char *command);
 extern int sheepfs_set_op(const char *path, unsigned opcode);
 
+typedef void (*printf_fn)(const char *func, int line, const char *, ...)
+__attribute__ ((format (__printf__, 3, 4)));
+
+printf_fn fs_printf;
+
+#define sheepfs_pr(fmt, args...)			\
+({							\
+	fs_printf(__func__, __LINE__, fmt, ##args);	\
+})
+
 /* shadow_file.c */
 extern size_t shadow_file_write(const char *path, char *buf, size_t size);
 extern int shadow_file_read(const char *, char *buf, size_t size, off_t);
