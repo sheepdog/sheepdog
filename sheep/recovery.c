@@ -195,13 +195,12 @@ static int is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
  */
 static int do_recover_object(struct recovery_work *rw)
 {
-	struct vnode_info *old, *cur;
+	struct vnode_info *old;
 	uint64_t oid = rw->oids[rw->done];
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
 	int nr_copies, ret, i, retry;
 
 	old = grab_vnode_info(rw->old_vnodes);
-	cur = grab_vnode_info(rw->cur_vnodes);
 
 again:
 	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n",
@@ -252,14 +251,12 @@ again:
 			goto err;
 		}
 
-		put_vnode_info(cur);
-		cur = old;
+		put_vnode_info(old);
 		old = new_old;
 		goto again;
 	}
 err:
 	put_vnode_info(old);
-	put_vnode_info(cur);
 	return ret;
 }
 
