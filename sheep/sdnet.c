@@ -105,8 +105,14 @@ static void io_op_done(struct work *work)
 	case SD_RES_NETWORK_ERROR:
 	case SD_RES_WAIT_FOR_JOIN:
 	case SD_RES_WAIT_FOR_FORMAT:
-		if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL))
-			goto retry;
+		if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL)) {
+			if (req->rp.epoch > sys->epoch &&
+			    req->rp.result == SD_RES_OLD_NODE_VER) {
+				list_add_tail(&req->request_list,
+						&sys->wait_rw_queue);
+			} else
+				goto retry;
+		}
 		break;
 	case SD_RES_EIO:
 		if (is_access_local(req, hdr->obj.oid)) {
@@ -250,9 +256,22 @@ void resume_wait_epoch_requests(void)
 
 	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
 				 request_list) {
-
-		list_del(&req->request_list);
-		list_add_tail(&req->request_list, &sys->request_queue);
+		switch (req->rp.result) {
+		/* gateway retries to send the request when
+		   its epoch changes. */
+		case SD_RES_OLD_NODE_VER:
+			req->rq.epoch = sys->epoch;
+			put_vnode_info(req->vnodes);
+			req->vnodes = get_vnode_info();
+			setup_access_to_local_objects(req);
+		/* peer retries the request locally when its epoch changes. */
+		case SD_RES_NEW_NODE_VER:
+			list_del(&req->request_list);
+			list_add_tail(&req->request_list, &sys->request_queue);
+			break;
+		default:
+			break;
+		}
 	}
 	process_request_event_queues();
 }
