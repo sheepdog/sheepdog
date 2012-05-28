@@ -65,8 +65,7 @@ static void check_object_consistency(struct sd_req *hdr)
 		nr_bmaps++;
 		if (bmap->vdi_id == vdi_id) {
 			set_bit(data_oid_to_idx(hdr->obj.oid), bmap->dobjs);
-			list_del(&bmap->list);
-			list_add_tail(&bmap->list, &sys->consistent_obj_list);
+			list_move_tail(&bmap->list, &sys->consistent_obj_list);
 			return;
 		}
 	}
@@ -267,8 +266,7 @@ void resume_wait_epoch_requests(void)
 			setup_access_to_local_objects(req);
 		/* peer retries the request locally when its epoch changes. */
 		case SD_RES_NEW_NODE_VER:
-			list_del(&req->request_list);
-			list_add_tail(&req->request_list, &sys->request_queue);
+			list_move_tail(&req->request_list, &sys->request_queue);
 			break;
 		default:
 			break;
@@ -287,8 +285,7 @@ void resume_wait_obj_requests(uint64_t oid)
 		 * recovered, notify the pending request. */
 		if (req->local_oid == oid) {
 			dprintf("retry %" PRIx64 "\n", req->local_oid);
-			list_del(&req->request_list);
-			list_add_tail(&req->request_list, &sys->request_queue);
+			list_move_tail(&req->request_list, &sys->request_queue);
 		}
 	}
 	process_request_event_queues();

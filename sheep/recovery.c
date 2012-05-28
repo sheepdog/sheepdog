@@ -417,10 +417,8 @@ static void resume_wait_recovery_requests(void)
 	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
 				 request_list) {
 		dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
-		if (req->rp.result == SD_RES_OBJ_RECOVERING) {
-			list_del(&req->request_list);
-			list_add_tail(&req->request_list, &sys->request_queue);
-		}
+		if (req->rp.result == SD_RES_OBJ_RECOVERING)
+			list_move_tail(&req->request_list, &sys->request_queue);
 	}
 
 	process_request_event_queues();

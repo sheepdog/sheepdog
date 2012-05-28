@@ -98,10 +98,8 @@ static void compaction(struct vdi_tree *parent)
 
 	list_for_each_entry_safe(vdi, e, &parent->children, siblings) {
 		new_parent = find_vdi(root, vdi->pvid, vdi->name);
-		if (new_parent && parent != new_parent) {
-			list_del(&vdi->siblings);
-			list_add_tail(&vdi->siblings, &new_parent->children);
-		}
+		if (new_parent && parent != new_parent)
+			list_move_tail(&vdi->siblings, &new_parent->children);
 
 		compaction(vdi);
 	}
