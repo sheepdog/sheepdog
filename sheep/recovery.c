@@ -41,10 +41,9 @@ struct recovery_work {
 	struct sd_node old_nodes[SD_MAX_NODES];
 	int cur_nr_nodes;
 	struct sd_node cur_nodes[SD_MAX_NODES];
-	int old_nr_vnodes;
-	struct sd_vnode old_vnodes[SD_MAX_VNODES];
-	int cur_nr_vnodes;
-	struct sd_vnode cur_vnodes[SD_MAX_VNODES];
+
+	struct vnode_info *old_vnodes;
+	struct vnode_info *cur_vnodes;
 };
 
 static struct recovery_work *next_rw;
@@ -62,25 +61,21 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-static void *get_vnodes_from_epoch(uint32_t epoch, int *nr, int *copies)
+static struct vnode_info *get_vnodes_from_epoch(uint32_t epoch)
 {
-	int nodes_nr, len = sizeof(struct sd_vnode) * SD_MAX_VNODES;
 	struct sd_node nodes[SD_MAX_NODES];
-	void *buf = xmalloc(len);
+	int nr_nodes;
 
-	nodes_nr = epoch_log_read_nr(epoch, (void *)nodes, sizeof(nodes));
-	if (nodes_nr < 0) {
-		nodes_nr = epoch_log_read_remote(epoch, (void *)nodes, sizeof(nodes));
-		if (nodes_nr == 0) {
-			free(buf);
+	nr_nodes = epoch_log_read_nr(epoch, (void *)nodes, sizeof(nodes));
+	if (nr_nodes < 0) {
+		nr_nodes = epoch_log_read_remote(epoch, (void *)nodes,
+						 sizeof(nodes));
+		if (nr_nodes == 0)
 			return NULL;
-		}
-		nodes_nr /= sizeof(nodes[0]);
+		nr_nodes /= sizeof(nodes[0]);
 	}
-	*nr = nodes_to_vnodes(nodes, nodes_nr, buf);
-	*copies = get_max_nr_copies_from(nodes, nodes_nr);
 
-	return buf;
+	return alloc_vnode_info(nodes, nr_nodes);
 }
 
 static int recover_object_from_replica(uint64_t oid,
@@ -180,22 +175,6 @@ out:
 	return ret;
 }
 
-static void rollback_old_cur(struct sd_vnode *old, int *old_nr, int *old_copies,
-			     struct sd_vnode *cur, int *cur_nr, int *cur_copies,
-			     struct sd_vnode *new_old, int new_old_nr, int new_old_copies)
-{
-	int nr_old = *old_nr;
-	int copies_old = *old_copies;
-
-	memcpy(cur, old, sizeof(*old) * nr_old);
-	*cur_nr = nr_old;
-	*cur_copies = copies_old;
-	memcpy(old, new_old, sizeof(*new_old) * new_old_nr);
-	*old_nr = new_old_nr;
-	*old_copies = new_old_copies;
-}
-
-
 /*
  * A virtual node that does not match any node in current node list
  * means the node has left the cluster, then it's an invalid virtual node.
@@ -216,33 +195,28 @@ static int is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
  */
 static int do_recover_object(struct recovery_work *rw)
 {
-	struct sd_vnode *old, *cur;
+	struct vnode_info *old, *cur;
 	uint64_t oid = rw->oids[rw->done];
-	int old_nr = rw->old_nr_vnodes, cur_nr = rw->cur_nr_vnodes;
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
-	struct sd_vnode *tgt_entry;
-	int old_copies, cur_copies, ret, i, retry;
+	int nr_copies, ret, i, retry;
 
-	old = xmalloc(sizeof(*old) * SD_MAX_VNODES);
-	cur = xmalloc(sizeof(*cur) * SD_MAX_VNODES);
-	memcpy(old, rw->old_vnodes, sizeof(*old) * old_nr);
-	memcpy(cur, rw->cur_vnodes, sizeof(*cur) * cur_nr);
-	old_copies = get_max_nr_copies_from(rw->old_nodes, rw->old_nr_nodes);
-	cur_copies = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
+	old = grab_vnode_info(rw->old_vnodes);
+	cur = grab_vnode_info(rw->cur_vnodes);
 
 again:
 	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n",
 		oid, tgt_epoch);
-	retry = 0;
+
 	/* Let's do a breadth-first search */
-	for (i = 0; i < old_copies; i++) {
-		int idx;
-		idx = obj_to_sheep(old, old_nr, oid, i);
-		tgt_entry = old + idx;
-		if (is_invalid_vnode(tgt_entry, rw->cur_nodes,
+	retry = 0;
+	nr_copies = get_nr_copies(old);
+	for (i = 0; i < nr_copies; i++) {
+		struct sd_vnode *tgt_vnode = oid_to_vnode(old, oid, i);
+
+		if (is_invalid_vnode(tgt_vnode, rw->cur_nodes,
 				     rw->cur_nr_nodes))
 			continue;
-		ret = recover_object_from_replica(oid, tgt_entry,
+		ret = recover_object_from_replica(oid, tgt_vnode,
 						  epoch, tgt_epoch);
 		if (ret == 0) {
 			/* Succeed */
@@ -253,16 +227,17 @@ again:
 			continue;
 		}
 	}
+
 	/* If not succeed but someone orders us to retry it, serve the order */
 	if (ret != 0 && retry == 1) {
 		ret = 0;
 		rw->retry = 1;
 		goto err;
 	}
+
 	/* No luck, roll back to an older configuration and try again */
 	if (ret < 0) {
-		struct sd_vnode *new_old;
-		int new_old_nr, new_old_copies;
+		struct vnode_info *new_old;
 
 		tgt_epoch--;
 		if (tgt_epoch < 1) {
@@ -271,19 +246,20 @@ again:
 			goto err;
 		}
 
-		new_old = get_vnodes_from_epoch(tgt_epoch, &new_old_nr, &new_old_copies);
+		new_old = get_vnodes_from_epoch(tgt_epoch);
 		if (!new_old) {
 			ret = -1;
 			goto err;
 		}
-		rollback_old_cur(old, &old_nr, &old_copies, cur, &cur_nr, &cur_copies,
-				new_old, new_old_nr, new_old_copies);
-		free(new_old);
+
+		put_vnode_info(cur);
+		cur = old;
+		old = new_old;
 		goto again;
 	}
 err:
-	free(old);
-	free(cur);
+	put_vnode_info(old);
+	put_vnode_info(cur);
 	return ret;
 }
 
@@ -430,6 +406,14 @@ static void flush_wait_obj_requests(void)
 	process_request_event_queues();
 }
 
+static void free_recovery_work(struct recovery_work *rw)
+{
+	put_vnode_info(rw->cur_vnodes);
+	put_vnode_info(rw->old_vnodes);
+	free(rw->oids);
+	free(rw);
+}
+
 static void do_recover_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
@@ -475,9 +459,7 @@ static void do_recover_main(struct work *work)
 	recovering_work = NULL;
 
 	sys->recovered_epoch = rw->epoch;
-
-	free(rw->oids);
-	free(rw);
+	free_recovery_work(rw);
 
 	if (next_rw) {
 		rw = next_rw;
@@ -561,23 +543,20 @@ int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2)
 
 static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_nr)
 {
-	int ret, i, cp, idx;
+	int ret, i, j;
 	struct strbuf buf = STRBUF_INIT;
-	struct sd_vnode *nodes = rw->cur_vnodes;
-	int nodes_nr = rw->cur_nr_vnodes;
-	int nr_objs = get_max_nr_copies_from(rw->cur_nodes, rw->cur_nr_nodes);
-	int idx_buf[SD_MAX_COPIES];
+	struct sd_vnode *vnodes[SD_MAX_COPIES];
+	int nr_objs;
 
+	nr_objs = get_nr_copies(rw->cur_vnodes);
 	for (i = 0; i < list_nr; i++) {
-		obj_to_sheeps(nodes, nodes_nr, list[i], nr_objs, idx_buf);
-		for (cp = 0; cp < nr_objs; cp++) {
-			idx = idx_buf[cp];
-			if (vnode_is_local(&nodes[idx]))
+		oid_to_vnodes(rw->cur_vnodes, list[i], nr_objs, vnodes);
+		for (j = 0; j < nr_objs; j++) {
+			if (vnode_is_local(vnodes[j])) {
+				strbuf_add(&buf, &list[i], sizeof(uint64_t));
 				break;
+			}
 		}
-		if (cp == nr_objs)
-			continue;
-		strbuf_add(&buf, &list[i], sizeof(uint64_t));
 	}
 	memcpy(list, buf.buf, buf.len);
 
@@ -686,11 +665,8 @@ static int init_rw(struct recovery_work *rw)
 	qsort(rw->old_nodes, rw->old_nr_nodes, sizeof(struct sd_node),
 		  node_cmp);
 
-	rw->old_nr_vnodes = nodes_to_vnodes(rw->old_nodes, rw->old_nr_nodes,
-					    rw->old_vnodes);
-	rw->cur_nr_vnodes = nodes_to_vnodes(rw->cur_nodes, rw->cur_nr_nodes,
-					    rw->cur_vnodes);
-
+	rw->old_vnodes = alloc_vnode_info(rw->old_nodes, rw->old_nr_nodes);
+	rw->cur_vnodes = alloc_vnode_info(rw->cur_nodes, rw->cur_nr_nodes);
 	return 0;
 }
 
@@ -736,11 +712,9 @@ int start_recovery(uint32_t epoch)
 	}
 
 	if (recovering_work != NULL) {
-		if (next_rw) {
-			/* skip the previous epoch recovery */
-			free(next_rw->oids);
-			free(next_rw);
-		}
+		/* skip the previous epoch recovery */
+		if (next_rw)
+			free_recovery_work(next_rw);
 		next_rw = rw;
 	} else {
 		recovering_work = rw;
