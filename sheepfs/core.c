@@ -259,6 +259,7 @@ static int sheepfs_main_loop(char *mountpoint)
 	fuse_opt_add_arg(&args, "sheepfs"); /* placeholder for argv[0] */
 	fuse_opt_add_arg(&args, "-oallow_root");
 	fuse_opt_add_arg(&args, "-obig_writes");
+	fuse_opt_add_arg(&args, "-okernel_cache");
 	fuse_opt_add_arg(&args, "-ofsname=sheepfs");
 	fuse_opt_add_arg(&args, mountpoint);
 	if (sheepfs_debug)
