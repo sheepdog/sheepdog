@@ -186,24 +186,16 @@ void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
 	}
 }
 
-static int update_vnode_info(void)
+struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes)
 {
 	struct vnode_info *vnode_info;
 
-	vnode_info = zalloc(sizeof(*vnode_info));
-	if (!vnode_info) {
-		eprintf("failed to allocate memory\n");
-		return 1;
-	}
-
-	vnode_info->nr_vnodes = nodes_to_vnodes(sys->nodes, sys->nr_nodes,
+	vnode_info = xzalloc(sizeof(*vnode_info));
+	vnode_info->nr_vnodes = nodes_to_vnodes(nodes, nr_nodes,
 						vnode_info->entries);
-	vnode_info->nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
 	uatomic_set(&vnode_info->refcnt, 1);
-
-	put_vnode_info(current_vnode_info);
-	current_vnode_info = vnode_info;
-	return 0;
+	return vnode_info;
 }
 
 /*
@@ -566,7 +558,8 @@ static void update_node_info(struct sd_node *nodes, size_t nr_nodes)
 	memcpy(sys->nodes, nodes, sizeof(*sys->nodes) * sys->nr_nodes);
 	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
 
-	update_vnode_info();
+	put_vnode_info(current_vnode_info);
+	current_vnode_info = alloc_vnode_info(sys->nodes, sys->nr_nodes);
 }
 
 static void log_last_epoch(struct join_message *msg, struct sd_node *joined,

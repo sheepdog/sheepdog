@@ -239,6 +239,7 @@ int get_vdi_attr(struct vnode_info *vnode_info, uint32_t epoch,
 		int excl, int delete);
 
 int get_zones_nr_from(struct sd_node *nodes, int nr_nodes);
+struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes);
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vnodes);
