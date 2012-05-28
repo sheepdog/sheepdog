@@ -210,7 +210,11 @@ static int check_request(struct request *req)
 	if (!req->local_oid)
 		return 0;
 
-	if (is_recoverying_oid(req->local_oid)) {
+	/* IO request of recovery should not wait, or else it may cause
+	   dead lock of recovery, if fails, recovery will take its own
+	   retrying mechanism. */
+	if (is_recoverying_oid(req->local_oid) &&
+	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
 		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
 			/* Sheep peer request */
 			if (is_recovery_init()) {
