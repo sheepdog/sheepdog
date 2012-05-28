@@ -110,6 +110,10 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 	char path[PATH_MAX];
 	ssize_t size;
 
+	if (iocb->epoch < sys_epoch()) {
+		dprintf("%"PRIu32" sys %"PRIu32"\n", iocb->epoch, sys_epoch());
+		return SD_RES_OLD_NODE_VER;
+	}
 	if (is_vdi_obj(oid))
 		flags &= ~O_DIRECT;
 

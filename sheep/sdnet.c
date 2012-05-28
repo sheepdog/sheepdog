@@ -97,7 +97,6 @@ static void io_op_done(struct work *work)
 	struct sd_req *hdr = &req->rq;
 
 	list_del(&req->request_list);
-	sys->nr_outstanding_io--;
 
 	switch (req->rp.result) {
 	case SD_RES_OLD_NODE_VER:
@@ -193,7 +192,6 @@ static int check_request(struct request *req)
 		/* ask gateway to retry. */
 		req->rp.result = SD_RES_OLD_NODE_VER;
 		req->rp.epoch = sys->epoch;
-		sys->nr_outstanding_io++;
 		req->work.done(&req->work);
 		return -1;
 	} else if (after(req->rq.epoch, sys->epoch)) {

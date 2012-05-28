@@ -140,7 +140,6 @@ struct cluster_info {
 	struct list_head wait_rw_queue;
 	struct list_head wait_obj_queue;
 	struct event_struct *cur_cevent;
-	int nr_outstanding_io;
 	int nr_outstanding_reqs;
 	unsigned int outstanding_data_size;
 

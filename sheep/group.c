@@ -1057,7 +1057,6 @@ static void process_request_queue(void)
 		if (is_io_op(req->op)) {
 			list_add_tail(&req->request_list,
 				      &sys->outstanding_req_list);
-			sys->nr_outstanding_io++;
 
 			if (need_consistency_check(req))
 				set_consistency_check(req);
@@ -1086,7 +1085,7 @@ static inline void process_event_queue(void)
 	 * we need to serialize events so we don't call queue_work
 	 * if one event is running by executing event_fn() or event_done().
 	 */
-	if (event_running || sys->nr_outstanding_io)
+	if (event_running)
 		return;
 
 	cevent = list_first_entry(&sys->event_queue,
