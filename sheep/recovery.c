@@ -596,14 +596,10 @@ static int newly_joined(struct sd_node *node, struct recovery_work *rw)
 {
 	struct sd_node *old = rw->old_nodes;
 	int old_nr = rw->old_nr_nodes;
-	int i;
-	for (i = 0; i < old_nr; i++)
-		if (node_cmp(node, old + i) == 0)
-			break;
 
-	if (i == old_nr)
-		return 1;
-	return 0;
+	if (bsearch(node, old, old_nr, sizeof(struct sd_node), node_cmp))
+		return 0;
+	return 1;
 }
 
 static int fill_obj_list(struct recovery_work *rw)
@@ -689,6 +685,9 @@ static int init_rw(struct recovery_work *rw)
 		eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch - 1);
 		return -1;
 	}
+	qsort(rw->old_nodes, rw->old_nr_nodes, sizeof(struct sd_node),
+		  node_cmp);
+
 	rw->old_nr_vnodes = nodes_to_vnodes(rw->old_nodes, rw->old_nr_nodes,
 					    rw->old_vnodes);
 	rw->cur_nr_vnodes = nodes_to_vnodes(rw->cur_nodes, rw->cur_nr_nodes,
