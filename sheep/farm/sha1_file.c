@@ -180,7 +180,11 @@ static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file
 
 	memcpy(hdr, map, sizeof(*hdr));
 	hdr_len = sizeof(*hdr);
-	buf = xmalloc(hdr->size);
+	buf = valloc(hdr->size);
+	if (!buf) {
+		dprintf("%m\n");
+		return NULL;
+	}
 
 	memcpy(buf, (char *)map + hdr_len, mapsize - hdr_len);
 	return buf;
