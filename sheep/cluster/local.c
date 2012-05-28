@@ -32,8 +32,6 @@ static int sigfd;
 static int event_pos;
 static struct sd_node this_node;
 
-static struct work_queue *local_block_wq;
-
 enum local_event_type {
 	EVENT_JOIN_REQUEST = 1,
 	EVENT_JOIN_RESPONSE,
@@ -452,12 +450,6 @@ static int local_init(const char *option, uint8_t *myaddr)
 	}
 
 	add_timer(&t, 1);
-
-	local_block_wq = init_work_queue(1);
-	if (!local_block_wq) {
-		eprintf("failed to create local workqueue: %m\n");
-		return -1;
-	}
 
 	ret = register_event(sigfd, local_handler, NULL);
 	if (ret) {
