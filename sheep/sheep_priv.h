@@ -137,6 +137,7 @@ struct cluster_info {
 
 	struct list_head request_queue;
 	struct list_head event_queue;
+	struct list_head wait_rw_queue;
 	struct event_struct *cur_cevent;
 	int nr_outstanding_io;
 	int nr_outstanding_reqs;
@@ -267,6 +268,7 @@ int get_nr_copies(struct vnode_info *vnode_info);
 int is_access_to_busy_objects(uint64_t oid);
 
 void resume_pending_requests(void);
+void resume_wait_epoch_requests(void);
 
 int create_cluster(int port, int64_t zone, int nr_vnodes);
 int leave_cluster(void);

@@ -1342,6 +1342,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 
 	INIT_LIST_HEAD(&sys->request_queue);
 	INIT_LIST_HEAD(&sys->event_queue);
+	INIT_LIST_HEAD(&sys->wait_rw_queue);
 
 	ret = send_join_request(&sys->this_node);
 	if (ret != 0)

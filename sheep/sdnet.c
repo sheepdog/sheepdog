@@ -167,24 +167,6 @@ static void do_local_request(struct work *work)
 	req->rp.result = ret;
 }
 
-static int check_epoch(struct request *req)
-{
-	uint32_t req_epoch = req->rq.epoch;
-	uint32_t opcode = req->rq.opcode;
-	int ret = SD_RES_SUCCESS;
-
-	if (before(req_epoch, sys->epoch)) {
-		ret = SD_RES_OLD_NODE_VER;
-		eprintf("old node version %u, %u, %x\n",
-				sys->epoch, req_epoch, opcode);
-	} else if (after(req_epoch, sys->epoch)) {
-		ret = SD_RES_NEW_NODE_VER;
-		eprintf("new node version %u, %u, %x\n",
-				sys->epoch, req_epoch, opcode);
-	}
-	return ret;
-}
-
 static int check_request(struct request *req)
 {
 	/*
@@ -198,14 +180,25 @@ static int check_request(struct request *req)
 
 	if (!req->local_oid && !req->local_cow_oid)
 		return 0;
-	else {
-		int ret = check_epoch(req);
-		if (ret != SD_RES_SUCCESS) {
-			req->rp.result = ret;
-			sys->nr_outstanding_io++;
-			req->work.done(&req->work);
-			return -1;
-		}
+
+	if (before(req->rq.epoch, sys->epoch)) {
+		eprintf("old node version %u, %u, %x\n",
+			sys->epoch, req->rq.epoch, req->rq.opcode);
+		/* ask gateway to retry. */
+		req->rp.result = SD_RES_OLD_NODE_VER;
+		req->rp.epoch = sys->epoch;
+		sys->nr_outstanding_io++;
+		req->work.done(&req->work);
+		return -1;
+	} else if (after(req->rq.epoch, sys->epoch)) {
+		eprintf("new node version %u, %u, %x\n",
+			sys->epoch, req->rq.epoch, req->rq.opcode);
+
+		/* put on local wait queue, waiting for local epoch
+		   to be lifted */
+		req->rp.result = SD_RES_NEW_NODE_VER;
+		list_add_tail(&req->request_list, &sys->wait_rw_queue);
+		return -1;
 	}
 
 	if (!req->local_oid)
@@ -249,6 +242,19 @@ void resume_pending_requests(void)
 
 	if (!list_empty(&sys->request_queue))
 		process_request_event_queues();
+}
+
+void resume_wait_epoch_requests(void)
+{
+	struct request *req, *t;
+
+	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
+				 request_list) {
+
+		list_del(&req->request_list);
+		list_add_tail(&req->request_list, &sys->request_queue);
+	}
+	process_request_event_queues();
 }
 
 static void queue_request(struct request *req)

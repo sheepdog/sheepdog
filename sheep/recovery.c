@@ -714,5 +714,7 @@ int start_recovery(uint32_t epoch)
 		queue_work(sys->recovery_wqueue, &rw->work);
 	}
 
+	resume_wait_epoch_requests();
+
 	return 0;
 }
