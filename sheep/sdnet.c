@@ -215,19 +215,14 @@ static int check_request(struct request *req)
 	   retrying mechanism. */
 	if (is_recoverying_oid(req->local_oid) &&
 	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
-		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-			/* Sheep peer request */
-			if (is_recovery_init()) {
-				req->rp.result = SD_RES_OBJ_RECOVERING;
-				list_add_tail(&req->request_list,
-						&sys->wait_rw_queue);
-			} else
-				list_add_tail(&req->request_list,
-						&sys->wait_obj_queue);
-		} else {
-			/* Gateway request */
-			list_add_tail(&req->request_list, &sys->req_wait_for_obj_list);
-		}
+		/* Peer requests and gateway requests all need to retry */
+		if (is_recovery_init()) {
+			req->rp.result = SD_RES_OBJ_RECOVERING;
+			list_add_tail(&req->request_list,
+				      &sys->wait_rw_queue);
+		} else
+			list_add_tail(&req->request_list,
+				      &sys->wait_obj_queue);
 		return -1;
 	}
 
