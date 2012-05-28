@@ -36,19 +36,6 @@
 
 #define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheep */
 
-enum event_type {
-	EVENT_JOIN,
-	EVENT_LEAVE,
-	EVENT_NOTIFY,
-};
-
-#define is_membership_change_event(x) \
-	((x) == EVENT_JOIN || (x) == EVENT_LEAVE)
-
-struct event_struct {
-	enum event_type ctype;
-	struct list_head event_list;
-};
 
 struct client_info {
 	struct connection conn;
@@ -136,10 +123,8 @@ struct cluster_info {
 	int nr_copies;
 
 	struct list_head request_queue;
-	struct list_head event_queue;
 	struct list_head wait_rw_queue;
 	struct list_head wait_obj_queue;
-	struct event_struct *cur_cevent;
 	int nr_outstanding_reqs;
 	unsigned int outstanding_data_size;
 
@@ -148,7 +133,6 @@ struct cluster_info {
 	int use_directio;
 	uint8_t async_flush;
 
-	struct work_queue *event_wqueue;
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
 	struct work_queue *deletion_wqueue;
