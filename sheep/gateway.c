@@ -85,7 +85,7 @@ int forward_read_obj_req(struct request *req)
 	struct sd_vnode *v;
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	uint64_t oid = req->rq.obj.oid;
-	int nr_copies;
+	int nr_copies, j;
 
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 	fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
@@ -108,8 +108,13 @@ int forward_read_obj_req(struct request *req)
 	}
 
 read_remote:
+	/* Read random copy from cluster for better load balance, useful for
+	 * reading base VM's COW objects
+	 */
+	j = random();
 	for (i = 0; i < nr_copies; i++) {
-		v = obj_vnodes[i];
+		int idx = (i + j) % nr_copies;
+		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
 			continue;
 
