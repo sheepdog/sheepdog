@@ -823,70 +823,6 @@ int is_access_to_busy_objects(uint64_t oid)
 	return 0;
 }
 
-static int need_consistency_check(struct request *req)
-{
-	struct sd_req *hdr = &req->rq;
-
-	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL)
-		/* only gateway fixes data consistency */
-		return 0;
-
-	if (hdr->opcode != SD_OP_READ_OBJ)
-		/* consistency is fixed when clients read data for the
-		 * first time */
-		return 0;
-
-	if (hdr->flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
-		return 0;
-
-	if (is_vdi_obj(hdr->obj.oid))
-		/* only check consistency for data objects */
-		return 0;
-
-	if (sys->enable_write_cache && object_is_cached(hdr->obj.oid))
-		/* we don't check consistency for cached objects */
-		return 0;
-
-	return 1;
-}
-
-static inline void set_consistency_check(struct request *req)
-{
-	uint32_t vdi_id = oid_to_vid(req->rq.obj.oid);
-	uint32_t idx = data_oid_to_idx(req->rq.obj.oid);
-	struct data_object_bmap *bmap;
-
-	req->check_consistency = 1;
-	list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
-		if (bmap->vdi_id == vdi_id) {
-			if (test_bit(idx, bmap->dobjs))
-				req->check_consistency = 0;
-			break;
-		}
-	}
-}
-
-/* can be called only by the main process */
-void process_request_event_queues(void)
-{
-	struct request *req, *n;
-
-	list_for_each_entry_safe(req, n, &sys->request_queue, request_list) {
-		list_del(&req->request_list);
-
-		list_add_tail(&req->request_list,
-			      &sys->outstanding_req_list);
-
-		if (need_consistency_check(req))
-			set_consistency_check(req);
-
-		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
-			queue_work(sys->io_wqueue, &req->work);
-		else
-			queue_work(sys->gateway_wqueue, &req->work);
-	}
-}
-
 void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		size_t nr_members, enum cluster_join_result result,
 		void *opaque)
@@ -1091,7 +1027,6 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 	INIT_LIST_HEAD(&sys->consistent_obj_list);
 	INIT_LIST_HEAD(&sys->blocking_conn_list);
 
-	INIT_LIST_HEAD(&sys->request_queue);
 	INIT_LIST_HEAD(&sys->wait_rw_queue);
 	INIT_LIST_HEAD(&sys->wait_obj_queue);
 

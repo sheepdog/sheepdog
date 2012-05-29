@@ -118,7 +118,6 @@ struct cluster_info {
 
 	int nr_copies;
 
-	struct list_head request_queue;
 	struct list_head wait_rw_queue;
 	struct list_head wait_obj_queue;
 	int nr_outstanding_reqs;
@@ -240,11 +239,12 @@ int is_access_to_busy_objects(uint64_t oid);
 void resume_pending_requests(void);
 void resume_wait_epoch_requests(void);
 void resume_wait_obj_requests(uint64_t oid);
+void resume_wait_recovery_requests(void);
+void flush_wait_obj_requests(void);
 
 int create_cluster(int port, int64_t zone, int nr_vnodes);
 int leave_cluster(void);
 
-void process_request_event_queues(void);
 void queue_cluster_request(struct request *req);
 void do_io_request(struct work *work);
 void do_gateway_request(struct work *work);

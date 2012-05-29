@@ -55,6 +55,45 @@ static void setup_access_to_local_objects(struct request *req)
 			req->local_cow_oid = hdr->obj.cow_oid;
 }
 
+static int need_consistency_check(struct request *req)
+{
+	struct sd_req *hdr = &req->rq;
+
+	if (hdr->opcode != SD_OP_READ_OBJ)
+		/* consistency is fixed when clients read data for the
+		 * first time */
+		return 0;
+
+	if (hdr->flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
+		return 0;
+
+	if (is_vdi_obj(hdr->obj.oid))
+		/* only check consistency for data objects */
+		return 0;
+
+	if (sys->enable_write_cache && object_is_cached(hdr->obj.oid))
+		/* we don't check consistency for cached objects */
+		return 0;
+
+	return 1;
+}
+
+static inline void set_consistency_check(struct request *req)
+{
+	uint32_t vdi_id = oid_to_vid(req->rq.obj.oid);
+	uint32_t idx = data_oid_to_idx(req->rq.obj.oid);
+	struct data_object_bmap *bmap;
+
+	req->check_consistency = 1;
+	list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
+		if (bmap->vdi_id == vdi_id) {
+			if (test_bit(idx, bmap->dobjs))
+				req->check_consistency = 0;
+			break;
+		}
+	}
+}
+
 static void check_object_consistency(struct sd_req *hdr)
 {
 	uint32_t vdi_id = oid_to_vid(hdr->obj.oid);
@@ -87,6 +126,19 @@ static void check_object_consistency(struct sd_req *hdr)
 					struct data_object_bmap, list);
 		list_del(&bmap->list);
 		free(bmap);
+	}
+}
+
+static void process_io_request(struct request *req)
+{
+	list_add_tail(&req->request_list, &sys->outstanding_req_list);
+
+	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
+		queue_work(sys->io_wqueue, &req->work);
+	} else {
+		if (need_consistency_check(req))
+			set_consistency_check(req);
+		queue_work(sys->gateway_wqueue, &req->work);
 	}
 }
 
@@ -142,7 +194,7 @@ retry:
 	put_vnode_info(req->vnodes);
 	req->vnodes = get_vnode_info();
 	setup_access_to_local_objects(req);
-	list_add_tail(&req->request_list, &sys->request_queue);
+	process_io_request(req);
 
 	resume_pending_requests();
 	resume_recovery_work();
@@ -243,11 +295,8 @@ void resume_pending_requests(void)
 
 		if (check_request(req) < 0)
 			continue;
-		list_add_tail(&req->request_list, &sys->request_queue);
+		process_io_request(req);
 	}
-
-	if (!list_empty(&sys->request_queue))
-		process_request_event_queues();
 }
 
 void resume_wait_epoch_requests(void)
@@ -266,13 +315,27 @@ void resume_wait_epoch_requests(void)
 			setup_access_to_local_objects(req);
 		/* peer retries the request locally when its epoch changes. */
 		case SD_RES_NEW_NODE_VER:
-			list_move_tail(&req->request_list, &sys->request_queue);
+			list_del(&req->request_list);
+			process_io_request(req);
 			break;
 		default:
 			break;
 		}
 	}
-	process_request_event_queues();
+}
+
+void resume_wait_recovery_requests(void)
+{
+	struct request *req, *t;
+
+	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
+				 request_list) {
+		dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
+		if (req->rp.result == SD_RES_OBJ_RECOVERING) {
+			list_del(&req->request_list);
+			process_io_request(req);
+		}
+	}
 }
 
 void resume_wait_obj_requests(uint64_t oid)
@@ -285,10 +348,20 @@ void resume_wait_obj_requests(uint64_t oid)
 		 * recovered, notify the pending request. */
 		if (req->local_oid == oid) {
 			dprintf("retry %" PRIx64 "\n", req->local_oid);
-			list_move_tail(&req->request_list, &sys->request_queue);
+			list_del(&req->request_list);
+			process_io_request(req);
 		}
 	}
-	process_request_event_queues();
+}
+
+void flush_wait_obj_requests(void)
+{
+	struct request *req, *n;
+
+	list_for_each_entry_safe(req, n, &sys->wait_obj_queue, request_list) {
+		list_del(&req->request_list);
+		process_io_request(req);
+	}
 }
 
 static void queue_io_request(struct request *req)
@@ -305,8 +378,7 @@ static void queue_io_request(struct request *req)
 	if (check_request(req) < 0)
 		return;
 
-	list_add_tail(&req->request_list, &sys->request_queue);
-	process_request_event_queues();
+	process_io_request(req);
 }
 
 static void queue_local_request(struct request *req)
@@ -357,13 +429,14 @@ static void queue_request(struct request *req)
 	}
 
 	/*
-	 * we set epoch for non direct requests here. Note that we
-	 * can't access to sys->epoch after calling
-	 * process_request_event_queues(that is, passing requests to work
-	 * threads).
+	 * we set epoch for non direct requests here.  Note that we need to
+	 * sample sys->epoch before passing requests to worker threads as
+	 * it can change anytime we return to processing membership change
+	 * events.
 	 */
 	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL))
 		hdr->epoch = sys->epoch;
+
 	/*
 	 * force operations shouldn't access req->vnodes in their
 	 * process_work() and process_main() because they can be

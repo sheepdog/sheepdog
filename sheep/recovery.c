@@ -383,26 +383,6 @@ int is_recoverying_oid(uint64_t oid)
 	return 0;
 }
 
-static void resume_wait_recovery_requests(void)
-{
-	struct request *req, *t;
-
-	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
-				 request_list) {
-		dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
-		if (req->rp.result == SD_RES_OBJ_RECOVERING)
-			list_move_tail(&req->request_list, &sys->request_queue);
-	}
-
-	process_request_event_queues();
-}
-
-static void flush_wait_obj_requests(void)
-{
-	list_splice_tail_init(&sys->wait_obj_queue, &sys->request_queue);
-	process_request_event_queues();
-}
-
 static void free_recovery_work(struct recovery_work *rw)
 {
 	put_vnode_info(rw->cur_vnodes);
