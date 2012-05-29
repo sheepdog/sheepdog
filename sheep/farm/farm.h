@@ -67,7 +67,6 @@ extern int trunk_update_entry(uint64_t oid);
 extern void trunk_reset(void);
 extern void trunk_put_entry(uint64_t oid);
 extern void trunk_get_entry(uint64_t oid);
-extern int trunk_get_working_objlist(uint64_t *list);
 
 /* snap.c */
 extern int snap_init(void);

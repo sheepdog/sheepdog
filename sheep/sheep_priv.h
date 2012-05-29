@@ -158,7 +158,6 @@ struct store_driver {
 	int (*read)(uint64_t oid, struct siocb *);
 	int (*format)(struct siocb *);
 	/* Operations in recovery */
-	int (*get_objlist)(struct siocb *);
 	int (*link)(uint64_t oid, struct siocb *, uint32_t tgt_epoch);
 	int (*atomic_put)(uint64_t oid, struct siocb *);
 	int (*begin_recover)(struct siocb *);
@@ -299,7 +298,6 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 
 int prealloc(int fd, uint32_t size);
 
-int init_objlist_cache(void);
 int objlist_cache_insert(uint64_t oid);
 void objlist_cache_remove(uint64_t oid);
 

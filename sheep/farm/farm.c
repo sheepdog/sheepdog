@@ -335,18 +335,6 @@ err:
 	return SD_RES_EIO;
 }
 
-static int farm_get_objlist(struct siocb *iocb)
-{
-	uint64_t *objlist = (uint64_t *)iocb->buf;
-
-	iocb->length = trunk_get_working_objlist(objlist);
-
-	dprintf("%"PRIu32"\n", iocb->length);
-
-	return SD_RES_SUCCESS;
-}
-
-
 static void *read_working_object(uint64_t oid, uint64_t offset,
 				 uint32_t length)
 {
@@ -737,7 +725,6 @@ struct store_driver farm = {
 	.exist = farm_exist,
 	.write = farm_write,
 	.read = farm_read,
-	.get_objlist = farm_get_objlist,
 	.link = farm_link,
 	.atomic_put = farm_atomic_put,
 	.end_recover = farm_end_recover,

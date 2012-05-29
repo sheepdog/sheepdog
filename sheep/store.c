@@ -503,10 +503,6 @@ int init_store(const char *d, int enable_write_cache)
 	if (ret)
 		return ret;
 
-	ret = init_objlist_cache();
-	if (ret)
-		return ret;
-
 	if (enable_write_cache) {
 		sys->enable_write_cache = 1;
 		ret = object_cache_init(d);

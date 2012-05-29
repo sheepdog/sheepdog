@@ -119,6 +119,7 @@ int trunk_init(void)
 		oid = strtoull(d->d_name, NULL, 16);
 		if (oid == 0 || oid == ULLONG_MAX)
 			continue;
+		objlist_cache_insert(oid);
 		lookup_trunk_entry(oid, 1);
 	}
 
@@ -397,18 +398,4 @@ void trunk_reset(void)
 	}
 	eprintf("%s\n", trunk_entry_active_nr ? "WARN: active_list not clean" :
 						"clean");
-}
-
-int trunk_get_working_objlist(uint64_t *list)
-{
-	int nr = 0;
-	struct trunk_entry_incore *entry;
-
-	pthread_mutex_lock(&active_list_lock);
-	list_for_each_entry(entry, &trunk_active_list, active_list) {
-		list[nr++] = entry->raw.oid;
-	}
-	pthread_mutex_unlock(&active_list_lock);
-
-	return nr;
 }

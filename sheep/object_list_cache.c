@@ -43,34 +43,6 @@ struct objlist_cache obj_list_cache = {
 			RB_ROOT, /* root */
 		};
 
-int init_objlist_cache(void)
-{
-	int i;
-	struct siocb iocb = { 0 };
-	uint64_t *buf;
-
-	pthread_rwlock_init(&obj_list_cache.lock, NULL);
-
-	if (sd_store) {
-		buf = zalloc(1 << 22);
-		if (!buf) {
-			eprintf("no memory to allocate.\n");
-			return -1;
-		}
-
-		iocb.length = 0;
-		iocb.buf = buf;
-		sd_store->get_objlist(&iocb);
-
-		for (i = 0; i < iocb.length; i++)
-			objlist_cache_insert(buf[i]);
-
-		free(buf);
-	}
-
-	return 0;
-}
-
 static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
 		struct objlist_cache_entry *new)
 {
