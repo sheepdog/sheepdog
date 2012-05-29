@@ -28,8 +28,10 @@
 #define QUEUE_FILE BASE_FILE "/queue"
 
 enum acrd_event_type {
-	EVENT_JOIN = 1,
+	EVENT_JOIN_REQUEST = 1,
+	EVENT_JOIN_RESPONSE,
 	EVENT_LEAVE,
+	EVENT_BLOCK,
 	EVENT_NOTIFY,
 };
 
@@ -46,7 +48,6 @@ struct acrd_event {
 
 	enum cluster_join_result join_result;
 
-	int blocked; /* set non-zero when sheep must block this event */
 	int callbacked; /* set non-zero after sd_block_handler() was called */
 };
 
@@ -165,8 +166,8 @@ again:
 	assert(rc == ACRD_SUCCESS);
 
 	if (queue_start_pos < 0) {
-		/* the first pushed data should be EVENT_JOIN */
-		assert(ev->type == EVENT_JOIN);
+		/* the first pushed data should be EVENT_JOIN_REQUEST */
+		assert(ev->type == EVENT_JOIN_REQUEST);
 		queue_start_pos = queue_end_pos;
 	}
 }
@@ -244,7 +245,7 @@ again:
 
 static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 		     struct sd_node *node, void *buf,
-		     size_t buf_len, int blocked)
+		     size_t buf_len)
 {
 	int idx;
 	struct sd_node *n;
@@ -255,7 +256,6 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 
 	ev.type = type;
 	ev.sender = *node;
-	ev.blocked = blocked;
 	ev.buf_len = buf_len;
 	if (buf)
 		memcpy(ev.buf, buf, buf_len);
@@ -263,7 +263,7 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 	ev.nr_nodes = get_nodes(ah, ev.nodes, ev.ids);
 
 	switch (type) {
-	case EVENT_JOIN:
+	case EVENT_JOIN_REQUEST:
 		ev.nodes[ev.nr_nodes] = *node;
 		ev.ids[ev.nr_nodes] = this_id; /* must be local node */
 		ev.nr_nodes++;
@@ -280,7 +280,10 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 		memmove(i, i + 1, sizeof(*i) * (ev.nr_nodes - idx));
 		break;
 	case EVENT_NOTIFY:
+	case EVENT_BLOCK:
 		break;
+	case EVENT_JOIN_RESPONSE:
+		abort();
 	}
 
 	acrd_queue_push(ah, &ev);
@@ -408,7 +411,7 @@ static void __acrd_leave(struct work *work)
 
 	for (i = 0; i < nr_nodes; i++) {
 		if (ids[i] == info->left_nodeid) {
-			add_event(ah, EVENT_LEAVE, nodes + i, NULL, 0, 0);
+			add_event(ah, EVENT_LEAVE, nodes + i, NULL, 0);
 			break;
 		}
 	}
@@ -463,23 +466,23 @@ static int accord_join(struct sd_node *myself,
 {
 	this_node = *myself;
 
-	return add_event(ahandle, EVENT_JOIN, &this_node,
-			 opaque, opaque_len, 1);
+	return add_event(ahandle, EVENT_JOIN_REQUEST, &this_node,
+			 opaque, opaque_len);
 }
 
 static int accord_leave(void)
 {
-	return add_event(ahandle, EVENT_LEAVE, &this_node, NULL, 0, 0);
+	return add_event(ahandle, EVENT_LEAVE, &this_node, NULL, 0);
 }
 
 static int accord_notify(void *msg, size_t msg_len)
 {
-	return add_event(ahandle, EVENT_NOTIFY, &this_node, msg, msg_len, 0);
+	return add_event(ahandle, EVENT_NOTIFY, &this_node, msg, msg_len);
 }
 
 static void accord_block(void)
 {
-	add_event(ahandle, EVENT_NOTIFY, &this_node, NULL, 0, 1);
+	add_event(ahandle, EVENT_BLOCK, &this_node, NULL, 0);
 }
 
 static void accord_unblock(void *msg, size_t msg_len)
@@ -490,7 +493,7 @@ static void accord_unblock(void *msg, size_t msg_len)
 
 	acrd_queue_pop(ahandle, &ev);
 
-	ev.blocked = 0;
+	ev.type = EVENT_NOTIFY;
 	ev.buf_len = msg_len;
 	if (msg)
 		memcpy(ev.buf, msg, msg_len);
@@ -526,26 +529,24 @@ static void acrd_handler(int listen_fd, int events, void *data)
 		goto out;
 
 	switch (ev.type) {
-	case EVENT_JOIN:
-		if (ev.blocked) {
-			if (node_eq(&ev.nodes[0], &this_node)) {
-				res = sd_check_join_cb(&ev.sender, ev.buf);
-				ev.join_result = res;
-				ev.blocked = 0;
-
-				acrd_queue_push_back(ahandle, &ev);
-
-				if (res == CJ_RES_MASTER_TRANSFER) {
-					eprintf("failed to join sheepdog cluster: "
-						"please retry when master is up\n");
-					exit(1);
-				}
-			} else
-				acrd_queue_push_back(ahandle, NULL);
-
-			goto out;
+	case EVENT_JOIN_REQUEST:
+		if (!node_eq(&ev.nodes[0], &this_node)) {
+			acrd_queue_push_back(ahandle, NULL);
+			break;
 		}
 
+		res = sd_check_join_cb(&ev.sender, ev.buf);
+		ev.join_result = res;
+		ev.type = EVENT_JOIN_RESPONSE;
+		acrd_queue_push_back(ahandle, &ev);
+
+		if (res == CJ_RES_MASTER_TRANSFER) {
+			eprintf("failed to join sheepdog cluster: "
+				"please retry when master is up\n");
+			exit(1);
+		}
+		break;
+	case EVENT_JOIN_RESPONSE:
 		if (ev.join_result == CJ_RES_MASTER_TRANSFER) {
 			/* FIXME: This code is tricky, but Sheepdog assumes that */
 			/* nr_nodes = 1 when join_result = MASTER_TRANSFER... */
@@ -562,26 +563,22 @@ static void acrd_handler(int listen_fd, int events, void *data)
 	case EVENT_LEAVE:
 		sd_leave_handler(&ev.sender, ev.nodes, ev.nr_nodes);
 		break;
-	case EVENT_NOTIFY:
-		if (ev.blocked) {
-			if (node_cmp(&ev.sender, &this_node) == 0 && !ev.callbacked) {
-				ev.callbacked = 1;
+	case EVENT_BLOCK:
+		if (node_cmp(&ev.sender, &this_node) == 0 && !ev.callbacked) {
+			ev.callbacked = 1;
 
-				acrd_queue_push_back(ahandle, &ev);
-				sd_block_handler();
-			} else
-				acrd_queue_push_back(ahandle, NULL);
-
-			goto out;
+			acrd_queue_push_back(ahandle, &ev);
+			sd_block_handler();
+		} else {
+			acrd_queue_push_back(ahandle, NULL);
 		}
-
+		break;
+	case EVENT_NOTIFY:
 		sd_notify_handler(&ev.sender, ev.buf, ev.buf_len);
 		break;
 	}
 out:
 	pthread_mutex_unlock(&queue_lock);
-
-	return;
 }
 
 static int accord_init(const char *option, uint8_t *myaddr)
