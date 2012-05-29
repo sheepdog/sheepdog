@@ -170,7 +170,7 @@ done:
 	dprintf("recovered oid %"PRIx64" from %d to epoch %d\n", oid, tgt_epoch, epoch);
 out:
 	if (ret == SD_RES_SUCCESS)
-		check_and_insert_objlist_cache(oid);
+		objlist_cache_insert(oid);
 	free(buf);
 	return ret;
 }

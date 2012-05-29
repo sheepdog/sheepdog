@@ -188,15 +188,6 @@ static inline struct store_driver *find_store_driver(const char *name)
 	return NULL;
 }
 
-struct objlist_cache {
-	int tree_version;
-	int buf_version;
-	int cache_size;
-	struct strbuf buffer;
-	struct rb_root root;
-	pthread_rwlock_t lock;
-};
-
 extern struct cluster_info *sys;
 extern struct store_driver *sd_store;
 extern char *obj_path;
@@ -205,7 +196,6 @@ extern char *jrnl_path;
 extern char *epoch_path;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
-extern struct objlist_cache obj_list_cache;
 
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)
@@ -310,8 +300,8 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 int prealloc(int fd, uint32_t size);
 
 int init_objlist_cache(void);
-int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid);
-int check_and_insert_objlist_cache(uint64_t oid);
+int objlist_cache_insert(uint64_t oid);
+void objlist_cache_remove(uint64_t oid);
 
 void req_done(struct request *req);
 

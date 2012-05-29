@@ -26,6 +26,15 @@ struct objlist_cache_entry {
 	struct rb_node node;
 };
 
+struct objlist_cache {
+	int tree_version;
+	int buf_version;
+	int cache_size;
+	struct strbuf buffer;
+	struct rb_root root;
+	pthread_rwlock_t lock;
+};
+
 struct objlist_cache obj_list_cache = {
 			1, /* tree_version */
 			0, /* buf_version */
@@ -54,7 +63,7 @@ int init_objlist_cache(void)
 		sd_store->get_objlist(&iocb);
 
 		for (i = 0; i < iocb.length; i++)
-			check_and_insert_objlist_cache(buf[i]);
+			objlist_cache_insert(buf[i]);
 
 		free(buf);
 	}
@@ -86,7 +95,7 @@ static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
 	return NULL; /* insert successfully */
 }
 
-int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
+static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 {
 	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
@@ -109,7 +118,17 @@ int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 	return -1; /* fail to remove */
 }
 
-int check_and_insert_objlist_cache(uint64_t oid)
+void objlist_cache_remove(uint64_t oid)
+{
+	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	if (!objlist_cache_rb_remove(&obj_list_cache.root, oid)) {
+		obj_list_cache.cache_size--;
+		obj_list_cache.tree_version++;
+	}
+	pthread_rwlock_unlock(&obj_list_cache.lock);
+}
+
+int objlist_cache_insert(uint64_t oid)
 {
 	struct objlist_cache_entry *entry, *p;
 

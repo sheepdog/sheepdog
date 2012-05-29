@@ -724,12 +724,7 @@ static int store_remove_obj(struct request *req)
 		eprintf("%m\n");
 		ret =  SD_RES_EIO;
 	}
-	pthread_rwlock_wrlock(&obj_list_cache.lock);
-	if (!objlist_cache_rb_remove(&obj_list_cache.root, oid)) {
-		obj_list_cache.cache_size--;
-		obj_list_cache.tree_version++;
-	}
-	pthread_rwlock_unlock(&obj_list_cache.lock);
+	objlist_cache_remove(oid);
  out:
 	strbuf_release(&buf);
 	return ret;
@@ -849,7 +844,7 @@ static int store_create_and_write_obj(struct request *req)
 		ret = do_write_obj(&iocb, hdr, epoch, req->data, 1);
 
 	if (SD_RES_SUCCESS == ret)
-		check_and_insert_objlist_cache(oid);
+		objlist_cache_insert(oid);
 out:
 	if (buf)
 		free(buf);
