@@ -398,6 +398,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buff
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd, ret = SD_RES_SUCCESS;
 	struct strbuf buf;
+	struct flock fl;
 
 	strbuf_init(&buf, PATH_MAX);
 	strbuf_addstr(&buf, cache_dir);
@@ -412,13 +413,20 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buff
 		ret = SD_RES_EIO;
 		goto out;
 	}
-	if (flock(fd, LOCK_EX) < 0) {
-		ret = SD_RES_EIO;
+	fl.l_type = F_WRLCK;
+	fl.l_whence = SEEK_SET;
+	fl.l_start = 0;
+	fl.l_len = 0; /* 0 means EOF */
+	fl.l_pid = getpid();
+	if (fcntl(fd, F_SETLKW, &fl) < 0) {
 		eprintf("%m\n");
+		ret = SD_RES_EIO;
 		goto out_close;
 	}
 	ret = xpwrite(fd, buffer, buf_size, 0);
-	if (flock(fd, LOCK_UN) < 0) {
+
+	fl.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &fl) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out_close;
