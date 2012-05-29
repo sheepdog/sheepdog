@@ -446,18 +446,15 @@ out:
 }
 
 /* Fetch the object, cache it in success */
-int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
-		uint32_t idx)
+int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
+		      uint32_t idx)
 {
-	int i, fd, ret = SD_RES_NO_MEM;
-	unsigned wlen = 0, rlen, data_length, read_len;
+	struct request read_req;
+	struct sd_req *hdr = &read_req.rq;
+	int ret = SD_RES_NO_MEM;
 	uint64_t oid;
-	struct sd_req hdr = { 0 };
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct sd_vnode *v;
-	struct sd_vnode *vnodes[SD_MAX_COPIES];
+	uint32_t data_length;
 	void *buf;
-	int nr_copies;
 
 	if (idx & CACHE_VDI_BIT) {
 		oid = vid_to_vdi_oid(oc->vid);
@@ -472,66 +469,27 @@ int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
 		eprintf("failed to allocate memory\n");
 		goto out;
 	}
+	memset(&read_req, 0, sizeof(read_req));
+	hdr->opcode = SD_OP_READ_OBJ;
+	hdr->data_length = data_length;
+	hdr->epoch = sys_epoch();
 
-	/* Check if we can read locally */
-	nr_copies = get_nr_copies(vnode_info);
-	oid_to_vnodes(vnode_info, oid, nr_copies, vnodes);
+	hdr->obj.oid = oid;
+	hdr->obj.offset = 0;
+	hdr->obj.copies = get_nr_copies(vnodes);
 
-	for (i = 0; i < nr_copies; i++) {
-		v = vnodes[i];
-		if (vnode_is_local(v)) {
-			struct siocb iocb = { 0 };
-			iocb.epoch = sys_epoch();
-			iocb.buf = buf;
-			iocb.length = data_length;
-			iocb.offset = 0;
-			ret = sd_store->read(oid, &iocb);
-			if (ret != SD_RES_SUCCESS)
-				goto pull_remote;
-			/* read succeed */
-			read_len = iocb.length;
-			dprintf("[local] %08"PRIx32"\n", idx);
-			goto out;
-		}
+	read_req.data = buf;
+	read_req.op = get_sd_op(hdr->opcode);
+	read_req.vnodes = vnodes;
+
+	ret = forward_read_obj_req(&read_req);
+
+	if (ret == SD_RES_SUCCESS) {
+		dprintf("oid %"PRIx64"pulled successfully\n", oid);
+		ret = create_cache_object(oc, idx, buf, data_length);
 	}
-
-pull_remote:
-	/* Okay, no luck, let's read remotely */
-	for (i = 0; i < nr_copies; i++) {
-		v = vnodes[i];
-
-		if (vnode_is_local(v))
-			continue;
-
-		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.epoch = sys_epoch();
-		hdr.data_length = rlen = data_length;
-		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
-		hdr.obj.oid = oid;
-
-		fd = get_sheep_fd(v->addr, v->port, v->node_idx,
-				  hdr.epoch);
-		if (fd < 0)
-			continue;
-
-		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
-		if (ret) { /* network errors */
-			del_sheep_fd(fd);
-			ret = SD_RES_NETWORK_ERROR;
-		} else
-			ret = rsp->result;
-		read_len = rlen;
-
-		dprintf("[remote] %08"PRIx32", res:%"PRIx32"\n", idx, ret);
-		if (ret != SD_RES_SUCCESS)
-			continue;
-		else
-			break;
-	}
-out:
-	if (ret == SD_RES_SUCCESS)
-		ret = create_cache_object(oc, idx, buf, read_len);
 	free(buf);
+out:
 	return ret;
 }
 

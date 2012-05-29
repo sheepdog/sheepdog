@@ -629,94 +629,26 @@ static int local_trace_cat_ops(const struct sd_req *req, struct sd_rsp *rsp, voi
 	return SD_RES_SUCCESS;
 }
 
-static int read_copy_from_replica(struct request *req, uint32_t epoch,
+static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 				  uint64_t oid, char *buf)
 {
-	int i, j, nr_copies, ret;
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
-	struct sd_vnode *v;
-	char name[128];
-	int rounded_rand, local = -1;
+	struct request read_req;
+	struct sd_req *hdr = &read_req.rq;
 
-	nr_copies = get_nr_copies(req->vnodes);
-	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
+	memset(&read_req, 0, sizeof(read_req));
+	hdr->opcode = SD_OP_READ_OBJ;
+	hdr->data_length = SD_DATA_OBJ_SIZE;
+	hdr->epoch = epoch;
 
-	/* first try to read from local copy */
-	for (i = 0; i < nr_copies; i++) {
-		struct siocb iocb;
+	hdr->obj.oid = oid;
+	hdr->obj.offset = 0;
+	hdr->obj.copies = get_nr_copies(vnodes);
 
-		v = obj_vnodes[i];
-		addr_to_str(name, sizeof(name), v->addr, 0);
+	read_req.data = buf;
+	read_req.op = get_sd_op(hdr->opcode);
+	read_req.vnodes = vnodes;
 
-		if (vnode_is_local(v)) {
-			memset(&iocb, 0, sizeof(iocb));
-			iocb.epoch = epoch;
-			iocb.buf = buf;
-			iocb.length = SD_DATA_OBJ_SIZE;
-			iocb.offset = 0;
-			ret = sd_store->read(oid, &iocb);
-			if (ret != SD_RES_SUCCESS) {
-				local = i;
-				break;
-			}
-			goto out;
-		}
-	}
-
-	/* then read random copy from cluster for better load balance */
-	rounded_rand = random() % nr_copies;
-
-	for (i = 0; i < nr_copies; i++) {
-		unsigned wlen, rlen;
-		int fd;
-
-		j = (i + rounded_rand) % nr_copies;
-
-		/* bypass the local copy */
-		if (local == j)
-			continue;
-
-		v = obj_vnodes[j];
-		addr_to_str(name, sizeof(name), v->addr, 0);
-
-		fd = connect_to(name, v->port);
-		if (fd < 0)
-			continue;
-
-		rlen = SD_DATA_OBJ_SIZE;
-		wlen = 0;
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
-		hdr.epoch = epoch;
-		hdr.data_length = rlen;
-
-		hdr.obj.oid = oid;
-		hdr.obj.offset = 0;
-
-		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
-
-		close(fd);
-
-		if (ret) {
-			dprintf("%x, %x\n", ret, rsp->result);
-			continue;
-		}
-		switch (rsp->result) {
-		case SD_RES_SUCCESS:
-			ret = SD_RES_SUCCESS;
-			goto out;
-		default:
-			;
-		}
-	}
-
-	ret = rsp->result;
-out:
-	return ret;
+	return forward_read_obj_req(&read_req);
 }
 
 static int store_remove_obj(struct request *req)
@@ -735,7 +667,7 @@ static int store_remove_obj(struct request *req)
 		ret =  SD_RES_EIO;
 	}
 	objlist_cache_remove(oid);
- out:
+out:
 	strbuf_release(&buf);
 	return ret;
 }
@@ -836,7 +768,7 @@ static int store_create_and_write_obj(struct request *req)
 			goto out;
 		}
 		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
-			ret = read_copy_from_replica(req, hdr->epoch,
+			ret = read_copy_from_replica(req->vnodes, hdr->epoch,
 						     hdr->obj.cow_oid, buf);
 			if (ret != SD_RES_SUCCESS) {
 				eprintf("failed to read cow object\n");
