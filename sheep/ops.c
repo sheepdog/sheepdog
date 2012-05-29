@@ -641,20 +641,20 @@ static int local_trace_cat_ops(const struct sd_req *req, struct sd_rsp *rsp, voi
 static int read_copy_from_replica(struct request *req, uint32_t epoch,
 				  uint64_t oid, char *buf)
 {
-	int i, nr_copies, ret;
+	int i, j, nr_copies, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
+	struct sd_vnode *v;
+	char name[128];
+	int rounded_rand, local = -1;
 
 	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
+	/* first try to read from local copy */
 	for (i = 0; i < nr_copies; i++) {
-		struct sd_vnode *v;
 		struct siocb iocb;
-		char name[128];
-		unsigned wlen, rlen;
-		int fd;
 
 		v = obj_vnodes[i];
 		addr_to_str(name, sizeof(name), v->addr, 0);
@@ -666,10 +666,29 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 			iocb.length = SD_DATA_OBJ_SIZE;
 			iocb.offset = 0;
 			ret = sd_store->read(oid, &iocb);
-			if (ret != SD_RES_SUCCESS)
-				continue;
+			if (ret != SD_RES_SUCCESS) {
+				local = i;
+				break;
+			}
 			goto out;
 		}
+	}
+
+	/* then read random copy from cluster for better load balance */
+	rounded_rand = random() % nr_copies;
+
+	for (i = 0; i < nr_copies; i++) {
+		unsigned wlen, rlen;
+		int fd;
+
+		j = (i + rounded_rand) % nr_copies;
+
+		/* bypass the local copy */
+		if (local == j)
+			continue;
+
+		v = obj_vnodes[j];
+		addr_to_str(name, sizeof(name), v->addr, 0);
 
 		fd = connect_to(name, v->port);
 		if (fd < 0)
@@ -691,10 +710,10 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 
 		close(fd);
 
-		dprintf("%x, %x\n", ret, rsp->result);
-		if (ret)
+		if (ret) {
+			dprintf("%x, %x\n", ret, rsp->result);
 			continue;
-
+		}
 		switch (rsp->result) {
 		case SD_RES_SUCCESS:
 			ret = SD_RES_SUCCESS;
