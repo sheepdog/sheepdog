@@ -17,7 +17,7 @@
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
-#include <accord/accord.h>
+#include <accord.h>
 
 #include "cluster.h"
 #include "event.h"
