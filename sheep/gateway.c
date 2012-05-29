@@ -76,7 +76,7 @@ static int object_cache_handle_request(struct request *req)
 	return object_cache_rw(cache, idx, req);
 }
 
-static int forward_read_obj_req(struct request *req)
+int forward_read_obj_req(struct request *req)
 {
 	int i, fd, ret = SD_RES_SUCCESS;
 	unsigned wlen, rlen;

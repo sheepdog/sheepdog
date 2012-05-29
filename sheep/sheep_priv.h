@@ -258,6 +258,7 @@ void queue_cluster_request(struct request *req);
 void do_io_request(struct work *work);
 void do_gateway_request(struct work *work);
 int forward_write_obj_req(struct request *req);
+int forward_read_obj_req(struct request *req);
 
 int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	       struct sd_node *entries, int *nr_entries);
