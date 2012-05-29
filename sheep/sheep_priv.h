@@ -107,10 +107,6 @@ struct cluster_info {
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
 
-	/* this array contains a list of ordered virtual nodes */
-	struct sd_vnode vnodes[SD_MAX_VNODES];
-	int nr_vnodes;
-
 	struct list_head pending_list;
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
