@@ -412,7 +412,7 @@ static int get_cluster_status(struct sd_node *from,
 			      int nr_entries, uint64_t ctime, uint32_t epoch,
 			      uint32_t *status, uint8_t *inc_epoch)
 {
-	int i, j, ret = SD_RES_SUCCESS;
+	int ret = SD_RES_SUCCESS;
 	int nr, nr_local_entries, nr_leave_entries;
 	struct sd_node local_entries[SD_MAX_NODES];
 	char str[256];
@@ -452,18 +452,6 @@ static int get_cluster_status(struct sd_node *from,
 				*status = SD_STATUS_OK;
 			}
 			break;
-		}
-
-		for (i = 0; i < nr_local_entries; i++) {
-			if (node_eq(local_entries + i, from))
-				goto next;
-			for (j = 0; j < sys->nr_nodes; j++) {
-				if (node_eq(local_entries + i, sys->nodes + j))
-					goto next;
-			}
-			break;
-		next:
-			;
 		}
 
 		*status = SD_STATUS_OK;
