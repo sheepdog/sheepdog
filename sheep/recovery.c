@@ -488,6 +488,7 @@ static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_n
 	struct strbuf buf = STRBUF_INIT;
 	struct sd_vnode *vnodes[SD_MAX_COPIES];
 	int nr_objs;
+	size_t len;
 
 	nr_objs = get_nr_copies(rw->cur_vnodes);
 	for (i = 0; i < list_nr; i++) {
@@ -499,9 +500,9 @@ static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_n
 			}
 		}
 	}
-	memcpy(list, buf.buf, buf.len);
+	len = strbuf_copyout(&buf, list, list_nr * sizeof(uint64_t));
 
-	ret = buf.len / sizeof(uint64_t);
+	ret = len / sizeof(uint64_t);
 	dprintf("%d\n", ret);
 	strbuf_release(&buf);
 

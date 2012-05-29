@@ -307,7 +307,7 @@ static int local_get_store_list(struct request *req)
 	list_for_each_entry(driver, &store_drivers, list) {
 		strbuf_addf(&buf, "%s ", driver->name);
 	}
-	memcpy(req->data, buf.buf, buf.len);
+	strbuf_copyout(&buf, req->data, req->data_length);
 
 	strbuf_release(&buf);
 	return SD_RES_SUCCESS;

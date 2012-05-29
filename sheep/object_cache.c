@@ -711,7 +711,7 @@ int object_cache_init(const char *p)
 			goto err;
 		}
 	}
-	memcpy(cache_dir, buf.buf, buf.len);
+	strbuf_copyout(&buf, cache_dir, sizeof(cache_dir));
 err:
 	strbuf_release(&buf);
 	return ret;

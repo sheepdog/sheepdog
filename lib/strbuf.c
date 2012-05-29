@@ -187,3 +187,11 @@ int strbuf_getline(struct strbuf *sb, FILE *fp, int term)
 		strbuf_setlen(sb, sb->len-1);
 	return 0;
 }
+
+int strbuf_copyout(struct strbuf *sb, void *buf, size_t len)
+{
+	len = min(len, sb->len + 1);
+	memcpy(buf, sb->buf, len);
+
+	return len;
+}

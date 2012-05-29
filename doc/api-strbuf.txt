@@ -197,3 +197,9 @@ same behaviour as well.
 	Reading stops after the terminator or at EOF.  The terminator
 	is removed from the buffer before returning.  Returns 0 unless
 	there was nothing left before EOF, in which case it returns `EOF`.
+
+`strbuf_copyout`::
+
+	Copy the contents of the strbuf to the second argument 'buf'.
+	The number of bytes to be copied is at most the third argument
+	'len'.

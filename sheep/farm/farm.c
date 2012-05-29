@@ -41,7 +41,7 @@ static int create_directory(char *p)
 	}
 
 	if (!strlen(farm_dir))
-		memcpy(farm_dir, buf.buf, buf.len);
+		strbuf_copyout(&buf, farm_dir, sizeof(farm_dir));
 
 	strbuf_addstr(&buf, "/objects");
 	if (mkdir(buf.buf, 0755) < 0) {
@@ -64,7 +64,7 @@ static int create_directory(char *p)
 	}
 
 	if (!strlen(farm_obj_dir))
-		memcpy(farm_obj_dir, buf.buf, buf.len);
+		strbuf_copyout(&buf, farm_obj_dir, sizeof(farm_obj_dir));
 err:
 	strbuf_release(&buf);
 	return ret;
