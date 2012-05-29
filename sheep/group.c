@@ -587,9 +587,8 @@ static void log_last_epoch(struct join_message *msg, struct sd_node *joined,
 			if (!node_eq(nodes + i, joined))
 				old_nodes[count++] = nodes[i];
 		}
-		qsort(old_nodes, count, sizeof(struct sd_node), node_cmp);
-
-		update_epoch_log(sys->epoch, old_nodes, count);
+		update_node_info(old_nodes, count);
+		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	}
 }
 
