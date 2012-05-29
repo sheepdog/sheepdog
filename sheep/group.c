@@ -91,7 +91,7 @@ static size_t get_join_message_size(struct join_message *jm)
 	return sizeof(*jm) + jm->nr_nodes * sizeof(jm->nodes[0]);
 }
 
-int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
+static int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 {
 	int nr_zones = 0, i, j;
 	uint32_t zones[SD_MAX_REDUNDANCY];
@@ -117,6 +117,21 @@ int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 	}
 
 	return nr_zones;
+}
+
+bool have_enough_zones(void)
+{
+	int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
+
+	dprintf("flags %d, nr_zones %d, copies %d\n", sys->flags, nr_zones,
+		sys->nr_copies);
+
+	if (sys_flag_nohalt())
+		return true;
+
+	if (nr_zones >= sys->nr_copies)
+		return true;
+	return false;
 }
 
 /*

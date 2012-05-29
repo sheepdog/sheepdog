@@ -251,17 +251,10 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	set_cluster_copies(sys->nr_copies);
 	set_cluster_flags(sys->flags);
-
-	if (sys_flag_nohalt())
+	if (have_enough_zones())
 		sys_stat_set(SD_STATUS_OK);
-	else {
-		int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-
-		if (nr_zones >= sys->nr_copies)
-			sys_stat_set(SD_STATUS_OK);
-		else
-			sys_stat_set(SD_STATUS_HALT);
-	}
+	else
+		sys_stat_set(SD_STATUS_HALT);
 
 	return SD_RES_SUCCESS;
 }
@@ -453,7 +446,7 @@ static int local_get_epoch(struct request *req)
 static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data)
 {
-	int s, nr_zones = 0, ret = SD_RES_SUCCESS;
+	int ret = SD_RES_SUCCESS;
 	uint8_t c;
 	uint16_t f;
 
@@ -477,16 +470,6 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->nr_copies = c;
 	sys->flags = f;
 
-	s = SD_STATUS_OK;
-	if (!sys_flag_nohalt()) {
-		nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-		if (nr_zones < sys->nr_copies)
-			s = SD_STATUS_HALT;
-	}
-
-	dprintf("flags %d, nr_zones %d, copies %d\n", sys->flags, nr_zones,
-		sys->nr_copies);
-
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
 	ret = update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
 	if (ret) {
@@ -494,7 +477,11 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 		sys->epoch--;
 		goto out;
 	}
-	sys_stat_set(s);
+
+	if (have_enough_zones())
+		sys_stat_set(SD_STATUS_OK);
+	else
+		sys_stat_set(SD_STATUS_HALT);
 out:
 	return ret;
 }
