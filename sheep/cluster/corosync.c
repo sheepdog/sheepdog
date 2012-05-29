@@ -40,8 +40,10 @@ static int join_finished;
 
 /* event types which are dispatched in corosync_dispatch() */
 enum corosync_event_type {
-	COROSYNC_EVENT_TYPE_JOIN,
+	COROSYNC_EVENT_TYPE_JOIN_REQUEST,
+	COROSYNC_EVENT_TYPE_JOIN_RESPONSE,
 	COROSYNC_EVENT_TYPE_LEAVE,
+	COROSYNC_EVENT_TYPE_BLOCK,
 	COROSYNC_EVENT_TYPE_NOTIFY,
 };
 
@@ -66,7 +68,6 @@ struct corosync_event {
 	uint32_t nr_nodes;
 	struct cpg_node nodes[SD_MAX_NODES];
 
-	int blocked;
 	int callbacked;
 
 	struct list_head list;
@@ -196,15 +197,12 @@ retry:
 	return 0;
 }
 
-static struct corosync_event *find_block_event(enum corosync_event_type type,
-					       struct cpg_node *sender)
+static struct corosync_event *find_event(enum corosync_event_type type,
+		struct cpg_node *sender)
 {
 	struct corosync_event *cevent;
 
 	list_for_each_entry(cevent, &corosync_event_list, list) {
-		if (!cevent->blocked)
-			continue;
-
 		if (cevent->type == type &&
 		    cpg_node_equal(&cevent->sender, sender))
 			return cevent;
@@ -254,37 +252,35 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 	int idx;
 
 	switch (cevent->type) {
-	case COROSYNC_EVENT_TYPE_JOIN:
-		if (cevent->blocked) {
-			if (is_master(&this_node) < 0)
-				return 0;
-
-			if (!cevent->msg)
-				/* we haven't receive JOIN_REQUEST yet */
-				return 0;
-
-			if (cevent->callbacked)
-				/* check_join() must be called only once */
-				return 0;
-
-			res = sd_check_join_cb(&cevent->sender.ent,
-						     cevent->msg);
-			if (res == CJ_RES_MASTER_TRANSFER)
-				nr_cpg_nodes = 0;
-
-			send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, res,
-				     &cevent->sender, cpg_nodes, nr_cpg_nodes,
-				     cevent->msg, cevent->msg_len);
-
-			if (res == CJ_RES_MASTER_TRANSFER) {
-				eprintf("failed to join sheepdog cluster: please retry when master is up\n");
-				exit(1);
-			}
-
-			cevent->callbacked = 1;
+	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
+		if (is_master(&this_node) < 0)
 			return 0;
+
+		if (!cevent->msg)
+			/* we haven't receive JOIN_REQUEST yet */
+			return 0;
+
+		if (cevent->callbacked)
+			/* check_join() must be called only once */
+			return 0;
+
+		res = sd_check_join_cb(&cevent->sender.ent,
+						     cevent->msg);
+		if (res == CJ_RES_MASTER_TRANSFER)
+			nr_cpg_nodes = 0;
+
+		send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, res,
+			     &cevent->sender, cpg_nodes, nr_cpg_nodes,
+			     cevent->msg, cevent->msg_len);
+
+		if (res == CJ_RES_MASTER_TRANSFER) {
+			eprintf("failed to join sheepdog cluster: please retry when master is up\n");
+			exit(1);
 		}
 
+		cevent->callbacked = 1;
+		return 0;
+	case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
 		switch (cevent->result) {
 		case CJ_RES_SUCCESS:
 		case CJ_RES_MASTER_TRANSFER:
@@ -311,18 +307,16 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
 		sd_leave_handler(&cevent->sender.ent, entries, nr_cpg_nodes);
 		break;
-	case COROSYNC_EVENT_TYPE_NOTIFY:
-		if (cevent->blocked) {
-			if (cpg_node_equal(&cevent->sender, &this_node) &&
-			    !cevent->callbacked) {
-				sd_block_handler();
-				cevent->callbacked = 1;
-			}
-
-			/* block the rest messages until unblock message comes */
-			return 0;
+	case COROSYNC_EVENT_TYPE_BLOCK:
+		if (cpg_node_equal(&cevent->sender, &this_node) &&
+		    !cevent->callbacked) {
+			sd_block_handler();
+			cevent->callbacked = 1;
 		}
 
+		/* block the rest messages until unblock message comes */
+		return 0;
+	case COROSYNC_EVENT_TYPE_NOTIFY:
 		sd_notify_handler(&cevent->sender.ent, cevent->msg,
 						 cevent->msg_len);
 		break;
@@ -334,32 +328,46 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 static void __corosync_dispatch(void)
 {
 	struct corosync_event *cevent;
-	int done;
 
 	while (!list_empty(&corosync_event_list)) {
 		cevent = list_first_entry(&corosync_event_list, typeof(*cevent), list);
 
 		/* update join status */
-		if (!join_finished && cevent->type == COROSYNC_EVENT_TYPE_JOIN) {
-			if (cevent->blocked && self_elect) {
-				join_finished = 1;
-				nr_cpg_nodes = 0;
-			}
-			if (!cevent->blocked && cpg_node_equal(&cevent->sender, &this_node)) {
-				join_finished = 1;
-				nr_cpg_nodes = cevent->nr_nodes;
-				memcpy(cpg_nodes, cevent->nodes,
-				       sizeof(*cevent->nodes) * cevent->nr_nodes);
+		if (!join_finished) {
+			switch (cevent->type) {
+			case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
+				if (self_elect) {
+					join_finished = 1;
+					nr_cpg_nodes = 0;
+				}
+				break;
+			case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
+				if (cpg_node_equal(&cevent->sender,
+						   &this_node)) {
+					join_finished = 1;
+					nr_cpg_nodes = cevent->nr_nodes;
+					memcpy(cpg_nodes, cevent->nodes,
+					       sizeof(*cevent->nodes) *
+					       cevent->nr_nodes);
+				}
+				break;
+			default:
+				break;
 			}
 		}
 
-		if (join_finished)
-			done = __corosync_dispatch_one(cevent);
-		else
-			done = !cevent->blocked;
-
-		if (!done)
-			break;
+		if (join_finished) {
+			if (!__corosync_dispatch_one(cevent))
+				return;
+		} else {
+			switch (cevent->type) {
+			case COROSYNC_MSG_TYPE_JOIN_REQUEST:
+			case COROSYNC_MSG_TYPE_BLOCK:
+				return;
+			default:
+				break;
+			}
+		}
 
 		list_del(&cevent->list);
 		free(cevent->msg);
@@ -367,13 +375,12 @@ static void __corosync_dispatch(void)
 	}
 }
 
-static struct corosync_event *update_block_event(enum corosync_event_type type,
-						 struct cpg_node *sender,
-						 void *msg, size_t msg_len)
+static struct corosync_event *update_event(enum corosync_event_type type,
+		struct cpg_node *sender, void *msg, size_t msg_len)
 {
 	struct corosync_event *cevent;
 
-	cevent = find_block_event(type, sender);
+	cevent = find_event(type, sender);
 	if (!cevent)
 		/* block message was casted before this node joins */
 		return NULL;
@@ -405,8 +412,8 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 	switch (cmsg->type) {
 	case COROSYNC_MSG_TYPE_JOIN_REQUEST:
-		cevent = update_block_event(COROSYNC_EVENT_TYPE_JOIN, &cmsg->sender,
-					    cmsg->msg, cmsg->msg_len);
+		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
+				      &cmsg->sender, cmsg->msg, cmsg->msg_len);
 		if (!cevent)
 			break;
 
@@ -419,7 +426,11 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		if (!cevent)
 			panic("failed to allocate memory\n");
 
-		cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
+		if (cmsg->type == COROSYNC_MSG_TYPE_BLOCK)
+			cevent->type = COROSYNC_EVENT_TYPE_BLOCK;
+		else
+			cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
+
 		cevent->sender = cmsg->sender;
 		cevent->msg_len = cmsg->msg_len;
 		if (cmsg->msg_len) {
@@ -430,8 +441,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		} else
 			cevent->msg = NULL;
 
-		if (cmsg->type == COROSYNC_MSG_TYPE_BLOCK)
-			cevent->blocked = 1;
 
 		list_add_tail(&cevent->list, &corosync_event_list);
 		break;
@@ -459,13 +468,12 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		list_add_tail(&cevent->list, &corosync_event_list);
 		break;
 	case COROSYNC_MSG_TYPE_JOIN_RESPONSE:
-		cevent = update_block_event(COROSYNC_EVENT_TYPE_JOIN, &cmsg->sender,
-					    cmsg->msg, cmsg->msg_len);
+		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
+				      &cmsg->sender, cmsg->msg, cmsg->msg_len);
 		if (!cevent)
 			break;
 
-		cevent->blocked = 0;
-
+		cevent->type = COROSYNC_EVENT_TYPE_JOIN_RESPONSE;
 		cevent->result = cmsg->result;
 		cevent->nr_nodes = cmsg->nr_nodes;
 		memcpy(cevent->nodes, cmsg->nodes,
@@ -473,12 +481,12 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 		break;
 	case COROSYNC_MSG_TYPE_UNBLOCK:
-		cevent = update_block_event(COROSYNC_EVENT_TYPE_NOTIFY,
-					    &cmsg->sender, cmsg->msg, cmsg->msg_len);
+		cevent = update_event(COROSYNC_EVENT_TYPE_BLOCK, &cmsg->sender,
+				      cmsg->msg, cmsg->msg_len);
 		if (!cevent)
 			break;
 
-		cevent->blocked = 0;
+		cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
 		break;
 	}
 
@@ -524,8 +532,8 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
 		int master;
-		cevent = find_block_event(COROSYNC_EVENT_TYPE_JOIN,
-					  left_sheep + i);
+		cevent = find_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
+				    left_sheep + i);
 		if (cevent) {
 			/* the node left before joining */
 			list_del(&cevent->list);
@@ -534,8 +542,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 			continue;
 		}
 
-		cevent = find_block_event(COROSYNC_EVENT_TYPE_NOTIFY,
-					  left_sheep + i);
+		cevent = find_event(COROSYNC_EVENT_TYPE_BLOCK, left_sheep + i);
 		if (cevent) {
 			/* the node left before sending UNBLOCK */
 			list_del(&cevent->list);
@@ -566,9 +573,8 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		if (!cevent)
 			panic("failed to allocate memory\n");
 
-		cevent->type = COROSYNC_EVENT_TYPE_JOIN;
+		cevent->type = COROSYNC_EVENT_TYPE_JOIN_REQUEST;
 		cevent->sender = joined_sheep[i];
-		cevent->blocked = 1; /* FIXME: add explanation */
 		list_add_tail(&cevent->list, &corosync_event_list);
 	}
 
@@ -578,8 +584,8 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		 * all other members, because events are ordered.
 		 */
 		for (i = 0; i < member_list_entries; i++) {
-			cevent = find_block_event(COROSYNC_EVENT_TYPE_JOIN,
-					&member_sheep[i]);
+			cevent = find_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
+					    &member_sheep[i]);
 			if (!cevent) {
 				dprintf("Not promoting because member is "
 					"not in our event list.\n");
