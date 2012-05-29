@@ -653,6 +653,8 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 static void update_cluster_info(struct join_message *msg,
 		struct sd_node *joined, struct sd_node *nodes, size_t nr_nodes)
 {
+	struct node *n, *t;
+
 	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status,
 		msg->epoch, msg->result, sys->join_finished);
 
@@ -677,6 +679,34 @@ static void update_cluster_info(struct join_message *msg,
 			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
 		}
+	}
+
+	if (!sys_stat_ok() &&
+	    (msg->cluster_status == SD_STATUS_OK ||
+	     msg->cluster_status != SD_STATUS_HALT)) {
+		int array_len = nr_nodes * sizeof(struct sd_node);
+		struct vdi_bitmap_work *w;
+
+		w = xmalloc(sizeof(*w) + array_len);
+		w->nr_members = nr_nodes;
+		memcpy(w->members, nodes, array_len);
+
+		w->work.fn = do_get_vdi_bitmap;
+		w->work.done = get_vdi_bitmap_done;
+		queue_work(sys->block_wqueue, &w->work);
+	}
+
+	sys_stat_set(msg->cluster_status);
+
+	if (sys_can_recover() && msg->inc_epoch) {
+		list_for_each_entry_safe(n, t, &sys->leave_list, list)
+			list_del(&n->list);
+		start_recovery(sys->epoch);
+	}
+
+	if (sys_stat_halt()) {
+		if (current_vnode_info->nr_zones >= sys->nr_copies)
+			sys_stat_set(SD_STATUS_OK);
 	}
 }
 
@@ -834,7 +864,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 {
 	int i;
 	int nr, nr_local, nr_leave;
-	struct node *n, *t;
+	struct node *n;
 	struct join_message *jm = opaque;
 	uint32_t le = get_latest_epoch();
 
@@ -860,34 +890,6 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 			break;
 
 		update_cluster_info(jm, joined, members, nr_members);
-
-		if (!sys_stat_ok() &&
-		    (jm->cluster_status == SD_STATUS_OK ||
-		     jm->cluster_status != SD_STATUS_HALT)) {
-			int array_len = nr_members * sizeof(struct sd_node);
-			struct vdi_bitmap_work *w;
-
-			w = xmalloc(sizeof(*w) + array_len);
-			w->nr_members = nr_members;
-			memcpy(w->members, members, array_len);
-
-			w->work.fn = do_get_vdi_bitmap;
-			w->work.done = get_vdi_bitmap_done;
-			queue_work(sys->block_wqueue, &w->work);
-		}
-
-		sys_stat_set(jm->cluster_status);
-
-		if (sys_can_recover() && jm->inc_epoch) {
-			list_for_each_entry_safe(n, t, &sys->leave_list, list)
-				list_del(&n->list);
-			start_recovery(sys->epoch);
-		}
-
-		if (sys_stat_halt()) {
-			if (current_vnode_info->nr_zones >= sys->nr_copies)
-				sys_stat_set(SD_STATUS_OK);
-		}
 
 		if (node_eq(joined, &sys->this_node))
 			/* this output is used for testing */
