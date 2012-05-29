@@ -245,7 +245,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->epoch = 1;
 	sys->recovered_epoch = 1;
 
-	ret = update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+	ret = log_current_epoch();
 	if (ret)
 		return SD_RES_EIO;
 
@@ -333,15 +333,19 @@ static int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 			       void *data)
 {
 	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)rsp;
+	struct vnode_info *vnode_info;
 	int nr_nodes;
 
-	nr_nodes = sys->nr_nodes;
-	memcpy(data, sys->nodes, sizeof(*sys->nodes) * nr_nodes);
+	vnode_info = get_vnode_info();
+	nr_nodes = vnode_info->nr_nodes;
+
+	memcpy(data, vnode_info->nodes, sizeof(struct sd_node) * nr_nodes);
 	node_rsp->data_length = nr_nodes * sizeof(struct sd_node);
 	node_rsp->nr_nodes = nr_nodes;
 	node_rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
 	node_rsp->master_idx = -1;
 
+	put_vnode_info(vnode_info);
 	return SD_RES_SUCCESS;
 }
 
@@ -471,7 +475,7 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->flags = f;
 
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
-	ret = update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+	ret = log_current_epoch();
 	if (ret) {
 		ret = SD_RES_EIO;
 		sys->epoch--;

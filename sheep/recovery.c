@@ -37,11 +37,6 @@ struct recovery_work {
 	int count;
 	uint64_t *oids;
 
-	int old_nr_nodes;
-	struct sd_node old_nodes[SD_MAX_NODES];
-	int cur_nr_nodes;
-	struct sd_node cur_nodes[SD_MAX_NODES];
-
 	struct vnode_info *old_vnodes;
 	struct vnode_info *cur_vnodes;
 };
@@ -212,8 +207,8 @@ again:
 	for (i = 0; i < nr_copies; i++) {
 		struct sd_vnode *tgt_vnode = oid_to_vnode(old, oid, i);
 
-		if (is_invalid_vnode(tgt_vnode, rw->cur_nodes,
-				     rw->cur_nr_nodes))
+		if (is_invalid_vnode(tgt_vnode, rw->cur_vnodes->nodes,
+				     rw->cur_vnodes->nr_nodes))
 			continue;
 		ret = recover_object_from_replica(oid, tgt_vnode,
 						  epoch, tgt_epoch);
@@ -548,10 +543,8 @@ static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_n
 
 static int newly_joined(struct sd_node *node, struct recovery_work *rw)
 {
-	struct sd_node *old = rw->old_nodes;
-	int old_nr = rw->old_nr_nodes;
-
-	if (bsearch(node, old, old_nr, sizeof(struct sd_node), node_cmp))
+	if (bsearch(node, rw->old_vnodes->nodes, rw->old_vnodes->nr_nodes,
+		    sizeof(struct sd_node), node_cmp))
 		return 0;
 	return 1;
 }
@@ -562,8 +555,8 @@ static int fill_obj_list(struct recovery_work *rw)
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
 	int retry_cnt;
-	struct sd_node *cur = rw->cur_nodes;
-	int cur_nr = rw->cur_nr_nodes;
+	struct sd_node *cur = rw->cur_vnodes->nodes;
+	int cur_nr = rw->cur_vnodes->nr_nodes;
 	int start = random() % cur_nr;
 	int end = cur_nr;
 
@@ -621,29 +614,23 @@ again:
 /* setup node list and virtual node list */
 static int init_rw(struct recovery_work *rw)
 {
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
 	uint32_t epoch = rw->epoch;
 
-	rw->cur_nr_nodes = epoch_log_read_nr(epoch, (char *)rw->cur_nodes,
-					     sizeof(rw->cur_nodes));
-	qsort(rw->cur_nodes, rw->cur_nr_nodes, sizeof(struct sd_node),
-		  node_cmp);
-
-	if (rw->cur_nr_nodes <= 0) {
+	nr_nodes = epoch_log_read_nr(epoch, (char *)nodes, sizeof(nodes));
+	if (nr_nodes <= 0) {
 		eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch);
 		return -1;
 	}
+	rw->cur_vnodes = alloc_vnode_info(nodes, nr_nodes);
 
-	rw->old_nr_nodes = epoch_log_read_nr(epoch - 1, (char *)rw->old_nodes,
-					     sizeof(rw->old_nodes));
-	if (rw->old_nr_nodes <= 0) {
+	nr_nodes = epoch_log_read_nr(epoch - 1, (char *)nodes, sizeof(nodes));
+	if (nr_nodes <= 0) {
 		eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch - 1);
 		return -1;
 	}
-	qsort(rw->old_nodes, rw->old_nr_nodes, sizeof(struct sd_node),
-		  node_cmp);
-
-	rw->old_vnodes = alloc_vnode_info(rw->old_nodes, rw->old_nr_nodes);
-	rw->cur_vnodes = alloc_vnode_info(rw->cur_nodes, rw->cur_nr_nodes);
+	rw->old_vnodes = alloc_vnode_info(nodes, nr_nodes);
 	return 0;
 }
 
@@ -656,8 +643,7 @@ static void do_recovery_work(struct work *work)
 	if (!sys->nr_copies)
 		return;
 
-	if (rw->cur_nr_nodes == 0)
-		init_rw(rw);
+	init_rw(rw);
 
 	if (fill_obj_list(rw) < 0) {
 		eprintf("fatal recovery error\n");

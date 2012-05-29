@@ -50,8 +50,16 @@ struct client_info {
 	int refcnt;
 };
 
-struct request;
-struct vnode_info;
+struct vnode_info {
+	struct sd_vnode vnodes[SD_MAX_VNODES];
+	int nr_vnodes;
+
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
+
+	int nr_zones;
+	int refcnt;
+};
 
 struct request {
 	struct sd_req rq;
@@ -255,6 +263,7 @@ int read_epoch(uint32_t *epoch, uint64_t *ctime,
 	       struct sd_node *entries, int *nr_entries);
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
+int log_current_epoch(void);
 
 int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);

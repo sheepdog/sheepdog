@@ -31,13 +31,6 @@ struct node {
 	struct list_head list;
 };
 
-struct vnode_info {
-	struct sd_vnode entries[SD_MAX_VNODES];
-	int nr_vnodes;
-	int nr_zones;
-	int refcnt;
-};
-
 struct join_message {
 	uint8_t proto_ver;
 	uint8_t nr_copies;
@@ -121,15 +114,16 @@ static int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 
 bool have_enough_zones(void)
 {
-	int nr_zones = get_zones_nr_from(sys->nodes, sys->nr_nodes);
-
-	dprintf("flags %d, nr_zones %d, copies %d\n", sys->flags, nr_zones,
-		sys->nr_copies);
-
 	if (sys_flag_nohalt())
 		return true;
 
-	if (nr_zones >= sys->nr_copies)
+	if (!current_vnode_info)
+		return false;
+
+	dprintf("flags %d, nr_zones %d, copies %d\n",
+		sys->flags, current_vnode_info->nr_zones, sys->nr_copies);
+
+	if (current_vnode_info->nr_zones >= sys->nr_copies)
 		return true;
 	return false;
 }
@@ -190,10 +184,10 @@ void put_vnode_info(struct vnode_info *vnode_info)
 struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
 		int copy_idx)
 {
-	int idx = obj_to_sheep(vnode_info->entries, vnode_info->nr_vnodes,
+	int idx = obj_to_sheep(vnode_info->vnodes, vnode_info->nr_vnodes,
 			oid, copy_idx);
 
-	return &vnode_info->entries[idx];
+	return &vnode_info->vnodes[idx];
 }
 
 void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
@@ -201,12 +195,12 @@ void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
 {
 	int idx_buf[SD_MAX_COPIES], i, n;
 
-	obj_to_sheeps(vnode_info->entries, vnode_info->nr_vnodes,
+	obj_to_sheeps(vnode_info->vnodes, vnode_info->nr_vnodes,
 			oid, nr_copies, idx_buf);
 
 	for (i = 0; i < nr_copies; i++) {
 		n = idx_buf[i];
-		vnodes[i] = &vnode_info->entries[n];
+		vnodes[i] = &vnode_info->vnodes[n];
 	}
 }
 
@@ -214,9 +208,16 @@ struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes)
 {
 	struct vnode_info *vnode_info;
 
+	print_node_list(nodes, nr_nodes);
+
 	vnode_info = xzalloc(sizeof(*vnode_info));
+
+	vnode_info->nr_nodes = nr_nodes;
+	memcpy(vnode_info->nodes, nodes, sizeof(*nodes) * nr_nodes);
+	qsort(vnode_info->nodes, nr_nodes, sizeof(*nodes), node_cmp);
+
 	vnode_info->nr_vnodes = nodes_to_vnodes(nodes, nr_nodes,
-						vnode_info->entries);
+						vnode_info->vnodes);
 	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
 	uatomic_set(&vnode_info->refcnt, 1);
 	return vnode_info;
@@ -452,7 +453,11 @@ static int get_cluster_status(struct sd_node *from,
 			ret = SD_RES_NOT_FORMATTED;
 		break;
 	case SD_STATUS_WAIT_FOR_JOIN:
-		nr = sys->nr_nodes + 1;
+		if (!current_vnode_info)
+			nr = 1;
+		else
+			nr = current_vnode_info->nr_nodes + 1;
+
 		nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
 						  sizeof(local_entries));
 
@@ -562,16 +567,12 @@ static void get_vdi_bitmap_done(struct work *work)
 	free(w);
 }
 
-static void update_node_info(struct sd_node *nodes, size_t nr_nodes)
+int log_current_epoch(void)
 {
-	print_node_list(nodes, nr_nodes);
-
-	sys->nr_nodes = nr_nodes;
-	memcpy(sys->nodes, nodes, sizeof(*sys->nodes) * sys->nr_nodes);
-	qsort(sys->nodes, sys->nr_nodes, sizeof(*sys->nodes), node_cmp);
-
-	put_vnode_info(current_vnode_info);
-	current_vnode_info = alloc_vnode_info(sys->nodes, sys->nr_nodes);
+	if (!current_vnode_info)
+		return update_epoch_log(sys->epoch, NULL, 0);
+	return update_epoch_log(sys->epoch, current_vnode_info->nodes,
+				current_vnode_info->nr_nodes);
 }
 
 static void log_last_epoch(struct join_message *msg, struct sd_node *joined,
@@ -587,8 +588,9 @@ static void log_last_epoch(struct join_message *msg, struct sd_node *joined,
 			if (!node_eq(nodes + i, joined))
 				old_nodes[count++] = nodes[i];
 		}
-		update_node_info(old_nodes, count);
-		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+		put_vnode_info(current_vnode_info);
+		current_vnode_info = alloc_vnode_info(old_nodes, count);
+		log_current_epoch();
 	}
 }
 
@@ -660,13 +662,14 @@ static void update_cluster_info(struct join_message *msg,
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 
-	update_node_info(nodes, nr_nodes);
+	put_vnode_info(current_vnode_info);
+	current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
 
 	if (msg->cluster_status == SD_STATUS_OK ||
 	    msg->cluster_status == SD_STATUS_HALT) {
 		if (msg->inc_epoch) {
 			uatomic_inc(&sys->epoch);
-			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+			log_current_epoch();
 		}
 		/* Fresh node */
 		if (!sys_stat_ok() && !sys_stat_halt()) {
@@ -915,7 +918,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		dprintf("%d == %d + %d\n", nr_local, nr, nr_leave);
 		if (nr_local == nr + nr_leave) {
 			sys_stat_set(SD_STATUS_OK);
-			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+			log_current_epoch();
 		}
 		break;
 	case CJ_RES_MASTER_TRANSFER:
@@ -940,9 +943,10 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		 */
 		if (!sys->join_finished) {
 			sys->join_finished = 1;
-			assert(sys->nr_nodes == 0);
-			update_node_info(&sys->this_node, 1);
 			sys->epoch = get_latest_epoch();
+
+			put_vnode_info(current_vnode_info);
+			current_vnode_info = alloc_vnode_info(&sys->this_node, 1);
 		}
 
 		nr_local = get_nodes_nr_epoch(sys->epoch);
@@ -952,7 +956,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		dprintf("%d == %d + %d\n", nr_local, nr, nr_leave);
 		if (nr_local == nr + nr_leave) {
 			sys_stat_set(SD_STATUS_OK);
-			update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+			log_current_epoch();
 		}
 
 		if (node_eq(joined, &sys->this_node))
@@ -974,11 +978,12 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 	if (sys_stat_shutdown())
 		return;
 
-	update_node_info(members, nr_members);
+	put_vnode_info(current_vnode_info);
+	current_vnode_info = alloc_vnode_info(members, nr_members);
 
 	if (sys_can_recover()) {
 		uatomic_inc(&sys->epoch);
-		update_epoch_log(sys->epoch, sys->nodes, sys->nr_nodes);
+		log_current_epoch();
 		start_recovery(sys->epoch);
 	}
 
