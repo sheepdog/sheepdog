@@ -291,7 +291,7 @@ void sd_block_handler(void)
  * Must run in the main thread as it access unlocked state like
  * sys->pending_list.
  */
-static void queue_cluster_request(struct request *req)
+void queue_cluster_request(struct request *req)
 {
 	eprintf("%p %x\n", req, req->rq.opcode);
 
@@ -874,27 +874,16 @@ void process_request_event_queues(void)
 	list_for_each_entry_safe(req, n, &sys->request_queue, request_list) {
 		list_del(&req->request_list);
 
-		if (is_io_op(req->op)) {
-			list_add_tail(&req->request_list,
-				      &sys->outstanding_req_list);
+		list_add_tail(&req->request_list,
+			      &sys->outstanding_req_list);
 
-			if (need_consistency_check(req))
-				set_consistency_check(req);
+		if (need_consistency_check(req))
+			set_consistency_check(req);
 
-			if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
-				queue_work(sys->io_wqueue, &req->work);
-			else
-				queue_work(sys->gateway_wqueue, &req->work);
-		} else if (is_cluster_op(req->op)) {
-			/*
-			 * Cluster requests are handed off to the cluster driver
-			 * directly from the main thread.  It's the cluster
-			 * drivers job to ensure we avoid blocking on I/O here.
-			 */
-			queue_cluster_request(req);
-		} else { /* is_local_op(req->op) */
+		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
 			queue_work(sys->io_wqueue, &req->work);
-		}
+		else
+			queue_work(sys->gateway_wqueue, &req->work);
 	}
 }
 

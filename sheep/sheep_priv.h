@@ -245,6 +245,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes);
 int leave_cluster(void);
 
 void process_request_event_queues(void);
+void queue_cluster_request(struct request *req);
 void do_io_request(struct work *work);
 void do_gateway_request(struct work *work);
 int forward_write_obj_req(struct request *req);

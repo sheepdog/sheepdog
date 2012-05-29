@@ -291,6 +291,31 @@ void resume_wait_obj_requests(uint64_t oid)
 	process_request_event_queues();
 }
 
+static void queue_io_request(struct request *req)
+{
+	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
+		req->work.fn = do_io_request;
+		req->work.done = io_op_done;
+	} else {
+		req->work.fn = do_gateway_request;
+		req->work.done = io_op_done;
+	}
+
+	setup_access_to_local_objects(req);
+	if (check_request(req) < 0)
+		return;
+
+	list_add_tail(&req->request_list, &sys->request_queue);
+	process_request_event_queues();
+}
+
+static void queue_local_request(struct request *req)
+{
+	req->work.fn = do_local_request;
+	req->work.done = local_op_done;
+	queue_work(sys->io_wqueue, &req->work);
+}
+
 static void queue_request(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
@@ -348,30 +373,17 @@ static void queue_request(struct request *req)
 		req->vnodes = get_vnode_info();
 
 	if (is_io_op(req->op)) {
-		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-			req->work.fn = do_io_request;
-			req->work.done = io_op_done;
-		} else {
-			req->work.fn = do_gateway_request;
-			req->work.done = io_op_done;
-		}
-		setup_access_to_local_objects(req);
-		if (check_request(req) < 0)
-			return;
+		queue_io_request(req);
 	} else if (is_local_op(req->op)) {
-		req->work.fn = do_local_request;
-		req->work.done = local_op_done;
+		queue_local_request(req);
 	} else if (is_cluster_op(req->op)) {
-		;
+		queue_cluster_request(req);
 	} else {
 		eprintf("unknown operation %d\n", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;
 		goto done;
 	}
 
-	list_add_tail(&req->request_list, &sys->request_queue);
-
-	process_request_event_queues();
 	return;
 done:
 	req_done(req);
