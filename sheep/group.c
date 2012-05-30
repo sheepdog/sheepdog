@@ -683,7 +683,7 @@ static void update_cluster_info(struct join_message *msg,
 
 	if (!sys_stat_ok() &&
 	    (msg->cluster_status == SD_STATUS_OK ||
-	     msg->cluster_status != SD_STATUS_HALT)) {
+	     msg->cluster_status == SD_STATUS_HALT)) {
 		int array_len = nr_nodes * sizeof(struct sd_node);
 		struct vdi_bitmap_work *w;
 
