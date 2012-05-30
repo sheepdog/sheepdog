@@ -574,29 +574,6 @@ again:
 	return 0;
 }
 
-/* setup node list and virtual node list */
-static int init_rw(struct recovery_work *rw)
-{
-	struct sd_node nodes[SD_MAX_NODES];
-	int nr_nodes;
-	uint32_t epoch = rw->epoch;
-
-	nr_nodes = epoch_log_read_nr(epoch, (char *)nodes, sizeof(nodes));
-	if (nr_nodes <= 0) {
-		eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch);
-		return -1;
-	}
-	rw->cur_vnodes = alloc_vnode_info(nodes, nr_nodes);
-
-	nr_nodes = epoch_log_read_nr(epoch - 1, (char *)nodes, sizeof(nodes));
-	if (nr_nodes <= 0) {
-		eprintf("failed to read epoch log for epoch %"PRIu32"\n", epoch - 1);
-		return -1;
-	}
-	rw->old_vnodes = alloc_vnode_info(nodes, nr_nodes);
-	return 0;
-}
-
 static void do_recovery_work(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
@@ -606,8 +583,6 @@ static void do_recovery_work(struct work *work)
 	if (!sys->nr_copies)
 		return;
 
-	init_rw(rw);
-
 	if (fill_obj_list(rw) < 0) {
 		eprintf("fatal recovery error\n");
 		rw->count = 0;
@@ -615,7 +590,7 @@ static void do_recovery_work(struct work *work)
 	}
 }
 
-int start_recovery(uint32_t epoch)
+int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
 {
 	struct recovery_work *rw;
 
@@ -625,15 +600,18 @@ int start_recovery(uint32_t epoch)
 
 	rw->state = RW_INIT;
 	rw->oids = malloc(1 << 20); /* FIXME */
-	rw->epoch = epoch;
+	rw->epoch = sys->epoch;
 	rw->count = 0;
+
+	rw->cur_vnodes = grab_vnode_info(cur_vnodes);
+	rw->old_vnodes = grab_vnode_info(old_vnodes);
 
 	rw->work.fn = do_recovery_work;
 	rw->work.done = do_recover_main;
 
 	if (sd_store->begin_recover) {
 		struct siocb iocb = { 0 };
-		iocb.epoch = epoch;
+		iocb.epoch = rw->epoch;
 		sd_store->begin_recover(&iocb);
 	}
 

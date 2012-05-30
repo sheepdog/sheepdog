@@ -654,6 +654,7 @@ static void update_cluster_info(struct join_message *msg,
 		struct sd_node *joined, struct sd_node *nodes, size_t nr_nodes)
 {
 	struct node *n, *t;
+	struct vnode_info *old_vnode_info;
 
 	eprintf("status = %d, epoch = %d, %x, %d\n", msg->cluster_status,
 		msg->epoch, msg->result, sys->join_finished);
@@ -664,7 +665,7 @@ static void update_cluster_info(struct join_message *msg,
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 
-	put_vnode_info(current_vnode_info);
+	old_vnode_info = current_vnode_info;
 	current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
 
 	if (msg->cluster_status == SD_STATUS_OK ||
@@ -701,8 +702,10 @@ static void update_cluster_info(struct join_message *msg,
 	if (sys_can_recover() && msg->inc_epoch) {
 		list_for_each_entry_safe(n, t, &sys->leave_list, list)
 			list_del(&n->list);
-		start_recovery(sys->epoch);
+		start_recovery(current_vnode_info, old_vnode_info);
 	}
+
+	put_vnode_info(old_vnode_info);
 
 	if (sys_stat_halt()) {
 		if (current_vnode_info->nr_zones >= sys->nr_copies)
@@ -971,6 +974,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 		size_t nr_members)
 {
+	struct vnode_info *old_vnode_info;
 	int i;
 
 	dprintf("leave %s\n", node_to_str(left));
@@ -980,14 +984,15 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 	if (sys_stat_shutdown())
 		return;
 
-	put_vnode_info(current_vnode_info);
+	old_vnode_info = current_vnode_info;
 	current_vnode_info = alloc_vnode_info(members, nr_members);
 
 	if (sys_can_recover()) {
 		uatomic_inc(&sys->epoch);
 		log_current_epoch();
-		start_recovery(sys->epoch);
+		start_recovery(current_vnode_info, old_vnode_info);
 	}
+	put_vnode_info(old_vnode_info);
 
 	if (sys_can_halt()) {
 		if (current_vnode_info->nr_zones < sys->nr_copies)
