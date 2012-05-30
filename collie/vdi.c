@@ -432,7 +432,7 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 
 	hdr.vdi.base_vdi_id = base_vid;
 	hdr.vdi.snapid = snapshot;
-	hdr.vdi.vdi_size = vdi_size;
+	hdr.vdi.vdi_size = roundup(vdi_size, 512);
 
 	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 
