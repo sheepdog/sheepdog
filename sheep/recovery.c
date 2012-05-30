@@ -405,9 +405,8 @@ static void do_recover_main(struct work *work)
 		rw = next_rw;
 		next_rw = NULL;
 
-		flush_wait_obj_requests();
-
 		recovering_work = rw;
+		flush_wait_obj_requests();
 
 		queue_work(sys->recovery_wqueue, &rw->work);
 	} else {
