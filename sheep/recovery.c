@@ -29,8 +29,7 @@ struct recovery_work {
 	uint32_t epoch;
 	uint32_t done;
 
-	struct timer timer;
-	int retry;
+	int stop;
 	struct work work;
 
 	int nr_blocking;
@@ -150,15 +149,9 @@ static int recover_object_from_replica(uint64_t oid,
 			ret = -1;
 			goto out;
 		}
-	} else if (rsp->result == SD_RES_NEW_NODE_VER ||
-			rsp->result == SD_RES_OLD_NODE_VER ||
-			rsp->result == SD_RES_NETWORK_ERROR) {
-		dprintf("retrying: %"PRIx32", %"PRIx64"\n", rsp->result, oid);
-		ret = 1;
-		goto out;
 	} else {
 		eprintf("failed, res: %"PRIx32"\n", rsp->result);
-		ret = -1;
+		ret = rsp->result;
 		goto out;
 	}
 done:
@@ -193,7 +186,7 @@ static int do_recover_object(struct recovery_work *rw)
 	struct vnode_info *old;
 	uint64_t oid = rw->oids[rw->done];
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
-	int nr_copies, ret, i, retry;
+	int nr_copies, ret, i;
 
 	old = grab_vnode_info(rw->old_vnodes);
 
@@ -202,7 +195,6 @@ again:
 		oid, tgt_epoch);
 
 	/* Let's do a breadth-first search */
-	retry = 0;
 	nr_copies = get_nr_copies(old);
 	for (i = 0; i < nr_copies; i++) {
 		struct sd_vnode *tgt_vnode = oid_to_vnode(old, oid, i);
@@ -215,18 +207,11 @@ again:
 		if (ret == 0) {
 			/* Succeed */
 			break;
-		} else if (ret > 0) {
-			retry = 1;
-			/* Try our best to recover from peers */
-			continue;
-		}
-	}
-
-	/* If not succeed but someone orders us to retry it, serve the order */
-	if (ret != 0 && retry == 1) {
-		ret = 0;
-		rw->retry = 1;
-		goto err;
+		} else if (SD_RES_OLD_NODE_VER == ret) {
+			rw->stop = 1;
+			goto err;
+		} else
+			ret = -1;
 	}
 
 	/* No luck, roll back to an older configuration and try again */
@@ -279,19 +264,6 @@ static void recover_object(struct work *work)
 }
 
 static struct recovery_work *suspended_recovery_work;
-
-static void recover_timer(void *data)
-{
-	struct recovery_work *rw = (struct recovery_work *)data;
-	uint64_t oid = rw->oids[rw->done];
-
-	if (is_access_to_busy_objects(oid)) {
-		suspended_recovery_work = rw;
-		return;
-	}
-
-	queue_work(sys->recovery_wqueue, &rw->work);
-}
 
 void resume_recovery_work(void)
 {
@@ -395,7 +367,7 @@ static void do_recover_main(struct work *work)
 		rw->state = RW_RUN;
 		recovered_oid = 0;
 		resume_wait_recovery_requests();
-	} else if (!rw->retry) {
+	} else if (!rw->stop){
 		rw->done++;
 		if (rw->nr_blocking > 0)
 			rw->nr_blocking--;
@@ -406,17 +378,13 @@ static void do_recover_main(struct work *work)
 	if (recovered_oid)
 		resume_wait_obj_requests(recovered_oid);
 
-	if (rw->retry && !next_rw) {
-		rw->retry = 0;
-
-		rw->timer.callback = recover_timer;
-		rw->timer.data = rw;
-		add_timer(&rw->timer, 2);
-		return;
-	}
-
 	if (rw->done < rw->count && !next_rw) {
 		rw->work.fn = recover_object;
+
+		if (rw->stop) {
+			flush_wait_obj_requests();
+			return;
+		}
 
 		if (is_access_to_busy_objects(oid)) {
 			suspended_recovery_work = rw;
@@ -440,6 +408,7 @@ static void do_recover_main(struct work *work)
 		flush_wait_obj_requests();
 
 		recovering_work = rw;
+
 		queue_work(sys->recovery_wqueue, &rw->work);
 	} else {
 		if (sd_store->end_recover) {
@@ -560,13 +529,7 @@ static int fill_obj_list(struct recovery_work *rw)
 	int start = random() % cur_nr;
 	int end = cur_nr;
 
-	buf = malloc(buf_size);
-	if (!buf) {
-		eprintf("out of memory\n");
-		rw->retry = 1;
-		return -1;
-	}
-
+	buf = xmalloc(buf_size);
 again:
 	for (i = start; i < end; i++) {
 		int buf_nr;
