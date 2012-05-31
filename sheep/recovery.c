@@ -15,7 +15,6 @@
 #include <sys/types.h>
 
 #include "sheep_priv.h"
-#include "strbuf.h"
 
 
 enum rw_state {
@@ -464,48 +463,30 @@ static int request_obj_list(struct sd_node *e, uint32_t epoch,
 	return rsp->data_length / sizeof(uint64_t);
 }
 
-int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2)
+static void screen_obj_list(struct recovery_work *rw,
+		uint64_t *oids, int nr_oids)
 {
-	int i;
-	int old_nr_list1 = nr_list1;
-
-	for (i = 0; i < nr_list2; i++) {
-		if (bsearch(list2 + i, list1, old_nr_list1, sizeof(*list1), obj_cmp))
-			continue;
-
-		list1[nr_list1++] = list2[i];
-	}
-
-	qsort(list1, nr_list1, sizeof(*list1), obj_cmp);
-
-	return nr_list1;
-}
-
-static int screen_obj_list(struct recovery_work *rw,  uint64_t *list, int list_nr)
-{
-	int ret, i, j;
-	struct strbuf buf = STRBUF_INIT;
 	struct sd_vnode *vnodes[SD_MAX_COPIES];
+	int old_count = rw->count;
 	int nr_objs;
-	size_t len;
+	int i, j;
 
 	nr_objs = get_nr_copies(rw->cur_vnodes);
-	for (i = 0; i < list_nr; i++) {
-		oid_to_vnodes(rw->cur_vnodes, list[i], nr_objs, vnodes);
+	for (i = 0; i < nr_oids; i++) {
+		oid_to_vnodes(rw->cur_vnodes, oids[i], nr_objs, vnodes);
 		for (j = 0; j < nr_objs; j++) {
-			if (vnode_is_local(vnodes[j])) {
-				strbuf_add(&buf, &list[i], sizeof(uint64_t));
-				break;
-			}
+			if (!vnode_is_local(vnodes[j]))
+				continue;
+			if (bsearch(&oids[i], rw->oids, old_count,
+				    sizeof(uint64_t), obj_cmp))
+				continue;
+
+			rw->oids[rw->count++] = oids[i];
+			break;
 		}
 	}
-	len = strbuf_copyout(&buf, list, list_nr * sizeof(uint64_t));
 
-	ret = len / sizeof(uint64_t);
-	dprintf("%d\n", ret);
-	strbuf_release(&buf);
-
-	return ret;
+	qsort(rw->oids, rw->count, sizeof(uint64_t), obj_cmp);
 }
 
 #define MAX_RETRY_CNT  6
@@ -558,9 +539,7 @@ again:
 				goto retry;
 			}
 		}
-		buf_nr = screen_obj_list(rw, (uint64_t *)buf, buf_nr);
-		if (buf_nr)
-			rw->count = merge_objlist(rw->oids, rw->count, (uint64_t *)buf, buf_nr);
+		screen_obj_list(rw, (uint64_t *)buf, buf_nr);
 	}
 
 	if (start != 0 && !next_rw) {

@@ -300,7 +300,6 @@ int read_object(struct vnode_info *vnodes, uint32_t node_version,
 		uint64_t offset, int nr);
 int remove_object(struct vnode_info *vnodes, uint32_t node_version,
 		  uint64_t oid, int nr);
-int merge_objlist(uint64_t *list1, int nr_list1, uint64_t *list2, int nr_list2);
 
 void del_sheep_fd(int fd);
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
