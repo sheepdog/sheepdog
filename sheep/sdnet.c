@@ -20,6 +20,7 @@
 
 #include "sheep_priv.h"
 
+static void queue_request(struct request *req);
 
 static int is_access_local(struct request *req, uint64_t oid)
 {
@@ -283,6 +284,14 @@ static int check_request(struct request *req)
 	return 0;
 }
 
+static void requeue_request(struct request *req)
+{
+	list_del(&req->request_list);
+	if (req->vnodes)
+		put_vnode_info(req->vnodes);
+	queue_request(req);
+}
+
 void resume_pending_requests(void)
 {
 	struct request *req, *n;
@@ -290,78 +299,81 @@ void resume_pending_requests(void)
 
 	list_splice_init(&sys->req_wait_for_obj_list, &pending_list);
 
-	list_for_each_entry_safe(req, n, &pending_list, request_list) {
-		list_del(&req->request_list);
-
-		if (check_request(req) < 0)
-			continue;
-		process_io_request(req);
-	}
+	list_for_each_entry_safe(req, n, &pending_list, request_list)
+		requeue_request(req);
 }
 
 void resume_wait_epoch_requests(void)
 {
 	struct request *req, *t;
+	LIST_HEAD(pending_list);
 
-	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
-				 request_list) {
+	list_splice_init(&sys->wait_rw_queue, &pending_list);
+
+	list_for_each_entry_safe(req, t, &pending_list, request_list) {
 		switch (req->rp.result) {
 		/* gateway retries to send the request when
 		   its epoch changes. */
 		case SD_RES_OLD_NODE_VER:
 			req->rq.epoch = sys->epoch;
-			put_vnode_info(req->vnodes);
-			req->vnodes = get_vnode_info();
-			setup_access_to_local_objects(req);
 		/* peer retries the request locally when its epoch changes. */
 		case SD_RES_NEW_NODE_VER:
-			list_del(&req->request_list);
-			process_io_request(req);
+			requeue_request(req);
 			break;
 		default:
 			break;
 		}
 	}
+
+	list_splice_init(&pending_list, &sys->wait_rw_queue);
 }
 
 void resume_wait_recovery_requests(void)
 {
 	struct request *req, *t;
+	LIST_HEAD(pending_list);
 
-	list_for_each_entry_safe(req, t, &sys->wait_rw_queue,
-				 request_list) {
+	list_splice_init(&sys->wait_rw_queue, &pending_list);
+
+	list_for_each_entry_safe(req, t, &pending_list, request_list) {
+		if (req->rp.result != SD_RES_OBJ_RECOVERING)
+			continue;
+
 		dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
-		if (req->rp.result == SD_RES_OBJ_RECOVERING) {
-			list_del(&req->request_list);
-			process_io_request(req);
-		}
+		requeue_request(req);
 	}
+
+	list_splice_init(&pending_list, &sys->wait_rw_queue);
 }
 
 void resume_wait_obj_requests(uint64_t oid)
 {
 	struct request *req, *t;
+	LIST_HEAD(pending_list);
 
-	list_for_each_entry_safe(req, t, &sys->wait_obj_queue,
-			request_list) {
+	list_splice_init(&sys->wait_obj_queue, &pending_list);
+
+	list_for_each_entry_safe(req, t, &pending_list, request_list) {
+		if (req->local_oid != oid)
+			continue;
+
 		/* the object requested by a pending request has been
 		 * recovered, notify the pending request. */
-		if (req->local_oid == oid) {
-			dprintf("retry %" PRIx64 "\n", req->local_oid);
-			list_del(&req->request_list);
-			process_io_request(req);
-		}
+		dprintf("retry %" PRIx64 "\n", req->local_oid);
+		requeue_request(req);
 	}
+	list_splice_init(&pending_list, &sys->wait_obj_queue);
 }
 
 void flush_wait_obj_requests(void)
 {
 	struct request *req, *n;
+	LIST_HEAD(pending_list);
 
-	list_for_each_entry_safe(req, n, &sys->wait_obj_queue, request_list) {
-		list_del(&req->request_list);
-		process_io_request(req);
-	}
+	list_splice_init(&sys->wait_obj_queue, &pending_list);
+
+	list_for_each_entry_safe(req, n, &pending_list, request_list)
+		requeue_request(req);
 }
 
 static void queue_io_request(struct request *req)
