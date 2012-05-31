@@ -16,66 +16,6 @@
 #include "sheep_priv.h"
 
 
-static int bypass_object_cache(struct request *req)
-{
-	uint64_t oid = req->rq.obj.oid;
-
-	if (!(req->rq.flags & SD_FLAG_CMD_CACHE)) {
-		uint32_t vid = oid_to_vid(oid);
-		struct object_cache *cache;
-
-		cache = find_object_cache(vid, 0);
-		if (!cache)
-			return 1;
-		if (req->rq.flags & SD_FLAG_CMD_WRITE) {
-			object_cache_flush_and_delete(req->vnodes, cache);
-			return 1;
-		} else  {
-			/* For read requet, we can read cache if any */
-			uint32_t idx = data_oid_to_idx(oid);
-			if (is_vdi_obj(oid))
-				idx |= 1 << CACHE_VDI_SHIFT;
-
-			if (object_cache_lookup(cache, idx, 0) < 0)
-				return 1;
-			else
-				return 0;
-		}
-	}
-
-	/*
-	 * For vmstate && vdi_attr object, we don't do caching
-	 */
-	if (is_vmstate_obj(oid) || is_vdi_attr_obj(oid) ||
-	    req->rq.flags & SD_FLAG_CMD_COW)
-		return 1;
-	return 0;
-}
-
-static int object_cache_handle_request(struct request *req)
-{
-	uint64_t oid = req->rq.obj.oid;
-	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
-	struct object_cache *cache;
-	int ret, create = 0;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
-
-	cache = find_object_cache(vid, 1);
-
-	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
-		create = 1;
-
-	if (object_cache_lookup(cache, idx, create) < 0) {
-		ret = object_cache_pull(req->vnodes, cache, idx);
-		if (ret != SD_RES_SUCCESS)
-			return ret;
-	}
-	return object_cache_rw(cache, idx, req);
-}
-
 int forward_read_obj_req(struct request *req)
 {
 	int i, fd, ret = SD_RES_SUCCESS;

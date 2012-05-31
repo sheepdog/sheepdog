@@ -533,45 +533,6 @@ int read_epoch(uint32_t *epoch, uint64_t *ct,
 	return SD_RES_SUCCESS;
 }
 
-static int write_object_cache(uint64_t oid, char *data, unsigned int datalen,
-			      uint64_t offset, uint16_t flags, int copies,
-			      uint32_t epoch, int create)
-{
-	int ret;
-	struct request *req;
-	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
-	struct object_cache *cache;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
-
-	cache = find_object_cache(vid, 0);
-
-	req = zalloc(sizeof(*req));
-	if (!req)
-		return SD_RES_NO_MEM;
-
-	if (create)
-		req->rq.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
-	else
-		req->rq.opcode = SD_OP_WRITE_OBJ;
-	req->rq.flags = flags | SD_FLAG_CMD_WRITE;
-	req->rq.data_length = datalen;
-
-	req->rq.obj.oid = oid;
-	req->rq.obj.offset = offset;
-	req->rq.obj.copies = copies;
-
-	req->data = data;
-	req->op = get_sd_op(req->rq.opcode);
-
-	ret = object_cache_rw(cache, idx, req);
-
-	free(req);
-	return ret;
-}
-
 /*
  * Write data to both local object cache (if enabled) and backends
  */
@@ -584,7 +545,7 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
-		ret = write_object_cache(oid, data, datalen, offset,
+		ret = object_cache_write(oid, data, datalen, offset,
 			flags, nr_copies, epoch, create);
 		if (ret != 0) {
 			eprintf("write cache failed %"PRIx64" %"PRIx32"\n",
@@ -613,40 +574,6 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
 	return ret;
 }
 
-static int read_object_cache(uint64_t oid, char *data, unsigned int datalen,
-			     uint64_t offset, int copies, uint32_t epoch)
-{
-	int ret;
-	struct request *req;
-	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
-	struct object_cache *cache;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
-
-	cache = find_object_cache(vid, 0);
-
-	req = zalloc(sizeof(*req));
-	if (!req)
-		return SD_RES_NO_MEM;
-
-	req->rq.opcode = SD_OP_READ_OBJ;
-	req->rq.data_length = datalen;
-
-	req->rq.obj.oid = oid;
-	req->rq.obj.offset = offset;
-	req->rq.obj.copies = copies;
-
-	req->data = data;
-	req->op = get_sd_op(req->rq.opcode);
-
-	ret = object_cache_rw(cache, idx, req);
-
-	free(req);
-
-	return ret;
-}
 /*
  * Read data firstly from local object cache(if enabled), if fail,
  * try read backends
@@ -660,7 +587,7 @@ int read_object(struct vnode_info *vnodes, uint32_t epoch,
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
-		ret = read_object_cache(oid, data, datalen, offset,
+		ret = object_cache_read(oid, data, datalen, offset,
 					nr_copies, epoch);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("try forward read %"PRIx64" %"PRIx32"\n",

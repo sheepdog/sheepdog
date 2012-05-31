@@ -27,11 +27,50 @@
 #include "strbuf.h"
 #include "rbtree.h"
 
-#define HASH_BITS	5
-#define HASH_SIZE	(1 << HASH_BITS)
+/*
+ * Object Cache ID
+ *
+ *  0 - 19 (20 bits): data object space
+ *  20 - 27 (8 bits): reserved
+ *  28 - 31 (4 bits): object type indentifier space
+ */
+#define CACHE_VDI_SHIFT       31
+#define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
+#define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
+
+struct object_cache {
+	uint32_t vid;
+	struct hlist_node hash;
+
+	struct list_head dirty_lists[2];
+	struct list_head *active_dirty_list;
+
+	struct rb_root dirty_trees[2];
+	struct rb_root *active_dirty_tree;
+
+	pthread_mutex_t lock;
+};
+
+struct object_cache_entry {
+	uint32_t idx;
+	uint64_t bmap; /* each bit represents one dirty
+			* block which should be flushed */
+	struct rb_node rb;
+	struct list_head list;
+	int create;
+};
+
+struct flush_work {
+	struct object_cache *cache;
+	struct vnode_info *vnode_info;
+	struct work work;
+};
 
 static char cache_dir[PATH_MAX];
 static int def_open_flags = O_RDWR;
+
+#define HASH_BITS	5
+#define HASH_SIZE	(1 << HASH_BITS)
 
 static pthread_mutex_t hashtable_lock[HASH_SIZE] = { [0 ... HASH_SIZE - 1] = PTHREAD_MUTEX_INITIALIZER };
 static struct hlist_head cache_hashtable[HASH_SIZE];
@@ -122,7 +161,7 @@ err:
 	return ret;
 }
 
-struct object_cache *find_object_cache(uint32_t vid, int create)
+static struct object_cache *find_object_cache(uint32_t vid, int create)
 {
 	int h = hash(vid);
 	struct hlist_head *head = cache_hashtable + h;
@@ -219,7 +258,8 @@ static void merge_dirty_tree_and_list(struct object_cache *oc,
 	pthread_mutex_unlock(&oc->lock);
 }
 
-int object_cache_lookup(struct object_cache *oc, uint32_t idx, int create)
+static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
+		int create)
 {
 	struct strbuf buf;
 	int fd, ret = 0, flags = def_open_flags;
@@ -364,7 +404,8 @@ out:
 	return ret;
 }
 
-int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *req)
+static int object_cache_rw(struct object_cache *oc, uint32_t idx,
+		struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	uint64_t bmap = 0;
@@ -446,7 +487,7 @@ out:
 }
 
 /* Fetch the object, cache it in success */
-int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
+static int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
 		      uint32_t idx)
 {
 	struct request read_req;
@@ -570,7 +611,8 @@ out:
 }
 
 /* Push back all the dirty objects to sheep cluster storage */
-int object_cache_push(struct vnode_info *vnode_info, struct object_cache *oc)
+static int object_cache_push(struct vnode_info *vnode_info,
+		struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
 	struct rb_root *inactive_dirty_tree;
@@ -653,7 +695,7 @@ void object_cache_delete(uint32_t vid)
 
 }
 
-int object_cache_flush_and_delete(struct vnode_info *vnode_info,
+static int object_cache_flush_and_delete(struct vnode_info *vnode_info,
 		struct object_cache *oc)
 {
 	DIR *dir;
@@ -695,6 +737,194 @@ int object_cache_flush_and_delete(struct vnode_info *vnode_info,
 out:
 	strbuf_release(&p);
 	return ret;
+}
+
+int bypass_object_cache(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+
+	if (!(req->rq.flags & SD_FLAG_CMD_CACHE)) {
+		uint32_t vid = oid_to_vid(oid);
+		struct object_cache *cache;
+
+		cache = find_object_cache(vid, 0);
+		if (!cache)
+			return 1;
+		if (req->rq.flags & SD_FLAG_CMD_WRITE) {
+			object_cache_flush_and_delete(req->vnodes, cache);
+			return 1;
+		} else  {
+			/* For read requet, we can read cache if any */
+			uint32_t idx = data_oid_to_idx(oid);
+			if (is_vdi_obj(oid))
+				idx |= 1 << CACHE_VDI_SHIFT;
+
+			if (object_cache_lookup(cache, idx, 0) < 0)
+				return 1;
+			else
+				return 0;
+		}
+	}
+
+	/*
+	 * For vmstate && vdi_attr object, we don't do caching
+	 */
+	if (is_vmstate_obj(oid) || is_vdi_attr_obj(oid) ||
+	    req->rq.flags & SD_FLAG_CMD_COW)
+		return 1;
+	return 0;
+}
+
+int object_cache_handle_request(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *cache;
+	int ret, create = 0;
+
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+
+	cache = find_object_cache(vid, 1);
+
+	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+		create = 1;
+
+	if (object_cache_lookup(cache, idx, create) < 0) {
+		ret = object_cache_pull(req->vnodes, cache, idx);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+	}
+	return object_cache_rw(cache, idx, req);
+}
+
+int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
+		uint64_t offset, uint16_t flags, int copies, uint32_t epoch,
+		int create)
+{
+	int ret;
+	struct request *req;
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *cache;
+
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+
+	cache = find_object_cache(vid, 0);
+
+	req = zalloc(sizeof(*req));
+	if (!req)
+		return SD_RES_NO_MEM;
+
+	if (create)
+		req->rq.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+	else
+		req->rq.opcode = SD_OP_WRITE_OBJ;
+	req->rq.flags = flags | SD_FLAG_CMD_WRITE;
+	req->rq.data_length = datalen;
+
+	req->rq.obj.oid = oid;
+	req->rq.obj.offset = offset;
+	req->rq.obj.copies = copies;
+
+	req->data = data;
+	req->op = get_sd_op(req->rq.opcode);
+
+	ret = object_cache_rw(cache, idx, req);
+
+	free(req);
+	return ret;
+}
+
+int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
+		uint64_t offset, int copies, uint32_t epoch)
+{
+	int ret;
+	struct request *req;
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *cache;
+
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+
+	cache = find_object_cache(vid, 0);
+
+	req = zalloc(sizeof(*req));
+	if (!req)
+		return SD_RES_NO_MEM;
+
+	req->rq.opcode = SD_OP_READ_OBJ;
+	req->rq.data_length = datalen;
+
+	req->rq.obj.oid = oid;
+	req->rq.obj.offset = offset;
+	req->rq.obj.copies = copies;
+
+	req->data = data;
+	req->op = get_sd_op(req->rq.opcode);
+
+	ret = object_cache_rw(cache, idx, req);
+
+	free(req);
+
+	return ret;
+}
+
+static void object_cache_flush_vdi_fn(struct work *work)
+{
+	struct flush_work *fw = container_of(work, struct flush_work, work);
+
+	dprintf("flush vdi %"PRIx32"\n", fw->cache->vid);
+	if (object_cache_push(fw->vnode_info, fw->cache) != SD_RES_SUCCESS)
+		eprintf("failed to flush vdi %"PRIx32"\n", fw->cache->vid);
+}
+
+static void object_cache_flush_vdi_done(struct work *work)
+{
+	struct flush_work *fw = container_of(work, struct flush_work, work);
+
+	dprintf("flush vdi %"PRIx32" done\n", fw->cache->vid);
+
+	put_vnode_info(fw->vnode_info);
+	free(fw);
+}
+
+int object_cache_flush_vdi(struct request *req)
+{
+	uint32_t vid = oid_to_vid(req->rq.obj.oid);
+	struct object_cache *cache;
+
+	cache = find_object_cache(vid, 0);
+	if (!cache)
+		return SD_RES_SUCCESS;
+
+	if (sys->async_flush) {
+		struct flush_work *fw = xmalloc(sizeof(*fw));
+
+		fw->work.fn = object_cache_flush_vdi_fn;
+		fw->work.done = object_cache_flush_vdi_done;
+		fw->cache = cache;
+		fw->vnode_info = grab_vnode_info(req->vnodes);
+
+		queue_work(sys->flush_wqueue, &fw->work);
+		return SD_RES_SUCCESS;
+	}
+
+	return object_cache_push(req->vnodes, cache);
+}
+
+int object_cache_flush_and_del(struct request *req)
+{
+	uint32_t vid = oid_to_vid(req->rq.obj.oid);
+	struct object_cache *cache;
+
+	cache = find_object_cache(vid, 0);
+	if (cache && object_cache_flush_and_delete(req->vnodes, cache) < 0)
+		return SD_RES_EIO;
+	return SD_RES_SUCCESS;
 }
 
 int object_cache_init(const char *p)

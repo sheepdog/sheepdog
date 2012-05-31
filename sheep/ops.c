@@ -58,12 +58,6 @@ struct sd_op_template {
 	int (*process_main)(const struct sd_req *req, struct sd_rsp *rsp, void *data);
 };
 
-struct flush_work {
-	struct object_cache *cache;
-	struct vnode_info *vnode_info;
-	struct work work;
-};
-
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
 	struct statvfs vs;
@@ -549,64 +543,18 @@ static int local_get_snap_file(struct request *req)
 	return ret;
 }
 
-static void flush_vdi_fn(struct work *work)
-{
-	struct flush_work *fw = container_of(work, struct flush_work, work);
-
-	dprintf("flush vdi %"PRIx32"\n", fw->cache->vid);
-	if (object_cache_push(fw->vnode_info, fw->cache) != SD_RES_SUCCESS)
-		eprintf("failed to flush vdi %"PRIx32"\n", fw->cache->vid);
-}
-
-static void flush_vdi_done(struct work *work)
-{
-	struct flush_work *fw = container_of(work, struct flush_work, work);
-
-	dprintf("flush vdi %"PRIx32" done\n", fw->cache->vid);
-
-	put_vnode_info(fw->vnode_info);
-	free(fw);
-}
-
 static int local_flush_vdi(struct request *req)
 {
-	uint64_t oid = req->rq.obj.oid;
-	uint32_t vid = oid_to_vid(oid);
-	struct object_cache *cache;
-
 	if (!sys->enable_write_cache)
 		return SD_RES_SUCCESS;
-
-	cache = find_object_cache(vid, 0);
-	if (cache) {
-		if (!sys->async_flush)
-			return object_cache_push(req->vnodes, cache);
-		else {
-			struct flush_work *fw = xmalloc(sizeof(*fw));
-
-			fw->work.fn = flush_vdi_fn;
-			fw->work.done = flush_vdi_done;
-			fw->cache = cache;
-			fw->vnode_info = grab_vnode_info(req->vnodes);
-
-			queue_work(sys->flush_wqueue, &fw->work);
-		}
-	}
-
-	return SD_RES_SUCCESS;
+	return object_cache_flush_vdi(req);
 }
 
 static int local_flush_and_del(struct request *req)
 {
-	uint64_t oid = req->rq.obj.oid;
-	uint32_t vid = oid_to_vid(oid);
-	struct object_cache *cache = find_object_cache(vid, 0);
-
-	if (cache)
-		if (object_cache_flush_and_delete(req->vnodes, cache) < 0)
-			return SD_RES_EIO;
-
-	return SD_RES_SUCCESS;
+	if (!sys->enable_write_cache)
+		return SD_RES_SUCCESS;
+	return object_cache_flush_and_del(req);
 }
 
 static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *data)

@@ -402,50 +402,20 @@ static inline int sys_can_halt(void)
 }
 
 /* object_cache */
-/*
- * Object Cache ID
- *
- *  0 - 19 (20 bits): data object space
- *  20 - 27 (8 bits): reserved
- *  28 - 31 (4 bits): object type indentifier space
- */
 
-#define CACHE_VDI_SHIFT       31
-#define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
-#define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
-
-struct object_cache {
-	uint32_t vid;
-	struct hlist_node hash;
-
-	struct list_head dirty_lists[2];
-	struct list_head *active_dirty_list;
-
-	struct rb_root dirty_trees[2];
-	struct rb_root *active_dirty_tree;
-
-	pthread_mutex_t lock;
-};
-
-struct object_cache_entry {
-	uint32_t idx;
-	uint64_t bmap; /* each bit represents one dirty
-			* block which should be flushed */
-	struct rb_node rb;
-	struct list_head list;
-	int create;
-};
-
-struct object_cache *find_object_cache(uint32_t vid, int create);
-int object_cache_lookup(struct object_cache *oc, uint32_t index, int create);
-int object_cache_rw(struct object_cache *oc, uint32_t idx, struct request *);
-int object_cache_pull(struct vnode_info *vnode_info, struct object_cache *oc,
-		uint32_t index);
-int object_cache_push(struct vnode_info *vnode_info, struct object_cache *oc);
-int object_cache_init(const char *p);
+int bypass_object_cache(struct request *req);
 int object_is_cached(uint64_t oid);
+
+int object_cache_handle_request(struct request *req);
+int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
+		uint64_t offset, uint16_t flags, int copies, uint32_t epoch,
+		int create);
+int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
+		uint64_t offset, int copies, uint32_t epoch);
+int object_cache_flush_vdi(struct request *req);
+int object_cache_flush_and_del(struct request *req);
 void object_cache_delete(uint32_t vid);
-int object_cache_flush_and_delete(struct vnode_info *vnode_info,
-		struct object_cache *oc);
+
+int object_cache_init(const char *p);
 
 #endif
