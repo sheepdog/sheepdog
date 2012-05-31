@@ -313,36 +313,6 @@ static int local_read_vdis(const struct sd_req *req, struct sd_rsp *rsp,
 	return read_vdis(data, req->data_length, &rsp->data_length);
 }
 
-static int get_node_idx(struct sd_node *ent,
-			struct sd_node *entries, int nr_nodes)
-{
-	ent = bsearch(ent, entries, nr_nodes, sizeof(*ent), node_cmp);
-	if (!ent)
-		return -1;
-
-	return ent - entries;
-}
-
-static int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
-			       void *data)
-{
-	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)rsp;
-	struct vnode_info *vnode_info;
-	int nr_nodes;
-
-	vnode_info = get_vnode_info();
-	nr_nodes = vnode_info->nr_nodes;
-
-	memcpy(data, vnode_info->nodes, sizeof(struct sd_node) * nr_nodes);
-	node_rsp->data_length = nr_nodes * sizeof(struct sd_node);
-	node_rsp->nr_nodes = nr_nodes;
-	node_rsp->local_idx = get_node_idx(&sys->this_node, data, nr_nodes);
-	node_rsp->master_idx = -1;
-
-	put_vnode_info(vnode_info);
-	return SD_RES_SUCCESS;
-}
-
 static int local_stat_sheep(struct request *req)
 {
 	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)&req->rp;

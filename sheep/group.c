@@ -128,6 +128,16 @@ bool have_enough_zones(void)
 	return false;
 }
 
+static int get_node_idx(struct vnode_info *vnode_info, struct sd_node *ent)
+{
+	ent = bsearch(ent, vnode_info->nodes, vnode_info->nr_nodes,
+		      sizeof(*ent), node_cmp);
+	if (!ent)
+		return -1;
+
+	return ent - vnode_info->nodes;
+}
+
 /*
  * If we have less zones available than the desired redundancy we have to do
  * with nr_zones copies, sorry.
@@ -221,6 +231,30 @@ struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes)
 	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
 	uatomic_set(&vnode_info->refcnt, 1);
 	return vnode_info;
+}
+
+int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
+			       void *data)
+{
+	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)rsp;
+	int nr_nodes;
+
+	if (current_vnode_info) {
+		nr_nodes = current_vnode_info->nr_nodes;
+		memcpy(data, current_vnode_info->nodes,
+			sizeof(struct sd_node) * nr_nodes);
+		node_rsp->data_length = nr_nodes * sizeof(struct sd_node);
+		node_rsp->nr_nodes = nr_nodes;
+		node_rsp->local_idx = get_node_idx(current_vnode_info,
+						   &sys->this_node);
+	} else {
+		node_rsp->data_length = 0;
+		node_rsp->nr_nodes = 0;
+		node_rsp->local_idx = 0;
+	}
+
+	node_rsp->master_idx = -1;
+	return SD_RES_SUCCESS;
 }
 
 /*
