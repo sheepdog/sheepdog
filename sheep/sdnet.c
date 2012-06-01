@@ -126,7 +126,6 @@ static void io_op_done(struct work *work)
 		leave_cluster();
 	}
 
-	resume_pending_requests();
 	resume_recovery_work();
 
 	req_done(req);
@@ -166,7 +165,6 @@ static void gateway_op_done(struct work *work)
 		break;
 	}
 
-	resume_pending_requests();
 	resume_recovery_work();
 
 	req_done(req);
@@ -243,11 +241,6 @@ static int check_request_busy(struct request *req)
 		return -1;
 	}
 
-	if (is_access_to_busy_objects(req->local_oid)) {
-		list_add_tail(&req->request_list, &sys->req_wait_for_obj_list);
-		return -1;
-	}
-
 	return 0;
 }
 
@@ -257,17 +250,6 @@ static void requeue_request(struct request *req)
 	if (req->vnodes)
 		put_vnode_info(req->vnodes);
 	queue_request(req);
-}
-
-void resume_pending_requests(void)
-{
-	struct request *req, *n;
-	LIST_HEAD(pending_list);
-
-	list_splice_init(&sys->req_wait_for_obj_list, &pending_list);
-
-	list_for_each_entry_safe(req, n, &pending_list, request_list)
-		requeue_request(req);
 }
 
 void resume_wait_epoch_requests(void)

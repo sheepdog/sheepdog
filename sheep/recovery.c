@@ -389,7 +389,6 @@ static void do_recover_main(struct work *work)
 			suspended_recovery_work = rw;
 			return;
 		}
-		resume_pending_requests();
 		queue_work(sys->recovery_wqueue, &rw->work);
 		return;
 	}
@@ -415,8 +414,6 @@ static void do_recover_main(struct work *work)
 			sd_store->end_recover(&iocb);
 		}
 	}
-
-	resume_pending_requests();
 }
 
 static int request_obj_list(struct sd_node *e, uint32_t epoch,
