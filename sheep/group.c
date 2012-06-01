@@ -315,6 +315,8 @@ static void cluster_op_done(struct work *work)
 		panic();
 
 	sys->cdrv->unblock(msg, size);
+
+	free(msg);
 }
 
 /*
