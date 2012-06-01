@@ -130,19 +130,6 @@ static void check_object_consistency(struct sd_req *hdr)
 	}
 }
 
-static void process_io_request(struct request *req)
-{
-	list_add_tail(&req->request_list, &sys->outstanding_req_list);
-
-	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-		queue_work(sys->io_wqueue, &req->work);
-	} else {
-		if (need_consistency_check(req))
-			set_consistency_check(req);
-		queue_work(sys->gateway_wqueue, &req->work);
-	}
-}
-
 static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -372,19 +359,24 @@ void flush_wait_obj_requests(void)
 
 static void queue_io_request(struct request *req)
 {
-	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-		req->work.fn = do_io_request;
-		req->work.done = io_op_done;
-	} else {
-		req->work.fn = do_gateway_request;
-		req->work.done = io_op_done;
-	}
-
 	setup_access_to_local_objects(req);
 	if (check_request(req) < 0)
 		return;
 
-	process_io_request(req);
+	list_add_tail(&req->request_list, &sys->outstanding_req_list);
+
+	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
+		req->work.fn = do_io_request;
+		req->work.done = io_op_done;
+		queue_work(sys->io_wqueue, &req->work);
+	} else {
+		if (need_consistency_check(req))
+			set_consistency_check(req);
+
+		req->work.fn = do_gateway_request;
+		req->work.done = io_op_done;
+		queue_work(sys->gateway_wqueue, &req->work);
+	}
 }
 
 static void queue_local_request(struct request *req)
