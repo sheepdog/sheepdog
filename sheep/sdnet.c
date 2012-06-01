@@ -262,12 +262,18 @@ void resume_wait_epoch_requests(void)
 
 	list_for_each_entry_safe(req, t, &pending_list, request_list) {
 		switch (req->rp.result) {
-		/* gateway retries to send the request when
-		   its epoch changes. */
 		case SD_RES_OLD_NODE_VER:
+			/*
+			 * Gateway retries to send the request when
+			 * its epoch changes.
+			 */
+			assert(!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL));
 			req->rq.epoch = sys->epoch;
-		/* peer retries the request locally when its epoch changes. */
+			requeue_request(req);
+			break;
 		case SD_RES_NEW_NODE_VER:
+			/* Peer retries the request locally when its epoch changes. */
+			assert(req->rq.flags & SD_FLAG_CMD_IO_LOCAL);
 			requeue_request(req);
 			break;
 		default:
