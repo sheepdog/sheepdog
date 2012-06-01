@@ -239,7 +239,7 @@ err:
 	return ret;
 }
 
-static void recover_object(struct work *work)
+static void recover_object_work(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work,
 						work);
@@ -357,63 +357,77 @@ static void free_recovery_work(struct recovery_work *rw)
 	free(rw);
 }
 
-static void do_recover_main(struct work *work)
+static void recover_object_main(struct work *work)
 {
-	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-	uint64_t oid, recovered_oid = rw->oids[rw->done];
-
-	if (rw->state == RW_INIT) {
-		rw->state = RW_RUN;
-		recovered_oid = 0;
-		resume_wait_recovery_requests();
-	} else if (!rw->stop){
-		rw->done++;
-		if (rw->nr_blocking > 0)
-			rw->nr_blocking--;
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
+	if (next_rw) {
+		free_recovery_work(rw);
+		rw = next_rw;
+		next_rw = NULL;
+		recovering_work = rw;
+		flush_wait_obj_requests();
+		queue_work(sys->recovery_wqueue, &rw->work);
+		dprintf("recovery work is superseded\n");
+		return;
 	}
 
-	oid = rw->oids[rw->done];
+	if (rw->stop){
+		/*
+		 * Stop this recovery process and wait for epoch to be
+		 * lifted and flush wait_obj queue to requeue those
+		 * requests
+		 */
+		flush_wait_obj_requests();
+		dprintf("recovery is stopped\n");
+		return;
+	}
 
-	if (recovered_oid)
-		resume_wait_obj_requests(recovered_oid);
+	if (rw->nr_blocking > 0)
+		rw->nr_blocking--;
+	resume_wait_obj_requests(rw->done++);
 
-	if (rw->done < rw->count && !next_rw) {
-		rw->work.fn = recover_object;
-
-		if (rw->stop) {
-			flush_wait_obj_requests();
-			return;
-		}
+	if (rw->done < rw->count) {
+		uint64_t oid;
+		oid = rw->oids[rw->done];
 
 		if (is_access_to_busy_objects(oid)) {
 			suspended_recovery_work = rw;
 			return;
 		}
+		/* Requeue the work */
 		queue_work(sys->recovery_wqueue, &rw->work);
 		return;
 	}
 
-	dprintf("recovery complete: new epoch %"PRIu32"\n", rw->epoch);
 	recovering_work = NULL;
-
 	sys->recovered_epoch = rw->epoch;
 	free_recovery_work(rw);
 
-	if (next_rw) {
-		rw = next_rw;
-		next_rw = NULL;
-
-		recovering_work = rw;
-		flush_wait_obj_requests();
-
-		queue_work(sys->recovery_wqueue, &rw->work);
-	} else {
-		if (sd_store->end_recover) {
-			struct siocb iocb = { 0 };
-			iocb.epoch = sys->epoch;
-			sd_store->end_recover(&iocb);
-		}
+	if (sd_store->end_recover) {
+		struct siocb iocb = { 0 };
+		iocb.epoch = sys->epoch;
+		sd_store->end_recover(&iocb);
 	}
+	dprintf("recovery complete: new epoch %"PRIu32"\n", sys->recovered_epoch);
+}
+
+static void finish_object_list(struct work *work)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
+	rw->state = RW_RUN;
+	/*
+	 * We have got the object list to be recovered locally, most of
+	 * objects are actually already being there, so let's resume
+	 * requests in the hope that most requests will be processed
+	 * without any problem.
+	 */
+	resume_wait_recovery_requests();
+	rw->work.fn = recover_object_work;
+	rw->work.done = recover_object_main;
+	queue_work(sys->recovery_wqueue, &rw->work);
+	return;
 }
 
 static int request_obj_list(struct sd_node *e, uint32_t epoch,
@@ -550,7 +564,7 @@ again:
 	return 0;
 }
 
-static void do_recovery_work(struct work *work)
+static void prepare_object_list(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work, work);
 
@@ -582,8 +596,8 @@ int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
 	rw->cur_vnodes = grab_vnode_info(cur_vnodes);
 	rw->old_vnodes = grab_vnode_info(old_vnodes);
 
-	rw->work.fn = do_recovery_work;
-	rw->work.done = do_recover_main;
+	rw->work.fn = prepare_object_list;
+	rw->work.done = finish_object_list;
 
 	if (sd_store->begin_recover) {
 		struct siocb iocb = { 0 };
@@ -595,6 +609,7 @@ int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
 		/* skip the previous epoch recovery */
 		if (next_rw)
 			free_recovery_work(next_rw);
+		dprintf("recovery skipped\n");
 		next_rw = rw;
 	} else {
 		recovering_work = rw;
