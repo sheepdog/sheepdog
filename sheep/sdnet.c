@@ -223,7 +223,7 @@ static int check_request_epoch(struct request *req)
 	return 0;
 }
 
-static int check_request_busy(struct request *req)
+static int check_request_in_recovery(struct request *req)
 {
 	/*
 	 * Request from recovery should not wait for objects under recovery to
@@ -331,7 +331,7 @@ static void queue_io_request(struct request *req)
 	if (req->local_oid) {
 		if (check_request_epoch(req) < 0)
 			return;
-		if (check_request_busy(req) < 0)
+		if (check_request_in_recovery(req) < 0)
 			return;
 	}
 	list_add_tail(&req->request_list, &sys->outstanding_req_list);
@@ -349,14 +349,13 @@ static void queue_gateway_request(struct request *req)
 		req->local_oid = hdr->obj.oid;
 
 	/*
-	 * If we go for a cached object, we don't care if it is busy
-	 * or being recovered.
+	 * If we go for a cached object, we don't care if it is being recovered.
 	 */
 	if (req->local_oid &&
 	    (!sys->enable_write_cache ||
 	     !(req->rq.flags & SD_FLAG_CMD_CACHE) ||
 	     !object_is_cached(req->rq.obj.oid))) {
-		if (check_request_busy(req) < 0)
+		if (check_request_in_recovery(req) < 0)
 			return;
 	}
 
