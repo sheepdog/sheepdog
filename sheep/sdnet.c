@@ -201,20 +201,8 @@ static void do_local_request(struct work *work)
 	req->rp.result = ret;
 }
 
-static int check_request(struct request *req)
+static int check_request_epoch(struct request *req)
 {
-	/*
-	 * if we go for a cached object, we don't care if it is busy
-	 * or being recovered.
-	 */
-	if (sys->enable_write_cache &&
-	    (req->rq.flags & SD_FLAG_CMD_CACHE) &&
-	    object_is_cached(req->rq.obj.oid))
-		return 0;
-
-	if (!req->local_oid && !req->local_cow_oid)
-		return 0;
-
 	if (before(req->rq.epoch, sys->epoch)) {
 		eprintf("old node version %u, %u, %x\n",
 			sys->epoch, req->rq.epoch, req->rq.opcode);
@@ -234,15 +222,17 @@ static int check_request(struct request *req)
 		return -1;
 	}
 
-	if (!req->local_oid)
-		return 0;
+	return 0;
+}
 
-	/* IO request of recovery should not wait, or else it may cause
-	   dead lock of recovery, if fails, recovery will take its own
-	   retrying mechanism. */
+static int check_request_busy(struct request *req)
+{
+	/*
+	 * Request from recovery should not wait for objects under recovery to
+	 * avoid deadlocks.  The recovery code will perfom its own retries.
+	 */
 	if (is_recoverying_oid(req->local_oid) &&
 	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
-		/* Peer requests and gateway requests all need to retry */
 		if (is_recovery_init()) {
 			req->rp.result = SD_RES_OBJ_RECOVERING;
 			list_add_tail(&req->request_list,
@@ -356,9 +346,12 @@ void flush_wait_obj_requests(void)
 static void queue_io_request(struct request *req)
 {
 	req->local_oid = req->rq.obj.oid;
-
-	if (check_request(req) < 0)
-		return;
+	if (req->local_oid) {
+		if (check_request_epoch(req) < 0)
+			return;
+		if (check_request_busy(req) < 0)
+			return;
+	}
 	list_add_tail(&req->request_list, &sys->outstanding_req_list);
 
 	req->work.fn = do_io_request;
@@ -373,13 +366,17 @@ static void queue_gateway_request(struct request *req)
 	if (is_access_local(req, hdr->obj.oid))
 		req->local_oid = hdr->obj.oid;
 
-	if (hdr->obj.cow_oid) {
-		if (is_access_local(req, hdr->obj.cow_oid))
-			req->local_cow_oid = hdr->obj.cow_oid;
+	/*
+	 * If we go for a cached object, we don't care if it is busy
+	 * or being recovered.
+	 */
+	if (req->local_oid &&
+	    (!sys->enable_write_cache ||
+	     !(req->rq.flags & SD_FLAG_CMD_CACHE) ||
+	     !object_is_cached(req->rq.obj.oid))) {
+		if (check_request_busy(req) < 0)
+			return;
 	}
-
-	if (check_request(req) < 0)
-		return;
 
 	list_add_tail(&req->request_list, &sys->outstanding_req_list);
 

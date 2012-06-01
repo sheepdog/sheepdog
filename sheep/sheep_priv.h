@@ -75,7 +75,6 @@ struct request {
 	struct list_head pending_list;
 
 	uint64_t local_oid;
-	uint64_t local_cow_oid;
 
 	struct vnode_info *vnodes;
 	int check_consistency;
