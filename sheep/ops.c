@@ -824,6 +824,7 @@ static struct sd_op_template sd_ops[] = {
 
 	[SD_OP_GET_NODE_LIST] = {
 		.type = SD_OP_TYPE_LOCAL,
+		.force = 1,
 		.process_main = local_get_node_list,
 	},
 
