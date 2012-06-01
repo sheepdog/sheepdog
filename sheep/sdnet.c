@@ -190,12 +190,9 @@ static void io_op_done(struct work *work)
 	return;
 
 retry:
-	req->rq.epoch = sys->epoch;
-
-	put_vnode_info(req->vnodes);
-	req->vnodes = get_vnode_info();
-	setup_access_to_local_objects(req);
-	process_io_request(req);
+	if (req->vnodes)
+		put_vnode_info(req->vnodes);
+	queue_request(req);
 }
 
 static void local_op_done(struct work *work)
