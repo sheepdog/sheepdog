@@ -83,7 +83,7 @@ static size_t nr_zk_nodes;
 
 static inline int is_blocking_event(struct zk_event *ev)
 {
-	return ev->type == EVENT_BLOCK || ev->type == EVENT_JOIN_RESPONSE;
+	return ev->type == EVENT_BLOCK || ev->type == EVENT_JOIN_REQUEST;
 }
 
 /* zookeeper API wrapper */
