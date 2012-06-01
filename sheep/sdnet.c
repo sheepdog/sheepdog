@@ -209,7 +209,7 @@ static int check_request_epoch(struct request *req)
 		/* ask gateway to retry. */
 		req->rp.result = SD_RES_OLD_NODE_VER;
 		req->rp.epoch = sys->epoch;
-		req->work.done(&req->work);
+		req_done(req);
 		return -1;
 	} else if (after(req->rq.epoch, sys->epoch)) {
 		eprintf("new node version %u, %u, %x\n",
