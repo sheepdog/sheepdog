@@ -109,6 +109,7 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 	ssize_t size;
+	struct flock fl;
 
 	if (iocb->epoch < sys_epoch()) {
 		dprintf("%"PRIu32" sys %"PRIu32"\n", iocb->epoch, sys_epoch());
@@ -125,6 +126,18 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
 
+	fl.l_type = F_WRLCK;
+	fl.l_whence = SEEK_SET;
+	/* For create, we lock the whole object */
+	fl.l_start = create ? 0: iocb->offset;
+	fl.l_len = create ? (is_vdi_obj(oid) ? SD_INODE_SIZE : SD_DATA_OBJ_SIZE)
+		   : iocb->length;
+	fl.l_pid = getpid();
+	if (fcntl(fd, F_SETLKW, &fl) < 0) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
 	if (create && !(iocb->flags & SD_FLAG_CMD_COW)) {
 		ret = prealloc(fd, is_vdi_obj(oid) ?
 			       SD_INODE_SIZE : SD_DATA_OBJ_SIZE);
@@ -132,6 +145,12 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 			goto out;
 	}
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
+	fl.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &fl) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	if (size != iocb->length) {
 		eprintf("%m\n");
 		ret = SD_RES_EIO;
@@ -410,10 +429,13 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 {
 	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
 	uint32_t epoch = sys_epoch();
+	char path[PATH_MAX];
+	ssize_t size;
+	int i;
+	void *buffer;
+	struct flock fl;
 
 	if (iocb->epoch < epoch) {
-		int i;
-		void *buffer;
 
 		buffer = read_working_object(oid, iocb->offset, iocb->length);
 		if (!buffer) {
@@ -424,7 +446,8 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 			 * in the next epoch we removed it from the local directory.
 			 * in this case, we should try to retrieve object upwards, since.
 			 * when the object is to be removed, it will get written to the
-			 * snapshot at later epoch. */
+			 * snapshot at later epoch.
+			 */
 			for (i = iocb->epoch; i < epoch; i++) {
 				buffer = retrieve_object_from_snap(oid, i);
 				if (buffer)
@@ -437,24 +460,37 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 		free(buffer);
 
 		return SD_RES_SUCCESS;
-	} else {
-		char path[PATH_MAX];
-		ssize_t size;
+	}
 
-		if (is_vdi_obj(oid))
-			flags &= ~O_DIRECT;
+	if (is_vdi_obj(oid))
+		flags &= ~O_DIRECT;
 
-		sprintf(path, "%s%016"PRIx64, obj_path, oid);
-		fd = open(path, flags);
+	sprintf(path, "%s%016"PRIx64, obj_path, oid);
+	fd = open(path, flags);
 
-		if (fd < 0)
-			return err_to_sderr(oid, errno);
+	if (fd < 0)
+		return err_to_sderr(oid, errno);
 
-		size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
-		if (size != iocb->length) {
-			ret = SD_RES_EIO;
-			goto out;
-		}
+	fl.l_type = F_RDLCK;
+	fl.l_whence = SEEK_SET;
+	fl.l_start = iocb->offset;
+	fl.l_len = iocb->length;
+	fl.l_pid = getpid();
+	if (fcntl(fd, F_SETLKW, &fl) < 0) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
+	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
+	fl.l_type = F_UNLCK;
+	if (fcntl(fd, F_SETLK, &fl) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
+	if (size != iocb->length) {
+		ret = SD_RES_EIO;
+		goto out;
 	}
 out:
 	close(fd);
