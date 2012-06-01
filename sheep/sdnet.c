@@ -39,23 +39,6 @@ static int is_access_local(struct request *req, uint64_t oid)
 	return 0;
 }
 
-static void setup_access_to_local_objects(struct request *req)
-{
-	struct sd_req *hdr = &req->rq;
-
-	if (hdr->flags & SD_FLAG_CMD_IO_LOCAL) {
-		req->local_oid = hdr->obj.oid;
-		return;
-	}
-
-	if (is_access_local(req, hdr->obj.oid))
-		req->local_oid = hdr->obj.oid;
-
-	if (hdr->obj.cow_oid)
-		if (is_access_local(req, hdr->obj.cow_oid))
-			req->local_cow_oid = hdr->obj.cow_oid;
-}
-
 static int need_consistency_check(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
@@ -359,24 +342,40 @@ void flush_wait_obj_requests(void)
 
 static void queue_io_request(struct request *req)
 {
-	setup_access_to_local_objects(req);
+	req->local_oid = req->rq.obj.oid;
+
+	if (check_request(req) < 0)
+		return;
+	list_add_tail(&req->request_list, &sys->outstanding_req_list);
+
+	req->work.fn = do_io_request;
+	req->work.done = io_op_done;
+	queue_work(sys->io_wqueue, &req->work);
+}
+
+static void queue_gateway_request(struct request *req)
+{
+	struct sd_req *hdr = &req->rq;
+
+	if (is_access_local(req, hdr->obj.oid))
+		req->local_oid = hdr->obj.oid;
+
+	if (hdr->obj.cow_oid) {
+		if (is_access_local(req, hdr->obj.cow_oid))
+			req->local_cow_oid = hdr->obj.cow_oid;
+	}
+
 	if (check_request(req) < 0)
 		return;
 
 	list_add_tail(&req->request_list, &sys->outstanding_req_list);
 
-	if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL) {
-		req->work.fn = do_io_request;
-		req->work.done = io_op_done;
-		queue_work(sys->io_wqueue, &req->work);
-	} else {
-		if (need_consistency_check(req))
-			set_consistency_check(req);
+	if (need_consistency_check(req))
+		set_consistency_check(req);
 
-		req->work.fn = do_gateway_request;
-		req->work.done = io_op_done;
-		queue_work(sys->gateway_wqueue, &req->work);
-	}
+	req->work.fn = do_gateway_request;
+	req->work.done = io_op_done;
+	queue_work(sys->gateway_wqueue, &req->work);
 }
 
 static void queue_local_request(struct request *req)
@@ -444,7 +443,10 @@ static void queue_request(struct request *req)
 		req->vnodes = get_vnode_info();
 
 	if (is_io_op(req->op)) {
-		queue_io_request(req);
+		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
+			queue_io_request(req);
+		else
+			queue_gateway_request(req);
 	} else if (is_local_op(req->op)) {
 		queue_local_request(req);
 	} else if (is_cluster_op(req->op)) {
