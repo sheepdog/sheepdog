@@ -220,22 +220,28 @@ static int check_request_epoch(struct request *req)
 
 static int check_request_in_recovery(struct request *req)
 {
-	/*
-	 * Request from recovery should not wait for objects under recovery to
-	 * avoid deadlocks.  The recovery code will perfom its own retries.
-	 */
-	if (is_recoverying_oid(req->local_oid) &&
-	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
-		if (is_recovery_init()) {
+	if (is_recoverying_oid(req->local_oid)) {
+		if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
+			/*
+			 * Request from recovery should not wait for objects
+			 * under recovery to avoid deadlocks.
+			 */
 			req->rp.result = SD_RES_OBJ_RECOVERING;
-			list_add_tail(&req->request_list,
-				      &sys->wait_rw_queue);
-		} else
-			list_add_tail(&req->request_list,
-				      &sys->wait_obj_queue);
+			req_done(req);
+		} else {
+			/*
+			 * Put request on wait queues of local node
+			 */
+			if (is_recovery_init()) {
+				req->rp.result = SD_RES_OBJ_RECOVERING;
+				list_add_tail(&req->request_list,
+					      &sys->wait_rw_queue);
+			} else
+				list_add_tail(&req->request_list,
+					      &sys->wait_obj_queue);
+		}
 		return -1;
 	}
-
 	return 0;
 }
 
