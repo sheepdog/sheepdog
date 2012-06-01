@@ -126,8 +126,6 @@ static void io_op_done(struct work *work)
 		leave_cluster();
 	}
 
-	resume_recovery_work();
-
 	req_done(req);
 	return;
 }
@@ -165,11 +163,8 @@ static void gateway_op_done(struct work *work)
 		break;
 	}
 
-	resume_recovery_work();
-
 	req_done(req);
 	return;
-
 retry:
 	if (req->vnodes)
 		put_vnode_info(req->vnodes);

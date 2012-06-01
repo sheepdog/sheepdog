@@ -244,8 +244,6 @@ void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
 		struct sd_vnode **vnodes);
 int get_nr_copies(struct vnode_info *vnode_info);
 
-int is_access_to_busy_objects(uint64_t oid);
-
 void resume_pending_requests(void);
 void resume_wait_epoch_requests(void);
 void resume_wait_obj_requests(uint64_t oid);

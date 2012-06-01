@@ -886,17 +886,6 @@ static int send_join_request(struct sd_node *ent)
 	return ret;
 }
 
-int is_access_to_busy_objects(uint64_t oid)
-{
-	struct request *req;
-
-	list_for_each_entry(req, &sys->outstanding_req_list, request_list) {
-		if (oid == req->local_oid)
-			return 1;
-	}
-	return 0;
-}
-
 void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		size_t nr_members, enum cluster_join_result result,
 		void *opaque)

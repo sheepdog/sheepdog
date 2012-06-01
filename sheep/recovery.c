@@ -262,26 +262,6 @@ static void recover_object_work(struct work *work)
 		eprintf("failed to recover object %"PRIx64"\n", oid);
 }
 
-static struct recovery_work *suspended_recovery_work;
-
-void resume_recovery_work(void)
-{
-	struct recovery_work *rw;
-	uint64_t oid;
-
-	if (!suspended_recovery_work)
-		return;
-
-	rw = suspended_recovery_work;
-
-	oid =  rw->oids[rw->done];
-	if (is_access_to_busy_objects(oid))
-		return;
-
-	suspended_recovery_work = NULL;
-	queue_work(sys->recovery_wqueue, &rw->work);
-}
-
 int node_in_recovery(void)
 {
 	return !!recovering_work;
@@ -388,13 +368,6 @@ static void recover_object_main(struct work *work)
 	resume_wait_obj_requests(rw->done++);
 
 	if (rw->done < rw->count) {
-		uint64_t oid;
-		oid = rw->oids[rw->done];
-
-		if (is_access_to_busy_objects(oid)) {
-			suspended_recovery_work = rw;
-			return;
-		}
 		/* Requeue the work */
 		queue_work(sys->recovery_wqueue, &rw->work);
 		return;
