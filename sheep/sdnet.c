@@ -116,35 +116,48 @@ static void check_object_consistency(struct sd_req *hdr)
 static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
+
+	list_del(&req->request_list);
+
+	if (req->rp.result == SD_RES_EIO) {
+		req->rp.result = SD_RES_NETWORK_ERROR;
+
+		eprintf("leaving sheepdog cluster\n");
+		leave_cluster();
+	}
+
+	resume_pending_requests();
+	resume_recovery_work();
+
+	req_done(req);
+	return;
+}
+
+static void gateway_op_done(struct work *work)
+{
+	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = &req->rq;
 
 	list_del(&req->request_list);
 
 	switch (req->rp.result) {
 	case SD_RES_OLD_NODE_VER:
+		if (req->rp.epoch > sys->epoch) {
+			list_add_tail(&req->request_list,
+				      &sys->wait_rw_queue);
+			break;
+		}
+		/*FALLTHRU*/
 	case SD_RES_NEW_NODE_VER:
 	case SD_RES_NETWORK_ERROR:
 	case SD_RES_WAIT_FOR_JOIN:
 	case SD_RES_WAIT_FOR_FORMAT:
-		if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL)) {
-			if (req->rp.epoch > sys->epoch &&
-			    req->rp.result == SD_RES_OLD_NODE_VER) {
-				list_add_tail(&req->request_list,
-						&sys->wait_rw_queue);
-			} else
-				goto retry;
-		}
-		break;
+		goto retry;
 	case SD_RES_EIO:
 		if (is_access_local(req, hdr->obj.oid)) {
 			eprintf("leaving sheepdog cluster\n");
 			leave_cluster();
-
-			if (!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL))
-				goto retry;
-
-			/* hack to retry */
-			req->rp.result = SD_RES_NETWORK_ERROR;
+			goto retry;
 		}
 		break;
 	case SD_RES_SUCCESS:
@@ -374,7 +387,7 @@ static void queue_gateway_request(struct request *req)
 		set_consistency_check(req);
 
 	req->work.fn = do_gateway_request;
-	req->work.done = io_op_done;
+	req->work.done = gateway_op_done;
 	queue_work(sys->gateway_wqueue, &req->work);
 }
 
