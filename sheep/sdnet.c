@@ -196,9 +196,6 @@ retry:
 	req->vnodes = get_vnode_info();
 	setup_access_to_local_objects(req);
 	process_io_request(req);
-
-	resume_pending_requests();
-	resume_recovery_work();
 }
 
 static void local_op_done(struct work *work)
