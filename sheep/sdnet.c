@@ -142,7 +142,11 @@ static void gateway_op_done(struct work *work)
 		if (req->rp.epoch > sys->epoch) {
 			list_add_tail(&req->request_list,
 				      &sys->wait_rw_queue);
-			break;
+			/*
+			 * Gateway of this node is expected to process this
+			 * request later when epoch is lifted.
+			 */
+			return;
 		}
 		/*FALLTHRU*/
 	case SD_RES_NEW_NODE_VER:
