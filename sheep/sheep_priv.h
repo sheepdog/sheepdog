@@ -119,7 +119,6 @@ struct cluster_info {
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	struct list_head outstanding_req_list;
 	struct list_head consistent_obj_list;
 	struct list_head blocking_conn_list;
 

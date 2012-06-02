@@ -1064,7 +1064,6 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 	INIT_LIST_HEAD(&sys->pending_list);
 	INIT_LIST_HEAD(&sys->leave_list);
 
-	INIT_LIST_HEAD(&sys->outstanding_req_list);
 	INIT_LIST_HEAD(&sys->consistent_obj_list);
 	INIT_LIST_HEAD(&sys->blocking_conn_list);
 

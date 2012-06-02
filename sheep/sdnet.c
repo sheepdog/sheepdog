@@ -20,7 +20,7 @@
 
 #include "sheep_priv.h"
 
-static void queue_request(struct request *req);
+static void requeue_request(struct request *req);
 
 static int is_access_local(struct request *req, uint64_t oid)
 {
@@ -117,8 +117,6 @@ static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 
-	list_del(&req->request_list);
-
 	if (req->rp.result == SD_RES_EIO) {
 		req->rp.result = SD_RES_NETWORK_ERROR;
 
@@ -134,8 +132,6 @@ static void gateway_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = &req->rq;
-
-	list_del(&req->request_list);
 
 	switch (req->rp.result) {
 	case SD_RES_OLD_NODE_VER:
@@ -170,9 +166,7 @@ static void gateway_op_done(struct work *work)
 	req_done(req);
 	return;
 retry:
-	if (req->vnodes)
-		put_vnode_info(req->vnodes);
-	queue_request(req);
+	requeue_request(req);
 }
 
 static void local_op_done(struct work *work)
@@ -247,14 +241,6 @@ static int check_request_in_recovery(struct request *req)
 		return -1;
 	}
 	return 0;
-}
-
-static void requeue_request(struct request *req)
-{
-	list_del(&req->request_list);
-	if (req->vnodes)
-		put_vnode_info(req->vnodes);
-	queue_request(req);
 }
 
 void resume_wait_epoch_requests(void)
@@ -345,7 +331,6 @@ static void queue_io_request(struct request *req)
 		if (check_request_in_recovery(req) < 0)
 			return;
 	}
-	list_add_tail(&req->request_list, &sys->outstanding_req_list);
 
 	req->work.fn = do_io_request;
 	req->work.done = io_op_done;
@@ -369,8 +354,6 @@ static void queue_gateway_request(struct request *req)
 		if (check_request_in_recovery(req) < 0)
 			return;
 	}
-
-	list_add_tail(&req->request_list, &sys->outstanding_req_list);
 
 	if (need_consistency_check(req))
 		set_consistency_check(req);
@@ -462,6 +445,13 @@ static void queue_request(struct request *req)
 	return;
 done:
 	req_done(req);
+}
+
+static void requeue_request(struct request *req)
+{
+	if (req->vnodes)
+		put_vnode_info(req->vnodes);
+	queue_request(req);
 }
 
 static void client_incref(struct client_info *ci);
