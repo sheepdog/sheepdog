@@ -80,6 +80,7 @@ static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 			p = &(*p)->rb_right;
 		else {
 			rb_erase(parent, root);
+			free(entry);
 			return 0;
 		}
 	}
