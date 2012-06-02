@@ -279,6 +279,11 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
+	if (chdir(dir) < 0) {
+		fprintf(stderr, "failed to chdir to %s: %m\n", dir);
+		exit(1);
+	}
+
 	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
 
 	while (!sys_stat_shutdown() || sys->nr_outstanding_reqs != 0)

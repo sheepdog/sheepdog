@@ -29,6 +29,7 @@
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <pthread.h>
+#include <libgen.h>
 
 #include "logger.h"
 #include "util.h"
@@ -404,12 +405,15 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 {
 	off_t offset;
 	size_t log_size;
+	char log_dir[PATH_MAX];
 
 	log_level = level;
 
 	logdbg(stderr, "entering log_init\n");
 	log_name = program_name;
 	log_nowname = outfile;
+	strcpy(log_dir, outfile);
+	strcpy(log_dir, dirname(log_dir));
 
 	semkey = random();
 
@@ -465,8 +469,8 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 		dup2(fd, 1);
 		dup2(fd, 2);
 		setsid();
-		if (chdir("/") < 0) {
-			syslog(LOG_ERR, "failed to chdir to /: %m\n");
+		if (chdir(log_dir) < 0) {
+			syslog(LOG_ERR, "failed to chdir to %s: %m\n", log_dir);
 			exit(1);
 		}
 
