@@ -365,7 +365,7 @@ static void recover_object_main(struct work *work)
 
 	if (rw->nr_blocking > 0)
 		rw->nr_blocking--;
-	resume_wait_obj_requests(rw->done++);
+	resume_wait_obj_requests(rw->oids[rw->done++]);
 
 	if (rw->done < rw->count) {
 		/* Requeue the work */
