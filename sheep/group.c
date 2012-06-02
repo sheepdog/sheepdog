@@ -423,8 +423,11 @@ static int cluster_sanity_check(struct sd_node *entries,
 
 	if (sys_stat_wait_format() || sys_stat_shutdown())
 		goto out;
-	/* When the joining node is newly created, we need not check anything. */
-	if (nr_entries == 0)
+	/*
+	 * When the joining node is newly created and we are not waiting for
+	 * join we need not check anything.
+	 */
+	if (nr_entries == 0 && !sys_stat_wait_join())
 		goto out;
 
 	if (ctime != get_cluster_ctime()) {
