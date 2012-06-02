@@ -216,7 +216,7 @@ static int check_request_epoch(struct request *req)
 	return 0;
 }
 
-static int check_request_in_recovery(struct request *req)
+static bool request_in_recovery(struct request *req)
 {
 	if (is_recoverying_oid(req->local_oid)) {
 		if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
@@ -238,9 +238,9 @@ static int check_request_in_recovery(struct request *req)
 				list_add_tail(&req->request_list,
 					      &sys->wait_obj_queue);
 		}
-		return -1;
+		return true;
 	}
-	return 0;
+	return false;
 }
 
 void resume_wait_epoch_requests(void)
@@ -328,7 +328,7 @@ static void queue_io_request(struct request *req)
 	if (req->local_oid) {
 		if (check_request_epoch(req) < 0)
 			return;
-		if (check_request_in_recovery(req) < 0)
+		if (request_in_recovery(req))
 			return;
 	}
 
@@ -351,7 +351,7 @@ static void queue_gateway_request(struct request *req)
 	    (!sys->enable_write_cache ||
 	     !(req->rq.flags & SD_FLAG_CMD_CACHE) ||
 	     !object_is_cached(req->rq.obj.oid))) {
-		if (check_request_in_recovery(req) < 0)
+		if (request_in_recovery(req))
 			return;
 	}
 
