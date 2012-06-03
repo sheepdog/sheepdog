@@ -218,25 +218,23 @@ static int check_request_epoch(struct request *req)
 
 static bool request_in_recovery(struct request *req)
 {
-	if (is_recoverying_oid(req->local_oid)) {
-		if (req->rq.flags & SD_FLAG_CMD_RECOVERY) {
-			/*
-			 * Request from recovery should not wait for objects
-			 * under recovery to avoid deadlocks.
-			 */
+	/*
+	 * Request from recovery should go down the Farm even if
+	 * is_recoverying_oid() returns true because we should also try snap
+	 * cache of the Farm and return the error code back if not found.
+	 */
+	if (is_recoverying_oid(req->local_oid) &&
+	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
+		/*
+		 * Put request on wait queues of local node
+		 */
+		if (is_recovery_init()) {
 			req->rp.result = SD_RES_OBJ_RECOVERING;
-			req_done(req);
+			list_add_tail(&req->request_list,
+				      &sys->wait_rw_queue);
 		} else {
-			/*
-			 * Put request on wait queues of local node
-			 */
-			if (is_recovery_init()) {
-				req->rp.result = SD_RES_OBJ_RECOVERING;
-				list_add_tail(&req->request_list,
-					      &sys->wait_rw_queue);
-			} else
-				list_add_tail(&req->request_list,
-					      &sys->wait_obj_queue);
+			list_add_tail(&req->request_list,
+				      &sys->wait_obj_queue);
 		}
 		return true;
 	}
