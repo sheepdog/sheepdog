@@ -246,9 +246,6 @@ static void recover_object_work(struct work *work)
 	uint64_t oid = rw->oids[rw->done];
 	int ret;
 
-	if (!sys->nr_copies)
-		return;
-
 	eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n",
 		rw->done, rw->count, oid);
 
@@ -387,7 +384,8 @@ static void recover_object_main(struct work *work)
 		iocb.epoch = sys->epoch;
 		sd_store->end_recover(&iocb);
 	}
-	dprintf("recovery complete: new epoch %"PRIu32"\n", sys->recovered_epoch);
+	dprintf("recovery complete: new epoch %"PRIu32"\n",
+		sys->recovered_epoch);
 }
 
 static void finish_object_list(struct work *work)
@@ -412,8 +410,9 @@ static void finish_object_list(struct work *work)
 	return;
 }
 
-static int request_obj_list(struct sd_node *e, uint32_t epoch,
-			   uint8_t *buf, size_t buf_size)
+/* Fetch the object list from all the nodes in the cluster */
+static int fetch_object_list(struct sd_node *e, uint32_t epoch,
+			     uint8_t *buf, size_t buf_size)
 {
 	int fd, ret;
 	unsigned wlen, rlen;
@@ -447,7 +446,7 @@ static int request_obj_list(struct sd_node *e, uint32_t epoch,
 	rsp = (struct sd_list_rsp *)&hdr;
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		eprintf("retrying: %"PRIu32", %"PRIu32"\n", ret, rsp->result);
+		eprintf("failed, %"PRIu32", %"PRIu32"\n", ret, rsp->result);
 		return -1;
 	}
 
@@ -456,8 +455,9 @@ static int request_obj_list(struct sd_node *e, uint32_t epoch,
 	return rsp->data_length / sizeof(uint64_t);
 }
 
-static void screen_obj_list(struct recovery_work *rw,
-		uint64_t *oids, int nr_oids)
+/* Screen out objects that don't belong to this node */
+static void screen_object_list(struct recovery_work *rw,
+			       uint64_t *oids, int nr_oids)
 {
 	struct sd_vnode *vnodes[SD_MAX_COPIES];
 	int old_count = rw->count;
@@ -482,8 +482,6 @@ static void screen_obj_list(struct recovery_work *rw,
 	qsort(rw->oids, rw->count, sizeof(uint64_t), obj_cmp);
 }
 
-#define MAX_RETRY_CNT  6
-
 static int newly_joined(struct sd_node *node, struct recovery_work *rw)
 {
 	if (bsearch(node, rw->old_vnodes->nodes, rw->old_vnodes->nr_nodes,
@@ -492,18 +490,22 @@ static int newly_joined(struct sd_node *node, struct recovery_work *rw)
 	return 1;
 }
 
-static int fill_obj_list(struct recovery_work *rw)
+/* Prepare the object list that belongs to this node */
+static void prepare_object_list(struct work *work)
 {
-	int i;
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
 	struct sd_node *cur = rw->cur_vnodes->nodes;
 	int cur_nr = rw->cur_vnodes->nr_nodes;
-	int start = random() % cur_nr;
-	int end = cur_nr;
+	int start = random() % cur_nr, i, end = cur_nr;
+
+	dprintf("%u\n", rw->epoch);
 
 	buf = xmalloc(buf_size);
 again:
+	/* We need to start at random node for better load balance */
 	for (i = start; i < end; i++) {
 		int buf_nr;
 		struct sd_node *node = cur + i;
@@ -516,10 +518,10 @@ again:
 			/* new node doesn't have a list file */
 			continue;
 
-		buf_nr = request_obj_list(node, rw->epoch, buf, buf_size);
+		buf_nr = fetch_object_list(node, rw->epoch, buf, buf_size);
 		if (buf_nr < 0)
 			continue;
-		screen_obj_list(rw, (uint64_t *)buf, buf_nr);
+		screen_object_list(rw, (uint64_t *)buf, buf_nr);
 	}
 
 	if (start != 0) {
@@ -531,23 +533,6 @@ again:
 	dprintf("%d\n", rw->count);
 out:
 	free(buf);
-	return 0;
-}
-
-static void prepare_object_list(struct work *work)
-{
-	struct recovery_work *rw = container_of(work, struct recovery_work, work);
-
-	dprintf("%u\n", rw->epoch);
-
-	if (!sys->nr_copies)
-		return;
-
-	if (fill_obj_list(rw) < 0) {
-		eprintf("fatal recovery error\n");
-		rw->count = 0;
-		return;
-	}
 }
 
 int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
