@@ -337,18 +337,23 @@ static void free_recovery_work(struct recovery_work *rw)
 	free(rw);
 }
 
+static inline void run_next_rw(struct recovery_work *rw)
+{
+	free_recovery_work(rw);
+	rw = next_rw;
+	next_rw = NULL;
+	recovering_work = rw;
+	flush_wait_obj_requests();
+	queue_work(sys->recovery_wqueue, &rw->work);
+	dprintf("recovery work is superseded\n");
+}
+
 static void recover_object_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work,
 						work);
 	if (next_rw) {
-		free_recovery_work(rw);
-		rw = next_rw;
-		next_rw = NULL;
-		recovering_work = rw;
-		flush_wait_obj_requests();
-		queue_work(sys->recovery_wqueue, &rw->work);
-		dprintf("recovery work is superseded\n");
+		run_next_rw(rw);
 		return;
 	}
 
@@ -390,6 +395,10 @@ static void finish_object_list(struct work *work)
 	struct recovery_work *rw = container_of(work, struct recovery_work,
 						work);
 	rw->state = RW_RUN;
+	if (next_rw) {
+		run_next_rw(rw);
+		return;
+	}
 	/*
 	 * We have got the object list to be recovered locally, most of
 	 * objects are actually already being there, so let's resume
