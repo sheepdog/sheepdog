@@ -497,7 +497,6 @@ static int fill_obj_list(struct recovery_work *rw)
 	int i;
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
-	int retry_cnt;
 	struct sd_node *cur = rw->cur_vnodes->nodes;
 	int cur_nr = rw->cur_vnodes->nr_nodes;
 	int start = random() % cur_nr;
@@ -509,39 +508,28 @@ again:
 		int buf_nr;
 		struct sd_node *node = cur + i;
 
+		if (next_rw) {
+			dprintf("go to the next recovery\n");
+			goto out;
+		}
 		if (newly_joined(node, rw))
 			/* new node doesn't have a list file */
 			continue;
 
-		retry_cnt = 0;
-	retry:
 		buf_nr = request_obj_list(node, rw->epoch, buf, buf_size);
-		if (buf_nr < 0) {
-			retry_cnt++;
-			if (retry_cnt > MAX_RETRY_CNT) {
-				eprintf("failed to get object list\n");
-				eprintf("some objects may be lost\n");
-				continue;
-			} else {
-				if (next_rw) {
-					dprintf("go to the next recovery\n");
-					break;
-				}
-				dprintf("trying to get object list again\n");
-				sleep(1);
-				goto retry;
-			}
-		}
+		if (buf_nr < 0)
+			continue;
 		screen_obj_list(rw, (uint64_t *)buf, buf_nr);
 	}
 
-	if (start != 0 && !next_rw) {
+	if (start != 0) {
 		end = start;
 		start = 0;
 		goto again;
 	}
 
 	dprintf("%d\n", rw->count);
+out:
 	free(buf);
 	return 0;
 }
