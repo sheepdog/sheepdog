@@ -62,19 +62,6 @@ struct vdi_bitmap_work {
 	struct sd_node members[];
 };
 
-#define print_node_list(nodes, nr_nodes)			\
-({								\
-	char __name[128];					\
-	int __i;						\
-	for (__i = 0; __i < (nr_nodes); __i++) {		\
-		dprintf("%c ip: %s, port: %d\n",		\
-			is_myself(nodes[__i].addr, nodes[__i].port) ? 'l' : ' ', \
-			addr_to_str(__name, sizeof(__name),	\
-				    nodes[__i].addr, nodes[__i].port), \
-			nodes[__i].port);			\
-	}							\
-})
-
 static struct vnode_info *current_vnode_info;
 
 static size_t get_join_message_size(struct join_message *jm)
@@ -217,8 +204,6 @@ void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
 struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes)
 {
 	struct vnode_info *vnode_info;
-
-	print_node_list(nodes, nr_nodes);
 
 	vnode_info = xzalloc(sizeof(*vnode_info));
 
