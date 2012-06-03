@@ -353,6 +353,21 @@ static inline void run_next_rw(struct recovery_work *rw)
 	dprintf("recovery work is superseded\n");
 }
 
+static inline void finish_recovery(struct recovery_work *rw)
+{
+	recovering_work = NULL;
+	sys->recovered_epoch = rw->epoch;
+	free_recovery_work(rw);
+
+	if (sd_store->end_recover) {
+		struct siocb iocb = { 0 };
+		iocb.epoch = sys->epoch;
+		sd_store->end_recover(&iocb);
+	}
+	dprintf("recovery complete: new epoch %"PRIu32"\n",
+		sys->recovered_epoch);
+}
+
 static void recover_object_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work,
@@ -378,22 +393,12 @@ static void recover_object_main(struct work *work)
 	resume_wait_obj_requests(rw->oids[rw->done++]);
 
 	if (rw->done < rw->count) {
-		/* Requeue the work */
+		/* Try recover next object */
 		queue_work(sys->recovery_wqueue, &rw->work);
 		return;
 	}
 
-	recovering_work = NULL;
-	sys->recovered_epoch = rw->epoch;
-	free_recovery_work(rw);
-
-	if (sd_store->end_recover) {
-		struct siocb iocb = { 0 };
-		iocb.epoch = sys->epoch;
-		sd_store->end_recover(&iocb);
-	}
-	dprintf("recovery complete: new epoch %"PRIu32"\n",
-		sys->recovered_epoch);
+	finish_recovery(rw);
 }
 
 static void finish_object_list(struct work *work)
@@ -403,6 +408,10 @@ static void finish_object_list(struct work *work)
 	rw->state = RW_RUN;
 	if (next_rw) {
 		run_next_rw(rw);
+		return;
+	}
+	if (!rw->count) {
+		finish_recovery(rw);
 		return;
 	}
 	/*
