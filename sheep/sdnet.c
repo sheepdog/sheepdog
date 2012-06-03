@@ -253,11 +253,13 @@ void resume_wait_epoch_requests(void)
 			 */
 			assert(!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL));
 			req->rq.epoch = sys->epoch;
+			list_del(&req->request_list);
 			requeue_request(req);
 			break;
 		case SD_RES_NEW_NODE_VER:
 			/* Peer retries the request locally when its epoch changes. */
 			assert(req->rq.flags & SD_FLAG_CMD_IO_LOCAL);
+			list_del(&req->request_list);
 			requeue_request(req);
 			break;
 		default:
@@ -280,6 +282,7 @@ void resume_wait_recovery_requests(void)
 			continue;
 
 		dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
+		list_del(&req->request_list);
 		requeue_request(req);
 	}
 
@@ -300,6 +303,7 @@ void resume_wait_obj_requests(uint64_t oid)
 		/* the object requested by a pending request has been
 		 * recovered, notify the pending request. */
 		dprintf("retry %" PRIx64 "\n", req->local_oid);
+		list_del(&req->request_list);
 		requeue_request(req);
 	}
 	list_splice_init(&pending_list, &sys->wait_obj_queue);
@@ -312,8 +316,10 @@ void flush_wait_obj_requests(void)
 
 	list_splice_init(&sys->wait_obj_queue, &pending_list);
 
-	list_for_each_entry_safe(req, n, &pending_list, request_list)
+	list_for_each_entry_safe(req, n, &pending_list, request_list) {
+		list_del(&req->request_list);
 		requeue_request(req);
+	}
 }
 
 static void queue_io_request(struct request *req)
