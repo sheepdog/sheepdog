@@ -55,10 +55,6 @@ static int need_consistency_check(struct request *req)
 		/* only check consistency for data objects */
 		return 0;
 
-	if (sys->enable_write_cache && object_is_cached(hdr->obj.oid))
-		/* we don't check consistency for cached objects */
-		return 0;
-
 	return 1;
 }
 
@@ -343,19 +339,21 @@ static void queue_gateway_request(struct request *req)
 		req->local_oid = hdr->obj.oid;
 
 	/*
-	 * If we go for a cached object, we don't care if it is being recovered.
+	 * If we go for a cached object, we don't care if it is being recovered
 	 */
-	if (req->local_oid &&
-	    (!sys->enable_write_cache ||
-	     !(req->rq.flags & SD_FLAG_CMD_CACHE) ||
-	     !object_is_cached(req->rq.obj.oid))) {
+	if (sys->enable_write_cache &&
+	    req->rq.flags & SD_FLAG_CMD_CACHE &&
+	    object_is_cached(req->rq.obj.oid))
+		goto queue_work;
+
+	if (req->local_oid)
 		if (request_in_recovery(req))
 			return;
-	}
 
 	if (need_consistency_check(req))
 		set_consistency_check(req);
 
+queue_work:
 	req->work.fn = do_gateway_request;
 	req->work.done = gateway_op_done;
 	queue_work(sys->gateway_wqueue, &req->work);
