@@ -271,59 +271,67 @@ int is_recovery_init(void)
 	return rw->state == RW_INIT;
 }
 
-int is_recoverying_oid(uint64_t oid)
+static inline bool schedule_oid(uint64_t oid)
 {
-	uint64_t hval = fnv_64a_buf(&oid, sizeof(uint64_t), FNV1A_64_INIT);
-	uint64_t min_hval;
-	struct recovery_work *rw = recovering_work;
+	uint64_t hval, min_hval;
 	int i;
+	struct recovery_work *rw = recovering_work;
 
-	if (oid == 0)
-		return 0;
-
-	if (!rw)
-		return 0; /* there is no thread working for object recovery */
-
-	min_hval = fnv_64a_buf(&rw->oids[rw->done + rw->nr_blocking], sizeof(uint64_t), FNV1A_64_INIT);
-
-	if (before(rw->epoch, sys->epoch))
-		return 1;
-
-	if (sd_store->exist(oid)) {
-		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
-		return 0;
-	}
-
-	if (rw->state == RW_INIT)
-		return 1;
-
-	/* the first 'rw->nr_blocking' objects were already scheduled to be done earlier */
+	/* Check if the oid is already scheduled in front */
 	for (i = 0; i < rw->nr_blocking; i++)
 		if (rw->oids[rw->done + i] == oid)
-			return 1;
+			return true;
+
+	min_hval = fnv_64a_buf(&rw->oids[rw->done + rw->nr_blocking],
+			       sizeof(uint64_t), FNV1A_64_INIT);
+	hval = fnv_64a_buf(&oid, sizeof(uint64_t), FNV1A_64_INIT);
 
 	if (min_hval <= hval) {
 		uint64_t *p;
 		p = bsearch(&oid, rw->oids + rw->done + rw->nr_blocking,
-			    rw->count - rw->done - rw->nr_blocking, sizeof(oid), obj_cmp);
+			    rw->count - rw->done - rw->nr_blocking, sizeof(oid),
+			    obj_cmp);
 		if (p) {
 			dprintf("recover the object %" PRIx64 " first\n", oid);
+			/* The first oid may be processed now */
 			if (rw->nr_blocking == 0)
-				rw->nr_blocking = 1; /* the first oid may be processed now */
+				rw->nr_blocking = 1;
+			/* This oid should be recovered first */
 			if (p > rw->oids + rw->done + rw->nr_blocking) {
-				/* this object should be recovered earlier */
 				memmove(rw->oids + rw->done + rw->nr_blocking + 1,
 					rw->oids + rw->done + rw->nr_blocking,
 					sizeof(uint64_t) * (p - (rw->oids + rw->done + rw->nr_blocking)));
 				rw->oids[rw->done + rw->nr_blocking] = oid;
 				rw->nr_blocking++;
 			}
-			return 1;
+			return true;
 		}
 	}
 
 	dprintf("the object %" PRIx64 " is not found\n", oid);
-	return 0;
+	return false;
+}
+
+bool oid_in_recovery(uint64_t oid)
+{
+	struct recovery_work *rw = recovering_work;
+
+	if (!node_in_recovery())
+		return false;
+
+	if (sd_store->exist(oid)) {
+		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
+		return false;
+	}
+
+	if (before(rw->epoch, sys->epoch))
+		return true;
+
+	/* If we are in preparation of object list, oid is not recovered yet */
+	if (rw->state == RW_INIT)
+		return true;
+
+	return schedule_oid(oid);
 }
 
 static void free_recovery_work(struct recovery_work *rw)

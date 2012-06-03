@@ -216,10 +216,10 @@ static bool request_in_recovery(struct request *req)
 {
 	/*
 	 * Request from recovery should go down the Farm even if
-	 * is_recoverying_oid() returns true because we should also try snap
+	 * oid_in_recovery() returns true because we should also try snap
 	 * cache of the Farm and return the error code back if not found.
 	 */
-	if (is_recoverying_oid(req->local_oid) &&
+	if (oid_in_recovery(req->local_oid) &&
 	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
 		/*
 		 * Put request on wait queues of local node

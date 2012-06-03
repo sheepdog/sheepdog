@@ -286,7 +286,7 @@ int get_obj_list(const struct sd_list_req *, struct sd_list_rsp *, void *);
 int start_recovery(struct vnode_info *cur_vnodes,
 	struct vnode_info *old_vnodes);
 void resume_recovery_work(void);
-int is_recoverying_oid(uint64_t oid);
+bool oid_in_recovery(uint64_t oid);
 int is_recovery_init(void);
 int node_in_recovery(void);
 
