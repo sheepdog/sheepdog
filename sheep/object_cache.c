@@ -304,7 +304,6 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
-	struct flock fl;
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
@@ -320,24 +319,18 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t coun
 		goto out;
 	}
 
-	fl.l_type = F_WRLCK;
-	fl.l_whence = SEEK_SET;
-	fl.l_start = offset;
-	fl.l_len = count;
-	fl.l_pid = getpid();
-	if (fcntl(fd, F_SETLKW, &fl) < 0) {
-		eprintf("%m\n");
+	if (flock(fd, LOCK_EX) < 0) {
 		ret = SD_RES_EIO;
+		eprintf("%m\n");
 		goto out_close;
 	}
 	size = xpwrite(fd, buf, count, offset);
-
-	fl.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &fl) < 0) {
+	if (flock(fd, LOCK_UN) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out_close;
 	}
+
 	if (size != count) {
 		eprintf("size %zu, count:%zu, offset %zu %m\n",
 			size, count, offset);
@@ -355,7 +348,6 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
-	struct flock fl;
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
@@ -371,21 +363,13 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count
 		goto out;
 	}
 
-	fl.l_type = F_RDLCK;
-	fl.l_whence = SEEK_SET;
-	fl.l_start = offset;
-	fl.l_len = count;
-	fl.l_pid = getpid();
-	if (fcntl(fd, F_SETLKW, &fl) < 0) {
-		eprintf("%m\n");
+	if (flock(fd, LOCK_SH) < 0) {
 		ret = SD_RES_EIO;
+		eprintf("%m\n");
 		goto out_close;
 	}
-
 	size = xpread(fd, buf, count, offset);
-
-	fl.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &fl) < 0) {
+	if (flock(fd, LOCK_UN) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out_close;
@@ -439,7 +423,6 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buff
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd, ret = SD_RES_SUCCESS;
 	struct strbuf buf;
-	struct flock fl;
 
 	strbuf_init(&buf, PATH_MAX);
 	strbuf_addstr(&buf, cache_dir);
@@ -451,27 +434,23 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buff
 			dprintf("%08"PRIx32" already created\n", idx);
 			goto out;
 		}
+		dprintf("%m\n");
 		ret = SD_RES_EIO;
 		goto out;
 	}
-	fl.l_type = F_WRLCK;
-	fl.l_whence = SEEK_SET;
-	fl.l_start = 0;
-	fl.l_len = 0; /* 0 means EOF */
-	fl.l_pid = getpid();
-	if (fcntl(fd, F_SETLKW, &fl) < 0) {
-		eprintf("%m\n");
+
+	if (flock(fd, LOCK_EX) < 0) {
 		ret = SD_RES_EIO;
+		eprintf("%m\n");
 		goto out_close;
 	}
 	ret = xpwrite(fd, buffer, buf_size, 0);
-
-	fl.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &fl) < 0) {
+	if (flock(fd, LOCK_UN) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("%m\n");
 		goto out_close;
 	}
+
 	if (ret != buf_size) {
 		ret = SD_RES_EIO;
 		eprintf("failed, vid %"PRIx32", idx %"PRIx32"\n", oc->vid, idx);
@@ -526,7 +505,7 @@ static int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
 	ret = forward_read_obj_req(&read_req);
 
 	if (ret == SD_RES_SUCCESS) {
-		dprintf("oid %"PRIx64"pulled successfully\n", oid);
+		dprintf("oid %"PRIx64" pulled successfully\n", oid);
 		ret = create_cache_object(oc, idx, buf, data_length);
 	}
 	free(buf);
