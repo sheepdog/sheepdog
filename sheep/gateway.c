@@ -151,6 +151,7 @@ int forward_write_obj_req(struct request *req)
 
 		if (rsp->result != SD_RES_SUCCESS) {
 			eprintf("fail %"PRIu32"\n", ret);
+			ret = rsp->result;
 			goto out;
 		}
 	}
