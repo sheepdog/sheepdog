@@ -729,7 +729,7 @@ static int corosync_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	return fd;
+	return 0;
 }
 
 struct cluster_driver cdrv_corosync = {

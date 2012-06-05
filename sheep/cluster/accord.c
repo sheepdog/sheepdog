@@ -635,7 +635,7 @@ static int accord_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	return efd;
+	return 0;
 }
 
 struct cluster_driver cdrv_accord = {

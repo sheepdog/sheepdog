@@ -457,7 +457,7 @@ static int local_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	return sigfd;
+	return 0;
 }
 
 struct cluster_driver cdrv_local = {
