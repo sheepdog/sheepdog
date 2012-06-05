@@ -268,6 +268,11 @@ int get_nr_copies(struct vnode_info *vnode_info)
 	return min(vnode_info->nr_zones, sys->nr_copies);
 }
 
+/*
+ * Indicator if a cluster operation is currently running.
+ */
+static bool cluster_op_running = false;
+
 static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 		size_t *sizep)
 {
@@ -312,6 +317,8 @@ static void cluster_op_done(struct work *work)
 	struct vdi_op_message *msg;
 	size_t size;
 
+	cluster_op_running = false;
+
 	msg = prepare_cluster_msg(req, &size);
 	if (!msg)
 		panic();
@@ -322,20 +329,33 @@ static void cluster_op_done(struct work *work)
 }
 
 /*
- * Perform a blocked cluster operation.
+ * Perform a blocked cluster operation if we were the node requesting it
+ * and do not have any other operation pending.
  *
- * Must run in the main thread as it access unlocked state like
+ * If this method returns false the caller must call the method again for
+ * the same event once it gets notified again.
+ *
+ * Must run in the main thread as it accesses unlocked state like
  * sys->pending_list.
  */
-void sd_block_handler(void)
+bool sd_block_handler(struct sd_node *sender)
 {
-	struct request *req = list_first_entry(&sys->pending_list,
-						struct request, pending_list);
+	struct request *req;
 
+	if (!node_eq(sender, &sys->this_node))
+		return false;
+	if (cluster_op_running)
+		return false;
+
+	cluster_op_running = true;
+
+	req = list_first_entry(&sys->pending_list,
+				struct request, pending_list);
 	req->work.fn = do_cluster_request;
 	req->work.done = cluster_op_done;
 
 	queue_work(sys->block_wqueue, &req->work);
+	return true;
 }
 
 /*

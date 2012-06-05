@@ -46,8 +46,6 @@ struct acrd_event {
 	uint64_t ids[SD_MAX_NODES];
 
 	enum cluster_join_result join_result;
-
-	int callbacked; /* set non-zero after sd_block_handler() was called */
 };
 
 static struct sd_node this_node;
@@ -511,14 +509,8 @@ static void acrd_handler(int listen_fd, int events, void *data)
 		sd_leave_handler(&ev.sender, ev.nodes, ev.nr_nodes);
 		break;
 	case EVENT_BLOCK:
-		if (node_cmp(&ev.sender, &this_node) == 0 && !ev.callbacked) {
-			ev.callbacked = 1;
-
-			acrd_queue_push_back(ahandle, &ev);
-			sd_block_handler();
-		} else {
-			acrd_queue_push_back(ahandle, NULL);
-		}
+		acrd_queue_push_back(ahandle, NULL);
+		sd_block_handler(&ev.sender);
 		break;
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev.sender, ev.buf, ev.buf_len);

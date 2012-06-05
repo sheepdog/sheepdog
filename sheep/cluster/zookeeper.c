@@ -60,8 +60,6 @@ struct zk_event {
 
 	enum cluster_join_result join_result;
 
-	int callbacked; /* set non-zero after sd_block_handler() was called */
-
 	size_t buf_len;
 	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
 };
@@ -242,7 +240,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	eventfd_t value = 1;
 
 	/* process leave event */
-	if (!uatomic_read(&zk_notify_blocked) &&
+	if (uatomic_read(&zk_notify_blocked) <= 0 &&
 	     uatomic_read(&nr_zk_levents)) {
 		nr_levents = uatomic_sub_return(&nr_zk_levents, 1) + 1;
 		dprintf("nr_zk_levents:%d, head:%u\n", nr_levents, zk_levent_head);
@@ -497,7 +495,6 @@ static int add_event(zhandle_t *zh, enum zk_event_type type,
 	ev.type = type;
 	ev.sender = *znode;
 	ev.buf_len = buf_len;
-	ev.callbacked = 0;
 	if (buf)
 		memcpy(ev.buf, buf, buf_len);
 	zk_queue_push(zh, &ev);
@@ -514,7 +511,6 @@ static int leave_event(zhandle_t *zh, struct zk_node *znode)
 	ev->type = EVENT_LEAVE;
 	ev->sender = *znode;
 	ev->buf_len = 0;
-	ev->callbacked = 0;
 
 	nr_levents = uatomic_add_return(&nr_zk_levents, 1);
 	dprintf("nr_zk_levents:%d, tail:%u\n", nr_levents, zk_levent_tail);
@@ -660,7 +656,7 @@ static void zk_handler(int listen_fd, int events, void *data)
 	if (ret < 0)
 		return;
 
-	if (uatomic_read(&zk_notify_blocked))
+	if (uatomic_read(&zk_notify_blocked) > 0)
 		return;
 
 	ret = zk_queue_pop(zhandle, &ev);
@@ -766,16 +762,9 @@ static void zk_handler(int listen_fd, int events, void *data)
 		break;
 	case EVENT_BLOCK:
 		dprintf("BLOCK\n");
-		if (node_eq(&ev.sender.node, &this_node.node)
-				&& !ev.callbacked) {
+		zk_queue_push_back(zhandle, NULL);
+		if (sd_block_handler(&ev.sender.node))
 			uatomic_inc(&zk_notify_blocked);
-			ev.callbacked = 1;
-			zk_queue_push_back(zhandle, &ev);
-			sd_block_handler();
-		} else {
-			zk_queue_push_back(zhandle, NULL);
-		}
-
 		break;
 	case EVENT_NOTIFY:
 		dprintf("NOTIFY\n");

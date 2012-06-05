@@ -309,13 +309,9 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		sd_leave_handler(&cevent->sender.ent, entries, nr_cpg_nodes);
 		break;
 	case COROSYNC_EVENT_TYPE_BLOCK:
-		if (cpg_node_equal(&cevent->sender, &this_node) &&
-		    !cevent->callbacked) {
-			sd_block_handler();
-			cevent->callbacked = 1;
-		}
+		sd_block_handler(&cevent->sender.ent);
 
-		/* block the rest messages until unblock message comes */
+		/* block other messages until the unblock message comes */
 		return 0;
 	case COROSYNC_EVENT_TYPE_NOTIFY:
 		sd_notify_handler(&cevent->sender.ent, cevent->msg,

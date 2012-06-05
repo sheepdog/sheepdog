@@ -11,6 +11,7 @@
 #ifndef __CLUSTER_H__
 #define __CLUSTER_H__
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -194,7 +195,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 		size_t nr_members);
 void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len);
-void sd_block_handler(void);
+bool sd_block_handler(struct sd_node *sender);
 enum cluster_join_result sd_check_join_cb(struct sd_node *joining,
 		void *opaque);
 

@@ -52,8 +52,6 @@ struct local_event {
 	pid_t pids[SD_MAX_NODES];
 
 	enum cluster_join_result join_result;
-
-	int callbacked; /* set non-zero after sd_block_handler() was called */
 };
 
 
@@ -405,10 +403,7 @@ static void local_handler(int listen_fd, int events, void *data)
 		shm_queue_pop();
 		break;
 	case EVENT_BLOCK:
-		if (node_eq(&ev->sender, &this_node) && !ev->callbacked) {
-			sd_block_handler();
-			ev->callbacked = 1;
-		}
+		sd_block_handler(&ev->sender);
 		break;
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev->sender, ev->buf, ev->buf_len);
