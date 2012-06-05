@@ -115,10 +115,17 @@ void do_io_request(struct work *work)
 int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 {
 	int i, ret;
-	unsigned int nr, le = get_latest_epoch();
+	unsigned int nr, le;
 	struct sd_node nodes[SD_MAX_NODES];
 
+	le = get_latest_epoch();
+	if (!le)
+		return 0;
+
 	nr = epoch_log_read(le, (char *)nodes, sizeof(nodes));
+	if (nr < 0)
+		return -1;
+
 	nr /= sizeof(nodes[0]);
 
 	for (i = 0; i < nr; i++) {
@@ -148,16 +155,15 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 		close(fd);
 
-		if (ret)
-			continue;
-		if (rsp->result == SD_RES_SUCCESS) {
-			ret = rsp->data_length;
-			goto out;
-		}
+		if (!ret && rsp->result == SD_RES_SUCCESS)
+			return rsp->data_length;
 	}
-	ret = 0; /* If no one has targeted epoch file, we can safely return 0 */
-out:
-	return ret;
+
+	/*
+	 * If no node has targeted epoch log, return 0 here to at least
+	 * allow reading older epoch logs.
+	 */
+	return 0;
 }
 
 int epoch_log_read_nr(uint32_t epoch, char *buf, int len)
