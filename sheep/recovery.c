@@ -403,10 +403,10 @@ static inline void finish_schedule_oids(struct recovery_work *rw)
 	dprintf("nr_recovered %d, nr_prio_oids %d, count %d, new %d\n",
 		nr_recovered, rw->nr_prio_oids, rw->count, new_idx);
 
-	free(rw->prio_oids);
 	free(rw->oids);
 	rw->oids = new_oids;
 done:
+	free(rw->prio_oids);
 	rw->prio_oids = NULL;
 	rw->nr_prio_oids = 0;
 }
