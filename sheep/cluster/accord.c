@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include <netdb.h>
 #include <search.h>
 #include <assert.h>
 #include <pthread.h>
@@ -292,58 +291,6 @@ out:
 	return 0;
 }
 
-static int get_addr(uint8_t *bytes)
-{
-	int ret;
-	char name[INET6_ADDRSTRLEN];
-	struct addrinfo hints, *res, *res0;
-
-	gethostname(name, sizeof(name));
-
-	memset(&hints, 0, sizeof(hints));
-
-	hints.ai_socktype = SOCK_STREAM;
-	ret = getaddrinfo(name, NULL, &hints, &res0);
-	if (ret)
-		exit(1);
-
-	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family == AF_INET) {
-			struct sockaddr_in *addr;
-			addr = (struct sockaddr_in *)res->ai_addr;
-
-			if (((char *) &addr->sin_addr)[0] == 127)
-				continue;
-
-			memset(bytes, 0, 12);
-			memcpy(bytes + 12, &addr->sin_addr, 4);
-			break;
-		} else if (res->ai_family == AF_INET6) {
-			struct sockaddr_in6 *addr;
-			uint8_t localhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
-						  0, 0, 0, 0, 0, 0, 0, 1 };
-
-			addr = (struct sockaddr_in6 *)res->ai_addr;
-
-			if (memcmp(&addr->sin6_addr, localhost, 16) == 0)
-				continue;
-
-			memcpy(bytes, &addr->sin6_addr, 16);
-			break;
-		} else
-			dprintf("unknown address family\n");
-	}
-
-	if (res == NULL) {
-		eprintf("failed to get address info\n");
-		return -1;
-	}
-
-	freeaddrinfo(res0);
-
-	return 0;
-}
-
 static void find_queue_end(struct acrd_handle *ah, const char *path, void *arg)
 {
 	int max;
@@ -599,7 +546,7 @@ static int accord_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	if (get_addr(myaddr) < 0)
+	if (get_local_addr(myaddr) < 0)
 		return -1;
 
 	efd = eventfd(0, EFD_NONBLOCK);
