@@ -201,7 +201,8 @@ void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
 	}
 }
 
-struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes)
+static struct vnode_info *alloc_vnode_info(struct sd_node *nodes,
+					   size_t nr_nodes)
 {
 	struct vnode_info *vnode_info;
 
@@ -216,6 +217,23 @@ struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes)
 	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
 	uatomic_set(&vnode_info->refcnt, 1);
 	return vnode_info;
+}
+
+struct vnode_info *get_vnode_info_epoch(uint32_t epoch)
+{
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
+
+	nr_nodes = epoch_log_read_nr(epoch, (void *)nodes, sizeof(nodes));
+	if (nr_nodes < 0) {
+		nr_nodes = epoch_log_read_remote(epoch, (void *)nodes,
+						 sizeof(nodes));
+		if (nr_nodes == 0)
+			return NULL;
+		nr_nodes /= sizeof(nodes[0]);
+	}
+
+	return alloc_vnode_info(nodes, nr_nodes);
 }
 
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,

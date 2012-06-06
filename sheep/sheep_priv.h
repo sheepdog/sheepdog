@@ -232,10 +232,10 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		void *data);
 
 bool have_enough_zones(void);
-struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes);
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vnodes);
+struct vnode_info *get_vnode_info_epoch(uint32_t epoch);
 
 struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
 		int copy_idx);

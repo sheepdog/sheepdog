@@ -55,23 +55,6 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-static struct vnode_info *get_vnodes_from_epoch(uint32_t epoch)
-{
-	struct sd_node nodes[SD_MAX_NODES];
-	int nr_nodes;
-
-	nr_nodes = epoch_log_read_nr(epoch, (void *)nodes, sizeof(nodes));
-	if (nr_nodes < 0) {
-		nr_nodes = epoch_log_read_remote(epoch, (void *)nodes,
-						 sizeof(nodes));
-		if (nr_nodes == 0)
-			return NULL;
-		nr_nodes /= sizeof(nodes[0]);
-	}
-
-	return alloc_vnode_info(nodes, nr_nodes);
-}
-
 static int recover_object_from_replica(uint64_t oid,
 				       struct sd_vnode *entry,
 				       uint32_t epoch, uint32_t tgt_epoch)
@@ -225,7 +208,7 @@ again:
 			goto err;
 		}
 
-		new_old = get_vnodes_from_epoch(tgt_epoch);
+		new_old = get_vnode_info_epoch(tgt_epoch);
 		if (!new_old) {
 			ret = -1;
 			goto err;

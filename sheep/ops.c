@@ -414,6 +414,7 @@ static int local_get_epoch(struct request *req)
 static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data)
 {
+	struct vnode_info *old_vnode_info, *vnode_info;
 	int ret = SD_RES_SUCCESS;
 	uint8_t c;
 	uint16_t f;
@@ -423,20 +424,24 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	 * 2) some nodes are physically down (same epoch condition).
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
 	 */
-	if (!sys_stat_wait_join()) {
-		ret = SD_RES_MANUAL_RECOVER;
-		goto out;
-	}
+	if (!sys_stat_wait_join())
+		return SD_RES_MANUAL_RECOVER;
 
 	ret = get_cluster_copies(&c);
 	if (ret)
-		goto out;
+		return ret;
 	ret = get_cluster_flags(&f);
 	if (ret)
-		goto out;
+		return ret;
 
 	sys->nr_copies = c;
 	sys->flags = f;
+
+	old_vnode_info = get_vnode_info_epoch(sys->epoch);
+	if (!old_vnode_info) {
+		eprintf("cannot get vnode info for epoch %d\n", sys->epoch);
+		return SD_RES_EIO;
+	}
 
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
 	ret = log_current_epoch();
@@ -450,7 +455,12 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 		sys_stat_set(SD_STATUS_OK);
 	else
 		sys_stat_set(SD_STATUS_HALT);
+
+	vnode_info = get_vnode_info();
+	start_recovery(vnode_info, old_vnode_info);
+	put_vnode_info(vnode_info);
 out:
+	put_vnode_info(old_vnode_info);
 	return ret;
 }
 
