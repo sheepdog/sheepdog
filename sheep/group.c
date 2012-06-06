@@ -797,9 +797,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 	if (node_eq(joining, &sys->this_node)) {
 		struct sd_node entries[SD_MAX_NODES];
 		int nr_entries;
-		uint64_t ctime;
 		uint32_t epoch;
-		int ret;
 
 		/*
 		 * If I'm the first sheep joins in colosync, I
@@ -808,16 +806,20 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 
 		vprintf(SDOG_DEBUG, "%s\n", node_to_str(&sys->this_node));
 
-		nr_entries = ARRAY_SIZE(entries);
-		ret = read_epoch(&epoch, &ctime, entries, &nr_entries);
-		if (ret == SD_RES_SUCCESS) {
-			sys->epoch = epoch;
-			jm->ctime = ctime;
-			get_cluster_status(joining, entries, nr_entries, ctime,
-					   epoch, &jm->cluster_status, NULL);
-		} else
+		epoch = get_latest_epoch();
+		if (!epoch) {
 			jm->cluster_status = SD_STATUS_WAIT_FOR_FORMAT;
+			return CJ_RES_SUCCESS;
+		}
 
+		nr_entries = epoch_log_read(epoch, entries, sizeof(entries));
+		if (nr_entries == -1)
+			return CJ_RES_FAIL;
+
+		sys->epoch = epoch;
+		jm->ctime = get_cluster_ctime();
+		get_cluster_status(joining, entries, nr_entries, jm->ctime,
+				   epoch, &jm->cluster_status, NULL);
 		return CJ_RES_SUCCESS;
 	}
 
@@ -863,7 +865,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 static int send_join_request(struct sd_node *ent)
 {
 	struct join_message *msg;
-	int nr_entries, ret;
+	int ret;
 
 	msg = zalloc(sizeof(*msg) + SD_MAX_NODES * sizeof(msg->nodes[0]));
 	if (!msg)
@@ -873,10 +875,16 @@ static int send_join_request(struct sd_node *ent)
 	get_cluster_copies(&msg->nr_copies);
 	get_cluster_flags(&msg->cluster_flags);
 
-	nr_entries = SD_MAX_NODES;
-	ret = read_epoch(&msg->epoch, &msg->ctime, msg->nodes, &nr_entries);
-	if (ret == SD_RES_SUCCESS)
-		msg->nr_nodes = nr_entries;
+	msg->epoch = get_latest_epoch();
+	msg->ctime = get_cluster_ctime();
+
+	if (msg->epoch) {
+		msg->nr_nodes = epoch_log_read(msg->epoch, msg->nodes,
+					       sizeof(struct sd_node) *
+					       SD_MAX_NODES);
+		if (msg->nr_nodes == -1)
+			return SD_RES_EIO;
+	}
 
 	ret = sys->cdrv->join(ent, msg, get_join_message_size(msg));
 

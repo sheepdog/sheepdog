@@ -258,9 +258,6 @@ void do_gateway_request(struct work *work);
 int forward_write_obj_req(struct request *req);
 int forward_read_obj_req(struct request *req);
 
-int read_epoch(uint32_t *epoch, uint64_t *ctime,
-	       struct sd_node *entries, int *nr_entries);
-
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 int log_current_epoch(void);
 

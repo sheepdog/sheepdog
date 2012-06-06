@@ -512,26 +512,6 @@ int init_store(const char *d, int enable_write_cache)
 	return ret;
 }
 
-int read_epoch(uint32_t *epoch, uint64_t *ct,
-	       struct sd_node *entries, int *nr_entries)
-{
-	int ret;
-
-	*epoch = get_latest_epoch();
-
-	ret = epoch_log_read(*epoch, entries, *nr_entries * sizeof(*entries));
-	if (ret == -1) {
-		eprintf("failed to read epoch %"PRIu32"\n", *epoch);
-		*nr_entries = 0;
-		return SD_RES_EIO;
-	}
-	*nr_entries = ret;
-
-	*ct = get_cluster_ctime();
-
-	return SD_RES_SUCCESS;
-}
-
 /*
  * Write data to both local object cache (if enabled) and backends
  */
