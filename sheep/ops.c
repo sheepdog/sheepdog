@@ -349,16 +349,17 @@ static int local_stat_cluster(struct request *req)
 		log = (struct epoch_log *)req->data + i;
 		log->epoch = epoch;
 		log->ctime = get_cluster_ctime();
-		log->nr_nodes = epoch_log_read(epoch, (char *)log->nodes,
+		log->nr_nodes = epoch_log_read_nr(epoch, (char *)log->nodes,
 					       sizeof(log->nodes));
-		if (log->nr_nodes == -1)
+		if (log->nr_nodes == -1) {
 			log->nr_nodes = epoch_log_read_remote(epoch,
 							      (char *)log->nodes,
 							      sizeof(log->nodes));
+			log->nr_nodes /= sizeof(log->nodes[0]);
+		}
 		log->nr_copies = get_max_nr_copies_from(log->nodes, log->nr_nodes);
 
 		rsp->data_length += sizeof(*log);
-		log->nr_nodes /= sizeof(log->nodes[0]);
 		/* FIXME: this hack would require sizeof(time_t) < sizeof(log->nodes[0]) */
 		log->time = *(uint64_t *)(&log->nodes[log->nr_nodes]);
 		epoch--;
