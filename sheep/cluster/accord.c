@@ -528,7 +528,7 @@ out:
 	pthread_mutex_unlock(&queue_lock);
 }
 
-static int accord_init(const char *option, uint8_t *myaddr)
+static int accord_init(const char *option)
 {
 	int ret;
 
@@ -545,9 +545,6 @@ static int accord_init(const char *option, uint8_t *myaddr)
 		eprintf("failed to connect to accrd server %s\n", option);
 		return -1;
 	}
-
-	if (get_local_addr(myaddr) < 0)
-		return -1;
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {

@@ -420,7 +420,16 @@ out:
 	shm_queue_unlock();
 }
 
-static int local_init(const char *option, uint8_t *myaddr)
+static int local_get_local_addr(uint8_t *myaddr)
+{
+	/* set 127.0.0.1 */
+	memset(myaddr, 0, 16);
+	myaddr[12] = 127;
+	myaddr[15] = 1;
+	return 0;
+}
+
+static int local_init(const char *option)
 {
 	sigset_t mask;
 	int ret;
@@ -431,11 +440,6 @@ static int local_init(const char *option, uint8_t *myaddr)
 
 	if (option)
 		shmfile = option;
-
-	/* set 127.0.0.1 */
-	memset(myaddr, 0, 16);
-	myaddr[12] = 127;
-	myaddr[15] = 1;
 
 	shm_queue_init();
 
@@ -461,14 +465,15 @@ static int local_init(const char *option, uint8_t *myaddr)
 }
 
 struct cluster_driver cdrv_local = {
-	.name       = "local",
+	.name		= "local",
 
-	.init       = local_init,
-	.join       = local_join,
-	.leave      = local_leave,
-	.notify     = local_notify,
-	.block      = local_block,
-	.unblock    = local_unblock,
+	.init		= local_init,
+	.get_local_addr	= local_get_local_addr,
+	.join		= local_join,
+	.leave		= local_leave,
+	.notify		= local_notify,
+	.block		= local_block,
+	.unblock	= local_unblock,
 };
 
 cdrv_register(cdrv_local);

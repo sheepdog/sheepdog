@@ -121,7 +121,7 @@ static inline void del_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 	memmove(nodes + idx, nodes + idx + 1, sizeof(*nodes) * (nr_nodes - idx));
 }
 
-static int nodeid_to_addr(uint32_t nodeid, uint8_t *addr)
+static int corosync_get_local_addr(uint8_t *addr)
 {
 	int ret, nr;
 	corosync_cfg_node_address_t caddr;
@@ -130,7 +130,8 @@ static int nodeid_to_addr(uint32_t nodeid, uint8_t *addr)
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)caddr.address;
 	void *saddr;
 
-	ret = corosync_cfg_get_node_addrs(cfg_handle, nodeid, 1, &nr, &caddr);
+	ret = corosync_cfg_get_node_addrs(cfg_handle, this_node.nodeid, 1,
+					  &nr, &caddr);
 	if (ret != CS_OK) {
 		vprintf(SDOG_ERR, "failed to get node addresses (%d)\n", ret);
 		return -1;
@@ -679,7 +680,7 @@ out:
 	exit(1);
 }
 
-static int corosync_init(const char *option, uint8_t *myaddr)
+static int corosync_init(const char *option)
 {
 	int ret, fd;
 	uint32_t nodeid;
@@ -707,12 +708,6 @@ static int corosync_init(const char *option, uint8_t *myaddr)
 		return -1;
 	}
 
-	ret = nodeid_to_addr(nodeid, myaddr);
-	if (ret < 0) {
-		eprintf("failed to get local address\n");
-		return -1;
-	}
-
 	this_node.nodeid = nodeid;
 	this_node.pid = getpid();
 
@@ -733,14 +728,15 @@ static int corosync_init(const char *option, uint8_t *myaddr)
 }
 
 struct cluster_driver cdrv_corosync = {
-	.name       = "corosync",
+	.name		= "corosync",
 
-	.init       = corosync_init,
-	.join       = corosync_join,
-	.leave      = corosync_leave,
-	.notify     = corosync_notify,
-	.block      = corosync_block,
-	.unblock    = corosync_unblock,
+	.init		= corosync_init,
+	.get_local_addr	= corosync_get_local_addr,
+	.join		= corosync_join,
+	.leave		= corosync_leave,
+	.notify		= corosync_notify,
+	.block		= corosync_block,
+	.unblock	= corosync_unblock,
 };
 
 cdrv_register(cdrv_corosync);

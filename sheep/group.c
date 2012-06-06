@@ -1046,7 +1046,14 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 		}
 	}
 
-	ret = sys->cdrv->init(sys->cdrv_option, sys->this_node.addr);
+	ret = sys->cdrv->init(sys->cdrv_option);
+	if (ret < 0)
+		return -1;
+
+	if (sys->cdrv->get_local_addr)
+		ret = sys->cdrv->get_local_addr(sys->this_node.addr);
+	else
+		ret = get_local_addr(sys->this_node.addr);
 	if (ret < 0)
 		return -1;
 

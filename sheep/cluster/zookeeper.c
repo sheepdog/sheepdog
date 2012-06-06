@@ -786,7 +786,7 @@ out:
 	return;
 }
 
-static int zk_init(const char *option, uint8_t *myaddr)
+static int zk_init(const char *option)
 {
 	int ret;
 
@@ -806,9 +806,6 @@ static int zk_init(const char *option, uint8_t *myaddr)
 	dprintf("request session timeout:%dms, "
 		"negotiated session timeout:%dms\n",
 		SESSION_TIMEOUT, zoo_recv_timeout(zhandle));
-
-	if (get_local_addr(myaddr) < 0)
-		return -1;
 
 	zk_queue_init(zhandle);
 

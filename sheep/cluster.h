@@ -41,11 +41,19 @@ struct cluster_driver {
 	/*
 	 * Initialize the cluster driver
 	 *
-	 * On success, this function returns the file descriptor that
-	 * may be used with the poll(2) to monitor cluster events.  On
-	 * error, returns -1.
+	 * Returns zero on success, -1 on error.
 	 */
-	int (*init)(const char *option, uint8_t *myaddr);
+	int (*init)(const char *option);
+
+	/*
+	 * Get a node ID for this sheep.
+	 *
+	 * Gets and ID that is used in all communication with other sheep,
+	 * which normally would be a string formatted IP address.
+	 *
+	 * Returns zero on success, -1 on error.
+	 */
+	int (*get_local_addr)(uint8_t *myaddr);
 
 	/*
 	 * Join the cluster
