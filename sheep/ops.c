@@ -349,14 +349,12 @@ static int local_stat_cluster(struct request *req)
 		log = (struct epoch_log *)req->data + i;
 		log->epoch = epoch;
 		log->ctime = get_cluster_ctime();
-		log->nr_nodes = epoch_log_read_nr(epoch, (char *)log->nodes,
+		log->nr_nodes = epoch_log_read(epoch, log->nodes,
 					       sizeof(log->nodes));
-		if (log->nr_nodes == -1) {
-			log->nr_nodes = epoch_log_read_remote(epoch,
-							      (char *)log->nodes,
+		if (log->nr_nodes == -1)
+			log->nr_nodes = epoch_log_read_remote(epoch, log->nodes,
 							      sizeof(log->nodes));
-			log->nr_nodes /= sizeof(log->nodes[0]);
-		}
+
 		log->nr_copies = get_max_nr_copies_from(log->nodes, log->nr_nodes);
 
 		rsp->data_length += sizeof(*log);
@@ -397,19 +395,18 @@ static int local_get_obj_list(struct request *req)
 static int local_get_epoch(struct request *req)
 {
 	uint32_t epoch = req->rq.obj.tgt_epoch;
-	int len, ret;
+	int nr_nodes;
 
 	dprintf("%d\n", epoch);
 
-	len = epoch_log_read(epoch, req->data, req->rq.data_length);
-	if (len == -1) {
-		ret = SD_RES_NO_TAG;
+	nr_nodes = epoch_log_read(epoch, req->data, req->rq.data_length);
+	if (nr_nodes == -1) {
 		req->rp.data_length = 0;
-	} else {
-		ret = SD_RES_SUCCESS;
-		req->rp.data_length = len;
+		return SD_RES_NO_TAG;
 	}
-	return ret;
+
+	req->rp.data_length = nr_nodes * sizeof(struct sd_node);
+	return SD_RES_SUCCESS;
 }
 
 static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,

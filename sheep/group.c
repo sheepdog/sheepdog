@@ -224,10 +224,9 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch)
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
 
-	nr_nodes = epoch_log_read_nr(epoch, (void *)nodes, sizeof(nodes));
+	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
 	if (nr_nodes < 0) {
-		nr_nodes = epoch_log_read_remote(epoch, (void *)nodes,
-						 sizeof(nodes));
+		nr_nodes = epoch_log_read_remote(epoch, nodes, sizeof(nodes));
 		if (nr_nodes == 0)
 			return NULL;
 		nr_nodes /= sizeof(nodes[0]);
@@ -383,11 +382,8 @@ static inline int get_nodes_nr_from(struct list_head *l)
 static int get_nodes_nr_epoch(uint32_t epoch)
 {
 	struct sd_node nodes[SD_MAX_NODES];
-	int nr;
 
-	nr = epoch_log_read(epoch, (char *)nodes, sizeof(nodes));
-	nr /= sizeof(nodes[0]);
-	return nr;
+	return epoch_log_read(epoch, nodes, sizeof(nodes));
 }
 
 static struct sd_node *find_entry_list(struct sd_node *entry,
@@ -408,7 +404,7 @@ static struct sd_node *find_entry_epoch(struct sd_node *entry,
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr, i;
 
-	nr = epoch_log_read_nr(epoch, (char *)nodes, sizeof(nodes));
+	nr = epoch_log_read(epoch, nodes, sizeof(nodes));
 
 	for (i = 0; i < nr; i++)
 		if (node_eq(&nodes[i], entry))
@@ -452,9 +448,8 @@ static int cluster_sanity_check(struct sd_node *entries,
 		goto out;
 	}
 
-	nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
-			sizeof(local_entries));
-
+	nr_local_entries = epoch_log_read(epoch, local_entries,
+					  sizeof(local_entries));
 	if (nr_entries != nr_local_entries ||
 	    memcmp(entries, local_entries, sizeof(entries[0]) * nr_entries) != 0) {
 		ret = SD_RES_INVALID_EPOCH;
@@ -500,7 +495,7 @@ static int get_cluster_status(struct sd_node *from,
 		else
 			nr = current_vnode_info->nr_nodes + 1;
 
-		nr_local_entries = epoch_log_read_nr(epoch, (char *)local_entries,
+		nr_local_entries = epoch_log_read(epoch, local_entries,
 						  sizeof(local_entries));
 
 		if (nr != nr_local_entries) {

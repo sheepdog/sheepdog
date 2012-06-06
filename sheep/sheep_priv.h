@@ -275,9 +275,8 @@ int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
 int get_max_nr_copies_from(struct sd_node *entries, int nr);
 
-int epoch_log_read(uint32_t epoch, char *buf, int len);
-int epoch_log_read_nr(uint32_t epoch, char *buf, int len);
-int epoch_log_read_remote(uint32_t epoch, char *buf, int len);
+int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len);
+int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len);
 uint32_t get_latest_epoch(void);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);

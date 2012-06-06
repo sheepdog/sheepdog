@@ -112,21 +112,19 @@ void do_io_request(struct work *work)
 	req->rp.result = ret;
 }
 
-int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
+int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 {
 	int i, ret;
 	unsigned int nr, le;
-	struct sd_node nodes[SD_MAX_NODES];
+	struct sd_node local_nodes[SD_MAX_NODES];
 
 	le = get_latest_epoch();
 	if (!le)
 		return 0;
 
-	nr = epoch_log_read(le, (char *)nodes, sizeof(nodes));
+	nr = epoch_log_read(le, local_nodes, sizeof(local_nodes));
 	if (nr < 0)
 		return -1;
-
-	nr /= sizeof(nodes[0]);
 
 	for (i = 0; i < nr; i++) {
 		struct sd_req hdr;
@@ -135,11 +133,11 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 		unsigned int rlen, wlen;
 		int fd;
 
-		if (is_myself(nodes[i].addr, nodes[i].port))
+		if (is_myself(local_nodes[i].addr, local_nodes[i].port))
 			continue;
 
-		addr_to_str(host, sizeof(host), nodes[i].addr, 0);
-		fd = connect_to(host, nodes[i].port);
+		addr_to_str(host, sizeof(host), local_nodes[i].addr, 0);
+		fd = connect_to(host, local_nodes[i].port);
 		if (fd < 0) {
 			vprintf(SDOG_ERR, "failed to connect to %s: %m\n", host);
 			continue;
@@ -152,11 +150,11 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 
 		wlen = 0;
 
-		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+		ret = exec_req(fd, &hdr, nodes, &wlen, &rlen);
 		close(fd);
 
 		if (!ret && rsp->result == SD_RES_SUCCESS)
-			return rsp->data_length;
+			return rsp->data_length / sizeof(*nodes);
 	}
 
 	/*
@@ -166,32 +164,27 @@ int epoch_log_read_remote(uint32_t epoch, char *buf, int len)
 	return 0;
 }
 
-int epoch_log_read_nr(uint32_t epoch, char *buf, int len)
-{
-	int nr;
-
-	nr = epoch_log_read(epoch, buf, len);
-	if (nr < 0)
-		return nr;
-	nr /= sizeof(struct sd_node);
-	return nr;
-}
-
-int epoch_log_read(uint32_t epoch, char *buf, int len)
+int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
 {
 	int fd;
 	char path[PATH_MAX];
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDONLY);
-	if (fd < 0)
+	if (fd < 0) {
+		eprintf("failed to open epoch %"PRIu32" log\n", epoch);
 		return -1;
+	}
 
-	len = read(fd, buf, len);
+	len = read(fd, nodes, len);
 
 	close(fd);
 
-	return len;
+	if (len < 0) {
+		eprintf("failed to read epoch %"PRIu32" log\n", epoch);
+		return -1;
+	}
+	return len / sizeof(*nodes);
 }
 
 uint32_t get_latest_epoch(void)
@@ -525,14 +518,14 @@ int read_epoch(uint32_t *epoch, uint64_t *ct,
 	int ret;
 
 	*epoch = get_latest_epoch();
-	ret = epoch_log_read(*epoch, (char *)entries,
-			     *nr_entries * sizeof(*entries));
+
+	ret = epoch_log_read(*epoch, entries, *nr_entries * sizeof(*entries));
 	if (ret == -1) {
 		eprintf("failed to read epoch %"PRIu32"\n", *epoch);
 		*nr_entries = 0;
 		return SD_RES_EIO;
 	}
-	*nr_entries = ret / sizeof(*entries);
+	*nr_entries = ret;
 
 	*ct = get_cluster_ctime();
 
