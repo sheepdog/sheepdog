@@ -16,6 +16,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
@@ -443,53 +445,43 @@ int set_timeout(int fd)
 
 int get_local_addr(uint8_t *bytes)
 {
-	int ret;
-	char name[INET6_ADDRSTRLEN];
-	struct addrinfo hints, *res, *res0;
+	struct ifaddrs *ifaddr, *ifa;
+	int ret = 0;
 
-	gethostname(name, sizeof(name));
-
-	memset(&hints, 0, sizeof(hints));
-
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	ret = getaddrinfo(name, NULL, &hints, &res0);
-	if (ret)
-		exit(1);
-
-	for (res = res0; res; res = res->ai_next) {
-		if (res->ai_family == AF_INET) {
-			struct sockaddr_in *addr;
-			addr = (struct sockaddr_in *)res->ai_addr;
-
-			if (((char *) &addr->sin_addr)[0] == 127)
-				continue;
-
-			memset(bytes, 0, 12);
-			memcpy(bytes + 12, &addr->sin_addr, 4);
-			break;
-		} else if (res->ai_family == AF_INET6) {
-			struct sockaddr_in6 *addr;
-			uint8_t localhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0,
-						  0, 0, 0, 0, 0, 0, 0, 1 };
-
-			addr = (struct sockaddr_in6 *)res->ai_addr;
-
-			if (memcmp(&addr->sin6_addr, localhost, 16) == 0)
-				continue;
-
-			memcpy(bytes, &addr->sin6_addr, 16);
-			break;
-		} else
-			dprintf("unknown address family\n");
-	}
-
-	if (res == NULL) {
-		eprintf("failed to get address info\n");
+	if (getifaddrs(&ifaddr) == -1) {
+		eprintf("getifaddrs failed: %m\n");
 		return -1;
 	}
 
-	freeaddrinfo(res0);
 
-	return 0;
+	for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+		struct sockaddr_in *sin;
+		struct sockaddr_in6 *sin6;
+
+		if (ifa->ifa_flags & IFF_LOOPBACK)
+			continue;
+		if (!ifa->ifa_addr)
+			continue;
+
+		switch (ifa->ifa_addr->sa_family) {
+		case AF_INET:
+			sin = (struct sockaddr_in *)ifa->ifa_addr;
+			memset(bytes, 0, 12);
+			memcpy(bytes + 12, &sin->sin_addr, 4);
+			memcpy(bytes + 12, &sin->sin_addr, 4);
+			eprintf("found IPv4 address\n");
+			goto out;
+		case AF_INET6:
+			sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+			memcpy(bytes, &sin6->sin6_addr, 16);
+			eprintf("found IPv6 address\n");
+			goto out;
+		}
+	}
+
+	eprintf("no valid interface found\n");
+	ret = -1;
+out:
+	freeifaddrs(ifaddr);
+	return ret;
 }
