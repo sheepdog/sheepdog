@@ -1034,7 +1034,8 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 	}
 }
 
-int create_cluster(int port, int64_t zone, int nr_vnodes)
+int create_cluster(int port, int64_t zone, int nr_vnodes,
+		   bool explicit_addr)
 {
 	int ret;
 
@@ -1053,12 +1054,14 @@ int create_cluster(int port, int64_t zone, int nr_vnodes)
 	if (ret < 0)
 		return -1;
 
-	if (sys->cdrv->get_local_addr)
-		ret = sys->cdrv->get_local_addr(sys->this_node.addr);
-	else
-		ret = get_local_addr(sys->this_node.addr);
-	if (ret < 0)
-		return -1;
+	if (!explicit_addr) {
+		if (sys->cdrv->get_local_addr)
+			ret = sys->cdrv->get_local_addr(sys->this_node.addr);
+		else
+			ret = get_local_addr(sys->this_node.addr);
+		if (ret < 0)
+			return -1;
+	}
 
 	sys->this_node.port = port;
 	sys->this_node.nr_vnodes = nr_vnodes;

@@ -249,7 +249,8 @@ void resume_wait_obj_requests(uint64_t oid);
 void resume_wait_recovery_requests(void);
 void flush_wait_obj_requests(void);
 
-int create_cluster(int port, int64_t zone, int nr_vnodes);
+int create_cluster(int port, int64_t zone, int nr_vnodes,
+		   bool explicit_addr);
 int leave_cluster(void);
 
 void queue_cluster_request(struct request *req);

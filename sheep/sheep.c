@@ -44,6 +44,7 @@ static struct option const long_options[] = {
 	{"help", no_argument, NULL, 'h'},
 	{"nr_io_worker", required_argument, NULL, 'i'},
 	{"loglevel", required_argument, NULL, 'l'},
+	{"myaddr", required_argument, NULL, 'y'},
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"vnodes", required_argument, NULL, 'v'},
@@ -52,7 +53,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "ac:dDfg:Ghi:l:op:v:Wz:";
+static const char *short_options = "ac:dDfg:Ghi:l:op:v:Wy:z:";
 
 static void usage(int status)
 {
@@ -78,6 +79,7 @@ Options:\n\
   -p, --port              specify the TCP port on which to listen\n\
   -v, --vnodes            specify the number of virtual nodes\n\
   -W, --disable-cache     disable writecache\n\
+  -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
 ", PACKAGE_VERSION, program_name);
 	exit(status);
@@ -112,6 +114,8 @@ int main(int argc, char **argv)
 	char path[PATH_MAX];
 	int64_t zone = -1;
 	int nr_vnodes = SD_DEFAULT_VNODES;
+	bool explicit_addr = false;
+	int af;
 	char *p;
 	struct cluster_driver *cdrv;
 	int enable_write_cache = 1; /* enabled by default */
@@ -141,6 +145,17 @@ int main(int argc, char **argv)
 				sdlog_help();
 				exit(1);
 			}
+			break;
+		case 'y':
+			af = strstr(optarg, ":") ? AF_INET6 : AF_INET;
+			if (!str_to_addr(af, optarg, sys->this_node.addr)) {
+				fprintf(stderr,
+					"Invalid address: '%s'\n",
+					optarg);
+				sdlog_help();
+				exit(1);
+			}
+			explicit_addr = true;
 			break;
 		case 'd':
 			/* removed soon. use loglevel instead */
@@ -254,7 +269,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = create_cluster(port, zone, nr_vnodes);
+	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
 	if (ret) {
 		eprintf("failed to create sheepdog cluster\n");
 		exit(1);
