@@ -122,9 +122,10 @@ int forward_write_obj_req(struct request *req)
 
 		fd = get_sheep_fd(v->addr, v->port, v->node_idx, fwd_hdr.epoch);
 		if (fd < 0) {
-			eprintf("failed to connect to %s:%"PRIu32"\n", name, v->port);
+			eprintf("failed to connect to %s:%"PRIu32"\n", name,
+				v->port);
 			ret = SD_RES_NETWORK_ERROR;
-			goto out;
+			goto err;
 		}
 
 		ret = send_req(fd, &fwd_hdr, req->data, &wlen);
@@ -132,7 +133,7 @@ int forward_write_obj_req(struct request *req)
 			del_sheep_fd(fd);
 			ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %"PRIu32"\n", ret);
-			goto out;
+			goto err;
 		}
 
 		pfds[nr_fds].fd = fd;
@@ -144,16 +145,14 @@ int forward_write_obj_req(struct request *req)
 		ret = do_local_io(req, fwd_hdr.epoch);
 		rsp->result = ret;
 
-		if (nr_fds == 0) {
-			eprintf("exit %"PRIu32"\n", ret);
-			goto out;
+		if (rsp->result != SD_RES_SUCCESS) {
+			eprintf("fail to write local %"PRIu32"\n", ret);
+			ret = rsp->result;
+			goto err;
 		}
 
-		if (rsp->result != SD_RES_SUCCESS) {
-			eprintf("fail %"PRIu32"\n", ret);
-			ret = rsp->result;
+		if (nr_fds == 0)
 			goto out;
-		}
 	}
 
 	ret = SD_RES_SUCCESS;
@@ -163,22 +162,18 @@ again:
 		if (errno == EINTR)
 			goto again;
 
-		ret = SD_RES_EIO;
-	} else if (pollret == 0) { /* poll time out */
-		eprintf("timeout\n");
-
-		for (i = 0; i < nr_fds; i++)
-			del_sheep_fd(pfds[i].fd);
-
 		ret = SD_RES_NETWORK_ERROR;
-		goto out;
+		goto err;
+	} else if (pollret == 0) {
+		/* poll time out */
+		eprintf("timeout\n");
+		ret = SD_RES_NETWORK_ERROR;
+		goto err;
 	}
 
 	for (i = 0; i < nr_fds; i++) {
-		if (pfds[i].fd < 0)
-			break;
-
-		if (pfds[i].revents & POLLERR || pfds[i].revents & POLLHUP || pfds[i].revents & POLLNVAL) {
+		if (pfds[i].revents & POLLERR || pfds[i].revents & POLLHUP ||
+		    pfds[i].revents & POLLNVAL) {
 			del_sheep_fd(pfds[i].fd);
 			ret = SD_RES_NETWORK_ERROR;
 			break;
@@ -208,10 +203,13 @@ again:
 
 	dprintf("%"PRIx64" %"PRIu32"\n", oid, nr_fds);
 
-	if (nr_fds > 0) {
+	if (nr_fds > 0)
 		goto again;
-	}
 out:
+	return ret;
+err:
+	for (i = 0; i < nr_fds; i++)
+		del_sheep_fd(pfds[i].fd);
 	return ret;
 }
 
