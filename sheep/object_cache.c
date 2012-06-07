@@ -881,7 +881,7 @@ int object_cache_flush_vdi(struct request *req)
 		return SD_RES_SUCCESS;
 
 	if (sys->async_flush) {
-		struct flush_work *fw = xmalloc(sizeof(*fw));
+		struct flush_work *fw = xzalloc(sizeof(*fw));
 
 		fw->work.fn = object_cache_flush_vdi_fn;
 		fw->work.done = object_cache_flush_vdi_done;
