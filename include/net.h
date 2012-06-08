@@ -6,8 +6,6 @@
 
 #include "sheepdog_proto.h"
 
-#define DEFAULT_SOCKET_TIMEOUT 5 /* seconds */
-
 enum conn_state {
 	C_IO_HEADER = 0,
 	C_IO_DATA_INIT,

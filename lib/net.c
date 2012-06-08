@@ -420,29 +420,6 @@ int set_nodelay(int fd)
 	return ret;
 }
 
-int set_timeout(int fd)
-{
-	int ret;
-	const struct timeval tv = {
-		.tv_sec = DEFAULT_SOCKET_TIMEOUT,
-		.tv_usec = 0,
-	};
-
-	ret = setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-	if (ret) {
-		eprintf("failed to set send timeout\n");
-		return ret;
-	}
-
-	ret = setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-	if (ret) {
-		eprintf("failed to set recv timeout\n");
-		return ret;
-	}
-
-	return 0;
-}
-
 int get_local_addr(uint8_t *bytes)
 {
 	struct ifaddrs *ifaddr, *ifa;
