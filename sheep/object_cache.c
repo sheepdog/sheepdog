@@ -86,17 +86,17 @@ static uint64_t calc_object_bmap(size_t len, off_t offset)
 	uint64_t bmap = 0;
 
 	start = offset / CACHE_BLOCK_SIZE;
-	end = (offset + len - 1) / CACHE_BLOCK_SIZE;
+	end = DIV_ROUND_UP(len + offset, CACHE_BLOCK_SIZE);
+	nr = end - start;
 
-	nr = end - start + 1;
 	while (nr--)
 		set_bit(start + nr, &bmap);
 
 	return bmap;
 }
 
-static struct object_cache_entry *dirty_tree_insert(struct rb_root *root,
-		struct object_cache_entry *new)
+static struct object_cache_entry *
+dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 {
 	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
@@ -573,7 +573,7 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 	hdr->epoch = sys_epoch();
 
 	hdr->obj.oid = oid;
-	hdr->obj.offset = 0;
+	hdr->obj.offset = offset;
 	hdr->obj.copies = sys->nr_copies;
 
 	fake_req.data = buf;
