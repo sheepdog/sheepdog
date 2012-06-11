@@ -72,7 +72,10 @@ static int def_open_flags = O_RDWR;
 #define HASH_BITS	5
 #define HASH_SIZE	(1 << HASH_BITS)
 
-static pthread_mutex_t hashtable_lock[HASH_SIZE] = { [0 ... HASH_SIZE - 1] = PTHREAD_MUTEX_INITIALIZER };
+static pthread_mutex_t hashtable_lock[HASH_SIZE] = {
+	[0 ... HASH_SIZE - 1] = PTHREAD_MUTEX_INITIALIZER
+};
+
 static struct hlist_head cache_hashtable[HASH_SIZE];
 
 static inline int hash(uint64_t vid)
@@ -122,9 +125,9 @@ dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 	return NULL; /* insert successfully */
 }
 
-__attribute__ ((unused))
-static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
-		struct object_cache_entry *entry)
+__attribute__ ((unused)) static struct
+object_cache_entry *dirty_tree_search(struct rb_root *root,
+				      struct object_cache_entry *entry)
 {
 	struct rb_node *n = root->rb_node;
 	struct object_cache_entry *t;
@@ -199,8 +202,10 @@ out:
 	return cache;
 }
 
-static void add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
-		uint64_t bmap, struct object_cache_entry *entry, int create)
+static void
+add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
+			   uint64_t bmap, struct object_cache_entry *entry,
+			   int create)
 {
 	if (!entry) {
 		entry = xzalloc(sizeof(*entry));
@@ -223,8 +228,8 @@ static inline void del_from_dirty_tree_and_list(
 }
 
 static void switch_dirty_tree_and_list(struct object_cache *oc,
-		struct rb_root ** inactive_dirty_tree,
-		struct list_head **inactive_dirty_list)
+				       struct rb_root **inactive_dirty_tree,
+				       struct list_head **inactive_dirty_list)
 {
 	pthread_mutex_lock(&oc->lock);
 
@@ -243,8 +248,8 @@ static void switch_dirty_tree_and_list(struct object_cache *oc,
 }
 
 static void merge_dirty_tree_and_list(struct object_cache *oc,
-		struct rb_root *inactive_dirty_tree,
-		struct list_head *inactive_dirty_list)
+				      struct rb_root *inactive_dirty_tree,
+				      struct list_head *inactive_dirty_list)
 {
 	struct object_cache_entry *entry, *t;
 
@@ -259,7 +264,7 @@ static void merge_dirty_tree_and_list(struct object_cache *oc,
 }
 
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
-		int create)
+			       int create)
 {
 	struct strbuf buf;
 	int fd, ret = 0, flags = def_open_flags;
@@ -299,7 +304,8 @@ out:
 	return ret;
 }
 
-static int write_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count, off_t offset)
+static int write_cache_object(uint32_t vid, uint32_t idx, void *buf,
+			      size_t count, off_t offset)
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
@@ -343,7 +349,8 @@ out:
 	return ret;
 }
 
-static int read_cache_object(uint32_t vid, uint32_t idx, void *buf, size_t count, off_t offset)
+static int read_cache_object(uint32_t vid, uint32_t idx, void *buf,
+			     size_t count, off_t offset)
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
@@ -389,7 +396,7 @@ out:
 }
 
 static int object_cache_rw(struct object_cache *oc, uint32_t idx,
-		struct request *req)
+			   struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	uint64_t bmap = 0;
@@ -418,8 +425,8 @@ out:
 	return ret;
 }
 
-static int create_cache_object(struct object_cache *oc, uint32_t idx, void *buffer,
-		size_t buf_size)
+static int create_cache_object(struct object_cache *oc, uint32_t idx,
+			       void *buffer, size_t buf_size)
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd, ret = SD_RES_SUCCESS;
 	struct strbuf buf;
@@ -467,7 +474,7 @@ out:
 
 /* Fetch the object, cache it in success */
 static int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
-		      uint32_t idx)
+			     uint32_t idx)
 {
 	struct request read_req;
 	struct sd_req *hdr = &read_req.rq;
@@ -522,7 +529,7 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 }
 
 static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
-		uint32_t idx, uint64_t bmap, int create)
+			     uint32_t idx, uint64_t bmap, int create)
 {
 	struct request fake_req;
 	struct sd_req *hdr = &fake_req.rq;
@@ -546,7 +553,7 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 	last_bit = fls64(bmap) - 1;
 
 	dprintf("bmap:0x%"PRIx64", first_bit:%d, last_bit:%d\n",
-			bmap, first_bit, last_bit);
+		bmap, first_bit, last_bit);
 	offset = first_bit * CACHE_BLOCK_SIZE;
 	data_length = (last_bit - first_bit + 1) * CACHE_BLOCK_SIZE;
 
@@ -591,7 +598,7 @@ out:
 
 /* Push back all the dirty objects to sheep cluster storage */
 static int object_cache_push(struct vnode_info *vnode_info,
-		struct object_cache *oc)
+			     struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
 	struct rb_root *inactive_dirty_tree;
@@ -602,9 +609,8 @@ static int object_cache_push(struct vnode_info *vnode_info,
 		/* We don't do flushing in recovery */
 		return SD_RES_SUCCESS;
 
-	switch_dirty_tree_and_list(oc,
-			&inactive_dirty_tree,
-			&inactive_dirty_list);
+	switch_dirty_tree_and_list(oc, &inactive_dirty_tree,
+				   &inactive_dirty_list);
 
 	/* 1. for async flush, there is only one worker
 	 * 2. for sync flush, Guest assure us of that only one sync
@@ -612,7 +618,7 @@ static int object_cache_push(struct vnode_info *vnode_info,
 	 * So we need not to protect inactive dirty tree and list */
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
 		ret = push_cache_object(vnode_info, oc->vid, entry->idx,
-				entry->bmap, entry->create);
+					entry->bmap, entry->create);
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
 		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
@@ -620,9 +626,8 @@ static int object_cache_push(struct vnode_info *vnode_info,
 	}
 	return ret;
 push_failed:
-	merge_dirty_tree_and_list(oc,
-			inactive_dirty_tree,
-			inactive_dirty_list);
+	merge_dirty_tree_and_list(oc, inactive_dirty_tree,
+				  inactive_dirty_list);
 	return ret;
 }
 
@@ -675,7 +680,7 @@ void object_cache_delete(uint32_t vid)
 }
 
 static int object_cache_flush_and_delete(struct vnode_info *vnode_info,
-		struct object_cache *oc)
+					 struct object_cache *oc)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -779,8 +784,8 @@ int object_cache_handle_request(struct request *req)
 }
 
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, uint16_t flags, int copies, uint32_t epoch,
-		int create)
+		       uint64_t offset, uint16_t flags, int copies,
+		       uint32_t epoch, int create)
 {
 	int ret;
 	struct request *req;
@@ -818,7 +823,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 }
 
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int copies, uint32_t epoch)
+		      uint64_t offset, int copies, uint32_t epoch)
 {
 	int ret;
 	struct request *req;
