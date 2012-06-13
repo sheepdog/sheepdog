@@ -277,7 +277,7 @@ int trunk_file_write_recovery(unsigned char *outsha1)
 			dprintf("stale oid %"PRIx64"\n", oid);
 			if (trunk_entry_no_sha1(entry) || trunk_entry_is_dirty(entry)) {
 				if (fill_entry_new_sha1(entry) < 0) {
-					eprintf("write sha1 object fail.\n");
+					eprintf("fill sha1 fail\n");
 					goto out;
 				}
 			}

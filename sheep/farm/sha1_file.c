@@ -124,6 +124,7 @@ static int sha1_buffer_write(const unsigned char *sha1, void *buf, unsigned int 
 	}
 	len = xwrite(fd, buf, size);
 	if (len != size) {
+		dprintf("%m\n");
 		close(fd);
 		return -1;
 	}
@@ -162,13 +163,16 @@ static void *map_sha1_file(const unsigned char *sha1, unsigned long *size)
 		return NULL;
 	}
 	if (fstat(fd, &st) < 0) {
+		dprintf("%m\n");
 		close(fd);
 		return NULL;
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
-	if (map == MAP_FAILED)
+	if (map == MAP_FAILED) {
+		dprintf("%m\n");
 		return NULL;
+	}
 	*size = st.st_size;
 	return map;
 }
