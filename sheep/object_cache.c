@@ -202,23 +202,6 @@ out:
 	return cache;
 }
 
-static void
-add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
-			   uint64_t bmap, struct object_cache_entry *entry,
-			   int create)
-{
-	if (!entry) {
-		entry = xzalloc(sizeof(*entry));
-		entry->idx = idx;
-		entry->bmap = bmap;
-		entry->create = create;
-	}
-	if (!dirty_tree_insert(oc->active_dirty_tree, entry))
-		list_add(&entry->list, oc->active_dirty_list);
-	else
-		free(entry);
-}
-
 static inline void del_from_dirty_tree_and_list(
 		struct object_cache_entry *entry,
 		struct rb_root *dirty_tree)
@@ -247,6 +230,18 @@ static void switch_dirty_tree_and_list(struct object_cache *oc,
 	pthread_mutex_unlock(&oc->lock);
 }
 
+/* Caller should hold the oc->lock */
+static inline void
+add_to_dirty_tree_and_list(struct object_cache *oc,
+			   struct object_cache_entry *entry)
+{
+	struct object_cache_entry *dummy;
+
+	dummy = dirty_tree_insert(oc->active_dirty_tree, entry);
+	assert(dummy == NULL);
+	list_add(&entry->list, oc->active_dirty_list);
+}
+
 static void merge_dirty_tree_and_list(struct object_cache *oc,
 				      struct rb_root *inactive_dirty_tree,
 				      struct list_head *inactive_dirty_list)
@@ -257,10 +252,22 @@ static void merge_dirty_tree_and_list(struct object_cache *oc,
 
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
 		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
-		add_to_dirty_tree_and_list(oc, entry->idx, 0, entry, 0);
+		add_to_dirty_tree_and_list(oc, entry);
 	}
 
 	pthread_mutex_unlock(&oc->lock);
+}
+
+static inline struct object_cache_entry *
+alloc_cache_entry(uint32_t idx, uint64_t bmap, int create)
+{
+	struct object_cache_entry *entry = xzalloc(sizeof(*entry));
+
+	entry->idx = idx;
+	entry->bmap = bmap;
+	entry->create = create;
+
+	return entry;
 }
 
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
@@ -283,7 +290,9 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 	}
 
 	if (create) {
+		struct object_cache_entry *entry;
 		unsigned data_length;
+
 		if (idx & CACHE_VDI_BIT)
 			data_length = SD_INODE_SIZE;
 		else
@@ -293,8 +302,9 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		if (ret != SD_RES_SUCCESS)
 			ret = -1;
 		else {
+			entry = alloc_cache_entry(idx, 0, 1);
 			pthread_mutex_lock(&oc->lock);
-			add_to_dirty_tree_and_list(oc, idx, 0, NULL, 1);
+			add_to_dirty_tree_and_list(oc, entry);
 			pthread_mutex_unlock(&oc->lock);
 		}
 	}
@@ -406,13 +416,19 @@ static int object_cache_rw(struct object_cache *oc, uint32_t idx,
 		hdr->data_length, hdr->obj.offset);
 
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
+		struct object_cache_entry *entry;
+
 		ret = write_cache_object(oc->vid, idx, req->data,
 					 hdr->data_length, hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		bmap = calc_object_bmap(hdr->data_length, hdr->obj.offset);
+		entry = alloc_cache_entry(idx, bmap, 0);
 		pthread_mutex_lock(&oc->lock);
-		add_to_dirty_tree_and_list(oc, idx, bmap, NULL, 0);
+		if (!dirty_tree_insert(oc->active_dirty_tree, entry))
+			list_add(&entry->list, oc->active_dirty_list);
+		else
+			free(entry);
 		pthread_mutex_unlock(&oc->lock);
 	} else {
 		ret = read_cache_object(oc->vid, idx, req->data,
