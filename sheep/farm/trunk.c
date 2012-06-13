@@ -142,10 +142,12 @@ static int fill_entry_new_sha1(struct trunk_entry_incore *entry)
 	strbuf_reset(&buf);
 
 	if (fd < 0) {
+		dprintf("%m\n");
 		ret = -1;
 		goto out;
 	}
 	if (!strbuf_read(&buf, fd, SD_DATA_OBJ_SIZE) == SD_DATA_OBJ_SIZE) {
+		dprintf("strbuf_read fail to read full\n");
 		ret = -1;
 		goto out_close;
 	}
