@@ -772,6 +772,12 @@ static void listen_handler(int listen_fd, int events, void *data)
 		return;
 	}
 
+	ret = set_keepalive(fd);
+	if (ret) {
+		close(fd);
+		return;
+	}
+
 	ret = set_nodelay(fd);
 	if (ret) {
 		close(fd);
