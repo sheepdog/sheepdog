@@ -267,9 +267,11 @@ static inline void prepare_schedule_oid(uint64_t oid)
 	/* The oid is currently being recovered */
 	if (rw->oids[rw->done] == oid)
 		return;
-
-	rw->prio_oids = xrealloc(rw->prio_oids, ++rw->nr_prio_oids);
+	rw->nr_prio_oids++;
+	rw->prio_oids = xrealloc(rw->prio_oids,
+				 rw->nr_prio_oids * sizeof(uint64_t));
 	rw->prio_oids[rw->nr_prio_oids - 1] = oid;
+
 	dprintf("%"PRIx64" nr_prio_oids %d\n", oid, rw->nr_prio_oids);
 }
 
@@ -373,9 +375,9 @@ static inline void finish_schedule_oids(struct recovery_work *rw)
 		goto done;
 
 	new_oids = xmalloc(1 << 20); /* FIXME */
-	memmove(new_oids, rw->oids, nr_recovered * sizeof(uint64_t));
-	memmove(new_oids + nr_recovered, rw->prio_oids,
-		rw->nr_prio_oids * sizeof(uint64_t));
+	memcpy(new_oids, rw->oids, nr_recovered * sizeof(uint64_t));
+	memcpy(new_oids + nr_recovered, rw->prio_oids,
+	       rw->nr_prio_oids * sizeof(uint64_t));
 	new_idx = nr_recovered + rw->nr_prio_oids;
 
 	for (i = rw->done; i < rw->count; i++) {
@@ -383,8 +385,10 @@ static inline void finish_schedule_oids(struct recovery_work *rw)
 			continue;
 		new_oids[new_idx++] = rw->oids[i];
 	}
-	dprintf("nr_recovered %d, nr_prio_oids %d, count %d, new %d\n",
-		nr_recovered, rw->nr_prio_oids, rw->count, new_idx);
+	/* rw->count should eq new_idx, otherwise something is wrong */
+	dprintf("%snr_recovered %d, nr_prio_oids %d, count %d = new %d\n",
+		rw->count == new_idx ? "" : "WARN: ", nr_recovered,
+		rw->nr_prio_oids, rw->count, new_idx);
 
 	free(rw->oids);
 	rw->oids = new_oids;
