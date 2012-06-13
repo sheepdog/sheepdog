@@ -526,6 +526,8 @@ static void screen_object_list(struct recovery_work *rw,
 			break;
 		}
 	}
+
+	qsort(rw->oids, rw->count, sizeof(uint64_t), obj_cmp);
 }
 
 static int newly_joined(struct sd_node *node, struct recovery_work *rw)
