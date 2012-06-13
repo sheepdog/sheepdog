@@ -828,41 +828,9 @@ void del_sheep_fd(int fd)
 	}
 }
 
-/*
- * Timeout after request is issued after 5s.
- *
- * Heart-beat message will be sent periodically with 1s interval.
- * If the node of the other end of fd fails, we'll detect it in 3s
- */
-static int set_keepalive(int fd)
-{
-	int val = 1;
-
-	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
-		return -1;
-	}
-	val = 5;
-	if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
-		return -1;
-	}
-	val = 1;
-	if (setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
-		return -1;
-	}
-	val = 3;
-	if (setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
-		return -1;
-	}
-	return 0;
-}
-
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch)
 {
-	int i, fd, ret;
+	int i, fd;
 	char name[INET6_ADDRSTRLEN];
 
 	if (cached_epoch == 0) {
@@ -901,19 +869,6 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch)
 	fd = connect_to(name, port);
 	if (fd < 0)
 		return -1;
-
-	ret = set_keepalive(fd);
-	if (ret) {
-		close(fd);
-		return -1;
-	}
-
-	ret = set_nodelay(fd);
-	if (ret) {
-		eprintf("%m\n");
-		close(fd);
-		return -1;
-	}
 
 	cached_fds[node_idx] = fd;
 

@@ -229,13 +229,26 @@ int connect_to(const char *name, int port)
 		}
 
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
-		if (ret)
+		if (ret) {
 			eprintf("failed to connect to %s:%d: %m\n",
 				name, port);
-		else
-			goto success;
+			close(fd);
+			continue;
+		}
 
-		close(fd);
+		ret = set_keepalive(fd);
+		if (ret) {
+			close(fd);
+			break;
+		}
+
+		ret = set_nodelay(fd);
+		if (ret) {
+			eprintf("%m\n");
+			close(fd);
+			break;
+		} else
+			goto success;
 	}
 	fd = -1;
 success:
@@ -418,6 +431,38 @@ int set_nodelay(int fd)
 	opt = 1;
 	ret = setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt));
 	return ret;
+}
+
+/*
+ * Timeout after request is issued after 5s.
+ *
+ * Heart-beat message will be sent periodically with 1s interval.
+ * If the node of the other end of fd fails, we'll detect it in 3s
+ */
+int set_keepalive(int fd)
+{
+	int val = 1;
+
+	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) < 0) {
+		dprintf("%m\n");
+		return -1;
+	}
+	val = 5;
+	if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
+		dprintf("%m\n");
+		return -1;
+	}
+	val = 1;
+	if (setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
+		dprintf("%m\n");
+		return -1;
+	}
+	val = 3;
+	if (setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
+		dprintf("%m\n");
+		return -1;
+	}
+	return 0;
 }
 
 int get_local_addr(uint8_t *bytes)
