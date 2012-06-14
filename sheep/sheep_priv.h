@@ -158,6 +158,7 @@ struct store_driver {
 	int (*write)(uint64_t oid, struct siocb *, int create);
 	int (*read)(uint64_t oid, struct siocb *);
 	int (*format)(struct siocb *);
+	int (*remove_object)(uint64_t oid);
 	/* Operations in recovery */
 	int (*link)(uint64_t oid, struct siocb *, uint32_t tgt_epoch);
 	int (*atomic_put)(uint64_t oid, struct siocb *);

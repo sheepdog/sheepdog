@@ -580,24 +580,11 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 static int store_remove_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
-	struct strbuf buf = STRBUF_INIT;
-	int ret = SD_RES_SUCCESS;
 
 	objlist_cache_remove(oid);
 	object_cache_remove(oid);
 
-	strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
-	if (unlink(buf.buf) < 0) {
-		if (errno == ENOENT) {
-			ret = SD_RES_NO_OBJ;
-			goto out;
-		}
-		eprintf("%m\n");
-		ret =  SD_RES_EIO;
-	}
-out:
-	strbuf_release(&buf);
-	return ret;
+	return sd_store->remove_object(oid);
 }
 
 static int store_read_obj(struct request *req)

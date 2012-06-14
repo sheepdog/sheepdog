@@ -719,6 +719,26 @@ static int farm_purge_obj(void)
 	return SD_RES_SUCCESS;
 }
 
+static int farm_remove_object(uint64_t oid)
+{
+	char path[PATH_MAX];
+	int ret = SD_RES_SUCCESS;
+
+	sprintf(path, "%s%016"PRIx64, obj_path, oid);
+
+	if (unlink(path) < 0) {
+		if (errno == ENOENT) {
+			ret = SD_RES_NO_OBJ;
+			goto out;
+		}
+		eprintf("%m\n");
+		ret =  SD_RES_EIO;
+	}
+out:
+	trunk_put_entry(oid);
+	return ret;
+}
+
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
@@ -734,6 +754,7 @@ struct store_driver farm = {
 	.get_snap_file = farm_get_snap_file,
 	.format = farm_format,
 	.purge_obj = farm_purge_obj,
+	.remove_object = farm_remove_object,
 };
 
 add_store_driver(farm);
