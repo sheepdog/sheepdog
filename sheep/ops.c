@@ -583,6 +583,9 @@ static int store_remove_obj(struct request *req)
 	struct strbuf buf = STRBUF_INIT;
 	int ret = SD_RES_SUCCESS;
 
+	objlist_cache_remove(oid);
+	object_cache_remove(oid);
+
 	strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
 	if (unlink(buf.buf) < 0) {
 		if (errno == ENOENT) {
@@ -592,7 +595,6 @@ static int store_remove_obj(struct request *req)
 		eprintf("%m\n");
 		ret =  SD_RES_EIO;
 	}
-	objlist_cache_remove(oid);
 out:
 	strbuf_release(&buf);
 	return ret;

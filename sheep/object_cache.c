@@ -125,9 +125,8 @@ dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 	return NULL; /* insert successfully */
 }
 
-__attribute__ ((unused)) static struct
-object_cache_entry *dirty_tree_search(struct rb_root *root,
-				      struct object_cache_entry *entry)
+static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
+						    uint32_t idx)
 {
 	struct rb_node *n = root->rb_node;
 	struct object_cache_entry *t;
@@ -135,9 +134,9 @@ object_cache_entry *dirty_tree_search(struct rb_root *root,
 	while (n) {
 		t = rb_entry(n, struct object_cache_entry, rb);
 
-		if (entry->idx < t->idx)
+		if (idx < t->idx)
 			n = n->rb_left;
-		else if (entry->idx > t->idx)
+		else if (idx > t->idx)
 			n = n->rb_right;
 		else
 			return t; /* found it */
@@ -925,6 +924,35 @@ int object_cache_flush_and_del(struct request *req)
 	if (cache && object_cache_flush_and_delete(req->vnodes, cache) < 0)
 		return SD_RES_EIO;
 	return SD_RES_SUCCESS;
+}
+
+void object_cache_remove(uint64_t oid)
+{
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = data_oid_to_idx(oid);
+	struct object_cache *oc;
+	struct object_cache_entry *entry;
+	int tree_id = 0;
+
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+
+	oc = find_object_cache(vid, 0);
+	if (!oc)
+		return;
+
+	pthread_mutex_lock(&oc->lock);
+	entry = dirty_tree_search(&oc->dirty_trees[tree_id], idx);
+	if (!entry) {
+		tree_id = 1;
+		entry = dirty_tree_search(&oc->dirty_trees[tree_id], idx);
+	}
+	if (!entry)
+		goto out;
+	del_from_dirty_tree_and_list(entry, &oc->dirty_trees[tree_id]);
+out:
+	pthread_mutex_unlock(&oc->lock);
+	return;
 }
 
 int object_cache_init(const char *p)
