@@ -83,6 +83,14 @@ static inline int hash(uint64_t vid)
 	return hash_64(vid, HASH_BITS);
 }
 
+static inline uint32_t object_cache_oid_to_idx(uint64_t oid)
+{
+	uint32_t idx = data_oid_to_idx(oid);
+	if (is_vdi_obj(oid))
+		idx |= 1 << CACHE_VDI_SHIFT;
+	return idx;
+}
+
 static uint64_t calc_object_bmap(size_t len, off_t offset)
 {
 	int start, end, nr;
@@ -649,11 +657,8 @@ push_failed:
 int object_is_cached(uint64_t oid)
 {
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
+	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
 
 	cache = find_object_cache(vid, 0);
 	if (!cache)
@@ -754,9 +759,7 @@ int bypass_object_cache(struct request *req)
 			return 1;
 		} else  {
 			/* For read requet, we can read cache if any */
-			uint32_t idx = data_oid_to_idx(oid);
-			if (is_vdi_obj(oid))
-				idx |= 1 << CACHE_VDI_SHIFT;
+			uint32_t idx = object_cache_oid_to_idx(oid);
 
 			if (object_cache_lookup(cache, idx, 0) < 0)
 				return 1;
@@ -778,12 +781,9 @@ int object_cache_handle_request(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
+	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
 	int ret, create = 0;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
 
 	cache = find_object_cache(vid, 1);
 
@@ -805,11 +805,8 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 	int ret;
 	struct request *req;
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
+	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
 
 	cache = find_object_cache(vid, 0);
 
@@ -843,11 +840,8 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 	int ret;
 	struct request *req;
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
+	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
 
 	cache = find_object_cache(vid, 0);
 
@@ -929,13 +923,10 @@ int object_cache_flush_and_del(struct request *req)
 void object_cache_remove(uint64_t oid)
 {
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = data_oid_to_idx(oid);
+	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *oc;
 	struct object_cache_entry *entry;
 	int tree_id = 0;
-
-	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
 
 	oc = find_object_cache(vid, 0);
 	if (!oc)
