@@ -728,7 +728,10 @@ static void zk_handler(int listen_fd, int events, void *data)
 		dprintf("one sheep joined[down], nr_nodes:%ld, sender:%s, joined:%d\n",
 				nr_zk_nodes, node_to_str(&ev.sender.node), ev.sender.joined);
 
-		if (ev.join_result == CJ_RES_SUCCESS) {
+		switch (ev.join_result) {
+		case CJ_RES_SUCCESS:
+		case CJ_RES_JOIN_LATER:
+		/* what about CJ_RES_MASTER_TRANSFER ? */
 			sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&ev.sender.node));
 			if (node_eq(&ev.sender.node, &this_node.node)) {
 				dprintf("create path:%s\n", path);
@@ -740,6 +743,9 @@ static void zk_handler(int listen_fd, int events, void *data)
 				rc = zk_exists(zhandle, path, 1, NULL);
 				dprintf("watch path:%s, exists:%d\n", path, (rc == ZOK));
 			}
+			break;
+		default:
+			break;
 		}
 
 		build_node_list(zk_node_btroot);

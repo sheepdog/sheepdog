@@ -285,11 +285,11 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		switch (cevent->result) {
 		case CJ_RES_SUCCESS:
 		case CJ_RES_MASTER_TRANSFER:
+		case CJ_RES_JOIN_LATER:
 			add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 			nr_cpg_nodes++;
 			/* fall through */
 		case CJ_RES_FAIL:
-		case CJ_RES_JOIN_LATER:
 			build_node_list(cpg_nodes, nr_cpg_nodes, entries);
 			sd_join_handler(&cevent->sender.ent, entries,
 						       nr_cpg_nodes, cevent->result,

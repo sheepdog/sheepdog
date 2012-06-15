@@ -112,6 +112,12 @@ struct cluster_info {
 	 */
 	struct list_head failed_nodes;
 
+	/*
+	 * List of nodes that weren't part of the last epoch, but joined
+	 * before restarting the cluster.
+	 */
+	struct list_head delayed_nodes;
+
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
 
