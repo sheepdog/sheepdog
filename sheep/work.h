@@ -6,16 +6,10 @@ struct work_queue;
 
 typedef void (*work_func_t)(struct work *);
 
-enum work_attr {
-	WORK_SIMPLE,
-	WORK_ORDERED,
-};
-
 struct work {
 	struct list_head w_list;
 	work_func_t fn;
 	work_func_t done;
-	enum work_attr attr;
 };
 
 struct work_queue {

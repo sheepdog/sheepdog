@@ -36,97 +36,18 @@ int total_nr_workers;
 LIST_HEAD(worker_info_list);
 
 enum wq_state {
-	WQ_BLOCKED = (1U << 0),
 	WQ_DEAD = (1U << 1),
 };
 
-static void work_queue_set_blocked(struct work_queue *q)
-{
-	q->wq_state |= WQ_BLOCKED;
-}
-
-static void work_queue_clear_blocked(struct work_queue *q)
-{
-	q->wq_state &= ~WQ_BLOCKED;
-}
-
-static int work_queue_blocked(struct work_queue *q)
-{
-	return q->wq_state & WQ_BLOCKED;
-}
-
-static int work_enabled(struct work_queue *q, struct work *w)
-{
-	int enabled = 0;
-
-	switch (w->attr) {
-	case WORK_SIMPLE:
-		if (!work_queue_blocked(q))
-			enabled = 1;
-		break;
-	case WORK_ORDERED:
-		if (!work_queue_blocked(q) && !q->nr_active)
-			enabled = 1;
-		break;
-	default:
-		enabled = -1;
-	}
-
-	return enabled;
-}
-
-static void work_post_queued(struct work_queue *q, struct work *w)
-{
-	q->nr_active++;
-	if (w->attr == WORK_ORDERED)
-		work_queue_set_blocked(q);
-}
-
-static void __queue_work(struct work_queue *q, struct work *work, int enabled)
+void queue_work(struct work_queue *q, struct work *work)
 {
 	struct worker_info *wi = container_of(q, struct worker_info, q);
 
-	if (enabled) {
-		pthread_mutex_lock(&wi->pending_lock);
+	pthread_mutex_lock(&wi->pending_lock);
+	list_add_tail(&work->w_list, &wi->q.pending_list);
+	pthread_mutex_unlock(&wi->pending_lock);
 
-		list_add_tail(&work->w_list, &wi->q.pending_list);
-
-		pthread_mutex_unlock(&wi->pending_lock);
-
-		pthread_cond_signal(&wi->pending_cond);
-
-		work_post_queued(q, work);
-	} else
-		list_add_tail(&work->w_list, &wi->q.blocked_list);
-}
-
-void queue_work(struct work_queue *q, struct work *work)
-{
-	int enabled;
-
-	if (!list_empty(&q->blocked_list))
-		enabled = 0;
-	else
-		enabled = work_enabled(q, work);
-
-	__queue_work(q, work, enabled);
-}
-
-static void work_post_done(struct work_queue *q, enum work_attr attr)
-{
-	struct work *n, *t;
-
-	q->nr_active--;
-	if (attr == WORK_ORDERED)
-		work_queue_clear_blocked(q);
-
-	list_for_each_entry_safe(n, t, &q->blocked_list, w_list) {
-		if (!work_enabled(q, n))
-			break;
-
-		list_del(&n->w_list);
-		__queue_work(q, n, 1);
-	}
+	pthread_cond_signal(&wi->pending_cond);
 }
 
 static void bs_thread_request_done(int fd, int events, void *data)
@@ -147,17 +68,10 @@ static void bs_thread_request_done(int fd, int events, void *data)
 		pthread_mutex_unlock(&wi->finished_lock);
 
 		while (!list_empty(&list)) {
-			enum work_attr attr;
 			work = list_first_entry(&list, struct work, w_list);
 			list_del(&work->w_list);
 
-			/*
-			 * work->done might free the work so we must
-			 * save its attr for qork_post_done().
-			 */
-			attr = work->attr;
 			work->done(work);
-			work_post_done(&wi->q, attr);
 		}
 	}
 }
