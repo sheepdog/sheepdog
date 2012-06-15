@@ -515,8 +515,14 @@ static int cluster_wait_for_join_check(struct sd_node *entries,
 	int ret;
 
 	ret = cluster_sanity_check(epoch, ctime);
-	if (ret != CJ_RES_SUCCESS)
+	if (ret != CJ_RES_SUCCESS)  {
+		if (epoch > sys->epoch) {
+			eprintf("transfer mastership (%d, %d)\n",
+				epoch, sys->epoch);
+			return CJ_RES_MASTER_TRANSFER;
+		}
 		return ret;
+	}
 
 	if (epoch < local_epoch) {
 		eprintf("joining node epoch too small: %"
@@ -902,22 +908,15 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 
 	jm->nr_copies = sys->nr_copies;
 	jm->cluster_flags = sys->flags;
+	jm->epoch = sys->epoch;
 	jm->ctime = get_cluster_ctime();
 	jm->nr_failed_nodes = 0;
 
 	if (sd_store)
 		strcpy((char *)jm->store, sd_store->name);
 
-	if (ret == CJ_RES_SUCCESS && jm->cluster_status != SD_STATUS_OK) {
+	if (ret == CJ_RES_SUCCESS && jm->cluster_status != SD_STATUS_OK)
 		format_failed_node_list(jm);
-	} else if (ret != CJ_RES_SUCCESS &&
-		   jm->epoch > sys->epoch &&
-		   jm->cluster_status == SD_STATUS_WAIT_FOR_JOIN) {
-		eprintf("transfer mastership (%d, %d)\n", jm->epoch, sys->epoch);
-		return CJ_RES_MASTER_TRANSFER;
-	}
-	jm->epoch = sys->epoch;
-
 	return ret;
 }
 
