@@ -483,44 +483,45 @@ static void clear_failed_node_list(void)
 		list_del(&n->list);
 }
 
-static int cluster_sanity_check(struct sd_node *entries,
-			     int nr_entries, uint64_t ctime, uint32_t epoch)
+static int cluster_sanity_check(uint32_t epoch, uint64_t ctime)
 {
-	struct sd_node local_entries[SD_MAX_NODES];
-	uint32_t lepoch;
-	int nr_local_entries;
+	uint64_t local_ctime = get_cluster_ctime();
+	uint32_t local_epoch = get_latest_epoch();
 
-	if (sys_stat_wait_format() || sys_stat_shutdown())
-		return CJ_RES_SUCCESS;
-	/*
-	 * When the joining node is newly created and we are not waiting for
-	 * join we need not check anything.
-	 */
-	if (nr_entries == 0 && !sys_stat_wait_join())
-		return CJ_RES_SUCCESS;
-
-	if (ctime != get_cluster_ctime()) {
+	if (ctime != local_ctime) {
 		eprintf("joining node ctime doesn't match: %"
 			PRIu64 " vs %" PRIu64 "\n",
-			ctime, get_cluster_ctime());
+			ctime, local_ctime);
 		return CJ_RES_FAIL;
 	}
 
-	lepoch = get_latest_epoch();
-	if (epoch > lepoch) {
+	if (epoch > local_epoch) {
 		eprintf("joining node epoch too large: %"
 			PRIu32 " vs %" PRIu32 "\n",
-			epoch, lepoch);
+			epoch, local_epoch);
 		return CJ_RES_JOIN_LATER;
 	}
 
-	if (sys_can_recover())
-		return CJ_RES_SUCCESS;
+	return CJ_RES_SUCCESS;
+}
 
-	if (epoch < lepoch) {
+static int cluster_wait_for_join_check(struct sd_node *entries,
+		int nr_entries, uint32_t epoch, uint64_t ctime,
+		uint32_t *status, uint8_t *inc_epoch)
+{
+	struct sd_node local_entries[SD_MAX_NODES];
+	int nr, nr_local_entries, nr_failed_entries;
+	uint32_t local_epoch = get_latest_epoch();
+	int ret;
+
+	ret = cluster_sanity_check(epoch, ctime);
+	if (ret != CJ_RES_SUCCESS)
+		return ret;
+
+	if (epoch < local_epoch) {
 		eprintf("joining node epoch too small: %"
 			PRIu32 " vs %" PRIu32 "\n",
-			epoch, lepoch);
+			epoch, local_epoch);
 		return CJ_RES_JOIN_LATER;
 	}
 
@@ -539,74 +540,86 @@ static int cluster_sanity_check(struct sd_node *entries,
 		return CJ_RES_FAIL;
 	}
 
+	if (!current_vnode_info)
+		nr = 1;
+	else
+		nr = current_vnode_info->nr_nodes + 1;
+
+	/*
+	 * If we have all members from the last epoch log in the in-memory
+	 * node list we can set the cluster live now without incrementing
+	 * the epoch.
+	 */
+	if (nr == nr_local_entries) {
+		*status = SD_STATUS_OK;
+		return CJ_RES_SUCCESS;
+	}
+
+	/*
+	 * If we reach the old node count, but some node failed we have to
+	 * update the epoch before setting the cluster live.
+	 */
+	nr_failed_entries = get_nodes_nr_from(&sys->failed_nodes);
+	if (nr_local_entries == nr + nr_failed_entries) {
+		if (inc_epoch)
+			*inc_epoch = 1;
+		*status = SD_STATUS_OK;
+		return CJ_RES_SUCCESS;
+	}
+
+	/*
+	 * The join was successful, but we don't have enough nodes yet to set
+	 * the cluster live.
+	 */
 	return CJ_RES_SUCCESS;
 }
 
-static int get_cluster_status(struct sd_node *from,
-			      struct sd_node *entries,
-			      int nr_entries, uint64_t ctime, uint32_t epoch,
-			      uint32_t *status, uint8_t *inc_epoch)
+static int cluster_running_check(int nr_entries, uint32_t epoch, uint64_t ctime,
+		uint8_t *inc_epoch)
 {
 	int ret;
-	int nr, nr_local_entries, nr_failed_entries;
-	struct sd_node local_entries[SD_MAX_NODES];
-	char str[256];
-	uint32_t sys_stat = sys_stat_get();
 
-	*status = sys_stat;
+	/*
+	 * When the joining node is newly created and we are not waiting for
+	 * join we do not need to check anything.
+	 */
+	if (nr_entries != 0) {
+		ret = cluster_sanity_check(epoch, ctime);
+		if (ret != CJ_RES_SUCCESS)
+			return ret;
+	}
+
+	if (inc_epoch)
+		*inc_epoch = 1;
+	return CJ_RES_SUCCESS;
+}
+
+static int get_cluster_status(struct sd_node *joined, struct sd_node *entries,
+		int nr_entries, uint64_t ctime, uint32_t epoch,
+		uint32_t *status, uint8_t *inc_epoch)
+{
+	*status = sys->status;
 	if (inc_epoch)
 		*inc_epoch = 0;
 
-	ret = cluster_sanity_check(entries, nr_entries, ctime, epoch);
-	if (ret)
-		goto out;
-
-	switch (sys_stat) {
-	case SD_STATUS_HALT:
-	case SD_STATUS_OK:
-		if (inc_epoch)
-			*inc_epoch = 1;
-		break;
+	switch (sys->status) {
 	case SD_STATUS_WAIT_FOR_FORMAT:
-		if (nr_entries != 0)
-			ret = CJ_RES_FAIL;
-		break;
-	case SD_STATUS_WAIT_FOR_JOIN:
-		if (!current_vnode_info)
-			nr = 1;
-		else
-			nr = current_vnode_info->nr_nodes + 1;
-
-		nr_local_entries = epoch_log_read(epoch, local_entries,
-						  sizeof(local_entries));
-
-		if (nr != nr_local_entries) {
-			nr_failed_entries = get_nodes_nr_from(&sys->failed_nodes);
-			if (nr_local_entries == nr + nr_failed_entries) {
-				/* Even though some nodes have left, we can make do without them.
-				 * Order cluster to do recovery right now.
-				 */
-				if (inc_epoch)
-					*inc_epoch = 1;
-				*status = SD_STATUS_OK;
-			}
-			break;
-		}
-
-		*status = SD_STATUS_OK;
-		break;
+		if (nr_entries == 0)
+			return CJ_RES_SUCCESS;
+		return CJ_RES_FAIL;
 	case SD_STATUS_SHUTDOWN:
-		ret = CJ_RES_FAIL;
-		break;
+		return CJ_RES_FAIL;
+	case SD_STATUS_OK:
+	case SD_STATUS_HALT:
+		return cluster_running_check(nr_entries, epoch, ctime,
+					     inc_epoch);
+	case SD_STATUS_WAIT_FOR_JOIN:
+		return cluster_wait_for_join_check(entries, nr_entries, epoch,
+						   ctime, status, inc_epoch);
 	default:
-		break;
+		eprintf("invalid system status: 0x%x\n", sys->status);
+		abort();
 	}
-out:
-	if (ret)
-		eprintf("%x, %s\n", ret,
-			addr_to_str(str, sizeof(str), from->addr, from->port));
-
-	return ret;
 }
 
 static int get_vdi_bitmap_from(struct sd_node *node)
@@ -842,6 +855,7 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 {
 	struct join_message *jm = opaque;
+	char str[256];
 	int ret;
 
 	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
@@ -882,7 +896,9 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 	ret = get_cluster_status(joining, jm->nodes, jm->nr_nodes,
 					jm->ctime, jm->epoch,
 					&jm->cluster_status, &jm->inc_epoch);
-	dprintf("%d, %d\n", ret, jm->cluster_status);
+	eprintf("%s: ret = 0x%x, cluster_status = 0x%x\n",
+		addr_to_str(str, sizeof(str), joining->addr, joining->port),
+		ret, jm->cluster_status);
 
 	jm->nr_copies = sys->nr_copies;
 	jm->cluster_flags = sys->flags;
