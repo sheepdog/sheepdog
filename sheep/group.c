@@ -760,23 +760,18 @@ int log_current_epoch(void)
 				current_vnode_info->nr_nodes);
 }
 
-static void log_last_epoch(struct join_message *msg, struct sd_node *joined,
+static struct vnode_info *alloc_old_vnode_info(struct sd_node *joined,
 		struct sd_node *nodes, size_t nr_nodes)
 {
-	if ((msg->cluster_status == SD_STATUS_OK ||
-	     msg->cluster_status == SD_STATUS_HALT) && msg->inc_epoch) {
-		struct sd_node old_nodes[SD_MAX_NODES];
-		size_t count = 0, i;
+	struct sd_node old_nodes[SD_MAX_NODES];
+	size_t count = 0, i;
 
-		/* exclude the newly added one */
-		for (i = 0; i < nr_nodes; i++) {
-			if (!node_eq(nodes + i, joined))
-				old_nodes[count++] = nodes[i];
-		}
-		put_vnode_info(current_vnode_info);
-		current_vnode_info = alloc_vnode_info(old_nodes, count);
-		log_current_epoch();
+	/* exclude the newly added one */
+	for (i = 0; i < nr_nodes; i++) {
+		if (!node_eq(nodes + i, joined))
+			old_nodes[count++] = nodes[i];
 	}
+	return alloc_vnode_info(old_nodes, count);
 }
 
 static void finish_join(struct join_message *msg, struct sd_node *joined,
@@ -785,12 +780,6 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	sys->join_finished = 1;
 	sys->nr_copies = msg->nr_copies;
 	sys->epoch = msg->epoch;
-
-	/*
-	 * Make sure we have an epoch log record for the epoch before
-	 * this node joins, as recovery expects this record to exist.
-	 */
-	log_last_epoch(msg, joined, nodes, nr_nodes);
 
 	if (msg->cluster_status != SD_STATUS_OK)
 		update_exceptional_node_list(get_latest_epoch(), msg);
@@ -861,6 +850,12 @@ static void update_cluster_info(struct join_message *msg,
 
 	if (sys_can_recover() && msg->inc_epoch) {
 		clear_exceptional_node_lists();
+
+		if (!old_vnode_info) {
+			old_vnode_info = alloc_old_vnode_info(joined, nodes,
+							      nr_nodes);
+		}
+
 		start_recovery(current_vnode_info, old_vnode_info);
 	}
 
