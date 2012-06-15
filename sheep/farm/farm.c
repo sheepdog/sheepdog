@@ -528,31 +528,26 @@ out:
 	return ret;
 }
 
-static int farm_end_recover(struct siocb *iocb)
+static int farm_end_recover(uint32_t old_epoch,
+		struct vnode_info *old_vnode_info)
 {
 	unsigned char snap_sha1[SHA1_LEN];
 	unsigned char trunk_sha1[SHA1_LEN];
-	uint32_t epoch = iocb->epoch - 1;
-	struct sd_node nodes[SD_MAX_NODES];
-	int nr_nodes;
 
-	if (epoch == 0)
+	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
-	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
-	if (nr_nodes < 0) {
-		dprintf("failed to read nodes for epoch %d\n", epoch);
-		return SD_RES_EIO;
-	}
+	dprintf("old epoch %d\n", old_epoch);
 
-	dprintf("epoch %d\n", iocb->epoch);
 	if (trunk_file_write_recovery(trunk_sha1) < 0)
 		return SD_RES_EIO;
 
-	if (snap_file_write(epoch, nodes, nr_nodes, trunk_sha1, snap_sha1) < 0)
+	if (snap_file_write(old_epoch, old_vnode_info->nodes,
+			    old_vnode_info->nr_nodes, trunk_sha1,
+			    snap_sha1) < 0)
 		return SD_RES_EIO;
 
-	if (snap_log_write(epoch, snap_sha1, 0) < 0)
+	if (snap_log_write(old_epoch, snap_sha1, 0) < 0)
 		return SD_RES_EIO;
 
 	return SD_RES_SUCCESS;

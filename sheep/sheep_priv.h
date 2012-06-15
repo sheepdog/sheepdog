@@ -169,7 +169,7 @@ struct store_driver {
 	int (*link)(uint64_t oid, struct siocb *, uint32_t tgt_epoch);
 	int (*atomic_put)(uint64_t oid, struct siocb *);
 	int (*begin_recover)(struct siocb *);
-	int (*end_recover)(struct siocb *);
+	int (*end_recover)(uint32_t epoch, struct vnode_info *old_vnode_info);
 	int (*purge_obj)(void);
 	/* Operations for snapshot */
 	int (*snapshot)(struct siocb *);

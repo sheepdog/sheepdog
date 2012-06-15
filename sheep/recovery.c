@@ -336,13 +336,12 @@ static inline void finish_recovery(struct recovery_work *rw)
 {
 	recovering_work = NULL;
 	sys->recovered_epoch = rw->epoch;
+
+	if (sd_store->end_recover)
+		sd_store->end_recover(sys->epoch - 1, rw->old_vnodes);
+
 	free_recovery_work(rw);
 
-	if (sd_store->end_recover) {
-		struct siocb iocb = { 0 };
-		iocb.epoch = sys->epoch;
-		sd_store->end_recover(&iocb);
-	}
 	dprintf("recovery complete: new epoch %"PRIu32"\n",
 		sys->recovered_epoch);
 }
