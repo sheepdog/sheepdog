@@ -756,9 +756,6 @@ static void update_cluster_info(struct join_message *msg,
 	eprintf("status = %d, epoch = %d, finished: %d\n", msg->cluster_status,
 		msg->epoch, sys->join_finished);
 
-	if (sys_stat_join_failed())
-		return;
-
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 

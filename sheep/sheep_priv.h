@@ -32,7 +32,6 @@
 #define SD_STATUS_WAIT_FOR_FORMAT   0x00000002
 #define SD_STATUS_WAIT_FOR_JOIN     0x00000004
 #define SD_STATUS_SHUTDOWN          0x00000008
-#define SD_STATUS_JOIN_FAILED       0x00000010
 #define SD_STATUS_HALT              0x00000020
 
 #define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheep */
@@ -361,11 +360,6 @@ static inline int sys_stat_wait_format(void)
 static inline int sys_stat_wait_join(void)
 {
 	return sys->status & SD_STATUS_WAIT_FOR_JOIN;
-}
-
-static inline int sys_stat_join_failed(void)
-{
-	return sys->status & SD_STATUS_JOIN_FAILED;
 }
 
 static inline int sys_stat_shutdown(void)

@@ -372,8 +372,6 @@ static int local_stat_cluster(struct request *req)
 		return SD_RES_WAIT_FOR_JOIN;
 	case SD_STATUS_SHUTDOWN:
 		return SD_RES_SHUTDOWN;
-	case SD_STATUS_JOIN_FAILED:
-		return SD_RES_JOIN_FAILED;
 	case SD_STATUS_HALT:
 		return SD_RES_HALT;
 	default:
