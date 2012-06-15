@@ -107,10 +107,11 @@ struct cluster_info {
 	uint32_t status;
 	uint16_t flags;
 
-	/* leave list is only used to account for bad nodes when we start
-	 * up the cluster nodes after we shutdown the cluster through collie.
+	/*
+	 * List of nodes that were past of the last epoch before a shutdown,
+	 * but failed to join.
 	 */
-	struct list_head leave_list;
+	struct list_head failed_nodes;
 
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
