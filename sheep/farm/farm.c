@@ -533,14 +533,23 @@ static int farm_end_recover(struct siocb *iocb)
 	unsigned char snap_sha1[SHA1_LEN];
 	unsigned char trunk_sha1[SHA1_LEN];
 	uint32_t epoch = iocb->epoch - 1;
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
 
 	if (epoch == 0)
 		return SD_RES_SUCCESS;
+
+	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
+	if (nr_nodes < 0) {
+		dprintf("failed to read nodes for epoch %d\n", epoch);
+		return SD_RES_EIO;
+	}
+
 	dprintf("epoch %d\n", iocb->epoch);
 	if (trunk_file_write_recovery(trunk_sha1) < 0)
 		return SD_RES_EIO;
 
-	if (snap_file_write(epoch, trunk_sha1, snap_sha1, 0) < 0)
+	if (snap_file_write(epoch, nodes, nr_nodes, trunk_sha1, snap_sha1) < 0)
 		return SD_RES_EIO;
 
 	if (snap_log_write(epoch, snap_sha1, 0) < 0)
@@ -553,6 +562,8 @@ static int farm_snapshot(struct siocb *iocb)
 {
 	unsigned char snap_sha1[SHA1_LEN];
 	unsigned char trunk_sha1[SHA1_LEN];
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
 	void *buffer;
 	int log_nr, ret = SD_RES_EIO, epoch;
 
@@ -562,10 +573,16 @@ static int farm_snapshot(struct siocb *iocb)
 
 	epoch = log_nr + 1;
 	dprintf("user epoch %d\n", epoch);
+
+	nr_nodes = epoch_log_read(sys->epoch, nodes, sizeof(nodes));
+	if (nr_nodes < 0)
+		goto out;
+
 	if (trunk_file_write_user(trunk_sha1) < 0)
 		goto out;
 
-	if (snap_file_write(epoch, trunk_sha1, snap_sha1, 1) < 0)
+	if (snap_file_write(sys->epoch, nodes, nr_nodes,
+			    trunk_sha1, snap_sha1) < 0)
 		goto out;
 
 	if (snap_log_write(epoch, snap_sha1, 1) < 0)

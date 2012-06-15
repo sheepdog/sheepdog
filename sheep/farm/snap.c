@@ -155,22 +155,16 @@ void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 	return buffer;
 }
 
-int snap_file_write(uint32_t epoch, unsigned char *trunksha1, unsigned char *outsha1, int user)
+int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
+		unsigned char *trunksha1, unsigned char *outsha1)
 {
 	int ret = 0;
 	struct strbuf buf = STRBUF_INIT;
-	struct sd_node nodes[SD_MAX_NODES];
-	int tgt_epoch = user ? sys_epoch() : epoch;
-	int nr_nodes;
 	struct sha1_file_hdr hdr;
-
-	nr_nodes = epoch_log_read(tgt_epoch, nodes, sizeof(nodes));
-	if (nr_nodes == -1)
-		return -1;
 
 	memcpy(hdr.tag, TAG_SNAP, TAG_LEN);
 	hdr.size = nr_nodes * sizeof(*nodes) + SHA1_LEN;
-	hdr.priv = tgt_epoch;
+	hdr.priv = epoch;
 	hdr.reserved = 0;
 
 	strbuf_add(&buf, &hdr, sizeof(hdr));
@@ -181,7 +175,7 @@ int snap_file_write(uint32_t epoch, unsigned char *trunksha1, unsigned char *out
 		goto err;
 	}
 
-	dprintf("epoch %u, sha1: %s\n", epoch, sha1_to_hex(outsha1));
+	dprintf("epoch: %" PRIu32 ", sha1: %s\n", epoch, sha1_to_hex(outsha1));
 err:
 	strbuf_release(&buf);
 	return ret;
