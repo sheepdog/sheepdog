@@ -201,11 +201,11 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 		p += strlen(p);
 	}
 
-	snprintf(p, MAX_MSG_SIZE, "%s(%d) ", func, line);
+	snprintf(p, MAX_MSG_SIZE - strlen(buff), "%s(%d) ", func, line);
 
 	p += strlen(p);
 
-	vsnprintf(p, MAX_MSG_SIZE - strlen(p), fmt, ap);
+	vsnprintf(p, MAX_MSG_SIZE - strlen(buff), fmt, ap);
 
 	len = strlen(buff) * sizeof(char) + 1;
 
