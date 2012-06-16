@@ -78,9 +78,13 @@ static void bs_thread_request_done(int fd, int events, void *data)
 
 static void *worker_routine(void *arg)
 {
-	struct worker_info *wi = arg;
+	struct worker_info_ext *wie = arg;
+	struct worker_info *wi = wie->wi;
 	struct work *work;
 	eventfd_t value = 1;
+
+	set_thread_id(wie->thread_id);
+	free(wie);
 
 	pthread_mutex_lock(&wi->startup_lock);
 	/* started this thread */
@@ -145,6 +149,8 @@ struct work_queue *init_work_queue(int nr)
 {
 	int i, ret;
 	struct worker_info *wi;
+	struct worker_info_ext *wie;
+	static int thread_id;
 
 	ret = init_eventfd();
 	if (ret)
@@ -168,8 +174,15 @@ struct work_queue *init_work_queue(int nr)
 
 	pthread_mutex_lock(&wi->startup_lock);
 	for (i = 0; i < wi->nr_threads; i++) {
+		wie = zalloc(sizeof(*wie));
+		if (!wie)
+			return NULL;
+
+		wie->wi = wi;
+		wie->thread_id = ++thread_id;
+
 		ret = pthread_create(&wi->worker_thread[i], NULL,
-				     worker_routine, wi);
+				     worker_routine, wie);
 
 		if (ret) {
 			eprintf("failed to create worker thread #%d: %s\n",

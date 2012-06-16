@@ -39,6 +39,11 @@ struct worker_info {
 	pthread_t worker_thread[0];
 };
 
+struct worker_info_ext {
+	int thread_id;
+	struct worker_info *wi;
+};
+
 extern struct list_head worker_info_list;
 extern int total_nr_workers;
 
