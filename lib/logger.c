@@ -47,7 +47,8 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 static void dolog(int prio, const char *func, int line, const char *fmt,
 		  va_list ap) __attribute__ ((format (printf, 4, 0)));
 
-static __thread int thread_id;
+static __thread const char *worker_name;
+static __thread int worker_idx;
 static struct logarea *la;
 static char *log_name;
 static char *log_nowname;
@@ -201,7 +202,12 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 		strftime(p, MAX_MSG_SIZE, "%b %2d %H:%M:%S", tmp);
 		p += strlen(p);
 
-		snprintf(p, MAX_MSG_SIZE - strlen(buff), "|%d|", thread_id);
+		if (worker_name)
+			snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s %d] ",
+				 worker_name, worker_idx);
+		else
+			strncpy(p, " [main] ", MAX_MSG_SIZE - strlen(buff));
+
 		p += strlen(p);
 	}
 
@@ -526,7 +532,8 @@ notrace void log_close(void)
 	}
 }
 
-notrace void set_thread_id(int tid)
+notrace void set_thread_name(const char *name, int idx)
 {
-	thread_id = tid;
+	worker_name = name;
+	worker_idx = idx;
 }

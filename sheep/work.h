@@ -20,6 +20,8 @@ struct work_queue {
 };
 
 struct worker_info {
+	const char *name;
+
 	struct list_head worker_info_siblings;
 
 	int nr_threads;
@@ -39,15 +41,10 @@ struct worker_info {
 	pthread_t worker_thread[0];
 };
 
-struct worker_info_ext {
-	int thread_id;
-	struct worker_info *wi;
-};
-
 extern struct list_head worker_info_list;
 extern int total_nr_workers;
 
-struct work_queue *init_work_queue(int nr);
+struct work_queue *init_work_queue(const char *name, int nr);
 void queue_work(struct work_queue *q, struct work *work);
 
 #endif
