@@ -446,7 +446,7 @@ static struct sd_node *find_entry_epoch(struct sd_node *entry,
  * an automated restart.  These nodes will become part of the cluster by
  * the time it does get restarted.
  */
-static bool add_delayed_node(int epoch, struct sd_node *node)
+static bool add_delayed_node(uint32_t epoch, struct sd_node *node)
 {
 	struct node *n;
 
@@ -465,7 +465,7 @@ static bool add_delayed_node(int epoch, struct sd_node *node)
  * epoch, and if so add it to the list of node expected to be present
  * but failing to join.
  */
-static bool add_failed_node(int epoch, struct sd_node *node)
+static bool add_failed_node(uint32_t epoch, struct sd_node *node)
 {
 	struct node *n;
 
@@ -484,7 +484,7 @@ static bool add_failed_node(int epoch, struct sd_node *node)
  * Add the failed and delayed nodes in a join message to the local
  * lists of such nodes.
  */
-static void update_exceptional_node_list(int epoch, struct join_message *jm)
+static void update_exceptional_node_list(uint32_t epoch, struct join_message *jm)
 {
 	int i;
 
@@ -627,7 +627,7 @@ static int cluster_wait_for_join_check(struct sd_node *joined,
 }
 
 static int cluster_running_check(int nr_entries, uint32_t epoch, uint64_t ctime,
-		uint8_t *inc_epoch)
+				 uint8_t *inc_epoch)
 {
 	int ret;
 
