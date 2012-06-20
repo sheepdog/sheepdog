@@ -431,6 +431,9 @@ static struct sd_node *find_entry_epoch(struct sd_node *entry,
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr, i;
 
+	if (!epoch)
+		return NULL;
+
 	nr = epoch_log_read(epoch, nodes, sizeof(nodes));
 
 	for (i = 0; i < nr; i++)
