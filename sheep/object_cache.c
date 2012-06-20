@@ -242,11 +242,10 @@ static inline void
 add_to_dirty_tree_and_list(struct object_cache *oc,
 			   struct object_cache_entry *entry)
 {
-	struct object_cache_entry *dummy;
-
-	dummy = dirty_tree_insert(oc->active_dirty_tree, entry);
-	assert(dummy == NULL);
-	list_add(&entry->list, oc->active_dirty_list);
+	if (!dirty_tree_insert(oc->active_dirty_tree, entry))
+		list_add(&entry->list, oc->active_dirty_list);
+	else
+		free(entry);
 }
 
 static void merge_dirty_tree_and_list(struct object_cache *oc,
@@ -434,10 +433,7 @@ static int object_cache_rw(struct object_cache *oc, uint32_t idx,
 		bmap = calc_object_bmap(hdr->data_length, hdr->obj.offset);
 		entry = alloc_cache_entry(idx, bmap, 0);
 		pthread_mutex_lock(&oc->lock);
-		if (!dirty_tree_insert(oc->active_dirty_tree, entry))
-			list_add(&entry->list, oc->active_dirty_list);
-		else
-			free(entry);
+		add_to_dirty_tree_and_list(oc, entry);
 		pthread_mutex_unlock(&oc->lock);
 	} else {
 		ret = read_cache_object(oc->vid, idx, req->data,
