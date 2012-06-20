@@ -14,6 +14,7 @@
 #include <dirent.h>
 #include <pthread.h>
 #include <linux/limits.h>
+#include <sys/file.h>
 
 #include "farm.h"
 #include "sheep_priv.h"
@@ -125,13 +126,29 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
 
+	if (flock(fd, LOCK_EX) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	if (create && !(iocb->flags & SD_FLAG_CMD_COW)) {
 		ret = prealloc(fd, is_vdi_obj(oid) ?
 			       SD_INODE_SIZE : SD_DATA_OBJ_SIZE);
-		if (ret != SD_RES_SUCCESS)
+		if (ret != SD_RES_SUCCESS) {
+			if (flock(fd, LOCK_UN) < 0) {
+				ret = SD_RES_EIO;
+				eprintf("%m\n");
+				goto out;
+			}
 			goto out;
+		}
 	}
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
+	if (flock(fd, LOCK_UN) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	if (size != iocb->length) {
 		eprintf("%m\n");
 		ret = SD_RES_EIO;
@@ -451,7 +468,17 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
 
+	if (flock(fd, LOCK_SH) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
+	if (flock(fd, LOCK_UN) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out;
+	}
 	if (size != iocb->length) {
 		ret = SD_RES_EIO;
 		goto out;
