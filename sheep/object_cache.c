@@ -309,7 +309,9 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		if (ret != SD_RES_SUCCESS)
 			ret = -1;
 		else {
-			entry = alloc_cache_entry(idx, 0, 1);
+			uint64_t bmap = UINT64_MAX;
+
+			entry = alloc_cache_entry(idx, bmap, 1);
 			pthread_mutex_lock(&oc->lock);
 			add_to_dirty_tree_and_list(oc, entry);
 			pthread_mutex_unlock(&oc->lock);
