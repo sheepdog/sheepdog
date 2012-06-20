@@ -39,76 +39,6 @@ static int is_access_local(struct request *req, uint64_t oid)
 	return 0;
 }
 
-static int need_consistency_check(struct request *req)
-{
-	struct sd_req *hdr = &req->rq;
-
-	if (hdr->opcode != SD_OP_READ_OBJ)
-		/* consistency is fixed when clients read data for the
-		 * first time */
-		return 0;
-
-	if (hdr->flags & SD_FLAG_CMD_WEAK_CONSISTENCY)
-		return 0;
-
-	if (is_vdi_obj(hdr->obj.oid))
-		/* only check consistency for data objects */
-		return 0;
-
-	return 1;
-}
-
-static inline void set_consistency_check(struct request *req)
-{
-	uint32_t vdi_id = oid_to_vid(req->rq.obj.oid);
-	uint32_t idx = data_oid_to_idx(req->rq.obj.oid);
-	struct data_object_bmap *bmap;
-
-	req->check_consistency = 1;
-	list_for_each_entry(bmap, &sys->consistent_obj_list, list) {
-		if (bmap->vdi_id == vdi_id) {
-			if (test_bit(idx, bmap->dobjs))
-				req->check_consistency = 0;
-			break;
-		}
-	}
-}
-
-static void check_object_consistency(struct sd_req *hdr)
-{
-	uint32_t vdi_id = oid_to_vid(hdr->obj.oid);
-	struct data_object_bmap *bmap, *n;
-	int nr_bmaps = 0;
-
-	list_for_each_entry_safe(bmap, n, &sys->consistent_obj_list, list) {
-		nr_bmaps++;
-		if (bmap->vdi_id == vdi_id) {
-			set_bit(data_oid_to_idx(hdr->obj.oid), bmap->dobjs);
-			list_move_tail(&bmap->list, &sys->consistent_obj_list);
-			return;
-		}
-	}
-
-	bmap = zalloc(sizeof(*bmap));
-	if (bmap == NULL) {
-		eprintf("failed to allocate memory\n");
-		return;
-	}
-
-	dprintf("allocating a new object map\n");
-
-	bmap->vdi_id = vdi_id;
-	list_add_tail(&bmap->list, &sys->consistent_obj_list);
-	set_bit(data_oid_to_idx(hdr->obj.oid), bmap->dobjs);
-	if (nr_bmaps >= MAX_DATA_OBJECT_BMAPS) {
-		/* the first entry is the least recently used one */
-		bmap = list_first_entry(&sys->consistent_obj_list,
-					struct data_object_bmap, list);
-		list_del(&bmap->list);
-		free(bmap);
-	}
-}
-
 static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -154,8 +84,6 @@ static void gateway_op_done(struct work *work)
 		}
 		break;
 	case SD_RES_SUCCESS:
-		if (req->check_consistency && is_data_obj(hdr->obj.oid))
-			check_object_consistency(hdr);
 		break;
 	}
 
@@ -355,9 +283,6 @@ static void queue_gateway_request(struct request *req)
 	if (req->local_oid)
 		if (request_in_recovery(req))
 			return;
-
-	if (need_consistency_check(req))
-		set_consistency_check(req);
 
 queue_work:
 	req->work.fn = do_gateway_request;

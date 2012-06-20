@@ -208,69 +208,6 @@ err:
 	return ret;
 }
 
-static int fix_object_consistency(struct request *req)
-{
-	int ret = SD_RES_NO_MEM;
-	unsigned int data_length;
-	struct sd_req *hdr = &req->rq;
-	struct sd_req req_bak;
-	struct sd_rsp rsp_bak;
-	void *data = req->data, *buf;
-	uint64_t oid = hdr->obj.oid;
-	int old_opcode = hdr->opcode;
-
-	memcpy(&req_bak, &req->rq, sizeof(req_bak));
-	memcpy(&rsp_bak, &req->rp, sizeof(rsp_bak));
-
-	if (is_vdi_obj(oid))
-		data_length = SD_INODE_SIZE;
-	else if (is_vdi_attr_obj(oid))
-		data_length = SD_ATTR_OBJ_SIZE;
-	else
-		data_length = SD_DATA_OBJ_SIZE;
-
-	buf = valloc(data_length);
-	if (buf == NULL) {
-		eprintf("failed to allocate memory\n");
-		goto out;
-	}
-	memset(buf, 0, data_length);
-
-
-	hdr->data_length = data_length;
-	hdr->opcode = SD_OP_READ_OBJ;
-	hdr->flags = 0;
-	hdr->obj.offset = 0;
-
-	req->data = buf;
-	req->op = get_sd_op(SD_OP_READ_OBJ);
-
-	ret = forward_read_obj_req(req);
-	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to read object %x\n", ret);
-		goto out;
-	}
-
-	hdr->opcode = SD_OP_CREATE_AND_WRITE_OBJ;
-	hdr->flags = SD_FLAG_CMD_WRITE;
-	hdr->obj.oid = oid;
-	req->op = get_sd_op(hdr->opcode);
-	ret = forward_write_obj_req(req);
-	if (ret != SD_RES_SUCCESS) {
-		eprintf("failed to write object %x\n", ret);
-		goto out;
-	}
-out:
-	free(buf);
-	req->data = data;
-	req->op = get_sd_op(old_opcode);
-
-	memcpy(&req->rq, &req_bak, sizeof(req_bak));
-	memcpy(&req->rp, &rsp_bak, sizeof(rsp_bak));
-
-	return ret;
-}
-
 void do_gateway_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -280,12 +217,6 @@ void do_gateway_request(struct work *work)
 		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 
 	if (!sys->enable_write_cache || bypass_object_cache(req)) {
-		/* fix object consistency when we read the object for the first time */
-		if (req->check_consistency) {
-			ret = fix_object_consistency(req);
-			if (ret != SD_RES_SUCCESS)
-				goto out;
-		}
 		if (req->rq.flags & SD_FLAG_CMD_WRITE)
 			ret = forward_write_obj_req(req);
 		else
@@ -294,7 +225,6 @@ void do_gateway_request(struct work *work)
 		ret = object_cache_handle_request(req);
 	}
 
-out:
 	if (ret != SD_RES_SUCCESS)
 		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
 			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);

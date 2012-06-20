@@ -76,18 +76,8 @@ struct request {
 	uint64_t local_oid;
 
 	struct vnode_info *vnodes;
-	int check_consistency;
 
 	struct work work;
-};
-
-#define MAX_DATA_OBJECT_BMAPS 64
-
-struct data_object_bmap {
-	uint32_t vdi_id;
-	DECLARE_BITMAP(dobjs, MAX_DATA_OBJS);
-
-	struct list_head list;
 };
 
 #define MAX_OUTSTANDING_DATA_SIZE (256 * 1024 * 1024)
@@ -125,7 +115,6 @@ struct cluster_info {
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	struct list_head consistent_obj_list;
 	struct list_head blocking_conn_list;
 
 	int nr_copies;
