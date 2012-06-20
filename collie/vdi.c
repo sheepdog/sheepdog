@@ -33,9 +33,6 @@ struct get_vdi_info {
 	uint32_t snapid;
 };
 
-struct sd_node latest_node_list[SD_MAX_NODES];
-int nr_latest_node_list;
-
 static int parse_option_size(const char *value, uint64_t *ret)
 {
 	char *postfix;
