@@ -12,6 +12,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
+#include <openssl/sha.h>
 
 #include "collie.h"
 #include "treeview.h"
@@ -1319,7 +1320,192 @@ out:
 	return ret;
 }
 
+static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
+{
+	struct sd_req hdr = { 0 };
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	int fd, ret;
+	unsigned wlen = 0, rlen = SD_DATA_OBJ_SIZE;
+	char name[128];
+	void *buf;
+
+	buf = malloc(SD_DATA_OBJ_SIZE);
+	if (!buf) {
+		fprintf(stderr, "Failed to allocate memory\n");
+		exit(EXIT_SYSFAIL);
+	}
+
+	addr_to_str(name, sizeof(name), vnode->addr, 0);
+	fd = connect_to(name, vnode->port);
+	if (fd < 0) {
+		fprintf(stderr, "failed to connect to %s:%"PRIu32"\n",
+			name, vnode->port);
+		exit(EXIT_FAILURE);
+	}
+
+	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.epoch = node_list_version;
+	hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+	hdr.data_length = rlen;
+
+	hdr.obj.oid = oid;
+
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "Failed to execute request\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to read, %s\n",
+			sd_strerror(rsp->result));
+		exit(EXIT_FAILURE);
+	}
+	return buf;
+}
+
+static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
+{
+	struct sd_req hdr = { 0 };
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	int fd, ret;
+	unsigned wlen = SD_DATA_OBJ_SIZE, rlen = 0;
+	char name[128];
+
+	addr_to_str(name, sizeof(name), vnode->addr, 0);
+	fd = connect_to(name, vnode->port);
+	if (fd < 0) {
+		fprintf(stderr, "failed to connect to %s:%"PRIu32"\n",
+			name, vnode->port);
+		exit(EXIT_FAILURE);
+	}
+
+	hdr.opcode = SD_OP_WRITE_OBJ;
+	hdr.epoch = node_list_version;
+	hdr.flags = SD_FLAG_CMD_IO_LOCAL | SD_FLAG_CMD_WRITE;
+	hdr.data_length = wlen;
+
+	hdr.obj.oid = oid;
+
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "Failed to execute request\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to read, %s\n",
+			sd_strerror(rsp->result));
+		exit(EXIT_FAILURE);
+	}
+}
+
+static void collie_oid_to_vnodes(struct sd_vnode *vnodes, int vnodes_nr,
+				 uint64_t oid, int nr_copies,
+				 struct sd_vnode **ret_vnodes)
+{
+        int idx_buf[SD_MAX_COPIES], i, n;
+
+        obj_to_sheeps(vnodes, vnodes_nr, oid, nr_copies, idx_buf);
+
+        for (i = 0; i < nr_copies; i++) {
+                n = idx_buf[i];
+                ret_vnodes[i] = &vnodes[n];
+        }
+}
+
+static void do_check_repair(uint64_t oid, int nr_copies)
+{
+	struct sd_vnode *tgt_vnodes[nr_copies];
+	unsigned char sha1[nr_copies][SHA1_LEN];
+	void *buf;
+	int i;
+
+	collie_oid_to_vnodes(vnode_list_entries, nr_vnodes,
+			     oid, nr_copies, tgt_vnodes);
+	for (i = 0; i < nr_copies; i++) {
+		buf = read_object_from(tgt_vnodes[i], oid);
+		SHA1(buf, SD_DATA_OBJ_SIZE, sha1[i]);
+		free(buf);
+	}
+
+	if (!memcmp(sha1[0], sha1[1], SHA1_LEN) &&
+	    !memcmp(sha1[0], sha1[2], SHA1_LEN))
+		return; /* All replica consistent */
+
+	/* Okay, let's fix the consistency */
+	buf = read_object_from(tgt_vnodes[0], oid);
+	for (i = 1; i < nr_copies; i++)
+		write_object_to(tgt_vnodes[i], oid, buf);
+	fprintf(stdout, "fix %"PRIx64" success\n", oid);
+	free(buf);
+}
+
+static int check_repair_vdi(uint32_t vid)
+{
+	struct sheepdog_inode *inode;
+	int ret;
+	uint64_t total, done = 0, oid;
+	uint32_t idx = 0, dvid;
+
+	inode = malloc(sizeof(*inode));
+	if (!inode) {
+		fprintf(stderr, "Failed to allocate memory\n");
+		return EXIT_SYSFAIL;
+	}
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to read an inode\n");
+		return EXIT_FAILURE;
+	}
+
+	total = inode->vdi_size;
+	while(done < total) {
+		dvid = inode->data_vdi_id[idx];
+		if (dvid) {
+			oid = vid_to_data_oid(dvid, idx);
+			do_check_repair(oid, inode->nr_copies);
+		}
+		done += SD_DATA_OBJ_SIZE;
+		idx++;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int vdi_check(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint32_t vid;
+	int ret;
+
+	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+			    vdi_cmd_data.snapshot_tag, &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	if (check_repair_vdi(vid) < 0) {
+		fprintf(stderr, "Failed to read an inode\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	fprintf(stdout, "finish check&repair %s\n", vdiname);
+	return EXIT_SUCCESS;
+out:
+	return ret;
+}
+
 static struct subcommand vdi_cmd[] = {
+	{"check", "<vdiname>", "saph", "check and repare image's consistency",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_check},
 	{"create", "<vdiname> <size>", "Paph", "create an image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
 	{"snapshot", "<vdiname>", "saph", "create a snapshot",
