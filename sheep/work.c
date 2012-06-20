@@ -81,7 +81,7 @@ static void *worker_routine(void *arg)
 	struct worker_info *wi = arg;
 	struct work *work;
 	eventfd_t value = 1;
-	int i, idx;
+	int i, uninitialized_var(idx);
 
 	for (i = 0; i < wi->nr_threads; i++) {
 		if (wi->worker_thread[i] == pthread_self()) {

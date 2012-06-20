@@ -33,6 +33,8 @@
 
 #define notrace __attribute__((no_instrument_function))
 
+#define uninitialized_var(x) x = x
+
 static inline int before(uint32_t seq1, uint32_t seq2)
 {
         return (int32_t)(seq1 - seq2) < 0;
