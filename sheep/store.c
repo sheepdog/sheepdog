@@ -48,9 +48,6 @@ LIST_HEAD(store_drivers);
 
 int do_local_io(struct request *req, uint32_t epoch)
 {
-	dprintf("%x, %" PRIx64" , %u\n",
-		req->rq.opcode, req->rq.obj.oid, epoch);
-
 	req->rq.epoch = epoch;
 	return do_process_work(req);
 }
