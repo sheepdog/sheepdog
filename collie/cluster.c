@@ -93,7 +93,7 @@ static int cluster_format(int argc, char **argv)
 	hdr.copies = cluster_cmd_data.copies;
 	if (cluster_cmd_data.nohalt)
 		set_nohalt(&hdr.flags);
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
@@ -133,7 +133,7 @@ static int cluster_info(int argc, char **argv)
 	struct tm tm;
 	char time_str[128];
 
-	log_length = node_list_version * sizeof(struct epoch_log);
+	log_length = sd_epoch * sizeof(struct epoch_log);
 again:
 	logs = malloc(log_length);
 	if (!logs) {
@@ -152,7 +152,7 @@ again:
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_STAT_CLUSTER;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
 	rlen = hdr.data_length;
@@ -223,7 +223,7 @@ static int cluster_shutdown(int argc, char **argv)
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_SHUTDOWN;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 
 	rlen = 0;
 	wlen = 0;
@@ -453,7 +453,7 @@ static int cluster_recover(int argc, char **argv)
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_RECOVER;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 
 	rlen = 0;
 	wlen = 0;

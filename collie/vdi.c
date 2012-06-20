@@ -270,14 +270,14 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		return;
 	}
 
-	for (i = 0; i < nr_nodes; i++) {
+	for (i = 0; i < sd_nodes_nr; i++) {
 		unsigned wlen = 0, rlen = size;
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
-		addr_to_str(name, sizeof(name), node_list_entries[i].addr, 0);
+		addr_to_str(name, sizeof(name), sd_nodes[i].addr, 0);
 
-		fd = connect_to(name, node_list_entries[i].port);
+		fd = connect_to(name, sd_nodes[i].port);
 		if (fd < 0)
 			break;
 
@@ -286,14 +286,14 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		hdr.opcode = SD_OP_READ_OBJ;
 		hdr.data_length = rlen;
 		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
-		hdr.epoch = node_list_version;
+		hdr.epoch = sd_epoch;
 
 		hdr.obj.oid = oid;
 
 		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 		close(fd);
 
-		sprintf(name + strlen(name), ":%d", node_list_entries[i].port);
+		sprintf(name + strlen(name), ":%d", sd_nodes[i].port);
 
 		if (ret)
 			fprintf(stderr, "Failed to connect to %s\n", name);
@@ -716,7 +716,7 @@ static int vdi_delete(int argc, char **argv)
 	wlen = sizeof(vdiname);
 
 	hdr.opcode = SD_OP_DEL_VDI;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
 	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
@@ -769,7 +769,7 @@ static int vdi_object(int argc, char **argv)
 
 	if (idx == ~0) {
 		printf("Looking for the inode object 0x%" PRIx32 " with %d nodes\n\n",
-		       vid, nr_nodes);
+		       vid, sd_nodes_nr);
 		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL, SD_INODE_SIZE);
 	} else {
 		struct get_data_oid_info old_info;
@@ -788,7 +788,7 @@ static int vdi_object(int argc, char **argv)
 			if (old_info.data_oid) {
 				printf("Looking for the object 0x%" PRIx64
 				       " (the inode vid 0x%" PRIx32 " idx %u) with %d nodes\n\n",
-				       old_info.data_oid, vid, idx, nr_nodes);
+				       old_info.data_oid, vid, idx, sd_nodes_nr);
 
 				parse_objs(old_info.data_oid, do_print_obj, NULL, SD_DATA_OBJ_SIZE);
 			} else
@@ -813,7 +813,7 @@ static int print_obj_epoch(uint64_t oid)
 	int vnodes_nr, nr_logs, log_length;
 	char host[128];
 
-	log_length = node_list_version * sizeof(struct epoch_log);
+	log_length = sd_epoch * sizeof(struct epoch_log);
 again:
 	logs = malloc(log_length);
 	if (!logs) {
@@ -832,7 +832,7 @@ again:
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_STAT_CLUSTER;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
 	rlen = hdr.data_length;
@@ -893,7 +893,7 @@ static int vdi_track(int argc, char **argv)
 
 	if (idx == ~0) {
 		printf("Tracking the inode object 0x%" PRIx32 " with %d nodes\n",
-		       vid, nr_nodes);
+		       vid, sd_nodes_nr);
 		print_obj_epoch(vid_to_vdi_oid(vid));
 	} else {
 		struct get_data_oid_info oid_info;
@@ -914,7 +914,7 @@ static int vdi_track(int argc, char **argv)
 				printf("Tracking the object 0x%" PRIx64
 				       " (the inode vid 0x%" PRIx32 " idx %u)"
 					   " with %d nodes\n",
-				       oid_info.data_oid, vid, idx, nr_nodes);
+				       oid_info.data_oid, vid, idx, sd_nodes_nr);
 				print_obj_epoch(oid_info.data_oid);
 
 			} else
@@ -1341,7 +1341,7 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 	}
 
 	hdr.opcode = SD_OP_READ_OBJ;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_IO_LOCAL;
 	hdr.data_length = rlen;
 
@@ -1380,7 +1380,7 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 	}
 
 	hdr.opcode = SD_OP_WRITE_OBJ;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_IO_LOCAL | SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
 
@@ -1422,7 +1422,7 @@ static void do_check_repair(uint64_t oid, int nr_copies)
 	void *buf;
 	int i;
 
-	collie_oid_to_vnodes(vnode_list_entries, nr_vnodes,
+	collie_oid_to_vnodes(sd_vnodes, sd_vnodes_nr,
 			     oid, nr_copies, tgt_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		buf = read_object_from(tgt_vnodes[i], oid);

@@ -57,7 +57,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	}
 
 	memset(&hdr, 0, sizeof(hdr));
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.flags = SD_FLAG_CMD_WEAK_CONSISTENCY;
 	hdr.data_length = rlen;
@@ -97,7 +97,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	}
 
 	memset(&hdr, 0, sizeof(hdr));
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	if (create)
 		hdr.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
 	else
@@ -145,7 +145,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 	req.opcode = SD_OP_READ_VDIS;
 	req.data_length = sizeof(vdi_inuse);
-	req.epoch = node_list_version;
+	req.epoch = sd_epoch;
 
 	rlen = sizeof(vdi_inuse);
 	ret = exec_req(fd, &req, vdi_inuse, &wlen, &rlen);

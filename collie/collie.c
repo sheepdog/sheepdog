@@ -53,11 +53,11 @@ static const struct sd_option collie_options[] = {
 
 static void usage(struct command *commands, int status);
 
-uint32_t node_list_version;
+uint32_t sd_epoch;
 
-struct sd_node node_list_entries[SD_MAX_NODES];
-struct sd_vnode vnode_list_entries[SD_MAX_VNODES];
-int nr_nodes, nr_vnodes;
+struct sd_node sd_nodes[SD_MAX_NODES];
+struct sd_vnode sd_vnodes[SD_MAX_VNODES];
+int sd_nodes_nr, sd_vnodes_nr;
 unsigned master_idx;
 
 static int update_node_list(int max_nodes, uint32_t epoch)
@@ -101,21 +101,21 @@ static int update_node_list(int max_nodes, uint32_t epoch)
 		goto out;
 	}
 
-	nr_nodes = size / sizeof(*ent);
-	if (nr_nodes == 0) {
+	sd_nodes_nr = size / sizeof(*ent);
+	if (sd_nodes_nr == 0) {
 		fprintf(stderr, "There are no active sheep daemons\n");
 		exit(EXIT_FAILURE);
 	}
 
 	/* FIXME */
-	if (nr_nodes > max_nodes) {
+	if (sd_nodes_nr > max_nodes) {
 		ret = -1;
 		goto out;
 	}
 
-	memcpy(node_list_entries, buf, size);
-	nr_vnodes = nodes_to_vnodes(node_list_entries, nr_nodes, vnode_list_entries);
-	node_list_version = hdr.epoch;
+	memcpy(sd_nodes, buf, size);
+	sd_vnodes_nr = nodes_to_vnodes(sd_nodes, sd_nodes_nr, sd_vnodes);
+	sd_epoch = hdr.epoch;
 	master_idx = rsp->master_idx;
 out:
 	if (buf)

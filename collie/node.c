@@ -27,24 +27,24 @@ static int node_list(int argc, char **argv)
 
 	if (!raw_output)
 		printf("M   Id   Host:Port         V-Nodes       Zone\n");
-	for (i = 0; i < nr_nodes; i++) {
+	for (i = 0; i < sd_nodes_nr; i++) {
 		char data[128];
 
-		addr_to_str(data, sizeof(data), node_list_entries[i].addr,
-			    node_list_entries[i].port);
+		addr_to_str(data, sizeof(data), sd_nodes[i].addr,
+			    sd_nodes[i].port);
 
 		if (i == master_idx) {
 			if (highlight)
 				printf(TEXT_BOLD);
 			printf(raw_output ? "* %d %s %d %d\n" : "* %4d   %-20s\t%2d%11d\n",
-			       i, data, node_list_entries[i].nr_vnodes,
-			       node_list_entries[i].zone);
+			       i, data, sd_nodes[i].nr_vnodes,
+			       sd_nodes[i].zone);
 			if (highlight)
 				printf(TEXT_NORMAL);
 		} else
 			printf(raw_output ? "- %d %s %d %d\n" : "- %4d   %-20s\t%2d%11d\n",
-			       i, data, node_list_entries[i].nr_vnodes,
-			       node_list_entries[i].zone);
+			       i, data, sd_nodes[i].nr_vnodes,
+			       sd_nodes[i].zone);
 	}
 
 	return EXIT_SUCCESS;
@@ -59,7 +59,7 @@ static int node_info(int argc, char **argv)
 	if (!raw_output)
 		printf("Id\tSize\tUsed\tUse%%\n");
 
-	for (i = 0; i < nr_nodes; i++) {
+	for (i = 0; i < sd_nodes_nr; i++) {
 		char name[128];
 		int fd;
 		unsigned wlen, rlen;
@@ -67,16 +67,16 @@ static int node_info(int argc, char **argv)
 		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 		char store_str[UINT64_DECIMAL_SIZE], free_str[UINT64_DECIMAL_SIZE];
 
-		addr_to_str(name, sizeof(name), node_list_entries[i].addr, 0);
+		addr_to_str(name, sizeof(name), sd_nodes[i].addr, 0);
 
-		fd = connect_to(name, node_list_entries[i].port);
+		fd = connect_to(name, sd_nodes[i].port);
 		if (fd < 0)
 			return 1;
 
 		memset(&req, 0, sizeof(req));
 
 		req.opcode = SD_OP_STAT_SHEEP;
-		req.epoch = node_list_version;
+		req.epoch = sd_epoch;
 
 		wlen = 0;
 		rlen = 0;
@@ -127,16 +127,16 @@ static int node_recovery(int argc, char **argv)
 		printf("  Id   Host:Port         V-Nodes       Zone\n");
 	}
 
-	for (i = 0; i < nr_nodes; i++) {
+	for (i = 0; i < sd_nodes_nr; i++) {
 		char host[128];
 		int fd;
 		unsigned wlen, rlen;
 		struct sd_node_req req;
 		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 
-		addr_to_str(host, sizeof(host), node_list_entries[i].addr, 0);
+		addr_to_str(host, sizeof(host), sd_nodes[i].addr, 0);
 
-		fd = connect_to(host, node_list_entries[i].port);
+		fd = connect_to(host, sd_nodes[i].port);
 		if (fd < 0)
 			return EXIT_FAILURE;
 
@@ -151,10 +151,10 @@ static int node_recovery(int argc, char **argv)
 
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			addr_to_str(host, sizeof(host),
-					node_list_entries[i].addr, node_list_entries[i].port);
+					sd_nodes[i].addr, sd_nodes[i].port);
 			printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s%5d%11d\n",
-				   i, host, node_list_entries[i].nr_vnodes,
-				   node_list_entries[i].zone);
+				   i, host, sd_nodes[i].nr_vnodes,
+				   sd_nodes[i].zone);
 		}
 	}
 

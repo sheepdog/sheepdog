@@ -48,7 +48,7 @@ static int do_trace_cat(void)
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_TRACE_CAT;
 	hdr.data_length = rlen = TRACE_BUF_LEN;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 
 	wlen = 0;
 	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
@@ -105,7 +105,7 @@ static int debug_trace(int argc, char **argv)
 	memset(&hdr, 0, sizeof(hdr));
 
 	hdr.opcode = SD_OP_TRACE;
-	hdr.epoch = node_list_version;
+	hdr.epoch = sd_epoch;
 	hdr.data_length = enabled;
 
 	rlen = 0;

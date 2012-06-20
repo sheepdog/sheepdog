@@ -55,10 +55,10 @@ extern int sdport;
 extern int highlight;
 extern int raw_output;
 
-extern uint32_t node_list_version;
-extern struct sd_node node_list_entries[SD_MAX_NODES];
-extern struct sd_vnode vnode_list_entries[SD_MAX_VNODES];
-extern int nr_nodes, nr_vnodes;
+extern uint32_t sd_epoch;
+extern struct sd_node sd_nodes[SD_MAX_NODES];
+extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
+extern int sd_nodes_nr, sd_vnodes_nr;
 extern unsigned master_idx;
 
 int is_current(struct sheepdog_inode *i);
