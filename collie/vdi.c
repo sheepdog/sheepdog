@@ -12,7 +12,6 @@
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
-#include <openssl/sha.h>
 
 #include "collie.h"
 #include "treeview.h"
@@ -1415,27 +1414,33 @@ static void collie_oid_to_vnodes(struct sd_vnode *vnodes, int vnodes_nr,
         }
 }
 
+/*
+ * Fix consistency of the replica of oid.
+ *
+ * XXX: The fix is rather dumb, just read the first copy and write it
+ * to other replica.
+ */
 static void do_check_repair(uint64_t oid, int nr_copies)
 {
 	struct sd_vnode *tgt_vnodes[nr_copies];
-	unsigned char sha1[nr_copies][SHA1_LEN];
-	void *buf;
+	void *buf, *buf_cmp;
 	int i;
 
 	collie_oid_to_vnodes(sd_vnodes, sd_vnodes_nr,
 			     oid, nr_copies, tgt_vnodes);
-	for (i = 0; i < nr_copies; i++) {
-		buf = read_object_from(tgt_vnodes[i], oid);
-		SHA1(buf, SD_DATA_OBJ_SIZE, sha1[i]);
-		free(buf);
-	}
-
-	if (!memcmp(sha1[0], sha1[1], SHA1_LEN) &&
-	    !memcmp(sha1[0], sha1[2], SHA1_LEN))
-		return; /* All replica consistent */
-
-	/* Okay, let's fix the consistency */
 	buf = read_object_from(tgt_vnodes[0], oid);
+	for (i = 1; i < nr_copies; i++) {
+		buf_cmp = read_object_from(tgt_vnodes[i], oid);
+		if (memcmp(buf, buf_cmp, SD_DATA_OBJ_SIZE)) {
+			free(buf_cmp);
+			goto fix_consistency;
+		}
+		free(buf_cmp);
+	}
+	free(buf);
+	return;
+
+fix_consistency:
 	for (i = 1; i < nr_copies; i++)
 		write_object_to(tgt_vnodes[i], oid, buf);
 	fprintf(stdout, "fix %"PRIx64" success\n", oid);
@@ -1488,11 +1493,9 @@ static int vdi_check(int argc, char **argv)
 		goto out;
 	}
 
-	if (check_repair_vdi(vid) < 0) {
-		fprintf(stderr, "Failed to read an inode\n");
-		ret = EXIT_FAILURE;
+	ret = check_repair_vdi(vid);
+	if (ret != EXIT_SUCCESS)
 		goto out;
-	}
 
 	fprintf(stdout, "finish check&repair %s\n", vdiname);
 	return EXIT_SUCCESS;
