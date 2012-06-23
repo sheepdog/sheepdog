@@ -660,18 +660,21 @@ static void client_handler(int fd, int events, void *data)
 {
 	struct client_info *ci = (struct client_info *)data;
 
+	if (events & (EPOLLERR | EPOLLHUP))
+		goto err;
+
 	if (events & EPOLLIN)
 		client_rx_handler(ci);
 
 	if (events & EPOLLOUT)
 		client_tx_handler(ci);
 
-	if ((events & (EPOLLERR | EPOLLHUP))
-		|| is_conn_dead(&ci->conn)) {
+	if (is_conn_dead(&ci->conn)) {
 		if (!(ci->conn.events & EPOLLIN))
 			list_del(&ci->conn.blocking_siblings);
-
-		dprintf("closed connection %d\n", fd);
+err:
+		dprintf("closed connection %d, %s:%d\n", fd,
+			ci->conn.ipstr, ci->conn.port);
 		unregister_event(fd);
 		client_decref(ci);
 	}
