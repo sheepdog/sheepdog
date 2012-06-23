@@ -546,8 +546,9 @@ static void client_tx_handler(struct client_info *ci)
 	int ret, opt;
 	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
 	struct connection *conn, *n;
-again:
+
 	init_tx_hdr(ci);
+again:
 	if (!ci->tx_req) {
 		conn_tx_off(&ci->conn);
 		conn_rx_on(&ci->conn);
@@ -598,6 +599,8 @@ again:
 	if (ci->conn.c_tx_state == C_IO_END) {
 		free_request(ci->tx_req);
 		ci->tx_req = NULL;
+		dprintf("connection from: %s:%d\n", ci->conn.ipstr,
+			ci->conn.port);
 		goto again;
 	}
 }
