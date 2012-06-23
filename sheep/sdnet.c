@@ -670,7 +670,7 @@ static void client_handler(int fd, int events, void *data)
 		client_tx_handler(ci);
 
 	if (is_conn_dead(&ci->conn)) {
-		if (!(ci->conn.events & EPOLLIN))
+		if (!list_empty(&ci->conn.blocking_siblings))
 			list_del(&ci->conn.blocking_siblings);
 err:
 		dprintf("closed connection %d, %s:%d\n", fd,
