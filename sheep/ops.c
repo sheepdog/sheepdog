@@ -403,7 +403,7 @@ static int local_get_epoch(struct request *req)
 		return SD_RES_NO_TAG;
 	}
 
-	req->rp.data_length = nr_nodes * sizeof(struct sd_node);
+	req->rp.data_length = nr_nodes * sizeof(struct sd_node) + sizeof(time_t);
 	return SD_RES_SUCCESS;
 }
 
