@@ -236,7 +236,6 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch)
 		nr_nodes = epoch_log_read_remote(epoch, nodes, sizeof(nodes));
 		if (nr_nodes == 0)
 			return NULL;
-		nr_nodes /= sizeof(nodes[0]);
 	}
 
 	return alloc_vnode_info(nodes, nr_nodes);
