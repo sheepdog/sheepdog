@@ -392,7 +392,7 @@ struct deletion_work {
 
 static LIST_HEAD(deletion_work_list);
 
-static int delete_inode(struct deletion_work *dw, int objs_deleted)
+static int delete_inode(struct deletion_work *dw)
 {
 	struct sheepdog_inode *inode = NULL;
 	int ret = SD_RES_SUCCESS;
@@ -413,13 +413,7 @@ static int delete_inode(struct deletion_work *dw, int objs_deleted)
 		goto out;
 	}
 
-	if (dw->delete_error)
-		inode->vdi_size = 0;
-	else {
-		memset(inode->name, 0, sizeof(inode->name));
-		if (objs_deleted)
-			inode->vdi_size = 0;
-	}
+	memset(inode->name, 0, sizeof(inode->name));
 
 	ret = write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(dw->vid),
 			   (char *)inode, SD_INODE_HEADER_SIZE, 0, 0,
@@ -485,11 +479,15 @@ static void delete_one(struct work *work)
 			inode->data_vdi_id[i] = 0;
 	}
 
-	if (dw->delete_error) {
-		write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
-			     (void *)inode, sizeof(*inode), 0, 0, nr_copies, 0);
-	}
+	if (!dw->delete_error && *(inode->name) == '\0')
+		goto out;
 
+	inode->vdi_size = 0;
+	if (!dw->delete_error)
+		memset(inode->name, 0, sizeof(inode->name));
+
+	write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
+		     (void *)inode, sizeof(*inode), 0, 0, nr_copies, 0);
 out:
 	free(inode);
 }
@@ -503,8 +501,6 @@ static void delete_one_done(struct work *work)
 		queue_work(sys->deletion_wqueue, &dw->work);
 		return;
 	}
-
-	delete_inode(dw, 1);
 
 	list_del(&dw->dw_siblings);
 
@@ -655,7 +651,7 @@ static int start_deletion(struct vnode_info *vnode_info, uint32_t vid,
 			dprintf("snapshot chain has valid vdi, "
 				"just mark vdi %" PRIx32 " as deleted.\n",
 				dw->vid);
-			delete_inode(dw, 0);
+			delete_inode(dw);
 			return SD_RES_SUCCESS;
 		}
 	}
