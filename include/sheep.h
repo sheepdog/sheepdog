@@ -28,7 +28,11 @@
 #define SD_MAX_VNODES 65536
 #define SD_MAX_VMS   4096 /* FIXME: should be removed */
 
-#define SD_OP_SHEEP          0x80
+/*
+ * Operations with opcodes above 0x80 are considered part of the inter-sheep
+ * protocol and will in the near future be versioned independently of the
+ * external sheepdog protocol.
+ */
 #define SD_OP_DEL_VDI        0x81
 #define SD_OP_GET_NODE_LIST  0x82
 #define SD_OP_GET_VM_LIST    0x83
@@ -266,11 +270,6 @@ static inline void obj_to_sheeps(struct sd_vnode *entries,
 	for (idx = 0; idx < nr_copies; idx++)
 		idxs[idx] = get_nth_node(entries, nr_entries,
 				(pos + 1) % nr_entries, idx);
-}
-
-static inline int is_sheep_op(uint8_t op)
-{
-	return op & SD_OP_SHEEP;
 }
 
 static inline const char *sd_strerror(int err)
