@@ -655,6 +655,7 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 	ci->refcnt = 1;
 
 	INIT_LIST_HEAD(&ci->done_reqs);
+	INIT_LIST_HEAD(&ci->conn.blocking_siblings);
 
 	init_rx_hdr(ci);
 
