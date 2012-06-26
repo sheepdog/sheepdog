@@ -38,6 +38,7 @@ struct objlist_cache {
 struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
+	.lock		= PTHREAD_RWLOCK_INITIALIZER,
 };
 
 static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
