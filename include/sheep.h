@@ -26,7 +26,6 @@
 #define SD_MAX_NODES 1024
 #define SD_DEFAULT_VNODES 64
 #define SD_MAX_VNODES 65536
-#define SD_MAX_VMS   4096 /* FIXME: should be removed */
 
 /*
  * Operations with opcodes above 0x80 are considered part of the inter-sheep
