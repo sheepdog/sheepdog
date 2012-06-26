@@ -108,9 +108,6 @@ struct cluster_info {
 	 */
 	struct list_head delayed_nodes;
 
-	struct sd_node nodes[SD_MAX_NODES];
-	int nr_nodes;
-
 	struct list_head pending_list;
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
