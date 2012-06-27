@@ -206,24 +206,19 @@ int create_listen_port(int port, void *data);
 int init_store(const char *dir, int enable_write_cache);
 int init_base_path(const char *dir);
 
-int add_vdi(struct vnode_info *vnode_info, uint32_t epoch, char *data,
-		int data_len, uint64_t size, uint32_t *new_vid,
-		uint32_t base_vid, uint32_t copies, int is_snapshot,
-		unsigned int *nr_copies);
+int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
+	    uint32_t base_vid, int is_snapshot, unsigned int *nr_copies);
 
-int del_vdi(struct vnode_info *vnode_info, uint32_t epoch, char *data,
-		int data_len, uint32_t *vid, uint32_t snapid,
-		unsigned int *nr_copies);
+int del_vdi(char *data,	int data_len, uint32_t *vid, uint32_t snapid,
+	    unsigned int *nr_copies);
 
-int lookup_vdi(struct vnode_info *vnode_info, uint32_t epoch, char *name,
-		char *tag, uint32_t *vid, uint32_t snapid,
-		unsigned int *nr_copies, uint64_t *ctime);
+int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
+	       unsigned int *nr_copies, uint64_t *ctime);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
-int get_vdi_attr(struct vnode_info *vnode_info, uint32_t epoch,
-		struct sheepdog_vdi_attr *vattr, int data_len, uint32_t vid,
-		uint32_t *attrid, int copies, uint64_t ctime, int write,
+int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len, uint32_t vid,
+		uint32_t *attrid, uint64_t ctime, int write,
 		int excl, int delete);
 
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
@@ -284,10 +279,10 @@ int is_recovery_init(void);
 int node_in_recovery(void);
 
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, int nr, int create);
+		 uint64_t offset, uint16_t flags, int create);
 int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int nr);
-int remove_object(uint64_t oid, int nr);
+		uint64_t offset);
+int remove_object(uint64_t oid);
 
 int exec_local_req(struct sd_req *rq, void *data, int data_length);
 void local_req_init(void);
@@ -390,10 +385,9 @@ int object_is_cached(uint64_t oid);
 
 int object_cache_handle_request(struct request *req);
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, uint16_t flags, int copies,
-		       int create);
+		       uint64_t offset, uint16_t flags, int create);
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int copies);
+		      uint64_t offset);
 int object_cache_flush_vdi(struct request *req);
 int object_cache_flush_and_del(struct request *req);
 void object_cache_delete(uint32_t vid);

@@ -514,14 +514,14 @@ int init_store(const char *d, int enable_write_cache)
  * Write data to both local object cache (if enabled) and backends
  */
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, int nr_copies, int create)
+		 uint64_t offset, uint16_t flags, int create)
 {
 	struct sd_req hdr;
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
 		ret = object_cache_write(oid, data, datalen, offset,
-			flags, nr_copies, create);
+					 flags, create);
 		if (ret != 0) {
 			eprintf("write cache failed %"PRIx64" %"PRIx32"\n",
 				oid, ret);
@@ -535,7 +535,6 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = nr_copies;
 
 	ret = exec_local_req(&hdr, data, datalen);
 	if (ret != SD_RES_SUCCESS)
@@ -549,14 +548,13 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
  * try read backends
  */
 int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int nr_copies)
+		uint64_t offset)
 {
 	struct sd_req hdr;
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
-		ret = object_cache_read(oid, data, datalen, offset,
-					nr_copies);
+		ret = object_cache_read(oid, data, datalen, offset);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("try forward read %"PRIx64" %"PRIx32"\n",
 				oid, ret);
@@ -570,7 +568,6 @@ forward_read:
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = nr_copies;
 
 	ret = exec_local_req(&hdr, data, datalen);
 	if (ret != SD_RES_SUCCESS)
@@ -579,7 +576,7 @@ forward_read:
 	return ret;
 }
 
-int remove_object(uint64_t oid, int nr)
+int remove_object(uint64_t oid)
 {
 	struct sd_req hdr;
 	int ret;
@@ -587,7 +584,6 @@ int remove_object(uint64_t oid, int nr)
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_REMOVE_OBJ;
 	hdr.obj.oid = oid;
-	hdr.obj.copies = nr;
 
 	ret = exec_local_req(&hdr, NULL, 0);
 	if (ret != SD_RES_SUCCESS)

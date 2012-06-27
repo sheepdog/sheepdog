@@ -771,8 +771,7 @@ int object_cache_handle_request(struct request *req)
 }
 
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, uint16_t flags, int copies,
-		       int create)
+		       uint64_t offset, uint16_t flags, int create)
 {
 	int ret;
 	struct request *req;
@@ -795,7 +794,6 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 
 	req->rq.obj.oid = oid;
 	req->rq.obj.offset = offset;
-	req->rq.obj.copies = copies;
 
 	req->data = data;
 	req->op = get_sd_op(req->rq.opcode);
@@ -807,7 +805,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 }
 
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
-		      uint64_t offset, int copies)
+		      uint64_t offset)
 {
 	int ret;
 	struct request *req;
@@ -826,7 +824,6 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 
 	req->rq.obj.oid = oid;
 	req->rq.obj.offset = offset;
-	req->rq.obj.copies = copies;
 
 	req->data = data;
 	req->op = get_sd_op(req->rq.opcode);

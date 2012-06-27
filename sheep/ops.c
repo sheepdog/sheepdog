@@ -112,9 +112,9 @@ static int cluster_new_vdi(struct request *req)
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
-	ret = add_vdi(req->vnodes, hdr->epoch, req->data, hdr->data_length,
+	ret = add_vdi(req->data, hdr->data_length,
 		      hdr->vdi.vdi_size, &vid, hdr->vdi.base_vdi_id,
-		      hdr->vdi.copies, hdr->vdi.snapid, &nr_copies);
+		      hdr->vdi.snapid, &nr_copies);
 
 	rsp->vdi.vdi_id = vid;
 	rsp->vdi.copies = nr_copies;
@@ -141,7 +141,7 @@ static int cluster_del_vdi(struct request *req)
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
-	ret = del_vdi(req->vnodes, hdr->epoch, req->data, hdr->data_length,
+	ret = del_vdi(req->data, hdr->data_length,
 		      &vid, hdr->vdi.snapid, &nr_copies);
 
 	if (sys->enable_write_cache && ret == SD_RES_SUCCESS)
@@ -171,7 +171,7 @@ static int cluster_get_vdi_info(struct request *req)
 	else
 		return SD_RES_INVALID_PARMS;
 
-	ret = lookup_vdi(req->vnodes, hdr->epoch, req->data, tag, &vid,
+	ret = lookup_vdi(req->data, tag, &vid,
 			 hdr->vdi.snapid, &nr_copies, NULL);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -271,8 +271,8 @@ static int cluster_get_vdi_attr(struct request *req)
 	struct sheepdog_vdi_attr *vattr;
 
 	vattr = req->data;
-	ret = lookup_vdi(req->vnodes, hdr->epoch, vattr->name, vattr->tag,
-			 &vid, hdr->vdi.snapid, &nr_copies, &created_time);
+	ret = lookup_vdi(vattr->name, vattr->tag, &vid,
+			 hdr->vdi.snapid, &nr_copies, &created_time);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -280,8 +280,8 @@ static int cluster_get_vdi_attr(struct request *req)
 	   so we use the hash value of the VDI name as the VDI id */
 	vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 	vid &= SD_NR_VDIS - 1;
-	ret = get_vdi_attr(req->vnodes, hdr->epoch, req->data, hdr->data_length,
-			   vid, &attrid, nr_copies, created_time,
+	ret = get_vdi_attr(req->data, hdr->data_length,
+			   vid, &attrid, created_time,
 			   hdr->flags & SD_FLAG_CMD_CREAT,
 			   hdr->flags & SD_FLAG_CMD_EXCL,
 			   hdr->flags & SD_FLAG_CMD_DEL);
