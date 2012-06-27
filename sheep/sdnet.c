@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <pthread.h>
+#include <sys/eventfd.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
@@ -384,6 +386,54 @@ static void requeue_request(struct request *req)
 static void client_incref(struct client_info *ci);
 static void client_decref(struct client_info *ci);
 
+static struct request *alloc_local_request(void *data, int data_length)
+{
+	struct request *req;
+
+	req = zalloc(sizeof(struct request));
+	if (data_length) {
+		req->data_length = data_length;
+		req->data = data;
+	}
+
+	req->local = 1;
+
+	INIT_LIST_HEAD(&req->request_list);
+
+	sys->nr_outstanding_reqs++;
+	sys->outstanding_data_size += data_length;
+
+	return req;
+}
+
+int exec_local_req(struct sd_req *rq, void *data, int data_length)
+{
+	struct request *req;
+	eventfd_t value = 1;
+	int ret;
+
+	req = alloc_local_request(data, data_length);
+	req->rq = *rq;
+	req->rq.data_length = data_length;
+	req->wait_efd = eventfd(0, 0);
+
+	pthread_mutex_lock(&sys->wait_req_lock);
+	list_add_tail(&req->request_list, &sys->wait_req_queue);
+	pthread_mutex_unlock(&sys->wait_req_lock);
+
+	eventfd_write(sys->req_efd, value);
+
+	ret = eventfd_read(req->wait_efd, &value);
+	if (ret < 0)
+		eprintf("event fd read error %m");
+
+	close(req->wait_efd);
+	ret = req->rp.result;
+	free(req);
+
+	return ret;
+}
+
 static struct request *alloc_request(struct client_info *ci, int data_length)
 {
 	struct request *req;
@@ -424,15 +474,24 @@ static void free_request(struct request *req)
 void req_done(struct request *req)
 {
 	struct client_info *ci = req->ci;
+	eventfd_t value = 1;
 
-	if (conn_tx_on(&ci->conn)) {
-		dprintf("connection seems to be dead\n");
-		free_request(req);
+	if (req->local) {
+		req->done = 1;
+		sys->nr_outstanding_reqs--;
+		sys->outstanding_data_size -= req->data_length;
+
+		eventfd_write(req->wait_efd, value);
 	} else {
-		list_add(&req->request_list, &ci->done_reqs);
-	}
+		if (conn_tx_on(&ci->conn)) {
+			dprintf("connection seems to be dead\n");
+			free_request(req);
+		} else {
+			list_add(&req->request_list, &ci->done_reqs);
+		}
 
-	client_decref(ci);
+		client_decref(ci);
+	}
 }
 
 static void init_rx_hdr(struct client_info *ci)
@@ -813,4 +872,35 @@ int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch)
 	cached_fds[node_idx] = fd;
 
 	return fd;
+}
+
+static void req_handler(int listen_fd, int events, void *data)
+{
+	eventfd_t value;
+	struct request *req, *t;
+	LIST_HEAD(pending_list);
+	int ret;
+
+	if (events & EPOLLERR)
+		eprintf("request handler error\n");
+
+	ret = eventfd_read(listen_fd, &value);
+	if (ret < 0)
+		return;
+
+	pthread_mutex_lock(&sys->wait_req_lock);
+	list_splice_init(&sys->wait_req_queue, &pending_list);
+	pthread_mutex_unlock(&sys->wait_req_lock);
+
+	list_for_each_entry_safe(req, t, &pending_list, request_list) {
+		list_del(&req->request_list);
+		queue_request(req);
+	}
+}
+
+void local_req_init(void)
+{
+	pthread_mutex_init(&sys->wait_req_lock, NULL);
+	sys->req_efd = eventfd(0, EFD_NONBLOCK);
+	register_event(sys->req_efd, req_handler, NULL);
 }

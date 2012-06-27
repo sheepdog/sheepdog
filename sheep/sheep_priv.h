@@ -73,6 +73,10 @@ struct request {
 	struct list_head request_list;
 	struct list_head pending_list;
 
+	int local;
+	int done;
+	int wait_efd;
+
 	uint64_t local_oid;
 
 	struct vnode_info *vnodes;
@@ -115,7 +119,10 @@ struct cluster_info {
 	struct list_head blocking_conn_list;
 
 	int nr_copies;
+	int req_efd;
 
+	pthread_mutex_t wait_req_lock;
+	struct list_head wait_req_queue;
 	struct list_head wait_rw_queue;
 	struct list_head wait_obj_queue;
 	int nr_outstanding_reqs;
@@ -291,6 +298,8 @@ int remove_object(struct vnode_info *vnodes, uint32_t node_version,
 
 void del_sheep_fd(int fd);
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
+int exec_local_req(struct sd_req *rq, void *data, int data_length);
+void local_req_init(void);
 
 int prealloc(int fd, uint32_t size);
 

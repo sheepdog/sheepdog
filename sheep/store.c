@@ -517,8 +517,7 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
 		 uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr_copies, int create)
 {
-	struct request write_req;
-	struct sd_req *hdr = &write_req.rq;
+	struct sd_req hdr;
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
@@ -531,23 +530,18 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
 		}
 	}
 
-	memset(&write_req, 0, sizeof(write_req));
-	hdr->opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
-	hdr->flags = SD_FLAG_CMD_WRITE;
-	hdr->data_length = datalen;
-	hdr->epoch = epoch;
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
+	hdr.flags = SD_FLAG_CMD_WRITE;
 
-	hdr->obj.oid = oid;
-	hdr->obj.offset = offset;
-	hdr->obj.copies = nr_copies;
+	hdr.obj.oid = oid;
+	hdr.obj.offset = offset;
+	hdr.obj.copies = nr_copies;
 
-	write_req.data = data;
-	write_req.op = get_sd_op(hdr->opcode);
-	write_req.vnodes = vnodes;
-
-	ret = forward_write_obj_req(&write_req);
+	ret = exec_local_req(&hdr, data, datalen);
 	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to forward write object %x\n", ret);
+		eprintf("failed to write object %" PRIx64 ", %x\n", oid, ret);
+
 	return ret;
 }
 
@@ -559,8 +553,7 @@ int read_object(struct vnode_info *vnodes, uint32_t epoch,
 		uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr_copies)
 {
-	struct request read_req;
-	struct sd_req *hdr = &read_req.rq;
+	struct sd_req hdr;
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
@@ -573,23 +566,17 @@ int read_object(struct vnode_info *vnodes, uint32_t epoch,
 		}
 		return ret;
 	}
-	memset(&read_req, 0, sizeof(read_req));
+
 forward_read:
-	hdr->opcode = SD_OP_READ_OBJ;
-	hdr->data_length = datalen;
-	hdr->epoch = epoch;
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.obj.oid = oid;
+	hdr.obj.offset = offset;
+	hdr.obj.copies = nr_copies;
 
-	hdr->obj.oid = oid;
-	hdr->obj.offset = offset;
-	hdr->obj.copies = nr_copies;
-
-	read_req.data = data;
-	read_req.op = get_sd_op(hdr->opcode);
-	read_req.vnodes = vnodes;
-
-	ret = forward_read_obj_req(&read_req);
+	ret = exec_local_req(&hdr, data, datalen);
 	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to forward read object %x\n", ret);
+		eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
 
 	return ret;
 }
@@ -597,49 +584,19 @@ forward_read:
 int remove_object(struct vnode_info *vnodes, uint32_t epoch,
 		  uint64_t oid, int nr)
 {
-	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
-	int err = 0, i = 0;
+	struct sd_req hdr;
+	int ret;
 
-	oid_to_vnodes(vnodes, oid, nr, obj_vnodes);
-	for (i = 0; i < nr; i++) {
-		struct sd_req hdr;
-		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		struct sd_vnode *v;
-		unsigned wlen = 0, rlen = 0;
-		char name[128];
-		int fd, ret;
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = SD_OP_REMOVE_OBJ;
+	hdr.obj.oid = oid;
+	hdr.obj.copies = nr;
 
-		v = obj_vnodes[i];
-		addr_to_str(name, sizeof(name), v->addr, 0);
+	ret = exec_local_req(&hdr, NULL, 0);
+	if (ret != SD_RES_SUCCESS)
+		eprintf("failed to remove object %" PRIx64 ", %x\n", oid, ret);
 
-		fd = connect_to(name, v->port);
-		if (fd < 0) {
-			rsp->result = SD_RES_NETWORK_ERROR;
-			return -1;
-		}
-
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.epoch = epoch;
-		hdr.opcode = SD_OP_REMOVE_OBJ;
-		hdr.flags = 0;
-		hdr.data_length = rlen;
-
-		hdr.obj.oid = oid;
-
-		ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-		close(fd);
-
-		if (ret)
-			return -1;
-
-		if (rsp->result != SD_RES_SUCCESS)
-			err = 1;
-	}
-
-	if (err)
-		return -1;
-
-	return 0;
+	return ret;
 }
 
 int set_cluster_copies(uint8_t copies)

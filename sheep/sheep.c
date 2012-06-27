@@ -275,6 +275,8 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	local_req_init();
+
 	sys->gateway_wqueue = init_work_queue("gateway", nr_gateway_worker);
 	sys->io_wqueue = init_work_queue("io", nr_io_worker);
 	sys->recovery_wqueue = init_work_queue("recovery", 1);
