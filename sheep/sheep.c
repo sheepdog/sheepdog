@@ -306,6 +306,7 @@ int main(int argc, char **argv)
 
 	vprintf(SDOG_INFO, "shutdown\n");
 
+	leave_cluster();
 	log_close();
 
 	return 0;

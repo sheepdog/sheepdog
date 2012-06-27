@@ -1171,8 +1171,17 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	return 0;
 }
 
-/* after this function is called, this node only works as a gateway */
+/* We will call this function for two reason:
+ * 1) make this node working as a gateway, or
+ * 2) the program is going to shutdown itself.
+ */
 int leave_cluster(void)
 {
+	static int left;
+
+	if (left)
+		return 0;
+
+	left = 1;
 	return sys->cdrv->leave();
 }
