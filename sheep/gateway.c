@@ -15,7 +15,11 @@
 
 #include "sheep_priv.h"
 
-
+/*
+ * Try our best to read one copy and read local first.
+ *
+ * Return success if any read succeed.
+ */
 int forward_read_obj_req(struct request *req)
 {
 	int i, fd, ret = SD_RES_SUCCESS;
@@ -35,20 +39,22 @@ int forward_read_obj_req(struct request *req)
 	else
 		nr_copies = get_nr_copies(req->vnodes);
 
-	/* TODO: we can do better; we need to check this first */
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			ret = do_local_io(req, fwd_hdr.epoch);
-			if (ret != SD_RES_SUCCESS)
+			if (ret != SD_RES_SUCCESS) {
 				goto read_remote;
+				eprintf("local read fail %x\n", ret);
+			}
 			return ret;
 		}
 	}
 
 read_remote:
-	/* Read random copy from cluster for better load balance, useful for
+	/*
+	 * Read random copy from cluster for better load balance, useful for
 	 * reading base VM's COW objects
 	 */
 	j = random();
@@ -71,16 +77,25 @@ read_remote:
 
 		ret = exec_req(fd, &fwd_hdr, req->data, &wlen, &rlen);
 
-		if (ret) { /* network errors */
-			sheep_del_fd(v, fd, sock_idx);
-			ret = SD_RES_NETWORK_ERROR;
-			continue;
-		} else {
-			sheep_put_fd(v, fd, sock_idx);
+		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			memcpy(&req->rp, rsp, sizeof(*rsp));
 			ret = rsp->result;
-			break;
+			sheep_put_fd(v, fd, sock_idx);
+			break; /* Read success */
 		}
+
+		if (ret) {
+			dprintf("remote node might have gone away");
+			sheep_del_fd(v, fd, sock_idx);
+			ret = SD_RES_NETWORK_ERROR;
+		} else {
+			ret = rsp->result;
+			eprintf("remote read fail %x\n", ret);
+			sheep_put_fd(v, fd, sock_idx);
+		}
+		/* Reset the hdr for next read */
+		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
+		fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 	}
 	return ret;
 }
@@ -163,7 +178,7 @@ again:
 			}
 			finish_one_write(wi, i);
 		} else {
-			eprintf("unhanlded poll event\n");
+			eprintf("unhandled poll event\n");
 		}
 	}
 finish_write:
