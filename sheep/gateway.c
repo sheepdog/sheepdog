@@ -216,7 +216,8 @@ void do_gateway_request(struct work *work)
 	dprintf("%x, %" PRIx64" , %u\n",
 		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 
-	if (!sys->enable_write_cache || bypass_object_cache(req)) {
+	if (!sys->enable_write_cache || req->local ||
+	    bypass_object_cache(req)) {
 		if (req->rq.flags & SD_FLAG_CMD_WRITE)
 			ret = forward_write_obj_req(req);
 		else

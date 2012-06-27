@@ -552,8 +552,7 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 			     uint32_t idx, uint64_t bmap, int create)
 {
-	struct request fake_req;
-	struct sd_req *hdr = &fake_req.rq;
+	struct sd_req hdr;
 	void *buf;
 	off_t offset;
 	unsigned data_length;
@@ -567,8 +566,6 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 		dprintf("WARN: nothing to flush\n");
 		return SD_RES_SUCCESS;
 	}
-
-	memset(&fake_req, 0, sizeof(fake_req));
 
 	first_bit = ffsll(bmap) - 1;
 	last_bit = fls64(bmap) - 1;
@@ -595,20 +592,15 @@ static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	hdr->opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
-	hdr->flags = SD_FLAG_CMD_WRITE;
-	hdr->data_length = data_length;
-	hdr->epoch = sys_epoch();
+	memset(&hdr, 0, sizeof(hdr));
+	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
+	hdr.flags = SD_FLAG_CMD_WRITE;
 
-	hdr->obj.oid = oid;
-	hdr->obj.offset = offset;
-	hdr->obj.copies = sys->nr_copies;
+	hdr.obj.oid = oid;
+	hdr.obj.offset = offset;
+	hdr.obj.copies = sys->nr_copies;
 
-	fake_req.data = buf;
-	fake_req.op = get_sd_op(hdr->opcode);
-	fake_req.vnodes = vnode_info;
-
-	ret = forward_write_obj_req(&fake_req);
+	ret = exec_local_req(&hdr, buf, data_length);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to push object %x\n", ret);
 
