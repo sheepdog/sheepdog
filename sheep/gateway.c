@@ -54,11 +54,13 @@ read_remote:
 	j = random();
 	for (i = 0; i < nr_copies; i++) {
 		int idx = (i + j) % nr_copies;
+		int sock_idx;
+
 		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
 			continue;
 
-		fd = sheep_get_fd(v);
+		fd = sheep_get_fd(v, &sock_idx);
 		if (fd < 0) {
 			ret = SD_RES_NETWORK_ERROR;
 			continue;
@@ -70,11 +72,11 @@ read_remote:
 		ret = exec_req(fd, &fwd_hdr, req->data, &wlen, &rlen);
 
 		if (ret) { /* network errors */
-			sheep_del_fd(v, fd);
+			sheep_del_fd(v, fd, sock_idx);
 			ret = SD_RES_NETWORK_ERROR;
 			continue;
 		} else {
-			sheep_put_fd(v, fd);
+			sheep_put_fd(v, fd, sock_idx);
 			memcpy(&req->rp, rsp, sizeof(*rsp));
 			ret = rsp->result;
 			break;
@@ -86,6 +88,7 @@ read_remote:
 struct write_info {
 	struct pollfd pfds[SD_MAX_REDUNDANCY];
 	struct sd_vnode *vnodes[SD_MAX_REDUNDANCY];
+	int sock_idx[SD_MAX_REDUNDANCY];
 };
 
 int forward_write_obj_req(struct request *req)
@@ -104,9 +107,10 @@ int forward_write_obj_req(struct request *req)
 
 	dprintf("%"PRIx64"\n", oid);
 
-	memset(&wi, 0, sizeof(wi));
-	for (i = 0; i < SD_MAX_REDUNDANCY; i++)
+	for (i = 0; i < SD_MAX_REDUNDANCY; i++) {
 		wi.pfds[i].fd = -1;
+		wi.vnodes[i] = NULL;
+	}
 
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 	fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
@@ -125,7 +129,7 @@ int forward_write_obj_req(struct request *req)
 			continue;
 		}
 
-		fd = sheep_get_fd(v);
+		fd = sheep_get_fd(v, &wi.sock_idx[nr_fds]);
 		if (fd < 0) {
 			ret = SD_RES_NETWORK_ERROR;
 			goto err;
@@ -133,7 +137,7 @@ int forward_write_obj_req(struct request *req)
 
 		ret = send_req(fd, &fwd_hdr, req->data, &wlen);
 		if (ret) { /* network errors */
-			sheep_del_fd(v, fd);
+			sheep_del_fd(v, fd, wi.sock_idx[nr_fds]);
 			ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %"PRIu32"\n", ret);
 			goto err;
@@ -174,7 +178,8 @@ again:
 		if (wi.pfds[i].revents & POLLERR ||
 		    wi.pfds[i].revents & POLLHUP ||
 		    wi.pfds[i].revents & POLLNVAL) {
-			sheep_del_fd(wi.vnodes[i], wi.pfds[i].fd);
+			sheep_del_fd(wi.vnodes[i], wi.pfds[i].fd,
+				     wi.sock_idx[i]);
 			ret = SD_RES_NETWORK_ERROR;
 			break;
 		}
@@ -184,7 +189,8 @@ again:
 
 		if (do_read(wi.pfds[i].fd, rsp, sizeof(*rsp))) {
 			eprintf("failed to read a response: %m\n");
-			sheep_del_fd(wi.vnodes[i], wi.pfds[i].fd);
+			sheep_del_fd(wi.vnodes[i], wi.pfds[i].fd,
+				     wi.sock_idx[i]);
 			ret = SD_RES_NETWORK_ERROR;
 			break;
 		}
@@ -193,8 +199,7 @@ again:
 			eprintf("fail %"PRIu32"\n", rsp->result);
 			ret = rsp->result;
 		}
-
-		sheep_put_fd(wi.vnodes[i], wi.pfds[i].fd);
+		sheep_put_fd(wi.vnodes[i], wi.pfds[i].fd, wi.sock_idx[i]);
 		break;
 	}
 	if (i < nr_fds) {
@@ -203,6 +208,8 @@ again:
 			sizeof(struct pollfd) * (nr_fds - i));
 		memmove(wi.vnodes + i, wi.vnodes + i + 1,
 			sizeof(struct sd_vnode *) * (nr_fds - i));
+		memmove(wi.sock_idx + i, wi.sock_idx + i + 1,
+			sizeof(int) * (nr_fds - i));
 	}
 
 	dprintf("%"PRIx64" %"PRIu32"\n", oid, nr_fds);
@@ -213,7 +220,7 @@ out:
 	return ret;
 err:
 	for (i = 0; i < nr_fds; i++)
-		sheep_del_fd(wi.vnodes[i], wi.pfds[i].fd);
+		sheep_del_fd(wi.vnodes[i], wi.pfds[i].fd, wi.sock_idx[i]);
 	return ret;
 }
 

@@ -412,8 +412,8 @@ void sockfd_cache_del(struct node_id *);
 void sockfd_cache_add(struct sd_node *);
 void sockfd_cache_add_group(struct sd_node *nodes, int nr);
 
-int sheep_get_fd(struct sd_vnode *vnode);
-void sheep_put_fd(struct sd_vnode *vnode, int fd);
-void sheep_del_fd(struct sd_vnode *vnode, int fd);
+int sheep_get_fd(struct sd_vnode *vnode, int *);
+void sheep_put_fd(struct sd_vnode *vnode, int fd, int);
+void sheep_del_fd(struct sd_vnode *vnode, int fd, int);
 
 #endif
