@@ -34,7 +34,6 @@ LIST_HEAD(cluster_drivers);
 static char program_name[] = "sheep";
 
 static struct option const long_options[] = {
-	{"asyncflush", no_argument, NULL, 'a'},
 	{"cluster", required_argument, NULL, 'c'},
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
@@ -53,7 +52,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "ac:dDfg:Ghi:l:op:v:Wy:z:";
+static const char *short_options = "c:dDfg:Ghi:l:op:v:Wy:z:";
 
 static void usage(int status)
 {
@@ -65,7 +64,6 @@ static void usage(int status)
 Sheepdog daemon (version %s)\n\
 Usage: %s [OPTION]... [PATH]\n\
 Options:\n\
-  -a, --asyncflush        flush the object cache asynchronously\n\
   -c, --cluster           specify the cluster driver\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object from object cache\n\
@@ -164,9 +162,6 @@ int main(int argc, char **argv)
 		case 'D':
 			dprintf("direct IO mode\n");
 			sys->use_directio = 1;
-			break;
-		case 'a':
-			sys->async_flush = 1;
 			break;
 		case 'g':
 			nr_gateway_worker = strtol(optarg, &p, 10);
@@ -281,11 +276,9 @@ int main(int argc, char **argv)
 	sys->io_wqueue = init_work_queue("io", nr_io_worker);
 	sys->recovery_wqueue = init_work_queue("recovery", 1);
 	sys->deletion_wqueue = init_work_queue("deletion", 1);
-	sys->flush_wqueue = init_work_queue("flush", 1);
 	sys->block_wqueue = init_work_queue("block", 1);
-	if (!sys->gateway_wqueue || !sys->io_wqueue ||
-	    !sys->recovery_wqueue || !sys->deletion_wqueue ||
-	    !sys->flush_wqueue || !sys->block_wqueue)
+	if (!sys->gateway_wqueue || !sys->io_wqueue ||!sys->recovery_wqueue ||
+	    !sys->deletion_wqueue || !sys->block_wqueue)
 		exit(1);
 
 	ret = init_signal();

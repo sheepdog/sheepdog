@@ -60,12 +60,6 @@ struct object_cache_entry {
 	int create;
 };
 
-struct flush_work {
-	struct object_cache *cache;
-	struct vnode_info *vnode_info;
-	struct work work;
-};
-
 static char cache_dir[PATH_MAX];
 static int def_open_flags = O_RDWR;
 
@@ -209,9 +203,9 @@ out:
 	return cache;
 }
 
-static inline void del_from_dirty_tree_and_list(
-		struct object_cache_entry *entry,
-		struct rb_root *dirty_tree)
+static inline void
+del_from_dirty_tree_and_list(struct object_cache_entry *entry,
+			     struct rb_root *dirty_tree)
 {
 	rb_erase(&entry->rb, dirty_tree);
 	list_del(&entry->list);
@@ -539,8 +533,8 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int push_cache_object(uint32_t vid, uint32_t idx,
-			     uint64_t bmap, int create)
+static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
+			     int create)
 {
 	struct sd_req hdr;
 	void *buf;
@@ -678,8 +672,7 @@ void object_cache_delete(uint32_t vid)
 
 }
 
-static int object_cache_flush_and_delete(struct vnode_info *vnode_info,
-					 struct object_cache *oc)
+static int object_cache_flush_and_delete(struct object_cache *oc)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -734,7 +727,7 @@ int bypass_object_cache(struct request *req)
 		if (!cache)
 			return 1;
 		if (req->rq.flags & SD_FLAG_CMD_WRITE) {
-			object_cache_flush_and_delete(req->vnodes, cache);
+			object_cache_flush_and_delete(cache);
 			return 1;
 		} else  {
 			/* For read requet, we can read cache if any */
@@ -845,25 +838,6 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 	return ret;
 }
 
-static void object_cache_flush_vdi_fn(struct work *work)
-{
-	struct flush_work *fw = container_of(work, struct flush_work, work);
-
-	dprintf("flush vdi %"PRIx32"\n", fw->cache->vid);
-	if (object_cache_push(fw->cache) != SD_RES_SUCCESS)
-		eprintf("failed to flush vdi %"PRIx32"\n", fw->cache->vid);
-}
-
-static void object_cache_flush_vdi_done(struct work *work)
-{
-	struct flush_work *fw = container_of(work, struct flush_work, work);
-
-	dprintf("flush vdi %"PRIx32" done\n", fw->cache->vid);
-
-	put_vnode_info(fw->vnode_info);
-	free(fw);
-}
-
 int object_cache_flush_vdi(struct request *req)
 {
 	uint32_t vid = oid_to_vid(req->rq.obj.oid);
@@ -872,18 +846,6 @@ int object_cache_flush_vdi(struct request *req)
 	cache = find_object_cache(vid, 0);
 	if (!cache)
 		return SD_RES_SUCCESS;
-
-	if (sys->async_flush) {
-		struct flush_work *fw = xzalloc(sizeof(*fw));
-
-		fw->work.fn = object_cache_flush_vdi_fn;
-		fw->work.done = object_cache_flush_vdi_done;
-		fw->cache = cache;
-		fw->vnode_info = grab_vnode_info(req->vnodes);
-
-		queue_work(sys->flush_wqueue, &fw->work);
-		return SD_RES_SUCCESS;
-	}
 
 	return object_cache_push(cache);
 }
@@ -894,7 +856,7 @@ int object_cache_flush_and_del(struct request *req)
 	struct object_cache *cache;
 
 	cache = find_object_cache(vid, 0);
-	if (cache && object_cache_flush_and_delete(req->vnodes, cache) < 0)
+	if (cache && object_cache_flush_and_delete(cache) < 0)
 		return SD_RES_EIO;
 	return SD_RES_SUCCESS;
 }

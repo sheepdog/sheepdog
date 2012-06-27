@@ -131,13 +131,11 @@ struct cluster_info {
 	uint32_t recovered_epoch;
 
 	int use_directio;
-	uint8_t async_flush;
 
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
 	struct work_queue *deletion_wqueue;
 	struct work_queue *recovery_wqueue;
-	struct work_queue *flush_wqueue;
 	struct work_queue *block_wqueue;
 };
 
@@ -300,7 +298,6 @@ int prealloc(int fd, uint32_t size);
 
 int objlist_cache_insert(uint64_t oid);
 void objlist_cache_remove(uint64_t oid);
-void object_cache_remove(uint64_t oid);
 
 void req_done(struct request *req);
 
@@ -402,8 +399,8 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 int object_cache_flush_vdi(struct request *req);
 int object_cache_flush_and_del(struct request *req);
 void object_cache_delete(uint32_t vid);
-
 int object_cache_init(const char *p);
+void object_cache_remove(uint64_t oid);
 
 /* sockfd_cache */
 struct sockfd {
