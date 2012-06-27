@@ -293,8 +293,6 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
 int remove_object(uint64_t oid, int nr);
 
-void del_sheep_fd(int fd);
-int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
 int exec_local_req(struct sd_req *rq, void *data, int data_length);
 void local_req_init(void);
 
@@ -406,5 +404,16 @@ int object_cache_flush_and_del(struct request *req);
 void object_cache_delete(uint32_t vid);
 
 int object_cache_init(const char *p);
+
+/* sockfd_cache */
+struct node_id;
+
+void sockfd_cache_del(struct node_id *);
+void sockfd_cache_add(struct sd_node *);
+void sockfd_cache_add_group(struct sd_node *nodes, int nr);
+
+int sheep_get_fd(struct sd_vnode *vnode);
+void sheep_put_fd(struct sd_vnode *vnode, int fd);
+void sheep_del_fd(struct sd_vnode *vnode, int fd);
 
 #endif

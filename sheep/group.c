@@ -803,10 +803,13 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 		if (sd_store->purge_obj &&
 		    sd_store->purge_obj() != SD_RES_SUCCESS)
 			eprintf("WARN: may have stale objects\n");
+
+	sockfd_cache_add_group(nodes, nr_nodes);
 }
 
 static void update_cluster_info(struct join_message *msg,
-		struct sd_node *joined, struct sd_node *nodes, size_t nr_nodes)
+				struct sd_node *joined, struct sd_node *nodes,
+				size_t nr_nodes)
 {
 	struct vnode_info *old_vnode_info;
 
@@ -867,6 +870,8 @@ static void update_cluster_info(struct join_message *msg,
 		if (current_vnode_info->nr_zones >= sys->nr_copies)
 			sys_stat_set(SD_STATUS_OK);
 	}
+
+	sockfd_cache_add(joined);
 }
 
 /*
@@ -1110,6 +1115,8 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 		if (current_vnode_info->nr_zones < sys->nr_copies)
 			sys_stat_set(SD_STATUS_HALT);
 	}
+
+	sockfd_cache_del((struct node_id *)left);
 }
 
 int create_cluster(int port, int64_t zone, int nr_vnodes,

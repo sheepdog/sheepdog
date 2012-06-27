@@ -158,11 +158,11 @@ struct sd_node {
 };
 
 struct sd_vnode {
-	uint64_t        id;
 	uint8_t         addr[16];
 	uint16_t        port;
 	uint16_t	node_idx;
 	uint32_t	zone;
+	uint64_t        id;
 };
 
 struct epoch_log {
