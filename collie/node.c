@@ -30,8 +30,8 @@ static int node_list(int argc, char **argv)
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char data[128];
 
-		addr_to_str(data, sizeof(data), sd_nodes[i].addr,
-			    sd_nodes[i].port);
+		addr_to_str(data, sizeof(data), sd_nodes[i].nid.addr,
+			    sd_nodes[i].nid.port);
 
 		if (i == master_idx) {
 			if (highlight)
@@ -67,9 +67,9 @@ static int node_info(int argc, char **argv)
 		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 		char store_str[UINT64_DECIMAL_SIZE], free_str[UINT64_DECIMAL_SIZE];
 
-		addr_to_str(name, sizeof(name), sd_nodes[i].addr, 0);
+		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr, 0);
 
-		fd = connect_to(name, sd_nodes[i].port);
+		fd = connect_to(name, sd_nodes[i].nid.port);
 		if (fd < 0)
 			return 1;
 
@@ -134,9 +134,9 @@ static int node_recovery(int argc, char **argv)
 		struct sd_node_req req;
 		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 
-		addr_to_str(host, sizeof(host), sd_nodes[i].addr, 0);
+		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
-		fd = connect_to(host, sd_nodes[i].port);
+		fd = connect_to(host, sd_nodes[i].nid.port);
 		if (fd < 0)
 			return EXIT_FAILURE;
 
@@ -151,7 +151,7 @@ static int node_recovery(int argc, char **argv)
 
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			addr_to_str(host, sizeof(host),
-					sd_nodes[i].addr, sd_nodes[i].port);
+					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
 			printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s%5d%11d\n",
 				   i, host, sd_nodes[i].nr_vnodes,
 				   sd_nodes[i].zone);

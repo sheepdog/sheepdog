@@ -326,14 +326,14 @@ int jrnl_recover(const char *jrnl_dir);
 
 static inline int is_myself(uint8_t *addr, uint16_t port)
 {
-	return (memcmp(addr, sys->this_node.addr,
-		       sizeof(sys->this_node.addr)) == 0) &&
-		port == sys->this_node.port;
+	return (memcmp(addr, sys->this_node.nid.addr,
+		       sizeof(sys->this_node.nid.addr)) == 0) &&
+		port == sys->this_node.nid.port;
 }
 
 static inline int vnode_is_local(struct sd_vnode *v)
 {
-	return is_myself(v->addr, v->port);
+	return is_myself(v->nid.addr, v->nid.port);
 }
 
 /* Cluster status/flag helper */
@@ -406,14 +406,12 @@ void object_cache_delete(uint32_t vid);
 int object_cache_init(const char *p);
 
 /* sockfd_cache */
-struct node_id;
-
 void sockfd_cache_del(struct node_id *);
-void sockfd_cache_add(struct sd_node *);
+void sockfd_cache_add(struct node_id *);
 void sockfd_cache_add_group(struct sd_node *nodes, int nr);
 
-int sheep_get_fd(struct sd_vnode *vnode, int *);
-void sheep_put_fd(struct sd_vnode *vnode, int fd, int);
-void sheep_del_fd(struct sd_vnode *vnode, int fd, int);
+int sheep_get_fd(struct node_id *, int *);
+void sheep_put_fd(struct node_id *, int fd, int);
+void sheep_del_fd(struct node_id *, int fd, int);
 
 #endif

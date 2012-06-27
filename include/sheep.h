@@ -150,16 +150,19 @@ struct sd_node_rsp {
 	uint64_t	store_free;
 };
 
+struct node_id {
+	uint8_t addr[16];
+	uint16_t port;
+};
+
 struct sd_node {
-	uint8_t         addr[16];
-	uint16_t        port;
+	struct node_id  nid;
 	uint16_t	nr_vnodes;
 	uint32_t	zone;
 };
 
 struct sd_vnode {
-	uint8_t         addr[16];
-	uint16_t        port;
+	struct node_id  nid;
 	uint16_t	node_idx;
 	uint32_t	zone;
 	uint64_t        id;
@@ -190,8 +193,8 @@ struct trace_graph_item {
 
 static inline int same_node(struct sd_vnode *e, int n1, int n2)
 {
-	if (memcmp(e[n1].addr, e[n2].addr, sizeof(e->addr)) == 0 &&
-	    e[n1].port == e[n2].port)
+	if (memcmp(e[n1].nid.addr, e[n2].nid.addr, sizeof(e->nid.addr)) == 0 &&
+	    e[n1].nid.port == e[n2].nid.port)
 		return 1;
 
 	return 0;
@@ -330,13 +333,13 @@ static inline int vnode_node_cmp(const void *a, const void *b)
 	const struct sd_node *node2 = b;
 	int cmp;
 
-	cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
+	cmp = memcmp(node1->nid.addr, node2->nid.addr, sizeof(node1->nid.addr));
 	if (cmp != 0)
 		return cmp;
 
-	if (node1->port < node2->port)
+	if (node1->nid.port < node2->nid.port)
 		return -1;
-	if (node1->port > node2->port)
+	if (node1->nid.port > node2->nid.port)
 		return 1;
 	return 0;
 }
@@ -347,13 +350,13 @@ static inline int node_cmp(const void *a, const void *b)
 	const struct sd_node *node2 = b;
 	int cmp;
 
-	cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
+	cmp = memcmp(node1->nid.addr, node2->nid.addr, sizeof(node1->nid.addr));
 	if (cmp != 0)
 		return cmp;
 
-	if (node1->port < node2->port)
+	if (node1->nid.port < node2->nid.port)
 		return -1;
-	if (node1->port > node2->port)
+	if (node1->nid.port > node2->nid.port)
 		return 1;
 	return 0;
 }
@@ -387,13 +390,13 @@ static inline int nodes_to_vnodes(struct sd_node *nodes, int nr,
 
 		for (i = 0; i < n->nr_vnodes; i++) {
 			if (vnodes) {
-				hval = fnv_64a_buf(&n->port, sizeof(n->port), hval);
-				for (j = ARRAY_SIZE(n->addr) - 1; j >= 0; j--)
-					hval = fnv_64a_buf(&n->addr[j], 1, hval);
+				hval = fnv_64a_buf(&n->nid.port, sizeof(n->nid.port), hval);
+				for (j = ARRAY_SIZE(n->nid.addr) - 1; j >= 0; j--)
+					hval = fnv_64a_buf(&n->nid.addr[j], 1, hval);
 
 				vnodes[nr_vnodes].id = hval;
-				memcpy(vnodes[nr_vnodes].addr, n->addr, sizeof(n->addr));
-				vnodes[nr_vnodes].port = n->port;
+				memcpy(vnodes[nr_vnodes].nid.addr, n->nid.addr, sizeof(n->nid.addr));
+				vnodes[nr_vnodes].nid.port = n->nid.port;
 				vnodes[nr_vnodes].node_idx = n - nodes;
 				vnodes[nr_vnodes].zone = n->zone;
 			}

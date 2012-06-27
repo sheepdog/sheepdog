@@ -148,7 +148,7 @@ int main(int argc, char **argv)
 			break;
 		case 'y':
 			af = strstr(optarg, ":") ? AF_INET6 : AF_INET;
-			if (!str_to_addr(af, optarg, sys->this_node.addr)) {
+			if (!str_to_addr(af, optarg, sys->this_node.nid.addr)) {
 				fprintf(stderr,
 					"Invalid address: '%s'\n",
 					optarg);

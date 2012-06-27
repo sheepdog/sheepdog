@@ -131,11 +131,11 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 		unsigned int rlen, wlen;
 		int fd;
 
-		if (is_myself(local_nodes[i].addr, local_nodes[i].port))
+		if (is_myself(local_nodes[i].nid.addr, local_nodes[i].nid.port))
 			continue;
 
-		addr_to_str(host, sizeof(host), local_nodes[i].addr, 0);
-		fd = connect_to(host, local_nodes[i].port);
+		addr_to_str(host, sizeof(host), local_nodes[i].nid.addr, 0);
+		fd = connect_to(host, local_nodes[i].nid.port);
 		if (fd < 0) {
 			vprintf(SDOG_ERR, "failed to connect to %s: %m\n", host);
 			continue;

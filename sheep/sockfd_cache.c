@@ -38,11 +38,6 @@
 #include "logger.h"
 #include "util.h"
 
-struct node_id {
-	uint8_t addr[16];
-	uint16_t port;
-};
-
 struct sockfd_cache {
 	struct rb_root root;
 	pthread_rwlock_t lock;
@@ -261,20 +256,18 @@ static void sockfd_cache_add_nolock(struct node_id *nid)
 void sockfd_cache_add_group(struct sd_node *nodes, int nr)
 {
 	struct sd_node *p;
-	struct node_id *nid;
 
 	dprintf("%d\n", nr);
 	pthread_rwlock_wrlock(&sockfd_cache.lock);
 	while (nr--) {
 		p = nodes + nr;
-		nid = (struct node_id *)p;
-		sockfd_cache_add_nolock(nid);
+		sockfd_cache_add_nolock(&p->nid);
 	}
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 }
 
 /* Add one node to the cache means we can do caching tricks on this node */
-void sockfd_cache_add(struct sd_node *node)
+void sockfd_cache_add(struct node_id *nid)
 {
 	struct sockfd_cache_entry *new = xzalloc(sizeof(*new));
 	char name[INET6_ADDRSTRLEN];
@@ -283,7 +276,7 @@ void sockfd_cache_add(struct sd_node *node)
 	for (i = 0; i < SOCKFD_CACHE_MAX_FD; i++)
 		new->fd[i] = -1;
 
-	memcpy(&new->nid, node, sizeof(struct node_id));
+	memcpy(&new->nid, nid, sizeof(struct node_id));
 	pthread_rwlock_rdlock(&sockfd_cache.lock);
 	if (sockfd_cache_insert(new)) {
 		free(new);
@@ -292,8 +285,8 @@ void sockfd_cache_add(struct sd_node *node)
 	}
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 	n = uatomic_add_return(&sockfd_cache.count, 1);
-	addr_to_str(name, sizeof(name), node->addr, 0);
-	dprintf("%s:%d, count %d\n", name, node->port, n);
+	addr_to_str(name, sizeof(name), nid->addr, 0);
+	dprintf("%s:%d, count %d\n", name, nid->port, n);
 }
 
 static int sockfd_cache_get(struct node_id *nid, char *name, int *ret_idx)
@@ -349,9 +342,8 @@ static void sockfd_cache_put(struct node_id *nid, int idx)
  *
  * ret_idx is opaque to the caller, -1 indicates it is a short FD.
  */
-int sheep_get_fd(struct sd_vnode *vnode, int *ret_idx)
+int sheep_get_fd(struct node_id *nid, int *ret_idx)
 {
-	struct node_id *nid = (struct node_id *)vnode;
 	char name[INET6_ADDRSTRLEN];
 	int fd;
 
@@ -380,10 +372,8 @@ int sheep_get_fd(struct sd_vnode *vnode, int *ret_idx)
  * sheep_put_fd() or sheep_del_fd() should be paired with sheep_get_fd()
  */
 
-void sheep_put_fd(struct sd_vnode *vnode, int fd, int idx)
+void sheep_put_fd(struct node_id *nid, int fd, int idx)
 {
-	struct node_id *nid = (struct node_id *)vnode;
-
 	if (idx == -1) {
 		dprintf("%d\n", fd);
 		close(fd);
@@ -400,10 +390,8 @@ void sheep_put_fd(struct sd_vnode *vnode, int fd, int idx)
  * this vnode in the cache.
  * If it is a short FD, just close it.
  */
-void sheep_del_fd(struct sd_vnode *vnode, int fd, int idx)
+void sheep_del_fd(struct node_id *nid, int fd, int idx)
 {
-	struct node_id *nid = (struct node_id *)vnode;
-
 	if (idx == -1) {
 		dprintf("%d\n", fd);
 		close(fd);

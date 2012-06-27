@@ -572,7 +572,7 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 		struct siocb iocb;
 
 		v = obj_vnodes[i];
-		addr_to_str(name, sizeof(name), v->addr, 0);
+		addr_to_str(name, sizeof(name), v->nid.addr, 0);
 
 		if (vnode_is_local(v)) {
 			memset(&iocb, 0, sizeof(iocb));
@@ -603,9 +603,9 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 			continue;
 
 		v = obj_vnodes[j];
-		addr_to_str(name, sizeof(name), v->addr, 0);
+		addr_to_str(name, sizeof(name), v->nid.addr, 0);
 
-		fd = connect_to(name, v->port);
+		fd = connect_to(name, v->nid.port);
 		if (fd < 0)
 			continue;
 

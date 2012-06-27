@@ -66,7 +66,7 @@ read_remote:
 		if (vnode_is_local(v))
 			continue;
 
-		fd = sheep_get_fd(v, &sock_idx);
+		fd = sheep_get_fd(&v->nid, &sock_idx);
 		if (fd < 0) {
 			ret = SD_RES_NETWORK_ERROR;
 			continue;
@@ -80,18 +80,18 @@ read_remote:
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			memcpy(&req->rp, rsp, sizeof(*rsp));
 			ret = rsp->result;
-			sheep_put_fd(v, fd, sock_idx);
+			sheep_put_fd(&v->nid, fd, sock_idx);
 			break; /* Read success */
 		}
 
 		if (ret) {
 			dprintf("remote node might have gone away");
-			sheep_del_fd(v, fd, sock_idx);
+			sheep_del_fd(&v->nid, fd, sock_idx);
 			ret = SD_RES_NETWORK_ERROR;
 		} else {
 			ret = rsp->result;
 			eprintf("remote read fail %x\n", ret);
-			sheep_put_fd(v, fd, sock_idx);
+			sheep_put_fd(&v->nid, fd, sock_idx);
 		}
 		/* Reset the hdr for next read */
 		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
@@ -121,14 +121,14 @@ static inline void update_write_info(struct write_info *wi, int pos)
 
 static inline void finish_one_write(struct write_info *wi, int i)
 {
-	sheep_put_fd(wi->vnodes[i], wi->pfds[i].fd,
+	sheep_put_fd(&wi->vnodes[i]->nid, wi->pfds[i].fd,
 		     wi->sock_idx[i]);
 	update_write_info(wi, i);
 }
 
 static inline void finish_one_write_err(struct write_info *wi, int i)
 {
-	sheep_del_fd(wi->vnodes[i], wi->pfds[i].fd,
+	sheep_del_fd(&wi->vnodes[i]->nid, wi->pfds[i].fd,
 		     wi->sock_idx[i]);
 	update_write_info(wi, i);
 }
@@ -228,7 +228,7 @@ int forward_write_obj_req(struct request *req)
 			continue;
 		}
 
-		fd = sheep_get_fd(v, &wi.sock_idx[wi.nr_sent]);
+		fd = sheep_get_fd(&v->nid, &wi.sock_idx[wi.nr_sent]);
 		if (fd < 0) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			break;
@@ -236,7 +236,7 @@ int forward_write_obj_req(struct request *req)
 
 		ret = send_req(fd, &fwd_hdr, req->data, &wlen);
 		if (ret) {
-			sheep_del_fd(v, fd, wi.sock_idx[wi.nr_sent]);
+			sheep_del_fd(&v->nid, fd, wi.sock_idx[wi.nr_sent]);
 			err_ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %d\n", ret);
 			break;

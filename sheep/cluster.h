@@ -153,7 +153,7 @@ static inline char *node_to_str(struct sd_node *id)
 	static char str[256];
 	char name[256];
 	int af = AF_INET6;
-	uint8_t *addr = id->addr;
+	uint8_t *addr = id->nid.addr;
 
 	/* Find address family type */
 	if (addr[12]) {
@@ -166,7 +166,7 @@ static inline char *node_to_str(struct sd_node *id)
 
 	snprintf(str, sizeof(str), "%s ip:%s port:%d",
 		(af == AF_INET) ? "IPv4" : "IPv6",
-		addr_to_str(name, sizeof(name), id->addr, 0), id->port);
+		addr_to_str(name, sizeof(name), id->nid.addr, 0), id->nid.port);
 
 	return str;
 }
@@ -177,12 +177,12 @@ static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
 	char v[8], ip[256];
 
 	sscanf(str, "%s ip:%s port:%d", v, ip, &port);
-	id->port = port;
+	id->nid.port = port;
 
 	if (strcmp(v, "IPv4") == 0)
 		af = AF_INET;
 
-	if (!str_to_addr(af, ip, id->addr))
+	if (!str_to_addr(af, ip, id->nid.addr))
 		return NULL;
 
 	return id;

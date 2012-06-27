@@ -93,11 +93,11 @@ static int recover_object_from_replica(uint64_t oid,
 		}
 	}
 
-	addr_to_str(name, sizeof(name), entry->addr, 0);
-	fd = connect_to(name, entry->port);
-	dprintf("%s, %d\n", name, entry->port);
+	addr_to_str(name, sizeof(name), entry->nid.addr, 0);
+	fd = connect_to(name, entry->nid.port);
+	dprintf("%s, %d\n", name, entry->nid.port);
 	if (fd < 0) {
-		eprintf("failed to connect to %s:%"PRIu32"\n", name, entry->port);
+		eprintf("failed to connect to %s:%"PRIu32"\n", name, entry->nid.port);
 		ret = -1;
 		goto out;
 	}
@@ -467,13 +467,13 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 	struct sd_list_req hdr;
 	struct sd_list_rsp *rsp;
 
-	addr_to_str(name, sizeof(name), e->addr, 0);
+	addr_to_str(name, sizeof(name), e->nid.addr, 0);
 
-	dprintf("%s %"PRIu32"\n", name, e->port);
+	dprintf("%s %"PRIu32"\n", name, e->nid.port);
 
-	fd = connect_to(name, e->port);
+	fd = connect_to(name, e->nid.port);
 	if (fd < 0) {
-		eprintf("%s %"PRIu32"\n", name, e->port);
+		eprintf("%s %"PRIu32"\n", name, e->nid.port);
 		return -1;
 	}
 

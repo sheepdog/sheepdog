@@ -686,19 +686,19 @@ static int get_vdi_bitmap_from(struct sd_node *node)
 	unsigned int rlen, wlen;
 	char host[128];
 
-	if (is_myself(node->addr, node->port))
+	if (is_myself(node->nid.addr, node->nid.port))
 		goto out;
 
-	addr_to_str(host, sizeof(host), node->addr, 0);
+	addr_to_str(host, sizeof(host), node->nid.addr, 0);
 
-	fd = connect_to(host, node->port);
+	fd = connect_to(host, node->nid.port);
 	if (fd < 0) {
 		vprintf(SDOG_ERR, "unable to get the VDI bitmap from %s: %m\n", host);
 		ret = -SD_RES_EIO;
 		goto out;
 	}
 
-	vprintf(SDOG_ERR, "%s:%d\n", host, node->port);
+	vprintf(SDOG_ERR, "%s:%d\n", host, node->nid.port);
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_VDIS;
@@ -871,7 +871,7 @@ static void update_cluster_info(struct join_message *msg,
 			sys_stat_set(SD_STATUS_OK);
 	}
 
-	sockfd_cache_add(joined);
+	sockfd_cache_add(&joined->nid);
 }
 
 /*
@@ -889,7 +889,7 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 
 	dprintf("size: %zd, from: %s\n", data_len, node_to_str(sender));
 
-	if (is_myself(sender->addr, sender->port)) {
+	if (is_myself(sender->nid.addr, sender->nid.port)) {
 		req = list_first_entry(&sys->pending_list, struct request,
 				       pending_list);
 		list_del(&req->pending_list);
@@ -952,7 +952,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 					jm->ctime, jm->epoch,
 					&jm->cluster_status, &jm->inc_epoch);
 	eprintf("%s: ret = 0x%x, cluster_status = 0x%x\n",
-		addr_to_str(str, sizeof(str), joining->addr, joining->port),
+		addr_to_str(str, sizeof(str), joining->nid.addr, joining->nid.port),
 		ret, jm->cluster_status);
 
 	jm->nr_copies = sys->nr_copies;
@@ -1116,7 +1116,7 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 			sys_stat_set(SD_STATUS_HALT);
 	}
 
-	sockfd_cache_del((struct node_id *)left);
+	sockfd_cache_del(&left->nid);
 }
 
 int create_cluster(int port, int64_t zone, int nr_vnodes,
@@ -1141,18 +1141,18 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	if (!explicit_addr) {
 		if (sys->cdrv->get_local_addr)
-			ret = sys->cdrv->get_local_addr(sys->this_node.addr);
+			ret = sys->cdrv->get_local_addr(sys->this_node.nid.addr);
 		else
-			ret = get_local_addr(sys->this_node.addr);
+			ret = get_local_addr(sys->this_node.nid.addr);
 		if (ret < 0)
 			return -1;
 	}
 
-	sys->this_node.port = port;
+	sys->this_node.nid.port = port;
 	sys->this_node.nr_vnodes = nr_vnodes;
 	if (zone == -1) {
 		/* use last 4 bytes as zone id */
-		uint8_t *b = sys->this_node.addr + 12;
+		uint8_t *b = sys->this_node.nid.addr + 12;
 		sys->this_node.zone = b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24;
 	} else
 		sys->this_node.zone = zone;

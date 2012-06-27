@@ -197,7 +197,7 @@ again:
 			printf("%s%s",
 			       (j == 0) ? "" : ", ",
 			       addr_to_str(name, sizeof(name),
-					   entry->addr, entry->port));
+					   entry->nid.addr, entry->nid.port));
 		}
 		printf("]\n");
 	}

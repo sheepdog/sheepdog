@@ -274,9 +274,9 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
-		addr_to_str(name, sizeof(name), sd_nodes[i].addr, 0);
+		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr, 0);
 
-		fd = connect_to(name, sd_nodes[i].port);
+		fd = connect_to(name, sd_nodes[i].nid.port);
 		if (fd < 0)
 			break;
 
@@ -292,7 +292,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 		close(fd);
 
-		sprintf(name + strlen(name), ":%d", sd_nodes[i].port);
+		sprintf(name + strlen(name), ":%d", sd_nodes[i].nid.port);
 
 		if (ret)
 			fprintf(stderr, "Failed to connect to %s\n", name);
@@ -849,14 +849,14 @@ again:
 	for (i = nr_logs - 1; i >= 0; i--) {
 		vnodes_nr = nodes_to_vnodes(logs[i].nodes, logs[i].nr_nodes, vnodes);
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
-				oid, logs[i].epoch, logs[i].nr_copies);
+		       oid, logs[i].epoch, logs[i].nr_copies);
 		printf("---------------------------------------------------\n");
 		obj_to_sheeps(vnodes, vnodes_nr, oid,
-				logs[i].nr_copies, idx_buf);
+			      logs[i].nr_copies, idx_buf);
 		for (j = 0; j < logs[i].nr_copies; j++) {
 			idx = idx_buf[j];
-			addr_to_str(host, sizeof(host), vnodes[idx].addr,
-					vnodes[idx].port);
+			addr_to_str(host, sizeof(host), vnodes[idx].nid.addr,
+				    vnodes[idx].nid.port);
 			printf("%s\n", host);
 		}
 	}
@@ -1331,11 +1331,11 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 		exit(EXIT_SYSFAIL);
 	}
 
-	addr_to_str(name, sizeof(name), vnode->addr, 0);
-	fd = connect_to(name, vnode->port);
+	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
+	fd = connect_to(name, vnode->nid.port);
 	if (fd < 0) {
 		fprintf(stderr, "failed to connect to %s:%"PRIu32"\n",
-			name, vnode->port);
+			name, vnode->nid.port);
 		exit(EXIT_FAILURE);
 	}
 
@@ -1370,11 +1370,11 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 	unsigned wlen = SD_DATA_OBJ_SIZE, rlen = 0;
 	char name[128];
 
-	addr_to_str(name, sizeof(name), vnode->addr, 0);
-	fd = connect_to(name, vnode->port);
+	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
+	fd = connect_to(name, vnode->nid.port);
 	if (fd < 0) {
 		fprintf(stderr, "failed to connect to %s:%"PRIu32"\n",
-			name, vnode->port);
+			name, vnode->nid.port);
 		exit(EXIT_FAILURE);
 	}
 
