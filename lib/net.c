@@ -265,7 +265,7 @@ reread:
 	if (ret < 0 || !ret) {
 		if (errno == EINTR)
 			goto reread;
-		eprintf("failed to read from socket: %m\n");
+		eprintf("failed to read from socket: %d\n", ret);
 		return 1;
 	}
 
@@ -352,7 +352,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 
 	ret = do_read(sockfd, rsp, sizeof(*rsp));
 	if (ret) {
-		eprintf("failed to read a response: %m\n");
+		eprintf("failed to read a response\n");
 		return 1;
 	}
 
@@ -362,7 +362,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	if (*rlen) {
 		ret = do_read(sockfd, data, *rlen);
 		if (ret) {
-			eprintf("failed to read the response data: %m\n");
+			eprintf("failed to read the response data\n");
 			return 1;
 		}
 	}

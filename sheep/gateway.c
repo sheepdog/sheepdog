@@ -158,7 +158,7 @@ again:
 
 			ret = rsp->result;
 			if (ret != SD_RES_SUCCESS) {
-				eprintf("fail %"PRIu32"\n", ret);
+				eprintf("fail %"PRIx32"\n", ret);
 				err_ret = ret;
 			}
 			finish_one_write(wi, i);
@@ -223,7 +223,7 @@ int forward_write_obj_req(struct request *req)
 		if (ret) {
 			sheep_del_fd(v, fd, wi.sock_idx[wi.nr_sent]);
 			err_ret = SD_RES_NETWORK_ERROR;
-			dprintf("fail %"PRIu32"\n", ret);
+			dprintf("fail %d\n", ret);
 			break;
 		}
 
@@ -239,12 +239,12 @@ int forward_write_obj_req(struct request *req)
 		ret = do_local_io(req, fwd_hdr.epoch);
 
 		if (ret != SD_RES_SUCCESS) {
-			eprintf("fail to write local %"PRIu32"\n", ret);
+			eprintf("fail to write local %"PRIx32"\n", ret);
 			err_ret = ret;
 		}
 	}
 
-	dprintf("nr_sent %d, err %d\n", wi.nr_sent, err_ret);
+	dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
 	if (wi.nr_sent > 0) {
 		ret = wait_forward_write(&wi, rsp);
 		if (ret != SD_RES_SUCCESS)
