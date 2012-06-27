@@ -387,7 +387,6 @@ struct deletion_work {
 	uint32_t *buf;
 
 	struct vnode_info *vnodes;
-	int delete_error;
 };
 
 static LIST_HEAD(deletion_work_list);
@@ -460,31 +459,30 @@ static void delete_one(struct work *work)
 		goto out;
 
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		uint64_t oid;
+
 		if (!inode->data_vdi_id[i])
 			continue;
 
+		oid = vid_to_data_oid(inode->data_vdi_id[i], i);
+
 		if (inode->data_vdi_id[i] != inode->vdi_id) {
 			dprintf("object %" PRIx64 " is base's data, would not be deleted.\n",
-					vid_to_data_oid(inode->data_vdi_id[i], i));
+				oid);
 			continue;
 		}
 
-		ret = remove_object(dw->vnodes, dw->epoch,
-			      vid_to_data_oid(inode->data_vdi_id[i], i),
-			      nr_copies);
+		ret = remove_object(dw->vnodes, dw->epoch, oid, nr_copies);
 
 		if (ret != SD_RES_SUCCESS)
-			dw->delete_error = 1;
-		else
-			inode->data_vdi_id[i] = 0;
+			eprintf("remove object %" PRIx64 " fail, %d\n", oid, ret);
 	}
 
-	if (!dw->delete_error && *(inode->name) == '\0')
+	if (*(inode->name) == '\0')
 		goto out;
 
 	inode->vdi_size = 0;
-	if (!dw->delete_error)
-		memset(inode->name, 0, sizeof(inode->name));
+	memset(inode->name, 0, sizeof(inode->name));
 
 	write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
 		     (void *)inode, sizeof(*inode), 0, 0, nr_copies, 0);
