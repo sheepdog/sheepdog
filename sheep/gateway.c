@@ -20,7 +20,7 @@
  *
  * Return success if any read succeed.
  */
-int forward_read_obj_req(struct request *req)
+static int forward_read_obj_req(struct request *req)
 {
 	int i, ret = SD_RES_SUCCESS;
 	unsigned wlen, rlen;
@@ -220,7 +220,7 @@ write_info_advance(struct write_info *wi, struct sd_vnode *v,
 	wi->nr_sent++;
 }
 
-int forward_write_obj_req(struct request *req)
+static int forward_write_obj_req(struct request *req)
 {
 	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
