@@ -56,8 +56,7 @@ static int create_vdi_obj(struct vnode_info *vnode_info, uint32_t epoch,
 		nr_copies = copies;
 
 	if (base_vid) {
-		ret = read_object(vnode_info, epoch,
-				  vid_to_vdi_oid(base_vid), (char *)base,
+		ret = read_object(vid_to_vdi_oid(base_vid), (char *)base,
 				  sizeof(*base), 0, nr_copies);
 		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_BASE_VDI_READ;
@@ -72,8 +71,7 @@ static int create_vdi_obj(struct vnode_info *vnode_info, uint32_t epoch,
 			vprintf(SDOG_INFO, "tree snapshot %s %" PRIx32 " %" PRIx32 "\n",
 				name, cur_vid, base_vid);
 
-			ret = read_object(vnode_info, epoch,
-					  vid_to_vdi_oid(cur_vid), (char *)cur,
+			ret = read_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 					  SD_INODE_HEADER_SIZE, 0, nr_copies);
 			if (ret != SD_RES_SUCCESS) {
 				vprintf(SDOG_ERR, "failed\n");
@@ -115,8 +113,7 @@ static int create_vdi_obj(struct vnode_info *vnode_info, uint32_t epoch,
 	}
 
 	if (is_snapshot && cur_vid != base_vid) {
-		ret = write_object(vnode_info, epoch,
-				   vid_to_vdi_oid(cur_vid), (char *)cur,
+		ret = write_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 				   SD_INODE_HEADER_SIZE, 0, 0, nr_copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
@@ -126,8 +123,7 @@ static int create_vdi_obj(struct vnode_info *vnode_info, uint32_t epoch,
 	}
 
 	if (base_vid) {
-		ret = write_object(vnode_info, epoch,
-				   vid_to_vdi_oid(base_vid), (char *)base,
+		ret = write_object(vid_to_vdi_oid(base_vid), (char *)base,
 				   SD_INODE_HEADER_SIZE, 0, 0, nr_copies, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
@@ -136,8 +132,7 @@ static int create_vdi_obj(struct vnode_info *vnode_info, uint32_t epoch,
 		}
 	}
 
-	ret = write_object(vnode_info, epoch,
-			   vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
+	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
 			   0, 0, nr_copies, 1);
 	if (ret != 0)
 		ret = SD_RES_VDI_WRITE;
@@ -170,8 +165,7 @@ static int find_first_vdi(struct vnode_info *vnode_info, uint32_t epoch,
 	nr_copies = get_nr_copies(vnode_info);
 
 	for (i = start; i >= end; i--) {
-		ret = read_object(vnode_info, epoch,
-				  vid_to_vdi_oid(i), (char *)inode,
+		ret = read_object(vid_to_vdi_oid(i), (char *)inode,
 				  SD_INODE_HEADER_SIZE, 0, nr_copies);
 		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_EIO;
@@ -405,8 +399,8 @@ static int delete_inode(struct deletion_work *dw)
 
 	nr_copies = get_nr_copies(dw->vnodes);
 
-	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(dw->vid),
-			  (char *)inode, SD_INODE_HEADER_SIZE, 0, nr_copies);
+	ret = read_object(vid_to_vdi_oid(dw->vid), (char *)inode,
+			  SD_INODE_HEADER_SIZE, 0, nr_copies);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -414,9 +408,8 @@ static int delete_inode(struct deletion_work *dw)
 
 	memset(inode->name, 0, sizeof(inode->name));
 
-	ret = write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(dw->vid),
-			   (char *)inode, SD_INODE_HEADER_SIZE, 0, 0,
-			   nr_copies, 0);
+	ret = write_object(vid_to_vdi_oid(dw->vid), (char *)inode,
+			   SD_INODE_HEADER_SIZE, 0, 0, nr_copies, 0);
 	if (ret != 0) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -446,7 +439,7 @@ static void delete_one(struct work *work)
 
 	nr_copies = get_nr_copies(dw->vnodes);
 
-	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
+	ret = read_object(vid_to_vdi_oid(vdi_id),
 			  (void *)inode, sizeof(*inode),
 			  0, nr_copies);
 
@@ -472,7 +465,7 @@ static void delete_one(struct work *work)
 			continue;
 		}
 
-		ret = remove_object(dw->vnodes, dw->epoch, oid, nr_copies);
+		ret = remove_object(oid, nr_copies);
 
 		if (ret != SD_RES_SUCCESS)
 			eprintf("remove object %" PRIx64 " fail, %d\n", oid, ret);
@@ -484,8 +477,8 @@ static void delete_one(struct work *work)
 	inode->vdi_size = 0;
 	memset(inode->name, 0, sizeof(inode->name));
 
-	write_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vdi_id),
-		     (void *)inode, sizeof(*inode), 0, 0, nr_copies, 0);
+	write_object(vid_to_vdi_oid(vdi_id), (void *)inode,
+		     sizeof(*inode), 0, 0, nr_copies, 0);
 out:
 	free(inode);
 }
@@ -533,9 +526,8 @@ static int fill_vdi_list(struct deletion_work *dw, uint32_t root_vid)
 	dw->buf[dw->count++] = root_vid;
 again:
 	vid = dw->buf[done++];
-	ret = read_object(dw->vnodes, dw->epoch, vid_to_vdi_oid(vid),
-			  (char *)inode, SD_INODE_HEADER_SIZE, 0,
-			  nr_copies);
+	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+			  SD_INODE_HEADER_SIZE, 0, nr_copies);
 
 	if (ret != SD_RES_SUCCESS) {
 		eprintf("cannot find VDI object\n");
@@ -578,7 +570,7 @@ static uint64_t get_vdi_root(struct vnode_info *vnode_info, uint32_t epoch,
 		goto out;
 	}
 next:
-	ret = read_object(vnode_info, epoch, vid_to_vdi_oid(vid), (char *)inode,
+	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, nr_copies);
 
 	if (vid == inode->vdi_id && inode->snap_id == 1
@@ -709,12 +701,11 @@ int get_vdi_attr(struct vnode_info *vnode_info, uint32_t epoch,
 	end = *attrid - 1;
 	while (*attrid != end) {
 		oid = vid_to_attr_oid(vid, *attrid);
-		ret = read_object(vnode_info, epoch, oid, (char *)&tmp_attr,
+		ret = read_object(oid, (char *)&tmp_attr,
 				  sizeof(tmp_attr), 0, nr_copies);
 
 		if (ret == SD_RES_NO_OBJ && wr) {
-			ret = write_object(vnode_info, epoch, oid,
-					   (char *)vattr, data_len, 0, 0,
+			ret = write_object(oid, (char *)vattr, data_len, 0, 0,
 					   nr_copies, 1);
 			if (ret)
 				ret = SD_RES_EIO;
@@ -734,8 +725,7 @@ int get_vdi_attr(struct vnode_info *vnode_info, uint32_t epoch,
 			if (excl)
 				ret = SD_RES_VDI_EXIST;
 			else if (delete) {
-				ret = write_object(vnode_info,
-						   epoch, oid, (char *)"", 1,
+				ret = write_object(oid, (char *)"", 1,
 						   offsetof(struct sheepdog_vdi_attr, name),
 						   0, nr_copies, 0);
 				if (ret)
@@ -743,8 +733,7 @@ int get_vdi_attr(struct vnode_info *vnode_info, uint32_t epoch,
 				else
 					ret = SD_RES_SUCCESS;
 			} else if (wr) {
-				ret = write_object(vnode_info,
-						   epoch, oid, (char *)vattr,
+				ret = write_object(oid, (char *)vattr,
 						   SD_ATTR_OBJ_SIZE, 0, 0,
 						   nr_copies, 0);
 

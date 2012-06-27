@@ -513,8 +513,7 @@ int init_store(const char *d, int enable_write_cache)
 /*
  * Write data to both local object cache (if enabled) and backends
  */
-int write_object(struct vnode_info *vnodes, uint32_t epoch,
-		 uint64_t oid, char *data, unsigned int datalen,
+int write_object(uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr_copies, int create)
 {
 	struct sd_req hdr;
@@ -522,7 +521,7 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
 		ret = object_cache_write(oid, data, datalen, offset,
-			flags, nr_copies, epoch, create);
+			flags, nr_copies, create);
 		if (ret != 0) {
 			eprintf("write cache failed %"PRIx64" %"PRIx32"\n",
 				oid, ret);
@@ -532,7 +531,7 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
 
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
-	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
@@ -549,8 +548,7 @@ int write_object(struct vnode_info *vnodes, uint32_t epoch,
  * Read data firstly from local object cache(if enabled), if fail,
  * try read backends
  */
-int read_object(struct vnode_info *vnodes, uint32_t epoch,
-		uint64_t oid, char *data, unsigned int datalen,
+int read_object(uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr_copies)
 {
 	struct sd_req hdr;
@@ -558,7 +556,7 @@ int read_object(struct vnode_info *vnodes, uint32_t epoch,
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
 		ret = object_cache_read(oid, data, datalen, offset,
-					nr_copies, epoch);
+					nr_copies);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("try forward read %"PRIx64" %"PRIx32"\n",
 				oid, ret);
@@ -581,8 +579,7 @@ forward_read:
 	return ret;
 }
 
-int remove_object(struct vnode_info *vnodes, uint32_t epoch,
-		  uint64_t oid, int nr)
+int remove_object(uint64_t oid, int nr)
 {
 	struct sd_req hdr;
 	int ret;

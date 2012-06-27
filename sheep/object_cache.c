@@ -549,8 +549,8 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int push_cache_object(struct vnode_info *vnode_info, uint32_t vid,
-			     uint32_t idx, uint64_t bmap, int create)
+static int push_cache_object(uint32_t vid, uint32_t idx,
+			     uint64_t bmap, int create)
 {
 	struct sd_req hdr;
 	void *buf;
@@ -610,8 +610,7 @@ out:
 }
 
 /* Push back all the dirty objects to sheep cluster storage */
-static int object_cache_push(struct vnode_info *vnode_info,
-			     struct object_cache *oc)
+static int object_cache_push(struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
 	struct rb_root *inactive_dirty_tree;
@@ -630,7 +629,7 @@ static int object_cache_push(struct vnode_info *vnode_info,
 	 * request is issued in one of gateway worker threads
 	 * So we need not to protect inactive dirty tree and list */
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
-		ret = push_cache_object(vnode_info, oc->vid, entry->idx,
+		ret = push_cache_object(oc->vid, entry->idx,
 					entry->bmap, entry->create);
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
@@ -718,7 +717,7 @@ static int object_cache_flush_and_delete(struct vnode_info *vnode_info,
 		idx = strtoul(d->d_name, NULL, 16);
 		if (idx == ULLONG_MAX)
 			continue;
-		if (push_cache_object(vnode_info, vid, idx, all, 1) !=
+		if (push_cache_object(vid, idx, all, 1) !=
 				SD_RES_SUCCESS) {
 			dprintf("failed to push %"PRIx64"\n",
 				idx_to_oid(vid, idx));
@@ -790,7 +789,7 @@ int object_cache_handle_request(struct request *req)
 
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, int copies,
-		       uint32_t epoch, int create)
+		       int create)
 {
 	int ret;
 	struct request *req;
@@ -825,7 +824,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 }
 
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
-		      uint64_t offset, int copies, uint32_t epoch)
+		      uint64_t offset, int copies)
 {
 	int ret;
 	struct request *req;
@@ -861,7 +860,7 @@ static void object_cache_flush_vdi_fn(struct work *work)
 	struct flush_work *fw = container_of(work, struct flush_work, work);
 
 	dprintf("flush vdi %"PRIx32"\n", fw->cache->vid);
-	if (object_cache_push(fw->vnode_info, fw->cache) != SD_RES_SUCCESS)
+	if (object_cache_push(fw->cache) != SD_RES_SUCCESS)
 		eprintf("failed to flush vdi %"PRIx32"\n", fw->cache->vid);
 }
 
@@ -896,7 +895,7 @@ int object_cache_flush_vdi(struct request *req)
 		return SD_RES_SUCCESS;
 	}
 
-	return object_cache_push(req->vnodes, cache);
+	return object_cache_push(cache);
 }
 
 int object_cache_flush_and_del(struct request *req)

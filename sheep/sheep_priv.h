@@ -287,14 +287,11 @@ bool oid_in_recovery(uint64_t oid);
 int is_recovery_init(void);
 int node_in_recovery(void);
 
-int write_object(struct vnode_info *vnodes, uint32_t node_version,
-		 uint64_t oid, char *data, unsigned int datalen,
+int write_object(uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, int nr, int create);
-int read_object(struct vnode_info *vnodes, uint32_t node_version,
-		uint64_t oid, char *data, unsigned int datalen,
+int read_object(uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr);
-int remove_object(struct vnode_info *vnodes, uint32_t node_version,
-		  uint64_t oid, int nr);
+int remove_object(uint64_t oid, int nr);
 
 void del_sheep_fd(int fd);
 int get_sheep_fd(uint8_t *addr, uint16_t port, int node_idx, uint32_t epoch);
@@ -400,10 +397,10 @@ int object_is_cached(uint64_t oid);
 
 int object_cache_handle_request(struct request *req);
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, uint16_t flags, int copies, uint32_t epoch,
-		int create);
+		       uint64_t offset, uint16_t flags, int copies,
+		       int create);
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int copies, uint32_t epoch);
+		uint64_t offset, int copies);
 int object_cache_flush_vdi(struct request *req);
 int object_cache_flush_and_del(struct request *req);
 void object_cache_delete(uint32_t vid);
