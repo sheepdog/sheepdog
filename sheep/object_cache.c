@@ -494,11 +494,9 @@ out:
 }
 
 /* Fetch the object, cache it in success */
-static int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
-			     uint32_t idx)
+static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
-	struct request read_req;
-	struct sd_req *hdr = &read_req.rq;
+	struct sd_req hdr = { 0 };
 	int ret = SD_RES_NO_MEM;
 	uint64_t oid;
 	uint32_t data_length;
@@ -517,20 +515,12 @@ static int object_cache_pull(struct vnode_info *vnodes, struct object_cache *oc,
 		eprintf("failed to allocate memory\n");
 		goto out;
 	}
-	memset(&read_req, 0, sizeof(read_req));
-	hdr->opcode = SD_OP_READ_OBJ;
-	hdr->data_length = data_length;
-	hdr->epoch = sys_epoch();
 
-	hdr->obj.oid = oid;
-	hdr->obj.offset = 0;
-	hdr->obj.copies = get_nr_copies(vnodes);
-
-	read_req.data = buf;
-	read_req.op = get_sd_op(hdr->opcode);
-	read_req.vnodes = vnodes;
-
-	ret = forward_read_obj_req(&read_req);
+	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.data_length = data_length;
+	hdr.obj.oid = oid;
+	hdr.obj.offset = 0;
+	ret = exec_local_req(&hdr, buf, data_length);
 
 	if (ret == SD_RES_SUCCESS) {
 		dprintf("oid %"PRIx64" pulled successfully\n", oid);
@@ -780,7 +770,7 @@ int object_cache_handle_request(struct request *req)
 		create = 1;
 
 	if (object_cache_lookup(cache, idx, create) < 0) {
-		ret = object_cache_pull(req->vnodes, cache, idx);
+		ret = object_cache_pull(cache, idx);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
