@@ -406,12 +406,17 @@ void object_cache_delete(uint32_t vid);
 int object_cache_init(const char *p);
 
 /* sockfd_cache */
+struct sockfd {
+	int fd;
+	int idx;
+};
+
 void sockfd_cache_del(struct node_id *);
 void sockfd_cache_add(struct node_id *);
 void sockfd_cache_add_group(struct sd_node *nodes, int nr);
 
-int sheep_get_fd(struct node_id *, int *);
-void sheep_put_fd(struct node_id *, int fd, int);
-void sheep_del_fd(struct node_id *, int fd, int);
+struct sockfd *sheep_get_sockfd(struct node_id *);
+void sheep_put_sockfd(struct node_id *, struct sockfd *);
+void sheep_del_sockfd(struct node_id *, struct sockfd *);
 
 #endif

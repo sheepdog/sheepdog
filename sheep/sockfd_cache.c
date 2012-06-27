@@ -272,30 +272,35 @@ void sockfd_cache_add(struct node_id *nid)
 	dprintf("%s:%d, count %d\n", name, nid->port, n);
 }
 
-static int sockfd_cache_get(struct node_id *nid, char *name, int *ret_idx)
+static struct sockfd *sockfd_cache_get(struct node_id *nid, char *name)
 {
 	struct sockfd_cache_entry *entry;
-	int fd;
+	struct sockfd *sfd;
+	int fd, idx;
 
-	entry = sockfd_cache_grab(nid, name, ret_idx);
+	entry = sockfd_cache_grab(nid, name, &idx);
 	if (!entry)
-		return -1;
+		return NULL;
 
-	if (entry->fd[*ret_idx] != -1) {
-		dprintf("%s:%d, idx %d\n", name, nid->port, *ret_idx);
-		return entry->fd[*ret_idx];
+	if (entry->fd[idx] != -1) {
+		dprintf("%s:%d, idx %d\n", name, nid->port, idx);
+		goto out;
 	}
 
 	/* Create a new cached connection for this vnode */
-	dprintf("create connection %s:%d idx %d\n", name, nid->port, *ret_idx);
+	dprintf("create connection %s:%d idx %d\n", name, nid->port, idx);
 	fd = connect_to(name, nid->port);
 	if (fd < 0) {
-		uatomic_dec(&entry->fd_in_use[*ret_idx]);
-		return -1;
+		uatomic_dec(&entry->fd_in_use[idx]);
+		return NULL;
 	}
-	entry->fd[*ret_idx] = fd;
+	entry->fd[idx] = fd;
 
-	return fd;
+out:
+	sfd = xmalloc(sizeof(*sfd));
+	sfd->fd = entry->fd[idx];
+	sfd->idx = idx;
+	return sfd;
 }
 
 static void sockfd_cache_put(struct node_id *nid, int idx)
@@ -317,70 +322,80 @@ static void sockfd_cache_put(struct node_id *nid, int idx)
 }
 
 /*
- * Return a FD connected to the vnode to the caller
+ * Return a sockfd connected to the vnode to the caller
  *
  * Try to get a 'long' FD as best, which is cached and never closed. If no FD
  * available, we return a 'short' FD which is supposed to be closed by
- * sheep_get_put().
+ * sheep_get_sockput().
  *
  * ret_idx is opaque to the caller, -1 indicates it is a short FD.
  */
-int sheep_get_fd(struct node_id *nid, int *ret_idx)
+struct sockfd *sheep_get_sockfd(struct node_id *nid)
 {
 	char name[INET6_ADDRSTRLEN];
+	struct sockfd *sfd;
 	int fd;
 
 	addr_to_str(name, sizeof(name), nid->addr, 0);
-	fd = sockfd_cache_get(nid, name, ret_idx);
-	if (fd != -1)
-		return fd;
+	sfd = sockfd_cache_get(nid, name);
+	if (sfd)
+		return sfd;
 
 	/* Create a fd that is to be closed */
 	fd = connect_to(name, nid->port);
 	if (fd < 0) {
 		dprintf("failed connect to %s:%d\n", name, nid->port);
-		return -1;
+		return NULL;
 	}
 
+	sfd = xmalloc(sizeof(*sfd));
+	sfd->idx = -1;
+	sfd->fd = fd;
 	dprintf("%d\n", fd);
-	return fd;
+	return sfd;
 }
 
 /*
- * Rlease a FD connected to the vnode, which is acquired from sheep_get_fd()
+ * Rlease a sockfd connected to the vnode, which is acquired from
+ * sheep_get_sockfd()
  *
  * If it is a long FD, just decrease the refcount to make it available again.
  * If it is a short FD, close it.
  *
- * sheep_put_fd() or sheep_del_fd() should be paired with sheep_get_fd()
+ * sheep_put_sockfd() or sheep_del_sockfd() should be paired with
+ * sheep_get_sockfd()
  */
 
-void sheep_put_fd(struct node_id *nid, int fd, int idx)
+void sheep_put_sockfd(struct node_id *nid, struct sockfd *sfd)
 {
-	if (idx == -1) {
-		dprintf("%d\n", fd);
-		close(fd);
+	if (sfd->idx == -1) {
+		dprintf("%d\n", sfd->fd);
+		close(sfd->fd);
+		free(sfd);
 		return;
 	}
 
-	sockfd_cache_put(nid, idx);
+	sockfd_cache_put(nid, sfd->idx);
+	free(sfd);
 }
 
 /*
- * Delete a FD connected to the vnode, when vnode is crashed.
+ * Delete a sockfd connected to the vnode, when vnode is crashed.
  *
  * If it is a long FD, de-refcount it and tres to destroy all the cached FDs of
  * this vnode in the cache.
  * If it is a short FD, just close it.
  */
-void sheep_del_fd(struct node_id *nid, int fd, int idx)
+void sheep_del_sockfd(struct node_id *nid, struct sockfd *sfd)
 {
-	if (idx == -1) {
-		dprintf("%d\n", fd);
-		close(fd);
+	if (sfd->idx == -1) {
+		dprintf("%d\n", sfd->fd);
+		close(sfd->fd);
+		free(sfd);
 		return;
 	}
 
-	sockfd_cache_put(nid, idx);
+	sockfd_cache_put(nid, sfd->idx);
 	sockfd_cache_del(nid);
+	free(sfd);
 }

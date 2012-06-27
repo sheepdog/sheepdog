@@ -22,7 +22,7 @@
  */
 int forward_read_obj_req(struct request *req)
 {
-	int i, fd, ret = SD_RES_SUCCESS;
+	int i, ret = SD_RES_SUCCESS;
 	unsigned wlen, rlen;
 	struct sd_req fwd_hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&fwd_hdr;
@@ -59,15 +59,15 @@ read_remote:
 	 */
 	j = random();
 	for (i = 0; i < nr_copies; i++) {
+		struct sockfd *sfd;
 		int idx = (i + j) % nr_copies;
-		int sock_idx;
 
 		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
 			continue;
 
-		fd = sheep_get_fd(&v->nid, &sock_idx);
-		if (fd < 0) {
+		sfd = sheep_get_sockfd(&v->nid);
+		if (!sfd) {
 			ret = SD_RES_NETWORK_ERROR;
 			continue;
 		}
@@ -75,23 +75,23 @@ read_remote:
 		wlen = 0;
 		rlen = fwd_hdr.data_length;
 
-		ret = exec_req(fd, &fwd_hdr, req->data, &wlen, &rlen);
+		ret = exec_req(sfd->fd, &fwd_hdr, req->data, &wlen, &rlen);
 
 		if (!ret && rsp->result == SD_RES_SUCCESS) {
 			memcpy(&req->rp, rsp, sizeof(*rsp));
 			ret = rsp->result;
-			sheep_put_fd(&v->nid, fd, sock_idx);
+			sheep_put_sockfd(&v->nid, sfd);
 			break; /* Read success */
 		}
 
 		if (ret) {
 			dprintf("remote node might have gone away");
-			sheep_del_fd(&v->nid, fd, sock_idx);
+			sheep_del_sockfd(&v->nid, sfd);
 			ret = SD_RES_NETWORK_ERROR;
 		} else {
 			ret = rsp->result;
 			eprintf("remote read fail %x\n", ret);
-			sheep_put_fd(&v->nid, fd, sock_idx);
+			sheep_put_sockfd(&v->nid, sfd);
 		}
 		/* Reset the hdr for next read */
 		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
@@ -100,37 +100,48 @@ read_remote:
 	return ret;
 }
 
+struct write_info_entry {
+	struct pollfd pfd;
+	struct node_id *nid;
+	struct sockfd *sfd;
+};
+
 struct write_info {
-	struct pollfd pfds[SD_MAX_REDUNDANCY];
-	struct sd_vnode *vnodes[SD_MAX_REDUNDANCY];
-	int sock_idx[SD_MAX_REDUNDANCY];
+	struct write_info_entry ent[SD_MAX_REDUNDANCY];
 	int nr_sent;
 };
 
-static inline void update_write_info(struct write_info *wi, int pos)
+static inline void write_info_update(struct write_info *wi, int pos)
 {
 	dprintf("%d, %d\n", wi->nr_sent, pos);
 	wi->nr_sent--;
-	memmove(wi->pfds + pos, wi->pfds + pos + 1,
-		sizeof(struct pollfd) * (wi->nr_sent - pos));
-	memmove(wi->vnodes + pos, wi->vnodes + pos + 1,
-		sizeof(struct sd_vnode *) * (wi->nr_sent - pos));
-	memmove(wi->sock_idx + pos, wi->sock_idx + pos + 1,
-		sizeof(int) * (wi->nr_sent - pos));
+	memmove(wi->ent + pos, wi->ent + pos + 1,
+		sizeof(struct write_info_entry) * (wi->nr_sent - pos));
 }
 
 static inline void finish_one_write(struct write_info *wi, int i)
 {
-	sheep_put_fd(&wi->vnodes[i]->nid, wi->pfds[i].fd,
-		     wi->sock_idx[i]);
-	update_write_info(wi, i);
+	sheep_put_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
+	write_info_update(wi, i);
 }
 
 static inline void finish_one_write_err(struct write_info *wi, int i)
 {
-	sheep_del_fd(&wi->vnodes[i]->nid, wi->pfds[i].fd,
-		     wi->sock_idx[i]);
-	update_write_info(wi, i);
+	sheep_del_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
+	write_info_update(wi, i);
+}
+
+struct pfd_info {
+	struct pollfd pfds[SD_MAX_REDUNDANCY];
+	int nr;
+};
+
+static inline void pfd_info_init(struct write_info *wi, struct pfd_info *pi)
+{
+	int i;
+	for (i = 0; i < wi->nr_sent; i++)
+		pi->pfds[i] = wi->ent[i].pfd;
+	pi->nr = wi->nr_sent;
 }
 
 /*
@@ -144,8 +155,10 @@ static inline void finish_one_write_err(struct write_info *wi, int i)
 static int wait_forward_write(struct write_info *wi, struct sd_rsp *rsp)
 {
 	int nr_sent, err_ret = SD_RES_SUCCESS, ret, pollret, i;
+	struct pfd_info pi;;
 again:
-	pollret = poll(wi->pfds, wi->nr_sent, -1);
+	pfd_info_init(wi, &pi);
+	pollret = poll(pi.pfds, pi.nr, -1);
 	if (pollret < 0) {
 		if (errno == EINTR)
 			goto again;
@@ -155,16 +168,16 @@ again:
 
 	nr_sent = wi->nr_sent;
 	for (i = 0; i < nr_sent; i++)
-		if (wi->pfds[i].revents & POLLIN)
+		if (pi.pfds[i].revents & POLLIN)
 			break;
 	if (i < nr_sent) {
-		int re = wi->pfds[i].revents;
+		int re = pi.pfds[i].revents;
 		dprintf("%d, revents %x\n", i, re);
 		if (re & (POLLERR | POLLHUP | POLLNVAL)) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
 		} else if (re & POLLIN) {
-			if (do_read(wi->pfds[i].fd, rsp, sizeof(*rsp))) {
+			if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp))) {
 				eprintf("remote node might have gone away\n");
 				err_ret = SD_RES_NETWORK_ERROR;
 				finish_one_write_err(wi, i);
@@ -188,19 +201,28 @@ finish_write:
 	return err_ret;
 }
 
-static void init_write_info(struct write_info *wi)
+static inline void write_info_init(struct write_info *wi)
 {
 	int i;
-	for (i = 0; i < SD_MAX_REDUNDANCY; i++) {
-		wi->pfds[i].fd = -1;
-		wi->vnodes[i] = NULL;
-	}
+	for (i = 0; i < SD_MAX_REDUNDANCY; i++)
+		wi->ent[i].pfd.fd = -1;
 	wi->nr_sent = 0;
+}
+
+static inline void
+write_info_advance(struct write_info *wi, struct sd_vnode *v,
+		   struct sockfd *sfd)
+{
+	wi->ent[wi->nr_sent].nid = &v->nid;
+	wi->ent[wi->nr_sent].pfd.fd = sfd->fd;
+	wi->ent[wi->nr_sent].pfd.events = POLLIN;
+	wi->ent[wi->nr_sent].sfd = sfd;
+	wi->nr_sent++;
 }
 
 int forward_write_obj_req(struct request *req)
 {
-	int i, fd, err_ret = SD_RES_SUCCESS, ret, local = -1;
+	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
 	struct sd_req fwd_hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
@@ -212,7 +234,7 @@ int forward_write_obj_req(struct request *req)
 
 	dprintf("%"PRIx64"\n", oid);
 
-	init_write_info(&wi);
+	write_info_init(&wi);
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 	fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
@@ -222,30 +244,28 @@ int forward_write_obj_req(struct request *req)
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
 	for (i = 0; i < nr_copies; i++) {
+		struct sockfd *sfd;
+
 		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
 			local = i;
 			continue;
 		}
 
-		fd = sheep_get_fd(&v->nid, &wi.sock_idx[wi.nr_sent]);
-		if (fd < 0) {
+		sfd = sheep_get_sockfd(&v->nid);
+		if (!sfd) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			break;
 		}
 
-		ret = send_req(fd, &fwd_hdr, req->data, &wlen);
+		ret = send_req(sfd->fd, &fwd_hdr, req->data, &wlen);
 		if (ret) {
-			sheep_del_fd(&v->nid, fd, wi.sock_idx[wi.nr_sent]);
+			sheep_del_sockfd(&v->nid, sfd);
 			err_ret = SD_RES_NETWORK_ERROR;
 			dprintf("fail %d\n", ret);
 			break;
 		}
-
-		wi.vnodes[wi.nr_sent] = v;
-		wi.pfds[wi.nr_sent].fd = fd;
-		wi.pfds[wi.nr_sent].events = POLLIN;
-		wi.nr_sent++;
+		write_info_advance(&wi, v, sfd);
 	}
 
 	if (local != -1 && err_ret == SD_RES_SUCCESS) {
