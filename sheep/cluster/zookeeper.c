@@ -330,7 +330,7 @@ static inline int zk_node_cmp(const void *a, const void *b)
 {
 	const struct zk_node *znode1 = a;
 	const struct zk_node *znode2 = b;
-	return node_cmp(&znode1->node, &znode2->node);
+	return node_id_cmp(&znode1->node.nid, &znode2->node.nid);
 }
 
 static void node_btree_add(void **btroot, struct zk_node *znode)

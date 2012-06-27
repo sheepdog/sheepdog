@@ -154,7 +154,7 @@ static int is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
 				int nr_nodes)
 {
 	if (bsearch(entry, nodes, nr_nodes, sizeof(struct sd_node),
-		    vnode_node_cmp))
+		    node_id_cmp))
 		return 0;
 	return 1;
 }
@@ -532,7 +532,7 @@ static void screen_object_list(struct recovery_work *rw,
 static int newly_joined(struct sd_node *node, struct recovery_work *rw)
 {
 	if (bsearch(node, rw->old_vnodes->nodes, rw->old_vnodes->nr_nodes,
-		    sizeof(struct sd_node), node_cmp))
+		    sizeof(struct sd_node), node_id_cmp))
 		return 0;
 	return 1;
 }

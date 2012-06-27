@@ -266,7 +266,8 @@ static int add_event(struct acrd_handle *ah, enum acrd_event_type type,
 		ev.nr_nodes++;
 		break;
 	case EVENT_LEAVE:
-		n = lfind(node, ev.nodes, &ev.nr_nodes, sizeof(*n), node_cmp);
+		n = lfind(node, ev.nodes, &ev.nr_nodes, sizeof(*n),
+			  node_id_cmp);
 		if (!n)
 			goto out;
 		idx = n - ev.nodes;

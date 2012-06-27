@@ -66,23 +66,6 @@ struct sockfd_cache_entry {
 	uint8_t fd_in_use[SOCKFD_CACHE_MAX_FD];
 };
 
-static inline int node_id_cmp(const void *a, const void *b)
-{
-	const struct node_id *node1 = a;
-	const struct node_id *node2 = b;
-	int cmp;
-
-	cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
-	if (cmp != 0)
-		return cmp;
-
-	if (node1->port < node2->port)
-		return -1;
-	if (node1->port > node2->port)
-		return 1;
-	return 0;
-}
-
 static struct sockfd_cache_entry *
 sockfd_cache_insert(struct sockfd_cache_entry *new)
 {

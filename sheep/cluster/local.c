@@ -231,7 +231,7 @@ static void add_event(enum local_event_type type, struct sd_node *node,
 		ev.nr_nodes++;
 		break;
 	case EVENT_LEAVE:
-		n = lfind(node, ev.nodes, &ev.nr_nodes, sizeof(*n), node_cmp);
+		n = lfind(node, ev.nodes, &ev.nr_nodes, sizeof(*n), node_id_cmp);
 		if (!n)
 			panic("internal error\n");
 		idx = n - ev.nodes;
