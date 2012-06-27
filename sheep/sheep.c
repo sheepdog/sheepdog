@@ -73,12 +73,12 @@ Options:\n\
   -g, --nr_gateway_worker set the number of workers for Guests' requests (default 4)\n\
   -G, --gateway           make the progam run as a gateway mode (same as '-v 0')\n\
   -h, --help              display this help and exit\n\
-  -i, --nr_io_worker      set the number of workers for sheep internal requests (default 4)\n\
+  -i, --nr_io_worker      set the number of workers for inter-sheep requests (default 4)\n\
   -l, --loglevel          specify the level of logging detail\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
   -v, --vnodes            specify the number of virtual nodes\n\
-  -W, --disable-cache     disable writecache\n\
+  -W, --disable-cache     disable object cache\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
 ", PACKAGE_VERSION, program_name);

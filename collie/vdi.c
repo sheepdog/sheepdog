@@ -1504,7 +1504,7 @@ out:
 }
 
 static struct subcommand vdi_cmd[] = {
-	{"check", "<vdiname>", "saph", "check and repare image's consistency",
+	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_check},
 	{"create", "<vdiname> <size>", "Paph", "create an image",
 	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},

@@ -45,7 +45,7 @@ static struct option const long_options[] = {
 	{"help", no_argument, NULL, 'h'},
 	{"foreground", no_argument, NULL, 'f'},
 	{"pagecache", no_argument, NULL, 'k'},
-	{"no-object-cache", no_argument, NULL, 'n'},
+	{"noobjectcache", no_argument, NULL, 'n'},
 	{"port", required_argument, NULL, 'p'},
 	{NULL, 0, NULL, 0},
 };
@@ -302,7 +302,7 @@ Options:\n\
   -d, --debug             enable debug output (implies -f)\n\
   -f, --foreground        sheepfs run in the foreground\n\
   -k, --pagecache         use local kernel's page cache to access volume\n\
-  -n  --no-object-cache   disable object cache of the attached volumes\n\
+  -n  --noobjectcache     disable object cache of the attached volumes\n\
   -p  --port              specify the sheep port (default: 7000)\n\
   -h, --help              display this help and exit\n\
 ");
