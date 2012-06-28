@@ -203,10 +203,9 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	put_socket_fd(vdi, sock_idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		sheepfs_pr(
-			"[%s] failed to %s object %" PRIx64 " ret %d, res %u\n",
-			__func__, rw == VOLUME_READ ? "read" : "write",
-			oid, ret, rsp->result);
+		sheepfs_pr("failed to %s object %" PRIx64 " ret %d, res %u\n",
+			   rw == VOLUME_READ ? "read" : "write",
+			   oid, ret, rsp->result);
 		return -1;
 	}
 
