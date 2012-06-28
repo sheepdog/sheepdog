@@ -904,7 +904,7 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 			memcpy(req->data, msg->data, msg->rsp.data_length);
 		memcpy(&req->rp, &msg->rsp, sizeof(req->rp));
 
-		req_done(req);
+		put_request(req);
 	}
 }
 

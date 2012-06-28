@@ -52,7 +52,7 @@ static void io_op_done(struct work *work)
 		leave_cluster();
 	}
 
-	req_done(req);
+	put_request(req);
 	return;
 }
 
@@ -89,7 +89,7 @@ static void gateway_op_done(struct work *work)
 		break;
 	}
 
-	req_done(req);
+	put_request(req);
 	return;
 retry:
 	requeue_request(req);
@@ -104,7 +104,7 @@ static void local_op_done(struct work *work)
 						 &req->rp, req->data);
 	}
 
-	req_done(req);
+	put_request(req);
 }
 
 static void do_local_request(struct work *work)
@@ -126,7 +126,7 @@ static int check_request_epoch(struct request *req)
 		/* ask gateway to retry. */
 		req->rp.result = SD_RES_OLD_NODE_VER;
 		req->rp.epoch = sys->epoch;
-		req_done(req);
+		put_request(req);
 		return -1;
 	} else if (after(req->rq.epoch, sys->epoch)) {
 		eprintf("new node version %u, %u, %x\n",
@@ -373,7 +373,7 @@ static void queue_request(struct request *req)
 
 	return;
 done:
-	req_done(req);
+	put_request(req);
 }
 
 static void requeue_request(struct request *req)
@@ -472,7 +472,7 @@ static void free_request(struct request *req)
 	free(req);
 }
 
-void req_done(struct request *req)
+void put_request(struct request *req)
 {
 	struct client_info *ci = req->ci;
 	eventfd_t value = 1;

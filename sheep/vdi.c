@@ -465,7 +465,7 @@ static void delete_one_done(struct work *work)
 
 	list_del(&dw->dw_siblings);
 
-	req_done(req);
+	put_request(req);
 
 	free(dw->buf);
 	free(dw);

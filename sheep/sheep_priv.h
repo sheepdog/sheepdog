@@ -293,7 +293,7 @@ int prealloc(int fd, uint32_t size);
 int objlist_cache_insert(uint64_t oid);
 void objlist_cache_remove(uint64_t oid);
 
-void req_done(struct request *req);
+void put_request(struct request *req);
 
 /* Operations */
 
