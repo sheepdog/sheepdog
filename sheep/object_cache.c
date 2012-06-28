@@ -85,6 +85,11 @@ static inline uint32_t object_cache_oid_to_idx(uint64_t oid)
 	return idx;
 }
 
+static inline int idx_has_vdi_bit(uint32_t idx)
+{
+	return idx & CACHE_VDI_BIT;
+}
+
 static uint64_t calc_object_bmap(size_t len, off_t offset)
 {
 	int start, end, nr;
@@ -293,7 +298,7 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		struct object_cache_entry *entry;
 		unsigned data_length;
 
-		if (idx & CACHE_VDI_BIT)
+		if (idx_has_vdi_bit(idx))
 			data_length = SD_INODE_SIZE;
 		else
 			data_length = SD_DATA_OBJ_SIZE;
@@ -327,7 +332,7 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf,
 	strbuf_addstr(&p, cache_dir);
 	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
 
-	if (sys->use_directio && !(idx & CACHE_VDI_BIT))
+	if (sys->use_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
@@ -372,7 +377,7 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf,
 	strbuf_addstr(&p, cache_dir);
 	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
 
-	if (sys->use_directio && !(idx & CACHE_VDI_BIT))
+	if (sys->use_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
@@ -496,7 +501,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	uint32_t data_length;
 	void *buf;
 
-	if (idx & CACHE_VDI_BIT) {
+	if (idx_has_vdi_bit(idx)) {
 		oid = vid_to_vdi_oid(oc->vid);
 		data_length = SD_INODE_SIZE;
 	} else {
@@ -527,7 +532,7 @@ out:
 
 static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 {
-	if (idx & CACHE_VDI_BIT)
+	if (idx_has_vdi_bit(idx))
 		return vid_to_vdi_oid(vid);
 	else
 		return vid_to_data_oid(vid, idx);
