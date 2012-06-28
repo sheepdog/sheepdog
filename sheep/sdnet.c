@@ -619,7 +619,7 @@ again:
 			list_for_each_entry_safe(conn, n, &sys->blocking_conn_list,
 						 blocking_siblings) {
 				dprintf("rx on %p\n", conn);
-				list_del(&conn->blocking_siblings);
+				list_del_init(&conn->blocking_siblings);
 				conn_rx_on(conn);
 			}
 		}
@@ -740,7 +740,7 @@ static void client_handler(int fd, int events, void *data)
 
 	if (is_conn_dead(&ci->conn)) {
 		if (!list_empty(&ci->conn.blocking_siblings))
-			list_del(&ci->conn.blocking_siblings);
+			list_del_init(&ci->conn.blocking_siblings);
 err:
 		dprintf("closed connection %d, %s:%d\n", fd,
 			ci->conn.ipstr, ci->conn.port);
