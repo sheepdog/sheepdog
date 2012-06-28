@@ -141,7 +141,7 @@ static int cluster_del_vdi(struct request *req)
 	uint32_t vid = 0, nr_copies = sys->nr_copies;
 	int ret;
 
-	ret = del_vdi(req->data, hdr->data_length,
+	ret = del_vdi(req, req->data, hdr->data_length,
 		      &vid, hdr->vdi.snapid, &nr_copies);
 
 	if (sys->enable_write_cache && ret == SD_RES_SUCCESS)

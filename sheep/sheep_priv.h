@@ -73,6 +73,7 @@ struct request {
 	struct list_head request_list;
 	struct list_head pending_list;
 
+	int refcnt;
 	int local;
 	int done;
 	int wait_efd;
@@ -209,8 +210,8 @@ int init_base_path(const char *dir);
 int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
 	    uint32_t base_vid, int is_snapshot, unsigned int *nr_copies);
 
-int del_vdi(char *data,	int data_len, uint32_t *vid, uint32_t snapid,
-	    unsigned int *nr_copies);
+int del_vdi(struct request *req, char *data, int data_len, uint32_t *vid,
+	    uint32_t snapid, unsigned int *nr_copies);
 
 int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
 	       unsigned int *nr_copies, uint64_t *ctime);

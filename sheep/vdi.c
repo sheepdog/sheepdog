@@ -305,10 +305,10 @@ int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
 			      cur_vid, next_snapid, is_snapshot);
 }
 
-static int start_deletion(uint32_t vid);
+static int start_deletion(struct request *req, uint32_t vid);
 
-int del_vdi(char *data, int data_len, uint32_t *vid, uint32_t snapid,
-	    unsigned int *nr_copies)
+int del_vdi(struct request *req, char *data, int data_len,
+	    uint32_t *vid, uint32_t snapid, unsigned int *nr_copies)
 {
 	char *name = data, *tag;
 	uint32_t dummy0;
@@ -330,7 +330,7 @@ int del_vdi(char *data, int data_len, uint32_t *vid, uint32_t snapid,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	ret = start_deletion(*vid);
+	ret = start_deletion(req, *vid);
 out:
 	return ret;
 }
@@ -351,6 +351,7 @@ struct deletion_work {
 
 	struct work work;
 	struct list_head dw_siblings;
+	struct request *req;
 
 	uint32_t vid;
 
@@ -454,6 +455,7 @@ out:
 static void delete_one_done(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
+	struct request *req = dw->req;
 
 	dw->done++;
 	if (dw->done < dw->count) {
@@ -462,6 +464,8 @@ static void delete_one_done(struct work *work)
 	}
 
 	list_del(&dw->dw_siblings);
+
+	req_done(req);
 
 	free(dw->buf);
 	free(dw);
@@ -561,7 +565,7 @@ out:
 	return vid;
 }
 
-static int start_deletion(uint32_t vid)
+static int start_deletion(struct request *req, uint32_t vid)
 {
 	struct deletion_work *dw = NULL;
 	int ret = SD_RES_NO_MEM, cloned;
@@ -578,6 +582,7 @@ static int start_deletion(uint32_t vid)
 
 	dw->count = 0;
 	dw->vid = vid;
+	dw->req = req;
 
 	dw->work.fn = delete_one;
 	dw->work.done = delete_one_done;
@@ -614,6 +619,7 @@ static int start_deletion(uint32_t vid)
 		goto out;
 	}
 
+	uatomic_inc(&req->refcnt);
 	list_add_tail(&dw->dw_siblings, &deletion_work_list);
 	queue_work(sys->deletion_wqueue, &dw->work);
 out:

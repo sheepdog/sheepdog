@@ -454,6 +454,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 	}
 
 	INIT_LIST_HEAD(&req->request_list);
+	uatomic_set(&req->refcnt, 1);
 
 	sys->nr_outstanding_reqs++;
 	sys->outstanding_data_size += data_length;
@@ -475,6 +476,9 @@ void req_done(struct request *req)
 {
 	struct client_info *ci = req->ci;
 	eventfd_t value = 1;
+
+	if (uatomic_sub_return(&req->refcnt, 1) > 0)
+		return;
 
 	if (req->local) {
 		req->done = 1;
