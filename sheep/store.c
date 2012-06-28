@@ -532,11 +532,12 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
+	hdr.data_length = datalen;
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
 
-	ret = exec_local_req(&hdr, data, datalen);
+	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to write object %" PRIx64 ", %x\n", oid, ret);
 
@@ -566,10 +567,11 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 forward_read:
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.data_length = datalen;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
 
-	ret = exec_local_req(&hdr, data, datalen);
+	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
 
@@ -585,7 +587,7 @@ int remove_object(uint64_t oid)
 	hdr.opcode = SD_OP_REMOVE_OBJ;
 	hdr.obj.oid = oid;
 
-	ret = exec_local_req(&hdr, NULL, 0);
+	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to remove object %" PRIx64 ", %x\n", oid, ret);
 

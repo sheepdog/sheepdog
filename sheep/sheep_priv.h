@@ -285,7 +285,7 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset);
 int remove_object(uint64_t oid);
 
-int exec_local_req(struct sd_req *rq, void *data, int data_length);
+int exec_local_req(struct sd_req *rq, void *data);
 void local_req_init(void);
 
 int prealloc(int fd, uint32_t size);

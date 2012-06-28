@@ -519,7 +519,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	hdr.data_length = data_length;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = 0;
-	ret = exec_local_req(&hdr, buf, data_length);
+	ret = exec_local_req(&hdr, buf);
 
 	if (ret == SD_RES_SUCCESS) {
 		dprintf("oid %"PRIx64" pulled successfully\n", oid);
@@ -584,10 +584,11 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = data_length;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
 
-	ret = exec_local_req(&hdr, buf, data_length);
+	ret = exec_local_req(&hdr, buf);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to push object %x\n", ret);
 

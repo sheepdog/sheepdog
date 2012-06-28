@@ -406,15 +406,19 @@ static struct request *alloc_local_request(void *data, int data_length)
 	return req;
 }
 
-int exec_local_req(struct sd_req *rq, void *data, int data_length)
+/*
+ * Exec the request locally and synchronously.
+ *
+ * This function takes advantage of gateway's retry mechanism.
+ */
+int exec_local_req(struct sd_req *rq, void *data)
 {
 	struct request *req;
 	eventfd_t value = 1;
 	int ret;
 
-	req = alloc_local_request(data, data_length);
+	req = alloc_local_request(data, rq->data_length);
 	req->rq = *rq;
-	req->rq.data_length = data_length;
 	req->wait_efd = eventfd(0, 0);
 
 	pthread_mutex_lock(&sys->wait_req_lock);
