@@ -323,10 +323,11 @@ static notrace void dolog(int prio, const char *func, int line,
 
 		vsnprintf(p, MAX_MSG_SIZE, fmt, ap);
 
-		if (log_name)
-			fprintf(stderr, "%s: %s(%d) %s", log_name, func, line, p);
+		if (worker_name)
+			fprintf(stderr, "[%s %d] %s(%d) %s", worker_name,
+				worker_idx, func, line, p);
 		else
-			fprintf(stderr, "%s(%d) %s", func, line, p);
+			fprintf(stderr, "[main] %s(%d) %s", func, line, p);
 
 		fflush(stderr);
 	}
