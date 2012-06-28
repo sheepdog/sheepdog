@@ -1,0 +1,147 @@
+.TH SHEEPDOG 2012-06-27
+.SH NAME
+collie \- Command line utility for the sheep daemon
+.SH SNYNOPSIS
+.B "collie <command> <subcommand> [options]"
+.SH DESCRIPTION
+.B collie
+- Sheepdog is a distributed storage system for KVM/QEMU. It provides
+highly available block level storage volumes to virtual machines.
+Sheepdog supports advanced volume management features such as snapshot,
+cloning, and thin provisioning. The architecture of Sheepdog is fully
+symmetric; there is no central node such as a meta-data server.
+
+The server daemon is called sheep(8).  A command line utility is available
+via collie(8).  KVM/QEMU virtual machines use the sheep daemon via a block
+driver available in qemu(1).
+
+For more information, run 'collie <command> <subcommand> --help'.
+.SH OPTIONS
+.TP
+.BI \-a "\fR, \fP" \--address
+This option specify the daemon address (default: localhost).
+.TP
+.BI \-p "\fR, \fP" \--port
+This option specify the daemon port.
+.TP
+.BI \-i "\fR, \fP" \--index
+This option specify the index of data objects.
+.TP
+.BI \-s "\fR, \fP" \--snapshot
+This option specify a snapshot id or tag name.
+.TP
+.BI \-P "\fR, \fP" \--prealloc
+This option preallocate all the data objects.
+.TP
+.BI \-r "\fR, \fP" \--raw
+This option set raw output mode: omit headers, separate fields with single spaces and print all sizes in decimal bytes.
+.TP
+.BI \-d "\fR, \fP" \--delete
+This option delete a key.
+.TP
+.BI \-x "\fR, \fP" \--exclusive
+This option write in an exclusive mode.
+.TP
+.BI \-b "\fR, \fP" \--store
+This option specify backend store.
+.TP
+.BI \-c "\fR, \fP" \--copies
+This option specify the data redundancy (number of copies).
+.TP
+.BI \-H "\fR, \fP" \--nohalt
+This option serve IO requests even if there are too few nodes for the configured redundancy.
+.TP
+.BI \-f "\fR, \fP" \--force
+Do not prompt for confirmation.
+.TP
+.BI \-R "\fR, \fP" \--restore
+This option restore the cluster.
+.TP
+.BI \-h "\fR, \fP" \--help
+Display help and exit.
+.SH COMMAND & SUBCOMMAND
+.TP
+.BI "vdi create [-P|--prealloc] [-a|--address address] [-p|--port port] [-h|--help] <vdiname> <size>"
+This command create an image.
+.TP
+.BI "vdi snapshot [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
+This command create a snapshot.
+.TP
+.BI "vdi check [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
+This command check and repair image's consistency.
+.TP
+.BI "vdi clone [-s snapshot] [-P] [-a address] [-p port] [-h] <src vdi> <dst vdi>"
+This command clone an image.
+.TP
+.BI "vdi delete [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
+This command delete an image.
+.TP
+.BI "vdi list [-a address] [-p port] [-r] [-h] [vdiname]"
+This command list images.
+.TP
+.BI "vdi track [-i index] [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
+This command show the object epoch trace in the image.
+.TP
+.BI "vdi tree [-a address] [-p port] [-h]"
+This command show images in tree view format.
+.TP
+.BI "vdi graph [-a address] [-p port] [-h]"
+This command show images in Graphviz dot format.
+.TP
+.BI "vdi object [-i index] [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
+This command show object information in the image.
+.TP
+.BI "vdi setattr [-d] [-x] [-a address] [-p port] [-h] <vdiname> <key> [value]"
+This command set a VDI attribute.
+.TP
+.BI "vdi getattr [-a address] [-p port] [-h] <vdiname> <key>"
+This command get a VDI attribute.
+.TP
+.BI "vdi resize [-a address] [-p port] [-h] <vdiname> <new size>"
+This command resize an image.
+.TP
+.BI "vdi read [-s snapshot] [-a address] [-p port] [-h] <vdiname> [<offset> [<len>]]"
+This command read data from an image.
+.TP
+.BI "vdi write [-a address] [-p port] [-h] <vdiname> [<offset> [<len>]]"
+This command write data to an image.
+.TP
+.BI "node list [-a address] [-p port] [-r] [-h]"
+This command list nodes.
+.TP
+.BI "node info [-a address] [-p port] [-r] [-h]"
+This command show information about each node.
+.TP
+.BI "node recovery [-a address] [-p port] [-r] [-h]"
+This command show nodes in recovery.
+.TP
+.BI "cluster info [-a address] [-p port] [-r] [-h]"
+This command show cluster information.
+.TP
+.BI "cluster format [-b store] [-c copies] [-H] [-a address] [-p port] [-h]"
+This command create a Sheepdog store.
+.TP
+.BI "cluster shutdown [-a address] [-p port] [-h]"
+This command stop Sheepdog.
+.TP
+.BI "cluster recover [-a address] [-f] [-p port] [-h]"
+This command manually recover the cluster.
+.TP
+.BI "cluster cleanup [-a address] [-p port] [-h]"
+This command cleanup the useless snapshot data from recovery.
+
+.SH DEPENDENCIES
+\fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z.
+
+.SH FILES
+none
+
+.SH SEE ALSO
+.BR sheep(8),
+.BR qemu(1),
+.BR corosync_overview(8)
+
+.SH AUTHORS
+This software is developed by the Sheepdog community which may be reached
+via mailing list at <sheepdog@lists.wpkg.org>.
+.PP
