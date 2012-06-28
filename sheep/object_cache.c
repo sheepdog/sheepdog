@@ -584,10 +584,8 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = sys->nr_copies;
 
 	ret = exec_local_req(&hdr, buf, data_length);
 	if (ret != SD_RES_SUCCESS)

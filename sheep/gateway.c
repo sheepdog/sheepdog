@@ -34,11 +34,7 @@ static int forward_read_obj_req(struct request *req)
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 	fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 
-	if (fwd_hdr.obj.copies)
-		nr_copies = fwd_hdr.obj.copies;
-	else
-		nr_copies = get_nr_copies(req->vnodes);
-
+	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
