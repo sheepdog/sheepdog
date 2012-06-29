@@ -89,9 +89,11 @@ read_remote:
 			eprintf("remote read fail %x\n", ret);
 			sheep_put_sockfd(&v->nid, sfd);
 		}
-		/* Reset the hdr for next read */
-		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-		fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
+		if (i + 1 != nr_copies) {
+			/* Reset the hdr for next read */
+			memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
+			fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
+		}
 	}
 	return ret;
 }
