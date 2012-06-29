@@ -400,9 +400,6 @@ static struct request *alloc_local_request(void *data, int data_length)
 
 	INIT_LIST_HEAD(&req->request_list);
 
-	sys->nr_outstanding_reqs++;
-	sys->outstanding_data_size += data_length;
-
 	return req;
 }
 
@@ -486,9 +483,6 @@ void put_request(struct request *req)
 
 	if (req->local) {
 		req->done = 1;
-		sys->nr_outstanding_reqs--;
-		sys->outstanding_data_size -= req->data_length;
-
 		eventfd_write(req->wait_efd, value);
 	} else {
 		if (conn_tx_on(&ci->conn)) {
