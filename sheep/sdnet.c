@@ -567,7 +567,6 @@ static void client_rx_handler(struct client_info *ci)
 		return;
 
 	/* now we have a complete command */
-	conn_rx_off(&ci->conn);
 
 	req = ci->rx_req;
 
@@ -617,7 +616,6 @@ again:
 	init_tx_hdr(ci);
 	if (!ci->tx_req) {
 		conn_tx_off(&ci->conn);
-		conn_rx_on(&ci->conn);
 		if (sys->outstanding_data_size < MAX_OUTSTANDING_DATA_SIZE) {
 			list_for_each_entry_safe(conn, n, &sys->blocking_conn_list,
 						 blocking_siblings) {
