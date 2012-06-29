@@ -81,7 +81,7 @@ read_remote:
 		}
 
 		if (ret) {
-			dprintf("remote node might have gone away");
+			dprintf("remote node might have gone away\n");
 			sheep_del_sockfd(&v->nid, sfd);
 			ret = SD_RES_NETWORK_ERROR;
 		} else {
