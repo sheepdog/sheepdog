@@ -732,11 +732,13 @@ static void client_handler(int fd, int events, void *data)
 		client_tx_handler(ci);
 
 	if (is_conn_dead(&ci->conn)) {
-		if (!list_empty(&ci->conn.blocking_siblings))
-			list_del_init(&ci->conn.blocking_siblings);
 err:
 		dprintf("closed connection %d, %s:%d\n", fd,
 			ci->conn.ipstr, ci->conn.port);
+
+		if (!list_empty(&ci->conn.blocking_siblings))
+			list_del_init(&ci->conn.blocking_siblings);
+
 		unregister_event(fd);
 		client_decref(ci);
 	}
