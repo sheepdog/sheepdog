@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/eventfd.h>
 #include <linux/types.h>
+#include <urcu/uatomic.h>
 
 #include "list.h"
 #include "util.h"
@@ -39,10 +40,61 @@ enum wq_state {
 	WQ_DEAD = (1U << 1),
 };
 
+/*
+ * Short thread is created on demand and destroyed after serving the work for
+ * gateway or io requests, aiming to solve two problems:
+ *
+ *  1. timeout of IO requests from guests. With on-demand short threads, we
+ *     guarantee that there is always one thread available to execute the
+ *     request as soon as possible.
+ *  2. sheep halt for corner case that all gateway and io threads are executing
+ *     local requests that ask for creation of another thread to execute the
+ *     requests and sleep-wait for responses.
+ */
+struct short_work {
+	struct work *work;
+	struct worker_info *wi;
+};
+
+static void *run_short_thread(void * arg)
+{
+	struct short_work *sw = arg;
+	eventfd_t value = 1;
+	static uint64_t idx = 0;
+
+	uatomic_inc(&idx);
+	set_thread_name(sw->wi->name, idx);
+
+	sw->work->fn(sw->work);
+
+	pthread_mutex_lock(&sw->wi->finished_lock);
+	list_add_tail(&sw->work->w_list, &sw->wi->finished_list);
+	pthread_mutex_unlock(&sw->wi->finished_lock);
+
+	eventfd_write(efd, value);
+	return NULL;
+}
+
+static inline void create_short_thread(struct worker_info *wi,
+				       struct work *work)
+{
+	pthread_t thread;
+	struct short_work *sw = xmalloc(sizeof *sw);
+
+	sw->work = work;
+	sw->wi = wi;
+	if (pthread_create(&thread, NULL, run_short_thread, sw))
+		panic("%m\n");
+}
+
 void queue_work(struct work_queue *q, struct work *work)
 {
 	struct worker_info *wi = container_of(q, struct worker_info, q);
 
+	if (!wi->nr_threads) {
+		create_short_thread(wi, work);
+		return;
+	}
 	pthread_mutex_lock(&wi->pending_lock);
 	list_add_tail(&work->w_list, &wi->q.pending_list);
 	pthread_mutex_unlock(&wi->pending_lock);
