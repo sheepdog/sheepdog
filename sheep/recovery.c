@@ -263,7 +263,16 @@ static inline void prepare_schedule_oid(uint64_t oid)
 	for (i = 0; i < rw->nr_prio_oids; i++)
 		if (rw->prio_oids[i] == oid )
 			return;
-
+	/*
+	 * We need this check because oid might not be recovered.
+	 * Very much unlikely though, but it might happen indeed.
+	 */
+	for (i = 0; i < rw->done; i++)
+		if (rw->oids[i] == oid) {
+			dprintf("%"PRIx64" not recovered, don't schedule it\n",
+				oid);
+			return;
+		}
 	/* The oid is currently being recovered */
 	if (rw->oids[rw->done] == oid)
 		return;
