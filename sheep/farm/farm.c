@@ -754,6 +754,7 @@ static int farm_purge_obj(void)
 {
 	if (cleanup_working_dir() < 0)
 		return SD_RES_EIO;
+	trunk_reset();
 
 	return SD_RES_SUCCESS;
 }

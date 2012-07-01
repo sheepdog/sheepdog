@@ -802,7 +802,7 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	if (msg->inc_epoch)
 		if (sd_store->purge_obj &&
 		    sd_store->purge_obj() != SD_RES_SUCCESS)
-			eprintf("WARN: may have stale objects\n");
+			panic("can't remove stale objects\n");
 
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
