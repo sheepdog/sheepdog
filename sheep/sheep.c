@@ -35,7 +35,7 @@ static struct option const long_options[] = {
 	{"debug", no_argument, NULL, 'd'},
 	{"directio", no_argument, NULL, 'D'},
 	{"foreground", no_argument, NULL, 'f'},
-	{"gateway", no_argument, NULL, 'G'},
+	{"gateway", no_argument, NULL, 'g'},
 	{"help", no_argument, NULL, 'h'},
 	{"loglevel", required_argument, NULL, 'l'},
 	{"myaddr", required_argument, NULL, 'y'},
@@ -47,7 +47,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfGhl:op:v:wy:z:";
+static const char *short_options = "c:dDfghl:op:v:wy:z:";
 
 static void usage(int status)
 {
@@ -63,7 +63,7 @@ Options:\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object from object cache\n\
   -f, --foreground        make the program run in the foreground\n\
-  -G, --gateway           make the progam run as a gateway mode (same as '-v 0')\n\
+  -g, --gateway           make the progam run as a gateway mode (same as '-v 0')\n\
   -h, --help              display this help and exit\n\
   -l, --loglevel          specify the level of logging detail\n\
   -o, --stdout            log to stdout instead of shared logger\n\
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 			dprintf("direct IO mode\n");
 			sys->use_directio = 1;
 			break;
-		case 'G':
+		case 'g':
 			/* same as '-v 0' */
 			nr_vnodes = 0;
 			break;
