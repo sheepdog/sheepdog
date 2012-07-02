@@ -22,6 +22,7 @@
 #include <urcu/uatomic.h>
 #include <pthread.h>
 
+#include "sheepdog_proto.h"
 #include "sheep.h"
 #include "strbuf.h"
 #include "sheepfs.h"
