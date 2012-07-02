@@ -31,7 +31,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "sheep.h"
 #include "sheep_priv.h"
 #include "list.h"
 #include "rbtree.h"

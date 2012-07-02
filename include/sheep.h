@@ -12,169 +12,17 @@
 #define __SHEEP_H__
 
 #include <stdint.h>
+#include "internal_proto.h"
 #include "util.h"
 #include "list.h"
 #include "net.h"
 #include "logger.h"
-
-#define SD_SHEEP_PROTO_VER 0x04
-
-#define SD_DEFAULT_REDUNDANCY 3
-#define SD_MAX_REDUNDANCY 8
-
-#define SD_MAX_COPIES 16
-#define SD_MAX_NODES 1024
-#define SD_DEFAULT_VNODES 64
-#define SD_MAX_VNODES 65536
-
-/*
- * Operations with opcodes above 0x80 are considered part of the inter-sheep
- * protocol and will in the near future be versioned independently of the
- * external sheepdog protocol.
- */
-#define SD_OP_DEL_VDI        0x81
-#define SD_OP_GET_NODE_LIST  0x82
-#define SD_OP_GET_VM_LIST    0x83
-#define SD_OP_MAKE_FS        0x84
-#define SD_OP_SHUTDOWN       0x85
-#define SD_OP_STAT_SHEEP     0x86
-#define SD_OP_STAT_CLUSTER   0x87
-#define SD_OP_KILL_NODE      0x88
-#define SD_OP_GET_VDI_ATTR   0x89
-#define SD_OP_RECOVER        0x8a
-#define SD_OP_GET_STORE_LIST 0x90
-#define SD_OP_SNAPSHOT       0x91
-#define SD_OP_RESTORE        0x92
-#define SD_OP_GET_SNAP_FILE  0x93
-#define SD_OP_CLEANUP        0x94
-#define SD_OP_TRACE          0x95
-#define SD_OP_TRACE_CAT      0x96
-#define SD_OP_STAT_RECOVERY  0x97
-#define SD_OP_FLUSH_DEL_CACHE  0x98
-
-#define SD_FLAG_CMD_IO_LOCAL   0x0010
-#define SD_FLAG_CMD_RECOVERY 0x0020
-
-/* set this flag when you want to read a VDI which is opened by
-   another client.  Note that the obtained data may not be the latest
-   one because Sheepdog cannot ensure strong consistency against
-   concurrent accesses to non-snapshot VDIs. */
-#define SD_FLAG_CMD_WEAK_CONSISTENCY 0x0040
-
-/* flags for VDI attribute operations */
-#define SD_FLAG_CMD_CREAT    0x0100
-#define SD_FLAG_CMD_EXCL     0x0200
-#define SD_FLAG_CMD_DEL      0x0400
-
-#define SD_RES_OLD_NODE_VER  0x41 /* Remote node has an old epoch */
-#define SD_RES_NEW_NODE_VER  0x42 /* Remote node has a new epoch */
-#define SD_RES_NOT_FORMATTED 0x43 /* Sheepdog is not formatted yet */
-#define SD_RES_INVALID_CTIME 0x44 /* Creation time of sheepdog is different */
-#define SD_RES_INVALID_EPOCH 0x45 /* Invalid epoch */
-
-#define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
-
-struct sd_so_req {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint64_t	oid;
-	uint64_t	ctime;
-	uint32_t	copies;
-	uint32_t	tag;
-	uint32_t	opcode_specific[2];
-};
-
-struct sd_so_rsp {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        result;
-	uint32_t	copies;
-	uint64_t	ctime;
-	uint64_t	oid;
-	uint32_t	opcode_specific[2];
-};
-
-struct sd_list_req {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        tgt_epoch;
-	uint32_t        pad[7];
-};
-
-struct sd_list_rsp {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        result;
-	uint32_t        pad[7];
-};
-
-struct sd_node_req {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t	request_ver;
-	uint32_t	pad[7];
-};
-
-struct sd_node_rsp {
-	uint8_t		proto_ver;
-	uint8_t		opcode;
-	uint16_t	flags;
-	uint32_t	epoch;
-	uint32_t        id;
-	uint32_t        data_length;
-	uint32_t        result;
-	uint32_t	nr_nodes;
-	uint32_t	local_idx;
-	uint32_t	master_idx;
-	uint64_t	store_size;
-	uint64_t	store_free;
-};
-
-struct node_id {
-	uint8_t addr[16];
-	uint16_t port;
-};
-
-struct sd_node {
-	struct node_id  nid;
-	uint16_t	nr_vnodes;
-	uint32_t	zone;
-};
 
 struct sd_vnode {
 	struct node_id  nid;
 	uint16_t	node_idx;
 	uint32_t	zone;
 	uint64_t        id;
-};
-
-struct epoch_log {
-	uint64_t ctime;
-	uint64_t time;
-	uint32_t epoch;
-	uint32_t nr_nodes;
-	uint32_t nr_copies;
-	struct sd_node nodes[SD_MAX_NODES];
 };
 
 #define TRACE_GRAPH_ENTRY  0x01

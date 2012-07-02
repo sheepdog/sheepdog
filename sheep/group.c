@@ -31,35 +31,6 @@ struct node {
 	struct list_head list;
 };
 
-struct join_message {
-	uint8_t proto_ver;
-	uint8_t nr_copies;
-	uint16_t nr_nodes;
-	uint16_t nr_failed_nodes;
-	uint16_t nr_delayed_nodes;
-	uint16_t cluster_flags;
-	uint32_t cluster_status;
-	uint32_t epoch;
-	uint64_t ctime;
-	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
-	uint8_t store[STORE_LEN];
-
-	/*
-	 * A joining sheep puts the local node list here, which is nr_nodes
-	 * entries long.  After the master replies it will contain the list of
-	 * nodes that attempted to join but failed the join process.  The
-	 * number of entries in that case is nr_failed_nodes, which by
-	 * defintion must be smaller than nr_nodes.
-	 */
-	struct sd_node nodes[];
-};
-
-struct vdi_op_message {
-	struct sd_req req;
-	struct sd_rsp rsp;
-	uint8_t data[0];
-};
-
 struct vdi_bitmap_work {
 	struct work work;
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);

@@ -25,18 +25,6 @@
 #include "rbtree.h"
 #include "strbuf.h"
 
-#define SD_OP_GET_OBJ_LIST   0xA1
-#define SD_OP_GET_EPOCH      0XA2
-
-#define SD_STATUS_OK                0x00000001
-#define SD_STATUS_WAIT_FOR_FORMAT   0x00000002
-#define SD_STATUS_WAIT_FOR_JOIN     0x00000004
-#define SD_STATUS_SHUTDOWN          0x00000008
-#define SD_STATUS_HALT              0x00000020
-
-#define SD_RES_NETWORK_ERROR    0x81 /* Network error between sheep */
-
-
 struct client_info {
 	struct connection conn;
 

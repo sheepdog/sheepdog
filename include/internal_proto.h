@@ -1,0 +1,215 @@
+/*
+ * Copyright (C) 2009-2011 Nippon Telegraph and Telephone Corporation.
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version
+ * 2 as published by the Free Software Foundation.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+#ifndef __INTERNAL_PROTO_H__
+#define __INTERNAL_PROTO_H__
+
+/*
+ * This file specified the sheepdog-internal protocol, which is spoken between
+ * sheepdog daemons, as well as between collie and sheepdog daemon for internal
+ * operations.
+ */
+
+#include <stdint.h>
+
+#define SD_SHEEP_PROTO_VER 0x04
+
+#define SD_DEFAULT_REDUNDANCY 3
+#define SD_MAX_REDUNDANCY 8
+
+#define SD_MAX_COPIES 16
+#define SD_MAX_NODES 1024
+#define SD_DEFAULT_VNODES 64
+#define SD_MAX_VNODES 65536
+
+/*
+ * Operations with opcodes above 0x80 are considered part of the inter-sheep
+ * protocol and will in the near future be versioned independently of the
+ * external sheepdog protocol.
+ */
+#define SD_OP_DEL_VDI        0x81
+#define SD_OP_GET_NODE_LIST  0x82
+#define SD_OP_GET_VM_LIST    0x83
+#define SD_OP_MAKE_FS        0x84
+#define SD_OP_SHUTDOWN       0x85
+#define SD_OP_STAT_SHEEP     0x86
+#define SD_OP_STAT_CLUSTER   0x87
+#define SD_OP_KILL_NODE      0x88
+#define SD_OP_GET_VDI_ATTR   0x89
+#define SD_OP_RECOVER        0x8a
+#define SD_OP_GET_STORE_LIST 0x90
+#define SD_OP_SNAPSHOT       0x91
+#define SD_OP_RESTORE        0x92
+#define SD_OP_GET_SNAP_FILE  0x93
+#define SD_OP_CLEANUP        0x94
+#define SD_OP_TRACE          0x95
+#define SD_OP_TRACE_CAT      0x96
+#define SD_OP_STAT_RECOVERY  0x97
+#define SD_OP_FLUSH_DEL_CACHE  0x98
+#define SD_OP_GET_OBJ_LIST   0xA1
+#define SD_OP_GET_EPOCH      0XA2
+
+
+
+#define SD_FLAG_CMD_IO_LOCAL   0x0010
+#define SD_FLAG_CMD_RECOVERY 0x0020
+
+/* set this flag when you want to read a VDI which is opened by
+   another client.  Note that the obtained data may not be the latest
+   one because Sheepdog cannot ensure strong consistency against
+   concurrent accesses to non-snapshot VDIs. */
+#define SD_FLAG_CMD_WEAK_CONSISTENCY 0x0040
+
+/* flags for VDI attribute operations */
+#define SD_FLAG_CMD_CREAT    0x0100
+#define SD_FLAG_CMD_EXCL     0x0200
+#define SD_FLAG_CMD_DEL      0x0400
+
+#define SD_RES_OLD_NODE_VER  0x41 /* Remote node has an old epoch */
+#define SD_RES_NEW_NODE_VER  0x42 /* Remote node has a new epoch */
+#define SD_RES_NOT_FORMATTED 0x43 /* Sheepdog is not formatted yet */
+#define SD_RES_INVALID_CTIME 0x44 /* Creation time of sheepdog is different */
+#define SD_RES_INVALID_EPOCH 0x45 /* Invalid epoch */
+#define SD_RES_NETWORK_ERROR 0x81 /* Network error between sheep */
+
+#define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
+
+#define SD_STATUS_OK                0x00000001
+#define SD_STATUS_WAIT_FOR_FORMAT   0x00000002
+#define SD_STATUS_WAIT_FOR_JOIN     0x00000004
+#define SD_STATUS_SHUTDOWN          0x00000008
+#define SD_STATUS_HALT              0x00000020
+
+struct sd_so_req {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint64_t	oid;
+	uint64_t	ctime;
+	uint32_t	copies;
+	uint32_t	tag;
+	uint32_t	opcode_specific[2];
+};
+
+struct sd_so_rsp {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t        result;
+	uint32_t	copies;
+	uint64_t	ctime;
+	uint64_t	oid;
+	uint32_t	opcode_specific[2];
+};
+
+struct sd_list_req {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t        tgt_epoch;
+	uint32_t        pad[7];
+};
+
+struct sd_list_rsp {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t        result;
+	uint32_t        pad[7];
+};
+
+struct sd_node_req {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t	request_ver;
+	uint32_t	pad[7];
+};
+
+struct sd_node_rsp {
+	uint8_t		proto_ver;
+	uint8_t		opcode;
+	uint16_t	flags;
+	uint32_t	epoch;
+	uint32_t        id;
+	uint32_t        data_length;
+	uint32_t        result;
+	uint32_t	nr_nodes;
+	uint32_t	local_idx;
+	uint32_t	master_idx;
+	uint64_t	store_size;
+	uint64_t	store_free;
+};
+
+struct node_id {
+	uint8_t addr[16];
+	uint16_t port;
+};
+
+struct sd_node {
+	struct node_id  nid;
+	uint16_t	nr_vnodes;
+	uint32_t	zone;
+};
+
+struct epoch_log {
+	uint64_t ctime;
+	uint64_t time;
+	uint32_t epoch;
+	uint32_t nr_nodes;
+	uint32_t nr_copies;
+	struct sd_node nodes[SD_MAX_NODES];
+};
+
+struct join_message {
+	uint8_t proto_ver;
+	uint8_t nr_copies;
+	uint16_t nr_nodes;
+	uint16_t nr_failed_nodes;
+	uint16_t nr_delayed_nodes;
+	uint16_t cluster_flags;
+	uint32_t cluster_status;
+	uint32_t epoch;
+	uint64_t ctime;
+	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
+	uint8_t store[STORE_LEN];
+
+	/*
+	 * A joining sheep puts the local node list here, which is nr_nodes
+	 * entries long.  After the master replies it will contain the list of
+	 * nodes that attempted to join but failed the join process.  The
+	 * number of entries in that case is nr_failed_nodes, which by
+	 * defintion must be smaller than nr_nodes.
+	 */
+	struct sd_node nodes[];
+};
+
+struct vdi_op_message {
+	struct sd_req req;
+	struct sd_rsp rsp;
+	uint8_t data[0];
+};
+
+#endif /* __INTERNAL_PROTO_H__ */
