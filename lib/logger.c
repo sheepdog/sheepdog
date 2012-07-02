@@ -202,9 +202,12 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 		strftime(p, MAX_MSG_SIZE, "%b %2d %H:%M:%S", tmp);
 		p += strlen(p);
 
-		if (worker_name)
+		if (worker_name && worker_idx)
 			snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s %d] ",
 				 worker_name, worker_idx);
+		else if (worker_name)
+			snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s] ",
+				 worker_name);
 		else
 			strncpy(p, " [main] ", MAX_MSG_SIZE - strlen(buff));
 
@@ -323,9 +326,12 @@ static notrace void dolog(int prio, const char *func, int line,
 
 		vsnprintf(p, MAX_MSG_SIZE, fmt, ap);
 
-		if (worker_name)
+		if (worker_name && worker_idx)
 			fprintf(stderr, "[%s %d] %s(%d) %s", worker_name,
 				worker_idx, func, line, p);
+		else if (worker_name)
+			fprintf(stderr, "[%s] %s(%d) %s", worker_name, func,
+				line, p);
 		else
 			fprintf(stderr, "[main] %s(%d) %s", func, line, p);
 
