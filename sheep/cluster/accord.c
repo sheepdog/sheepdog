@@ -545,7 +545,7 @@ static int accord_init(const char *option)
 		return -1;
 	}
 
-	acrd_wq = init_work_queue("accord", 1);
+	acrd_wq = init_work_queue("accord", true);
 	if (!acrd_wq) {
 		eprintf("failed to create accord workqueue: %m\n");
 		return -1;

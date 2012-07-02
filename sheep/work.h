@@ -14,9 +14,7 @@ struct work {
 
 struct work_queue {
 	int wq_state;
-	int nr_active;
 	struct list_head pending_list;
-	struct list_head blocked_list;
 };
 
 struct worker_info {
@@ -24,7 +22,7 @@ struct worker_info {
 
 	struct list_head worker_info_siblings;
 
-	int nr_threads;
+	bool ordered;
 
 	pthread_mutex_t finished_lock;
 	struct list_head finished_list;
@@ -38,13 +36,14 @@ struct worker_info {
 
 	pthread_mutex_t startup_lock;
 
-	pthread_t worker_thread[0];
+	pthread_t worker_thread; /* used for an ordered work queue */
 };
 
 extern struct list_head worker_info_list;
 extern int total_nr_workers;
 
-struct work_queue *init_work_queue(const char *name, int nr);
+/* if 'ordered' is true, the work queue are processes in order. */
+struct work_queue *init_work_queue(const char *name, bool ordered);
 void queue_work(struct work_queue *q, struct work *work);
 
 #endif

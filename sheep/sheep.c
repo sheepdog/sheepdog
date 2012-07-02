@@ -247,11 +247,11 @@ int main(int argc, char **argv)
 
 	local_req_init();
 
-	sys->gateway_wqueue = init_work_queue("gateway", 0);
-	sys->io_wqueue = init_work_queue("io", 0);
-	sys->recovery_wqueue = init_work_queue("recovery", 1);
-	sys->deletion_wqueue = init_work_queue("deletion", 1);
-	sys->block_wqueue = init_work_queue("block", 1);
+	sys->gateway_wqueue = init_work_queue("gateway", false);
+	sys->io_wqueue = init_work_queue("io", false);
+	sys->recovery_wqueue = init_work_queue("recovery", true);
+	sys->deletion_wqueue = init_work_queue("deletion", true);
+	sys->block_wqueue = init_work_queue("block", true);
 	if (!sys->gateway_wqueue || !sys->io_wqueue ||!sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue)
 		exit(1);

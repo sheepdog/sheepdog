@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <string.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -91,15 +92,14 @@ void queue_work(struct work_queue *q, struct work *work)
 {
 	struct worker_info *wi = container_of(q, struct worker_info, q);
 
-	if (!wi->nr_threads) {
-		create_short_thread(wi, work);
-		return;
-	}
-	pthread_mutex_lock(&wi->pending_lock);
-	list_add_tail(&work->w_list, &wi->q.pending_list);
-	pthread_mutex_unlock(&wi->pending_lock);
+	if (wi->ordered) {
+		pthread_mutex_lock(&wi->pending_lock);
+		list_add_tail(&work->w_list, &wi->q.pending_list);
+		pthread_mutex_unlock(&wi->pending_lock);
 
-	pthread_cond_signal(&wi->pending_cond);
+		pthread_cond_signal(&wi->pending_cond);
+	} else
+		create_short_thread(wi, work);
 }
 
 static void bs_thread_request_done(int fd, int events, void *data)
@@ -133,16 +133,8 @@ static void *worker_routine(void *arg)
 	struct worker_info *wi = arg;
 	struct work *work;
 	eventfd_t value = 1;
-	int i, uninitialized_var(idx);
 
-	for (i = 0; i < wi->nr_threads; i++) {
-		if (wi->worker_thread[i] == pthread_self()) {
-			idx = i;
-			break;
-		}
-	}
-
-	set_thread_name(wi->name, idx);
+	set_thread_name(wi->name, 0);
 
 	pthread_mutex_lock(&wi->startup_lock);
 	/* started this thread */
@@ -203,58 +195,56 @@ static int init_eventfd(void)
 	return 0;
 }
 
-struct work_queue *init_work_queue(const char *name, int nr)
+struct work_queue *init_work_queue(const char *name, bool ordered)
 {
-	int i, ret;
+	int ret;
 	struct worker_info *wi;
 
 	ret = init_eventfd();
 	if (ret)
 		return NULL;
 
-	wi = zalloc(sizeof(*wi) + nr * sizeof(pthread_t));
+	wi = zalloc(sizeof(*wi));
 	if (!wi)
 		return NULL;
 
 	wi->name = name;
-	wi->nr_threads = nr;
+	wi->ordered = ordered;
 
-	INIT_LIST_HEAD(&wi->q.pending_list);
-	INIT_LIST_HEAD(&wi->q.blocked_list);
 	INIT_LIST_HEAD(&wi->finished_list);
 
-	pthread_cond_init(&wi->pending_cond, NULL);
-
 	pthread_mutex_init(&wi->finished_lock, NULL);
-	pthread_mutex_init(&wi->pending_lock, NULL);
-	pthread_mutex_init(&wi->startup_lock, NULL);
 
-	pthread_mutex_lock(&wi->startup_lock);
-	for (i = 0; i < wi->nr_threads; i++) {
-		ret = pthread_create(&wi->worker_thread[i], NULL,
-				     worker_routine, wi);
+	if (ordered) {
+		INIT_LIST_HEAD(&wi->q.pending_list);
 
+		pthread_cond_init(&wi->pending_cond, NULL);
+		pthread_mutex_init(&wi->pending_lock, NULL);
+		pthread_mutex_init(&wi->startup_lock, NULL);
+
+		pthread_mutex_lock(&wi->startup_lock);
+
+		ret = pthread_create(&wi->worker_thread, NULL, worker_routine,
+				     wi);
 		if (ret) {
-			eprintf("failed to create worker thread #%d: %s\n",
-				i, strerror(ret));
-			if (ret)
-				goto destroy_threads;
+			eprintf("failed to create worker thread: %s\n",
+				strerror(ret));
+			goto destroy_threads;
 		}
+
+		pthread_mutex_unlock(&wi->startup_lock);
 	}
-	pthread_mutex_unlock(&wi->startup_lock);
 
 	list_add(&wi->worker_info_siblings, &worker_info_list);
 
-	total_nr_workers += nr;
+	total_nr_workers++;
 	return &wi->q;
 destroy_threads:
 
 	wi->q.wq_state |= WQ_DEAD;
 	pthread_mutex_unlock(&wi->startup_lock);
-	for (; i > 0; i--) {
-		pthread_join(wi->worker_thread[i - 1], NULL);
-		eprintf("stopped worker thread #%d\n", i - 1);
-	}
+	pthread_join(wi->worker_thread, NULL);
+	eprintf("stopped worker thread\n");
 
 /* destroy_cond_mutex: */
 	pthread_cond_destroy(&wi->pending_cond);
