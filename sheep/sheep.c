@@ -42,12 +42,12 @@ static struct option const long_options[] = {
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"vnodes", required_argument, NULL, 'v'},
-	{"disable-cache", no_argument, NULL, 'W'},
+	{"enable-cache", no_argument, NULL, 'w'},
 	{"zone", required_argument, NULL, 'z'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfGhl:op:v:Wy:z:";
+static const char *short_options = "c:dDfGhl:op:v:wy:z:";
 
 static void usage(int status)
 {
@@ -69,7 +69,7 @@ Options:\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
   -v, --vnodes            specify the number of virtual nodes\n\
-  -W, --disable-cache     disable object cache\n\
+  -w, --enable-cache      enable object cache\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
 ", PACKAGE_VERSION, program_name);
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
 	int af;
 	char *p;
 	struct cluster_driver *cdrv;
-	int enable_write_cache = 1; /* enabled by default */
+	int enable_write_cache = 0; /* disabled by default */
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -173,9 +173,9 @@ int main(int argc, char **argv)
 			}
 			sys->this_node.zone = zone;
 			break;
-		case 'W':
-			vprintf(SDOG_INFO, "disable write cache\n");
-			enable_write_cache = 0;
+		case 'w':
+			vprintf(SDOG_INFO, "enable write cache\n");
+			enable_write_cache = 1;
 			break;
 		case 'v':
 			nr_vnodes = strtol(optarg, &p, 10);
