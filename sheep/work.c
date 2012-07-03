@@ -62,6 +62,12 @@ static void *run_short_thread(void *arg)
 	struct short_work *sw = arg;
 	eventfd_t value = 1;
 	static uint64_t idx = 0;
+	int err;
+
+	/* Tell runtime to release resources after termination */
+	err = pthread_detach(pthread_self());
+	if (err)
+		panic("%s\n", strerror(err));
 
 	set_thread_name(sw->wi->name, uatomic_add_return(&idx, 1));
 
@@ -73,7 +79,7 @@ static void *run_short_thread(void *arg)
 
 	eventfd_write(efd, value);
 	free(sw);
-	return NULL;
+	pthread_exit(NULL);
 }
 
 static inline void create_short_thread(struct worker_info *wi,
@@ -81,11 +87,14 @@ static inline void create_short_thread(struct worker_info *wi,
 {
 	pthread_t thread;
 	struct short_work *sw = xmalloc(sizeof *sw);
+	int err;
 
 	sw->work = work;
 	sw->wi = wi;
-	if (pthread_create(&thread, NULL, run_short_thread, sw))
-		panic("%m\n");
+
+	err = pthread_create(&thread, NULL, run_short_thread, sw);
+	if (err)
+		panic("%s\n", strerror(err));
 }
 
 void queue_work(struct work_queue *q, struct work *work)
