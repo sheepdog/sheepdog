@@ -57,14 +57,13 @@ struct short_work {
 	struct worker_info *wi;
 };
 
-static void *run_short_thread(void * arg)
+static void *run_short_thread(void *arg)
 {
 	struct short_work *sw = arg;
 	eventfd_t value = 1;
 	static uint64_t idx = 0;
 
-	uatomic_inc(&idx);
-	set_thread_name(sw->wi->name, idx);
+	set_thread_name(sw->wi->name, uatomic_add_return(&idx, 1));
 
 	sw->work->fn(sw->work);
 
@@ -73,6 +72,7 @@ static void *run_short_thread(void * arg)
 	pthread_mutex_unlock(&sw->wi->finished_lock);
 
 	eventfd_write(efd, value);
+	free(sw);
 	return NULL;
 }
 
