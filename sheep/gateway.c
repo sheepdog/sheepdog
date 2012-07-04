@@ -20,7 +20,7 @@
  *
  * Return success if any read succeed.
  */
-static int forward_read_obj_req(struct request *req)
+int gateway_read_obj(struct request *req)
 {
 	int i, ret = SD_RES_SUCCESS;
 	unsigned wlen, rlen;
@@ -215,7 +215,7 @@ write_info_advance(struct write_info *wi, struct sd_vnode *v,
 	wi->nr_sent++;
 }
 
-static int forward_write_obj_req(struct request *req)
+static int do_gateway_write_obj(struct request *req, bool create)
 {
 	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
@@ -234,7 +234,7 @@ static int forward_write_obj_req(struct request *req)
 
 	write_info_init(&wi);
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+	if (create)
 		fwd_hdr.opcode = SD_OP_CREATE_AND_WRITE_PEER;
 	else
 		fwd_hdr.opcode = SD_OP_WRITE_PEER;
@@ -272,7 +272,7 @@ static int forward_write_obj_req(struct request *req)
 	if (local != -1 && err_ret == SD_RES_SUCCESS) {
 		v = obj_vnodes[local];
 
-		if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+		if (create)
 			ret = peer_create_and_write_obj(req);
 		else
 			ret = peer_write_obj(req);
@@ -293,18 +293,26 @@ static int forward_write_obj_req(struct request *req)
 	return err_ret;
 }
 
+int gateway_write_obj(struct request *req)
+{
+	return do_gateway_write_obj(req, false);
+}
+
+int gateway_create_and_write_obj(struct request *req)
+{
+	return do_gateway_write_obj(req, true);
+}
+
 void do_gateway_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	int ret;
+	int ret = SD_RES_SUCCESS;
 
 	dprintf("%x, %" PRIx64" , %u\n",
 		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 
-	if (req->rq.flags & SD_FLAG_CMD_WRITE)
-		ret = forward_write_obj_req(req);
-	else
-		ret = forward_read_obj_req(req);
+	if (has_process_work(req->op))
+		ret = do_process_work(req);
 
 	if (ret != SD_RES_SUCCESS)
 		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",

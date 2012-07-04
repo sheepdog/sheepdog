@@ -921,14 +921,17 @@ static struct sd_op_template sd_ops[] = {
 	/* gateway I/O operations */
 	[SD_OP_CREATE_AND_WRITE_OBJ] = {
 		.type = SD_OP_TYPE_GATEWAY,
+		.process_work = gateway_create_and_write_obj,
 	},
 
 	[SD_OP_READ_OBJ] = {
 		.type = SD_OP_TYPE_GATEWAY,
+		.process_work = gateway_read_obj,
 	},
 
 	[SD_OP_WRITE_OBJ] = {
 		.type = SD_OP_TYPE_GATEWAY,
+		.process_work = gateway_write_obj,
 	},
 
 	/* peer I/O operations */

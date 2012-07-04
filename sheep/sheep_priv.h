@@ -367,6 +367,11 @@ static inline int sys_can_halt(void)
 	return sys_stat_ok() && !sys_flag_nohalt();
 }
 
+/* gateway operations */
+int gateway_read_obj(struct request *req);
+int gateway_write_obj(struct request *req);
+int gateway_create_and_write_obj(struct request *req);
+
 /* backend store */
 int peer_read_obj(struct request *req);
 int peer_write_obj(struct request *req);
