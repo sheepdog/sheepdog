@@ -46,12 +46,6 @@ mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 struct store_driver *sd_store;
 LIST_HEAD(store_drivers);
 
-int do_local_io(struct request *req, uint32_t epoch)
-{
-	req->rq.epoch = epoch;
-	return do_process_work(req);
-}
-
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 {
 	int fd, ret, len;
@@ -91,22 +85,19 @@ err_open:
 void do_io_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	uint32_t epoch;
 	int ret;
 
 	if (req->rq.flags & SD_FLAG_CMD_RECOVERY)
-		epoch = req->rq.obj.tgt_epoch;
-	else
-		epoch = req->rq.epoch;
+		req->rq.epoch = req->rq.obj.tgt_epoch;
 
 	dprintf("%x, %" PRIx64" , %u\n",
-		req->rq.opcode, req->rq.obj.oid, epoch);
+		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 
-	ret = do_local_io(req, epoch);
+	ret = do_process_work(req);
 
 	if (ret != SD_RES_SUCCESS)
 		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
-			req->rq.opcode, req->rq.obj.oid, epoch, ret);
+			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
 	req->rp.result = ret;
 }
 

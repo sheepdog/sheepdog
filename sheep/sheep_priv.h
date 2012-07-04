@@ -295,7 +295,6 @@ int has_process_main(struct sd_op_template *op);
 int do_process_work(struct request *req);
 int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
-int do_local_io(struct request *req, uint32_t epoch);
 
 /* Journal */
 struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,

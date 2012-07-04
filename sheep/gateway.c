@@ -38,17 +38,16 @@ static int forward_read_obj_req(struct request *req)
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
-		if (vnode_is_local(v)) {
-			ret = do_local_io(req, fwd_hdr.epoch);
-			if (ret != SD_RES_SUCCESS) {
-				goto read_remote;
-				eprintf("local read fail %x\n", ret);
-			}
+		if (!vnode_is_local(v))
+			continue;
+		ret = do_process_work(req);
+		if (ret == SD_RES_SUCCESS)
 			return ret;
-		}
+
+		eprintf("local read fail %x\n", ret);
+		break;
 	}
 
-read_remote:
 	/*
 	 * Read random copy from cluster for better load balance, useful for
 	 * reading base VM's COW objects
@@ -269,8 +268,7 @@ static int forward_write_obj_req(struct request *req)
 	if (local != -1 && err_ret == SD_RES_SUCCESS) {
 		v = obj_vnodes[local];
 
-		ret = do_local_io(req, fwd_hdr.epoch);
-
+		ret = do_process_work(req);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("fail to write local %"PRIx32"\n", ret);
 			err_ret = ret;
