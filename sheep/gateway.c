@@ -31,16 +31,13 @@ static int forward_read_obj_req(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies, j;
 
-	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-	fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
-
 	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
 		if (!vnode_is_local(v))
 			continue;
-		ret = do_process_work(req);
+		ret = peer_read_obj(req);
 		if (ret == SD_RES_SUCCESS)
 			return ret;
 
@@ -56,6 +53,9 @@ static int forward_read_obj_req(struct request *req)
 	for (i = 0; i < nr_copies; i++) {
 		struct sockfd *sfd;
 		int idx = (i + j) % nr_copies;
+
+		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
+		fwd_hdr.opcode = SD_OP_READ_PEER;
 
 		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
@@ -87,11 +87,6 @@ static int forward_read_obj_req(struct request *req)
 			ret = rsp->result;
 			eprintf("remote read fail %x\n", ret);
 			sheep_put_sockfd(&v->nid, sfd);
-		}
-		if (i + 1 != nr_copies) {
-			/* Reset the hdr for next read */
-			memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-			fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
 		}
 	}
 	return ret;
@@ -233,7 +228,10 @@ static int forward_write_obj_req(struct request *req)
 
 	write_info_init(&wi);
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-	fwd_hdr.flags |= SD_FLAG_CMD_IO_LOCAL;
+	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+		fwd_hdr.opcode = SD_OP_CREATE_AND_WRITE_PEER;
+	else
+		fwd_hdr.opcode = SD_OP_WRITE_PEER;
 
 	wlen = fwd_hdr.data_length;
 
@@ -268,7 +266,11 @@ static int forward_write_obj_req(struct request *req)
 	if (local != -1 && err_ret == SD_RES_SUCCESS) {
 		v = obj_vnodes[local];
 
-		ret = do_process_work(req);
+		if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+			ret = peer_create_and_write_obj(req);
+		else
+			ret = peer_write_obj(req);
+
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("fail to write local %"PRIx32"\n", ret);
 			err_ret = ret;

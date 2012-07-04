@@ -103,9 +103,9 @@ static int recover_object_from_replica(uint64_t oid,
 	}
 
 	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.opcode = SD_OP_READ_PEER;
 	hdr.epoch = epoch;
-	hdr.flags = SD_FLAG_CMD_RECOVERY | SD_FLAG_CMD_IO_LOCAL;
+	hdr.flags = SD_FLAG_CMD_RECOVERY;
 	hdr.data_length = rlen;
 
 	hdr.obj.oid = oid;

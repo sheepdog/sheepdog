@@ -181,14 +181,14 @@ void resume_wait_epoch_requests(void)
 			 * Gateway retries to send the request when
 			 * its epoch changes.
 			 */
-			assert(!(req->rq.flags & SD_FLAG_CMD_IO_LOCAL));
+			assert(is_gateway_op(req->op));
 			req->rq.epoch = sys->epoch;
 			list_del(&req->request_list);
 			requeue_request(req);
 			break;
 		case SD_RES_NEW_NODE_VER:
 			/* Peer retries the request locally when its epoch changes. */
-			assert(req->rq.flags & SD_FLAG_CMD_IO_LOCAL);
+			assert(!is_gateway_op(req->op));
 			list_del(&req->request_list);
 			requeue_request(req);
 			break;
@@ -252,7 +252,7 @@ void flush_wait_obj_requests(void)
 	}
 }
 
-static void queue_io_request(struct request *req)
+static void queue_peer_request(struct request *req)
 {
 	req->local_oid = req->rq.obj.oid;
 	if (req->local_oid) {
@@ -340,15 +340,6 @@ static void queue_request(struct request *req)
 	}
 
 	/*
-	 * we set epoch for non direct requests here.  Note that we need to
-	 * sample sys->epoch before passing requests to worker threads as
-	 * it can change anytime we return to processing membership change
-	 * events.
-	 */
-	if (!(hdr->flags & SD_FLAG_CMD_IO_LOCAL))
-		hdr->epoch = sys->epoch;
-
-	/*
 	 * force operations shouldn't access req->vnodes in their
 	 * process_work() and process_main() because they can be
 	 * called before we set up current_vnode_info
@@ -356,14 +347,16 @@ static void queue_request(struct request *req)
 	if (!is_force_op(req->op))
 		req->vnodes = get_vnode_info();
 
-	if (is_io_op(req->op)) {
-		if (req->rq.flags & SD_FLAG_CMD_IO_LOCAL)
-			queue_io_request(req);
-		else
-			queue_gateway_request(req);
+	if (is_peer_op(req->op)) {
+		queue_peer_request(req);
+	} else if (is_gateway_op(req->op)) {
+		hdr->epoch = sys->epoch;
+		queue_gateway_request(req);
 	} else if (is_local_op(req->op)) {
+		hdr->epoch = sys->epoch;
 		queue_local_request(req);
 	} else if (is_cluster_op(req->op)) {
+		hdr->epoch = sys->epoch;
 		queue_cluster_request(req);
 	} else {
 		eprintf("unknown operation %d\n", hdr->opcode);

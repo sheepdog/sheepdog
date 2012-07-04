@@ -282,9 +282,9 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 		memset(&hdr, 0, sizeof(hdr));
 
-		hdr.opcode = SD_OP_READ_OBJ;
+		hdr.opcode = SD_OP_READ_PEER;
 		hdr.data_length = rlen;
-		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+		hdr.flags = 0;
 		hdr.epoch = sd_epoch;
 
 		hdr.obj.oid = oid;
@@ -1339,9 +1339,9 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 		exit(EXIT_FAILURE);
 	}
 
-	hdr.opcode = SD_OP_READ_OBJ;
+	hdr.opcode = SD_OP_READ_PEER;
 	hdr.epoch = sd_epoch;
-	hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+	hdr.flags = 0;
 	hdr.data_length = rlen;
 
 	hdr.obj.oid = oid;
@@ -1378,9 +1378,9 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 		exit(EXIT_FAILURE);
 	}
 
-	hdr.opcode = SD_OP_WRITE_OBJ;
+	hdr.opcode = SD_OP_WRITE_PEER;
 	hdr.epoch = sd_epoch;
-	hdr.flags = SD_FLAG_CMD_IO_LOCAL | SD_FLAG_CMD_WRITE;
+	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
 
 	hdr.obj.oid = oid;

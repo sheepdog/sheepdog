@@ -103,7 +103,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	else
 		hdr.opcode = SD_OP_WRITE_OBJ;
 	hdr.data_length = wlen;
-	hdr.flags = (flags & ~SD_FLAG_CMD_IO_LOCAL) | SD_FLAG_CMD_WRITE;
+	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 
 	hdr.obj.copies = copies;
 	hdr.obj.oid = oid;

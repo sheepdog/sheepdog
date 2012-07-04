@@ -54,11 +54,12 @@
 #define SD_OP_STAT_RECOVERY  0x97
 #define SD_OP_FLUSH_DEL_CACHE  0x98
 #define SD_OP_GET_OBJ_LIST   0xA1
-#define SD_OP_GET_EPOCH      0XA2
+#define SD_OP_GET_EPOCH      0xA2
+#define SD_OP_CREATE_AND_WRITE_PEER 0xa3
+#define SD_OP_READ_PEER      0xa4
+#define SD_OP_WRITE_PEER     0xa5
 
-
-
-#define SD_FLAG_CMD_IO_LOCAL   0x0010
+/* 0x0010 was SD_FLAG_CMD_IO_LOCAL */
 #define SD_FLAG_CMD_RECOVERY 0x0020
 
 /* set this flag when you want to read a VDI which is opened by

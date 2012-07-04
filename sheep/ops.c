@@ -29,7 +29,8 @@
 enum sd_op_type {
 	SD_OP_TYPE_CLUSTER = 1, /* cluster operations */
 	SD_OP_TYPE_LOCAL,       /* local operations */
-	SD_OP_TYPE_IO,          /* io operations */
+	SD_OP_TYPE_PEER,          /* io operations */
+	SD_OP_TYPE_GATEWAY,	/* gateway operations */
 };
 
 struct sd_op_template {
@@ -51,7 +52,7 @@ struct sd_op_template {
 	 * If type is SD_OP_TYPE_LOCAL, both process_work() and process_main()
 	 * will be called on the local node.
 	 *
-	 * If type is SD_OP_TYPE_IO, only process_work() will be called, and it
+	 * If type is SD_OP_TYPE_PEER, only process_work() will be called, and it
 	 * will be called on the local node.
 	 */
 	int (*process_work)(struct request *req);
@@ -613,8 +614,7 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 		wlen = 0;
 
 		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_OBJ;
-		hdr.flags = SD_FLAG_CMD_IO_LOCAL;
+		hdr.opcode = SD_OP_READ_PEER;
 		hdr.epoch = epoch;
 		hdr.data_length = rlen;
 
@@ -650,7 +650,7 @@ static int store_remove_obj(struct request *req)
 	return sd_store->remove_object(oid);
 }
 
-static int store_read_obj(struct request *req)
+int peer_read_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
@@ -703,7 +703,7 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 	return ret;
 }
 
-static int store_write_obj(struct request *req)
+int peer_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	uint32_t epoch = hdr->epoch;
@@ -715,7 +715,7 @@ static int store_write_obj(struct request *req)
 	return do_write_obj(&iocb, hdr, epoch, req->data, 0);
 }
 
-static int store_create_and_write_obj(struct request *req)
+int peer_create_and_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	struct sd_req cow_hdr;
@@ -918,25 +918,38 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = local_trace_cat_ops,
 	},
 
-	/* I/O operations */
+	/* gateway I/O operations */
 	[SD_OP_CREATE_AND_WRITE_OBJ] = {
-		.type = SD_OP_TYPE_IO,
-		.process_work = store_create_and_write_obj,
+		.type = SD_OP_TYPE_GATEWAY,
 	},
 
 	[SD_OP_READ_OBJ] = {
-		.type = SD_OP_TYPE_IO,
-		.process_work = store_read_obj,
+		.type = SD_OP_TYPE_GATEWAY,
 	},
 
 	[SD_OP_WRITE_OBJ] = {
-		.type = SD_OP_TYPE_IO,
-		.process_work = store_write_obj,
+		.type = SD_OP_TYPE_GATEWAY,
 	},
 
+	/* peer I/O operations */
 	[SD_OP_REMOVE_OBJ] = {
-		.type = SD_OP_TYPE_IO,
+		.type = SD_OP_TYPE_PEER,
 		.process_work = store_remove_obj,
+	},
+
+	[SD_OP_CREATE_AND_WRITE_PEER] = {
+		.type = SD_OP_TYPE_PEER,
+		.process_work = peer_create_and_write_obj,
+	},
+
+	[SD_OP_READ_PEER] = {
+		.type = SD_OP_TYPE_PEER,
+		.process_work = peer_read_obj,
+	},
+
+	[SD_OP_WRITE_PEER] = {
+		.type = SD_OP_TYPE_PEER,
+		.process_work = peer_write_obj,
 	},
 };
 
@@ -958,9 +971,14 @@ int is_local_op(struct sd_op_template *op)
 	return op->type == SD_OP_TYPE_LOCAL;
 }
 
-int is_io_op(struct sd_op_template *op)
+int is_peer_op(struct sd_op_template *op)
 {
-	return op->type == SD_OP_TYPE_IO;
+	return op->type == SD_OP_TYPE_PEER;
+}
+
+int is_gateway_op(struct sd_op_template *op)
+{
+	return op->type == SD_OP_TYPE_GATEWAY;
 }
 
 int is_force_op(struct sd_op_template *op)

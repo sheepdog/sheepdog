@@ -288,7 +288,8 @@ void put_request(struct request *req);
 struct sd_op_template *get_sd_op(uint8_t opcode);
 int is_cluster_op(struct sd_op_template *op);
 int is_local_op(struct sd_op_template *op);
-int is_io_op(struct sd_op_template *op);
+int is_peer_op(struct sd_op_template *op);
+int is_gateway_op(struct sd_op_template *op);
 int is_force_op(struct sd_op_template *op);
 int has_process_work(struct sd_op_template *op);
 int has_process_main(struct sd_op_template *op);
@@ -365,6 +366,11 @@ static inline int sys_can_halt(void)
 {
 	return sys_stat_ok() && !sys_flag_nohalt();
 }
+
+/* backend store */
+int peer_read_obj(struct request *req);
+int peer_write_obj(struct request *req);
+int peer_create_and_write_obj(struct request *req);
 
 /* object_cache */
 
