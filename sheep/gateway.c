@@ -302,3 +302,72 @@ int gateway_create_and_write_obj(struct request *req)
 {
 	return do_gateway_write_obj(req, true);
 }
+
+int gateway_remove_obj(struct request *req)
+{
+	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
+	unsigned wlen;
+	struct sd_req fwd_hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
+	struct sd_vnode *v;
+	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
+	uint64_t oid = req->rq.obj.oid;
+	int nr_copies;
+	struct write_info wi;
+
+	dprintf("%"PRIx64"\n", oid);
+
+	write_info_init(&wi);
+	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
+	fwd_hdr.opcode = SD_OP_REMOVE_PEER;
+
+	wlen = fwd_hdr.data_length;
+
+	nr_copies = get_nr_copies(req->vnodes);
+	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
+
+	for (i = 0; i < nr_copies; i++) {
+		struct sockfd *sfd;
+
+		v = obj_vnodes[i];
+		if (vnode_is_local(v)) {
+			local = i;
+			continue;
+		}
+
+		sfd = sheep_get_sockfd(&v->nid);
+		if (!sfd) {
+			err_ret = SD_RES_NETWORK_ERROR;
+			break;
+		}
+
+		ret = send_req(sfd->fd, &fwd_hdr, req->data, &wlen);
+		if (ret) {
+			sheep_del_sockfd(&v->nid, sfd);
+			err_ret = SD_RES_NETWORK_ERROR;
+			dprintf("fail %d\n", ret);
+			break;
+		}
+		write_info_advance(&wi, v, sfd);
+	}
+
+	if (local != -1 && err_ret == SD_RES_SUCCESS) {
+		v = obj_vnodes[local];
+
+		ret = peer_remove_obj(req);
+
+		if (ret != SD_RES_SUCCESS) {
+			eprintf("fail to write local %"PRIx32"\n", ret);
+			err_ret = ret;
+		}
+	}
+
+	dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
+	if (wi.nr_sent > 0) {
+		ret = wait_forward_write(&wi, rsp);
+		if (ret != SD_RES_SUCCESS)
+			err_ret = ret;
+	}
+
+	return err_ret;
+}

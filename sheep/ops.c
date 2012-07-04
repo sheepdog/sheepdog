@@ -640,7 +640,7 @@ out:
 	return ret;
 }
 
-static int store_remove_obj(struct request *req)
+int peer_remove_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
@@ -934,12 +934,12 @@ static struct sd_op_template sd_ops[] = {
 		.process_work = gateway_write_obj,
 	},
 
-	/* peer I/O operations */
 	[SD_OP_REMOVE_OBJ] = {
-		.type = SD_OP_TYPE_PEER,
-		.process_work = store_remove_obj,
+		.type = SD_OP_TYPE_GATEWAY,
+		.process_work = gateway_remove_obj,
 	},
 
+	/* peer I/O operations */
 	[SD_OP_CREATE_AND_WRITE_PEER] = {
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_create_and_write_obj,
@@ -953,6 +953,11 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_WRITE_PEER] = {
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_write_obj,
+	},
+
+	[SD_OP_REMOVE_PEER] = {
+		.type = SD_OP_TYPE_PEER,
+		.process_work = peer_remove_obj,
 	},
 };
 

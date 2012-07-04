@@ -369,11 +369,13 @@ static inline int sys_can_halt(void)
 int gateway_read_obj(struct request *req);
 int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
+int gateway_remove_obj(struct request *req);
 
 /* backend store */
 int peer_read_obj(struct request *req);
 int peer_write_obj(struct request *req);
 int peer_create_and_write_obj(struct request *req);
+int peer_remove_obj(struct request *req);
 
 /* object_cache */
 

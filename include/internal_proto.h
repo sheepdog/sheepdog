@@ -58,6 +58,7 @@
 #define SD_OP_CREATE_AND_WRITE_PEER 0xa3
 #define SD_OP_READ_PEER      0xa4
 #define SD_OP_WRITE_PEER     0xa5
+#define SD_OP_REMOVE_PEER    0xa6
 
 /* 0x0010 was SD_FLAG_CMD_IO_LOCAL */
 #define SD_FLAG_CMD_RECOVERY 0x0020
