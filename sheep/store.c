@@ -82,22 +82,6 @@ err_open:
 	return -1;
 }
 
-void do_io_request(struct work *work)
-{
-	struct request *req = container_of(work, struct request, work);
-	int ret;
-
-	dprintf("%x, %" PRIx64" , %u\n",
-		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
-
-	ret = do_process_work(req);
-
-	if (ret != SD_RES_SUCCESS)
-		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
-			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
-	req->rp.result = ret;
-}
-
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 {
 	int i, ret;

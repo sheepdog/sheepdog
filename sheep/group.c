@@ -279,15 +279,6 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 	return msg;
 }
 
-static void do_cluster_request(struct work *work)
-{
-	struct request *req = container_of(work, struct request, work);
-	int ret;
-
-	ret = do_process_work(req);
-	req->rp.result = ret;
-}
-
 static void cluster_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
@@ -328,7 +319,7 @@ bool sd_block_handler(struct sd_node *sender)
 
 	req = list_first_entry(&sys->pending_list,
 				struct request, pending_list);
-	req->work.fn = do_cluster_request;
+	req->work.fn = do_process_work;
 	req->work.done = cluster_op_done;
 
 	queue_work(sys->block_wqueue, &req->work);

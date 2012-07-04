@@ -302,20 +302,3 @@ int gateway_create_and_write_obj(struct request *req)
 {
 	return do_gateway_write_obj(req, true);
 }
-
-void do_gateway_request(struct work *work)
-{
-	struct request *req = container_of(work, struct request, work);
-	int ret = SD_RES_SUCCESS;
-
-	dprintf("%x, %" PRIx64" , %u\n",
-		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
-
-	if (has_process_work(req->op))
-		ret = do_process_work(req);
-
-	if (ret != SD_RES_SUCCESS)
-		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
-			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
-	req->rp.result = ret;
-}

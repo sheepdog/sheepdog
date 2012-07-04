@@ -236,8 +236,6 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 int leave_cluster(void);
 
 void queue_cluster_request(struct request *req);
-void do_io_request(struct work *work);
-void do_gateway_request(struct work *work);
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 int log_current_epoch(void);
@@ -293,7 +291,7 @@ int is_gateway_op(struct sd_op_template *op);
 int is_force_op(struct sd_op_template *op);
 int has_process_work(struct sd_op_template *op);
 int has_process_main(struct sd_op_template *op);
-int do_process_work(struct request *req);
+void do_process_work(struct work *work);
 int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
 

@@ -107,17 +107,6 @@ static void local_op_done(struct work *work)
 	put_request(req);
 }
 
-static void do_local_request(struct work *work)
-{
-	struct request *req = container_of(work, struct request, work);
-	int ret = SD_RES_SUCCESS;
-
-	if (has_process_work(req->op))
-		ret = do_process_work(req);
-
-	req->rp.result = ret;
-}
-
 static int check_request_epoch(struct request *req)
 {
 	if (before(req->rq.epoch, sys->epoch)) {
@@ -265,7 +254,7 @@ static void queue_peer_request(struct request *req)
 	if (req->rq.flags & SD_FLAG_CMD_RECOVERY)
 		req->rq.epoch = req->rq.obj.tgt_epoch;
 
-	req->work.fn = do_io_request;
+	req->work.fn = do_process_work;
 	req->work.done = io_op_done;
 	queue_work(sys->io_wqueue, &req->work);
 }
@@ -290,14 +279,14 @@ static void queue_gateway_request(struct request *req)
 			return;
 
 queue_work:
-	req->work.fn = do_gateway_request;
+	req->work.fn = do_process_work;
 	req->work.done = gateway_op_done;
 	queue_work(sys->gateway_wqueue, &req->work);
 }
 
 static void queue_local_request(struct request *req)
 {
-	req->work.fn = do_local_request;
+	req->work.fn = do_process_work;
 	req->work.done = local_op_done;
 	queue_work(sys->io_wqueue, &req->work);
 }

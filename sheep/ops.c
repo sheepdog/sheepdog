@@ -999,9 +999,23 @@ int has_process_main(struct sd_op_template *op)
 	return !!op->process_main;
 }
 
-int do_process_work(struct request *req)
+void do_process_work(struct work *work)
 {
-	return req->op->process_work(req);
+	struct request *req = container_of(work, struct request, work);
+	int ret = SD_RES_SUCCESS;
+
+	dprintf("%x, %" PRIx64" , %u\n",
+		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
+
+	if (req->op->process_work)
+		ret = req->op->process_work(req);
+
+	if (ret != SD_RES_SUCCESS) {
+		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
+			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
+	}
+
+	req->rp.result = ret;
 }
 
 int do_process_main(struct sd_op_template *op, const struct sd_req *req,
