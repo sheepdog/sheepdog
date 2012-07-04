@@ -87,9 +87,6 @@ void do_io_request(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	int ret;
 
-	if (req->rq.flags & SD_FLAG_CMD_RECOVERY)
-		req->rq.epoch = req->rq.obj.tgt_epoch;
-
 	dprintf("%x, %" PRIx64" , %u\n",
 		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 

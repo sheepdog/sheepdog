@@ -262,6 +262,9 @@ static void queue_peer_request(struct request *req)
 			return;
 	}
 
+	if (req->rq.flags & SD_FLAG_CMD_RECOVERY)
+		req->rq.epoch = req->rq.obj.tgt_epoch;
+
 	req->work.fn = do_io_request;
 	req->work.done = io_op_done;
 	queue_work(sys->io_wqueue, &req->work);
