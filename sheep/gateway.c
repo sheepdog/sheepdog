@@ -31,6 +31,9 @@ static int forward_read_obj_req(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies, j;
 
+	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+		return object_cache_handle_request(req);
+
 	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
@@ -226,6 +229,9 @@ static int forward_write_obj_req(struct request *req)
 
 	dprintf("%"PRIx64"\n", oid);
 
+	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+		return object_cache_handle_request(req);
+
 	write_info_init(&wi);
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
@@ -290,20 +296,15 @@ static int forward_write_obj_req(struct request *req)
 void do_gateway_request(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
-	int ret = SD_RES_SUCCESS;
+	int ret;
 
 	dprintf("%x, %" PRIx64" , %u\n",
 		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 
-	if (!sys->enable_write_cache || req->local ||
-	    bypass_object_cache(req)) {
-		if (req->rq.flags & SD_FLAG_CMD_WRITE)
-			ret = forward_write_obj_req(req);
-		else
-			ret = forward_read_obj_req(req);
-	} else {
-		ret = object_cache_handle_request(req);
-	}
+	if (req->rq.flags & SD_FLAG_CMD_WRITE)
+		ret = forward_write_obj_req(req);
+	else
+		ret = forward_read_obj_req(req);
 
 	if (ret != SD_RES_SUCCESS)
 		dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
