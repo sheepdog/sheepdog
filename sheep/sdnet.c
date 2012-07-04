@@ -375,7 +375,7 @@ static struct request *alloc_local_request(void *data, int data_length)
 {
 	struct request *req;
 
-	req = zalloc(sizeof(struct request));
+	req = xzalloc(sizeof(struct request));
 	if (data_length) {
 		req->data_length = data_length;
 		req->data = data;
