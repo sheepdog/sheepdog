@@ -93,7 +93,7 @@ static int jrnl_write_header(struct jrnl_descriptor *jd)
 	ssize_t ret;
 	struct jrnl_head *head = (struct jrnl_head *) &jd->head;
 
-	ret = pwrite64(jd->fd, head, sizeof(*head), 0);
+	ret = xpwrite(jd->fd, head, sizeof(*head), 0);
 
 	if (ret != sizeof(*head)) {
 		if (errno == ENOSPC)
@@ -111,7 +111,7 @@ static int jrnl_write_data(struct jrnl_descriptor *jd)
 	ssize_t ret;
 	struct jrnl_head *head = (struct jrnl_head *) &jd->head;
 
-	ret = pwrite64(jd->fd, jd->data, head->size, sizeof(*head));
+	ret = xpwrite(jd->fd, jd->data, head->size, sizeof(*head));
 
 	if (ret != head->size) {
 		if (errno == ENOSPC)
@@ -131,7 +131,7 @@ static int jrnl_write_end_mark(struct jrnl_descriptor *jd)
 	uint32_t end_mark = JRNL_END_MARK;
 	struct jrnl_head *head = (struct jrnl_head *) &jd->head;
 
-	retsize = pwrite64(jd->fd, &end_mark, sizeof(end_mark),
+	retsize = xpwrite(jd->fd, &end_mark, sizeof(end_mark),
 			   sizeof(*head) + head->size);
 
 	if (retsize != sizeof(end_mark)) {
@@ -160,9 +160,9 @@ static int jrnl_apply_to_target_object(struct jrnl_descriptor *jd)
 	}
 
 	/* Flush out journal to disk (VDI object) */
-	retsize = pread64(jd->fd, &jd->head, sizeof(jd->head), 0);
-	retsize = pread64(jd->fd, buf, jd->head.size, sizeof(jd->head));
-	retsize = pwrite64(jd->target_fd, buf, jd->head.size, jd->head.offset);
+	retsize = xpread(jd->fd, &jd->head, sizeof(jd->head), 0);
+	retsize = xpread(jd->fd, buf, jd->head.size, sizeof(jd->head));
+	retsize = xpwrite(jd->target_fd, buf, jd->head.size, jd->head.offset);
 	if (retsize != jd->head.size) {
 		if (errno == ENOSPC)
 			res = SD_RES_NO_SPACE;
@@ -257,7 +257,13 @@ int jrnl_recover(const char *jrnl_dir)
 			goto end_while_3;
 		}
 
-		ret = pread64(jd.fd, &end_mark, sizeof(end_mark),
+		ret = xpread(jd.fd, &jd.head, sizeof(jd.head), 0);
+		if (ret != sizeof(jd.head)) {
+			eprintf("can't read journal head\n");
+			goto end_while_2;
+		}
+
+		ret = xpread(jd.fd, &end_mark, sizeof(end_mark),
 				sizeof(jd.head) + jd.head.size);
 		if (ret != sizeof(end_mark)) {
 			eprintf("can't read journal end mark for object %s\n",
