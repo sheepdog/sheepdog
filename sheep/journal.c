@@ -275,7 +275,7 @@ int jrnl_recover(const char *jrnl_dir)
 			goto end_while_2;
 
 		jd.target_fd = open(jd.head.target_path, O_DSYNC | O_RDWR);
-		if (ret) {
+		if (jd.target_fd < 0) {
 			eprintf("unable to open the object file %s for recovery\n",
 				jd.head.target_path);
 			goto end_while_2;
