@@ -31,7 +31,8 @@ static struct cpg_name cpg_group = { 8, "sheepdog" };
 static corosync_cfg_handle_t cfg_handle;
 static struct cpg_node this_node;
 
-static LIST_HEAD(corosync_event_list);
+static LIST_HEAD(corosync_notify_list);
+static LIST_HEAD(corosync_confchg_list);
 
 static struct cpg_node cpg_nodes[SD_MAX_NODES];
 static size_t nr_cpg_nodes;
@@ -198,18 +199,50 @@ retry:
 	return 0;
 }
 
-static struct corosync_event *find_event(enum corosync_event_type type,
-		struct cpg_node *sender)
+static inline struct corosync_event *
+find_notify_event(enum corosync_event_type type, struct cpg_node *sender)
 {
 	struct corosync_event *cevent;
 
-	list_for_each_entry(cevent, &corosync_event_list, list) {
+	list_for_each_entry(cevent, &corosync_notify_list, list) {
 		if (cevent->type == type &&
 		    cpg_node_equal(&cevent->sender, sender))
 			return cevent;
 	}
 
 	return NULL;
+}
+
+static inline struct corosync_event *
+find_confchg_event(enum corosync_event_type type, struct cpg_node *sender)
+{
+	struct corosync_event *cevent;
+
+	list_for_each_entry(cevent, &corosync_confchg_list, list) {
+		if (cevent->type == type &&
+		    cpg_node_equal(&cevent->sender, sender))
+			return cevent;
+	}
+
+	return NULL;
+}
+
+static inline bool event_is_confchg(enum corosync_event_type type)
+{
+	if (type == COROSYNC_EVENT_TYPE_BLOCK ||
+	    type == COROSYNC_MSG_TYPE_NOTIFY)
+		return false;
+
+	return true;
+}
+
+static inline struct corosync_event *
+find_event(enum corosync_event_type type, struct cpg_node *sender)
+{
+	if (event_is_confchg(type))
+		return find_confchg_event(type, sender);
+	else
+		return find_notify_event(type, sender);
 }
 
 static int is_master(struct cpg_node *node)
@@ -326,8 +359,14 @@ static void __corosync_dispatch(void)
 {
 	struct corosync_event *cevent;
 
-	while (!list_empty(&corosync_event_list)) {
-		cevent = list_first_entry(&corosync_event_list, typeof(*cevent), list);
+	while (!list_empty(&corosync_notify_list) ||
+	       !list_empty(&corosync_confchg_list)) {
+		if (!list_empty(&corosync_confchg_list))
+			cevent = list_first_entry(&corosync_confchg_list,
+						  typeof(*cevent), list);
+		else
+			cevent = list_first_entry(&corosync_notify_list,
+						  typeof(*cevent), list);
 
 		/* update join status */
 		if (!join_finished) {
@@ -372,8 +411,9 @@ static void __corosync_dispatch(void)
 	}
 }
 
-static struct corosync_event *update_event(enum corosync_event_type type,
-		struct cpg_node *sender, void *msg, size_t msg_len)
+static struct corosync_event *
+update_event(enum corosync_event_type type, struct cpg_node *sender, void *msg,
+	     size_t msg_len)
 {
 	struct corosync_event *cevent;
 
@@ -439,7 +479,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 			cevent->msg = NULL;
 
 
-		list_add_tail(&cevent->list, &corosync_event_list);
+		list_add_tail(&cevent->list, &corosync_notify_list);
 		break;
 	case COROSYNC_MSG_TYPE_LEAVE:
 		cevent = zalloc(sizeof(*cevent));
@@ -462,7 +502,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		} else
 			cevent->msg = NULL;
 
-		list_add_tail(&cevent->list, &corosync_event_list);
+		list_add_tail(&cevent->list, &corosync_confchg_list);
 		break;
 	case COROSYNC_MSG_TYPE_JOIN_RESPONSE:
 		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
@@ -561,7 +601,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
 		cevent->sender = left_sheep[i];
 
-		list_add_tail(&cevent->list, &corosync_event_list);
+		list_add_tail(&cevent->list, &corosync_confchg_list);
 	}
 
 	/* dispatch join_handler */
@@ -572,7 +612,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 
 		cevent->type = COROSYNC_EVENT_TYPE_JOIN_REQUEST;
 		cevent->sender = joined_sheep[i];
-		list_add_tail(&cevent->list, &corosync_event_list);
+		list_add_tail(&cevent->list, &corosync_confchg_list);
 	}
 
 	if (!join_finished) {
