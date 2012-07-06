@@ -555,6 +555,7 @@ static void client_rx_handler(struct client_info *ci)
 
 	if (is_conn_dead(conn) && ci->rx_req) {
 		free_request(ci->rx_req);
+		ci->rx_req = NULL;
 		return;
 	}
 
@@ -572,7 +573,8 @@ static void client_rx_handler(struct client_info *ci)
 	else
 		req->rp.data_length = hdr->data_length;
 
-	dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
+	dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
+		ci->conn.ipstr, ci->conn.port);
 	queue_request(req);
 }
 
@@ -652,10 +654,13 @@ again:
 
 	if (is_conn_dead(&ci->conn)) {
 		free_request(ci->tx_req);
+		ci->tx_req = NULL;
 		return;
 	}
 
 	if (ci->conn.c_tx_state == C_IO_END) {
+		dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
+			ci->conn.ipstr, ci->conn.port);
 		free_request(ci->tx_req);
 		ci->tx_req = NULL;
 		goto again;
@@ -671,6 +676,23 @@ static void destroy_client(struct client_info *ci)
 
 static void clear_client(struct client_info *ci)
 {
+	struct request *req;
+
+	if (ci->rx_req) {
+		free_request(ci->rx_req);
+		ci->rx_req = NULL;
+	}
+
+	if (ci->tx_req) {
+		free_request(ci->tx_req);
+		ci->tx_req = NULL;
+	}
+
+	list_for_each_entry(req, &ci->done_reqs, request_list) {
+		list_del(&req->request_list);
+		free_request(req);
+	}
+
 	if (!list_empty(&ci->conn.blocking_siblings))
 		list_del_init(&ci->conn.blocking_siblings);
 
@@ -739,8 +761,7 @@ static void client_handler(int fd, int events, void *data)
 
 	if (is_conn_dead(&ci->conn)) {
 err:
-		dprintf("closed connection %d, %s:%d\n", fd,
-			ci->conn.ipstr, ci->conn.port);
+		dprintf("connection seems to be dead\n");
 		clear_client(ci);
 	}
 }
