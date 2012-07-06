@@ -59,7 +59,6 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.epoch = sd_epoch;
 	hdr.opcode = SD_OP_READ_OBJ;
-	hdr.flags = SD_FLAG_CMD_WEAK_CONSISTENCY;
 	hdr.data_length = rlen;
 
 	hdr.obj.oid = oid;
