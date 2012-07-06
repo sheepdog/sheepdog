@@ -36,12 +36,10 @@
  */
 #define SD_OP_DEL_VDI        0x81
 #define SD_OP_GET_NODE_LIST  0x82
-#define SD_OP_GET_VM_LIST    0x83
 #define SD_OP_MAKE_FS        0x84
 #define SD_OP_SHUTDOWN       0x85
 #define SD_OP_STAT_SHEEP     0x86
 #define SD_OP_STAT_CLUSTER   0x87
-#define SD_OP_KILL_NODE      0x88
 #define SD_OP_GET_VDI_ATTR   0x89
 #define SD_OP_RECOVER        0x8a
 #define SD_OP_GET_STORE_LIST 0x90

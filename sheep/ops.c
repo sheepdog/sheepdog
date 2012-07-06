@@ -380,11 +380,6 @@ static int local_stat_cluster(struct request *req)
 	}
 }
 
-static int local_kill_node(struct request *req)
-{
-	exit(1);
-}
-
 static int local_get_obj_list(struct request *req)
 {
 	return get_obj_list((const struct sd_list_req *)&req->rq,
@@ -872,12 +867,6 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_work = local_stat_cluster,
-	},
-
-	[SD_OP_KILL_NODE] = {
-		.type = SD_OP_TYPE_LOCAL,
-		.force = 1,
-		.process_work = local_kill_node,
 	},
 
 	[SD_OP_GET_OBJ_LIST] = {
