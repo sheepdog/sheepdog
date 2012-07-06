@@ -230,7 +230,7 @@ find_confchg_event(enum corosync_event_type type, struct cpg_node *sender)
 static inline bool event_is_confchg(enum corosync_event_type type)
 {
 	if (type == COROSYNC_EVENT_TYPE_BLOCK ||
-	    type == COROSYNC_MSG_TYPE_NOTIFY)
+	    type == COROSYNC_EVENT_TYPE_NOTIFY)
 		return false;
 
 	return true;
