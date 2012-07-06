@@ -1,7 +1,7 @@
 .TH SHEEPDOG 2012-06-27
 .SH NAME
-sheepfs \- A pseudo file system exports both Sheepdog's internal state as well as Sheepdog's stroage
-.SH SNYNOPSIS
+sheepfs \- A pseudo file system exports both Sheepdog's internal state as well as Sheepdog's storage
+.SH SYNOPSIS
 .B "sheepfs [OPTION]... MOUNTPOINT"
 .SH DESCRIPTION
 .B sheepfs
@@ -17,13 +17,13 @@ virtual machines use the sheep daemon via a block driver available in qemu(1).
 
 Sheepfs is a FUSE-based pseudo file system in userland to access both
 Sheepdog's internal state (for e.g, cluster info, vdi list) as well as
-Sheepdog's high reliable stroage.
+Sheepdog's high reliable storage.
 
-The idea here is that its sometimes useful that we can envision our interactio
+The idea here is that its sometimes useful that we can envision our interaction
 with an Sheepdog's object in terms of a directory structure and filesystem
 operations.
 
-People mighte be mostly intrested into sheepfs's volume directory, which export
+People might be mostly interested into sheepfs's volume directory, which export
 VM's volume as a pseudo block file in your local file system hierarchy, which
 can be used as
 
@@ -33,7 +33,7 @@ can be used as
 
 3. a loop device file for some VM's image, which you want to access(RW) its internal data.
 
-4. stroage media for other hypervisor, such as XEN
+4. storage media for other hypervisor, such as XEN
 
 This file abstraction integrates well into kernel's pagecache.
 .SH OPTIONS
