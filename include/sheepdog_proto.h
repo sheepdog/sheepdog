@@ -34,6 +34,7 @@
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
 #define SD_FLAG_CMD_CACHE    0x04
+/* flags above 0x80 are sheepdog-internal */
 
 #define SD_RES_SUCCESS       0x00 /* Success */
 #define SD_RES_UNKNOWN       0x01 /* Unknown error */
@@ -66,6 +67,8 @@
 #define SD_RES_NO_SUPPORT       0x21 /* Operation is not supported by backend store */
 #define SD_RES_CLUSTER_RECOVERING 0x22 /* Cluster is recovering. */
 #define SD_RES_OBJ_RECOVERING     0x23 /* Object is recovering */
+
+/* errors above 0x80 are sheepdog-internal */
 
 /*
  * Object ID rules

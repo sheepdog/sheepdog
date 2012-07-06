@@ -58,20 +58,21 @@
 #define SD_OP_WRITE_PEER     0xa5
 #define SD_OP_REMOVE_PEER    0xa6
 
-/* 0x0010 was SD_FLAG_CMD_IO_LOCAL */
-#define SD_FLAG_CMD_RECOVERY 0x0020
+/* internal flags for hdr.flags, must be above 0x80 */
+#define SD_FLAG_CMD_RECOVERY 0x0080
 
 /* flags for VDI attribute operations */
 #define SD_FLAG_CMD_CREAT    0x0100
 #define SD_FLAG_CMD_EXCL     0x0200
 #define SD_FLAG_CMD_DEL      0x0400
 
-#define SD_RES_OLD_NODE_VER  0x41 /* Remote node has an old epoch */
-#define SD_RES_NEW_NODE_VER  0x42 /* Remote node has a new epoch */
-#define SD_RES_NOT_FORMATTED 0x43 /* Sheepdog is not formatted yet */
-#define SD_RES_INVALID_CTIME 0x44 /* Creation time of sheepdog is different */
-#define SD_RES_INVALID_EPOCH 0x45 /* Invalid epoch */
-#define SD_RES_NETWORK_ERROR 0x81 /* Network error between sheep */
+/* internal error return values, must be above 0x80 */
+#define SD_RES_OLD_NODE_VER  0x81 /* Remote node has an old epoch */
+#define SD_RES_NEW_NODE_VER  0x82 /* Remote node has a new epoch */
+#define SD_RES_NOT_FORMATTED 0x83 /* Sheepdog is not formatted yet */
+#define SD_RES_INVALID_CTIME 0x84 /* Creation time of sheepdog is different */
+#define SD_RES_INVALID_EPOCH 0x85 /* Invalid epoch */
+#define SD_RES_NETWORK_ERROR 0x86 /* Network error between sheep */
 
 #define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
 
