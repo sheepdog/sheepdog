@@ -125,10 +125,8 @@ void unregister_event(int fd)
 	struct event_info *ei;
 
 	ei = lookup_event(fd);
-	if (!ei) {
-		eprintf("event info for fd %d not found\n", fd);
+	if (!ei)
 		return;
-	}
 
 	ret = epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
 	if (ret)

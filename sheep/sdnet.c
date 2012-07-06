@@ -385,8 +385,7 @@ static void requeue_request(struct request *req)
 	queue_request(req);
 }
 
-static void client_incref(struct client_info *ci);
-static void client_decref(struct client_info *ci);
+static void clear_client(struct client_info *ci);
 
 static struct request *alloc_local_request(void *data, int data_length)
 {
@@ -446,7 +445,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 		return NULL;
 
 	req->ci = ci;
-	client_incref(ci);
+	ci->refcnt++;
 	if (data_length) {
 		req->data_length = data_length;
 		req->data = valloc(data_length);
@@ -470,6 +469,7 @@ static void free_request(struct request *req)
 	sys->nr_outstanding_reqs--;
 	sys->outstanding_data_size -= req->data_length;
 
+	req->ci->refcnt--;
 	put_vnode_info(req->vnodes);
 	free(req->data);
 	free(req);
@@ -490,11 +490,10 @@ void put_request(struct request *req)
 		if (conn_tx_on(&ci->conn)) {
 			dprintf("connection seems to be dead\n");
 			free_request(req);
+			clear_client(ci);
 		} else {
 			list_add(&req->request_list, &ci->done_reqs);
 		}
-
-		client_decref(ci);
 	}
 }
 
@@ -670,16 +669,21 @@ static void destroy_client(struct client_info *ci)
 	free(ci);
 }
 
-static void client_incref(struct client_info *ci)
+static void clear_client(struct client_info *ci)
 {
-	if (ci)
-		ci->refcnt++;
-}
+	if (!list_empty(&ci->conn.blocking_siblings))
+		list_del_init(&ci->conn.blocking_siblings);
 
-static void client_decref(struct client_info *ci)
-{
-	if (ci && --ci->refcnt == 0)
-		destroy_client(ci);
+	unregister_event(ci->conn.fd);
+
+	dprintf("refcnt:%d, fd:%d, %s:%d\n",
+		ci->refcnt, ci->conn.fd,
+		ci->conn.ipstr, ci->conn.port);
+
+	if (ci->refcnt)
+		return;
+
+	destroy_client(ci);
 }
 
 static struct client_info *create_client(int fd, struct cluster_info *cluster)
@@ -710,7 +714,7 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 
 	ci->conn.fd = fd;
 	ci->conn.events = EPOLLIN;
-	ci->refcnt = 1;
+	ci->refcnt = 0;
 
 	INIT_LIST_HEAD(&ci->done_reqs);
 	INIT_LIST_HEAD(&ci->conn.blocking_siblings);
@@ -737,12 +741,7 @@ static void client_handler(int fd, int events, void *data)
 err:
 		dprintf("closed connection %d, %s:%d\n", fd,
 			ci->conn.ipstr, ci->conn.port);
-
-		if (!list_empty(&ci->conn.blocking_siblings))
-			list_del_init(&ci->conn.blocking_siblings);
-
-		unregister_event(fd);
-		client_decref(ci);
+		clear_client(ci);
 	}
 }
 
