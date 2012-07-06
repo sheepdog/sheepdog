@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 
-#define SD_SHEEP_PROTO_VER 0x04
+#define SD_SHEEP_PROTO_VER 0x05
 
 #define SD_DEFAULT_REDUNDANCY 3
 #define SD_MAX_REDUNDANCY 8
@@ -31,8 +31,9 @@
 
 /*
  * Operations with opcodes above 0x80 are considered part of the inter-sheep
- * protocol and will in the near future be versioned independently of the
- * external sheepdog protocol.
+ * protocol and are versioned using SD_SHEEP_PROTO_VER instead of SD_PROTO_VER.
+ *
+ * These same applies for the above 0x80 flags and error values below.
  */
 #define SD_OP_DEL_VDI        0x81
 #define SD_OP_GET_NODE_LIST  0x82

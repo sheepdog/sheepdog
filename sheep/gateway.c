@@ -59,6 +59,7 @@ int gateway_read_obj(struct request *req)
 
 		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 		fwd_hdr.opcode = SD_OP_READ_PEER;
+		fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
 
 		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
@@ -238,6 +239,7 @@ static int do_gateway_write_obj(struct request *req, bool create)
 		fwd_hdr.opcode = SD_OP_CREATE_AND_WRITE_PEER;
 	else
 		fwd_hdr.opcode = SD_OP_WRITE_PEER;
+	fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
 
 	wlen = fwd_hdr.data_length;
 
@@ -320,6 +322,7 @@ int gateway_remove_obj(struct request *req)
 	write_info_init(&wi);
 	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
 	fwd_hdr.opcode = SD_OP_REMOVE_PEER;
+	fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
 
 	wlen = fwd_hdr.data_length;
 

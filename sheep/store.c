@@ -113,8 +113,7 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 			continue;
 		}
 
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_GET_EPOCH;
+		sd_init_req(&hdr, SD_OP_GET_EPOCH);
 		hdr.data_length = rlen = len;
 		hdr.obj.tgt_epoch = epoch;
 
@@ -501,8 +500,10 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 		}
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
+	if (create)
+		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+	else
+		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 	hdr.data_length = datalen;
 
@@ -537,8 +538,7 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 	}
 
 forward_read:
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_READ_OBJ;
+	sd_init_req(&hdr, SD_OP_READ_OBJ);
 	hdr.data_length = datalen;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
@@ -555,8 +555,7 @@ int remove_object(uint64_t oid)
 	struct sd_req hdr;
 	int ret;
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_REMOVE_OBJ;
+	sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 	hdr.obj.oid = oid;
 
 	ret = exec_local_req(&hdr, NULL);

@@ -80,8 +80,7 @@ static int update_node_list(int max_nodes, uint32_t epoch)
 		goto out;
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_GET_NODE_LIST;
+	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_NODE_LIST);
 	hdr.request_ver = epoch;
 
 	hdr.data_length = size;

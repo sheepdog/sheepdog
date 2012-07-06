@@ -102,8 +102,7 @@ static int recover_object_from_replica(uint64_t oid,
 		goto out;
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_READ_PEER;
+	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY;
 	hdr.data_length = rlen;
@@ -489,8 +488,7 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 	wlen = 0;
 	rlen = buf_size;
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_GET_OBJ_LIST;
+	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.tgt_epoch = epoch - 1;
 	hdr.flags = 0;
 	hdr.data_length = rlen;

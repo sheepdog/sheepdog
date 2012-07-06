@@ -296,6 +296,23 @@ static void queue_request(struct request *req)
 	struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
 
+	/*
+	 * Check the protocol version for all internal commands, and public
+	 * commands that have it set.  We can't enforce it on all public
+	 * ones as it isn't a mandatory part of the public protocol.
+	 */
+	if (hdr->opcode >= 0x80) {
+		if (hdr->proto_ver != SD_SHEEP_PROTO_VER) {
+			rsp->result = SD_RES_VER_MISMATCH;
+			goto done;
+		}
+	} else if (hdr->proto_ver) {
+		if (hdr->proto_ver != SD_PROTO_VER) {
+			rsp->result = SD_RES_VER_MISMATCH;
+			goto done;
+		}
+	}
+
 	req->op = get_sd_op(hdr->opcode);
 	if (!req->op) {
 		eprintf("invalid opcode %d\n", hdr->opcode);

@@ -662,8 +662,7 @@ static int get_vdi_bitmap_from(struct sd_node *node)
 
 	vprintf(SDOG_ERR, "%s:%d\n", host, node->nid.port);
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_READ_VDIS;
+	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.epoch = sys->epoch;
 	hdr.data_length = sizeof(tmp_vdi_inuse);
 	rlen = hdr.data_length;

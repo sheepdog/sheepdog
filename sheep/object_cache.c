@@ -495,7 +495,7 @@ out:
 /* Fetch the object, cache it in success */
 static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
-	struct sd_req hdr = { 0 };
+	struct sd_req hdr;
 	int ret = SD_RES_NO_MEM;
 	uint64_t oid;
 	uint32_t data_length;
@@ -515,7 +515,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		goto out;
 	}
 
-	hdr.opcode = SD_OP_READ_OBJ;
+	sd_init_req(&hdr, SD_OP_READ_OBJ);
 	hdr.data_length = data_length;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = 0;
@@ -581,8 +581,10 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = create ? SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
+	if (create)
+		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+	else
+		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = data_length;
 	hdr.obj.oid = oid;
@@ -790,9 +792,9 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		return SD_RES_NO_MEM;
 
 	if (create)
-		req->rq.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+		sd_init_req(&req->rq, SD_OP_CREATE_AND_WRITE_OBJ);
 	else
-		req->rq.opcode = SD_OP_WRITE_OBJ;
+		sd_init_req(&req->rq, SD_OP_WRITE_OBJ);
 	req->rq.flags = flags | SD_FLAG_CMD_WRITE;
 	req->rq.data_length = datalen;
 
@@ -823,7 +825,7 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 	if (!req)
 		return SD_RES_NO_MEM;
 
-	req->rq.opcode = SD_OP_READ_OBJ;
+	sd_init_req(&req->rq, SD_OP_READ_OBJ);
 	req->rq.data_length = datalen;
 
 	req->rq.obj.oid = oid;

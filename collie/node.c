@@ -73,9 +73,7 @@ static int node_info(int argc, char **argv)
 		if (fd < 0)
 			return 1;
 
-		memset(&req, 0, sizeof(req));
-
-		req.opcode = SD_OP_STAT_SHEEP;
+		sd_init_req((struct sd_req *)&req, SD_OP_STAT_SHEEP);
 		req.epoch = sd_epoch;
 
 		wlen = 0;
@@ -140,9 +138,7 @@ static int node_recovery(int argc, char **argv)
 		if (fd < 0)
 			return EXIT_FAILURE;
 
-		memset(&req, 0, sizeof(req));
-
-		req.opcode = SD_OP_STAT_RECOVERY;
+		sd_init_req((struct sd_req *)&req, SD_OP_STAT_RECOVERY);
 
 		wlen = 0;
 		rlen = 0;

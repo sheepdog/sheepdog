@@ -280,9 +280,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		if (fd < 0)
 			break;
 
-		memset(&hdr, 0, sizeof(hdr));
-
-		hdr.opcode = SD_OP_READ_PEER;
+		sd_init_req(&hdr, SD_OP_READ_PEER);
 		hdr.data_length = rlen;
 		hdr.flags = 0;
 		hdr.epoch = sd_epoch;
@@ -371,11 +369,10 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
 	strncpy(buf + SD_MAX_VDI_LEN, tag, SD_MAX_VDI_TAG_LEN);
 
-	memset(&hdr, 0, sizeof(hdr));
 	if (for_snapshot)
-		hdr.opcode = SD_OP_GET_VDI_INFO;
+		sd_init_req(&hdr, SD_OP_GET_VDI_INFO);
 	else
-		hdr.opcode = SD_OP_LOCK_VDI;
+		sd_init_req(&hdr, SD_OP_LOCK_VDI);
 	wlen = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
 	hdr.proto_ver = SD_PROTO_VER;
 	hdr.data_length = wlen;
@@ -422,8 +419,7 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 
 	wlen = SD_MAX_VDI_LEN;
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_NEW_VDI;
+	sd_init_req(&hdr, SD_OP_NEW_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
 
@@ -709,12 +705,10 @@ static int vdi_delete(int argc, char **argv)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
 	rlen = 0;
 	wlen = sizeof(vdiname);
 
-	hdr.opcode = SD_OP_DEL_VDI;
+	sd_init_req(&hdr, SD_OP_DEL_VDI);
 	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
@@ -828,9 +822,7 @@ again:
 	if (fd < 0)
 		goto error;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_STAT_CLUSTER;
+	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
@@ -952,8 +944,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 		return SD_RES_EIO;
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_GET_VDI_ATTR;
+	sd_init_req(&hdr, SD_OP_GET_VDI_ATTR);
 	wlen = SD_ATTR_OBJ_SIZE;
 	rlen = 0;
 	hdr.proto_ver = SD_PROTO_VER;
@@ -1318,7 +1309,7 @@ out:
 
 static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 {
-	struct sd_req hdr = { 0 };
+	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
 	unsigned wlen = 0, rlen = SD_DATA_OBJ_SIZE;
@@ -1339,7 +1330,7 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 		exit(EXIT_FAILURE);
 	}
 
-	hdr.opcode = SD_OP_READ_PEER;
+	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = 0;
 	hdr.data_length = rlen;
@@ -1364,7 +1355,7 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 
 static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 {
-	struct sd_req hdr = { 0 };
+	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
 	unsigned wlen = SD_DATA_OBJ_SIZE, rlen = 0;
@@ -1378,7 +1369,7 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 		exit(EXIT_FAILURE);
 	}
 
-	hdr.opcode = SD_OP_WRITE_PEER;
+	sd_init_req(&hdr, SD_OP_WRITE_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;

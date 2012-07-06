@@ -45,11 +45,10 @@ static int list_store(void)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
 	wlen = 0;
 	rlen = 512;
-	hdr.opcode = SD_OP_GET_STORE_LIST;
+
+	sd_init_req(&hdr, SD_OP_GET_STORE_LIST);
 	hdr.data_length = rlen;
 
 	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
@@ -87,9 +86,7 @@ static int cluster_format(int argc, char **argv)
 
 	gettimeofday(&tv, NULL);
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_MAKE_FS;
+	sd_init_req((struct sd_req *)&hdr, SD_OP_MAKE_FS);
 	hdr.copies = cluster_cmd_data.copies;
 	if (cluster_cmd_data.nohalt)
 		set_nohalt(&hdr.flags);
@@ -149,9 +146,7 @@ again:
 	if (fd < 0)
 		goto error;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_STAT_CLUSTER;
+	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
@@ -220,9 +215,7 @@ static int cluster_shutdown(int argc, char **argv)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_SHUTDOWN;
+	sd_init_req(&hdr, SD_OP_SHUTDOWN);
 	hdr.epoch = sd_epoch;
 
 	rlen = 0;
@@ -255,9 +248,7 @@ static int restore_snap(uint32_t epoch)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_RESTORE;
+	sd_init_req(&hdr, SD_OP_RESTORE);
 	hdr.obj.tgt_epoch = epoch;
 
 	rlen = 0;
@@ -309,11 +300,10 @@ static int list_snap(void)
 	if (fd < 0)
 		goto out;
 
-	memset(&hdr, 0, sizeof(hdr));
-
 	wlen = 0;
 	rlen = SD_DATA_OBJ_SIZE;
-	hdr.opcode = SD_OP_GET_SNAP_FILE;
+
+	sd_init_req(&hdr, SD_OP_GET_SNAP_FILE);
 	hdr.data_length = rlen;
 
 	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
@@ -348,9 +338,7 @@ static int do_snapshot(void)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_SNAPSHOT;
+	sd_init_req(&hdr, SD_OP_SNAPSHOT);
 
 	rlen = 0;
 	wlen = 0;
@@ -394,9 +382,7 @@ static int cluster_cleanup(int argc, char **argv)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_CLEANUP;
+	sd_init_req(&hdr, SD_OP_CLEANUP);
 
 	rlen = 0;
 	wlen = 0;
@@ -450,9 +436,7 @@ static int cluster_recover(int argc, char **argv)
 			return EXIT_SUCCESS;
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_RECOVER;
+	sd_init_req(&hdr, SD_OP_RECOVER);
 	hdr.epoch = sd_epoch;
 
 	rlen = 0;

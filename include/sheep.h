@@ -39,6 +39,13 @@ struct trace_graph_item {
 	unsigned long long return_time;
 };
 
+static inline void sd_init_req(struct sd_req *req, uint8_t opcode)
+{
+	memset(req, 0, sizeof(*req));
+	req->opcode = opcode;
+	req->proto_ver = opcode < 0x80 ? SD_PROTO_VER : SD_SHEEP_PROTO_VER;
+}
+
 static inline int same_node(struct sd_vnode *e, int n1, int n2)
 {
 	if (memcmp(e[n1].nid.addr, e[n2].nid.addr, sizeof(e->nid.addr)) == 0 &&

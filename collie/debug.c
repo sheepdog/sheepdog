@@ -45,8 +45,7 @@ static int do_trace_cat(void)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.opcode = SD_OP_TRACE_CAT;
+	sd_init_req(&hdr, SD_OP_TRACE_CAT);
 	hdr.data_length = rlen = TRACE_BUF_LEN;
 	hdr.epoch = sd_epoch;
 
@@ -102,9 +101,7 @@ static int debug_trace(int argc, char **argv)
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	memset(&hdr, 0, sizeof(hdr));
-
-	hdr.opcode = SD_OP_TRACE;
+	sd_init_req(&hdr, SD_OP_TRACE);
 	hdr.epoch = sd_epoch;
 	hdr.data_length = enabled;
 

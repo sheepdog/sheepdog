@@ -162,9 +162,6 @@ static int cluster_get_vdi_info(struct request *req)
 	void *tag;
 	int ret;
 
-	if (hdr->proto_ver != SD_PROTO_VER)
-		return SD_RES_VER_MISMATCH;
-
 	if (hdr->data_length == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
 		tag = (char *)req->data + SD_MAX_VDI_LEN;
 	else if (hdr->data_length == SD_MAX_VDI_LEN)
@@ -608,8 +605,7 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 		rlen = SD_DATA_OBJ_SIZE;
 		wlen = 0;
 
-		memset(&hdr, 0, sizeof(hdr));
-		hdr.opcode = SD_OP_READ_PEER;
+		sd_init_req(&hdr, SD_OP_READ_PEER);
 		hdr.epoch = epoch;
 		hdr.data_length = rlen;
 

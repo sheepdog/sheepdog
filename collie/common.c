@@ -56,9 +56,8 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		return SD_RES_EIO;
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
+	sd_init_req(&hdr, SD_OP_READ_OBJ);
 	hdr.epoch = sd_epoch;
-	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.data_length = rlen;
 
 	hdr.obj.oid = oid;
@@ -95,12 +94,12 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 		return SD_RES_EIO;
 	}
 
-	memset(&hdr, 0, sizeof(hdr));
-	hdr.epoch = sd_epoch;
 	if (create)
-		hdr.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
 	else
-		hdr.opcode = SD_OP_WRITE_OBJ;
+		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
+
+	hdr.epoch = sd_epoch;
 	hdr.data_length = wlen;
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 
@@ -140,9 +139,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 		return fd;
 	}
 
-	memset(&req, 0, sizeof(req));
-
-	req.opcode = SD_OP_READ_VDIS;
+	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
 	req.epoch = sd_epoch;
 
