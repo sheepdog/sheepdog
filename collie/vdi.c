@@ -374,7 +374,6 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 	else
 		sd_init_req(&hdr, SD_OP_LOCK_VDI);
 	wlen = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
-	hdr.proto_ver = SD_PROTO_VER;
 	hdr.data_length = wlen;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.vdi.snapid = snapid;
@@ -947,7 +946,6 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	sd_init_req(&hdr, SD_OP_GET_VDI_ATTR);
 	wlen = SD_ATTR_OBJ_SIZE;
 	rlen = 0;
-	hdr.proto_ver = SD_PROTO_VER;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
 	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
