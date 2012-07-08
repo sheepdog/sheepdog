@@ -148,7 +148,7 @@ _collie_vdi_setattr()
 _collie_cluster()
 {
     local opts
-    opts="info format shutdown recover"
+    opts="info format shutdown recover snapshot cleanup"
 
     case "$1" in
         info)
@@ -160,6 +160,10 @@ _collie_cluster()
             ;;
         recover)
             _collie_cluster_recover
+            ;;
+        snapshot)
+            ;;
+        cleanup)
             ;;
         "")
             COMPREPLY=($( compgen \
@@ -175,12 +179,14 @@ _collie_cluster()
 _collie_node()
 {
     local opts
-    opts="info list"
+    opts="info list recovery"
 
     case "$1" in
         info)
             ;;
         list)
+            ;;
+        recovery)
             ;;
         "")
             COMPREPLY=($( compgen \
@@ -197,7 +203,7 @@ _collie_vdi()
 {
     local opts
     opts="create snapshot clone resize read write \
-list tree graph delete object setattr getattr"
+list tree graph delete object setattr getattr track check"
 
     case "$1" in
 	create)
@@ -232,6 +238,10 @@ list tree graph delete object setattr getattr"
             _collie_vdi_setattr
             ;;
         getattr)
+            ;;
+        track)
+            ;;
+        check)
             ;;
         "")
             COMPREPLY=($( compgen \
