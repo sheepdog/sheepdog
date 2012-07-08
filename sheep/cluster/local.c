@@ -340,29 +340,17 @@ static void local_unblock(void *msg, size_t msg_len)
 	shm_queue_unlock();
 }
 
-static void local_handler(int listen_fd, int events, void *data)
+/*
+ * Returns true if an event is processed
+ */
+static bool local_process_event(void)
 {
-	struct signalfd_siginfo siginfo;
 	struct local_event *ev;
 	enum cluster_join_result res;
-	int ret;
-
-	if (events & EPOLLHUP) {
-		eprintf("local driver received EPOLLHUP event, exiting.\n");
-		log_close();
-		exit(1);
-	}
-
-	dprintf("read siginfo\n");
-
-	ret = read(sigfd, &siginfo, sizeof(siginfo));
-	assert(ret == sizeof(siginfo));
-
-	shm_queue_lock();
 
 	ev = shm_queue_peek();
 	if (!ev)
-		goto out;
+		return false;
 
 	switch (ev->type) {
 	case EVENT_JOIN_REQUEST:
@@ -403,7 +391,8 @@ static void local_handler(int listen_fd, int events, void *data)
 		shm_queue_pop();
 		break;
 	case EVENT_BLOCK:
-		sd_block_handler(&ev->sender);
+		if (!sd_block_handler(&ev->sender))
+			return false;
 		break;
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev->sender, ev->buf, ev->buf_len);
@@ -411,7 +400,30 @@ static void local_handler(int listen_fd, int events, void *data)
 		break;
 	}
 
-out:
+	return true;
+}
+
+static void local_handler(int listen_fd, int events, void *data)
+{
+	struct signalfd_siginfo siginfo;
+	int ret;
+
+	if (events & EPOLLHUP) {
+		eprintf("local driver received EPOLLHUP event, exiting.\n");
+		log_close();
+		exit(1);
+	}
+
+	dprintf("read siginfo\n");
+
+	ret = read(sigfd, &siginfo, sizeof(siginfo));
+	assert(ret == sizeof(siginfo));
+
+	shm_queue_lock();
+
+	while (local_process_event())
+		;
+
 	shm_queue_unlock();
 }
 
