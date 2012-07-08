@@ -714,20 +714,12 @@ int peer_create_and_write_obj(struct request *req)
 	uint64_t oid = hdr->obj.oid;
 	char *buf = NULL;
 	struct siocb iocb;
-	unsigned data_length;
 	int ret = SD_RES_SUCCESS;
-
-	if (is_vdi_obj(oid))
-		data_length = SD_INODE_SIZE;
-	else if (is_vdi_attr_obj(oid))
-		data_length = SD_ATTR_OBJ_SIZE;
-	else
-		data_length = SD_DATA_OBJ_SIZE;
 
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	iocb.length = data_length;
+	iocb.length = get_objsize(oid);
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		dprintf("%" PRIx64 ", %" PRIx64 "\n", oid, hdr->obj.cow_oid);
 

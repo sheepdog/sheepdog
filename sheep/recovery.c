@@ -67,12 +67,7 @@ static int recover_object_from_replica(uint64_t oid,
 	void *buf;
 	struct siocb iocb = { 0 };
 
-	if (is_vdi_obj(oid))
-		rlen = SD_INODE_SIZE;
-	else if (is_vdi_attr_obj(oid))
-		rlen = SD_ATTR_OBJ_SIZE;
-	else
-		rlen = SD_DATA_OBJ_SIZE;
+	rlen = get_objsize(oid);
 
 	buf = valloc(rlen);
 	if (!buf) {

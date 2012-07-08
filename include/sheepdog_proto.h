@@ -239,6 +239,17 @@ static inline int is_data_obj(uint64_t oid)
 		!is_vdi_attr_obj(oid);
 }
 
+static inline size_t get_objsize(uint64_t oid)
+{
+	if (is_vdi_obj(oid))
+		return SD_INODE_SIZE;
+
+	if (is_vdi_attr_obj(oid))
+		return SD_ATTR_OBJ_SIZE;
+
+	return SD_DATA_OBJ_SIZE;
+}
+
 static inline uint64_t data_oid_to_idx(uint64_t oid)
 {
 	return oid & (MAX_DATA_OBJS - 1);
