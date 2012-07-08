@@ -614,14 +614,13 @@ static int start_deletion(struct request *req, uint32_t vid)
 	if (dw->count == 0)
 		goto out;
 
-	if (!list_empty(&deletion_work_list)) {
-		list_add_tail(&dw->dw_siblings, &deletion_work_list);
-		goto out;
-	}
-
 	uatomic_inc(&req->refcnt);
-	list_add_tail(&dw->dw_siblings, &deletion_work_list);
-	queue_work(sys->deletion_wqueue, &dw->work);
+
+	if (list_empty(&deletion_work_list)) {
+		list_add_tail(&dw->dw_siblings, &deletion_work_list);
+		queue_work(sys->deletion_wqueue, &dw->work);
+	} else
+		list_add_tail(&dw->dw_siblings, &deletion_work_list);
 out:
 	return SD_RES_SUCCESS;
 err:
