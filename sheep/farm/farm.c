@@ -115,7 +115,7 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 		dprintf("%"PRIu32" sys %"PRIu32"\n", iocb->epoch, sys_epoch());
 		return SD_RES_OLD_NODE_VER;
 	}
-	if (is_vdi_obj(oid))
+	if (!is_data_obj(oid))
 		flags &= ~O_DIRECT;
 
 	if (create)
@@ -132,8 +132,7 @@ static int farm_write(uint64_t oid, struct siocb *iocb, int create)
 		goto out;
 	}
 	if (create && !(iocb->flags & SD_FLAG_CMD_COW)) {
-		ret = prealloc(fd, is_vdi_obj(oid) ?
-			       SD_INODE_SIZE : SD_DATA_OBJ_SIZE);
+		ret = prealloc(fd, get_objsize(oid));
 		if (ret != SD_RES_SUCCESS) {
 			if (flock(fd, LOCK_UN) < 0) {
 				ret = SD_RES_EIO;
@@ -362,7 +361,7 @@ static void *read_working_object(uint64_t oid, uint64_t offset,
 
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
 
-	if (is_vdi_obj(oid))
+	if (!is_data_obj(oid))
 		flags &= ~O_DIRECT;
 
 	fd = open(path, flags);
@@ -459,7 +458,7 @@ static int farm_read(uint64_t oid, struct siocb *iocb)
 		return SD_RES_SUCCESS;
 	}
 
-	if (is_vdi_obj(oid))
+	if (!is_data_obj(oid))
 		flags &= ~O_DIRECT;
 
 	sprintf(path, "%s%016"PRIx64, obj_path, oid);
@@ -499,7 +498,7 @@ static int farm_atomic_put(uint64_t oid, struct siocb *iocb)
 	snprintf(tmp_path, sizeof(tmp_path), "%s%016" PRIx64 ".tmp",
 		 obj_path, oid);
 
-	if (is_vdi_obj(oid))
+	if (!is_data_obj(oid))
 		flags &= ~O_DIRECT;
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
