@@ -7,7 +7,7 @@
 1.  OVERVIEW
 
 Farm is an object store for Sheepdog on node basis. It consists of backend
-store, which caches the snapshot objects, and working drrectory, storing
+store, which caches the snapshot objects, and working directory, storing
 objects that Sheepdog currently operates. That being said, the I/O performance
 for VM Guests would be practically the same as Simple Store.
 
