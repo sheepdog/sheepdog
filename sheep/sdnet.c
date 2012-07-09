@@ -676,7 +676,7 @@ static void destroy_client(struct client_info *ci)
 
 static void clear_client(struct client_info *ci)
 {
-	struct request *req;
+	struct request *req, *t;
 
 	if (ci->rx_req) {
 		free_request(ci->rx_req);
@@ -688,7 +688,7 @@ static void clear_client(struct client_info *ci)
 		ci->tx_req = NULL;
 	}
 
-	list_for_each_entry(req, &ci->done_reqs, request_list) {
+	list_for_each_entry_safe(req, t, &ci->done_reqs, request_list) {
 		list_del(&req->request_list);
 		free_request(req);
 	}
