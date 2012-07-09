@@ -349,8 +349,8 @@ static void node_btree_add(void **btroot, struct zk_node *znode)
 	else if (*p != n) {
 		**p = *n;
 		free(n);
-	}
-	nr_zk_nodes++;
+	} else
+		nr_zk_nodes++;
 }
 
 static inline void node_btree_del(void **btroot, struct zk_node *znode)
