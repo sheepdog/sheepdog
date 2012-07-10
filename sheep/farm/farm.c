@@ -376,19 +376,31 @@ static void *read_working_object(uint64_t oid, uint64_t offset,
 		goto out;
 	}
 
+	if (flock(fd, LOCK_SH) < 0) {
+		eprintf("%m\n");
+		goto err;
+	}
+
 	size = xpread(fd, buf, length, offset);
+	if (flock(fd, LOCK_UN) < 0) {
+		eprintf("%m\n");
+		goto err;
+	}
+
 	if (length != size) {
 		eprintf("size %zu len %"PRIu32" off %"PRIu64" %m\n", size,
 			length, offset);
-		free(buf);
-		buf = NULL;
-		goto out;
+		goto err;
 	}
 
 out:
 	if (fd > 0)
 		close(fd);
 	return buf;
+err:
+	free(buf);
+	close(fd);
+	return NULL;
 }
 
 static void *retrieve_object_from_snap(uint64_t oid, uint32_t epoch)
