@@ -284,6 +284,7 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 	enum cluster_join_result res;
 	struct sd_node entries[SD_MAX_NODES];
 	int idx;
+	static bool blocked = false;
 
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
@@ -342,11 +343,16 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		sd_leave_handler(&cevent->sender.ent, entries, nr_cpg_nodes);
 		break;
 	case COROSYNC_EVENT_TYPE_BLOCK:
-		sd_block_handler(&cevent->sender.ent);
+		if (blocked)
+			/* block events until the unblock message changes this
+			   event type to COROSYNC_EVENT_TYPE_NOTIFY */
+			return 0;
+		blocked = sd_block_handler(&cevent->sender.ent);
 
 		/* block other messages until the unblock message comes */
 		return 0;
 	case COROSYNC_EVENT_TYPE_NOTIFY:
+		blocked = false;
 		sd_notify_handler(&cevent->sender.ent, cevent->msg,
 						 cevent->msg_len);
 		break;
