@@ -12,13 +12,13 @@
 #include <errno.h>
 #include <sys/mman.h>
 #include <linux/limits.h>
-#include <openssl/sha.h>
 #include <zlib.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "logger.h"
 #include "strbuf.h"
+#include "sha1.h"
 
 #define HEX_LEN         40
 #define NAME_LEN        HEX_LEN

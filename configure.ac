@@ -280,10 +280,6 @@ if test "x${enable_accord}" = xyes; then
 fi
 
 if test "x${enable_farm}" = xyes; then
-	AC_CHECK_LIB([crypto], [SHA1_Init],,
-		AC_MSG_ERROR(libcrypto not found))
-	AC_CHECK_HEADERS([openssl/sha.h],,
-		AC_MSG_ERROR(sha.h header missing))
 	AC_DEFINE_UNQUOTED([HAVE_FARM], 1, [have farm])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES farm"
 fi

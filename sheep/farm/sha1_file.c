@@ -138,11 +138,11 @@ err_open:
 int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *outsha1)
 {
 	unsigned char sha1[SHA1_LEN];
-	SHA_CTX c;
+	struct sha1_ctx c;
 
-	SHA1_Init(&c);
-	SHA1_Update(&c, buf, len);
-	SHA1_Final(sha1, &c);
+	sha1_init(&c);
+	sha1_update(&c, buf, len);
+	sha1_final(&c, sha1);
 
 	if (sha1_buffer_write(sha1, buf, len) < 0)
 		return -1;
@@ -197,11 +197,11 @@ static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file
 static int verify_sha1_file(const unsigned char *sha1, void *buf, unsigned long len)
 {
 	unsigned char tmp[SHA1_LEN];
-	SHA_CTX c;
+	struct sha1_ctx c;
 
-	SHA1_Init(&c);
-	SHA1_Update(&c, buf, len);
-	SHA1_Final(tmp, &c);
+	sha1_init(&c);
+	sha1_update(&c, buf, len);
+	sha1_final(&c, tmp);
 
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
 		dprintf("failed, %s != %s\n", sha1_to_hex(sha1),
