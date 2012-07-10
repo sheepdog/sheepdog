@@ -355,7 +355,7 @@ static bool local_process_event(void)
 	switch (ev->type) {
 	case EVENT_JOIN_REQUEST:
 		if (!node_eq(&ev->nodes[0], &this_node))
-			break;
+			return false;
 
 		res = sd_check_join_cb(&ev->sender, ev->buf);
 		ev->join_result = res;
@@ -370,7 +370,7 @@ static bool local_process_event(void)
 			shm_queue_unlock();
 			exit(1);
 		}
-		break;
+		return false;
 	case EVENT_JOIN_RESPONSE:
 		if (ev->join_result == CJ_RES_MASTER_TRANSFER) {
 			/* FIXME: This code is tricky, but Sheepdog assumes that */
@@ -391,9 +391,8 @@ static bool local_process_event(void)
 		shm_queue_pop();
 		break;
 	case EVENT_BLOCK:
-		if (!sd_block_handler(&ev->sender))
-			return false;
-		break;
+		sd_block_handler(&ev->sender);
+		return false;
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev->sender, ev->buf, ev->buf_len);
 		shm_queue_pop();
