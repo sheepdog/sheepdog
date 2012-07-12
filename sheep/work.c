@@ -267,15 +267,12 @@ destroy_threads:
 #ifdef COMPILE_UNUSED_CODE
 static void exit_work_queue(struct work_queue *q)
 {
-	int i;
 	struct worker_info *wi = container_of(q, struct worker_info, q);
 
 	q->wq_state |= WQ_DEAD;
 	pthread_cond_broadcast(&wi->pending_cond);
 
-	for (i = 0; wi->worker_thread[i] &&
-		     i < wi->nr_threads; i++)
-		pthread_join(wi->worker_thread[i], NULL);
+	pthread_join(wi->worker_thread, NULL);
 
 	pthread_cond_destroy(&wi->pending_cond);
 	pthread_mutex_destroy(&wi->pending_lock);
