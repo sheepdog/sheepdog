@@ -188,7 +188,8 @@ static int32_t zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 	sprintf(path, "%s/", QUEUE_ZNODE);
 	rc = zk_create(zh, path, (char *)ev, len,
 		&ZOO_OPEN_ACL_UNSAFE, ZOO_SEQUENCE, buf, sizeof(buf));
-	dprintf("create path:%s, nr_nodes:%ld, queue_pos:%010d, len:%d, rc:%d\n", buf, nr_zk_nodes, queue_pos, len, rc);
+	dprintf("create path:%s, nr_nodes:%zu, queue_pos:%010d, len:%d,"
+		" rc:%d\n", buf, nr_zk_nodes, queue_pos, len, rc);
 	if (rc != ZOK)
 		panic("failed to zk_create path:%s, rc:%d\n", path, rc);
 
@@ -288,7 +289,8 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	len = sizeof(*ev);
 	sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
 	rc = zk_get(zh, path, 1, (char *)ev, &len, NULL);
-	dprintf("read path:%s, nr_nodes:%ld, type:%d, len:%d, rc:%d\n", path, nr_zk_nodes, ev->type, len, rc);
+	dprintf("read path:%s, nr_nodes:%zu, type:%d, len:%d, rc:%d\n", path,
+		nr_zk_nodes, ev->type, len, rc);
 	if (rc != ZOK)
 		panic("failed to zk_set path:%s, rc:%d\n", path, rc);
 
@@ -401,7 +403,7 @@ static inline void build_node_list(void *btroot)
 	nr_sd_nodes = 0;
 	twalk(btroot, node_btree_build_list_fn);
 	assert(nr_sd_nodes == nr_zk_nodes);
-	dprintf("nr_sd_nodes:%lu\n", nr_sd_nodes);
+	dprintf("nr_sd_nodes:%zu\n", nr_sd_nodes);
 }
 
 static void node_btree_find_master_fn(const void *nodep,
@@ -477,7 +479,7 @@ static void zk_member_init(zhandle_t *zh)
 			}
 		}
 	}
-	dprintf("nr_nodes:%ld\n", nr_zk_nodes);
+	dprintf("nr_nodes:%zu\n", nr_zk_nodes);
 }
 
 
@@ -536,7 +538,7 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path, void* 
 	if (type == -1) {
 		cid = zoo_client_id(zh);
 		assert(cid != NULL);
-		dprintf("session change, clientid:%ld\n", cid->client_id);
+		dprintf("session change, clientid:%"PRId64"\n", cid->client_id);
 	}
 
 	/* discard useless event */
@@ -588,7 +590,7 @@ static int zk_join(struct sd_node *myself,
 	assert(cid != NULL);
 	this_node.clientid = *cid;
 
-	dprintf("clientid:%ld\n", cid->client_id);
+	dprintf("clientid:%"PRId64"\n", cid->client_id);
 
 	return add_event(zhandle, EVENT_JOIN_REQUEST, &this_node,
 			 opaque, opaque_len);
@@ -665,7 +667,7 @@ static void zk_handler(int listen_fd, int events, void *data)
 
 	switch (ev.type) {
 	case EVENT_JOIN_REQUEST:
-		dprintf("JOIN REQUEST nr_nodes: %ld, sender: %s, joined: %d\n",
+		dprintf("JOIN REQUEST nr_nodes: %zu, sender: %s, joined: %d\n",
 			nr_zk_nodes, node_to_str(&ev.sender.node),
 			ev.sender.joined);
 
@@ -725,8 +727,9 @@ static void zk_handler(int listen_fd, int events, void *data)
 			node_btree_clear(&zk_node_btroot);
 
 		node_btree_add(&zk_node_btroot, &ev.sender);
-		dprintf("one sheep joined[down], nr_nodes:%ld, sender:%s, joined:%d\n",
-				nr_zk_nodes, node_to_str(&ev.sender.node), ev.sender.joined);
+		dprintf("one sheep joined[down], nr_nodes:%zu, sender:%s,"
+			" joined:%d\n", nr_zk_nodes,
+			node_to_str(&ev.sender.node), ev.sender.joined);
 
 		switch (ev.join_result) {
 		case CJ_RES_SUCCESS:
@@ -761,7 +764,7 @@ static void zk_handler(int listen_fd, int events, void *data)
 		}
 
 		node_btree_del(&zk_node_btroot, n);
-		dprintf("one sheep left, nr_nodes:%ld\n", nr_zk_nodes);
+		dprintf("one sheep left, nr_nodes:%zu\n", nr_zk_nodes);
 
 		build_node_list(zk_node_btroot);
 		sd_leave_handler(&ev.sender.node, sd_nodes, nr_sd_nodes);

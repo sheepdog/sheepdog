@@ -499,7 +499,7 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 		return -1;
 	}
 
-	dprintf("%"PRIu64"\n", rsp->data_length / sizeof(uint64_t));
+	dprintf("%zu\n", rsp->data_length / sizeof(uint64_t));
 
 	return rsp->data_length / sizeof(uint64_t);
 }

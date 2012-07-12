@@ -93,7 +93,7 @@ static inline int idx_has_vdi_bit(uint32_t idx)
 static uint64_t calc_object_bmap(size_t len, off_t offset)
 {
 	int start, end, nr;
-	uint64_t bmap = 0;
+	unsigned long bmap = 0;
 
 	start = offset / CACHE_BLOCK_SIZE;
 	end = DIV_ROUND_UP(len + offset, CACHE_BLOCK_SIZE);
@@ -102,7 +102,7 @@ static uint64_t calc_object_bmap(size_t len, off_t offset)
 	while (nr--)
 		set_bit(start + nr, &bmap);
 
-	return bmap;
+	return (uint64_t)bmap;
 }
 
 static struct object_cache_entry *
@@ -355,8 +355,8 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf,
 	}
 
 	if (size != count) {
-		eprintf("size %zu, count:%zu, offset %zu %m\n",
-			size, count, offset);
+		eprintf("size %zu, count:%zu, offset %jd %m\n",
+			size, count, (intmax_t)offset);
 		ret = SD_RES_EIO;
 	}
 out_close:
@@ -400,8 +400,8 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf,
 	}
 
 	if (size != count) {
-		eprintf("size %zu, count:%zu, offset %zu %m\n",
-			size, count, offset);
+		eprintf("size %zu, count:%zu, offset %jd %m\n",
+			size, count, (intmax_t)offset);
 		ret = SD_RES_EIO;
 	}
 
