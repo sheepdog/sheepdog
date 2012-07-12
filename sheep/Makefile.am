@@ -38,9 +38,7 @@ if BUILD_ACCORD
 sheep_SOURCES		+= cluster/accord.c
 endif
 
-if BUILD_FARM
 sheep_SOURCES		+= farm/sha1_file.c farm/trunk.c farm/snap.c farm/farm.c
-endif
 
 if BUILD_TRACE
 sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/stabs.c trace/graph.c
