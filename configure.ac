@@ -279,6 +279,9 @@ if test "x${enable_trace}" = xyes; then
 	   test "x${enable_coverage}" = xyes; then
 		AC_MSG_ERROR(tracer cannot be used with debug options)
 	fi
+	if [[[ $host != *x86_64* ]]]; then
+		AC_MSG_ERROR(tracer can be used on x86_64 architectures)
+	fi
 	AC_CHECK_LIB([rt], [clock_gettime],,
 		AC_MSG_ERROR(librt not found))
 	AC_DEFINE_UNQUOTED([HAVE_TRACE], 1, [have trace])
