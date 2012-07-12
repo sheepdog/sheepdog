@@ -202,9 +202,12 @@ AC_ARG_WITH([initddir],
 	[ INITDDIR="$withval" ],
 	[ INITDDIR="$sysconfdir/init.d" ])
 
-AC_ARG_ENABLE([trace],
-	[  --enable-trace           : enable trace],,
-	[ enable_trace="no" ],)
+# Fixme: tracer is disabled for 0.4.0 and should be enabled later.
+#
+#AC_ARG_ENABLE([trace],
+#	[  --enable-trace           : enable trace],,
+#	[ enable_trace="no" ],)
+enable_trace="no"
 AM_CONDITIONAL(BUILD_TRACE, test x$enable_trace = xyes)
 
 PKG_CHECK_MODULES([fuse],[fuse], HAVE_FUSE="yes", HAVE_FUSE="no")
