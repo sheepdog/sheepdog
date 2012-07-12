@@ -275,6 +275,10 @@ if test "x${enable_accord}" = xyes; then
 fi
 
 if test "x${enable_trace}" = xyes; then
+	if test "x${enable_debug}" = xyes || \
+	   test "x${enable_coverage}" = xyes; then
+		AC_MSG_ERROR(tracer cannot be used with debug options)
+	fi
 	AC_CHECK_LIB([rt], [clock_gettime],,
 		AC_MSG_ERROR(librt not found))
 	AC_DEFINE_UNQUOTED([HAVE_TRACE], 1, [have trace])
