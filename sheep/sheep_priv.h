@@ -294,6 +294,7 @@ int has_process_main(struct sd_op_template *op);
 void do_process_work(struct work *work);
 int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
+int sheep_do_op_work(struct sd_op_template *op, struct request *req);
 
 /* Journal */
 struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,

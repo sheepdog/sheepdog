@@ -18,7 +18,8 @@
 /*
  * Try our best to read one copy and read local first.
  *
- * Return success if any read succeed.
+ * Return success if any read succeed. We don't call gateway_forward_request()
+ * because we only read once.
  */
 int gateway_read_obj(struct request *req)
 {
@@ -216,33 +217,22 @@ write_info_advance(struct write_info *wi, struct sd_vnode *v,
 	wi->nr_sent++;
 }
 
-static int do_gateway_write_obj(struct request *req, bool create)
+static int gateway_forward_request(struct request *req, struct sd_req *hdr)
 {
 	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
-	struct sd_req fwd_hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 	struct sd_vnode *v;
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies;
 	struct write_info wi;
+	struct sd_op_template *op = get_sd_op(hdr->opcode);
 
 	dprintf("%"PRIx64"\n", oid);
 
-	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
-		return object_cache_handle_request(req);
-
 	write_info_init(&wi);
-	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-	if (create)
-		fwd_hdr.opcode = SD_OP_CREATE_AND_WRITE_PEER;
-	else
-		fwd_hdr.opcode = SD_OP_WRITE_PEER;
-	fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
-
-	wlen = fwd_hdr.data_length;
-
+	wlen = hdr->data_length;
 	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
@@ -261,7 +251,7 @@ static int do_gateway_write_obj(struct request *req, bool create)
 			break;
 		}
 
-		ret = send_req(sfd->fd, &fwd_hdr, req->data, &wlen);
+		ret = send_req(sfd->fd, hdr, req->data, &wlen);
 		if (ret) {
 			sheep_del_sockfd(&v->nid, sfd);
 			err_ret = SD_RES_NETWORK_ERROR;
@@ -274,10 +264,8 @@ static int do_gateway_write_obj(struct request *req, bool create)
 	if (local != -1 && err_ret == SD_RES_SUCCESS) {
 		v = obj_vnodes[local];
 
-		if (create)
-			ret = peer_create_and_write_obj(req);
-		else
-			ret = peer_write_obj(req);
+		assert(op);
+		ret = sheep_do_op_work(op, req);
 
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("fail to write local %"PRIx32"\n", ret);
@@ -297,80 +285,39 @@ static int do_gateway_write_obj(struct request *req, bool create)
 
 int gateway_write_obj(struct request *req)
 {
-	return do_gateway_write_obj(req, false);
+	struct sd_req hdr;
+
+	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+		return object_cache_handle_request(req);
+
+	memcpy(&hdr, &req->rq, sizeof(hdr));
+	hdr.opcode = SD_OP_WRITE_PEER;
+	hdr.proto_ver = SD_SHEEP_PROTO_VER;
+
+	return gateway_forward_request(req, &hdr);
 }
 
 int gateway_create_and_write_obj(struct request *req)
 {
-	return do_gateway_write_obj(req, true);
+	struct sd_req hdr;
+
+	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+		return object_cache_handle_request(req);
+
+	memcpy(&hdr, &req->rq, sizeof(hdr));
+	hdr.opcode = SD_OP_CREATE_AND_WRITE_PEER;
+	hdr.proto_ver = SD_SHEEP_PROTO_VER;
+
+	return gateway_forward_request(req, &hdr);
 }
 
 int gateway_remove_obj(struct request *req)
 {
-	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
-	unsigned wlen;
-	struct sd_req fwd_hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
-	struct sd_vnode *v;
-	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
-	uint64_t oid = req->rq.obj.oid;
-	int nr_copies;
-	struct write_info wi;
+	struct sd_req hdr;
 
-	dprintf("%"PRIx64"\n", oid);
+	memcpy(&hdr, &req->rq, sizeof(hdr));
+	hdr.opcode = SD_OP_REMOVE_PEER;
+	hdr.proto_ver = SD_SHEEP_PROTO_VER;
 
-	write_info_init(&wi);
-	memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-	fwd_hdr.opcode = SD_OP_REMOVE_PEER;
-	fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
-
-	wlen = fwd_hdr.data_length;
-
-	nr_copies = get_nr_copies(req->vnodes);
-	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
-
-	for (i = 0; i < nr_copies; i++) {
-		struct sockfd *sfd;
-
-		v = obj_vnodes[i];
-		if (vnode_is_local(v)) {
-			local = i;
-			continue;
-		}
-
-		sfd = sheep_get_sockfd(&v->nid);
-		if (!sfd) {
-			err_ret = SD_RES_NETWORK_ERROR;
-			break;
-		}
-
-		ret = send_req(sfd->fd, &fwd_hdr, req->data, &wlen);
-		if (ret) {
-			sheep_del_sockfd(&v->nid, sfd);
-			err_ret = SD_RES_NETWORK_ERROR;
-			dprintf("fail %d\n", ret);
-			break;
-		}
-		write_info_advance(&wi, v, sfd);
-	}
-
-	if (local != -1 && err_ret == SD_RES_SUCCESS) {
-		v = obj_vnodes[local];
-
-		ret = peer_remove_obj(req);
-
-		if (ret != SD_RES_SUCCESS) {
-			eprintf("fail to write local %"PRIx32"\n", ret);
-			err_ret = ret;
-		}
-	}
-
-	dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
-	if (wi.nr_sent > 0) {
-		ret = wait_forward_write(&wi, rsp);
-		if (ret != SD_RES_SUCCESS)
-			err_ret = ret;
-	}
-
-	return err_ret;
+	return gateway_forward_request(req, &hdr);
 }

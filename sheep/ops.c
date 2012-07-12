@@ -1005,3 +1005,8 @@ int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 {
 	return op->process_main(req, rsp, data);
 }
+
+int sheep_do_op_work(struct sd_op_template *op, struct request *req)
+{
+	return op->process_work(req);
+}
