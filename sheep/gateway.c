@@ -217,7 +217,14 @@ write_info_advance(struct write_info *wi, struct sd_vnode *v,
 	wi->nr_sent++;
 }
 
-static int gateway_forward_request(struct request *req, struct sd_req *hdr)
+static inline void gateway_init_fwd_hdr(struct sd_req *fwd, struct sd_req *hdr)
+{
+	memcpy(fwd, hdr, sizeof(*fwd));
+	fwd->opcode = gateway_to_peer_opcode(hdr->opcode);
+	fwd->proto_ver = SD_SHEEP_PROTO_VER;
+}
+
+static int gateway_forward_request(struct request *req)
 {
 	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
@@ -227,12 +234,16 @@ static int gateway_forward_request(struct request *req, struct sd_req *hdr)
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies;
 	struct write_info wi;
-	struct sd_op_template *op = get_sd_op(hdr->opcode);
+	struct sd_op_template *op;
+	struct sd_req hdr;
 
 	dprintf("%"PRIx64"\n", oid);
 
+	gateway_init_fwd_hdr(&hdr, &req->rq);
+	op = get_sd_op(hdr.opcode);
+
 	write_info_init(&wi);
-	wlen = hdr->data_length;
+	wlen = hdr.data_length;
 	nr_copies = get_nr_copies(req->vnodes);
 	oid_to_vnodes(req->vnodes, oid, nr_copies, obj_vnodes);
 
@@ -251,7 +262,7 @@ static int gateway_forward_request(struct request *req, struct sd_req *hdr)
 			break;
 		}
 
-		ret = send_req(sfd->fd, hdr, req->data, &wlen);
+		ret = send_req(sfd->fd, &hdr, req->data, &wlen);
 		if (ret) {
 			sheep_del_sockfd(&v->nid, sfd);
 			err_ret = SD_RES_NETWORK_ERROR;
@@ -285,39 +296,21 @@ static int gateway_forward_request(struct request *req, struct sd_req *hdr)
 
 int gateway_write_obj(struct request *req)
 {
-	struct sd_req hdr;
-
 	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	memcpy(&hdr, &req->rq, sizeof(hdr));
-	hdr.opcode = SD_OP_WRITE_PEER;
-	hdr.proto_ver = SD_SHEEP_PROTO_VER;
-
-	return gateway_forward_request(req, &hdr);
+	return gateway_forward_request(req);
 }
 
 int gateway_create_and_write_obj(struct request *req)
 {
-	struct sd_req hdr;
-
 	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	memcpy(&hdr, &req->rq, sizeof(hdr));
-	hdr.opcode = SD_OP_CREATE_AND_WRITE_PEER;
-	hdr.proto_ver = SD_SHEEP_PROTO_VER;
-
-	return gateway_forward_request(req, &hdr);
+	return gateway_forward_request(req);
 }
 
 int gateway_remove_obj(struct request *req)
 {
-	struct sd_req hdr;
-
-	memcpy(&hdr, &req->rq, sizeof(hdr));
-	hdr.opcode = SD_OP_REMOVE_PEER;
-	hdr.proto_ver = SD_SHEEP_PROTO_VER;
-
-	return gateway_forward_request(req, &hdr);
+	return gateway_forward_request(req);
 }

@@ -25,6 +25,7 @@
 #include "sheep_priv.h"
 #include "strbuf.h"
 #include "trace/trace.h"
+#include "util.h"
 
 enum sd_op_type {
 	SD_OP_TYPE_CLUSTER = 1, /* cluster operations */
@@ -1009,4 +1010,17 @@ int do_process_main(struct sd_op_template *op, const struct sd_req *req,
 int sheep_do_op_work(struct sd_op_template *op, struct request *req)
 {
 	return op->process_work(req);
+}
+
+static int map_table[] = {
+	[SD_OP_CREATE_AND_WRITE_OBJ] = SD_OP_CREATE_AND_WRITE_PEER,
+	[SD_OP_READ_OBJ] = SD_OP_READ_PEER,
+	[SD_OP_WRITE_OBJ] = SD_OP_WRITE_PEER,
+	[SD_OP_REMOVE_OBJ] = SD_OP_REMOVE_PEER,
+};
+
+int gateway_to_peer_opcode(int opcode)
+{
+	assert(opcode < ARRAY_SIZE(map_table));
+	return map_table[opcode];
 }
