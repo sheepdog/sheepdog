@@ -12,7 +12,6 @@
 #include <errno.h>
 #include <sys/mman.h>
 #include <linux/limits.h>
-#include <zlib.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
