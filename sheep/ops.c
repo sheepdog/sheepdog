@@ -35,6 +35,7 @@ enum sd_op_type {
 };
 
 struct sd_op_template {
+	const char *name;
 	enum sd_op_type type;
 
 	/* process request even when cluster is not working */
@@ -759,65 +760,77 @@ static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
 	[SD_OP_NEW_VDI] = {
+		.name = "NEW_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_new_vdi,
 		.process_main = post_cluster_new_vdi,
 	},
 
 	[SD_OP_DEL_VDI] = {
+		.name = "DEL_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_del_vdi,
 	},
 
 	[SD_OP_GET_VDI_INFO] = {
+		.name = "GET_VDI_INFO",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_get_vdi_info,
 	},
 
 	[SD_OP_LOCK_VDI] = {
+		.name = "LOCK_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_get_vdi_info,
 	},
 
 	[SD_OP_MAKE_FS] = {
+		.name = "MAKE_FS",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_make_fs,
 	},
 
 	[SD_OP_SHUTDOWN] = {
+		.name = "SHUTDOWN",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_main = cluster_shutdown,
 	},
 
 	[SD_OP_GET_VDI_ATTR] = {
+		.name = "GET_VDI_ATTR",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_get_vdi_attr,
 	},
 
 	[SD_OP_RELEASE_VDI] = {
+		.name = "RELEASE_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
 	},
 
 	[SD_OP_RECOVER] = {
+		.name = "RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_manual_recover,
 	},
 
 	[SD_OP_SNAPSHOT] = {
+		.name = "SNAPSHOT",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_snapshot,
 	},
 
 	[SD_OP_RESTORE] = {
+		.name = "RESTORE",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_restore,
 	},
 
 	[SD_OP_CLEANUP] = {
+		.name = "CLEANUP",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_cleanup,
@@ -825,34 +838,40 @@ static struct sd_op_template sd_ops[] = {
 
 	/* local operations */
 	[SD_OP_GET_STORE_LIST] = {
+		.name = "GET_STORE_LIST",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_work = local_get_store_list,
 	},
 
 	[SD_OP_READ_VDIS] = {
+		.name = "READ_VDIS",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_read_vdis,
 	},
 
 	[SD_OP_GET_NODE_LIST] = {
+		.name = "GET_NODE_LIST",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_get_node_list,
 	},
 
 	[SD_OP_STAT_SHEEP] = {
+		.name = "STAT_SHEEP",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_stat_sheep,
 	},
 
 	[SD_OP_STAT_RECOVERY] = {
+		.name = "STAT_RECOVERY",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_stat_recovery,
 	},
 
 	[SD_OP_STAT_CLUSTER] = {
+		.name = "STAT_CLUSTER",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_work = local_stat_cluster,
@@ -864,33 +883,39 @@ static struct sd_op_template sd_ops[] = {
 	},
 
 	[SD_OP_GET_EPOCH] = {
+		.name = "GET_OBJ_LIST",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_epoch,
 	},
 
 	[SD_OP_GET_SNAP_FILE] = {
+		.name = "GET_SNAP_FILE",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_work = local_get_snap_file,
 	},
 
 	[SD_OP_FLUSH_VDI] = {
+		.name = "FLUSH_VDI",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_flush_vdi,
 	},
 
 	[SD_OP_FLUSH_DEL_CACHE] = {
+		.name = "DEL_CACHE",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_flush_and_del,
 	},
 
 	[SD_OP_TRACE] = {
+		.name = "TRACE",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_trace_ops,
 	},
 
 	[SD_OP_TRACE_CAT] = {
+		.name = "TRACE_CAT",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_trace_cat_ops,
@@ -898,42 +923,50 @@ static struct sd_op_template sd_ops[] = {
 
 	/* gateway I/O operations */
 	[SD_OP_CREATE_AND_WRITE_OBJ] = {
+		.name = "CREATE_AND_WRITE_OBJ",
 		.type = SD_OP_TYPE_GATEWAY,
 		.process_work = gateway_create_and_write_obj,
 	},
 
 	[SD_OP_READ_OBJ] = {
+		.name = "READ_OBJ",
 		.type = SD_OP_TYPE_GATEWAY,
 		.process_work = gateway_read_obj,
 	},
 
 	[SD_OP_WRITE_OBJ] = {
+		.name = "WRITE_OBJ",
 		.type = SD_OP_TYPE_GATEWAY,
 		.process_work = gateway_write_obj,
 	},
 
 	[SD_OP_REMOVE_OBJ] = {
+		.name = "REMOVE_OBJ",
 		.type = SD_OP_TYPE_GATEWAY,
 		.process_work = gateway_remove_obj,
 	},
 
 	/* peer I/O operations */
 	[SD_OP_CREATE_AND_WRITE_PEER] = {
+		.name = "CREATE_AND_WRITE_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_create_and_write_obj,
 	},
 
 	[SD_OP_READ_PEER] = {
+		.name = "READ_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_read_obj,
 	},
 
 	[SD_OP_WRITE_PEER] = {
+		.name = "WRITE_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_write_obj,
 	},
 
 	[SD_OP_REMOVE_PEER] = {
+		.name = "REMOVE_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_remove_obj,
 	},
@@ -945,6 +978,11 @@ struct sd_op_template *get_sd_op(uint8_t opcode)
 		return NULL;
 
 	return sd_ops + opcode;
+}
+
+const char *op_name(struct sd_op_template *op)
+{
+	return op->name;
 }
 
 int is_cluster_op(struct sd_op_template *op)

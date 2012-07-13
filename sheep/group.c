@@ -335,7 +335,7 @@ bool sd_block_handler(struct sd_node *sender)
  */
 void queue_cluster_request(struct request *req)
 {
-	eprintf("%p %x\n", req, req->rq.opcode);
+	eprintf("%s (%p)\n", op_name(req->op), req);
 
 	if (has_process_work(req->op)) {
 		list_add_tail(&req->pending_list, &sys->pending_list);

@@ -284,6 +284,7 @@ void put_request(struct request *req);
 /* Operations */
 
 struct sd_op_template *get_sd_op(uint8_t opcode);
+const char *op_name(struct sd_op_template *op);
 int is_cluster_op(struct sd_op_template *op);
 int is_local_op(struct sd_op_template *op);
 int is_peer_op(struct sd_op_template *op);

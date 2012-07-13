@@ -110,16 +110,16 @@ static void local_op_done(struct work *work)
 static int check_request_epoch(struct request *req)
 {
 	if (before(req->rq.epoch, sys->epoch)) {
-		eprintf("old node version %u, %u, %x\n",
-			sys->epoch, req->rq.epoch, req->rq.opcode);
+		eprintf("old node version %u, %u (%s)\n",
+			sys->epoch, req->rq.epoch, op_name(req->op));
 		/* ask gateway to retry. */
 		req->rp.result = SD_RES_OLD_NODE_VER;
 		req->rp.epoch = sys->epoch;
 		put_request(req);
 		return -1;
 	} else if (after(req->rq.epoch, sys->epoch)) {
-		eprintf("new node version %u, %u, %x\n",
-			sys->epoch, req->rq.epoch, req->rq.opcode);
+		eprintf("new node version %u, %u (%s)\n",
+			sys->epoch, req->rq.epoch, op_name(req->op));
 
 		/* put on local wait queue, waiting for local epoch
 		   to be lifted */
@@ -320,7 +320,7 @@ static void queue_request(struct request *req)
 		goto done;
 	}
 
-	dprintf("%x\n", hdr->opcode);
+	dprintf("%s\n", op_name(req->op));
 
 	switch (sys->status) {
 	case SD_STATUS_SHUTDOWN:
