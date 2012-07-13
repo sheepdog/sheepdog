@@ -77,6 +77,12 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_NETWORK_ERROR:
 	case SD_RES_WAIT_FOR_JOIN:
 	case SD_RES_WAIT_FOR_FORMAT:
+		dprintf("retrying failed I/O request "
+			"op %s result %d epoch %d, sys epoch %d\n",
+			op_name(req->op),
+			req->rp.result,
+			req->rq.epoch,
+			sys->epoch);
 		goto retry;
 	case SD_RES_EIO:
 		if (is_access_local(req, hdr->obj.oid)) {
