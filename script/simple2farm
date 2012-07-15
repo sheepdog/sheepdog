@@ -28,7 +28,7 @@ config_offset=11
 # Get the backend store from config file
 echo "Read config file"
 store=$(od --skip-bytes=$config_offset -An -c ../config | sed 's/ //g' | sed 's/\\0//g')
-if [ $store == "farm" ]; then
+if [ "x$store" == "xfarm" ]; then
 	echo "It's already the farm store, we'er done"
 	exit 0
 fi
