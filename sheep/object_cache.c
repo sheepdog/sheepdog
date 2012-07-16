@@ -818,32 +818,10 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset)
 {
-	int ret;
-	struct request *req;
 	uint32_t vid = oid_to_vid(oid);
 	uint32_t idx = object_cache_oid_to_idx(oid);
-	struct object_cache *cache;
 
-	cache = find_object_cache(vid, 0);
-
-	req = zalloc(sizeof(*req));
-	if (!req)
-		return SD_RES_NO_MEM;
-
-	sd_init_req(&req->rq, SD_OP_READ_OBJ);
-	req->rq.data_length = datalen;
-
-	req->rq.obj.oid = oid;
-	req->rq.obj.offset = offset;
-
-	req->data = data;
-	req->op = get_sd_op(req->rq.opcode);
-
-	ret = object_cache_rw(cache, idx, req);
-
-	free(req);
-
-	return ret;
+	return read_cache_object(vid, idx, data, datalen, offset);
 }
 
 int object_cache_flush_vdi(struct request *req)
