@@ -275,6 +275,18 @@ alloc_cache_entry(uint32_t idx, uint64_t bmap, int create)
 	return entry;
 }
 
+static void update_cache_entry(struct object_cache *oc, uint32_t idx,
+		size_t datalen, off_t offset)
+{
+	struct object_cache_entry *entry;
+
+	entry = alloc_cache_entry(idx, calc_object_bmap(datalen, offset), 0);
+
+	pthread_mutex_lock(&oc->lock);
+	add_to_dirty_tree_and_list(oc, entry);
+	pthread_mutex_unlock(&oc->lock);
+}
+
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			       int create)
 {
@@ -416,24 +428,17 @@ static int object_cache_rw(struct object_cache *oc, uint32_t idx,
 			   struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
-	uint64_t bmap = 0;
 	int ret;
 
 	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx,
 		hdr->data_length, hdr->obj.offset);
 
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
-		struct object_cache_entry *entry;
-
 		ret = write_cache_object(oc->vid, idx, req->data,
 					 hdr->data_length, hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		bmap = calc_object_bmap(hdr->data_length, hdr->obj.offset);
-		entry = alloc_cache_entry(idx, bmap, 0);
-		pthread_mutex_lock(&oc->lock);
-		add_to_dirty_tree_and_list(oc, entry);
-		pthread_mutex_unlock(&oc->lock);
+		update_cache_entry(oc, idx, hdr->data_length, hdr->obj.offset);
 	} else {
 		ret = read_cache_object(oc->vid, idx, req->data,
 					hdr->data_length, hdr->obj.offset);
