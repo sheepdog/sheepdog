@@ -424,32 +424,6 @@ out:
 	return ret;
 }
 
-static int object_cache_rw(struct object_cache *oc, uint32_t idx,
-			   struct request *req)
-{
-	struct sd_req *hdr = &req->rq;
-	int ret;
-
-	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx,
-		hdr->data_length, hdr->obj.offset);
-
-	if (hdr->flags & SD_FLAG_CMD_WRITE) {
-		ret = write_cache_object(oc->vid, idx, req->data,
-					 hdr->data_length, hdr->obj.offset);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-		update_cache_entry(oc, idx, hdr->data_length, hdr->obj.offset);
-	} else {
-		ret = read_cache_object(oc->vid, idx, req->data,
-					hdr->data_length, hdr->obj.offset);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-		req->rp.data_length = hdr->data_length;
-	}
-out:
-	return ret;
-}
-
 static int create_cache_object(struct object_cache *oc, uint32_t idx,
 			       void *buffer, size_t buf_size)
 {
@@ -762,11 +736,15 @@ int bypass_object_cache(struct request *req)
 
 int object_cache_handle_request(struct request *req)
 {
+	struct sd_req *hdr = &req->rq;
 	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid);
 	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
 	int ret, create = 0;
+
+	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx,
+		hdr->data_length, hdr->obj.offset);
 
 	cache = find_object_cache(vid, 1);
 
@@ -778,7 +756,23 @@ int object_cache_handle_request(struct request *req)
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
-	return object_cache_rw(cache, idx, req);
+
+	if (hdr->flags & SD_FLAG_CMD_WRITE) {
+		ret = write_cache_object(cache->vid, idx, req->data,
+					 hdr->data_length, hdr->obj.offset);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		update_cache_entry(cache, idx, hdr->data_length,
+				hdr->obj.offset);
+	} else {
+		ret = read_cache_object(cache->vid, idx, req->data,
+					hdr->data_length, hdr->obj.offset);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		req->rp.data_length = hdr->data_length;
+	}
+out:
+	return ret;
 }
 
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
