@@ -784,34 +784,16 @@ int object_cache_handle_request(struct request *req)
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, int create)
 {
-	int ret;
-	struct request *req;
 	uint32_t vid = oid_to_vid(oid);
 	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
+	int ret;
 
 	cache = find_object_cache(vid, 0);
 
-	req = zalloc(sizeof(*req));
-	if (!req)
-		return SD_RES_NO_MEM;
-
-	if (create)
-		sd_init_req(&req->rq, SD_OP_CREATE_AND_WRITE_OBJ);
-	else
-		sd_init_req(&req->rq, SD_OP_WRITE_OBJ);
-	req->rq.flags = flags | SD_FLAG_CMD_WRITE;
-	req->rq.data_length = datalen;
-
-	req->rq.obj.oid = oid;
-	req->rq.obj.offset = offset;
-
-	req->data = data;
-	req->op = get_sd_op(req->rq.opcode);
-
-	ret = object_cache_rw(cache, idx, req);
-
-	free(req);
+	ret = write_cache_object(vid, idx, data, datalen, offset);
+	if (ret == SD_RES_SUCCESS)
+		update_cache_entry(cache, idx, datalen, offset);
 	return ret;
 }
 
