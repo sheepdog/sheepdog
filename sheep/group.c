@@ -287,6 +287,8 @@ static void cluster_op_done(struct work *work)
 
 	cluster_op_running = false;
 
+	dprintf("%s (%p)\n", op_name(req->op), req);
+
 	msg = prepare_cluster_msg(req, &size);
 	if (!msg)
 		panic();
@@ -848,7 +850,8 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 	int ret = msg->rsp.result;
 	struct request *req = NULL;
 
-	dprintf("size: %zd, from: %s\n", data_len, node_to_str(sender));
+	dprintf("op %s, size: %zd, from: %s\n",
+		op_name(op), data_len, node_to_str(sender));
 
 	if (is_myself(sender->nid.addr, sender->nid.port)) {
 		req = list_first_entry(&sys->pending_list, struct request,
