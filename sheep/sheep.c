@@ -19,6 +19,10 @@
 #include <signal.h>
 #include <linux/limits.h>
 #include <sys/syslog.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include "sheep_priv.h"
 #include "trace/trace.h"
@@ -44,10 +48,11 @@ static struct option const long_options[] = {
 	{"vnodes", required_argument, NULL, 'v'},
 	{"enable-cache", no_argument, NULL, 'w'},
 	{"zone", required_argument, NULL, 'z'},
+	{"pidfile", required_argument, NULL, 'P'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfghl:op:v:wy:z:";
+static const char *short_options = "c:dDfghl:op:P:v:wy:z:";
 
 static void usage(int status)
 {
@@ -68,6 +73,7 @@ Options:\n\
   -l, --loglevel          specify the level of logging detail\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
+  -P, --pidfile           create a pid file\n\
   -v, --vnodes            specify the number of virtual nodes\n\
   -w, --enable-cache      enable object cache\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
@@ -91,6 +97,31 @@ Available log levels:\n\
   7    SDOG_DEBUG      debugging messages\n");
 }
 
+static int create_pidfile(const char *filename)
+{
+	int fd = -1;
+	int len;
+	char buffer[128];
+
+	if ((fd = open(filename, O_RDWR|O_CREAT|O_SYNC, 0600)) == -1) {
+		return -1;
+	}
+
+	if (lockf(fd, F_TLOCK, 0) == -1) {
+		close(fd);
+		return -1;
+	}
+
+	len = snprintf(buffer, sizeof(buffer), "%d\n", getpid());
+	if (write(fd, buffer, len) != len) {
+		close(fd);
+		return -1;
+	}
+
+	/* keep pidfile open & locked forever */
+	return 0;
+}
+
 static struct cluster_info __sys;
 struct cluster_info *sys = &__sys;
 
@@ -110,6 +141,7 @@ int main(int argc, char **argv)
 	char *p;
 	struct cluster_driver *cdrv;
 	int enable_write_cache = 0; /* disabled by default */
+	char *pid_file = NULL;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -123,6 +155,9 @@ int main(int argc, char **argv)
 					optarg);
 				exit(1);
 			}
+			break;
+		case 'P':
+			pid_file = optarg;
 			break;
 		case 'f':
 			is_daemon = 0;
@@ -264,6 +299,12 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
+	if (pid_file && (create_pidfile(pid_file) != 0)) {
+		fprintf(stderr, "failed to pid file '%s' - %s\n", pid_file,
+			strerror(errno));
+		exit(1);
+	}
+
 	if (chdir(dir) < 0) {
 		fprintf(stderr, "failed to chdir to %s: %m\n", dir);
 		exit(1);
@@ -278,6 +319,9 @@ int main(int argc, char **argv)
 
 	leave_cluster();
 	log_close();
+
+	if (pid_file)
+		unlink(pid_file);
 
 	return 0;
 }
