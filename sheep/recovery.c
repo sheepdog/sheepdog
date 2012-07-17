@@ -584,9 +584,17 @@ out:
 	free(buf);
 }
 
+static inline bool node_is_gateway_only(void)
+{
+	return sys->this_node.nr_vnodes == 0 ? true : false;
+}
+
 int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
 {
 	struct recovery_work *rw;
+
+	if (node_is_gateway_only())
+		return 0;
 
 	rw = zalloc(sizeof(struct recovery_work));
 	if (!rw) {
