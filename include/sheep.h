@@ -75,9 +75,6 @@ next:
 			panic("bug"); /* not found */
 		}
 		for (i = 0; i < nr; i++) {
-			if (same_node(entries, idx, nodes[i]))
-				/* this node is already selected, so skip here */
-				goto next;
 			if (same_zone(entries, idx, nodes[i]))
 				/* this node is in the same zone, so skip here */
 				goto next;
