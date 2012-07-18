@@ -247,7 +247,7 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
  */
 int get_nr_copies(struct vnode_info *vnode_info)
 {
-	return min(vnode_info->nr_zones, sys->nr_copies);
+	return min(vnode_info->nr_zones, (int)sys->nr_copies);
 }
 
 /*
@@ -727,7 +727,6 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 		struct sd_node *nodes, size_t nr_nodes)
 {
 	sys->join_finished = 1;
-	sys->nr_copies = msg->nr_copies;
 	sys->epoch = msg->epoch;
 
 	if (msg->cluster_status != SD_STATUS_OK)
@@ -778,8 +777,11 @@ static void update_cluster_info(struct join_message *msg,
 			uatomic_inc(&sys->epoch);
 			log_current_epoch();
 		}
+
 		/* Fresh node */
-		if (!sys_stat_ok() && !sys_stat_halt()) {
+		if (sys->status == SD_STATUS_WAIT_FOR_FORMAT) {
+			sys->nr_copies = msg->nr_copies;
+
 			set_cluster_copies(sys->nr_copies);
 			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
@@ -958,15 +960,11 @@ static int send_join_request(struct sd_node *ent)
 	struct join_message *msg;
 	int ret;
 
-	msg = zalloc(sizeof(*msg) + SD_MAX_NODES * sizeof(msg->nodes[0]));
-	if (!msg)
-		panic("failed to allocate memory\n");
+	msg = xzalloc(sizeof(*msg) + SD_MAX_NODES * sizeof(msg->nodes[0]));
 	msg->proto_ver = SD_SHEEP_PROTO_VER;
-
-	get_cluster_copies(&msg->nr_copies);
-	get_cluster_flags(&msg->cluster_flags);
-
-	msg->epoch = get_latest_epoch();
+	msg->nr_copies = sys->nr_copies;
+	msg->cluster_flags = sys->flags;
+	msg->epoch = sys->epoch;
 	msg->ctime = get_cluster_ctime();
 
 	if (msg->epoch) {
@@ -1139,10 +1137,17 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		sys->this_node.zone = zone;
 	dprintf("zone id = %u\n", sys->this_node.zone);
 
-	if (get_latest_epoch() == 0)
-		sys_stat_set(SD_STATUS_WAIT_FOR_FORMAT);
-	else
+	if (get_latest_epoch() > 0) {
 		sys_stat_set(SD_STATUS_WAIT_FOR_JOIN);
+
+		get_cluster_copies(&sys->nr_copies);
+		get_cluster_flags(&sys->flags);
+
+		sys->epoch = get_latest_epoch();
+	} else {
+		sys_stat_set(SD_STATUS_WAIT_FOR_FORMAT);
+	}
+
 	INIT_LIST_HEAD(&sys->pending_list);
 	INIT_LIST_HEAD(&sys->failed_nodes);
 	INIT_LIST_HEAD(&sys->delayed_nodes);

@@ -103,7 +103,7 @@ struct cluster_info {
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	int nr_copies;
+	uint8_t nr_copies;
 	int req_efd;
 
 	pthread_mutex_t wait_req_lock;
