@@ -1,4 +1,4 @@
-.TH SHEEPDOG 8 2012-07-3
+.TH SHEEPDOG 8 2012-07-18
 .SH NAME
 sheep \- Distributed Block Storage System for KVM
 .SH SYNOPSIS
@@ -15,6 +15,9 @@ The server daemon is called sheep(8).  A command line utility is available
 via collie(8).  KVM/QEMU virtual machines use the sheep daemon via a block
 driver available in qemu(1).
 .SH OPTIONS
+.TP
+.BI \-P "\fR, \fP" \--pidfile " pidfile"
+This option create a pid file.
 .TP
 .BI \-p "\fR, \fP" \--port " port"
 This option specifies the IP port over which \fBsheep\fP looks for other
