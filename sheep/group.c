@@ -762,6 +762,20 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
 
+static void get_vdi_bitmap(struct sd_node *nodes, size_t nr_nodes)
+{
+	int array_len = nr_nodes * sizeof(struct sd_node);
+	struct vdi_bitmap_work *w;
+
+	w = xmalloc(sizeof(*w) + array_len);
+	w->nr_members = nr_nodes;
+	memcpy(w->members, nodes, array_len);
+
+	w->work.fn = do_get_vdi_bitmap;
+	w->work.done = get_vdi_bitmap_done;
+	queue_work(sys->block_wqueue, &w->work);
+}
+
 static void update_cluster_info(struct join_message *msg,
 				struct sd_node *joined, struct sd_node *nodes,
 				size_t nr_nodes)
@@ -777,58 +791,49 @@ static void update_cluster_info(struct join_message *msg,
 	old_vnode_info = current_vnode_info;
 	current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
 
-	if (msg->cluster_status == SD_STATUS_OK ||
-	    msg->cluster_status == SD_STATUS_HALT) {
-		if (msg->inc_epoch) {
-			uatomic_inc(&sys->epoch);
-			log_current_epoch();
-		}
-
-		/* Fresh node */
-		if (sys->status == SD_STATUS_WAIT_FOR_FORMAT) {
+	switch (msg->cluster_status) {
+	case SD_STATUS_OK:
+	case SD_STATUS_HALT:
+		switch (sys->status) {
+		case SD_STATUS_WAIT_FOR_FORMAT:
 			sys->nr_copies = msg->nr_copies;
 			sys->flags = msg->cluster_flags;
 
 			set_cluster_copies(sys->nr_copies);
 			set_cluster_flags(sys->flags);
 			set_cluster_ctime(msg->ctime);
-		}
-	}
-
-	if (!sys_stat_ok() &&
-	    (msg->cluster_status == SD_STATUS_OK ||
-	     msg->cluster_status == SD_STATUS_HALT)) {
-		int array_len = nr_nodes * sizeof(struct sd_node);
-		struct vdi_bitmap_work *w;
-
-		w = xmalloc(sizeof(*w) + array_len);
-		w->nr_members = nr_nodes;
-		memcpy(w->members, nodes, array_len);
-
-		w->work.fn = do_get_vdi_bitmap;
-		w->work.done = get_vdi_bitmap_done;
-		queue_work(sys->block_wqueue, &w->work);
-	}
-
-	sys_stat_set(msg->cluster_status);
-
-	if (sys_can_recover() && msg->inc_epoch) {
-		clear_exceptional_node_lists();
-
-		if (!old_vnode_info) {
-			old_vnode_info = alloc_old_vnode_info(joined, nodes,
-							      nr_nodes);
+			/*FALLTHROUGH*/
+		case SD_STATUS_WAIT_FOR_JOIN:
+			get_vdi_bitmap(nodes, nr_nodes);
+			break;
+		default:
+			break;
 		}
 
-		start_recovery(current_vnode_info, old_vnode_info);
+		sys_stat_set(msg->cluster_status);
+
+		if (msg->inc_epoch) {
+			uatomic_inc(&sys->epoch);
+			log_current_epoch();
+			clear_exceptional_node_lists();
+
+			if (!old_vnode_info) {
+				old_vnode_info = alloc_old_vnode_info(joined,
+						nodes, nr_nodes);
+			}
+
+			start_recovery(current_vnode_info, old_vnode_info);
+		}
+
+		if (have_enough_zones())
+			sys_stat_set(SD_STATUS_OK);
+		break;
+	default:
+		sys_stat_set(msg->cluster_status);
+		break;
 	}
 
 	put_vnode_info(old_vnode_info);
-
-	if (sys_stat_halt()) {
-		if (have_enough_zones())
-			sys_stat_set(SD_STATUS_OK);
-	}
 
 	sockfd_cache_add(&joined->nid);
 }
