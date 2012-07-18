@@ -519,6 +519,12 @@ static int cluster_sanity_check(struct join_message *jm)
 		return CJ_RES_FAIL;
 	}
 
+	if (jm->cluster_flags != sys->flags) {
+		eprintf("joining node cluster_flags don't match: %u vs %u\n",
+			jm->cluster_flags, sys->flags);
+		return CJ_RES_FAIL;
+	}
+
 	return CJ_RES_SUCCESS;
 }
 
@@ -781,6 +787,7 @@ static void update_cluster_info(struct join_message *msg,
 		/* Fresh node */
 		if (sys->status == SD_STATUS_WAIT_FOR_FORMAT) {
 			sys->nr_copies = msg->nr_copies;
+			sys->flags = msg->cluster_flags;
 
 			set_cluster_copies(sys->nr_copies);
 			set_cluster_flags(sys->flags);
