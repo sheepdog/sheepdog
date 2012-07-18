@@ -492,6 +492,12 @@ static int cluster_sanity_check(struct join_message *jm)
 {
 	uint64_t local_ctime = get_cluster_ctime();
 	uint32_t local_epoch = get_latest_epoch();
+	uint8_t local_nr_copies;
+
+	if (get_cluster_copies(&local_nr_copies)) {
+		eprintf("failed to get nr_copies\n");
+		return CJ_RES_FAIL;
+	}
 
 	if (jm->ctime != local_ctime) {
 		eprintf("joining node ctime doesn't match: %"
@@ -504,6 +510,12 @@ static int cluster_sanity_check(struct join_message *jm)
 		eprintf("joining node epoch too large: %"
 			PRIu32 " vs %" PRIu32 "\n",
 			jm->epoch, local_epoch);
+		return CJ_RES_FAIL;
+	}
+
+	if (jm->nr_copies != local_nr_copies) {
+		eprintf("joining node nr_copies doesn't match: %u vs %u\n",
+			jm->nr_copies, local_nr_copies);
 		return CJ_RES_FAIL;
 	}
 
