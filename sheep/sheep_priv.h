@@ -191,6 +191,7 @@ int create_listen_port(int port, void *data);
 int init_store(const char *dir, int enable_write_cache);
 int init_base_path(const char *dir);
 
+int vdi_exist(uint32_t vid);
 int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
 	    uint32_t base_vid, int is_snapshot, unsigned int *nr_copies);
 
@@ -253,6 +254,7 @@ uint32_t get_latest_epoch(void);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 int get_obj_list(const struct sd_list_req *, struct sd_list_rsp *, void *);
+int objlist_cache_cleanup(uint32_t vid);
 
 int start_recovery(struct vnode_info *cur_vnodes,
 	struct vnode_info *old_vnodes);

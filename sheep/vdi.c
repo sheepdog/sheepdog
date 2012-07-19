@@ -15,6 +15,33 @@
 #include "sheepdog_proto.h"
 #include "sheep_priv.h"
 
+int vdi_exist(uint32_t vid)
+{
+	struct sheepdog_inode *inode;
+	int ret = 1;
+
+	inode = zalloc(sizeof(*inode));
+	if (!inode) {
+		ret = 0;
+		goto out;
+	}
+
+	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+			  sizeof(*inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		eprintf("fail to read vdi inode (%" PRIx32 ")\n", vid);
+		ret = 0;
+		goto out;
+	}
+
+	if (*inode->name == '\0')
+		ret = 0;
+	ret = 1;
+
+out:
+	free(inode);
+	return ret;
+}
 
 /* TODO: should be performed atomically */
 static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,

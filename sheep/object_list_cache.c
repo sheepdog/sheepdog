@@ -37,6 +37,11 @@ struct objlist_cache {
 	pthread_rwlock_t lock;
 };
 
+struct objlist_deletion_work {
+	uint32_t vid;
+	struct work work;
+};
+
 struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
@@ -165,5 +170,65 @@ out:
 	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
 	memcpy(data, obj_list_cache.buf, rsp->data_length);
 	pthread_rwlock_unlock(&obj_list_cache.lock);
+	return SD_RES_SUCCESS;
+}
+
+static void objlist_deletion_work(struct work *work)
+{
+	struct objlist_deletion_work *ow =
+		container_of(work, struct objlist_deletion_work, work);
+	struct objlist_cache_entry *entry, *t;
+	uint32_t vid = ow->vid, entry_vid;
+
+	/* Before reclaiming the cache belonging to the VDI just deleted,
+	 * we should test whether the VDI is exist, because after some node
+	 * deleting it and before the notification is sent to all the node,
+	 * another node may issus a VDI creation event and reused the VDI id
+	 * again, in which case we should not reclaim the cached entry.
+	 */
+	if (vdi_exist(vid)) {
+		eprintf("VDI (%" PRIx32 ") is still in use, can not be deleted\n",
+			vid);
+		return;
+	}
+
+	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	list_for_each_entry_safe(entry, t, &obj_list_cache.entry_list, list) {
+		entry_vid = oid_to_vid(entry->oid);
+		if (entry_vid != vid)
+			continue;
+		dprintf("delete object entry %" PRIx64 "\n", entry->oid);
+		list_del(&entry->list);
+		rb_erase(&entry->node, &obj_list_cache.root);
+		free(entry);
+	}
+	pthread_rwlock_unlock(&obj_list_cache.lock);
+}
+
+static void objlist_deletion_done(struct work *work)
+{
+	struct objlist_deletion_work *ow =
+		container_of(work, struct objlist_deletion_work, work);
+	free(ow);
+}
+
+/*
+ * During recovery, some objects may be migrated from one node to a
+ * new one, but we can't remove the object list cache entry in this
+ * case, it may causes recovery failure, so after recovery, we can
+ * not locate the cache entry correctly, causing objlist_cache_remove()
+ * fail to delete it, then we need this function to do the cleanup work
+ * in all nodes.
+ */
+int objlist_cache_cleanup(uint32_t vid)
+{
+	struct objlist_deletion_work *ow;
+
+	ow = xzalloc(sizeof(*ow));
+	ow->vid = vid;
+	ow->work.fn = objlist_deletion_work;
+	ow->work.done = objlist_deletion_done;
+	queue_work(sys->deletion_wqueue, &ow->work);
+
 	return SD_RES_SUCCESS;
 }
