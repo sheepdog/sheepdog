@@ -30,8 +30,6 @@ struct connection {
 	int tx_length;
 	void *tx_buf;
 	struct sd_rsp tx_hdr;
-
-	struct list_head blocking_siblings;
 };
 
 int conn_tx_off(struct connection *conn);

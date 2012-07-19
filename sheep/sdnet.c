@@ -464,16 +464,14 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 	INIT_LIST_HEAD(&req->request_list);
 	uatomic_set(&req->refcnt, 1);
 
-	sys->nr_outstanding_reqs++;
-	sys->outstanding_data_size += data_length;
+	uatomic_inc(&sys->nr_outstanding_reqs);
 
 	return req;
 }
 
 static void free_request(struct request *req)
 {
-	sys->nr_outstanding_reqs--;
-	sys->outstanding_data_size -= req->data_length;
+	uatomic_dec(&sys->nr_outstanding_reqs);
 
 	req->ci->refcnt--;
 	put_vnode_info(req->vnodes);
@@ -518,13 +516,6 @@ static void client_rx_handler(struct client_info *ci)
 	struct connection *conn = &ci->conn;
 	struct sd_req *hdr = &conn->rx_hdr;
 	struct request *req;
-
-	if (!ci->rx_req && sys->outstanding_data_size > MAX_OUTSTANDING_DATA_SIZE) {
-		dprintf("too many requests (%p)\n", &ci->conn);
-		conn_rx_off(&ci->conn);
-		list_add(&ci->conn.blocking_siblings, &sys->blocking_conn_list);
-		return;
-	}
 
 	switch (conn->c_rx_state) {
 	case C_IO_HEADER:
@@ -614,19 +605,10 @@ static void client_tx_handler(struct client_info *ci)
 {
 	int ret, opt;
 	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
-	struct connection *conn, *n;
 again:
 	init_tx_hdr(ci);
 	if (!ci->tx_req) {
 		conn_tx_off(&ci->conn);
-		if (sys->outstanding_data_size < MAX_OUTSTANDING_DATA_SIZE) {
-			list_for_each_entry_safe(conn, n, &sys->blocking_conn_list,
-						 blocking_siblings) {
-				dprintf("rx on %p\n", conn);
-				list_del_init(&conn->blocking_siblings);
-				conn_rx_on(conn);
-			}
-		}
 		return;
 	}
 
@@ -699,9 +681,6 @@ static void clear_client(struct client_info *ci)
 		free_request(req);
 	}
 
-	if (!list_empty(&ci->conn.blocking_siblings))
-		list_del_init(&ci->conn.blocking_siblings);
-
 	unregister_event(ci->conn.fd);
 
 	dprintf("refcnt:%d, fd:%d, %s:%d\n",
@@ -745,7 +724,6 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 	ci->refcnt = 0;
 
 	INIT_LIST_HEAD(&ci->done_reqs);
-	INIT_LIST_HEAD(&ci->conn.blocking_siblings);
 
 	init_rx_hdr(ci);
 

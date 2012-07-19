@@ -73,8 +73,6 @@ struct request {
 	struct work work;
 };
 
-#define MAX_OUTSTANDING_DATA_SIZE (256 * 1024 * 1024)
-
 struct cluster_info {
 	struct cluster_driver *cdrv;
 	const char *cdrv_option;
@@ -105,8 +103,6 @@ struct cluster_info {
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	struct list_head blocking_conn_list;
-
 	int nr_copies;
 	int req_efd;
 
@@ -115,7 +111,6 @@ struct cluster_info {
 	struct list_head wait_rw_queue;
 	struct list_head wait_obj_queue;
 	int nr_outstanding_reqs;
-	unsigned int outstanding_data_size;
 
 	uint32_t recovered_epoch;
 
