@@ -48,8 +48,8 @@ This option specify backend store.
 .BI \-c "\fR, \fP" \--copies
 This option specify the data redundancy (number of copies).
 .TP
-.BI \-H "\fR, \fP" \--nohalt
-This option serve IO requests even if there are too few nodes for the configured redundancy.
+.BI \-m "\fR, \fP" \--mode\ [safe|quorum|unsafe]
+This option controls the behavior when there are too few nodes for the configured redundancy. Mode 'safe' halt cluster IO when (nr_nodes < nr_copies). Mode 'quorum' halt cluster IO when (nr_nodes < nr_copies/2 + 1). Mode 'unsafe' never halt the cluster.
 .TP
 .BI \-f "\fR, \fP" \--force
 Do not prompt for confirmation.
