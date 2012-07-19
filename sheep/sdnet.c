@@ -508,7 +508,7 @@ static void init_rx_hdr(struct client_info *ci)
 	ci->conn.rx_buf = &ci->conn.rx_hdr;
 }
 
-static void client_rx_handler(struct client_info *ci)
+static inline int begin_rx(struct client_info *ci)
 {
 	int ret;
 	uint64_t data_len;
@@ -549,14 +549,23 @@ static void client_rx_handler(struct client_info *ci)
 		eprintf("bug: unknown state %d\n", conn->c_rx_state);
 	}
 
-	if (is_conn_dead(conn))
-		return clear_client_info(ci);
+	if (is_conn_dead(conn)) {
+		clear_client_info(ci);
+		return -1;
+	}
 
 	/* Short read happens */
 	if (conn->c_rx_state != C_IO_END)
-		return;
+		return -1;
 
-	/* now we have a complete command */
+	return 0;
+}
+
+static inline void finish_rx(struct client_info *ci)
+{
+	struct request *req;
+	struct sd_req *hdr = &ci->conn.rx_hdr;
+
 	req = ci->rx_req;
 	init_rx_hdr(ci);
 	if (hdr->flags & SD_FLAG_CMD_WRITE)
@@ -564,9 +573,16 @@ static void client_rx_handler(struct client_info *ci)
 	else
 		req->rp.data_length = hdr->data_length;
 
-	dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
-		ci->conn.ipstr, ci->conn.port);
+	dprintf("%d, %s:%d\n", ci->conn.fd, ci->conn.ipstr, ci->conn.port);
 	queue_request(req);
+}
+
+static void do_client_rx(struct client_info *ci)
+{
+	if (begin_rx(ci) < 0)
+		return;
+
+	finish_rx(ci);
 }
 
 static void init_tx_hdr(struct client_info *ci)
@@ -743,7 +759,7 @@ static void client_handler(int fd, int events, void *data)
 		return clear_client_info(ci);
 
 	if (events & EPOLLIN)
-		client_rx_handler(ci);
+		do_client_rx(ci);
 
 	if (events & EPOLLOUT)
 		client_tx_handler(ci);
