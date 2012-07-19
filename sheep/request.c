@@ -492,8 +492,8 @@ void put_request(struct request *req)
 		eventfd_write(req->wait_efd, value);
 	} else {
 		if (conn_tx_on(&ci->conn)) {
-			free_request(req);
 			clear_client_info(ci);
+			free_request(req);
 		} else {
 			list_add(&req->request_list, &ci->done_reqs);
 		}
