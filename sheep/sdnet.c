@@ -549,11 +549,8 @@ static void client_rx_handler(struct client_info *ci)
 		eprintf("bug: unknown state %d\n", conn->c_rx_state);
 	}
 
-	if (is_conn_dead(conn) && ci->rx_req) {
-		free_request(ci->rx_req);
-		ci->rx_req = NULL;
-		return;
-	}
+	if (is_conn_dead(conn))
+		return clear_client_info(ci);
 
 	if (conn->c_rx_state != C_IO_END)
 		return;
@@ -607,7 +604,8 @@ static void client_tx_handler(struct client_info *ci)
 again:
 	init_tx_hdr(ci);
 	if (!ci->tx_req) {
-		conn_tx_off(&ci->conn);
+		if (conn_tx_off(&ci->conn))
+			clear_client_info(ci);
 		return;
 	}
 
@@ -639,11 +637,8 @@ again:
 	opt = 0;
 	setsockopt(ci->conn.fd, SOL_TCP, TCP_CORK, &opt, sizeof(opt));
 
-	if (is_conn_dead(&ci->conn)) {
-		free_request(ci->tx_req);
-		ci->tx_req = NULL;
-		return;
-	}
+	if (is_conn_dead(&ci->conn))
+		return clear_client_info(ci);
 
 	if (ci->conn.c_tx_state == C_IO_END) {
 		dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
@@ -735,19 +730,17 @@ static void client_handler(int fd, int events, void *data)
 {
 	struct client_info *ci = (struct client_info *)data;
 
-	if (events & (EPOLLERR | EPOLLHUP))
-		goto err;
+	dprintf("%x, rx %d, tx %d\n", events, ci->conn.c_rx_state,
+		ci->conn.c_tx_state);
+
+	if (events & (EPOLLERR | EPOLLHUP) || is_conn_dead(&ci->conn))
+		return clear_client_info(ci);
 
 	if (events & EPOLLIN)
 		client_rx_handler(ci);
 
 	if (events & EPOLLOUT)
 		client_tx_handler(ci);
-
-	if (is_conn_dead(&ci->conn)) {
-err:
-		clear_client_info(ci);
-	}
 }
 
 static void listen_handler(int listen_fd, int events, void *data)
