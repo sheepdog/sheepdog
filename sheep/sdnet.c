@@ -610,17 +610,11 @@ static void init_tx_hdr(struct client_info *ci)
 	rsp->id = req->rq.id;
 }
 
-static void client_tx_handler(struct client_info *ci)
+static inline int begin_tx(struct client_info *ci)
 {
 	int ret, opt;
 	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
 
-	if (list_empty(&ci->done_reqs)) {
-		if (conn_tx_off(&ci->conn))
-			clear_client_info(ci);
-		return;
-	}
-again:
 	/* If short send happens, we don't need init hdr */
 	if (!ci->tx_req)
 		init_tx_hdr(ci);
@@ -653,9 +647,16 @@ again:
 	opt = 0;
 	setsockopt(ci->conn.fd, SOL_TCP, TCP_CORK, &opt, sizeof(opt));
 
-	if (is_conn_dead(&ci->conn))
-		return clear_client_info(ci);
+	if (is_conn_dead(&ci->conn)) {
+		clear_client_info(ci);
+		return -1;
+	}
+	return 0;
+}
 
+/* Return 1 if short send happens or we have more data to send */
+static inline int finish_tx(struct client_info *ci)
+{
 	/* Finish sending one response */
 	if (ci->conn.c_tx_state == C_IO_END) {
 		dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
@@ -663,12 +664,28 @@ again:
 		free_request(ci->tx_req);
 		ci->tx_req = NULL;
 	}
-	/* Short send happens or we have more data to send */
 	if (ci->tx_req || !list_empty(&ci->done_reqs))
-		goto again;
-	else
+		return 1;
+	return 0;
+}
+
+static void do_client_tx(struct client_info *ci)
+{
+	if (list_empty(&ci->done_reqs)) {
 		if (conn_tx_off(&ci->conn))
 			clear_client_info(ci);
+		return;
+	}
+again:
+	if (begin_tx(ci) < 0)
+		return;
+
+	if (finish_tx(ci))
+		goto again;
+
+	/* Let's go sleep, and put_request() will wake me up */
+	if (conn_tx_off(&ci->conn))
+		clear_client_info(ci);
 }
 
 static void destroy_client(struct client_info *ci)
@@ -762,7 +779,7 @@ static void client_handler(int fd, int events, void *data)
 		do_client_rx(ci);
 
 	if (events & EPOLLOUT)
-		client_tx_handler(ci);
+		do_client_tx(ci);
 }
 
 static void listen_handler(int listen_fd, int events, void *data)
