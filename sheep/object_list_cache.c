@@ -23,6 +23,7 @@
 
 struct objlist_cache_entry {
 	uint64_t oid;
+	struct list_head list;
 	struct rb_node node;
 };
 
@@ -31,6 +32,7 @@ struct objlist_cache {
 	int buf_version;
 	int cache_size;
 	uint64_t *buf;
+	struct list_head entry_list;
 	struct rb_root root;
 	pthread_rwlock_t lock;
 };
@@ -38,6 +40,7 @@ struct objlist_cache {
 struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
+	.entry_list     = LIST_HEAD_INIT(obj_list_cache.entry_list),
 	.lock		= PTHREAD_RWLOCK_INITIALIZER,
 };
 
@@ -80,6 +83,7 @@ static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 		else if (oid > entry->oid)
 			p = &(*p)->rb_right;
 		else {
+			list_del(&entry->list);
 			rb_erase(parent, root);
 			free(entry);
 			return 0;
@@ -118,6 +122,7 @@ int objlist_cache_insert(uint64_t oid)
 	if (p)
 		free(entry);
 	else {
+		list_add(&entry->list, &obj_list_cache.entry_list);
 		obj_list_cache.cache_size++;
 		obj_list_cache.tree_version++;
 	}
@@ -130,7 +135,6 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 {
 	int nr = 0;
 	struct objlist_cache_entry *entry;
-	struct rb_node *p;
 
 	/* first try getting the cached buffer with only a read lock held */
 	pthread_rwlock_rdlock(&obj_list_cache.lock);
@@ -147,8 +151,7 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 	obj_list_cache.buf = xrealloc(obj_list_cache.buf,
 				obj_list_cache.cache_size * sizeof(uint64_t));
 
-	for (p = rb_first(&obj_list_cache.root); p; p = rb_next(p)) {
-		entry = rb_entry(p, struct objlist_cache_entry, node);
+	list_for_each_entry(entry, &obj_list_cache.entry_list, list) {
 		obj_list_cache.buf[nr++] = entry->oid;
 	}
 
