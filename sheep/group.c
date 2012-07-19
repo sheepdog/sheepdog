@@ -79,7 +79,7 @@ static int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 
 bool have_enough_zones(void)
 {
-	if (sys_flag_nohalt())
+	if (sys->flags & SD_FLAG_NOHALT)
 		return true;
 
 	if (!current_vnode_info)
@@ -88,7 +88,7 @@ bool have_enough_zones(void)
 	dprintf("flags %d, nr_zones %d, copies %d\n",
 		sys->flags, current_vnode_info->nr_zones, sys->nr_copies);
 
-	if (sys_flag_quorum()) {
+	if (sys->flags & SD_FLAG_QUORUM) {
 		if (current_vnode_info->nr_zones > (sys->nr_copies/2))
 			return true;
 	} else {
@@ -694,7 +694,7 @@ static void do_get_vdi_bitmap(struct work *work)
 		 * If a new comer try to join the running cluster, it only
 		 * need read one copy of bitmap from one of other members.
 		 */
-		if (sys_stat_wait_format())
+		if (sys->status == SD_STATUS_WAIT_FOR_FORMAT)
 			break;
 	}
 }
@@ -810,7 +810,7 @@ static void update_cluster_info(struct join_message *msg,
 			break;
 		}
 
-		sys_stat_set(msg->cluster_status);
+		sys->status = msg->cluster_status;
 
 		if (msg->inc_epoch) {
 			uatomic_inc(&sys->epoch);
@@ -826,10 +826,10 @@ static void update_cluster_info(struct join_message *msg,
 		}
 
 		if (have_enough_zones())
-			sys_stat_set(SD_STATUS_OK);
+			sys->status = SD_STATUS_OK;
 		break;
 	default:
-		sys_stat_set(msg->cluster_status);
+		sys->status = msg->cluster_status;
 		break;
 	}
 
@@ -1022,7 +1022,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		for (i = 0; i < nr_members; i++)
 			dprintf("[%x] %s\n", i, node_to_str(members + i));
 
-		if (sys_stat_shutdown())
+		if (sys->status == SD_STATUS_SHUTDOWN)
 			break;
 
 		update_cluster_info(jm, joined, members, nr_members);
@@ -1032,7 +1032,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 			vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;
 	case CJ_RES_FAIL:
-		if (!sys_stat_wait_join())
+		if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
 			break;
 
 		if (!add_failed_node(le, joined))
@@ -1045,7 +1045,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 
 		dprintf("%d == %d + %d\n", nr_local, nr, nr_failed);
 		if (nr_local == nr + nr_failed - nr_delayed_nodes) {
-			sys_stat_set(SD_STATUS_OK);
+			sys->status = SD_STATUS_OK;
 			log_current_epoch();
 		}
 		break;
@@ -1070,7 +1070,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 
 		dprintf("%d == %d + %d\n", nr_local, nr, nr_failed);
 		if (nr_local == nr + nr_failed - nr_delayed_nodes) {
-			sys_stat_set(SD_STATUS_OK);
+			sys->status = SD_STATUS_OK;
 			log_current_epoch();
 		}
 
@@ -1091,21 +1091,27 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 	for (i = 0; i < nr_members; i++)
 		dprintf("[%x] %s\n", i, node_to_str(members + i));
 
-	if (sys_stat_shutdown())
+	if (sys->status == SD_STATUS_SHUTDOWN)
 		return;
 
 	old_vnode_info = current_vnode_info;
 	current_vnode_info = alloc_vnode_info(members, nr_members);
 
-	if (sys_can_recover()) {
+	switch (sys->status) {
+	case SD_STATUS_HALT:
+	case SD_STATUS_OK:
 		uatomic_inc(&sys->epoch);
 		log_current_epoch();
 		start_recovery(current_vnode_info, old_vnode_info);
-	}
-	put_vnode_info(old_vnode_info);
 
-	if (!have_enough_zones())
-		sys_stat_set(SD_STATUS_HALT);
+		if (!have_enough_zones())
+			sys->status = SD_STATUS_HALT;
+		break;
+	default:
+		break;
+	}
+
+	put_vnode_info(old_vnode_info);
 
 	sockfd_cache_del(&left->nid);
 }
@@ -1150,14 +1156,14 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	dprintf("zone id = %u\n", sys->this_node.zone);
 
 	if (get_latest_epoch() > 0) {
-		sys_stat_set(SD_STATUS_WAIT_FOR_JOIN);
+		sys->status = SD_STATUS_WAIT_FOR_JOIN;
 
 		get_cluster_copies(&sys->nr_copies);
 		get_cluster_flags(&sys->flags);
 
 		sys->epoch = get_latest_epoch();
 	} else {
-		sys_stat_set(SD_STATUS_WAIT_FOR_FORMAT);
+		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	}
 
 	INIT_LIST_HEAD(&sys->pending_list);

@@ -789,7 +789,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 	int fd, ret;
 	struct client_info *ci;
 
-	if (sys_stat_shutdown()) {
+	if (sys->status == SD_STATUS_SHUTDOWN) {
 		dprintf("unregistering connection %d\n", listen_fd);
 		unregister_event(listen_fd);
 		return;

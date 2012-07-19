@@ -314,63 +314,6 @@ static inline int vnode_is_local(struct sd_vnode *v)
 	return is_myself(v->nid.addr, v->nid.port);
 }
 
-/* Cluster status/flag helper */
-
-static inline int sys_flag_nohalt(void)
-{
-	return sys->flags & SD_FLAG_NOHALT;
-}
-
-static inline int sys_flag_quorum(void)
-{
-	return sys->flags & SD_FLAG_QUORUM;
-}
-
-static inline int sys_stat_ok(void)
-{
-	return sys->status & SD_STATUS_OK;
-}
-
-static inline int sys_stat_wait_format(void)
-{
-	return sys->status & SD_STATUS_WAIT_FOR_FORMAT;
-}
-
-static inline int sys_stat_wait_join(void)
-{
-	return sys->status & SD_STATUS_WAIT_FOR_JOIN;
-}
-
-static inline int sys_stat_shutdown(void)
-{
-	return sys->status & SD_STATUS_SHUTDOWN;
-}
-
-static inline int sys_stat_halt(void)
-{
-	return sys->status & SD_STATUS_HALT;
-}
-
-static inline void sys_stat_set(uint32_t s)
-{
-	sys->status = s;
-}
-
-static inline uint32_t sys_stat_get(void)
-{
-	return sys->status;
-}
-
-static inline int sys_can_recover(void)
-{
-	return sys_stat_ok() || sys_stat_halt();
-}
-
-static inline int sys_can_halt(void)
-{
-	return sys_stat_ok() && !sys_flag_nohalt();
-}
-
 /* gateway operations */
 int gateway_read_obj(struct request *req);
 int gateway_write_obj(struct request *req);

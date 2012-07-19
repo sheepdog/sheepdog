@@ -246,9 +246,9 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	set_cluster_copies(sys->nr_copies);
 	set_cluster_flags(sys->flags);
 	if (have_enough_zones())
-		sys_stat_set(SD_STATUS_OK);
+		sys->status = SD_STATUS_OK;
 	else
-		sys_stat_set(SD_STATUS_HALT);
+		sys->status = SD_STATUS_HALT;
 
 	return SD_RES_SUCCESS;
 }
@@ -256,8 +256,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 			    void *data)
 {
-	sys_stat_set(SD_STATUS_SHUTDOWN);
-
+	sys->status = SD_STATUS_SHUTDOWN;
 	return SD_RES_SUCCESS;
 }
 
@@ -337,7 +336,7 @@ static int local_stat_cluster(struct request *req)
 	struct sd_rsp *rsp = &req->rp;
 	struct epoch_log *log;
 	int i, max_logs;
-	uint32_t sys_stat = sys_stat_get(), epoch;
+	uint32_t epoch;
 
 	max_logs = rsp->data_length / sizeof(*log);
 	epoch = get_latest_epoch();
@@ -363,7 +362,7 @@ static int local_stat_cluster(struct request *req)
 		epoch--;
 	}
 
-	switch (sys_stat) {
+	switch (sys->status) {
 	case SD_STATUS_OK:
 		return SD_RES_SUCCESS;
 	case SD_STATUS_WAIT_FOR_FORMAT:
@@ -415,7 +414,7 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	 * 2) some nodes are physically down (same epoch condition).
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
 	 */
-	if (!sys_stat_wait_join())
+	if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
 		return SD_RES_MANUAL_RECOVER;
 
 	ret = get_cluster_copies(&c);
@@ -443,9 +442,9 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	}
 
 	if (have_enough_zones())
-		sys_stat_set(SD_STATUS_OK);
+		sys->status = SD_STATUS_OK;
 	else
-		sys_stat_set(SD_STATUS_HALT);
+		sys->status = SD_STATUS_HALT;
 
 	vnode_info = get_vnode_info();
 	start_recovery(vnode_info, old_vnode_info);
