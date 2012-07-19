@@ -754,21 +754,24 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	if (msg->cluster_status != SD_STATUS_OK)
 		update_exceptional_node_list(get_latest_epoch(), msg);
 
-	if (!sd_store && strlen((char *)msg->store)) {
+	/* We don't need backend for gateway-only node */
+	if (!sys->gateway_only && !sd_store && strlen((char *)msg->store)) {
 		sd_store = find_store_driver((char *)msg->store);
 		if (sd_store) {
 			sd_store->init(obj_path);
 			if (set_cluster_store(sd_store->name) != SD_RES_SUCCESS)
 				panic("failed to store into config file\n");
 		} else
-				panic("backend store %s not supported\n", msg->store);
+				panic("backend store %s not supported\n",
+				      msg->store);
 	}
 
 	/* We need to purge the stale objects for sheep joining back
 	 * after crash
 	 */
 	if (msg->inc_epoch)
-		if (sd_store->purge_obj &&
+		if (!sys->gateway_only &&
+		    sd_store->purge_obj &&
 		    sd_store->purge_obj() != SD_RES_SUCCESS)
 			panic("can't remove stale objects\n");
 

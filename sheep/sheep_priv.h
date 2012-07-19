@@ -115,6 +115,7 @@ struct cluster_info {
 	uint32_t recovered_epoch;
 
 	int use_directio;
+	uint8_t gateway_only;
 
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;

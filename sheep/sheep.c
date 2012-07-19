@@ -243,6 +243,8 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
+	if (nr_vnodes == 0)
+		sys->gateway_only = 1;
 
 	if (optind != argc)
 		dir = argv[optind];

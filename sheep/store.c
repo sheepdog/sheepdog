@@ -467,9 +467,11 @@ int init_store(const char *d, int enable_write_cache)
 	if (ret)
 		return ret;
 
-	ret = init_store_driver();
-	if (ret)
-		return ret;
+	if (!sys->gateway_only) {
+		ret = init_store_driver();
+		if (ret)
+			return ret;
+	}
 
 	if (enable_write_cache) {
 		sys->enable_write_cache = 1;
