@@ -552,15 +552,13 @@ static void client_rx_handler(struct client_info *ci)
 	if (is_conn_dead(conn))
 		return clear_client_info(ci);
 
+	/* Short read happens */
 	if (conn->c_rx_state != C_IO_END)
 		return;
 
 	/* now we have a complete command */
-
 	req = ci->rx_req;
-
 	init_rx_hdr(ci);
-
 	if (hdr->flags & SD_FLAG_CMD_WRITE)
 		req->rp.data_length = 0;
 	else
@@ -576,8 +574,7 @@ static void init_tx_hdr(struct client_info *ci)
 	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
 	struct request *req;
 
-	if (ci->tx_req || list_empty(&ci->done_reqs))
-		return;
+	assert(!list_empty(&ci->done_reqs));
 
 	memset(rsp, 0, sizeof(*rsp));
 
@@ -601,13 +598,16 @@ static void client_tx_handler(struct client_info *ci)
 {
 	int ret, opt;
 	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
-again:
-	init_tx_hdr(ci);
-	if (!ci->tx_req) {
+
+	if (list_empty(&ci->done_reqs)) {
 		if (conn_tx_off(&ci->conn))
 			clear_client_info(ci);
 		return;
 	}
+again:
+	/* If short send happens, we don't need init hdr */
+	if (!ci->tx_req)
+		init_tx_hdr(ci);
 
 	opt = 1;
 	setsockopt(ci->conn.fd, SOL_TCP, TCP_CORK, &opt, sizeof(opt));
@@ -640,13 +640,19 @@ again:
 	if (is_conn_dead(&ci->conn))
 		return clear_client_info(ci);
 
+	/* Finish sending one response */
 	if (ci->conn.c_tx_state == C_IO_END) {
 		dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
 			ci->conn.ipstr, ci->conn.port);
 		free_request(ci->tx_req);
 		ci->tx_req = NULL;
-		goto again;
 	}
+	/* Short send happens or we have more data to send */
+	if (ci->tx_req || !list_empty(&ci->done_reqs))
+		goto again;
+	else
+		if (conn_tx_off(&ci->conn))
+			clear_client_info(ci);
 }
 
 static void destroy_client(struct client_info *ci)
