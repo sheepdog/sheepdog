@@ -52,6 +52,7 @@
 #define SD_OP_TRACE_CAT      0x96
 #define SD_OP_STAT_RECOVERY  0x97
 #define SD_OP_FLUSH_DEL_CACHE  0x98
+#define SD_OP_NOTIFY_VDI_DEL 0x99
 #define SD_OP_GET_OBJ_LIST   0xA1
 #define SD_OP_GET_EPOCH      0xA2
 #define SD_OP_CREATE_AND_WRITE_PEER 0xA3

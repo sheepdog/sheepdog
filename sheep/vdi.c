@@ -393,12 +393,27 @@ out:
 	return ret;
 }
 
+static int notify_vdi_deletion(uint32_t vdi_id)
+{
+	struct sd_req hdr;
+	int ret = SD_RES_SUCCESS;
+
+	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_DEL);
+	hdr.data_length = sizeof(vdi_id);
+
+	ret = exec_local_req(&hdr, &vdi_id);
+	if (ret != SD_RES_SUCCESS)
+		eprintf("fail to notify vdi deletion(%" PRIx32 "), %d\n",
+			vdi_id, ret);
+
+	return ret;
+}
 
 static void delete_one(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
-	int ret, i;
+	int ret, i, nr_deleted;
 	struct sheepdog_inode *inode = NULL;
 
 	eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
@@ -420,7 +435,7 @@ static void delete_one(struct work *work)
 	if (inode->vdi_size == 0 && inode->name[0] == '\0')
 		goto out;
 
-	for (i = 0; i < MAX_DATA_OBJS; i++) {
+	for (nr_deleted = 0, i = 0; i < MAX_DATA_OBJS; i++) {
 		uint64_t oid;
 
 		if (!inode->data_vdi_id[i])
@@ -435,10 +450,14 @@ static void delete_one(struct work *work)
 		}
 
 		ret = remove_object(oid);
-
 		if (ret != SD_RES_SUCCESS)
 			eprintf("remove object %" PRIx64 " fail, %d\n", oid, ret);
+
+		nr_deleted++;
 	}
+
+	if (nr_deleted)
+		notify_vdi_deletion(vdi_id);
 
 	if (*(inode->name) == '\0')
 		goto out;
