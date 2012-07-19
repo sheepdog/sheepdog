@@ -76,6 +76,7 @@
 #define SD_RES_NETWORK_ERROR 0x86 /* Network error between sheep */
 
 #define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
+#define SD_FLAG_QUORUM       0x0008 /* Serve the IO rquest as long we are quorate */
 
 #define SD_STATUS_OK                0x00000001
 #define SD_STATUS_WAIT_FOR_FORMAT   0x00000002

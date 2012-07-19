@@ -318,6 +318,11 @@ static inline int sys_flag_nohalt(void)
 	return sys->flags & SD_FLAG_NOHALT;
 }
 
+static inline int sys_flag_quorum(void)
+{
+	return sys->flags & SD_FLAG_QUORUM;
+}
+
 static inline int sys_stat_ok(void)
 {
 	return sys->status & SD_STATUS_OK;

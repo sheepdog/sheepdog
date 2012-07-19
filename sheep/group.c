@@ -88,8 +88,13 @@ bool have_enough_zones(void)
 	dprintf("flags %d, nr_zones %d, copies %d\n",
 		sys->flags, current_vnode_info->nr_zones, sys->nr_copies);
 
-	if (current_vnode_info->nr_zones >= sys->nr_copies)
-		return true;
+	if (sys_flag_quorum()) {
+		if (current_vnode_info->nr_zones > (sys->nr_copies/2))
+			return true;
+	} else {
+		if (current_vnode_info->nr_zones >= sys->nr_copies)
+			return true;
+	}
 	return false;
 }
 
@@ -1076,10 +1081,8 @@ void sd_leave_handler(struct sd_node *left, struct sd_node *members,
 	}
 	put_vnode_info(old_vnode_info);
 
-	if (sys_can_halt()) {
-		if (current_vnode_info->nr_zones < sys->nr_copies)
-			sys_stat_set(SD_STATUS_HALT);
-	}
+	if (!have_enough_zones())
+		sys_stat_set(SD_STATUS_HALT);
 
 	sockfd_cache_del(&left->nid);
 }

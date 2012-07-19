@@ -21,17 +21,12 @@ struct cluster_cmd_data {
 	int list;
 	int copies;
 	int nohalt;
+	int quorum;
 	int force;
 	char name[STORE_LEN];
 } cluster_cmd_data;
 
 #define DEFAULT_STORE	"farm"
-
-static void set_nohalt(uint16_t *p)
-{
-	if (p)
-		*p |= SD_FLAG_NOHALT;
-}
 
 static int list_store(void)
 {
@@ -89,7 +84,10 @@ static int cluster_format(int argc, char **argv)
 	sd_init_req((struct sd_req *)&hdr, SD_OP_MAKE_FS);
 	hdr.copies = cluster_cmd_data.copies;
 	if (cluster_cmd_data.nohalt)
-		set_nohalt(&hdr.flags);
+		hdr.flags |= SD_FLAG_NOHALT;
+	if (cluster_cmd_data.quorum)
+		hdr.flags |= SD_FLAG_QUORUM;
+
 	hdr.epoch = sd_epoch;
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
@@ -461,7 +459,7 @@ static int cluster_recover(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 SUBCMD_FLAG_NEED_NODELIST, cluster_info},
-	{"format", NULL, "bcHaph", "create a Sheepdog store",
+	{"format", NULL, "bcmaph", "create a Sheepdog store",
 	 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
@@ -495,8 +493,20 @@ static int cluster_parser(int ch, char *opt)
 		}
 		cluster_cmd_data.copies = copies;
 		break;
-	case 'H':
-		cluster_cmd_data.nohalt = 1;
+	case 'm':
+		if (strcmp(opt, "safe") == 0) {
+			cluster_cmd_data.nohalt = 0;
+			cluster_cmd_data.quorum = 0;
+		} else if (strcmp(opt, "quorum") == 0) {
+			cluster_cmd_data.nohalt = 0;
+			cluster_cmd_data.quorum = 1;
+		} else if (strcmp(opt, "unsafe") == 0) {
+			cluster_cmd_data.nohalt = 1;
+			cluster_cmd_data.quorum = 0;
+		} else {
+			fprintf(stderr, "Unknown mode '%s'\n", opt);
+			exit(EXIT_FAILURE);
+		}
 		break;
 	case 'f':
 		cluster_cmd_data.force = 1;
