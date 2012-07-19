@@ -71,6 +71,7 @@ static struct zk_event zk_levents[SD_MAX_NODES];
 static int nr_zk_levents;
 static unsigned zk_levent_head;
 static unsigned zk_levent_tail;
+static bool called_by_zk_unblock;
 
 static void *zk_node_btroot;
 static struct zk_node *zk_master;
@@ -240,9 +241,11 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	struct zk_event *lev;
 	eventfd_t value = 1;
 
-	/* process leave event */
-	if (uatomic_read(&zk_notify_blocked) <= 0 &&
-	     uatomic_read(&nr_zk_levents)) {
+	/*
+	 * Continue to process LEAVE event even if
+	 * we have an unfinished BLOCK event.
+	 */
+	if (!called_by_zk_unblock && uatomic_read(&nr_zk_levents)) {
 		nr_levents = uatomic_sub_return(&nr_zk_levents, 1) + 1;
 		dprintf("nr_zk_levents:%d, head:%u\n", nr_levents, zk_levent_head);
 
@@ -282,6 +285,9 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 
 		return 0;
 	}
+
+	if (!called_by_zk_unblock && uatomic_read(&zk_notify_blocked) > 0)
+		return -1;
 
 	if (zk_queue_empty(zh))
 		return -1;
@@ -620,7 +626,9 @@ static void zk_unblock(void *msg, size_t msg_len)
 	struct zk_event ev;
 	eventfd_t value = 1;
 
+	called_by_zk_unblock = true;
 	rc = zk_queue_pop(zhandle, &ev);
+	called_by_zk_unblock = false;
 	assert(rc == 0);
 
 	ev.type = EVENT_NOTIFY;
@@ -656,9 +664,6 @@ static void zk_handler(int listen_fd, int events, void *data)
 
 	ret = eventfd_read(efd, &value);
 	if (ret < 0)
-		return;
-
-	if (uatomic_read(&zk_notify_blocked) > 0)
 		return;
 
 	ret = zk_queue_pop(zhandle, &ev);
