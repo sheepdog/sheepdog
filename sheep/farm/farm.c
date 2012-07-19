@@ -15,6 +15,8 @@
 #include <pthread.h>
 #include <linux/limits.h>
 #include <sys/file.h>
+#include <sys/types.h>
+#include <sys/xattr.h>
 
 #include "farm.h"
 #include "sheep_priv.h"
@@ -332,6 +334,9 @@ static int farm_init(char *p)
 
 	dprintf("use farm store driver\n");
 	if (create_directory(p) < 0)
+		goto err;
+
+	if ((listxattr(p, NULL, 0) == -1) && (errno == ENOTSUP))
 		goto err;
 
 	if (trunk_init() < 0)
