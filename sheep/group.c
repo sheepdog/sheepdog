@@ -838,7 +838,7 @@ static void update_cluster_info(struct join_message *msg,
 	put_vnode_info(old_vnode_info);
 
 	if (sys_stat_halt()) {
-		if (current_vnode_info->nr_zones >= sys->nr_copies)
+		if (have_enough_zones())
 			sys_stat_set(SD_STATUS_OK);
 	}
 
