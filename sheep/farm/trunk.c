@@ -275,30 +275,46 @@ int trunk_file_write_recovery(unsigned char *outsha1)
 
 	list_for_each_entry_safe(entry, t, &trunk_active_list, active_list) {
 		oid = entry->raw.oid;
-		if (oid_stale(oid)) {
-			dprintf("stale oid %"PRIx64"\n", oid);
-			if (trunk_entry_no_sha1(entry) || trunk_entry_is_dirty(entry)) {
-				if (fill_entry_new_sha1(entry) < 0) {
-					eprintf("fill sha1 fail\n");
-					goto out;
-				}
-			}
+		if (!oid_stale(oid))
+			continue;
 
-			old_sha1 = omap_tree_insert(oid, entry->raw.sha1);
-			if (old_sha1)
-				sha1_file_try_delete(old_sha1);
-
-			strbuf_add(&buf, &entry->raw, sizeof(struct trunk_entry));
-			active_nr++;
-
-			snprintf(p, sizeof(p), "%s%016"PRIx64, obj_path, entry->raw.oid);
-			if (unlink(p) < 0) {
-				eprintf("%s:%m\n", p);
+		dprintf("stale oid %"PRIx64"\n", oid);
+		if (trunk_entry_no_sha1(entry) || trunk_entry_is_dirty(entry)) {
+			if (fill_entry_new_sha1(entry) < 0) {
+				eprintf("fill sha1 fail\n");
 				goto out;
 			}
-			dprintf("remove file %"PRIx64"\n", entry->raw.oid);
-			put_entry(entry);
 		}
+
+		old_sha1 = omap_tree_insert(oid, entry->raw.sha1);
+		if (old_sha1)
+			sha1_file_try_delete(old_sha1);
+
+		strbuf_add(&buf, &entry->raw, sizeof(struct trunk_entry));
+		active_nr++;
+
+		/*
+		 * We remove object from the working directory, but can not
+		 * remove the objlist cache entry.
+		 *
+		 * Consider the following case:
+		 *
+		 * If node A ends recovery before some other nodes, and then it
+		 * delete the stale object from the farm working directory, but
+		 * if it also deletes the objlist entry, it may causes problem,
+		 * try thinking of another node B which issues a get_obj_list()
+		 * request after the objlist entry is deleted on the original
+		 * node A, but still not added to the target node C, then
+		 * node B would not find the objlist entry, then for node B,
+		 * this object is ignored to recovery, so it's lost.
+		 */
+		snprintf(p, sizeof(p), "%s%016"PRIx64, obj_path, entry->raw.oid);
+		if (unlink(p) < 0) {
+			eprintf("%s:%m\n", p);
+			goto out;
+		}
+		dprintf("remove file %"PRIx64"\n", entry->raw.oid);
+		put_entry(entry);
 	}
 
 	h = (struct sha1_file_hdr*)buf.buf;
