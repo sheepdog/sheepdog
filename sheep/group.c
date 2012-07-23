@@ -962,7 +962,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 		strcpy((char *)jm->store, sd_store->name);
 
 	if (jm->cluster_status != SD_STATUS_OK &&
-	    (ret == CJ_RES_SUCCESS || CJ_RES_JOIN_LATER))
+	    (ret == CJ_RES_SUCCESS || ret == CJ_RES_JOIN_LATER))
 		format_exceptional_node_list(jm);
 	return ret;
 }
