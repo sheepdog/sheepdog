@@ -53,7 +53,7 @@ extern unsigned long trace_return_call(void);
   extern pthread_cond_t trace_cond;
   extern pthread_mutex_t trace_mux;
 
-  extern int init_signal(void);
+  extern int trace_init_signal(void);
   extern int trace_init(void);
   extern int register_trace_function(trace_func_t func);
   extern int trace_enable(void);
@@ -62,7 +62,7 @@ extern unsigned long trace_return_call(void);
   extern int trace_copy_buffer(void *buf);
   extern void trace_reset_buffer(void);
 #else
-  static inline int init_signal(void) { return 0; }
+  static inline int trace_init_signal(void) { return 0; }
   static inline int trace_init(void) { return 0; }
   static inline int trace_enable(void) { return 0; }
   static inline int trace_disable(void) { return 0; }

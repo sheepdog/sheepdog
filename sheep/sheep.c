@@ -122,6 +122,11 @@ static int create_pidfile(const char *filename)
 	return 0;
 }
 
+static int init_signal(void)
+{
+	return trace_init_signal();
+}
+
 static struct cluster_info __sys;
 struct cluster_info *sys = &__sys;
 

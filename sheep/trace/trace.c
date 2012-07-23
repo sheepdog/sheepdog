@@ -250,7 +250,7 @@ notrace int trace_disable(void)
 	return SD_RES_SUCCESS;
 }
 
-int init_signal(void)
+int trace_init_signal(void)
 {
 	struct sigaction act;
 
