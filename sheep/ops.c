@@ -845,6 +845,7 @@ static struct sd_op_template sd_ops[] = {
 	},
 
 	[SD_OP_NOTIFY_VDI_DEL] = {
+		.name = "NOTIFY_VDI_DEL",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_notify_vdi_del,
