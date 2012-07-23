@@ -66,6 +66,7 @@ fi
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
 %{_mandir}/man8/sheep.8*
+%{_mandir}/man8/collie.8*
 
 %changelog
 * @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
