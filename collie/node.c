@@ -157,7 +157,44 @@ static int node_recovery(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int node_kill(int argc, char **argv)
+{
+	char host[128];
+	int fd, node_id, ret;
+	unsigned wlen, rlen;
+	struct sd_node_req req;
+	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
+
+	node_id = strtol(argv[optind++], NULL, 10);
+	if (node_id < 0 || node_id >= sd_nodes_nr) {
+		fprintf(stderr, "Invalid node id '%d'\n", node_id);
+		exit(EXIT_USAGE);
+	}
+
+	addr_to_str(host, sizeof(host), sd_nodes[node_id].nid.addr, 0);
+
+	fd = connect_to(host, sd_nodes[node_id].nid.port);
+	if (fd < 0)
+		return EXIT_FAILURE;
+
+	sd_init_req((struct sd_req *)&req, SD_OP_KILL_NODE);
+
+	wlen = 0;
+	rlen = 0;
+	ret = exec_req(fd, (struct sd_req *)&req, NULL, &wlen, &rlen);
+	close(fd);
+
+	if (ret || rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to execute request\n");
+		exit(EXIT_FAILURE);
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static struct subcommand node_cmd[] = {
+	{"kill", "<node id>", "aprh", "kill node",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, node_kill},
 	{"list", NULL, "aprh", "list nodes",
 	 SUBCMD_FLAG_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node",

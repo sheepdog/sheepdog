@@ -77,6 +77,7 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_NETWORK_ERROR:
 	case SD_RES_WAIT_FOR_JOIN:
 	case SD_RES_WAIT_FOR_FORMAT:
+	case SD_RES_KILLED:
 		dprintf("retrying failed I/O request "
 			"op %s result %d epoch %d, sys epoch %d\n",
 			op_name(req->op),
@@ -329,6 +330,9 @@ static void queue_request(struct request *req)
 	dprintf("%s\n", op_name(req->op));
 
 	switch (sys->status) {
+	case SD_STATUS_KILLED:
+		rsp->result = SD_RES_KILLED;
+		goto done;
 	case SD_STATUS_SHUTDOWN:
 		rsp->result = SD_RES_SHUTDOWN;
 		goto done;
