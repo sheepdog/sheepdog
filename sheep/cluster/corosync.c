@@ -186,9 +186,9 @@ static int send_message(enum corosync_message_type type,
 retry:
 	ret = cpg_mcast_joined(cpg_handle, CPG_TYPE_AGREED, iov, iov_cnt);
 	switch (ret) {
-	case CPG_OK:
+	case CS_OK:
 		break;
-	case CPG_ERR_TRY_AGAIN:
+	case CS_ERR_TRY_AGAIN:
 		dprintf("failed to send message: retrying\n");
 		sleep(1);
 		goto retry;
@@ -655,13 +655,13 @@ static int corosync_join(struct sd_node *myself,
 retry:
 	ret = cpg_join(cpg_handle, &cpg_group);
 	switch (ret) {
-	case CPG_OK:
+	case CS_OK:
 		break;
-	case CPG_ERR_TRY_AGAIN:
+	case CS_ERR_TRY_AGAIN:
 		dprintf("failed to join the sheepdog group: retrying\n");
 		sleep(1);
 		goto retry;
-	case CPG_ERR_SECURITY:
+	case CS_ERR_SECURITY:
 		eprintf("permission denied to join the sheepdog group\n");
 		return -1;
 	default:
@@ -710,8 +710,8 @@ static void corosync_handler(int listen_fd, int events, void *data)
 		goto out;
 	}
 
-	ret = cpg_dispatch(cpg_handle, CPG_DISPATCH_ALL);
-	if (ret != CPG_OK) {
+	ret = cpg_dispatch(cpg_handle, CS_DISPATCH_ALL);
+	if (ret != CS_OK) {
 		eprintf("cpg_dispatch returned %d\n", ret);
 		goto out;
 	}
@@ -732,7 +732,7 @@ static int corosync_init(const char *option)
 	};
 
 	ret = cpg_initialize(&cpg_handle, &cb);
-	if (ret != CPG_OK) {
+	if (ret != CS_OK) {
 		eprintf("failed to initialize cpg (%d) - "
 			"is corosync running?\n", ret);
 		return -1;
@@ -754,7 +754,7 @@ static int corosync_init(const char *option)
 	this_node.pid = getpid();
 
 	ret = cpg_fd_get(cpg_handle, &fd);
-	if (ret != CPG_OK) {
+	if (ret != CS_OK) {
 		eprintf("failed to get cpg file descriptor (%d)\n", ret);
 		return -1;
 	}
