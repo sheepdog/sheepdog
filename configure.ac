@@ -38,6 +38,8 @@ AC_LANG([C])
 
 AM_SILENT_RULES([yes])
 
+m4_ifndef([PKG_PROG_PKG_CONFIG], AC_MSG_ERROR([pkg-config not found]))
+
 dnl Fix default variables - "prefix" variable if not specified
 if test "$prefix" = "NONE"; then
 	prefix="/usr"
