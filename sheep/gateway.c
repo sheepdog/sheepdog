@@ -142,14 +142,14 @@ static inline void pfd_info_init(struct write_info *wi, struct pfd_info *pi)
 }
 
 /*
- * Wait for all forward writes completion.
+ * Wait for all forward requests completion.
  *
- * Even if something goes wrong, we have to wait forward write completion to
+ * Even if something goes wrong, we have to wait forward requests completion to
  * avoid interleaved requests.
  *
  * Return error code if any one request fails.
  */
-static int wait_forward_write(struct write_info *wi, struct sd_rsp *rsp)
+static int wait_forward_request(struct write_info *wi, struct sd_rsp *rsp)
 {
 	int nr_sent, err_ret = SD_RES_SUCCESS, ret, pollret, i;
 	struct pfd_info pi;;
@@ -286,7 +286,7 @@ static int gateway_forward_request(struct request *req)
 
 	dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
 	if (wi.nr_sent > 0) {
-		ret = wait_forward_write(&wi, rsp);
+		ret = wait_forward_request(&wi, rsp);
 		if (ret != SD_RES_SUCCESS)
 			err_ret = ret;
 	}
