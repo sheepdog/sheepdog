@@ -48,21 +48,30 @@ static struct sockfd_cache sockfd_cache = {
 	.lock = PTHREAD_RWLOCK_INITIALIZER,
 };
 
+/*
+ * Suppose request size from Guest is 512k, then 4M / 512k = 8, so at
+ * most 8 requests can be issued to the same sheep object. Based on this
+ * assumption, '16' would be effecient for servers that only host 2~4
+ * Guests.
+ *
+ * This fd count will be dynamically grown when the idx reaches watermark which
+ * is calculated as FDS_COUNT * 0.75
+ */
+#define DEFAULT_FDS_COUNT	16
+#define DEFAULT_FDS_WATERMARK	12
+
+/* How many FDs we cache for one node */
+static int fds_count = DEFAULT_FDS_COUNT;
+
+struct sockfd_cache_fd {
+	int fd;
+	uint8_t in_use;
+};
+
 struct sockfd_cache_entry {
 	struct rb_node rb;
 	struct node_id nid;
-#define SOCKFD_CACHE_MAX_FD	8 /* How many FDs we cache for one node */
-	/*
-	 * FIXME: Make this macro configurable.
-	 *
-	 * Suppose request size from Guest is 512k, then 4M / 512k = 8, so at
-	 * most 8 requests can be issued to the same sheep object. Based on this
-	 * assumption, '8' would be effecient for servers that only host 4~8
-	 * Guests, but for powerful servers that can host dozens of Guests, we
-	 * might consider bigger value.
-	 */
-	int fd[SOCKFD_CACHE_MAX_FD];
-	uint8_t fd_in_use[SOCKFD_CACHE_MAX_FD];
+	struct sockfd_cache_fd *fds;
 };
 
 static struct sockfd_cache_entry *
@@ -118,8 +127,8 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
 {
 	int idx = -1, i;
 
-	for (i = 0; i < SOCKFD_CACHE_MAX_FD; i++) {
-		if (uatomic_cmpxchg(&entry->fd_in_use[i], 0, 1))
+	for (i = 0; i < fds_count; i++) {
+		if (uatomic_cmpxchg(&entry->fds[i].in_use, 0, 1))
 			continue;
 		idx = i;
 		break;
@@ -155,8 +164,8 @@ out:
 static inline bool slots_all_free(struct sockfd_cache_entry *entry)
 {
 	int i;
-	for (i = 0; i < SOCKFD_CACHE_MAX_FD; i++)
-		if (uatomic_read(&entry->fd_in_use[i]))
+	for (i = 0; i < fds_count; i++)
+		if (uatomic_read(&entry->fds[i].in_use))
 			return false;
 	return true;
 }
@@ -164,9 +173,9 @@ static inline bool slots_all_free(struct sockfd_cache_entry *entry)
 static inline void destroy_all_slots(struct sockfd_cache_entry *entry)
 {
 	int i;
-	for (i = 0; i < SOCKFD_CACHE_MAX_FD; i++)
-		if (entry->fd[i] != -1)
-			close(entry->fd[i]);
+	for (i = 0; i < fds_count; i++)
+		if (entry->fds[i].fd != -1)
+			close(entry->fds[i].fd);
 }
 
 /*
@@ -220,11 +229,12 @@ void sockfd_cache_del(struct node_id *nid)
 
 static void sockfd_cache_add_nolock(struct node_id *nid)
 {
-	struct sockfd_cache_entry *new = xzalloc(sizeof(*new));
+	struct sockfd_cache_entry *new = xmalloc(sizeof(*new));
 	int i;
 
-	for (i = 0; i < SOCKFD_CACHE_MAX_FD; i++)
-		new->fd[i] = -1;
+	new->fds = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
+	for (i = 0; i < fds_count; i++)
+		new->fds[i].fd = -1;
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
 	if (sockfd_cache_insert(new)) {
@@ -251,15 +261,17 @@ void sockfd_cache_add_group(struct sd_node *nodes, int nr)
 /* Add one node to the cache means we can do caching tricks on this node */
 void sockfd_cache_add(struct node_id *nid)
 {
-	struct sockfd_cache_entry *new = xzalloc(sizeof(*new));
+	struct sockfd_cache_entry *new;
 	char name[INET6_ADDRSTRLEN];
 	int n, i;
 
-	for (i = 0; i < SOCKFD_CACHE_MAX_FD; i++)
-		new->fd[i] = -1;
+	pthread_rwlock_rdlock(&sockfd_cache.lock);
+	new = xmalloc(sizeof(*new));
+	new->fds = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
+	for (i = 0; i < fds_count; i++)
+		new->fds[i].fd = -1;
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
-	pthread_rwlock_rdlock(&sockfd_cache.lock);
 	if (sockfd_cache_insert(new)) {
 		free(new);
 		pthread_rwlock_unlock(&sockfd_cache.lock);
@@ -269,6 +281,56 @@ void sockfd_cache_add(struct node_id *nid)
 	n = uatomic_add_return(&sockfd_cache.count, 1);
 	addr_to_str(name, sizeof(name), nid->addr, 0);
 	dprintf("%s:%d, count %d\n", name, nid->port, n);
+}
+
+static void do_grow_fds(struct work *work)
+{
+	struct sockfd_cache_entry *entry;
+	struct rb_node *p;
+	int old_fds_count, new_fds_count, new_size, i;
+
+	dprintf("%d\n", fds_count);
+	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	old_fds_count = fds_count;
+	new_fds_count = fds_count * 2;
+	new_size = sizeof(struct sockfd_cache_fd) * fds_count * 2;
+	for (p = rb_first(&sockfd_cache.root); p; p = rb_next(p)) {
+		entry = rb_entry(p, struct sockfd_cache_entry, rb);
+		entry->fds = xrealloc(entry->fds, new_size);
+		for (i = old_fds_count; i < new_fds_count; i++) {
+			entry->fds[i].fd = -1;
+			entry->fds[i].in_use = 0;
+		}
+	}
+	pthread_rwlock_unlock(&sockfd_cache.lock);
+}
+
+static bool fds_in_grow;
+static int fds_high_watermark = DEFAULT_FDS_WATERMARK;
+
+static void grow_fds_done(struct work *work)
+{
+	fds_in_grow = false;
+	fds_count *= 2;
+	fds_high_watermark = fds_count * 3 / 4;
+	dprintf("fd count has been grown into %d\n", fds_count);
+	free(work);
+}
+
+static inline void check_idx(int idx)
+{
+	struct work *w;
+
+	if (idx <= fds_high_watermark)
+		return;
+	if (fds_in_grow)
+		return;
+
+	w = xmalloc(sizeof(*w));
+	w->fn = do_grow_fds;
+	w->done = grow_fds_done;
+	fds_in_grow = true;
+	queue_work(sys->sockfd_wqueue, w);
 }
 
 static struct sockfd *sockfd_cache_get(struct node_id *nid, char *name)
@@ -281,7 +343,9 @@ static struct sockfd *sockfd_cache_get(struct node_id *nid, char *name)
 	if (!entry)
 		return NULL;
 
-	if (entry->fd[idx] != -1) {
+	check_idx(idx);
+
+	if (entry->fds[idx].fd != -1) {
 		dprintf("%s:%d, idx %d\n", name, nid->port, idx);
 		goto out;
 	}
@@ -290,14 +354,14 @@ static struct sockfd *sockfd_cache_get(struct node_id *nid, char *name)
 	dprintf("create connection %s:%d idx %d\n", name, nid->port, idx);
 	fd = connect_to(name, nid->port);
 	if (fd < 0) {
-		uatomic_dec(&entry->fd_in_use[idx]);
+		uatomic_dec(&entry->fds[idx].in_use);
 		return NULL;
 	}
-	entry->fd[idx] = fd;
+	entry->fds[idx].fd = fd;
 
 out:
 	sfd = xmalloc(sizeof(*sfd));
-	sfd->fd = entry->fd[idx];
+	sfd->fd = entry->fds[idx].fd;
 	sfd->idx = idx;
 	return sfd;
 }
@@ -316,7 +380,7 @@ static void sockfd_cache_put(struct node_id *nid, int idx)
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 
 	assert(entry);
-	refcnt = uatomic_cmpxchg(&entry->fd_in_use[idx], 1, 0);
+	refcnt = uatomic_cmpxchg(&entry->fds[idx].in_use, 1, 0);
 	assert(refcnt == 1);
 }
 

@@ -122,6 +122,7 @@ struct cluster_info {
 	struct work_queue *deletion_wqueue;
 	struct work_queue *recovery_wqueue;
 	struct work_queue *block_wqueue;
+	struct work_queue *sockfd_wqueue;
 };
 
 struct siocb {
