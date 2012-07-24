@@ -325,7 +325,7 @@ static void sockfd_cache_put(struct node_id *nid, int idx)
  *
  * Try to get a 'long' FD as best, which is cached and never closed. If no FD
  * available, we return a 'short' FD which is supposed to be closed by
- * sheep_get_sockput().
+ * sheep_put_sockfd().
  *
  * ret_idx is opaque to the caller, -1 indicates it is a short FD.
  */
