@@ -144,41 +144,14 @@ object_cache_insert(struct rb_root *root, struct object_cache_entry *new)
 	return NULL; /* insert successfully */
 }
 
-static struct object_cache_entry *
-dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
-{
-	struct rb_node **p = &root->rb_node;
-	struct rb_node *parent = NULL;
-	struct object_cache_entry *entry;
-
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct object_cache_entry, dirty_node);
-
-		if (new->idx < entry->idx)
-			p = &(*p)->rb_left;
-		else if (new->idx > entry->idx)
-			p = &(*p)->rb_right;
-		else {
-			/* already has this entry, merge bmap */
-			entry->bmap |= new->bmap;
-			return entry;
-		}
-	}
-	rb_link_node(&new->dirty_node, parent, p);
-	rb_insert_color(&new->dirty_node, root);
-
-	return NULL; /* insert successfully */
-}
-
-static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
-						    uint32_t idx)
+static struct object_cache_entry *object_tree_search(struct rb_root *root,
+						     uint32_t idx)
 {
 	struct rb_node *n = root->rb_node;
 	struct object_cache_entry *t;
 
 	while (n) {
-		t = rb_entry(n, struct object_cache_entry, dirty_node);
+		t = rb_entry(n, struct object_cache_entry, node);
 
 		if (idx < t->idx)
 			n = n->rb_left;
@@ -191,14 +164,50 @@ static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
 	return NULL;
 }
 
-static struct object_cache_entry *object_tree_search(struct rb_root *root,
-						     uint32_t idx)
+static struct object_cache_entry *
+dirty_tree_insert(struct object_cache *oc, uint32_t idx,
+		  uint64_t bmap, int create)
+{
+	struct rb_node **p = &oc->dirty_tree.rb_node;
+	struct rb_node *parent = NULL;
+	struct object_cache_entry *entry;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct object_cache_entry, dirty_node);
+
+		if (idx < entry->idx)
+			p = &(*p)->rb_left;
+		else if (idx > entry->idx)
+			p = &(*p)->rb_right;
+		else {
+			/* already has this entry, merge bmap */
+			entry->bmap |= bmap;
+			return entry;
+		}
+	}
+
+	entry = object_tree_search(&oc->object_tree, idx);
+	if (!entry)
+		return NULL;
+
+	entry->bmap |= bmap;
+	entry->flags |= ENTRY_CREATE_BIT;
+	rb_link_node(&entry->dirty_node, parent, p);
+	rb_insert_color(&entry->dirty_node, &oc->dirty_tree);
+	list_add(&entry->list, &oc->dirty_list);
+
+	return entry;
+}
+
+static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
+						    uint32_t idx)
 {
 	struct rb_node *n = root->rb_node;
 	struct object_cache_entry *t;
 
 	while (n) {
-		t = rb_entry(n, struct object_cache_entry, node);
+		t = rb_entry(n, struct object_cache_entry, dirty_node);
 
 		if (idx < t->idx)
 			n = n->rb_left;
@@ -272,36 +281,28 @@ del_from_dirty_tree_and_list(struct object_cache_entry *entry,
 
 /* Caller should hold the oc->lock */
 static inline void
-add_to_dirty_tree_and_list(struct object_cache *oc,
-			   struct object_cache_entry *entry)
+add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
+			   uint64_t bmap, int create)
 {
-	if (!dirty_tree_insert(&oc->dirty_tree, entry))
-		list_add(&entry->list, &oc->dirty_list);
-	else
-		free(entry);
-}
+	struct object_cache_entry *entry;
+	entry = dirty_tree_insert(oc, idx, bmap, create);
+	if (!entry)
+		panic("Can not find object entry %" PRIx32 "\n", idx);
 
-static inline struct object_cache_entry *
-alloc_cache_entry(uint32_t idx, uint64_t bmap, int create)
-{
-	struct object_cache_entry *entry = xzalloc(sizeof(*entry));
-
-	entry->idx = idx;
-	entry->bmap = bmap;
-	entry->flags |= ENTRY_CREATE_BIT;
-
-	return entry;
+	/* If cache isn't in reclaiming, move it
+	 * to the head of lru list */
+	cds_list_del_rcu(&entry->lru_list);
+	cds_list_add_rcu(&entry->lru_list,
+			 &sys_cache.cache_lru_list);
 }
 
 static void update_cache_entry(struct object_cache *oc, uint32_t idx,
 		size_t datalen, off_t offset)
 {
-	struct object_cache_entry *entry;
-
-	entry = alloc_cache_entry(idx, calc_object_bmap(datalen, offset), 0);
+	uint64_t bmap = calc_object_bmap(datalen, offset);
 
 	pthread_rwlock_wrlock(&oc->lock);
-	add_to_dirty_tree_and_list(oc, entry);
+	add_to_dirty_tree_and_list(oc, idx, bmap, 0);
 	pthread_rwlock_unlock(&oc->lock);
 }
 
@@ -352,7 +353,6 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 	}
 
 	if (create) {
-		struct object_cache_entry *entry;
 		unsigned data_length;
 
 		if (idx_has_vdi_bit(idx))
@@ -368,9 +368,8 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 
 			add_to_object_cache(oc, idx);
 
-			entry = alloc_cache_entry(idx, bmap, 1);
 			pthread_rwlock_wrlock(&oc->lock);
-			add_to_dirty_tree_and_list(oc, entry);
+			add_to_dirty_tree_and_list(oc, idx, bmap, 1);
 			pthread_rwlock_unlock(&oc->lock);
 		}
 	}
@@ -797,6 +796,7 @@ int object_cache_handle_request(struct request *req)
 	uint32_t vid = oid_to_vid(oid);
 	uint32_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
+	struct object_cache_entry *entry;
 	int ret, create = 0;
 
 	dprintf("%08"PRIx32", len %"PRIu32", off %"PRIu64"\n", idx,
@@ -813,19 +813,29 @@ int object_cache_handle_request(struct request *req)
 			return ret;
 	}
 
+	pthread_rwlock_rdlock(&cache->lock);
+	entry = object_tree_search(&cache->object_tree, idx);
+	pthread_rwlock_unlock(&cache->lock);
+
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
 		ret = write_cache_object(cache->vid, idx, req->data,
 					 hdr->data_length, hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		update_cache_entry(cache, idx, hdr->data_length,
-				hdr->obj.offset);
+				   hdr->obj.offset);
 	} else {
 		ret = read_cache_object(cache->vid, idx, req->data,
 					hdr->data_length, hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		req->rp.data_length = hdr->data_length;
+
+		if (entry) {
+			cds_list_del_rcu(&entry->lru_list);
+			cds_list_add_rcu(&entry->lru_list,
+					 &sys_cache.cache_lru_list);
+		}
 	}
 out:
 	return ret;
