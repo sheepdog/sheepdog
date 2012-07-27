@@ -21,6 +21,8 @@
 #include <errno.h>
 #include <sys/file.h>
 #include <dirent.h>
+#include <urcu/uatomic.h>
+#include <urcu/rculist.h>
 
 #include "sheep_priv.h"
 #include "util.h"
@@ -38,6 +40,14 @@
 #define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
 #define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
 
+#define ENTRY_CREATE_BIT      (1)
+
+struct global_cache {
+	uint64_t cache_size;
+	int reclaiming;
+	struct cds_list_head cache_lru_list;
+};
+
 struct object_cache {
 	uint32_t vid;
 	struct hlist_node hash;
@@ -48,6 +58,8 @@ struct object_cache {
 	struct rb_root dirty_trees[2];
 	struct rb_root *active_dirty_tree;
 
+	struct rb_root object_tree;
+
 	pthread_mutex_t lock;
 };
 
@@ -55,11 +67,16 @@ struct object_cache_entry {
 	uint32_t idx;
 	uint64_t bmap; /* each bit represents one dirty
 			* block which should be flushed */
-	struct rb_node rb;
+	int refcnt;
+	int flags;
+	struct rb_node node;
+	struct rb_node dirty_node;
+	struct object_cache *oc;
 	struct list_head list;
-	int create;
+	struct cds_list_head lru_list;
 };
 
+static struct global_cache sys_cache;
 static char cache_dir[PATH_MAX];
 static int def_open_flags = O_RDWR;
 
@@ -106,6 +123,32 @@ static uint64_t calc_object_bmap(size_t len, off_t offset)
 }
 
 static struct object_cache_entry *
+object_cache_insert(struct rb_root *root, struct object_cache_entry *new)
+{
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct object_cache_entry *entry;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct object_cache_entry, node);
+
+		if (new->idx < entry->idx)
+			p = &(*p)->rb_left;
+		else if (new->idx > entry->idx)
+			p = &(*p)->rb_right;
+		else {
+			/* already has this entry */
+			return entry;
+		}
+	}
+	rb_link_node(&new->node, parent, p);
+	rb_insert_color(&new->node, root);
+
+	return NULL; /* insert successfully */
+}
+
+static struct object_cache_entry *
 dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 {
 	struct rb_node **p = &root->rb_node;
@@ -114,7 +157,7 @@ dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 
 	while (*p) {
 		parent = *p;
-		entry = rb_entry(parent, struct object_cache_entry, rb);
+		entry = rb_entry(parent, struct object_cache_entry, dirty_node);
 
 		if (new->idx < entry->idx)
 			p = &(*p)->rb_left;
@@ -126,8 +169,8 @@ dirty_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 			return entry;
 		}
 	}
-	rb_link_node(&new->rb, parent, p);
-	rb_insert_color(&new->rb, root);
+	rb_link_node(&new->dirty_node, parent, p);
+	rb_insert_color(&new->dirty_node, root);
 
 	return NULL; /* insert successfully */
 }
@@ -139,7 +182,27 @@ static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
 	struct object_cache_entry *t;
 
 	while (n) {
-		t = rb_entry(n, struct object_cache_entry, rb);
+		t = rb_entry(n, struct object_cache_entry, dirty_node);
+
+		if (idx < t->idx)
+			n = n->rb_left;
+		else if (idx > t->idx)
+			n = n->rb_right;
+		else
+			return t; /* found it */
+	}
+
+	return NULL;
+}
+
+static struct object_cache_entry *object_tree_search(struct rb_root *root,
+						     uint32_t idx)
+{
+	struct rb_node *n = root->rb_node;
+	struct object_cache_entry *t;
+
+	while (n) {
+		t = rb_entry(n, struct object_cache_entry, node);
 
 		if (idx < t->idx)
 			n = n->rb_left;
@@ -212,7 +275,7 @@ static inline void
 del_from_dirty_tree_and_list(struct object_cache_entry *entry,
 			     struct rb_root *dirty_tree)
 {
-	rb_erase(&entry->rb, dirty_tree);
+	rb_erase(&entry->dirty_node, dirty_tree);
 	list_del(&entry->list);
 }
 
@@ -270,7 +333,7 @@ alloc_cache_entry(uint32_t idx, uint64_t bmap, int create)
 
 	entry->idx = idx;
 	entry->bmap = bmap;
-	entry->create = create;
+	entry->flags |= ENTRY_CREATE_BIT;
 
 	return entry;
 }
@@ -284,6 +347,33 @@ static void update_cache_entry(struct object_cache *oc, uint32_t idx,
 
 	pthread_mutex_lock(&oc->lock);
 	add_to_dirty_tree_and_list(oc, entry);
+	pthread_mutex_unlock(&oc->lock);
+}
+
+static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
+{
+	struct object_cache_entry *entry, *old;
+	uint32_t data_length;
+
+	if (idx_has_vdi_bit(idx))
+		data_length = SD_INODE_SIZE;
+	else
+		data_length = SD_DATA_OBJ_SIZE;
+
+	entry = xzalloc(sizeof(*entry));
+	entry->oc = oc;
+	entry->idx = idx;
+	CDS_INIT_LIST_HEAD(&entry->lru_list);
+
+	pthread_mutex_lock(&oc->lock);
+	old = object_cache_insert(&oc->object_tree, entry);
+	if (!old) {
+		uatomic_add(&sys_cache.cache_size, data_length);
+		cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
+	} else {
+		free(entry);
+		entry = old;
+	}
 	pthread_mutex_unlock(&oc->lock);
 }
 
@@ -320,6 +410,8 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			ret = -1;
 		else {
 			uint64_t bmap = UINT64_MAX;
+
+			add_to_object_cache(oc, idx);
 
 			entry = alloc_cache_entry(idx, bmap, 1);
 			pthread_mutex_lock(&oc->lock);
@@ -471,6 +563,7 @@ out:
 	return ret;
 }
 
+
 /* Fetch the object, cache it in success */
 static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
@@ -503,6 +596,8 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	if (ret == SD_RES_SUCCESS) {
 		dprintf("oid %"PRIx64" pulled successfully\n", oid);
 		ret = create_cache_object(oc, idx, buf, data_length);
+		if (ret == SD_RES_SUCCESS)
+			add_to_object_cache(oc, idx);
 	}
 	free(buf);
 out:
@@ -599,11 +694,11 @@ static int object_cache_push(struct object_cache *oc)
 	 * So we need not to protect inactive dirty tree and list */
 	list_for_each_entry_safe(entry, t, inactive_dirty_list, list) {
 		ret = push_cache_object(oc->vid, entry->idx,
-					entry->bmap, entry->create);
+					entry->bmap,
+					entry->flags & ENTRY_CREATE_BIT);
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
 		del_from_dirty_tree_and_list(entry, inactive_dirty_tree);
-		free(entry);
 	}
 	return ret;
 push_failed:
@@ -849,6 +944,77 @@ out:
 	return;
 }
 
+static int load_existing_cache_object(struct object_cache *cache)
+{
+	DIR *dir;
+	struct dirent *d;
+	uint32_t idx;
+	struct strbuf idx_buf;
+	int ret = 0;
+
+	strbuf_init(&idx_buf, PATH_MAX);
+	strbuf_addstr(&idx_buf, cache_dir);
+	strbuf_addf(&idx_buf, "/%06"PRIx32, cache->vid);
+
+	dir = opendir(idx_buf.buf);
+	if (!dir) {
+		dprintf("%m\n");
+		ret = -1;
+		goto out;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strncmp(d->d_name, ".", 1))
+			continue;
+		idx = strtoul(d->d_name, NULL, 16);
+		if (idx == ULLONG_MAX)
+			continue;
+
+		add_to_object_cache(cache, idx);
+		dprintf("load cache %06" PRIx32 "/%08" PRIx32 "\n",
+			cache->vid, idx);
+	}
+
+out:
+	strbuf_release(&idx_buf);
+	return ret;
+}
+
+static int load_existing_cache(void)
+{
+	DIR *dir;
+	struct dirent *d;
+	uint32_t vid;
+	struct object_cache *cache;
+	struct strbuf vid_buf;
+	int ret = 0;
+
+	strbuf_init(&vid_buf, PATH_MAX);
+	strbuf_addstr(&vid_buf, cache_dir);
+
+	dir = opendir(vid_buf.buf);
+	if (!dir) {
+		dprintf("%m\n");
+		ret = -1;
+		goto out;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strncmp(d->d_name, ".", 1))
+			continue;
+		vid = strtoul(d->d_name, NULL, 16);
+		if (vid == ULLONG_MAX)
+			continue;
+
+		cache = find_object_cache(vid, 1);
+		load_existing_cache_object(cache);
+	}
+
+out:
+	strbuf_release(&vid_buf);
+	return ret;
+}
+
 int object_cache_init(const char *p)
 {
 	int ret = 0;
@@ -864,6 +1030,11 @@ int object_cache_init(const char *p)
 		}
 	}
 	strbuf_copyout(&buf, cache_dir, sizeof(cache_dir));
+
+	CDS_INIT_LIST_HEAD(&sys_cache.cache_lru_list);
+	uatomic_set(&sys_cache.cache_size, 0);
+
+	ret = load_existing_cache();
 err:
 	strbuf_release(&buf);
 	return ret;
