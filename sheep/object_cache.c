@@ -56,7 +56,7 @@ struct object_cache {
 	struct rb_root dirty_tree;
 	struct rb_root object_tree;
 
-	pthread_mutex_t lock;
+	pthread_rwlock_t lock;
 };
 
 struct object_cache_entry {
@@ -253,7 +253,7 @@ not_found:
 		cache->dirty_tree = RB_ROOT;
 		INIT_LIST_HEAD(&cache->dirty_list);
 
-		pthread_mutex_init(&cache->lock, NULL);
+		pthread_rwlock_init(&cache->lock, NULL);
 		hlist_add_head(&cache->hash, head);
 	} else
 		cache = NULL;
@@ -300,9 +300,9 @@ static void update_cache_entry(struct object_cache *oc, uint32_t idx,
 
 	entry = alloc_cache_entry(idx, calc_object_bmap(datalen, offset), 0);
 
-	pthread_mutex_lock(&oc->lock);
+	pthread_rwlock_wrlock(&oc->lock);
 	add_to_dirty_tree_and_list(oc, entry);
-	pthread_mutex_unlock(&oc->lock);
+	pthread_rwlock_unlock(&oc->lock);
 }
 
 static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
@@ -320,7 +320,7 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 	entry->idx = idx;
 	CDS_INIT_LIST_HEAD(&entry->lru_list);
 
-	pthread_mutex_lock(&oc->lock);
+	pthread_rwlock_wrlock(&oc->lock);
 	old = object_cache_insert(&oc->object_tree, entry);
 	if (!old) {
 		uatomic_add(&sys_cache.cache_size, data_length);
@@ -329,7 +329,7 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 		free(entry);
 		entry = old;
 	}
-	pthread_mutex_unlock(&oc->lock);
+	pthread_rwlock_unlock(&oc->lock);
 }
 
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
@@ -369,9 +369,9 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			add_to_object_cache(oc, idx);
 
 			entry = alloc_cache_entry(idx, bmap, 1);
-			pthread_mutex_lock(&oc->lock);
+			pthread_rwlock_wrlock(&oc->lock);
 			add_to_dirty_tree_and_list(oc, entry);
-			pthread_mutex_unlock(&oc->lock);
+			pthread_rwlock_unlock(&oc->lock);
 		}
 	}
 	close(fd);
@@ -640,30 +640,30 @@ static int object_cache_push(struct object_cache *oc)
 		/* We don't do flushing in recovery */
 		return SD_RES_SUCCESS;
 
-	pthread_mutex_lock(&oc->lock);
+	pthread_rwlock_wrlock(&oc->lock);
 	list_splice_init(&oc->dirty_list, &inactive_dirty_list);
-	pthread_mutex_unlock(&oc->lock);
+	pthread_rwlock_unlock(&oc->lock);
 
 	list_for_each_entry_safe(entry, t, &inactive_dirty_list, list) {
-		pthread_mutex_lock(&oc->lock);
+		pthread_rwlock_rdlock(&oc->lock);
 		bmap = entry->bmap;
 		create = entry->flags & ENTRY_CREATE_BIT;
-		pthread_mutex_unlock(&oc->lock);
+		pthread_rwlock_unlock(&oc->lock);
 
 		ret = push_cache_object(oc->vid, entry->idx, bmap, create);
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
 
-		pthread_mutex_lock(&oc->lock);
+		pthread_rwlock_wrlock(&oc->lock);
 		del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
-		pthread_mutex_unlock(&oc->lock);
+		pthread_rwlock_unlock(&oc->lock);
 	}
 	return ret;
 
 push_failed:
-	pthread_mutex_lock(&oc->lock);
+	pthread_rwlock_wrlock(&oc->lock);
 	list_splice_init(&inactive_dirty_list, &oc->dirty_list);
-	pthread_mutex_unlock(&oc->lock);
+	pthread_rwlock_unlock(&oc->lock);
 
 	return ret;
 }
@@ -890,13 +890,13 @@ void object_cache_remove(uint64_t oid)
 	if (!oc)
 		return;
 
-	pthread_mutex_lock(&oc->lock);
+	pthread_rwlock_wrlock(&oc->lock);
 	entry = dirty_tree_search(&oc->dirty_tree, idx);
 	if (!entry)
 		goto out;
 	del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
 out:
-	pthread_mutex_unlock(&oc->lock);
+	pthread_rwlock_unlock(&oc->lock);
 	return;
 }
 
