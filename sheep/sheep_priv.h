@@ -87,6 +87,8 @@ struct cluster_info {
 	uint32_t status;
 	uint16_t flags;
 
+	uint64_t cache_size;
+
 	/*
 	 * List of nodes that were past of the last epoch before a shutdown,
 	 * but failed to join.

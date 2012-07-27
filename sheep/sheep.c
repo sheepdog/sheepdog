@@ -53,7 +53,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfghl:op:P:v:wy:z:";
+static const char *short_options = "c:dDfghl:op:P:v:w:y:z:";
 
 static void usage(int status)
 {
@@ -76,7 +76,7 @@ Options:\n\
   -p, --port              specify the TCP port on which to listen\n\
   -P, --pidfile           create a pid file\n\
   -v, --vnodes            specify the number of virtual nodes\n\
-  -w, --enable-cache      enable object cache\n\
+  -w, --enable-cache      enable object cache and specify the max cache size in megabytes\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
 ", PACKAGE_VERSION, program_name);
@@ -186,6 +186,7 @@ int main(int argc, char **argv)
 	int log_level = SDOG_INFO;
 	char path[PATH_MAX];
 	int64_t zone = -1;
+	int64_t cache_size = 0;
 	int nr_vnodes = SD_DEFAULT_VNODES;
 	bool explicit_addr = false;
 	int af;
@@ -260,8 +261,18 @@ int main(int argc, char **argv)
 			sys->this_node.zone = zone;
 			break;
 		case 'w':
-			vprintf(SDOG_INFO, "enable write cache\n");
 			enable_write_cache = 1;
+			cache_size = strtol(optarg, &p, 10);
+			if (optarg == p || cache_size < 0 ||
+			    UINT64_MAX < cache_size) {
+				fprintf(stderr, "Invalid cache size '%s': "
+					"must be an integer between 0 and %lu\n",
+					optarg, UINT64_MAX);
+				exit(1);
+			}
+			vprintf(SDOG_INFO, "enable write cache, max cache size %" PRIu64 "M\n",
+				cache_size);
+			sys->cache_size = cache_size * 1024 * 1024;
 			break;
 		case 'v':
 			nr_vnodes = strtol(optarg, &p, 10);
