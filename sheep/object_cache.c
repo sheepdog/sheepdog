@@ -60,6 +60,7 @@ struct object_cache {
 	struct hlist_node hash;
 
 	struct list_head dirty_list;
+	struct list_head object_list;
 	struct rb_root dirty_tree;
 	struct rb_root object_tree;
 
@@ -74,7 +75,8 @@ struct object_cache_entry {
 	struct rb_node node;
 	struct rb_node dirty_node;
 	struct object_cache *oc;
-	struct list_head list;
+	struct list_head dirty_list;
+	struct list_head object_list;
 	struct cds_list_head lru_list;
 };
 
@@ -195,7 +197,7 @@ del_from_dirty_tree_and_list(struct object_cache_entry *entry,
 			     struct rb_root *dirty_tree)
 {
 	rb_erase(&entry->dirty_node, dirty_tree);
-	list_del_init(&entry->list);
+	list_del_init(&entry->dirty_list);
 }
 
 static inline void
@@ -538,7 +540,7 @@ dirty_tree_insert(struct object_cache *oc, uint32_t idx,
 		entry->idx |= CACHE_CREATE_BIT;
 	rb_link_node(&entry->dirty_node, parent, p);
 	rb_insert_color(&entry->dirty_node, &oc->dirty_tree);
-	list_add(&entry->list, &oc->dirty_list);
+	list_add(&entry->dirty_list, &oc->dirty_list);
 
 	return entry;
 }
@@ -638,6 +640,8 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 	entry = xzalloc(sizeof(*entry));
 	entry->oc = oc;
 	entry->idx = idx;
+	INIT_LIST_HEAD(&entry->dirty_list);
+	INIT_LIST_HEAD(&entry->object_list);
 	CDS_INIT_LIST_HEAD(&entry->lru_list);
 
 	dprintf("cache object for vdi %" PRIx32 ", idx %08" PRIx32 "added\n",
@@ -831,7 +835,7 @@ static int object_cache_push(struct object_cache *oc)
 	list_splice_init(&oc->dirty_list, &inactive_dirty_list);
 	pthread_rwlock_unlock(&oc->lock);
 
-	list_for_each_entry_safe(entry, t, &inactive_dirty_list, list) {
+	list_for_each_entry_safe(entry, t, &inactive_dirty_list, dirty_list) {
 		pthread_rwlock_wrlock(&oc->lock);
 		bmap = entry->bmap;
 		create = entry->idx & CACHE_CREATE_BIT;
@@ -876,29 +880,34 @@ int object_is_cached(uint64_t oid)
 void object_cache_delete(uint32_t vid)
 {
 	struct object_cache *cache;
+	int h = hash(vid);
+	struct object_cache_entry *entry, *t;
+	struct strbuf buf = STRBUF_INIT;
 
 	cache = find_object_cache(vid, 0);
-	if (cache) {
-		int h = hash(vid);
-		struct object_cache_entry *entry, *t;
-		struct strbuf buf = STRBUF_INIT;
+	if (!cache)
+		return;
 
-		/* Firstly we free memeory */
-		pthread_mutex_lock(&hashtable_lock[h]);
-		hlist_del(&cache->hash);
-		pthread_mutex_unlock(&hashtable_lock[h]);
+	/* Firstly we free memeory */
+	pthread_mutex_lock(&hashtable_lock[h]);
+	hlist_del(&cache->hash);
+	pthread_mutex_unlock(&hashtable_lock[h]);
 
-		list_for_each_entry_safe(entry, t, &cache->dirty_list, list) {
-			free(entry);
-		}
-		free(cache);
-
-		/* Then we free disk */
-		strbuf_addf(&buf, "%s/%06"PRIx32, cache_dir, vid);
-		rmdir_r(buf.buf);
-
-		strbuf_release(&buf);
+	pthread_rwlock_wrlock(&cache->lock);
+	list_for_each_entry_safe(entry, t, &cache->object_list, dirty_list) {
+		del_from_object_tree_and_list(entry, &cache->object_tree);
+		if (!list_empty(&entry->dirty_list))
+			del_from_dirty_tree_and_list(entry, &cache->dirty_tree);
+		free(entry);
 	}
+	pthread_rwlock_unlock(&cache->lock);
+	free(cache);
+
+	/* Then we free disk */
+	strbuf_addf(&buf, "%s/%06"PRIx32, cache_dir, vid);
+	rmdir_r(buf.buf);
+
+	strbuf_release(&buf);
 
 }
 
@@ -1157,7 +1166,7 @@ void object_cache_remove(uint64_t oid)
 	entry = object_tree_search(&oc->object_tree, idx);
 	if (!entry)
 		goto out;
-	if (!list_empty(&entry->list))
+	if (!list_empty(&entry->dirty_list))
 		del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
 	del_from_object_tree_and_list(entry, &oc->object_tree);
 	free(entry);
