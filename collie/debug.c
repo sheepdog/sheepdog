@@ -97,25 +97,12 @@ static int debug_trace(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
-
 	sd_init_req(&hdr, SD_OP_TRACE);
 	hdr.epoch = sd_epoch;
 	hdr.data_length = enabled;
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-	close(fd);
-
+	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Trace failed: %s\n",
 				sd_strerror(rsp->result));
 		return EXIT_FAILURE;

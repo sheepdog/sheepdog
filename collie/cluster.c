@@ -204,66 +204,30 @@ error:
 
 static int cluster_shutdown(int argc, char **argv)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
 
 	sd_init_req(&hdr, SD_OP_SHUTDOWN);
 	hdr.epoch = sd_epoch;
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Shutdown failed: %s\n",
-				sd_strerror(rsp->result));
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
 		return EXIT_FAILURE;
-	}
 
 	return EXIT_SUCCESS;
 }
 
 static int restore_snap(uint32_t epoch)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
 
 	sd_init_req(&hdr, SD_OP_RESTORE);
 	hdr.obj.tgt_epoch = epoch;
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Restore failed: %s\n",
-				sd_strerror(rsp->result));
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
 		return EXIT_FAILURE;
-	}
 
 	printf("Cluster restore to the snapshot %d\n", epoch);
 	return EXIT_SUCCESS;
@@ -327,32 +291,14 @@ out:
 
 static int do_snapshot(void)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
 
 	sd_init_req(&hdr, SD_OP_SNAPSHOT);
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Snapshot failed: %s\n",
-				sd_strerror(rsp->result));
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
 		return EXIT_FAILURE;
-	}
 
 	return EXIT_SUCCESS;
 }
@@ -371,32 +317,14 @@ static int cluster_snapshot(int argc, char **argv)
 
 static int cluster_cleanup(int argc, char **argv)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
 
 	sd_init_req(&hdr, SD_OP_CLEANUP);
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Cleanup failed: %s\n",
-				sd_strerror(rsp->result));
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
 		return EXIT_FAILURE;
-	}
 
 	return EXIT_SUCCESS;
 }
@@ -411,15 +339,9 @@ Are you sure you want to continue? [yes/no]: "
 
 static int cluster_recover(int argc, char **argv)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	char str[123] = {'\0'};
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
 
 	if (!cluster_cmd_data.force) {
 		int i, l;
@@ -437,19 +359,9 @@ static int cluster_recover(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_RECOVER);
 	hdr.epoch = sd_epoch;
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
-	close(fd);
-
+	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Recovery failed: %s\n",
-				sd_strerror(rsp->result));
+		fprintf(stderr, "Recovery failed\n");
 		return EXIT_FAILURE;
 	}
 

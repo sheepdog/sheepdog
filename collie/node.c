@@ -60,31 +60,23 @@ static int node_info(int argc, char **argv)
 		printf("Id\tSize\tUsed\tUse%%\n");
 
 	for (i = 0; i < sd_nodes_nr; i++) {
-		char name[128];
-		int fd;
-		unsigned wlen, rlen;
+		char host[128];
 		struct sd_node_req req;
 		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 		char store_str[UINT64_DECIMAL_SIZE], free_str[UINT64_DECIMAL_SIZE];
 
-		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr, 0);
-
-		fd = connect_to(name, sd_nodes[i].nid.port);
-		if (fd < 0)
-			return 1;
+		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
 		sd_init_req((struct sd_req *)&req, SD_OP_STAT_SHEEP);
 		req.epoch = sd_epoch;
 
-		wlen = 0;
-		rlen = 0;
-		ret = exec_req(fd, (struct sd_req *)&req, NULL, &wlen, &rlen);
-		close(fd);
+		ret = send_light_req((struct sd_req *)&req, host,
+				     sd_nodes[i].nid.port);
 
 		size_to_str(rsp->store_size, store_str, sizeof(store_str));
 		size_to_str(rsp->store_size - rsp->store_free, free_str,
 			    sizeof(free_str));
-		if (!ret && rsp->result == SD_RES_SUCCESS) {
+		if (!ret) {
 			printf(raw_output ? "%d %s %s %d%%\n" : "%2d\t%s\t%s\t%3d%%\n",
 			       i, store_str, free_str,
 			       (int)(((double)(rsp->store_size - rsp->store_free) / rsp->store_size) * 100));
@@ -127,25 +119,15 @@ static int node_recovery(int argc, char **argv)
 
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char host[128];
-		int fd;
-		unsigned wlen, rlen;
 		struct sd_node_req req;
-		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 
 		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
-		fd = connect_to(host, sd_nodes[i].nid.port);
-		if (fd < 0)
-			return EXIT_FAILURE;
-
 		sd_init_req((struct sd_req *)&req, SD_OP_STAT_RECOVERY);
 
-		wlen = 0;
-		rlen = 0;
-		ret = exec_req(fd, (struct sd_req *)&req, NULL, &wlen, &rlen);
-		close(fd);
-
-		if (!ret && rsp->result == SD_RES_SUCCESS) {
+		ret = send_light_req((struct sd_req *)&req, host,
+				     sd_nodes[i].nid.port);
+		if (!ret) {
 			addr_to_str(host, sizeof(host),
 					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
 			printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s%5d%11d\n",
@@ -160,10 +142,8 @@ static int node_recovery(int argc, char **argv)
 static int node_kill(int argc, char **argv)
 {
 	char host[128];
-	int fd, node_id, ret;
-	unsigned wlen, rlen;
+	int node_id, ret;
 	struct sd_node_req req;
-	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
 
 	node_id = strtol(argv[optind++], NULL, 10);
 	if (node_id < 0 || node_id >= sd_nodes_nr) {
@@ -173,18 +153,11 @@ static int node_kill(int argc, char **argv)
 
 	addr_to_str(host, sizeof(host), sd_nodes[node_id].nid.addr, 0);
 
-	fd = connect_to(host, sd_nodes[node_id].nid.port);
-	if (fd < 0)
-		return EXIT_FAILURE;
-
 	sd_init_req((struct sd_req *)&req, SD_OP_KILL_NODE);
 
-	wlen = 0;
-	rlen = 0;
-	ret = exec_req(fd, (struct sd_req *)&req, NULL, &wlen, &rlen);
-	close(fd);
-
-	if (ret || rsp->result != SD_RES_SUCCESS) {
+	ret = send_light_req((struct sd_req *)&req, host,
+			     sd_nodes[node_id].nid.port);
+	if (ret) {
 		fprintf(stderr, "Failed to execute request\n");
 		exit(EXIT_FAILURE);
 	}

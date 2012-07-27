@@ -26,6 +26,7 @@
 #include <sys/types.h>
 
 #include "sheepdog_proto.h"
+#include "sheep.h"
 #include "util.h"
 #include "event.h"
 #include "net.h"
@@ -365,6 +366,34 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 			eprintf("failed to read the response data\n");
 			return 1;
 		}
+	}
+
+	return 0;
+}
+
+/*
+ * Light request only contains header, without body content.
+ */
+int send_light_req(struct sd_req *hdr, const char *host, int port)
+{
+	int fd, ret;
+	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
+	unsigned rlen, wlen;
+
+	fd = connect_to(host, port);
+	if (fd < 0)
+		return -1;
+
+	rlen = 0;
+	wlen = 0;
+	ret = exec_req(fd, hdr, NULL, &wlen, &rlen);
+	close(fd);
+	if (ret)
+		return -1;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		eprintf("Response's result: %s\n", sd_strerror(rsp->result));
+		return -1;
 	}
 
 	return 0;
