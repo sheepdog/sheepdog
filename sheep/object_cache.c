@@ -190,33 +190,12 @@ static struct object_cache_entry *object_tree_search(struct rb_root *root,
 	return NULL;
 }
 
-static struct object_cache_entry *dirty_tree_search(struct rb_root *root,
-						    uint32_t idx)
-{
-	struct rb_node *n = root->rb_node;
-	struct object_cache_entry *t;
-	idx = idx_mask(idx);
-
-	while (n) {
-		t = rb_entry(n, struct object_cache_entry, dirty_node);
-
-		if (idx < idx_mask(t->idx))
-			n = n->rb_left;
-		else if (idx > idx_mask(t->idx))
-			n = n->rb_right;
-		else
-			return t; /* found it */
-	}
-
-	return NULL;
-}
-
 static inline void
 del_from_dirty_tree_and_list(struct object_cache_entry *entry,
 			     struct rb_root *dirty_tree)
 {
 	rb_erase(&entry->dirty_node, dirty_tree);
-	list_del(&entry->list);
+	list_del_init(&entry->list);
 }
 
 static inline void
@@ -1175,10 +1154,13 @@ void object_cache_remove(uint64_t oid)
 		return;
 
 	pthread_rwlock_wrlock(&oc->lock);
-	entry = dirty_tree_search(&oc->dirty_tree, idx);
+	entry = object_tree_search(&oc->object_tree, idx);
 	if (!entry)
 		goto out;
-	del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
+	if (!list_empty(&entry->list))
+		del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
+	del_from_object_tree_and_list(entry, &oc->object_tree);
+	free(entry);
 out:
 	pthread_rwlock_unlock(&oc->lock);
 	return;
