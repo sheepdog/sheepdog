@@ -191,3 +191,35 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 	return 0;
 }
+
+/*
+ * Light request only contains header, without body content.
+ */
+int send_light_req(struct sd_req *hdr, const char *host, int port)
+{
+	int fd, ret;
+	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
+	unsigned rlen, wlen;
+
+	fd = connect_to(host, port);
+	if (fd < 0)
+		return -1;
+
+	rlen = 0;
+	wlen = 0;
+	ret = exec_req(fd, hdr, NULL, &wlen, &rlen);
+	close(fd);
+	if (ret) {
+		fprintf(stderr, "failed to connect to  %s:%d\n",
+			host, port);
+		return -1;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Response's result: %s\n",
+			sd_strerror(rsp->result));
+		return -1;
+	}
+
+	return 0;
+}

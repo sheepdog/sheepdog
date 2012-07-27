@@ -211,8 +211,10 @@ static int cluster_shutdown(int argc, char **argv)
 	hdr.epoch = sd_epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret)
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
 		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -226,8 +228,10 @@ static int restore_snap(uint32_t epoch)
 	hdr.obj.tgt_epoch = epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret)
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
 		return EXIT_FAILURE;
+	}
 
 	printf("Cluster restore to the snapshot %d\n", epoch);
 	return EXIT_SUCCESS;
@@ -297,8 +301,10 @@ static int do_snapshot(void)
 	sd_init_req(&hdr, SD_OP_SNAPSHOT);
 
 	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret)
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
 		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -323,8 +329,10 @@ static int cluster_cleanup(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_CLEANUP);
 
 	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret)
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
 		return EXIT_FAILURE;
+	}
 
 	return EXIT_SUCCESS;
 }
@@ -361,7 +369,7 @@ static int cluster_recover(int argc, char **argv)
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "Recovery failed\n");
+		fprintf(stderr, "failed to execute request\n");
 		return EXIT_FAILURE;
 	}
 

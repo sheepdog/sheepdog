@@ -371,34 +371,6 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	return 0;
 }
 
-/*
- * Light request only contains header, without body content.
- */
-int send_light_req(struct sd_req *hdr, const char *host, int port)
-{
-	int fd, ret;
-	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
-	unsigned rlen, wlen;
-
-	fd = connect_to(host, port);
-	if (fd < 0)
-		return -1;
-
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, hdr, NULL, &wlen, &rlen);
-	close(fd);
-	if (ret)
-		return -1;
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		eprintf("Response's result: %s\n", sd_strerror(rsp->result));
-		return -1;
-	}
-
-	return 0;
-}
-
 char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
 {
 	int  af = AF_INET6;
