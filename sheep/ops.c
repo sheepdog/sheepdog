@@ -221,8 +221,15 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	sd_store = driver;
 	latest_epoch = get_latest_epoch();
 	iocb.epoch = latest_epoch;
-	sd_store->format(&iocb);
-	sd_store->init(obj_path);
+
+	ret = sd_store->format(&iocb);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	ret = sd_store->init(obj_path);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
 	sys->nr_copies = hdr->copies;
 	sys->flags = hdr->flags;
 	if (!sys->nr_copies)

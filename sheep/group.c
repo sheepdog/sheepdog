@@ -737,7 +737,8 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	if (!sys->gateway_only && !sd_store && strlen((char *)msg->store)) {
 		sd_store = find_store_driver((char *)msg->store);
 		if (sd_store) {
-			sd_store->init(obj_path);
+			if (sd_store->init(obj_path) != SD_RES_SUCCESS)
+				panic("failed to initialize store\n");
 			if (set_cluster_store(sd_store->name) != SD_RES_SUCCESS)
 				panic("failed to store into config file\n");
 		} else
