@@ -328,6 +328,15 @@ static int init_sys_vdi_bitmap(char *path)
 	return 0;
 }
 
+static bool is_xattr_enabled(char *path)
+{
+	int ret, dummy;
+
+	ret = getxattr(path, "user.dummy", &dummy, sizeof(dummy));
+
+	return !(ret == -1 && errno == ENOTSUP);
+}
+
 static int farm_init(char *p)
 {
 	struct siocb iocb;
@@ -336,8 +345,10 @@ static int farm_init(char *p)
 	if (create_directory(p) < 0)
 		goto err;
 
-	if ((listxattr(p, NULL, 0) == -1) && (errno == ENOTSUP))
+	if (!is_xattr_enabled(p)) {
+		eprintf("xattrs are not enabled on %s\n", p);
 		goto err;
+	}
 
 	if (trunk_init() < 0)
 		goto err;
