@@ -110,7 +110,10 @@ static int cluster_format(int argc, char **argv)
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Format failed: %s\n",
 				sd_strerror(rsp->result));
-		return list_store();
+		if (rsp->result == SD_RES_NO_STORE)
+			return list_store();
+		else
+			return EXIT_SYSFAIL;
 	}
 
 	return EXIT_SUCCESS;
