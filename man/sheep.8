@@ -17,7 +17,7 @@ driver available in qemu(1).
 .SH OPTIONS
 .TP
 .BI \-P "\fR, \fP" \--pidfile " pidfile"
-This option create a pid file.
+This option creates a pid file.
 .TP
 .BI \-p "\fR, \fP" \--port " port"
 This option specifies the IP port over which \fBsheep\fP looks for other
@@ -26,23 +26,20 @@ sheepdog cluster nodes.
 .BI \-f "\fR, \fP" \--foreground
 This option forces the sheepdog daemon to run in the foreground.
 .TP
-.BI \-l "\fR, \fP" \--loglevel " loglevel"
-This option specifies the message level printed.
-.TP
 .BI \-d "\fR, \fP" \--debug
 This option displays debug messages.
 .TP
 .BI \-D "\fR, \fP" \--directio
-This option use direct IO when accessing the object cache.
+This option enables direct IO when accessing the object cache.
 .TP
 .BI \-z "\fR, \fP" \--zone
-This option specify the zone id.
+This option specifies the availability zone id.
 .TP
 .BI \-c "\fR, \fP" \--cluster
-This option specify the cluster driver.
+This option specifies the cluster driver.
 .TP
 .BI \-g "\fR, \fP" \--gateway
-Make the program run as a gateway mode (same as '-v 0').
+Makes the sheep instance run in gateway mode (same as '-v 0').
 .TP
 .BI \-l "\fR, \fP" \--loglevel
 Specify the level of logging detail.
@@ -54,7 +51,7 @@ Log to stdout instead of shared logger.
 Specify the number of virtual nodes.
 .TP
 .BI \-w "\fR, \fP" \--enable-cache
-Enable object cache.
+Enable object caching (EXPERIMENTAL).
 .TP
 .BI \-y "\fR, \fP" \--myaddr
 Specify the address advertised to other sheep.
