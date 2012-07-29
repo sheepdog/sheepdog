@@ -1,4 +1,4 @@
-.TH SHEEPDOG 8 2012-07-24
+.TH SHEEPDOG 8 2012-07-29
 .SH NAME
 collie \- Command line utility for the sheep daemon
 .SH SYNOPSIS
@@ -19,119 +19,119 @@ For more information, run 'collie <command> <subcommand> --help'.
 .SH OPTIONS
 .TP
 .BI \-a "\fR, \fP" \--address
-This option specify the daemon address (default: localhost).
+This option specifies the daemon address (default: localhost).
 .TP
 .BI \-p "\fR, \fP" \--port
-This option specify the daemon port.
+This option specifies the daemon port.
 .TP
 .BI \-i "\fR, \fP" \--index
-This option specify the index of data objects.
+This option specifies the index of data objects.
 .TP
 .BI \-s "\fR, \fP" \--snapshot
-This option specify a snapshot id or tag name.
+This option specifies a snapshot id or tag name.
 .TP
 .BI \-P "\fR, \fP" \--prealloc
-This option preallocate all the data objects.
+This option preallocates all the data objects.
 .TP
 .BI \-r "\fR, \fP" \--raw
 This option set raw output mode: omit headers, separate fields with single spaces and print all sizes in decimal bytes.
 .TP
 .BI \-d "\fR, \fP" \--delete
-This option delete a key.
+This option deletes a key.
 .TP
 .BI \-x "\fR, \fP" \--exclusive
-This option write in an exclusive mode.
+This option enables exclusive write mode.
 .TP
 .BI \-b "\fR, \fP" \--store
-This option specify backend store.
+This option specifies the backend store.
 .TP
 .BI \-c "\fR, \fP" \--copies
-This option specify the data redundancy (number of copies).
+This option specifies the level of data redundancy (i.e. number of copies to maintain of each object).
 .TP
 .BI \-m "\fR, \fP" \--mode\ [safe|quorum|unsafe]
-This option controls the behavior when there are too few nodes for the configured redundancy. Mode 'safe' halt cluster IO when (nr_nodes < nr_copies). Mode 'quorum' halt cluster IO when (nr_nodes < nr_copies/2 + 1). Mode 'unsafe' never halt the cluster.
+This option controls the behavior when there are too few nodes for the configured redundancy. Mode 'safe' will halt cluster IO when (nr_nodes < nr_copies). Mode 'quorum' will halt cluster IO when (nr_nodes < nr_copies/2 + 1). Mode 'unsafe' will never halt the cluster and therefore data loss may result.
 .TP
 .BI \-f "\fR, \fP" \--force
 Do not prompt for confirmation.
 .TP
 .BI \-R "\fR, \fP" \--restore
-This option restore the cluster.
+This option restores the cluster.
 .TP
 .BI \-h "\fR, \fP" \--help
 Display help and exit.
 .SH COMMAND & SUBCOMMAND
 .TP
 .BI "vdi create [-P|--prealloc] [-a|--address address] [-p|--port port] [-h|--help] <vdiname> <size>"
-This command create an image.
+This command creates an image.
 .TP
 .BI "vdi snapshot [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
-This command create a snapshot.
+This command creates a snapshot.
 .TP
 .BI "vdi check [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
-This command check and repair image's consistency.
+This command checks and repairs an image's consistency.
 .TP
 .BI "vdi clone [-s snapshot] [-P] [-a address] [-p port] [-h] <src vdi> <dst vdi>"
-This command clone an image.
+This command clones an image.
 .TP
 .BI "vdi delete [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
-This command delete an image.
+This command deletes an image.
 .TP
 .BI "vdi list [-a address] [-p port] [-r] [-h] [vdiname]"
-This command list images.
+This command lists images.
 .TP
 .BI "vdi track [-i index] [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
-This command show the object epoch trace in the image.
+This command shows the object epoch trace in the image.
 .TP
 .BI "vdi tree [-a address] [-p port] [-h]"
-This command show images in tree view format.
+This command shows images in tree view format.
 .TP
 .BI "vdi graph [-a address] [-p port] [-h]"
-This command show images in Graphviz dot format.
+This command shows images in Graphviz dot format.
 .TP
 .BI "vdi object [-i index] [-s snapshot] [-a address] [-p port] [-h] <vdiname>"
-This command show object information in the image.
+This command shows object information in the image.
 .TP
 .BI "vdi setattr [-d] [-x] [-a address] [-p port] [-h] <vdiname> <key> [value]"
-This command set a VDI attribute.
+This command sets a VDI attribute.
 .TP
 .BI "vdi getattr [-a address] [-p port] [-h] <vdiname> <key>"
-This command get a VDI attribute.
+This command gets a VDI attribute.
 .TP
 .BI "vdi resize [-a address] [-p port] [-h] <vdiname> <new size>"
-This command resize an image.
+This command resizes an image.
 .TP
 .BI "vdi read [-s snapshot] [-a address] [-p port] [-h] <vdiname> [<offset> [<len>]]"
-This command read data from an image.
+This command reads data from an image.
 .TP
 .BI "vdi write [-a address] [-p port] [-h] <vdiname> [<offset> [<len>]]"
-This command write data to an image.
+This command writes data to an image.
 .TP
 .BI "node kill [-a address] [-p port] [-r] [-h] <node id>"
-This command kill node.
+This command kills the specified node.
 .TP
 .BI "node list [-a address] [-p port] [-r] [-h]"
-This command list nodes.
+This command lists nodes.
 .TP
 .BI "node info [-a address] [-p port] [-r] [-h]"
-This command show information about each node.
+This command shows information about each node.
 .TP
 .BI "node recovery [-a address] [-p port] [-r] [-h]"
-This command show nodes in recovery.
+This command shows nodes currently in recovery.
 .TP
 .BI "cluster info [-a address] [-p port] [-r] [-h]"
-This command show cluster information.
+This command shows cluster information.
 .TP
 .BI "cluster format [-b store] [-c copies] [-m mode] [-a address] [-p port] [-h]"
-This command create a Sheepdog store.
+This command creates a Sheepdog store.
 .TP
 .BI "cluster shutdown [-a address] [-p port] [-h]"
-This command stop Sheepdog.
+This command stops Sheepdog.
 .TP
 .BI "cluster recover [-a address] [-f] [-p port] [-h]"
-This command manually recover the cluster.
+This command starts manual recovery of the cluster.
 .TP
 .BI "cluster cleanup [-a address] [-p port] [-h]"
-This command cleanup the useless snapshot data from recovery.
+This command cleans up unwanted snapshot data after recovery.
 
 .SH DEPENDENCIES
 \fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z.
