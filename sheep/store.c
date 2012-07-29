@@ -495,6 +495,9 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 	if (sys->enable_write_cache && object_is_cached(oid)) {
 		ret = object_cache_write(oid, data, datalen, offset,
 					 flags, create);
+		if (ret == SD_RES_NO_CACHE)
+			goto forward_write;
+
 		if (ret != 0) {
 			eprintf("write cache failed %"PRIx64" %"PRIx32"\n",
 				oid, ret);
@@ -502,6 +505,7 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 		}
 	}
 
+forward_write:
 	if (create)
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
 	else

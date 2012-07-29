@@ -356,8 +356,9 @@ int main(int argc, char **argv)
 	sys->deletion_wqueue = init_work_queue("deletion", true);
 	sys->block_wqueue = init_work_queue("block", true);
 	sys->sockfd_wqueue = init_work_queue("sockfd", true);
+	sys->reclaim_wqueue = init_work_queue("reclaim", true);
 	if (!sys->gateway_wqueue || !sys->io_wqueue ||!sys->recovery_wqueue ||
-	    !sys->deletion_wqueue || !sys->block_wqueue)
+	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->reclaim_wqueue)
 		exit(1);
 
 	ret = trace_init();
