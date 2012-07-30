@@ -139,6 +139,49 @@ static int node_recovery(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int node_cache(int argc, char **argv)
+{
+	char *p;
+	int fd, ret, cache_size;
+	unsigned int wlen, rlen = 0;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+
+	cache_size = strtol(argv[optind], &p, 10);
+	if (argv[optind] == p || cache_size < 0) {
+		fprintf(stderr, "Invalid cache size %s\n", argv[optind]);
+		return EXIT_FAILURE;
+	}
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		return EXIT_FAILURE;
+
+	wlen = sizeof(cache_size);
+
+	sd_init_req(&hdr, SD_OP_SET_CACHE_SIZE);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = wlen;
+
+	ret = exec_req(fd, &hdr, (void *)&cache_size, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "Failed to connect\n");
+		return EXIT_FAILURE;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "specify max cache size failed: %s\n",
+				sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	printf("Max cache size set to %dM\n", cache_size);
+
+	return EXIT_SUCCESS;
+}
+
 static int node_kill(int argc, char **argv)
 {
 	char host[128];
@@ -174,6 +217,8 @@ static struct subcommand node_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, node_info},
 	{"recovery", NULL, "aprh", "show nodes in recovery",
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
+	{"cache", "<cache size>", "aprh", "specify max cache size",
+	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, node_cache},
 	{NULL,},
 };
 
