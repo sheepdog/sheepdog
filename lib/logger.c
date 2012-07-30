@@ -233,6 +233,7 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	if (la->head > la->tail &&
 	    (len + sizeof(struct logmsg)) > ((char *)la->head - (char *)la->tail)) {
 		logdbg(stderr, "enqueue: log area overrun, dropping message\n");
+		syslog(LOG_ERR, "enqueue: log area overrun, dropping message\n");
 
 		if (!la->empty)
 			la->tail = lastmsg;
