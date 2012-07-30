@@ -40,13 +40,10 @@
 #define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
 #define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
 
-#define CACHE_RECLAIM_SHIFT   27
-#define CACHE_RECLAIM_BIT     (UINT32_C(1) << CACHE_RECLAIM_SHIFT)
-
-#define CACHE_CREATE_SHIFT    26
+#define CACHE_CREATE_SHIFT    27
 #define CACHE_CREATE_BIT      (UINT32_C(1) << CACHE_CREATE_SHIFT)
 
-#define CACHE_INDEX_MASK      (CACHE_RECLAIM_BIT | CACHE_CREATE_BIT)
+#define CACHE_INDEX_MASK      (CACHE_CREATE_BIT)
 
 struct global_cache {
 	uint64_t cache_size;
@@ -457,8 +454,6 @@ static int reclaim_object(struct object_cache_entry *entry)
 		}
 	}
 
-	entry->idx |= CACHE_RECLAIM_BIT;
-
 	ret = remove_cache_object(oc, entry->idx);
 	if (ret == SD_RES_SUCCESS)
 		del_from_object_tree_and_list(entry, &oc->object_tree);
@@ -668,18 +663,6 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 	}
 }
 
-static inline struct object_cache_entry *
-find_cache_entry(struct object_cache *oc, uint32_t idx)
-{
-	struct object_cache_entry *entry;
-
-	entry = object_tree_search(&oc->object_tree, idx);
-	if (!entry || entry->idx & CACHE_RECLAIM_BIT)
-		return NULL;
-
-	return entry;
-}
-
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			       int create)
 {
@@ -689,7 +672,7 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 
 	if (!create) {
 		pthread_rwlock_wrlock(&oc->lock);
-		if (!find_cache_entry(oc, idx))
+		if (!object_tree_search(&oc->object_tree, idx))
 			ret = SD_RES_NO_CACHE;
 		pthread_rwlock_unlock(&oc->lock);
 		return ret;
@@ -917,7 +900,7 @@ get_cache_entry(struct object_cache *cache, uint32_t idx)
 	struct object_cache_entry *entry;
 
 	pthread_rwlock_rdlock(&cache->lock);
-	entry = find_cache_entry(cache, idx);
+	entry = object_tree_search(&cache->object_tree, idx);
 	if (!entry) {
 		/* The cache entry may be reclaimed, so try again. */
 		pthread_rwlock_unlock(&cache->lock);
