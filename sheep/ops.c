@@ -501,6 +501,17 @@ static int cluster_notify_vdi_del(const struct sd_req *req, struct sd_rsp *rsp,
 	return objlist_cache_cleanup(vid);
 }
 
+static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
+				  void *data)
+{
+	int cache_size = *(int *)data;
+
+	uatomic_set(&sys->cache_size, cache_size);
+	dprintf("Max cache size set to %dM\n", cache_size);
+
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
@@ -956,6 +967,12 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_kill_node,
+	},
+
+	[SD_OP_SET_CACHE_SIZE] = {
+		.name = "SET_CACHE_SIZE",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_set_cache_size,
 	},
 
 	/* gateway I/O operations */
