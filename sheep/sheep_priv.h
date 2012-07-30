@@ -335,6 +335,7 @@ int peer_remove_obj(struct request *req);
 int bypass_object_cache(struct request *req);
 int object_is_cached(uint64_t oid);
 
+void object_cache_try_to_reclaim(void);
 int object_cache_handle_request(struct request *req);
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, int create);

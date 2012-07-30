@@ -622,6 +622,25 @@ static void update_cache_entry(struct object_cache *oc, uint32_t idx,
 	pthread_rwlock_unlock(&oc->lock);
 }
 
+void object_cache_try_to_reclaim(void)
+{
+	struct work *work;
+
+	if (!sys->cache_size)
+		return;
+
+	if (uatomic_read(&sys_cache.cache_size) < sys->cache_size)
+		return;
+
+	if (cache_in_reclaim(1))
+		return;
+
+	work = xzalloc(sizeof(struct work));
+	work->fn = reclaim_work;
+	work->done = reclaim_done;
+	queue_work(sys->reclaim_wqueue, work);
+}
+
 static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 {
 	struct object_cache_entry *entry, *old;
@@ -653,14 +672,7 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 	}
 	pthread_rwlock_unlock(&oc->lock);
 
-	if (sys->cache_size &&
-	    uatomic_read(&sys_cache.cache_size) > sys->cache_size &&
-	    !cache_in_reclaim(1)) {
-		struct work *work = xzalloc(sizeof(struct work));
-		work->fn = reclaim_work;
-		work->done = reclaim_done;
-		queue_work(sys->reclaim_wqueue, work);
-	}
+	object_cache_try_to_reclaim();
 }
 
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
