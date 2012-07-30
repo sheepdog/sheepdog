@@ -1087,7 +1087,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		panic("cache object %" PRIx32 " doesn't exist\n", idx);
+		dprintf("cache object %" PRIx32 " doesn't exist\n", idx);
 		return SD_RES_NO_CACHE;
 	}
 
@@ -1115,7 +1115,7 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		panic("cache object %" PRIx32 " doesn't exist\n", idx);
+		dprintf("cache object %" PRIx32 " doesn't exist\n", idx);
 		return SD_RES_NO_CACHE;
 	}
 
