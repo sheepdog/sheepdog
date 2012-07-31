@@ -1,4 +1,4 @@
-.TH SHEEPDOG 8 2012-07-18
+.TH SHEEPDOG 8 2012-07-31
 .SH NAME
 sheep \- Distributed Block Storage System for KVM
 .SH SYNOPSIS
@@ -50,8 +50,8 @@ Log to stdout instead of shared logger.
 .BI \-v "\fR, \fP" \--vnodes
 Specify the number of virtual nodes.
 .TP
-.BI \-w "\fR, \fP" \--enable-cache
-Enable object caching (EXPERIMENTAL).
+.BI \-w "\fR, \fP" \--enable-cache " size"
+Enable object cache and specify the max cache size in megabytes (EXPERIMENTAL).
 .TP
 .BI \-y "\fR, \fP" \--myaddr
 Specify the address advertised to other sheep.

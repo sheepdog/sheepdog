@@ -47,7 +47,7 @@ static struct option const long_options[] = {
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"vnodes", required_argument, NULL, 'v'},
-	{"enable-cache", no_argument, NULL, 'w'},
+	{"enable-cache", required_argument, NULL, 'w'},
 	{"zone", required_argument, NULL, 'z'},
 	{"pidfile", required_argument, NULL, 'P'},
 	{NULL, 0, NULL, 0},
