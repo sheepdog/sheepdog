@@ -408,7 +408,7 @@ static int local_get_epoch(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
-static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
+static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data)
 {
 	struct vnode_info *old_vnode_info, *vnode_info;
@@ -422,7 +422,7 @@ static int cluster_manual_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
 	 */
 	if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
-		return SD_RES_MANUAL_RECOVER;
+		return SD_RES_FORCE_RECOVER;
 
 	ret = get_cluster_copies(&c);
 	if (ret)
@@ -844,11 +844,11 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 	},
 
-	[SD_OP_RECOVER] = {
-		.name = "RECOVER",
+	[SD_OP_FORCE_RECOVER] = {
+		.name = "FORCE_RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
-		.process_main = cluster_manual_recover,
+		.process_main = cluster_force_recover,
 	},
 
 	[SD_OP_SNAPSHOT] = {

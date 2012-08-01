@@ -50,7 +50,7 @@ static const struct sd_option collie_options[] = {
 	{ 0, NULL, 0, NULL },
 };
 
-static void usage(struct command *commands, int status);
+static void usage(const struct command *commands, int status);
 
 uint32_t sd_epoch;
 
@@ -142,6 +142,47 @@ static const struct sd_option *find_opt(int ch)
 	exit(EXIT_SYSFAIL);
 }
 
+static void init_commands(const struct command **commands)
+{
+	static struct command *cmds;
+	struct command command_list[] = {
+		vdi_command,
+		node_command,
+		cluster_command,
+		debug_command,
+		{NULL,}
+	};
+
+	if (!cmds) {
+		cmds = (struct command *)malloc(sizeof(command_list));
+		memcpy(cmds, command_list, sizeof(command_list));
+	}
+
+	*commands = cmds;
+	return;
+}
+
+static const struct subcommand *find_subcmd(const char *cmd, const char *subcmd)
+{
+	int i, j;
+	const struct command *commands;
+	const struct subcommand *sub;
+
+	init_commands(&commands);
+
+	for (i = 0; commands[i].name; i++) {
+		if (!strcmp(commands[i].name, cmd)) {
+			sub = commands[i].sub;
+			for (j = 0; sub[j].name; j++) {
+				if (!strcmp(sub[j].name, subcmd))
+					return &sub[j];
+			}
+		}
+	}
+
+	return NULL;
+}
+
 static char *build_short_options(const char *opts)
 {
 	static char sopts[256], *p;
@@ -180,7 +221,8 @@ static struct option *build_long_options(const char *opts)
 	return lopts;
 }
 
-static unsigned long setup_command(struct command *commands, char *cmd, char *subcmd)
+static unsigned long setup_commands(const struct command *commands,
+				    char *cmd, char *subcmd)
 {
 	int i, found = 0;
 	struct subcommand *s;
@@ -223,7 +265,7 @@ static unsigned long setup_command(struct command *commands, char *cmd, char *su
 	return flags;
 }
 
-static void usage(struct command *commands, int status)
+static void usage(const struct command *commands, int status)
 {
 	int i;
 	struct subcommand *s;
@@ -248,13 +290,32 @@ static void usage(struct command *commands, int status)
 	exit(status);
 }
 
-static void subcommand_usage(char *cmd, char *subcmd, int status)
+void subcommand_usage(char *cmd, char *subcmd, int status)
 {
-	int i, len = strlen(command_options);
+	int i, n, len = strlen(command_options);
 	const struct sd_option *sd_opt;
+	const struct subcommand *sub, *subsub;
 	char name[64];
 
 	printf("Usage: %s %s %s", program_name, cmd, subcmd);
+
+	/* Show subcmd's subcommands if necessary */
+	sub = find_subcmd(cmd, subcmd);
+	subsub = sub->sub;
+	if (subsub) {
+		n = 0;
+		while (subsub[n].name)
+			n++;
+		if (n == 1)
+			printf(" %s", subsub[0].name);
+		else if (n > 1) {
+			printf(" {%s", subsub[0].name);
+			for (i = 1; i < n; i++)
+				printf("|%s", subsub[i].name);
+			printf("}");
+		}
+	}
+
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_options[i]);
 		if (sd_opt->has_arg)
@@ -264,7 +325,16 @@ static void subcommand_usage(char *cmd, char *subcmd, int status)
 	}
 	if (command_arg)
 		printf(" %s", command_arg);
-	printf("\nOptions:\n");
+
+	printf("\n");
+	if (subsub) {
+		printf("Available subcommands:\n");
+		for (i = 0; subsub[i].name; i++)
+			printf("  %-24s%s\n", subsub[i].name, subsub[i].desc);
+
+	}
+
+	printf("Options:\n");
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_options[i]);
 		sprintf(name, "-%c, --%s", sd_opt->val, sd_opt->name);
@@ -279,21 +349,16 @@ int main(int argc, char **argv)
 	int ch, longindex, ret;
 	unsigned long flags;
 	struct option *long_options;
+	const struct command *commands;
 	const char *short_options;
 	char *p;
-	struct command commands[] = {
-		vdi_command,
-		node_command,
-		cluster_command,
-		debug_command,
-		{NULL,}
-	};
 
+	init_commands(&commands);
 
 	if (argc < 3)
 		usage(commands, 0);
 
-	flags = setup_command(commands, argv[1], argv[2]);
+	flags = setup_commands(commands, argv[1], argv[2]);
 
 	optind = 3;
 

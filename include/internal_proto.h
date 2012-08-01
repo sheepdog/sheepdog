@@ -42,7 +42,7 @@
 #define SD_OP_STAT_SHEEP     0x86
 #define SD_OP_STAT_CLUSTER   0x87
 #define SD_OP_GET_VDI_ATTR   0x89
-#define SD_OP_RECOVER        0x8a
+#define SD_OP_FORCE_RECOVER  0x8a
 #define SD_OP_GET_STORE_LIST 0x90
 #define SD_OP_SNAPSHOT       0x91
 #define SD_OP_RESTORE        0x92

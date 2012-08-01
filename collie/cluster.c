@@ -343,12 +343,12 @@ static int cluster_cleanup(int argc, char **argv)
 #define RECOVER_PRINT \
 "Caution! Please try starting all the cluster nodes normally before\n\
 running this command.\n\n\
-The cluster may need to be recovered manually if:\n\
+The cluster may need to be force recovered if:\n\
   - the master node fails to start because of epoch mismatch; or\n\
   - some nodes fail to start after a cluster shutdown.\n\n\
 Are you sure you want to continue? [yes/no]: "
 
-static int cluster_recover(int argc, char **argv)
+static int cluster_force_recover(int argc, char **argv)
 {
 	int ret;
 	struct sd_req hdr;
@@ -367,7 +367,7 @@ static int cluster_recover(int argc, char **argv)
 			return EXIT_SUCCESS;
 	}
 
-	sd_init_req(&hdr, SD_OP_RECOVER);
+	sd_init_req(&hdr, SD_OP_FORCE_RECOVER);
 	hdr.epoch = sd_epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
@@ -379,19 +379,41 @@ static int cluster_recover(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+/* Subcommand list of recover */
+static struct subcommand cluster_recover_cmd[] = {
+	{"force", NULL, NULL, "force recover cluster immediately",
+	 NULL, 0, cluster_force_recover},
+	{NULL},
+};
+
+static int cluster_recover(int argc, char **argv)
+{
+	int i;
+
+	for (i = 0; cluster_recover_cmd[i].name; i++) {
+		if (!strcmp(cluster_recover_cmd[i].name, argv[3]))
+			return cluster_recover_cmd[i].fn(argc, argv);
+	}
+
+	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
+	return EXIT_FAILURE;
+}
+
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
-	 SUBCMD_FLAG_NEED_NODELIST, cluster_info},
+	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info},
 	{"format", NULL, "bcmaph", "create a Sheepdog store",
-	 0, cluster_format},
+	 NULL, 0, cluster_format},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
-	 SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
-	{"recover", NULL, "afph", "manually recover the cluster",
-	0, cluster_recover},
+	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
 	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
-	0, cluster_snapshot},
-	{"cleanup", NULL, "aph", "cleanup the useless snapshot data from recovery",
-	0, cluster_cleanup},
+	 NULL, 0, cluster_snapshot},
+	{"cleanup", NULL, "aph",
+	 "cleanup the useless snapshot data from recovery",
+	 NULL, 0, cluster_cleanup},
+	{"recover", NULL, "afph",
+	 "See 'collie cluster recover' for more information\n",
+	 cluster_recover_cmd, SUBCMD_FLAG_NEED_THIRD_ARG, cluster_recover},
 	{NULL,},
 };
 

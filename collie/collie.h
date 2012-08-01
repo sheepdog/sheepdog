@@ -46,9 +46,11 @@ struct subcommand {
 	const char *arg;
 	const char *opts;
 	const char *desc;
+	struct subcommand *sub;
 	unsigned long flags;
 	int (*fn)(int, char **);
 };
+void subcommand_usage(char *cmd, char *subcmd, int status);
 
 extern const char *sdhost;
 extern int sdport;

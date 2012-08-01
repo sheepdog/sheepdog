@@ -160,7 +160,7 @@ static inline const char *sd_strerror(int err)
 		{SD_RES_WAIT_FOR_JOIN, "Waiting for other nodes to join cluster"},
 		{SD_RES_JOIN_FAILED, "Node has failed to join cluster"},
 		{SD_RES_HALT, "IO has halted as there are too few living nodes"},
-		{SD_RES_MANUAL_RECOVER, "Cluster is running/halted and cannot be manually recovered"},
+		{SD_RES_FORCE_RECOVER, "Cluster is running/halted and cannot be force recovered"},
 		{SD_RES_NO_STORE, "Targeted backend store is not found"},
 		{SD_RES_NO_SUPPORT, "Operation is not supported"},
 		{SD_RES_CLUSTER_RECOVERING, "Cluster is recovering"},
