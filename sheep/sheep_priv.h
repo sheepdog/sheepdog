@@ -184,6 +184,10 @@ extern char *jrnl_path;
 extern char *epoch_path;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
+extern struct sd_node joining_nodes[];
+extern size_t nr_joining_nodes;
+extern struct sd_node all_nodes[];
+extern size_t nr_all_nodes;
 
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)
@@ -216,8 +220,11 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		void *data);
 
 bool have_enough_zones(void);
+void clear_exceptional_node_lists(void);
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
+void update_vnode_info(struct vnode_info *vnode_info);
+struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes);
 void put_vnode_info(struct vnode_info *vnodes);
 struct vnode_info *get_vnode_info_epoch(uint32_t epoch);
 

@@ -38,6 +38,11 @@ struct vdi_bitmap_work {
 	struct sd_node members[];
 };
 
+struct sd_node joining_nodes[SD_MAX_NODES];
+size_t nr_joining_nodes;
+struct sd_node all_nodes[SD_MAX_NODES];
+size_t nr_all_nodes;
+
 static struct vnode_info *current_vnode_info;
 
 static size_t get_join_message_size(struct join_message *jm)
@@ -147,6 +152,17 @@ struct vnode_info *get_vnode_info(void)
 }
 
 /*
+ * update currently active vnode information structure,
+ * this must only be called from the main thread.
+ */
+void update_vnode_info(struct vnode_info *vnode_info)
+{
+
+	put_vnode_info(current_vnode_info);
+	current_vnode_info = vnode_info;
+}
+
+/*
  * Release a reference to the current vnode information.
  *
  * Must be called from the main thread.
@@ -184,7 +200,7 @@ void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
 	}
 }
 
-static struct vnode_info *alloc_vnode_info(struct sd_node *nodes,
+struct vnode_info *alloc_vnode_info(struct sd_node *nodes,
 					   size_t nr_nodes)
 {
 	struct vnode_info *vnode_info;
@@ -477,7 +493,7 @@ static void format_exceptional_node_list(struct join_message *jm)
 		jm->nodes[jm->nr_failed_nodes + jm->nr_delayed_nodes++] = n->ent;
 }
 
-static void clear_exceptional_node_lists(void)
+void clear_exceptional_node_lists(void)
 {
 	struct node *n, *t;
 
@@ -772,20 +788,42 @@ static void get_vdi_bitmap(struct sd_node *nodes, size_t nr_nodes)
 	queue_work(sys->block_wqueue, &w->work);
 }
 
+static void prepare_recovery(struct sd_node *joined,
+				    struct sd_node *nodes, size_t nr_nodes)
+{
+	int i;
+
+	joining_nodes[nr_joining_nodes++] = *joined;
+	if (!nr_all_nodes) {
+		/* exclude the newly added one */
+		for (i = 0; i < nr_nodes; i++) {
+			if (!node_eq(nodes + i, joined))
+				all_nodes[nr_all_nodes++] = nodes[i];
+		}
+	}
+
+	if (!current_vnode_info)
+		current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
+}
+
 static void update_cluster_info(struct join_message *msg,
 				struct sd_node *joined, struct sd_node *nodes,
 				size_t nr_nodes)
 {
-	struct vnode_info *old_vnode_info;
+	struct vnode_info *old_vnode_info = NULL;
 
 	eprintf("status = %d, epoch = %d, finished: %d\n", msg->cluster_status,
 		msg->epoch, sys->join_finished);
 
+	sys->disable_recovery = msg->disable_recovery;
+
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 
-	old_vnode_info = current_vnode_info;
-	current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
+	if (!sys->disable_recovery) {
+		old_vnode_info = current_vnode_info;
+		current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
+	}
 
 	switch (msg->cluster_status) {
 	case SD_STATUS_OK:
@@ -809,16 +847,21 @@ static void update_cluster_info(struct join_message *msg,
 		sys->status = msg->cluster_status;
 
 		if (msg->inc_epoch) {
-			uatomic_inc(&sys->epoch);
-			log_current_epoch();
-			clear_exceptional_node_lists();
+			if (!sys->disable_recovery) {
+				uatomic_inc(&sys->epoch);
+				log_current_epoch();
+				clear_exceptional_node_lists();
 
-			if (!old_vnode_info) {
-				old_vnode_info = alloc_old_vnode_info(joined,
-						nodes, nr_nodes);
-			}
+				if (!old_vnode_info) {
+					old_vnode_info =
+						alloc_old_vnode_info(joined,
+							nodes, nr_nodes);
+				}
 
-			start_recovery(current_vnode_info, old_vnode_info);
+				start_recovery(current_vnode_info,
+					       old_vnode_info);
+			} else
+				prepare_recovery(joined, nodes, nr_nodes);
 		}
 
 		if (have_enough_zones())
@@ -894,6 +937,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 		vprintf(SDOG_DEBUG, "%s\n", node_to_str(&sys->this_node));
 
 		jm->cluster_status = sys->status;
+		jm->disable_recovery = sys->disable_recovery;
 
 		epoch = get_latest_epoch();
 		if (!epoch)
@@ -918,6 +962,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 	}
 
 	jm->cluster_status = sys->status;
+	jm->disable_recovery = sys->disable_recovery;
 	jm->inc_epoch = 0;
 
 	switch (sys->status) {

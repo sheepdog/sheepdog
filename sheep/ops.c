@@ -270,6 +270,28 @@ static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_enable_recover(const struct sd_req *req,
 				    struct sd_rsp *rsp, void *data)
 {
+	int i;
+	struct vnode_info *old_vnode_info, *vnode_info;
+
+	if (nr_joining_nodes) {
+
+		for (i = 0; i < nr_joining_nodes; i++)
+			all_nodes[nr_all_nodes++] = joining_nodes[i];
+
+		old_vnode_info = get_vnode_info();
+		vnode_info = alloc_vnode_info(all_nodes, nr_all_nodes);
+		update_vnode_info(vnode_info);
+
+		uatomic_inc(&sys->epoch);
+		log_current_epoch();
+		clear_exceptional_node_lists();
+
+		start_recovery(vnode_info, old_vnode_info);
+
+		put_vnode_info(old_vnode_info);
+	}
+
+	nr_joining_nodes = 0;
 	sys->disable_recovery = 0;
 	return SD_RES_SUCCESS;
 }
