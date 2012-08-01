@@ -303,6 +303,16 @@ static int cluster_disable_recover(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
+static int local_info_recover(const struct sd_req *req,
+			      struct sd_rsp *rsp, void *data)
+{
+	rsp->__pad[0] = sys->disable_recovery;
+	rsp->data_length = nr_joining_nodes * sizeof(struct sd_node);
+	memcpy(data, joining_nodes, rsp->data_length);
+
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_get_vdi_attr(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
@@ -1073,6 +1083,11 @@ static struct sd_op_template sd_ops[] = {
 		.name = "DISABLE_RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_main = cluster_disable_recover,
+	},
+	[SD_OP_INFO_RECOVER] = {
+		.name = "INFO_RECOVER",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_info_recover,
 	},
 };
 

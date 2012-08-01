@@ -348,6 +348,65 @@ The cluster may need to be force recovered if:\n\
   - some nodes fail to start after a cluster shutdown.\n\n\
 Are you sure you want to continue? [yes/no]: "
 
+static int cluster_info_recover(int argc, char **argv)
+{
+	int fd, ret = EXIT_SYSFAIL;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	unsigned rlen, wlen;
+	void *buf;
+	int i, nr_nodes;
+	const char *status[] = {"enable", "disable"};
+
+	wlen = 0;
+	rlen = SD_MAX_NODES * sizeof(struct sd_node);
+
+	buf = malloc(rlen);
+	if (!buf)
+		return EXIT_SYSFAIL;
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0)
+		goto out;
+
+	sd_init_req(&hdr, SD_OP_INFO_RECOVER);
+	hdr.data_length = rlen;
+
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	close(fd);
+
+	if (ret) {
+		fprintf(stderr, "Failed to connect\n");
+		goto out;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed: %s\n", sd_strerror(rsp->result));
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	nr_nodes = rsp->data_length/sizeof(struct sd_node);
+
+	printf("Status: %s\n", status[rsp->__pad[0]]);
+	printf("Joining nodes in inner temporary list:\n"
+	       "--------------------------------------\n"
+	       "Id               Host:Port\n");
+	for (i = 0; i < nr_nodes; i++) {
+		char ipaddr[128];
+		struct sd_node *rnodes;
+
+		rnodes = (struct sd_node *)buf;
+		addr_to_str(ipaddr, sizeof(ipaddr), rnodes[i].nid.addr,
+			    rnodes[i].nid.port);
+		printf("%2d               %s\n", i, ipaddr);
+	}
+
+
+out:
+	free(buf);
+	return EXIT_SUCCESS;
+}
+
 static int cluster_force_recover(int argc, char **argv)
 {
 	int ret;
@@ -414,6 +473,8 @@ static int cluster_enable_recover(int argc, char **argv)
 
 /* Subcommand list of recover */
 static struct subcommand cluster_recover_cmd[] = {
+	{"info", NULL, NULL, "show the status of recovery to user",
+	 NULL, 0, cluster_info_recover},
 	{"force", NULL, NULL, "force recover cluster immediately",
 	 NULL, 0, cluster_force_recover},
 	{"enable", NULL, NULL, "enable automatic recovery and "
