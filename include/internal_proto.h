@@ -61,6 +61,8 @@
 #define SD_OP_WRITE_PEER     0xA5
 #define SD_OP_REMOVE_PEER    0xA6
 #define SD_OP_SET_CACHE_SIZE 0xA7
+#define SD_OP_ENABLE_RECOVER 0xA8
+#define SD_OP_DISABLE_RECOVER 0xA9
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080

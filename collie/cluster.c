@@ -379,10 +379,49 @@ static int cluster_force_recover(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int cluster_disable_recover(int argc, char **argv)
+{
+	int ret;
+	struct sd_req hdr;
+
+	sd_init_req(&hdr, SD_OP_DISABLE_RECOVER);
+	hdr.epoch = sd_epoch;
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
+		return EXIT_FAILURE;
+
+	printf("*Note*: Only disable the recovery caused by JOIN envets\n"
+	       "Cluster recovery: disable\n");
+	return EXIT_SUCCESS;
+}
+
+static int cluster_enable_recover(int argc, char **argv)
+{
+	int ret;
+	struct sd_req hdr;
+
+	sd_init_req(&hdr, SD_OP_ENABLE_RECOVER);
+	hdr.epoch = sd_epoch;
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
+		return EXIT_FAILURE;
+
+	printf("Cluster recovery: enable\n");
+	return EXIT_SUCCESS;
+}
+
 /* Subcommand list of recover */
 static struct subcommand cluster_recover_cmd[] = {
 	{"force", NULL, NULL, "force recover cluster immediately",
 	 NULL, 0, cluster_force_recover},
+	{"enable", NULL, NULL, "enable automatic recovery and "
+				"run once recover if necessary",
+	 NULL, 0, cluster_enable_recover},
+	{"disable", NULL, NULL, "disable automatic recovery caused "
+				"by JOIN events (excluding LEAVE events now)",
+	 NULL, 0, cluster_disable_recover},
 	{NULL},
 };
 

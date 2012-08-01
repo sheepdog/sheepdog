@@ -118,6 +118,7 @@ struct cluster_info {
 
 	int use_directio;
 	uint8_t gateway_only;
+	uint8_t disable_recovery;
 
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;

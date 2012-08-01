@@ -267,6 +267,20 @@ static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 	return SD_RES_SUCCESS;
 }
 
+static int cluster_enable_recover(const struct sd_req *req,
+				    struct sd_rsp *rsp, void *data)
+{
+	sys->disable_recovery = 0;
+	return SD_RES_SUCCESS;
+}
+
+static int cluster_disable_recover(const struct sd_req *req,
+				   struct sd_rsp *rsp, void *data)
+{
+	sys->disable_recovery = 1;
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_get_vdi_attr(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
@@ -1025,6 +1039,18 @@ static struct sd_op_template sd_ops[] = {
 		.name = "REMOVE_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_remove_obj,
+	},
+
+	[SD_OP_ENABLE_RECOVER] = {
+		.name = "ENABLE_RECOVER",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_main = cluster_enable_recover,
+	},
+
+	[SD_OP_DISABLE_RECOVER] = {
+		.name = "DISABLE_RECOVER",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_main = cluster_disable_recover,
 	},
 };
 
