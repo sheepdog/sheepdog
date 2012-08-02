@@ -443,10 +443,6 @@ static void do_reclaim(struct work *work)
 {
 	struct object_cache_entry *entry, *n;
 
-	/* TODO confirm whether this check is necessary */
-	if (node_in_recovery())
-		return;
-
 	list_for_each_entry_revert_safe_rcu(entry, n,
 		       &sys_cache.cache_lru_list, lru_list) {
 		unsigned data_length;
@@ -794,10 +790,6 @@ static int object_cache_push(struct object_cache *oc)
 	struct object_cache_entry *entry, *t;
 
 	int ret = SD_RES_SUCCESS;
-
-	if (node_in_recovery())
-		/* We don't do flushing in recovery */
-		return SD_RES_SUCCESS;
 
 	pthread_rwlock_wrlock(&oc->lock);
 	list_for_each_entry_safe(entry, t, &oc->dirty_list, dirty_list) {
