@@ -33,17 +33,19 @@
  * Object Cache ID
  *
  *  0 - 19 (20 bits): data object space
- *  20 - 27 (8 bits): reserved
+ *  20 - 27 (8 bits): object flag space
  *  28 - 31 (4 bits): object type indentifier space
  */
-#define CACHE_VDI_SHIFT       31
-#define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
-#define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
+#define CACHE_VDI_SHIFT       31 /* if the entry is identified as VDI object */
+#define CACHE_CREATE_SHIFT    27 /* If the entry should be created at backend */
 
-#define CACHE_CREATE_SHIFT    27
+#define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
 #define CACHE_CREATE_BIT      (UINT32_C(1) << CACHE_CREATE_SHIFT)
 
 #define CACHE_INDEX_MASK      (CACHE_CREATE_BIT)
+
+#define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
+
 
 struct global_cache {
 	uint64_t cache_size;
@@ -53,7 +55,6 @@ struct global_cache {
 
 struct object_cache {
 	uint32_t vid;
-	uint8_t in_flush;
 	struct hlist_node hash;
 
 	struct list_head dirty_list;
@@ -66,12 +67,11 @@ struct object_cache {
 
 struct object_cache_entry {
 	uint32_t idx;
-	uint64_t bmap; /* each bit represents one dirty
-			* block which should be flushed */
 	int refcnt;
+	uint64_t bmap; /* each bit represents one dirty block in object */
+	struct object_cache *oc;
 	struct rb_node node;
 	struct rb_node dirty_node;
-	struct object_cache *oc;
 	struct list_head dirty_list;
 	struct list_head object_list;
 	struct cds_list_head lru_list;
@@ -397,75 +397,51 @@ out:
 	return ret;
 }
 
-static int reclaim_object(struct object_cache_entry *entry)
+/*
+ * The reclaim algorithm is similar to Linux kernel's page cache:
+ *  - only tries to reclaim 'clean' object, which doesn't has any dirty updates,
+ *    in a LRU list.
+ *  - skip the object when it is in R/W operation.
+ *  - skip the dirty object if it is not in push(writeback) phase.
+ *  - wait on the dirty object if it is in push phase.
+ */
+static int do_reclaim_object(struct object_cache_entry *entry)
 {
 	struct object_cache *oc = entry->oc;
-	int ret = SD_RES_SUCCESS;
+	uint64_t oid;
+	int ret = 0;
 
 	pthread_rwlock_wrlock(&oc->lock);
-	dprintf("reclaiming /%06"PRIx32"/%08"PRIx32", cache_size: %ld\n",
-		oc->vid, entry->idx, uatomic_read(&sys_cache.cache_size));
 
+	oid = idx_to_oid(oc->vid, entry->idx);
 	if (uatomic_read(&entry->refcnt) > 0) {
+		dprintf("%"PRIx64" is in operation, skip...\n", oid);
 		ret = -1;
 		goto out;
 	}
 
 	if (entry_is_dirty(entry)) {
-		uint64_t bmap = entry->bmap;
-		int create = entry->idx & CACHE_CREATE_BIT;
-
-		if (oc->in_flush) {
-			ret = -1;
-			goto out;
-		}
-
-		entry->bmap = 0;
-		del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
-		pthread_rwlock_unlock(&oc->lock);
-
-		ret = push_cache_object(oc->vid, entry->idx, bmap, create);
-
-		pthread_rwlock_wrlock(&oc->lock);
-		if (ret != SD_RES_SUCCESS) {
-			/* still dirty */
-			entry->bmap |= bmap;
-			ret = -1;
-			goto out;
-		}
-
-		entry->idx &= ~CACHE_CREATE_BIT;
-		/* dirty again */
-		if (entry_is_dirty(entry)) {
-			dprintf("object cache is dirty again %06" PRIx32 "\n",
-				entry->idx);
-			ret = -1;
-			goto out;
-		}
-
-		if (oc->in_flush) {
-			ret = -1;
-			goto out;
-		}
-
-		if (uatomic_read(&entry->refcnt) > 0) {
-			ret = -1;
-			goto out;
-		}
+		dprintf("%"PRIx64" is dirty, skip...\n", oid);
+		ret = -1;
+		goto out;
 	}
 
-	ret = remove_cache_object(oc, entry->idx);
-	if (ret == SD_RES_SUCCESS)
-		del_from_object_tree_and_list(entry, &oc->object_tree);
+	if (remove_cache_object(oc, entry->idx) != SD_RES_SUCCESS) {
+		ret = -1;
+		goto out;
+	}
+
+	dprintf("oid %"PRIx64" reclaimed successfully, cache_size: %ld\n", oid,
+		uatomic_read(&sys_cache.cache_size));
+	del_from_object_tree_and_list(entry, &oc->object_tree);
 out:
 	pthread_rwlock_unlock(&oc->lock);
 	return ret;
 }
 
-static void reclaim_work(struct work *work)
+static void do_reclaim(struct work *work)
 {
 	struct object_cache_entry *entry, *n;
-	int ret;
 
 	/* TODO confirm whether this check is necessary */
 	if (node_in_recovery())
@@ -479,8 +455,7 @@ static void reclaim_work(struct work *work)
 		    sys->cache_size * 8 / 10)
 			break;
 
-		ret = reclaim_object(entry);
-		if (ret != SD_RES_SUCCESS)
+		if (do_reclaim_object(entry) < 0)
 			continue;
 		if (idx_has_vdi_bit(entry->idx))
 			data_length = SD_INODE_SIZE;
@@ -501,7 +476,7 @@ static void reclaim_done(struct work *work)
 }
 
 static struct object_cache_entry *
-dirty_tree_insert(struct object_cache *oc, uint32_t idx,
+dirty_tree_and_list_insert(struct object_cache *oc, uint32_t idx,
 		  uint64_t bmap, int create)
 {
 	struct rb_node **p = &oc->dirty_tree.rb_node;
@@ -598,18 +573,16 @@ add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
 			   uint64_t bmap, int create)
 {
 	struct object_cache_entry *entry;
-	entry = dirty_tree_insert(oc, idx, bmap, create);
+	entry = dirty_tree_and_list_insert(oc, idx, bmap, create);
 	if (!entry)
 		panic("Can not find object entry %" PRIx32 "\n", idx);
 
 	if (cache_in_reclaim(0))
 		return;
 
-	/* If cache isn't in reclaiming, move it
-	 * to the head of lru list */
+	/* If cache isn't in reclaiming, move it to the head of lru list */
 	cds_list_del_rcu(&entry->lru_list);
-	cds_list_add_rcu(&entry->lru_list,
-			 &sys_cache.cache_lru_list);
+	cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 }
 
 static void update_cache_entry(struct object_cache *oc, uint32_t idx,
@@ -636,7 +609,7 @@ void object_cache_try_to_reclaim(void)
 		return;
 
 	work = xzalloc(sizeof(struct work));
-	work->fn = reclaim_work;
+	work->fn = do_reclaim;
 	work->done = reclaim_done;
 	queue_work(sys->reclaim_wqueue, work);
 }
@@ -658,12 +631,10 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 	INIT_LIST_HEAD(&entry->object_list);
 	CDS_INIT_LIST_HEAD(&entry->lru_list);
 
-	dprintf("cache object for vdi %" PRIx32 ", idx %08" PRIx32 "added\n",
-		oc->vid, idx);
-
 	pthread_rwlock_wrlock(&oc->lock);
 	old = object_cache_insert(&oc->object_tree, entry);
 	if (!old) {
+		dprintf("oid %"PRIx64"\n", idx_to_oid(oc->vid, idx));
 		uatomic_add(&sys_cache.cache_size, data_length);
 		cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 	} else {
@@ -817,45 +788,25 @@ out:
 static int object_cache_push(struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
-	LIST_HEAD(inactive_dirty_list);
-	int ret = SD_RES_SUCCESS, create;
-	uint64_t bmap;
+
+	int ret = SD_RES_SUCCESS;
 
 	if (node_in_recovery())
 		/* We don't do flushing in recovery */
 		return SD_RES_SUCCESS;
 
 	pthread_rwlock_wrlock(&oc->lock);
-	oc->in_flush = 1;
-	list_splice_init(&oc->dirty_list, &inactive_dirty_list);
-	pthread_rwlock_unlock(&oc->lock);
-
-	list_for_each_entry_safe(entry, t, &inactive_dirty_list, dirty_list) {
-		pthread_rwlock_wrlock(&oc->lock);
-		bmap = entry->bmap;
-		create = entry->idx & CACHE_CREATE_BIT;
+	list_for_each_entry_safe(entry, t, &oc->dirty_list, dirty_list) {
+		ret = push_cache_object(oc->vid, entry->idx, entry->bmap,
+					!!(entry->idx & CACHE_CREATE_BIT));
+		if (ret != SD_RES_SUCCESS)
+			goto push_failed;
+		entry->idx &= ~CACHE_CREATE_BIT;
 		entry->bmap = 0;
 		del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
-		pthread_rwlock_unlock(&oc->lock);
-
-		ret = push_cache_object(oc->vid, entry->idx, bmap, create);
-
-		pthread_rwlock_wrlock(&oc->lock);
-		if (ret != SD_RES_SUCCESS) {
-			entry->bmap |= bmap;
-			goto push_failed;
-		}
-		entry->idx &= ~CACHE_CREATE_BIT;
-		pthread_rwlock_unlock(&oc->lock);
 	}
-	oc->in_flush = 0;
-	return ret;
-
 push_failed:
-	oc->in_flush = 0;
-	list_splice_init(&inactive_dirty_list, &oc->dirty_list);
-	pthread_rwlock_unlock(&oc->lock);
-
+	pthread_rwlock_wrlock(&oc->lock);
 	return ret;
 }
 
@@ -1037,8 +988,8 @@ retry:
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		dprintf("cache entry %"PRIx32"/%"PRIx32" may be reclaimed\n",
-			vid, idx);
+		dprintf("oid %"PRIx64" maybe reclaimed\n",
+			idx_to_oid(vid, idx));
 		goto retry;
 	}
 
