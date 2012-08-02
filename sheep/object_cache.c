@@ -503,7 +503,7 @@ dirty_tree_and_list_insert(struct object_cache *oc, uint32_t idx,
 
 	entry = object_tree_search(&oc->object_tree, idx);
 	if (!entry)
-		return NULL;
+		panic("Can not find object entry %" PRIx32 "\n", idx);
 
 	entry->bmap |= bmap;
 	if (create)
@@ -574,8 +574,6 @@ add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
 {
 	struct object_cache_entry *entry;
 	entry = dirty_tree_and_list_insert(oc, idx, bmap, create);
-	if (!entry)
-		panic("Can not find object entry %" PRIx32 "\n", idx);
 
 	if (cache_in_reclaim(0))
 		return;
@@ -614,7 +612,8 @@ void object_cache_try_to_reclaim(void)
 	queue_work(sys->reclaim_wqueue, work);
 }
 
-static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
+static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
+				int create)
 {
 	struct object_cache_entry *entry, *old;
 	uint32_t data_length;
@@ -640,6 +639,10 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx)
 	} else {
 		free(entry);
 		entry = old;
+	}
+	if (create) {
+		uint64_t all = UINT64_MAX;
+		add_to_dirty_tree_and_list(oc, idx, all, create);
 	}
 	pthread_rwlock_unlock(&oc->lock);
 
@@ -681,15 +684,8 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 	ret = prealloc(fd, data_length);
 	if (ret != SD_RES_SUCCESS)
 		ret = SD_RES_EIO;
-	else {
-		uint64_t bmap = UINT64_MAX;
-
-		add_to_object_cache(oc, idx);
-
-		pthread_rwlock_wrlock(&oc->lock);
-		add_to_dirty_tree_and_list(oc, idx, bmap, 1);
-		pthread_rwlock_unlock(&oc->lock);
-	}
+	else
+		add_to_object_cache(oc, idx, 1);
 	close(fd);
 out:
 	strbuf_release(&buf);
@@ -777,7 +773,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		dprintf("oid %"PRIx64" pulled successfully\n", oid);
 		ret = create_cache_object(oc, idx, buf, data_length);
 		if (ret == SD_RES_SUCCESS)
-			add_to_object_cache(oc, idx);
+			add_to_object_cache(oc, idx, 0);
 	}
 	free(buf);
 out:
@@ -806,7 +802,7 @@ static int object_cache_push(struct object_cache *oc)
 		del_from_dirty_tree_and_list(entry, &oc->dirty_tree);
 	}
 push_failed:
-	pthread_rwlock_wrlock(&oc->lock);
+	pthread_rwlock_unlock(&oc->lock);
 	return ret;
 }
 
@@ -1147,7 +1143,7 @@ static int load_existing_cache_object(struct object_cache *cache)
 		if (idx == ULLONG_MAX)
 			continue;
 
-		add_to_object_cache(cache, idx);
+		add_to_object_cache(cache, idx, 0);
 		dprintf("load cache %06" PRIx32 "/%08" PRIx32 "\n",
 			cache->vid, idx);
 	}
