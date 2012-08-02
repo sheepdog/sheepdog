@@ -661,9 +661,8 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			} else {
 				ret = SD_RES_NO_CACHE;
 			}
-			return ret;
 		}
-		return ret;
+		goto out;
 	}
 
 	flags |= O_CREAT | O_TRUNC;
@@ -981,8 +980,7 @@ retry:
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		dprintf("oid %"PRIx64" maybe reclaimed\n",
-			idx_to_oid(vid, idx));
+		dprintf("oid %"PRIx64" maybe reclaimed\n", oid);
 		goto retry;
 	}
 
@@ -1019,7 +1017,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 
 	cache = find_object_cache(vid, 0);
 
-	dprintf("cache object write %" PRIx32 "\n", idx);
+	dprintf("%" PRIx64 "\n", oid);
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
@@ -1047,7 +1045,7 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 
 	cache = find_object_cache(vid, 0);
 
-	dprintf("cache object read %" PRIx32 "\n", idx);
+	dprintf("%" PRIx64 "\n", oid);
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
