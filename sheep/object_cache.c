@@ -49,7 +49,7 @@
 
 struct global_cache {
 	uint64_t cache_size;
-	int reclaiming;
+	int in_reclaim;
 	struct cds_list_head cache_lru_list;
 };
 
@@ -90,12 +90,13 @@ static pthread_mutex_t hashtable_lock[HASH_SIZE] = {
 
 static struct hlist_head cache_hashtable[HASH_SIZE];
 
-static inline int cache_in_reclaim(int start)
+/*
+ * If the cache is already in reclaim, return 1, otherwise return 0
+ * and set sys_cache.in_reclaim to 1
+ */
+static inline int mark_cache_in_reclaim(void)
 {
-	if (start)
-		return uatomic_cmpxchg(&sys_cache.reclaiming, 0, 1);
-	else
-		return uatomic_read(&sys_cache.reclaiming);
+	return uatomic_cmpxchg(&sys_cache.in_reclaim, 0, 1);
 }
 
 static inline int entry_is_dirty(struct object_cache_entry *entry)
@@ -467,7 +468,7 @@ static void do_reclaim(struct work *work)
 
 static void reclaim_done(struct work *work)
 {
-	uatomic_set(&sys_cache.reclaiming, 0);
+	uatomic_set(&sys_cache.in_reclaim, 0);
 	free(work);
 }
 
@@ -571,10 +572,6 @@ add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
 	struct object_cache_entry *entry;
 	entry = dirty_tree_and_list_insert(oc, idx, bmap, create);
 
-	if (cache_in_reclaim(0))
-		return;
-
-	/* If cache isn't in reclaiming, move it to the head of lru list */
 	cds_list_del_rcu(&entry->lru_list);
 	cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 }
@@ -599,7 +596,7 @@ void object_cache_try_to_reclaim(void)
 	if (uatomic_read(&sys_cache.cache_size) < sys->cache_size)
 		return;
 
-	if (cache_in_reclaim(1))
+	if (mark_cache_in_reclaim())
 		return;
 
 	work = xzalloc(sizeof(struct work));
@@ -1003,11 +1000,8 @@ retry:
 			goto err;
 		req->rp.data_length = hdr->data_length;
 
-		if (entry && !cache_in_reclaim(0)) {
-			cds_list_del_rcu(&entry->lru_list);
-			cds_list_add_rcu(&entry->lru_list,
-					 &sys_cache.cache_lru_list);
-		}
+		cds_list_del_rcu(&entry->lru_list);
+		cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 	}
 err:
 	put_cache_entry(entry);
@@ -1206,7 +1200,7 @@ int object_cache_init(const char *p)
 
 	CDS_INIT_LIST_HEAD(&sys_cache.cache_lru_list);
 	uatomic_set(&sys_cache.cache_size, 0);
-	uatomic_set(&sys_cache.reclaiming, 0);
+	uatomic_set(&sys_cache.in_reclaim, 0);
 
 	ret = load_existing_cache();
 err:
