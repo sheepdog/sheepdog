@@ -274,11 +274,11 @@ static void queue_gateway_request(struct request *req)
 		req->local_oid = hdr->obj.oid;
 
 	/*
-	 * If we go for a cached object, we don't care if it is being recovered
+	 * If we go for cache object, we don't care if it is being recovered
+	 * Even if it doesn't exist in cache, we'll rely on cache layer to pull
+	 * it.
 	 */
-	if (sys->enable_write_cache &&
-	    req->rq.flags & SD_FLAG_CMD_CACHE &&
-	    object_is_cached(req->rq.obj.oid))
+	if (sys->enable_write_cache && req->rq.flags & SD_FLAG_CMD_CACHE)
 		goto queue_work;
 
 	if (req->local_oid)
