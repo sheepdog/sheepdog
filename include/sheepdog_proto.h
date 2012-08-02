@@ -68,6 +68,7 @@
 #define SD_RES_CLUSTER_RECOVERING 0x22 /* Cluster is recovering. */
 #define SD_RES_OBJ_RECOVERING     0x23 /* Object is recovering */
 #define SD_RES_KILLED           0x24 /* Node is killed */
+#define SD_RES_OID_EXIST        0x25 /* Object ID exists already */
 
 /* errors above 0x80 are sheepdog-internal */
 

@@ -700,7 +700,8 @@ out:
 static int create_cache_object(struct object_cache *oc, uint32_t idx,
 			       void *buffer, size_t buf_size)
 {
-	int flags = def_open_flags | O_CREAT | O_EXCL, fd, ret = SD_RES_SUCCESS;
+	int flags = def_open_flags | O_CREAT | O_EXCL, fd;
+	int ret = SD_RES_OID_EXIST;
 	struct strbuf buf;
 
 	strbuf_init(&buf, PATH_MAX);
@@ -779,6 +780,8 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		ret = create_cache_object(oc, idx, buf, data_length);
 		if (ret == SD_RES_SUCCESS)
 			add_to_object_cache(oc, idx, 0);
+		else if (ret == SD_RES_OID_EXIST)
+			ret = SD_RES_SUCCESS;
 	}
 	free(buf);
 out:
