@@ -656,17 +656,22 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 	int fd, ret = SD_RES_SUCCESS, flags = def_open_flags;
 	unsigned data_length;
 
-	if (!create) {
-		pthread_rwlock_wrlock(&oc->lock);
-		if (!object_tree_search(&oc->object_tree, idx))
-			ret = SD_RES_NO_CACHE;
-		pthread_rwlock_unlock(&oc->lock);
-		return ret;
-	}
-
 	strbuf_init(&buf, PATH_MAX);
 	strbuf_addstr(&buf, cache_dir);
 	strbuf_addf(&buf, "/%06"PRIx32"/%08"PRIx32, oc->vid, idx);
+
+	if (!create) {
+		if (access(buf.buf, R_OK | W_OK) < 0) {
+			if (errno != ENOENT) {
+				dprintf("%m\n");
+				ret = SD_RES_EIO;
+			} else {
+				ret = SD_RES_NO_CACHE;
+			}
+			return ret;
+		}
+		return ret;
+	}
 
 	flags |= O_CREAT | O_TRUNC;
 
