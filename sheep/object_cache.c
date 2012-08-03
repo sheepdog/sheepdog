@@ -437,6 +437,12 @@ static int do_reclaim_object(struct object_cache_entry *entry)
 	del_from_object_tree_and_list(entry, &oc->object_tree);
 out:
 	pthread_rwlock_unlock(&oc->lock);
+	/*
+	 * Reclaimer grabs a write lock, which will blocks all the IO thread of
+	 * this VDI. We call pthread_yield() to expect that other threads can
+	 * grab the lock more often.
+	 */
+	pthread_yield();
 	return ret;
 }
 
@@ -980,7 +986,13 @@ retry:
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		dprintf("oid %"PRIx64" maybe reclaimed\n", oid);
+		dprintf("retry oid %"PRIx64"\n", oid);
+		/*
+		 * For the case that object exists but can't be added to list,
+		 * we call pthread_yield() to expect other thread can add object
+		 * to list ASAP.
+		 */
+		pthread_yield();
 		goto retry;
 	}
 
