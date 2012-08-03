@@ -132,9 +132,10 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	int ret = rsp->result;
 
 	vprintf(SDOG_INFO, "done %d %ld\n", ret, nr);
-	set_bit(nr, sys->vdi_inuse);
+	if (ret == SD_RES_SUCCESS)
+		set_bit(nr, sys->vdi_inuse);
 
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 static int cluster_del_vdi(struct request *req)
