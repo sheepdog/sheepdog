@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <poll.h>
+#include <sys/vfs.h>
 #include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -29,6 +30,7 @@
 
 struct sheepdog_config {
 	uint64_t ctime;
+	uint64_t space;
 	uint16_t flags;
 	uint8_t copies;
 	uint8_t store[STORE_LEN];
@@ -443,6 +445,35 @@ static int init_store_driver(void)
 	return sd_store->init(obj_path);
 }
 
+static int init_disk_space(const char *base_path)
+{
+	int ret = SD_RES_SUCCESS;
+	uint64_t space_size = 0;
+	struct statfs sf;
+
+	if (sys->gateway_only)
+		goto out;
+
+	ret = get_cluster_space(&space_size);
+	if (space_size != 0) {
+		sys->disk_space = space_size;
+		goto out;
+	}
+
+	ret = statfs(base_path, &sf);
+	if (ret < 0) {
+		dprintf("get disk space failed %m\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	sys->disk_space = sf.f_bfree * 4 / 1024;
+	ret = set_cluster_space(sys->disk_space);
+out:
+	dprintf("disk free space is %" PRIu64 "M\n", sys->disk_space);
+	return ret;
+}
+
 int init_store(const char *d, int enable_write_cache)
 {
 	int ret;
@@ -464,6 +495,10 @@ int init_store(const char *d, int enable_write_cache)
 		return ret;
 
 	ret = init_config_path(d);
+	if (ret)
+		return ret;
+
+	ret = init_disk_space(d);
 	if (ret)
 		return ret;
 
@@ -708,6 +743,55 @@ int get_cluster_store(char *buf)
 		    offsetof(struct sheepdog_config, store));
 
 	if (ret == -1)
+		ret = SD_RES_EIO;
+	else
+		ret = SD_RES_SUCCESS;
+
+	close(fd);
+out:
+	return ret;
+}
+
+int set_cluster_space(uint64_t space)
+{
+	int fd, ret = SD_RES_EIO;
+	void *jd;
+
+	fd = open(config_path, O_DSYNC | O_WRONLY);
+	if (fd < 0)
+		goto out;
+
+	jd = jrnl_begin(&space, sizeof(space),
+			offsetof(struct sheepdog_config, space),
+			config_path, jrnl_path);
+	if (!jd) {
+		ret = SD_RES_EIO;
+		goto err;
+	}
+	ret = xpwrite(fd, &space, sizeof(space),
+		      offsetof(struct sheepdog_config, space));
+	if (ret != sizeof(space))
+		ret = SD_RES_EIO;
+	else
+		ret = SD_RES_SUCCESS;
+	jrnl_end(jd);
+err:
+	close(fd);
+out:
+	return ret;
+}
+
+int get_cluster_space(uint64_t *space)
+{
+	int fd, ret = SD_RES_EIO;
+
+	fd = open(config_path, O_RDONLY);
+	if (fd < 0)
+		goto out;
+
+	ret = xpread(fd, space, sizeof(*space),
+		     offsetof(struct sheepdog_config, space));
+	if (ret != sizeof(*space))
 		ret = SD_RES_EIO;
 	else
 		ret = SD_RES_SUCCESS;
