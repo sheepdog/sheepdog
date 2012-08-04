@@ -460,6 +460,11 @@ static int init_disk_space(const char *base_path)
 		goto out;
 	}
 
+	if (sys->disk_space) {
+		ret = set_cluster_space(sys->disk_space);
+		goto out;
+	}
+
 	ret = statfs(base_path, &sf);
 	if (ret < 0) {
 		dprintf("get disk space failed %m\n");

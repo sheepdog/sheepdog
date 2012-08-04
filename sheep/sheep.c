@@ -47,13 +47,14 @@ static struct option const long_options[] = {
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"vnodes", required_argument, NULL, 'v'},
+	{"disk-space", required_argument, NULL, 's'},
 	{"enable-cache", required_argument, NULL, 'w'},
 	{"zone", required_argument, NULL, 'z'},
 	{"pidfile", required_argument, NULL, 'P'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfghl:op:P:v:w:y:z:";
+static const char *short_options = "c:dDfghl:op:P:v:s:w:y:z:";
 
 static void usage(int status)
 {
@@ -76,6 +77,7 @@ Options:\n\
   -p, --port              specify the TCP port on which to listen\n\
   -P, --pidfile           create a pid file\n\
   -v, --vnodes            specify the number of virtual nodes\n\
+  -s, --disk-space        specify the free disk space in megabytes\n\
   -w, --enable-cache      enable object cache and specify the max cache size in megabytes\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
@@ -187,6 +189,7 @@ int main(int argc, char **argv)
 	char path[PATH_MAX];
 	int64_t zone = -1;
 	int64_t cache_size = 0;
+	int64_t free_space = 0;
 	int nr_vnodes = SD_DEFAULT_VNODES;
 	bool explicit_addr = false;
 	int af;
@@ -282,6 +285,17 @@ int main(int argc, char **argv)
 					optarg, SD_MAX_VNODES);
 				exit(1);
 			}
+			break;
+		case 's':
+			free_space = strtoll(optarg, &p, 10);
+			if (optarg == p || free_space <= 0 ||
+			    UINT64_MAX < free_space) {
+				fprintf(stderr, "Invalid free space size '%s': "
+					"must be an integer between 0 and %lu\n",
+					optarg, UINT64_MAX);
+				exit(1);
+			}
+			sys->disk_space = free_space;
 			break;
 		case 'c':
 			sys->cdrv = find_cdrv(optarg);
