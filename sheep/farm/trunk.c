@@ -247,7 +247,8 @@ static int oid_stale(uint64_t oid)
 	vnodes = get_vnode_info();
 	nr_copies = get_nr_copies(vnodes);
 
-	oid_to_vnodes(vnodes, oid, nr_copies, obj_vnodes);
+	oid_to_vnodes(vnodes->vnodes, vnodes->nr_vnodes, oid,
+		      nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {

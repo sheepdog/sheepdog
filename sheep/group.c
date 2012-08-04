@@ -177,29 +177,6 @@ void put_vnode_info(struct vnode_info *vnode_info)
 	}
 }
 
-struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
-		int copy_idx)
-{
-	int idx = obj_to_sheep(vnode_info->vnodes, vnode_info->nr_vnodes,
-			oid, copy_idx);
-
-	return &vnode_info->vnodes[idx];
-}
-
-void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
-		struct sd_vnode **vnodes)
-{
-	int idx_buf[SD_MAX_COPIES], i, n;
-
-	obj_to_sheeps(vnode_info->vnodes, vnode_info->nr_vnodes,
-			oid, nr_copies, idx_buf);
-
-	for (i = 0; i < nr_copies; i++) {
-		n = idx_buf[i];
-		vnodes[i] = &vnode_info->vnodes[n];
-	}
-}
-
 struct vnode_info *alloc_vnode_info(struct sd_node *nodes,
 					   size_t nr_nodes)
 {

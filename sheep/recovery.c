@@ -174,7 +174,9 @@ again:
 	/* Let's do a breadth-first search */
 	nr_copies = get_nr_copies(old);
 	for (i = 0; i < nr_copies; i++) {
-		struct sd_vnode *tgt_vnode = oid_to_vnode(old, oid, i);
+		struct sd_vnode *tgt_vnode = oid_to_vnode(old->vnodes,
+							  old->nr_vnodes,
+							  oid, i);
 
 		if (is_invalid_vnode(tgt_vnode, rw->cur_vnodes->nodes,
 				     rw->cur_vnodes->nr_nodes))
@@ -515,7 +517,8 @@ static void screen_object_list(struct recovery_work *rw,
 
 	nr_objs = get_nr_copies(rw->cur_vnodes);
 	for (i = 0; i < nr_oids; i++) {
-		oid_to_vnodes(rw->cur_vnodes, oids[i], nr_objs, vnodes);
+		oid_to_vnodes(rw->cur_vnodes->vnodes, rw->cur_vnodes->nr_vnodes,
+			      oids[i], nr_objs, vnodes);
 		for (j = 0; j < nr_objs; j++) {
 			if (!vnode_is_local(vnodes[j]))
 				continue;

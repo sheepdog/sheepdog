@@ -25,6 +25,17 @@ struct sd_vnode {
 	uint64_t        id;
 };
 
+struct vnode_info {
+	struct sd_vnode vnodes[SD_MAX_VNODES];
+	int nr_vnodes;
+
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
+
+	int nr_zones;
+	int refcnt;
+};
+
 #define TRACE_GRAPH_ENTRY  0x01
 #define TRACE_GRAPH_RETURN 0x02
 
@@ -129,23 +140,29 @@ static inline int get_vnode_nth_idx(struct sd_vnode *entries,
 	return idxs[nth];
 }
 
-static inline int obj_to_sheep(struct sd_vnode *entries, int nr_entries,
-			       uint64_t oid, int nth_idx)
+static inline struct sd_vnode *oid_to_vnode(struct sd_vnode *entries,
+					    int nr_entries, uint64_t oid,
+					    int copy_idx)
 {
-	return get_vnode_nth_idx(entries, nr_entries, oid, nth_idx);
+	int idx = get_vnode_nth_idx(entries, nr_entries, oid, copy_idx);
+
+	return &entries[idx];
 }
 
-static inline void obj_to_sheeps(struct sd_vnode *entries, int nr_entries,
-				 uint64_t oid, int nr_copies, int *idxs)
+static inline void oid_to_vnodes(struct sd_vnode *entries, int nr_entries,
+				 uint64_t oid, int nr_copies,
+				 struct sd_vnode **vnodes)
 {
-	int nr_idxs = 0;
+	int idx, idxs[SD_MAX_COPIES], i;
 
-	idxs[nr_idxs++] = get_vnode_first_idx(entries, nr_entries, oid);
+	idx = get_vnode_first_idx(entries, nr_entries, oid);
+	idxs[0] = idx;
+	vnodes[0] = &entries[idx];
 
-	while (nr_idxs < nr_copies) {
-		idxs[nr_idxs] = get_vnode_next_idx(entries, nr_entries,
-						     idxs, nr_idxs);
-		nr_idxs++;
+	for (i = 1; i < nr_copies; i++) {
+		idx = get_vnode_next_idx(entries, nr_entries, idxs, i);
+		idxs[i] = idx;
+		vnodes[i] = &entries[idx];
 	}
 }
 

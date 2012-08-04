@@ -37,17 +37,6 @@ struct client_info {
 	int refcnt;
 };
 
-struct vnode_info {
-	struct sd_vnode vnodes[SD_MAX_VNODES];
-	int nr_vnodes;
-
-	struct sd_node nodes[SD_MAX_NODES];
-	int nr_nodes;
-
-	int nr_zones;
-	int refcnt;
-};
-
 struct request {
 	struct sd_req rq;
 	struct sd_rsp rp;
@@ -230,10 +219,6 @@ struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes);
 void put_vnode_info(struct vnode_info *vnodes);
 struct vnode_info *get_vnode_info_epoch(uint32_t epoch);
 
-struct sd_vnode *oid_to_vnode(struct vnode_info *vnode_info, uint64_t oid,
-		int copy_idx);
-void oid_to_vnodes(struct vnode_info *vnode_info, uint64_t oid, int nr_copies,
-		struct sd_vnode **vnodes);
 int get_nr_copies(struct vnode_info *vnode_info);
 
 void resume_pending_requests(void);

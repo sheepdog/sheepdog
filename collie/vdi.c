@@ -795,12 +795,12 @@ static int vdi_object(int argc, char **argv)
 
 static int print_obj_epoch(uint64_t oid)
 {
-	int i, j, fd, ret, idx;
+	int i, j, fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
 	struct sd_vnode vnodes[SD_MAX_VNODES];
-	int idx_buf[SD_MAX_COPIES];
+	struct sd_vnode *vnode_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
 	int vnodes_nr, nr_logs, log_length;
 	char host[128];
@@ -842,12 +842,11 @@ again:
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
 		       oid, logs[i].epoch, logs[i].nr_copies);
 		printf("---------------------------------------------------\n");
-		obj_to_sheeps(vnodes, vnodes_nr, oid,
-			      logs[i].nr_copies, idx_buf);
+		oid_to_vnodes(vnodes, vnodes_nr, oid, logs[i].nr_copies,
+			      vnode_buf);
 		for (j = 0; j < logs[i].nr_copies; j++) {
-			idx = idx_buf[j];
-			addr_to_str(host, sizeof(host), vnodes[idx].nid.addr,
-				    vnodes[idx].nid.port);
+			addr_to_str(host, sizeof(host), vnode_buf[j]->nid.addr,
+				    vnode_buf[j]->nid.port);
 			printf("%s\n", host);
 		}
 	}
@@ -1389,20 +1388,6 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 	}
 }
 
-static void collie_oid_to_vnodes(struct sd_vnode *vnodes, int vnodes_nr,
-				 uint64_t oid, int nr_copies,
-				 struct sd_vnode **ret_vnodes)
-{
-        int idx_buf[SD_MAX_COPIES], i, n;
-
-        obj_to_sheeps(vnodes, vnodes_nr, oid, nr_copies, idx_buf);
-
-        for (i = 0; i < nr_copies; i++) {
-                n = idx_buf[i];
-                ret_vnodes[i] = &vnodes[n];
-        }
-}
-
 /*
  * Fix consistency of the replica of oid.
  *
@@ -1415,8 +1400,7 @@ static void do_check_repair(uint64_t oid, int nr_copies)
 	void *buf, *buf_cmp;
 	int i;
 
-	collie_oid_to_vnodes(sd_vnodes, sd_vnodes_nr,
-			     oid, nr_copies, tgt_vnodes);
+	oid_to_vnodes(sd_vnodes, sd_vnodes_nr, oid, nr_copies, tgt_vnodes);
 	buf = read_object_from(tgt_vnodes[0], oid);
 	for (i = 1; i < nr_copies; i++) {
 		buf_cmp = read_object_from(tgt_vnodes[i], oid);
