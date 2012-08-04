@@ -19,7 +19,7 @@
 
 #include <stdint.h>
 
-#define SD_SHEEP_PROTO_VER 0x05
+#define SD_SHEEP_PROTO_VER 0x06
 
 #define SD_DEFAULT_REDUNDANCY 3
 #define SD_MAX_REDUNDANCY 8
@@ -177,6 +177,7 @@ struct sd_node {
 	struct node_id  nid;
 	uint16_t	nr_vnodes;
 	uint32_t	zone;
+	uint64_t        space;
 };
 
 struct epoch_log {

@@ -211,7 +211,9 @@ struct vnode_info *alloc_vnode_info(struct sd_node *nodes,
 	memcpy(vnode_info->nodes, nodes, sizeof(*nodes) * nr_nodes);
 	qsort(vnode_info->nodes, nr_nodes, sizeof(*nodes), node_id_cmp);
 
-	vnode_info->nr_vnodes = nodes_to_vnodes(nodes, nr_nodes,
+	recalculate_vnodes(vnode_info->nodes, nr_nodes);
+
+	vnode_info->nr_vnodes = nodes_to_vnodes(vnode_info->nodes, nr_nodes,
 						vnode_info->vnodes);
 	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
 	uatomic_set(&vnode_info->refcnt, 1);
@@ -806,6 +808,28 @@ static void prepare_recovery(struct sd_node *joined,
 		current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
 }
 
+void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
+{
+	int i, nr_non_gateway_nodes = 0;
+	uint64_t avg_size = 0;
+	float factor;
+
+	for (i = 0; i < nr_nodes; i++) {
+		if (nodes[i].space) {
+			avg_size += nodes[i].space;
+			nr_non_gateway_nodes++;
+		}
+	}
+	avg_size /= nr_non_gateway_nodes;
+
+	for (i = 0; i < nr_nodes; i++) {
+		factor = (float)nodes[i].space / (float)avg_size;
+		nodes[i].nr_vnodes = SD_DEFAULT_VNODES * factor;
+		dprintf("node %d has %d vnodes, free space %" PRIu64 "\n",
+			nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
+	}
+}
+
 static void update_cluster_info(struct join_message *msg,
 				struct sd_node *joined, struct sd_node *nodes,
 				size_t nr_nodes)
@@ -1195,6 +1219,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	} else
 		sys->this_node.zone = zone;
 	dprintf("zone id = %u\n", sys->this_node.zone);
+
+	sys->this_node.space = sys->disk_space;
 
 	if (get_latest_epoch() > 0) {
 		sys->status = SD_STATUS_WAIT_FOR_JOIN;
