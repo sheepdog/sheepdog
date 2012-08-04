@@ -60,32 +60,9 @@ static inline int same_zone(struct sd_vnode *e, int n1, int n2)
 	return e[n1].zone != 0 && e[n1].zone == e[n2].zone;
 }
 
-/* traverse the virtual node list and return the n'th one */
-static inline int get_nth_node(struct sd_vnode *entries,
-			       int nr_entries, int base, int n)
-{
-	int nodes[SD_MAX_REDUNDANCY];
-	int nr = 0, idx = base, i;
-
-	while (n--) {
-		nodes[nr++] = idx;
-next:
-		idx = (idx + 1) % nr_entries;
-		if (idx == base) {
-			panic("bug"); /* not found */
-		}
-		for (i = 0; i < nr; i++) {
-			if (same_zone(entries, idx, nodes[i]))
-				/* this node is in the same zone, so skip here */
-				goto next;
-		}
-	}
-
-	return idx;
-}
-
-static inline int get_vnode_pos(struct sd_vnode *entries,
-			int nr_entries, uint64_t oid)
+/* Get the first vnode's index which is matching the OID */
+static inline int get_vnode_first_idx(struct sd_vnode *entries, int nr_entries,
+				      uint64_t oid)
 {
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 	int start, end, pos;
@@ -94,36 +71,82 @@ static inline int get_vnode_pos(struct sd_vnode *entries,
 	end = nr_entries - 1;
 
 	if (id > entries[end].id || id < entries[start].id)
-		return end;
+		return (end + 1) % nr_entries;
 
 	for (;;) {
 		pos = (end - start) / 2 + start;
 		if (entries[pos].id < id) {
 			if (entries[pos + 1].id >= id)
-				return pos;
+				return (pos + 1) % nr_entries;
 			start = pos;
 		} else
 			end = pos;
 	}
 }
 
-static inline int obj_to_sheep(struct sd_vnode *entries,
-			       int nr_entries, uint64_t oid, int idx)
+/* Get next vnode's index according to the PREV_IDXS */
+static inline int get_vnode_next_idx(struct sd_vnode *entries, int nr_entries,
+				     int *prev_idxs, int nr_prev_idxs)
 {
-	int pos = get_vnode_pos(entries, nr_entries, oid);
+	int i, found, idx, first_idx;
 
-	return get_nth_node(entries, nr_entries, (pos + 1) % nr_entries, idx);
+	first_idx = prev_idxs[0];
+	idx = prev_idxs[nr_prev_idxs - 1];
+	for (;;) {
+		idx = (idx + 1) % nr_entries;
+		if (idx == first_idx)
+			panic("can't find next new idx\n");
+
+		for (found = 0, i = 0; i < nr_prev_idxs; i++) {
+			if (same_zone(entries, idx, prev_idxs[i])) {
+				found = 1;
+				break;
+			}
+		}
+
+		if (!found)
+			return idx;
+	}
 }
 
-static inline void obj_to_sheeps(struct sd_vnode *entries,
-		  int nr_entries, uint64_t oid, int nr_copies, int *idxs)
+/* Get the n'th vnode's index which is matching the OID */
+static inline int get_vnode_nth_idx(struct sd_vnode *entries,
+			int nr_entries, uint64_t oid, int nth)
 {
-	int pos = get_vnode_pos(entries, nr_entries, oid);
-	int idx;
+	int nr_idxs = 0, idxs[SD_MAX_REDUNDANCY];
 
-	for (idx = 0; idx < nr_copies; idx++)
-		idxs[idx] = get_nth_node(entries, nr_entries,
-				(pos + 1) % nr_entries, idx);
+	idxs[nr_idxs++] = get_vnode_first_idx(entries, nr_entries, oid);
+
+	if (!nth)
+		return idxs[nth];
+
+	while (nr_idxs <= nth) {
+		idxs[nr_idxs] = get_vnode_next_idx(entries, nr_entries,
+						     idxs, nr_idxs);
+		nr_idxs++;
+	}
+
+	return idxs[nth];
+}
+
+static inline int obj_to_sheep(struct sd_vnode *entries, int nr_entries,
+			       uint64_t oid, int nth_idx)
+{
+	return get_vnode_nth_idx(entries, nr_entries, oid, nth_idx);
+}
+
+static inline void obj_to_sheeps(struct sd_vnode *entries, int nr_entries,
+				 uint64_t oid, int nr_copies, int *idxs)
+{
+	int nr_idxs = 0;
+
+	idxs[nr_idxs++] = get_vnode_first_idx(entries, nr_entries, oid);
+
+	while (nr_idxs < nr_copies) {
+		idxs[nr_idxs] = get_vnode_next_idx(entries, nr_entries,
+						     idxs, nr_idxs);
+		nr_idxs++;
+	}
 }
 
 static inline const char *sd_strerror(int err)
