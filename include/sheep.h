@@ -68,7 +68,7 @@ static inline int same_node(struct sd_vnode *e, int n1, int n2)
 
 static inline int same_zone(struct sd_vnode *e, int n1, int n2)
 {
-	return e[n1].zone != 0 && e[n1].zone == e[n2].zone;
+	return e[n1].zone == e[n2].zone;
 }
 
 /* Get the first vnode's index which is matching the OID */
