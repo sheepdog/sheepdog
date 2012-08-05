@@ -53,18 +53,6 @@ struct global_cache {
 	struct cds_list_head cache_lru_list;
 };
 
-struct object_cache {
-	uint32_t vid;
-	struct hlist_node hash;
-
-	struct list_head dirty_list;
-	struct list_head object_list;
-	struct rb_root dirty_tree;
-	struct rb_root object_tree;
-
-	pthread_rwlock_t lock;
-};
-
 struct object_cache_entry {
 	uint32_t idx;
 	int refcnt;
@@ -75,6 +63,21 @@ struct object_cache_entry {
 	struct list_head dirty_list;
 	struct list_head object_list;
 	struct cds_list_head lru_list;
+};
+
+struct object_cache {
+	uint32_t vid;
+	struct hlist_node hash;
+
+	struct list_head dirty_list;
+	struct list_head object_list;
+	struct rb_root dirty_tree;
+	struct rb_root object_tree;
+
+	pthread_rwlock_t lock;
+
+	int (*read)(struct object_cache_entry *, void *, size_t, off_t);
+	int (*write)(struct object_cache_entry *, void *, size_t, off_t, int);
 };
 
 static struct global_cache sys_cache;
@@ -223,7 +226,7 @@ static int remove_cache_object(struct object_cache *oc, uint32_t idx)
 	strbuf_addstr(&buf, cache_dir);
 	strbuf_addf(&buf, "/%06"PRIx32"/%08"PRIx32, oc->vid, idx);
 
-	dprintf("removing cache object %s\n", buf.buf);
+	dprintf("removing cache object %"PRIx64"\n", idx_to_oid(oc->vid, idx));
 	if (unlink(buf.buf) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("failed to remove cached object %m\n");
@@ -280,11 +283,11 @@ static inline void lru_move_entry(struct object_cache_entry *entry)
 
 static inline void update_cache_entry(struct object_cache_entry *entry,
 				      uint32_t idx, size_t datalen,
-				      off_t offset, int wrt)
+				      off_t offset, int dirty)
 {
 	struct object_cache *oc = entry->oc;
 
-	if (wrt) {
+	if (dirty) {
 		uint64_t bmap = calc_object_bmap(datalen, offset);
 
 		pthread_rwlock_wrlock(&oc->lock);
@@ -293,55 +296,6 @@ static inline void update_cache_entry(struct object_cache_entry *entry,
 	}
 
 	lru_move_entry(entry);
-}
-
-static int write_cache_object(struct object_cache_entry *entry, void *buf,
-			      size_t count, off_t offset)
-{
-	size_t size;
-	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
-	struct strbuf p;
-	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
-
-	strbuf_init(&p, PATH_MAX);
-	strbuf_addstr(&p, cache_dir);
-	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
-
-	if (sys->use_directio && !idx_has_vdi_bit(idx))
-		flags |= O_DIRECT;
-
-	fd = open(p.buf, flags, def_fmode);
-	if (fd < 0) {
-		eprintf("%m\n");
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	if (flock(fd, LOCK_EX) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
-	size = xpwrite(fd, buf, count, offset);
-	if (flock(fd, LOCK_UN) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
-
-	if (size != count) {
-		eprintf("size %zu, count:%zu, offset %jd %m\n",
-			size, count, (intmax_t)offset);
-		ret = SD_RES_EIO;
-		goto out_close;
-	}
-
-	update_cache_entry(entry, idx, count, offset, 1);
-out_close:
-	close(fd);
-out:
-	strbuf_release(&p);
-	return ret;
 }
 
 static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
@@ -390,6 +344,67 @@ out:
 	strbuf_release(&p);
 	return ret;
 }
+
+static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
+				       size_t count, off_t offset)
+{
+	size_t size;
+	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
+	struct strbuf p;
+
+	strbuf_init(&p, PATH_MAX);
+	strbuf_addstr(&p, cache_dir);
+	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
+
+	if (sys->use_directio && !idx_has_vdi_bit(idx))
+		flags |= O_DIRECT;
+
+	fd = open(p.buf, flags, def_fmode);
+	if (fd < 0) {
+		eprintf("%m\n");
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
+	if (flock(fd, LOCK_EX) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out_close;
+	}
+	size = xpwrite(fd, buf, count, offset);
+	if (flock(fd, LOCK_UN) < 0) {
+		ret = SD_RES_EIO;
+		eprintf("%m\n");
+		goto out_close;
+	}
+
+	if (size != count) {
+		eprintf("size %zu, count:%zu, offset %jd %m\n",
+			size, count, (intmax_t)offset);
+		ret = SD_RES_EIO;
+		goto out_close;
+	}
+
+out_close:
+	close(fd);
+out:
+	strbuf_release(&p);
+	return ret;
+}
+
+static int write_cache_object(struct object_cache_entry *entry, void *buf,
+			      size_t count, off_t offset, int create)
+{
+	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
+	int ret;
+
+	ret = write_cache_object_noupdate(vid, idx, buf, count, offset);
+
+	if (ret == SD_RES_SUCCESS)
+		update_cache_entry(entry, idx, count, offset, 1);
+	return ret;
+}
+
 static int read_cache_object(struct object_cache_entry *entry, void *buf,
 			     size_t count, off_t offset)
 {
@@ -400,6 +415,40 @@ static int read_cache_object(struct object_cache_entry *entry, void *buf,
 
 	if (ret == SD_RES_SUCCESS)
 		update_cache_entry(entry, idx, count, offset, 0);
+	return ret;
+}
+
+static int write_and_push_cache_object(struct object_cache_entry *entry,
+				       void *buf, size_t count, off_t offset,
+				       int create)
+{
+	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
+	uint64_t oid = idx_to_oid(vid, idx);
+	struct sd_req hdr;
+	int ret;
+
+	ret = write_cache_object_noupdate(vid, idx, buf, count, offset);
+
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	if (create)
+		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+	else
+		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
+	hdr.flags =  SD_FLAG_CMD_WRITE;
+	hdr.data_length = count;
+
+	hdr.obj.oid = oid;
+	hdr.obj.offset = offset;
+
+	ret = exec_local_req(&hdr, buf);
+	if (ret != SD_RES_SUCCESS) {
+		eprintf("failed to write object %" PRIx64 ", %x\n", oid, ret);
+		return ret;
+	}
+
+	update_cache_entry(entry, idx, count, offset, 0);
 	return ret;
 }
 
@@ -589,8 +638,15 @@ not_found:
 
 		pthread_rwlock_init(&cache->lock, NULL);
 		hlist_add_head(&cache->hash, head);
-	} else
+
+		cache->read = read_cache_object;
+		if (sys->writethrough)
+			cache->write = write_and_push_cache_object;
+		else
+			cache->write = write_cache_object;
+	} else {
 		cache = NULL;
+	}
 out:
 	pthread_mutex_unlock(&hashtable_lock[h]);
 	return cache;
@@ -690,10 +746,14 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		data_length = SD_DATA_OBJ_SIZE;
 
 	ret = prealloc(fd, data_length);
-	if (ret != SD_RES_SUCCESS)
+	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_EIO;
-	else
-		add_to_object_cache(oc, idx, 1);
+	} else {
+		if (sys->writethrough)
+			add_to_object_cache(oc, idx, 0);
+		else
+			add_to_object_cache(oc, idx, 1);
+	}
 	close(fd);
 out:
 	strbuf_release(&buf);
@@ -990,17 +1050,16 @@ retry:
 	}
 
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
-		ret = write_cache_object(entry, req->data, hdr->data_length,
-					 hdr->obj.offset);
+		ret = cache->write(entry, req->data, hdr->data_length,
+				   hdr->obj.offset, create);
 		if (ret != SD_RES_SUCCESS)
 			goto err;
 	} else {
-		ret = read_cache_object(entry, req->data, hdr->data_length,
-					hdr->obj.offset);
+		ret = cache->read(entry, req->data, hdr->data_length,
+				  hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto err;
 		req->rp.data_length = hdr->data_length;
-
 	}
 err:
 	put_cache_entry(entry);
@@ -1026,7 +1085,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		return SD_RES_NO_CACHE;
 	}
 
-	ret = write_cache_object(entry, data, datalen, offset);
+	ret = write_cache_object(entry, data, datalen, offset, create);
 
 	put_cache_entry(entry);
 

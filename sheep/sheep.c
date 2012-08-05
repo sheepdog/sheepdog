@@ -69,14 +69,14 @@ Options:\n\
   -d, --debug             include debug messages in the log\n\
   -D, --directio          use direct IO when accessing the object from object cache\n\
   -f, --foreground        make the program run in the foreground\n\
-  -g, --gateway           make the progam run as a gateway mode (same as '-v 0')\n\
+  -g, --gateway           make the progam run as a gateway mode\n\
   -h, --help              display this help and exit\n\
   -l, --loglevel          specify the level of logging detail\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
   -P, --pidfile           create a pid file\n\
   -s, --disk-space        specify the free disk space in megabytes\n\
-  -w, --enable-cache      enable object cache and specify the max cache size in megabytes\n\
+  -w, --enable-cache      enable object cache and specify the max size (M) and mode\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
 ", PACKAGE_VERSION, program_name);
@@ -193,8 +193,9 @@ int main(int argc, char **argv)
 	int af;
 	char *p;
 	struct cluster_driver *cdrv;
-	int enable_write_cache = 0; /* disabled by default */
+	int enable_object_cache = 0; /* disabled by default */
 	char *pid_file = NULL;
+	char *object_cache_size, *object_cache_mode;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -262,8 +263,10 @@ int main(int argc, char **argv)
 			sys->this_node.zone = zone;
 			break;
 		case 'w':
-			enable_write_cache = 1;
-			cache_size = strtol(optarg, &p, 10);
+			enable_object_cache = 1;
+			object_cache_size = strtok(optarg, ",");
+			object_cache_mode = strtok(NULL, ",");
+			cache_size = strtol(object_cache_size, &p, 10);
 			if (optarg == p || cache_size < 0 ||
 			    UINT64_MAX < cache_size) {
 				fprintf(stderr, "Invalid cache size '%s': "
@@ -271,9 +274,16 @@ int main(int argc, char **argv)
 					optarg, UINT64_MAX);
 				exit(1);
 			}
-			vprintf(SDOG_INFO, "enable write cache, max cache size %" PRIu64 "M\n",
-				cache_size);
 			sys->cache_size = cache_size * 1024 * 1024;
+
+			if (!object_cache_mode ||
+			    strcmp(object_cache_mode, "writeback") != 0) {
+				sys->writethrough = 1;
+			}
+			vprintf(SDOG_INFO, "enable write cache, "
+				"max cache size %" PRIu64 "M, %s mode\n",
+				cache_size, sys->writethrough ?
+				"writethrough" : "writeback");
 			break;
 		case 's':
 			free_space = strtoll(optarg, &p, 10);
@@ -331,7 +341,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_store(dir, enable_write_cache);
+	ret = init_store(dir, enable_object_cache);
 	if (ret)
 		exit(1);
 
