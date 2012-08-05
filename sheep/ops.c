@@ -378,11 +378,9 @@ static int local_stat_recovery(const struct sd_req *req, struct sd_rsp *rsp,
 					void *data)
 {
 	if (node_in_recovery())
-		return SD_RES_SUCCESS;
-	else
-		return SD_RES_UNKNOWN;
+		return SD_RES_NODE_IN_RECOVERY;
 
-	return SD_RES_UNKNOWN;
+	return SD_RES_SUCCESS;
 }
 
 static int local_stat_cluster(struct request *req)
@@ -530,7 +528,7 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 	iocb.epoch = sys->epoch;
 
 	if (node_in_recovery())
-		return SD_RES_CLUSTER_RECOVERING;
+		return SD_RES_NODE_IN_RECOVERY;
 
 	if (sd_store->cleanup)
 		ret = sd_store->cleanup(&iocb);

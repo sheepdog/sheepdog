@@ -74,6 +74,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int datalen,
 		    uint64_t offset, uint32_t flags, int copies, int create);
 int send_light_req(struct sd_req *hdr, const char *host, int port);
+int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
 
 extern struct command vdi_command;
 extern struct command node_command;

@@ -65,7 +65,7 @@
 #define SD_RES_FORCE_RECOVER    0x1A /* Users should not force recover this cluster */
 #define SD_RES_NO_STORE         0x20 /* No targeted backend store */
 #define SD_RES_NO_SUPPORT       0x21 /* Operation is not supported by backend store */
-#define SD_RES_CLUSTER_RECOVERING 0x22 /* Cluster is recovering. */
+#define SD_RES_NODE_IN_RECOVERY 0x22 /*	Targeted node is in recovery */
 #define SD_RES_OBJ_RECOVERING     0x23 /* Object is recovering */
 #define SD_RES_KILLED           0x24 /* Node is killed */
 #define SD_RES_OID_EXIST        0x25 /* Object ID exists already */

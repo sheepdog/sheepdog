@@ -125,9 +125,9 @@ static int node_recovery(int argc, char **argv)
 
 		sd_init_req((struct sd_req *)&req, SD_OP_STAT_RECOVERY);
 
-		ret = send_light_req((struct sd_req *)&req, host,
-				     sd_nodes[i].nid.port);
-		if (!ret) {
+		ret = send_light_req_get_response((struct sd_req *)&req, host,
+						  sd_nodes[i].nid.port);
+		if (ret == SD_RES_NODE_IN_RECOVERY) {
 			addr_to_str(host, sizeof(host),
 					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
 			printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s%5d%11d\n",

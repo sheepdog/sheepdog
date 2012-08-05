@@ -192,10 +192,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	return 0;
 }
 
-/*
- * Light request only contains header, without body content.
- */
-int send_light_req(struct sd_req *hdr, const char *host, int port)
+int send_light_req_get_response(struct sd_req *hdr, const char *host, int port)
 {
 	int fd, ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
@@ -215,9 +212,25 @@ int send_light_req(struct sd_req *hdr, const char *host, int port)
 		return -1;
 	}
 
-	if (rsp->result != SD_RES_SUCCESS) {
+	if (rsp->result != SD_RES_SUCCESS)
+		return rsp->result;
+
+	return SD_RES_SUCCESS;
+}
+
+/*
+ * Light request only contains header, without body content.
+ */
+int send_light_req(struct sd_req *hdr, const char *host, int port)
+{
+	int ret = send_light_req_get_response(hdr, host, port);
+
+	if (ret == -1)
+		return -1;
+
+	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "Response's result: %s\n",
-			sd_strerror(rsp->result));
+			sd_strerror(ret));
 		return -1;
 	}
 
