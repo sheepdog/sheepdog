@@ -1,4 +1,4 @@
-.TH SHEEPDOG 8 2012-07-31
+.TH SHEEPDOG 8 2012-08-05
 .SH NAME
 sheep \- Distributed Block Storage System for KVM
 .SH SYNOPSIS
@@ -39,7 +39,7 @@ This option specifies the availability zone id.
 This option specifies the cluster driver.
 .TP
 .BI \-g "\fR, \fP" \--gateway
-Makes the sheep instance run in gateway mode (same as '-v 0').
+Makes the sheep instance run in gateway mode.
 .TP
 .BI \-l "\fR, \fP" \--loglevel
 Specify the level of logging detail.
@@ -47,11 +47,12 @@ Specify the level of logging detail.
 .BI \-o "\fR, \fP" \--stdout
 Log to stdout instead of shared logger.
 .TP
-.BI \-v "\fR, \fP" \--vnodes
-Specify the number of virtual nodes.
+.BI \-s "\fR, \fP" \--disk-space
+Specify the free disk space in megabytes.
 .TP
-.BI \-w "\fR, \fP" \--enable-cache " size"
-Enable object cache and specify the max cache size in megabytes (EXPERIMENTAL).
+.BI \-w "\fR, \fP" \--enable-cache " size[,mode]"
+Enable object cache and specify the max cache size in megabytes and mode.
+Mode can be writethrough (default) or writeback. (EXPERIMENTAL)
 .TP
 .BI \-y "\fR, \fP" \--myaddr
 Specify the address advertised to other sheep.
