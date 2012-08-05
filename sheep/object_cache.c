@@ -244,12 +244,76 @@ out:
 	return ret;
 }
 
-static int write_cache_object(uint32_t vid, uint32_t idx, void *buf,
+static struct object_cache_entry *
+dirty_tree_and_list_insert(struct object_cache *oc, uint32_t idx,
+		  uint64_t bmap, int create)
+{
+	struct rb_node **p = &oc->dirty_tree.rb_node;
+	struct rb_node *parent = NULL;
+	struct object_cache_entry *entry;
+	idx = idx_mask(idx);
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct object_cache_entry, dirty_node);
+
+		if (idx < idx_mask(entry->idx))
+			p = &(*p)->rb_left;
+		else if (idx > idx_mask(entry->idx))
+			p = &(*p)->rb_right;
+		else {
+			/* already has this entry, merge bmap */
+			entry->bmap |= bmap;
+			if (create)
+				entry->idx |= CACHE_CREATE_BIT;
+			return entry;
+		}
+	}
+
+	entry = object_tree_search(&oc->object_tree, idx);
+	if (!entry)
+		panic("Can not find object entry %" PRIx32 "\n", idx);
+
+	entry->bmap |= bmap;
+	if (create)
+		entry->idx |= CACHE_CREATE_BIT;
+	rb_link_node(&entry->dirty_node, parent, p);
+	rb_insert_color(&entry->dirty_node, &oc->dirty_tree);
+	list_add(&entry->dirty_list, &oc->dirty_list);
+
+	return entry;
+}
+
+static inline void lru_move_entry(struct object_cache_entry *entry)
+{
+	cds_list_del_rcu(&entry->lru_list);
+	cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
+}
+
+static inline void update_cache_entry(struct object_cache_entry *entry,
+				      uint32_t idx, size_t datalen,
+				      off_t offset, int wrt)
+{
+	struct object_cache *oc = entry->oc;
+
+	if (wrt) {
+		uint64_t bmap = calc_object_bmap(datalen, offset);
+
+		pthread_rwlock_wrlock(&oc->lock);
+		dirty_tree_and_list_insert(oc, idx, bmap, 0);
+		pthread_rwlock_unlock(&oc->lock);
+	}
+
+	lru_move_entry(entry);
+}
+
+static int write_cache_object(struct object_cache_entry *entry, void *buf,
 			      size_t count, off_t offset)
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
+	uint32_t vid = entry->oc->vid, idx = idx_mask(entry->idx);
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
@@ -281,7 +345,10 @@ static int write_cache_object(uint32_t vid, uint32_t idx, void *buf,
 		eprintf("size %zu, count:%zu, offset %jd %m\n",
 			size, count, (intmax_t)offset);
 		ret = SD_RES_EIO;
+		goto out_close;
 	}
+
+	update_cache_entry(entry, idx, count, offset, 1);
 out_close:
 	close(fd);
 out:
@@ -289,8 +356,8 @@ out:
 	return ret;
 }
 
-static int read_cache_object(uint32_t vid, uint32_t idx, void *buf,
-			     size_t count, off_t offset)
+static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
+				      size_t count, off_t offset)
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
@@ -326,12 +393,25 @@ static int read_cache_object(uint32_t vid, uint32_t idx, void *buf,
 		eprintf("size %zu, count:%zu, offset %jd %m\n",
 			size, count, (intmax_t)offset);
 		ret = SD_RES_EIO;
+		goto out_close;
 	}
 
 out_close:
 	close(fd);
 out:
 	strbuf_release(&p);
+	return ret;
+}
+static int read_cache_object(struct object_cache_entry *entry, void *buf,
+			     size_t count, off_t offset)
+{
+	uint32_t vid = entry->oc->vid, idx = idx_mask(entry->idx);
+	int ret;
+
+	ret = read_cache_object_noupdate(vid, idx, buf, count, offset);
+
+	if (ret == SD_RES_SUCCESS)
+		update_cache_entry(entry, idx, count, offset, 0);
 	return ret;
 }
 
@@ -376,7 +456,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 		goto out;
 	}
 
-	ret = read_cache_object(vid, idx, buf, data_length, offset);
+	ret = read_cache_object_noupdate(vid, idx, buf, data_length, offset);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
@@ -478,46 +558,6 @@ static void reclaim_done(struct work *work)
 	free(work);
 }
 
-static struct object_cache_entry *
-dirty_tree_and_list_insert(struct object_cache *oc, uint32_t idx,
-		  uint64_t bmap, int create)
-{
-	struct rb_node **p = &oc->dirty_tree.rb_node;
-	struct rb_node *parent = NULL;
-	struct object_cache_entry *entry;
-	idx = idx_mask(idx);
-
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct object_cache_entry, dirty_node);
-
-		if (idx < idx_mask(entry->idx))
-			p = &(*p)->rb_left;
-		else if (idx > idx_mask(entry->idx))
-			p = &(*p)->rb_right;
-		else {
-			/* already has this entry, merge bmap */
-			entry->bmap |= bmap;
-			if (create)
-				entry->idx |= CACHE_CREATE_BIT;
-			return entry;
-		}
-	}
-
-	entry = object_tree_search(&oc->object_tree, idx);
-	if (!entry)
-		panic("Can not find object entry %" PRIx32 "\n", idx);
-
-	entry->bmap |= bmap;
-	if (create)
-		entry->idx |= CACHE_CREATE_BIT;
-	rb_link_node(&entry->dirty_node, parent, p);
-	rb_insert_color(&entry->dirty_node, &oc->dirty_tree);
-	list_add(&entry->dirty_list, &oc->dirty_list);
-
-	return entry;
-}
-
 static int create_dir_for(uint32_t vid)
 {
 	int ret = 0;
@@ -570,28 +610,6 @@ out:
 	return cache;
 }
 
-/* Caller should hold the oc->lock */
-static inline void
-add_to_dirty_tree_and_list(struct object_cache *oc, uint32_t idx,
-			   uint64_t bmap, int create)
-{
-	struct object_cache_entry *entry;
-	entry = dirty_tree_and_list_insert(oc, idx, bmap, create);
-
-	cds_list_del_rcu(&entry->lru_list);
-	cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
-}
-
-static void update_cache_entry(struct object_cache *oc, uint32_t idx,
-		size_t datalen, off_t offset)
-{
-	uint64_t bmap = calc_object_bmap(datalen, offset);
-
-	pthread_rwlock_wrlock(&oc->lock);
-	add_to_dirty_tree_and_list(oc, idx, bmap, 0);
-	pthread_rwlock_unlock(&oc->lock);
-}
-
 void object_cache_try_to_reclaim(void)
 {
 	struct work *work;
@@ -641,9 +659,10 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
 	}
 	if (create) {
 		uint64_t all = UINT64_MAX;
-		add_to_dirty_tree_and_list(oc, idx, all, create);
+		dirty_tree_and_list_insert(oc, idx, all, create);
 	}
 	pthread_rwlock_unlock(&oc->lock);
+	lru_move_entry(entry);
 
 	object_cache_try_to_reclaim();
 }
@@ -976,30 +995,26 @@ retry:
 	if (!entry) {
 		dprintf("retry oid %"PRIx64"\n", oid);
 		/*
-		 * For the case that object exists but can't be added to list,
-		 * we call pthread_yield() to expect other thread can add object
-		 * to list ASAP.
+		 * For the case that object exists but isn't added to object
+		 * list yet, we call pthread_yield() to expect other thread can
+		 * add object to list ASAP.
 		 */
 		pthread_yield();
 		goto retry;
 	}
 
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
-		ret = write_cache_object(cache->vid, idx, req->data,
-					 hdr->data_length, hdr->obj.offset);
+		ret = write_cache_object(entry, req->data, hdr->data_length,
+					 hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto err;
-		update_cache_entry(cache, idx, hdr->data_length,
-				   hdr->obj.offset);
 	} else {
-		ret = read_cache_object(cache->vid, idx, req->data,
-					hdr->data_length, hdr->obj.offset);
+		ret = read_cache_object(entry, req->data, hdr->data_length,
+					hdr->obj.offset);
 		if (ret != SD_RES_SUCCESS)
 			goto err;
 		req->rp.data_length = hdr->data_length;
 
-		cds_list_del_rcu(&entry->lru_list);
-		cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 	}
 err:
 	put_cache_entry(entry);
@@ -1021,13 +1036,11 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		dprintf("cache object %" PRIx32 " doesn't exist\n", idx);
+		dprintf("%" PRIx64 " doesn't exist\n", oid);
 		return SD_RES_NO_CACHE;
 	}
 
-	ret = write_cache_object(vid, idx, data, datalen, offset);
-	if (ret == SD_RES_SUCCESS)
-		update_cache_entry(cache, idx, datalen, offset);
+	ret = write_cache_object(entry, data, datalen, offset);
 
 	put_cache_entry(entry);
 
@@ -1049,11 +1062,11 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
-		dprintf("cache object %" PRIx32 " doesn't exist\n", idx);
+		dprintf("%" PRIx64 " doesn't exist\n", oid);
 		return SD_RES_NO_CACHE;
 	}
 
-	ret = read_cache_object(vid, idx, data, datalen, offset);
+	ret = read_cache_object(entry, data, datalen, offset);
 
 	put_cache_entry(entry);
 
