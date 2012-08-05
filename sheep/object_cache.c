@@ -717,18 +717,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out;
 	}
 
-	if (flock(fd, LOCK_EX) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
 	ret = xpwrite(fd, buffer, buf_size, 0);
-	if (flock(fd, LOCK_UN) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
-
 	if (ret != buf_size) {
 		ret = SD_RES_EIO;
 		eprintf("failed, vid %"PRIx32", idx %"PRIx32"\n", oc->vid, idx);
@@ -742,7 +731,6 @@ out:
 	strbuf_release(&buf);
 	return ret;
 }
-
 
 /* Fetch the object, cache it in success */
 static int object_cache_pull(struct object_cache *oc, uint32_t idx)
