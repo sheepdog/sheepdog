@@ -969,12 +969,13 @@ static struct sd_op_template sd_ops[] = {
 	},
 
 	[SD_OP_GET_OBJ_LIST] = {
+		.name = "GET_OBJ_LIST",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_obj_list,
 	},
 
 	[SD_OP_GET_EPOCH] = {
-		.name = "GET_OBJ_LIST",
+		.name = "GET_EPOCH",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_epoch,
 	},
