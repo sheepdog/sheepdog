@@ -57,7 +57,7 @@ static size_t get_join_message_size(struct join_message *jm)
 static int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 {
 	int nr_zones = 0, i, j;
-	uint32_t zones[SD_MAX_REDUNDANCY];
+	uint32_t zones[SD_MAX_COPIES];
 
 	for (i = 0; i < nr_nodes; i++) {
 		/*

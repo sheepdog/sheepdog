@@ -105,7 +105,7 @@ struct write_info_entry {
 };
 
 struct write_info {
-	struct write_info_entry ent[SD_MAX_REDUNDANCY];
+	struct write_info_entry ent[SD_MAX_COPIES];
 	int nr_sent;
 };
 
@@ -130,7 +130,7 @@ static inline void finish_one_write_err(struct write_info *wi, int i)
 }
 
 struct pfd_info {
-	struct pollfd pfds[SD_MAX_REDUNDANCY];
+	struct pollfd pfds[SD_MAX_COPIES];
 	int nr;
 };
 
@@ -202,7 +202,7 @@ finish_write:
 static inline void write_info_init(struct write_info *wi)
 {
 	int i;
-	for (i = 0; i < SD_MAX_REDUNDANCY; i++)
+	for (i = 0; i < SD_MAX_COPIES; i++)
 		wi->ent[i].pfd.fd = -1;
 	wi->nr_sent = 0;
 }

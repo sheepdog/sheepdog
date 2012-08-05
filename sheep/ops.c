@@ -234,7 +234,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->nr_copies = hdr->copies;
 	sys->flags = hdr->flags;
 	if (!sys->nr_copies)
-		sys->nr_copies = SD_DEFAULT_REDUNDANCY;
+		sys->nr_copies = SD_DEFAULT_COPIES;
 
 	created_time = hdr->ctime;
 	set_cluster_ctime(created_time);

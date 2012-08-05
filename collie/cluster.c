@@ -531,9 +531,9 @@ static int cluster_parser(int ch, char *opt)
 		if (opt == p || copies < 1) {
 			fprintf(stderr, "There must be at least one copy of data\n");
 			exit(EXIT_FAILURE);
-		} else if (copies > SD_MAX_REDUNDANCY) {
+		} else if (copies > SD_MAX_COPIES) {
 			fprintf(stderr, "Redundancy may not exceed %d copies\n",
-				SD_MAX_REDUNDANCY);
+				SD_MAX_COPIES);
 			exit(EXIT_FAILURE);
 		}
 		cluster_cmd_data.copies = copies;

@@ -115,7 +115,7 @@ static inline int get_vnode_next_idx(struct sd_vnode *entries, int nr_entries,
 static inline int get_vnode_nth_idx(struct sd_vnode *entries,
 			int nr_entries, uint64_t oid, int nth)
 {
-	int nr_idxs = 0, idxs[SD_MAX_REDUNDANCY];
+	int nr_idxs = 0, idxs[SD_MAX_COPIES];
 
 	idxs[nr_idxs++] = get_vnode_first_idx(entries, nr_entries, oid);
 
