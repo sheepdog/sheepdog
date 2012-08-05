@@ -30,8 +30,8 @@ static int is_access_local(struct request *req, uint64_t oid)
 	int nr_copies;
 	int i;
 
-	nr_copies = get_nr_copies(req->vnodes);
-	oid_to_vnodes(req->vnodes->vnodes, req->vnodes->nr_vnodes, oid,
+	nr_copies = get_nr_copies(req->vinfo);
+	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 
 	for (i = 0; i < nr_copies; i++) {
@@ -365,7 +365,7 @@ static void queue_request(struct request *req)
 	 * called before we set up current_vnode_info
 	 */
 	if (!is_force_op(req->op))
-		req->vnodes = get_vnode_info();
+		req->vinfo = get_vnode_info();
 
 	if (is_peer_op(req->op)) {
 		queue_peer_request(req);
@@ -391,8 +391,8 @@ done:
 
 static void requeue_request(struct request *req)
 {
-	if (req->vnodes)
-		put_vnode_info(req->vnodes);
+	if (req->vinfo)
+		put_vnode_info(req->vinfo);
 	queue_request(req);
 }
 
@@ -479,7 +479,7 @@ static void free_request(struct request *req)
 	uatomic_dec(&sys->nr_outstanding_reqs);
 
 	req->ci->refcnt--;
-	put_vnode_info(req->vnodes);
+	put_vnode_info(req->vinfo);
 	free(req->data);
 	free(req);
 }

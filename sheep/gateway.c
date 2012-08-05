@@ -35,8 +35,8 @@ int gateway_read_obj(struct request *req)
 	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	nr_copies = get_nr_copies(req->vnodes);
-	oid_to_vnodes(req->vnodes->vnodes, req->vnodes->nr_vnodes, oid,
+	nr_copies = get_nr_copies(req->vinfo);
+	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
@@ -245,8 +245,8 @@ static int gateway_forward_request(struct request *req)
 
 	write_info_init(&wi);
 	wlen = hdr.data_length;
-	nr_copies = get_nr_copies(req->vnodes);
-	oid_to_vnodes(req->vnodes->vnodes, req->vnodes->nr_vnodes, oid,
+	nr_copies = get_nr_copies(req->vinfo);
+	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 
 	for (i = 0; i < nr_copies; i++) {

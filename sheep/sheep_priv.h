@@ -57,7 +57,7 @@ struct request {
 
 	uint64_t local_oid;
 
-	struct vnode_info *vnodes;
+	struct vnode_info *vinfo;
 
 	struct work work;
 };
@@ -216,7 +216,7 @@ struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void update_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes);
-void put_vnode_info(struct vnode_info *vnodes);
+void put_vnode_info(struct vnode_info *vinfo);
 struct vnode_info *get_vnode_info_epoch(uint32_t epoch);
 
 int get_nr_copies(struct vnode_info *vnode_info);
@@ -257,8 +257,7 @@ uint64_t get_cluster_ctime(void);
 int get_obj_list(const struct sd_list_req *, struct sd_list_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
 
-int start_recovery(struct vnode_info *cur_vnodes,
-	struct vnode_info *old_vnodes);
+int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo);
 void resume_recovery_work(void);
 bool oid_in_recovery(uint64_t oid);
 int is_recovery_init(void);

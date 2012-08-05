@@ -36,8 +36,8 @@ struct recovery_work {
 	uint64_t *prio_oids;
 	int nr_prio_oids;
 
-	struct vnode_info *old_vnodes;
-	struct vnode_info *cur_vnodes;
+	struct vnode_info *old_vinfo;
+	struct vnode_info *cur_vinfo;
 };
 
 static struct recovery_work *next_rw;
@@ -165,7 +165,7 @@ static int do_recover_object(struct recovery_work *rw)
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
 	int nr_copies, ret, i;
 
-	old = grab_vnode_info(rw->old_vnodes);
+	old = grab_vnode_info(rw->old_vinfo);
 
 again:
 	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n",
@@ -178,8 +178,8 @@ again:
 							  old->nr_vnodes,
 							  oid, i);
 
-		if (is_invalid_vnode(tgt_vnode, rw->cur_vnodes->nodes,
-				     rw->cur_vnodes->nr_nodes))
+		if (is_invalid_vnode(tgt_vnode, rw->cur_vinfo->nodes,
+				     rw->cur_vinfo->nr_nodes))
 			continue;
 		ret = recover_object_from_replica(oid, tgt_vnode,
 						  epoch, tgt_epoch);
@@ -320,8 +320,8 @@ bool oid_in_recovery(uint64_t oid)
 
 static void free_recovery_work(struct recovery_work *rw)
 {
-	put_vnode_info(rw->cur_vnodes);
-	put_vnode_info(rw->old_vnodes);
+	put_vnode_info(rw->cur_vinfo);
+	put_vnode_info(rw->old_vinfo);
 	free(rw->oids);
 	free(rw);
 }
@@ -343,7 +343,7 @@ static inline void finish_recovery(struct recovery_work *rw)
 	sys->recovered_epoch = rw->epoch;
 
 	if (sd_store->end_recover)
-		sd_store->end_recover(sys->epoch - 1, rw->old_vnodes);
+		sd_store->end_recover(sys->epoch - 1, rw->old_vinfo);
 
 	free_recovery_work(rw);
 
@@ -515,9 +515,9 @@ static void screen_object_list(struct recovery_work *rw,
 	int nr_objs;
 	int i, j;
 
-	nr_objs = get_nr_copies(rw->cur_vnodes);
+	nr_objs = get_nr_copies(rw->cur_vinfo);
 	for (i = 0; i < nr_oids; i++) {
-		oid_to_vnodes(rw->cur_vnodes->vnodes, rw->cur_vnodes->nr_vnodes,
+		oid_to_vnodes(rw->cur_vinfo->vnodes, rw->cur_vinfo->nr_vnodes,
 			      oids[i], nr_objs, vnodes);
 		for (j = 0; j < nr_objs; j++) {
 			if (!vnode_is_local(vnodes[j]))
@@ -536,7 +536,7 @@ static void screen_object_list(struct recovery_work *rw,
 
 static int newly_joined(struct sd_node *node, struct recovery_work *rw)
 {
-	if (bsearch(node, rw->old_vnodes->nodes, rw->old_vnodes->nr_nodes,
+	if (bsearch(node, rw->old_vinfo->nodes, rw->old_vinfo->nr_nodes,
 		    sizeof(struct sd_node), node_id_cmp))
 		return 0;
 	return 1;
@@ -549,8 +549,8 @@ static void prepare_object_list(struct work *work)
 						work);
 	uint8_t *buf = NULL;
 	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
-	struct sd_node *cur = rw->cur_vnodes->nodes;
-	int cur_nr = rw->cur_vnodes->nr_nodes;
+	struct sd_node *cur = rw->cur_vinfo->nodes;
+	int cur_nr = rw->cur_vinfo->nr_nodes;
 	int start = random() % cur_nr, i, end = cur_nr;
 
 	dprintf("%u\n", rw->epoch);
@@ -592,7 +592,7 @@ static inline bool node_is_gateway_only(void)
 	return sys->this_node.nr_vnodes == 0 ? true : false;
 }
 
-int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
+int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 {
 	struct recovery_work *rw;
 
@@ -610,8 +610,8 @@ int start_recovery(struct vnode_info *cur_vnodes, struct vnode_info *old_vnodes)
 	rw->epoch = sys->epoch;
 	rw->count = 0;
 
-	rw->cur_vnodes = grab_vnode_info(cur_vnodes);
-	rw->old_vnodes = grab_vnode_info(old_vnodes);
+	rw->cur_vinfo = grab_vnode_info(cur_vinfo);
+	rw->old_vinfo = grab_vnode_info(old_vinfo);
 
 	rw->work.fn = prepare_object_list;
 	rw->work.done = finish_object_list;

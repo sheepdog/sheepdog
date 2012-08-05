@@ -815,7 +815,7 @@ int peer_create_and_write_obj(struct request *req)
 			goto out;
 		}
 		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
-			ret = read_copy_from_replica(req->vnodes, hdr->epoch,
+			ret = read_copy_from_replica(req->vinfo, hdr->epoch,
 						     hdr->obj.cow_oid, buf);
 			if (ret != SD_RES_SUCCESS) {
 				eprintf("failed to read cow object\n");
