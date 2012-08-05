@@ -109,9 +109,10 @@ static inline int hash(uint64_t vid)
 	return hash_64(vid, HASH_BITS);
 }
 
-static inline uint32_t idx_mask(uint32_t idx)
+/* We should always use this helper to get entry idx */
+static inline uint32_t entry_idx(struct object_cache_entry *entry)
 {
-	return idx &= ~CACHE_INDEX_MASK;
+	return entry->idx & ~CACHE_INDEX_MASK;
 }
 
 static inline uint32_t object_cache_oid_to_idx(uint64_t oid)
@@ -148,15 +149,15 @@ object_cache_insert(struct rb_root *root, struct object_cache_entry *new)
 	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
 	struct object_cache_entry *entry;
-	uint32_t idx = idx_mask(new->idx);
+	uint32_t idx = entry_idx(new);
 
 	while (*p) {
 		parent = *p;
 		entry = rb_entry(parent, struct object_cache_entry, node);
 
-		if (idx < idx_mask(entry->idx))
+		if (idx < entry_idx(entry))
 			p = &(*p)->rb_left;
-		else if (idx > idx_mask(entry->idx))
+		else if (idx > entry_idx(entry))
 			p = &(*p)->rb_right;
 		else {
 			/* already has this entry */
@@ -174,14 +175,13 @@ static struct object_cache_entry *object_tree_search(struct rb_root *root,
 {
 	struct rb_node *n = root->rb_node;
 	struct object_cache_entry *t;
-	idx = idx_mask(idx);
 
 	while (n) {
 		t = rb_entry(n, struct object_cache_entry, node);
 
-		if (idx < idx_mask(t->idx))
+		if (idx < entry_idx(t))
 			n = n->rb_left;
-		else if (idx > idx_mask(t->idx))
+		else if (idx > entry_idx(t))
 			n = n->rb_right;
 		else
 			return t; /* found it */
@@ -206,27 +206,18 @@ del_from_object_tree_and_list(struct object_cache_entry *entry,
 	cds_list_del_rcu(&entry->lru_list);
 }
 
-static uint64_t cache_vid_to_data_oid(uint32_t vid, uint32_t idx)
-{
-	idx = idx_mask(idx);
-
-	return vid_to_data_oid(vid, idx);
-}
-
 static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 {
 	if (idx_has_vdi_bit(idx))
 		return vid_to_vdi_oid(vid);
 	else
-		return cache_vid_to_data_oid(vid, idx);
+		return vid_to_data_oid(vid, idx);
 }
 
 static int remove_cache_object(struct object_cache *oc, uint32_t idx)
 {
 	struct strbuf buf;
 	int ret = SD_RES_SUCCESS;
-
-	idx = idx_mask(idx);
 
 	strbuf_init(&buf, PATH_MAX);
 	strbuf_addstr(&buf, cache_dir);
@@ -246,20 +237,19 @@ out:
 
 static struct object_cache_entry *
 dirty_tree_and_list_insert(struct object_cache *oc, uint32_t idx,
-		  uint64_t bmap, int create)
+			   uint64_t bmap, int create)
 {
 	struct rb_node **p = &oc->dirty_tree.rb_node;
 	struct rb_node *parent = NULL;
 	struct object_cache_entry *entry;
-	idx = idx_mask(idx);
 
 	while (*p) {
 		parent = *p;
 		entry = rb_entry(parent, struct object_cache_entry, dirty_node);
 
-		if (idx < idx_mask(entry->idx))
+		if (idx < entry_idx(entry))
 			p = &(*p)->rb_left;
-		else if (idx > idx_mask(entry->idx))
+		else if (idx > entry_idx(entry))
 			p = &(*p)->rb_right;
 		else {
 			/* already has this entry, merge bmap */
@@ -313,7 +303,7 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	struct strbuf p;
-	uint32_t vid = entry->oc->vid, idx = idx_mask(entry->idx);
+	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
 
 	strbuf_init(&p, PATH_MAX);
 	strbuf_addstr(&p, cache_dir);
@@ -405,7 +395,7 @@ out:
 static int read_cache_object(struct object_cache_entry *entry, void *buf,
 			     size_t count, off_t offset)
 {
-	uint32_t vid = entry->oc->vid, idx = idx_mask(entry->idx);
+	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
 	int ret;
 
 	ret = read_cache_object_noupdate(vid, idx, buf, count, offset);
@@ -427,8 +417,6 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 	int first_bit, last_bit;
 
 	dprintf("%"PRIx64", create %d\n", oid, create);
-
-	idx = idx_mask(idx);
 
 	if (!bmap) {
 		dprintf("WARN: nothing to flush\n");
@@ -494,7 +482,7 @@ static int do_reclaim_object(struct object_cache_entry *entry)
 
 	pthread_rwlock_wrlock(&oc->lock);
 
-	oid = idx_to_oid(oc->vid, entry->idx);
+	oid = idx_to_oid(oc->vid, entry_idx(entry));
 	if (uatomic_read(&entry->refcnt) > 0) {
 		dprintf("%"PRIx64" is in operation, skip...\n", oid);
 		ret = -1;
@@ -507,7 +495,7 @@ static int do_reclaim_object(struct object_cache_entry *entry)
 		goto out;
 	}
 
-	if (remove_cache_object(oc, entry->idx) != SD_RES_SUCCESS) {
+	if (remove_cache_object(oc, entry_idx(entry)) != SD_RES_SUCCESS) {
 		ret = -1;
 		goto out;
 	}
@@ -540,7 +528,7 @@ static void do_reclaim(struct work *work)
 
 		if (do_reclaim_object(entry) < 0)
 			continue;
-		if (idx_has_vdi_bit(entry->idx))
+		if (idx_has_vdi_bit(entry_idx(entry)))
 			data_length = SD_INODE_SIZE;
 		else
 			data_length = SD_DATA_OBJ_SIZE;
@@ -764,7 +752,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		oid = vid_to_vdi_oid(oc->vid);
 		data_length = SD_INODE_SIZE;
 	} else {
-		oid = cache_vid_to_data_oid(oc->vid, idx);
+		oid = vid_to_data_oid(oc->vid, idx);
 		data_length = SD_DATA_OBJ_SIZE;
 	}
 
@@ -802,7 +790,7 @@ static int object_cache_push(struct object_cache *oc)
 
 	pthread_rwlock_wrlock(&oc->lock);
 	list_for_each_entry_safe(entry, t, &oc->dirty_list, dirty_list) {
-		ret = push_cache_object(oc->vid, entry->idx, entry->bmap,
+		ret = push_cache_object(oc->vid, entry_idx(entry), entry->bmap,
 					!!(entry->idx & CACHE_CREATE_BIT));
 		if (ret != SD_RES_SUCCESS)
 			goto push_failed;
@@ -845,7 +833,7 @@ void object_cache_delete(uint32_t vid)
 	pthread_mutex_unlock(&hashtable_lock[h]);
 
 	pthread_rwlock_wrlock(&cache->lock);
-	list_for_each_entry_safe(entry, t, &cache->object_list, dirty_list) {
+	list_for_each_entry_safe(entry, t, &cache->object_list, object_list) {
 		del_from_object_tree_and_list(entry, &cache->object_tree);
 		if (!list_empty(&entry->dirty_list))
 			del_from_dirty_tree_and_list(entry, &cache->dirty_tree);
