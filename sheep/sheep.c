@@ -46,7 +46,6 @@ static struct option const long_options[] = {
 	{"myaddr", required_argument, NULL, 'y'},
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
-	{"vnodes", required_argument, NULL, 'v'},
 	{"disk-space", required_argument, NULL, 's'},
 	{"enable-cache", required_argument, NULL, 'w'},
 	{"zone", required_argument, NULL, 'z'},
@@ -54,7 +53,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfghl:op:P:v:s:w:y:z:";
+static const char *short_options = "c:dDfghl:op:P:s:w:y:z:";
 
 static void usage(int status)
 {
@@ -76,7 +75,6 @@ Options:\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
   -P, --pidfile           create a pid file\n\
-  -v, --vnodes            specify the number of virtual nodes\n\
   -s, --disk-space        specify the free disk space in megabytes\n\
   -w, --enable-cache      enable object cache and specify the max cache size in megabytes\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
@@ -277,15 +275,6 @@ int main(int argc, char **argv)
 				cache_size);
 			sys->cache_size = cache_size * 1024 * 1024;
 			break;
-		case 'v':
-			nr_vnodes = strtol(optarg, &p, 10);
-			if (optarg == p || nr_vnodes < 0 || SD_MAX_VNODES < nr_vnodes) {
-				fprintf(stderr, "Invalid number of virtual nodes '%s': "
-					"must be an integer between 0 and %u\n",
-					optarg, SD_MAX_VNODES);
-				exit(1);
-			}
-			break;
 		case 's':
 			free_space = strtoll(optarg, &p, 10);
 			if (optarg == p || free_space <= 0 ||
@@ -319,8 +308,10 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
-	if (nr_vnodes == 0)
+	if (nr_vnodes == 0) {
 		sys->gateway_only = 1;
+		sys->disk_space = 0;
+	}
 
 	if (optind != argc)
 		dir = argv[optind];
