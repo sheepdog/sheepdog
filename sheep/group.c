@@ -797,6 +797,10 @@ void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
 			nr_non_gateway_nodes++;
 		}
 	}
+
+	if (!nr_non_gateway_nodes)
+		return;
+
 	avg_size /= nr_non_gateway_nodes;
 
 	for (i = 0; i < nr_nodes; i++) {
