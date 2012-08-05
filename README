@@ -3,17 +3,20 @@ Sheepdog: Distributed Storage System for KVM
 
 Overview
 --------
-Sheepdog is a distributed storage system for KVM/QEMU. It provides
+Sheepdog is a distributed storage system for QEMU. It provides
 highly available block level storage volumes to virtual machines. 
 Sheepdog supports advanced volume management features such as snapshot,
-cloning, and thin provisioning. The architecture of Sheepdog is fully
-symmetric; there is no central node such as a meta-data server.
+cloning, and thin provisioning.
+
 Sheepdog is an Open Source software, released under the terms of the
 GNU General Public License version 2. 
 
 For the latest information about Sheepdog, please visit our website at:
 
    http://www.osrg.net/sheepdog/
+
+And (recommended for new comers) wiki at:
+   https://github.com/collie/sheepdog/wiki/
 
 Requirements
 ------------
@@ -27,8 +30,43 @@ instructions on installing or compiling from source.
 
 Usage
 -----
-* Configure corosync.  Reference the corosync(8) and corosync.conf(5) man page
-  for further details.
+
+* Cluster Management Backends
+
+   Sheepdog uses a cluster management backend to manage membership and broadcast
+   messages to the cluster nodes.
+
+   For now, sheepdog can use local driver (for development on a single box),
+   corosync (the default), zookeeper and Accord.
+
+* Local Driver
+
+   This driver just makes use of UNIX IPC mechanism to manage the membership
+   on a single box, where we start multiple 'sheep' processes to simulate the
+   cluster. It is very easy and fast setup and especially useful to test
+   functionality without involving any other software.
+
+   To set up a 3 node cluster using local driver in one liner bash with debug mode:
+
+      $ mkdir /path/to/store
+      $ for i in 0 1 2; do sheep -c local -d /path/to/store/$i -z $i -p 700$i;sleep 1;done
+
+* Configure corosync.
+
+   Nearly every modern Linux distribution has x86_64 corosync binaries pre-built
+   available via their repositories. We recommend you use these packages if they
+   are available on your distribution.
+
+   For debian package based systems:
+
+      $ sudo aptitude install corosync libcorosync-dev
+
+   For RPM package based systems:
+
+      $ sudo yum install corosynclib-devel
+
+   Reference our wiki, the corosync(8) and corosync.conf(5) man page for further
+   details.
 
 * Setup Sheepdog
    1. Launch sheepdog on each machines of the cluster.
