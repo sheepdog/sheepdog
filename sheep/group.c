@@ -782,7 +782,7 @@ static void prepare_recovery(struct sd_node *joined,
 	}
 
 	if (!current_vnode_info)
-		current_vnode_info = alloc_vnode_info(nodes, nr_nodes);
+		current_vnode_info = alloc_vnode_info(all_nodes, nr_all_nodes);
 }
 
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
