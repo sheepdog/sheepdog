@@ -1,4 +1,4 @@
-.TH SHEEPDOG 8 2012-07-29
+.TH SHEEPDOG 8 2012-08-05
 .SH NAME
 collie \- Command line utility for the sheep daemon
 .SH SYNOPSIS
@@ -127,8 +127,17 @@ This command creates a Sheepdog store.
 .BI "cluster shutdown [-a address] [-p port] [-h]"
 This command stops Sheepdog.
 .TP
-.BI "cluster recover [-a address] [-f] [-p port] [-h]"
-This command starts manual recovery of the cluster.
+.BI "cluster recover info [-a address] [-f] [-p port] [-h]"
+Show the status of recovery to user.
+.TP
+.BI "cluster recover force [-a address] [-f] [-p port] [-h]"
+Force recover cluster immediately.
+.TP
+.BI "cluster recover enable [-a address] [-f] [-p port] [-h]"
+Enable automatic recovery and run once recover if necessary.
+.TP
+.BI "cluster recover disable [-a address] [-f] [-p port] [-h]"
+Disable automatic recovery caused by JOIN events (excluding LEAVE events now).
 .TP
 .BI "cluster cleanup [-a address] [-p port] [-h]"
 This command cleans up unwanted snapshot data after recovery.
