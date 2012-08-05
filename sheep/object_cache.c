@@ -254,8 +254,6 @@ dirty_tree_and_list_insert(struct object_cache *oc, uint32_t idx,
 		else {
 			/* already has this entry, merge bmap */
 			entry->bmap |= bmap;
-			if (create)
-				entry->idx |= CACHE_CREATE_BIT;
 			return entry;
 		}
 	}
