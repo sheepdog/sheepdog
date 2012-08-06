@@ -356,11 +356,16 @@ static notrace void rotate_log(void)
 		rename(log_nowname, old_logfile);
 	}
 	new_fd = open(log_nowname, O_RDWR | O_CREAT | O_APPEND, 0644);
-	if (new_fd < 0)
-		syslog(LOG_ERR, "fail to create new log file\n");
+	if (new_fd < 0) {
+		syslog(LOG_ERR, "failed to create new log file\n");
+		exit(1);
+	}
 
-	dup2(new_fd, la->fd);
-	la->fd = new_fd;
+	if (dup2(new_fd, la->fd) < 0) {
+		syslog(LOG_ERR, "failed to dup2 the log fd\n");
+		exit(1);
+	}
+	close(new_fd);
 }
 
 notrace void log_write(int prio, const char *func, int line, const char *fmt, ...)
