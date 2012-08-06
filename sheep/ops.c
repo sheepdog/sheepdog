@@ -733,6 +733,9 @@ int peer_read_obj(struct request *req)
 	uint32_t epoch = hdr->epoch;
 	struct siocb iocb;
 
+	if (sys->gateway_only)
+		return SD_RES_NO_OBJ;
+
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
