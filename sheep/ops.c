@@ -530,6 +530,9 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 	if (node_in_recovery())
 		return SD_RES_NODE_IN_RECOVERY;
 
+	if (sys->gateway_only)
+		return SD_RES_SUCCESS;
+
 	if (sd_store->cleanup)
 		ret = sd_store->cleanup(&iocb);
 	else
