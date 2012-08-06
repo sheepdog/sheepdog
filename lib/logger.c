@@ -74,6 +74,7 @@ struct logmsg {
 	char *str;
 };
 
+static int log_fd = -1;
 static __thread const char *worker_name;
 static __thread int worker_idx;
 static struct logarea *la;
@@ -172,8 +173,8 @@ static notrace int logarea_init(int size)
 
 static void notrace free_logarea(void)
 {
-	if (la->fd >= 0)
-		close(la->fd);
+	if (log_fd >= 0)
+		close(log_fd);
 	semctl(la->semid, 0, IPC_RMID, la->semarg);
 	shmdt(la->buff);
 	shmdt(la->start);
@@ -208,6 +209,8 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	char *p, buff[MAX_MSG_SIZE];
 	struct logmsg *msg;
 	struct logmsg *lastmsg;
+	time_t t;
+	struct tm *tmp;
 
 	lastmsg = (struct logmsg *)la->tail;
 
@@ -219,28 +222,23 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 
 	p = buff;
 
-	if (la->fd != -1) {
-		time_t t;
-		struct tm *tmp;
 
-		t = time(NULL);
-		tmp = localtime(&t);
+	t = time(NULL);
+	tmp = localtime(&t);
 
-		strftime(p, MAX_MSG_SIZE, "%b %2d %H:%M:%S", tmp);
-		p += strlen(p);
+	strftime(p, MAX_MSG_SIZE, "%b %2d %H:%M:%S", tmp);
+	p += strlen(p);
 
-		if (worker_name && worker_idx)
-			snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s %d] ",
-				 worker_name, worker_idx);
-		else if (worker_name)
-			snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s] ",
-				 worker_name);
-		else
-			strncpy(p, " [main] ", MAX_MSG_SIZE - strlen(buff));
+	if (worker_name && worker_idx)
+		snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s %d] ",
+			 worker_name, worker_idx);
+	else if (worker_name)
+		snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s] ",
+			 worker_name);
+	else
+		strncpy(p, " [main] ", MAX_MSG_SIZE - strlen(buff));
 
-		p += strlen(p);
-	}
-
+	p += strlen(p);
 	snprintf(p, MAX_MSG_SIZE - strlen(buff), "%s(%d) ", func, line);
 
 	p += strlen(p);
@@ -322,8 +320,8 @@ static notrace void log_syslog(void *buff)
 {
 	struct logmsg * msg = (struct logmsg *)buff;
 
-	if (la->fd >= 0)
-		xwrite(la->fd, (char *)&msg->str, strlen((char *)&msg->str));
+	if (log_fd >= 0)
+		xwrite(log_fd, (char *)&msg->str, strlen((char *)&msg->str));
 	else
 		syslog(msg->prio, "%s", (char *)&msg->str);
 }
@@ -388,7 +386,7 @@ static notrace void rotate_log(void)
 		exit(1);
 	}
 
-	if (dup2(new_fd, la->fd) < 0) {
+	if (dup2(new_fd, log_fd) < 0) {
 		syslog(LOG_ERR, "failed to dup2 the log fd\n");
 		exit(1);
 	}
@@ -472,25 +470,10 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 		struct sigaction sa_new;
 		int fd;
 
-		if (outfile) {
-			fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
-			if (fd < 0) {
-				syslog(LOG_ERR, "failed to open %s\n", outfile);
-				return 1;
-			}
-		} else {
-			fd = -1;
-			openlog(log_name, LOG_CONS | LOG_PID, LOG_DAEMON);
-			setlogmask (LOG_UPTO (LOG_DEBUG));
-		}
-
 		if (logarea_init(size)) {
 			syslog(LOG_ERR, "failed to initialize the logger\n");
 			return 1;
 		}
-
-		la->active = 1;
-		la->fd = fd;
 
 		/*
 		 * Store the pid of the sheep process for use by the death
@@ -508,6 +491,13 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 			syslog(LOG_WARNING, "logger pid %d starting\n", logger_pid);
 			return 0;
 		}
+
+		log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
+		if (log_fd < 0) {
+			syslog(LOG_ERR, "failed to open %s\n", outfile);
+			exit(1);
+		}
+		la->active = 1;
 
 		fd = open("/dev/null", O_RDWR);
 		if (fd < 0) {
@@ -539,7 +529,7 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 
 			if (max_logsize) {
 				pthread_mutex_lock(&logsize_lock);
-				offset = lseek(la->fd, 0, SEEK_END);
+				offset = lseek(log_fd, 0, SEEK_END);
 				if (offset < 0) {
 					syslog(LOG_ERR, "sheep log error\n");
 				} else {
