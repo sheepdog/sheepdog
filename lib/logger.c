@@ -448,11 +448,71 @@ static notrace void crash_handler(int signo)
 	exit(1);
 }
 
+static notrace void logger(char *log_dir, char *outfile)
+{
+	struct sigaction sa_old;
+	struct sigaction sa_new;
+	int fd;
+
+	log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
+	if (log_fd < 0) {
+		syslog(LOG_ERR, "failed to open %s\n", outfile);
+		exit(1);
+	}
+	la->active = 1;
+
+	fd = open("/dev/null", O_RDWR);
+	if (fd < 0) {
+		syslog(LOG_ERR, "failed to open /dev/null: %m\n");
+		exit(1);
+	}
+
+	dup2(fd, 0);
+	dup2(fd, 1);
+	dup2(fd, 2);
+	setsid();
+	if (chdir(log_dir) < 0) {
+		syslog(LOG_ERR, "failed to chdir to %s: %m\n", log_dir);
+		exit(1);
+	}
+
+	/* flush when either the logger or its parent dies */
+	sa_new.sa_handler = crash_handler;
+	sa_new.sa_flags = 0;
+	sigemptyset(&sa_new.sa_mask);
+
+	sigaction(SIGSEGV, &sa_new, &sa_old);
+	sigaction(SIGHUP, &sa_new, &sa_old);
+
+	prctl(PR_SET_PDEATHSIG, SIGHUP);
+
+	while (la->active) {
+		log_flush();
+
+		if (max_logsize) {
+			off_t offset;
+
+			pthread_mutex_lock(&logsize_lock);
+			offset = lseek(log_fd, 0, SEEK_END);
+			if (offset < 0) {
+				syslog(LOG_ERR, "sheep log error\n");
+			} else {
+				size_t log_size = (size_t)offset;
+				if (log_size >= max_logsize)
+					rotate_log();
+			}
+			pthread_mutex_unlock(&logsize_lock);
+		}
+
+		sleep(1);
+	}
+
+	exit(0);
+}
+
 notrace int log_init(char *program_name, int size, int to_stdout, int level,
 		char *outfile)
 {
-	off_t offset;
-	size_t log_size;
 	char log_dir[PATH_MAX];
 
 	log_level = level;
@@ -466,10 +526,6 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 	semkey = random();
 
 	if (!to_stdout) {
-		struct sigaction sa_old;
-		struct sigaction sa_new;
-		int fd;
-
 		if (logarea_init(size)) {
 			syslog(LOG_ERR, "failed to initialize the logger\n");
 			return 1;
@@ -482,68 +538,16 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 		 * and getppid() will always return 1.
 		 */
 		sheep_pid = getpid();
-
 		logger_pid = fork();
 		if (logger_pid < 0) {
 			syslog(LOG_ERR, "failed to fork the logger process: %m\n");
 			return 1;
-		} else if (logger_pid) {
+		}
+
+		if (logger_pid)
 			syslog(LOG_WARNING, "logger pid %d starting\n", logger_pid);
-			return 0;
-		}
-
-		log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
-		if (log_fd < 0) {
-			syslog(LOG_ERR, "failed to open %s\n", outfile);
-			exit(1);
-		}
-		la->active = 1;
-
-		fd = open("/dev/null", O_RDWR);
-		if (fd < 0) {
-			syslog(LOG_ERR, "failed to open /dev/null: %m\n");
-			exit(1);
-		}
-
-		dup2(fd, 0);
-		dup2(fd, 1);
-		dup2(fd, 2);
-		setsid();
-		if (chdir(log_dir) < 0) {
-			syslog(LOG_ERR, "failed to chdir to %s: %m\n", log_dir);
-			exit(1);
-		}
-
-		/* flush when either the logger or its parent dies */
-		sa_new.sa_handler = crash_handler;
-		sa_new.sa_flags = 0;
-		sigemptyset(&sa_new.sa_mask);
-
-		sigaction(SIGSEGV, &sa_new, &sa_old);
-		sigaction(SIGHUP, &sa_new, &sa_old);
-
-		prctl(PR_SET_PDEATHSIG, SIGHUP);
-
-		while (la->active) {
-			log_flush();
-
-			if (max_logsize) {
-				pthread_mutex_lock(&logsize_lock);
-				offset = lseek(log_fd, 0, SEEK_END);
-				if (offset < 0) {
-					syslog(LOG_ERR, "sheep log error\n");
-				} else {
-					log_size = (size_t)offset;
-					if (log_size >= max_logsize)
-						rotate_log();
-				}
-				pthread_mutex_unlock(&logsize_lock);
-			}
-
-			sleep(1);
-		}
-
-		exit(0);
+		else
+			logger(log_dir, outfile);
 	}
 
 	return 0;
