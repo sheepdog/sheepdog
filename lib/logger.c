@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/sem.h>
 #include <pthread.h>
 #include <libgen.h>
 
@@ -46,6 +47,32 @@ static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 		       va_list ap) __attribute__ ((format (printf, 4, 0)));
 static void dolog(int prio, const char *func, int line, const char *fmt,
 		  va_list ap) __attribute__ ((format (printf, 4, 0)));
+
+union semun {
+	int val;
+	struct semid_ds *buf;
+	unsigned short int *array;
+	struct seminfo *__buf;
+};
+
+struct logarea {
+	int empty;
+	int active;
+	void *head;
+	void *tail;
+	void *start;
+	void *end;
+	char *buff;
+	int semid;
+	union semun semarg;
+	int fd;
+};
+
+struct logmsg {
+	short int prio;
+	void *next;
+	char *str;
+};
 
 static __thread const char *worker_name;
 static __thread int worker_idx;

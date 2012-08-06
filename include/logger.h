@@ -14,37 +14,10 @@
 #ifndef LOGGER_H
 #define LOGGER_H
 
-#include <sys/sem.h>
 #include <sys/syslog.h>
-
-union semun {
-	int val;
-	struct semid_ds *buf;
-	unsigned short int *array;
-	struct seminfo *__buf;
-};
 
 #define LOG_SPACE_SIZE 1048576
 #define MAX_MSG_SIZE 256
-
-struct logmsg {
-	short int prio;
-	void *next;
-	char *str;
-};
-
-struct logarea {
-	int empty;
-	int active;
-	void *head;
-	void *tail;
-	void *start;
-	void *end;
-	char *buff;
-	int semid;
-	union semun semarg;
-	int fd;
-};
 
 extern int log_init(char *progname, int size, int to_stdout, int level,
 		char *outfile);
