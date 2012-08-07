@@ -30,7 +30,6 @@ AM_INIT_AUTOMAKE([-Wno-portability])
 
 AC_CONFIG_SRCDIR([collie/collie.c])
 AC_CONFIG_HEADER([include/config.h])
-AC_CONFIG_TESTDIR([tests])
 
 AC_CANONICAL_HOST
 
@@ -134,8 +133,7 @@ AC_CONFIG_FILES([Makefile
 		include/Makefile
 		script/Makefile
 		lib/Makefile
-		man/Makefile
-		tests/Makefile])
+		man/Makefile])
 
 ### Local business
 
