@@ -169,7 +169,9 @@ out:
 
 static inline int trunk_entry_no_sha1(struct trunk_entry_incore *entry)
 {
-	return !strlen((char *)entry->raw.sha1);
+	unsigned char empty[SHA1_LEN] = {0};
+
+	return memcmp(entry->raw.sha1, empty, SHA1_LEN) == 0;
 }
 
 static inline void put_entry(struct trunk_entry_incore *entry)
