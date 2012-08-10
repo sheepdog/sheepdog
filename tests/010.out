@@ -1,0 +1,5 @@
+QA output created by 010
+using backend farm store
+*Note*: Only disable the recovery caused by JOIN envets
+Cluster recovery: disable
+Formatting 'sheepdog:test', fmt=raw size=4294967296 

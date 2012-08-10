@@ -1,0 +1,4 @@
+QA output created by 008
+using backend farm store
+begin kill
+wait for object recovery to finish

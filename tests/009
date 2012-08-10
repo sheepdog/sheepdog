@@ -1,16 +1,17 @@
 #!/bin/bash
 
-set -ex
+seq=`basename $0`
+echo "QA output created by $seq"
 
-DRIVER=${DRIVER:-local}
-STORE=${STORE:-/tmp/sheepdog}
-SHEEP=${SHEEP:-./sheep/sheep}
-COLLIE=${COLLIE:-./collie/collie}
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
 
-killall -9 sheep collie || true
-sleep 1
-rm -r $STORE/* || true
-mkdir -p $STORE
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
 
 # start three sheep daemons
 for i in 0 1 2; do
@@ -37,5 +38,8 @@ sleep 10
 
 # show md5sum of the vdi on each node
 for i in 0 1 2; do
-    $COLLIE vdi read test -p 700$i | md5sum
+    $COLLIE vdi read test -p 700$i | md5sum > /tmp/csum.$i
 done
+
+diff -u /tmp/csum.0 /tmp/csum.1
+diff -u /tmp/csum.0 /tmp/csum.2

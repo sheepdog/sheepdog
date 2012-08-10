@@ -1,0 +1,28 @@
+QA output created by 015
+using backend farm store
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+there should be 3 setattr errors
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+there should be 8 setattr errors
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+there should be 6 setattr errors
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+The attribute 'lock' already exists
+there should be 5 setattr errors

@@ -1,0 +1,135 @@
+#!/bin/bash
+#
+# Copyright (C) 2009 Red Hat, Inc.
+# Copyright (c) 2000-2006 Silicon Graphics, Inc.  All Rights Reserved.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+# we need common.config
+if [ "$iam" != "check" ]
+then
+    if ! . ./common.config
+        then
+        echo "$iam: failed to source common.config"
+        exit 1
+    fi
+fi
+
+# make sure we have a standard umask
+umask 022
+
+# Do a command, log it to $seq.full, optionally test return status
+# and die if command fails. If called with one argument _do executes the
+# command, logs it, and returns its exit status. With two arguments _do
+# first prints the message passed in the first argument, and then "done"
+# or "fail" depending on the return status of the command passed in the
+# second argument. If the command fails and the variable _do_die_on_error
+# is set to "always" or the two argument form is used and _do_die_on_error
+# is set to "message_only" _do will print an error message to
+# $seq.out and exit.
+
+_do()
+{
+    if [ $# -eq 1 ]; then
+	_cmd=$1
+    elif [ $# -eq 2 ]; then
+	_note=$1
+	_cmd=$2
+	echo -n "$_note... "
+    else
+	echo "Usage: _do [note] cmd" 1>&2
+	status=1; exit
+    fi
+
+    (eval "echo '---' \"$_cmd\"") >>$here/$seq.full
+    (eval "$_cmd") >$tmp._out 2>&1; ret=$?
+    cat $tmp._out >>$here/$seq.full
+    if [ $# -eq 2 ]; then
+	if [ $ret -eq 0 ]; then
+	    echo "done"
+	else
+	    echo "fail"
+	fi
+    fi
+    if [ $ret -ne 0  ] \
+	&& [ "$_do_die_on_error" = "always" \
+	    -o \( $# -eq 2 -a "$_do_die_on_error" = "message_only" \) ]
+    then
+	[ $# -ne 2 ] && echo
+	eval "echo \"$_cmd\" failed \(returned $ret\): see $seq.full"
+	status=1; exit
+    fi
+
+    return $ret
+}
+
+# bail out, setting up .notrun file
+#
+_notrun()
+{
+    echo "$*" >$seq.notrun
+    echo "$seq not run: $*"
+    status=0
+    exit
+}
+
+# just plain bail out
+#
+_fail()
+{
+    echo "$*" | tee -a $here/$seq.full
+    echo "(see $seq.full for details)"
+    status=1
+    exit 1
+}
+
+# this test requires that a specified command (executable) exists
+#
+_require_command()
+{
+    [ -n "`which $1`" ] || _notrun "$1 utility required, skipped this test"
+    [ -x "`which $1`" ] || _notrun "$1 utility required, skipped this test"
+}
+
+_full_platform_details()
+{
+    os=`uname -s`
+    host=`hostname -s`
+    kernel=`uname -r`
+    platform=`uname -m`
+    echo "$os/$platform $host $kernel"
+}
+
+_die()
+{
+    echo $@
+    exit 1
+}
+
+_cleanup()
+{
+    killall -9 sheep collie >/dev/null 2>&1 || true
+    sleep 1
+    mkdir -p $STORE
+    for i in $STORE/?; do
+        rm -rf $i
+    done
+    for i in $STORE/??; do
+        rm -rf $i
+    done
+}
+
+# make sure this script returns success
+/bin/true

@@ -1,16 +1,18 @@
 #!/bin/bash
 
-set -ex
+seq=`basename $0`
+echo "QA output created by $seq"
 
-DRIVER=${DRIVER:-local}
-STORE=${STORE:-/tmp/sheepdog}
-SHEEP=${SHEEP:-./sheep/sheep}
-COLLIE=${COLLIE:-./collie/collie}
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
 
-killall -9 sheep collie || true
-sleep 1
-rm -r $STORE/* || true
-mkdir -p $STORE
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
 
 # create a node who has wrong epoch
 $SHEEP $STORE/1 -p 7001 -z 1 -c $DRIVER
@@ -31,8 +33,8 @@ for i in `seq 0 5`; do
 
     if [ "`$COLLIE node list -p 7002 -r | wc -l`" -ne 2 ]; then
 	echo "test failed"
-	$COLLIE cluster info -p 7000
-	$COLLIE cluster info -p 7002
+	$COLLIE cluster info -p 7000 | _filter_cluster_info
+	$COLLIE cluster info -p 7002 | _filter_cluster_info
 	exit 1
     fi
 

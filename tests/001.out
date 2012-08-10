@@ -1,0 +1,46 @@
+QA output created by 001
+using backend farm store
+check whether Sheepdog is running with only one node
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      4 [127.0.0.1:7002]
+DATE      3 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 []
+DATE      1 []
+check whether all nodes have the same cluster info
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      6 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      5 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7002]
+DATE      3 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7001]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      6 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      5 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7002]
+DATE      3 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7001]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      6 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      5 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7002]
+DATE      3 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7001]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]

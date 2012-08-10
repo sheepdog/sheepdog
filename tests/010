@@ -1,19 +1,23 @@
 #!/bin/bash
 
-set -ex
+seq=`basename $0`
+echo "QA output created by $seq"
 
-DRIVER=${DRIVER:-local}
-STORE=${STORE:-/tmp/sheepdog}
-SHEEP=${SHEEP:-./sheep/sheep}
-COLLIE=${COLLIE:-./collie/collie}
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
 
-killall -9 sheep collie || true
-sleep 1
-rm -r $STORE/* || true
-mkdir -p $STORE
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
 
 $SHEEP $STORE/0 -z 0 -p 7000 -c $DRIVER
 $SHEEP $STORE/1 -z 1 -p 7001 -c $DRIVER
+
+sleep 2
+
 $COLLIE cluster format -c 2
 $COLLIE cluster recover disable
 

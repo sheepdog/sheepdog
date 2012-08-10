@@ -1,0 +1,35 @@
+#!/bin/bash
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+    $SHEEP $STORE/$i -p 700$i -z $i -c $DRIVER
+done
+
+sleep 1
+
+$COLLIE cluster format -c 1
+
+qemu-img create sheepdog:test 4G
+qemu-img snapshot -c tag1 sheepdog:test
+qemu-img snapshot -c tag2 sheepdog:test
+qemu-img snapshot -c tag3 sheepdog:test
+
+qemu-img create sheepdog:test2 4G
+qemu-img snapshot -c tag1 sheepdog:test2
+qemu-img snapshot -c tag2 sheepdog:test2
+qemu-io -c "write 0 512" sheepdog:test2:1 | _filter_qemu_io
+qemu-img snapshot -c tag3 sheepdog:test2
+
+$COLLIE vdi tree | _filter_short_date

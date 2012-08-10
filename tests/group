@@ -1,0 +1,31 @@
+#
+# QA groups control file
+#
+# Defines test groups
+# - do not start group names with a digit
+# - test-group association are one line per test
+# - each test can be part of multiple groups
+#
+# auto:		tests that are run by defaul
+# quick:	test that take less than 30 seconds (normally)
+# cluster:	cluster drivers tests: join/leave/etc
+# store:	basic data integrity
+# vdi:		qemu I/O, snapshots, volume creation and deletion
+#
+001 auto quick cluster
+002 auto quick cluster
+003 auto quick cluster
+004 auto quick cluster
+005 auto quick cluster
+006 auto quick cluster
+007 auto quick cluster
+008 auto store
+009 auto quick store
+010 auto quick store
+011 auto quick store
+012 auto quick store
+013 auto quick vdi
+014 auto quick vdi
+015 auto quick vdi
+016 auto quick vdi
+017 auto quick vdi
