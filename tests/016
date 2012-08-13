@@ -14,7 +14,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in 0 1 2; do
-    $SHEEP $STORE/$i -p 700$i -z $i -c $DRIVER
+    $SHEEP $STORE/$i -s 4096 -p 700$i -z $i -c $DRIVER
 done
 
 sleep 1;
