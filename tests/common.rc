@@ -131,5 +131,17 @@ _cleanup()
     done
 }
 
+# wait collie command to execute to completion
+_wait_for_collie()
+{
+    for ((;;)); do
+        if [ "$(pgrep collie)" ]; then
+            sleep 1
+        else
+            break
+        fi
+    done
+}
+
 # make sure this script returns success
 /bin/true

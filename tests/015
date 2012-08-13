@@ -25,7 +25,7 @@ $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
-$COLLIE vdi write test 512 512 < /dev/zero
+_wait_for_collie
 echo "there should be 3 setattr errors"
 
 $COLLIE vdi setattr test lock 1 -x &
@@ -36,7 +36,7 @@ $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
-$COLLIE vdi write test 512 512 < /dev/zero
+_wait_for_collie
 echo "there should be 8 setattr errors"
 
 $COLLIE vdi setattr test lock 1 -x &
@@ -45,7 +45,7 @@ $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
-$COLLIE vdi write test 512 512 < /dev/zero
+_wait_for_collie
 echo "there should be 6 setattr errors"
 
 $COLLIE vdi setattr test lock 1 -x &
@@ -53,5 +53,5 @@ $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &
-$COLLIE vdi write test 512 512 < /dev/zero
+_wait_for_collie
 echo "there should be 5 setattr errors"
