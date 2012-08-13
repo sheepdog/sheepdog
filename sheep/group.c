@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <sys/epoll.h>
 #include <urcu/uatomic.h>
+#include <math.h>
 
 #include "sheepdog_proto.h"
 #include "sheep_priv.h"
@@ -805,7 +806,7 @@ void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
 
 	for (i = 0; i < nr_nodes; i++) {
 		factor = (float)nodes[i].space / (float)avg_size;
-		nodes[i].nr_vnodes = SD_DEFAULT_VNODES * factor;
+		nodes[i].nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
 		dprintf("node %d has %d vnodes, free space %" PRIu64 "\n",
 			nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
 	}
