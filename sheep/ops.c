@@ -63,7 +63,6 @@ struct sd_op_template {
 
 static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
 {
-	struct statvfs vs;
 	int ret;
 	DIR *dir;
 	struct dirent *d;
@@ -71,12 +70,6 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch
 	struct stat s;
 	char path[1024];
 	struct strbuf store_dir = STRBUF_INIT;
-
-	ret = statvfs(mnt_path, &vs);
-	if (ret) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
 
 	strbuf_addf(&store_dir, "%s", obj_path);
 	dir = opendir(store_dir.buf);
@@ -101,8 +94,8 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch
 	closedir(dir);
 	ret = SD_RES_SUCCESS;
 
-	*store_size = (uint64_t)vs.f_frsize * vs.f_bfree + used;
-	*store_free = (uint64_t)vs.f_frsize * vs.f_bfree;
+	*store_size = sys->disk_space;
+	*store_free = sys->disk_space - used;
 out:
 	strbuf_release(&store_dir);
 	return ret;

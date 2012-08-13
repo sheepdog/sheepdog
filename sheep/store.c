@@ -449,7 +449,7 @@ static int init_disk_space(const char *base_path)
 {
 	int ret = SD_RES_SUCCESS;
 	uint64_t space_size = 0;
-	struct statfs sf;
+	struct statvfs fs;
 
 	if (sys->gateway_only)
 		goto out;
@@ -465,17 +465,17 @@ static int init_disk_space(const char *base_path)
 		goto out;
 	}
 
-	ret = statfs(base_path, &sf);
+	ret = statvfs(base_path, &fs);
 	if (ret < 0) {
 		dprintf("get disk space failed %m\n");
 		ret = SD_RES_EIO;
 		goto out;
 	}
 
-	sys->disk_space = sf.f_bfree * 4 / 1024;
+	sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bfree;
 	ret = set_cluster_space(sys->disk_space);
 out:
-	dprintf("disk free space is %" PRIu64 "M\n", sys->disk_space);
+	dprintf("disk free space is %" PRIu64 "\n", sys->disk_space);
 	return ret;
 }
 

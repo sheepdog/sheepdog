@@ -294,7 +294,7 @@ int main(int argc, char **argv)
 					optarg, UINT64_MAX);
 				exit(1);
 			}
-			sys->disk_space = free_space;
+			sys->disk_space = free_space * 1024 * 1024;
 			break;
 		case 'c':
 			sys->cdrv = find_cdrv(optarg);
