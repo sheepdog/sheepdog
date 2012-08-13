@@ -17,12 +17,7 @@ for i in `seq 0 7`; do
     $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
 done
 
-while true; do
-    sleep 2
-    if [ $($COLLIE node list | wc -l) -eq 9 ]; then
-	break
-    fi
-done
+_wait_for_sheep "8"
 
 $COLLIE cluster format -c 3
 sleep 1
