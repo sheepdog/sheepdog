@@ -15,6 +15,7 @@
 *.d
 *.orig
 *.rej
+cscope.*
 
 #
 # for GLOBAL
@@ -29,7 +30,7 @@ GSYMS
 #
 collie/collie
 sheep/sheep
-
+sheepfs/sheepfs
 
 # directories
 .deps
@@ -53,3 +54,8 @@ libtool
 ltmain.sh
 config.h
 config.h.in
+script/generic
+
+tests/check.log
+tests/check.time
+tests/atconfig
