@@ -23,6 +23,7 @@ struct vdi_cmd_data {
 	int exclusive;
 	int delete;
 	int prealloc;
+	int cache;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -1248,6 +1249,9 @@ static int vdi_write(int argc, char **argv)
 			flags = SD_FLAG_CMD_COW;
 		}
 
+		if (vdi_cmd_data.cache)
+			flags |= SD_FLAG_CMD_CACHE;
+
 		remain = len;
 		while (remain > 0) {
 			ret = read(STDIN_FILENO, buf + (len - remain), remain);
@@ -1281,7 +1285,8 @@ static int vdi_write(int argc, char **argv)
 
 		if (create) {
 			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
-					      SD_INODE_HEADER_SIZE + sizeof(vid) * idx, 0,
+					      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
+					      flags & ~SD_FLAG_CMD_COW,
 					      inode->nr_copies, 0);
 			if (ret) {
 				ret = EXIT_FAILURE;
@@ -1505,7 +1510,7 @@ static struct subcommand vdi_cmd[] = {
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_resize},
 	{"read", "<vdiname> [<offset> [<len>]]", "saph", "read data from an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_read},
-	{"write", "<vdiname> [<offset> [<len>]]", "aph", "write data to an image",
+	{"write", "<vdiname> [<offset> [<len>]]", "apCh", "write data to an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_write},
 	{NULL,},
 };
@@ -1538,6 +1543,9 @@ static int vdi_parser(int ch, char *opt)
 		break;
 	case 'd':
 		vdi_cmd_data.delete = 1;
+		break;
+	case 'C':
+		vdi_cmd_data.cache = 1;
 		break;
 	}
 

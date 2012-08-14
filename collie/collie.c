@@ -38,6 +38,7 @@ static const struct sd_option collie_options[] = {
 	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
 	{'x', "exclusive", 0, "write in an exclusive mode"},
 	{'d', "delete", 0, "delete a key"},
+	{'C', "cache", 0, "enable object cache"},
 
 	/* cluster options */
 	{'b', "store", 1, "specify backend store"},
