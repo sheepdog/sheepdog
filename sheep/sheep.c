@@ -280,7 +280,7 @@ int main(int argc, char **argv)
 			    strcmp(object_cache_mode, "writeback") != 0) {
 				sys->writethrough = 1;
 			}
-			vprintf(SDOG_INFO, "enable write cache, "
+			fprintf(stdout, "enable write cache, "
 				"max cache size %" PRIu64 "M, %s mode\n",
 				cache_size, sys->writethrough ?
 				"writethrough" : "writeback");

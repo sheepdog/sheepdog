@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Test object cache writeback mode
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    $SHEEP $STORE/$i -w 100,writeback -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "3"
+
+$COLLIE cluster format -c 2
+
+$COLLIE vdi create test 4M
+
+dd if=/dev/urandom | $COLLIE vdi write -C test
+
+$COLLIE vdi flush test
+
+for port in `seq 0 2`; do
+    $COLLIE vdi read test -p 700$port | md5sum > /tmp/csum.$port
+done
+
+for port in `seq 1 2`; do
+    diff -u /tmp/csum.0 /tmp/csum.$port
+done

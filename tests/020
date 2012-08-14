@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Test object cache reclaim
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    $SHEEP $STORE/$i -d -w 20 -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "3"
+
+$COLLIE cluster format -c 2
+
+$COLLIE vdi create test 40M
+
+dd if=/dev/urandom | $COLLIE vdi write -C test
+
+# check cache size, should be 20 * 80%
+nr=`ls /tmp/sheepdog/0/cache/7c2b25 | wc -l`
+if [ $nr -gt 4 ]; then
+    echo "reclaim failed"
+fi
