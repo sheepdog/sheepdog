@@ -1,0 +1,10 @@
+Running tests:
+    - cd tests
+    - For now, we need sudo or root privilege to run the test
+    - By default, ./check will run all the tests
+    - You can run selected tests: ./check 001 002 003
+    - You can run a range of tests: ./check 003-009
+    - Groups of tests maybe ran by: ./check -g [group(s)]
+      See the 'group' file for details on groups
+      For e.g, './check -g quick' run tests grouped as 'quick'
+    - To randomize test order: ./check -r [test(s)]
