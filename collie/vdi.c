@@ -1481,6 +1481,32 @@ out:
 	return ret;
 }
 
+static int vdi_flush(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	struct sd_req hdr;
+	uint32_t vid;
+	int ret = EXIT_SUCCESS;
+
+	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	sd_init_req(&hdr, SD_OP_FLUSH_VDI);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
+		return EXIT_FAILURE;
+	}
+out:
+	return ret;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_check},
@@ -1512,6 +1538,8 @@ static struct subcommand vdi_cmd[] = {
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_read},
 	{"write", "<vdiname> [<offset> [<len>]]", "apCh", "write data to an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_write},
+	{"flush", "<vdiname>", "aph", "flush data to cluster",
+	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_flush},
 	{NULL,},
 };
 

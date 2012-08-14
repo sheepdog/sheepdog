@@ -1124,8 +1124,10 @@ int object_cache_flush_vdi(struct request *req)
 	struct object_cache *cache;
 
 	cache = find_object_cache(vid, 0);
-	if (!cache)
+	if (!cache) {
+		dprintf("%"PRIX32" not found\n", vid);
 		return SD_RES_SUCCESS;
+	}
 
 	return object_cache_push(cache);
 }
