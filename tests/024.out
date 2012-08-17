@@ -1,0 +1,15 @@
+QA output created by 024
+starting first sheep
+formatting cluster
+using backend farm store
+creating vdi 
+filling test with data
+wrote 314572800/314572800 bytes at offset 0
+300 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
+reading back test
+read 1048576/1048576 bytes at offset 0
+1 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
+starting second sheep
+reading data from second sheep
+read 314572800/314572800 bytes at offset 0
+300 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
