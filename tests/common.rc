@@ -143,12 +143,17 @@ _wait_for_collie()
     done
 }
 
-# wait all sheep to join completely
+# wait for all sheep to join completely
 _wait_for_sheep()
 {
     while true; do
-        sleep 2
-        if [ $($COLLIE node list | wc -l) -eq $(($1+1)) ]; then
+        sleep 1
+        nr_sheep="$($COLLIE node list | wc -l)"
+        if [ ${nr_sheep} -eq $(($1+1)) ]; then
+            break
+        fi
+        if [ ${nr_sheep} -gt $(($1+1)) ]; then
+            echo "ERROR: too many sheep in cluster: ${nr_sheep}"
             break
         fi
     done
