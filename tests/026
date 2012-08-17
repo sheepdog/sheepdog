@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Test vdi create operation during node changes
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 7`; do
+    $SHEEP $STORE/$i -d -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "8"
+
+$COLLIE cluster format
+
+# create new vdis
+(
+for i in `seq 0 40`;do
+    $COLLIE vdi create test$i 4M
+done
+) &
+
+# kill nodes and join them back
+sleep 1
+for i in `seq 1 5`; do pkill -f "sheep $STORE/$i";done
+sleep 10
+for i in `seq 1 5`; do
+    $SHEEP $STORE/$i -d -w 20 -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_collie
+
+# wait vdi create to completion
+while true; do
+    nr1=`$COLLIE vdi list | wc -l`
+    sleep 1
+    nr2=`$COLLIE vdi list | wc -l`
+    if [ $nr1 -eq $nr2 ]; then
+         break;
+    fi
+done
+
+echo $nr1
