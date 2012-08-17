@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Test that format still works in a cluster that has only gateways
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    $SHEEP $STORE/$i -d -g -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "3"
+
+$COLLIE cluster format -c 3
