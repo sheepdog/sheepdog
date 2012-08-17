@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Test that writing to a cluster that only has gateways fails
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    $SHEEP $STORE/$i -d -g -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "3"
+
+$COLLIE cluster format -c 3
+
+echo "creating a VDI should fail without data nodes available"
+$COLLIE vdi create test 100M
+
+status=0
