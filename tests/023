@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Reproduce a joinstorm just after format
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 0`; do
+    $SHEEP $STORE/$i -d -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "1"
+
+$COLLIE cluster format -c 1
+
+for i in `seq 1 9`; do
+    $SHEEP $STORE/$i -d -g -z $i -p 700$i -c $DRIVER
+done
+
+_wait_for_sheep "10"
+
+
+echo "comparing cluster info for all sheep.  Should be the same"
+for i in `seq 0 10`; do
+    $COLLIE cluster info > /tmp/cinfo.$i
+done
+for i in `seq 1 10`; do
+    diff -u /tmp/cinfo.0 /tmp/cinfo.$i
+done
