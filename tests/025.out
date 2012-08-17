@@ -1,0 +1,42 @@
+QA output created by 025
+starting two sheep in the first zone
+starting a sheep in the second zone
+formatting cluster
+using backend farm store
+creating vdi 
+filling test with data
+wrote 20971520/20971520 bytes at offset 0
+20 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
+reading back test from second zone
+read 1048576/1048576 bytes at offset 0
+1 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
+starting a sheep in the third zone
+check that all sheep are alive
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
