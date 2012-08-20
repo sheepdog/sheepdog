@@ -16,7 +16,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in `seq 0 0`; do
-    $SHEEP $STORE/$i -d -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 
 _wait_for_sheep "1"
@@ -24,7 +24,7 @@ _wait_for_sheep "1"
 $COLLIE cluster format -c 1
 
 for i in `seq 1 9`; do
-    $SHEEP $STORE/$i -d -g -z $i -p 700$i -c $DRIVER
+    _start_sheep $i "-g"
 done
 
 _wait_for_sheep "10"

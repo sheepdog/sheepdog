@@ -33,7 +33,7 @@ for i in 0 1 2; do
     mkfs.xfs -f $STORE/$i.img > $seq.full
     mkdir $STORE/$i
     mount -o loop $STORE/$i.img $STORE/$i
-    $SHEEP $STORE/$i/ -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 
 sleep 1

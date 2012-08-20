@@ -14,7 +14,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in `seq 0 7`; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 
 _wait_for_sheep "8"
@@ -34,12 +34,12 @@ sleep 3
 
 echo begin kill
 for i in `seq 1 5`; do
-    pkill -f "$SHEEP $STORE/$i -z $i -p 700$i"
+    _kill_sheep $i
     sleep 3
 done
 
 for i in `seq 1 5`; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 
 echo wait for object recovery to finish

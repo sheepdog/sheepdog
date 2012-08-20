@@ -159,5 +159,15 @@ _wait_for_sheep()
     done
 }
 
+_start_sheep()
+{
+    $SHEEP $STORE/$1 -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2
+}
+
+_kill_sheep()
+{
+    pkill -f "$SHEEP $STORE/$1"
+}
+
 # make sure this script returns success
 /bin/true

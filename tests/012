@@ -14,11 +14,11 @@ status=1        # failure is the default!
 _cleanup
 
 for i in 0 1 2; do
-    $SHEEP $STORE/$i/ -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 
 # add gateway node
-$SHEEP $STORE/4/ -z 4 -p 7004 -c $DRIVER -g
+_start_sheep 4 "-g"
 
 sleep 1
 

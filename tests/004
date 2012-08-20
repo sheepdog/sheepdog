@@ -14,7 +14,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in 0 1; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 
@@ -23,21 +23,21 @@ $COLLIE cluster format -c 2
 
 for i in 2 3 4; do
     # add one node after killing existing one node
-    pkill -f "sheep $STORE/$((i - 2))"
+    _kill_sheep $((i - 2))
     sleep 1
 
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 
 # kill all existing nodes
 for i in 3 4; do
-    pkill -f "sheep $STORE/$i"
+    _kill_sheep $i
     sleep 1
 done
 
 for i in 0 1 2 3 4; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 
@@ -46,7 +46,7 @@ $COLLIE cluster info -p 7004 | _filter_cluster_info
 
 # add the other nodes
 for i in 0 1 2 3; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 

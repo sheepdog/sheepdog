@@ -14,7 +14,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in 0 1 2; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 
@@ -23,13 +23,13 @@ $COLLIE cluster format
 
 # kill all sheeps
 for i in 0 1 2; do
-    pkill -f "sheep $STORE/$i"
+    _kill_sheep $i
     sleep 1
 done
 
 # master transfer will happen twice
 for i in 0 1 2; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 
@@ -38,7 +38,7 @@ $COLLIE cluster info -p 7002 | _filter_cluster_info
 
 # add the other nodes
 for i in 0 1; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
     sleep 1
 done
 

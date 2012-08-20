@@ -16,7 +16,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in `seq 0 2`; do
-    $SHEEP $STORE/$i -w 100 -z $i -p 700$i -c $DRIVER
+    _start_sheep $i "-w 100"
 done
 
 _wait_for_sheep "3"

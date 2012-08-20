@@ -20,7 +20,7 @@ VDI_SIZE="300M"
 
 echo "starting first sheep"
 for i in `seq 0 0`; do
-    $SHEEP $STORE/$i -d -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 _wait_for_sheep "1"
 
@@ -38,7 +38,7 @@ qemu-io -c "read 0 1m" sheepdog:${VDI_NAME} | _filter_qemu_io
 
 echo "starting second sheep"
 for i in `seq 1 1`; do
-    $SHEEP $STORE/$i -d -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 _wait_for_sheep "2"
 

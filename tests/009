@@ -15,7 +15,7 @@ _cleanup
 
 # start three sheep daemons
 for i in 0 1 2; do
-    $SHEEP $STORE/$i -z $i -p 700$i -c $DRIVER
+    _start_sheep $i
 done
 
 sleep 1
@@ -25,13 +25,13 @@ $COLLIE cluster format -c 2
 $COLLIE vdi create test 80M -P
 
 # stop the 3rd node
-pkill -f "$SHEEP $STORE/2"
+_kill_sheep 2
 
 # write data to the vdi
 cat /dev/urandom | $COLLIE vdi write test
 
 # restart the 3rd node
-$SHEEP $STORE/2 -z 2 -p 7002 -c $DRIVER
+_start_sheep 2
 
 # wait for object recovery to finish
 sleep 10
