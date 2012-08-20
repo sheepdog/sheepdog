@@ -135,6 +135,7 @@ common options
 
 check options
     -sheepdog           test sheepdog
+    -corosync           use corosync driver (default: local)
     -xdiff		graphical mode diff
     -n			show me, do not run tests
     -T			output timestamps
@@ -149,6 +150,10 @@ testlist options
 	    exit 0
 	    ;;
 
+	-corosync)
+	    DRIVER="corosync"
+	    xpand=false
+	    ;;
 	-g)	# -g group ... pick from group file
 	    group=true
 	    xpand=false
