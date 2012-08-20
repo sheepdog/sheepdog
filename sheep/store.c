@@ -30,10 +30,11 @@
 
 struct sheepdog_config {
 	uint64_t ctime;
-	uint64_t space;
 	uint16_t flags;
 	uint8_t copies;
 	uint8_t store[STORE_LEN];
+	uint8_t __pad[5];
+	uint64_t space;
 };
 
 char *obj_path;
