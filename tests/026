@@ -32,8 +32,12 @@ done
 
 # kill nodes and join them back
 sleep 1
-for i in `seq 1 5`; do _kill_sheep $i;done
-sleep 10
+for i in 1 2; do _kill_sheep $i;done
+sleep 6
+for i in 3 4; do _kill_sheep $i;done
+sleep 6
+for i in 5; do _kill_sheep $i;done
+sleep 6
 for i in `seq 1 5`; do _start_sheep $i;done
 
 _wait_for_collie
