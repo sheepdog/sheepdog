@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Test sheep recovery logic
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 3`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep "4"
+
+$COLLIE cluster format -c 2
+
+$COLLIE vdi create test0 40M
+$COLLIE vdi create test1 40M
+
+_kill_sheep 3
+
+_wait_for_sheep_recovery 0
+
+find $STORE -name '80fd32fc00000000'

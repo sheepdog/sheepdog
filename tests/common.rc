@@ -169,5 +169,15 @@ _kill_sheep()
     pkill -f "$SHEEP $STORE/$1"
 }
 
+_wait_for_sheep_recovery()
+{
+    while true; do
+       sleep 2
+       if [ $($COLLIE node recovery -p $((7000+$1)) | wc -l) -eq 2 ]; then
+           break
+       fi
+    done
+}
+
 # make sure this script returns success
 /bin/true
