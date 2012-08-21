@@ -2,4 +2,17 @@ QA output created by 010
 using backend farm store
 *Note*: Only disable the recovery caused by JOIN envets
 Cluster recovery: disable
-Formatting 'sheepdog:test', fmt=raw size=4294967296 
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
+Cluster recovery: enable
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test manual recovery command
+
 seq=`basename $0`
 echo "QA output created by $seq"
 
@@ -13,15 +15,14 @@ status=1        # failure is the default!
 
 _cleanup
 
-_start_sheep 0
-_start_sheep 1
+for i in `seq 0 1`; do _start_sheep $i; done
 
-sleep 2
+_wait_for_sheep 2
 
 $COLLIE cluster format -c 2
 $COLLIE cluster recover disable
 
-qemu-img create sheepdog:test 4G
+$COLLIE vdi create test 4G
 
 # create 20 objects
 for i in `seq 0 19`; do
@@ -34,3 +35,8 @@ _start_sheep 2
 for i in `seq 0 19`; do
     $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512 < /dev/zero
 done
+
+$COLLIE cluster info | _filter_cluster_info
+
+$COLLIE cluster recover enable
+$COLLIE cluster info | _filter_cluster_info
