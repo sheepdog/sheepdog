@@ -166,7 +166,7 @@ _start_sheep()
 
 _kill_sheep()
 {
-    pkill -f "$SHEEP $STORE/$1"
+    pkill -9 -f "$SHEEP $STORE/$1"
 }
 
 _wait_for_sheep_recovery()
