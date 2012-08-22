@@ -30,4 +30,4 @@ _kill_sheep 3
 
 _wait_for_sheep_recovery 0
 
-find $STORE -name '80fd32fc00000000'
+find $STORE -name '80fd32fc00000000' | sort
