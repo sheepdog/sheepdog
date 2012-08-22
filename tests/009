@@ -33,8 +33,7 @@ cat /dev/urandom | $COLLIE vdi write test
 # restart the 3rd node
 _start_sheep 2
 
-# wait for object recovery to finish
-sleep 10
+_wait_for_sheep_recovery 0
 
 # show md5sum of the vdi on each node
 for i in 0 1 2; do

@@ -12,4 +12,16 @@ Looking for the object 0x7c2b2500000001 (the inode vid 0x7c2b25 idx 1) with 2 no
 
 127.0.0.1:7000 has the object (should be 2 copies)
 127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000002 (the inode vid 0x7c2b25 idx 2) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000003 (the inode vid 0x7c2b25 idx 3) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000004 (the inode vid 0x7c2b25 idx 4) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
 update test successfully

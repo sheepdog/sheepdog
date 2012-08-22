@@ -48,11 +48,11 @@ $COLLIE vdi read test -p 7001 | md5sum > /tmp/csum.3
 
 $COLLIE vdi object test
 
-for i in `seq 0 1`; do
+for i in `seq 0 4`; do
     $COLLIE vdi object -i $i test
 done
 
-if [ "$diff -u /tmp/csum.0 /tmp/csum.1)" ]; then
+if [ "$(diff -u /tmp/csum.0 /tmp/csum.1)" ]; then
     echo "update test successfully"
 fi
 
