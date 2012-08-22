@@ -1,0 +1,60 @@
+#!/bin/bash
+
+# Test sheep recovery logic
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 1`; do _start_sheep $i; done
+
+_wait_for_sheep 2
+
+$COLLIE cluster format -c 2
+
+$COLLIE vdi create test 20M
+
+dd if=/dev/urandom | $COLLIE vdi write test
+$COLLIE vdi read test | md5sum > /tmp/csum.0
+
+for i in 2 3; do
+    _start_sheep $i
+    sleep 1
+    _kill_sheep $(($i-2))
+    _wait_for_sheep_recovery $i
+done
+
+dd if=/dev/urandom | $COLLIE vdi write test -p 7002
+$COLLIE vdi read test -p 7002 | md5sum > /tmp/csum.1
+
+for i in 2 3; do
+    _start_sheep $(($i-2))
+    sleep 1
+    _kill_sheep $i
+    _wait_for_sheep_recovery $(($i-2))
+done
+
+$COLLIE vdi read test | md5sum > /tmp/csum.2
+$COLLIE vdi read test -p 7001 | md5sum > /tmp/csum.3
+
+$COLLIE vdi object test
+
+for i in `seq 0 1`; do
+    $COLLIE vdi object -i $i test
+done
+
+if [ "$diff -u /tmp/csum.0 /tmp/csum.1)" ]; then
+    echo "update test successfully"
+fi
+
+diff -u /tmp/csum.1 /tmp/csum.2
+diff -u /tmp/csum.1 /tmp/csum.3
