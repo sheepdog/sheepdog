@@ -283,10 +283,10 @@ int is_recovery_init(void);
 int node_in_recovery(void);
 
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, int create);
+		 uint64_t offset, uint16_t flags, int create, int nr_copies);
 int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset);
-int remove_object(uint64_t oid);
+		uint64_t offset, int nr_copies);
+int remove_object(uint64_t oid, int nr_copies);
 
 int exec_local_req(struct sd_req *rq, void *data);
 void local_req_init(void);

@@ -30,7 +30,7 @@ static int is_access_local(struct request *req, uint64_t oid)
 	int nr_copies;
 	int i;
 
-	nr_copies = get_nr_copies(req->vinfo);
+	nr_copies = get_req_copy_number(req);
 	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 

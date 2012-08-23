@@ -247,7 +247,9 @@ static int oid_stale(uint64_t oid)
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 
 	vinfo = get_vnode_info();
-	nr_copies = get_nr_copies(vinfo);
+	nr_copies = get_obj_copy_number(oid);
+	if (!nr_copies)
+		return 0;
 
 	oid_to_vnodes(vinfo->vnodes, vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);

@@ -528,7 +528,7 @@ int init_store(const char *d, int enable_write_cache)
  * Write data to both local object cache (if enabled) and backends
  */
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, int create)
+		 uint64_t offset, uint16_t flags, int create, int nr_copies)
 {
 	struct sd_req hdr;
 	int ret;
@@ -556,6 +556,7 @@ forward_write:
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
+	hdr.obj.copies = nr_copies;
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -569,7 +570,7 @@ forward_write:
  * try read backends
  */
 int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset)
+		uint64_t offset, int nr_copies)
 {
 	struct sd_req hdr;
 	int ret;
@@ -589,6 +590,7 @@ forward_read:
 	hdr.data_length = datalen;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
+	hdr.obj.copies = nr_copies;
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -597,13 +599,14 @@ forward_read:
 	return ret;
 }
 
-int remove_object(uint64_t oid)
+int remove_object(uint64_t oid, int copies)
 {
 	struct sd_req hdr;
 	int ret;
 
 	sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 	hdr.obj.oid = oid;
+	hdr.obj.copies = copies;
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)

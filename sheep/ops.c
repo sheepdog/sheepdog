@@ -647,7 +647,7 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 	char name[128];
 	int rounded_rand, local = -1;
 
-	nr_copies = get_nr_copies(vnodes);
+	nr_copies = get_obj_copy_number(oid);
 	oid_to_vnodes(vnodes->vnodes, vnodes->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 
