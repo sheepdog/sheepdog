@@ -410,7 +410,7 @@ static int local_stat_cluster(struct request *req)
 			log->nr_nodes = epoch_log_read_remote(epoch, log->nodes,
 							      sizeof(log->nodes));
 
-		log->nr_copies = get_max_nr_copies_from(log->nodes, log->nr_nodes);
+		log->nr_copies = sys->nr_copies;
 
 		rsp->data_length += sizeof(*log);
 		/* FIXME: this hack would require sizeof(time_t) < sizeof(log->nodes[0]) */
@@ -754,7 +754,6 @@ int peer_read_obj(struct request *req)
 		goto out;
 
 	rsp->data_length = hdr->data_length;
-	rsp->obj.copies = sys->nr_copies;
 out:
 	return ret;
 }

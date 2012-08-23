@@ -91,20 +91,27 @@ static int get_zones_nr_from(struct sd_node *nodes, int nr_nodes)
 
 bool have_enough_zones(void)
 {
+	int max_copies;
+
 	if (sys->flags & SD_FLAG_NOHALT)
 		return true;
 
 	if (!current_vnode_info)
 		return false;
 
-	dprintf("flags %d, nr_zones %d, copies %d\n",
-		sys->flags, current_vnode_info->nr_zones, sys->nr_copies);
+	max_copies = get_max_copy_number();
+
+	dprintf("flags %d, nr_zones %d, min copies %d\n",
+		sys->flags, current_vnode_info->nr_zones, max_copies);
+
+	if (!current_vnode_info->nr_zones)
+		return false;
 
 	if (sys->flags & SD_FLAG_QUORUM) {
-		if (current_vnode_info->nr_zones > (sys->nr_copies/2))
+		if (current_vnode_info->nr_zones > (max_copies/2))
 			return true;
 	} else {
-		if (current_vnode_info->nr_zones >= sys->nr_copies)
+		if (current_vnode_info->nr_zones >= max_copies)
 			return true;
 	}
 	return false;
@@ -118,18 +125,6 @@ static int get_node_idx(struct vnode_info *vnode_info, struct sd_node *ent)
 		return -1;
 
 	return ent - vnode_info->nodes;
-}
-
-/*
- * If we have less zones available than the desired redundancy we have to do
- * with nr_zones copies, sorry.
- *
- * Note that you generally want to use get_nr_copies below, as it uses the
- * current vnode state snapshot instead of global data.
- */
-int get_max_nr_copies_from(struct sd_node *nodes, int nr_nodes)
-{
-	return min((int)sys->nr_copies, get_zones_nr_from(nodes, nr_nodes));
 }
 
 /*
@@ -241,15 +236,6 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 
 	node_rsp->master_idx = -1;
 	return SD_RES_SUCCESS;
-}
-
-/*
- * If we have less zones available than the desired redundancy we have to do
- * with nr_zones copies, sorry.
- */
-int get_nr_copies(struct vnode_info *vnode_info)
-{
-	return min(vnode_info->nr_zones, (int)sys->nr_copies);
 }
 
 /*
