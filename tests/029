@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Test sheep VDI redundancy level
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 6`; do
+	_start_sheep $i;
+done
+
+_wait_for_sheep 7
+
+$COLLIE cluster format -c 3
+
+for i in `seq 2 4`; do
+	$COLLIE vdi create test$i 20M -c $i -P
+done
+
+$COLLIE vdi snapshot -s tag test2
+$COLLIE vdi clone -s 1 test2 clone -c 3
+
+
+for i in `seq 2 3`; do
+	_kill_sheep $i;
+done
+
+for i in `seq 7 8`; do
+	_start_sheep $i;
+done
+
+_wait_for_sheep_recovery 0
+
+$COLLIE vdi delete clone
+$COLLIE vdi delete -s 1 test2
+
+$COLLIE vdi list | _filter_short_date
+
+for i in `seq 2 4`; do
+	$COLLIE vdi object test$i -i 1;
+done
+
