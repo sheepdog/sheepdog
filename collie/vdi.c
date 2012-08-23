@@ -112,14 +112,14 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 				putchar('\\');
 			putchar(*name++);
 		}
-		printf(" %d %s %s %s %s %" PRIx32 " %s\n", snapid,
+		printf(" %d %s %s %s %s %" PRIx32 " %d %s\n", snapid,
 				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid,
-				i->tag);
+				i->nr_copies, i->tag);
 	} else {
-		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 "  %s\n",
+		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 " %5d %13s\n",
 				is_current(i) ? (is_clone ? 'c' : ' ') : 's',
 				name, snapid, vdi_size_str, my_objs_str, cow_objs_str,
-				dbuf, vid, i->tag);
+				dbuf, vid, i->nr_copies, i->tag);
 	}
 }
 
@@ -312,7 +312,7 @@ static int vdi_list(int argc, char **argv)
 	char *vdiname = argv[optind];
 
 	if (!raw_output)
-		printf("  Name        Id    Size    Used  Shared    Creation time   VDI id  Tag\n");
+		printf("  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag\n");
 
 	if (vdiname) {
 		struct get_vdi_info info;
