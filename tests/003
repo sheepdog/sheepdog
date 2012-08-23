@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test master transfer for crashed cluster
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

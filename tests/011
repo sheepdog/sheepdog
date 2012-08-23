@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test sheep booting on existing images mounted as loop device
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

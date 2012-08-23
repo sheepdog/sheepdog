@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test cluster rejecting node with wrong epoch
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

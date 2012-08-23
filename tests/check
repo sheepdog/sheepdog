@@ -417,10 +417,11 @@ do
 	#
 	rm -f $seq.out.bad
 	lasttime=`sed -n -e "/^$seq /s/.* //p" <check.time`
+	description=`sed -n '3s/# Test/Test/p' $seq`
 	if [ "X$lasttime" != X ]; then
-		echo -n " ${lasttime}s ..."
+		echo -n " Last Used:${lasttime}s. $description"
 	else
-		echo -n "	"	# prettier output with timestamps.
+		echo -n " $description"	# prettier output with timestamps.
 	fi
 	rm -f core $seq.notrun
 

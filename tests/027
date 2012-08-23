@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test sheep recovery logic
+# Test sheep recovery logic breadth-first algorithm
 
 seq=`basename $0`
 echo "QA output created by $seq"

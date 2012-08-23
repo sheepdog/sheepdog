@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test gateway only functionality
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

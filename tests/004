@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test membership, add one node after killing existing one node
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test master node killing and master transfer
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

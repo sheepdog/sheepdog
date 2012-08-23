@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test doing heavy IO while confchg change
+
 seq=`basename $0`
 echo "QA output created by $seq"
 

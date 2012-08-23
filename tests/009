@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Test data integrity after joining a new node
+
 seq=`basename $0`
 echo "QA output created by $seq"
 
