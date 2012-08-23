@@ -44,15 +44,15 @@ out:
 }
 
 /* TODO: should be performed atomically */
-static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
-			  uint32_t base_vid, uint32_t cur_vid, uint32_t snapid,
-			  int is_snapshot)
+static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
+			  uint32_t cur_vid, uint32_t snapid)
 {
 	/* we are not called concurrently */
 	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
 	struct timeval tv;
 	int ret = SD_RES_NO_MEM;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
+	char *name = iocb->name;
 
 	new = zalloc(sizeof(*new));
 	if (!new) {
@@ -60,7 +60,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 		goto out;
 	}
 
-	if (base_vid) {
+	if (iocb->base_vid) {
 		base = zalloc(sizeof(*base));
 		if (!base) {
 			eprintf("failed to allocate memory\n");
@@ -68,7 +68,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 		}
 	}
 
-	if (is_snapshot && cur_vid != base_vid) {
+	if (iocb->snapid && cur_vid != iocb->base_vid) {
 		cur = zalloc(SD_INODE_HEADER_SIZE);
 		if (!cur) {
 			eprintf("failed to allocate memory\n");
@@ -76,8 +76,8 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 		}
 	}
 
-	if (base_vid) {
-		ret = read_object(vid_to_vdi_oid(base_vid), (char *)base,
+	if (iocb->base_vid) {
+		ret = read_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
 				  sizeof(*base), 0);
 		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_BASE_VDI_READ;
@@ -87,10 +87,10 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 
 	gettimeofday(&tv, NULL);
 
-	if (is_snapshot) {
-		if (cur_vid != base_vid) {
+	if (iocb->snapid) {
+		if (cur_vid != iocb->base_vid) {
 			vprintf(SDOG_INFO, "tree snapshot %s %" PRIx32 " %" PRIx32 "\n",
-				name, cur_vid, base_vid);
+				name, cur_vid, iocb->base_vid);
 
 			ret = read_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 					  SD_INODE_HEADER_SIZE, 0);
@@ -108,16 +108,16 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 	strncpy(new->name, name, sizeof(new->name));
 	new->vdi_id = new_vid;
 	new->ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
-	new->vdi_size = size;
+	new->vdi_size = iocb->size;
 	new->copy_policy = 0;
-	new->nr_copies = sys->nr_copies;
+	new->nr_copies = iocb->nr_copies;
 	new->block_size_shift = find_next_bit(&block_size, BITS_PER_LONG, 0);
 	new->snap_id = snapid;
 
-	if (base_vid) {
+	if (iocb->base_vid) {
 		int i;
 
-		new->parent_vdi_id = base_vid;
+		new->parent_vdi_id = iocb->base_vid;
 		memcpy(new->data_vdi_id, base->data_vdi_id, sizeof(new->data_vdi_id));
 
 		for (i = 0; i < ARRAY_SIZE(base->child_vdi_id); i++) {
@@ -133,7 +133,7 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 		}
 	}
 
-	if (is_snapshot && cur_vid != base_vid) {
+	if (iocb->snapid && cur_vid != iocb->base_vid) {
 		ret = write_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 				   SD_INODE_HEADER_SIZE, 0, 0, 0);
 		if (ret != 0) {
@@ -143,8 +143,8 @@ static int create_vdi_obj(char *name, uint32_t new_vid, uint64_t size,
 		}
 	}
 
-	if (base_vid) {
-		ret = write_object(vid_to_vdi_oid(base_vid), (char *)base,
+	if (iocb->base_vid) {
+		ret = write_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
 				   SD_INODE_HEADER_SIZE, 0, 0, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
@@ -280,25 +280,25 @@ int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
 			     ctime);
 }
 
-int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
-	    uint32_t base_vid, int is_snapshot, unsigned int *nr_copies)
+int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 {
 	uint32_t cur_vid = 0;
 	uint32_t next_snapid;
 	unsigned long nr, deleted_nr = SD_NR_VDIS, right_nr = SD_NR_VDIS;
+	unsigned int dummy;
 	int ret;
 	char *name;
 
-	if (data_len != SD_MAX_VDI_LEN)
+	if (iocb->data_len != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
 
-	name = data;
+	name = iocb->name;
 
 	ret = do_lookup_vdi(name, strlen(name), &cur_vid,
 			    NULL, 0, &next_snapid, &right_nr, &deleted_nr,
-			    nr_copies, NULL);
+			    &dummy, NULL);
 
-	if (is_snapshot) {
+	if (iocb->snapid) {
 		if (ret != SD_RES_SUCCESS) {
 			if (ret == SD_RES_NO_VDI)
 				vprintf(SDOG_CRIT, "VDI %s does not exist\n", name);
@@ -324,12 +324,11 @@ int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
 	*new_vid = nr;
 
 	vprintf(SDOG_INFO, "creating new %s %s: size %" PRIu64 ", vid %"
-		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 "\n",
-		is_snapshot ? "snapshot" : "vdi", name, size, *new_vid,
-		base_vid, cur_vid);
+		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 ", copies %d\n",
+		iocb->snapid ? "snapshot" : "vdi", name, iocb->size,
+		*new_vid, iocb->base_vid, cur_vid, iocb->nr_copies);
 
-	return create_vdi_obj(name, *new_vid, size, base_vid,
-			      cur_vid, next_snapid, is_snapshot);
+	return create_vdi_obj(iocb, *new_vid, cur_vid, next_snapid);
 }
 
 static int start_deletion(struct request *req, uint32_t vid);

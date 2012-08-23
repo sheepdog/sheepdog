@@ -128,6 +128,15 @@ struct siocb {
 	uint64_t offset;
 };
 
+struct vdi_iocb {
+	char *name;
+	uint32_t data_len;
+	uint64_t size;
+	uint32_t base_vid;
+	int snapid;
+	int nr_copies;
+};
+
 struct store_driver {
 	struct list_head list;
 	const char *name;
@@ -192,8 +201,7 @@ int init_store(const char *dir, int enable_write_cache);
 int init_base_path(const char *dir);
 
 int vdi_exist(uint32_t vid);
-int add_vdi(char *data, int data_len, uint64_t size, uint32_t *new_vid,
-	    uint32_t base_vid, int is_snapshot, unsigned int *nr_copies);
+int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid);
 
 int del_vdi(struct request *req, char *data, int data_len, uint32_t *vid,
 	    uint32_t snapid, unsigned int *nr_copies);
