@@ -78,7 +78,7 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	if (info && strcmp(name, info->name) != 0)
 		return;
 
-	ti = i->ctime >> 32;
+	ti = i->create_time >> 32;
 	if (raw_output) {
 		snprintf(dbuf, sizeof(dbuf), "%" PRIu64, (uint64_t) ti);
 	} else {
@@ -133,7 +133,7 @@ static void print_vdi_tree(uint32_t vid, char *name, char * tag, uint32_t snapid
 	if (is_current(i))
 		strcpy(buf, "(you are here)");
 	else {
-		ti = i->ctime >> 32;
+		ti = i->create_time >> 32;
 		localtime_r(&ti, &tm);
 
 		strftime(buf, sizeof(buf),
@@ -150,7 +150,7 @@ static void print_vdi_graph(uint32_t vid, char *name, char * tag, uint32_t snapi
 	struct tm tm;
 	char dbuf[128], tbuf[128], size_str[128];
 
-	ti = i->ctime >> 32;
+	ti = i->create_time >> 32;
 	localtime_r(&ti, &tm);
 
 	strftime(dbuf, sizeof(dbuf), "%Y-%m-%d", &tm);

@@ -107,7 +107,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	strncpy(new->name, name, sizeof(new->name));
 	new->vdi_id = new_vid;
-	new->ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
+	new->create_time = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 	new->vdi_size = iocb->size;
 	new->copy_policy = 0;
 	new->nr_copies = iocb->nr_copies;
@@ -168,7 +168,7 @@ out:
 static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 			  char *tag, uint32_t snapid, uint32_t *vid,
 			  unsigned long *deleted_nr, uint32_t *next_snap,
-			  unsigned int *inode_nr_copies, uint64_t *ctime)
+			  unsigned int *inode_nr_copies, uint64_t *create_time)
 {
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
@@ -205,8 +205,8 @@ static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 			*next_snap = inode->snap_id + 1;
 			*vid = inode->vdi_id;
 			*inode_nr_copies = inode->nr_copies;
-			if (ctime)
-				*ctime = inode->ctime;
+			if (create_time)
+				*create_time = inode->create_time;
 			ret = SD_RES_SUCCESS;
 			goto out_free_inode;
 		}
@@ -226,7 +226,7 @@ out:
 static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, char *tag,
 		uint32_t snapid, uint32_t *next_snapid, unsigned long *right_nr,
 		unsigned long *deleted_nr, unsigned int *nr_copies,
-		uint64_t *ctime)
+		uint64_t *create_time)
 {
 	int ret;
 	unsigned long nr, start_nr;
@@ -245,7 +245,7 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, char *tag,
 		/* look up on the right side of the hash point */
 		ret = find_first_vdi(nr - 1, start_nr, name,
 				     tag, snapid, vid, deleted_nr, next_snapid,
-				     nr_copies, ctime);
+				     nr_copies, create_time);
 		return ret;
 	} else {
 		/* round up... bitmap search from the head of the bitmap */
@@ -257,7 +257,8 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, char *tag,
 			/* look up on the left side of the hash point */
 			ret = find_first_vdi(nr - 1, 0, name,
 					     tag, snapid, vid, deleted_nr,
-					     next_snapid, nr_copies, ctime);
+					     next_snapid, nr_copies,
+					     create_time);
 			if (ret == SD_RES_NO_VDI)
 				; /* we need to go to the right side */
 			else
@@ -270,14 +271,14 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, char *tag,
 }
 
 int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
-	       unsigned int *nr_copies, uint64_t *ctime)
+	       unsigned int *nr_copies, uint64_t *create_time)
 {
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 
 	return do_lookup_vdi(name, strlen(name), vid, tag,
 			     snapid, &dummy0, &dummy1, &dummy2, nr_copies,
-			     ctime);
+			     create_time);
 }
 
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
@@ -677,7 +678,7 @@ err:
 }
 
 int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
-		 uint32_t vid, uint32_t *attrid, uint64_t ctime,
+		 uint32_t vid, uint32_t *attrid, uint64_t create_time,
 		 int wr, int excl, int delete)
 {
 	struct sheepdog_vdi_attr tmp_attr;
@@ -685,7 +686,7 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 	uint32_t end;
 	int ret;
 
-	vattr->ctime = ctime;
+	vattr->ctime = create_time;
 
 	/* we cannot include value_len for calculating the hash value */
 	hval = fnv_64a_buf(vattr->name, sizeof(vattr->name), FNV1A_64_INIT);

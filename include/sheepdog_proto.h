@@ -155,7 +155,7 @@ struct sd_rsp {
 struct sheepdog_inode {
 	char name[SD_MAX_VDI_LEN];
 	char tag[SD_MAX_VDI_TAG_LEN];
-	uint64_t ctime;
+	uint64_t create_time;
 	uint64_t snap_ctime;
 	uint64_t vm_clock_nsec;
 	uint64_t vdi_size;
