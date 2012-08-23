@@ -754,6 +754,10 @@ int peer_read_obj(struct request *req)
 		goto out;
 
 	rsp->data_length = hdr->data_length;
+	if (hdr->obj.copies)
+		rsp->obj.copies = hdr->obj.copies;
+	else
+		rsp->obj.copies = get_obj_copy_number(hdr->obj.oid);
 out:
 	return ret;
 }
