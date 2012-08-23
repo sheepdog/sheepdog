@@ -105,7 +105,7 @@ static int cluster_new_vdi(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid = 0, nr_copies = sys->nr_copies;
+	uint32_t vid = 0;
 	struct vdi_iocb iocb;
 	int ret;
 
@@ -114,12 +114,15 @@ static int cluster_new_vdi(struct request *req)
 	iocb.size = hdr->vdi.vdi_size;
 	iocb.base_vid = hdr->vdi.base_vdi_id;
 	iocb.snapid = hdr->vdi.snapid;
-	iocb.nr_copies = sys->nr_copies;
+	iocb.nr_copies = hdr->vdi.copies;
+
+	if (!iocb.nr_copies)
+		iocb.nr_copies = sys->nr_copies;
 
 	ret = add_vdi(&iocb, &vid);
 
 	rsp->vdi.vdi_id = vid;
-	rsp->vdi.copies = nr_copies;
+	rsp->vdi.copies = iocb.nr_copies;
 
 	return ret;
 }

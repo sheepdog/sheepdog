@@ -23,6 +23,7 @@ struct vdi_cmd_data {
 	int exclusive;
 	int delete;
 	int prealloc;
+	int nr_copies;
 	int cache;
 } vdi_cmd_data = { ~0, };
 
@@ -400,7 +401,7 @@ out:
 }
 
 static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
-			 uint32_t *vdi_id, int snapshot)
+			 uint32_t *vdi_id, int snapshot, int nr_copies)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -426,6 +427,7 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 	hdr.vdi.base_vdi_id = base_vid;
 	hdr.vdi.snapid = snapshot;
 	hdr.vdi.vdi_size = roundup(vdi_size, 512);
+	hdr.vdi.copies = nr_copies;
 
 	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 
@@ -470,7 +472,7 @@ static int vdi_create(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
-	ret = do_vdi_create(vdiname, size, 0, &vid, 0);
+	ret = do_vdi_create(vdiname, size, 0, &vid, 0, vdi_cmd_data.nr_copies);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
@@ -549,7 +551,8 @@ static int vdi_snapshot(int argc, char **argv)
 				      0, inode->nr_copies, 0);
 	}
 
-	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, 1);
+	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, 1,
+			     inode->nr_copies);
 }
 
 static int vdi_clone(int argc, char **argv)
@@ -596,7 +599,8 @@ static int vdi_clone(int argc, char **argv)
 		goto out;
 	}
 
-	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, 0);
+	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, 0,
+			    vdi_cmd_data.nr_copies);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
@@ -1510,11 +1514,11 @@ out:
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_check},
-	{"create", "<vdiname> <size>", "Paph", "create an image",
+	{"create", "<vdiname> <size>", "Pcaph", "create an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_create},
 	{"snapshot", "<vdiname>", "saph", "create a snapshot",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_snapshot},
-	{"clone", "<src vdi> <dst vdi>", "sPaph", "clone an image",
+	{"clone", "<src vdi> <dst vdi>", "sPcaph", "clone an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_clone},
 	{"delete", "<vdiname>", "saph", "delete an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, vdi_delete},
@@ -1546,6 +1550,7 @@ static struct subcommand vdi_cmd[] = {
 static int vdi_parser(int ch, char *opt)
 {
 	char *p;
+	int nr_copies;
 
 	switch (ch) {
 	case 'P':
@@ -1575,6 +1580,14 @@ static int vdi_parser(int ch, char *opt)
 	case 'C':
 		vdi_cmd_data.cache = 1;
 		break;
+	case 'c':
+		nr_copies = strtol(opt, &p, 10);
+		if (opt == p || nr_copies < 0 || nr_copies > SD_MAX_COPIES) {
+			fprintf(stderr, "Invalid copies number, must be "
+				"an integer between 0 and %d\n", SD_MAX_COPIES);
+			exit(EXIT_FAILURE);
+		}
+		vdi_cmd_data.nr_copies = nr_copies;
 	}
 
 	return 0;
