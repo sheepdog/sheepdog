@@ -181,10 +181,11 @@ int vdi_exist(uint32_t vid)
 		goto out;
 	}
 
-	if (*inode->name == '\0')
+	if (*inode->name == '\0') {
 		ret = 0;
+		goto out;
+	}
 	ret = 1;
-
 out:
 	free(inode);
 	return ret;
