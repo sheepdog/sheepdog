@@ -200,6 +200,11 @@ int create_listen_port(int port, void *data);
 int init_store(const char *dir, int enable_write_cache);
 int init_base_path(const char *dir);
 
+int get_vdi_copy_number(uint32_t vid);
+int get_obj_copy_number(uint64_t oid);
+int get_max_copy_number(void);
+int get_req_copy_number(struct request *req);
+int add_vdi_copy_number(uint32_t vid, int nr_copies);
 int vdi_exist(uint32_t vid);
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid);
 

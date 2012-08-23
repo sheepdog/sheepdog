@@ -10,10 +10,134 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <sys/time.h>
 
 #include "sheepdog_proto.h"
 #include "sheep_priv.h"
+
+struct vdi_copy_entry {
+	uint32_t vid;
+	unsigned int nr_copies;
+	struct rb_node node;
+};
+
+static uint32_t max_copies;
+static struct rb_root vdi_copy_root = RB_ROOT;
+pthread_rwlock_t vdi_copy_lock = PTHREAD_RWLOCK_INITIALIZER;
+
+static struct vdi_copy_entry *vdi_copy_search(struct rb_root *root,
+					      uint32_t vid)
+{
+	struct rb_node *n = root->rb_node;
+	struct vdi_copy_entry *t;
+
+	while (n) {
+		t = rb_entry(n, struct vdi_copy_entry, node);
+
+		if (vid < t->vid)
+			n = n->rb_left;
+		else if (vid > t->vid)
+			n = n->rb_right;
+		else
+			return t;
+	}
+
+	return NULL;
+}
+
+static struct vdi_copy_entry *vdi_copy_insert(struct rb_root *root,
+					      struct vdi_copy_entry *new)
+{
+	struct rb_node **p = &root->rb_node;
+	struct rb_node *parent = NULL;
+	struct vdi_copy_entry *entry;
+
+	while (*p) {
+		parent = *p;
+		entry = rb_entry(parent, struct vdi_copy_entry, node);
+
+		if (new->vid < entry->vid)
+			p = &(*p)->rb_left;
+		else if (new->vid > entry->vid)
+			p = &(*p)->rb_right;
+		else
+			return entry; /* already has this entry */
+	}
+	rb_link_node(&new->node, parent, p);
+	rb_insert_color(&new->node, root);
+
+	return NULL; /* insert successfully */
+}
+
+int get_vdi_copy_number(uint32_t vid)
+{
+	struct vdi_copy_entry *entry;
+
+	pthread_rwlock_rdlock(&vdi_copy_lock);
+	entry = vdi_copy_search(&vdi_copy_root, vid);
+	pthread_rwlock_unlock(&vdi_copy_lock);
+
+	if (!entry) {
+		eprintf("No VDI copy entry for %" PRIx32 " found\n", vid);
+		return 0;
+	}
+
+	return entry->nr_copies;
+}
+
+int get_obj_copy_number(uint64_t oid)
+{
+	uint32_t vid;
+	if (is_vdi_attr_obj(oid))
+		vid = attr_oid_to_vid(oid);
+	else
+		vid = oid_to_vid(oid);
+
+	return get_vdi_copy_number(vid);
+}
+
+int get_req_copy_number(struct request *req)
+{
+	int nr_copies;
+
+	nr_copies = req->rq.obj.copies;
+	if (!nr_copies)
+		nr_copies = get_obj_copy_number(req->rq.obj.oid);
+
+	return nr_copies;
+}
+
+int get_max_copy_number(void)
+{
+	return uatomic_read(&max_copies);
+}
+
+int add_vdi_copy_number(uint32_t vid, int nr_copies)
+{
+	struct vdi_copy_entry *entry, *old;
+
+	entry = xzalloc(sizeof(*entry));
+	entry->vid = vid;
+	entry->nr_copies = nr_copies;
+
+	dprintf("%" PRIx32 ", %d\n", vid, nr_copies);
+
+	pthread_rwlock_wrlock(&vdi_copy_lock);
+	old = vdi_copy_insert(&vdi_copy_root, entry);
+	if (old) {
+		free(entry);
+		entry = old;
+		entry->nr_copies = nr_copies;
+	}
+
+	if (uatomic_read(&max_copies) == 0 ||
+	    nr_copies > uatomic_read(&max_copies))
+		uatomic_set(&max_copies, nr_copies);
+	pthread_rwlock_unlock(&vdi_copy_lock);
+
+	return SD_RES_SUCCESS;
+}
 
 int vdi_exist(uint32_t vid)
 {

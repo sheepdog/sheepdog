@@ -277,4 +277,9 @@ static inline uint64_t vid_to_attr_oid(uint32_t vid, uint32_t attrid)
 	return ((uint64_t)vid << VDI_SPACE_SHIFT) | VDI_ATTR_BIT | attrid;
 }
 
+static inline uint32_t attr_oid_to_vid(uint64_t oid)
+{
+	return (~VDI_ATTR_BIT & oid) >> VDI_SPACE_SHIFT;
+}
+
 #endif
