@@ -225,7 +225,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	if (iocb->base_vid) {
 		ret = read_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
-				  sizeof(*base), 0, iocb->nr_copies);
+				  sizeof(*base), 0, 0);
 		if (ret != SD_RES_SUCCESS) {
 			ret = SD_RES_BASE_VDI_READ;
 			goto out;
@@ -240,7 +240,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 				name, cur_vid, iocb->base_vid);
 
 			ret = read_object(vid_to_vdi_oid(cur_vid), (char *)cur,
-					  SD_INODE_HEADER_SIZE, 0, iocb->nr_copies);
+					  SD_INODE_HEADER_SIZE, 0, 0);
 			if (ret != SD_RES_SUCCESS) {
 				vprintf(SDOG_ERR, "failed\n");
 				ret = SD_RES_BASE_VDI_READ;
@@ -282,8 +282,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	if (iocb->snapid && cur_vid != iocb->base_vid) {
 		ret = write_object(vid_to_vdi_oid(cur_vid), (char *)cur,
-				   SD_INODE_HEADER_SIZE, 0, 0, 0,
-				   iocb->nr_copies);
+				   SD_INODE_HEADER_SIZE, 0, 0, 0, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_READ;
@@ -293,8 +292,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	if (iocb->base_vid) {
 		ret = write_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
-				   SD_INODE_HEADER_SIZE, 0, 0, 0,
-				   iocb->nr_copies);
+				   SD_INODE_HEADER_SIZE, 0, 0, 0, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_WRITE;
