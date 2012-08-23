@@ -16,6 +16,17 @@
 
 #include "collie.h"
 
+static struct sd_option cluster_options[] = {
+	{'b', "store", 1, "specify backend store"},
+	{'c', "copies", 1, "specify the default data redundancy (number of copies)"},
+	{'m', "mode", 1, "mode (safe, quorum, unsafe)"},
+	{'f', "force", 0, "do not prompt for confirmation"},
+	{'R', "restore", 1, "restore the cluster"},
+	{'l', "list", 0, "list the user epoch information"},
+
+	{ 0, NULL, 0, NULL },
+};
+
 struct cluster_cmd_data {
 	uint32_t epoch;
 	int list;
@@ -501,19 +512,20 @@ static int cluster_recover(int argc, char **argv)
 
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
-	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info},
+	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info, cluster_options},
 	{"format", NULL, "bcmaph", "create a Sheepdog store",
-	 NULL, 0, cluster_format},
+	 NULL, 0, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
-	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown},
+	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown, cluster_options},
 	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
-	 NULL, 0, cluster_snapshot},
+	 NULL, 0, cluster_snapshot, cluster_options},
 	{"cleanup", NULL, "aph",
 	 "cleanup the useless snapshot data from recovery",
-	 NULL, 0, cluster_cleanup},
+	 NULL, 0, cluster_cleanup, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",
-	 cluster_recover_cmd, SUBCMD_FLAG_NEED_THIRD_ARG, cluster_recover},
+	 cluster_recover_cmd, SUBCMD_FLAG_NEED_THIRD_ARG,
+	 cluster_recover, cluster_options},
 	{NULL,},
 };
 

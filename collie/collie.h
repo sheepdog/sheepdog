@@ -49,6 +49,7 @@ struct subcommand {
 	struct subcommand *sub;
 	unsigned long flags;
 	int (*fn)(int, char **);
+	struct sd_option *options;
 };
 void subcommand_usage(char *cmd, char *subcmd, int status);
 

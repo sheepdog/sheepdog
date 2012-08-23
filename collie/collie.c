@@ -25,28 +25,12 @@ int raw_output = 0;
 
 static const struct sd_option collie_options[] = {
 
-	/* common options */
+	/* common options for all collie commands */
 	{'a', "address", 1, "specify the daemon address (default: localhost)"},
 	{'p', "port", 1, "specify the daemon port"},
 	{'r', "raw", 0, "raw output mode: omit headers, separate fields with\n\
                           single spaces and print all sizes in decimal bytes"},
 	{'h', "help", 0, "display this help and exit"},
-
-	/* VDI options */
-	{'P', "prealloc", 0, "preallocate all the data objects"},
-	{'i', "index", 1, "specify the index of data objects"},
-	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
-	{'x', "exclusive", 0, "write in an exclusive mode"},
-	{'d', "delete", 0, "delete a key"},
-	{'C', "cache", 0, "enable object cache"},
-
-	/* cluster options */
-	{'b', "store", 1, "specify backend store"},
-	{'c', "copies", 1, "specify the data redundancy (number of copies)"},
-	{'m', "mode", 1, "mode (safe, quorum, unsafe)"},
-	{'f', "force", 0, "do not prompt for confirmation"},
-	{'R', "restore", 1, "restore the cluster"},
-	{'l', "list", 0, "list the user epoch information"},
 
 	{ 0, NULL, 0, NULL },
 };
@@ -127,18 +111,34 @@ out:
 
 static int (*command_parser)(int, char *);
 static int (*command_fn)(int, char **);
-static const char *command_options;
+static const char *command_opts;
 static const char *command_arg;
 static const char *command_desc;
+static struct sd_option *command_options;
 
 static const struct sd_option *find_opt(int ch)
 {
 	int i;
+	struct sd_option *opt;
 
+	/* search for common options */
 	for (i = 0; i < ARRAY_SIZE(collie_options); i++) {
 		if (collie_options[i].val == ch)
 			return collie_options + i;
 	}
+
+	/* search for self options */
+	if (!command_options)
+		goto out;
+
+	opt = command_options;
+	while (opt->val) {
+		if (opt->val == ch)
+			return opt;
+		opt++;
+	}
+
+out:
 	fprintf(stderr, "Internal error\n");
 	exit(EXIT_SYSFAIL);
 }
@@ -246,9 +246,10 @@ static unsigned long setup_commands(const struct command *commands,
 	for (s = commands[i].sub; s->name; s++) {
 		if (!strcmp(s->name, subcmd)) {
 			command_fn = s->fn;
-			command_options = s->opts;
+			command_opts = s->opts;
 			command_arg = s->arg;
 			command_desc = s->desc;
+			command_options = s->options;
 			flags = s->flags;
 			break;
 		}
@@ -293,7 +294,7 @@ static void usage(const struct command *commands, int status)
 
 void subcommand_usage(char *cmd, char *subcmd, int status)
 {
-	int i, n, len = strlen(command_options);
+	int i, n, len = strlen(command_opts);
 	const struct sd_option *sd_opt;
 	const struct subcommand *sub, *subsub;
 	char name[64];
@@ -318,7 +319,7 @@ void subcommand_usage(char *cmd, char *subcmd, int status)
 	}
 
 	for (i = 0; i < len; i++) {
-		sd_opt = find_opt(command_options[i]);
+		sd_opt = find_opt(command_opts[i]);
 		if (sd_opt->has_arg)
 			printf(" [-%c %s]", sd_opt->val, sd_opt->name);
 		else
@@ -337,7 +338,7 @@ void subcommand_usage(char *cmd, char *subcmd, int status)
 
 	printf("Options:\n");
 	for (i = 0; i < len; i++) {
-		sd_opt = find_opt(command_options[i]);
+		sd_opt = find_opt(command_opts[i]);
 		sprintf(name, "-%c, --%s", sd_opt->val, sd_opt->name);
 		printf("  %-24s%s\n", name, sd_opt->desc);
 	}
@@ -363,8 +364,8 @@ int main(int argc, char **argv)
 
 	optind = 3;
 
-	long_options = build_long_options(command_options);
-	short_options = build_short_options(command_options);
+	long_options = build_long_options(command_opts);
+	short_options = build_short_options(command_opts);
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				&longindex)) >= 0) {
