@@ -137,6 +137,11 @@ struct vdi_iocb {
 	int nr_copies;
 };
 
+struct vdi_copy {
+	uint32_t vid;
+	uint32_t nr_copies;
+};
+
 struct store_driver {
 	struct list_head list;
 	const char *name;
@@ -231,6 +236,7 @@ void update_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *alloc_vnode_info(struct sd_node *nodes, size_t nr_nodes);
 void put_vnode_info(struct vnode_info *vinfo);
 struct vnode_info *get_vnode_info_epoch(uint32_t epoch);
+void wait_get_vdis_done(void);
 
 int get_nr_copies(struct vnode_info *vnode_info);
 

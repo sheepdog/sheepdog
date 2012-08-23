@@ -131,7 +131,14 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	static struct sheepdog_inode i;
 	struct sd_req req;
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
-	unsigned int rlen, wlen = 0;
+	unsigned int wlen = 0, rlen = sizeof(vdi_inuse) * 2;
+	char *buf;
+
+	buf = zalloc(rlen);
+	if (!buf) {
+		fprintf(stderr, "Failed to allocate memory\n");
+		return -1;
+	}
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -140,11 +147,10 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	}
 
 	sd_init_req(&req, SD_OP_READ_VDIS);
-	req.data_length = sizeof(vdi_inuse);
+	req.data_length = rlen;
 	req.epoch = sd_epoch;
 
-	rlen = sizeof(vdi_inuse);
-	ret = exec_req(fd, &req, vdi_inuse, &wlen, &rlen);
+	ret = exec_req(fd, &req, buf, &wlen, &rlen);
 	if (ret < 0) {
 		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
 			sdhost, sdport);
@@ -153,6 +159,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	}
 	close(fd);
 
+	memcpy(&vdi_inuse, buf, sizeof(vdi_inuse));
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
 		uint64_t oid;
 

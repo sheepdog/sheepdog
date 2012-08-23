@@ -139,6 +139,26 @@ int add_vdi_copy_number(uint32_t vid, int nr_copies)
 	return SD_RES_SUCCESS;
 }
 
+static int fill_vdi_copy_list(void *data)
+{
+	int nr = 0;
+	struct rb_node *n;
+	struct vdi_copy *vc = data;
+	struct vdi_copy_entry *entry;
+
+	pthread_rwlock_rdlock(&vdi_copy_lock);
+	for (n = rb_first(&vdi_copy_root); n; n = rb_next(n)) {
+		entry = rb_entry(n, struct vdi_copy_entry, node);
+		vc->vid = entry->vid;
+		vc->nr_copies = entry->nr_copies;
+		vc++;
+		nr++;
+	}
+	pthread_rwlock_unlock(&vdi_copy_lock);
+
+	return nr * sizeof(*vc);
+}
+
 int vdi_exist(uint32_t vid)
 {
 	struct sheepdog_inode *inode;
@@ -488,11 +508,13 @@ out:
 
 int read_vdis(char *data, int len, unsigned int *rsp_len)
 {
-	if (len != sizeof(sys->vdi_inuse))
-		return SD_RES_INVALID_PARMS;
+	int length;
 
 	memcpy(data, sys->vdi_inuse, sizeof(sys->vdi_inuse));
-	*rsp_len = sizeof(sys->vdi_inuse);
+	/* put vdi copy list at the end of vdi bitmap */
+	length = fill_vdi_copy_list(data + sizeof(sys->vdi_inuse));
+
+	*rsp_len = sizeof(sys->vdi_inuse) + length;
 
 	return SD_RES_SUCCESS;
 }

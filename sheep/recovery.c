@@ -555,6 +555,8 @@ static void prepare_object_list(struct work *work)
 
 	dprintf("%u\n", rw->epoch);
 
+	wait_get_vdis_done();
+
 	buf = xmalloc(buf_size);
 again:
 	/* We need to start at random node for better load balance */

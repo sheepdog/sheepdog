@@ -16,6 +16,8 @@
 #include <arpa/inet.h>
 #include <sys/time.h>
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
+#include <pthread.h>
 #include <urcu/uatomic.h>
 #include <math.h>
 
@@ -32,12 +34,16 @@ struct node {
 	struct list_head list;
 };
 
-struct vdi_bitmap_work {
+struct get_vdis_work {
 	struct work work;
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	size_t nr_members;
 	struct sd_node members[];
 };
+
+pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t wait_vdis_cond = PTHREAD_COND_INITIALIZER;
+static int is_vdi_list_ready = 1;
 
 struct sd_node joining_nodes[SD_MAX_NODES];
 size_t nr_joining_nodes;
@@ -622,14 +628,24 @@ static int cluster_running_check(struct join_message *jm)
 	return CJ_RES_SUCCESS;
 }
 
-static int get_vdi_bitmap_from(struct sd_node *node)
+static int get_vdis_from(struct sd_node *node)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct vdi_copy *vc;
 	static DECLARE_BITMAP(tmp_vdi_inuse, SD_NR_VDIS);
 	int fd, i, ret = SD_RES_SUCCESS;
-	unsigned int rlen, wlen;
+	unsigned int rlen = SD_NR_VDIS * 3, wlen;
 	char host[128];
+	char *buf = NULL;
+	int count;
+
+	buf = zalloc(rlen);
+	if (!buf) {
+		vprintf(SDOG_ERR, "unable to allocate memory\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
 
 	if (is_myself(node->nid.addr, node->nid.port))
 		goto out;
@@ -647,13 +663,10 @@ static int get_vdi_bitmap_from(struct sd_node *node)
 
 	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.epoch = sys->epoch;
-	hdr.data_length = sizeof(tmp_vdi_inuse);
-	rlen = hdr.data_length;
+	hdr.data_length = rlen;
 	wlen = 0;
 
-	ret = exec_req(fd, &hdr, (char *)tmp_vdi_inuse,
-			&wlen, &rlen);
-
+	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
 	close(fd);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
@@ -662,24 +675,31 @@ static int get_vdi_bitmap_from(struct sd_node *node)
 		goto out;
 	}
 
+	memcpy(tmp_vdi_inuse, buf, sizeof(tmp_vdi_inuse));
 	for (i = 0; i < ARRAY_SIZE(sys->vdi_inuse); i++)
 		sys->vdi_inuse[i] |= tmp_vdi_inuse[i];
+
+	count = (rsp->data_length - sizeof(tmp_vdi_inuse)) / sizeof(*vc);
+	vc = (struct vdi_copy *)(buf + sizeof(tmp_vdi_inuse));
+	for (i = 0; i < count; i++, vc++)
+		add_vdi_copy_number(vc->vid, vc->nr_copies);
 out:
+	free(buf);
 	return ret;
 }
 
-static void do_get_vdi_bitmap(struct work *work)
+static void do_get_vdis(struct work *work)
 {
-	struct vdi_bitmap_work *w =
-		container_of(work, struct vdi_bitmap_work, work);
+	struct get_vdis_work *w =
+		container_of(work, struct get_vdis_work, work);
 	int i;
 
 	for (i = 0; i < w->nr_members; i++) {
-		/* We should not fetch vdi_bitmap from myself */
+		/* We should not fetch vdi_bitmap and copy list from myself */
 		if (node_eq(&w->members[i], &sys->this_node))
 			continue;
 
-		get_vdi_bitmap_from(&w->members[i]);
+		get_vdis_from(&w->members[i]);
 
 		/*
 		 * If a new comer try to join the running cluster, it only
@@ -690,10 +710,15 @@ static void do_get_vdi_bitmap(struct work *work)
 	}
 }
 
-static void get_vdi_bitmap_done(struct work *work)
+static void get_vdis_done(struct work *work)
 {
-	struct vdi_bitmap_work *w =
-		container_of(work, struct vdi_bitmap_work, work);
+	struct get_vdis_work *w =
+		container_of(work, struct get_vdis_work, work);
+
+	pthread_mutex_lock(&wait_vdis_lock);
+	is_vdi_list_ready = 1;
+	pthread_cond_broadcast(&wait_vdis_cond);
+	pthread_mutex_unlock(&wait_vdis_lock);
 
 	free(w);
 }
@@ -754,18 +779,32 @@ static void finish_join(struct join_message *msg, struct sd_node *joined,
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
 
-static void get_vdi_bitmap(struct sd_node *nodes, size_t nr_nodes)
+static void get_vdis(struct sd_node *nodes, size_t nr_nodes)
 {
 	int array_len = nr_nodes * sizeof(struct sd_node);
-	struct vdi_bitmap_work *w;
+	struct get_vdis_work *w;
 
 	w = xmalloc(sizeof(*w) + array_len);
 	w->nr_members = nr_nodes;
 	memcpy(w->members, nodes, array_len);
 
-	w->work.fn = do_get_vdi_bitmap;
-	w->work.done = get_vdi_bitmap_done;
+	is_vdi_list_ready = 0;
+
+	w->work.fn = do_get_vdis;
+	w->work.done = get_vdis_done;
 	queue_work(sys->block_wqueue, &w->work);
+}
+
+void wait_get_vdis_done(void)
+{
+	dprintf("waiting for vdi list\n");
+
+	pthread_mutex_lock(&wait_vdis_lock);
+	while (!is_vdi_list_ready)
+		pthread_cond_wait(&wait_vdis_cond, &wait_vdis_lock);
+	pthread_mutex_unlock(&wait_vdis_lock);
+
+	dprintf("vdi list ready\n");
 }
 
 static void prepare_recovery(struct sd_node *joined,
@@ -844,7 +883,7 @@ static void update_cluster_info(struct join_message *msg,
 			set_cluster_ctime(msg->ctime);
 			/*FALLTHROUGH*/
 		case SD_STATUS_WAIT_FOR_JOIN:
-			get_vdi_bitmap(nodes, nr_nodes);
+			get_vdis(nodes, nr_nodes);
 			break;
 		default:
 			break;

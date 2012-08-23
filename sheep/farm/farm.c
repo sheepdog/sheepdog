@@ -294,10 +294,36 @@ out:
 	return ret;
 }
 
+static int read_vdi_copy_number(uint64_t oid)
+{
+	char path[PATH_MAX];
+	int fd, flags = def_open_flags, ret;
+	struct sheepdog_inode inode;
+
+	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
+
+	fd = open(path, flags);
+	if (fd < 0) {
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	ret = xpread(fd, (void *)&inode, SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_INODE_HEADER_SIZE) {
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	add_vdi_copy_number(oid_to_vid(oid), inode.nr_copies);
+
+	return SD_RES_SUCCESS;
+}
+
 static int init_sys_vdi_bitmap(char *path)
 {
 	DIR *dir;
 	struct dirent *dent;
+	int ret = SD_RES_SUCCESS;
 
 	dir = opendir(path);
 	if (!dir) {
@@ -322,10 +348,13 @@ static int init_sys_vdi_bitmap(char *path)
 		vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
 
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
+		ret = read_vdi_copy_number(oid);
+		if (ret != SD_RES_SUCCESS)
+			break;
 	}
 	closedir(dir);
 
-	return 0;
+	return ret;
 }
 
 static bool is_xattr_enabled(char *path)
