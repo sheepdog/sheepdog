@@ -618,20 +618,11 @@ static int get_vdis_from(struct sd_node *node)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct vdi_copy *vc;
-	static DECLARE_BITMAP(tmp_vdi_inuse, SD_NR_VDIS);
+	struct vdi_copy *vc = NULL;
 	int fd, i, ret = SD_RES_SUCCESS;
-	unsigned int rlen = SD_NR_VDIS * 3, wlen;
+	unsigned int rlen, wlen;
 	char host[128];
-	char *buf = NULL;
 	int count;
-
-	buf = zalloc(rlen);
-	if (!buf) {
-		vprintf(SDOG_ERR, "unable to allocate memory\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
-	}
 
 	if (is_myself(node->nid.addr, node->nid.port))
 		goto out;
@@ -647,12 +638,20 @@ static int get_vdis_from(struct sd_node *node)
 
 	vprintf(SDOG_ERR, "%s:%d\n", host, node->nid.port);
 
-	sd_init_req(&hdr, SD_OP_READ_VDIS);
+	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
+	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
 	hdr.epoch = sys->epoch;
 	hdr.data_length = rlen;
 	wlen = 0;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	vc = zalloc(rlen);
+	if (!vc) {
+		vprintf(SDOG_ERR, "unable to allocate memory\n");
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+
+	ret = exec_req(fd, &hdr, (char *)vc, &wlen, &rlen);
 	close(fd);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
@@ -661,16 +660,13 @@ static int get_vdis_from(struct sd_node *node)
 		goto out;
 	}
 
-	memcpy(tmp_vdi_inuse, buf, sizeof(tmp_vdi_inuse));
-	for (i = 0; i < ARRAY_SIZE(sys->vdi_inuse); i++)
-		sys->vdi_inuse[i] |= tmp_vdi_inuse[i];
-
-	count = (rsp->data_length - sizeof(tmp_vdi_inuse)) / sizeof(*vc);
-	vc = (struct vdi_copy *)(buf + sizeof(tmp_vdi_inuse));
-	for (i = 0; i < count; i++, vc++)
-		add_vdi_copy_number(vc->vid, vc->nr_copies);
+	count = rsp->data_length / sizeof(*vc);
+	for (i = 0; i < count; i++) {
+		set_bit(vc[i].vid, sys->vdi_inuse);
+		add_vdi_copy_number(vc[i].vid, vc[i].nr_copies);
+	}
 out:
-	free(buf);
+	free(vc);
 	return ret;
 }
 

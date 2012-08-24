@@ -139,7 +139,7 @@ int add_vdi_copy_number(uint32_t vid, int nr_copies)
 	return SD_RES_SUCCESS;
 }
 
-static int fill_vdi_copy_list(void *data)
+int fill_vdi_copy_list(void *data)
 {
 	int nr = 0;
 	struct rb_node *n;
@@ -514,13 +514,11 @@ out:
 
 int read_vdis(char *data, int len, unsigned int *rsp_len)
 {
-	int length;
+	if (len != sizeof(sys->vdi_inuse))
+		return SD_RES_INVALID_PARMS;
 
 	memcpy(data, sys->vdi_inuse, sizeof(sys->vdi_inuse));
-	/* put vdi copy list at the end of vdi bitmap */
-	length = fill_vdi_copy_list(data + sizeof(sys->vdi_inuse));
-
-	*rsp_len = sizeof(sys->vdi_inuse) + length;
+	*rsp_len = sizeof(sys->vdi_inuse);
 
 	return SD_RES_SUCCESS;
 }

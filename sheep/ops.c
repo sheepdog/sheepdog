@@ -370,6 +370,14 @@ static int local_read_vdis(const struct sd_req *req, struct sd_rsp *rsp,
 	return read_vdis(data, req->data_length, &rsp->data_length);
 }
 
+static int local_get_vdi_copies(const struct sd_req *req, struct sd_rsp *rsp,
+			   void *data)
+{
+	rsp->data_length = fill_vdi_copy_list(data);
+
+	return SD_RES_SUCCESS;
+}
+
 static int local_stat_sheep(struct request *req)
 {
 	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)&req->rp;
@@ -951,6 +959,13 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
 		.process_main = local_read_vdis,
+	},
+
+	[SD_OP_GET_VDI_COPIES] = {
+		.name = "GET_VDI_COPIES",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = 1,
+		.process_main = local_get_vdi_copies,
 	},
 
 	[SD_OP_GET_NODE_LIST] = {

@@ -63,6 +63,7 @@
 #define SD_OP_ENABLE_RECOVER 0xA8
 #define SD_OP_DISABLE_RECOVER 0xA9
 #define SD_OP_INFO_RECOVER 0xAA
+#define SD_OP_GET_VDI_COPIES 0xAB
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
