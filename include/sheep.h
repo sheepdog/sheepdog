@@ -36,6 +36,11 @@ struct vnode_info {
 	int refcnt;
 };
 
+struct vdi_copy {
+	uint32_t vid;
+	uint32_t nr_copies;
+};
+
 #define TRACE_GRAPH_ENTRY  0x01
 #define TRACE_GRAPH_RETURN 0x02
 

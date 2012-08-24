@@ -137,11 +137,6 @@ struct vdi_iocb {
 	int nr_copies;
 };
 
-struct vdi_copy {
-	uint32_t vid;
-	uint32_t nr_copies;
-};
-
 struct store_driver {
 	struct list_head list;
 	const char *name;
