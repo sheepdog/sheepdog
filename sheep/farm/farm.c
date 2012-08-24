@@ -26,8 +26,6 @@
 char farm_obj_dir[PATH_MAX];
 char farm_dir[PATH_MAX];
 
-static int def_open_flags = O_DIRECT | O_DSYNC | O_RDWR;
-
 static int create_directory(char *p)
 {
 	int i, ret = 0;
@@ -70,95 +68,6 @@ static int create_directory(char *p)
 		strbuf_copyout(&buf, farm_obj_dir, sizeof(farm_obj_dir));
 err:
 	strbuf_release(&buf);
-	return ret;
-}
-
-static int farm_exist(uint64_t oid)
-{
-	char path[PATH_MAX];
-
-	sprintf(path, "%s%016"PRIx64, obj_path, oid);
-	if (access(path, R_OK | W_OK) < 0) {
-		if (errno != ENOENT)
-			eprintf("%m\n");
-		return 0;
-	}
-
-	return 1;
-}
-
-static int err_to_sderr(uint64_t oid, int err)
-{
-	int ret;
-	if (err == ENOENT) {
-		struct stat s;
-
-		if (stat(obj_path, &s) < 0) {
-			eprintf("corrupted\n");
-			ret = SD_RES_EIO;
-		} else {
-			dprintf("object %016" PRIx64 " not found locally\n", oid);
-			ret = SD_RES_NO_OBJ;
-		}
-	} else {
-		eprintf("%m\n");
-		ret = SD_RES_UNKNOWN;
-	}
-	return ret;
-}
-
-static int farm_write(uint64_t oid, struct siocb *iocb, int create)
-{
-	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
-	char path[PATH_MAX];
-	ssize_t size;
-
-	if (iocb->epoch < sys_epoch()) {
-		dprintf("%"PRIu32" sys %"PRIu32"\n", iocb->epoch, sys_epoch());
-		return SD_RES_OLD_NODE_VER;
-	}
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
-
-	if (create)
-		flags |= O_CREAT | O_TRUNC;
-
-	sprintf(path, "%s%016"PRIx64, obj_path, oid);
-	fd = open(path, flags, def_fmode);
-	if (fd < 0)
-		return err_to_sderr(oid, errno);
-
-	if (flock(fd, LOCK_EX) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out;
-	}
-	if (create && !(iocb->flags & SD_FLAG_CMD_COW)) {
-		ret = prealloc(fd, get_objsize(oid));
-		if (ret != SD_RES_SUCCESS) {
-			if (flock(fd, LOCK_UN) < 0) {
-				ret = SD_RES_EIO;
-				eprintf("%m\n");
-				goto out;
-			}
-			goto out;
-		}
-	}
-	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
-	if (flock(fd, LOCK_UN) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out;
-	}
-	if (size != iocb->length) {
-		eprintf("%m\n");
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	trunk_update_entry(oid);
-out:
-	close(fd);
 	return ret;
 }
 
@@ -231,132 +140,6 @@ out:
 	return ret;
 }
 
-static int cleanup_trunk(uint32_t epoch)
-{
-	struct sha1_file_hdr hdr;
-	struct trunk_entry *trunk_buf, *trunk_free = NULL;
-	unsigned char trunk_sha1[SHA1_LEN];
-	uint64_t nr_trunks, i;
-	int ret = SD_RES_EIO;
-
-	if (get_trunk_sha1(epoch, trunk_sha1, 0) < 0)
-		goto out;
-
-	trunk_free = trunk_buf = trunk_file_read(trunk_sha1, &hdr);
-	if (!trunk_buf)
-		goto out;
-
-	nr_trunks = hdr.priv;
-	for (i = 0; i < nr_trunks; i++, trunk_buf++)
-		sha1_file_try_delete(trunk_buf->sha1);
-
-	if (sha1_file_try_delete(trunk_sha1) < 0)
-		goto out;
-
-	ret = SD_RES_SUCCESS;
-
-out:
-	free(trunk_free);
-	return ret;
-}
-
-static int farm_cleanup_sys_obj(struct siocb *iocb)
-{
-	int i, ret = SD_RES_SUCCESS;
-	uint32_t epoch = iocb->epoch;
-	struct snap_log *log_pos, *log_free = NULL;
-	int nr_logs;
-
-	if (iocb->epoch == 0)
-		return ret;
-
-	for (i = 1; i <= epoch; i++)
-		cleanup_trunk(i);
-
-	log_free = log_pos = snap_log_read(&nr_logs, 0);
-	if (snap_log_truncate() < 0) {
-		dprintf("snap reset fail\n");
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	for (i = epoch + 1; i < nr_logs; i++, log_pos++) {
-		if (snap_log_write(log_pos->epoch, log_pos->sha1, 0) < 0) {
-			dprintf("snap write fail %d, %s\n",
-					log_pos->epoch, sha1_to_hex(log_pos->sha1));
-			ret = SD_RES_EIO;
-			goto out;
-		}
-	}
-
-out:
-	free(log_free);
-	return ret;
-}
-
-static int read_vdi_copy_number(uint64_t oid)
-{
-	char path[PATH_MAX];
-	int fd, flags = def_open_flags, ret;
-	struct sheepdog_inode inode;
-
-	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
-
-	fd = open(path, flags);
-	if (fd < 0) {
-		eprintf("%m\n");
-		return SD_RES_EIO;
-	}
-
-	ret = xpread(fd, (void *)&inode, SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_INODE_HEADER_SIZE) {
-		eprintf("%m\n");
-		return SD_RES_EIO;
-	}
-
-	add_vdi_copy_number(oid_to_vid(oid), inode.nr_copies);
-
-	return SD_RES_SUCCESS;
-}
-
-static int init_sys_vdi_bitmap(char *path)
-{
-	DIR *dir;
-	struct dirent *dent;
-	int ret = SD_RES_SUCCESS;
-
-	dir = opendir(path);
-	if (!dir) {
-		vprintf(SDOG_ERR, "failed to open the working directory: %m\n");
-		return -1;
-	}
-
-	vprintf(SDOG_INFO, "found the working directory %s\n", path);
-	while ((dent = readdir(dir))) {
-		uint64_t oid;
-
-		if (!strcmp(dent->d_name, "."))
-			continue;
-
-		oid = strtoull(dent->d_name, NULL, 16);
-		if (oid == 0 || oid == ULLONG_MAX)
-			continue;
-
-		if (!is_vdi_obj(oid))
-			continue;
-
-		vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
-
-		set_bit(oid_to_vid(oid), sys->vdi_inuse);
-		ret = read_vdi_copy_number(oid);
-		if (ret != SD_RES_SUCCESS)
-			break;
-	}
-	closedir(dir);
-
-	return ret;
-}
-
 static bool is_xattr_enabled(char *path)
 {
 	int ret, dummy;
@@ -368,8 +151,6 @@ static bool is_xattr_enabled(char *path)
 
 static int farm_init(char *p)
 {
-	struct siocb iocb;
-
 	dprintf("use farm store driver\n");
 	if (create_directory(p) < 0)
 		goto err;
@@ -385,255 +166,12 @@ static int farm_init(char *p)
 	if (snap_init() < 0)
 		goto err;
 
-	if (init_sys_vdi_bitmap(p) < 0)
+	if (default_init(p) < 0)
 		goto err;
-
-	iocb.epoch = sys->epoch ? sys->epoch - 1 : 0;
-	farm_cleanup_sys_obj(&iocb);
 
 	return SD_RES_SUCCESS;
 err:
 	return SD_RES_EIO;
-}
-
-static void *read_working_object(uint64_t oid, uint64_t offset,
-				 uint32_t length)
-{
-	void *buf = NULL;
-	char path[PATH_MAX];
-	int fd, flags = def_open_flags;
-	size_t size;
-
-	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
-
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
-
-	fd = open(path, flags);
-	if (fd < 0) {
-		dprintf("object %"PRIx64" not found\n", oid);
-		goto out;
-	}
-
-	buf = valloc(length);
-	if (!buf) {
-		eprintf("no memory to allocate buffer.\n");
-		goto out;
-	}
-
-	if (flock(fd, LOCK_SH) < 0) {
-		eprintf("%m\n");
-		goto err;
-	}
-
-	size = xpread(fd, buf, length, offset);
-	if (flock(fd, LOCK_UN) < 0) {
-		eprintf("%m\n");
-		goto err;
-	}
-
-	if (length != size) {
-		eprintf("size %zu len %"PRIu32" off %"PRIu64" %m\n", size,
-			length, offset);
-		goto err;
-	}
-
-out:
-	if (fd > 0)
-		close(fd);
-	return buf;
-err:
-	free(buf);
-	close(fd);
-	return NULL;
-}
-
-static void *retrieve_object_from_snap(uint64_t oid, uint32_t epoch)
-{
-	struct sha1_file_hdr hdr;
-	struct trunk_entry *trunk_buf, *trunk_free = NULL;
-	unsigned char trunk_sha1[SHA1_LEN];
-	uint64_t nr_trunks, i;
-	void *buffer = NULL;
-
-	if (get_trunk_sha1(epoch, trunk_sha1, 0) < 0)
-		goto out;
-
-	trunk_free = trunk_buf = trunk_file_read(trunk_sha1, &hdr);
-	if (!trunk_buf)
-		goto out;
-
-	nr_trunks = hdr.priv;
-	for (i = 0; i < nr_trunks; i++, trunk_buf++) {
-		struct sha1_file_hdr h;
-		if (trunk_buf->oid != oid)
-			continue;
-
-		buffer = sha1_file_read(trunk_buf->sha1, &h);
-		break;
-	}
-
-out:
-	dprintf("oid %"PRIx64", epoch %d, %s\n", oid, epoch, buffer ? "succeed" : "fail");
-	free(trunk_free);
-	return buffer;
-}
-
-static int farm_read(uint64_t oid, struct siocb *iocb)
-{
-	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
-	uint32_t epoch = sys_epoch();
-	char path[PATH_MAX];
-	ssize_t size;
-	int i;
-	void *buffer;
-
-	if (iocb->epoch < epoch) {
-
-		buffer = read_working_object(oid, iocb->offset, iocb->length);
-		if (!buffer) {
-			/* Here if read the object from the targeted epoch failed,
-			 * we need to read from the later epoch, because at some epoch
-			 * we doesn't write the object to the snapshot, we assume
-			 * it in the current local object directory, but maybe
-			 * in the next epoch we removed it from the local directory.
-			 * in this case, we should try to retrieve object upwards, since.
-			 * when the object is to be removed, it will get written to the
-			 * snapshot at later epoch.
-			 */
-			for (i = iocb->epoch; i < epoch; i++) {
-				buffer = retrieve_object_from_snap(oid, i);
-				if (buffer)
-					break;
-			}
-		}
-		if (!buffer)
-			return SD_RES_NO_OBJ;
-		memcpy(iocb->buf, buffer, iocb->length);
-		free(buffer);
-
-		return SD_RES_SUCCESS;
-	}
-
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
-
-	sprintf(path, "%s%016"PRIx64, obj_path, oid);
-	fd = open(path, flags);
-
-	if (fd < 0)
-		return err_to_sderr(oid, errno);
-
-	if (flock(fd, LOCK_SH) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out;
-	}
-	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
-	if (flock(fd, LOCK_UN) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out;
-	}
-	if (size != iocb->length) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
-out:
-	close(fd);
-	return ret;
-}
-
-static int farm_atomic_put(uint64_t oid, struct siocb *iocb)
-{
-	char path[PATH_MAX], tmp_path[PATH_MAX];
-	int flags = def_open_flags | O_CREAT;
-	int ret = SD_RES_EIO, fd;
-	uint32_t len = iocb->length;
-
-	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
-	snprintf(tmp_path, sizeof(tmp_path), "%s%016" PRIx64 ".tmp",
-		 obj_path, oid);
-
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
-	fd = open(tmp_path, flags, def_fmode);
-	if (fd < 0) {
-		eprintf("failed to open %s: %m\n", tmp_path);
-		goto out;
-	}
-
-	ret = xwrite(fd, iocb->buf, len);
-	if (ret != len) {
-		eprintf("failed to write object. %m\n");
-		ret = SD_RES_EIO;
-		goto out_close;
-	}
-
-	ret = rename(tmp_path, path);
-	if (ret < 0) {
-		eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
-		ret = SD_RES_EIO;
-		goto out_close;
-	}
-	dprintf("%"PRIx64"\n", oid);
-	trunk_get_entry(oid);
-	ret = SD_RES_SUCCESS;
-out_close:
-	close(fd);
-out:
-	return ret;
-}
-
-static int farm_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
-{
-	int ret = SD_RES_EIO;
-	void *buf = NULL;
-	struct siocb io = { 0 };
-	int i;
-	uint32_t epoch = sys_epoch();
-
-	dprintf("try link %"PRIx64" from snapshot with epoch %d\n", oid, tgt_epoch);
-
-	for (i = tgt_epoch; i < epoch; i++) {
-		buf = retrieve_object_from_snap(oid, i);
-		if (buf)
-			break;
-	}
-	if (!buf)
-		goto out;
-
-	io.length = iocb->length;
-	io.buf = buf;
-	ret = farm_atomic_put(oid, &io);
-out:
-	free(buf);
-	return ret;
-}
-
-static int farm_end_recover(uint32_t old_epoch,
-		struct vnode_info *old_vnode_info)
-{
-	unsigned char snap_sha1[SHA1_LEN];
-	unsigned char trunk_sha1[SHA1_LEN];
-
-	if (old_epoch == 0)
-		return SD_RES_SUCCESS;
-
-	dprintf("old epoch %d\n", old_epoch);
-
-	if (trunk_file_write_recovery(trunk_sha1) < 0)
-		return SD_RES_EIO;
-
-	if (snap_file_write(old_epoch, old_vnode_info->nodes,
-			    old_vnode_info->nr_nodes, trunk_sha1,
-			    snap_sha1) < 0)
-		return SD_RES_EIO;
-
-	if (snap_log_write(old_epoch, snap_sha1, 0) < 0)
-		return SD_RES_EIO;
-
-	return SD_RES_SUCCESS;
 }
 
 static int farm_snapshot(struct siocb *iocb)
@@ -728,7 +266,7 @@ static int restore_objects_from_snap(uint32_t epoch)
 		}
 		io.length = h.size;
 		io.buf = buffer;
-		ret = farm_atomic_put(oid, &io);
+		ret = default_atomic_put(oid, &io);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("oid %"PRIx64" not restored\n", oid);
 			goto out;
@@ -801,56 +339,25 @@ static int farm_format(struct siocb *iocb)
 	if (set_cluster_store(name) < 0)
 		return SD_RES_EIO;
 
-	trunk_reset();
-
 	return SD_RES_SUCCESS;
-}
-
-static int farm_purge_obj(void)
-{
-	if (cleanup_working_dir() < 0)
-		return SD_RES_EIO;
-	trunk_reset();
-
-	return SD_RES_SUCCESS;
-}
-
-static int farm_remove_object(uint64_t oid)
-{
-	char path[PATH_MAX];
-	int ret = SD_RES_SUCCESS;
-
-	sprintf(path, "%s%016"PRIx64, obj_path, oid);
-
-	if (unlink(path) < 0) {
-		if (errno == ENOENT) {
-			ret = SD_RES_NO_OBJ;
-			goto out;
-		}
-		eprintf("%m\n");
-		ret =  SD_RES_EIO;
-	}
-out:
-	trunk_put_entry(oid);
-	return ret;
 }
 
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
-	.exist = farm_exist,
-	.write = farm_write,
-	.read = farm_read,
-	.link = farm_link,
-	.atomic_put = farm_atomic_put,
-	.end_recover = farm_end_recover,
+	.exist = default_exist,
+	.write = default_write,
+	.read = default_read,
+	.link = default_link,
+	.atomic_put = default_atomic_put,
+	.end_recover = default_end_recover,
 	.snapshot = farm_snapshot,
-	.cleanup = farm_cleanup_sys_obj,
+	.cleanup = default_cleanup,
 	.restore = farm_restore,
 	.get_snap_file = farm_get_snap_file,
 	.format = farm_format,
-	.purge_obj = farm_purge_obj,
-	.remove_object = farm_remove_object,
+	.purge_obj = default_purge_obj,
+	.remove_object = default_remove_object,
 };
 
 add_store_driver(farm);

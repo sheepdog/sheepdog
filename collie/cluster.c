@@ -520,7 +520,7 @@ static struct subcommand cluster_cmd[] = {
 	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
 	 NULL, 0, cluster_snapshot, cluster_options},
 	{"cleanup", NULL, "aph",
-	 "cleanup the useless snapshot data from recovery",
+	 "cleanup the useless data genereated from recovery",
 	 NULL, 0, cluster_cleanup, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",

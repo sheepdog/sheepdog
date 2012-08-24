@@ -63,7 +63,7 @@ static int for_each_objects(int (*func)(uint64_t oid))
 	return ret;
 }
 
-static int default_exist(uint64_t oid)
+int default_exist(uint64_t oid)
 {
 	char path[PATH_MAX];
 
@@ -95,7 +95,7 @@ static int err_to_sderr(uint64_t oid, int err)
 	return SD_RES_NO_OBJ;
 }
 
-static int default_write(uint64_t oid, struct siocb *iocb, int create)
+int default_write(uint64_t oid, struct siocb *iocb, int create)
 {
 	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
@@ -132,7 +132,7 @@ out:
 	return ret;
 }
 
-static int default_cleanup(struct siocb *iocb)
+int default_cleanup(struct siocb *iocb)
 {
 	rmdir_r(stale_dir);
 	if (mkdir(stale_dir, 0755) < 0) {
@@ -155,7 +155,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
-static int default_init(char *p)
+int default_init(char *p)
 {
 	dprintf("use plain store driver\n");
 
@@ -196,7 +196,7 @@ out:
 	return ret;
 }
 
-static int default_read(uint64_t oid, struct siocb *iocb)
+int default_read(uint64_t oid, struct siocb *iocb)
 {
 	int ret;
 	char path[PATH_MAX];
@@ -213,7 +213,7 @@ static int default_read(uint64_t oid, struct siocb *iocb)
 	return ret;
 }
 
-static int default_atomic_put(uint64_t oid, struct siocb *iocb)
+int default_atomic_put(uint64_t oid, struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int flags = def_open_flags | O_CREAT;
@@ -251,7 +251,7 @@ out:
 	return ret;
 }
 
-static int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
+int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 
@@ -317,8 +317,7 @@ static int move_object_to_stale_dir(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
-static int default_end_recover(uint32_t old_epoch,
-				    struct vnode_info *old_vnode_info)
+int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 {
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
@@ -326,7 +325,7 @@ static int default_end_recover(uint32_t old_epoch,
 	return for_each_objects(move_object_to_stale_dir);
 }
 
-static int default_format(struct siocb *iocb)
+int default_format(struct siocb *iocb)
 {
 	unsigned ret;
 	const char name[] = "plain";
@@ -348,7 +347,7 @@ static int default_format(struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
-static int default_remove_object(uint64_t oid)
+int default_remove_object(uint64_t oid)
 {
 	char path[PATH_MAX];
 
@@ -365,7 +364,7 @@ static int default_remove_object(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
-static int default_purge_obj(void)
+int default_purge_obj(void)
 {
 	return for_each_objects(default_remove_object);
 }

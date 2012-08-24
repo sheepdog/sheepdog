@@ -159,6 +159,18 @@ struct store_driver {
 	int (*get_snap_file)(struct siocb *);
 };
 
+int default_init(char *p);
+int default_exist(uint64_t oid);
+int default_write(uint64_t oid, struct siocb *iocb, int create);
+int default_read(uint64_t oid, struct siocb *iocb);
+int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch);
+int default_atomic_put(uint64_t oid, struct siocb *iocb);
+int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info);
+int default_cleanup(struct siocb *iocb);
+int default_format(struct siocb *iocb);
+int default_remove_object(uint64_t oid);
+int default_purge_obj(void);
+
 extern struct list_head store_drivers;
 #define add_store_driver(driver)                                 \
 static void __attribute__((constructor)) add_ ## driver(void) {  \
