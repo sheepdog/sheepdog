@@ -36,7 +36,7 @@ static int get_stale_obj_path(uint64_t oid, char *path)
 	return sprintf(path, "%s/%016"PRIx64, stale_dir, oid);
 }
 
-static int for_each_objects(int (*func)(uint64_t oid))
+int for_each_object_in_wd(int (*func)(uint64_t oid))
 {
 	DIR *dir;
 	struct dirent *d;
@@ -196,7 +196,7 @@ int default_init(char *p)
 		}
 	}
 
-	return for_each_objects(init_objlist_and_vdi_bitmap);
+	return for_each_object_in_wd(init_objlist_and_vdi_bitmap);
 }
 
 static int default_read_from_path(uint64_t oid, char *path,
@@ -350,7 +350,7 @@ int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
-	return for_each_objects(move_object_to_stale_dir);
+	return for_each_object_in_wd(move_object_to_stale_dir);
 }
 
 int default_format(char *name)
@@ -393,7 +393,7 @@ int default_remove_object(uint64_t oid)
 
 int default_purge_obj(void)
 {
-	return for_each_objects(default_remove_object);
+	return for_each_object_in_wd(default_remove_object);
 }
 
 struct store_driver plain_store = {

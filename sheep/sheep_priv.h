@@ -170,6 +170,7 @@ int default_cleanup(struct siocb *iocb);
 int default_format(char *name);
 int default_remove_object(uint64_t oid);
 int default_purge_obj(void);
+int for_each_object_in_wd(int (*func)(uint64_t oid));
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)                                 \

@@ -160,9 +160,6 @@ static int farm_init(char *p)
 		goto err;
 	}
 
-	if (trunk_init() < 0)
-		goto err;
-
 	if (snap_init() < 0)
 		goto err;
 
@@ -194,7 +191,7 @@ static int farm_snapshot(struct siocb *iocb)
 	if (nr_nodes < 0)
 		goto out;
 
-	if (trunk_file_write_user(trunk_sha1) < 0)
+	if (trunk_file_write(trunk_sha1) < 0)
 		goto out;
 
 	if (snap_file_write(sys->epoch, nodes, nr_nodes,
