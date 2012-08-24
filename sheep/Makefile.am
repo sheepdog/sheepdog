@@ -26,7 +26,8 @@ sbin_PROGRAMS		= sheep
 
 sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c work.c \
 			  journal.c ops.c recovery.c cluster/local.c \
-			  object_cache.c object_list_cache.c sockfd_cache.c
+			  object_cache.c object_list_cache.c sockfd_cache.c \
+			  plain_store.c
 
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c
