@@ -143,14 +143,42 @@ int default_cleanup(struct siocb *iocb)
 	return SD_RES_SUCCESS;
 }
 
+static int init_vdi_copy_number(uint64_t oid)
+{
+	char path[PATH_MAX];
+	int fd, flags = def_open_flags, ret;
+	struct sheepdog_inode inode;
+
+	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
+
+	fd = open(path, flags);
+	if (fd < 0) {
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	ret = xpread(fd, (void *)&inode, SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_INODE_HEADER_SIZE) {
+		eprintf("%m\n");
+		return SD_RES_EIO;
+	}
+
+	add_vdi_copy_number(oid_to_vid(oid), inode.nr_copies);
+
+	return SD_RES_SUCCESS;
+}
+
 static int init_objlist_and_vdi_bitmap(uint64_t oid)
 {
+	int ret;
 	objlist_cache_insert(oid);
 
 	if (is_vdi_obj(oid)) {
 		vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
-
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
+		ret = init_vdi_copy_number(oid);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
 	}
 	return SD_RES_SUCCESS;
 }
