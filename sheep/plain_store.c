@@ -353,10 +353,9 @@ int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 	return for_each_objects(move_object_to_stale_dir);
 }
 
-int default_format(struct siocb *iocb)
+int default_format(char *name)
 {
 	unsigned ret;
-	const char name[] = "plain";
 
 	dprintf("try get a clean store\n");
 	ret = rmdir_r(obj_path);

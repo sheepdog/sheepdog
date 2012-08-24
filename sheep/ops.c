@@ -227,7 +227,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	latest_epoch = get_latest_epoch();
 	iocb.epoch = latest_epoch;
 
-	ret = sd_store->format(&iocb);
+	ret = sd_store->format(data);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 

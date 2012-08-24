@@ -318,30 +318,6 @@ out:
 	return ret;
 }
 
-static int farm_format(struct siocb *iocb)
-{
-	char path[PATH_MAX];
-	unsigned ret;
-	const char name[] = "farm";
-
-	dprintf("try get a clean store\n");
-	snprintf(path, sizeof(path), "%s", obj_path);
-	ret = rmdir_r(path);
-	if (ret && ret != -ENOENT) {
-		eprintf("failed to remove %s: %s\n", path, strerror(-ret));
-		return SD_RES_EIO;
-	}
-	if (mkdir(path, def_dmode) < 0) {
-		eprintf("%m\n");
-		return SD_RES_EIO;
-	}
-
-	if (set_cluster_store(name) < 0)
-		return SD_RES_EIO;
-
-	return SD_RES_SUCCESS;
-}
-
 struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
@@ -355,7 +331,7 @@ struct store_driver farm = {
 	.cleanup = default_cleanup,
 	.restore = farm_restore,
 	.get_snap_file = farm_get_snap_file,
-	.format = farm_format,
+	.format = default_format,
 	.purge_obj = default_purge_obj,
 	.remove_object = default_remove_object,
 };

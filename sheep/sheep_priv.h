@@ -144,7 +144,7 @@ struct store_driver {
 	int (*exist)(uint64_t oid);
 	int (*write)(uint64_t oid, struct siocb *, int create);
 	int (*read)(uint64_t oid, struct siocb *);
-	int (*format)(struct siocb *);
+	int (*format)(char *name);
 	int (*remove_object)(uint64_t oid);
 	/* Operations in recovery */
 	int (*link)(uint64_t oid, struct siocb *, uint32_t tgt_epoch);
@@ -167,7 +167,7 @@ int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch);
 int default_atomic_put(uint64_t oid, struct siocb *iocb);
 int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info);
 int default_cleanup(struct siocb *iocb);
-int default_format(struct siocb *iocb);
+int default_format(char *name);
 int default_remove_object(uint64_t oid);
 int default_purge_obj(void);
 
