@@ -319,17 +319,7 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 		goto out;
 	}
 
-	if (flock(fd, LOCK_SH) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
 	size = xpread(fd, buf, count, offset);
-	if (flock(fd, LOCK_UN) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
 
 	if (size != count) {
 		eprintf("size %zu, count:%zu, offset %jd %m\n",
@@ -366,17 +356,7 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 		goto out;
 	}
 
-	if (flock(fd, LOCK_EX) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
 	size = xpwrite(fd, buf, count, offset);
-	if (flock(fd, LOCK_UN) < 0) {
-		ret = SD_RES_EIO;
-		eprintf("%m\n");
-		goto out_close;
-	}
 
 	if (size != count) {
 		eprintf("size %zu, count:%zu, offset %jd %m\n",
