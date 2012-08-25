@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Test recovery when we have less zones availability
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 8
+
+$COLLIE cluster format
+
+$COLLIE vdi create test 100MB
+# create 25 objects
+for i in `seq 0 24`; do
+    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+$COLLIE vdi read test | md5sum
+
+for i in `seq 7 -1 0`; do
+    _wait_for_sheep_recovery 0
+    _kill_sheep $i
+done
+
+sleep 1
+
+# start master first to avoid master transfer
+_start_sheep 0
+_wait_for_sheep 1
+for i in `seq 0 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep_recovery 0
+
+ls $STORE/*/obj/807c2b2500000000 | sort
+for i in `seq 0 24`; do
+    ls $STORE/*/obj/007c2b25000000`printf "%02x" $i` | sort
+done
+
+$COLLIE vdi read test | md5sum
