@@ -19,7 +19,18 @@
 
 static char stale_dir[PATH_MAX];
 
-static int def_open_flags = O_DIRECT | O_DSYNC | O_RDWR;
+static int get_open_flags(uint64_t oid, bool create)
+{
+	int flags = O_DSYNC | O_RDWR;
+
+	if (is_data_obj(oid))
+		flags |= O_DIRECT;
+
+	if (create)
+		flags |= O_CREAT | O_TRUNC;
+
+	return flags;
+}
 
 static int get_obj_path(uint64_t oid, char *path)
 {
@@ -97,7 +108,7 @@ static int err_to_sderr(uint64_t oid, int err)
 
 int default_write(uint64_t oid, struct siocb *iocb, int create)
 {
-	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
+	int flags = get_open_flags(oid, create), fd, ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 	ssize_t size;
 
@@ -105,11 +116,6 @@ int default_write(uint64_t oid, struct siocb *iocb, int create)
 		dprintf("%"PRIu32" sys %"PRIu32"\n", iocb->epoch, sys_epoch());
 		return SD_RES_OLD_NODE_VER;
 	}
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
-
-	if (create)
-		flags |= O_CREAT | O_TRUNC;
 
 	get_obj_path(oid, path);
 	fd = open(path, flags, def_fmode);
@@ -146,7 +152,7 @@ int default_cleanup(struct siocb *iocb)
 static int init_vdi_copy_number(uint64_t oid)
 {
 	char path[PATH_MAX];
-	int fd, flags = def_open_flags, ret;
+	int fd, flags = get_open_flags(oid, false), ret;
 	struct sheepdog_inode inode;
 
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
@@ -202,11 +208,8 @@ int default_init(char *p)
 static int default_read_from_path(uint64_t oid, char *path,
 				       struct siocb *iocb)
 {
-	int flags = def_open_flags, fd, ret = SD_RES_SUCCESS;
+	int flags = get_open_flags(oid, false), fd, ret = SD_RES_SUCCESS;
 	ssize_t size;
-
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
 
 	fd = open(path, flags);
 
@@ -244,15 +247,13 @@ int default_read(uint64_t oid, struct siocb *iocb)
 int default_atomic_put(uint64_t oid, struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
-	int flags = def_open_flags | O_CREAT;
+	int flags = get_open_flags(oid, true);
 	int ret = SD_RES_EIO, fd;
 	uint32_t len = iocb->length;
 
 	get_obj_path(oid, path);
 	get_tmp_obj_path(oid, tmp_path);
 
-	if (!is_data_obj(oid))
-		flags &= ~O_DIRECT;
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
 		eprintf("failed to open %s: %m\n", tmp_path);
