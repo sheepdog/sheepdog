@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Test vdi list after cluster restart
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+_start_sheep 0
+_wait_for_sheep 1
+
+$COLLIE cluster format -c 1
+
+for i in 1 2 3; do
+    $COLLIE vdi create test$i ${i}00MB
+done
+
+$COLLIE vdi list | _filter_short_date
+
+$COLLIE cluster shutdown
+sleep 1
+
+_start_sheep 0
+_wait_for_sheep 1
+
+$COLLIE vdi list | _filter_short_date
