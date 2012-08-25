@@ -148,13 +148,17 @@ _wait_for_sheep()
 {
     while true; do
         sleep 1
-        nr_sheep="$($COLLIE node list | wc -l)"
-        if [ ${nr_sheep} -eq $(($1+1)) ]; then
+        node_list="$($COLLIE node list)"
+
+        if [ $? != 0 ]; then
+            _die "failed to get node list"
+        fi
+
+        if [ $(echo "$node_list" | wc -l) -eq $(($1+1)) ]; then
             break
         fi
         if [ ${nr_sheep} -gt $(($1+1)) ]; then
-            echo "ERROR: too many sheep in cluster: ${nr_sheep}"
-            break
+            _die "ERROR: too many sheep in cluster: ${nr_sheep}"
         fi
     done
 }
@@ -162,20 +166,35 @@ _wait_for_sheep()
 _start_sheep()
 {
     $SHEEP $STORE/$1 -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2
+
+    if [ $? != 0 ]; then
+        _die "cannot start sheep $1"
+    fi
 }
 
 _kill_sheep()
 {
     pkill -9 -f "$SHEEP $STORE/$1"
+
+    if [ $? != 0 ]; then
+        _die "cannot kill sheep $1"
+    fi
 }
 
 _wait_for_sheep_recovery()
 {
     while true; do
-       sleep 2
-       if [ $($COLLIE node recovery -p $((7000+$1)) | wc -l) -eq 2 ]; then
-           break
-       fi
+        sleep 2
+        recovery_info="$($COLLIE node recovery -p $((7000+$1)))"
+
+        if [ $? != 0 ]; then
+            _die "failed to get recovery info"
+        fi
+
+        if [ $(echo "$recovery_info" | wc -l) -eq 2 ]; then
+            break
+        fi
+
     done
 }
 
