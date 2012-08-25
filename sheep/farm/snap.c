@@ -28,19 +28,6 @@ int snap_init(void)
 	struct strbuf buf = STRBUF_INIT;
 
 	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", "sys_snap");
-
-	fd = open(buf.buf, O_CREAT | O_EXCL, 0666);
-	if (fd < 0) {
-		if (errno != EEXIST) {
-			ret = -1;
-			goto out;
-		}
-	}
-	close(fd);
-
-	strbuf_reset(&buf);
-	strbuf_addstr(&buf, farm_dir);
 	strbuf_addf(&buf, "/%s", "user_snap");
 
 	fd = open(buf.buf, O_CREAT | O_EXCL, 0666);
@@ -57,24 +44,7 @@ out:
 	return ret;
 }
 
-int snap_log_truncate(void)
-{
-	int ret = 0;
-	struct strbuf buf = STRBUF_INIT;
-
-	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", "sys_snap");
-
-	if (truncate(buf.buf, 0) < 0) {
-		dprintf("truncate snapshot log file fail:%m.\n");
-		ret = -1;
-	}
-
-	strbuf_release(&buf);
-	return ret;
-}
-
-int snap_log_write(uint32_t epoch, unsigned char *sha1, int user)
+int snap_log_write(uint32_t epoch, unsigned char *sha1)
 {
 	int fd, ret = -1;
 	struct strbuf buf = STRBUF_INIT;
@@ -83,7 +53,7 @@ int snap_log_write(uint32_t epoch, unsigned char *sha1, int user)
 
 	memcpy(log.sha1, sha1, SHA1_LEN);
 	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", user ? "user_snap" : "sys_snap");
+	strbuf_addf(&buf, "/%s", "user_snap");
 
 	fd = open(buf.buf, O_WRONLY | O_APPEND);
 	if (fd < 0) {
@@ -103,7 +73,7 @@ out:
 	return ret;
 }
 
-void *snap_log_read(int *out_nr, int user)
+void *snap_log_read(int *out_nr)
 {
 	struct strbuf buf = STRBUF_INIT;
 	struct stat st;
@@ -111,7 +81,7 @@ void *snap_log_read(int *out_nr, int user)
 	int len, fd;
 
 	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", user ? "user_snap" : "sys_snap");
+	strbuf_addf(&buf, "/%s", "user_snap");
 
 	fd = open(buf.buf, O_RDONLY);
 	if (fd < 0) {
@@ -156,7 +126,7 @@ void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 }
 
 int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
-		unsigned char *trunksha1, unsigned char *outsha1)
+		    unsigned char *trunksha1, unsigned char *outsha1)
 {
 	int ret = 0;
 	struct strbuf buf = STRBUF_INIT;

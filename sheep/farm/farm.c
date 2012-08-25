@@ -112,14 +112,14 @@ int prealloc(int fd, uint32_t size)
 	return ret;
 }
 
-static int get_trunk_sha1(uint32_t epoch, unsigned char *outsha1, int user)
+static int get_trunk_sha1(uint32_t epoch, unsigned char *outsha1)
 {
 	int i, nr_logs = -1, ret = -1;
 	struct snap_log *log_buf, *log_free = NULL;
 	void *snap_buf = NULL;
 	struct sha1_file_hdr hdr;
 
-	log_free = log_buf = snap_log_read(&nr_logs, user);
+	log_free = log_buf = snap_log_read(&nr_logs);
 	dprintf("%d\n", nr_logs);
 	if (nr_logs < 0)
 		goto out;
@@ -180,7 +180,7 @@ static int farm_snapshot(struct siocb *iocb)
 	void *buffer;
 	int log_nr, ret = SD_RES_EIO, epoch;
 
-	buffer = snap_log_read(&log_nr, 1);
+	buffer = snap_log_read(&log_nr);
 	if (!buffer)
 		goto out;
 
@@ -198,7 +198,7 @@ static int farm_snapshot(struct siocb *iocb)
 			    trunk_sha1, snap_sha1) < 0)
 		goto out;
 
-	if (snap_log_write(epoch, snap_sha1, 1) < 0)
+	if (snap_log_write(epoch, snap_sha1) < 0)
 		goto out;
 
 	ret = SD_RES_SUCCESS;
@@ -240,7 +240,7 @@ static int restore_objects_from_snap(uint32_t epoch)
 	uint64_t nr_trunks, i;
 	int ret = SD_RES_EIO;
 
-	if (get_trunk_sha1(epoch, trunk_sha1, 1) < 0)
+	if (get_trunk_sha1(epoch, trunk_sha1) < 0)
 		goto out;
 
 	trunk_free = trunk_buf = trunk_file_read(trunk_sha1, &hdr);
@@ -303,7 +303,7 @@ static int farm_get_snap_file(struct siocb *iocb)
 	int nr;
 
 	dprintf("try get snap file\n");
-	buffer = snap_log_read(&nr, 1);
+	buffer = snap_log_read(&nr);
 	if (!buffer)
 		goto out;
 	size = nr * sizeof(struct snap_log);
