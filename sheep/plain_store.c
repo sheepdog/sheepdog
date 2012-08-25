@@ -307,7 +307,7 @@ static bool oid_stale(uint64_t oid)
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 
 	vinfo = get_vnode_info();
-	nr_copies = get_obj_copy_number(oid);
+	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
 	if (!nr_copies) {
 		ret = false;
 		goto out;

@@ -655,7 +655,7 @@ static int read_copy_from_replica(struct vnode_info *vnodes, uint32_t epoch,
 	char name[128];
 	int rounded_rand, local = -1;
 
-	nr_copies = get_obj_copy_number(oid);
+	nr_copies = get_obj_copy_number(oid, vnodes->nr_zones);
 	oid_to_vnodes(vnodes->vnodes, vnodes->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 
@@ -765,7 +765,8 @@ int peer_read_obj(struct request *req)
 	if (hdr->obj.copies)
 		rsp->obj.copies = hdr->obj.copies;
 	else
-		rsp->obj.copies = get_obj_copy_number(hdr->obj.oid);
+		rsp->obj.copies = get_obj_copy_number(hdr->obj.oid,
+						      req->vinfo->nr_zones);
 out:
 	return ret;
 }

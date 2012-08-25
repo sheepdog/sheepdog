@@ -215,7 +215,7 @@ int init_base_path(const char *dir);
 
 int fill_vdi_copy_list(void *data);
 int get_vdi_copy_number(uint32_t vid);
-int get_obj_copy_number(uint64_t oid);
+int get_obj_copy_number(uint64_t oid, int nr_zones);
 int get_max_copy_number(void);
 int get_req_copy_number(struct request *req);
 int add_vdi_copy_number(uint32_t vid, int nr_copies);

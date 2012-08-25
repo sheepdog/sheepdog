@@ -86,7 +86,7 @@ int get_vdi_copy_number(uint32_t vid)
 	return entry->nr_copies;
 }
 
-int get_obj_copy_number(uint64_t oid)
+int get_obj_copy_number(uint64_t oid, int nr_zones)
 {
 	uint32_t vid;
 	if (is_vdi_attr_obj(oid))
@@ -94,16 +94,17 @@ int get_obj_copy_number(uint64_t oid)
 	else
 		vid = oid_to_vid(oid);
 
-	return get_vdi_copy_number(vid);
+	return min(get_vdi_copy_number(vid), nr_zones);
 }
 
 int get_req_copy_number(struct request *req)
 {
 	int nr_copies;
 
-	nr_copies = req->rq.obj.copies;
+	nr_copies = min((int)req->rq.obj.copies, req->vinfo->nr_zones);
 	if (!nr_copies)
-		nr_copies = get_obj_copy_number(req->rq.obj.oid);
+		nr_copies = get_obj_copy_number(req->rq.obj.oid,
+						req->vinfo->nr_zones);
 
 	return nr_copies;
 }

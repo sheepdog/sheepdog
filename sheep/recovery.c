@@ -172,7 +172,7 @@ again:
 		oid, tgt_epoch);
 
 	/* Let's do a breadth-first search */
-	nr_copies = get_obj_copy_number(oid);
+	nr_copies = get_obj_copy_number(oid, old->nr_zones);
 	for (i = 0; i < nr_copies; i++) {
 		struct sd_vnode *tgt_vnode = oid_to_vnode(old->vnodes,
 							  old->nr_vnodes,
@@ -516,7 +516,7 @@ static void screen_object_list(struct recovery_work *rw,
 	int i, j;
 
 	for (i = 0; i < nr_oids; i++) {
-		nr_objs = get_obj_copy_number(oids[i]);
+		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
 		if (!nr_objs) {
 			dprintf("can not find copy number for object %" PRIx64
 				"\n", oids[i]);
