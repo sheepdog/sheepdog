@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Test sheep joining with older objects
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+# start 8 nodes
+for i in `seq 0 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 8
+
+$COLLIE cluster format
+
+$COLLIE vdi create test 100MB
+# create 25 objects
+for i in `seq 0 24`; do
+    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+# kill 5 nodes
+for i in `seq 3 7`; do
+    _wait_for_sheep_recovery 0
+    _kill_sheep $i
+done
+
+# update vdi
+for i in `seq 0 24`; do
+    echo $(($i + 100)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+$COLLIE vdi read test | md5sum
+
+# start 5 nodes who have old objects
+for i in `seq 3 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 8
+
+for i in `seq 0 7`; do
+    $COLLIE vdi read test -p 700$i | md5sum
+done
