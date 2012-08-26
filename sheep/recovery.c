@@ -337,6 +337,31 @@ static inline void run_next_rw(struct recovery_work *rw)
 	dprintf("recovery work is superseded\n");
 }
 
+static void notify_recovery_completion_work(struct work *work)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
+	struct sd_req hdr;
+	int ret;
+
+	sd_init_req(&hdr, SD_OP_COMPLETE_RECOVERY);
+	hdr.epoch = rw->epoch;
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = sizeof(sys->this_node);
+
+	ret = exec_local_req(&hdr, &sys->this_node);
+	if (ret != SD_RES_SUCCESS)
+		eprintf("failed to notify recovery completion, %d\n",
+			rw->epoch);
+}
+
+static void notify_recovery_completion_main(struct work *work)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
+	free_recovery_work(rw);
+}
+
 static inline void finish_recovery(struct recovery_work *rw)
 {
 	recovering_work = NULL;
@@ -345,7 +370,10 @@ static inline void finish_recovery(struct recovery_work *rw)
 	if (sd_store->end_recover)
 		sd_store->end_recover(sys->epoch - 1, rw->old_vinfo);
 
-	free_recovery_work(rw);
+	/* notify recovery completion to other nodes */
+	rw->work.fn = notify_recovery_completion_work;
+	rw->work.done = notify_recovery_completion_main;
+	queue_work(sys->recovery_wqueue, &rw->work);
 
 	dprintf("recovery complete: new epoch %"PRIu32"\n",
 		sys->recovered_epoch);

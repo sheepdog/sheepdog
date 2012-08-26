@@ -536,8 +536,6 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data)
 {
 	int ret;
-	struct siocb iocb = { 0 };
-	iocb.epoch = sys->epoch;
 
 	if (node_in_recovery())
 		return SD_RES_NODE_IN_RECOVERY;
@@ -546,7 +544,7 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 		return SD_RES_SUCCESS;
 
 	if (sd_store->cleanup)
-		ret = sd_store->cleanup(&iocb);
+		ret = sd_store->cleanup();
 	else
 		ret = SD_RES_NO_SUPPORT;
 
@@ -559,6 +557,49 @@ static int cluster_notify_vdi_del(const struct sd_req *req, struct sd_rsp *rsp,
 	uint32_t vid = *(uint32_t *)data;
 
 	return objlist_cache_cleanup(vid);
+}
+
+static int cluster_recovery_completion(const struct sd_req *req,
+				       struct sd_rsp *rsp,
+				       void *data)
+{
+	static struct sd_node recovereds[SD_MAX_NODES], *node;
+	static size_t nr_recovereds;
+	static int latest_epoch;
+	struct vnode_info *vnode_info;
+	int i;
+
+	node = (struct sd_node *)data;
+
+	if (latest_epoch < req->epoch) {
+		dprintf("new epoch %d\n", req->epoch);
+		latest_epoch = req->epoch;
+		nr_recovereds = 0;
+	}
+
+	recovereds[nr_recovereds++] = *(struct sd_node *)node;
+	qsort(recovereds, nr_recovereds, sizeof(*recovereds), node_id_cmp);
+
+	dprintf("%s is recovered at epoch %d\n", node_to_str(node), req->epoch);
+	for (i = 0; i < nr_recovereds; i++)
+		dprintf("[%x] %s\n", i, node_to_str(recovereds + i));
+
+	if (sys->epoch != latest_epoch)
+		return SD_RES_SUCCESS;
+
+	vnode_info = get_vnode_info();
+
+	if (vnode_info->nr_nodes == nr_recovereds &&
+	    memcmp(vnode_info->nodes, recovereds,
+		   sizeof(*recovereds) * nr_recovereds) == 0) {
+		dprintf("all nodes are recovered at epoch %d\n", req->epoch);
+		if (sd_store->cleanup)
+			sd_store->cleanup();
+	}
+
+	put_vnode_info(vnode_info);
+
+	return SD_RES_SUCCESS;
 }
 
 static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
@@ -945,6 +986,13 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = 1,
 		.process_main = cluster_notify_vdi_del,
+	},
+
+	[SD_OP_COMPLETE_RECOVERY] = {
+		.name = "COMPLETE_RECOVERY",
+		.type = SD_OP_TYPE_CLUSTER,
+		.force = 1,
+		.process_main = cluster_recovery_completion,
 	},
 
 	/* local operations */

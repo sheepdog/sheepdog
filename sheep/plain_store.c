@@ -138,7 +138,7 @@ out:
 	return ret;
 }
 
-int default_cleanup(struct siocb *iocb)
+int default_cleanup(void)
 {
 	rmdir_r(stale_dir);
 	if (mkdir(stale_dir, 0755) < 0) {
