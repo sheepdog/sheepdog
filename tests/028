@@ -21,9 +21,12 @@ _wait_for_sheep 2
 
 $COLLIE cluster format -c 2
 
-$COLLIE vdi create test 20M
+$COLLIE vdi create test 100M
 
-dd if=/dev/urandom | $COLLIE vdi write test
+for i in `seq 0 24`; do
+    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
 $COLLIE vdi read test | md5sum > /tmp/csum.0
 
 for i in 2 3; do
@@ -33,7 +36,11 @@ for i in 2 3; do
     _wait_for_sheep_recovery $i
 done
 
-dd if=/dev/urandom | $COLLIE vdi write test -p 7002
+# write different content
+for i in `seq 0 24`; do
+    echo $(($i+1)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512 -p 7002
+done
+
 $COLLIE vdi read test -p 7002 | md5sum > /tmp/csum.1
 
 for i in 2 3; do
@@ -48,7 +55,7 @@ $COLLIE vdi read test -p 7001 | md5sum > /tmp/csum.3
 
 $COLLIE vdi object test
 
-for i in `seq 0 4`; do
+for i in `seq 0 24`; do
     $COLLIE vdi object -i $i test
 done
 

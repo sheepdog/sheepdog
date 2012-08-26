@@ -24,4 +24,84 @@ Looking for the object 0x7c2b2500000004 (the inode vid 0x7c2b25 idx 4) with 2 no
 
 127.0.0.1:7000 has the object (should be 2 copies)
 127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000005 (the inode vid 0x7c2b25 idx 5) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000006 (the inode vid 0x7c2b25 idx 6) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000007 (the inode vid 0x7c2b25 idx 7) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000008 (the inode vid 0x7c2b25 idx 8) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000009 (the inode vid 0x7c2b25 idx 9) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b250000000a (the inode vid 0x7c2b25 idx 10) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b250000000b (the inode vid 0x7c2b25 idx 11) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b250000000c (the inode vid 0x7c2b25 idx 12) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b250000000d (the inode vid 0x7c2b25 idx 13) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b250000000e (the inode vid 0x7c2b25 idx 14) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b250000000f (the inode vid 0x7c2b25 idx 15) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000010 (the inode vid 0x7c2b25 idx 16) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000011 (the inode vid 0x7c2b25 idx 17) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000012 (the inode vid 0x7c2b25 idx 18) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000013 (the inode vid 0x7c2b25 idx 19) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000014 (the inode vid 0x7c2b25 idx 20) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000015 (the inode vid 0x7c2b25 idx 21) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000016 (the inode vid 0x7c2b25 idx 22) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000017 (the inode vid 0x7c2b25 idx 23) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
+Looking for the object 0x7c2b2500000018 (the inode vid 0x7c2b25 idx 24) with 2 nodes
+
+127.0.0.1:7000 has the object (should be 2 copies)
+127.0.0.1:7001 has the object (should be 2 copies)
 update test successfully
