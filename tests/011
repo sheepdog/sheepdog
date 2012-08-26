@@ -23,6 +23,7 @@ _cleanup_devices()
         umount $STORE/$i
         rm -f $STORE/$i.img
     done
+    rm $seq.full
 }
 
 _cleanup

@@ -19,9 +19,9 @@ for i in 0 2; do
     _start_sheep $i
 done
 
-sleep 1
+_wait_for_sheep 2
 
-$COLLIE cluster format -c 2 >> $0.full
+$COLLIE cluster format -c 2
 $COLLIE vdi create test 4G
 
 echo -n value > $STORE/tmp.dat

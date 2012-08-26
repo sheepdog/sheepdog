@@ -154,7 +154,9 @@ _wait_for_sheep()
             _die "failed to get node list"
         fi
 
-        if [ $(echo "$node_list" | wc -l) -eq $(($1+1)) ]; then
+        nr_sheep="$(echo "$node_list" | wc -l)"
+
+        if [ ${nr_sheep} -eq $(($1+1)) ]; then
             break
         fi
         if [ ${nr_sheep} -gt $(($1+1)) ]; then
