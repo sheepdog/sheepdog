@@ -55,5 +55,6 @@ ls $STORE/*/obj/807c2b2500000000 | sort
 for i in `seq 0 24`; do
     ls $STORE/*/obj/007c2b25000000`printf "%02x" $i` | sort
 done
+ls $STORE/*/obj/.stale | sort
 
 $COLLIE vdi read test | md5sum

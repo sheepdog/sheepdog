@@ -79,4 +79,19 @@ using backend farm store
 /tmp/sheepdog/0/obj/007c2b2500000018
 /tmp/sheepdog/1/obj/007c2b2500000018
 /tmp/sheepdog/5/obj/007c2b2500000018
+
+
+
+
+
+
+
+/tmp/sheepdog/0/obj/.stale:
+/tmp/sheepdog/1/obj/.stale:
+/tmp/sheepdog/2/obj/.stale:
+/tmp/sheepdog/3/obj/.stale:
+/tmp/sheepdog/4/obj/.stale:
+/tmp/sheepdog/5/obj/.stale:
+/tmp/sheepdog/6/obj/.stale:
+/tmp/sheepdog/7/obj/.stale:
 9c7766570b3be3aff2724f587c2f4107  -
