@@ -170,7 +170,7 @@ int default_cleanup(void);
 int default_format(char *name);
 int default_remove_object(uint64_t oid);
 int default_purge_obj(void);
-int for_each_object_in_wd(int (*func)(uint64_t oid));
+int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg);
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)                                 \

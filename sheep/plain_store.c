@@ -47,7 +47,7 @@ static int get_stale_obj_path(uint64_t oid, char *path)
 	return sprintf(path, "%s/%016"PRIx64, stale_dir, oid);
 }
 
-int for_each_object_in_wd(int (*func)(uint64_t oid))
+int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -76,7 +76,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid))
 			continue;
 		}
 
-		ret = func(oid);
+		ret = func(oid, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
@@ -184,7 +184,7 @@ static int init_vdi_copy_number(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
-static int init_objlist_and_vdi_bitmap(uint64_t oid)
+static int init_objlist_and_vdi_bitmap(uint64_t oid, void *arg)
 {
 	int ret;
 	objlist_cache_insert(oid);
@@ -212,7 +212,7 @@ int default_init(char *p)
 		}
 	}
 
-	return for_each_object_in_wd(init_objlist_and_vdi_bitmap);
+	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, NULL);
 }
 
 static int default_read_from_path(uint64_t oid, char *path,
@@ -337,7 +337,7 @@ out:
 	return ret;
 }
 
-static int move_object_to_stale_dir(uint64_t oid)
+static int move_object_to_stale_dir(uint64_t oid, void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 
@@ -353,10 +353,10 @@ static int move_object_to_stale_dir(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
-static int check_stale_objects(uint64_t oid)
+static int check_stale_objects(uint64_t oid, void *arg)
 {
 	if (oid_stale(oid))
-		return move_object_to_stale_dir(oid);
+		return move_object_to_stale_dir(oid, arg);
 
 	return SD_RES_SUCCESS;
 }
@@ -366,7 +366,7 @@ int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
-	return for_each_object_in_wd(check_stale_objects);
+	return for_each_object_in_wd(check_stale_objects, NULL);
 }
 
 int default_format(char *name)
@@ -409,7 +409,7 @@ int default_remove_object(uint64_t oid)
 
 int default_purge_obj(void)
 {
-	return for_each_object_in_wd(move_object_to_stale_dir);
+	return for_each_object_in_wd(move_object_to_stale_dir, NULL);
 }
 
 struct store_driver plain_store = {

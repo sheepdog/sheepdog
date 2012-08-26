@@ -66,11 +66,12 @@ out:
 	return ret;
 }
 
-static uint64_t object_nr;
-
-static int inc_object_nr(uint64_t oid)
+static int inc_object_nr(uint64_t oid, void *arg)
 {
-	object_nr++;
+	uint64_t *object_nr = arg;
+
+	(*object_nr)++;
+
 	return 0;
 }
 
@@ -81,11 +82,11 @@ int trunk_file_write(unsigned char *outsha1)
 	struct trunk_entry entry;
 	struct dirent *d;
 	DIR *dir;
-	uint64_t data_size, oid;
+	uint64_t data_size, oid, object_nr = 0;
 	int ret = 0;
 
 	/* Add the hdr first */
-	for_each_object_in_wd(inc_object_nr);
+	for_each_object_in_wd(inc_object_nr, &object_nr);
 	data_size = sizeof(struct trunk_entry) * object_nr;
 	hdr.size = data_size;
 	hdr.priv = object_nr;
@@ -121,7 +122,6 @@ int trunk_file_write(unsigned char *outsha1)
 	}
 	dprintf("trunk sha1: %s\n", sha1_to_hex(outsha1));
 out:
-	object_nr = 0;
 	closedir(dir);
 	strbuf_release(&buf);
 	return ret;
