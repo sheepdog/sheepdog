@@ -197,6 +197,7 @@ again:
 	if (ret < 0) {
 		struct vnode_info *new_old;
 
+rollback:
 		tgt_epoch--;
 		if (tgt_epoch < 1) {
 			eprintf("can not recover oid %"PRIx64"\n", oid);
@@ -205,10 +206,9 @@ again:
 		}
 
 		new_old = get_vnode_info_epoch(tgt_epoch);
-		if (!new_old) {
-			ret = -1;
-			goto err;
-		}
+		if (!new_old)
+			/* We rollback in case we don't get a valid epoch */
+			goto rollback;
 
 		put_vnode_info(old);
 		old = new_old;
