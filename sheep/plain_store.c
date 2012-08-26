@@ -331,9 +331,6 @@ static int move_object_to_stale_dir(uint64_t oid)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 
-	if (!oid_stale(oid))
-		return SD_RES_SUCCESS;
-
 	get_obj_path(oid, path);
 	get_stale_obj_path(oid, stale_path);
 
@@ -346,12 +343,20 @@ static int move_object_to_stale_dir(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
+static int check_stale_objects(uint64_t oid)
+{
+	if (oid_stale(oid))
+		return move_object_to_stale_dir(oid);
+
+	return SD_RES_SUCCESS;
+}
+
 int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 {
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
-	return for_each_object_in_wd(move_object_to_stale_dir);
+	return for_each_object_in_wd(check_stale_objects);
 }
 
 int default_format(char *name)
@@ -394,7 +399,7 @@ int default_remove_object(uint64_t oid)
 
 int default_purge_obj(void)
 {
-	return for_each_object_in_wd(default_remove_object);
+	return for_each_object_in_wd(move_object_to_stale_dir);
 }
 
 struct store_driver plain_store = {
