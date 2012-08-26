@@ -53,6 +53,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid))
 	struct dirent *d;
 	uint64_t oid;
 	int ret = SD_RES_SUCCESS;
+	char path[PATH_MAX];
 
 	dir = opendir(obj_path);
 	if (!dir)
@@ -65,6 +66,15 @@ int for_each_object_in_wd(int (*func)(uint64_t oid))
 		oid = strtoull(d->d_name, NULL, 16);
 		if (oid == 0 || oid == ULLONG_MAX)
 			continue;
+
+		/* remove object if it is temporary one */
+		if (strlen(d->d_name) == 20 &&
+		    strcmp(d->d_name + 16, ".tmp") == 0) {
+			get_tmp_obj_path(oid, path);
+			dprintf("remove tmp object %s\n", path);
+			unlink(path);
+			continue;
+		}
 
 		ret = func(oid);
 		if (ret != SD_RES_SUCCESS)
