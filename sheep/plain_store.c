@@ -42,9 +42,9 @@ static int get_tmp_obj_path(uint64_t oid, char *path)
 	return sprintf(path, "%s%016"PRIx64".tmp", obj_path, oid);
 }
 
-static int get_stale_obj_path(uint64_t oid, char *path)
+static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 {
-	return sprintf(path, "%s/%016"PRIx64, stale_dir, oid);
+	return sprintf(path, "%s/%016"PRIx64".%d", stale_dir, oid, epoch);
 }
 
 int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg)
@@ -241,13 +241,16 @@ int default_read(uint64_t oid, struct siocb *iocb)
 {
 	int ret;
 	char path[PATH_MAX];
+	uint32_t epoch = sys_epoch();
 
 	get_obj_path(oid, path);
 	ret = default_read_from_path(oid, path, iocb);
 
-	if (ret == SD_RES_NO_OBJ && iocb->epoch < sys_epoch()) {
-		/* try to read from the stale directory */
-		get_stale_obj_path(oid, path);
+	/* If the request is againt the older epoch, try to read from
+	 * the stale directory */
+	while (ret == SD_RES_NO_OBJ && iocb->epoch < epoch) {
+		epoch--;
+		get_stale_obj_path(oid, epoch, path);
 		ret = default_read_from_path(oid, path, iocb);
 	}
 
@@ -298,7 +301,7 @@ int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 		tgt_epoch);
 
 	get_obj_path(oid, path);
-	get_stale_obj_path(oid, stale_path);
+	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (rename(stale_path, path) < 0) {
 		eprintf("%m\n");
@@ -340,9 +343,10 @@ out:
 static int move_object_to_stale_dir(uint64_t oid, void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
+	uint32_t tgt_epoch = *(int *)arg;
 
 	get_obj_path(oid, path);
-	get_stale_obj_path(oid, stale_path);
+	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (rename(path, stale_path) < 0) {
 		eprintf("%s:%m\n", path);
@@ -366,7 +370,7 @@ int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
-	return for_each_object_in_wd(check_stale_objects, NULL);
+	return for_each_object_in_wd(check_stale_objects, &old_epoch);
 }
 
 int default_format(char *name)
@@ -409,7 +413,9 @@ int default_remove_object(uint64_t oid)
 
 int default_purge_obj(void)
 {
-	return for_each_object_in_wd(move_object_to_stale_dir, NULL);
+	uint32_t tgt_epoch = get_latest_epoch();
+
+	return for_each_object_in_wd(move_object_to_stale_dir, &tgt_epoch);
 }
 
 struct store_driver plain_store = {
