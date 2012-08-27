@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Test sockfd keepalive
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+trap "_uninit; exit \$status" 0 1 2 3 15
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_uninit()
+{
+	iptables -D INPUT -p tcp --sport 7001 -j DROP
+	iptables -D INPUT -p tcp --dport 7001 -j DROP
+}
+
+_cleanup
+
+for i in `seq 0 1 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format -c 3 -m unsafe
+
+$COLLIE vdi create test 40M
+(
+dd if=/dev/urandom | $COLLIE vdi write test
+) &
+
+sleep 3
+# Simulate machine(127.0.0.1:7001) down
+iptables -A INPUT -p tcp --sport 7001 -j DROP
+iptables -A INPUT -p tcp --dport 7001 -j DROP
+
+sleep 1
+# Trigger the confchg
+_kill_sheep 1
+
+_wait_for_collie
+
+for i in `seq 0 9`; do
+	$COLLIE vdi object -i $i test
+done
+
+status=0
