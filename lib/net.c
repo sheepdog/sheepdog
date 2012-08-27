@@ -243,6 +243,12 @@ int connect_to(const char *name, int port)
 			break;
 		}
 
+		ret = set_snd_timeout(fd);
+		if (ret) {
+			close(fd);
+			break;
+		}
+
 		ret = set_nodelay(fd);
 		if (ret) {
 			eprintf("%m\n");
@@ -423,6 +429,18 @@ int set_nonblocking(int fd)
 	}
 
 	return ret;
+}
+
+/* Send timeout for 5 second */
+int set_snd_timeout(int fd)
+{
+	struct timeval timeout;
+
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+
+	return setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
+			  sizeof(timeout));
 }
 
 int set_nodelay(int fd)

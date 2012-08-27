@@ -51,6 +51,7 @@ uint8_t *str_to_addr(int af, const char *ipstr, uint8_t *addr);
 int set_nonblocking(int fd);
 int set_nodelay(int fd);
 int set_keepalive(int fd);
+int set_snd_timeout(int fd);
 int set_timeout(int fd);
 int get_local_addr(uint8_t *bytes);
 
