@@ -141,6 +141,12 @@ static int check_request_epoch(struct request *req)
 
 static bool request_in_recovery(struct request *req)
 {
+
+	/* For CREATE request, we simply service it */
+	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_PEER ||
+	    req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
+		return false;
+
 	/*
 	 * Request from recovery should go down the Farm even if
 	 * oid_in_recovery() returns true because we should also try snap
@@ -152,10 +158,12 @@ static bool request_in_recovery(struct request *req)
 		 * Put request on wait queues of local node
 		 */
 		if (is_recovery_init()) {
+			dprintf("%"PRIx64" on rw_queue\n", req->local_oid);
 			req->rp.result = SD_RES_OBJ_RECOVERING;
 			list_add_tail(&req->request_list,
 				      &sys->wait_rw_queue);
 		} else {
+			dprintf("%"PRIx64" on obj_queue\n", req->local_oid);
 			list_add_tail(&req->request_list,
 				      &sys->wait_obj_queue);
 		}
@@ -328,7 +336,7 @@ static void queue_request(struct request *req)
 		goto done;
 	}
 
-	dprintf("%s\n", op_name(req->op));
+	dprintf("%s, %d\n", op_name(req->op), sys->status);
 
 	switch (sys->status) {
 	case SD_STATUS_KILLED:
