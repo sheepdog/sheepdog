@@ -31,7 +31,6 @@ done
 ) &
 
 # kill nodes and join them back
-sleep 1
 for i in 1 2; do _kill_sheep $i;done
 _wait_for_sheep_recovery 0
 for i in 3 4; do _kill_sheep $i;done
@@ -45,7 +44,7 @@ _wait_for_collie
 # wait vdi create to completion
 while true; do
     nr1=`$COLLIE vdi list | wc -l`
-    sleep 1
+    sleep 3
     nr2=`$COLLIE vdi list | wc -l`
     if [ $nr1 -eq $nr2 ]; then
          break;
