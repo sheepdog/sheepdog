@@ -80,7 +80,7 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_WAIT_FOR_FORMAT:
 	case SD_RES_KILLED:
 		dprintf("retrying failed I/O request "
-			"op %s result %d epoch %d, sys epoch %d\n",
+			"op %s result %x epoch %"PRIu32", sys epoch %"PRIu32"\n",
 			op_name(req->op),
 			req->rp.result,
 			req->rq.epoch,

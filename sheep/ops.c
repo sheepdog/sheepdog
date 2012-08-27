@@ -1222,7 +1222,7 @@ void do_process_work(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	int ret = SD_RES_SUCCESS;
 
-	dprintf("%x, %" PRIx64" , %u\n",
+	dprintf("%x, %" PRIx64", %"PRIu32"\n",
 		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
 
 	if (req->op->process_work)

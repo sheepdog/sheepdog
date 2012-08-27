@@ -44,7 +44,7 @@ static int get_tmp_obj_path(uint64_t oid, char *path)
 
 static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 {
-	return sprintf(path, "%s/%016"PRIx64".%d", stale_dir, oid, epoch);
+	return sprintf(path, "%s/%016"PRIx64".%"PRIx32, stale_dir, oid, epoch);
 }
 
 int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg)
