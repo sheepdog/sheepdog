@@ -370,6 +370,7 @@ int main(int argc, char **argv)
 	sys->gateway_wqueue = init_work_queue("gateway", false);
 	sys->io_wqueue = init_work_queue("io", false);
 	sys->recovery_wqueue = init_work_queue("recovery", true);
+	sys->recovery_notify_wqueue = init_work_queue("recovery notify", true);
 	sys->deletion_wqueue = init_work_queue("deletion", true);
 	sys->block_wqueue = init_work_queue("block", true);
 	sys->sockfd_wqueue = init_work_queue("sockfd", true);

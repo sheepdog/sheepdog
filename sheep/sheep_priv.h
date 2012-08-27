@@ -115,6 +115,7 @@ struct cluster_info {
 	struct work_queue *io_wqueue;
 	struct work_queue *deletion_wqueue;
 	struct work_queue *recovery_wqueue;
+	struct work_queue *recovery_notify_wqueue;
 	struct work_queue *block_wqueue;
 	struct work_queue *sockfd_wqueue;
 	struct work_queue *reclaim_wqueue;
