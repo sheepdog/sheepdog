@@ -79,6 +79,7 @@ static int node_info(int argc, char **argv)
 		if (!ret) {
 			printf(raw_output ? "%d %s %s %d%%\n" : "%2d\t%s\t%s\t%3d%%\n",
 			       i, store_str, free_str,
+			       rsp->store_size == 0 ? 0 :
 			       (int)(((double)(rsp->store_size - rsp->store_free) / rsp->store_size) * 100));
 			success++;
 		}
