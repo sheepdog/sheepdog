@@ -138,12 +138,9 @@ Enable automatic recovery and run once recover if necessary.
 .TP
 .BI "cluster recover disable [-a address] [-f] [-p port] [-h]"
 Disable automatic recovery caused by JOIN events (excluding LEAVE events now).
-.TP
-.BI "cluster cleanup [-a address] [-p port] [-h]"
-This command cleans up unwanted snapshot data after recovery.
 
 .SH DEPENDENCIES
-\fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z.
+\fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z or 2.y.z.
 
 .SH FILES
 none

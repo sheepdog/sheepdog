@@ -335,22 +335,6 @@ static int cluster_snapshot(int argc, char **argv)
 	return ret;
 }
 
-static int cluster_cleanup(int argc, char **argv)
-{
-	int ret;
-	struct sd_req hdr;
-
-	sd_init_req(&hdr, SD_OP_CLEANUP);
-
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-
 #define RECOVER_PRINT \
 "Caution! Please try starting all the cluster nodes normally before\n\
 running this command.\n\n\
@@ -519,9 +503,6 @@ static struct subcommand cluster_cmd[] = {
 	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown, cluster_options},
 	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
 	 NULL, 0, cluster_snapshot, cluster_options},
-	{"cleanup", NULL, "aph",
-	 "cleanup the useless data genereated from recovery",
-	 NULL, 0, cluster_cleanup, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",
 	 cluster_recover_cmd, SUBCMD_FLAG_NEED_THIRD_ARG,
