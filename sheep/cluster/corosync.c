@@ -731,8 +731,16 @@ static int corosync_init(const char *option)
 		.cpg_confchg_fn = cdrv_cpg_confchg
 	};
 
+again:
 	ret = cpg_initialize(&cpg_handle, &cb);
-	if (ret != CS_OK) {
+	switch (ret) {
+	case CS_OK:
+		/* success */
+		break;
+	case CS_ERR_TRY_AGAIN:
+		dprintf("retry cpg_initialize\n");
+		goto again;
+	default:
 		eprintf("failed to initialize cpg (%d) - "
 			"is corosync running?\n", ret);
 		return -1;
