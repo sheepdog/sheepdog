@@ -578,6 +578,7 @@ static int notify_vdi_deletion(uint32_t vdi_id)
 	int ret = SD_RES_SUCCESS;
 
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_DEL);
+	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = sizeof(vdi_id);
 
 	ret = exec_local_req(&hdr, &vdi_id);

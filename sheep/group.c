@@ -249,7 +249,7 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 	struct vdi_op_message *msg;
 	size_t size;
 
-	if (has_process_main(req->op))
+	if (has_process_main(req->op) && req->rq.flags & SD_FLAG_CMD_WRITE)
 		size = sizeof(*msg) + req->rq.data_length;
 	else
 		size = sizeof(*msg);
@@ -265,7 +265,7 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 	memcpy(&msg->req, &req->rq, sizeof(struct sd_req));
 	memcpy(&msg->rsp, &req->rp, sizeof(struct sd_rsp));
 
-	if (has_process_main(req->op))
+	if (has_process_main(req->op) && req->rq.flags & SD_FLAG_CMD_WRITE)
 		memcpy(msg->data, req->data, req->rq.data_length);
 
 	*sizep = size;
@@ -931,7 +931,8 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 
 	if (req) {
 		msg->rsp.result = ret;
-		if (has_process_main(req->op))
+		if (has_process_main(req->op) &&
+		    !(req->rq.flags & SD_FLAG_CMD_WRITE))
 			memcpy(req->data, msg->data, msg->rsp.data_length);
 		memcpy(&req->rp, &msg->rsp, sizeof(req->rp));
 
