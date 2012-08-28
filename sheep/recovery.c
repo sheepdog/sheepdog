@@ -300,8 +300,12 @@ bool oid_in_recovery(uint64_t oid)
 	if (rw->state == RW_INIT)
 		return true;
 
-	/* FIXME: do we need more efficient yet complex data structure? */
-	for (i = rw->done - 1; i < rw->count; i++)
+	/*
+	 * Check if oid is in the list that to be recovered later
+	 *
+	 * FIXME: do we need more efficient yet complex data structure?
+	 */
+	for (i = rw->done; i < rw->count; i++)
 		if (rw->oids[i] == oid)
 			break;
 
