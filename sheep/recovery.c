@@ -377,7 +377,7 @@ static inline void finish_recovery(struct recovery_work *rw)
 	/* notify recovery completion to other nodes */
 	rw->work.fn = notify_recovery_completion_work;
 	rw->work.done = notify_recovery_completion_main;
-	queue_work(sys->recovery_notify_wqueue, &rw->work);
+	queue_work(sys->recovery_wqueue, &rw->work);
 
 	dprintf("recovery complete: new epoch %"PRIu32"\n",
 		sys->recovered_epoch);
