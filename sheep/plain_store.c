@@ -56,8 +56,10 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg)
 	char path[PATH_MAX];
 
 	dir = opendir(obj_path);
-	if (!dir)
+	if (!dir) {
+		eprintf("failed to open %s, %m\n", obj_path);
 		return SD_RES_EIO;
+	}
 
 	while ((d = readdir(dir))) {
 		if (!strncmp(d->d_name, ".", 1))
@@ -91,7 +93,7 @@ int default_exist(uint64_t oid)
 	get_obj_path(oid, path);
 	if (access(path, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
-			eprintf("%m\n");
+			eprintf("failed to check object %"PRIx64", %m\n", oid);
 		return 0;
 	}
 
@@ -103,7 +105,7 @@ static int err_to_sderr(uint64_t oid, int err)
 	struct stat s;
 
 	if (err != ENOENT) {
-		eprintf("%m\n");
+		eprintf("oid=%"PRIx64", %m\n", oid);
 		return SD_RES_EIO;
 	}
 
@@ -139,7 +141,9 @@ int default_write(uint64_t oid, struct siocb *iocb, int create)
 	}
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
-		eprintf("%m\n");
+		eprintf("failed to write object %"PRIx64", path=%s, offset=%"
+			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
+			iocb->offset, iocb->length, size);
 		ret = SD_RES_EIO;
 		goto out;
 	}
@@ -169,13 +173,13 @@ static int init_vdi_copy_number(uint64_t oid)
 
 	fd = open(path, flags);
 	if (fd < 0) {
-		eprintf("%m\n");
+		eprintf("failed to open %s, %m\n", path);
 		return SD_RES_EIO;
 	}
 
 	ret = xpread(fd, (void *)&inode, SD_INODE_HEADER_SIZE, 0);
 	if (ret != SD_INODE_HEADER_SIZE) {
-		eprintf("%m\n");
+		eprintf("failed to read inode header, path=%s, %m\n", path);
 		return SD_RES_EIO;
 	}
 
@@ -228,6 +232,9 @@ static int default_read_from_path(uint64_t oid, char *path,
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
+		eprintf("failed to read object %"PRIx64", path=%s, offset=%"
+			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
+			iocb->offset, iocb->length, size);
 		ret = SD_RES_EIO;
 		goto out;
 	}
@@ -304,7 +311,8 @@ int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (rename(stale_path, path) < 0) {
-		eprintf("%m\n");
+		eprintf("failed to rename from %s to %s, %m\n", stale_path,
+			path);
 		return SD_RES_EIO;
 	}
 
@@ -349,7 +357,8 @@ static int move_object_to_stale_dir(uint64_t oid, void *arg)
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (rename(path, stale_path) < 0) {
-		eprintf("%s:%m\n", path);
+		eprintf("failed to move stale object %"PRIX64" to %s, %m\n",
+			oid, path);
 		return SD_RES_EIO;
 	}
 
@@ -404,7 +413,7 @@ int default_remove_object(uint64_t oid)
 		if (errno == ENOENT)
 			return SD_RES_NO_OBJ;
 
-		eprintf("%m\n");
+		eprintf("failed to remove object %"PRIx64", %m\n", oid);
 		return SD_RES_EIO;
 	}
 
