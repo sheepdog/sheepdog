@@ -211,7 +211,7 @@ static int node_kill(int argc, char **argv)
 
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprh", "kill node", NULL,
-	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, node_kill},
+	 SUBCMD_FLAG_NEED_THIRD_ARG, node_kill},
 	{"list", NULL, "aprh", "list nodes", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node", NULL,
@@ -219,7 +219,7 @@ static struct subcommand node_cmd[] = {
 	{"recovery", NULL, "aprh", "show nodes in recovery", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
 	{"cache", "<cache size>", "aprh", "specify max cache size", NULL,
-	 SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG, node_cache},
+	 SUBCMD_FLAG_NEED_THIRD_ARG, node_cache},
 	{NULL,},
 };
 

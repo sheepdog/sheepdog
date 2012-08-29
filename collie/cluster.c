@@ -99,7 +99,6 @@ static int cluster_format(int argc, char **argv)
 	if (cluster_cmd_data.quorum)
 		hdr.flags |= SD_FLAG_QUORUM;
 
-	hdr.epoch = sd_epoch;
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
@@ -159,7 +158,6 @@ again:
 		goto error;
 
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
-	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
 	rlen = hdr.data_length;
@@ -222,7 +220,6 @@ static int cluster_shutdown(int argc, char **argv)
 	struct sd_req hdr;
 
 	sd_init_req(&hdr, SD_OP_SHUTDOWN);
-	hdr.epoch = sd_epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
@@ -500,7 +497,7 @@ static struct subcommand cluster_cmd[] = {
 	{"format", NULL, "bcmaph", "create a Sheepdog store",
 	 NULL, 0, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
-	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_shutdown, cluster_options},
+	 NULL, 0, cluster_shutdown, cluster_options},
 	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
 	 NULL, 0, cluster_snapshot, cluster_options},
 	{"recover", NULL, "afph",

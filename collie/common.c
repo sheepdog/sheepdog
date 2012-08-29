@@ -57,7 +57,6 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	}
 
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
-	hdr.epoch = sd_epoch;
 	hdr.data_length = rlen;
 
 	hdr.obj.oid = oid;
@@ -99,7 +98,6 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	else
 		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
 
-	hdr.epoch = sd_epoch;
 	hdr.data_length = wlen;
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 
@@ -149,7 +147,6 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 	sd_init_req(&req, SD_OP_GET_VDI_COPIES);
 	req.data_length = rlen;
-	req.epoch = sd_epoch;
 
 	ret = exec_req(fd, &req, (char *)vc, &wlen, &rlen);
 	if (ret < 0) {
