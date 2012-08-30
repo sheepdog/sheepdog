@@ -22,7 +22,7 @@ static struct sd_option vdi_options[] = {
 	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
 	{'x', "exclusive", 0, "write in an exclusive mode"},
 	{'d', "delete", 0, "delete a key"},
-	{'C', "cache", 0, "enable object cache"},
+	{'w', "writeback", 0, "use writeback mode"},
 	{'c', "copies", 1, "specify the data redundancy (number of copies)"},
 	{ 0, NULL, 0, NULL },
 };
@@ -35,7 +35,7 @@ struct vdi_cmd_data {
 	int delete;
 	int prealloc;
 	int nr_copies;
-	int cache;
+	bool writeback;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -1263,7 +1263,7 @@ static int vdi_write(int argc, char **argv)
 			flags = SD_FLAG_CMD_COW;
 		}
 
-		if (vdi_cmd_data.cache)
+		if (vdi_cmd_data.writeback)
 			flags |= SD_FLAG_CMD_CACHE;
 
 		remain = len;
@@ -1561,7 +1561,7 @@ static struct subcommand vdi_cmd[] = {
 	{"read", "<vdiname> [<offset> [<len>]]", "saph", "read data from an image",
 	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_read, vdi_options},
-	{"write", "<vdiname> [<offset> [<len>]]", "apCh", "write data to an image",
+	{"write", "<vdiname> [<offset> [<len>]]", "apwh", "write data to an image",
 	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_write, vdi_options},
 	{"flush", "<vdiname>", "aph", "flush data to cluster",
@@ -1600,8 +1600,8 @@ static int vdi_parser(int ch, char *opt)
 	case 'd':
 		vdi_cmd_data.delete = 1;
 		break;
-	case 'C':
-		vdi_cmd_data.cache = 1;
+	case 'w':
+		vdi_cmd_data.writeback = 1;
 		break;
 	case 'c':
 		nr_copies = strtol(opt, &p, 10);
