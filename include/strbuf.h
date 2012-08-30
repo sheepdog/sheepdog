@@ -95,7 +95,8 @@ extern void strbuf_addf(struct strbuf *sb, const char *fmt, ...);
 extern size_t strbuf_fread(struct strbuf *, size_t, FILE *);
 /* XXX: if read fails, any partial read is undone */
 extern ssize_t strbuf_read(struct strbuf *, int fd, size_t hint);
-int strbuf_getline(struct strbuf *sb, FILE *fp, int term);
+extern int strbuf_getline(struct strbuf *sb, FILE *fp, int term);
 extern int strbuf_copyout(struct strbuf *sb, void *buf, size_t len);
+extern int strbuf_stripout(struct strbuf *sb, void *buf, size_t len);
 
 #endif

@@ -195,3 +195,15 @@ int strbuf_copyout(struct strbuf *sb, void *buf, size_t len)
 
 	return len;
 }
+
+int strbuf_stripout(struct strbuf *sb, void *buf, size_t len)
+{
+	len = min(len, sb->len);
+	if (len == 0)
+		goto out;
+
+	memcpy(buf, sb->buf, len);
+	strbuf_remove(sb, 0, len);
+out:
+	return len;
+}

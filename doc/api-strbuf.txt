@@ -203,3 +203,9 @@ same behaviour as well.
 	Copy the contents of the strbuf to the second argument 'buf'.
 	The number of bytes to be copied is at most the third argument
 	'len'.
+
+`strbuf_stripout`::
+
+	Strip out the contents of the strbuf to the second argument 'buf'.
+	The number of bytes to be copied is at most the third argument
+	'len'.
