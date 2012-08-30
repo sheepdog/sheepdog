@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Test node failure just after format
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 8
+
+$COLLIE cluster format &
+
+for i in `seq 4 7`; do
+    _kill_sheep $i
+done
+
+_wait_for_collie
+
+for i in `seq 4 7`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep "8"
+
+for i in `seq 0 7`; do
+    $COLLIE cluster info -p 700$i | head -1
+    $COLLIE node list -p 700$i
+done

@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Test format cluster just after sheeps start up
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 7`; do
+    _start_sheep $i
+done
+
+while true; do
+    $COLLIE cluster format 2> /dev/null
+    if [ $? == 0 ]; then
+        break
+    fi
+    # try again until at least one sheep starts up
+done
+
+_wait_for_sheep 8
+
+for i in `seq 0 7`; do
+    $COLLIE cluster info -p 700$i | head -1
+    $COLLIE node list -p 700$i
+done
