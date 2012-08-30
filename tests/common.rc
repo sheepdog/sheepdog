@@ -143,11 +143,21 @@ _wait_for_collie()
     done
 }
 
+_count_sheep_processes()
+{
+    pgrep -f "$SHEEP $STORE/" -l | awk '{ $1=""; print }' | sort | uniq | wc -l
+}
+
 # wait for all sheep to join completely
 _wait_for_sheep()
 {
     while true; do
         sleep 1
+
+        if [ $(_count_sheep_processes) != $1 ]; then
+            _die "there are not enough sheep processes"
+        fi
+
         node_list="$($COLLIE node list)"
 
         if [ $? != 0 ]; then
