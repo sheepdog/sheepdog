@@ -32,6 +32,7 @@
 #include "work.h"
 #include "logger.h"
 #include "event.h"
+#include "trace/trace.h"
 
 static int efd;
 int total_nr_workers;
@@ -95,6 +96,7 @@ static inline void create_short_thread(struct worker_info *wi,
 	err = pthread_create(&thread, NULL, run_short_thread, sw);
 	if (err)
 		panic("%s\n", strerror(err));
+	short_thread_begin();
 }
 
 void queue_work(struct work_queue *q, struct work *work)
@@ -133,6 +135,8 @@ static void bs_thread_request_done(int fd, int events, void *data)
 			list_del(&work->w_list);
 
 			work->done(work);
+			if (!wi->ordered)
+				short_thread_end();
 		}
 	}
 }

@@ -1,6 +1,8 @@
 #ifndef __WORK_H__
 #define __WORK_H__
 
+#include <stdbool.h>
+
 struct work;
 struct work_queue;
 

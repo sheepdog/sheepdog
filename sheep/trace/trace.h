@@ -34,7 +34,6 @@ typedef void (*trace_func_graph_ret_t)(struct trace_graph_item *);
 typedef void (*trace_func_graph_ent_t)(struct trace_graph_item *);
 
 /* graph.c */
-extern void trace_init_buffer(struct list_head *list);
 
 /* stabs.c */
 extern int get_ipinfo(unsigned long ip, struct ipinfo *info);
@@ -50,24 +49,27 @@ extern unsigned long trace_return_call(void);
 
 /* trace.c */
 #ifdef ENABLE_TRACE
-  extern pthread_cond_t trace_cond;
-  extern pthread_mutex_t trace_mux;
-
   extern int trace_init_signal(void);
   extern int trace_init(void);
   extern int register_trace_function(trace_func_t func);
   extern int trace_enable(void);
   extern int trace_disable(void);
   extern struct caller *trace_lookup_ip(unsigned long ip, int create);
-  extern int trace_copy_buffer(void *buf);
-  extern void trace_reset_buffer(void);
+  extern uint32_t trace_buffer_pop(void *buf, uint32_t len);
+  extern void trace_buffer_push(int cpuid, struct trace_graph_item *item);
+  extern void short_thread_begin(void);
+  extern void short_thread_end(void);
 #else
   static inline int trace_init_signal(void) { return 0; }
   static inline int trace_init(void) { return 0; }
   static inline int trace_enable(void) { return 0; }
   static inline int trace_disable(void) { return 0; }
-  static inline int trace_copy_buffer(void *buf) { return 0; }
-  static inline void trace_reset_buffer(void) {}
+  static inline uint32_t trace_buffer_pop(void *buf) { return 0; }
+  static inline void trace_buffer_push(int cpuid, struct
+				       trace_graph_item *item) { return; }
+  extern inline void short_thread_begin(void) { return; }
+  extern inline void short_thread_end(void) { return; }
+
 #endif /* ENABLE_TRACE */
 
 #define register_tracer(new)			\

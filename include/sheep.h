@@ -46,8 +46,10 @@ struct vdi_copy {
 
 #define TRACE_BUF_LEN      (1024 * 1024 * 8)
 #define TRACE_FNAME_LEN    36
+#define TRACE_THREAD_LEN   20
 
 struct trace_graph_item {
+	char tname[TRACE_THREAD_LEN];
 	int type;
 	char fname[TRACE_FNAME_LEN];
 	int depth;

@@ -77,27 +77,4 @@ extern ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
 extern ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 extern int rmdir_r(char *dir_path);
 
-/* ring_buffer.c */
-struct rbuffer {
-	struct list_head list;
-	char *buffer;           /* data buffer */
-	char *buffer_end;
-	size_t capacity;        /* initial maximum number of items in the buffer */
-	size_t count;           /* number of items in the buffer */
-	size_t sz;              /* size of each item in the buffer */
-	char *head;
-	char *tail;
-};
-
-static inline size_t rbuffer_size(struct rbuffer *rbuf)
-{
-	return rbuf->count * rbuf->sz;
-}
-
-void rbuffer_push(struct rbuffer *rbuf, const void *item);
-void rbuffer_pop(struct rbuffer *rbuf, void *item);
-void rbuffer_destroy(struct rbuffer *rbuf);
-void rbuffer_create(struct rbuffer *rbuf, size_t capacity, size_t item_size);
-void rbuffer_reset(struct rbuffer *rbuf);
-
 #endif

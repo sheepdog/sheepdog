@@ -674,9 +674,8 @@ static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *d
 static int local_trace_cat_ops(const struct sd_req *req, struct sd_rsp *rsp,
 			       void *data)
 {
-	rsp->data_length = trace_copy_buffer(data);
+	rsp->data_length = trace_buffer_pop(data, req->data_length);
 	dprintf("%u\n", rsp->data_length);
-	trace_reset_buffer();
 	return SD_RES_SUCCESS;
 }
 

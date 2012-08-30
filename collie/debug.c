@@ -72,10 +72,9 @@ static int do_trace_cat(void)
 
 static int debug_trace(int argc, char **argv)
 {
-	int fd, ret, i, l;
+	int ret, i, l;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	char *cmd = argv[optind];
 	int enabled;
 
@@ -118,7 +117,7 @@ static int debug_parser(int ch, char *opt)
 
 static struct subcommand debug_cmd[] = {
 	{"trace", "{start, stop, cat}", "aph", "trace the node",
-		0, debug_trace},
+	 NULL, 0, debug_trace},
 	{NULL,},
 };
 

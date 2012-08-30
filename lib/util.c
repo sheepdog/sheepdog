@@ -60,7 +60,7 @@ void *xzalloc(size_t size)
 	return ret;
 }
 
-void *xrealloc(void *ptr, size_t size)
+notrace void *xrealloc(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
 	if (!ret && !size)

@@ -16,12 +16,15 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/eventfd.h>
 
 #include "trace.h"
 #include "logger.h"
 #include "list.h"
 #include "work.h"
 #include "sheepdog_proto.h"
+#include "strbuf.h"
+#include "event.h"
 
 #define TRACE_HASH_BITS       7
 #define TRACE_HASH_SIZE       (1 << TRACE_HASH_BITS)
@@ -31,12 +34,15 @@ static LIST_HEAD(caller_list);
 static pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static trace_func_t trace_func = trace_call;
-static int trace_count;
-static int trace_buffer_inited;
 
-static LIST_HEAD(buffer_list);
-pthread_cond_t trace_cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t trace_mux = PTHREAD_MUTEX_INITIALIZER;
+static int trace_efd;
+static int nr_short_thread;
+static int trace_in_patch;
+
+pthread_mutex_t suspend_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static struct strbuf *buffer;
+static int nr_cpu;
 
 union instruction {
 	unsigned char start[INSN_SIZE];
@@ -48,15 +54,11 @@ union instruction {
 
 static notrace void suspend(int num)
 {
-	dprintf("worker thread %u going to suspend\n", (int)pthread_self());
-
-	pthread_mutex_lock(&trace_mux);
-	trace_count--;
-	if (!trace_buffer_inited)
-		trace_init_buffer(&buffer_list); /* init worker threads rbuffer */
-	pthread_cond_wait(&trace_cond, &trace_mux);
-	pthread_mutex_unlock(&trace_mux);
-	dprintf("worker thread going to resume\n");
+	dprintf("going to suspend\n");
+	pthread_mutex_lock(&suspend_lock);
+	/* Now I am suspended and sleep on suspend_lock */
+	pthread_mutex_unlock(&suspend_lock);
+	dprintf("going to resume\n");
 }
 
 static inline int trace_hash(unsigned long ip)
@@ -178,29 +180,19 @@ notrace int register_trace_function(trace_func_t func)
 static notrace void suspend_worker_threads(void)
 {
 	struct worker_info *wi;
-	int i;
-	trace_count = total_nr_workers;
+
+	/* Hold the lock, then all other worker can sleep on it */
+	pthread_mutex_lock(&suspend_lock);
 	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
-		for (i = 0; i < wi->nr_threads; i++)
-			if (pthread_kill(wi->worker_thread[i], SIGUSR2) != 0)
-				dprintf("%m\n");
+		if (wi->worker_thread &&
+		    pthread_kill(wi->worker_thread, SIGUSR2) != 0)
+			dprintf("%m\n");
 	}
-wait_for_worker_suspend:
-	pthread_mutex_lock(&trace_mux);
-	if (trace_count > 0) {
-		pthread_mutex_unlock(&trace_mux);
-		pthread_yield();
-		goto wait_for_worker_suspend;
-	}
-	pthread_mutex_unlock(&trace_mux);
-	trace_buffer_inited = 1;
 }
 
 static notrace void resume_worker_threads(void)
 {
-	pthread_mutex_lock(&trace_mux);
-	pthread_cond_broadcast(&trace_cond);
-	pthread_mutex_unlock(&trace_mux);
+	pthread_mutex_unlock(&suspend_lock);
 }
 
 static notrace void patch_all_sites(unsigned long addr)
@@ -227,6 +219,40 @@ static notrace void nop_all_sites(void)
 	pthread_mutex_unlock(&trace_lock);
 }
 
+static notrace void enable_tracer(int fd, int events, void *data)
+{
+	eventfd_t value;
+	int ret;
+
+	ret = eventfd_read(trace_efd, &value);
+	if (ret < 0)
+		eprintf("%m");
+
+	suspend_worker_threads();
+	patch_all_sites((unsigned long)trace_caller);
+	resume_worker_threads();
+	unregister_event(trace_efd);
+	trace_in_patch = 0;
+	dprintf("tracer enabled\n");
+}
+
+static notrace void disable_tracer(int fd, int events, void *data)
+{
+	eventfd_t value;
+	int ret;
+
+	ret = eventfd_read(fd, &value);
+	if (ret < 0)
+		eprintf("%m");
+
+	suspend_worker_threads();
+	nop_all_sites();
+	resume_worker_threads();
+	unregister_event(trace_efd);
+	trace_in_patch = 0;
+	dprintf("tracer disabled\n");
+}
+
 notrace int trace_enable(void)
 {
 	if (trace_func == trace_call) {
@@ -234,19 +260,17 @@ notrace int trace_enable(void)
 		return SD_RES_NO_TAG;
 	}
 
-	suspend_worker_threads();
-	patch_all_sites((unsigned long)trace_caller);
-	resume_worker_threads();
-	dprintf("patch tracer done\n");
+	register_event(trace_efd, enable_tracer, NULL);
+	trace_in_patch = 1;
+
 	return SD_RES_SUCCESS;
 }
 
 notrace int trace_disable(void)
 {
-	suspend_worker_threads();
-	nop_all_sites();
-	resume_worker_threads();
-	dprintf("patch nop done\n");
+	register_event(trace_efd, disable_tracer, NULL);
+	trace_in_patch = 1;
+
 	return SD_RES_SUCCESS;
 }
 
@@ -264,33 +288,50 @@ int trace_init_signal(void)
 	return 0;
 }
 
-notrace int trace_copy_buffer(void *buf)
+notrace uint32_t trace_buffer_pop(void *buf, uint32_t len)
 {
-	struct rbuffer *rbuf;
-	int total = 0;
+	uint32_t readin, count = 0, requested = len;
+	char *buff = (char *)buf;
+	int i;
 
-	list_for_each_entry(rbuf, &buffer_list, list) {
-		int rbuf_size = rbuffer_size(rbuf);
-		if (rbuf_size) {
-			memcpy((char *)buf + total, rbuf->buffer, rbuf_size);
-			total += rbuf_size;
-		}
+	for (i = 0; i < nr_cpu; i++) {
+		readin = strbuf_stripout(&buffer[i], buff, len);
+		count += readin;
+		if (count == requested)
+			return count;
+		if (readin == 0)
+			continue;
+
+		len -= readin;
+		buff += readin;
 	}
-	return total;
+
+	return count;
 }
 
-notrace void trace_reset_buffer(void)
+notrace void trace_buffer_push(int cpuid, struct trace_graph_item *item)
 {
-	struct rbuffer *rbuf;
+	strbuf_add(&buffer[cpuid], item, sizeof(*item));
+}
 
-	list_for_each_entry(rbuf, &buffer_list, list) {
-		rbuffer_reset(rbuf);
-	}
+void short_thread_begin(void)
+{
+	nr_short_thread++;
+}
+
+void short_thread_end(void)
+{
+	eventfd_t value = 1;
+
+	nr_short_thread--;
+	if (trace_in_patch && nr_short_thread == 0)
+		eventfd_write(trace_efd, value);
 }
 
 notrace int trace_init()
 {
 	sigset_t block;
+	int i;
 
 	sigemptyset(&block);
 	sigaddset(&block, SIGUSR2);
@@ -304,9 +345,15 @@ notrace int trace_init()
 		return -1;
 	}
 
-	trace_init_buffer(&buffer_list); /* init main thread ring buffer */
 	replace_mcount_call((unsigned long)do_trace_init);
-	dprintf("main thread %u\n", (int)pthread_self());
-	dprintf("trace support enabled.\n");
+
+	nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
+	buffer = xzalloc(sizeof(*buffer) * nr_cpu);
+	for (i = 0; i < nr_cpu; i++)
+		strbuf_init(&buffer[i], 0);
+
+	trace_efd = eventfd(0, EFD_NONBLOCK);
+
+	dprintf("trace support enabled. cpu count %d.\n", nr_cpu);
 	return 0;
 }

@@ -13,6 +13,7 @@
 
 #include <time.h>
 #include <assert.h>
+#include <sched.h>
 
 #include "trace.h"
 #include "logger.h"
@@ -24,8 +25,6 @@ static __thread struct trace_ret_stack {
 	unsigned long func;
 	unsigned long long entry_time;
 } trace_ret_stack[100]; /* FIXME: consider stack overrun */
-
-static __thread struct rbuffer rbuf;
 
 static void push_return_trace(unsigned long ret, unsigned long long etime,
 		unsigned long func, int *depth)
@@ -55,12 +54,12 @@ static notrace uint64_t clock_get_time(void)
 
 static notrace void default_trace_graph_entry(struct trace_graph_item *item)
 {
-	rbuffer_push(&rbuf, item);
+	trace_buffer_push(sched_getcpu(), item);
 }
 
 static notrace void default_trace_graph_return(struct trace_graph_item *item)
 {
-	rbuffer_push(&rbuf, item);
+	trace_buffer_push(sched_getcpu(), item);
 }
 
 static trace_func_graph_ent_t trace_graph_entry = default_trace_graph_entry;
@@ -71,19 +70,15 @@ notrace unsigned long trace_return_call(void)
 	struct trace_graph_item trace;
 	unsigned long ret;
 
+	memset(&trace, 0, sizeof(trace));
+
+	get_thread_name(trace.tname);
 	trace.return_time = clock_get_time();
 	pop_return_trace(&trace, &ret);
 	trace.type = TRACE_GRAPH_RETURN;
 	trace_graph_return(&trace);
 
 	return ret;
-}
-
-notrace void trace_init_buffer(struct list_head *list)
-{
-	int sz = sizeof(struct trace_graph_item);
-	rbuffer_create(&rbuf, TRACE_BUF_LEN / sz, sz);
-	list_add(&rbuf.list, list);
 }
 
 /* Hook the return address and push it in the trace_ret_stack.
@@ -98,10 +93,13 @@ static notrace void graph_tracer(unsigned long ip, unsigned long *ret_addr)
 	struct trace_graph_item trace;
 	struct caller *cr;
 
+	memset(&trace, 0, sizeof(trace));
+
 	cr = trace_lookup_ip(ip, 0);
 	assert(cr->namelen + 1 < TRACE_FNAME_LEN);
 	memcpy(trace.fname, cr->name, cr->namelen);
 	memset(trace.fname + cr->namelen, '\0', 1);
+	get_thread_name(trace.tname);
 
 	*ret_addr = (unsigned long)trace_return_caller;
 	entry_time = clock_get_time();
