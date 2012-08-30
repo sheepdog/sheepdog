@@ -197,7 +197,6 @@ int main(int argc, char **argv)
 	struct cluster_driver *cdrv;
 	int enable_object_cache = 0; /* disabled by default */
 	char *pid_file = NULL;
-	char *object_cache_size, *object_cache_mode;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -266,9 +265,7 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			enable_object_cache = 1;
-			object_cache_size = strtok(optarg, ",");
-			object_cache_mode = strtok(NULL, ",");
-			cache_size = strtol(object_cache_size, &p, 10);
+			cache_size = strtol(optarg, &p, 10);
 			if (optarg == p || cache_size < 0 ||
 			    UINT64_MAX < cache_size) {
 				fprintf(stderr, "Invalid cache size '%s': "
@@ -278,14 +275,8 @@ int main(int argc, char **argv)
 			}
 			sys->cache_size = cache_size * 1024 * 1024;
 
-			if (!object_cache_mode ||
-			    strcmp(object_cache_mode, "writeback") != 0) {
-				sys->writethrough = 1;
-			}
 			fprintf(stdout, "enable write cache, "
-				"max cache size %" PRIu64 "M, %s mode\n",
-				cache_size, sys->writethrough ?
-				"writethrough" : "writeback");
+				"max cache size %" PRIu64 "M\n", cache_size);
 			break;
 		case 's':
 			free_space = strtoll(optarg, &p, 10);
