@@ -312,7 +312,7 @@ bool sd_block_handler(struct sd_node *sender)
 
 	cluster_op_running = true;
 
-	req = list_first_entry(&sys->pending_list,
+	req = list_first_entry(&sys->pending_block_list,
 				struct request, pending_list);
 	req->work.fn = do_process_work;
 	req->work.done = cluster_op_done;
@@ -333,7 +333,7 @@ void queue_cluster_request(struct request *req)
 	eprintf("%s (%p)\n", op_name(req->op), req);
 
 	if (has_process_work(req->op)) {
-		list_add_tail(&req->pending_list, &sys->pending_list);
+		list_add_tail(&req->pending_list, &sys->pending_block_list);
 		sys->cdrv->block();
 	} else {
 		struct vdi_op_message *msg;
@@ -343,7 +343,7 @@ void queue_cluster_request(struct request *req)
 		if (!msg)
 			return;
 
-		list_add_tail(&req->pending_list, &sys->pending_list);
+		list_add_tail(&req->pending_list, &sys->pending_notify_list);
 
 		msg->rsp.result = SD_RES_SUCCESS;
 		sys->cdrv->notify(msg, size);
@@ -921,8 +921,12 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 		op_name(op), data_len, node_to_str(sender));
 
 	if (is_myself(sender->nid.addr, sender->nid.port)) {
-		req = list_first_entry(&sys->pending_list, struct request,
-				       pending_list);
+		if (has_process_work(op))
+			req = list_first_entry(&sys->pending_block_list,
+					       struct request, pending_list);
+		else
+			req = list_first_entry(&sys->pending_notify_list,
+					       struct request, pending_list);
 		list_del(&req->pending_list);
 	}
 
@@ -1237,7 +1241,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	}
 
-	INIT_LIST_HEAD(&sys->pending_list);
+	INIT_LIST_HEAD(&sys->pending_block_list);
+	INIT_LIST_HEAD(&sys->pending_notify_list);
 	INIT_LIST_HEAD(&sys->failed_nodes);
 	INIT_LIST_HEAD(&sys->delayed_nodes);
 

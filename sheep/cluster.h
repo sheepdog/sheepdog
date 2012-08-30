@@ -86,7 +86,8 @@ struct cluster_driver {
 	 * Notify a message to all nodes in the cluster
 	 *
 	 * This function sends 'msg' to all the nodes.  The notified messages
-	 * can be read through sd_notify_handler().
+	 * can be read through sd_notify_handler() and totally ordered with
+	 * node change events.
 	 *
 	 * Returns zero on success, -1 on error
 	 */
