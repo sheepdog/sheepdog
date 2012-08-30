@@ -48,7 +48,7 @@
 #define SD_OP_GET_SNAP_FILE  0x93
 #define SD_OP_CLEANUP        0x94
 #define SD_OP_TRACE          0x95
-#define SD_OP_TRACE_CAT      0x96
+#define SD_OP_TRACE_READ_BUF 0x96
 #define SD_OP_STAT_RECOVERY  0x97
 #define SD_OP_FLUSH_DEL_CACHE  0x98
 #define SD_OP_NOTIFY_VDI_DEL 0x99

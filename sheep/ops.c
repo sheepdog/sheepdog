@@ -671,7 +671,7 @@ static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	return ret;
 }
 
-static int local_trace_cat_ops(const struct sd_req *req, struct sd_rsp *rsp,
+static int local_trace_read_buf(const struct sd_req *req, struct sd_rsp *rsp,
 			       void *data)
 {
 	rsp->data_length = trace_buffer_pop(data, req->data_length);
@@ -1083,11 +1083,11 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = local_trace_ops,
 	},
 
-	[SD_OP_TRACE_CAT] = {
-		.name = "TRACE_CAT",
+	[SD_OP_TRACE_READ_BUF] = {
+		.name = "TRACE_READ_BUF",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
-		.process_main = local_trace_cat_ops,
+		.process_main = local_trace_read_buf,
 	},
 
 	[SD_OP_KILL_NODE] = {

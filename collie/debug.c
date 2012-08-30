@@ -92,7 +92,7 @@ static int trace_read_buffer(void)
 		return EXIT_SYSFAIL;
 
 read_buffer:
-	sd_init_req(&hdr, SD_OP_TRACE_CAT);
+	sd_init_req(&hdr, SD_OP_TRACE_READ_BUF);
 	hdr.data_length = rlen = TRACE_BUF_LEN;
 	hdr.epoch = sd_epoch;
 
