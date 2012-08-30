@@ -44,7 +44,6 @@ struct vdi_copy {
 #define TRACE_GRAPH_ENTRY  0x01
 #define TRACE_GRAPH_RETURN 0x02
 
-#define TRACE_BUF_LEN      (1024 * 1024 * 8)
 #define TRACE_FNAME_LEN    36
 #define TRACE_THREAD_LEN   20
 
