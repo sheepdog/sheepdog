@@ -26,6 +26,7 @@ extern void dump_logmsg(void *);
 extern void log_write(int prio, const char *func, int line, const char *fmt, ...)
 	__attribute__ ((format (printf, 4, 5)));
 extern void set_thread_name(const char *name, int idx);
+extern void get_thread_name(char *name);
 
 /*
 + * sheep log priorities, comliant with syslog spec

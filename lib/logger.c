@@ -571,3 +571,13 @@ notrace void set_thread_name(const char *name, int idx)
 	worker_name = name;
 	worker_idx = idx;
 }
+
+notrace void get_thread_name(char *name)
+{
+	if (worker_name && worker_idx)
+		sprintf(name, "%s %d", worker_name, worker_idx);
+	else if (worker_name)
+		sprintf(name, "%s", worker_name);
+	else
+		sprintf(name, "%s", "main");
+}
