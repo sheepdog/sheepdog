@@ -19,7 +19,7 @@
 #include "logger.h"
 #include "util.h"
 
-static __thread unsigned ret_stack_index;
+static __thread int ret_stack_index;
 static __thread struct trace_ret_stack {
 	unsigned long ret;
 	unsigned long func;

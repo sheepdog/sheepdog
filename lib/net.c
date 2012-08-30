@@ -60,7 +60,7 @@ int conn_rx_on(struct connection *conn)
 	return modify_event(conn->fd, conn->events);
 }
 
-int is_conn_dead(struct connection *conn)
+notrace int is_conn_dead(struct connection *conn)
 {
 	if (conn->c_rx_state == C_IO_CLOSED || conn->c_tx_state == C_IO_CLOSED)
 		return 1;
@@ -93,7 +93,7 @@ int rx(struct connection *conn, enum conn_state next_state)
 	return ret;
 }
 
-int tx(struct connection *conn, enum conn_state next_state, int flags)
+notrace int tx(struct connection *conn, enum conn_state next_state, int flags)
 {
 	int ret;
 
