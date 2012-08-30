@@ -367,9 +367,9 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	sys->gateway_wqueue = init_work_queue("gateway", false);
+	sys->gateway_wqueue = init_work_queue("gway", false);
 	sys->io_wqueue = init_work_queue("io", false);
-	sys->recovery_wqueue = init_work_queue("recovery", false);
+	sys->recovery_wqueue = init_work_queue("rw", false);
 	sys->deletion_wqueue = init_work_queue("deletion", true);
 	sys->block_wqueue = init_work_queue("block", true);
 	sys->sockfd_wqueue = init_work_queue("sockfd", true);
