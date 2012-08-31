@@ -248,6 +248,8 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	created_time = hdr->ctime;
 	set_cluster_ctime(created_time);
+	set_cluster_copies(sys->nr_copies);
+	set_cluster_flags(sys->flags);
 
 	for (i = 1; i <= latest_epoch; i++)
 		remove_epoch(i);
@@ -261,8 +263,6 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret)
 		return SD_RES_EIO;
 
-	set_cluster_copies(sys->nr_copies);
-	set_cluster_flags(sys->flags);
 	if (have_enough_zones())
 		sys->status = SD_STATUS_OK;
 	else
