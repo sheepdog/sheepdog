@@ -141,7 +141,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, fd, sock_idx;
 	unsigned wlen = 0, rlen = 0;
-	int create = 0;
+	bool create = false;
 	uint32_t vid = oid_to_vid(oid);
 	struct vdi_inode *vdi;
 	unsigned long idx = 0;
@@ -165,7 +165,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 				memset(buf, 0, size);
 				goto done;
 			}
-			create = 1;
+			create = true;
 		} else {
 			if (rw == VOLUME_READ) {
 				oid = vid_to_data_oid(
@@ -177,7 +177,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 						vdi->inode->data_vdi_id[idx],
 						idx);
 				hdr.flags |= SD_FLAG_CMD_COW;
-				create = 1;
+				create = true;
 			}
 		}
 	}

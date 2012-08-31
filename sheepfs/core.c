@@ -34,8 +34,8 @@ char sheepfs_shadow[PATH_MAX];
 
 static int sheepfs_debug;
 static int sheepfs_fg;
-int sheepfs_page_cache = 0;
-int sheepfs_object_cache = 1;
+int sheepfs_page_cache = false;
+int sheepfs_object_cache = true;
 char sdhost[32] = "localhost";
 int sdport = SD_LISTEN_PORT;
 
@@ -323,20 +323,20 @@ int main(int argc, char **argv)
 			memcpy(sdhost, optarg, strlen(optarg));
 			break;
 		case 'd':
-			sheepfs_debug = 1;
+			sheepfs_debug = true;
 			break;
 		case 'h':
 			usage(0);
 			break;
 		case 'f':
-			sheepfs_fg = 1;
+			sheepfs_fg = true;
 			fs_printf = fg_printf;
 			break;
 		case 'k':
-			sheepfs_page_cache = 1;
+			sheepfs_page_cache = true;
 			break;
 		case 'n':
-			sheepfs_object_cache = 0;
+			sheepfs_object_cache = false;
 			break;
 		case 'p':
 			sdport = strtol(optarg, NULL, 10);

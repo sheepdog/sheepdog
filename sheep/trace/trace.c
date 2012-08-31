@@ -37,7 +37,7 @@ static trace_func_t trace_func = trace_call;
 
 static int trace_efd;
 static int nr_short_thread;
-static int trace_in_patch;
+static bool trace_in_patch;
 
 static pthread_mutex_t suspend_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t suspend_cond = PTHREAD_COND_INITIALIZER;
@@ -106,7 +106,7 @@ static notrace int make_text_writable(unsigned long ip)
 	return mprotect((void *)start, getpagesize() + INSN_SIZE, PROT_READ | PROT_EXEC | PROT_WRITE);
 }
 
-notrace struct caller *trace_lookup_ip(unsigned long ip, int create)
+notrace struct caller *trace_lookup_ip(unsigned long ip, bool create)
 {
 	int h = trace_hash(ip);
 	struct hlist_head *head = trace_hashtable + h;
@@ -165,7 +165,7 @@ static notrace void do_trace_init(unsigned long ip)
 		return;
 
 	memcpy((void *)ip, NOP5, INSN_SIZE);
-	trace_lookup_ip(ip, 1);
+	trace_lookup_ip(ip, true);
 }
 
 notrace int register_trace_function(trace_func_t func)
@@ -258,7 +258,7 @@ static notrace void enable_tracer(int fd, int events, void *data)
 	patch_all_sites((unsigned long)trace_caller);
 	resume_worker_threads();
 	unregister_event(trace_efd);
-	trace_in_patch = 0;
+	trace_in_patch = false;
 	dprintf("tracer enabled\n");
 }
 
@@ -280,7 +280,7 @@ static notrace void disable_tracer(int fd, int events, void *data)
 	nop_all_sites();
 	resume_worker_threads();
 	unregister_event(trace_efd);
-	trace_in_patch = 0;
+	trace_in_patch = false;
 	dprintf("tracer disabled\n");
 }
 
@@ -292,7 +292,7 @@ notrace int trace_enable(void)
 	}
 
 	register_event(trace_efd, enable_tracer, NULL);
-	trace_in_patch = 1;
+	trace_in_patch = true;
 
 	return SD_RES_SUCCESS;
 }
@@ -300,7 +300,7 @@ notrace int trace_enable(void)
 notrace int trace_disable(void)
 {
 	register_event(trace_efd, disable_tracer, NULL);
-	trace_in_patch = 1;
+	trace_in_patch = true;
 
 	return SD_RES_SUCCESS;
 }

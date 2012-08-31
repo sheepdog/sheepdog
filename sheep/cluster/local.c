@@ -183,7 +183,7 @@ static void shm_queue_notify(void)
 	}
 }
 
-static int is_shm_queue_valid(void)
+static bool is_shm_queue_valid(void)
 {
 	int i;
 	size_t nr;
@@ -192,13 +192,13 @@ static int is_shm_queue_valid(void)
 	nr = get_nodes(lnodes);
 
 	if (nr == 0)
-		return 1;
+		return true;
 
 	for (i = 0; i < nr; i++)
 		if (process_exists(lnodes[i].pid))
-			return 1;
+			return true;
 
-	return 0;
+	return false;
 }
 
 static void shm_queue_init(void)

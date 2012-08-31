@@ -39,8 +39,8 @@ static LIST_HEAD(corosync_nonblock_event_list);
 
 static struct cpg_node cpg_nodes[SD_MAX_NODES];
 static size_t nr_cpg_nodes;
-static int self_elect;
-static int join_finished;
+static bool self_elect;
+static bool join_finished;
 static int cpg_fd;
 static size_t nr_majority; /* used for network partition detection */
 
@@ -74,7 +74,7 @@ struct corosync_event {
 	uint32_t nr_nodes;
 	struct cpg_node nodes[SD_MAX_NODES];
 
-	int callbacked;
+	bool callbacked;
 
 	struct list_head list;
 };
@@ -89,7 +89,7 @@ struct corosync_message {
 	uint8_t msg[0];
 };
 
-static int cpg_node_equal(struct cpg_node *a, struct cpg_node *b)
+static bool cpg_node_equal(struct cpg_node *a, struct cpg_node *b)
 {
 	return (a->nodeid == b->nodeid && a->pid == b->pid);
 }
@@ -275,9 +275,9 @@ static void build_node_list(struct cpg_node *nodes, size_t nr_nodes,
 /*
  * Process one dispatch event
  *
- * Returns 1 if the event is processed
+ * Returns true if the event is processed
  */
-static int __corosync_dispatch_one(struct corosync_event *cevent)
+static bool __corosync_dispatch_one(struct corosync_event *cevent)
 {
 	enum cluster_join_result res;
 	struct sd_node entries[SD_MAX_NODES];
@@ -286,15 +286,15 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
 		if (is_master(&this_node) < 0)
-			return 0;
+			return false;
 
 		if (!cevent->msg)
 			/* we haven't receive JOIN_REQUEST yet */
-			return 0;
+			return false;
 
 		if (cevent->callbacked)
 			/* check_join() must be called only once */
-			return 0;
+			return false;
 
 		res = sd_check_join_cb(&cevent->sender.ent,
 						     cevent->msg);
@@ -310,8 +310,8 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 			exit(1);
 		}
 
-		cevent->callbacked = 1;
-		return 0;
+		cevent->callbacked = true;
+		return false;
 	case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
 		switch (cevent->result) {
 		case CJ_RES_SUCCESS:
@@ -343,16 +343,16 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		if (cevent->callbacked)
 			/* block events until the unblock message
 			   removes this event */
-			return 0;
+			return false;
 		cevent->callbacked = sd_block_handler(&cevent->sender.ent);
-		return 0;
+		return false;
 	case COROSYNC_EVENT_TYPE_NOTIFY:
 		sd_notify_handler(&cevent->sender.ent, cevent->msg,
 						 cevent->msg_len);
 		break;
 	}
 
-	return 1;
+	return true;
 }
 
 static void __corosync_dispatch(void)
@@ -388,14 +388,14 @@ static void __corosync_dispatch(void)
 			switch (cevent->type) {
 			case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
 				if (self_elect) {
-					join_finished = 1;
+					join_finished = true;
 					nr_cpg_nodes = 0;
 				}
 				break;
 			case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
 				if (cpg_node_equal(&cevent->sender,
 						   &this_node)) {
-					join_finished = 1;
+					join_finished = true;
 					nr_cpg_nodes = cevent->nr_nodes;
 					memcpy(cpg_nodes, cevent->nodes,
 					       sizeof(*cevent->nodes) *
@@ -578,7 +578,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	struct cpg_node member_sheep[SD_MAX_NODES];
 	struct cpg_node joined_sheep[SD_MAX_NODES];
 	struct cpg_node left_sheep[SD_MAX_NODES];
-	int promote = 1;
+	bool promote = true;
 
 	dprintf("mem:%zu, joined:%zu, left:%zu\n",
 		member_list_entries, joined_list_entries,
@@ -666,7 +666,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 			if (!cevent) {
 				dprintf("Not promoting because member is "
 					"not in our event list.\n");
-				promote = 0;
+				promote = false;
 				break;
 			}
 		}
@@ -676,7 +676,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		 * master right here.
 		 */
 		if (promote)
-			self_elect = 1;
+			self_elect = true;
 	}
 	__corosync_dispatch();
 }

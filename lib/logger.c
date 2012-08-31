@@ -56,8 +56,8 @@ union semun {
 };
 
 struct logarea {
-	int empty;
-	int active;
+	bool empty;
+	bool active;
 	void *head;
 	void *tail;
 	void *start;
@@ -129,7 +129,7 @@ static notrace int logarea_init(int size)
 
 	shmctl(shmid, IPC_RMID, NULL);
 
-	la->empty = 1;
+	la->empty = true;
 	la->end = (char *)la->start + size;
 	la->head = la->start;
 	la->tail = la->start;
@@ -267,7 +267,7 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	}
 
 	/* ok, we can stage the msg in the area */
-	la->empty = 0;
+	la->empty = false;
 	msg = (struct logmsg *)la->tail;
 	msg->prio = prio;
 	memcpy((void *)&msg->str, buff, len);
@@ -300,7 +300,7 @@ static notrace int log_dequeue(void *buff)
 	memcpy(dst, src,  len);
 
 	if (la->tail == la->head)
-		la->empty = 1; /* we purge the last logmsg */
+		la->empty = true; /* we purge the last logmsg */
 	else {
 		la->head = src->next;
 		lst->next = la->head;
@@ -459,7 +459,7 @@ static notrace void logger(char *log_dir, char *outfile)
 		syslog(LOG_ERR, "failed to open %s\n", outfile);
 		exit(1);
 	}
-	la->active = 1;
+	la->active = true;
 
 	fd = open("/dev/null", O_RDWR);
 	if (fd < 0) {
@@ -510,7 +510,7 @@ static notrace void logger(char *log_dir, char *outfile)
 	exit(0);
 }
 
-notrace int log_init(char *program_name, int size, int to_stdout, int level,
+notrace int log_init(char *program_name, int size, bool to_stdout, int level,
 		char *outfile)
 {
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
@@ -556,7 +556,7 @@ notrace int log_init(char *program_name, int size, int to_stdout, int level,
 notrace void log_close(void)
 {
 	if (la) {
-		la->active = 0;
+		la->active = false;
 		waitpid(logger_pid, NULL, 0);
 
 		vprintf(SDOG_WARNING, "logger pid %d stopped\n", logger_pid);

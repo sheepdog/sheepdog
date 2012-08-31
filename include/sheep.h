@@ -96,7 +96,8 @@ static inline int get_vnode_first_idx(struct sd_vnode *entries, int nr_entries,
 static inline int get_vnode_next_idx(struct sd_vnode *entries, int nr_entries,
 				     int *prev_idxs, int nr_prev_idxs)
 {
-	int i, found, idx, first_idx;
+	int i, idx, first_idx;
+	bool found;
 
 	first_idx = prev_idxs[0];
 	idx = prev_idxs[nr_prev_idxs - 1];
@@ -105,9 +106,9 @@ static inline int get_vnode_next_idx(struct sd_vnode *entries, int nr_entries,
 		if (idx == first_idx)
 			panic("can't find next new idx\n");
 
-		for (found = 0, i = 0; i < nr_prev_idxs; i++) {
+		for (found = false, i = 0; i < nr_prev_idxs; i++) {
 			if (same_zone(entries, idx, prev_idxs[i])) {
-				found = 1;
+				found = true;
 				break;
 			}
 		}
@@ -246,7 +247,7 @@ static inline int node_id_cmp(const void *a, const void *b)
 	return 0;
 }
 
-static inline int node_eq(const struct sd_node *a, const struct sd_node *b)
+static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 {
 	return node_id_cmp(a, b) == 0;
 }

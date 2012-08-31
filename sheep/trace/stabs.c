@@ -66,7 +66,8 @@ extern const char __STABSTR_END__[];
 static notrace void stab_bsearch(const struct stab *stabs, int *region_left, int *region_right,
 		int type, uintptr_t addr)
 {
-	int l = *region_left, r = *region_right, any_matches = 0;
+	int l = *region_left, r = *region_right;
+	bool any_matches = false;
 
 	while (l <= r) {
 		int true_m = (l + r) / 2, m = true_m;
@@ -80,7 +81,7 @@ static notrace void stab_bsearch(const struct stab *stabs, int *region_left, int
 		}
 
 		/* actual binary search */
-		any_matches = 1;
+		any_matches = true;
 		if (stabs[m].value < addr) {
 			*region_left = m;
 			l = true_m + 1;

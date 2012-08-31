@@ -32,7 +32,7 @@
 struct sd_option {
 	int val;
 	const char *name;
-	int has_arg;
+	bool has_arg;
 	const char *desc;
 };
 
@@ -56,8 +56,8 @@ void subcommand_usage(char *cmd, char *subcmd, int status);
 
 extern const char *sdhost;
 extern int sdport;
-extern int highlight;
-extern int raw_output;
+extern bool highlight;
+extern bool raw_output;
 
 extern uint32_t sd_epoch;
 extern struct sd_node sd_nodes[SD_MAX_NODES];
@@ -65,7 +65,7 @@ extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 extern int sd_nodes_nr, sd_vnodes_nr;
 extern unsigned master_idx;
 
-int is_current(struct sheepdog_inode *i);
+bool is_current(struct sheepdog_inode *i);
 char *size_to_str(uint64_t _size, char *str, int str_size);
 typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, char *tag,
 				  uint32_t snapid, uint32_t flags,
@@ -75,7 +75,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		   uint64_t offset, bool direct);
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    unsigned int datalen, uint64_t offset, uint32_t flags,
-		    int copies, int create, bool direct);
+		    int copies, bool create, bool direct);
 int send_light_req(struct sd_req *hdr, const char *host, int port);
 int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
 

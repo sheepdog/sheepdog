@@ -24,7 +24,7 @@
 
 static void requeue_request(struct request *req);
 
-static int is_access_local(struct request *req, uint64_t oid)
+static bool is_access_local(struct request *req, uint64_t oid)
 {
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	int nr_copies;
@@ -36,10 +36,10 @@ static int is_access_local(struct request *req, uint64_t oid)
 
 	for (i = 0; i < nr_copies; i++) {
 		if (vnode_is_local(obj_vnodes[i]))
-			return 1;
+			return true;
 	}
 
-	return 0;
+	return false;
 }
 
 static void io_op_done(struct work *work)
@@ -433,7 +433,7 @@ static struct request *alloc_local_request(void *data, int data_length)
 		req->data = data;
 	}
 
-	req->local = 1;
+	req->local = true;
 
 	INIT_LIST_HEAD(&req->request_list);
 
@@ -531,10 +531,9 @@ void put_request(struct request *req)
 	if (uatomic_sub_return(&req->refcnt, 1) > 0)
 		return;
 
-	if (req->local) {
-		req->done = 1;
+	if (req->local)
 		eventfd_write(req->wait_efd, value);
-	} else {
+	else {
 		if (conn_tx_on(&ci->conn)) {
 			clear_client_info(ci);
 			free_request(req);

@@ -168,12 +168,13 @@ uint32_t get_latest_epoch(void)
 	return epoch;
 }
 
-static int init_path(const char *d, int *new)
+static int init_path(const char *d, bool *new)
 {
 	int ret, retry = 0;
 	struct stat s;
 
-	*new = 0;
+	if (new)
+		*new = false;
 again:
 	ret = stat(d, &s);
 	if (ret) {
@@ -187,7 +188,8 @@ again:
 			eprintf("cannot create the directory %s: %m\n", d);
 			return 1;
 		} else {
-			*new = 1;
+			if (new)
+				*new = true;
 			retry++;
 			goto again;
 		}
@@ -238,10 +240,9 @@ out:
 
 int init_base_path(const char *d)
 {
-	int new = 0;
 	int ret;
 
-	ret = init_path(d, &new);
+	ret = init_path(d, NULL);
 	if (ret)
 		return ret;
 	return lock_base_dir(d);
@@ -251,7 +252,7 @@ int init_base_path(const char *d)
 
 static int init_obj_path(const char *base_path)
 {
-	int new, len;
+	int len;
 
 	len = strlen(base_path);
 	/* farm needs extra HEX_LEN + 3 chars to store snapshot objects.
@@ -265,19 +266,17 @@ static int init_obj_path(const char *base_path)
 	obj_path = zalloc(strlen(base_path) + strlen(OBJ_PATH) + 1);
 	sprintf(obj_path, "%s" OBJ_PATH, base_path);
 
-	return init_path(obj_path, &new);
+	return init_path(obj_path, NULL);
 }
 
 #define EPOCH_PATH "/epoch/"
 
 static int init_epoch_path(const char *base_path)
 {
-	int new;
-
 	epoch_path = zalloc(strlen(base_path) + strlen(EPOCH_PATH) + 1);
 	sprintf(epoch_path, "%s" EPOCH_PATH, base_path);
 
-	return init_path(epoch_path, &new);
+	return init_path(epoch_path, NULL);
 }
 
 static int init_mnt_path(const char *base_path)
@@ -315,7 +314,8 @@ static int init_mnt_path(const char *base_path)
 
 static int init_jrnl_path(const char *base_path)
 {
-	int new, ret;
+	int ret;
+	bool new;
 
 	/* Create journal directory */
 	jrnl_path = zalloc(strlen(base_path) + strlen(JRNL_PATH) + 1);
@@ -452,7 +452,7 @@ int init_store(const char *d)
  * Write data to both local object cache (if enabled) and backends
  */
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, int create, int nr_copies)
+		 uint64_t offset, uint16_t flags, bool create, int nr_copies)
 {
 	struct sd_req hdr;
 	int ret;

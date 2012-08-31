@@ -94,7 +94,7 @@ static notrace void graph_tracer(unsigned long ip, unsigned long *ret_addr)
 
 	memset(&trace, 0, sizeof(trace));
 
-	cr = trace_lookup_ip(ip, 0);
+	cr = trace_lookup_ip(ip, false);
 	assert(cr->namelen + 1 < TRACE_FNAME_LEN);
 	memcpy(trace.fname, cr->name, cr->namelen);
 	memset(trace.fname + cr->namelen, '\0', 1);

@@ -28,7 +28,7 @@ struct recovery_work {
 	uint32_t epoch;
 	uint32_t done;
 
-	int stop;
+	bool stop;
 	struct work work;
 	bool suspended; /* true when automatic recovery is disabled
 			 * and recovery process is suspended */
@@ -113,13 +113,13 @@ out:
  * A virtual node that does not match any node in current node list
  * means the node has left the cluster, then it's an invalid virtual node.
  */
-static int is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
-				int nr_nodes)
+static bool is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
+			     int nr_nodes)
 {
 	if (bsearch(entry, nodes, nr_nodes, sizeof(struct sd_node),
 		    node_id_cmp))
-		return 0;
-	return 1;
+		return false;
+	return true;
 }
 
 /*
@@ -156,7 +156,7 @@ again:
 			/* Succeed */
 			break;
 		} else if (SD_RES_OLD_NODE_VER == ret) {
-			rw->stop = 1;
+			rw->stop = true;
 			goto err;
 		} else
 			ret = -1;
@@ -208,12 +208,12 @@ static void recover_object_work(struct work *work)
 		eprintf("failed to recover object %"PRIx64"\n", oid);
 }
 
-int node_in_recovery(void)
+bool node_in_recovery(void)
 {
 	return !!recovering_work;
 }
 
-int is_recovery_init(void)
+bool is_recovery_init(void)
 {
 	struct recovery_work *rw = recovering_work;
 
@@ -574,12 +574,12 @@ again:
 	qsort(rw->oids, rw->count, sizeof(uint64_t), obj_cmp);
 }
 
-static int newly_joined(struct sd_node *node, struct recovery_work *rw)
+static bool newly_joined(struct sd_node *node, struct recovery_work *rw)
 {
 	if (bsearch(node, rw->old_vinfo->nodes, rw->old_vinfo->nr_nodes,
 		    sizeof(struct sd_node), node_id_cmp))
-		return 0;
-	return 1;
+		return false;
+	return true;
 }
 
 /* Prepare the object list that belongs to this node */

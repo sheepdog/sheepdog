@@ -20,19 +20,19 @@
 static char program_name[] = "collie";
 const char *sdhost = "localhost";
 int sdport = SD_LISTEN_PORT;
-int highlight = 1;
-int raw_output = 0;
+bool highlight = true;
+bool raw_output = false;
 
 static const struct sd_option collie_options[] = {
 
 	/* common options for all collie commands */
-	{'a', "address", 1, "specify the daemon address (default: localhost)"},
-	{'p', "port", 1, "specify the daemon port"},
-	{'r', "raw", 0, "raw output mode: omit headers, separate fields with\n\
+	{'a', "address", true, "specify the daemon address (default: localhost)"},
+	{'p', "port", true, "specify the daemon port"},
+	{'r', "raw", false, "raw output mode: omit headers, separate fields with\n\
                           single spaces and print all sizes in decimal bytes"},
-	{'h', "help", 0, "display this help and exit"},
+	{'h', "help", false, "display this help and exit"},
 
-	{ 0, NULL, 0, NULL },
+	{ 0, NULL, false, NULL },
 };
 
 static void usage(const struct command *commands, int status);
@@ -225,13 +225,14 @@ static struct option *build_long_options(const char *opts)
 static unsigned long setup_commands(const struct command *commands,
 				    char *cmd, char *subcmd)
 {
-	int i, found = 0;
+	int i;
+	bool found = false;
 	struct subcommand *s;
 	unsigned long flags = 0;
 
 	for (i = 0; commands[i].name; i++) {
 		if (!strcmp(commands[i].name, cmd)) {
-			found = 1;
+			found = true;
 			if (commands[i].parser)
 				command_parser = commands[i].parser;
 			break;
@@ -382,7 +383,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'r':
-			raw_output = 1;
+			raw_output = true;
 			break;
 		case 'h':
 			subcommand_usage(argv[1], argv[2], EXIT_SUCCESS);
@@ -400,7 +401,7 @@ int main(int argc, char **argv)
 	}
 
 	if (!isatty(STDOUT_FILENO) || raw_output)
-		highlight = 0;
+		highlight = false;
 
 	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
 		ret = update_node_list(SD_MAX_NODES, 0);

@@ -228,7 +228,7 @@ static void object_cache_directio_set(char *s)
 static void _object_cache_set(char *s)
 {
 	int i;
-	static int first = 1;
+	static bool first = true;
 
 	struct object_cache_arg {
 		const char *name;
@@ -243,7 +243,7 @@ static void _object_cache_set(char *s)
 
 	if (first) {
 		assert(!strcmp(s, "object"));
-		first = 0;
+		first = false;
 		return;
 	}
 
@@ -316,8 +316,8 @@ int main(int argc, char **argv)
 	int ch, longindex;
 	int ret, port = SD_LISTEN_PORT;
 	const char *dir = DEFAULT_OBJECT_DIR;
-	int is_daemon = 1;
-	int to_stdout = 0;
+	bool is_daemon = true;
+	bool to_stdout = false;
 	int log_level = SDOG_INFO;
 	char path[PATH_MAX];
 	int64_t zone = -1;
@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 			pid_file = optarg;
 			break;
 		case 'f':
-			is_daemon = 0;
+			is_daemon = false;
 			break;
 		case 'l':
 			log_level = strtol(optarg, &p, 10);
@@ -382,7 +382,7 @@ int main(int argc, char **argv)
 			nr_vnodes = 0;
 			break;
 		case 'o':
-			to_stdout = 1;
+			to_stdout = true;
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
@@ -449,7 +449,7 @@ int main(int argc, char **argv)
 		}
 	}
 	if (nr_vnodes == 0) {
-		sys->gateway_only = 1;
+		sys->gateway_only = true;
 		sys->disk_space = 0;
 	}
 

@@ -17,23 +17,23 @@
 #include "collie.h"
 
 static struct sd_option cluster_options[] = {
-	{'b', "store", 1, "specify backend store"},
-	{'c', "copies", 1, "specify the default data redundancy (number of copies)"},
-	{'m', "mode", 1, "mode (safe, quorum, unsafe)"},
-	{'f', "force", 0, "do not prompt for confirmation"},
-	{'R', "restore", 1, "restore the cluster"},
-	{'l', "list", 0, "list the user epoch information"},
+	{'b', "store", true, "specify backend store"},
+	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
+	{'m', "mode", true, "mode (safe, quorum, unsafe)"},
+	{'f', "force", false, "do not prompt for confirmation"},
+	{'R', "restore", true, "restore the cluster"},
+	{'l', "list", false, "list the user epoch information"},
 
-	{ 0, NULL, 0, NULL },
+	{ 0, NULL, false, NULL },
 };
 
 struct cluster_cmd_data {
 	uint32_t epoch;
-	int list;
+	bool list;
 	int copies;
-	int nohalt;
-	int quorum;
-	int force;
+	bool nohalt;
+	bool quorum;
+	bool force;
 	char name[STORE_LEN];
 } cluster_cmd_data;
 
@@ -470,21 +470,21 @@ static int cluster_parser(int ch, char *opt)
 		break;
 	case 'm':
 		if (strcmp(opt, "safe") == 0) {
-			cluster_cmd_data.nohalt = 0;
-			cluster_cmd_data.quorum = 0;
+			cluster_cmd_data.nohalt = false;
+			cluster_cmd_data.quorum = false;
 		} else if (strcmp(opt, "quorum") == 0) {
-			cluster_cmd_data.nohalt = 0;
-			cluster_cmd_data.quorum = 1;
+			cluster_cmd_data.nohalt = false;
+			cluster_cmd_data.quorum = true;
 		} else if (strcmp(opt, "unsafe") == 0) {
-			cluster_cmd_data.nohalt = 1;
-			cluster_cmd_data.quorum = 0;
+			cluster_cmd_data.nohalt = true;
+			cluster_cmd_data.quorum = false;
 		} else {
 			fprintf(stderr, "Unknown mode '%s'\n", opt);
 			exit(EXIT_FAILURE);
 		}
 		break;
 	case 'f':
-		cluster_cmd_data.force = 1;
+		cluster_cmd_data.force = true;
 		break;
 	case 'R':
 		cluster_cmd_data.epoch = strtol(opt, &p, 10);
@@ -498,7 +498,7 @@ static int cluster_parser(int ch, char *opt)
 		}
 		break;
 	case 'l':
-		cluster_cmd_data.list = 1;
+		cluster_cmd_data.list = true;
 		break;
 	}
 

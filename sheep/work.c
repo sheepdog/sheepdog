@@ -187,9 +187,9 @@ retest:
 static int init_eventfd(void)
 {
 	int ret;
-	static int done = 0;
+	static bool done = false;
 
-	if (done++)
+	if (done)
 		return 0;
 
 	efd = eventfd(0, EFD_NONBLOCK);
@@ -204,6 +204,8 @@ static int init_eventfd(void)
 		close(efd);
 		return 1;
 	}
+
+	done = true;
 
 	return 0;
 }

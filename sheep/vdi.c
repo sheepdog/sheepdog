@@ -284,7 +284,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	if (iocb->snapid && cur_vid != iocb->base_vid) {
 		ret = write_object(vid_to_vdi_oid(cur_vid), (char *)cur,
-				   SD_INODE_HEADER_SIZE, 0, 0, 0, 0);
+				   SD_INODE_HEADER_SIZE, 0, 0, false, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_READ;
@@ -294,7 +294,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	if (iocb->base_vid) {
 		ret = write_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
-				   SD_INODE_HEADER_SIZE, 0, 0, 0, 0);
+				   SD_INODE_HEADER_SIZE, 0, 0, false, 0);
 		if (ret != 0) {
 			vprintf(SDOG_ERR, "failed\n");
 			ret = SD_RES_BASE_VDI_WRITE;
@@ -303,7 +303,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 	}
 
 	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, 0, 1, iocb->nr_copies);
+			   0, 0, true, iocb->nr_copies);
 	if (ret != 0)
 		ret = SD_RES_VDI_WRITE;
 
@@ -322,7 +322,7 @@ static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
 	int ret = SD_RES_NO_MEM;
-	int vdi_found = 0;
+	bool vdi_found = false;
 	int nr_copies;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
@@ -346,7 +346,7 @@ static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 		}
 
 		if (!strncmp(inode->name, name, strlen(inode->name))) {
-			vdi_found = 1;
+			vdi_found = true;
 			if (tag && tag[0] &&
 			    strncmp(inode->tag, tag, sizeof(inode->tag)) != 0)
 				continue;
@@ -561,7 +561,7 @@ static int delete_inode(struct deletion_work *dw)
 	memset(inode->name, 0, sizeof(inode->name));
 
 	ret = write_object(vid_to_vdi_oid(dw->vid), (char *)inode,
-			   SD_INODE_HEADER_SIZE, 0, 0, 0, dw->nr_copies);
+			   SD_INODE_HEADER_SIZE, 0, 0, false, dw->nr_copies);
 	if (ret != 0) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -648,7 +648,7 @@ static void delete_one(struct work *work)
 	memset(inode->name, 0, sizeof(inode->name));
 
 	write_object(vid_to_vdi_oid(vdi_id), (void *)inode,
-		     sizeof(*inode), 0, 0, 0, nr_copies);
+		     sizeof(*inode), 0, 0, false, nr_copies);
 out:
 	free(inode);
 }
@@ -725,12 +725,12 @@ out:
 	return 1;
 }
 
-static uint64_t get_vdi_root(uint32_t vid, int *cloned)
+static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
 {
 	int ret, nr_copies;
 	struct sheepdog_inode *inode = NULL;
 
-	*cloned = 0;
+	*cloned = false;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
@@ -748,7 +748,7 @@ next:
 			&& !inode->snap_ctime) {
 		dprintf("vdi %" PRIx32 " is a cloned vdi.\n", vid);
 		/* current vdi is a cloned vdi */
-		*cloned = 1;
+		*cloned = true;
 	}
 
 	if (ret != SD_RES_SUCCESS) {
@@ -772,7 +772,8 @@ out:
 static int start_deletion(struct request *req, uint32_t vid)
 {
 	struct deletion_work *dw = NULL;
-	int ret = SD_RES_NO_MEM, cloned;
+	int ret = SD_RES_NO_MEM;
+	bool cloned;
 	uint32_t root_vid;
 
 	dw = zalloc(sizeof(struct deletion_work));
@@ -838,7 +839,7 @@ err:
 
 int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, uint64_t create_time,
-		 int wr, int excl, int delete)
+		 bool wr, bool excl, bool delete)
 {
 	struct sheepdog_vdi_attr tmp_attr;
 	uint64_t oid, hval;
@@ -863,7 +864,7 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 
 		if (ret == SD_RES_NO_OBJ && wr) {
 			ret = write_object(oid, (char *)vattr,
-					   data_len, 0, 0, 1, nr_copies);
+					   data_len, 0, 0, true, nr_copies);
 			if (ret)
 				ret = SD_RES_EIO;
 			else
@@ -884,15 +885,15 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 			else if (delete) {
 				ret = write_object(oid, (char *)"", 1,
 						   offsetof(struct sheepdog_vdi_attr, name),
-						   0, 0, nr_copies);
+						   0, false, nr_copies);
 				if (ret)
 					ret = SD_RES_EIO;
 				else
 					ret = SD_RES_SUCCESS;
 			} else if (wr) {
 				ret = write_object(oid, (char *)vattr,
-						   SD_ATTR_OBJ_SIZE, 0, 0, 0,
-						   nr_copies);
+						   SD_ATTR_OBJ_SIZE, 0, 0,
+						   false, nr_copies);
 
 				if (ret)
 					ret = SD_RES_EIO;

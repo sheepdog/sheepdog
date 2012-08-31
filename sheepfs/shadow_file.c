@@ -134,7 +134,7 @@ int shadow_file_delete(const char *path)
 	return 0;
 }
 
-int shadow_file_exsit(const char *path)
+bool shadow_file_exsit(const char *path)
 {
 	char p[PATH_MAX];
 
@@ -142,8 +142,8 @@ int shadow_file_exsit(const char *path)
 	if (access(p, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
 			sheepfs_pr("%m\n");
-		return 0;
+		return false;
 	}
 
-	return 1;
+	return true;
 }

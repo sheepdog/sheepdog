@@ -222,27 +222,27 @@ static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 	return hash & ((1 << bits) - 1);
 }
 
-static inline int is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
+static inline bool is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
 {
 	return inode->vdi_id == inode->data_vdi_id[idx];
 }
 
-static inline int is_vdi_obj(uint64_t oid)
+static inline bool is_vdi_obj(uint64_t oid)
 {
 	return !!(oid & VDI_BIT);
 }
 
-static inline int is_vmstate_obj(uint64_t oid)
+static inline bool is_vmstate_obj(uint64_t oid)
 {
 	return !!(oid & VMSTATE_BIT);
 }
 
-static inline int is_vdi_attr_obj(uint64_t oid)
+static inline bool is_vdi_attr_obj(uint64_t oid)
 {
 	return !!(oid & VDI_ATTR_BIT);
 }
 
-static inline int is_data_obj(uint64_t oid)
+static inline bool is_data_obj(uint64_t oid)
 {
 	return !is_vdi_obj(oid) && !is_vmstate_obj(oid) &&
 		!is_vdi_attr_obj(oid);

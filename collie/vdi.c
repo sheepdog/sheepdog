@@ -20,24 +20,24 @@
 #include "treeview.h"
 
 static struct sd_option vdi_options[] = {
-	{'P', "prealloc", 0, "preallocate all the data objects"},
-	{'i', "index", 1, "specify the index of data objects"},
-	{'s', "snapshot", 1, "specify a snapshot id or tag name"},
-	{'x', "exclusive", 0, "write in an exclusive mode"},
-	{'d', "delete", 0, "delete a key"},
-	{'w', "writeback", 0, "use writeback mode"},
-	{'c', "copies", 1, "specify the data redundancy (number of copies)"},
-	{'F', "from", 1, "create a differential backup from the snapshot"},
-	{ 0, NULL, 0, NULL },
+	{'P', "prealloc", false, "preallocate all the data objects"},
+	{'i', "index", true, "specify the index of data objects"},
+	{'s', "snapshot", true, "specify a snapshot id or tag name"},
+	{'x', "exclusive", false, "write in an exclusive mode"},
+	{'d', "delete", false, "delete a key"},
+	{'w', "writeback", false, "use writeback mode"},
+	{'c', "copies", true, "specify the data redundancy (number of copies)"},
+	{'F', "from", true, "create a differential backup from the snapshot"},
+	{ 0, NULL, false, NULL },
 };
 
 struct vdi_cmd_data {
 	unsigned int index;
 	int snapshot_id;
 	char snapshot_tag[SD_MAX_VDI_TAG_LEN];
-	int exclusive;
-	int delete;
-	int prealloc;
+	bool exclusive;
+	bool delete;
+	bool prealloc;
 	int nr_copies;
 	bool writeback;
 	int from_snapshot_id;
@@ -84,7 +84,8 @@ static int parse_option_size(const char *value, uint64_t *ret)
 static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
-	int idx, is_clone = 0;
+	int idx;
+	bool is_clone = false;
 	uint64_t my_objs, cow_objs;
 	char vdi_size_str[16], my_objs_str[16], cow_objs_str[16];
 	time_t ti;
@@ -120,7 +121,7 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
 
 	if (i->snap_id == 1 && i->parent_vdi_id != 0)
-		is_clone = 1;
+		is_clone = true;
 
 	if (raw_output) {
 		printf("%c ", is_current(i) ? (is_clone ? 'c' : '=') : 's');
@@ -240,7 +241,7 @@ static int do_print_obj(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 }
 
 struct get_data_oid_info {
-	int success;
+	bool success;
 	uint64_t data_oid;
 	unsigned idx;
 };
@@ -255,7 +256,7 @@ static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 	case SD_RES_SUCCESS:
 		if (info->success)
 			break;
-		info->success = 1;
+		info->success = true;
 		if (inode->data_vdi_id[info->idx]) {
 			info->data_oid = vid_to_data_oid(inode->data_vdi_id[info->idx], info->idx);
 			return 1;
@@ -547,7 +548,7 @@ static int vdi_create(int argc, char **argv)
 		oid = vid_to_data_oid(vid, idx);
 
 		ret = sd_write_object(oid, 0, buf, SD_DATA_OBJ_SIZE, 0, 0,
-				      inode->nr_copies, 1, true);
+				      inode->nr_copies, true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -556,7 +557,7 @@ static int vdi_create(int argc, char **argv)
 		inode->data_vdi_id[idx] = vid;
 		ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx, 0,
-				      inode->nr_copies, 0, true);
+				      inode->nr_copies, false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -591,7 +592,7 @@ static int vdi_snapshot(int argc, char **argv)
 		ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
 				      SD_MAX_VDI_TAG_LEN,
 				      offsetof(struct sheepdog_inode, tag),
-				      0, inode->nr_copies, 0, true);
+				      0, inode->nr_copies, false, true);
 	}
 
 	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, 1,
@@ -661,7 +662,7 @@ static int vdi_clone(int argc, char **argv)
 
 		oid = vid_to_data_oid(new_vid, idx);
 		ret = sd_write_object(oid, 0, buf, SD_DATA_OBJ_SIZE, 0, 0,
-				      inode->nr_copies, 1, true);
+				      inode->nr_copies, true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -669,7 +670,7 @@ static int vdi_clone(int argc, char **argv)
 
 		ret = sd_write_object(vid_to_vdi_oid(new_vid), 0, &new_vid, sizeof(new_vid),
 				      SD_INODE_HEADER_SIZE + sizeof(new_vid) * idx, 0,
-				      inode->nr_copies, 0, true);
+				      inode->nr_copies, false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -714,7 +715,7 @@ static int vdi_resize(int argc, char **argv)
 	inode->vdi_size = new_size;
 
 	ret = sd_write_object(vid_to_vdi_oid(vid), 0, inode, SD_INODE_HEADER_SIZE, 0,
-			      0, inode->nr_copies, 0, true);
+			      0, inode->nr_copies, false, true);
 	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to update an inode header\n");
 		return EXIT_FAILURE;
@@ -833,7 +834,7 @@ static int vdi_object(int argc, char **argv)
 	} else {
 		struct get_data_oid_info oid_info = {0};
 
-		oid_info.success = 0;
+		oid_info.success = false;
 		oid_info.idx = idx;
 
 		if (idx >= MAX_DATA_OBJS) {
@@ -954,7 +955,7 @@ static int vdi_track(int argc, char **argv)
 	} else {
 		struct get_data_oid_info oid_info = {0};
 
-		oid_info.success = 0;
+		oid_info.success = false;
 		oid_info.idx = idx;
 
 		if (idx >= MAX_DATA_OBJS) {
@@ -986,7 +987,7 @@ static int vdi_track(int argc, char **argv)
 static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 			     char *key, void *value, unsigned int value_len,
 			     uint32_t *vid, uint64_t *oid, unsigned int *nr_copies,
-			     int create, int excl, int delete)
+			     bool create, bool excl, bool delete)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1123,8 +1124,8 @@ static int vdi_getattr(int argc, char **argv)
 	}
 
 	ret = find_vdi_attr_oid(vdiname, vdi_cmd_data.snapshot_tag,
-				vdi_cmd_data.snapshot_id, key, NULL, 0,
-				&vid, &attr_oid, &nr_copies, 0, 0, 0);
+				vdi_cmd_data.snapshot_id, key, NULL, 0, &vid,
+				&attr_oid, &nr_copies, false, false, false);
 	if (ret == SD_RES_NO_OBJ) {
 		fprintf(stderr, "Attribute '%s' not found\n", key);
 		return EXIT_MISSING;
@@ -1245,7 +1246,7 @@ static int vdi_write(int argc, char **argv)
 	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
 	unsigned int len, remain;
 	char *buf = NULL;
-	int create;
+	bool create;
 
 	if (argv[optind]) {
 		ret = parse_option_size(argv[optind++], &offset);
@@ -1285,15 +1286,15 @@ static int vdi_write(int argc, char **argv)
 	idx = offset / SD_DATA_OBJ_SIZE;
 	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
-		create = 0;
+		create = false;
 		old_oid = 0;
 		flags = 0;
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
 
 		if (!inode->data_vdi_id[idx])
-			create = 1;
+			create = true;
 		else if (!is_data_obj_writeable(inode, idx)) {
-			create = 1;
+			create = true;
 			old_oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
 		}
 
@@ -1334,7 +1335,7 @@ static int vdi_write(int argc, char **argv)
 		if (create) {
 			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 					      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
-					      flags, inode->nr_copies, 0, false);
+					      flags, inode->nr_copies, false, false);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;
@@ -1718,13 +1719,13 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 	/* send a copy-on-write request */
 	ret = sd_write_object(vid_to_data_oid(vid, backup->idx), parent_oid,
 			      backup->data, backup->length, backup->offset,
-			      0, parent_inode->nr_copies, 1, true);
+			      0, parent_inode->nr_copies, true, true);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	return sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 			       SD_INODE_HEADER_SIZE + sizeof(vid) * backup->idx,
-			       0, parent_inode->nr_copies, 0, true);
+			       0, parent_inode->nr_copies, false, true);
 }
 
 static uint32_t do_restore(char *vdiname, int snapid, const char *tag)
@@ -1918,7 +1919,7 @@ static int vdi_parser(int ch, char *opt)
 
 	switch (ch) {
 	case 'P':
-		vdi_cmd_data.prealloc = 1;
+		vdi_cmd_data.prealloc = true;
 		break;
 	case 'i':
 		vdi_cmd_data.index = strtol(opt, &p, 10);
@@ -1936,13 +1937,13 @@ static int vdi_parser(int ch, char *opt)
 		}
 		break;
 	case 'x':
-		vdi_cmd_data.exclusive = 1;
+		vdi_cmd_data.exclusive = true;
 		break;
 	case 'd':
-		vdi_cmd_data.delete = 1;
+		vdi_cmd_data.delete = true;
 		break;
 	case 'w':
-		vdi_cmd_data.writeback = 1;
+		vdi_cmd_data.writeback = true;
 		break;
 	case 'c':
 		nr_copies = strtol(opt, &p, 10);

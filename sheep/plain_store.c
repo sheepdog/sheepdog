@@ -91,7 +91,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
 	return ret;
 }
 
-int default_exist(uint64_t oid)
+bool default_exist(uint64_t oid)
 {
 	char path[PATH_MAX];
 
@@ -99,10 +99,10 @@ int default_exist(uint64_t oid)
 	if (access(path, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
 			eprintf("failed to check object %"PRIx64", %m\n", oid);
-		return 0;
+		return false;
 	}
 
-	return 1;
+	return true;
 }
 
 static int err_to_sderr(uint64_t oid, int err)

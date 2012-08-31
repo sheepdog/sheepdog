@@ -48,7 +48,7 @@ extern int shadow_file_setxattr(const char *path, const char *name,
 extern int shadow_file_getxattr(const char *path, const char *name,
 				void *value, size_t size);
 extern int shadow_file_delete(const char *path);
-extern int shadow_file_exsit(const char *path);
+extern bool shadow_file_exsit(const char *path);
 
 /* volume.c */
 extern int create_volume_layout(void);

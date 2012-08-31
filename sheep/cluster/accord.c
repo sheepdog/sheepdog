@@ -133,7 +133,7 @@ static void acrd_unlock(struct acrd_handle *ah)
 static int queue_start_pos;
 static int queue_end_pos;
 
-static int acrd_queue_empty(struct acrd_handle *ah)
+static bool acrd_queue_empty(struct acrd_handle *ah)
 {
 	int rc;
 	char path[256];
@@ -143,9 +143,9 @@ static int acrd_queue_empty(struct acrd_handle *ah)
 
 	rc = acrd_read(ah, path, NULL, &count, 0, 0);
 	if (rc == ACRD_SUCCESS)
-		return 0;
+		return false;
 
-	return 1;
+	return true;
 }
 
 static void acrd_queue_push(struct acrd_handle *ah, struct acrd_event *ev)
@@ -305,24 +305,24 @@ static pthread_cond_t start_cond = PTHREAD_COND_INITIALIZER;
 /* protect queue_start_pos */
 static pthread_mutex_t queue_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static int need_cleanup;
+static bool need_cleanup;
 
 static void acrd_join_fn(struct acrd_handle *ah, const uint64_t *member_list,
 			 size_t member_list_entries, uint64_t nodeid, void *arg)
 {
-	static int init = 0;
+	static bool init = false;
 
 	if (!init) {
 		this_id = nodeid;
 
 		if (member_list_entries == 1)
-			need_cleanup = 1;
+			need_cleanup = true;
 
 		pthread_mutex_lock(&start_lock);
 		pthread_cond_signal(&start_cond);
 		pthread_mutex_unlock(&start_lock);
 
-		init = 1;
+		init = true;
 	}
 }
 
@@ -376,14 +376,14 @@ static void acrd_leave_fn(struct acrd_handle *ah, const uint64_t *member_list,
 			  size_t member_list_entries, uint64_t nodeid, void *arg)
 {
 	struct acrd_leave_info *info;
-	static int left;
+	static bool left;
 
 	if (nodeid == this_id) {
-		left = 1;
+		left = true;
 		close(efd);
 	}
 
-	if(left)
+	if (left)
 		return;
 
 	info = zalloc(sizeof(*info));

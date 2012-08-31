@@ -28,7 +28,7 @@ struct vdi_tree {
 	char label[256];
 	uint32_t vid;
 	uint32_t pvid;
-	int highlight;
+	bool highlight;
 	struct list_head children;
 	struct list_head siblings;
 };
@@ -53,7 +53,7 @@ static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint32_t vid,
 }
 
 static struct vdi_tree *new_vdi(const char *name, const char *label,
-				uint64_t vid, uint64_t pvid, int highlight)
+				uint64_t vid, uint64_t pvid, bool highlight)
 {
 	struct vdi_tree *vdi;
 
@@ -77,7 +77,7 @@ void init_tree(void)
 }
 
 void add_vdi_tree(const char *name, const char *label, uint32_t vid,
-		  uint32_t pvid, int highlight)
+		  uint32_t pvid, bool highlight)
 {
 	struct vdi_tree *vdi, *parent;
 
@@ -124,7 +124,7 @@ static void spaces(int n)
 		putchar(' ');
 }
 
-static void indent(int level, int first, int last)
+static void indent(int level, bool first, bool last)
 {
 	int lvl;
 
@@ -141,7 +141,7 @@ static void indent(int level, int first, int last)
 	}
 }
 
-static void _dump_tree(struct vdi_tree *current, int level, int first, int last)
+static void _dump_tree(struct vdi_tree *current, int level, bool first, bool last)
 {
 	struct vdi_tree *vdi;
 
@@ -190,6 +190,6 @@ void dump_tree(void)
 		printf("%s", vdi->name);
 		more[0] = 0;
 		width[0] = strlen(vdi->name);
-		_dump_tree(vdi, 1, 1, 1);
+		_dump_tree(vdi, 1, true, true);
 	}
 }

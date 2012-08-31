@@ -42,7 +42,7 @@ struct get_vdis_work {
 
 pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t wait_vdis_cond = PTHREAD_COND_INITIALIZER;
-static int is_vdi_list_ready = 1;
+static int is_vdi_list_ready = true;
 
 static struct vnode_info *current_vnode_info;
 
@@ -670,7 +670,7 @@ static void get_vdis_done(struct work *work)
 		container_of(work, struct get_vdis_work, work);
 
 	pthread_mutex_lock(&wait_vdis_lock);
-	is_vdi_list_ready = 1;
+	is_vdi_list_ready = true;
 	pthread_cond_broadcast(&wait_vdis_cond);
 	pthread_mutex_unlock(&wait_vdis_lock);
 
@@ -702,7 +702,7 @@ static struct vnode_info *alloc_old_vnode_info(struct sd_node *joined,
 static void finish_join(struct join_message *msg, struct sd_node *joined,
 		struct sd_node *nodes, size_t nr_nodes)
 {
-	sys->join_finished = 1;
+	sys->join_finished = true;
 	sys->epoch = msg->epoch;
 
 	if (msg->cluster_status != SD_STATUS_OK)
@@ -742,7 +742,7 @@ static void get_vdis(struct sd_node *nodes, size_t nr_nodes)
 	w->nr_members = nr_nodes;
 	memcpy(w->members, nodes, array_len);
 
-	is_vdi_list_ready = 0;
+	is_vdi_list_ready = false;
 
 	w->work.fn = do_get_vdis;
 	w->work.done = get_vdis_done;
@@ -1074,7 +1074,7 @@ void sd_join_handler(struct sd_node *joined, struct sd_node *members,
 		 * Now mastership transfer is done.
 		 */
 		if (!sys->join_finished) {
-			sys->join_finished = 1;
+			sys->join_finished = true;
 			sys->epoch = get_latest_epoch();
 
 			put_vnode_info(current_vnode_info);
@@ -1208,11 +1208,11 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
  */
 int leave_cluster(void)
 {
-	static int left;
+	static bool left;
 
 	if (left)
 		return 0;
 
-	left = 1;
+	left = true;
 	return sys->cdrv->leave();
 }

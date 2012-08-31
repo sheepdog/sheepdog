@@ -54,7 +54,7 @@ extern unsigned long trace_return_call(void);
   extern int register_trace_function(trace_func_t func);
   extern int trace_enable(void);
   extern int trace_disable(void);
-  extern struct caller *trace_lookup_ip(unsigned long ip, int create);
+  extern struct caller *trace_lookup_ip(unsigned long ip, bool create);
   extern int trace_buffer_pop(void *buf, uint32_t len);
   extern void trace_buffer_push(int cpuid, struct trace_graph_item *item);
   extern void short_thread_begin(void);

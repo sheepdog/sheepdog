@@ -11,9 +11,11 @@
 #ifndef __TREEVIEW__
 #define __TREEVIEW__
 
+#include <stdbool.h>
+
 void init_tree(void);
 void add_vdi_tree(const char *label, const char *tag, uint32_t vid,
-		  uint32_t pvid, int highlight);
+		  uint32_t pvid, bool highlight);
 void dump_tree(void);
 
 #endif

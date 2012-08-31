@@ -49,7 +49,7 @@ enum zk_event_type {
 };
 
 struct zk_node {
-	int joined;
+	bool joined;
 	clientid_t clientid;
 	struct sd_node node;
 };
@@ -79,7 +79,7 @@ static struct sd_node sd_nodes[SD_MAX_NODES];
 static size_t nr_sd_nodes;
 static size_t nr_zk_nodes;
 
-static inline int is_blocking_event(struct zk_event *ev)
+static inline bool is_blocking_event(struct zk_event *ev)
 {
 	return ev->type == EVENT_BLOCK || ev->type == EVENT_JOIN_REQUEST;
 }
@@ -163,7 +163,7 @@ static inline ZOOAPI int zk_get_children(zhandle_t *zh, const char *path,
 static int efd;
 static int32_t queue_pos;
 
-static int zk_queue_empty(zhandle_t *zh)
+static bool zk_queue_empty(zhandle_t *zh)
 {
 	int rc;
 	char path[256];
@@ -172,14 +172,14 @@ static int zk_queue_empty(zhandle_t *zh)
 
 	rc = zk_exists(zh, path, 1, NULL);
 	if (rc == ZOK)
-		return 0;
+		return false;
 
-	return 1;
+	return true;
 }
 
 static int32_t zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 {
-	static int first_push = 1;
+	static bool first_push = true;
 	int32_t seq;
 	int rc, len;
 	char path[256], buf[256];
@@ -204,7 +204,7 @@ static int32_t zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 		dprintf("write event to efd:%d\n", efd);
 		eventfd_write(efd, value);
 
-		first_push = 0;
+		first_push = false;
 	}
 
 	return seq;
@@ -430,22 +430,22 @@ static void node_btree_find_master_fn(const void *nodep,
 	}
 }
 
-static int is_master(zhandle_t *zh, struct zk_node *znode)
+static bool is_master(zhandle_t *zh, struct zk_node *znode)
 {
 	zk_master = NULL;
 
 	if (!zk_node_btroot) {
 		if (zk_member_empty(zh))
-			return 1;
+			return true;
 		else
-			return 0;
+			return false;
 	}
 
 	twalk(zk_node_btroot, node_btree_find_master_fn);
 	if (node_eq(&zk_master->node, &znode->node))
-		return 1;
+		return true;
 
-	return 0;
+	return false;
 }
 
 static void zk_queue_init(zhandle_t *zh)
@@ -457,7 +457,7 @@ static void zk_queue_init(zhandle_t *zh)
 
 static void zk_member_init(zhandle_t *zh)
 {
-	static int finished;
+	static bool finished;
 	int rc, len;
 	struct String_vector strs;
 	struct zk_node znode;
@@ -466,7 +466,7 @@ static void zk_member_init(zhandle_t *zh)
 	if (finished)
 		return;
 
-	finished = 1;
+	finished = true;
 
 	if (!zk_member_empty(zh)) {
 		FOR_EACH_ZNODE(zh, MEMBER_ZNODE, path, &strs) {
@@ -591,7 +591,7 @@ static int zk_join(struct sd_node *myself,
 	if (rc == ZOK)
 		panic("previous zookeeper session exist, shutdown\n");
 
-	this_node.joined = 0;
+	this_node.joined = false;
 	cid = zoo_client_id(zhandle);
 	assert(cid != NULL);
 	this_node.clientid = *cid;
@@ -684,7 +684,7 @@ static void zk_handler(int listen_fd, int events, void *data)
 		res = sd_check_join_cb(&ev.sender.node, ev.buf);
 		ev.join_result = res;
 		ev.type = EVENT_JOIN_RESPONSE;
-		ev.sender.joined = 1;
+		ev.sender.joined = true;
 
 		dprintf("I'm master, push back join event\n");
 		zk_queue_push_back(zhandle, &ev);
