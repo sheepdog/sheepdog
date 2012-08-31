@@ -1,0 +1,63 @@
+#!/bin/bash
+
+# Test vdi rollback
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 4`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 5
+
+$COLLIE cluster format
+$COLLIE vdi create test 4G
+
+qemu-io -c "write 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$COLLIE vdi snapshot test -s snap1
+qemu-io -c "write 0 512 -P 2" sheepdog:test | _filter_qemu_io
+
+$COLLIE vdi rollback test -s snap1
+qemu-io -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$COLLIE vdi tree | _filter_short_date
+$COLLIE vdi list | _filter_short_date
+
+qemu-io -c "write 0 512 -P 2" sheepdog:test | _filter_qemu_io
+$COLLIE vdi snapshot test -s snap2
+qemu-io -c "write 0 512 -P 3" sheepdog:test | _filter_qemu_io
+
+$COLLIE vdi rollback test -s snap1
+qemu-io -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$COLLIE vdi tree | _filter_short_date
+$COLLIE vdi list | _filter_short_date
+
+$COLLIE vdi rollback test -s snap2
+qemu-io -c "read 0 512 -P 2" sheepdog:test | _filter_qemu_io
+$COLLIE vdi tree | _filter_short_date
+$COLLIE vdi list | _filter_short_date
+
+$COLLIE vdi rollback test -s snap1
+qemu-io -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
+$COLLIE vdi tree | _filter_short_date
+$COLLIE vdi list | _filter_short_date
+
+qemu-io -c "write 0 512 -P 3" sheepdog:test | _filter_qemu_io
+$COLLIE vdi snapshot test -s snap3
+qemu-io -c "write 0 512 -P 4" sheepdog:test | _filter_qemu_io
+$COLLIE vdi snapshot test -s snap4
+
+$COLLIE vdi rollback test -s snap3
+qemu-io -c "read 0 512 -P 3" sheepdog:test | _filter_qemu_io
+$COLLIE vdi tree | _filter_short_date
+$COLLIE vdi list | _filter_short_date
