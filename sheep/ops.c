@@ -221,6 +221,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	uint64_t created_time;
 	struct siocb iocb = { 0 };
 	struct store_driver *driver;
+	char *store_name = data;
 
 	driver = find_store_driver(data);
 	if (!driver)
@@ -230,9 +231,11 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	latest_epoch = get_latest_epoch();
 	iocb.epoch = latest_epoch;
 
-	ret = sd_store->format(data);
+	ret = sd_store->format();
 	if (ret != SD_RES_SUCCESS)
 		return ret;
+	if (set_cluster_store(store_name) < 0)
+		return SD_RES_EIO;
 
 	ret = sd_store->init(obj_path);
 	if (ret != SD_RES_SUCCESS)

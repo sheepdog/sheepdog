@@ -382,7 +382,7 @@ int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 	return for_each_object_in_wd(check_stale_objects, &old_epoch);
 }
 
-int default_format(char *name)
+int default_format(void)
 {
 	unsigned ret;
 
@@ -396,9 +396,6 @@ int default_format(char *name)
 		eprintf("%m\n");
 		return SD_RES_EIO;
 	}
-
-	if (set_cluster_store(name) < 0)
-		return SD_RES_EIO;
 
 	return SD_RES_SUCCESS;
 }
