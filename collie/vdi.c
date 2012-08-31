@@ -707,32 +707,31 @@ static int vdi_resize(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int vdi_delete(int argc, char **argv)
+static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 {
-	char *data = argv[optind];
 	int fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen, wlen;
-	char vdiname[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
+	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
 	rlen = 0;
-	wlen = sizeof(vdiname);
+	wlen = sizeof(data);
 
 	sd_init_req(&hdr, SD_OP_DEL_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = wlen;
-	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
-	memset(vdiname, 0, sizeof(vdiname));
-	strncpy(vdiname, data, SD_MAX_VDI_LEN);
-	strncpy(vdiname + SD_MAX_VDI_LEN, vdi_cmd_data.snapshot_tag,
-		SD_MAX_VDI_TAG_LEN);
+	hdr.vdi.snapid = snap_id;
+	memset(data, 0, sizeof(data));
+	strncpy(data, vdiname, SD_MAX_VDI_LEN);
+	if (snap_tag)
+		strncpy(data + SD_MAX_VDI_LEN, snap_tag, SD_MAX_VDI_TAG_LEN);
 
-	ret = exec_req(fd, &hdr, vdiname, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
 	close(fd);
 
 	if (ret) {
@@ -750,6 +749,51 @@ static int vdi_delete(int argc, char **argv)
 	}
 
 	return EXIT_SUCCESS;
+}
+
+static int vdi_delete(int argc, char **argv)
+{
+	char *vdiname = argv[optind];
+
+	return do_vdi_delete(vdiname, vdi_cmd_data.snapshot_id,
+			     vdi_cmd_data.snapshot_tag);
+}
+
+static int vdi_rollback(int argc, char **argv)
+{
+	char *vdiname = argv[optind++];
+	uint32_t base_vid;
+	int ret;
+	char buf[SD_INODE_HEADER_SIZE];
+	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+
+	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
+		fprintf(stderr, "Please specify the '-s' option\n");
+		return EXIT_USAGE;
+	}
+
+	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+			    vdi_cmd_data.snapshot_tag, &base_vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	ret = sd_read_object(vid_to_vdi_oid(base_vid), inode,
+			     SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to read an inode\n");
+		return EXIT_FAILURE;
+	}
+
+	ret = do_vdi_delete(vdiname, 0, NULL);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to delete the current state\n");
+		return EXIT_FAILURE;
+	}
+
+	return do_vdi_create(vdiname, inode->vdi_size, base_vid, NULL,
+			     inode->snap_id, vdi_cmd_data.nr_copies);
 }
 
 static int vdi_object(int argc, char **argv)
@@ -1537,6 +1581,9 @@ static struct subcommand vdi_cmd[] = {
 	{"delete", "<vdiname>", "saph", "delete an image",
 	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_delete, vdi_options},
+	{"rollback", "<vdiname>", "saph", "rollback to a snapshot",
+	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
+	 vdi_rollback, vdi_options},
 	{"list", "[vdiname]", "aprh", "list images",
 	 NULL, 0, vdi_list, vdi_options},
 	{"tree", NULL, "aph", "show images in tree view format",
