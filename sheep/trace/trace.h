@@ -64,11 +64,11 @@ extern unsigned long trace_return_call(void);
   static inline int trace_init(void) { return 0; }
   static inline int trace_enable(void) { return 0; }
   static inline int trace_disable(void) { return 0; }
-  static inline uint32_t trace_buffer_pop(void *buf) { return 0; }
+  static inline uint32_t trace_buffer_pop(void *buf, uint32_t len) { return 0; }
   static inline void trace_buffer_push(int cpuid, struct
 				       trace_graph_item *item) { return; }
-  extern inline void short_thread_begin(void) { return; }
-  extern inline void short_thread_end(void) { return; }
+  static inline void short_thread_begin(void) { return; }
+  static inline void short_thread_end(void) { return; }
 
 #endif /* ENABLE_TRACE */
 
