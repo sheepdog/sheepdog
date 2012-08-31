@@ -191,6 +191,10 @@ _kill_sheep()
     if [ $? != 0 ]; then
         _die "cannot kill sheep $1"
     fi
+
+    while [ $? == 0 ]; do
+	pgrep -f "$SHEEP $STORE/$1" > /dev/null
+    done
 }
 
 _wait_for_sheep_recovery()
