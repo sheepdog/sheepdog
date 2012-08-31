@@ -219,6 +219,11 @@ static notrace void nop_all_sites(void)
 	pthread_mutex_unlock(&trace_lock);
 }
 
+static inline bool short_thread_running(void)
+{
+	return !!nr_short_thread;
+}
+
 static notrace void enable_tracer(int fd, int events, void *data)
 {
 	eventfd_t value;
@@ -227,6 +232,9 @@ static notrace void enable_tracer(int fd, int events, void *data)
 	ret = eventfd_read(trace_efd, &value);
 	if (ret < 0)
 		eprintf("%m");
+
+	if (short_thread_running())
+		return;
 
 	suspend_worker_threads();
 	patch_all_sites((unsigned long)trace_caller);
@@ -244,6 +252,9 @@ static notrace void disable_tracer(int fd, int events, void *data)
 	ret = eventfd_read(fd, &value);
 	if (ret < 0)
 		eprintf("%m");
+
+	if (short_thread_running())
+		return;
 
 	suspend_worker_threads();
 	nop_all_sites();
