@@ -275,7 +275,6 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 	enum cluster_join_result res;
 	struct sd_node entries[SD_MAX_NODES];
 	int idx;
-	static bool blocked = false;
 
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
@@ -334,16 +333,13 @@ static int __corosync_dispatch_one(struct corosync_event *cevent)
 		sd_leave_handler(&cevent->sender.ent, entries, nr_cpg_nodes);
 		break;
 	case COROSYNC_EVENT_TYPE_BLOCK:
-		if (blocked)
-			/* block events until the unblock message changes this
-			   event type to COROSYNC_EVENT_TYPE_NOTIFY */
+		if (cevent->callbacked)
+			/* block events until the unblock message
+			   removes this event */
 			return 0;
-		blocked = sd_block_handler(&cevent->sender.ent);
-
-		/* block other messages until the unblock message comes */
+		cevent->callbacked = sd_block_handler(&cevent->sender.ent);
 		return 0;
 	case COROSYNC_EVENT_TYPE_NOTIFY:
-		blocked = false;
 		sd_notify_handler(&cevent->sender.ent, cevent->msg,
 						 cevent->msg_len);
 		break;
@@ -462,6 +458,15 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		cevent->sender = cmsg->sender;
 		cevent->msg_len = cmsg->msg_len;
 		break;
+	case COROSYNC_MSG_TYPE_UNBLOCK:
+		cevent = update_event(COROSYNC_EVENT_TYPE_BLOCK, &cmsg->sender,
+				      cmsg->msg, cmsg->msg_len);
+		if (cevent) {
+			list_del(&cevent->list);
+			free(cevent->msg);
+			free(cevent);
+		}
+		/* fall through */
 	case COROSYNC_MSG_TYPE_BLOCK:
 	case COROSYNC_MSG_TYPE_NOTIFY:
 		cevent = zalloc(sizeof(*cevent));
@@ -520,14 +525,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		memcpy(cevent->nodes, cmsg->nodes,
 		       sizeof(*cmsg->nodes) * cmsg->nr_nodes);
 
-		break;
-	case COROSYNC_MSG_TYPE_UNBLOCK:
-		cevent = update_event(COROSYNC_EVENT_TYPE_BLOCK, &cmsg->sender,
-				      cmsg->msg, cmsg->msg_len);
-		if (!cevent)
-			break;
-
-		cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
 		break;
 	}
 

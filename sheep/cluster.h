@@ -103,7 +103,8 @@ struct cluster_driver {
 	void (*block)(void);
 
 	/*
-	 * Unblock events on all nodes, and send a a message to all nodes.
+	 * Unblock events on all nodes, and send a total order message
+	 * to all nodes.
 	 */
 	void (*unblock)(void *msg, size_t msg_len);
 
