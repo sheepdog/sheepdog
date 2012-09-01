@@ -674,10 +674,17 @@ static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	return ret;
 }
 
-static int local_trace_read_buf(const struct sd_req *req, struct sd_rsp *rsp,
-			       void *data)
+static int local_trace_read_buf(struct request *request)
 {
-	rsp->data_length = trace_buffer_pop(data, req->data_length);
+	struct sd_req *req = &request->rq;
+	struct sd_rsp *rsp = &request->rp;
+	int ret;
+
+	ret = trace_buffer_pop(request->data, req->data_length);
+	if (ret == -1)
+		return SD_RES_AGAIN;
+
+	rsp->data_length = ret;
 	dprintf("%u\n", rsp->data_length);
 	return SD_RES_SUCCESS;
 }
@@ -1090,7 +1097,7 @@ static struct sd_op_template sd_ops[] = {
 		.name = "TRACE_READ_BUF",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = 1,
-		.process_main = local_trace_read_buf,
+		.process_work = local_trace_read_buf,
 	},
 
 	[SD_OP_KILL_NODE] = {

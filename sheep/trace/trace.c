@@ -299,11 +299,14 @@ int trace_init_signal(void)
 	return 0;
 }
 
-notrace uint32_t trace_buffer_pop(void *buf, uint32_t len)
+notrace int trace_buffer_pop(void *buf, uint32_t len)
 {
-	uint32_t readin, count = 0, requested = len;
+	int readin, count = 0, requested = len;
 	char *buff = (char *)buf;
 	int i;
+
+	if (trace_in_patch)
+		return -1;
 
 	for (i = 0; i < nr_cpu; i++) {
 		readin = strbuf_stripout(&buffer[i], buff, len);

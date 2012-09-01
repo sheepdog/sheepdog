@@ -105,6 +105,9 @@ read_buffer:
 		return EXIT_SYSFAIL;
 	}
 
+	if (rsp->result == SD_RES_AGAIN)
+		goto read_buffer;
+
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Trace failed: %s\n",
 				sd_strerror(rsp->result));
