@@ -39,7 +39,9 @@ static int trace_efd;
 static int nr_short_thread;
 static int trace_in_patch;
 
-pthread_mutex_t suspend_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t suspend_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t suspend_cond = PTHREAD_COND_INITIALIZER;
+static int suspend_count;
 
 static struct strbuf *buffer;
 static int nr_cpu;
@@ -54,11 +56,10 @@ union instruction {
 
 static notrace void suspend(int num)
 {
-	dprintf("going to suspend\n");
 	pthread_mutex_lock(&suspend_lock);
-	/* Now I am suspended and sleep on suspend_lock */
+	suspend_count--;
+	pthread_cond_wait(&suspend_cond, &suspend_lock);
 	pthread_mutex_unlock(&suspend_lock);
-	dprintf("going to resume\n");
 }
 
 static inline int trace_hash(unsigned long ip)
@@ -180,18 +181,29 @@ notrace int register_trace_function(trace_func_t func)
 static notrace void suspend_worker_threads(void)
 {
 	struct worker_info *wi;
+	suspend_count = total_ordered_workers;
 
 	/* Hold the lock, then all other worker can sleep on it */
-	pthread_mutex_lock(&suspend_lock);
 	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
-		if (wi->worker_thread &&
+		if (wi->ordered &&
 		    pthread_kill(wi->worker_thread, SIGUSR2) != 0)
 			dprintf("%m\n");
 	}
+
+wait_for_worker_suspend:
+	pthread_mutex_lock(&suspend_lock);
+	if (suspend_count > 0) {
+		pthread_mutex_unlock(&suspend_lock);
+		pthread_yield();
+		goto wait_for_worker_suspend;
+	}
+	pthread_mutex_unlock(&suspend_lock);
 }
 
 static notrace void resume_worker_threads(void)
 {
+	pthread_mutex_lock(&suspend_lock);
+	pthread_cond_broadcast(&suspend_cond);
 	pthread_mutex_unlock(&suspend_lock);
 }
 

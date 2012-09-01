@@ -42,7 +42,7 @@ struct worker_info {
 };
 
 extern struct list_head worker_info_list;
-extern int total_nr_workers;
+extern int total_ordered_workers;
 
 /* if 'ordered' is true, the work queue are processes in order. */
 struct work_queue *init_work_queue(const char *name, bool ordered);

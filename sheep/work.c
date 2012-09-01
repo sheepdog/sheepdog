@@ -35,7 +35,7 @@
 #include "trace/trace.h"
 
 static int efd;
-int total_nr_workers;
+int total_ordered_workers;
 LIST_HEAD(worker_info_list);
 
 enum wq_state {
@@ -246,11 +246,11 @@ struct work_queue *init_work_queue(const char *name, bool ordered)
 		}
 
 		pthread_mutex_unlock(&wi->startup_lock);
+		total_ordered_workers++;
 	}
 
 	list_add(&wi->worker_info_siblings, &worker_info_list);
 
-	total_nr_workers++;
 	return &wi->q;
 destroy_threads:
 

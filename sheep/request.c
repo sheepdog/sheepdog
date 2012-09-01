@@ -446,7 +446,7 @@ int exec_local_req(struct sd_req *rq, void *data)
 
 	ret = eventfd_read(req->wait_efd, &value);
 	if (ret < 0)
-		eprintf("event fd read error %m");
+		eprintf("%m\n");
 
 	close(req->wait_efd);
 	ret = req->rp.result;
