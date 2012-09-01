@@ -242,8 +242,14 @@ static notrace void enable_tracer(int fd, int events, void *data)
 	int ret;
 
 	ret = eventfd_read(trace_efd, &value);
-	if (ret < 0)
-		eprintf("%m");
+	/*
+	 * In error case we can't retry read in main thread, simply return and
+	 * expected to be waken up by epoll again.
+	 */
+	if (ret < 0) {
+		eprintf("%m\n");
+		return;
+	}
 
 	if (short_thread_running())
 		return;
@@ -262,8 +268,10 @@ static notrace void disable_tracer(int fd, int events, void *data)
 	int ret;
 
 	ret = eventfd_read(fd, &value);
-	if (ret < 0)
-		eprintf("%m");
+	if (ret < 0) {
+		eprintf("%m\n");
+		return;
+	}
 
 	if (short_thread_running())
 		return;

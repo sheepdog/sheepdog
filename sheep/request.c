@@ -426,7 +426,8 @@ static struct request *alloc_local_request(void *data, int data_length)
 /*
  * Exec the request locally and synchronously.
  *
- * This function takes advantage of gateway's retry mechanism.
+ * This function takes advantage of gateway's retry mechanism and can be only
+ * called from worker thread.
  */
 int exec_local_req(struct sd_req *rq, void *data)
 {
@@ -444,9 +445,13 @@ int exec_local_req(struct sd_req *rq, void *data)
 
 	eventfd_write(sys->req_efd, value);
 
+again:
+	/* In error case (for e.g, EINTR) just retry read */
 	ret = eventfd_read(req->wait_efd, &value);
-	if (ret < 0)
+	if (ret < 0) {
 		eprintf("%m\n");
+		goto again;
+	}
 
 	close(req->wait_efd);
 	ret = req->rp.result;
@@ -857,7 +862,6 @@ int create_listen_port(int port, void *data)
 {
 	return create_listen_ports(port, create_listen_port_fn, data);
 }
-
 
 static void req_handler(int listen_fd, int events, void *data)
 {
