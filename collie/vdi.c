@@ -823,25 +823,25 @@ static int vdi_object(int argc, char **argv)
 		       vid, sd_nodes_nr);
 		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL, SD_INODE_SIZE);
 	} else {
-		struct get_data_oid_info old_info;
+		struct get_data_oid_info oid_info = {0};
 
-		old_info.success = 0;
-		old_info.idx = idx;
+		oid_info.success = 0;
+		oid_info.idx = idx;
 
 		if (idx >= MAX_DATA_OBJS) {
 			printf("The offset is too large!\n");
 			exit(EXIT_FAILURE);
 		}
 
-		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &old_info, SD_DATA_OBJ_SIZE);
+		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &oid_info, SD_DATA_OBJ_SIZE);
 
-		if (old_info.success) {
-			if (old_info.data_oid) {
+		if (oid_info.success) {
+			if (oid_info.data_oid) {
 				printf("Looking for the object 0x%" PRIx64
 				       " (the inode vid 0x%" PRIx32 " idx %u) with %d nodes\n\n",
-				       old_info.data_oid, vid, idx, sd_nodes_nr);
+				       oid_info.data_oid, vid, idx, sd_nodes_nr);
 
-				parse_objs(old_info.data_oid, do_print_obj, NULL, SD_DATA_OBJ_SIZE);
+				parse_objs(oid_info.data_oid, do_print_obj, NULL, SD_DATA_OBJ_SIZE);
 			} else
 				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
 				       vid, idx);
@@ -944,7 +944,7 @@ static int vdi_track(int argc, char **argv)
 		       vid, sd_nodes_nr);
 		print_obj_epoch(vid_to_vdi_oid(vid));
 	} else {
-		struct get_data_oid_info oid_info;
+		struct get_data_oid_info oid_info = {0};
 
 		oid_info.success = 0;
 		oid_info.idx = idx;
