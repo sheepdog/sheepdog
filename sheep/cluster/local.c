@@ -267,14 +267,23 @@ static void check_pids(void *arg)
 	size_t nr;
 	struct sd_node nodes[SD_MAX_NODES];
 	pid_t pids[SD_MAX_NODES];
+	struct local_event *ev;
 
 	shm_queue_lock();
 
 	nr = get_nodes(nodes, pids);
 
 	for (i = 0; i < nr; i++)
-		if (!process_exists(pids[i]))
+		if (!process_exists(pids[i])) {
 			add_event(EVENT_LEAVE, nodes + i, NULL, 0);
+
+			/* unblock blocking event if sender has gone */
+			ev = shm_queue_peek_block_event();
+			if (node_eq(nodes + i, &ev->sender)) {
+				ev->removed = true;
+				msync(ev, sizeof(*ev), MS_SYNC);
+			}
+		}
 
 	shm_queue_unlock();
 
