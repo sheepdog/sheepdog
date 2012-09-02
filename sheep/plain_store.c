@@ -231,14 +231,16 @@ static int default_read_from_path(uint64_t oid, char *path,
 		return err_to_sderr(oid, errno);
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
-	if (size != iocb->length) {
+	if (size == 0) {
+		/* the requested object is being created */
+		ret = SD_RES_NO_OBJ;
+	} else if (size != iocb->length) {
 		eprintf("failed to read object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
 			iocb->offset, iocb->length, size);
 		ret = SD_RES_EIO;
-		goto out;
 	}
-out:
+
 	close(fd);
 
 	return ret;
