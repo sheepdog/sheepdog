@@ -30,7 +30,8 @@
 const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
 static int sigfd;
-static int event_pos;
+static int block_event_pos;
+static int nonblock_event_pos;
 static struct sd_node this_node;
 
 enum local_event_type {
@@ -44,6 +45,8 @@ enum local_event_type {
 struct local_event {
 	enum local_event_type type;
 	struct sd_node sender;
+
+	bool removed;
 
 	size_t buf_len;
 	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
@@ -59,8 +62,10 @@ struct local_event {
 /* shared memory queue */
 
 struct shm_queue {
-	int pos;
-	struct local_event events[MAX_EVENTS];
+	int block_event_pos;
+	struct local_event block_events[MAX_EVENTS];
+	int nonblock_event_pos;
+	struct local_event nonblock_events[MAX_EVENTS];
 } *shm_queue;
 
 static void shm_queue_lock(void)
@@ -73,16 +78,11 @@ static void shm_queue_unlock(void)
 	flock(shmfd, LOCK_UN);
 }
 
-static int shm_queue_empty(void)
-{
-	return event_pos == shm_queue->pos;
-}
-
 static size_t get_nodes(struct sd_node *n, pid_t *p)
 {
 	struct local_event *ev;
 
-	ev = shm_queue->events + shm_queue->pos;
+	ev = shm_queue->nonblock_events + shm_queue->nonblock_event_pos;
 
 	if (n)
 		memcpy(n, ev->nodes, sizeof(ev->nodes));
@@ -97,31 +97,57 @@ static int process_exists(pid_t pid)
 	return kill(pid, 0) == 0;
 }
 
+static struct local_event *shm_queue_peek_block_event(void)
+{
+	return shm_queue->block_events + (block_event_pos + 1) % MAX_EVENTS;
+}
+
+static struct local_event *shm_queue_peek_nonblock_event(void)
+{
+	return shm_queue->nonblock_events +
+		(nonblock_event_pos + 1) % MAX_EVENTS;
+}
+
 static struct local_event *shm_queue_peek(void)
 {
-	if (shm_queue_empty())
+	/* try to peek nonblock queue first */
+	if (nonblock_event_pos != shm_queue->nonblock_event_pos)
+		return shm_queue_peek_nonblock_event();
+	else if (block_event_pos != shm_queue->block_event_pos)
+		return shm_queue_peek_block_event();
+	else
 		return NULL;
-
-	return shm_queue->events + (event_pos + 1) % MAX_EVENTS;
 }
 
 static void shm_queue_push(struct local_event *ev)
 {
-	shm_queue->pos = (shm_queue->pos + 1) % MAX_EVENTS;
-	shm_queue->events[shm_queue->pos] = *ev;
+	if (ev->type == EVENT_BLOCK) {
+		shm_queue->block_event_pos =
+			(shm_queue->block_event_pos + 1) % MAX_EVENTS;
+		shm_queue->block_events[shm_queue->block_event_pos] = *ev;
 
-	msync(shm_queue->events + shm_queue->pos, sizeof(*ev), MS_SYNC);
-	msync(&shm_queue->pos, sizeof(shm_queue->pos), MS_SYNC);
+		msync(shm_queue->block_events +
+		      shm_queue->block_event_pos, sizeof(*ev), MS_SYNC);
+		msync(&shm_queue->block_event_pos,
+		      sizeof(shm_queue->block_event_pos), MS_SYNC);
+	} else {
+		shm_queue->nonblock_event_pos =
+			(shm_queue->nonblock_event_pos + 1) % MAX_EVENTS;
+		shm_queue->nonblock_events[shm_queue->nonblock_event_pos] = *ev;
+
+		msync(shm_queue->nonblock_events +
+		      shm_queue->nonblock_event_pos, sizeof(*ev), MS_SYNC);
+		msync(&shm_queue->nonblock_event_pos,
+		      sizeof(shm_queue->nonblock_event_pos), MS_SYNC);
+	}
 }
 
-static struct local_event *shm_queue_pop(void)
+static void shm_queue_remove(struct local_event *ev)
 {
-	if (shm_queue_empty())
-		return NULL;
-
-	event_pos = (event_pos + 1) % MAX_EVENTS;
-
-	return shm_queue->events + event_pos;
+	if (ev == shm_queue_peek_block_event())
+		block_event_pos = (block_event_pos + 1) % MAX_EVENTS;
+	else
+		nonblock_event_pos = (nonblock_event_pos + 1) % MAX_EVENTS;
 }
 
 static void shm_queue_notify(void)
@@ -171,11 +197,13 @@ static void shm_queue_init(void)
 			 PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
 	assert(shm_queue != MAP_FAILED);
 
-	if (is_shm_queue_valid())
-		event_pos = shm_queue->pos;
-	else {
+	if (is_shm_queue_valid()) {
+		block_event_pos = shm_queue->block_event_pos;
+		nonblock_event_pos = shm_queue->nonblock_event_pos;
+	} else {
 		/* initialize shared memory */
-		event_pos = 0;
+		block_event_pos = 0;
+		nonblock_event_pos = 0;
 		ret = ftruncate(shmfd, 0);
 		assert(ret == 0);
 		ret = ftruncate(shmfd, sizeof(*shm_queue));
@@ -305,15 +333,12 @@ static void local_unblock(void *msg, size_t msg_len)
 
 	shm_queue_lock();
 
-	ev = shm_queue_peek();
+	ev = shm_queue_peek_block_event();
 
-	ev->type = EVENT_NOTIFY;
-	ev->buf_len = msg_len;
-	if (msg)
-		memcpy(ev->buf, msg, msg_len);
+	ev->removed = true;
 	msync(ev, sizeof(*ev), MS_SYNC);
 
-	shm_queue_notify();
+	add_event(EVENT_NOTIFY, &this_node, msg, msg_len);
 
 	shm_queue_unlock();
 }
@@ -329,6 +354,9 @@ static bool local_process_event(void)
 	ev = shm_queue_peek();
 	if (!ev)
 		return false;
+
+	if (ev->removed)
+		goto out;
 
 	switch (ev->type) {
 	case EVENT_JOIN_REQUEST:
@@ -356,24 +384,24 @@ static bool local_process_event(void)
 			ev->nr_nodes = 1;
 			ev->nodes[0] = this_node;
 			ev->pids[0] = getpid();
+			msync(ev, sizeof(*ev), MS_SYNC);
 		}
 
 		sd_join_handler(&ev->sender, ev->nodes, ev->nr_nodes,
 				    ev->join_result, ev->buf);
-		shm_queue_pop();
 		break;
 	case EVENT_LEAVE:
 		sd_leave_handler(&ev->sender, ev->nodes, ev->nr_nodes);
-		shm_queue_pop();
 		break;
 	case EVENT_BLOCK:
 		sd_block_handler(&ev->sender);
 		return false;
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev->sender, ev->buf, ev->buf_len);
-		shm_queue_pop();
 		break;
 	}
+out:
+	shm_queue_remove(ev);
 
 	return true;
 }
