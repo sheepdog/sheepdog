@@ -157,11 +157,14 @@ static void shm_queue_notify(void)
 	int i;
 	size_t nr;
 	pid_t pids[SD_MAX_NODES];
+	struct sd_node nodes[SD_MAX_NODES];
 
-	nr = get_nodes(NULL, pids);
+	nr = get_nodes(nodes, pids);
 
-	for (i = 0; i < nr; i++)
+	for (i = 0; i < nr; i++) {
+		dprintf("send signal to %s\n", node_to_str(nodes + i));
 		kill(pids[i], SIGUSR1);
+	}
 }
 
 static int is_shm_queue_valid(void)
@@ -218,7 +221,7 @@ static void shm_queue_init(void)
 static void add_event(enum local_event_type type, struct sd_node *node,
 		void *buf, size_t buf_len)
 {
-	int idx;
+	int idx, i;
 	struct sd_node *n;
 	pid_t *p;
 	struct local_event ev = {
@@ -255,6 +258,10 @@ static void add_event(enum local_event_type type, struct sd_node *node,
 	case EVENT_JOIN_RESPONSE:
 		abort();
 	}
+
+	dprintf("type = %d, sender = %s\n", ev.type, node_to_str(&ev.sender));
+	for (i = 0; i < ev.nr_nodes; i++)
+		dprintf("%d: %s\n", i, node_to_str(ev.nodes + i));
 
 	shm_queue_push(&ev);
 
@@ -361,10 +368,16 @@ static bool local_process_event(void)
 {
 	struct local_event *ev;
 	enum cluster_join_result res;
+	int i;
 
 	ev = shm_queue_peek();
 	if (!ev)
 		return false;
+
+	dprintf("type = %d, sender = %s\n", ev->type, node_to_str(&ev->sender));
+	dprintf("callbacked = %d, removed = %d\n", ev->callbacked, ev->removed);
+	for (i = 0; i < ev->nr_nodes; i++)
+		dprintf("%d: %s\n", i, node_to_str(ev->nodes + i));
 
 	if (ev->removed)
 		goto out;
