@@ -25,6 +25,7 @@
 #include "work.h"
 
 #define MAX_EVENTS 500
+#define PROCESS_CHECK_INTERVAL 200 /* ms */
 
 const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
@@ -247,7 +248,7 @@ static void check_pids(void *arg)
 
 	shm_queue_unlock();
 
-	add_timer(arg, 1);
+	add_timer(arg, PROCESS_CHECK_INTERVAL);
 }
 
 
@@ -434,7 +435,7 @@ static int local_init(const char *option)
 		return -1;
 	}
 
-	add_timer(&t, 1);
+	add_timer(&t, PROCESS_CHECK_INTERVAL);
 
 	ret = register_event(sigfd, local_handler, NULL);
 	if (ret) {

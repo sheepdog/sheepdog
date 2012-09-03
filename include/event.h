@@ -18,6 +18,6 @@ struct timer {
 	void *data;
 };
 
-void add_timer(struct timer *t, unsigned int seconds);
+void add_timer(struct timer *t, unsigned int mseconds);
 
 #endif

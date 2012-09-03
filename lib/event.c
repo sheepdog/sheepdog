@@ -40,7 +40,7 @@ static void timer_handler(int fd, int events, void *data)
 	close(fd);
 }
 
-void add_timer(struct timer *t, unsigned int seconds)
+void add_timer(struct timer *t, unsigned int mseconds)
 {
 	struct itimerspec it;
 	int tfd;
@@ -52,7 +52,8 @@ void add_timer(struct timer *t, unsigned int seconds)
 	}
 
 	memset(&it, 0, sizeof(it));
-	it.it_value.tv_sec = seconds;
+	it.it_value.tv_sec = mseconds / 1000;
+	it.it_value.tv_nsec = (mseconds % 1000) * 1000000;
 
 	if (timerfd_settime(tfd, 0, &it, NULL) < 0) {
 		eprintf("timerfd_settime: %m\n");
