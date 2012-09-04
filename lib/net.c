@@ -229,6 +229,13 @@ int connect_to(const char *name, int port)
 			continue;
 		}
 
+		ret = set_snd_timeout(fd);
+		if (ret) {
+			eprintf("failed to set send timeout: %m\n");
+			close(fd);
+			break;
+		}
+
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
 			eprintf("failed to connect to %s:%d: %m\n",
@@ -238,12 +245,6 @@ int connect_to(const char *name, int port)
 		}
 
 		ret = set_keepalive(fd);
-		if (ret) {
-			close(fd);
-			break;
-		}
-
-		ret = set_snd_timeout(fd);
 		if (ret) {
 			close(fd);
 			break;
