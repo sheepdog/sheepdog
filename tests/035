@@ -17,33 +17,28 @@ trap "_uninit; exit \$status" 0 1 2 3 15
 
 _uninit()
 {
-	iptables -D INPUT -p tcp --sport 7001 -j DROP
-	iptables -D INPUT -p tcp --dport 7001 -j DROP
+	for i in `seq 1 4`; do
+		_cleanup_machine_simulation $i
+	done
 }
 
 _cleanup
 
-for i in `seq 0 1 2`; do
-    _start_sheep $i
+for i in `seq 0 5`; do
+	_start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
 $COLLIE cluster format -c 3 -m unsafe
 
 $COLLIE vdi create test 40M
-(
-dd if=/dev/urandom | $COLLIE vdi write test
-) &
+dd if=/dev/urandom | $COLLIE vdi write test &
 
 sleep 3
-# Simulate machine(127.0.0.1:7001) down
-iptables -A INPUT -p tcp --sport 7001 -j DROP
-iptables -A INPUT -p tcp --dport 7001 -j DROP
-
-sleep 1
-# Trigger the confchg
-_kill_sheep 1
+for i in `seq 1 4`; do
+	_simulate_machine_down $i
+done
 
 _wait_for_collie
 
