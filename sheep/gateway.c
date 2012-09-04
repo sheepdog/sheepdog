@@ -150,18 +150,32 @@ static inline void pfd_info_init(struct write_info *wi, struct pfd_info *pi)
  *
  * Return error code if any one request fails.
  */
-static int wait_forward_request(struct write_info *wi, struct sd_rsp *rsp)
+static int wait_forward_request(struct write_info *wi, struct request *req)
 {
 	int nr_sent, err_ret = SD_RES_SUCCESS, ret, pollret, i;
-	struct pfd_info pi;;
+	struct pfd_info pi;
+	struct sd_rsp *rsp = &req->rp;
 again:
 	pfd_info_init(wi, &pi);
-	pollret = poll(pi.pfds, pi.nr, -1);
+	pollret = poll(pi.pfds, pi.nr, 5000);
 	if (pollret < 0) {
 		if (errno == EINTR)
 			goto again;
 
 		panic("%m\n");
+	} else if (pollret == 0) {
+		eprintf("poll timeout %d\n", wi->nr_sent);
+
+		if (req->rq.epoch == sys_epoch())
+			goto again;
+
+		nr_sent = wi->nr_sent;
+		/* XXX Blinedly close all the connections */
+		for (i = 0; i < nr_sent; i++)
+			finish_one_write_err(wi, i);
+
+		err_ret = SD_RES_NETWORK_ERROR;
+		goto finish_write;
 	}
 
 	nr_sent = wi->nr_sent;
@@ -229,7 +243,6 @@ static int gateway_forward_request(struct request *req)
 {
 	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req->rp;
 	struct sd_vnode *v;
 	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	uint64_t oid = req->rq.obj.oid;
@@ -288,7 +301,7 @@ static int gateway_forward_request(struct request *req)
 
 	dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
 	if (wi.nr_sent > 0) {
-		ret = wait_forward_request(&wi, rsp);
+		ret = wait_forward_request(&wi, req);
 		if (ret != SD_RES_SUCCESS)
 			err_ret = ret;
 	}
