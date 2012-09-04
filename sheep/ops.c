@@ -219,7 +219,6 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	int i, ret;
 	uint32_t latest_epoch;
 	uint64_t created_time;
-	struct siocb iocb = { 0 };
 	struct store_driver *driver;
 	char *store_name = data;
 
@@ -229,7 +228,6 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	sd_store = driver;
 	latest_epoch = get_latest_epoch();
-	iocb.epoch = latest_epoch;
 
 	ret = sd_store->format();
 	if (ret != SD_RES_SUCCESS)
