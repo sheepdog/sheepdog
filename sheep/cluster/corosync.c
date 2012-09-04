@@ -18,6 +18,8 @@
 #include "event.h"
 #include "work.h"
 
+#define CPG_INIT_RETRY_CNT 10
+
 struct cpg_node {
 	uint32_t nodeid;
 	uint32_t pid;
@@ -719,7 +721,7 @@ out:
 
 static int corosync_init(const char *option)
 {
-	int ret, fd;
+	int ret, fd, retry_cnt = 0;
 	uint32_t nodeid;
 	cpg_callbacks_t cb = {
 		.cpg_deliver_fn = cdrv_cpg_deliver,
@@ -733,7 +735,13 @@ again:
 		/* success */
 		break;
 	case CS_ERR_TRY_AGAIN:
+		if (retry_cnt++ == CPG_INIT_RETRY_CNT) {
+			eprintf("failed to initialize cpg (%d) - "
+				"is corosync running?\n", ret);
+			return -1;
+		}
 		dprintf("retry cpg_initialize\n");
+		usleep(200000);
 		goto again;
 	default:
 		eprintf("failed to initialize cpg (%d) - "
