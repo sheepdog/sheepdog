@@ -58,8 +58,6 @@ struct local_event {
 /* shared memory queue */
 
 struct shm_queue {
-	uint64_t chksum;
-
 	int pos;
 	struct local_event events[MAX_EVENTS];
 } *shm_queue;
@@ -125,25 +123,11 @@ static struct local_event *shm_queue_pop(void)
 	return shm_queue->events + event_pos;
 }
 
-static uint64_t shm_queue_calc_chksum(void)
-{
-	return fnv_64a_buf(shm_queue->events + shm_queue->pos,
-			   sizeof(*shm_queue->events), FNV1A_64_INIT);
-}
-
-static void shm_queue_set_chksum(void)
-{
-	shm_queue->chksum = shm_queue_calc_chksum();
-	msync(&shm_queue->chksum, sizeof(shm_queue->chksum), MS_SYNC);
-}
-
 static void shm_queue_notify(void)
 {
 	int i;
 	size_t nr;
 	pid_t pids[SD_MAX_NODES];
-
-	shm_queue_set_chksum();
 
 	nr = get_nodes(NULL, pids);
 
@@ -156,11 +140,6 @@ static int is_shm_queue_valid(void)
 	int i;
 	size_t nr;
 	pid_t pids[SD_MAX_NODES];
-
-	if (shm_queue->chksum != shm_queue_calc_chksum()) {
-		dprintf("invalid shm queue\n");
-		return 0;
-	}
 
 	nr = get_nodes(NULL, pids);
 
@@ -200,8 +179,6 @@ static void shm_queue_init(void)
 		assert(ret == 0);
 		ret = ftruncate(shmfd, sizeof(*shm_queue));
 		assert(ret == 0);
-
-		shm_queue_set_chksum();
 	}
 
 	shm_queue_unlock();
@@ -378,8 +355,6 @@ static bool local_process_event(void)
 			ev->nr_nodes = 1;
 			ev->nodes[0] = this_node;
 			ev->pids[0] = getpid();
-
-			shm_queue_set_chksum();
 		}
 
 		sd_join_handler(&ev->sender, ev->nodes, ev->nr_nodes,
