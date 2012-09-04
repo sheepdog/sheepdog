@@ -33,6 +33,7 @@ static int sigfd;
 static int block_event_pos;
 static int nonblock_event_pos;
 static struct sd_node this_node;
+static bool joined;
 
 enum local_event_type {
 	EVENT_JOIN_REQUEST = 1,
@@ -362,11 +363,29 @@ static bool local_process_event(void)
 	if (ev->callbacked)
 		return false; /* wait for unblock event */
 
+	if (ev->type == EVENT_JOIN_RESPONSE && node_eq(&this_node, &ev->sender)) {
+		dprintf("join Sheepdog\n");
+		joined = true;
+	}
+
+	if (!joined) {
+		if (ev->type == EVENT_JOIN_REQUEST &&
+		    node_eq(&this_node, &ev->sender)) {
+			struct sd_node nodes[SD_MAX_NODES];
+
+			get_nodes(nodes, NULL);
+
+			if (!node_eq(&this_node, &nodes[0])) {
+				dprintf("wait for another node to accept this "
+					"node\n");
+				return false;
+			}
+		} else
+			goto out;
+	}
+
 	switch (ev->type) {
 	case EVENT_JOIN_REQUEST:
-		if (!node_eq(&ev->nodes[0], &this_node))
-			return false;
-
 		res = sd_check_join_cb(&ev->sender, ev->buf);
 		ev->join_result = res;
 		ev->type = EVENT_JOIN_RESPONSE;
