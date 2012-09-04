@@ -632,7 +632,7 @@ static int get_vdis_from(struct sd_node *node)
 	fd = connect_to(host, node->nid.port);
 	if (fd < 0) {
 		vprintf(SDOG_ERR, "unable to get the VDI bitmap from %s: %m\n", host);
-		ret = -SD_RES_EIO;
+		ret = SD_RES_EIO;
 		goto out;
 	}
 
@@ -657,6 +657,7 @@ static int get_vdis_from(struct sd_node *node)
 	if (ret || rsp->result != SD_RES_SUCCESS) {
 		vprintf(SDOG_ERR, "unable to get the VDI bitmap (%d, %d)\n", ret,
 				rsp->result);
+		ret = rsp->result;
 		goto out;
 	}
 
@@ -665,6 +666,7 @@ static int get_vdis_from(struct sd_node *node)
 		set_bit(vc[i].vid, sys->vdi_inuse);
 		add_vdi_copy_number(vc[i].vid, vc[i].nr_copies);
 	}
+	ret = SD_RES_SUCCESS;
 out:
 	free(vc);
 	return ret;
@@ -674,14 +676,17 @@ static void do_get_vdis(struct work *work)
 {
 	struct get_vdis_work *w =
 		container_of(work, struct get_vdis_work, work);
-	int i;
+	int i, ret;
 
 	for (i = 0; i < w->nr_members; i++) {
 		/* We should not fetch vdi_bitmap and copy list from myself */
 		if (node_eq(&w->members[i], &sys->this_node))
 			continue;
 
-		get_vdis_from(&w->members[i]);
+		ret = get_vdis_from(&w->members[i]);
+		if (ret != SD_RES_SUCCESS)
+			/* try to read from another node */
+			continue;
 
 		/*
 		 * If a new comer try to join the running cluster, it only
