@@ -46,6 +46,7 @@ struct local_event {
 	enum local_event_type type;
 	struct sd_node sender;
 
+	bool callbacked;
 	bool removed;
 
 	size_t buf_len;
@@ -358,6 +359,9 @@ static bool local_process_event(void)
 	if (ev->removed)
 		goto out;
 
+	if (ev->callbacked)
+		return false; /* wait for unblock event */
+
 	switch (ev->type) {
 	case EVENT_JOIN_REQUEST:
 		if (!node_eq(&ev->nodes[0], &this_node))
@@ -394,7 +398,8 @@ static bool local_process_event(void)
 		sd_leave_handler(&ev->sender, ev->nodes, ev->nr_nodes);
 		break;
 	case EVENT_BLOCK:
-		sd_block_handler(&ev->sender);
+		ev->callbacked = sd_block_handler(&ev->sender);
+		msync(ev, sizeof(*ev), MS_SYNC);
 		return false;
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev->sender, ev->buf, ev->buf_len);
