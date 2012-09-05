@@ -180,6 +180,14 @@ _valgrind_sheep()
 {
     mkdir $1 > /dev/null 2>&1
     sh -c "valgrind $SHEEP_PROG $@ -f -o > $1/sheep.log 2>&1 &"
+
+    # wait for sheep to start up
+    while true; do
+        ls $1/lock > /dev/null 2>&1
+        if [ $? == 0 ]; then
+            break
+        fi
+    done
 }
 
 _start_sheep()
