@@ -565,6 +565,25 @@ forward_write:
 	return ret;
 }
 
+int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
+		       uint64_t offset, int nr_copies)
+{
+	struct sd_req hdr;
+	int ret;
+
+	sd_init_req(&hdr, SD_OP_READ_OBJ);
+	hdr.data_length = datalen;
+	hdr.obj.oid = oid;
+	hdr.obj.offset = offset;
+	hdr.obj.copies = nr_copies;
+
+	ret = exec_local_req(&hdr, data);
+	if (ret != SD_RES_SUCCESS)
+		eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
+
+	return ret;
+}
+
 /*
  * Read data firstly from local object cache(if enabled), if fail,
  * try read backends
@@ -572,7 +591,6 @@ forward_write:
 int read_object(uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr_copies)
 {
-	struct sd_req hdr;
 	int ret;
 
 	if (sys->enable_write_cache && object_is_cached(oid)) {
@@ -586,15 +604,7 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 	}
 
 forward_read:
-	sd_init_req(&hdr, SD_OP_READ_OBJ);
-	hdr.data_length = datalen;
-	hdr.obj.oid = oid;
-	hdr.obj.offset = offset;
-	hdr.obj.copies = nr_copies;
-
-	ret = exec_local_req(&hdr, data);
-	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
+	ret = read_backend_object(oid, data, datalen, offset, nr_copies);
 
 	return ret;
 }

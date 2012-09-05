@@ -606,7 +606,7 @@ static void delete_one(struct work *work)
 	}
 
 	nr_copies = get_vdi_copy_number(vdi_id);
-	ret = read_object(vid_to_vdi_oid(vdi_id),
+	ret = read_backend_object(vid_to_vdi_oid(vdi_id),
 			  (void *)inode, sizeof(*inode), 0, nr_copies);
 
 	if (ret != SD_RES_SUCCESS) {
@@ -697,7 +697,7 @@ static int fill_vdi_list(struct deletion_work *dw, uint32_t root_vid)
 again:
 	vid = dw->buf[done++];
 	nr_copies = get_vdi_copy_number(vid);
-	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+	ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, nr_copies);
 
 	if (ret != SD_RES_SUCCESS) {
@@ -740,7 +740,7 @@ static uint64_t get_vdi_root(uint32_t vid, int *cloned)
 	}
 next:
 	nr_copies = get_vdi_copy_number(vid);
-	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+	ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, nr_copies);
 
 	if (vid == inode->vdi_id && inode->snap_id == 1
