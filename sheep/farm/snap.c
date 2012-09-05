@@ -36,8 +36,8 @@ int snap_init(void)
 			ret = -1;
 			goto out;
 		}
-	}
-	close(fd);
+	} else
+		close(fd);
 
 out:
 	strbuf_release(&buf);
