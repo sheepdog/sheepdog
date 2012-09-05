@@ -19,7 +19,7 @@ for i in 0 1 2; do
     _start_sheep $i "-s 4096"
 done
 
-sleep 1;
+_wait_for_sheep 3
 
 $COLLIE cluster format -c 3
 $COLLIE vdi create base 100M -P

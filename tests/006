@@ -16,7 +16,7 @@ status=1        # failure is the default!
 _cleanup
 
 _start_sheep 0
-sleep 1
+_wait_for_sheep 1
 
 # start Sheepdog with one node
 $COLLIE cluster format
@@ -27,7 +27,7 @@ for i in `seq 1 9`; do
     _start_sheep $i
 done
 
-_wait_for_sheep "10"
+_wait_for_sheep 10
 
 echo check whether all nodes have the same cluster info
 for i in `seq 0 9`; do
