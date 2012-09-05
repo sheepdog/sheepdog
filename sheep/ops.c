@@ -860,8 +860,10 @@ int peer_read_obj(struct request *req)
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
 	ret = sd_store->read(hdr->obj.oid, &iocb);
-	if (ret != SD_RES_SUCCESS)
+	if (ret != SD_RES_SUCCESS) {
+		rsp->data_length = 0;
 		goto out;
+	}
 
 	rsp->data_length = hdr->data_length;
 	if (hdr->obj.copies)
