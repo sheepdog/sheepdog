@@ -85,7 +85,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned wlen = datalen, rlen;
+	unsigned wlen = datalen, rlen = 0;
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {

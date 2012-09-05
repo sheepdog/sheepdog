@@ -105,8 +105,11 @@ static int cluster_format(int argc, char **argv)
 		strncpy(store_name, cluster_cmd_data.name, STORE_LEN);
 	else
 		strcpy(store_name, DEFAULT_STORE);
-	hdr.data_length = wlen = strlen(store_name) + 1;
+	hdr.data_length = strlen(store_name) + 1;
 	hdr.flags |= SD_FLAG_CMD_WRITE;
+
+	wlen = hdr.data_length;
+	rlen = 0;
 
 	printf("using backend %s store\n", store_name);
 	ret = exec_req(fd, (struct sd_req *)&hdr, store_name, &wlen, &rlen);

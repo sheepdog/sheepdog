@@ -986,6 +986,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	unsigned int wlen, rlen;
 	struct sheepdog_vdi_attr vattr;
 
+	memset(&vattr, 0, sizeof(vattr));
 	strncpy(vattr.name, vdiname, SD_MAX_VDI_LEN);
 	strncpy(vattr.tag, vdi_cmd_data.snapshot_tag, SD_MAX_VDI_TAG_LEN);
 	vattr.snap_id = vdi_cmd_data.snapshot_id;
