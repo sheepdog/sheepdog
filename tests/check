@@ -62,6 +62,7 @@ sortme=false
 expunge=true
 have_test_arg=false
 randomize=false
+valgrind=false
 rm -f $tmp.list $tmp.tmp $tmp.sed
 
 for r
@@ -136,6 +137,7 @@ common options
 check options
     -sheepdog           test sheepdog
     -corosync           use corosync driver (default: local)
+    -valgrind           use valgrind
     -xdiff		graphical mode diff
     -n			show me, do not run tests
     -T			output timestamps
@@ -154,6 +156,12 @@ testlist options
 	    DRIVER="corosync"
 	    xpand=false
 	    ;;
+
+	-valgrind)
+	    valgrind=true
+	    xpand=false
+	    ;;
+
 	-g)	# -g group ... pick from group file
 	    group=true
 	    xpand=false
@@ -275,6 +283,10 @@ rm -f $tmp.list $tmp.tmp $tmp.sed
 if $randomize
 then
     list=`echo $list | awk -f randomize.awk`
+fi
+
+if $valgrind; then
+    export SHEEP=_valgrind_sheep
 fi
 
 # we need common.rc
