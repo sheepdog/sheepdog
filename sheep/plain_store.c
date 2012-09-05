@@ -167,24 +167,29 @@ static int init_vdi_copy_number(uint64_t oid)
 {
 	char path[PATH_MAX];
 	int fd, flags = get_open_flags(oid, false), ret;
-	struct sheepdog_inode inode;
+	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
 
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
 
 	fd = open(path, flags);
 	if (fd < 0) {
 		eprintf("failed to open %s, %m\n", path);
-		return SD_RES_EIO;
+		ret = SD_RES_EIO;
+		goto out;
 	}
 
-	ret = xpread(fd, (void *)&inode, SD_INODE_HEADER_SIZE, 0);
+	ret = xpread(fd, inode, SD_INODE_HEADER_SIZE, 0);
 	if (ret != SD_INODE_HEADER_SIZE) {
 		eprintf("failed to read inode header, path=%s, %m\n", path);
-		return SD_RES_EIO;
+		ret = SD_RES_EIO;
+		goto out;
 	}
 
-	add_vdi_copy_number(oid_to_vid(oid), inode.nr_copies);
+	add_vdi_copy_number(oid_to_vid(oid), inode->nr_copies);
 
+	ret = SD_RES_SUCCESS;
+out:
+	free(inode);
 	return SD_RES_SUCCESS;
 }
 
