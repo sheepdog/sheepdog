@@ -45,13 +45,7 @@ for i in `seq 1 5`; do
 done
 
 echo wait for object recovery to finish
-while true; do
-    if [ "$(pgrep collie)" ]; then
-        sleep 1
-    else
-        break
-    fi
-done
+_wait_for_collie
 
 for i in `seq 0 4`; do
     for port in `seq 0 7`; do

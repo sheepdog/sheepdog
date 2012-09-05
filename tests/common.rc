@@ -120,7 +120,7 @@ _die()
 
 _cleanup()
 {
-    killall -9 collie >/dev/null 2>&1 || true
+    _kill_all_collies
     _kill_all_sheeps
 
     mkdir -p $STORE
@@ -136,7 +136,7 @@ _cleanup()
 _wait_for_collie()
 {
     for ((;;)); do
-        if [ "$(pgrep collie)" ]; then
+        if [ "$(pgrep -f "$COLLIE_PROG (cluster|vdi|node|debug)")" ]; then
             sleep 1
         else
             break
@@ -190,6 +190,16 @@ _valgrind_sheep()
     done
 }
 
+_valgrind_collie()
+{
+    logfile=$(mktemp)
+    valgrind --log-file=$logfile --error-exitcode=99 $COLLIE_PROG "$@"
+    if [ $? == 99 ]; then
+        cat $logfile 1>&2
+    fi
+    rm $logfile
+}
+
 _start_sheep()
 {
     # ensure that sheep is not running
@@ -212,6 +222,15 @@ _start_sheep()
     if [ $? != 0 ]; then
         _die "cannot start sheep $1"
     fi
+}
+
+_kill_all_collies()
+{
+    pkill -9 -f "$COLLIE_PROG (cluster|vdi|node|debug)"
+
+    while [ $? == 0 ]; do
+        pgrep -f "$COLLIE_PROG (cluster|vdi|node|debug)" > /dev/null
+    done
 }
 
 _kill_all_sheeps()
