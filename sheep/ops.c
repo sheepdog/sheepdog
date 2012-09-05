@@ -155,11 +155,49 @@ static int cluster_del_vdi(struct request *req)
 	ret = del_vdi(req, req->data, hdr->data_length,
 		      &vid, hdr->vdi.snapid, &nr_copies);
 
-	if (sys->enable_write_cache && ret == SD_RES_SUCCESS)
-		object_cache_delete(vid);
-
 	rsp->vdi.vdi_id = vid;
 	rsp->vdi.copies = nr_copies;
+
+	return ret;
+}
+
+struct cache_deletion_work {
+	uint32_t vid;
+	struct work work;
+};
+
+static void cache_delete_work(struct work *work)
+{
+	struct cache_deletion_work *dw =
+		container_of(work, struct cache_deletion_work, work);
+
+	object_cache_delete(dw->vid);
+}
+
+static void cache_delete_done(struct work *work)
+{
+	struct cache_deletion_work *dw =
+		container_of(work, struct cache_deletion_work, work);
+
+	free(dw);
+}
+
+static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
+				void *data)
+{
+	unsigned long vid = rsp->vdi.vdi_id;
+	struct cache_deletion_work *dw;
+	int ret = rsp->result;
+
+	if (!sys->enable_write_cache)
+		return ret;
+
+	dw = xzalloc(sizeof(*dw));
+	dw->vid = vid;
+	dw->work.fn = cache_delete_work;
+	dw->work.done = cache_delete_done;
+
+	queue_work(sys->deletion_wqueue, &dw->work);
 
 	return ret;
 }
@@ -925,6 +963,7 @@ static struct sd_op_template sd_ops[] = {
 		.name = "DEL_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_del_vdi,
+		.process_main = post_cluster_del_vdi,
 	},
 
 	[SD_OP_GET_VDI_INFO] = {

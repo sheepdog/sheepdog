@@ -203,6 +203,7 @@ del_from_object_tree_and_list(struct object_cache_entry *entry,
 			      struct rb_root *object_tree)
 {
 	rb_erase(&entry->node, object_tree);
+	list_del_init(&entry->object_list);
 	cds_list_del_rcu(&entry->lru_list);
 }
 
@@ -865,7 +866,6 @@ void object_cache_delete(uint32_t vid)
 	rmdir_r(buf.buf);
 
 	strbuf_release(&buf);
-
 }
 
 static struct object_cache_entry *
