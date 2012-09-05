@@ -602,6 +602,7 @@ not_found:
 
 		cache->dirty_tree = RB_ROOT;
 		INIT_LIST_HEAD(&cache->dirty_list);
+		INIT_LIST_HEAD(&cache->object_list);
 
 		pthread_rwlock_init(&cache->lock, NULL);
 		hlist_add_head(&cache->hash, head);
@@ -655,6 +656,7 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
 	if (!old) {
 		dprintf("oid %"PRIx64"\n", idx_to_oid(oc->vid, idx));
 		uatomic_add(&sys_cache.cache_size, data_length);
+		list_add(&entry->object_list, &oc->object_list);
 		cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 	} else {
 		free(entry);
