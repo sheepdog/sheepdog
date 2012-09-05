@@ -41,7 +41,7 @@ sleep 1
 # start master first to avoid master transfer
 _start_sheep 0
 _wait_for_sheep 1
-for i in `seq 0 7`; do
+for i in `seq 1 7`; do
     _start_sheep $i
 done
 

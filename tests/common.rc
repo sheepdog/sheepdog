@@ -120,8 +120,9 @@ _die()
 
 _cleanup()
 {
-    killall -9 sheep collie >/dev/null 2>&1 || true
-    sleep 1
+    killall -9 collie >/dev/null 2>&1 || true
+    _kill_all_sheeps
+
     mkdir -p $STORE
     for i in $STORE/?; do
         rm -rf $i
@@ -177,11 +178,35 @@ _wait_for_sheep()
 
 _start_sheep()
 {
+    # ensure that sheep is not running
+    running=true
+    for cnt in `seq 1 10`; do  # wait at most 10 seconds
+        pgrep -f "$SHEEP_PROG $STORE/$1" > /dev/null
+        if [ $? != 0 ]; then
+            running=false
+            break
+        fi
+        sleep 1
+    done
+
+    if $running; then
+        _die "sheep $1 is still running"
+    fi
+
     $SHEEP $STORE/$1 -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2
 
     if [ $? != 0 ]; then
         _die "cannot start sheep $1"
     fi
+}
+
+_kill_all_sheeps()
+{
+    pkill -9 -f "$SHEEP_PROG $STORE"
+
+    while [ $? == 0 ]; do
+        pgrep -f "$SHEEP_PROG $STORE" > /dev/null
+    done
 }
 
 _kill_sheep()
