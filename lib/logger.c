@@ -513,15 +513,15 @@ static notrace void logger(char *log_dir, char *outfile)
 notrace int log_init(char *program_name, int size, int to_stdout, int level,
 		char *outfile)
 {
-	char log_dir[PATH_MAX];
+	char log_dir[PATH_MAX], tmp[PATH_MAX];
 
 	log_level = level;
 
 	logdbg(stderr, "entering log_init\n");
 	log_name = program_name;
 	log_nowname = outfile;
-	strcpy(log_dir, outfile);
-	strcpy(log_dir, dirname(log_dir));
+	strcpy(tmp, outfile);
+	strcpy(log_dir, dirname(tmp));
 
 	semkey = random();
 
