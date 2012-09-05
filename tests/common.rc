@@ -179,12 +179,17 @@ _wait_for_sheep()
 _valgrind_sheep()
 {
     mkdir $1 > /dev/null 2>&1
-    sh -c "valgrind $SHEEP_PROG $@ -f -o > $1/sheep.log 2>&1 &"
+
+    # Dump a core file and stop the script on the first valgrind error.
+    db_cmd="gdb -nw --ex \"generate-core-file $1/core\" %f %p > /dev/null; \
+            echo \"core dumped ($1/core)\"; kill \$PPID"
+    opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp"
+
+    sh -c "echo y | valgrind ${opts} $SHEEP_PROG $@ -f -o 2> $1/sheep.log &"
 
     # wait for sheep to start up
     while true; do
-        ls $1/lock > /dev/null 2>&1
-        if [ $? == 0 ]; then
+        if [ -a $1/lock ]; then
             break
         fi
     done

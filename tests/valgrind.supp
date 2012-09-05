@@ -1,0 +1,29 @@
+{
+	corosync 2.0.1 and libqb 0.14.1
+	Memcheck:Param
+	socketcall.sendto(msg)
+	fun:send
+	fun:qb_ipc_us_send
+	fun:qb_ipcc_us_setup_connect
+	fun:qb_ipcc_connect
+	fun:corosync_cfg_initialize
+}
+{
+	corosync 1.4.1
+	Memcheck:Param
+	socketcall.sendmsg(msg.msg_iov[i])
+	fun:__sendmsg_nocancel
+	fun:coroipcc_service_connect
+	fun:cpg_model_initialize
+	fun:cpg_initialize
+	fun:corosync_init
+}
+{
+	corosync 1.4.1
+	Memcheck:Param
+	socketcall.sendmsg(msg.msg_iov[i])
+	fun:__sendmsg_nocancel
+	fun:coroipcc_service_connect
+	fun:corosync_cfg_initialize
+	fun:corosync_init
+}
