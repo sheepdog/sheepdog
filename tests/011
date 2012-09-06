@@ -33,13 +33,21 @@ dd if=/dev/zero of=$STORE/0.img seek=$((2 * 1024 ** 3 - 1)) bs=1 count=1 > $seq.
 dd if=/dev/zero of=$STORE/1.img seek=$((4 * 1024 ** 3 - 1)) bs=1 count=1 > $seq.full 2>&1
 dd if=/dev/zero of=$STORE/2.img seek=$((8 * 1024 ** 3 - 1)) bs=1 count=1 > $seq.full 2>&1
 
-if [ "$(df -T / | grep ext)" ]; then
-    mkops="-q -F"
-elif [ "$(df -T / | grep xfs)" ]; then
-    mkops="-f"
-else
-    _die  "For now we only support xfs and ext*."
-fi
+fstype="$(df -T / | tail -1 | awk '{print $2}')"
+case $fstype in
+    ext2)
+        mkops="-t $fstype -q -F"
+        ;;
+    ext[3-4])
+        mkops="-t $fstype -q -F -J size=4"
+        ;;
+    xfs)
+        mkops="-t $fstype -f"
+        ;;
+    *)
+        _die  "For now we only support xfs and ext*."
+        ;;
+esac
 
 for i in 0 1 2; do
     mkfs $mkops $STORE/$i.img > $seq.full
