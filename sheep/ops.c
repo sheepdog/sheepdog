@@ -452,6 +452,7 @@ static int local_stat_cluster(struct request *req)
 			break;
 
 		log = (struct epoch_log *)req->data + i;
+		memset(log, 0, sizeof(*log));
 		log->epoch = epoch;
 		log->ctime = get_cluster_ctime();
 		log->nr_nodes = epoch_log_read(epoch, log->nodes,

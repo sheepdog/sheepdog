@@ -78,8 +78,8 @@ static int inc_object_nr(uint64_t oid, void *arg)
 int trunk_file_write(unsigned char *outsha1)
 {
 	struct strbuf buf;
-	struct sha1_file_hdr hdr;
-	struct trunk_entry entry;
+	struct sha1_file_hdr hdr = {};
+	struct trunk_entry entry = {};
 	struct dirent *d;
 	DIR *dir;
 	uint64_t data_size, oid, object_nr = 0;

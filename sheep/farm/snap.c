@@ -130,7 +130,7 @@ int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
 {
 	int ret = 0;
 	struct strbuf buf = STRBUF_INIT;
-	struct sha1_file_hdr hdr;
+	struct sha1_file_hdr hdr = {};
 
 	memcpy(hdr.tag, TAG_SNAP, TAG_LEN);
 	hdr.size = nr_nodes * sizeof(*nodes) + SHA1_LEN;
