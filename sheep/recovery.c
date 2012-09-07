@@ -629,7 +629,7 @@ out:
 
 static inline bool node_is_gateway_only(void)
 {
-	return sys->this_node.nr_vnodes == 0 ? true : false;
+	return sys->this_node.nr_vnodes == 0;
 }
 
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
