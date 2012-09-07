@@ -148,19 +148,12 @@ static int jrnl_write_end_mark(struct jrnl_descriptor *jd)
 static int jrnl_apply_to_target_object(struct jrnl_descriptor *jd)
 {
 	char *buf = NULL;
-	int buf_len, res = 0;
+	int res = 0;
 	ssize_t retsize;
-
-	/* FIXME: handle larger size */
-	buf_len = (1 << 22);
-	buf = zalloc(buf_len);
-	if (!buf) {
-		eprintf("failed to allocate memory\n");
-		return SD_RES_NO_MEM;
-	}
 
 	/* Flush out journal to disk (VDI object) */
 	retsize = xpread(jd->fd, &jd->head, sizeof(jd->head), 0);
+	buf = xzalloc(jd->head.size);
 	retsize = xpread(jd->fd, buf, jd->head.size, sizeof(jd->head));
 	retsize = xpwrite(jd->target_fd, buf, jd->head.size, jd->head.offset);
 	if (retsize != jd->head.size) {
