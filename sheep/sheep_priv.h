@@ -158,6 +158,7 @@ struct store_driver {
 	int (*cleanup)(void);
 	int (*restore)(struct siocb *);
 	int (*get_snap_file)(struct siocb *);
+	int (*flush)(void);
 };
 
 int default_init(char *p);

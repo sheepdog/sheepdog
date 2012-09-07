@@ -124,7 +124,7 @@ AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		getcwd getpeerucred getpeereid gettimeofday inet_ntoa memmove \
 		memset mkdir scandir select socket strcasecmp strchr strdup \
-		strerror strrchr strspn strstr])
+		strerror strrchr strspn strstr syncfs])
 
 AC_CONFIG_FILES([Makefile
 		collie/Makefile

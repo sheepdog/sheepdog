@@ -130,6 +130,8 @@ int default_write(uint64_t oid, struct siocb *iocb, int create)
 	}
 
 	get_obj_path(oid, path);
+	if (iocb->flags & SD_FLAG_CMD_CACHE && is_disk_cache_enabled())
+		flags &= ~O_DSYNC;
 	fd = open(path, flags, def_fmode);
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
@@ -431,6 +433,34 @@ int default_purge_obj(void)
 	return for_each_object_in_wd(move_object_to_stale_dir, &tgt_epoch);
 }
 
+#ifndef HAVE_SYNCFS
+static int syncfs(int fd)
+{
+	sync();
+	return 0;
+}
+#endif
+
+int default_flush(void)
+{
+	int fd, ret = SD_RES_SUCCESS;
+
+	fd = open(obj_path, O_RDONLY);
+	if (fd < 0) {
+		eprintf("error at open() %s, %s\n", obj_path, strerror(errno));
+		return SD_RES_NO_OBJ;
+	}
+
+	if (syncfs(fd)) {
+		eprintf("error at syncfs(), %s\n", strerror(errno));
+		ret = SD_RES_EIO;
+	}
+
+	close(fd);
+
+	return ret;
+}
+
 struct store_driver plain_store = {
 	.name = "plain",
 	.init = default_init,
@@ -444,6 +474,7 @@ struct store_driver plain_store = {
 	.format = default_format,
 	.remove_object = default_remove_object,
 	.purge_obj = default_purge_obj,
+	.flush = default_flush,
 };
 
 add_store_driver(plain_store);
