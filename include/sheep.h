@@ -163,6 +163,19 @@ static inline void oid_to_vnodes(struct sd_vnode *entries, int nr_entries,
 	}
 }
 
+static inline void oid_to_nodes(struct sd_vnode *entries, int nr_entries,
+				uint64_t oid, int nr_copies,
+				struct sd_node *all_nodes,
+				struct sd_node **nodes)
+{
+	int i;
+	struct sd_vnode *vnodes[SD_MAX_COPIES];
+
+	oid_to_vnodes(entries, nr_entries, oid, nr_copies, vnodes);
+	for (i = 0; i < nr_copies; i++)
+		nodes[i] = &all_nodes[vnodes[i]->node_idx];
+}
+
 static inline const char *sd_strerror(int err)
 {
 	int i;

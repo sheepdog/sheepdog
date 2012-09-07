@@ -345,6 +345,11 @@ static inline int vnode_is_local(struct sd_vnode *v)
 	return is_myself(v->nid.addr, v->nid.port);
 }
 
+static inline int node_is_local(struct sd_node *n)
+{
+	return is_myself(n->nid.addr, n->nid.port);
+}
+
 /* gateway operations */
 int gateway_read_obj(struct request *req);
 int gateway_write_obj(struct request *req);
