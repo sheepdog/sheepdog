@@ -122,6 +122,8 @@ struct cluster_info {
 
 	uint64_t object_cache_size;
 	bool object_cache_directio;
+
+	bool use_journal;
 };
 
 struct siocb {

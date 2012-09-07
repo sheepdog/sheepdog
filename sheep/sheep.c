@@ -43,6 +43,7 @@ static struct option const long_options[] = {
 	{"foreground", no_argument, NULL, 'f'},
 	{"gateway", no_argument, NULL, 'g'},
 	{"help", no_argument, NULL, 'h'},
+	{"journal", no_argument, NULL, 'j'},
 	{"loglevel", required_argument, NULL, 'l'},
 	{"myaddr", required_argument, NULL, 'y'},
 	{"stdout", no_argument, NULL, 'o'},
@@ -54,7 +55,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfghl:op:P:s:w:y:z:";
+static const char *short_options = "c:dDfghjl:op:P:s:w:y:z:";
 
 static void usage(int status)
 {
@@ -71,6 +72,7 @@ Options:\n\
   -f, --foreground        make the program run in the foreground\n\
   -g, --gateway           make the progam run as a gateway mode\n\
   -h, --help              display this help and exit\n\
+  -j, --journal           use jouranl to update vdi objects\n\
   -l, --loglevel          specify the level of logging detail\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
@@ -408,6 +410,9 @@ int main(int argc, char **argv)
 			break;
 		case 'w':
 			init_cache_type(optarg);
+			break;
+		case 'j':
+			sys->use_journal = true;
 			break;
 		case 'h':
 			usage(0);

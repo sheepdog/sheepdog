@@ -886,7 +886,10 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 	iocb->buf = data;
 	iocb->length = hdr->data_length;
 	iocb->offset = hdr->obj.offset;
-	if (is_vdi_obj(oid)) {
+
+	if (is_vdi_obj(oid) && create)
+		ret = sd_store->atomic_put(oid, iocb);
+	else if (is_vdi_obj(oid) && sys->use_journal) {
 		struct strbuf buf = STRBUF_INIT;
 
 		strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
