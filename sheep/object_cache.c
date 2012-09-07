@@ -307,7 +307,7 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	strbuf_addstr(&p, cache_dir);
 	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
 
-	if (sys->use_directio && !idx_has_vdi_bit(idx))
+	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
@@ -344,7 +344,7 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	strbuf_addstr(&p, cache_dir);
 	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
 
-	if (sys->use_directio && !idx_has_vdi_bit(idx))
+	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
 	fd = open(p.buf, flags, def_fmode);
@@ -538,7 +538,7 @@ static void do_reclaim(struct work *work)
 		unsigned data_length;
 		/* Reclaim cache to 80% of max size */
 		if (uatomic_read(&sys_cache.cache_size) <=
-		    sys->cache_size * 8 / 10)
+			sys->object_cache_size * 8 / 10)
 			break;
 
 		if (do_reclaim_object(entry) < 0)
@@ -619,10 +619,10 @@ void object_cache_try_to_reclaim(void)
 {
 	struct work *work;
 
-	if (!sys->cache_size)
+	if (!sys->object_cache_size)
 		return;
 
-	if (uatomic_read(&sys_cache.cache_size) < sys->cache_size)
+	if (uatomic_read(&sys_cache.cache_size) < sys->object_cache_size)
 		return;
 
 	if (mark_cache_in_reclaim())

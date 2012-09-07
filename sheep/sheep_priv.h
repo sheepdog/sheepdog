@@ -66,8 +66,6 @@ struct cluster_info {
 	struct cluster_driver *cdrv;
 	const char *cdrv_option;
 
-	int enable_write_cache;
-
 	/* set after finishing the JOIN procedure */
 	int join_finished;
 	struct sd_node this_node;
@@ -76,7 +74,6 @@ struct cluster_info {
 	uint32_t status;
 	uint16_t flags;
 
-	uint64_t cache_size;
 	uint64_t disk_space;
 
 	/*
@@ -107,7 +104,6 @@ struct cluster_info {
 
 	uint32_t recovered_epoch;
 
-	int use_directio;
 	uint8_t gateway_only;
 	uint8_t disable_recovery;
 
@@ -119,6 +115,13 @@ struct cluster_info {
 	struct work_queue *block_wqueue;
 	struct work_queue *sockfd_wqueue;
 	struct work_queue *reclaim_wqueue;
+
+#define CACHE_TYPE_OBJECT 0x1
+#define CACHE_TYPE_DISK   0x2
+	int enabled_cache_type;
+
+	uint64_t object_cache_size;
+	bool object_cache_directio;
 };
 
 struct siocb {
@@ -212,7 +215,7 @@ static inline uint32_t sys_epoch(void)
 
 int create_listen_port(int port, void *data);
 
-int init_store(const char *dir, int enable_write_cache);
+int init_store(const char *dir);
 int init_base_path(const char *dir);
 
 int fill_vdi_copy_list(void *data);
@@ -356,12 +359,16 @@ int gateway_read_obj(struct request *req);
 int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
 int gateway_remove_obj(struct request *req);
+int gateway_flush_nodes(struct request *req);
 
 /* backend store */
 int peer_read_obj(struct request *req);
 int peer_write_obj(struct request *req);
 int peer_create_and_write_obj(struct request *req);
 int peer_remove_obj(struct request *req);
+int peer_flush(struct request *req);
+
+int default_flush(void);
 
 /* object_cache */
 
@@ -393,5 +400,15 @@ void sockfd_cache_add_group(struct sd_node *nodes, int nr);
 struct sockfd *sheep_get_sockfd(struct node_id *);
 void sheep_put_sockfd(struct node_id *, struct sockfd *);
 void sheep_del_sockfd(struct node_id *, struct sockfd *);
+
+static inline bool is_object_cache_enabled(void)
+{
+	return !!(sys->enabled_cache_type & CACHE_TYPE_OBJECT);
+}
+
+static inline bool is_disk_cache_enabled(void)
+{
+	return !!(sys->enabled_cache_type & CACHE_TYPE_DISK);
+}
 
 #endif

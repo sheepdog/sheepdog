@@ -40,7 +40,6 @@ static char program_name[] = "sheep";
 static struct option const long_options[] = {
 	{"cluster", required_argument, NULL, 'c'},
 	{"debug", no_argument, NULL, 'd'},
-	{"directio", no_argument, NULL, 'D'},
 	{"foreground", no_argument, NULL, 'f'},
 	{"gateway", no_argument, NULL, 'g'},
 	{"help", no_argument, NULL, 'h'},
@@ -49,9 +48,9 @@ static struct option const long_options[] = {
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"disk-space", required_argument, NULL, 's'},
-	{"enable-cache", required_argument, NULL, 'w'},
 	{"zone", required_argument, NULL, 'z'},
 	{"pidfile", required_argument, NULL, 'P'},
+	{"write-cache", required_argument, NULL, 'w'},
 	{NULL, 0, NULL, 0},
 };
 
@@ -69,7 +68,6 @@ Usage: %s [OPTION]... [PATH]\n\
 Options:\n\
   -c, --cluster           specify the cluster driver\n\
   -d, --debug             include debug messages in the log\n\
-  -D, --directio          use direct IO when accessing the object from object cache\n\
   -f, --foreground        make the program run in the foreground\n\
   -g, --gateway           make the progam run as a gateway mode\n\
   -h, --help              display this help and exit\n\
@@ -78,9 +76,9 @@ Options:\n\
   -p, --port              specify the TCP port on which to listen\n\
   -P, --pidfile           create a pid file\n\
   -s, --disk-space        specify the free disk space in megabytes\n\
-  -w, --enable-cache      enable object cache and specify the max size (M) and mode\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
+  -w, --write-cache       specify the cache type\n\
 ", PACKAGE_VERSION, program_name);
 	exit(status);
 }
@@ -178,6 +176,132 @@ static int init_signal(void)
 static struct cluster_info __sys;
 struct cluster_info *sys = &__sys;
 
+static void parse_arg(char *arg, const char *delim, void (*fn)(char *))
+{
+	char *savep, *s;
+
+	s = strtok_r(arg, delim, &savep);
+	do {
+		fn(s);
+	} while ((s = strtok_r(NULL, delim, &savep)));
+}
+
+static void object_cache_size_set(char *s)
+{
+	const char *header = "size=";
+	int len = strlen(header);
+	char *size, *p;
+	int64_t cache_size;
+
+	assert(!strncmp(s, header, len));
+
+	size = s + len;
+	cache_size = strtol(size, &p, 10);
+	if (size == p || cache_size < 0 || UINT64_MAX < cache_size)
+		goto err;
+
+	sys->object_cache_size = cache_size * 1024 * 1024;
+	return;
+
+err:
+	fprintf(stderr, "Invalid object cache option '%s': "
+		"size must be an integer between 0 and %lu\n",
+		s, UINT64_MAX);
+	exit(1);
+}
+
+static void object_cache_directio_set(char *s)
+{
+	assert(!strcmp(s, "directio"));
+	sys->object_cache_directio = true;
+}
+
+static void _object_cache_set(char *s)
+{
+	int i;
+	static int first = 1;
+
+	struct object_cache_arg {
+		const char *name;
+		void (*set)(char *);
+	};
+
+	struct object_cache_arg object_cache_args[] = {
+		{ "size=", object_cache_size_set },
+		{ "directio", object_cache_directio_set },
+		{ NULL, NULL },
+	};
+
+	if (first) {
+		assert(!strcmp(s, "object"));
+		first = 0;
+		return;
+	}
+
+	for (i = 0; object_cache_args[i].name; i++) {
+		const char *n = object_cache_args[i].name;
+
+		if (!strncmp(s, n, strlen(n))) {
+			object_cache_args[i].set(s);
+			return;
+		}
+	}
+
+	fprintf(stderr, "invalid object cache arg: %s\n", s);
+	exit(1);
+}
+
+static void object_cache_set(char *s)
+{
+	sys->enabled_cache_type |= CACHE_TYPE_OBJECT;
+	parse_arg(s, ":", _object_cache_set);
+}
+
+static void disk_cache_set(char *s)
+{
+	assert(!strcmp(s, "disk"));
+	sys->enabled_cache_type |= CACHE_TYPE_DISK;
+}
+
+static void do_cache_type(char *s)
+{
+	int i;
+
+	struct cache_type {
+		const char *name;
+		void (*set)(char *);
+	};
+	struct cache_type cache_types[] = {
+		{ "object", object_cache_set },
+		{ "disk", disk_cache_set },
+		{ NULL, NULL },
+	};
+
+	for (i = 0; cache_types[i].name; i++) {
+		const char *n = cache_types[i].name;
+
+		if (!strncmp(s, n, strlen(n))) {
+			cache_types[i].set(s);
+			return;
+		}
+	}
+
+	fprintf(stderr, "invalid cache type: %s\n", s);
+	exit(1);
+}
+
+static void init_cache_type(char *arg)
+{
+	sys->object_cache_size = -1;
+
+	parse_arg(arg, ",", do_cache_type);
+
+	if (is_object_cache_enabled() && sys->object_cache_size == -1) {
+		fprintf(stderr, "object cache size is not set\n");
+		exit(1);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex;
@@ -188,14 +312,12 @@ int main(int argc, char **argv)
 	int log_level = SDOG_INFO;
 	char path[PATH_MAX];
 	int64_t zone = -1;
-	int64_t cache_size = 0;
 	int64_t free_space = 0;
 	int nr_vnodes = SD_DEFAULT_VNODES;
 	bool explicit_addr = false;
 	int af;
 	char *p;
 	struct cluster_driver *cdrv;
-	int enable_object_cache = 0; /* disabled by default */
 	char *pid_file = NULL;
 
 	signal(SIGPIPE, SIG_IGN);
@@ -242,10 +364,6 @@ int main(int argc, char **argv)
 			/* removed soon. use loglevel instead */
 			log_level = SDOG_DEBUG;
 			break;
-		case 'D':
-			dprintf("direct IO mode\n");
-			sys->use_directio = 1;
-			break;
 		case 'g':
 			/* same as '-v 0' */
 			nr_vnodes = 0;
@@ -262,21 +380,6 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			sys->this_node.zone = zone;
-			break;
-		case 'w':
-			enable_object_cache = 1;
-			cache_size = strtol(optarg, &p, 10);
-			if (optarg == p || cache_size < 0 ||
-			    UINT64_MAX < cache_size) {
-				fprintf(stderr, "Invalid cache size '%s': "
-					"must be an integer between 0 and %lu\n",
-					optarg, UINT64_MAX);
-				exit(1);
-			}
-			sys->cache_size = cache_size * 1024 * 1024;
-
-			fprintf(stdout, "enable write cache, "
-				"max cache size %" PRIu64 "M\n", cache_size);
 			break;
 		case 's':
 			free_space = strtoll(optarg, &p, 10);
@@ -302,6 +405,9 @@ int main(int argc, char **argv)
 			}
 
 			sys->cdrv_option = get_cdrv_option(sys->cdrv, optarg);
+			break;
+		case 'w':
+			init_cache_type(optarg);
 			break;
 		case 'h':
 			usage(0);
@@ -334,7 +440,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_store(dir, enable_object_cache);
+	ret = init_store(dir);
 	if (ret)
 		exit(1);
 
@@ -364,7 +470,7 @@ int main(int argc, char **argv)
 	sys->deletion_wqueue = init_work_queue("deletion", true);
 	sys->block_wqueue = init_work_queue("block", true);
 	sys->sockfd_wqueue = init_work_queue("sockfd", true);
-	if (sys->enable_write_cache) {
+	if (is_object_cache_enabled()) {
 		sys->reclaim_wqueue = init_work_queue("reclaim", true);
 		if (!sys->reclaim_wqueue)
 			exit(1);

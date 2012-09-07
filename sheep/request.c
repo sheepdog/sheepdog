@@ -287,7 +287,7 @@ static void queue_gateway_request(struct request *req)
 	 * Even if it doesn't exist in cache, we'll rely on cache layer to pull
 	 * it.
 	 */
-	if (sys->enable_write_cache)
+	if (is_object_cache_enabled())
 		goto queue_work;
 
 	if (req->local_oid)

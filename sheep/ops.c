@@ -189,7 +189,7 @@ static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	struct cache_deletion_work *dw;
 	int ret = rsp->result;
 
-	if (!sys->enable_write_cache)
+	if (!is_object_cache_enabled())
 		return ret;
 
 	dw = xzalloc(sizeof(*dw));
@@ -649,7 +649,7 @@ static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	int cache_size = *(int *)data;
 
-	uatomic_set(&sys->cache_size, cache_size);
+	uatomic_set(&sys->object_cache_size, cache_size);
 	dprintf("Max cache size set to %dM\n", cache_size);
 
 	object_cache_try_to_reclaim();
@@ -686,14 +686,27 @@ static int local_get_snap_file(struct request *req)
 
 static int local_flush_vdi(struct request *req)
 {
-	if (!sys->enable_write_cache)
-		return SD_RES_SUCCESS;
-	return object_cache_flush_vdi(req);
+	int ret = SD_RES_SUCCESS;
+
+	if (is_object_cache_enabled()) {
+		ret = object_cache_flush_vdi(req);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+	}
+
+	if (is_disk_cache_enabled()) {
+		struct sd_req hdr;
+
+		sd_init_req(&hdr, SD_OP_FLUSH_NODES);
+		return exec_local_req(&hdr, NULL);
+	}
+
+	return ret;
 }
 
 static int local_flush_and_del(struct request *req)
 {
-	if (!sys->enable_write_cache)
+	if (!is_object_cache_enabled())
 		return SD_RES_SUCCESS;
 	return object_cache_flush_and_del(req);
 }
@@ -947,6 +960,14 @@ out:
 	if (buf)
 		free(buf);
 	return ret;
+}
+
+int peer_flush(struct request *req)
+{
+	if (sys->gateway_only)
+		return SD_RES_SUCCESS;
+
+	return sd_store->flush();
 }
 
 static struct sd_op_template sd_ops[] = {
@@ -1216,6 +1237,17 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_info_recover,
 	},
+
+	[SD_OP_FLUSH_PEER] = {
+		.name = "FLUSH_PEER",
+		.type = SD_OP_TYPE_PEER,
+		.process_work = peer_flush,
+	},
+	[SD_OP_FLUSH_NODES] = {
+		.name = "FLUSH_NODES",
+		.type = SD_OP_TYPE_GATEWAY,
+		.process_work = gateway_flush_nodes,
+	},
 };
 
 struct sd_op_template *get_sd_op(uint8_t opcode)
@@ -1301,6 +1333,7 @@ static int map_table[] = {
 	[SD_OP_READ_OBJ] = SD_OP_READ_PEER,
 	[SD_OP_WRITE_OBJ] = SD_OP_WRITE_PEER,
 	[SD_OP_REMOVE_OBJ] = SD_OP_REMOVE_PEER,
+	[SD_OP_FLUSH_NODES] = SD_OP_FLUSH_PEER,
 };
 
 int gateway_to_peer_opcode(int opcode)

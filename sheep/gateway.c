@@ -32,7 +32,7 @@ int gateway_read_obj(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies, j;
 
-	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+	if (is_object_cache_enabled() && !req->local && !bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
 	nr_copies = get_req_copy_number(req);
@@ -328,7 +328,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 
 int gateway_write_obj(struct request *req)
 {
-	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+	if (is_object_cache_enabled() && !req->local && !bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
 	return gateway_forward_request(req, false);
@@ -336,7 +336,7 @@ int gateway_write_obj(struct request *req)
 
 int gateway_create_and_write_obj(struct request *req)
 {
-	if (sys->enable_write_cache && !req->local && !bypass_object_cache(req))
+	if (is_object_cache_enabled() && !req->local && !bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
 	return gateway_forward_request(req, false);
@@ -347,7 +347,7 @@ int gateway_remove_obj(struct request *req)
 	return gateway_forward_request(req, false);
 }
 
-int gateway_sync_vdi(struct request *req)
+int gateway_flush_nodes(struct request *req)
 {
 	return gateway_forward_request(req, true);
 }

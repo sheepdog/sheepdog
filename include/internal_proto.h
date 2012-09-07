@@ -65,6 +65,8 @@
 #define SD_OP_INFO_RECOVER 0xAA
 #define SD_OP_GET_VDI_COPIES 0xAB
 #define SD_OP_COMPLETE_RECOVERY 0xAC
+#define SD_OP_FLUSH_NODES 0xAD
+#define SD_OP_FLUSH_PEER 0xAE
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
