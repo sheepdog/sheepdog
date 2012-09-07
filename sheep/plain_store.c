@@ -16,6 +16,7 @@
 #include <dirent.h>
 
 #include "sheep_priv.h"
+#include "config.h"
 
 static char stale_dir[PATH_MAX];
 
