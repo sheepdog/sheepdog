@@ -106,7 +106,7 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 		unsigned int rlen, wlen;
 		int fd;
 
-		if (is_myself(local_nodes[i].nid.addr, local_nodes[i].nid.port))
+		if (node_is_local(&local_nodes[i]))
 			continue;
 
 		addr_to_str(host, sizeof(host), local_nodes[i].nid.addr, 0);

@@ -624,7 +624,7 @@ static int get_vdis_from(struct sd_node *node)
 	char host[128];
 	int count;
 
-	if (is_myself(node->nid.addr, node->nid.port))
+	if (node_is_local(node))
 		goto out;
 
 	addr_to_str(host, sizeof(host), node->nid.addr, 0);
@@ -925,7 +925,7 @@ void sd_notify_handler(struct sd_node *sender, void *data, size_t data_len)
 	dprintf("op %s, size: %zd, from: %s\n",
 		op_name(op), data_len, node_to_str(sender));
 
-	if (is_myself(sender->nid.addr, sender->nid.port)) {
+	if (node_is_local(sender)) {
 		if (has_process_work(op))
 			req = list_first_entry(&sys->pending_block_list,
 					       struct request, pending_list);
