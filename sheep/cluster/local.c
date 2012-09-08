@@ -123,24 +123,24 @@ static struct local_event *shm_queue_peek(void)
 
 static void shm_queue_push(struct local_event *ev)
 {
+	int pos;
+
 	if (ev->type == EVENT_BLOCK) {
-		shm_queue->block_event_pos =
-			(shm_queue->block_event_pos + 1) % MAX_EVENTS;
-		shm_queue->block_events[shm_queue->block_event_pos] = *ev;
+		pos = (shm_queue->block_event_pos + 1) % MAX_EVENTS;
 
-		msync(shm_queue->block_events +
-		      shm_queue->block_event_pos, sizeof(*ev), MS_SYNC);
-		msync(&shm_queue->block_event_pos,
-		      sizeof(shm_queue->block_event_pos), MS_SYNC);
+		shm_queue->block_events[pos] = *ev;
+		msync(shm_queue->block_events + pos, sizeof(*ev), MS_SYNC);
+
+		shm_queue->block_event_pos = pos;
+		msync(&shm_queue->block_event_pos, sizeof(pos), MS_SYNC);
 	} else {
-		shm_queue->nonblock_event_pos =
-			(shm_queue->nonblock_event_pos + 1) % MAX_EVENTS;
-		shm_queue->nonblock_events[shm_queue->nonblock_event_pos] = *ev;
+		pos = (shm_queue->nonblock_event_pos + 1) % MAX_EVENTS;
 
-		msync(shm_queue->nonblock_events +
-		      shm_queue->nonblock_event_pos, sizeof(*ev), MS_SYNC);
-		msync(&shm_queue->nonblock_event_pos,
-		      sizeof(shm_queue->nonblock_event_pos), MS_SYNC);
+		shm_queue->nonblock_events[pos] = *ev;
+		msync(shm_queue->nonblock_events + pos, sizeof(*ev), MS_SYNC);
+
+		shm_queue->nonblock_event_pos = pos;
+		msync(&shm_queue->nonblock_event_pos, sizeof(pos), MS_SYNC);
 	}
 }
 
