@@ -199,7 +199,7 @@ static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	struct get_vdi_info *info = data;
 
 	if (info->name) {
-		if (info->tag) {
+		if (info->tag && info->tag[0]) {
 			if (!strcmp(name, info->name) && !strcmp(tag, info->tag))
 				info->vid = vid;
 		} else if (info->snapid) {
