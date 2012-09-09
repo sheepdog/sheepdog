@@ -32,8 +32,13 @@ done
 $COLLIE vdi read test | md5sum
 
 # kill 7 nodes without waiting to finish recovery
-for i in `seq 7 -1 1`; do
+for i in 7 6 5; do
     _kill_sheep $i
+done
+sleep 1 # this is necessary to avoid network partition detection
+for i in 4 3 2 1; do
+    _kill_sheep $i
+    sleep 1
 done
 
 # make sheep 0 master to avoid master transfer
