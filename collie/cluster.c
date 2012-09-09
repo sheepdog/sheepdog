@@ -178,7 +178,7 @@ again:
 	else
 		printf("%s\n", sd_strerror(rsp->result));
 
-	if (!raw_output) {
+	if (!raw_output && rsp->data_length > 0) {
 		ct = logs[0].ctime >> 32;
 		printf("\nCluster created at %s\n", ctime(&ct));
 		printf("Epoch Time           Version\n");
