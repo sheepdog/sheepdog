@@ -1294,7 +1294,6 @@ static int vdi_write(int argc, char **argv)
 		else if (!is_data_obj_writeable(inode, idx)) {
 			create = 1;
 			old_oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
-			flags = SD_FLAG_CMD_COW;
 		}
 
 		if (vdi_cmd_data.writeback)
@@ -1334,8 +1333,7 @@ static int vdi_write(int argc, char **argv)
 		if (create) {
 			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 					      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
-					      flags & ~SD_FLAG_CMD_COW,
-					      inode->nr_copies, 0);
+					      flags, inode->nr_copies, 0);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;
@@ -1698,6 +1696,155 @@ out:
 	return ret;
 }
 
+/* restore backup data to vdi */
+static int restore_obj(struct obj_backup *backup, uint32_t vid,
+		       struct sheepdog_inode *parent_inode)
+{
+	int ret;
+	uint32_t parent_vid = parent_inode->data_vdi_id[backup->idx];
+	uint64_t parent_oid = 0;
+
+	if (parent_vid)
+		parent_oid = vid_to_data_oid(parent_vid, backup->idx);
+
+	/* send a copy-on-write request */
+	ret = sd_write_object(vid_to_data_oid(vid, backup->idx), parent_oid,
+			      backup->data, backup->length, backup->offset,
+			      0, parent_inode->nr_copies, 1);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	return sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
+			       SD_INODE_HEADER_SIZE + sizeof(vid) * backup->idx,
+			       0, parent_inode->nr_copies, 0);
+}
+
+static uint32_t do_restore(char *vdiname, int snapid, const char *tag,
+			   const char *backup_file)
+{
+	int fd, i, ret;
+	uint32_t vid;
+	struct backup_hdr hdr;
+	struct obj_backup *backup = xzalloc(sizeof(*backup));
+	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
+
+	printf("restoring %s... ", backup_file);
+
+	fd = open(backup_file, O_RDONLY);
+	if (fd < 0) {
+		printf("Cannot open the backup file\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	xread(fd, &hdr, sizeof(hdr));
+
+	if (hdr.version != VDI_BACKUP_FORMAT_VERSION ||
+	    hdr.magic != VDI_BACKUP_MAGIC) {
+		printf("The backup file is corrupted\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	ret = read_vdi_obj(vdiname, snapid, tag, NULL, inode, SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
+
+	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid, 1,
+			    inode->nr_copies);
+	if (ret != EXIT_SUCCESS) {
+		printf("Failed to read VDI\n");
+		goto out;
+	}
+
+	for (i = 0; i < hdr.nr_obj_backups; i++) {
+		xread(fd, backup, sizeof(*backup) - sizeof(backup->data));
+		xread(fd, backup->data, backup->length);
+
+		ret = restore_obj(backup, vid, inode);
+		if (ret != SD_RES_SUCCESS) {
+			printf("error\n");
+			do_vdi_delete(vdiname, 0, NULL);
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+	}
+
+	ret = EXIT_SUCCESS;
+	printf("done\n");
+out:
+	free(backup);
+	free(inode);
+
+	return ret;
+}
+
+static int vdi_restore(int argc, char **argv)
+{
+	char *vdiname = argv[optind++], *backup_file;
+	int ret;
+	char buf[SD_INODE_HEADER_SIZE] = {0};
+	struct sheepdog_inode *current_inode = xzalloc(sizeof(*current_inode));
+	struct sheepdog_inode *parent_inode = (struct sheepdog_inode *)buf;
+	bool need_current_recovery = false;
+
+	backup_file = argv[optind++];
+	if (!backup_file) {
+		fprintf(stderr, "Please specify a backup to be restored\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
+		fprintf(stderr, "We can restore a backup file only to"
+			"snapshots\n");
+		fprintf(stderr, "Please specify the '-s' option\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	/* delete the current vdi temporarily first to avoid making
+	 * the current state become snapshot */
+	ret = read_vdi_obj(vdiname, 0, "", NULL, current_inode,
+			   SD_INODE_HEADER_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
+
+	ret = sd_read_object(vid_to_vdi_oid(current_inode->parent_vdi_id),
+			     parent_inode, SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		printf("error\n");
+		goto out;
+	}
+
+	ret = do_vdi_delete(vdiname, 0, NULL);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to delete the current state\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	need_current_recovery = true;
+
+	/* restore backup data */
+	ret = do_restore(vdiname, vdi_cmd_data.snapshot_id,
+			 vdi_cmd_data.snapshot_tag, backup_file);
+out:
+	if (need_current_recovery) {
+		int recovery_ret;
+		/* recreate the current vdi object */
+		recovery_ret = do_vdi_create(vdiname, current_inode->vdi_size,
+					     current_inode->parent_vdi_id, NULL,
+					     parent_inode->snap_id,
+					     current_inode->nr_copies);
+		if (recovery_ret != EXIT_SUCCESS) {
+			fprintf(stderr, "failed to resume the current vdi\n");
+			ret = recovery_ret;
+		}
+	}
+	free(current_inode);
+	return ret;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
@@ -1750,6 +1897,9 @@ static struct subcommand vdi_cmd[] = {
 	{"backup", "<vdiname> <backup>", "sFaph", "create an incremental backup between two snapshots",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_backup, vdi_options},
+	{"restore", "<vdiname> <backup>", "saph", "restore snapshot images from a backup",
+	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
+	 vdi_restore, vdi_options},
 	{NULL,},
 };
 

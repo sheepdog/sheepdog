@@ -100,6 +100,8 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 
 	hdr.data_length = wlen;
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
+	if (cow_oid)
+		hdr.flags |= SD_FLAG_CMD_COW;
 
 	hdr.obj.copies = copies;
 	hdr.obj.oid = oid;
