@@ -86,7 +86,7 @@ int trunk_file_write(unsigned char *outsha1)
 	int ret = 0;
 
 	/* Add the hdr first */
-	for_each_object_in_wd(inc_object_nr, &object_nr);
+	for_each_object_in_wd(inc_object_nr, false, &object_nr);
 	data_size = sizeof(struct trunk_entry) * object_nr;
 	hdr.size = data_size;
 	hdr.priv = object_nr;

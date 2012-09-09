@@ -48,7 +48,9 @@ static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 	return sprintf(path, "%s/%016"PRIx64".%"PRIx32, stale_dir, oid, epoch);
 }
 
-int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg)
+/* If cleanup is true, temporary objects will be removed */
+int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
+			  void *arg)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -70,12 +72,14 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), void *arg)
 		if (oid == 0 || oid == ULLONG_MAX)
 			continue;
 
-		/* remove object if it is temporary one */
+		/* don't call callback against temporary objects */
 		if (strlen(d->d_name) == 20 &&
 		    strcmp(d->d_name + 16, ".tmp") == 0) {
-			get_tmp_obj_path(oid, path);
-			dprintf("remove tmp object %s\n", path);
-			unlink(path);
+			if (cleanup) {
+				get_tmp_obj_path(oid, path);
+				dprintf("remove tmp object %s\n", path);
+				unlink(path);
+			}
 			continue;
 		}
 
@@ -224,7 +228,7 @@ int default_init(char *p)
 		}
 	}
 
-	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, NULL);
+	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 
 static int default_read_from_path(uint64_t oid, char *path,
@@ -389,7 +393,7 @@ int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info)
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
-	return for_each_object_in_wd(check_stale_objects, &old_epoch);
+	return for_each_object_in_wd(check_stale_objects, false, &old_epoch);
 }
 
 int default_format(void)
@@ -431,7 +435,7 @@ int default_purge_obj(void)
 {
 	uint32_t tgt_epoch = get_latest_epoch();
 
-	return for_each_object_in_wd(move_object_to_stale_dir, &tgt_epoch);
+	return for_each_object_in_wd(move_object_to_stale_dir, true, &tgt_epoch);
 }
 
 #ifndef HAVE_SYNCFS
