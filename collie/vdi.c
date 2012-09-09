@@ -411,6 +411,39 @@ out:
 	return ret;
 }
 
+static int read_vdi_obj(char *vdiname, int snapid, const char *tag,
+			uint32_t *pvid, struct sheepdog_inode *inode,
+			size_t size)
+{
+	int ret;
+	uint32_t vid;
+
+	ret = find_vdi_name(vdiname, snapid, tag, &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), inode, size, 0);
+	if (ret != SD_RES_SUCCESS) {
+		if (snapid) {
+			fprintf(stderr, "Failed to read a snapshot %s:%d\n",
+				vdiname, snapid);
+		} else if (tag && tag[0]) {
+			fprintf(stderr, "Failed to read a snapshot %s:%s\n",
+				vdiname, tag);
+		} else {
+			fprintf(stderr, "Failed to read a vdi %s\n", vdiname);
+		}
+		return EXIT_FAILURE;
+	}
+
+	if (pvid)
+		*pvid = vid;
+
+	return EXIT_SUCCESS;
+}
+
 static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 			 uint32_t *vdi_id, int snapshot, int nr_copies)
 {
@@ -543,17 +576,9 @@ static int vdi_snapshot(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
-	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
-		return EXIT_FAILURE;
-	}
-
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read an inode header\n");
-		return EXIT_FAILURE;
-	}
+	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_HEADER_SIZE);
+	if (ret != EXIT_SUCCESS)
+		return ret;
 
 	if (vdi_cmd_data.snapshot_tag[0]) {
 		ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
@@ -589,26 +614,18 @@ static int vdi_clone(int argc, char **argv)
 		goto out;
 	}
 
-	ret = find_vdi_name(src_vdi, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &base_vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", src_vdi);
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
 	inode = malloc(sizeof(*inode));
 	if (!inode) {
 		fprintf(stderr, "Failed to allocate memory\n");
 		ret = EXIT_SYSFAIL;
 		goto out;
 	}
-	ret = sd_read_object(vid_to_vdi_oid(base_vid), inode, SD_INODE_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read a base inode\n");
-		ret = EXIT_FAILURE;
+
+	ret = read_vdi_obj(src_vdi, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, &base_vid, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
 		goto out;
-	}
 
 	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, 0,
 			    vdi_cmd_data.nr_copies);
@@ -679,17 +696,9 @@ static int vdi_resize(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
-	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
-		return EXIT_FAILURE;
-	}
-
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read an inode header\n");
-		return EXIT_FAILURE;
-	}
+	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_HEADER_SIZE);
+	if (ret != EXIT_SUCCESS)
+		return ret;
 
 	if (new_size < inode->vdi_size) {
 		fprintf(stderr, "Shrinking VDIs is not implemented\n");
@@ -772,19 +781,11 @@ static int vdi_rollback(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
-	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &base_vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, &base_vid, inode,
+			   SD_INODE_HEADER_SIZE);
+	if (ret < 0)
 		return EXIT_FAILURE;
-	}
-
-	ret = sd_read_object(vid_to_vdi_oid(base_vid), inode,
-			     SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read an inode\n");
-		return EXIT_FAILURE;
-	}
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != SD_RES_SUCCESS) {
@@ -978,7 +979,7 @@ static int vdi_track(int argc, char **argv)
 static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 			     char *key, void *value, unsigned int value_len,
 			     uint32_t *vid, uint64_t *oid, unsigned int *nr_copies,
-			     int creat, int excl, int delete)
+			     int create, int excl, int delete)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1009,7 +1010,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	hdr.data_length = wlen;
 	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
 
-	if (creat)
+	if (create)
 		hdr.flags |= SD_FLAG_CMD_CREAT;
 	if (excl)
 		hdr.flags |= SD_FLAG_CMD_EXCL;
@@ -1145,7 +1146,6 @@ static int vdi_getattr(int argc, char **argv)
 static int vdi_read(int argc, char **argv)
 {
 	char *vdiname = argv[optind++];
-	uint32_t vid;
 	int ret, idx;
 	struct sheepdog_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
@@ -1175,19 +1175,11 @@ static int vdi_read(int argc, char **argv)
 		goto out;
 	}
 
-	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
-		ret = EXIT_FAILURE;
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
 		goto out;
-	}
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read an inode\n");
-		ret = EXIT_FAILURE;
-		goto out;
-	}
 
 	if (inode->vdi_size < offset) {
 		fprintf(stderr, "Read offset is beyond the end of the VDI\n");
@@ -1271,18 +1263,9 @@ static int vdi_write(int argc, char **argv)
 		goto out;
 	}
 
-	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
-		ret = EXIT_FAILURE;
+	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
 		goto out;
-	}
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read an inode\n");
-		ret = EXIT_FAILURE;
-		goto out;
-	}
 
 	if (inode->vdi_size < offset) {
 		fprintf(stderr, "Write offset is beyond the end of the VDI\n");
@@ -1484,55 +1467,30 @@ fix_consistency:
 	free(buf);
 }
 
-static int check_repair_vdi(uint32_t vid)
+static int vdi_check(int argc, char **argv)
 {
-	struct sheepdog_inode *inode;
+	char *vdiname = argv[optind++];
 	int ret;
 	uint64_t total, done = 0, oid;
-	uint32_t idx = 0, dvid;
+	uint32_t idx = 0, vid;
+	struct sheepdog_inode *inode = xmalloc(sizeof(*inode));
 
-	inode = malloc(sizeof(*inode));
-	if (!inode) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		return EXIT_SYSFAIL;
-	}
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read an inode\n");
-		return EXIT_FAILURE;
-	}
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
 
 	total = inode->vdi_size;
 	while(done < total) {
-		dvid = inode->data_vdi_id[idx];
-		if (dvid) {
-			oid = vid_to_data_oid(dvid, idx);
+		vid = inode->data_vdi_id[idx];
+		if (vid) {
+			oid = vid_to_data_oid(vid, idx);
 			do_check_repair(oid, inode->nr_copies);
 		}
 		done += SD_DATA_OBJ_SIZE;
 		idx++;
 	}
-
-	return EXIT_SUCCESS;
-}
-
-static int vdi_check(int argc, char **argv)
-{
-	char *vdiname = argv[optind++];
-	uint32_t vid;
-	int ret;
-
-	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	ret = check_repair_vdi(vid);
-	if (ret != EXIT_SUCCESS)
-		goto out;
 
 	fprintf(stdout, "finish check&repair %s\n", vdiname);
 	return EXIT_SUCCESS;
