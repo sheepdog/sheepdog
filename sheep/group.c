@@ -411,6 +411,7 @@ static bool add_delayed_node(uint32_t epoch, struct sd_node *node)
 
 	if (find_entry_list(node, &sys->delayed_nodes))
 		return false;
+	assert(!find_entry_epoch(node, epoch));
 
 	n = xmalloc(sizeof(*n));
 	n->ent = *node;
@@ -545,6 +546,10 @@ static int cluster_wait_for_join_check(struct sd_node *joined,
 		eprintf("joining node epoch too small: %"
 			PRIu32 " vs %" PRIu32 "\n",
 			jm->epoch, local_epoch);
+
+		if (bsearch(joined, local_entries, nr_local_entries,
+			    sizeof(struct sd_node), node_id_cmp))
+			return CJ_RES_FAIL;
 		return CJ_RES_JOIN_LATER;
 	}
 
