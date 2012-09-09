@@ -109,6 +109,9 @@ This command reads data from an image.
 .BI "vdi write [-a address] [-p port] [-h] <vdiname> [<offset> [<len>]]"
 This command writes data to an image.
 .TP
+.BI "vdi backup [-s snapshot] [-F from] [-a address] [-p port] [-h] <vdiname> <backup>"
+This command creates an incremental backup between two snapshots.
+.TP
 .BI "node kill [-a address] [-p port] [-r] [-h] <node id>"
 This command kills the specified node.
 .TP

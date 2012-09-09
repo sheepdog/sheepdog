@@ -12,6 +12,9 @@
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "collie.h"
 #include "treeview.h"
@@ -24,6 +27,7 @@ static struct sd_option vdi_options[] = {
 	{'d', "delete", 0, "delete a key"},
 	{'w', "writeback", 0, "use writeback mode"},
 	{'c', "copies", 1, "specify the data redundancy (number of copies)"},
+	{'F', "from", 1, "create a differential backup from the snapshot"},
 	{ 0, NULL, 0, NULL },
 };
 
@@ -36,6 +40,8 @@ struct vdi_cmd_data {
 	int prealloc;
 	int nr_copies;
 	bool writeback;
+	int from_snapshot_id;
+	char from_snapshot_tag[SD_MAX_VDI_TAG_LEN];
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -1524,6 +1530,174 @@ out:
 	return ret;
 }
 
+/* vdi backup format */
+
+#define VDI_BACKUP_FORMAT_VERSION 1
+#define VDI_BACKUP_MAGIC 0x11921192
+
+struct backup_hdr {
+	uint32_t version;
+	uint32_t magic;
+	uint32_t nr_obj_backups;
+	uint32_t reserved;
+};
+
+struct obj_backup {
+	uint32_t idx;
+	uint32_t offset;
+	uint32_t length;
+	uint32_t reserved;
+	uint8_t data[SD_DATA_OBJ_SIZE];
+};
+
+/*
+ * discards redundant area from backup data
+ */
+static void compact_obj_backup(struct obj_backup *backup, uint8_t *from_data)
+{
+	uint8_t *p1, *p2;
+
+	p1 = backup->data;
+	p2 = from_data;
+	while (backup->length > 0 && memcmp(p1, p2, SECTOR_SIZE) == 0) {
+		p1 += SECTOR_SIZE;
+		p2 += SECTOR_SIZE;
+		backup->offset += SECTOR_SIZE;
+		backup->length -= SECTOR_SIZE;
+	}
+
+	p1 = backup->data + SD_DATA_OBJ_SIZE - SECTOR_SIZE;
+	p2 = from_data + SD_DATA_OBJ_SIZE - SECTOR_SIZE;
+	while (backup->length > 0 && memcmp(p1, p2, SECTOR_SIZE) == 0) {
+		p1 -= SECTOR_SIZE;
+		p2 -= SECTOR_SIZE;
+		backup->length -= SECTOR_SIZE;
+	}
+}
+
+static int get_obj_backup(int idx, uint32_t from_vid, uint32_t to_vid,
+			  struct obj_backup *backup)
+{
+	int ret;
+	uint8_t *from_data = xzalloc(SD_DATA_OBJ_SIZE);
+
+	backup->idx = idx;
+	backup->offset = 0;
+	backup->length = SD_DATA_OBJ_SIZE;
+
+	if (to_vid) {
+		ret = sd_read_object(vid_to_data_oid(to_vid, idx), backup->data,
+				     SD_DATA_OBJ_SIZE, 0);
+		if (ret != SD_RES_SUCCESS) {
+			fprintf(stderr, "Failed to read object %"PRIx32", %d\n",
+				to_vid, idx);
+			return EXIT_FAILURE;
+		}
+	} else
+		memset(backup->data, 0, SD_DATA_OBJ_SIZE);
+
+	if (from_vid) {
+		ret = sd_read_object(vid_to_data_oid(from_vid, idx), from_data,
+				     SD_DATA_OBJ_SIZE, 0);
+		if (ret != SD_RES_SUCCESS) {
+			fprintf(stderr, "Failed to read object %"PRIx32", %d\n",
+				from_vid, idx);
+			return EXIT_FAILURE;
+		}
+	}
+
+	compact_obj_backup(backup, from_data);
+
+	free(from_data);
+
+	return EXIT_SUCCESS;
+}
+
+static int vdi_backup(int argc, char **argv)
+{
+	char *vdiname = argv[optind++], *backup_file;
+	int ret = EXIT_SUCCESS, fd = -1, idx, nr_objs;
+	struct sheepdog_inode *from_inode = xzalloc(sizeof(*from_inode));
+	struct sheepdog_inode *to_inode = xzalloc(sizeof(*to_inode));
+	struct backup_hdr hdr = {
+		.version = VDI_BACKUP_FORMAT_VERSION,
+		.magic = VDI_BACKUP_MAGIC,
+	};
+	struct obj_backup *backup = xzalloc(sizeof(*backup));
+
+	backup_file = argv[optind++];
+	if (!backup_file) {
+		fprintf(stderr, "Please specify a backup file\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	fd = open(backup_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (fd < 0) {
+		fprintf(stderr, "Cannot open %s, %m\n", backup_file);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	if ((!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) ||
+	    (!vdi_cmd_data.from_snapshot_id &&
+	     !vdi_cmd_data.from_snapshot_tag[0])) {
+		fprintf(stderr, "Please specify snapshots with '-F' and '-s'"
+			"options\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.from_snapshot_id,
+			   vdi_cmd_data.from_snapshot_tag, NULL,
+			   from_inode, SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
+
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, to_inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
+
+	nr_objs = DIV_ROUND_UP(to_inode->vdi_size, SD_DATA_OBJ_SIZE);
+
+	ret = lseek(fd, sizeof(hdr), SEEK_SET);
+	if (ret != sizeof(hdr)) {
+		fprintf(stderr, "failed to seek, %m\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	for (idx = 0; idx < nr_objs; idx++) {
+		uint32_t from_vid = from_inode->data_vdi_id[idx];
+		uint32_t to_vid = to_inode->data_vdi_id[idx];
+
+		if (to_vid == 0 && from_vid == 0)
+			continue;
+
+		ret = get_obj_backup(idx, from_vid, to_vid, backup);
+		if (ret != EXIT_SUCCESS)
+			goto out;
+
+		if (backup->length) {
+			hdr.nr_obj_backups++;
+			xwrite(fd, backup, sizeof(*backup) - sizeof(backup->data));
+			xwrite(fd, backup->data + backup->offset, backup->length);
+		}
+	}
+
+	xpwrite(fd, &hdr, sizeof(hdr), 0);
+out:
+	if (fd >= 0)
+		close(fd);
+
+	free(from_inode);
+	free(to_inode);
+	free(backup);
+	return ret;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
@@ -1573,6 +1747,9 @@ static struct subcommand vdi_cmd[] = {
 	{"flush", "<vdiname>", "aph", "flush data to cluster",
 	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_flush, vdi_options},
+	{"backup", "<vdiname> <backup>", "sFaph", "create an incremental backup between two snapshots",
+	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
+	 vdi_backup, vdi_options},
 	{NULL,},
 };
 
@@ -1617,6 +1794,13 @@ static int vdi_parser(int ch, char *opt)
 			exit(EXIT_FAILURE);
 		}
 		vdi_cmd_data.nr_copies = nr_copies;
+	case 'F':
+		vdi_cmd_data.from_snapshot_id = strtol(opt, &p, 10);
+		if (opt == p) {
+			vdi_cmd_data.from_snapshot_id = 0;
+			strncpy(vdi_cmd_data.from_snapshot_tag, opt,
+				sizeof(vdi_cmd_data.from_snapshot_tag));
+		}
 	}
 
 	return 0;
