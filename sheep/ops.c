@@ -444,9 +444,8 @@ static int local_stat_cluster(struct request *req)
 	int i, max_logs;
 	uint32_t epoch;
 
-	max_logs = rsp->data_length / sizeof(*log);
+	max_logs = req->rq.data_length / sizeof(*log);
 	epoch = get_latest_epoch();
-	rsp->data_length = 0;
 	for (i = 0; i < max_logs; i++) {
 		if (epoch <= 0)
 			break;
@@ -499,10 +498,8 @@ static int local_get_epoch(struct request *req)
 	dprintf("%d\n", epoch);
 
 	nr_nodes = epoch_log_read(epoch, req->data, req->rq.data_length);
-	if (nr_nodes == -1) {
-		req->rp.data_length = 0;
+	if (nr_nodes == -1)
 		return SD_RES_NO_TAG;
-	}
 
 	req->rp.data_length = nr_nodes * sizeof(struct sd_node) + sizeof(time_t);
 	return SD_RES_SUCCESS;
@@ -861,10 +858,8 @@ int peer_read_obj(struct request *req)
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
 	ret = sd_store->read(hdr->obj.oid, &iocb);
-	if (ret != SD_RES_SUCCESS) {
-		rsp->data_length = 0;
+	if (ret != SD_RES_SUCCESS)
 		goto out;
-	}
 
 	rsp->data_length = hdr->data_length;
 	if (hdr->obj.copies)

@@ -229,7 +229,6 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		node_rsp->local_idx = get_node_idx(current_vnode_info,
 						   &sys->this_node);
 	} else {
-		node_rsp->data_length = 0;
 		node_rsp->nr_nodes = 0;
 		node_rsp->local_idx = 0;
 	}

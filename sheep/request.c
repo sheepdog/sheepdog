@@ -582,14 +582,9 @@ static inline int begin_rx(struct client_info *ci)
 static inline void finish_rx(struct client_info *ci)
 {
 	struct request *req;
-	struct sd_req *hdr = &ci->conn.rx_hdr;
 
 	req = ci->rx_req;
 	init_rx_hdr(ci);
-	if (hdr->flags & SD_FLAG_CMD_WRITE)
-		req->rp.data_length = 0;
-	else
-		req->rp.data_length = hdr->data_length;
 
 	dprintf("%d, %s:%d\n", ci->conn.fd, ci->conn.ipstr, ci->conn.port);
 	queue_request(req);
