@@ -282,8 +282,8 @@ _wait_for_sheep_recovery()
 _simulate_machine_down()
 {
 	# Drop the packet in/out this port
-	iptables -A INPUT -p tcp --sport $((7000+$i)) -j DROP
-	iptables -A INPUT -p tcp --dport $((7000+$i)) -j DROP
+	iptables -A INPUT -p tcp --sport $((7000+$1)) -j DROP
+	iptables -A INPUT -p tcp --dport $((7000+$1)) -j DROP
 
 	sleep 3
 	# Trigger the confchg because cluster driver doesn't know we'er offline
@@ -294,8 +294,8 @@ _simulate_machine_down()
 # Cleanup the iptables rules used to simulate machine down
 _cleanup_machine_simulation()
 {
-	iptables -D INPUT -p tcp --sport $((7000+$i)) -j DROP
-	iptables -D INPUT -p tcp --dport $((7000+$i)) -j DROP
+	iptables -D INPUT -p tcp --sport $((7000+$1)) -j DROP
+	iptables -D INPUT -p tcp --dport $((7000+$1)) -j DROP
 }
 
 # make sure this script returns success
