@@ -57,6 +57,7 @@ diff="diff -u"
 verbose=false
 group=false
 xgroup=false
+exit_on_err=false
 showme=false
 sortme=false
 expunge=true
@@ -139,6 +140,7 @@ check options
     -corosync           use corosync driver (default: local)
     -valgrind           use valgrind
     -xdiff		graphical mode diff
+    -e			exit immediately on test failure
     -n			show me, do not run tests
     -T			output timestamps
     -r 			randomize test order
@@ -179,6 +181,10 @@ testlist options
 	    fi
 	    ;;
 
+	-e)	# exit immediately on test failure
+	    exit_on_err=true
+	    xpand=false
+	    ;;
 	-n)	# show me, don't do it
 	    showme=true
 	    xpand=false
@@ -495,13 +501,17 @@ do
 
     # come here for each test, except when $showme is true
     #
+    [ -f $seq.notrun ] || try=`expr $try + 1`
     if $err
     then
 	bad="$bad $seq"
 	n_bad=`expr $n_bad + 1`
 	quick=false
+	if $exit_on_err
+	then
+	    break
+	fi
     fi
-    [ -f $seq.notrun ] || try=`expr $try + 1`
     
     seq="after_$seq"
 done
