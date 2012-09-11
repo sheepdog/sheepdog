@@ -29,7 +29,7 @@ char *size_to_str(uint64_t _size, char *str, int str_size)
 
 	size = (double)_size;
 	size /= 1024 * 1024;
-	while (i < ARRAY_SIZE(units) && size >= 1024) {
+	while (i < ARRAY_SIZE(units) - 1 && size >= 1024) {
 		i++;
 		size /= 1024;
 	}
