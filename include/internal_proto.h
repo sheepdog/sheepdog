@@ -195,7 +195,7 @@ struct epoch_log {
 struct join_message {
 	uint8_t proto_ver;
 	uint8_t nr_copies;
-	uint16_t nr_nodes;
+	int16_t nr_nodes;
 	uint16_t nr_failed_nodes;
 	uint16_t nr_delayed_nodes;
 	uint16_t cluster_flags;
