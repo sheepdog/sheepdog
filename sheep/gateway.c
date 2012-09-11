@@ -188,23 +188,21 @@ again:
 		if (re & (POLLERR | POLLHUP | POLLNVAL)) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
-		} else if (re & POLLIN) {
-			if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp))) {
-				eprintf("remote node might have gone away\n");
-				err_ret = SD_RES_NETWORK_ERROR;
-				finish_one_write_err(wi, i);
-				goto finish_write;
-			}
-
-			ret = rsp->result;
-			if (ret != SD_RES_SUCCESS) {
-				eprintf("fail %"PRIx32"\n", ret);
-				err_ret = ret;
-			}
-			finish_one_write(wi, i);
-		} else {
-			eprintf("unhandled poll event\n");
+			goto finish_write;
 		}
+		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp))) {
+			eprintf("remote node might have gone away\n");
+			err_ret = SD_RES_NETWORK_ERROR;
+			finish_one_write_err(wi, i);
+			goto finish_write;
+		}
+
+		ret = rsp->result;
+		if (ret != SD_RES_SUCCESS) {
+			eprintf("fail %"PRIx32"\n", ret);
+			err_ret = ret;
+		}
+		finish_one_write(wi, i);
 	}
 finish_write:
 	if (wi->nr_sent > 0)
