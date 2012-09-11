@@ -132,18 +132,6 @@ _cleanup()
     done
 }
 
-# wait collie command to execute to completion
-_wait_for_collie()
-{
-    for ((;;)); do
-        if [ "$(pgrep -f "$COLLIE_PROG (cluster|vdi|node|debug)")" ]; then
-            sleep 1
-        else
-            break
-        fi
-    done
-}
-
 _count_sheep_processes()
 {
     pgrep -f "$SHEEP_PROG $STORE/" -l | awk '{ $1=""; print }' | sort | uniq | wc -l

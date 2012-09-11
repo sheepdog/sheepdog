@@ -45,7 +45,7 @@ for i in `seq 1 5`; do
 done
 
 echo wait for object recovery to finish
-_wait_for_collie
+wait
 
 for i in `seq 0 4`; do
     for port in `seq 0 7`; do

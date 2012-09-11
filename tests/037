@@ -27,7 +27,8 @@ for i in `seq 4 7`; do
     _kill_sheep $i
 done
 
-_wait_for_collie
+# wait for collie to finish
+wait
 
 for i in `seq 4 7`; do
     _start_sheep $i

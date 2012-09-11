@@ -40,7 +40,8 @@ for i in `seq 1 4`; do
 	_simulate_machine_down $i
 done
 
-_wait_for_collie
+# wait for collie to finish
+wait
 
 for i in `seq 0 9`; do
 	$COLLIE vdi object -i $i test

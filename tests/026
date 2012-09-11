@@ -39,7 +39,8 @@ for i in 5; do _kill_sheep $i;done
 _wait_for_sheep_recovery 0
 for i in `seq 1 5`; do _start_sheep $i;done
 
-_wait_for_collie
+# wait for collie to finish
+wait
 
 # wait vdi create to completion
 while true; do
