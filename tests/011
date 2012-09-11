@@ -20,6 +20,8 @@ _cleanup_devices()
     _kill_all_collies
     _kill_all_sheeps
 
+    sleep 1
+
     for i in 0 1 2; do
         umount $STORE/$i
         rm -f $STORE/$i.img
