@@ -202,7 +202,6 @@ struct join_message {
 	uint32_t epoch;
 	uint64_t ctime;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
-	uint8_t disable_recovery;
 	uint8_t store[STORE_LEN];
 
 	/*
