@@ -58,17 +58,16 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-static int recover_object_from_replica(uint64_t oid,
-				       struct sd_vnode *entry,
+static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 				       uint32_t epoch, uint32_t tgt_epoch)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	char name[128];
 	unsigned wlen = 0, rlen;
-	int fd, ret = -1;
+	int ret = -1;
 	void *buf;
 	struct siocb iocb = { 0 };
+	struct sockfd *sfd;
 
 	rlen = get_objsize(oid);
 
@@ -78,7 +77,7 @@ static int recover_object_from_replica(uint64_t oid,
 		goto out;
 	}
 
-	if (vnode_is_local(entry)) {
+	if (vnode_is_local(vnode)) {
 		iocb.epoch = epoch;
 		iocb.length = rlen;
 		ret = sd_store->link(oid, &iocb, tgt_epoch);
@@ -91,11 +90,9 @@ static int recover_object_from_replica(uint64_t oid,
 		}
 	}
 
-	addr_to_str(name, sizeof(name), entry->nid.addr, 0);
-	fd = connect_to(name, entry->nid.port);
-	dprintf("%s, %d\n", name, entry->nid.port);
-	if (fd < 0) {
-		eprintf("failed to connect to %s:%"PRIu32"\n", name, entry->nid.port);
+
+	sfd = sheep_get_sockfd(&vnode->nid);
+	if (!sfd) {
 		ret = -1;
 		goto out;
 	}
@@ -108,19 +105,18 @@ static int recover_object_from_replica(uint64_t oid,
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
-
-	close(fd);
+	ret = exec_req(sfd->fd, &hdr, buf, &wlen, &rlen);
 
 	if (ret != 0) {
 		eprintf("res: %"PRIx32"\n", rsp->result);
 		ret = -1;
+		sheep_del_sockfd(&vnode->nid, sfd);
 		goto out;
 	}
 
-	rsp = (struct sd_rsp *)&hdr;
-
 	if (rsp->result == SD_RES_SUCCESS) {
+		sheep_put_sockfd(&vnode->nid, sfd);
+
 		iocb.epoch = epoch;
 		iocb.length = rlen;
 		iocb.buf = buf;
@@ -132,6 +128,7 @@ static int recover_object_from_replica(uint64_t oid,
 	} else {
 		eprintf("failed, res: %"PRIx32"\n", rsp->result);
 		ret = rsp->result;
+		sheep_del_sockfd(&vnode->nid, sfd);
 		goto out;
 	}
 done:
@@ -541,18 +538,19 @@ static void finish_object_list(struct work *work)
 static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 			     uint8_t *buf, size_t buf_size)
 {
-	int fd, ret;
 	unsigned wlen, rlen;
 	char name[128];
 	struct sd_list_req hdr;
-	struct sd_list_rsp *rsp;
+	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&hdr;
+	struct sockfd *sfd;
+	int ret;
 
 	addr_to_str(name, sizeof(name), e->nid.addr, 0);
 
 	dprintf("%s %"PRIu32"\n", name, e->nid.port);
 
-	fd = connect_to(name, e->nid.port);
-	if (fd < 0) {
+	sfd = sheep_get_sockfd(&e->nid);
+	if (!sfd) {
 		eprintf("%s %"PRIu32"\n", name, e->nid.port);
 		return -1;
 	}
@@ -565,16 +563,21 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 	hdr.flags = 0;
 	hdr.data_length = rlen;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	ret = exec_req(sfd->fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
-	close(fd);
-
-	rsp = (struct sd_list_rsp *)&hdr;
-
-	if (ret || rsp->result != SD_RES_SUCCESS) {
-		eprintf("failed, %"PRIu32", %"PRIu32"\n", ret, rsp->result);
+	if (ret) {
+		dprintf("remote node might have gone away\n");
+		sheep_del_sockfd(&e->nid, sfd);
 		return -1;
 	}
+	if (rsp->result != SD_RES_SUCCESS) {
+		ret = rsp->result;
+		eprintf("failed %x\n", ret);
+		sheep_put_sockfd(&e->nid, sfd);
+		return -1;
+	}
+
+	sheep_put_sockfd(&e->nid, sfd);
 
 	dprintf("%zu\n", rsp->data_length / sizeof(uint64_t));
 

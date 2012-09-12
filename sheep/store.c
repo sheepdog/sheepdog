@@ -102,17 +102,14 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 	for (i = 0; i < nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		char host[128];
+		struct sockfd *sfd;
 		unsigned int rlen, wlen;
-		int fd;
 
 		if (node_is_local(&local_nodes[i]))
 			continue;
 
-		addr_to_str(host, sizeof(host), local_nodes[i].nid.addr, 0);
-		fd = connect_to(host, local_nodes[i].nid.port);
-		if (fd < 0) {
-			vprintf(SDOG_ERR, "failed to connect to %s: %m\n", host);
+		sfd = sheep_get_sockfd(&local_nodes[i].nid);
+		if (!sfd) {
 			continue;
 		}
 
@@ -122,11 +119,21 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 
 		wlen = 0;
 
-		ret = exec_req(fd, &hdr, nodes, &wlen, &rlen);
-		close(fd);
+		ret = exec_req(sfd->fd, &hdr, nodes, &wlen, &rlen);
+		if (ret) {
+			dprintf("remote node might have gone away\n");
+			sheep_del_sockfd(&local_nodes[i].nid, sfd);
+			continue;
+		}
+		if (rsp->result != SD_RES_SUCCESS) {
+			ret = rsp->result;
+			eprintf("failed %x\n", ret);
+			sheep_put_sockfd(&local_nodes[i].nid, sfd);
+			continue;
+		}
 
-		if (!ret && rsp->result == SD_RES_SUCCESS)
-			return rsp->data_length / sizeof(*nodes);
+		sheep_put_sockfd(&local_nodes[i].nid, sfd);
+		return rsp->data_length / sizeof(*nodes);
 	}
 
 	/*

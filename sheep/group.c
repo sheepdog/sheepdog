@@ -607,24 +607,19 @@ static int get_vdis_from(struct sd_node *node)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct vdi_copy *vc = NULL;
-	int fd, i, ret = SD_RES_SUCCESS;
+	struct sockfd *sfd;
+	int i, ret = SD_RES_SUCCESS;
 	unsigned int rlen, wlen;
-	char host[128];
 	int count;
 
 	if (node_is_local(node))
 		goto out;
 
-	addr_to_str(host, sizeof(host), node->nid.addr, 0);
-
-	fd = connect_to(host, node->nid.port);
-	if (fd < 0) {
-		vprintf(SDOG_ERR, "unable to get the VDI bitmap from %s: %m\n", host);
-		ret = SD_RES_EIO;
+	sfd = sheep_get_sockfd(&node->nid);
+	if (!sfd) {
+		ret = SD_RES_NETWORK_ERROR;
 		goto out;
 	}
-
-	vprintf(SDOG_ERR, "%s:%d\n", host, node->nid.port);
 
 	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
@@ -639,16 +634,22 @@ static int get_vdis_from(struct sd_node *node)
 		goto out;
 	}
 
-	ret = exec_req(fd, &hdr, (char *)vc, &wlen, &rlen);
-	close(fd);
+	ret = exec_req(sfd->fd, &hdr, (char *)vc, &wlen, &rlen);
 
-	if (ret || rsp->result != SD_RES_SUCCESS) {
-		vprintf(SDOG_ERR, "unable to get the VDI bitmap (%d, %d)\n", ret,
-				rsp->result);
+	if (ret) {
+		dprintf("remote node might have gone away\n");
+		sheep_del_sockfd(&node->nid, sfd);
+		ret = SD_RES_NETWORK_ERROR;
+		goto out;
+	}
+	if (rsp->result != SD_RES_SUCCESS) {
 		ret = rsp->result;
+		eprintf("failed %x\n", ret);
+		sheep_put_sockfd(&node->nid, sfd);
 		goto out;
 	}
 
+	sheep_put_sockfd(&node->nid, sfd);
 	count = rsp->data_length / sizeof(*vc);
 	for (i = 0; i < count; i++) {
 		set_bit(vc[i].vid, sys->vdi_inuse);
