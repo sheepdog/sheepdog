@@ -197,11 +197,13 @@ struct join_message {
 	int16_t nr_nodes;
 	uint16_t nr_failed_nodes;
 	uint16_t nr_delayed_nodes;
-	uint16_t cluster_flags;
 	uint32_t cluster_status;
 	uint32_t epoch;
 	uint64_t ctime;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
+	uint8_t disable_recovery;
+	uint16_t cluster_flags;
+	uint32_t __pad;
 	uint8_t store[STORE_LEN];
 
 	/*

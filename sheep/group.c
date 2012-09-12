@@ -836,6 +836,7 @@ static void update_cluster_info(struct join_message *msg,
 			set_cluster_ctime(msg->ctime);
 			/*FALLTHROUGH*/
 		case SD_STATUS_WAIT_FOR_JOIN:
+			sys->disable_recovery = msg->disable_recovery;
 			get_vdis(nodes, nr_nodes);
 			break;
 		default:
@@ -994,6 +995,7 @@ enum cluster_join_result sd_check_join_cb(struct sd_node *joining, void *opaque)
 	jm->epoch = sys->epoch;
 	jm->ctime = get_cluster_ctime();
 	jm->nr_failed_nodes = 0;
+	jm->disable_recovery = sys->disable_recovery;
 
 	if (sd_store)
 		strcpy((char *)jm->store, sd_store->name);

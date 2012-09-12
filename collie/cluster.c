@@ -386,8 +386,7 @@ static int cluster_disable_recover(int argc, char **argv)
 	if (ret)
 		return EXIT_FAILURE;
 
-	printf("*Note*: Only disable the recovery caused by JOIN envets\n"
-	       "Cluster recovery: disable\n");
+	printf("Cluster recovery: disable\n");
 	return EXIT_SUCCESS;
 }
 

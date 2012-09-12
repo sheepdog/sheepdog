@@ -318,6 +318,7 @@ static int cluster_enable_recover(const struct sd_req *req,
 				    struct sd_rsp *rsp, void *data)
 {
 	sys->disable_recovery = 0;
+	resume_suspended_recovery();
 	return SD_RES_SUCCESS;
 }
 

@@ -30,11 +30,14 @@ struct recovery_work {
 
 	int stop;
 	struct work work;
+	bool suspended; /* true when automatic recovery is disabled
+			 * and recovery process is suspended */
 
 	int count;
 	uint64_t *oids;
 	uint64_t *prio_oids;
 	int nr_prio_oids;
+	int nr_scheduled_prio_oids;
 
 	struct vnode_info *old_vinfo;
 	struct vnode_info *cur_vinfo;
@@ -269,13 +272,15 @@ static inline void prepare_schedule_oid(uint64_t oid)
 				oid);
 			return;
 		}
-	/* The oid is currently being recovered */
-	if (rw->oids[rw->done] == oid)
+	/* When auto recovery is enabled, the oid is currently being
+	 * recovered */
+	if (!sys->disable_recovery && rw->oids[rw->done] == oid)
 		return;
 	rw->nr_prio_oids++;
 	rw->prio_oids = xrealloc(rw->prio_oids,
 				 rw->nr_prio_oids * sizeof(uint64_t));
 	rw->prio_oids[rw->nr_prio_oids - 1] = oid;
+	resume_suspended_recovery();
 
 	dprintf("%"PRIx64" nr_prio_oids %d\n", oid, rw->nr_prio_oids);
 }
@@ -431,7 +436,49 @@ static inline void finish_schedule_oids(struct recovery_work *rw)
 done:
 	free(rw->prio_oids);
 	rw->prio_oids = NULL;
+	rw->nr_scheduled_prio_oids += rw->nr_prio_oids;
 	rw->nr_prio_oids = 0;
+}
+
+/*
+ * When automatic object recovery is disabled, the behavior of the
+ * recovery process is like 'lazy recovery'.  This function returns
+ * true if the recovery queue contains objects being accessed by
+ * clients.  Sheep recovers such objects for availability even when
+ * automatic object recovery is not enabled.
+ */
+static bool has_scheduled_objects(struct recovery_work *rw)
+{
+	return rw->done < rw->nr_scheduled_prio_oids;
+}
+
+static void recover_next_object(struct recovery_work *rw)
+{
+	if (next_rw) {
+		run_next_rw(rw);
+		return;
+	}
+
+	if (rw->nr_prio_oids)
+		finish_schedule_oids(rw);
+
+	if (sys->disable_recovery && !has_scheduled_objects(rw)) {
+		dprintf("suspended\n");
+		rw->suspended = true;
+		/* suspend until resume_suspended_recovery() is called */
+		return;
+	}
+
+	/* Try recover next object */
+	queue_work(sys->recovery_wqueue, &rw->work);
+}
+
+void resume_suspended_recovery(void)
+{
+	if (recovering_work && recovering_work->suspended) {
+		recovering_work->suspended = false;
+		recover_next_object(recovering_work);
+	}
 }
 
 static void recover_object_main(struct work *work)
@@ -457,11 +504,7 @@ static void recover_object_main(struct work *work)
 	resume_wait_obj_requests(rw->oids[rw->done++]);
 
 	if (rw->done < rw->count) {
-		if (rw->nr_prio_oids)
-			finish_schedule_oids(rw);
-
-		/* Try recover next object */
-		queue_work(sys->recovery_wqueue, &rw->work);
+		recover_next_object(rw);
 		return;
 	}
 
@@ -490,7 +533,7 @@ static void finish_object_list(struct work *work)
 	resume_wait_recovery_requests();
 	rw->work.fn = recover_object_work;
 	rw->work.done = recover_object_main;
-	queue_work(sys->recovery_wqueue, &rw->work);
+	recover_next_object(rw);
 	return;
 }
 
@@ -673,6 +716,10 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 			free_recovery_work(next_rw);
 		dprintf("recovery skipped\n");
 		next_rw = rw;
+
+		/* This is necesary to invoke run_next_rw when
+		 * recovery work is suspended. */
+		resume_suspended_recovery();
 	} else {
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);

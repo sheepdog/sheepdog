@@ -255,6 +255,7 @@ void resume_wait_epoch_requests(void);
 void resume_wait_obj_requests(uint64_t oid);
 void resume_wait_recovery_requests(void);
 void flush_wait_obj_requests(void);
+void resume_suspended_recovery(void);
 
 int create_cluster(int port, int64_t zone, int nr_vnodes,
 		   bool explicit_addr);
