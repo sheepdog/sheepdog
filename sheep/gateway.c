@@ -56,44 +56,27 @@ int gateway_read_obj(struct request *req)
 	 */
 	j = random();
 	for (i = 0; i < nr_copies; i++) {
-		struct sockfd *sfd;
 		int idx = (i + j) % nr_copies;
-
-		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-		fwd_hdr.opcode = SD_OP_READ_PEER;
-		fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
 
 		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
 			continue;
 
-		sfd = sheep_get_sockfd(&v->nid);
-		if (!sfd) {
-			ret = SD_RES_NETWORK_ERROR;
-			continue;
-		}
-
+		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
+		fwd_hdr.opcode = SD_OP_READ_PEER;
+		fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
 		wlen = 0;
 		rlen = fwd_hdr.data_length;
 
-		ret = exec_req(sfd->fd, &fwd_hdr, req->data, &wlen, &rlen);
+		ret = sheep_exec_req(&v->nid, &fwd_hdr, req->data, &wlen,
+				     &rlen);
 
-		if (!ret && rsp->result == SD_RES_SUCCESS) {
-			memcpy(&req->rp, rsp, sizeof(*rsp));
-			ret = rsp->result;
-			sheep_put_sockfd(&v->nid, sfd);
-			break; /* Read success */
-		}
+		if (ret != SD_RES_SUCCESS)
+			continue;
 
-		if (ret) {
-			dprintf("remote node might have gone away\n");
-			sheep_del_sockfd(&v->nid, sfd);
-			ret = SD_RES_NETWORK_ERROR;
-		} else {
-			ret = rsp->result;
-			eprintf("remote read fail %x\n", ret);
-			sheep_put_sockfd(&v->nid, sfd);
-		}
+		/* Read success */
+		memcpy(&req->rp, rsp, sizeof(*rsp));
+		break;
 	}
 	return ret;
 }

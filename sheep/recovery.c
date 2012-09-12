@@ -48,8 +48,10 @@ static struct recovery_work *recovering_work;
 
 static int obj_cmp(const void *oid1, const void *oid2)
 {
-	const uint64_t hval1 = fnv_64a_buf((void *)oid1, sizeof(uint64_t), FNV1A_64_INIT);
-	const uint64_t hval2 = fnv_64a_buf((void *)oid2, sizeof(uint64_t), FNV1A_64_INIT);
+	const uint64_t hval1 = fnv_64a_buf((void *)oid1, sizeof(uint64_t),
+					   FNV1A_64_INIT);
+	const uint64_t hval2 = fnv_64a_buf((void *)oid2, sizeof(uint64_t),
+					   FNV1A_64_INIT);
 
 	if (hval1 < hval2)
 		return -1;
@@ -62,15 +64,12 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 				       uint32_t epoch, uint32_t tgt_epoch)
 {
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned wlen = 0, rlen;
-	int ret = -1;
+	int ret = SD_RES_NO_MEM;
 	void *buf;
 	struct siocb iocb = { 0 };
-	struct sockfd *sfd;
 
 	rlen = get_objsize(oid);
-
 	buf = valloc(rlen);
 	if (!buf) {
 		eprintf("%m\n");
@@ -81,19 +80,6 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 		iocb.epoch = epoch;
 		iocb.length = rlen;
 		ret = sd_store->link(oid, &iocb, tgt_epoch);
-		if (ret == SD_RES_SUCCESS) {
-			ret = 0;
-			goto done;
-		} else {
-			ret = -1;
-			goto out;
-		}
-	}
-
-
-	sfd = sheep_get_sockfd(&vnode->nid);
-	if (!sfd) {
-		ret = -1;
 		goto out;
 	}
 
@@ -101,41 +87,22 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY;
 	hdr.data_length = rlen;
-
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
 
-	ret = exec_req(sfd->fd, &hdr, buf, &wlen, &rlen);
-
-	if (ret != 0) {
-		eprintf("res: %"PRIx32"\n", rsp->result);
-		ret = -1;
-		sheep_del_sockfd(&vnode->nid, sfd);
+	ret = sheep_exec_req(&vnode->nid, &hdr, buf, &wlen, &rlen);
+	if (ret != SD_RES_SUCCESS)
 		goto out;
-	}
-
-	if (rsp->result == SD_RES_SUCCESS) {
-		sheep_put_sockfd(&vnode->nid, sfd);
-
-		iocb.epoch = epoch;
-		iocb.length = rlen;
-		iocb.buf = buf;
-		ret = sd_store->atomic_put(oid, &iocb);
-		if (ret != SD_RES_SUCCESS) {
-			ret = -1;
-			goto out;
-		}
-	} else {
-		eprintf("failed, res: %"PRIx32"\n", rsp->result);
-		ret = rsp->result;
-		sheep_del_sockfd(&vnode->nid, sfd);
-		goto out;
-	}
-done:
-	dprintf("recovered oid %"PRIx64" from %d to epoch %d\n", oid, tgt_epoch, epoch);
+	iocb.epoch = epoch;
+	iocb.length = rlen;
+	iocb.buf = buf;
+	ret = sd_store->atomic_put(oid, &iocb);
 out:
-	if (ret == SD_RES_SUCCESS)
+	if (ret == SD_RES_SUCCESS) {
+		dprintf("recovered oid %"PRIx64" from %d to epoch %d\n", oid,
+			tgt_epoch, epoch);
 		objlist_cache_insert(oid);
+	}
 	free(buf);
 	return ret;
 }
@@ -183,7 +150,7 @@ again:
 			continue;
 		ret = recover_object_from_replica(oid, tgt_vnode,
 						  epoch, tgt_epoch);
-		if (ret == 0) {
+		if (ret == SD_RES_SUCCESS) {
 			/* Succeed */
 			break;
 		} else if (SD_RES_OLD_NODE_VER == ret) {
@@ -542,18 +509,11 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 	char name[128];
 	struct sd_list_req hdr;
 	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&hdr;
-	struct sockfd *sfd;
 	int ret;
 
 	addr_to_str(name, sizeof(name), e->nid.addr, 0);
 
 	dprintf("%s %"PRIu32"\n", name, e->nid.port);
-
-	sfd = sheep_get_sockfd(&e->nid);
-	if (!sfd) {
-		eprintf("%s %"PRIu32"\n", name, e->nid.port);
-		return -1;
-	}
 
 	wlen = 0;
 	rlen = buf_size;
@@ -563,21 +523,10 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 	hdr.flags = 0;
 	hdr.data_length = rlen;
 
-	ret = exec_req(sfd->fd, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	ret = sheep_exec_req(&e->nid, (struct sd_req *)&hdr, buf, &wlen, &rlen);
 
-	if (ret) {
-		dprintf("remote node might have gone away\n");
-		sheep_del_sockfd(&e->nid, sfd);
+	if (ret != SD_RES_SUCCESS)
 		return -1;
-	}
-	if (rsp->result != SD_RES_SUCCESS) {
-		ret = rsp->result;
-		eprintf("failed %x\n", ret);
-		sheep_put_sockfd(&e->nid, sfd);
-		return -1;
-	}
-
-	sheep_put_sockfd(&e->nid, sfd);
 
 	dprintf("%zu\n", rsp->data_length / sizeof(uint64_t));
 

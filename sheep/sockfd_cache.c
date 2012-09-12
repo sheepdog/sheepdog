@@ -462,3 +462,28 @@ void sheep_del_sockfd(struct node_id *nid, struct sockfd *sfd)
 	sockfd_cache_del(nid);
 	free(sfd);
 }
+
+int sheep_exec_req(struct node_id *nid, struct sd_req *hdr, void *buf,
+		   unsigned int *wlen, unsigned int *rlen)
+{
+	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
+	struct sockfd *sfd;
+	int ret;
+
+	sfd = sheep_get_sockfd(nid);
+	if (!sfd)
+		return SD_RES_NETWORK_ERROR;
+
+	ret = exec_req(sfd->fd, hdr, buf, wlen, rlen);
+	if (ret) {
+		dprintf("remote node might have gone away\n");
+		sheep_del_sockfd(nid, sfd);
+		return SD_RES_NETWORK_ERROR;
+	}
+	ret = rsp->result;
+	if (ret != SD_RES_SUCCESS)
+		eprintf("failed %x\n", ret);
+
+	sheep_put_sockfd(nid, sfd);
+	return ret;
+}

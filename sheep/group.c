@@ -607,7 +607,6 @@ static int get_vdis_from(struct sd_node *node)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct vdi_copy *vc = NULL;
-	struct sockfd *sfd;
 	int i, ret = SD_RES_SUCCESS;
 	unsigned int rlen, wlen;
 	int count;
@@ -615,18 +614,7 @@ static int get_vdis_from(struct sd_node *node)
 	if (node_is_local(node))
 		goto out;
 
-	sfd = sheep_get_sockfd(&node->nid);
-	if (!sfd) {
-		ret = SD_RES_NETWORK_ERROR;
-		goto out;
-	}
-
 	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
-	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
-	hdr.epoch = sys->epoch;
-	hdr.data_length = rlen;
-	wlen = 0;
-
 	vc = zalloc(rlen);
 	if (!vc) {
 		vprintf(SDOG_ERR, "unable to allocate memory\n");
@@ -634,28 +622,19 @@ static int get_vdis_from(struct sd_node *node)
 		goto out;
 	}
 
-	ret = exec_req(sfd->fd, &hdr, (char *)vc, &wlen, &rlen);
-
-	if (ret) {
-		dprintf("remote node might have gone away\n");
-		sheep_del_sockfd(&node->nid, sfd);
-		ret = SD_RES_NETWORK_ERROR;
+	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
+	hdr.epoch = sys->epoch;
+	hdr.data_length = rlen;
+	wlen = 0;
+	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc, &wlen, &rlen);
+	if (ret != SD_RES_SUCCESS)
 		goto out;
-	}
-	if (rsp->result != SD_RES_SUCCESS) {
-		ret = rsp->result;
-		eprintf("failed %x\n", ret);
-		sheep_put_sockfd(&node->nid, sfd);
-		goto out;
-	}
 
-	sheep_put_sockfd(&node->nid, sfd);
 	count = rsp->data_length / sizeof(*vc);
 	for (i = 0; i < count; i++) {
 		set_bit(vc[i].vid, sys->vdi_inuse);
 		add_vdi_copy_number(vc[i].vid, vc[i].nr_copies);
 	}
-	ret = SD_RES_SUCCESS;
 out:
 	free(vc);
 	return ret;

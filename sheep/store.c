@@ -102,37 +102,20 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 	for (i = 0; i < nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		struct sockfd *sfd;
 		unsigned int rlen, wlen;
 
 		if (node_is_local(&local_nodes[i]))
 			continue;
 
-		sfd = sheep_get_sockfd(&local_nodes[i].nid);
-		if (!sfd) {
-			continue;
-		}
-
 		sd_init_req(&hdr, SD_OP_GET_EPOCH);
 		hdr.data_length = rlen = len;
 		hdr.obj.tgt_epoch = epoch;
-
 		wlen = 0;
-
-		ret = exec_req(sfd->fd, &hdr, nodes, &wlen, &rlen);
-		if (ret) {
-			dprintf("remote node might have gone away\n");
-			sheep_del_sockfd(&local_nodes[i].nid, sfd);
+		ret = sheep_exec_req(&local_nodes[i].nid, &hdr, nodes, &wlen,
+				     &rlen);
+		if (ret != SD_RES_SUCCESS)
 			continue;
-		}
-		if (rsp->result != SD_RES_SUCCESS) {
-			ret = rsp->result;
-			eprintf("failed %x\n", ret);
-			sheep_put_sockfd(&local_nodes[i].nid, sfd);
-			continue;
-		}
 
-		sheep_put_sockfd(&local_nodes[i].nid, sfd);
 		return rsp->data_length / sizeof(*nodes);
 	}
 
