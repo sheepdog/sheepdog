@@ -96,7 +96,7 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 	iocb.epoch = epoch;
 	iocb.length = rlen;
 	iocb.buf = buf;
-	ret = sd_store->atomic_put(oid, &iocb);
+	ret = sd_store->create_and_write(oid, &iocb);
 out:
 	if (ret == SD_RES_SUCCESS) {
 		dprintf("recovered oid %"PRIx64" from %d to epoch %d\n", oid,

@@ -123,9 +123,9 @@ static int err_to_sderr(uint64_t oid, int err)
 	return SD_RES_NO_OBJ;
 }
 
-int default_write(uint64_t oid, struct siocb *iocb, int create)
+int default_write(uint64_t oid, struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, create), fd, ret = SD_RES_SUCCESS;
+	int flags = get_open_flags(oid, false), fd, ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 	ssize_t size;
 
@@ -141,11 +141,6 @@ int default_write(uint64_t oid, struct siocb *iocb, int create)
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
 
-	if (create && !(iocb->flags & SD_FLAG_CMD_COW)) {
-		ret = prealloc(fd, get_objsize(oid));
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-	}
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
 		eprintf("failed to write object %"PRIx64", path=%s, offset=%"
@@ -243,10 +238,7 @@ static int default_read_from_path(uint64_t oid, char *path,
 		return err_to_sderr(oid, errno);
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
-	if (size == 0) {
-		/* the requested object is being created */
-		ret = SD_RES_NO_OBJ;
-	} else if (size != iocb->length) {
+	if (size != iocb->length) {
 		eprintf("failed to read object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
 			iocb->offset, iocb->length, size);
@@ -278,7 +270,7 @@ int default_read(uint64_t oid, struct siocb *iocb)
 	return ret;
 }
 
-int default_atomic_put(uint64_t oid, struct siocb *iocb)
+int default_create_and_write(uint64_t oid, struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int flags = get_open_flags(oid, true);
@@ -292,6 +284,12 @@ int default_atomic_put(uint64_t oid, struct siocb *iocb)
 	if (fd < 0) {
 		eprintf("failed to open %s: %m\n", tmp_path);
 		return SD_RES_EIO;
+	}
+
+	if (iocb->offset != 0 || iocb->length != get_objsize(oid)) {
+		ret = prealloc(fd, get_objsize(oid));
+		if (ret != SD_RES_SUCCESS)
+			goto out;
 	}
 
 	ret = xwrite(fd, iocb->buf, len);
@@ -470,10 +468,10 @@ struct store_driver plain_store = {
 	.name = "plain",
 	.init = default_init,
 	.exist = default_exist,
+	.create_and_write = default_create_and_write,
 	.write = default_write,
 	.read = default_read,
 	.link = default_link,
-	.atomic_put = default_atomic_put,
 	.end_recover = default_end_recover,
 	.cleanup = default_cleanup,
 	.format = default_format,

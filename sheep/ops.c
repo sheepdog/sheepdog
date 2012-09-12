@@ -776,8 +776,18 @@ out:
 	return ret;
 }
 
+static int do_create_and_write_obj(struct siocb *iocb, struct sd_req *hdr,
+				   uint32_t epoch, void *data)
+{
+	iocb->buf = data;
+	iocb->length = hdr->data_length;
+	iocb->offset = hdr->obj.offset;
+
+	return sd_store->create_and_write(hdr->obj.oid, iocb);
+}
+
 static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
-		void *data, int create)
+			void *data)
 {
 	uint64_t oid = hdr->obj.oid;
 	int ret = SD_RES_SUCCESS;
@@ -787,9 +797,7 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 	iocb->length = hdr->data_length;
 	iocb->offset = hdr->obj.offset;
 
-	if (is_vdi_obj(oid) && create)
-		ret = sd_store->atomic_put(oid, iocb);
-	else if (is_vdi_obj(oid) && sys->use_journal) {
+	if (is_vdi_obj(oid) && sys->use_journal) {
 		struct strbuf buf = STRBUF_INIT;
 
 		strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
@@ -799,11 +807,11 @@ static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
 			strbuf_release(&buf);
 			return SD_RES_EIO;
 		}
-		ret = sd_store->write(oid, iocb, create);
+		ret = sd_store->write(oid, iocb);
 		jrnl_end(jd);
 		strbuf_release(&buf);
 	} else
-		ret = sd_store->write(oid, iocb, create);
+		ret = sd_store->write(oid, iocb);
 
 	return ret;
 }
@@ -817,7 +825,7 @@ int peer_write_obj(struct request *req)
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.flags = hdr->flags;
-	return do_write_obj(&iocb, hdr, epoch, req->data, 0);
+	return do_write_obj(&iocb, hdr, epoch, req->data);
 }
 
 int peer_create_and_write_obj(struct request *req)
@@ -856,9 +864,9 @@ int peer_create_and_write_obj(struct request *req)
 		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
 		cow_hdr.obj.offset = 0;
 
-		ret = do_write_obj(&iocb, &cow_hdr, epoch, buf, 1);
+		ret = do_create_and_write_obj(&iocb, &cow_hdr, epoch, buf);
 	} else
-		ret = do_write_obj(&iocb, hdr, epoch, req->data, 1);
+		ret = do_create_and_write_obj(&iocb, hdr, epoch, req->data);
 
 	if (SD_RES_SUCCESS == ret)
 		objlist_cache_insert(oid);

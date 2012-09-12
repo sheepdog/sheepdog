@@ -142,7 +142,11 @@ static int check_request_epoch(struct request *req)
 static bool request_in_recovery(struct request *req)
 {
 
-	/* For CREATE request, we simply service it */
+	/*
+	 * For CREATE request, we simply service it.  CREATE operations are
+	 * atomic, so it cannot happen for recover process to overwrite the
+	 * created objects with the older data.
+	 */
 	if (req->rq.opcode == SD_OP_CREATE_AND_WRITE_PEER ||
 	    req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
 		return false;

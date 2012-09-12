@@ -263,7 +263,7 @@ static int restore_objects_from_snap(uint32_t epoch)
 		}
 		io.length = h.size;
 		io.buf = buffer;
-		ret = default_atomic_put(oid, &io);
+		ret = default_create_and_write(oid, &io);
 		if (ret != SD_RES_SUCCESS) {
 			eprintf("oid %"PRIx64" not restored\n", oid);
 			goto out;
@@ -319,10 +319,10 @@ struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
 	.exist = default_exist,
+	.create_and_write = default_create_and_write,
 	.write = default_write,
 	.read = default_read,
 	.link = default_link,
-	.atomic_put = default_atomic_put,
 	.end_recover = default_end_recover,
 	.snapshot = farm_snapshot,
 	.cleanup = default_cleanup,
