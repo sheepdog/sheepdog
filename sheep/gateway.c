@@ -15,6 +15,13 @@
 
 #include "sheep_priv.h"
 
+static inline void gateway_init_fwd_hdr(struct sd_req *fwd, struct sd_req *hdr)
+{
+	memcpy(fwd, hdr, sizeof(*fwd));
+	fwd->opcode = gateway_to_peer_opcode(hdr->opcode);
+	fwd->proto_ver = SD_SHEEP_PROTO_VER;
+}
+
 /*
  * Try our best to read one copy and read local first.
  *
@@ -61,16 +68,15 @@ int gateway_read_obj(struct request *req)
 		v = obj_vnodes[idx];
 		if (vnode_is_local(v))
 			continue;
-
-		memcpy(&fwd_hdr, &req->rq, sizeof(fwd_hdr));
-		fwd_hdr.opcode = SD_OP_READ_PEER;
-		fwd_hdr.proto_ver = SD_SHEEP_PROTO_VER;
+		/*
+		 * We need to re-init it because rsp and req share the same
+		 * structure.
+		 */
+		gateway_init_fwd_hdr(&fwd_hdr, &req->rq);
 		wlen = 0;
 		rlen = fwd_hdr.data_length;
-
 		ret = sheep_exec_req(&v->nid, &fwd_hdr, req->data, &wlen,
 				     &rlen);
-
 		if (ret != SD_RES_SUCCESS)
 			continue;
 
@@ -211,13 +217,6 @@ write_info_advance(struct write_info *wi, struct node_id *nid,
 	wi->ent[wi->nr_sent].pfd.events = POLLIN;
 	wi->ent[wi->nr_sent].sfd = sfd;
 	wi->nr_sent++;
-}
-
-static inline void gateway_init_fwd_hdr(struct sd_req *fwd, struct sd_req *hdr)
-{
-	memcpy(fwd, hdr, sizeof(*fwd));
-	fwd->opcode = gateway_to_peer_opcode(hdr->opcode);
-	fwd->proto_ver = SD_SHEEP_PROTO_VER;
 }
 
 static int init_target_nodes(struct request *req, bool all_node,
