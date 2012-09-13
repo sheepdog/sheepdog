@@ -28,7 +28,7 @@ static int get_open_flags(uint64_t oid, bool create)
 		flags |= O_DIRECT;
 
 	if (create)
-		flags |= O_CREAT | O_TRUNC;
+		flags |= O_CREAT | O_EXCL;
 
 	return flags;
 }
@@ -282,6 +282,15 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
+		if (errno == EEXIST)
+			/* This happens if node membership changes during object
+			 * creation; while gateway retries a CREATE request,
+			 * recovery process could also recover the object at the
+			 * same time.  They should try to write the same date,
+			 * so it is okay to simply return success here. */
+			dprintf("%s exists\n", tmp_path);
+			return SD_RES_SUCCESS;
+
 		eprintf("failed to open %s: %m\n", tmp_path);
 		return SD_RES_EIO;
 	}
