@@ -413,8 +413,7 @@ static struct subcommand cluster_recover_cmd[] = {
 	{"enable", NULL, NULL, "enable automatic recovery and "
 				"run once recover if necessary",
 	 NULL, 0, cluster_enable_recover},
-	{"disable", NULL, NULL, "disable automatic recovery caused "
-				"by JOIN events (excluding LEAVE events now)",
+	{"disable", NULL, NULL, "disable automatic recovery",
 	 NULL, 0, cluster_disable_recover},
 	{NULL},
 };
