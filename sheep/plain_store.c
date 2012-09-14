@@ -331,8 +331,8 @@ int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 	get_obj_path(oid, path);
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
-	if (rename(stale_path, path) < 0) {
-		eprintf("failed to rename from %s to %s, %m\n", stale_path,
+	if (link(stale_path, path) < 0) {
+		eprintf("failed to link from %s to %s, %m\n", stale_path,
 			path);
 		return SD_RES_EIO;
 	}
