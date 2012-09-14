@@ -1,5 +1,9 @@
 QA output created by 028
 using backend farm store
+9c7766570b3be3aff2724f587c2f4107  -
+a6c5d562057d0b8e7c90df17e5ea9450  -
+a6c5d562057d0b8e7c90df17e5ea9450  -
+a6c5d562057d0b8e7c90df17e5ea9450  -
 Looking for the inode object 0x7c2b25 with 2 nodes
 
 127.0.0.1:7000 has the object (should be 2 copies)
@@ -104,4 +108,3 @@ Looking for the object 0x7c2b2500000018 (the inode vid 0x7c2b25 idx 24) with 2 n
 
 127.0.0.1:7000 has the object (should be 2 copies)
 127.0.0.1:7001 has the object (should be 2 copies)
-update test successfully

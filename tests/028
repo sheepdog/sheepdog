@@ -27,7 +27,7 @@ for i in `seq 0 24`; do
     echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$COLLIE vdi read test | md5sum > /tmp/csum.0
+$COLLIE vdi read test | md5sum
 
 for i in 2 3; do
     _start_sheep $i
@@ -41,7 +41,7 @@ for i in `seq 0 24`; do
     echo $(($i+1)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512 -p 7002
 done
 
-$COLLIE vdi read test -p 7002 | md5sum > /tmp/csum.1
+$COLLIE vdi read test -p 7002 | md5sum
 
 for i in 2 3; do
     _start_sheep $(($i-2))
@@ -50,18 +50,11 @@ for i in 2 3; do
     _wait_for_sheep_recovery $(($i-2))
 done
 
-$COLLIE vdi read test | md5sum > /tmp/csum.2
-$COLLIE vdi read test -p 7001 | md5sum > /tmp/csum.3
+$COLLIE vdi read test | md5sum
+$COLLIE vdi read test -p 7001 | md5sum
 
 $COLLIE vdi object test
 
 for i in `seq 0 24`; do
     $COLLIE vdi object -i $i test
 done
-
-if [ "$(diff -u /tmp/csum.0 /tmp/csum.1)" ]; then
-    echo "update test successfully"
-fi
-
-diff -u /tmp/csum.1 /tmp/csum.2
-diff -u /tmp/csum.1 /tmp/csum.3
