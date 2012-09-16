@@ -403,8 +403,10 @@ done:
 
 static void requeue_request(struct request *req)
 {
-	if (req->vinfo)
+	if (req->vinfo) {
 		put_vnode_info(req->vinfo);
+		req->vinfo = NULL;
+	}
 	queue_request(req);
 }
 
