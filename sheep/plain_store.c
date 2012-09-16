@@ -109,18 +109,22 @@ static int err_to_sderr(uint64_t oid, int err)
 {
 	struct stat s;
 
-	if (err != ENOENT) {
+	switch (err) {
+	case ENOENT:
+		if (stat(obj_path, &s) < 0) {
+			eprintf("corrupted\n");
+			return SD_RES_EIO;
+		}
+		dprintf("object %016" PRIx64 " not found locally\n", oid);
+		return SD_RES_NO_OBJ;
+	case ENOSPC:
+		/* TODO: stop automatic recovery */
+		eprintf("diskfull, oid=%"PRIx64"\n", oid);
+		return SD_RES_NO_SPACE;
+	default:
 		eprintf("oid=%"PRIx64", %m\n", oid);
 		return SD_RES_EIO;
 	}
-
-	if (stat(obj_path, &s) < 0) {
-		eprintf("corrupted\n");
-		return SD_RES_EIO;
-	}
-
-	dprintf("object %016" PRIx64 " not found locally\n", oid);
-	return SD_RES_NO_OBJ;
 }
 
 int default_write(uint64_t oid, struct siocb *iocb)
@@ -146,7 +150,7 @@ int default_write(uint64_t oid, struct siocb *iocb)
 		eprintf("failed to write object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
 			iocb->offset, iocb->length, size);
-		ret = SD_RES_EIO;
+		ret = err_to_sderr(oid, errno);
 		goto out;
 	}
 out:
@@ -242,7 +246,7 @@ static int default_read_from_path(uint64_t oid, char *path,
 		eprintf("failed to read object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
 			iocb->offset, iocb->length, size);
-		ret = SD_RES_EIO;
+		ret = err_to_sderr(oid, errno);
 	}
 
 	close(fd);
@@ -270,11 +274,52 @@ int default_read(uint64_t oid, struct siocb *iocb)
 	return ret;
 }
 
+static int write_last_sector(int fd, uint32_t length)
+{
+	const int size = SECTOR_SIZE;
+	char *buf;
+	int ret;
+	off_t off = length - size;
+
+	buf = valloc(size);
+	if (!buf) {
+		eprintf("failed to allocate memory\n");
+		return SD_RES_NO_MEM;
+	}
+	memset(buf, 0, size);
+
+	ret = xpwrite(fd, buf, size, off);
+	if (ret != size)
+		ret = err_to_sderr(0, errno); /* FIXME: set oid */
+	else
+		ret = SD_RES_SUCCESS;
+	free(buf);
+
+	return ret;
+}
+
+/*
+ * Preallocate the whole object to get a better filesystem layout.
+ */
+int prealloc(int fd, uint32_t size)
+{
+	int ret = fallocate(fd, 0, 0, size);
+	if (ret < 0) {
+		if (errno != ENOSYS && errno != EOPNOTSUPP) {
+			dprintf("%m\n");
+			ret = SD_RES_SYSTEM_ERROR;
+		} else
+			ret = write_last_sector(fd, size);
+	} else
+		ret = SD_RES_SUCCESS;
+	return ret;
+}
+
 int default_create_and_write(uint64_t oid, struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int flags = get_open_flags(oid, true);
-	int ret = SD_RES_EIO, fd;
+	int ret, fd;
 	uint32_t len = iocb->length;
 
 	get_obj_path(oid, path);
@@ -292,7 +337,7 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 			return SD_RES_SUCCESS;
 
 		eprintf("failed to open %s: %m\n", tmp_path);
-		return SD_RES_EIO;
+		return err_to_sderr(oid, errno);
 	}
 
 	if (iocb->offset != 0 || iocb->length != get_objsize(oid)) {
@@ -304,14 +349,14 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 	ret = xwrite(fd, iocb->buf, len);
 	if (ret != len) {
 		eprintf("failed to write object. %m\n");
-		ret = SD_RES_EIO;
+		ret = err_to_sderr(oid, errno);
 		goto out;
 	}
 
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
 		eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
-		ret = SD_RES_EIO;
+		ret = err_to_sderr(oid, errno);
 		goto out;
 	}
 	dprintf("%"PRIx64"\n", oid);
@@ -334,7 +379,7 @@ int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch)
 	if (link(stale_path, path) < 0) {
 		eprintf("failed to link from %s to %s, %m\n", stale_path,
 			path);
-		return SD_RES_EIO;
+		return err_to_sderr(oid, errno);
 	}
 
 	return SD_RES_SUCCESS;

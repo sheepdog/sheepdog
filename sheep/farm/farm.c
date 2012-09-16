@@ -71,47 +71,6 @@ err:
 	return ret;
 }
 
-static int write_last_sector(int fd, uint32_t length)
-{
-	const int size = SECTOR_SIZE;
-	char *buf;
-	int ret;
-	off_t off = length - size;
-
-	buf = valloc(size);
-	if (!buf) {
-		eprintf("failed to allocate memory\n");
-		return SD_RES_NO_MEM;
-	}
-	memset(buf, 0, size);
-
-	ret = xpwrite(fd, buf, size, off);
-	if (ret != size)
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-	free(buf);
-
-	return ret;
-}
-
-/*
- * Preallocate the whole object to get a better filesystem layout.
- */
-int prealloc(int fd, uint32_t size)
-{
-	int ret = fallocate(fd, 0, 0, size);
-	if (ret < 0) {
-		if (errno != ENOSYS && errno != EOPNOTSUPP) {
-			dprintf("%m\n");
-			ret = SD_RES_SYSTEM_ERROR;
-		} else
-			ret = write_last_sector(fd, size);
-	} else
-		ret = SD_RES_SUCCESS;
-	return ret;
-}
-
 static int get_trunk_sha1(uint32_t epoch, unsigned char *outsha1)
 {
 	int i, nr_logs = -1, ret = -1;
