@@ -1536,8 +1536,6 @@ out:
 struct backup_hdr {
 	uint32_t version;
 	uint32_t magic;
-	uint32_t nr_obj_backups;
-	uint32_t reserved;
 };
 
 struct obj_backup {
@@ -1613,8 +1611,8 @@ static int get_obj_backup(int idx, uint32_t from_vid, uint32_t to_vid,
 
 static int vdi_backup(int argc, char **argv)
 {
-	char *vdiname = argv[optind++], *backup_file;
-	int ret = EXIT_SUCCESS, fd = -1, idx, nr_objs;
+	char *vdiname = argv[optind++];
+	int ret = EXIT_SUCCESS, idx, nr_objs;
 	struct sheepdog_inode *from_inode = xzalloc(sizeof(*from_inode));
 	struct sheepdog_inode *to_inode = xzalloc(sizeof(*to_inode));
 	struct backup_hdr hdr = {
@@ -1622,20 +1620,6 @@ static int vdi_backup(int argc, char **argv)
 		.magic = VDI_BACKUP_MAGIC,
 	};
 	struct obj_backup *backup = xzalloc(sizeof(*backup));
-
-	backup_file = argv[optind++];
-	if (!backup_file) {
-		fprintf(stderr, "Please specify a backup file\n");
-		ret = EXIT_USAGE;
-		goto out;
-	}
-
-	fd = open(backup_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	if (fd < 0) {
-		fprintf(stderr, "Cannot open %s, %m\n", backup_file);
-		ret = EXIT_FAILURE;
-		goto out;
-	}
 
 	if ((!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) ||
 	    (!vdi_cmd_data.from_snapshot_id &&
@@ -1660,10 +1644,10 @@ static int vdi_backup(int argc, char **argv)
 
 	nr_objs = DIV_ROUND_UP(to_inode->vdi_size, SD_DATA_OBJ_SIZE);
 
-	ret = lseek(fd, sizeof(hdr), SEEK_SET);
-	if (ret != sizeof(hdr)) {
-		fprintf(stderr, "failed to seek, %m\n");
-		ret = EXIT_FAILURE;
+	ret = xwrite(STDOUT_FILENO, &hdr, sizeof(hdr));
+	if (ret < 0) {
+		fprintf(stderr, "failed to write backup header, %m\n");
+		ret = EXIT_SYSFAIL;
 		goto out;
 	}
 
@@ -1678,18 +1662,38 @@ static int vdi_backup(int argc, char **argv)
 		if (ret != EXIT_SUCCESS)
 			goto out;
 
-		if (backup->length) {
-			hdr.nr_obj_backups++;
-			xwrite(fd, backup, sizeof(*backup) - sizeof(backup->data));
-			xwrite(fd, backup->data + backup->offset, backup->length);
+		if (backup->length == 0)
+			continue;
+
+		ret = xwrite(STDOUT_FILENO, backup,
+			     sizeof(*backup) - sizeof(backup->data));
+		if (ret < 0) {
+			fprintf(stderr, "failed to write backup data, %m\n");
+			ret = EXIT_SYSFAIL;
+			goto out;
+		}
+		ret = xwrite(STDOUT_FILENO, backup->data + backup->offset,
+			     backup->length);
+		if (ret < 0) {
+			fprintf(stderr, "failed to write backup data, %m\n");
+			ret = EXIT_SYSFAIL;
+			goto out;
 		}
 	}
 
-	xpwrite(fd, &hdr, sizeof(hdr), 0);
-out:
-	if (fd >= 0)
-		close(fd);
+	/* write end marker */
+	memset(backup, 0, sizeof(*backup) - sizeof(backup->data));
+	backup->idx = UINT32_MAX;
+	ret = xwrite(STDOUT_FILENO, backup,
+		     sizeof(*backup) - sizeof(backup->data));
+	if (ret < 0) {
+		fprintf(stderr, "failed to write end marker, %m\n");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
 
+	fsync(STDOUT_FILENO);
+out:
 	free(from_inode);
 	free(to_inode);
 	free(backup);
@@ -1719,30 +1723,23 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 			       0, parent_inode->nr_copies, 0);
 }
 
-static uint32_t do_restore(char *vdiname, int snapid, const char *tag,
-			   const char *backup_file)
+static uint32_t do_restore(char *vdiname, int snapid, const char *tag)
 {
-	int fd, i, ret;
+	int ret;
 	uint32_t vid;
 	struct backup_hdr hdr;
 	struct obj_backup *backup = xzalloc(sizeof(*backup));
 	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
 
-	printf("restoring %s... ", backup_file);
-
-	fd = open(backup_file, O_RDONLY);
-	if (fd < 0) {
-		printf("Cannot open the backup file\n");
-		ret = EXIT_FAILURE;
-		goto out;
+	ret = xread(STDIN_FILENO, &hdr, sizeof(hdr));
+	if (ret != sizeof(hdr)) {
+		fprintf(stderr, "failed to read backup header, %m\n");
 	}
-
-	xread(fd, &hdr, sizeof(hdr));
 
 	if (hdr.version != VDI_BACKUP_FORMAT_VERSION ||
 	    hdr.magic != VDI_BACKUP_MAGIC) {
-		printf("The backup file is corrupted\n");
-		ret = EXIT_FAILURE;
+		fprintf(stderr, "The backup file is corrupted\n");
+		ret = EXIT_SYSFAIL;
 		goto out;
 	}
 
@@ -1753,25 +1750,39 @@ static uint32_t do_restore(char *vdiname, int snapid, const char *tag,
 	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid, 1,
 			    inode->nr_copies);
 	if (ret != EXIT_SUCCESS) {
-		printf("Failed to read VDI\n");
+		fprintf(stderr, "Failed to read VDI\n");
 		goto out;
 	}
 
-	for (i = 0; i < hdr.nr_obj_backups; i++) {
-		xread(fd, backup, sizeof(*backup) - sizeof(backup->data));
-		xread(fd, backup->data, backup->length);
+	while (true) {
+		ret = xread(STDIN_FILENO, backup,
+			    sizeof(*backup) - sizeof(backup->data));
+		if (ret != sizeof(*backup) - sizeof(backup->data)) {
+			fprintf(stderr, "failed to read backup data\n");
+			ret = EXIT_SYSFAIL;
+			break;
+		}
+
+		if (backup->idx == UINT32_MAX) {
+			ret = EXIT_SUCCESS;
+			break;
+		}
+
+		ret = xread(STDIN_FILENO, backup->data, backup->length);
+		if (ret != backup->length) {
+			fprintf(stderr, "failed to read backup data\n");
+			ret = EXIT_SYSFAIL;
+			break;
+		}
 
 		ret = restore_obj(backup, vid, inode);
 		if (ret != SD_RES_SUCCESS) {
-			printf("error\n");
+			fprintf(stderr, "failed to restore backup\n");
 			do_vdi_delete(vdiname, 0, NULL);
 			ret = EXIT_FAILURE;
-			goto out;
+			break;
 		}
 	}
-
-	ret = EXIT_SUCCESS;
-	printf("done\n");
 out:
 	free(backup);
 	free(inode);
@@ -1781,19 +1792,12 @@ out:
 
 static int vdi_restore(int argc, char **argv)
 {
-	char *vdiname = argv[optind++], *backup_file;
+	char *vdiname = argv[optind++];
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE] = {0};
 	struct sheepdog_inode *current_inode = xzalloc(sizeof(*current_inode));
 	struct sheepdog_inode *parent_inode = (struct sheepdog_inode *)buf;
 	bool need_current_recovery = false;
-
-	backup_file = argv[optind++];
-	if (!backup_file) {
-		fprintf(stderr, "Please specify a backup to be restored\n");
-		ret = EXIT_USAGE;
-		goto out;
-	}
 
 	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
 		fprintf(stderr, "We can restore a backup file only to"
@@ -1827,7 +1831,7 @@ static int vdi_restore(int argc, char **argv)
 
 	/* restore backup data */
 	ret = do_restore(vdiname, vdi_cmd_data.snapshot_id,
-			 vdi_cmd_data.snapshot_tag, backup_file);
+			 vdi_cmd_data.snapshot_tag);
 out:
 	if (need_current_recovery) {
 		int recovery_ret;

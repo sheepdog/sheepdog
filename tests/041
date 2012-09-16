@@ -44,24 +44,24 @@ for i in `seq 1 3`; do
 done
 
 # create backup files between snapshots
-$COLLIE vdi backup test -F snap1 -s snap2 /tmp/backup.1.2
-$COLLIE vdi backup test -F snap1 -s snap3 /tmp/backup.1.3
-$COLLIE vdi backup test -F snap2 -s snap3 /tmp/backup.2.3
+$COLLIE vdi backup test -F snap1 -s snap2 > /tmp/backup.1.2
+$COLLIE vdi backup test -F snap1 -s snap3 > /tmp/backup.1.3
+$COLLIE vdi backup test -F snap2 -s snap3 > /tmp/backup.2.3
 
 # restore backups
-$COLLIE vdi restore test -s snap1 /tmp/backup.1.2
+$COLLIE vdi restore test -s snap1 < /tmp/backup.1.2
 $COLLIE vdi list | _filter_short_date
 $COLLIE vdi tree | _filter_short_date
 
-$COLLIE vdi restore test -s 4 /tmp/backup.2.3
+$COLLIE vdi restore test -s 4 < /tmp/backup.2.3
 $COLLIE vdi list | _filter_short_date
 $COLLIE vdi tree | _filter_short_date
 
-$COLLIE vdi restore test -s snap1 /tmp/backup.1.3
+$COLLIE vdi restore test -s snap1 < /tmp/backup.1.3
 $COLLIE vdi list | _filter_short_date
 $COLLIE vdi tree | _filter_short_date
 
-$COLLIE vdi restore test -s snap2 /tmp/backup.2.3
+$COLLIE vdi restore test -s snap2 < /tmp/backup.2.3
 $COLLIE vdi list | _filter_short_date
 $COLLIE vdi tree | _filter_short_date
 
