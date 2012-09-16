@@ -1,0 +1,146 @@
+QA output created by 042
+using backend farm store
+Failed to write object fd34af00000000: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000000: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000001: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000001: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000002: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000002: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000003: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000003: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000004: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000004: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000005: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000005: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000006: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000006: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000007: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000007: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000008: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000008: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af00000009: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc00000009: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd34af0000000a: Server has no space for new objects
+Failed to write VDI
+Failed to write object fd32fc0000000a: Server has no space for new objects
+Failed to write VDI
+Failed to create VDI test2: Failed to write to requested VDI
+Failed to create VDI test3: Failed to write to requested VDI
+Id	Size	Used	Use%
+ 0	1.0 TB	96 MB	  0%
+ 1	1.0 TB	80 MB	  0%
+ 2	1.0 TB	0.0 MB	  0%
+ 3	1.0 TB	8.0 MB	  0%
+Total	4.0 TB	184 MB	  0%
+
+Total virtual image size	200 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	64          0
+-    1   127.0.0.1:7001      	64          1
+-    2   127.0.0.1:7002      	64          2
+-    3   127.0.0.1:7003      	64          3
+Id	Size	Used	Use%
+ 0	1.0 TB	96 MB	  0%
+ 1	1.0 TB	80 MB	  0%
+ 2	1.0 TB	0.0 MB	  0%
+ 3	1.0 TB	8.0 MB	  0%
+Total	4.0 TB	184 MB	  0%
+
+Total virtual image size	200 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	64          0
+-    1   127.0.0.1:7001      	64          1
+-    2   127.0.0.1:7002      	64          2
+-    3   127.0.0.1:7003      	64          3
+Id	Size	Used	Use%
+ 0	1.0 TB	96 MB	  0%
+ 1	1.0 TB	80 MB	  0%
+ 2	1.0 TB	0.0 MB	  0%
+ 3	1.0 TB	8.0 MB	  0%
+Total	4.0 TB	184 MB	  0%
+
+Total virtual image size	200 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	64          0
+-    1   127.0.0.1:7001      	64          1
+-    2   127.0.0.1:7002      	64          2
+-    3   127.0.0.1:7003      	64          3
+Id	Size	Used	Use%
+ 0	1.0 TB	96 MB	  0%
+ 1	1.0 TB	80 MB	  0%
+ 2	1.0 TB	0.0 MB	  0%
+ 3	1.0 TB	8.0 MB	  0%
+Total	4.0 TB	184 MB	  0%
+
+Total virtual image size	200 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	64          0
+-    1   127.0.0.1:7001      	64          1
+-    2   127.0.0.1:7002      	64          2
+-    3   127.0.0.1:7003      	64          3
+/tmp/sheepdog/0/obj/00fd32fc00000000
+/tmp/sheepdog/0/obj/00fd32fc00000001
+/tmp/sheepdog/0/obj/00fd32fc00000002
+/tmp/sheepdog/0/obj/00fd32fc00000003
+/tmp/sheepdog/0/obj/00fd32fc00000004
+/tmp/sheepdog/0/obj/00fd32fc00000005
+/tmp/sheepdog/0/obj/00fd32fc00000006
+/tmp/sheepdog/0/obj/00fd32fc00000007
+/tmp/sheepdog/0/obj/00fd32fc00000008
+/tmp/sheepdog/0/obj/00fd32fc00000009
+/tmp/sheepdog/0/obj/00fd32fc0000000a
+/tmp/sheepdog/0/obj/00fd34af00000000
+/tmp/sheepdog/0/obj/00fd34af00000001
+/tmp/sheepdog/0/obj/00fd34af00000002
+/tmp/sheepdog/0/obj/00fd34af00000003
+/tmp/sheepdog/0/obj/00fd34af00000004
+/tmp/sheepdog/0/obj/00fd34af00000005
+/tmp/sheepdog/0/obj/00fd34af00000006
+/tmp/sheepdog/0/obj/00fd34af00000007
+/tmp/sheepdog/0/obj/00fd34af00000008
+/tmp/sheepdog/0/obj/00fd34af0000000a
+/tmp/sheepdog/0/obj/80fd32fc00000000
+/tmp/sheepdog/0/obj/80fd34af00000000
+/tmp/sheepdog/0/obj/80fd381500000000
+/tmp/sheepdog/1/obj/00fd32fc00000000
+/tmp/sheepdog/1/obj/00fd32fc00000001
+/tmp/sheepdog/1/obj/00fd32fc00000002
+/tmp/sheepdog/1/obj/00fd32fc00000003
+/tmp/sheepdog/1/obj/00fd32fc00000005
+/tmp/sheepdog/1/obj/00fd32fc00000006
+/tmp/sheepdog/1/obj/00fd32fc00000007
+/tmp/sheepdog/1/obj/00fd32fc00000008
+/tmp/sheepdog/1/obj/00fd34af00000000
+/tmp/sheepdog/1/obj/00fd34af00000001
+/tmp/sheepdog/1/obj/00fd34af00000002
+/tmp/sheepdog/1/obj/00fd34af00000003
+/tmp/sheepdog/1/obj/00fd34af00000004
+/tmp/sheepdog/1/obj/00fd34af00000006
+/tmp/sheepdog/1/obj/00fd34af00000009
+/tmp/sheepdog/1/obj/00fd34af0000000a
+/tmp/sheepdog/1/obj/80fd32fc00000000
+/tmp/sheepdog/1/obj/80fd34af00000000
+/tmp/sheepdog/1/obj/80fd366200000000
+/tmp/sheepdog/1/obj/80fd381500000000
+/tmp/sheepdog/3/obj/80fd32fc00000000
+/tmp/sheepdog/3/obj/80fd34af00000000
