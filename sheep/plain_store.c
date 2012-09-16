@@ -362,6 +362,8 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 	dprintf("%"PRIx64"\n", oid);
 	ret = SD_RES_SUCCESS;
 out:
+	if (ret != SD_RES_SUCCESS)
+		unlink(tmp_path);
 	close(fd);
 	return ret;
 }
