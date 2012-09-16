@@ -123,6 +123,8 @@ _cleanup()
     _kill_all_collies
     _kill_all_sheeps
 
+    _cleanup_devices
+
     mkdir -p $STORE
     for i in $STORE/?; do
         rm -rf $i
@@ -284,6 +286,49 @@ _cleanup_machine_simulation()
 {
 	iptables -D INPUT -p tcp --sport $((7000+$1)) -j DROP
 	iptables -D INPUT -p tcp --dport $((7000+$1)) -j DROP
+}
+
+_make_device()
+{
+    idx=$1; shift
+    size=$1; shift
+    args=$@
+
+    dd if=/dev/zero of=$STORE/$idx.img seek=$(($size - 1)) bs=1 count=1 > $seq.full 2>&1
+    if [ $? != 0 ]; then
+        _die "failed to create $STORE/$idx.img"
+    fi
+
+    fstype="$(df -T / | tail -1 | awk '{print $2}')"
+    case $fstype in
+        ext2)
+            mkops="-t $fstype -q -F"
+            mntops="-o user_xattr"
+            ;;
+        ext[3-4])
+            mkops="-t $fstype -q -F -J size=4"
+            mntops="-o user_xattr"
+            ;;
+        xfs)
+            mkops="-t $fstype -f"
+            mntops=""
+            ;;
+        *)
+            _die  "For now we only support xfs and ext*."
+            ;;
+    esac
+
+    mkfs $mkops $STORE/$idx.img > $seq.full
+    mkdir $STORE/$idx
+    mount -o loop $mntops $args $STORE/$idx.img $STORE/$idx
+}
+
+_cleanup_devices()
+{
+    for d in `mount | grep -o $STORE/.`; do
+        umount -l $d
+        rm -f $d.img
+    done
 }
 
 # make sure this script returns success
