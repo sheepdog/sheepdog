@@ -429,6 +429,12 @@ static struct request *alloc_local_request(void *data, int data_length)
 	return req;
 }
 
+static void free_local_request(struct request *req)
+{
+	put_vnode_info(req->vinfo);
+	free(req);
+}
+
 /*
  * Exec the request locally and synchronously.
  *
@@ -461,7 +467,7 @@ again:
 
 	close(req->wait_efd);
 	ret = req->rp.result;
-	free(req);
+	free_local_request(req);
 
 	return ret;
 }
