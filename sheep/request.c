@@ -51,6 +51,8 @@ static void io_op_done(struct work *work)
 
 		eprintf("leaving sheepdog cluster\n");
 		leave_cluster();
+		/* TODO: make this node work as a gateway */
+		exit(1);
 	}
 
 	put_request(req);
@@ -90,6 +92,8 @@ static void gateway_op_done(struct work *work)
 		if (is_access_local(req, hdr->obj.oid)) {
 			eprintf("leaving sheepdog cluster\n");
 			leave_cluster();
+			/* TODO: make this node work as a gateway */
+			exit(1);
 			goto retry;
 		}
 		break;
