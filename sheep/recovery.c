@@ -70,16 +70,16 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 	struct siocb iocb = { 0 };
 
 	rlen = get_objsize(oid);
-	buf = valloc(rlen);
-	if (!buf) {
-		eprintf("%m\n");
-		goto out;
-	}
-
 	if (vnode_is_local(vnode)) {
 		iocb.epoch = epoch;
 		iocb.length = rlen;
 		ret = sd_store->link(oid, &iocb, tgt_epoch);
+		goto out;
+	}
+
+	buf = valloc(rlen);
+	if (!buf) {
+		eprintf("%m\n");
 		goto out;
 	}
 
