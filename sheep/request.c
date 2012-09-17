@@ -46,13 +46,19 @@ static void io_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 
-	if (req->rp.result == SD_RES_EIO) {
+	switch (req->rp.result) {
+	case SD_RES_EIO:
 		req->rp.result = SD_RES_NETWORK_ERROR;
 
 		eprintf("leaving sheepdog cluster\n");
 		leave_cluster();
-		/* TODO: make this node work as a gateway */
-		exit(1);
+		break;
+	case SD_RES_SUCCESS:
+		break;
+	default:
+		dprintf("unhandled error %d\n", req->rp.result);
+		break;
+
 	}
 
 	put_request(req);
@@ -92,12 +98,13 @@ static void gateway_op_done(struct work *work)
 		if (is_access_local(req, hdr->obj.oid)) {
 			eprintf("leaving sheepdog cluster\n");
 			leave_cluster();
-			/* TODO: make this node work as a gateway */
-			exit(1);
 			goto retry;
 		}
 		break;
 	case SD_RES_SUCCESS:
+		break;
+	default:
+		dprintf("unhandled error %d\n", req->rp.result);
 		break;
 	}
 
