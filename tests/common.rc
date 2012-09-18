@@ -318,7 +318,7 @@ _make_device()
             ;;
     esac
 
-    mkfs $mkops $STORE/$idx.img > $seq.full
+    mkfs $mkops $STORE/$idx.img > $seq.full 2>&1
     mkdir $STORE/$idx
     mount -o loop $mntops $args $STORE/$idx.img $STORE/$idx
 }
