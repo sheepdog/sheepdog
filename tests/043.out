@@ -1,0 +1,125 @@
+QA output created by 043
+using backend farm store
+e6fffdc037c9f623d1c03fda7ef9cabf  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+e6fffdc037c9f623d1c03fda7ef9cabf  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+e6fffdc037c9f623d1c03fda7ef9cabf  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+e6fffdc037c9f623d1c03fda7ef9cabf  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+e6fffdc037c9f623d1c03fda7ef9cabf  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+c2f72711cc1e4781841aa416f0b43e0d  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+c2f72711cc1e4781841aa416f0b43e0d  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+c2f72711cc1e4781841aa416f0b43e0d  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+c2f72711cc1e4781841aa416f0b43e0d  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+c2f72711cc1e4781841aa416f0b43e0d  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+99970159bd855e83ced168eca46ae6c5  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+99970159bd855e83ced168eca46ae6c5  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+99970159bd855e83ced168eca46ae6c5  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+99970159bd855e83ced168eca46ae6c5  -
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   40 MB   40 MB  0.0 MB DATE   7c2b25     3              
+  test2        1   20 MB  0.0 MB  0.0 MB DATE   fd3815     3              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   40 MB   40 MB  0.0 MB DATE   7c2b25     3              
+  test2        1   20 MB  0.0 MB  0.0 MB DATE   fd3815     3              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   40 MB   40 MB  0.0 MB DATE   7c2b25     3              
+  test2        1   20 MB  0.0 MB  0.0 MB DATE   fd3815     3              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   40 MB   40 MB  0.0 MB DATE   7c2b25     3              
+  test2        1   20 MB  0.0 MB  0.0 MB DATE   fd3815     3              
