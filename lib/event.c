@@ -107,6 +107,7 @@ int register_event(int fd, event_handler_t h, void *data)
 	ei->handler = h;
 	ei->data = data;
 
+	memset(&ev, 0, sizeof(ev));
 	ev.events = EPOLLIN;
 	ev.data.ptr = ei;
 
