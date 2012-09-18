@@ -120,7 +120,7 @@ struct cluster_info {
 #define CACHE_TYPE_DISK   0x2
 	int enabled_cache_type;
 
-	uint64_t object_cache_size;
+	uint32_t object_cache_size;
 	bool object_cache_directio;
 
 	bool use_journal;

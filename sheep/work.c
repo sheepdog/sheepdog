@@ -62,7 +62,7 @@ static void *run_short_thread(void *arg)
 {
 	struct short_work *sw = arg;
 	eventfd_t value = 1;
-	static uint64_t idx = 0;
+	static unsigned long idx = 0;
 	int err;
 
 	/* Tell runtime to release resources after termination */

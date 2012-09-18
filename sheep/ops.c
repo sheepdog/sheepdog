@@ -614,7 +614,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
 				  void *data)
 {
-	int cache_size = *(int *)data;
+	uint32_t cache_size = *(uint32_t *)data;
 
 	uatomic_set(&sys->object_cache_size, cache_size);
 	dprintf("Max cache size set to %dM\n", cache_size);

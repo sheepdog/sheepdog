@@ -143,7 +143,8 @@ static int node_recovery(int argc, char **argv)
 static int node_cache(int argc, char **argv)
 {
 	char *p;
-	int fd, ret, cache_size;
+	int fd, ret;
+	uint32_t cache_size;
 	unsigned int wlen, rlen = 0;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
