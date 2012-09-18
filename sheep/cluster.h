@@ -76,7 +76,9 @@ struct cluster_driver {
 	 * Leave the cluster
 	 *
 	 * This function is used to leave the cluster, and notifies a
-	 * leave event to all the nodes.
+	 * leave event to all the nodes.  The cluster driver calls event
+	 * handlers even after this function is called, so the left node can
+	 * work as a gateway.
 	 *
 	 * Returns zero on success, -1 on error
 	 */
