@@ -66,7 +66,7 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 	struct sd_req hdr;
 	unsigned wlen = 0, rlen;
 	int ret = SD_RES_NO_MEM;
-	void *buf;
+	void *buf = NULL;
 	struct siocb iocb = { 0 };
 
 	rlen = get_objsize(oid);
