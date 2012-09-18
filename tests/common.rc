@@ -325,7 +325,7 @@ _make_device()
 
 _cleanup_devices()
 {
-    for d in `mount | grep -o $STORE/.`; do
+    for d in `mount | grep -o $STORE/. | sort | uniq`; do
         umount -l $d
         rm -f $d.img
     done
