@@ -1,0 +1,81 @@
+#!/bin/bash
+
+# Test vdi snapshot functionality concurrently with object cache enabled
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+    _start_sheep $i '-s 4096 -w object:size=1000'
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format
+$COLLIE vdi create base1 20M -p 7000
+$COLLIE vdi create base2 20M -p 7001
+$COLLIE vdi create base3 20M -p 7002
+
+for i in `seq 0 4`; do
+    echo $i | $COLLIE vdi write base1 $((i * 4 * 1024 * 1024)) 512
+done &
+
+for i in `seq 0 4`; do
+    echo $i | $COLLIE vdi write base2 $((i * 4 * 1024 * 1024)) 512
+done &
+
+for i in `seq 0 4`; do
+    echo $i | $COLLIE vdi write base3 $((i * 4 * 1024 * 1024)) 512
+done &
+
+wait
+
+$COLLIE vdi snapshot -s snap0 base1 -p 7000
+$COLLIE vdi snapshot -s snap0 base2 -p 7001
+$COLLIE vdi snapshot -s snap0 base3 -p 7002
+sleep 1
+
+for i in `seq 1 10`; do
+	$COLLIE vdi snapshot -s snap$i base1 -p 7000
+	$COLLIE vdi delete -s snap$(($i - 1)) base1 -p 7000
+	sleep 1
+done &
+
+for i in `seq 1 10`; do
+	$COLLIE vdi snapshot -s snap$i base2 -p 7001
+	$COLLIE vdi delete -s snap$(($i - 1)) base2 -p 7001
+	sleep 1
+done &
+
+for i in `seq 1 10`; do
+	$COLLIE vdi snapshot -s snap$i base3 -p 7002
+	$COLLIE vdi delete -s snap$(($i - 1)) base3 -p 7002
+	sleep 1
+done &
+
+wait
+
+$COLLIE vdi delete base1 -p 7000
+$COLLIE vdi delete base2 -p 7001
+$COLLIE vdi delete base3 -p 7002
+$COLLIE vdi delete -s snap10 base1 -p 7000
+$COLLIE vdi delete -s snap10 base2 -p 7001
+$COLLIE vdi delete -s snap10 base3 -p 7002
+
+echo there should be no vdi
+$COLLIE vdi list
+
+echo there should be no object
+$COLLIE node info
+
+find $STORE/*/cache -type f | sort
