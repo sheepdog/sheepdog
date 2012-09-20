@@ -345,7 +345,7 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 			goto out;
 	}
 
-	ret = xwrite(fd, iocb->buf, len);
+	ret = xpwrite(fd, iocb->buf, len, iocb->offset);
 	if (ret != len) {
 		eprintf("failed to write object. %m\n");
 		ret = err_to_sderr(oid, errno);
