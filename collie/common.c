@@ -43,7 +43,7 @@ char *size_to_str(uint64_t _size, char *str, int str_size)
 }
 
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
-		   uint64_t offset)
+		   uint64_t offset, bool direct)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -61,6 +61,8 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
+	if (direct)
+		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
 	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
 	close(fd);
@@ -79,8 +81,9 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	return SD_RES_SUCCESS;
 }
 
-int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int datalen,
-		    uint64_t offset, uint32_t flags, int copies, int create)
+int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
+		    unsigned int datalen, uint64_t offset, uint32_t flags,
+		    int copies, int create, bool direct)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -102,6 +105,8 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int dat
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 	if (cow_oid)
 		hdr.flags |= SD_FLAG_CMD_COW;
+	if (direct)
+		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
 	hdr.obj.copies = copies;
 	hdr.obj.oid = oid;
@@ -166,7 +171,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 		oid = vid_to_vdi_oid(vc[nr].vid);
 
 		memset(&i, 0, sizeof(i));
-		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0);
+		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			fprintf(stderr, "Failed to read inode header\n");
 			continue;
@@ -182,7 +187,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 				rlen = size - SD_INODE_HEADER_SIZE;
 
 			ret = sd_read_object(oid, ((char *)&i) + SD_INODE_HEADER_SIZE,
-					     rlen, SD_INODE_HEADER_SIZE);
+					     rlen, SD_INODE_HEADER_SIZE, true);
 
 			if (ret != SD_RES_SUCCESS) {
 				fprintf(stderr, "Failed to read inode\n");

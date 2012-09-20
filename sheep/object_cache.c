@@ -940,6 +940,27 @@ int bypass_object_cache(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
+	if (req->rq.flags & SD_FLAG_CMD_DIRECT) {
+		uint32_t vid = oid_to_vid(oid);
+		struct object_cache *cache;
+
+		cache = find_object_cache(vid, 0);
+		if (!cache)
+			return 1;
+		if (req->rq.flags & SD_FLAG_CMD_WRITE) {
+			object_cache_flush_and_delete(cache);
+			return 1;
+		} else  {
+			/* For read requet, we can read cache if any */
+			uint32_t idx = object_cache_oid_to_idx(oid);
+
+			if (object_cache_lookup(cache, idx, 0, false) == 0)
+				return 0;
+			else
+				return 1;
+		}
+	}
+
 	/*
 	 * For vmstate && vdi_attr object, we don't do caching
 	 */

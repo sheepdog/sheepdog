@@ -72,9 +72,10 @@ typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, char *tag,
 				  struct sheepdog_inode *i, void *data);
 int parse_vdi(vdi_parser_func_t func, size_t size, void *data);
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
-		   uint64_t offset);
-int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data, unsigned int datalen,
-		    uint64_t offset, uint32_t flags, int copies, int create);
+		   uint64_t offset, bool direct);
+int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
+		    unsigned int datalen, uint64_t offset, uint32_t flags,
+		    int copies, int create, bool direct);
 int send_light_req(struct sd_req *hdr, const char *host, int port);
 int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
 
