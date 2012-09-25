@@ -51,13 +51,14 @@ static struct option const long_options[] = {
 	{"stdout", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{"disk-space", required_argument, NULL, 's'},
+	{"upgrade", no_argument, NULL, 'u'},
 	{"zone", required_argument, NULL, 'z'},
 	{"pidfile", required_argument, NULL, 'P'},
 	{"write-cache", required_argument, NULL, 'w'},
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "b:c:dDfghjl:op:P:s:w:y:z:";
+static const char *short_options = "b:c:dDfghjl:op:P:s:uw:y:z:";
 
 static void usage(int status)
 {
@@ -81,6 +82,7 @@ Options:\n\
   -p, --port              specify the TCP port on which to listen\n\
   -P, --pidfile           create a pid file\n\
   -s, --disk-space        specify the free disk space in megabytes\n\
+  -u, --upgrade           upgrade to the latest data layout\n\
   -y, --myaddr            specify the address advertised to other sheep\n\
   -z, --zone              specify the zone id\n\
   -w, --write-cache       specify the cache type\n\
@@ -401,6 +403,9 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			sys->disk_space = free_space * 1024 * 1024;
+			break;
+		case 'u':
+			sys->upgrade = true;
 			break;
 		case 'c':
 			sys->cdrv = find_cdrv(optarg);

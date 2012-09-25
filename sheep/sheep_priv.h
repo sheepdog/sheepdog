@@ -124,6 +124,8 @@ struct cluster_info {
 	bool object_cache_directio;
 
 	bool use_journal;
+	bool upgrade; /* upgrade data layout before starting service
+		       * if necessary*/
 };
 
 struct siocb {
@@ -385,6 +387,9 @@ int object_cache_flush_and_del(struct request *req);
 void object_cache_delete(uint32_t vid);
 int object_cache_init(const char *p);
 void object_cache_remove(uint64_t oid);
+
+/* store layout migration */
+int sd_migrate_store(int from, int to);
 
 /* sockfd_cache */
 struct sockfd {

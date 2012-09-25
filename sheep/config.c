@@ -29,7 +29,7 @@ static struct sheepdog_config {
 	uint64_t space;
 } config;
 
-static char *config_path;
+char *config_path;
 
 #define CONFIG_PATH "/config"
 
@@ -94,6 +94,13 @@ int init_config_path(const char *base_path)
 	if (config.version != SD_FORMAT_VERSION) {
 		eprintf("This sheep version is not compatible with the existing "
 			"data layout, %d\n", config.version);
+		if (sys->upgrade) {
+			/* upgrade sheep store */
+			ret = sd_migrate_store(config.version, SD_FORMAT_VERSION);
+			goto out;
+		}
+
+		eprintf("use '-u' option to upgrade sheep store\n");
 		ret = -1;
 		goto out;
 	}
