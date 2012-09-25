@@ -28,20 +28,10 @@
 #include "util.h"
 #include "farm/farm.h"
 
-struct sheepdog_config {
-	uint64_t ctime;
-	uint16_t flags;
-	uint8_t copies;
-	uint8_t store[STORE_LEN];
-	uint8_t __pad[5];
-	uint64_t space;
-};
-
 char *obj_path;
 char *mnt_path;
 char *jrnl_path;
 char *epoch_path;
-static char *config_path;
 
 mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
@@ -173,52 +163,6 @@ uint32_t get_latest_epoch(void)
 	closedir(dir);
 
 	return epoch;
-}
-
-int set_cluster_ctime(uint64_t ct)
-{
-	int fd, ret;
-	void *jd;
-
-	fd = open(config_path, O_DSYNC | O_WRONLY);
-	if (fd < 0)
-		return SD_RES_EIO;
-
-	jd = jrnl_begin(&ct, sizeof(ct),
-			offsetof(struct sheepdog_config, ctime),
-			config_path, jrnl_path);
-	if (!jd) {
-		ret = SD_RES_EIO;
-		goto err;
-	}
-	ret = xpwrite(fd, &ct, sizeof(ct), offsetof(struct sheepdog_config, ctime));
-	if (ret != sizeof(ct))
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-
-	jrnl_end(jd);
-err:
-	close(fd);
-	return ret;
-}
-
-uint64_t get_cluster_ctime(void)
-{
-	int fd, ret;
-	uint64_t ct;
-
-	fd = open(config_path, O_RDONLY);
-	if (fd < 0)
-		return 0;
-
-	ret = xpread(fd, &ct, sizeof(ct),
-		     offsetof(struct sheepdog_config, ctime));
-	close(fd);
-
-	if (ret != sizeof(ct))
-		return 0;
-	return ct;
 }
 
 static int init_path(const char *d, int *new)
@@ -384,18 +328,6 @@ static int init_jrnl_path(const char *base_path)
 		return 0;
 
 	jrnl_recover(jrnl_path);
-
-	return 0;
-}
-
-#define CONFIG_PATH "/config"
-
-static int init_config_path(const char *base_path)
-{
-	config_path = zalloc(strlen(base_path) + strlen(CONFIG_PATH) + 1);
-	sprintf(config_path, "%s" CONFIG_PATH, base_path);
-
-	mknod(config_path, def_fmode, S_IFREG);
 
 	return 0;
 }
@@ -611,200 +543,5 @@ int remove_object(uint64_t oid, int copies)
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to remove object %" PRIx64 ", %x\n", oid, ret);
 
-	return ret;
-}
-
-int set_cluster_copies(uint8_t copies)
-{
-	int fd, ret;
-	void *jd;
-
-	fd = open(config_path, O_DSYNC | O_WRONLY);
-	if (fd < 0)
-		return SD_RES_EIO;
-
-	jd = jrnl_begin(&copies, sizeof(copies),
-			offsetof(struct sheepdog_config, copies),
-			config_path, jrnl_path);
-	if (!jd) {
-		ret = SD_RES_EIO;
-		goto err;
-	}
-
-	ret = xpwrite(fd, &copies, sizeof(copies), offsetof(struct sheepdog_config, copies));
-	if (ret != sizeof(copies))
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-	jrnl_end(jd);
-err:
-	close(fd);
-	return ret;
-}
-
-int get_cluster_copies(uint8_t *copies)
-{
-	int fd, ret;
-
-	fd = open(config_path, O_RDONLY);
-	if (fd < 0)
-		return SD_RES_EIO;
-
-	ret = xpread(fd, copies, sizeof(*copies),
-		     offsetof(struct sheepdog_config, copies));
-	close(fd);
-
-	if (ret != sizeof(*copies))
-		return SD_RES_EIO;
-
-	return SD_RES_SUCCESS;
-}
-
-int set_cluster_flags(uint16_t flags)
-{
-	int fd, ret = SD_RES_EIO;
-	void *jd;
-
-	fd = open(config_path, O_DSYNC | O_WRONLY);
-	if (fd < 0)
-		goto out;
-
-	jd = jrnl_begin(&flags, sizeof(flags),
-			offsetof(struct sheepdog_config, flags),
-			config_path, jrnl_path);
-	if (!jd) {
-		ret = SD_RES_EIO;
-		goto err;
-	}
-	ret = xpwrite(fd, &flags, sizeof(flags), offsetof(struct sheepdog_config, flags));
-	if (ret != sizeof(flags))
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-	jrnl_end(jd);
-err:
-	close(fd);
-out:
-	return ret;
-}
-
-int get_cluster_flags(uint16_t *flags)
-{
-	int fd, ret = SD_RES_EIO;
-
-	fd = open(config_path, O_RDONLY);
-	if (fd < 0)
-		goto out;
-
-	ret = xpread(fd, flags, sizeof(*flags),
-		     offsetof(struct sheepdog_config, flags));
-	if (ret != sizeof(*flags))
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-
-	close(fd);
-out:
-	return ret;
-}
-
-int set_cluster_store(const char *name)
-{
-	int fd, ret = SD_RES_EIO, len;
-	void *jd;
-
-	fd = open(config_path, O_DSYNC | O_WRONLY);
-	if (fd < 0)
-		goto out;
-
-	len = strlen(name) + 1;
-	if (len > STORE_LEN)
-		goto err;
-	jd = jrnl_begin(name, len,
-			offsetof(struct sheepdog_config, store),
-			config_path, jrnl_path);
-	if (!jd) {
-		ret = SD_RES_EIO;
-		goto err;
-	}
-	ret = xpwrite(fd, name, len, offsetof(struct sheepdog_config, store));
-	if (ret != len)
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-	jrnl_end(jd);
-err:
-	close(fd);
-out:
-	return ret;
-}
-
-int get_cluster_store(char *buf)
-{
-	int fd, ret = SD_RES_EIO;
-
-	fd = open(config_path, O_RDONLY);
-	if (fd < 0)
-		goto out;
-
-	ret = pread(fd, buf, STORE_LEN,
-		    offsetof(struct sheepdog_config, store));
-
-	if (ret == -1)
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-
-	close(fd);
-out:
-	return ret;
-}
-
-int set_cluster_space(uint64_t space)
-{
-	int fd, ret = SD_RES_EIO;
-	void *jd;
-
-	fd = open(config_path, O_DSYNC | O_WRONLY);
-	if (fd < 0)
-		goto out;
-
-	jd = jrnl_begin(&space, sizeof(space),
-			offsetof(struct sheepdog_config, space),
-			config_path, jrnl_path);
-	if (!jd) {
-		ret = SD_RES_EIO;
-		goto err;
-	}
-	ret = xpwrite(fd, &space, sizeof(space),
-		      offsetof(struct sheepdog_config, space));
-	if (ret != sizeof(space))
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-	jrnl_end(jd);
-err:
-	close(fd);
-out:
-	return ret;
-}
-
-int get_cluster_space(uint64_t *space)
-{
-	int fd, ret = SD_RES_EIO;
-
-	fd = open(config_path, O_RDONLY);
-	if (fd < 0)
-		goto out;
-
-	ret = xpread(fd, space, sizeof(*space),
-		     offsetof(struct sheepdog_config, space));
-	if (ret != sizeof(*space))
-		ret = SD_RES_EIO;
-	else
-		ret = SD_RES_SUCCESS;
-
-	close(fd);
-out:
 	return ret;
 }
