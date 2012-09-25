@@ -113,7 +113,8 @@ notrace int tx(struct connection *conn, enum conn_state next_state, int flags)
 	return ret;
 }
 
-int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
+int create_listen_ports(char *bindaddr, int port,
+		int (*callback)(int fd, void *), void *data)
 {
 	char servname[64];
 	int fd, ret, opt;
@@ -127,7 +128,7 @@ int create_listen_ports(int port, int (*callback)(int fd, void *), void *data)
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	ret = getaddrinfo(NULL, servname, &hints, &res0);
+	ret = getaddrinfo(bindaddr, servname, &hints, &res0);
 	if (ret) {
 		eprintf("failed to get address info: %m\n");
 		return 1;

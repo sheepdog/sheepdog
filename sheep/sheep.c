@@ -26,6 +26,7 @@
 #include <sys/eventfd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <arpa/inet.h>
 
 #include "sheep_priv.h"
 #include "trace/trace.h"
@@ -38,6 +39,7 @@ LIST_HEAD(cluster_drivers);
 static char program_name[] = "sheep";
 
 static struct option const long_options[] = {
+	{"bindaddr", required_argument, NULL, 'b'},
 	{"cluster", required_argument, NULL, 'c'},
 	{"debug", no_argument, NULL, 'd'},
 	{"foreground", no_argument, NULL, 'f'},
@@ -55,7 +57,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "c:dDfghjl:op:P:s:w:y:z:";
+static const char *short_options = "b:c:dDfghjl:op:P:s:w:y:z:";
 
 static void usage(int status)
 {
@@ -67,6 +69,7 @@ static void usage(int status)
 Sheepdog daemon (version %s)\n\
 Usage: %s [OPTION]... [PATH]\n\
 Options:\n\
+  -b, --bindaddr          specify IP address of interface to listen on\n\
   -c, --cluster           specify the cluster driver\n\
   -d, --debug             include debug messages in the log\n\
   -f, --foreground        make the program run in the foreground\n\
@@ -322,6 +325,10 @@ int main(int argc, char **argv)
 	char *p;
 	struct cluster_driver *cdrv;
 	char *pid_file = NULL;
+	char *bindaddr = NULL;
+	unsigned char buf[sizeof(struct in6_addr)];
+	int ipv4 = 0;
+	int ipv6 = 0;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -415,6 +422,18 @@ int main(int argc, char **argv)
 		case 'j':
 			sys->use_journal = true;
 			break;
+		case 'b':
+			/* validate provided address using inet_pton */
+			ipv4 = inet_pton(AF_INET, optarg, buf);
+			ipv6 = inet_pton(AF_INET6, optarg, buf);
+			if (ipv4 || ipv6) {
+				bindaddr = optarg;
+			} else {
+				fprintf(stderr,
+					"Invalid bind address '%s'\n", optarg);
+				exit(1);
+			}
+			break;
 		case 'h':
 			usage(0);
 			break;
@@ -454,7 +473,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = create_listen_port(port, sys);
+	ret = create_listen_port(bindaddr, port, sys);
 	if (ret)
 		exit(1);
 

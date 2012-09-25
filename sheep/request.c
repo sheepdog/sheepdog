@@ -876,9 +876,9 @@ static int create_listen_port_fn(int fd, void *data)
 	return register_event(fd, listen_handler, data);
 }
 
-int create_listen_port(int port, void *data)
+int create_listen_port(char *bindaddr, int port, void *data)
 {
-	return create_listen_ports(port, create_listen_port_fn, data);
+	return create_listen_ports(bindaddr, port, create_listen_port_fn, data);
 }
 
 static void req_handler(int listen_fd, int events, void *data)
