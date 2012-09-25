@@ -548,6 +548,7 @@ static void do_reclaim(struct work *work)
 		else
 			data_length = SD_DATA_OBJ_SIZE;
 
+		data_length = data_length / 1024 / 1024;
 		uatomic_sub(&sys_cache.cache_size, data_length);
 		free(entry);
 	}
@@ -644,6 +645,7 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
 		data_length = SD_INODE_SIZE;
 	else
 		data_length = SD_DATA_OBJ_SIZE;
+	data_length = data_length / 1024 / 1024;
 
 	entry = xzalloc(sizeof(*entry));
 	entry->oc = oc;

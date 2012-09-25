@@ -193,17 +193,17 @@ static void object_cache_size_set(char *s)
 	const char *header = "size=";
 	int len = strlen(header);
 	char *size, *p;
-	uint32_t cache_size;
-	const uint32_t max_cache_size = UINT32_MAX / 1024 / 1024;
+	uint64_t cache_size;
+	const uint32_t max_cache_size = UINT32_MAX;
 
 	assert(!strncmp(s, header, len));
 
 	size = s + len;
-	cache_size = strtol(size, &p, 10);
-	if (size == p || cache_size < 0 || max_cache_size < cache_size)
+	cache_size = strtoull(size, &p, 10);
+	if (size == p || max_cache_size < cache_size)
 		goto err;
 
-	sys->object_cache_size = cache_size * 1024 * 1024;
+	sys->object_cache_size = cache_size;
 	return;
 
 err:
