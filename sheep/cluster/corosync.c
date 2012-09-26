@@ -253,9 +253,11 @@ static int is_master(struct cpg_node *node)
 
 	for (i = 0; i < SD_MAX_NODES; i++) {
 		if (!cpg_nodes[i].gone)
-			break;
+			goto eq_check;
 	}
+	return -1;
 
+eq_check:
 	if (cpg_node_equal(&cpg_nodes[i], n))
 		return i;
 	return -1;
