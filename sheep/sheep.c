@@ -208,7 +208,7 @@ static void object_cache_size_set(char *s)
 
 err:
 	fprintf(stderr, "Invalid object cache option '%s': "
-		"size must be an integer between 0 and %"PRIu32"\n",
+		"size must be an integer between 1 and %"PRIu32" inclusive\n",
 		s, max_cache_size);
 	exit(1);
 }
@@ -295,11 +295,11 @@ static void do_cache_type(char *s)
 
 static void init_cache_type(char *arg)
 {
-	sys->object_cache_size = -1;
+	sys->object_cache_size = 0;
 
 	parse_arg(arg, ",", do_cache_type);
 
-	if (is_object_cache_enabled() && sys->object_cache_size == -1) {
+	if (is_object_cache_enabled() && sys->object_cache_size == 0) {
 		fprintf(stderr, "object cache size is not set\n");
 		exit(1);
 	}
