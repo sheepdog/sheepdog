@@ -64,6 +64,7 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 				       uint32_t epoch, uint32_t tgt_epoch)
 {
 	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned wlen = 0, rlen;
 	int ret = SD_RES_NO_MEM;
 	void *buf = NULL;
@@ -95,6 +96,7 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 		goto out;
 	iocb.epoch = epoch;
 	iocb.length = rlen;
+	iocb.offset = rsp->obj.offset;
 	iocb.buf = buf;
 	ret = sd_store->create_and_write(oid, &iocb);
 out:

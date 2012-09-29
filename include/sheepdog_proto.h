@@ -15,7 +15,10 @@
 #include <stdint.h>
 #include "util.h"
 
-#define SD_PROTO_VER 0x01
+#define SD_PROTO_VER 0x02
+
+/* This or later version supports trimming zero sectors from read response */
+#define SD_PROTO_VER_TRIM_ZERO_SECTORS 0x02
 
 #define SD_LISTEN_PORT 7000
 
@@ -97,7 +100,6 @@
 #define SD_NR_VDIS   (1U << 24)
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
-#define SECTOR_SIZE (1U << 9)
 
 #define SD_INODE_SIZE (sizeof(struct sheepdog_inode))
 #define SD_INODE_HEADER_SIZE (sizeof(struct sheepdog_inode) - \
@@ -144,6 +146,7 @@ struct sd_rsp {
 		struct {
 			uint32_t	__pad;
 			uint32_t	copies;
+			uint64_t	offset;
 		} obj;
 		struct {
 			uint32_t	__pad;

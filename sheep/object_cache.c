@@ -724,7 +724,8 @@ out:
 }
 
 static int create_cache_object(struct object_cache *oc, uint32_t idx,
-			       void *buffer, size_t buf_size)
+			       void *buffer, size_t buf_size, off_t offset,
+			       size_t obj_size)
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd;
 	int ret = SD_RES_OID_EXIST;
@@ -745,7 +746,16 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out;
 	}
 
-	ret = xpwrite(fd, buffer, buf_size, 0);
+	if (offset != 0 || buf_size != obj_size) {
+		ret = prealloc(fd, obj_size);
+		if (ret < 0) {
+			ret = SD_RES_EIO;
+			eprintf("%m\n");
+			goto out_close;
+		}
+	}
+
+	ret = xpwrite(fd, buffer, buf_size, offset);
 	if (ret != buf_size) {
 		ret = SD_RES_EIO;
 		eprintf("failed, vid %"PRIx32", idx %"PRIx32"\n", oc->vid, idx);
@@ -764,6 +774,7 @@ out:
 static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
 	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret = SD_RES_NO_MEM;
 	uint64_t oid;
 	uint32_t data_length;
@@ -791,7 +802,9 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 
 	if (ret == SD_RES_SUCCESS) {
 		dprintf("oid %"PRIx64" pulled successfully\n", oid);
-		ret = create_cache_object(oc, idx, buf, data_length);
+
+		ret = create_cache_object(oc, idx, buf, rsp->data_length,
+					  rsp->obj.offset, data_length);
 		if (ret == SD_RES_SUCCESS)
 			add_to_object_cache(oc, idx, 0);
 		else if (ret == SD_RES_OID_EXIST)

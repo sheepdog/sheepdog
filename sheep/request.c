@@ -338,7 +338,7 @@ static void queue_request(struct request *req)
 			goto done;
 		}
 	} else if (hdr->proto_ver) {
-		if (hdr->proto_ver != SD_PROTO_VER) {
+		if (hdr->proto_ver > SD_PROTO_VER) {
 			rsp->result = SD_RES_VER_MISMATCH;
 			goto done;
 		}
@@ -475,6 +475,9 @@ again:
 		eprintf("%m\n");
 		goto again;
 	}
+
+	/* fill rq with response header as exec_req does */
+	memcpy(rq, &req->rp, sizeof(req->rp));
 
 	close(req->wait_efd);
 	ret = req->rp.result;

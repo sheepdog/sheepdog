@@ -314,6 +314,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		if (ret)
 			fprintf(stderr, "Failed to connect to %s\n", name);
 		else {
+			set_trimmed_sectors(buf, rsp->obj.offset, rlen, size);
 			cb_ret = func(name, oid, rsp, buf, data);
 			if (cb_ret)
 				break;
@@ -1398,6 +1399,9 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 			sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
+
+	set_trimmed_sectors(buf, rsp->obj.offset, rlen, SD_DATA_OBJ_SIZE);
+
 	return buf;
 }
 

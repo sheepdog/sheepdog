@@ -493,6 +493,7 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, int nr_copies)
 {
 	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
 
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
@@ -504,6 +505,8 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
 		eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
+
+	set_trimmed_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
 
 	return ret;
 }

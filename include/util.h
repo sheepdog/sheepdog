@@ -12,6 +12,8 @@
 #include "list.h"
 #include "logger.h"
 
+#define SECTOR_SIZE (1U << 9)
+
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define roundup(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
 
@@ -76,6 +78,10 @@ extern ssize_t xwrite(int fd, const void *buf, size_t len);
 extern ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
 extern ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 extern int rmdir_r(char *dir_path);
+
+void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
+void set_trimmed_sectors(void *buf, uint64_t offset,uint32_t len,
+			 uint32_t requested_len);
 
 #ifdef assert
 #undef assert

@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <assert.h>
 
 #include "util.h"
 #include "logger.h"
@@ -261,4 +262,46 @@ int rmdir_r(char *dir_path)
 out:
 	closedir(dir);
 	return ret;
+}
+
+/* Trim zero sectors from the beginning and end of buffer */
+void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len)
+{
+	const uint8_t zero[SECTOR_SIZE] = {0};
+	uint8_t *p = buf;
+
+	assert(*offset == 0);
+
+	/* trim zero sectors from the beginning of buffer */
+	while (*len >= SECTOR_SIZE) {
+		if (memcmp(p + *offset, zero, SECTOR_SIZE) != 0)
+			break;
+
+		*offset += SECTOR_SIZE;
+		*len -= SECTOR_SIZE;
+	}
+	memmove(buf, p + *offset, *len);
+
+	/* trim zero sectors from the end of buffer */
+	while (*len >= SECTOR_SIZE) {
+		if (memcmp(p + *len - SECTOR_SIZE, zero, SECTOR_SIZE) != 0)
+			break;
+
+		*len -= SECTOR_SIZE;
+	}
+}
+
+/* Set trimmed zero sectors to the beginning and end of buffer */
+void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
+			 uint32_t requested_len)
+{
+	uint8_t *p = buf;
+
+	if (offset > 0) {
+		memmove(p + offset, buf, len);
+		memset(p, 0, offset);
+	}
+
+	if (offset + len < requested_len)
+		memset(p + offset + len, 0, requested_len- offset - len);
 }

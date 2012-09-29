@@ -718,6 +718,8 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 {
 	struct request read_req = { };
 	struct sd_req *hdr = &read_req.rq;
+	struct sd_rsp *rsp = &read_req.rp;
+	int ret;
 
 	/* Create a fake gateway read request */
 	sd_init_req(hdr, SD_OP_READ_OBJ);
@@ -732,7 +734,13 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	read_req.op = get_sd_op(hdr->opcode);
 	read_req.vinfo = req->vinfo;
 
-	return gateway_read_obj(&read_req);
+	ret = gateway_read_obj(&read_req);
+
+	if (ret == SD_RES_SUCCESS)
+		set_trimmed_sectors(buf, rsp->obj.offset, rsp->data_length,
+				    SD_DATA_OBJ_SIZE);
+
+	return ret;
 }
 
 int peer_remove_obj(struct request *req)
@@ -767,6 +775,13 @@ int peer_read_obj(struct request *req)
 		goto out;
 
 	rsp->data_length = hdr->data_length;
+
+	if (hdr->proto_ver >= SD_PROTO_VER_TRIM_ZERO_SECTORS) {
+		rsp->obj.offset = 0;
+		trim_zero_sectors(req->data, &rsp->obj.offset,
+				  &rsp->data_length);
+	}
+
 	if (hdr->obj.copies)
 		rsp->obj.copies = hdr->obj.copies;
 	else
@@ -863,6 +878,8 @@ int peer_create_and_write_obj(struct request *req)
 		memcpy(&cow_hdr, hdr, sizeof(cow_hdr));
 		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
 		cow_hdr.obj.offset = 0;
+		trim_zero_sectors(buf, &cow_hdr.obj.offset,
+				  &cow_hdr.data_length);
 
 		ret = do_create_and_write_obj(&iocb, &cow_hdr, epoch, buf);
 	} else
