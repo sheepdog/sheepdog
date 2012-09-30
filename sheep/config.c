@@ -77,15 +77,14 @@ int init_config_path(const char *base_path)
 			eprintf("failed to read config file, %m\n");
 			return -1;
 		}
-
-		config.version = SD_FORMAT_VERSION;
-		if (write_config() != SD_RES_SUCCESS)
-			return -1;
-
-		return 0;
+		goto create;
 	}
 
 	ret = xread(fd, &config, sizeof(config));
+	if (ret == 0) {
+		close(fd);
+		goto create;
+	}
 	if (ret < 0) {
 		eprintf("failed to read config file, %m\n");
 		goto out;
@@ -109,6 +108,12 @@ out:
 	close(fd);
 
 	return ret;
+create:
+	config.version = SD_FORMAT_VERSION;
+	if (write_config() != SD_RES_SUCCESS)
+		return -1;
+
+	return 0;
 }
 
 int set_cluster_ctime(uint64_t ct)
