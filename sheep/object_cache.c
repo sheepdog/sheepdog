@@ -712,9 +712,9 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		data_length = SD_DATA_OBJ_SIZE;
 
 	ret = prealloc(fd, data_length);
-	if (ret != SD_RES_SUCCESS) {
+	if (ret < 0)
 		ret = SD_RES_EIO;
-	} else
+	else
 		add_to_object_cache(oc, idx, writeback);
 
 	close(fd);
