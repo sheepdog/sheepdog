@@ -139,18 +139,20 @@ struct sd_rsp {
 	uint32_t	epoch;
 	uint32_t        id;
 	uint32_t        data_length;
-	uint32_t        result;
 	union {
+		uint32_t        result;
 		struct {
+			uint32_t	__pad;
 			uint32_t	copies;
 		} obj;
 		struct {
+			uint32_t	__pad;
 			uint32_t	rsvd;
 			uint32_t	vdi_id;
 			uint32_t	attr_id;
 			uint32_t	copies;
 		} vdi;
-		uint32_t		__pad[7];
+		uint32_t		__pad[8];
 	};
 };
 
