@@ -96,6 +96,16 @@ int init_config_path(const char *base_path)
 		if (sys->upgrade) {
 			/* upgrade sheep store */
 			ret = sd_migrate_store(config.version, SD_FORMAT_VERSION);
+			if (ret == 0) {
+				/* reload config file */
+				ret = xpread(fd, &config, sizeof(config), 0);
+				if (ret != sizeof(config)) {
+					eprintf("failed to reload config file,"
+						" %m\n");
+					ret = -1;
+				} else
+					ret = 0;
+			}
 			goto out;
 		}
 

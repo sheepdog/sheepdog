@@ -81,21 +81,29 @@ static int migrate_from_v0_to_v1(void)
 		return ret;
 	}
 
+	config.version = 1;
+	ret = xpwrite(fd, &config, sizeof(config), 0);
+	if (ret != sizeof(config)) {
+		eprintf("failed to write config data, %m\n");
+		close(fd);
+		return -1;
+	}
+
+	/* 0.5.1 could wrongly extend the config file, so truncate it here */
+	ret = ftruncate(fd, sizeof(config));
+	if (ret != 0) {
+		eprintf("failed to truncate config data, %m\n");
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
 	/* If the config file contains a space field, the store layout
 	 * is compatible with v1.  In this case, what we need to do is
 	 * only adding version number to the config file. */
-	if (config.space > 0) {
-		config.version = 1;
-		ret = xwrite(fd, &config, sizeof(config));
-		if (ret != sizeof(config)) {
-			eprintf("failed to write config data, %m\n");
-			close(fd);
-			return -1;
-		}
-
-		close(fd);
+	if (config.space > 0)
 		return 0;
-	}
 
 	/* upgrade epoch log */
 	le = get_latest_epoch();
