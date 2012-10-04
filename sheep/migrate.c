@@ -11,8 +11,10 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <time.h>
 
 #include "sheep_priv.h"
 
@@ -60,6 +62,91 @@ struct sheepdog_config_v1 {
 	uint64_t space;
 };
 
+/* copy file from 'fname' to 'fname.suffix' */
+static int backup_file(char *fname, char *suffix)
+{
+	char dst_file[PATH_MAX];
+	int fd = -1, ret, len;
+	struct stat stbuf;
+	void *buf = NULL;
+
+	snprintf(dst_file, sizeof(dst_file), "%s.%s", fname, suffix);
+
+	fd = open(fname, O_RDONLY);
+	if (fd < 0) {
+		if (errno != ENOENT) {
+			eprintf("failed to open %s, %m\n", fname);
+			ret = -1;
+		} else
+			ret = 0;
+		goto out;
+	}
+
+	ret = stat(fname, &stbuf);
+	if (ret < 0) {
+		eprintf("failed to stat %s, %m\n", fname);
+		goto out;
+	}
+	len = stbuf.st_size;
+
+	buf = xmalloc(len);
+	ret = xread(fd, buf, len);
+	if (ret != len) {
+		eprintf("failed to read %s, %d %m\n", fname, ret);
+		ret = -1;
+		goto out;
+	}
+
+	close(fd);
+
+	fd = open(dst_file, O_CREAT | O_WRONLY | O_DSYNC, 0644);
+	if (fd < 0) {
+		eprintf("failed to create %s, %m\n", dst_file);
+		ret = -1;
+		goto out;
+	}
+
+	ret = xwrite(fd, buf, len);
+	if (ret != len) {
+		eprintf("failed to write to %s, %d %m\n", dst_file, ret);
+		ret = -1;
+	}
+out:
+	if (fd >= 0)
+		close(fd);
+	free(buf);
+
+	return ret;
+}
+
+/* backup config and epoch info */
+static int backup_store(void)
+{
+	char suffix[256];
+	struct timeval tv;
+	struct tm tm;
+	int ret, epoch, le;
+
+	gettimeofday(&tv, NULL);
+	localtime_r(&tv.tv_sec, &tm);
+	strftime(suffix, sizeof(suffix), "%Y-%m-%d_%H%M%S", &tm);
+
+	ret = backup_file(config_path, suffix);
+	if (ret < 0)
+		return ret;
+
+	le = get_latest_epoch();
+	for (epoch = 1; epoch <= le; epoch++) {
+		char path[PATH_MAX];
+		snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+
+		ret = backup_file(path, suffix);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
 
 static int migrate_from_v0_to_v1(void)
 {
@@ -173,6 +260,12 @@ int sd_migrate_store(int from, int to)
 	int ver, ret;
 
 	assert(to <= sizeof(migrate));
+
+	ret = backup_store();
+	if (ret != 0) {
+		eprintf("failed to backup the old store\n");
+		return ret;
+	}
 
 	for (ver = from; ver < to; ver++) {
 		ret = migrate[ver]();

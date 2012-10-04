@@ -157,6 +157,9 @@ uint32_t get_latest_epoch(void)
 		if (d->d_name == p)
 			continue;
 
+		if (strlen(d->d_name) != 8)
+			continue;
+
 		if (e > epoch)
 			epoch = e;
 	}
