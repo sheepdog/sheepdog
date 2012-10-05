@@ -1,7 +1,6 @@
 #ifndef STRBUF_H
 #define STRBUF_H
 
-#include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>
 #include <unistd.h>

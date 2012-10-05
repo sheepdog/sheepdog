@@ -12,7 +12,6 @@
  */
 
 #include <time.h>
-#include <assert.h>
 #include <sched.h>
 
 #include "trace.h"

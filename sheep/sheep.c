@@ -30,6 +30,7 @@
 
 #include "sheep_priv.h"
 #include "trace/trace.h"
+#include "util.h"
 
 #define EPOLL_SIZE 4096
 #define DEFAULT_OBJECT_DIR "/tmp"

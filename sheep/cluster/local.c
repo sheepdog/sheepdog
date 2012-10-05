@@ -17,11 +17,11 @@
 #include <sys/file.h>
 #include <signal.h>
 #include <fcntl.h>
-#include <assert.h>
 
 #include "cluster.h"
 #include "event.h"
 #include "work.h"
+#include "util.h"
 
 #define MAX_EVENTS 500
 #define PROCESS_CHECK_INTERVAL 200 /* ms */

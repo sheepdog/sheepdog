@@ -12,7 +12,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <search.h>
-#include <assert.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <zookeeper/zookeeper.h>
@@ -21,6 +20,7 @@
 #include "cluster.h"
 #include "event.h"
 #include "work.h"
+#include "util.h"
 
 #define SESSION_TIMEOUT 30000		/* millisecond */
 #define MEMBER_CREATE_TIMEOUT SESSION_TIMEOUT

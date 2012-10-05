@@ -77,4 +77,22 @@ extern ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
 extern ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 extern int rmdir_r(char *dir_path);
 
+#ifdef assert
+#undef assert
+#endif
+
+#ifndef NDEBUG
+
+#define assert(expr) ((expr) ?						\
+			(void)0 :					\
+			panic("assert: %s:%d: %s: "			\
+				"Asserting `%s' failed.\n",		\
+				__FILE__, __LINE__, __func__, #expr))
+
+#else
+
+#define assert(expr) ((void)0)
+
+#endif	/* NDEBUG */
+
 #endif

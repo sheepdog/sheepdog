@@ -12,7 +12,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <search.h>
-#include <assert.h>
 #include <pthread.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
@@ -21,6 +20,7 @@
 #include "cluster.h"
 #include "event.h"
 #include "work.h"
+#include "util.h"
 
 #define BASE_FILE "/sheepdog"
 #define LOCK_FILE BASE_FILE "/lock"
