@@ -70,7 +70,7 @@ static void parse_trace_buffer(char *buf, int size)
 	return;
 }
 
-const char *tracefile = "/tmp/tracefile";
+static const char *tracefile = "/tmp/tracefile";
 
 static int trace_read_buffer(void)
 {

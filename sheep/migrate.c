@@ -18,8 +18,6 @@
 
 #include "sheep_priv.h"
 
-extern char *config_path;
-
 /* sheepdog 0.4.0 */
 struct node_id_v0 {
 	uint8_t addr[16];

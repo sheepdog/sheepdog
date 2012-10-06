@@ -241,7 +241,7 @@ static int sheepfs_open(const char *path, struct fuse_file_info *fi)
 	return ret;
 }
 
-struct fuse_operations sheepfs_ops =  {
+static struct fuse_operations sheepfs_ops =  {
 	.getattr  = sheepfs_getattr,
 	.readdir  = sheepfs_readdir,
 	.truncate = sheepfs_truncate,

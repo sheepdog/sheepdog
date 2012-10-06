@@ -268,6 +268,7 @@ void queue_cluster_request(struct request *req);
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 int log_current_epoch(void);
 
+extern char *config_path;
 int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);
 int set_cluster_flags(uint16_t flags);

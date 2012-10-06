@@ -40,8 +40,8 @@ struct get_vdis_work {
 	struct sd_node members[];
 };
 
-pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t wait_vdis_cond = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t wait_vdis_cond = PTHREAD_COND_INITIALIZER;
 static int is_vdi_list_ready = true;
 
 static struct vnode_info *current_vnode_info;

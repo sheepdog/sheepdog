@@ -362,7 +362,7 @@ void short_thread_end(void)
 		eventfd_write(trace_efd, value);
 }
 
-notrace int trace_init()
+notrace int trace_init(void)
 {
 	sigset_t block;
 	int i;

@@ -87,7 +87,7 @@ static key_t semkey;
 
 static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
 
-pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static notrace int logarea_init(int size)
 {

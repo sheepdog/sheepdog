@@ -274,7 +274,7 @@ out:
 	return ret;
 }
 
-struct store_driver farm = {
+static struct store_driver farm = {
 	.name = "farm",
 	.init = farm_init,
 	.exist = default_exist,

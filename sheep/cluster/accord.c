@@ -575,7 +575,7 @@ static int accord_init(const char *option)
 	return 0;
 }
 
-struct cluster_driver cdrv_accord = {
+static struct cluster_driver cdrv_accord = {
 	.name       = "accord",
 
 	.init       = accord_init,

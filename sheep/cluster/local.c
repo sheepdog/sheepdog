@@ -26,7 +26,7 @@
 #define MAX_EVENTS 500
 #define PROCESS_CHECK_INTERVAL 200 /* ms */
 
-const char *shmfile = "/tmp/sheepdog_shm";
+static const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
 static int sigfd;
 static int block_event_pos;
@@ -82,7 +82,7 @@ struct local_event {
 
 /* shared memory queue */
 
-struct shm_queue {
+static struct shm_queue {
 	int block_event_pos;
 	struct local_event block_events[MAX_EVENTS];
 	int nonblock_event_pos;
@@ -214,7 +214,7 @@ static void shm_queue_init(void)
 	ret = ftruncate(shmfd, sizeof(*shm_queue));
 	assert(ret == 0);
 
-	shm_queue = mmap(0, sizeof(*shm_queue),
+	shm_queue = mmap(NULL, sizeof(*shm_queue),
 			 PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
 	assert(shm_queue != MAP_FAILED);
 
@@ -558,7 +558,7 @@ static int local_init(const char *option)
 	return 0;
 }
 
-struct cluster_driver cdrv_local = {
+static struct cluster_driver cdrv_local = {
 	.name		= "local",
 
 	.init		= local_init,

@@ -27,7 +27,7 @@ static struct sd_option cluster_options[] = {
 	{ 0, NULL, false, NULL },
 };
 
-struct cluster_cmd_data {
+static struct cluster_cmd_data {
 	uint32_t epoch;
 	bool list;
 	int copies;

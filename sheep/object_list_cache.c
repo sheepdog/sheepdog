@@ -42,7 +42,7 @@ struct objlist_deletion_work {
 	struct work work;
 };
 
-struct objlist_cache obj_list_cache = {
+static struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
 	.entry_list     = LIST_HEAD_INIT(obj_list_cache.entry_list),

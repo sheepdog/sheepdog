@@ -499,7 +499,7 @@ int default_flush(void)
 	return ret;
 }
 
-struct store_driver plain_store = {
+static struct store_driver plain_store = {
 	.name = "plain",
 	.init = default_init,
 	.exist = default_exist,

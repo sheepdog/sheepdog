@@ -801,7 +801,8 @@ static int zk_init(const char *option)
 		return -1;
 	}
 
-	zhandle = zookeeper_init(option, watcher, SESSION_TIMEOUT, 0, NULL, 0);
+	zhandle = zookeeper_init(option, watcher, SESSION_TIMEOUT, NULL, NULL,
+				 0);
 	if (!zhandle) {
 		eprintf("failed to connect to zk server %s\n", option);
 		return -1;
@@ -828,7 +829,7 @@ static int zk_init(const char *option)
 	return 0;
 }
 
-struct cluster_driver cdrv_zookeeper = {
+static struct cluster_driver cdrv_zookeeper = {
 	.name       = "zookeeper",
 
 	.init       = zk_init,

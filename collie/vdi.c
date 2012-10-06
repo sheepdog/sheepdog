@@ -31,7 +31,7 @@ static struct sd_option vdi_options[] = {
 	{ 0, NULL, false, NULL },
 };
 
-struct vdi_cmd_data {
+static struct vdi_cmd_data {
 	unsigned int index;
 	int snapshot_id;
 	char snapshot_tag[SD_MAX_VDI_TAG_LEN];
@@ -1452,7 +1452,7 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
  */
 static void do_check_repair(uint64_t oid, int nr_copies)
 {
-	struct sd_vnode *tgt_vnodes[nr_copies];
+	struct sd_vnode *tgt_vnodes[SD_MAX_COPIES];
 	void *buf, *buf_cmp;
 	int i;
 

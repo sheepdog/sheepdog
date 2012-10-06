@@ -817,7 +817,7 @@ again:
 	return 0;
 }
 
-struct cluster_driver cdrv_corosync = {
+static struct cluster_driver cdrv_corosync = {
 	.name		= "corosync",
 
 	.init		= corosync_init,

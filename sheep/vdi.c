@@ -24,7 +24,7 @@ struct vdi_copy_entry {
 
 static uint32_t max_copies;
 static struct rb_root vdi_copy_root = RB_ROOT;
-pthread_rwlock_t vdi_copy_lock = PTHREAD_RWLOCK_INITIALIZER;
+static pthread_rwlock_t vdi_copy_lock = PTHREAD_RWLOCK_INITIALIZER;
 
 static struct vdi_copy_entry *vdi_copy_search(struct rb_root *root,
 					      uint32_t vid)
