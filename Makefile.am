@@ -68,3 +68,9 @@ rpm: clean
 	$(MAKE) $(SPEC) $(TARFILE)
 	rpmbuild $(RPMBUILDOPTS) -ba $(SPEC)
 
+CGCC=cgcc
+CGCC_CFLAGS=-Wbitwise -Wno-return-void $(ARCH)
+
+sparse-check: ARCH=$(shell sh script/checkarch.sh)
+sparse-check:
+	$(MAKE) CC=$(CGCC) CFLAGS="$(CFLAGS) $(CGCC_CFLAGS)"

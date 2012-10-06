@@ -3,10 +3,10 @@ arch=`gcc -dumpmachine`
 
 case $arch in
 `echo $arch | grep x86_64`)
-	echo -m64
+	echo -D__SIZEOF_POINTER__=8 -m64
 	;;
 `echo $arch | grep "i[3-6]86"`)
-	echo -m32
+	echo -D__SIZEOF_POINTER__=4 -m32
 	;;
 *)
 	echo '
