@@ -775,12 +775,8 @@ int peer_read_obj(struct request *req)
 		goto out;
 
 	rsp->data_length = hdr->data_length;
-
-	if (hdr->proto_ver >= SD_PROTO_VER_TRIM_ZERO_SECTORS) {
-		rsp->obj.offset = 0;
-		trim_zero_sectors(req->data, &rsp->obj.offset,
-				  &rsp->data_length);
-	}
+	rsp->obj.offset = 0;
+	trim_zero_sectors(req->data, &rsp->obj.offset, &rsp->data_length);
 
 	if (hdr->obj.copies)
 		rsp->obj.copies = hdr->obj.copies;
