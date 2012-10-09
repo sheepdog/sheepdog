@@ -149,10 +149,11 @@ _wait_for_sheep()
             _die "there are not enough sheep processes"
         fi
 
-        node_list="$($COLLIE node list)"
+        node_list="$($COLLIE node list 2> /dev/null)"
 
         if [ $? != 0 ]; then
-            _die "failed to get node list"
+            # sheep is not ready yet
+            continue
         fi
 
         nr_sheep="$(echo "$node_list" | wc -l)"
