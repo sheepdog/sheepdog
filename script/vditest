@@ -12,6 +12,7 @@
 use strict;
 use Getopt::Std;
 use Switch;
+use Time::HiRes qw(gettimeofday);
 
 my $program = "vditest";
 my ($vdiname, $vdisize);
@@ -19,7 +20,7 @@ my ($vdiname, $vdisize);
 my $use_aio = 0;
 my ($lblk, $hblk) = (512, 1048576);
 my $cache = 'writethrough';
-my $cycles = 256;
+my $runtime = 10;
 my ($rrate, $wrate) = (100, 0);
 my $no_act = 0;
 my $offset = 0;
@@ -64,7 +65,6 @@ sub print_options {
     $opt .= "-a "  if $use_aio;
     $opt .= "-B $lblk:$hblk ";
     $opt .= "-c $cache ";
-    $opt .= "-C $cycles ";
     $opt .= "-D $rrate:$wrate ";
     $opt .= "-n "  if $no_act;
     $opt .= "-o $offset\n";
@@ -72,6 +72,7 @@ sub print_options {
     $opt .= "-p $seek_pattern ";
     $opt .= "-s $seed ";
     $opt .= "-S $sblk:$eblk ";
+    $opt .= "-T $runtime ";
     $opt .= "-f $flush_interval\n";
 
     print $opt;
@@ -146,7 +147,7 @@ sub vdi_flush {
 sub parse_opts {
     my %opts = ();
 
-    getopts("aB:c:C:D:f:hno:p:rs:S:t:vw", \%opts) or help(1);
+    getopts("aB:c:D:f:hno:p:rs:S:T:vw", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
@@ -171,10 +172,6 @@ sub parse_opts {
 		    error("\"$val\" is not valid\n");
 		}
 		$cache = $val;
-	    }
-	    case 'C' {
-		error("\"$val\" is not valid\n")  if ($val <= 0);
-		$cycles = $val;
 	    }
 	    case 'D' {
 		($rrate, $wrate) = ($val =~ /(\d+)\%?:?(\d*)\%?/);
@@ -221,6 +218,10 @@ sub parse_opts {
 		error("$sblk is not sector aligned\n")  if $sblk % 512 != 0;
 		error("$eblk is not sector aligned\n")  if $eblk % 512 != 0;
 	    }
+	    case 'T' {
+		error("\"$val\" is not valid\n")  if ($val < 0);
+		$runtime = $val;
+	    }
 	    case 'v' {
 		$verbose = 1;
 	    }
@@ -263,10 +264,16 @@ sub vdi_main {
     my $roffset = $offset;
     my $woffset = $offset;
     my %written_data = ();
+    my $i = 1;
+    my ($sec, $microsec, $start_time, $end_time);
+
+    ($sec, $microsec) = gettimeofday();
+    $start_time = $sec * 1000000 + $microsec;
+    $end_time = $start_time + $runtime * 1000000;
 
     srand($seed);
 
-    foreach my $i (1 .. $cycles) {
+    while (1) {
 	my $length = get_aligned_blk($lblk, $hblk);
 	my $pattern;
 	my $ptn_length = 0;
@@ -317,6 +324,10 @@ sub vdi_main {
 	} elsif ($flush_interval > 0 && $i % $flush_interval == 0) {
 	    vdi_flush();
 	}
+
+	($sec, $microsec) = gettimeofday();
+	last if ($end_time <= $sec * 1000000 + $microsec);
+	$i++;
     }
 }
 
@@ -329,7 +340,6 @@ Usage: $program [OPTION] vdiname
   -B lblk[:hblk]       set the block transfer size.
   -c cache             specify how to use the host cache.
                        cache is "none", "writeback", or "writethrough".
-  -C cycles            run until cycles disk access cycles are complete.
   -D r%:w%             duty cycle used while reading and/or writing.
   -f flush_interval    specify that a flush should occur at flush_interval
                        number of IO operations.
@@ -341,6 +351,7 @@ Usage: $program [OPTION] vdiname
   -r                   read data from vdi.
   -s seed              set seed for random number generation.
   -S sblk[:eblk]       set the start [and stop] test block.
+  -T runtime           run until <runtime> seconds have elapsed.
   -v                   verbose mode.
   -w                   write data to vdi.
 
