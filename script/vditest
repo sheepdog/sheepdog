@@ -28,6 +28,7 @@ my $seek_pattern = "linear";
 my $seed = time();
 my ($sblk, $eblk) = (0, 0);
 my $flush_interval = -1;
+my $verbose = 0;
 
 parse();
 print_options();
@@ -79,7 +80,7 @@ sub print_options {
 sub print_qemu {
     my ($cmd) = @_;
 
-    print $cmd;
+    print $cmd  if $verbose;
 
     print QEMU $cmd  if !$no_act;
 }
@@ -90,7 +91,11 @@ sub vdi_open {
 
     return  if $no_act;
 
-    $cmd = "| qemu-io -t $cache sheepdog:$vdiname";
+    if ($verbose) {
+	$cmd = "| qemu-io -t $cache sheepdog:$vdiname";
+    } else {
+	$cmd = "| qemu-io -t $cache sheepdog:$vdiname > /dev/null";
+    }
 
     open QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
 }
@@ -139,7 +144,7 @@ sub vdi_flush {
 }
 
 sub parse {
-    getopts("aB:c:C:D:f:hno:p:s:S:t:", \%opts) or help(1);
+    getopts("aB:c:C:D:f:hno:p:s:S:t:v", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
@@ -180,6 +185,7 @@ sub parse {
 	    }
 	    case 'n' {
 		$no_act = 1;
+		$verbose = 1;
 	    }
 	    case 'o' {
 		error("\"$val\" is not valid\n")  if ($val < 0);
@@ -204,6 +210,9 @@ sub parse {
 
 		error("$sblk is not sector aligned\n")  if $sblk % 512 != 0;
 		error("$eblk is not sector aligned\n")  if $eblk % 512 != 0;
+	    }
+	    case 'v' {
+		$verbose = 1;
 	    }
 	}
     }
@@ -235,7 +244,7 @@ sub vdi_main {
 	my $pattern;
 	my $ptn_length = 0;
 
-	print "$i: ";
+	print "$i: "  if $verbose;
 
 	if (rand($rrate + $wrate) < $rrate) {
 	    # read
@@ -304,6 +313,7 @@ Usage: $program [OPTION] vdiname
                        seek_pattern is "linear" or "random".
   -s seed              set seed for random number generation.
   -S sblk[:eblk]       set the start [and stop] test block.
+  -v                   verbose mode.
 
 END_OF_HELP
     exit($status);
