@@ -14,7 +14,6 @@ use Getopt::Std;
 use Switch;
 
 my $program = "vditest";
-my %opts = ();
 my ($vdiname, $vdisize);
 
 my $use_aio = 0;
@@ -143,7 +142,9 @@ sub vdi_flush {
     }
 }
 
-sub parse {
+sub parse_opts {
+    my %opts = ();
+
     getopts("aB:c:C:D:f:hno:p:s:S:t:v", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
@@ -216,11 +217,20 @@ sub parse {
 	    }
 	}
     }
+}
 
-    error("vdiname must be specified\n")  if @ARGV == 0;
-    error("too many arguments\n")  if @ARGV > 1;
+sub parse {
+    parse_opts();
+    if (@ARGV == 0) {
+	error("vdiname must be specified\n");
+    } else {
+	$vdiname = shift @ARGV;
 
-    $vdiname = $ARGV[0];
+	# process the rest of options
+	parse_opts()  if (@ARGV > 0);
+    }
+    error("too many arguments\n")  if @ARGV > 0;
+
     $vdisize = `qemu-io -c length sheepdog:$vdiname`;
     to_bytes($vdisize);
 
