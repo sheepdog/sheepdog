@@ -13,6 +13,7 @@ use strict;
 use Getopt::Std;
 use Switch;
 use Time::HiRes qw(gettimeofday);
+use IPC::Open2;
 
 my $program = "vditest";
 my ($vdiname, $vdisize);
@@ -30,6 +31,11 @@ my ($sblk, $eblk) = (0, 0);
 my $flush_interval = -1;
 my $verbose = 0;
 my ($read_test, $write_test) = (0,0);
+my $hbeat = 0;
+my ($rd_bytes, $wr_bytes, $rd_ops, $wr_ops) = (0, 0, 0, 0);
+my ($total_rd_bytes, $total_wr_bytes, $total_rd_ops, $total_wr_ops) = (0, 0, 0, 0);
+
+$/ = 'qemu-io> ';
 
 parse();
 print_options();
@@ -59,6 +65,18 @@ sub to_bytes {
     $_[0] = $size;
 }
 
+sub to_str {
+    my ($size) = @_;
+    my @units = ("", "K", "M", "G", "T", "P", "E", "Z", "Y");
+
+    while ($size >= 1024) {
+	shift @units;
+	$size /= 1024;
+    }
+
+    return sprintf "%.1f%s", $size, $units[0];
+}
+
 sub print_options {
     my $opt = "options: ";
 
@@ -84,6 +102,12 @@ sub print_qemu {
     print $cmd  if $verbose;
 
     print QEMU $cmd  if !$no_act;
+
+    my $result = <QEMU_OUT>;
+    if ($verbose) {
+	$result =~ s/qemu-io> //;
+	print $result;
+    }
 }
 
 sub vdi_open {
@@ -92,13 +116,9 @@ sub vdi_open {
 
     return  if $no_act;
 
-    if ($verbose) {
-	$cmd = "| qemu-io -t $cache sheepdog:$vdiname";
-    } else {
-	$cmd = "| qemu-io -t $cache sheepdog:$vdiname > /dev/null";
-    }
-
-    open QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
+    $cmd = "qemu-io -t $cache sheepdog:$vdiname";
+    open2 *QEMU_OUT, *QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
+    <QEMU_OUT>;
 }
 
 sub vdi_close {
@@ -124,6 +144,11 @@ sub vdi_read {
 	    print_qemu("read $offset $length\n");
 	}
     }
+
+    $rd_ops++;
+    $rd_bytes += $length;
+    $total_rd_ops++;
+    $total_rd_bytes += $length;
 }
 
 sub vdi_write {
@@ -134,6 +159,11 @@ sub vdi_write {
     } else {
 	print_qemu("write -P $ptn $offset $length\n");
     }
+
+    $wr_ops++;
+    $wr_bytes += $length;
+    $total_wr_ops++;
+    $total_wr_bytes += $length;
 }
 
 sub vdi_flush {
@@ -147,11 +177,14 @@ sub vdi_flush {
 sub parse_opts {
     my %opts = ();
 
-    getopts("aB:c:D:f:hno:p:rs:S:T:vw", \%opts) or help(1);
+    getopts("?aB:c:D:f:h:no:p:rs:S:T:vw", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
 	switch ($key) {
+	    case '?' {
+		help(0);
+	    }
 	    case 'a' {
 		$use_aio = 1;
 	    }
@@ -180,7 +213,8 @@ sub parse_opts {
 		$flush_interval = $val;
 	    }
 	    case 'h' {
-		help(0);
+		error("\"$val\" is not valid\n")  if ($val <= 0);
+		$hbeat = $val;
 	    }
 	    case 'n' {
 		$no_act = 1;
@@ -265,10 +299,11 @@ sub vdi_main {
     my $woffset = $offset;
     my %written_data = ();
     my $i = 1;
-    my ($sec, $microsec, $start_time, $end_time);
+    my ($sec, $microsec, $cur_time, $start_time, $end_time, $hbeat_time);
 
     ($sec, $microsec) = gettimeofday();
     $start_time = $sec * 1000000 + $microsec;
+    $hbeat_time = $start_time + $hbeat * 1000000;
     $end_time = $start_time + $runtime * 1000000;
 
     srand($seed);
@@ -326,8 +361,35 @@ sub vdi_main {
 	}
 
 	($sec, $microsec) = gettimeofday();
-	last if ($end_time <= $sec * 1000000 + $microsec);
+	$cur_time = $sec * 1000000 + $microsec;
+	if ($hbeat > 0 && $hbeat_time <= $cur_time) {
+	    if ($rrate) {
+		printf "Heartbeat read throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
+		$rd_bytes / $hbeat, to_str($rd_bytes / $hbeat), $rd_ops / $hbeat;
+	    }
+	    if ($wrate) {
+		printf "Heartbeat write throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
+		$wr_bytes / $hbeat, to_str($wr_bytes / $hbeat), $wr_ops / $hbeat;
+	    }
+
+	    $rd_ops = $wr_ops = 0;
+	    $rd_bytes = $wr_bytes = 0;
+
+	    $hbeat_time += $hbeat * 1000000;
+	}
+	last if ($end_time <= $cur_time);
 	$i++;
+    }
+
+    if ($rrate) {
+	printf "Total read throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
+	$total_rd_bytes / $runtime, to_str($total_rd_bytes / $runtime),
+	$total_rd_ops / $runtime;
+    }
+    if ($wrate) {
+	printf "Total write throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
+	$total_wr_bytes / $runtime, to_str($total_wr_bytes / $runtime),
+	$total_wr_ops / $runtime;
     }
 }
 
@@ -336,6 +398,7 @@ sub help {
     print <<END_OF_HELP;
 Usage: $program [OPTION] vdiname
 
+  -?                   display this help text and exit.
   -a                   use asynchronous I/O for testing.
   -B lblk[:hblk]       set the block transfer size.
   -c cache             specify how to use the host cache.
@@ -343,7 +406,7 @@ Usage: $program [OPTION] vdiname
   -D r%:w%             duty cycle used while reading and/or writing.
   -f flush_interval    specify that a flush should occur at flush_interval
                        number of IO operations.
-  -h                   display this help text and exit.
+  -h hbeat             displays performance statistic every <hbeat> seconds.
   -n                   print events that would occur but do not access disk.
   -o offset            set the start offset.
   -p seek_pattern      set the pattern of disk seeks.
