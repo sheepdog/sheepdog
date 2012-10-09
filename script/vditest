@@ -27,6 +27,7 @@ my $offset = 0;
 my $seek_pattern = "linear";
 my $seed = time();
 my ($sblk, $eblk) = (0, 0);
+my $flush_interval = -1;
 
 parse();
 print_options();
@@ -70,6 +71,7 @@ sub print_options {
     $opt .= "-p $seek_pattern ";
     $opt .= "-s $seed ";
     $opt .= "-S $sblk:$eblk ";
+    $opt .= "-f $flush_interval\n";
 
     print $opt;
 }
@@ -137,7 +139,7 @@ sub vdi_flush {
 }
 
 sub parse {
-    getopts("aB:c:C:D:hno:p:s:S:t:", \%opts) or help(1);
+    getopts("aB:c:C:D:f:hno:p:s:S:t:", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
@@ -169,6 +171,9 @@ sub parse {
 	    }
 	    case 'D' {
 		($rrate, $wrate) = ($val =~ /(\d+)\%?:?(\d*)\%?/);
+	    }
+	    case 'f' {
+		$flush_interval = $val;
 	    }
 	    case 'h' {
 		help(0);
@@ -271,7 +276,11 @@ sub vdi_main {
 
 	%written_data = ()  if %written_data > 1000000;
 
-	vdi_flush()  if ($use_aio && $i % 4 == 0);
+	if ($flush_interval == 0) {
+	    vdi_flush();
+	} elsif ($flush_interval > 0 && $i % $flush_interval == 0) {
+	    vdi_flush();
+	}
     }
 }
 
@@ -286,6 +295,8 @@ Usage: $program [OPTION] vdiname
                        cache is "none", "writeback", or "writethrough".
   -C cycles            run until cycles disk access cycles are complete.
   -D r%:w%             duty cycle used while reading and/or writing.
+  -f flush_interval    specify that a flush should occur at flush_interval
+                       number of IO operations.
   -h                   display this help text and exit.
   -n                   print events that would occur but do not access disk.
   -o offset            set the start offset.
