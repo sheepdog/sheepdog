@@ -88,18 +88,7 @@ sub vdi_open {
 
     return  if $no_act;
 
-    switch ($cache) {
-	case 'none' {
-	    $cmd = "| qemu-io -n sheepdog:$vdiname";
-	}
-	case 'writeback' {
-	    # BDRV_O_CACHE_WB option is not suported by qemu-io
-	    $cmd = "| qemu-io sheepdog:$vdiname";
-	}
-	case 'writethrough' {
-	    $cmd = "| qemu-io sheepdog:$vdiname";
-	}
-    }
+    $cmd = "| qemu-io -t $cache sheepdog:$vdiname";
 
     open QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
 }
