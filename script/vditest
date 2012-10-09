@@ -20,7 +20,7 @@ my $use_aio = 0;
 my ($lblk, $hblk) = (512, 1048576);
 my $cache = 'writethrough';
 my $cycles = 256;
-my ($rrate, $wrate) = (50, 50);
+my ($rrate, $wrate) = (100, 0);
 my $no_act = 0;
 my $offset = 0;
 my $seek_pattern = "linear";
@@ -28,6 +28,7 @@ my $seed = time();
 my ($sblk, $eblk) = (0, 0);
 my $flush_interval = -1;
 my $verbose = 0;
+my ($read_test, $write_test) = (0,0);
 
 parse();
 print_options();
@@ -145,7 +146,7 @@ sub vdi_flush {
 sub parse_opts {
     my %opts = ();
 
-    getopts("aB:c:C:D:f:hno:p:s:S:t:v", \%opts) or help(1);
+    getopts("aB:c:C:D:f:hno:p:rs:S:t:vw", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
@@ -201,6 +202,14 @@ sub parse_opts {
 		    error("\"$val\" is not valid\n");
 		}
 	    }
+	    case 'r' {
+		$read_test = 1;
+		if ($write_test) {
+		    ($rrate, $wrate) = (50, 50);
+		} else {
+		    ($rrate, $wrate) = (100, 0);
+		}
+	    }
 	    case 's' {
 		$seed = $val;
 	    }
@@ -214,6 +223,14 @@ sub parse_opts {
 	    }
 	    case 'v' {
 		$verbose = 1;
+	    }
+	    case 'w' {
+		$write_test = 1;
+		if ($read_test) {
+		    ($rrate, $wrate) = (50, 50);
+		} else {
+		    ($rrate, $wrate) = (0, 100);
+		}
 	    }
 	}
     }
@@ -321,9 +338,11 @@ Usage: $program [OPTION] vdiname
   -o offset            set the start offset.
   -p seek_pattern      set the pattern of disk seeks.
                        seek_pattern is "linear" or "random".
+  -r                   read data from vdi.
   -s seed              set seed for random number generation.
   -S sblk[:eblk]       set the start [and stop] test block.
   -v                   verbose mode.
+  -w                   write data to vdi.
 
 END_OF_HELP
     exit($status);
