@@ -106,7 +106,7 @@ struct write_info_entry {
 };
 
 struct write_info {
-	struct write_info_entry ent[SD_MAX_COPIES];
+	struct write_info_entry ent[SD_MAX_NODES];
 	int nr_sent;
 };
 
@@ -131,7 +131,7 @@ static inline void finish_one_write_err(struct write_info *wi, int i)
 }
 
 struct pfd_info {
-	struct pollfd pfds[SD_MAX_COPIES];
+	struct pollfd pfds[SD_MAX_NODES];
 	int nr;
 };
 
@@ -215,7 +215,7 @@ finish_write:
 static inline void write_info_init(struct write_info *wi)
 {
 	int i;
-	for (i = 0; i < SD_MAX_COPIES; i++)
+	for (i = 0; i < SD_MAX_NODES; i++)
 		wi->ent[i].pfd.fd = -1;
 	wi->nr_sent = 0;
 }
@@ -261,7 +261,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 	struct write_info wi;
 	struct sd_op_template *op;
 	struct sd_req hdr;
-	struct sd_node *target_nodes[SD_MAX_COPIES];
+	struct sd_node *target_nodes[SD_MAX_NODES];
 
 	dprintf("%"PRIx64"\n", oid);
 
