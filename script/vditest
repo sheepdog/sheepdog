@@ -197,7 +197,7 @@ sub parse_opts {
 		error("$lblk is not sector aligned\n")  if $lblk % 512 != 0;
 		error("$lblk is not valid\n")  if $lblk == 0;
 		error("$hblk is not sector aligned\n")  if $hblk % 512 != 0;
-		error("$hblk is too large\n")  if $lblk > 1048576;
+		error("$hblk is too large\n")  if $lblk > (64 * 1024 ** 2);
 		error("transfer range is invalid\n")  if $lblk > $hblk;
 	    }
 	    case 'c' {
