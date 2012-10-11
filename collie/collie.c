@@ -414,5 +414,8 @@ int main(int argc, char **argv)
 	if (flags & SUBCMD_FLAG_NEED_THIRD_ARG && argc == optind)
 		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 
+	if (!(flags & SUBCMD_FLAG_NEED_THIRD_ARG) && argc != optind)
+		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+
 	return command_fn(argc, argv);
 }
