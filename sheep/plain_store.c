@@ -307,7 +307,7 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
-		if (errno == EEXIST)
+		if (errno == EEXIST) {
 			/* This happens if node membership changes during object
 			 * creation; while gateway retries a CREATE request,
 			 * recovery process could also recover the object at the
@@ -315,6 +315,7 @@ int default_create_and_write(uint64_t oid, struct siocb *iocb)
 			 * so it is okay to simply return success here. */
 			dprintf("%s exists\n", tmp_path);
 			return SD_RES_SUCCESS;
+		}
 
 		eprintf("failed to open %s: %m\n", tmp_path);
 		return err_to_sderr(oid, errno);
