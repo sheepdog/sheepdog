@@ -217,7 +217,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 		}
 	}
 
-	if (iocb->snapid && cur_vid != iocb->base_vid) {
+	if (iocb->create_snapshot && cur_vid != iocb->base_vid) {
 		cur = zalloc(SD_INODE_HEADER_SIZE);
 		if (!cur) {
 			eprintf("failed to allocate memory\n");
@@ -236,7 +236,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	gettimeofday(&tv, NULL);
 
-	if (iocb->snapid) {
+	if (iocb->create_snapshot) {
 		if (cur_vid != iocb->base_vid) {
 			vprintf(SDOG_INFO, "tree snapshot %s %" PRIx32 " %" PRIx32 "\n",
 				name, cur_vid, iocb->base_vid);
@@ -282,7 +282,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 		}
 	}
 
-	if (iocb->snapid && cur_vid != iocb->base_vid) {
+	if (iocb->create_snapshot && cur_vid != iocb->base_vid) {
 		ret = write_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 				   SD_INODE_HEADER_SIZE, 0, 0, false, 0);
 		if (ret != 0) {
@@ -453,7 +453,7 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 			    NULL, 0, &next_snapid, &right_nr, &deleted_nr,
 			    &dummy, NULL);
 
-	if (iocb->snapid) {
+	if (iocb->create_snapshot) {
 		if (ret != SD_RES_SUCCESS) {
 			if (ret == SD_RES_NO_VDI)
 				vprintf(SDOG_CRIT, "VDI %s does not exist\n", name);
@@ -480,7 +480,7 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 
 	vprintf(SDOG_INFO, "creating new %s %s: size %" PRIu64 ", vid %"
 		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 ", copies %d\n",
-		iocb->snapid ? "snapshot" : "vdi", name, iocb->size,
+		iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
 		*new_vid, iocb->base_vid, cur_vid, iocb->nr_copies);
 
 	return create_vdi_obj(iocb, *new_vid, cur_vid, next_snapid);

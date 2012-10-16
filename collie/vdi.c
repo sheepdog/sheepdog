@@ -453,7 +453,7 @@ static int read_vdi_obj(char *vdiname, int snapid, const char *tag,
 }
 
 static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
-			 uint32_t *vdi_id, int snapshot, int nr_copies)
+			 uint32_t *vdi_id, bool snapshot, int nr_copies)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -477,7 +477,7 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 	hdr.data_length = wlen;
 
 	hdr.vdi.base_vdi_id = base_vid;
-	hdr.vdi.snapid = snapshot;
+	hdr.vdi.snapid = snapshot ? 1 : 0;
 	hdr.vdi.vdi_size = roundup(vdi_size, 512);
 	hdr.vdi.copies = nr_copies;
 
@@ -524,7 +524,8 @@ static int vdi_create(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
-	ret = do_vdi_create(vdiname, size, 0, &vid, 0, vdi_cmd_data.nr_copies);
+	ret = do_vdi_create(vdiname, size, 0, &vid, false,
+			    vdi_cmd_data.nr_copies);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
@@ -595,7 +596,7 @@ static int vdi_snapshot(int argc, char **argv)
 				      0, inode->nr_copies, false, true);
 	}
 
-	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, 1,
+	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, true,
 			     inode->nr_copies);
 }
 
@@ -635,7 +636,7 @@ static int vdi_clone(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		goto out;
 
-	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, 0,
+	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, false,
 			    vdi_cmd_data.nr_copies);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
@@ -802,7 +803,7 @@ static int vdi_rollback(int argc, char **argv)
 	}
 
 	return do_vdi_create(vdiname, inode->vdi_size, base_vid, NULL,
-			     inode->snap_id, vdi_cmd_data.nr_copies);
+			     true, vdi_cmd_data.nr_copies);
 }
 
 static int vdi_object(int argc, char **argv)
@@ -1752,8 +1753,8 @@ static uint32_t do_restore(char *vdiname, int snapid, const char *tag)
 	if (ret != EXIT_SUCCESS)
 		goto out;
 
-	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid, 1,
-			    inode->nr_copies);
+	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid,
+			    true, inode->nr_copies);
 	if (ret != EXIT_SUCCESS) {
 		fprintf(stderr, "Failed to read VDI\n");
 		goto out;
@@ -1843,8 +1844,7 @@ out:
 		/* recreate the current vdi object */
 		recovery_ret = do_vdi_create(vdiname, current_inode->vdi_size,
 					     current_inode->parent_vdi_id, NULL,
-					     parent_inode->snap_id,
-					     current_inode->nr_copies);
+					     true, current_inode->nr_copies);
 		if (recovery_ret != EXIT_SUCCESS) {
 			fprintf(stderr, "failed to resume the current vdi\n");
 			ret = recovery_ret;

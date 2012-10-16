@@ -116,7 +116,7 @@ static int cluster_new_vdi(struct request *req)
 	iocb.data_len = hdr->data_length;
 	iocb.size = hdr->vdi.vdi_size;
 	iocb.base_vid = hdr->vdi.base_vdi_id;
-	iocb.snapid = hdr->vdi.snapid;
+	iocb.create_snapshot = !!hdr->vdi.snapid;
 	iocb.nr_copies = hdr->vdi.copies;
 
 	if (!iocb.nr_copies)
