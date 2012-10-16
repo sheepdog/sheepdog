@@ -420,7 +420,8 @@ do
 
     if $showme
     then
-	echo
+	description=`sed -n '3s/^#//p' $seq`
+	echo " $description"
 	continue
     elif [ -f expunged ] && $expunge && egrep "^$seq([ 	]|\$)" expunged >/dev/null
     then
