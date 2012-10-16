@@ -346,8 +346,10 @@ static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 		}
 
 		if (!strncmp(inode->name, name, strlen(inode->name))) {
+			*next_snap = inode->snap_id + 1;
+
 			if (!(tag && tag[0]) && !snapid && inode->snap_ctime)
-				continue;
+				break;
 
 			vdi_found = true;
 			if (tag && tag[0] &&
@@ -356,7 +358,6 @@ static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 			if (snapid && snapid != inode->snap_id)
 				continue;
 
-			*next_snap = inode->snap_id + 1;
 			*vid = inode->vdi_id;
 			*inode_nr_copies = inode->nr_copies;
 			if (create_time)
@@ -438,7 +439,7 @@ int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 {
 	uint32_t cur_vid = 0;
-	uint32_t next_snapid;
+	uint32_t next_snapid = 1;
 	unsigned long nr, deleted_nr = SD_NR_VDIS, right_nr = SD_NR_VDIS;
 	unsigned int dummy;
 	int ret;
@@ -472,8 +473,6 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 			nr = right_nr;
 		else
 			nr = deleted_nr; /* we can recycle a deleted VDI */
-
-		next_snapid = 1;
 	}
 
 	*new_vid = nr;

@@ -803,7 +803,7 @@ static int vdi_rollback(int argc, char **argv)
 	}
 
 	return do_vdi_create(vdiname, inode->vdi_size, base_vid, NULL,
-			     true, vdi_cmd_data.nr_copies);
+			     false, vdi_cmd_data.nr_copies);
 }
 
 static int vdi_object(int argc, char **argv)
@@ -1754,7 +1754,7 @@ static uint32_t do_restore(char *vdiname, int snapid, const char *tag)
 		goto out;
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid,
-			    true, inode->nr_copies);
+			    false, inode->nr_copies);
 	if (ret != EXIT_SUCCESS) {
 		fprintf(stderr, "Failed to read VDI\n");
 		goto out;
