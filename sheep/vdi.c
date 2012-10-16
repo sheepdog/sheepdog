@@ -346,6 +346,9 @@ static int find_first_vdi(unsigned long start, unsigned long end, char *name,
 		}
 
 		if (!strncmp(inode->name, name, strlen(inode->name))) {
+			if (!(tag && tag[0]) && !snapid && inode->snap_ctime)
+				continue;
+
 			vdi_found = true;
 			if (tag && tag[0] &&
 			    strncmp(inode->tag, tag, sizeof(inode->tag)) != 0)
