@@ -23,7 +23,7 @@ for i in 0 1 2; do
     _start_sheep $i
 done
 
-sleep 1
+_wait_for_sheep 3
 
 echo check the number of vnodes
 for i in 0 1 2; do
