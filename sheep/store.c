@@ -92,17 +92,14 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 	for (i = 0; i < nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		unsigned int rlen, wlen;
 
 		if (node_is_local(&local_nodes[i]))
 			continue;
 
 		sd_init_req(&hdr, SD_OP_GET_EPOCH);
-		hdr.data_length = rlen = len;
+		hdr.data_length = len;
 		hdr.obj.tgt_epoch = epoch;
-		wlen = 0;
-		ret = sheep_exec_req(&local_nodes[i].nid, &hdr, nodes, &wlen,
-				     &rlen);
+		ret = sheep_exec_req(&local_nodes[i].nid, &hdr, nodes);
 		if (ret != SD_RES_SUCCESS)
 			continue;
 

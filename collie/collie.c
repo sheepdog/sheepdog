@@ -47,7 +47,7 @@ unsigned master_idx;
 static int update_node_list(int max_nodes, uint32_t epoch)
 {
 	int fd, ret;
-	unsigned int size, wlen;
+	unsigned int size;
 	char *buf = NULL;
 	struct sd_node *ent;
 	struct sd_node_req hdr;
@@ -69,9 +69,7 @@ static int update_node_list(int max_nodes, uint32_t epoch)
 
 	hdr.data_length = size;
 
-	wlen = 0;
-
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf, &wlen, &size);
+	ret = exec_req(fd, (struct sd_req *)&hdr, buf);
 	if (ret) {
 		ret = -1;
 		goto out;
@@ -84,6 +82,7 @@ static int update_node_list(int max_nodes, uint32_t epoch)
 		goto out;
 	}
 
+	size = rsp->data_length;
 	sd_nodes_nr = size / sizeof(*ent);
 	if (sd_nodes_nr == 0) {
 		fprintf(stderr, "There are no active sheep daemons\n");

@@ -320,7 +320,7 @@ rewrite:
 	return 0;
 }
 
-int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int *wlen)
+int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen)
 {
 	int ret;
 	struct msghdr msg;
@@ -334,27 +334,35 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int *wlen)
 	iov[0].iov_base = hdr;
 	iov[0].iov_len = sizeof(*hdr);
 
-	if (*wlen) {
+	if (wlen) {
 		msg.msg_iovlen++;
 		iov[1].iov_base = data;
-		iov[1].iov_len = *wlen;
+		iov[1].iov_len = wlen;
 	}
 
-	ret = do_write(sockfd, &msg, sizeof(*hdr) + *wlen);
+	ret = do_write(sockfd, &msg, sizeof(*hdr) + wlen);
 	if (ret) {
 		eprintf("failed to send request %x, %d: %m\n", hdr->opcode,
-			*wlen);
+			wlen);
 		ret = -1;
 	}
 
 	return ret;
 }
 
-int exec_req(int sockfd, struct sd_req *hdr, void *data,
-	     unsigned int *wlen, unsigned int *rlen)
+int exec_req(int sockfd, struct sd_req *hdr, void *data)
 {
 	int ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
+	unsigned int wlen, rlen;
+
+	if (hdr->flags & SD_FLAG_CMD_WRITE) {
+		wlen = hdr->data_length;
+		rlen = 0;
+	} else {
+		wlen = 0;
+		rlen = hdr->data_length;
+	}
 
 	if (send_req(sockfd, hdr, data, wlen))
 		return 1;
@@ -365,11 +373,11 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 		return 1;
 	}
 
-	if (*rlen > rsp->data_length)
-		*rlen = rsp->data_length;
+	if (rlen > rsp->data_length)
+		rlen = rsp->data_length;
 
-	if (*rlen) {
-		ret = do_read(sockfd, data, *rlen);
+	if (rlen) {
+		ret = do_read(sockfd, data, rlen);
 		if (ret) {
 			eprintf("failed to read the response data\n");
 			return 1;

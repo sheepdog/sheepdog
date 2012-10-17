@@ -140,7 +140,6 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	struct sd_req hdr = { 0 };
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, fd, sock_idx;
-	unsigned wlen = 0, rlen = 0;
 	bool create = false;
 	uint32_t vid = oid_to_vid(oid);
 	struct vdi_inode *vdi;
@@ -182,11 +181,9 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 		}
 	}
 
-	if (rw == VOLUME_READ) {
-		rlen = size;
+	if (rw == VOLUME_READ)
 		hdr.opcode = SD_OP_READ_OBJ;
-	} else {
-		wlen = size;
+	else {
 		hdr.opcode = create ?
 			SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 		hdr.flags |= SD_FLAG_CMD_WRITE;
@@ -200,7 +197,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 		hdr.flags |= SD_FLAG_CMD_CACHE;
 
 	fd = get_socket_fd(vdi, &sock_idx);
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 	put_socket_fd(vdi, sock_idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
@@ -296,7 +293,6 @@ static int volume_do_sync(uint32_t vid)
 	struct sd_req hdr = { 0 };
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, fd, idx;
-	unsigned wlen = 0, rlen = 0;
 	struct vdi_inode *vdi;
 
 	pthread_rwlock_rdlock(&vdi_inode_tree_lock);
@@ -307,7 +303,7 @@ static int volume_do_sync(uint32_t vid)
 	hdr.obj.oid = vid_to_vdi_oid(vid);
 
 	fd = get_socket_fd(vdi, &idx);
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, NULL);
 	put_socket_fd(vdi, idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
@@ -484,7 +480,6 @@ static int volume_sync_and_delete(uint32_t vid)
 	struct sd_req hdr = { 0 };
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, fd, idx;
-	unsigned wlen = 0, rlen = 0;
 	struct vdi_inode *vdi;
 
 	pthread_rwlock_rdlock(&vdi_inode_tree_lock);
@@ -495,7 +490,7 @@ static int volume_sync_and_delete(uint32_t vid)
 	hdr.obj.oid = vid_to_vdi_oid(vid);
 
 	fd = get_socket_fd(vdi, &idx);
-	ret = exec_req(fd, &hdr, NULL, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, NULL);
 	put_socket_fd(vdi, idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {

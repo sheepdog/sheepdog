@@ -290,7 +290,6 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 	}
 
 	for (i = 0; i < sd_nodes_nr; i++) {
-		unsigned wlen = 0, rlen = size;
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
@@ -301,13 +300,13 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 			break;
 
 		sd_init_req(&hdr, SD_OP_READ_PEER);
-		hdr.data_length = rlen;
+		hdr.data_length = size;
 		hdr.flags = 0;
 		hdr.epoch = sd_epoch;
 
 		hdr.obj.oid = oid;
 
-		ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+		ret = exec_req(fd, &hdr, buf);
 		close(fd);
 
 		sprintf(name + strlen(name), ":%d", sd_nodes[i].nid.port);
@@ -315,7 +314,8 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		if (ret)
 			fprintf(stderr, "Failed to connect to %s\n", name);
 		else {
-			set_trimmed_sectors(buf, rsp->obj.offset, rlen, size);
+			set_trimmed_sectors(buf, rsp->obj.offset,
+					    rsp->data_length, size);
 			cb_ret = func(name, oid, rsp, buf, data);
 			if (cb_ret)
 				break;
@@ -379,7 +379,6 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 	int ret, fd;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned int wlen, rlen = 0;
 	char buf[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 
 	fd = connect_to(sdhost, sdport);
@@ -394,12 +393,11 @@ static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
 		sd_init_req(&hdr, SD_OP_GET_VDI_INFO);
 	else
 		sd_init_req(&hdr, SD_OP_LOCK_VDI);
-	wlen = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
-	hdr.data_length = wlen;
+	hdr.data_length = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.vdi.snapid = snapid;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 	if (ret) {
 		ret = -1;
 		goto out;
@@ -458,7 +456,6 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned int wlen, rlen = 0;
 	char buf[SD_MAX_VDI_LEN];
 
 	fd = connect_to(sdhost, sdport);
@@ -470,18 +467,16 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 	memset(buf, 0, sizeof(buf));
 	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
 
-	wlen = SD_MAX_VDI_LEN;
-
 	sd_init_req(&hdr, SD_OP_NEW_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = wlen;
+	hdr.data_length = SD_MAX_VDI_LEN;
 
 	hdr.vdi.base_vdi_id = base_vid;
 	hdr.vdi.snapid = snapshot ? 1 : 0;
 	hdr.vdi.vdi_size = roundup(vdi_size, 512);
 	hdr.vdi.copies = nr_copies;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 
 	close(fd);
 
@@ -730,26 +725,22 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	int fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	rlen = 0;
-	wlen = sizeof(data);
-
 	sd_init_req(&hdr, SD_OP_DEL_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = wlen;
+	hdr.data_length = sizeof(data);
 	hdr.vdi.snapid = snap_id;
 	memset(data, 0, sizeof(data));
 	strncpy(data, vdiname, SD_MAX_VDI_LEN);
 	if (snap_tag)
 		strncpy(data + SD_MAX_VDI_LEN, snap_tag, SD_MAX_VDI_TAG_LEN);
 
-	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, data);
 	close(fd);
 
 	if (ret) {
@@ -867,7 +858,6 @@ static int print_obj_epoch(uint64_t oid)
 	int i, j, fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	struct sd_vnode vnodes[SD_MAX_VNODES];
 	struct sd_vnode *vnode_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
@@ -894,9 +884,7 @@ again:
 	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
-	rlen = hdr.data_length;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, logs, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, logs);
 	close(fd);
 
 	if (ret != 0)
@@ -993,7 +981,6 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned int wlen, rlen;
 	struct sheepdog_vdi_attr vattr;
 
 	memset(&vattr, 0, sizeof(vattr));
@@ -1013,10 +1000,8 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	}
 
 	sd_init_req(&hdr, SD_OP_GET_VDI_ATTR);
-	wlen = SD_ATTR_OBJ_SIZE;
-	rlen = 0;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = wlen;
+	hdr.data_length = SD_ATTR_OBJ_SIZE;
 	hdr.vdi.snapid = vdi_cmd_data.snapshot_id;
 
 	if (create)
@@ -1026,7 +1011,7 @@ static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
 	if (delete)
 		hdr.flags |= SD_FLAG_CMD_DEL;
 
-	ret = exec_req(fd, &hdr, &vattr, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, &vattr);
 	if (ret) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -1363,7 +1348,6 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned wlen = 0, rlen = SD_DATA_OBJ_SIZE;
 	char name[128];
 	void *buf;
 
@@ -1384,11 +1368,11 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = 0;
-	hdr.data_length = rlen;
+	hdr.data_length = SD_DATA_OBJ_SIZE;
 
 	hdr.obj.oid = oid;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {
@@ -1402,7 +1386,8 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 		exit(EXIT_FAILURE);
 	}
 
-	set_trimmed_sectors(buf, rsp->obj.offset, rlen, SD_DATA_OBJ_SIZE);
+	set_trimmed_sectors(buf, rsp->obj.offset, rsp->data_length,
+			    SD_DATA_OBJ_SIZE);
 
 	return buf;
 }
@@ -1412,7 +1397,6 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned wlen = SD_DATA_OBJ_SIZE, rlen = 0;
 	char name[128];
 
 	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
@@ -1426,11 +1410,11 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
 	sd_init_req(&hdr, SD_OP_WRITE_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = wlen;
+	hdr.data_length = SD_DATA_OBJ_SIZE;
 
 	hdr.obj.oid = oid;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {

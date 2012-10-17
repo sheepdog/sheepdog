@@ -65,7 +65,7 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned wlen = 0, rlen;
+	unsigned rlen;
 	int ret = SD_RES_NO_MEM;
 	void *buf = NULL;
 	struct siocb iocb = { 0 };
@@ -91,11 +91,11 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
 
-	ret = sheep_exec_req(&vnode->nid, &hdr, buf, &wlen, &rlen);
+	ret = sheep_exec_req(&vnode->nid, &hdr, buf);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 	iocb.epoch = epoch;
-	iocb.length = rlen;
+	iocb.length = rsp->data_length;
 	iocb.offset = rsp->obj.offset;
 	iocb.buf = buf;
 	ret = sd_store->create_and_write(oid, &iocb);
@@ -507,7 +507,6 @@ static void finish_object_list(struct work *work)
 static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 			     uint8_t *buf, size_t buf_size)
 {
-	unsigned wlen, rlen;
 	char name[128];
 	struct sd_list_req hdr;
 	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&hdr;
@@ -517,15 +516,11 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 
 	dprintf("%s %"PRIu32"\n", name, e->nid.port);
 
-	wlen = 0;
-	rlen = buf_size;
-
 	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.tgt_epoch = epoch - 1;
-	hdr.flags = 0;
-	hdr.data_length = rlen;
+	hdr.data_length = buf_size;
 
-	ret = sheep_exec_req(&e->nid, (struct sd_req *)&hdr, buf, &wlen, &rlen);
+	ret = sheep_exec_req(&e->nid, (struct sd_req *)&hdr, buf);
 
 	if (ret != SD_RES_SUCCESS)
 		return -1;

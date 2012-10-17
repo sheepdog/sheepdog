@@ -48,7 +48,6 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned wlen = 0, rlen = datalen;
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -57,14 +56,14 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	}
 
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
-	hdr.data_length = rlen;
+	hdr.data_length = datalen;
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
 	if (direct)
 		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
-	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, data);
 	close(fd);
 
 	if (ret) {
@@ -90,7 +89,6 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int fd, ret;
-	unsigned wlen = datalen, rlen = 0;
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -103,7 +101,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	else
 		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
 
-	hdr.data_length = wlen;
+	hdr.data_length = datalen;
 	hdr.flags = flags | SD_FLAG_CMD_WRITE;
 	if (cow_oid)
 		hdr.flags |= SD_FLAG_CMD_COW;
@@ -115,7 +113,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	hdr.obj.cow_oid = cow_oid;
 	hdr.obj.offset = offset;
 
-	ret = exec_req(fd, &hdr, data, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, data);
 	close(fd);
 
 	if (ret) {
@@ -139,7 +137,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	static struct sheepdog_inode i;
 	struct sd_req req;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req;
-	unsigned int wlen = 0, rlen = SD_DATA_OBJ_SIZE; /* FIXME */
+	unsigned int rlen = SD_DATA_OBJ_SIZE; /* FIXME */
 
 	vc = zalloc(rlen);
 	if (!vc) {
@@ -157,7 +155,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	sd_init_req(&req, SD_OP_GET_VDI_COPIES);
 	req.data_length = rlen;
 
-	ret = exec_req(fd, &req, (char *)vc, &wlen, &rlen);
+	ret = exec_req(fd, &req, (char *)vc);
 	if (ret < 0) {
 		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
 			sdhost, sdport);
@@ -209,15 +207,12 @@ int send_light_req_get_response(struct sd_req *hdr, const char *host, int port)
 {
 	int fd, ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
-	unsigned rlen, wlen;
 
 	fd = connect_to(host, port);
 	if (fd < 0)
 		return -1;
 
-	rlen = 0;
-	wlen = 0;
-	ret = exec_req(fd, hdr, NULL, &wlen, &rlen);
+	ret = exec_req(fd, hdr, NULL);
 	close(fd);
 	if (ret) {
 		fprintf(stderr, "failed to connect to  %s:%d\n",

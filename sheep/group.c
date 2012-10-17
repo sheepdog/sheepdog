@@ -607,7 +607,7 @@ static int get_vdis_from(struct sd_node *node)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct vdi_copy *vc = NULL;
 	int i, ret = SD_RES_SUCCESS;
-	unsigned int rlen, wlen;
+	unsigned int rlen;
 	int count;
 
 	if (node_is_local(node))
@@ -624,8 +624,7 @@ static int get_vdis_from(struct sd_node *node)
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
 	hdr.epoch = sys->epoch;
 	hdr.data_length = rlen;
-	wlen = 0;
-	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc, &wlen, &rlen);
+	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 

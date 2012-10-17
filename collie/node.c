@@ -145,7 +145,6 @@ static int node_cache(int argc, char **argv)
 	char *p;
 	int fd, ret;
 	uint32_t cache_size;
-	unsigned int wlen, rlen = 0;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
@@ -159,13 +158,11 @@ static int node_cache(int argc, char **argv)
 	if (fd < 0)
 		return EXIT_FAILURE;
 
-	wlen = sizeof(cache_size);
-
 	sd_init_req(&hdr, SD_OP_SET_CACHE_SIZE);
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = wlen;
+	hdr.data_length = sizeof(cache_size);
 
-	ret = exec_req(fd, &hdr, (void *)&cache_size, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, (void *)&cache_size);
 	close(fd);
 
 	if (ret) {

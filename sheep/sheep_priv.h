@@ -404,8 +404,7 @@ void sockfd_cache_add_group(struct sd_node *nodes, int nr);
 struct sockfd *sheep_get_sockfd(struct node_id *);
 void sheep_put_sockfd(struct node_id *, struct sockfd *);
 void sheep_del_sockfd(struct node_id *, struct sockfd *);
-int sheep_exec_req(struct node_id *nid, struct sd_req *hdr, void *data,
-		   unsigned int *wlen, unsigned int *rlen);
+int sheep_exec_req(struct node_id *nid, struct sd_req *hdr, void *data);
 
 static inline bool is_object_cache_enabled(void)
 {

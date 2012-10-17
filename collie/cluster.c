@@ -44,20 +44,16 @@ static int list_store(void)
 	int fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	char buf[512] = { 0 };
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return EXIT_SYSFAIL;
 
-	wlen = 0;
-	rlen = 512;
-
 	sd_init_req(&hdr, SD_OP_GET_STORE_LIST);
-	hdr.data_length = rlen;
+	hdr.data_length = 512;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {
@@ -82,7 +78,6 @@ static int cluster_format(int argc, char **argv)
 	int fd, ret;
 	struct sd_so_req hdr;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
-	unsigned rlen, wlen;
 	struct timeval tv;
 	char store_name[STORE_LEN];
 
@@ -108,11 +103,8 @@ static int cluster_format(int argc, char **argv)
 	hdr.data_length = strlen(store_name) + 1;
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
-	wlen = hdr.data_length;
-	rlen = 0;
-
 	printf("using backend %s store\n", store_name);
-	ret = exec_req(fd, (struct sd_req *)&hdr, store_name, &wlen, &rlen);
+	ret = exec_req(fd, (struct sd_req *)&hdr, store_name);
 	close(fd);
 
 	if (ret) {
@@ -137,7 +129,6 @@ static int cluster_info(int argc, char **argv)
 	int i, fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	struct epoch_log *logs;
 	int nr_logs, log_length;
 	time_t ti, ct;
@@ -163,9 +154,7 @@ again:
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	rlen = hdr.data_length;
-	wlen = 0;
-	ret = exec_req(fd, &hdr, logs, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, logs);
 	close(fd);
 
 	if (ret != 0)
@@ -269,7 +258,6 @@ static int list_snap(void)
 	int fd, ret = EXIT_SYSFAIL;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen, wlen;
 	void *buf;
 
 	buf = malloc(SD_DATA_OBJ_SIZE);
@@ -280,13 +268,10 @@ static int list_snap(void)
 	if (fd < 0)
 		goto out;
 
-	wlen = 0;
-	rlen = SD_DATA_OBJ_SIZE;
-
 	sd_init_req(&hdr, SD_OP_GET_SNAP_FILE);
-	hdr.data_length = rlen;
+	hdr.data_length = SD_DATA_OBJ_SIZE;
 
-	ret = exec_req(fd, &hdr, buf, &wlen, &rlen);
+	ret = exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {
@@ -301,7 +286,7 @@ static int list_snap(void)
 		goto out;
 	}
 
-	print_list(buf, rlen);
+	print_list(buf, rsp->data_length);
 out:
 	free(buf);
 	return EXIT_SUCCESS;

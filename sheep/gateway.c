@@ -31,7 +31,6 @@ static inline void gateway_init_fwd_hdr(struct sd_req *fwd, struct sd_req *hdr)
 int gateway_read_obj(struct request *req)
 {
 	int i, ret = SD_RES_SUCCESS;
-	unsigned wlen, rlen;
 	struct sd_req fwd_hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&fwd_hdr;
 	struct sd_vnode *v;
@@ -76,10 +75,7 @@ int gateway_read_obj(struct request *req)
 		 * structure.
 		 */
 		gateway_init_fwd_hdr(&fwd_hdr, &req->rq);
-		wlen = 0;
-		rlen = fwd_hdr.data_length;
-		ret = sheep_exec_req(&v->nid, &fwd_hdr, req->data, &wlen,
-				     &rlen);
+		ret = sheep_exec_req(&v->nid, &fwd_hdr, req->data);
 		if (ret != SD_RES_SUCCESS)
 			continue;
 
@@ -288,7 +284,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 			break;
 		}
 
-		ret = send_req(sfd->fd, &hdr, req->data, &wlen);
+		ret = send_req(sfd->fd, &hdr, req->data, wlen);
 		if (ret) {
 			sheep_del_sockfd(nid, sfd);
 			err_ret = SD_RES_NETWORK_ERROR;
