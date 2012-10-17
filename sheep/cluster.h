@@ -70,7 +70,8 @@ struct cluster_driver {
 	 *
 	 * Returns zero on success, -1 on error
 	 */
-	int (*join)(struct sd_node *myself, void *opaque, size_t opaque_len);
+	int (*join)(const struct sd_node *myself, void *opaque,
+		    size_t opaque_len);
 
 	/*
 	 * Leave the cluster
@@ -141,7 +142,7 @@ static inline struct cluster_driver *find_cdrv(const char *name)
 	return NULL;
 }
 
-static inline const char *get_cdrv_option(struct cluster_driver *cdrv,
+static inline const char *get_cdrv_option(const struct cluster_driver *cdrv,
 					  const char *arg)
 {
 	int len = strlen(cdrv->name);
@@ -152,12 +153,12 @@ static inline const char *get_cdrv_option(struct cluster_driver *cdrv,
 		return NULL;
 }
 
-static inline char *node_to_str(struct sd_node *id)
+static inline char *node_to_str(const struct sd_node *id)
 {
 	static char str[256];
 	char name[256];
 	int af = AF_INET6;
-	uint8_t *addr = id->nid.addr;
+	const uint8_t *addr = id->nid.addr;
 
 	/* Find address family type */
 	if (addr[12]) {
@@ -193,14 +194,15 @@ static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
 }
 
 /* callbacks back into sheepdog from the cluster drivers */
-void sd_join_handler(struct sd_node *joined, struct sd_node *members,
-		size_t nr_members, enum cluster_join_result result,
-		void *opaque);
-void sd_leave_handler(struct sd_node *left, struct sd_node *members,
-		size_t nr_members);
-void sd_notify_handler(struct sd_node *sender, void *msg, size_t msg_len);
-bool sd_block_handler(struct sd_node *sender);
-enum cluster_join_result sd_check_join_cb(struct sd_node *joining,
+void sd_join_handler(const struct sd_node *joined,
+		     const struct sd_node *members,
+		     size_t nr_members, enum cluster_join_result result,
+		     const void *opaque);
+void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
+		      size_t nr_members);
+void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
+bool sd_block_handler(const struct sd_node *sender);
+enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 

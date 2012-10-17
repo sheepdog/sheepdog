@@ -63,14 +63,14 @@ static inline void sd_init_req(struct sd_req *req, uint8_t opcode)
 	req->proto_ver = opcode < 0x80 ? SD_PROTO_VER : SD_SHEEP_PROTO_VER;
 }
 
-static inline int same_zone(struct sd_vnode *e, int n1, int n2)
+static inline int same_zone(const struct sd_vnode *e, int n1, int n2)
 {
 	return e[n1].zone == e[n2].zone;
 }
 
 /* Get the first vnode's index which is matching the OID */
-static inline int get_vnode_first_idx(struct sd_vnode *entries, int nr_entries,
-				      uint64_t oid)
+static inline int get_vnode_first_idx(const struct sd_vnode *entries,
+				      int nr_entries, uint64_t oid)
 {
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 	int start, end, pos;
@@ -93,8 +93,9 @@ static inline int get_vnode_first_idx(struct sd_vnode *entries, int nr_entries,
 }
 
 /* Get next vnode's index according to the PREV_IDXS */
-static inline int get_vnode_next_idx(struct sd_vnode *entries, int nr_entries,
-				     int *prev_idxs, int nr_prev_idxs)
+static inline int get_vnode_next_idx(const struct sd_vnode *entries,
+				     int nr_entries, int *prev_idxs,
+				     int nr_prev_idxs)
 {
 	int i, idx, first_idx;
 	bool found;
@@ -119,7 +120,7 @@ static inline int get_vnode_next_idx(struct sd_vnode *entries, int nr_entries,
 }
 
 /* Get the n'th vnode's index which is matching the OID */
-static inline int get_vnode_nth_idx(struct sd_vnode *entries,
+static inline int get_vnode_nth_idx(const struct sd_vnode *entries,
 			int nr_entries, uint64_t oid, int nth)
 {
 	int nr_idxs = 0, idxs[SD_MAX_COPIES];
@@ -138,18 +139,18 @@ static inline int get_vnode_nth_idx(struct sd_vnode *entries,
 	return idxs[nth];
 }
 
-static inline struct sd_vnode *oid_to_vnode(struct sd_vnode *entries,
-					    int nr_entries, uint64_t oid,
-					    int copy_idx)
+static inline const struct sd_vnode *oid_to_vnode(const struct sd_vnode *entries,
+						  int nr_entries, uint64_t oid,
+						  int copy_idx)
 {
 	int idx = get_vnode_nth_idx(entries, nr_entries, oid, copy_idx);
 
 	return &entries[idx];
 }
 
-static inline void oid_to_vnodes(struct sd_vnode *entries, int nr_entries,
+static inline void oid_to_vnodes(const struct sd_vnode *entries, int nr_entries,
 				 uint64_t oid, int nr_copies,
-				 struct sd_vnode **vnodes)
+				 const struct sd_vnode **vnodes)
 {
 	int idx, idxs[SD_MAX_COPIES], i;
 
@@ -164,13 +165,13 @@ static inline void oid_to_vnodes(struct sd_vnode *entries, int nr_entries,
 	}
 }
 
-static inline void oid_to_nodes(struct sd_vnode *entries, int nr_entries,
+static inline void oid_to_nodes(const struct sd_vnode *entries, int nr_entries,
 				uint64_t oid, int nr_copies,
-				struct sd_node *all_nodes,
-				struct sd_node **nodes)
+				const struct sd_node *all_nodes,
+				const struct sd_node **nodes)
 {
 	int i;
-	struct sd_vnode *vnodes[SD_MAX_COPIES];
+	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 
 	oid_to_vnodes(entries, nr_entries, oid, nr_copies, vnodes);
 	for (i = 0; i < nr_copies; i++)

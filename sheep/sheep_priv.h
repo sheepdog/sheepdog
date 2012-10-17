@@ -41,7 +41,7 @@ struct request {
 	struct sd_req rq;
 	struct sd_rsp rp;
 
-	struct sd_op_template *op;
+	const struct sd_op_template *op;
 
 	void *data;
 	unsigned int data_length;
@@ -136,7 +136,7 @@ struct siocb {
 };
 
 struct vdi_iocb {
-	char *name;
+	const char *name;
 	uint32_t data_len;
 	uint64_t size;
 	uint32_t base_vid;
@@ -147,34 +147,36 @@ struct vdi_iocb {
 struct store_driver {
 	struct list_head list;
 	const char *name;
-	int (*init)(char *path);
+	int (*init)(const char *path);
 	bool (*exist)(uint64_t oid);
 	/* create_and_write must be an atomic operation*/
-	int (*create_and_write)(uint64_t oid, struct siocb *);
-	int (*write)(uint64_t oid, struct siocb *);
-	int (*read)(uint64_t oid, struct siocb *);
+	int (*create_and_write)(uint64_t oid, const struct siocb *);
+	int (*write)(uint64_t oid, const struct siocb *);
+	int (*read)(uint64_t oid, const struct siocb *);
 	int (*format)(void);
 	int (*remove_object)(uint64_t oid);
 	/* Operations in recovery */
-	int (*link)(uint64_t oid, struct siocb *, uint32_t tgt_epoch);
-	int (*begin_recover)(struct siocb *);
-	int (*end_recover)(uint32_t epoch, struct vnode_info *old_vnode_info);
+	int (*link)(uint64_t oid, uint32_t tgt_epoch);
+	int (*begin_recover)(const struct siocb *);
+	int (*end_recover)(uint32_t epoch,
+			   const struct vnode_info *old_vnode_info);
 	int (*purge_obj)(void);
 	/* Operations for snapshot */
-	int (*snapshot)(struct siocb *);
+	int (*snapshot)(const struct siocb *);
 	int (*cleanup)(void);
-	int (*restore)(struct siocb *);
+	int (*restore)(const struct siocb *);
 	int (*get_snap_file)(struct siocb *);
 	int (*flush)(void);
 };
 
-int default_init(char *p);
+int default_init(const char *p);
 bool default_exist(uint64_t oid);
-int default_create_and_write(uint64_t oid, struct siocb *iocb);
-int default_write(uint64_t oid, struct siocb *iocb);
-int default_read(uint64_t oid, struct siocb *iocb);
-int default_link(uint64_t oid, struct siocb *iocb, uint32_t tgt_epoch);
-int default_end_recover(uint32_t old_epoch, struct vnode_info *old_vnode_info);
+int default_create_and_write(uint64_t oid, const struct siocb *iocb);
+int default_write(uint64_t oid, const struct siocb *iocb);
+int default_read(uint64_t oid, const struct siocb *iocb);
+int default_link(uint64_t oid, uint32_t tgt_epoch);
+int default_end_recover(uint32_t old_epoch,
+			const struct vnode_info *old_vnode_info);
 int default_cleanup(void);
 int default_format(void);
 int default_remove_object(uint64_t oid);
@@ -231,8 +233,8 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid);
 int del_vdi(struct request *req, char *data, int data_len, uint32_t *vid,
 	    uint32_t snapid, unsigned int *nr_copies);
 
-int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
-	       unsigned int *nr_copies, uint64_t *ctime);
+int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
+	       uint32_t snapid, unsigned int *nr_copies, uint64_t *ctime);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
@@ -280,7 +282,6 @@ int get_cluster_space(uint64_t *space);
 
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
-int get_max_nr_copies_from(struct sd_node *entries, int nr);
 
 int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len);
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len);
@@ -317,19 +318,19 @@ void put_request(struct request *req);
 
 /* Operations */
 
-struct sd_op_template *get_sd_op(uint8_t opcode);
-const char *op_name(struct sd_op_template *op);
-bool is_cluster_op(struct sd_op_template *op);
-bool is_local_op(struct sd_op_template *op);
-bool is_peer_op(struct sd_op_template *op);
-bool is_gateway_op(struct sd_op_template *op);
-bool is_force_op(struct sd_op_template *op);
-bool has_process_work(struct sd_op_template *op);
-bool has_process_main(struct sd_op_template *op);
+const struct sd_op_template *get_sd_op(uint8_t opcode);
+const char *op_name(const struct sd_op_template *op);
+bool is_cluster_op(const struct sd_op_template *op);
+bool is_local_op(const struct sd_op_template *op);
+bool is_peer_op(const struct sd_op_template *op);
+bool is_gateway_op(const struct sd_op_template *op);
+bool is_force_op(const struct sd_op_template *op);
+bool has_process_work(const struct sd_op_template *op);
+bool has_process_main(const struct sd_op_template *op);
 void do_process_work(struct work *work);
-int do_process_main(struct sd_op_template *op, const struct sd_req *req,
+int do_process_main(const struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
-int sheep_do_op_work(struct sd_op_template *op, struct request *req);
+int sheep_do_op_work(const struct sd_op_template *op, struct request *req);
 int gateway_to_peer_opcode(int opcode);
 
 /* Journal */
@@ -338,19 +339,19 @@ struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
 int jrnl_end(struct jrnl_descriptor *jd);
 int jrnl_recover(const char *jrnl_dir);
 
-static inline bool is_myself(uint8_t *addr, uint16_t port)
+static inline bool is_myself(const uint8_t *addr, uint16_t port)
 {
 	return (memcmp(addr, sys->this_node.nid.addr,
 		       sizeof(sys->this_node.nid.addr)) == 0) &&
 		port == sys->this_node.nid.port;
 }
 
-static inline bool vnode_is_local(struct sd_vnode *v)
+static inline bool vnode_is_local(const struct sd_vnode *v)
 {
 	return is_myself(v->nid.addr, v->nid.port);
 }
 
-static inline bool node_is_local(struct sd_node *n)
+static inline bool node_is_local(const struct sd_node *n)
 {
 	return is_myself(n->nid.addr, n->nid.port);
 }
@@ -373,7 +374,7 @@ int default_flush(void);
 
 /* object_cache */
 
-bool bypass_object_cache(struct request *req);
+bool bypass_object_cache(const struct request *req);
 bool object_is_cached(uint64_t oid);
 
 void object_cache_try_to_reclaim(void);
@@ -382,8 +383,8 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, bool create);
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset);
-int object_cache_flush_vdi(struct request *req);
-int object_cache_flush_and_del(struct request *req);
+int object_cache_flush_vdi(const struct request *req);
+int object_cache_flush_and_del(const struct request *req);
 void object_cache_delete(uint32_t vid);
 int object_cache_init(const char *p);
 void object_cache_remove(uint64_t oid);
@@ -397,14 +398,14 @@ struct sockfd {
 	int idx;
 };
 
-void sockfd_cache_del(struct node_id *);
-void sockfd_cache_add(struct node_id *);
-void sockfd_cache_add_group(struct sd_node *nodes, int nr);
+void sockfd_cache_del(const struct node_id *);
+void sockfd_cache_add(const struct node_id *);
+void sockfd_cache_add_group(const struct sd_node *nodes, int nr);
 
-struct sockfd *sheep_get_sockfd(struct node_id *);
-void sheep_put_sockfd(struct node_id *, struct sockfd *);
-void sheep_del_sockfd(struct node_id *, struct sockfd *);
-int sheep_exec_req(struct node_id *nid, struct sd_req *hdr, void *data);
+struct sockfd *sheep_get_sockfd(const struct node_id *);
+void sheep_put_sockfd(const struct node_id *, struct sockfd *);
+void sheep_del_sockfd(const struct node_id *, struct sockfd *);
+int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *data);
 
 static inline bool is_object_cache_enabled(void)
 {

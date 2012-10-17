@@ -60,7 +60,7 @@ int conn_rx_on(struct connection *conn)
 	return modify_event(conn->fd, conn->events);
 }
 
-notrace bool is_conn_dead(struct connection *conn)
+notrace bool is_conn_dead(const struct connection *conn)
 {
 	if (conn->c_rx_state == C_IO_CLOSED || conn->c_tx_state == C_IO_CLOSED)
 		return true;
@@ -113,7 +113,7 @@ notrace int tx(struct connection *conn, enum conn_state next_state, int flags)
 	return ret;
 }
 
-int create_listen_ports(char *bindaddr, int port,
+int create_listen_ports(const char *bindaddr, int port,
 		int (*callback)(int fd, void *), void *data)
 {
 	char servname[64];
@@ -387,7 +387,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data)
 	return 0;
 }
 
-char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
+char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
 {
 	int  af = AF_INET6;
 	int  addr_start_idx = 0;

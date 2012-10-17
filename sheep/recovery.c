@@ -60,7 +60,8 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
+static int recover_object_from_replica(uint64_t oid,
+				       const struct sd_vnode *vnode,
 				       uint32_t epoch, uint32_t tgt_epoch)
 {
 	struct sd_req hdr;
@@ -70,14 +71,12 @@ static int recover_object_from_replica(uint64_t oid, struct sd_vnode *vnode,
 	void *buf = NULL;
 	struct siocb iocb = { 0 };
 
-	rlen = get_objsize(oid);
 	if (vnode_is_local(vnode)) {
-		iocb.epoch = epoch;
-		iocb.length = rlen;
-		ret = sd_store->link(oid, &iocb, tgt_epoch);
+		ret = sd_store->link(oid, tgt_epoch);
 		goto out;
 	}
 
+	rlen = get_objsize(oid);
 	buf = valloc(rlen);
 	if (!buf) {
 		eprintf("%m\n");
@@ -113,8 +112,8 @@ out:
  * A virtual node that does not match any node in current node list
  * means the node has left the cluster, then it's an invalid virtual node.
  */
-static bool is_invalid_vnode(struct sd_vnode *entry, struct sd_node *nodes,
-			     int nr_nodes)
+static bool is_invalid_vnode(const struct sd_vnode *entry,
+			     struct sd_node *nodes, int nr_nodes)
 {
 	if (bsearch(entry, nodes, nr_nodes, sizeof(struct sd_node),
 		    node_id_cmp))
@@ -143,9 +142,9 @@ again:
 	/* Let's do a breadth-first search */
 	nr_copies = get_obj_copy_number(oid, old->nr_zones);
 	for (i = 0; i < nr_copies; i++) {
-		struct sd_vnode *tgt_vnode = oid_to_vnode(old->vnodes,
-							  old->nr_vnodes,
-							  oid, i);
+		const struct sd_vnode *tgt_vnode;
+
+		tgt_vnode = oid_to_vnode(old->vnodes,old->nr_vnodes, oid, i);
 
 		if (is_invalid_vnode(tgt_vnode, rw->cur_vinfo->nodes,
 				     rw->cur_vinfo->nr_nodes))
@@ -534,7 +533,7 @@ static int fetch_object_list(struct sd_node *e, uint32_t epoch,
 static void screen_object_list(struct recovery_work *rw,
 			       uint64_t *oids, int nr_oids)
 {
-	struct sd_vnode *vnodes[SD_MAX_COPIES];
+	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 	int old_count = rw->count;
 	int nr_objs;
 	int i, j;

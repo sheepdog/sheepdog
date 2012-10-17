@@ -177,7 +177,7 @@ again:
 	for (i = 0; i < nr_logs; i++) {
 		int j;
 		char name[128];
-		struct sd_node *entry;
+		const struct sd_node *entry;
 
 		ti = logs[i].time;
 		if (raw_output) {

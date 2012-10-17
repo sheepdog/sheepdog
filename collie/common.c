@@ -11,7 +11,7 @@
 
 #include "collie.h"
 
-bool is_current(struct sheepdog_inode *i)
+bool is_current(const struct sheepdog_inode *i)
 {
 	return !i->snap_ctime;
 }

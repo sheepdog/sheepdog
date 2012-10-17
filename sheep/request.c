@@ -26,7 +26,7 @@ static void requeue_request(struct request *req);
 
 static bool is_access_local(struct request *req, uint64_t oid)
 {
-	struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
+	const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	int nr_copies;
 	int i;
 

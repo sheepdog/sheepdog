@@ -201,7 +201,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 	struct timeval tv;
 	int ret = SD_RES_NO_MEM;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
-	char *name = iocb->name;
+	const char *name = iocb->name;
 
 	new = zalloc(sizeof(*new));
 	if (!new) {
@@ -314,10 +314,11 @@ out:
 	return ret;
 }
 
-static int find_first_vdi(unsigned long start, unsigned long end, char *name,
-			  char *tag, uint32_t snapid, uint32_t *vid,
-			  unsigned long *deleted_nr, uint32_t *next_snap,
-			  unsigned int *inode_nr_copies, uint64_t *create_time)
+static int find_first_vdi(unsigned long start, unsigned long end,
+			  const char *name, const char *tag, uint32_t snapid,
+			  uint32_t *vid, unsigned long *deleted_nr,
+			  uint32_t *next_snap, unsigned int *inode_nr_copies,
+			  uint64_t *create_time)
 {
 	struct sheepdog_inode *inode = NULL;
 	unsigned long i;
@@ -378,10 +379,11 @@ out:
 	return ret;
 }
 
-static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, char *tag,
-		uint32_t snapid, uint32_t *next_snapid, unsigned long *right_nr,
-		unsigned long *deleted_nr, unsigned int *nr_copies,
-		uint64_t *create_time)
+static int do_lookup_vdi(const char *name, int namelen, uint32_t *vid,
+			 const char *tag, uint32_t snapid,
+			 uint32_t *next_snapid, unsigned long *right_nr,
+			 unsigned long *deleted_nr, unsigned int *nr_copies,
+			 uint64_t *create_time)
 {
 	int ret;
 	unsigned long nr, start_nr;
@@ -425,8 +427,8 @@ right_side:
 	}
 }
 
-int lookup_vdi(char *name, char *tag, uint32_t *vid, uint32_t snapid,
-	       unsigned int *nr_copies, uint64_t *create_time)
+int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
+	       uint32_t snapid, unsigned int *nr_copies, uint64_t *create_time)
 {
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
@@ -443,7 +445,7 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 	unsigned long nr, deleted_nr = SD_NR_VDIS, right_nr = SD_NR_VDIS;
 	unsigned int dummy;
 	int ret;
-	char *name;
+	const char *name;
 
 	if (iocb->data_len != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
@@ -490,7 +492,7 @@ static int start_deletion(struct request *req, uint32_t vid);
 int del_vdi(struct request *req, char *data, int data_len,
 	    uint32_t *vid, uint32_t snapid, unsigned int *nr_copies)
 {
-	char *name = data, *tag;
+	const char *name = data, *tag;
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;

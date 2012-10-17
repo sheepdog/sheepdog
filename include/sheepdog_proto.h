@@ -203,7 +203,7 @@ struct snap_log {
 /*
  * 64 bit Fowler/Noll/Vo FNV-1a hash code
  */
-static inline uint64_t fnv_64a_buf(void *buf, size_t len, uint64_t hval)
+static inline uint64_t fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
 {
 	unsigned char *bp = (unsigned char *) buf;
 	unsigned char *be = bp + len;
@@ -222,7 +222,8 @@ static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 	return hash & ((1 << bits) - 1);
 }
 
-static inline bool is_data_obj_writeable(struct sheepdog_inode *inode, int idx)
+static inline bool is_data_obj_writeable(const struct sheepdog_inode *inode,
+					 int idx)
 {
 	return inode->vdi_id == inode->data_vdi_id[idx];
 }

@@ -325,7 +325,7 @@ static void check_pids(void *arg)
 
 /* Local driver APIs */
 
-static int local_join(struct sd_node *myself,
+static int local_join(const struct sd_node *myself,
 		      void *opaque, size_t opaque_len)
 {
 	this_node.node = *myself;

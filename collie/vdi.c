@@ -45,8 +45,8 @@ static struct vdi_cmd_data {
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
-	char *name;
-	char *tag;
+	const char *name;
+	const char *tag;
 	uint32_t vid;
 	uint32_t snapid;
 };
@@ -81,8 +81,9 @@ static int parse_option_size(const char *value, uint64_t *ret)
 	return 0;
 }
 
-static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
-			   uint32_t flags, struct sheepdog_inode *i, void *data)
+static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
+			   uint32_t snapid, uint32_t flags,
+			   const struct sheepdog_inode *i, void *data)
 {
 	int idx;
 	bool is_clone = false;
@@ -141,8 +142,9 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	}
 }
 
-static void print_vdi_tree(uint32_t vid, char *name, char *tag, uint32_t snapid,
-			   uint32_t flags, struct sheepdog_inode *i, void *data)
+static void print_vdi_tree(uint32_t vid, const char *name, const char *tag,
+			   uint32_t snapid, uint32_t flags,
+			   const struct sheepdog_inode *i, void *data)
 {
 	time_t ti;
 	struct tm tm;
@@ -161,8 +163,9 @@ static void print_vdi_tree(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	add_vdi_tree(name, buf, vid, i->parent_vdi_id, highlight && is_current(i));
 }
 
-static void print_vdi_graph(uint32_t vid, char *name, char *tag, uint32_t snapid,
-			    uint32_t flags, struct sheepdog_inode *i, void *data)
+static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
+			    uint32_t snapid, uint32_t flags,
+			    const struct sheepdog_inode *i, void *data)
 {
 	time_t ti;
 	struct tm tm;
@@ -194,8 +197,9 @@ static void print_vdi_graph(uint32_t vid, char *name, char *tag, uint32_t snapid
 
 }
 
-static void get_oid(uint32_t vid, char *name, char *tag, uint32_t snapid,
-		    uint32_t flags, struct sheepdog_inode *i, void *data)
+static void get_oid(uint32_t vid, const char *name, const char *tag,
+		    uint32_t snapid, uint32_t flags,
+		    const struct sheepdog_inode *i, void *data)
 {
 	struct get_vdi_info *info = data;
 
@@ -328,7 +332,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 static int vdi_list(int argc, char **argv)
 {
-	char *vdiname = argv[optind];
+	const char *vdiname = argv[optind];
 
 	if (!raw_output)
 		printf("  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag\n");
@@ -373,7 +377,7 @@ static int vdi_graph(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int find_vdi_name(char *vdiname, uint32_t snapid, const char *tag,
+static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 			 uint32_t *vid, int for_snapshot)
 {
 	int ret, fd;
@@ -417,7 +421,7 @@ out:
 	return ret;
 }
 
-static int read_vdi_obj(char *vdiname, int snapid, const char *tag,
+static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 			uint32_t *pvid, struct sheepdog_inode *inode,
 			size_t size)
 {
@@ -450,8 +454,9 @@ static int read_vdi_obj(char *vdiname, int snapid, const char *tag,
 	return EXIT_SUCCESS;
 }
 
-static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
-			 uint32_t *vdi_id, bool snapshot, int nr_copies)
+static int do_vdi_create(const char *vdiname, int64_t vdi_size,
+			 uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
+			 int nr_copies)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -499,7 +504,7 @@ static int do_vdi_create(char *vdiname, int64_t vdi_size, uint32_t base_vid,
 
 static int vdi_create(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	uint64_t size;
 	uint32_t vid;
 	uint64_t oid;
@@ -568,7 +573,7 @@ out:
 
 static int vdi_snapshot(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	uint32_t vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
@@ -597,7 +602,7 @@ static int vdi_snapshot(int argc, char **argv)
 
 static int vdi_clone(int argc, char **argv)
 {
-	char *src_vdi = argv[optind++], *dst_vdi;
+	const char *src_vdi = argv[optind++], *dst_vdi;
 	uint32_t base_vid, new_vid;
 	uint64_t oid;
 	int idx, max_idx, ret;
@@ -681,7 +686,7 @@ out:
 
 static int vdi_resize(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	uint64_t new_size;
 	uint32_t vid;
 	int ret;
@@ -770,7 +775,7 @@ static int vdi_delete(int argc, char **argv)
 
 static int vdi_rollback(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	uint32_t base_vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
@@ -799,7 +804,7 @@ static int vdi_rollback(int argc, char **argv)
 
 static int vdi_object(int argc, char **argv)
 {
-	char *vdiname = argv[optind];
+	const char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
 	struct get_vdi_info info;
 	uint32_t vid;
@@ -859,7 +864,7 @@ static int print_obj_epoch(uint64_t oid)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct sd_vnode vnodes[SD_MAX_VNODES];
-	struct sd_vnode *vnode_buf[SD_MAX_COPIES];
+	const struct sd_vnode *vnode_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
 	int vnodes_nr, nr_logs, log_length;
 	char host[128];
@@ -917,7 +922,7 @@ error:
 
 static int vdi_track(int argc, char **argv)
 {
-	char *vdiname = argv[optind];
+	const char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
 	struct get_vdi_info info;
 	uint32_t vid;
@@ -973,8 +978,8 @@ static int vdi_track(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int find_vdi_attr_oid(char *vdiname, char *tag, uint32_t snapid,
-			     char *key, void *value, unsigned int value_len,
+static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snapid,
+			     const char *key, void *value, unsigned int value_len,
 			     uint32_t *vid, uint64_t *oid, unsigned int *nr_copies,
 			     bool create, bool excl, bool delete)
 {
@@ -1037,7 +1042,8 @@ static int vdi_setattr(int argc, char **argv)
 	int ret, value_len = 0;
 	uint64_t attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
-	char *vdiname = argv[optind++], *key, *value;
+	const char *vdiname = argv[optind++], *key;
+	char *value;
 	uint64_t offset;
 
 	key = argv[optind++];
@@ -1100,7 +1106,7 @@ static int vdi_getattr(int argc, char **argv)
 	int ret;
 	uint64_t oid, attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
-	char *vdiname = argv[optind++], *key;
+	const char *vdiname = argv[optind++], *key;
 	struct sheepdog_vdi_attr vattr;
 
 	key = argv[optind++];
@@ -1139,7 +1145,7 @@ static int vdi_getattr(int argc, char **argv)
 
 static int vdi_read(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	int ret, idx;
 	struct sheepdog_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
@@ -1225,7 +1231,7 @@ out:
 
 static int vdi_write(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	uint32_t vid, flags;
 	int ret, idx;
 	struct sheepdog_inode *inode = NULL;
@@ -1342,7 +1348,7 @@ out:
 	return ret;
 }
 
-static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
+static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1391,7 +1397,8 @@ static void *read_object_from(struct sd_vnode *vnode, uint64_t oid)
 	return buf;
 }
 
-static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
+static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
+			    void *buf)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1436,7 +1443,7 @@ static void write_object_to(struct sd_vnode *vnode, uint64_t oid, void *buf)
  */
 static void do_check_repair(uint64_t oid, int nr_copies)
 {
-	struct sd_vnode *tgt_vnodes[SD_MAX_COPIES];
+	const struct sd_vnode *tgt_vnodes[SD_MAX_COPIES];
 	void *buf, *buf_cmp;
 	int i;
 
@@ -1462,7 +1469,7 @@ fix_consistency:
 
 static int vdi_check(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	int ret;
 	uint64_t total, done = 0, oid;
 	uint32_t idx = 0, vid;
@@ -1493,7 +1500,7 @@ out:
 
 static int vdi_flush(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	struct sd_req hdr;
 	uint32_t vid;
 	int ret = EXIT_SUCCESS;
@@ -1600,7 +1607,7 @@ static int get_obj_backup(int idx, uint32_t from_vid, uint32_t to_vid,
 
 static int vdi_backup(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	int ret = EXIT_SUCCESS, idx, nr_objs;
 	struct sheepdog_inode *from_inode = xzalloc(sizeof(*from_inode));
 	struct sheepdog_inode *to_inode = xzalloc(sizeof(*to_inode));
@@ -1712,7 +1719,7 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 			       0, parent_inode->nr_copies, false, true);
 }
 
-static uint32_t do_restore(char *vdiname, int snapid, const char *tag)
+static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 {
 	int ret;
 	uint32_t vid;
@@ -1780,7 +1787,7 @@ out:
 
 static int vdi_restore(int argc, char **argv)
 {
-	char *vdiname = argv[optind++];
+	const char *vdiname = argv[optind++];
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE] = {0};
 	struct sheepdog_inode *current_inode = xzalloc(sizeof(*current_inode));

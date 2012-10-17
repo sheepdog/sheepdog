@@ -26,7 +26,7 @@
 char farm_obj_dir[PATH_MAX];
 char farm_dir[PATH_MAX];
 
-static int create_directory(char *p)
+static int create_directory(const char *p)
 {
 	int i, ret = 0;
 	struct strbuf buf = STRBUF_INIT;
@@ -99,7 +99,7 @@ out:
 	return ret;
 }
 
-static bool is_xattr_enabled(char *path)
+static bool is_xattr_enabled(const char *path)
 {
 	int ret, dummy;
 
@@ -108,7 +108,7 @@ static bool is_xattr_enabled(char *path)
 	return !(ret == -1 && errno == ENOTSUP);
 }
 
-static int farm_init(char *p)
+static int farm_init(const char *p)
 {
 	dprintf("use farm store driver\n");
 	if (create_directory(p) < 0)
@@ -130,7 +130,7 @@ err:
 	return SD_RES_EIO;
 }
 
-static int farm_snapshot(struct siocb *iocb)
+static int farm_snapshot(const struct siocb *iocb)
 {
 	unsigned char snap_sha1[SHA1_LEN];
 	unsigned char trunk_sha1[SHA1_LEN];
@@ -236,7 +236,7 @@ out:
 	return ret;
 }
 
-static int farm_restore(struct siocb *iocb)
+static int farm_restore(const struct siocb *iocb)
 {
 	int ret = SD_RES_EIO, epoch = iocb->epoch;
 

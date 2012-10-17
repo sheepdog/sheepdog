@@ -99,7 +99,7 @@ static inline int mark_cache_in_reclaim(void)
 	return uatomic_cmpxchg(&sys_cache.in_reclaim, 0, 1);
 }
 
-static inline bool entry_is_dirty(struct object_cache_entry *entry)
+static inline bool entry_is_dirty(const struct object_cache_entry *entry)
 {
 	return !!entry->bmap;
 }
@@ -110,7 +110,7 @@ static inline int hash(uint64_t vid)
 }
 
 /* We should always use this helper to get entry idx */
-static inline uint32_t entry_idx(struct object_cache_entry *entry)
+static inline uint32_t entry_idx(const struct object_cache_entry *entry)
 {
 	return entry->idx & ~CACHE_INDEX_MASK;
 }
@@ -951,7 +951,7 @@ out:
 	return ret;
 }
 
-bool bypass_object_cache(struct request *req)
+bool bypass_object_cache(const struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
@@ -1096,7 +1096,7 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 	return ret;
 }
 
-int object_cache_flush_vdi(struct request *req)
+int object_cache_flush_vdi(const struct request *req)
 {
 	uint32_t vid = oid_to_vid(req->rq.obj.oid);
 	struct object_cache *cache;
@@ -1110,7 +1110,7 @@ int object_cache_flush_vdi(struct request *req)
 	return object_cache_push(cache);
 }
 
-int object_cache_flush_and_del(struct request *req)
+int object_cache_flush_and_del(const struct request *req)
 {
 	uint32_t vid = oid_to_vid(req->rq.obj.oid);
 	struct object_cache *cache;

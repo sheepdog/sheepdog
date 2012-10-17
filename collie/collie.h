@@ -65,11 +65,12 @@ extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 extern int sd_nodes_nr, sd_vnodes_nr;
 extern unsigned master_idx;
 
-bool is_current(struct sheepdog_inode *i);
+bool is_current(const struct sheepdog_inode *i);
 char *size_to_str(uint64_t _size, char *str, int str_size);
-typedef void (*vdi_parser_func_t)(uint32_t vid, char *name, char *tag,
-				  uint32_t snapid, uint32_t flags,
-				  struct sheepdog_inode *i, void *data);
+typedef void (*vdi_parser_func_t)(uint32_t vid, const char *name,
+				  const char *tag, uint32_t snapid,
+				  uint32_t flags,
+				  const struct sheepdog_inode *i, void *data);
 int parse_vdi(vdi_parser_func_t func, size_t size, void *data);
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		   uint64_t offset, bool direct);

@@ -578,7 +578,7 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path,
 	eventfd_write(efd, value);
 }
 
-static int zk_join(struct sd_node *myself,
+static int zk_join(const struct sd_node *myself,
 		   void *opaque, size_t opaque_len)
 {
 	int rc;

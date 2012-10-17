@@ -101,7 +101,7 @@ sockfd_cache_insert(struct sockfd_cache_entry *new)
 	return NULL; /* insert successfully */
 }
 
-static struct sockfd_cache_entry *sockfd_cache_search(struct node_id *nid)
+static struct sockfd_cache_entry *sockfd_cache_search(const struct node_id *nid)
 {
 	struct rb_node *n = sockfd_cache.root.rb_node;
 	struct sockfd_cache_entry *t;
@@ -141,7 +141,7 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
  *
  * If no free slot available, this typically means we should use short FD.
  */
-static struct sockfd_cache_entry *sockfd_cache_grab(struct node_id *nid,
+static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
 						    char *name, int *ret_idx)
 {
 	struct sockfd_cache_entry *entry;
@@ -185,7 +185,7 @@ static inline void destroy_all_slots(struct sockfd_cache_entry *entry)
  * the victim node will finally find itself talking to a dead node and call
  * sheep_del_fd() to delete this node from the cache.
  */
-static bool sockfd_cache_destroy(struct node_id *nid)
+static bool sockfd_cache_destroy(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *entry;
 
@@ -214,7 +214,7 @@ false_out:
 }
 
 /* When node craches, we should delete it from the cache */
-void sockfd_cache_del(struct node_id *nid)
+void sockfd_cache_del(const struct node_id *nid)
 {
 	char name[INET6_ADDRSTRLEN];
 	int n;
@@ -227,7 +227,7 @@ void sockfd_cache_del(struct node_id *nid)
 	dprintf("%s:%d, count %d\n", name, nid->port, n);
 }
 
-static void sockfd_cache_add_nolock(struct node_id *nid)
+static void sockfd_cache_add_nolock(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *new = xmalloc(sizeof(*new));
 	int i;
@@ -245,9 +245,9 @@ static void sockfd_cache_add_nolock(struct node_id *nid)
 }
 
 /* Add group of nodes to the cache */
-void sockfd_cache_add_group(struct sd_node *nodes, int nr)
+void sockfd_cache_add_group(const struct sd_node *nodes, int nr)
 {
-	struct sd_node *p;
+	const struct sd_node *p;
 
 	dprintf("%d\n", nr);
 	pthread_rwlock_wrlock(&sockfd_cache.lock);
@@ -259,7 +259,7 @@ void sockfd_cache_add_group(struct sd_node *nodes, int nr)
 }
 
 /* Add one node to the cache means we can do caching tricks on this node */
-void sockfd_cache_add(struct node_id *nid)
+void sockfd_cache_add(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *new;
 	char name[INET6_ADDRSTRLEN];
@@ -333,7 +333,7 @@ static inline void check_idx(int idx)
 	queue_work(sys->sockfd_wqueue, w);
 }
 
-static struct sockfd *sockfd_cache_get(struct node_id *nid, char *name)
+static struct sockfd *sockfd_cache_get(const struct node_id *nid, char *name)
 {
 	struct sockfd_cache_entry *entry;
 	struct sockfd *sfd;
@@ -366,7 +366,7 @@ out:
 	return sfd;
 }
 
-static void sockfd_cache_put(struct node_id *nid, int idx)
+static void sockfd_cache_put(const struct node_id *nid, int idx)
 {
 	struct sockfd_cache_entry *entry;
 	char name[INET6_ADDRSTRLEN];
@@ -393,7 +393,7 @@ static void sockfd_cache_put(struct node_id *nid, int idx)
  *
  * ret_idx is opaque to the caller, -1 indicates it is a short FD.
  */
-struct sockfd *sheep_get_sockfd(struct node_id *nid)
+struct sockfd *sheep_get_sockfd(const struct node_id *nid)
 {
 	char name[INET6_ADDRSTRLEN];
 	struct sockfd *sfd;
@@ -429,7 +429,7 @@ struct sockfd *sheep_get_sockfd(struct node_id *nid)
  * sheep_get_sockfd()
  */
 
-void sheep_put_sockfd(struct node_id *nid, struct sockfd *sfd)
+void sheep_put_sockfd(const struct node_id *nid, struct sockfd *sfd)
 {
 	if (sfd->idx == -1) {
 		dprintf("%d\n", sfd->fd);
@@ -449,7 +449,7 @@ void sheep_put_sockfd(struct node_id *nid, struct sockfd *sfd)
  * this vnode in the cache.
  * If it is a short FD, just close it.
  */
-void sheep_del_sockfd(struct node_id *nid, struct sockfd *sfd)
+void sheep_del_sockfd(const struct node_id *nid, struct sockfd *sfd)
 {
 	if (sfd->idx == -1) {
 		dprintf("%d\n", sfd->fd);
@@ -463,7 +463,7 @@ void sheep_del_sockfd(struct node_id *nid, struct sockfd *sfd)
 	free(sfd);
 }
 
-int sheep_exec_req(struct node_id *nid, struct sd_req *hdr, void *buf)
+int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 {
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 	struct sockfd *sfd;
