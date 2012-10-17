@@ -343,7 +343,7 @@ static int cluster_force_recover(int argc, char **argv)
 		l = strlen(str);
 		for (i = 0; i < l; i++)
 			str[i] = tolower(str[i]);
-		if (strncmp(str, "yes", 3) !=0)
+		if (strncmp(str, "yes", 3) != 0)
 			return EXIT_SUCCESS;
 	}
 

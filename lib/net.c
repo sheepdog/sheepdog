@@ -395,7 +395,8 @@ char *addr_to_str(char *str, int size, uint8_t *addr, uint16_t port)
 	/* Find address family type */
 	if (addr[12]) {
 		int  oct_no = 0;
-		while (!addr[oct_no] && oct_no++ < 12 );
+		while (!addr[oct_no] && oct_no++ < 12)
+			;
 		if (oct_no == 12) {
 			af = AF_INET;
 			addr_start_idx = 12;

@@ -17,11 +17,11 @@
 #include "sheep.h"
 #include "collie.h"
 
-static char program_name[] = "collie";
+static const char program_name[] = "collie";
 const char *sdhost = "localhost";
 int sdport = SD_LISTEN_PORT;
 bool highlight = true;
-bool raw_output = false;
+bool raw_output;
 
 static const struct sd_option collie_options[] = {
 

@@ -20,7 +20,7 @@
 #define LOG_SPACE_SIZE 1048576
 #define MAX_MSG_SIZE 256
 
-extern int log_init(char *progname, int size, bool to_stdout, int level,
+extern int log_init(const char *progname, int size, bool to_stdout, int level,
 		    char *outfile);
 extern void log_close(void);
 extern void dump_logmsg(void *);

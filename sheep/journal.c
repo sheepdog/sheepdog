@@ -205,7 +205,7 @@ err:
 	return NULL;
 }
 
-int jrnl_end(struct jrnl_descriptor * jd)
+int jrnl_end(struct jrnl_descriptor *jd)
 {
 	int ret = 0;
 	if (!jd)

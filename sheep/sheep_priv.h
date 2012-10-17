@@ -335,7 +335,7 @@ int gateway_to_peer_opcode(int opcode);
 /* Journal */
 struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
 				   const char *path, const char *jrnl_dir);
-int jrnl_end(struct jrnl_descriptor * jd);
+int jrnl_end(struct jrnl_descriptor *jd);
 int jrnl_recover(const char *jrnl_dir);
 
 static inline bool is_myself(uint8_t *addr, uint16_t port)

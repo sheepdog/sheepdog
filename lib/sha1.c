@@ -25,7 +25,7 @@
 
 static inline uint32_t rol(uint32_t value, uint32_t bits)
 {
-	return (((value) << (bits)) | ((value) >> (32 - (bits))));
+	return (value << bits) | (value >> (32 - bits));
 }
 
 /* blk0() and blk() perform the initial expand. */
@@ -91,7 +91,7 @@ static void sha1_transform(uint32_t *state, const uint8_t *in)
 	state[4] += e;
 	/* Wipe variables */
 	a = b = c = d = e = 0;
-	memset (block32, 0x00, sizeof block32);
+	memset(block32, 0x00, sizeof block32);
 }
 
 void sha1_init(void *ctx)
@@ -117,18 +117,17 @@ void sha1_update(void *ctx, const uint8_t *data, unsigned int len)
 	if ((j + len) > 63) {
 		memcpy(&sctx->buffer[j], data, (i = 64-j));
 		sha1_transform(sctx->state, sctx->buffer);
-		for ( ; i + 63 < len; i += 64) {
+		for ( ; i + 63 < len; i += 64)
 			sha1_transform(sctx->state, &data[i]);
-		}
 		j = 0;
-	}
-	else i = 0;
+	} else
+		i = 0;
 	memcpy(&sctx->buffer[j], &data[i], len - i);
 }
 
 
 /* Add padding and return the message digest. */
-void sha1_final(void* ctx, uint8_t *out)
+void sha1_final(void *ctx, uint8_t *out)
 {
 	struct sha1_ctx *sctx = ctx;
 	uint32_t i, j, idx, padlen;

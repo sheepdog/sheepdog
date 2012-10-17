@@ -520,9 +520,9 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 		master = is_master(&cmsg->sender);
 		if (master >= 0)
-		/* Master is down before new nodes finish joining.
-		 * We have to revoke its mastership to avoid cluster hanging
-		 */
+			/* Master is down before new nodes finish joining.
+			 * We have to revoke its mastership to avoid cluster
+			 * hanging */
 			cpg_nodes[master].gone = 1;
 
 		cevent->sender = cmsg->sender;

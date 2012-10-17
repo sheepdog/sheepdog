@@ -141,7 +141,7 @@ static void print_vdi_list(uint32_t vid, char *name, char *tag, uint32_t snapid,
 	}
 }
 
-static void print_vdi_tree(uint32_t vid, char *name, char * tag, uint32_t snapid,
+static void print_vdi_tree(uint32_t vid, char *name, char *tag, uint32_t snapid,
 			   uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	time_t ti;
@@ -161,7 +161,7 @@ static void print_vdi_tree(uint32_t vid, char *name, char * tag, uint32_t snapid
 	add_vdi_tree(name, buf, vid, i->parent_vdi_id, highlight && is_current(i));
 }
 
-static void print_vdi_graph(uint32_t vid, char *name, char * tag, uint32_t snapid,
+static void print_vdi_graph(uint32_t vid, char *name, char *tag, uint32_t snapid,
 			    uint32_t flags, struct sheepdog_inode *i, void *data)
 {
 	time_t ti;
@@ -1299,8 +1299,7 @@ static int vdi_write(int argc, char **argv)
 				memset(buf + (len - remain), 0, remain);
 				total = done + len;
 				break;
-			}
-			else if (ret < 0) {
+			} else if (ret < 0) {
 				fprintf(stderr, "Failed to read from stdin: %m\n");
 				ret = EXIT_SYSFAIL;
 				goto out;
@@ -1476,7 +1475,7 @@ static int vdi_check(int argc, char **argv)
 		goto out;
 
 	total = inode->vdi_size;
-	while(done < total) {
+	while (done < total) {
 		vid = inode->data_vdi_id[idx];
 		if (vid) {
 			oid = vid_to_data_oid(vid, idx);
@@ -1722,9 +1721,8 @@ static uint32_t do_restore(char *vdiname, int snapid, const char *tag)
 	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
 
 	ret = xread(STDIN_FILENO, &hdr, sizeof(hdr));
-	if (ret != sizeof(hdr)) {
+	if (ret != sizeof(hdr))
 		fprintf(stderr, "failed to read backup header, %m\n");
-	}
 
 	if (hdr.version != VDI_BACKUP_FORMAT_VERSION ||
 	    hdr.magic != VDI_BACKUP_MAGIC) {

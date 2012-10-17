@@ -60,9 +60,8 @@ void add_timer(struct timer *t, unsigned int mseconds)
 		return;
 	}
 
-	if (register_event(tfd, timer_handler, t) < 0) {
+	if (register_event(tfd, timer_handler, t) < 0)
 		eprintf("failed to register timer fd\n");
-	}
 }
 
 struct event_info {

@@ -78,7 +78,7 @@ static int log_fd = -1;
 static __thread const char *worker_name;
 static __thread int worker_idx;
 static struct logarea *la;
-static char *log_name;
+static const char *log_name;
 static char *log_nowname;
 static int log_level = SDOG_INFO;
 static pid_t sheep_pid;
@@ -95,8 +95,9 @@ static notrace int logarea_init(int size)
 
 	logdbg(stderr, "entering logarea_init\n");
 
-	if ((shmid = shmget(IPC_PRIVATE, sizeof(struct logarea),
-			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
+	shmid = shmget(IPC_PRIVATE, sizeof(struct logarea),
+		       0644 | IPC_CREAT | IPC_EXCL);
+	if (shmid == -1) {
 		syslog(LOG_ERR, "shmget logarea failed: %m");
 		return 1;
 	}
@@ -112,8 +113,8 @@ static notrace int logarea_init(int size)
 	if (size < MAX_MSG_SIZE)
 		size = LOG_SPACE_SIZE;
 
-	if ((shmid = shmget(IPC_PRIVATE, size,
-			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
+	shmid = shmget(IPC_PRIVATE, size, 0644 | IPC_CREAT | IPC_EXCL);
+	if (shmid == -1) {
 		syslog(LOG_ERR, "shmget msg failed: %m");
 		shmdt(la);
 		return 1;
@@ -134,8 +135,9 @@ static notrace int logarea_init(int size)
 	la->head = la->start;
 	la->tail = la->start;
 
-	if ((shmid = shmget(IPC_PRIVATE, MAX_MSG_SIZE + sizeof(struct logmsg),
-			    0644 | IPC_CREAT | IPC_EXCL)) == -1) {
+	shmid = shmget(IPC_PRIVATE, MAX_MSG_SIZE + sizeof(struct logmsg),
+		       0644 | IPC_CREAT | IPC_EXCL);
+	if (shmid == -1) {
 		syslog(LOG_ERR, "shmget logmsg failed: %m");
 		shmdt(la->start);
 		shmdt(la);
@@ -151,7 +153,8 @@ static notrace int logarea_init(int size)
 
 	shmctl(shmid, IPC_RMID, NULL);
 
-	if ((la->semid = semget(semkey, 1, 0666 | IPC_CREAT)) < 0) {
+	la->semid = semget(semkey, 1, 0666 | IPC_CREAT);
+	if (la->semid < 0) {
 		syslog(LOG_ERR, "semget failed: %m");
 		shmdt(la->buff);
 		shmdt(la->start);
@@ -159,7 +162,7 @@ static notrace int logarea_init(int size)
 		return 1;
 	}
 
-	la->semarg.val=1;
+	la->semarg.val = 1;
 	if (semctl(la->semid, 0, SETVAL, la->semarg) < 0) {
 		syslog(LOG_ERR, "semctl failed: %m");
 		shmdt(la->buff);
@@ -184,7 +187,7 @@ static void notrace free_logarea(void)
 #if LOGDBG
 static void dump_logarea(void)
 {
-	struct logmsg * msg;
+	struct logmsg *msg;
 
 	logdbg(stderr, "\n==== area: start addr = %p, end addr = %p ====\n",
 		la->start, la->end);
@@ -285,9 +288,9 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 
 static notrace int log_dequeue(void *buff)
 {
-	struct logmsg * src = (struct logmsg *)la->head;
-	struct logmsg * dst = (struct logmsg *)buff;
-	struct logmsg * lst = (struct logmsg *)la->tail;
+	struct logmsg *src = (struct logmsg *)la->head;
+	struct logmsg *dst = (struct logmsg *)buff;
+	struct logmsg *lst = (struct logmsg *)la->tail;
 	int len;
 
 	if (la->empty)
@@ -318,7 +321,7 @@ static notrace int log_dequeue(void *buff)
  */
 static notrace void log_syslog(void *buff)
 {
-	struct logmsg * msg = (struct logmsg *)buff;
+	struct logmsg *msg = (struct logmsg *)buff;
 
 	if (log_fd >= 0)
 		xwrite(log_fd, (char *)&msg->str, strlen((char *)&msg->str));
@@ -510,8 +513,8 @@ static notrace void logger(char *log_dir, char *outfile)
 	exit(0);
 }
 
-notrace int log_init(char *program_name, int size, bool to_stdout, int level,
-		char *outfile)
+notrace int log_init(const char *program_name, int size, bool to_stdout,
+		     int level, char *outfile)
 {
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
 

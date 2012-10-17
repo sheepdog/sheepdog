@@ -303,5 +303,5 @@ void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
 	}
 
 	if (offset + len < requested_len)
-		memset(p + offset + len, 0, requested_len- offset - len);
+		memset(p + offset + len, 0, requested_len - offset - len);
 }

@@ -396,7 +396,7 @@ static int do_lookup_vdi(char *name, int namelen, uint32_t *vid, char *tag,
 	if (nr == start_nr) {
 		return SD_RES_NO_VDI;
 	} else if (nr < SD_NR_VDIS) {
-	right_side:
+right_side:
 		/* look up on the right side of the hash point */
 		ret = find_first_vdi(nr - 1, start_nr, name,
 				     tag, snapid, vid, deleted_nr, next_snapid,

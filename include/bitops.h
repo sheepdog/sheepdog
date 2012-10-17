@@ -5,10 +5,10 @@
 
 #include "util.h"
 
-#define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #define BITS_PER_BYTE		8
 #define BITS_TO_LONGS(nr)	DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
-#define DECLARE_BITMAP(name,bits) \
+#define DECLARE_BITMAP(name, bits) \
 	unsigned long name[BITS_TO_LONGS(bits)]
 #define BITS_PER_LONG (BITS_PER_BYTE * sizeof(long))
 
@@ -39,7 +39,8 @@ static inline unsigned long find_next_zero_bit(const unsigned long *addr, unsign
 		result += BITS_PER_LONG;
 	}
 	while (size & ~(BITS_PER_LONG-1)) {
-		if (~(tmp = *(p++)))
+		tmp = *(p++);
+		if (~tmp)
 			goto found_middle;
 		result += BITS_PER_LONG;
 		size -= BITS_PER_LONG;
@@ -78,7 +79,8 @@ static inline unsigned long find_next_bit(const unsigned long *addr, unsigned lo
 		result += BITS_PER_LONG;
 	}
 	while (size & ~(BITS_PER_LONG-1)) {
-		if ((tmp = *(p++)))
+		tmp = *(p++);
+		if (tmp)
 			goto found_middle;
 		result += BITS_PER_LONG;
 		size -= BITS_PER_LONG;

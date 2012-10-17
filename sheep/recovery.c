@@ -226,7 +226,7 @@ static inline void prepare_schedule_oid(uint64_t oid)
 	int i;
 
 	for (i = 0; i < rw->nr_prio_oids; i++)
-		if (rw->prio_oids[i] == oid )
+		if (rw->prio_oids[i] == oid)
 			return;
 	/*
 	 * We need this check because oid might not be recovered.
@@ -456,7 +456,7 @@ static void recover_object_main(struct work *work)
 		return;
 	}
 
-	if (rw->stop){
+	if (rw->stop) {
 		/*
 		 * Stop this recovery process and wait for epoch to be
 		 * lifted and flush wait_obj queue to requeue those

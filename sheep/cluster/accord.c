@@ -310,7 +310,7 @@ static bool need_cleanup;
 static void acrd_join_fn(struct acrd_handle *ah, const uint64_t *member_list,
 			 size_t member_list_entries, uint64_t nodeid, void *arg)
 {
-	static bool init = false;
+	static bool init;
 
 	if (!init) {
 		this_id = nodeid;

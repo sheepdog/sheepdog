@@ -37,7 +37,7 @@
 #define LOG_FILE_NAME "sheep.log"
 
 LIST_HEAD(cluster_drivers);
-static char program_name[] = "sheep";
+static const char program_name[] = "sheep";
 
 static struct option const long_options[] = {
 	{"bindaddr", required_argument, NULL, 'b'},
@@ -112,9 +112,9 @@ static int create_pidfile(const char *filename)
 	int len;
 	char buffer[128];
 
-	if ((fd = open(filename, O_RDWR|O_CREAT|O_SYNC, 0600)) == -1) {
+	fd = open(filename, O_RDWR|O_CREAT|O_SYNC, 0600);
+	if (fd == -1)
 		return -1;
-	}
 
 	if (lockf(fd, F_TLOCK, 0) == -1) {
 		close(fd);
@@ -143,10 +143,10 @@ static void signal_handler(int listen_fd, int events, void *data)
 	dprintf("signal %d\n", siginfo.ssi_signo);
 	switch (siginfo.ssi_signo) {
 	case SIGTERM:
-		sys->status= SD_STATUS_KILLED;
+		sys->status = SD_STATUS_KILLED;
 		break;
 	default:
-		eprintf("signal %d unhandled \n", siginfo.ssi_signo);
+		eprintf("signal %d unhandled\n", siginfo.ssi_signo);
 		break;
 	}
 }
@@ -506,7 +506,7 @@ int main(int argc, char **argv)
 		if (!sys->reclaim_wqueue)
 			exit(1);
 	}
-	if (!sys->gateway_wqueue || !sys->io_wqueue ||!sys->recovery_wqueue ||
+	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->sockfd_wqueue)
 		exit(1);
 

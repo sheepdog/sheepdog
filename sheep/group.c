@@ -223,7 +223,7 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 /*
  * Indicator if a cluster operation is currently running.
  */
-static bool cluster_op_running = false;
+static bool cluster_op_running;
 
 static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 		size_t *sizep)

@@ -531,7 +531,8 @@ static int leave_event(zhandle_t *zh, struct zk_node *znode)
 	return 0;
 }
 
-static void watcher(zhandle_t *zh, int type, int state, const char *path, void* ctx)
+static void watcher(zhandle_t *zh, int type, int state, const char *path,
+		    void *ctx)
 {
 	eventfd_t value = 1;
 	const clientid_t *cid;

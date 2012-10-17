@@ -11,7 +11,7 @@
 
 #include "collie.h"
 
-static void cal_total_vdi_size(uint32_t vid, char *name, char * tag,
+static void cal_total_vdi_size(uint32_t vid, char *name, char *tag,
 			       uint32_t snapid, uint32_t flags,
 			       struct sheepdog_inode *i, void *data)
 {
