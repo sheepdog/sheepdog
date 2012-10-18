@@ -319,7 +319,7 @@ static void notify_recovery_completion_work(struct work *work)
 	int ret;
 
 	sd_init_req(&hdr, SD_OP_COMPLETE_RECOVERY);
-	hdr.epoch = rw->epoch;
+	hdr.obj.tgt_epoch = rw->epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = sizeof(sys->this_node);
 

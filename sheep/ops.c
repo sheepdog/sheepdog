@@ -577,19 +577,23 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	static int latest_epoch;
 	struct vnode_info *vnode_info;
 	int i;
+	uint32_t epoch = req->obj.tgt_epoch;
 
 	node = (struct sd_node *)data;
 
-	if (latest_epoch < req->epoch) {
-		dprintf("new epoch %d\n", req->epoch);
-		latest_epoch = req->epoch;
+	if (latest_epoch > epoch)
+		return SD_RES_SUCCESS;
+
+	if (latest_epoch < epoch) {
+		dprintf("new epoch %d\n", epoch);
+		latest_epoch = epoch;
 		nr_recovereds = 0;
 	}
 
 	recovereds[nr_recovereds++] = *(struct sd_node *)node;
 	qsort(recovereds, nr_recovereds, sizeof(*recovereds), node_id_cmp);
 
-	dprintf("%s is recovered at epoch %d\n", node_to_str(node), req->epoch);
+	dprintf("%s is recovered at epoch %d\n", node_to_str(node), epoch);
 	for (i = 0; i < nr_recovereds; i++)
 		dprintf("[%x] %s\n", i, node_to_str(recovereds + i));
 
@@ -601,7 +605,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	if (vnode_info->nr_nodes == nr_recovereds &&
 	    memcmp(vnode_info->nodes, recovereds,
 		   sizeof(*recovereds) * nr_recovereds) == 0) {
-		dprintf("all nodes are recovered at epoch %d\n", req->epoch);
+		dprintf("all nodes are recovered at epoch %d\n", epoch);
 		if (sd_store->cleanup)
 			sd_store->cleanup();
 	}
