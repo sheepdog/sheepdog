@@ -93,7 +93,6 @@ static int trace_read_buffer(void)
 read_buffer:
 	sd_init_req(&hdr, SD_OP_TRACE_READ_BUF);
 	hdr.data_length = TRACE_BUF_LEN;
-	hdr.epoch = sd_epoch;
 
 	ret = exec_req(fd, &hdr, buf);
 
@@ -131,7 +130,6 @@ static int trace_start(int argc, char **argv)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
 	sd_init_req(&hdr, SD_OP_TRACE);
-	hdr.epoch = sd_epoch;
 	hdr.data_length = 1;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
@@ -151,7 +149,6 @@ static int trace_stop(int argc, char **argv)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
 	sd_init_req(&hdr, SD_OP_TRACE);
-	hdr.epoch = sd_epoch;
 	hdr.data_length = 0;
 
 	ret = send_light_req(&hdr, sdhost, sdport);

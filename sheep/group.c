@@ -623,7 +623,6 @@ static int get_vdis_from(struct sd_node *node)
 	}
 
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
-	hdr.epoch = sys->epoch;
 	hdr.data_length = rlen;
 	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc);
 	if (ret != SD_RES_SUCCESS)

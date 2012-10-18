@@ -348,7 +348,6 @@ static int cluster_force_recover(int argc, char **argv)
 	}
 
 	sd_init_req(&hdr, SD_OP_FORCE_RECOVER);
-	hdr.epoch = sd_epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
@@ -365,7 +364,6 @@ static int cluster_disable_recover(int argc, char **argv)
 	struct sd_req hdr;
 
 	sd_init_req(&hdr, SD_OP_DISABLE_RECOVER);
-	hdr.epoch = sd_epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret)
@@ -381,7 +379,6 @@ static int cluster_enable_recover(int argc, char **argv)
 	struct sd_req hdr;
 
 	sd_init_req(&hdr, SD_OP_ENABLE_RECOVER);
-	hdr.epoch = sd_epoch;
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret)

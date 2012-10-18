@@ -886,7 +886,6 @@ again:
 		goto error;
 
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
-	hdr.epoch = sd_epoch;
 	hdr.data_length = log_length;
 
 	ret = exec_req(fd, &hdr, logs);

@@ -68,7 +68,6 @@ static int node_info(int argc, char **argv)
 		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
 		sd_init_req((struct sd_req *)&req, SD_OP_STAT_SHEEP);
-		req.epoch = sd_epoch;
 
 		ret = send_light_req((struct sd_req *)&req, host,
 				     sd_nodes[i].nid.port);
