@@ -35,14 +35,6 @@
 #include "logger.h"
 #include "util.h"
 
-#define LOGDBG 0
-
-#if LOGDBG
-#define logdbg(file, fmt, args...) fprintf(file, fmt, ##args)
-#else
-#define logdbg(file, fmt, args...) do {} while (0)
-#endif
-
 static int log_enqueue(int prio, const char *func, int line, const char *fmt,
 		       va_list ap) __attribute__ ((format (printf, 4, 0)));
 static void dolog(int prio, const char *func, int line, const char *fmt,
@@ -92,8 +84,6 @@ static pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
 static notrace int logarea_init(int size)
 {
 	int shmid;
-
-	logdbg(stderr, "entering logarea_init\n");
 
 	shmid = shmget(IPC_PRIVATE, sizeof(struct logarea),
 		       0644 | IPC_CREAT | IPC_EXCL);
@@ -184,27 +174,6 @@ static void notrace free_logarea(void)
 	shmdt(la);
 }
 
-#if LOGDBG
-static void dump_logarea(void)
-{
-	struct logmsg *msg;
-
-	logdbg(stderr, "\n==== area: start addr = %p, end addr = %p ====\n",
-		la->start, la->end);
-	logdbg(stderr, "|addr     |next     |prio|msg\n");
-
-	for (msg = (struct logmsg *)la->head; (void *)msg != la->tail;
-	     msg = msg->next)
-		logdbg(stderr, "|%p |%p |%i   |%s\n", (void *)msg, msg->next,
-				msg->prio, (char *)&msg->str);
-
-	logdbg(stderr, "|%p |%p |%i   |%s\n", (void *)msg, msg->next,
-			msg->prio, (char *)&msg->str);
-
-	logdbg(stderr, "\n\n");
-}
-#endif
-
 static notrace int log_enqueue(int prio, const char *func, int line, const char *fmt,
 		       va_list ap)
 {
@@ -252,15 +221,12 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 
 	/* not enough space on tail : rewind */
 	if (la->head <= la->tail &&
-	    (len + sizeof(struct logmsg)) > ((char *)la->end - (char *)la->tail)) {
-		logdbg(stderr, "enqueue: rewind tail to %p\n", la->tail);
-			la->tail = la->start;
-	}
+	    (len + sizeof(struct logmsg)) > ((char *)la->end - (char *)la->tail))
+		la->tail = la->start;
 
 	/* not enough space on head : drop msg */
 	if (la->head > la->tail &&
 	    (len + sizeof(struct logmsg)) > ((char *)la->head - (char *)la->tail)) {
-		logdbg(stderr, "enqueue: log area overrun, dropping message\n");
 		syslog(LOG_ERR, "enqueue: log area overrun, dropping message\n");
 
 		if (!la->empty)
@@ -277,12 +243,6 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	lastmsg->next = la->tail;
 	msg->next = la->head;
 
-	logdbg(stderr, "enqueue: %p, %p, %i, %s\n", (void *)msg, msg->next,
-		msg->prio, (char *)&msg->str);
-
-#if LOGDBG
-	dump_logarea();
-#endif
 	return 0;
 }
 
@@ -308,8 +268,6 @@ static notrace int log_dequeue(void *buff)
 		la->head = src->next;
 		lst->next = la->head;
 	}
-	logdbg(stderr, "dequeue: %p, %p, %i, %s\n",
-		(void *)src, src->next, src->prio, (char *)&src->str);
 
 	memset((void *)src, 0,  len);
 
@@ -520,7 +478,6 @@ notrace int log_init(const char *program_name, int size, bool to_stdout,
 
 	log_level = level;
 
-	logdbg(stderr, "entering log_init\n");
 	log_name = program_name;
 	log_nowname = outfile;
 	strcpy(tmp, outfile);
