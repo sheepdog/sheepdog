@@ -54,7 +54,6 @@ struct logarea {
 	void *tail;
 	void *start;
 	void *end;
-	char *buff;
 	int semid;
 	union semun semarg;
 	int fd;
@@ -76,6 +75,7 @@ static int log_level = SDOG_INFO;
 static pid_t sheep_pid;
 static pid_t logger_pid;
 static key_t semkey;
+static char *log_buff;
 
 static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
 
@@ -125,28 +125,9 @@ static notrace int logarea_init(int size)
 	la->head = la->start;
 	la->tail = la->start;
 
-	shmid = shmget(IPC_PRIVATE, MAX_MSG_SIZE + sizeof(struct logmsg),
-		       0644 | IPC_CREAT | IPC_EXCL);
-	if (shmid == -1) {
-		syslog(LOG_ERR, "shmget logmsg failed: %m");
-		shmdt(la->start);
-		shmdt(la);
-		return 1;
-	}
-	la->buff = shmat(shmid, NULL, 0);
-	if (!la->buff) {
-		syslog(LOG_ERR, "shmat logmsg failed: %m");
-		shmdt(la->start);
-		shmdt(la);
-		return 1;
-	}
-
-	shmctl(shmid, IPC_RMID, NULL);
-
 	la->semid = semget(semkey, 1, 0666 | IPC_CREAT);
 	if (la->semid < 0) {
 		syslog(LOG_ERR, "semget failed: %m");
-		shmdt(la->buff);
 		shmdt(la->start);
 		shmdt(la);
 		return 1;
@@ -155,7 +136,6 @@ static notrace int logarea_init(int size)
 	la->semarg.val = 1;
 	if (semctl(la->semid, 0, SETVAL, la->semarg) < 0) {
 		syslog(LOG_ERR, "semctl failed: %m");
-		shmdt(la->buff);
 		shmdt(la->start);
 		shmdt(la);
 		return 1;
@@ -169,7 +149,6 @@ static void notrace free_logarea(void)
 	if (log_fd >= 0)
 		close(log_fd);
 	semctl(la->semid, 0, IPC_RMID, la->semarg);
-	shmdt(la->buff);
 	shmdt(la->start);
 	shmdt(la);
 }
@@ -246,41 +225,11 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	return 0;
 }
 
-static notrace int log_dequeue(void *buff)
-{
-	struct logmsg *src = (struct logmsg *)la->head;
-	struct logmsg *dst = (struct logmsg *)buff;
-	struct logmsg *lst = (struct logmsg *)la->tail;
-	int len;
-
-	if (la->empty)
-		return 1;
-
-	len = strlen((char *)&src->str) * sizeof(char) +
-		sizeof(struct logmsg) + 1;
-
-	dst->prio = src->prio;
-	memcpy(dst, src,  len);
-
-	if (la->tail == la->head)
-		la->empty = true; /* we purge the last logmsg */
-	else {
-		la->head = src->next;
-		lst->next = la->head;
-	}
-
-	memset((void *)src, 0,  len);
-
-	return la->empty;
-}
-
 /*
  * this one can block under memory pressure
  */
-static notrace void log_syslog(void *buff)
+static notrace void log_syslog(const struct logmsg *msg)
 {
-	struct logmsg *msg = (struct logmsg *)buff;
-
 	if (log_fd >= 0)
 		xwrite(log_fd, (char *)&msg->str, strlen((char *)&msg->str));
 	else
@@ -369,24 +318,37 @@ notrace void log_write(int prio, const char *func, int line, const char *fmt, ..
 static notrace void log_flush(void)
 {
 	struct sembuf ops;
+	size_t size, done = 0;
+	const struct logmsg *msg;
 
-	while (!la->empty) {
-		ops.sem_num = 0;
-		ops.sem_flg = SEM_UNDO;
-		ops.sem_op = -1;
-		if (semop(la->semid, &ops, 1) < 0) {
-			syslog(LOG_ERR, "semop up failed: %m");
-			exit(1);
-		}
+	if (la->empty)
+		return;
 
-		log_dequeue(la->buff);
+	ops.sem_num = 0;
+	ops.sem_flg = SEM_UNDO;
+	ops.sem_op = -1;
+	if (semop(la->semid, &ops, 1) < 0) {
+		syslog(LOG_ERR, "semop up failed: %m");
+		exit(1);
+	}
 
-		ops.sem_op = 1;
-		if (semop(la->semid, &ops, 1) < 0) {
-			syslog(LOG_ERR, "semop down failed: %m");
-			exit(1);
-		}
-		log_syslog(la->buff);
+	size = (char *)la->tail - (char *)la->start;
+	memcpy(log_buff, la->start, size);
+	memset(la->start, 0, size);
+	la->empty = true;
+	la->head = la->start;
+	la->tail = la->start;
+
+	ops.sem_op = 1;
+	if (semop(la->semid, &ops, 1) < 0) {
+		syslog(LOG_ERR, "semop down failed: %m");
+		exit(1);
+	}
+
+	while (done < size) {
+		msg = (const struct logmsg *)(log_buff + done);
+		log_syslog(msg);
+		done += sizeof(*msg) + strlen((char *)&msg->str) + 1;
 	}
 }
 
@@ -414,6 +376,8 @@ static notrace void logger(char *log_dir, char *outfile)
 	struct sigaction sa_old;
 	struct sigaction sa_new;
 	int fd;
+
+	log_buff = xzalloc((char *)la->end - (char *)la->start);
 
 	log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
 	if (log_fd < 0) {
@@ -468,6 +432,7 @@ static notrace void logger(char *log_dir, char *outfile)
 		sleep(1);
 	}
 
+	free(log_buff);
 	exit(0);
 }
 
