@@ -60,6 +60,7 @@ struct logarea {
 };
 
 struct logmsg {
+	time_t t;
 	short int prio;
 	void *next;
 	char *str;
@@ -160,8 +161,6 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	char *p, buff[MAX_MSG_SIZE];
 	struct logmsg *msg;
 	struct logmsg *lastmsg;
-	time_t t;
-	struct tm *tmp;
 
 	lastmsg = (struct logmsg *)la->tail;
 
@@ -174,20 +173,12 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	p = buff;
 
 
-	t = time(NULL);
-	tmp = localtime(&t);
-
-	strftime(p, MAX_MSG_SIZE, "%b %2d %H:%M:%S", tmp);
-	p += strlen(p);
-
 	if (worker_name && worker_idx)
-		snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s %d] ",
-			 worker_name, worker_idx);
+		snprintf(p, MAX_MSG_SIZE, "[%s %d] ", worker_name, worker_idx);
 	else if (worker_name)
-		snprintf(p, MAX_MSG_SIZE - strlen(buff), " [%s] ",
-			 worker_name);
+		snprintf(p, MAX_MSG_SIZE, "[%s] ", worker_name);
 	else
-		strncpy(p, " [main] ", MAX_MSG_SIZE - strlen(buff));
+		strncpy(p, "[main] ", MAX_MSG_SIZE);
 
 	p += strlen(p);
 	snprintf(p, MAX_MSG_SIZE - strlen(buff), "%s(%d) ", func, line);
@@ -217,6 +208,7 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 	/* ok, we can stage the msg in the area */
 	la->empty = false;
 	msg = (struct logmsg *)la->tail;
+	msg->t = time(NULL);
 	msg->prio = prio;
 	memcpy((void *)&msg->str, buff, len);
 	lastmsg->next = la->tail;
@@ -230,10 +222,18 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
  */
 static notrace void log_syslog(const struct logmsg *msg)
 {
+	char str[MAX_MSG_SIZE];
+	struct tm tm;
+	size_t len;
+
+	localtime_r(&msg->t, &tm);
+	len = strftime(str, sizeof(str), "%b %2d %H:%M:%S ", &tm);
+	strncpy(str + len, (char *)&msg->str, sizeof(str) - len);
+
 	if (log_fd >= 0)
-		xwrite(log_fd, (char *)&msg->str, strlen((char *)&msg->str));
+		xwrite(log_fd, str, strlen(str));
 	else
-		syslog(msg->prio, "%s", (char *)&msg->str);
+		syslog(msg->prio, "%s", str);
 }
 
 static notrace void dolog(int prio, const char *func, int line,
