@@ -208,10 +208,10 @@ finish_write:
 	return err_ret;
 }
 
-static inline void write_info_init(struct write_info *wi)
+static inline void write_info_init(struct write_info *wi, size_t nr_to_send)
 {
 	int i;
-	for (i = 0; i < SD_MAX_NODES; i++)
+	for (i = 0; i < nr_to_send; i++)
 		wi->ent[i].pfd.fd = -1;
 	wi->nr_sent = 0;
 }
@@ -264,9 +264,9 @@ static int gateway_forward_request(struct request *req, bool all_node)
 	gateway_init_fwd_hdr(&hdr, &req->rq);
 	op = get_sd_op(hdr.opcode);
 
-	write_info_init(&wi);
 	wlen = hdr.data_length;
 	nr_to_send = init_target_nodes(req, all_node, oid, target_nodes);
+	write_info_init(&wi, nr_to_send);
 
 	for (i = 0; i < nr_to_send; i++) {
 		struct sockfd *sfd;
