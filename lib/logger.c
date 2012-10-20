@@ -48,12 +48,10 @@ union semun {
 };
 
 struct logarea {
-	bool empty;
 	bool active;
-	void *head;
-	void *tail;
-	void *start;
-	void *end;
+	char *tail;
+	char *start;
+	char *end;
 	int semid;
 	union semun semarg;
 	int fd;
@@ -61,9 +59,8 @@ struct logarea {
 
 struct logmsg {
 	time_t t;
-	short int prio;
-	void *next;
-	char *str;
+	int prio;
+	char str[0];
 };
 
 static int log_fd = -1;
@@ -121,9 +118,7 @@ static notrace int logarea_init(int size)
 
 	shmctl(shmid, IPC_RMID, NULL);
 
-	la->empty = true;
-	la->end = (char *)la->start + size;
-	la->head = la->start;
+	la->end = la->start + size;
 	la->tail = la->start;
 
 	la->semid = semget(semkey, 1, 0666 | IPC_CREAT);
@@ -157,21 +152,11 @@ static void notrace free_logarea(void)
 static notrace int log_enqueue(int prio, const char *func, int line, const char *fmt,
 		       va_list ap)
 {
-	int len, fwd;
+	int len;
 	char *p, buff[MAX_MSG_SIZE];
 	struct logmsg *msg;
-	struct logmsg *lastmsg;
-
-	lastmsg = (struct logmsg *)la->tail;
-
-	if (!la->empty) {
-		fwd = sizeof(struct logmsg) +
-		      strlen((char *)&lastmsg->str) * sizeof(char) + 1;
-		la->tail = (char *)la->tail + fwd;
-	}
 
 	p = buff;
-
 
 	if (worker_name && worker_idx)
 		snprintf(p, MAX_MSG_SIZE, "[%s %d] ", worker_name, worker_idx);
@@ -187,32 +172,21 @@ static notrace int log_enqueue(int prio, const char *func, int line, const char 
 
 	vsnprintf(p, MAX_MSG_SIZE - strlen(buff), fmt, ap);
 
-	len = strlen(buff) * sizeof(char) + 1;
+	len = strlen(buff) + 1;
 
-	/* not enough space on tail : rewind */
-	if (la->head <= la->tail &&
-	    (len + sizeof(struct logmsg)) > ((char *)la->end - (char *)la->tail))
-		la->tail = la->start;
-
-	/* not enough space on head : drop msg */
-	if (la->head > la->tail &&
-	    (len + sizeof(struct logmsg)) > ((char *)la->head - (char *)la->tail)) {
+	/* not enough space: drop msg */
+	if (len + sizeof(struct logmsg) > la->end - la->tail) {
 		syslog(LOG_ERR, "enqueue: log area overrun, dropping message\n");
-
-		if (!la->empty)
-			la->tail = lastmsg;
 
 		return 1;
 	}
 
 	/* ok, we can stage the msg in the area */
-	la->empty = false;
 	msg = (struct logmsg *)la->tail;
 	msg->t = time(NULL);
 	msg->prio = prio;
-	memcpy((void *)&msg->str, buff, len);
-	lastmsg->next = la->tail;
-	msg->next = la->head;
+	memcpy(msg->str, buff, len);
+	la->tail += sizeof(struct logmsg) + len;
 
 	return 0;
 }
@@ -228,7 +202,7 @@ static notrace void log_syslog(const struct logmsg *msg)
 
 	localtime_r(&msg->t, &tm);
 	len = strftime(str, sizeof(str), "%b %2d %H:%M:%S ", &tm);
-	strncpy(str + len, (char *)&msg->str, sizeof(str) - len);
+	strncpy(str + len, msg->str, sizeof(str) - len);
 
 	if (log_fd >= 0)
 		xwrite(log_fd, str, strlen(str));
@@ -321,7 +295,7 @@ static notrace void log_flush(void)
 	size_t size, done = 0;
 	const struct logmsg *msg;
 
-	if (la->empty)
+	if (la->tail == la->start)
 		return;
 
 	ops.sem_num = 0;
@@ -332,11 +306,9 @@ static notrace void log_flush(void)
 		exit(1);
 	}
 
-	size = (char *)la->tail - (char *)la->start;
+	size = la->tail - la->start;
 	memcpy(log_buff, la->start, size);
 	memset(la->start, 0, size);
-	la->empty = true;
-	la->head = la->start;
 	la->tail = la->start;
 
 	ops.sem_op = 1;
@@ -348,7 +320,7 @@ static notrace void log_flush(void)
 	while (done < size) {
 		msg = (const struct logmsg *)(log_buff + done);
 		log_syslog(msg);
-		done += sizeof(*msg) + strlen((char *)&msg->str) + 1;
+		done += sizeof(*msg) + strlen(msg->str) + 1;
 	}
 }
 
@@ -377,7 +349,7 @@ static notrace void logger(char *log_dir, char *outfile)
 	struct sigaction sa_new;
 	int fd;
 
-	log_buff = xzalloc((char *)la->end - (char *)la->start);
+	log_buff = xzalloc(la->end - la->start);
 
 	log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
 	if (log_fd < 0) {
