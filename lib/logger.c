@@ -35,8 +35,9 @@
 #include "logger.h"
 #include "util.h"
 
-static int log_enqueue(int prio, const char *func, int line, const char *fmt,
-		       va_list ap) __attribute__ ((format (printf, 4, 0)));
+static int log_vsnprintf(char *buff, size_t size, int prio,
+			 const char *func, int line, const char *fmt,
+			 va_list ap) __attribute__ ((format (printf, 6, 0)));
 static void dolog(int prio, const char *func, int line, const char *fmt,
 		  va_list ap) __attribute__ ((format (printf, 4, 0)));
 
@@ -149,46 +150,29 @@ static void notrace free_logarea(void)
 	shmdt(la);
 }
 
-static notrace int log_enqueue(int prio, const char *func, int line, const char *fmt,
-		       va_list ap)
+static notrace int log_vsnprintf(char *buff, size_t size, int prio,
+				 const char *func, int line, const char *fmt,
+				 va_list ap)
 {
-	int len;
-	char *p, buff[MAX_MSG_SIZE];
-	struct logmsg *msg;
-
-	p = buff;
+	char *p = buff;
 
 	if (worker_name && worker_idx)
-		snprintf(p, MAX_MSG_SIZE, "[%s %d] ", worker_name, worker_idx);
+		snprintf(p, size, "[%s %d] ", worker_name, worker_idx);
 	else if (worker_name)
-		snprintf(p, MAX_MSG_SIZE, "[%s] ", worker_name);
+		snprintf(p, size, "[%s] ", worker_name);
 	else
-		strncpy(p, "[main] ", MAX_MSG_SIZE);
+		strncpy(p, "[main] ", size);
 
 	p += strlen(p);
-	snprintf(p, MAX_MSG_SIZE - strlen(buff), "%s(%d) ", func, line);
+	snprintf(p, size - strlen(buff), "%s(%d) ", func, line);
 
 	p += strlen(p);
 
-	vsnprintf(p, MAX_MSG_SIZE - strlen(buff), fmt, ap);
+	vsnprintf(p, size - strlen(buff), fmt, ap);
 
-	len = strlen(buff) + 1;
+	p += strlen(p);
 
-	/* not enough space: drop msg */
-	if (len + sizeof(struct logmsg) > la->end - la->tail) {
-		syslog(LOG_ERR, "enqueue: log area overrun, dropping message\n");
-
-		return 1;
-	}
-
-	/* ok, we can stage the msg in the area */
-	msg = (struct logmsg *)la->tail;
-	msg->t = time(NULL);
-	msg->prio = prio;
-	memcpy(msg->str, buff, len);
-	la->tail += sizeof(struct logmsg) + len;
-
-	return 0;
+	return p - buff;
 }
 
 /*
@@ -213,8 +197,15 @@ static notrace void log_syslog(const struct logmsg *msg)
 static notrace void dolog(int prio, const char *func, int line,
 		const char *fmt, va_list ap)
 {
+	char str[MAX_MSG_SIZE];
+	int len;
+
+	len = log_vsnprintf(str, sizeof(str), prio, func, line, fmt, ap);
+
 	if (la) {
 		struct sembuf ops;
+		struct logmsg *msg;
+		time_t t = time(NULL);
 
 		ops.sem_num = 0;
 		ops.sem_flg = SEM_UNDO;
@@ -224,7 +215,18 @@ static notrace void dolog(int prio, const char *func, int line,
 			return;
 		}
 
-		log_enqueue(prio, func, line, fmt, ap);
+		/* not enough space: drop msg */
+		if (len + sizeof(struct logmsg) + 1 > la->end - la->tail)
+			syslog(LOG_ERR, "enqueue: log area overrun, "
+			       "dropping message\n");
+		else {
+			/* ok, we can stage the msg in the area */
+			msg = (struct logmsg *)la->tail;
+			msg->t = t;
+			msg->prio = prio;
+			memcpy(msg->str, str, len + 1);
+			la->tail += sizeof(struct logmsg) + len + 1;
+		}
 
 		ops.sem_op = 1;
 		if (semop(la->semid, &ops, 1) < 0) {
@@ -232,19 +234,7 @@ static notrace void dolog(int prio, const char *func, int line,
 			return;
 		}
 	} else {
-		char p[MAX_MSG_SIZE];
-
-		vsnprintf(p, MAX_MSG_SIZE, fmt, ap);
-
-		if (worker_name && worker_idx)
-			fprintf(stderr, "[%s %d] %s(%d) %s", worker_name,
-				worker_idx, func, line, p);
-		else if (worker_name)
-			fprintf(stderr, "[%s] %s(%d) %s", worker_name, func,
-				line, p);
-		else
-			fprintf(stderr, "[main] %s(%d) %s", func, line, p);
-
+		xwrite(fileno(stderr), str, len);
 		fflush(stderr);
 	}
 }
