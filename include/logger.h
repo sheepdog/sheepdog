@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include <sys/syslog.h>
 
-#define LOG_SPACE_SIZE 1048576
+#define LOG_SPACE_SIZE (32 * 1024 * 1024)
 #define MAX_MSG_SIZE 256
 
 extern int log_init(const char *progname, int size, bool to_stdout, int level,
