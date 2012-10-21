@@ -373,6 +373,11 @@ static notrace void logger(char *log_dir, char *outfile)
 
 	prctl(PR_SET_PDEATHSIG, SIGHUP);
 
+	/* we need to check the aliveness of the sheep process since
+	 * it could die before the logger call prctl. */
+	if (kill(sheep_pid, 0) < 0)
+		kill(logger_pid, SIGHUP);
+
 	while (la->active) {
 		log_flush();
 
