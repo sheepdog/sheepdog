@@ -55,10 +55,7 @@ void *xmalloc(size_t size)
 
 void *xzalloc(size_t size)
 {
-	void *ret;
-	ret = xmalloc(size);
-	memset(ret, 0, size);
-	return ret;
+	return xcalloc(1, size);
 }
 
 notrace void *xrealloc(void *ptr, size_t size)
