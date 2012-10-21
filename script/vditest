@@ -19,6 +19,7 @@ my $program = "vditest";
 my ($vdiname, $vdisize);
 
 my $use_aio = 0;
+my $nr_outstanding_aio = 0;
 my ($lblk, $hblk) = (512, 1048576);
 my $cache = 'writethrough';
 my $runtime = 10;
@@ -142,6 +143,7 @@ sub vdi_read {
 	    # partial check is not supported
 	    print_qemu("aio_read $offset $length\n");
 	}
+	$nr_outstanding_aio++;
     } else {
 	if ($ptn_length > 0) {
 	    print_qemu("read -P $ptn -l $ptn_length $offset $length\n");
@@ -161,6 +163,7 @@ sub vdi_write {
 
     if ($use_aio) {
 	print_qemu("aio_write -P $ptn $offset $length\n");
+	$nr_outstanding_aio++;
     } else {
 	print_qemu("write -P $ptn $offset $length\n");
     }
@@ -370,6 +373,9 @@ sub vdi_main {
 	    vdi_flush();
 	} elsif ($flush_interval > 0 && $i % $flush_interval == 0) {
 	    vdi_flush();
+	} elsif ($nr_outstanding_aio > 500) { # FIXME
+	    vdi_flush();
+	    $nr_outstanding_aio = 0;
 	}
 
 	($sec, $microsec) = gettimeofday();
