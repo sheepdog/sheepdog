@@ -1941,6 +1941,7 @@ static int vdi_parser(int ch, char *opt)
 			exit(EXIT_FAILURE);
 		}
 		vdi_cmd_data.nr_copies = nr_copies;
+		break;
 	case 'F':
 		vdi_cmd_data.from_snapshot_id = strtol(opt, &p, 10);
 		if (opt == p) {
@@ -1948,6 +1949,7 @@ static int vdi_parser(int ch, char *opt)
 			strncpy(vdi_cmd_data.from_snapshot_tag, opt,
 				sizeof(vdi_cmd_data.from_snapshot_tag));
 		}
+		break;
 	}
 
 	return 0;
