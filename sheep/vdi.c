@@ -254,7 +254,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 			base->snap_ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 	}
 
-	strncpy(new->name, name, sizeof(new->name));
+	pstrcpy(new->name, sizeof(new->name), name);
 	new->vdi_id = new_vid;
 	new->create_time = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 	new->vdi_size = iocb->size;

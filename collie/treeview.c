@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "list.h"
+#include "util.h"
 #include "treeview.h"
 
 #ifndef MAX_DEPTH
@@ -62,8 +62,8 @@ static struct vdi_tree *new_vdi(const char *name, const char *label,
 		fprintf(stderr, "Failed to allocate memory\n");
 		return NULL;
 	}
-	strcpy(vdi->name, name);
-	strcpy(vdi->label, label);
+	pstrcpy(vdi->name, sizeof(vdi->name), name);
+	pstrcpy(vdi->label, sizeof(vdi->label), label);
 	vdi->vid = vid;
 	vdi->pvid = pvid;
 	vdi->highlight = highlight;

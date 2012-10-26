@@ -161,7 +161,7 @@ static notrace int log_vsnprintf(char *buff, size_t size, int prio,
 	else if (worker_name)
 		snprintf(p, size, "[%s] ", worker_name);
 	else
-		strncpy(p, "[main] ", size);
+		pstrcpy(p, size, "[main] ");
 
 	p += strlen(p);
 	snprintf(p, size - strlen(buff), "%s(%d) ", func, line);
@@ -186,7 +186,7 @@ static notrace void log_syslog(const struct logmsg *msg)
 
 	localtime_r(&msg->t, &tm);
 	len = strftime(str, sizeof(str), "%b %2d %H:%M:%S ", &tm);
-	strncpy(str + len, msg->str, sizeof(str) - len);
+	pstrcpy(str + len, sizeof(str) - len, msg->str);
 
 	if (log_fd >= 0)
 		xwrite(log_fd, str, strlen(str));
@@ -412,8 +412,8 @@ notrace int log_init(const char *program_name, int size, bool to_stdout,
 
 	log_name = program_name;
 	log_nowname = outfile;
-	strcpy(tmp, outfile);
-	strcpy(log_dir, dirname(tmp));
+	pstrcpy(tmp, sizeof(tmp), outfile);
+	pstrcpy(log_dir, sizeof(log_dir), dirname(tmp));
 
 	semkey = random();
 

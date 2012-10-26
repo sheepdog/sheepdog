@@ -169,7 +169,7 @@ int get_cluster_flags(uint16_t *flags)
 int set_cluster_store(const char *name)
 {
 	memset(config.store, 0, sizeof(config.store));
-	strcpy((char *)config.store, name);
+	pstrcpy((char *)config.store, sizeof(config.store), name);
 
 	return write_config();
 }

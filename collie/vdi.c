@@ -151,7 +151,7 @@ static void print_vdi_tree(uint32_t vid, const char *name, const char *tag,
 	char buf[128];
 
 	if (is_current(i))
-		strcpy(buf, "(you are here)");
+		pstrcpy(buf, sizeof(buf), "(you are here)");
 	else {
 		ti = i->create_time >> 32;
 		localtime_r(&ti, &tm);
@@ -390,8 +390,8 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 		return -1;
 
 	memset(buf, 0, sizeof(buf));
-	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
-	strncpy(buf + SD_MAX_VDI_LEN, tag, SD_MAX_VDI_TAG_LEN);
+	pstrcpy(buf, SD_MAX_VDI_LEN, vdiname);
+	pstrcpy(buf + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, tag);
 
 	if (for_snapshot)
 		sd_init_req(&hdr, SD_OP_GET_VDI_INFO);
@@ -470,7 +470,7 @@ static int do_vdi_create(const char *vdiname, int64_t vdi_size,
 	}
 
 	memset(buf, 0, sizeof(buf));
-	strncpy(buf, vdiname, SD_MAX_VDI_LEN);
+	pstrcpy(buf, SD_MAX_VDI_LEN, vdiname);
 
 	sd_init_req(&hdr, SD_OP_NEW_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
@@ -738,9 +738,9 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	hdr.data_length = sizeof(data);
 	hdr.vdi.snapid = snap_id;
 	memset(data, 0, sizeof(data));
-	strncpy(data, vdiname, SD_MAX_VDI_LEN);
+	pstrcpy(data, SD_MAX_VDI_LEN, vdiname);
 	if (snap_tag)
-		strncpy(data + SD_MAX_VDI_LEN, snap_tag, SD_MAX_VDI_TAG_LEN);
+		pstrcpy(data + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, snap_tag);
 
 	ret = exec_req(fd, &hdr, data);
 	close(fd);
@@ -985,10 +985,10 @@ static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snap
 	struct sheepdog_vdi_attr vattr;
 
 	memset(&vattr, 0, sizeof(vattr));
-	strncpy(vattr.name, vdiname, SD_MAX_VDI_LEN);
-	strncpy(vattr.tag, vdi_cmd_data.snapshot_tag, SD_MAX_VDI_TAG_LEN);
+	pstrcpy(vattr.name, SD_MAX_VDI_LEN, vdiname);
+	pstrcpy(vattr.tag, SD_MAX_VDI_TAG_LEN, vdi_cmd_data.snapshot_tag);
 	vattr.snap_id = vdi_cmd_data.snapshot_id;
-	strncpy(vattr.key, key, SD_MAX_VDI_ATTR_KEY_LEN);
+	pstrcpy(vattr.key, SD_MAX_VDI_ATTR_KEY_LEN, key);
 	if (value && value_len) {
 		vattr.value_len = value_len;
 		memcpy(vattr.value, value, value_len);
@@ -1917,8 +1917,8 @@ static int vdi_parser(int ch, char *opt)
 		vdi_cmd_data.snapshot_id = strtol(opt, &p, 10);
 		if (opt == p) {
 			vdi_cmd_data.snapshot_id = 0;
-			strncpy(vdi_cmd_data.snapshot_tag, opt,
-				sizeof(vdi_cmd_data.snapshot_tag));
+			pstrcpy(vdi_cmd_data.snapshot_tag,
+				sizeof(vdi_cmd_data.snapshot_tag), opt);
 		}
 		break;
 	case 'x':
@@ -1943,8 +1943,8 @@ static int vdi_parser(int ch, char *opt)
 		vdi_cmd_data.from_snapshot_id = strtol(opt, &p, 10);
 		if (opt == p) {
 			vdi_cmd_data.from_snapshot_id = 0;
-			strncpy(vdi_cmd_data.from_snapshot_tag, opt,
-				sizeof(vdi_cmd_data.from_snapshot_tag));
+			pstrcpy(vdi_cmd_data.from_snapshot_tag,
+				sizeof(vdi_cmd_data.from_snapshot_tag), opt);
 		}
 		break;
 	}

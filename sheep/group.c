@@ -981,7 +981,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 	jm->disable_recovery = sys->disable_recovery;
 
 	if (sd_store)
-		strcpy((char *)jm->store, sd_store->name);
+		pstrcpy((char *)jm->store, sizeof(jm->store), sd_store->name);
 
 	if (jm->cluster_status != SD_STATUS_OK &&
 	    (ret == CJ_RES_SUCCESS || ret == CJ_RES_JOIN_LATER))

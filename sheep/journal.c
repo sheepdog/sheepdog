@@ -39,7 +39,7 @@ struct jrnl_descriptor {
 /* Journal APIs */
 static int jrnl_open(struct jrnl_descriptor *jd, const char *path)
 {
-	strcpy(jd->path, path);
+	pstrcpy(jd->path, sizeof(jd->path), path);
 	jd->fd = open(path, O_RDONLY);
 
 	if (jd->fd < 0) {
@@ -180,7 +180,7 @@ struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
 
 	jd->head.offset = offset;
 	jd->head.size = count;
-	strcpy(jd->head.target_path, path);
+	pstrcpy(jd->head.target_path, sizeof(jd->head.target_path), path);
 
 	jd->data = buf;
 

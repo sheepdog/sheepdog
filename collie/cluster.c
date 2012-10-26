@@ -97,9 +97,9 @@ static int cluster_format(int argc, char **argv)
 	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
-		strncpy(store_name, cluster_cmd_data.name, STORE_LEN);
+		pstrcpy(store_name, STORE_LEN, cluster_cmd_data.name);
 	else
-		strcpy(store_name, DEFAULT_STORE);
+		pstrcpy(store_name, STORE_LEN, DEFAULT_STORE);
 	hdr.data_length = strlen(store_name) + 1;
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
@@ -436,7 +436,8 @@ static int cluster_parser(int ch, char *opt)
 
 	switch (ch) {
 	case 'b':
-		strncpy(cluster_cmd_data.name, opt, 10);
+		pstrcpy(cluster_cmd_data.name, sizeof(cluster_cmd_data.name),
+			opt);
 		break;
 	case 'c':
 		copies = strtol(opt, &p, 10);
