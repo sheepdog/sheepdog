@@ -510,7 +510,6 @@ static int vdi_create(int argc, char **argv)
 	uint64_t oid;
 	int idx, max_idx, ret;
 	struct sheepdog_inode *inode = NULL;
-	char *buf = NULL;
 
 	if (!argv[optind]) {
 		fprintf(stderr, "Please specify the VDI size\n");
@@ -530,8 +529,7 @@ static int vdi_create(int argc, char **argv)
 		goto out;
 
 	inode = malloc(sizeof(*inode));
-	buf = zalloc(SD_DATA_OBJ_SIZE);
-	if (!inode || !buf) {
+	if (!inode) {
 		fprintf(stderr, "Failed to allocate memory\n");
 		ret = EXIT_SYSFAIL;
 		goto out;
@@ -548,8 +546,8 @@ static int vdi_create(int argc, char **argv)
 	for (idx = 0; idx < max_idx; idx++) {
 		oid = vid_to_data_oid(vid, idx);
 
-		ret = sd_write_object(oid, 0, buf, SD_DATA_OBJ_SIZE, 0, 0,
-				      inode->nr_copies, true, true);
+		ret = sd_write_object(oid, 0, NULL, 0, 0, 0, inode->nr_copies,
+				      true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -567,7 +565,6 @@ static int vdi_create(int argc, char **argv)
 	ret = EXIT_SUCCESS;
 out:
 	free(inode);
-	free(buf);
 	return ret;
 }
 
