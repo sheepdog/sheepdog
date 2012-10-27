@@ -214,7 +214,7 @@ static __always_inline int fls64(uint64_t x)
 	return __fls(x) + 1;
 }
 #else
-#error BITS_PER_LONG not 32 or 64
+#error __SIZEOF_POINTER__ not 4 or 8
 #endif
 
 #endif /* __BITOPS_H__ */
