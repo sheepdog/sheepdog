@@ -18,7 +18,7 @@ use IPC::Open2;
 my $program = "vditest";
 my ($vdiname, $vdisize);
 
-my $use_aio = 0;
+my $concurrency = 1;
 my $nr_outstanding_aio = 0;
 my ($lblk, $hblk) = (512, 1048576);
 my $cache = 'writethrough';
@@ -82,9 +82,9 @@ sub to_str {
 sub print_options {
     my $opt = "options: ";
 
-    $opt .= "-a "  if $use_aio;
     $opt .= "-B $lblk:$hblk ";
     $opt .= "-c $cache ";
+    $opt .= "-C $concurrency ";
     $opt .= "-D $rrate:$wrate ";
     $opt .= "-n "  if $no_act;
     $opt .= "-o $offset\n";
@@ -110,6 +110,26 @@ sub print_qemu {
 	$result =~ s/qemu-io> //;
 	print $result;
     }
+
+    while ($result =~ /wrote|read/g) {
+	$nr_outstanding_aio--;
+    }
+}
+
+sub wait_aio_requests {
+    my $old_sep = $/;
+    $/ = "\n";
+
+    my $result = <QEMU_OUT>;
+    if ($verbose) {
+	print $result;
+    }
+
+    while ($result =~ /wrote|read/g) {
+	$nr_outstanding_aio--;
+    }
+
+    $/ = $old_sep;
 }
 
 sub vdi_open {
@@ -119,9 +139,9 @@ sub vdi_open {
     return  if $no_act;
 
     if ($file) {
-	$cmd = "qemu-io -t $cache $vdiname";
+	$cmd = "stdbuf -o0 qemu-io -t $cache $vdiname";
     } else {
-	$cmd = "qemu-io -t $cache sheepdog:$vdiname";
+	$cmd = "stdbuf -o0 qemu-io -t $cache sheepdog:$vdiname";
     }
     open2 *QEMU_OUT, *QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
     <QEMU_OUT>;
@@ -136,22 +156,14 @@ sub vdi_close {
 sub vdi_read {
     my ($offset, $length, $ptn, $ptn_length) = @_;
 
-    if ($use_aio) {
-	if ($length == $ptn_length) {
-	    print_qemu("aio_read -P $ptn $offset $length\n");
-	} else {
-	    # partial check is not supported
-	    print_qemu("aio_read $offset $length\n");
-	}
-	$nr_outstanding_aio++;
+    if ($length == $ptn_length) {
+	print_qemu("aio_read -P $ptn $offset $length\n");
     } else {
-	if ($ptn_length > 0) {
-	    print_qemu("read -P $ptn -l $ptn_length $offset $length\n");
-	} else {
-	    print_qemu("read $offset $length\n");
-	}
+	# partial check is not supported
+	print_qemu("aio_read $offset $length\n");
     }
 
+    $nr_outstanding_aio++;
     $rd_ops++;
     $rd_bytes += $length;
     $total_rd_ops++;
@@ -161,13 +173,9 @@ sub vdi_read {
 sub vdi_write {
     my ($offset, $length, $ptn) = @_;
 
-    if ($use_aio) {
-	print_qemu("aio_write -P $ptn $offset $length\n");
-	$nr_outstanding_aio++;
-    } else {
-	print_qemu("write -P $ptn $offset $length\n");
-    }
+    print_qemu("aio_write -P $ptn $offset $length\n");
 
+    $nr_outstanding_aio++;
     $wr_ops++;
     $wr_bytes += $length;
     $total_wr_ops++;
@@ -175,26 +183,19 @@ sub vdi_write {
 }
 
 sub vdi_flush {
-    if ($use_aio) {
-	print_qemu("aio_flush\n");
-    } else {
-	print_qemu("flush\n");
-    }
+    print_qemu("aio_flush\n");
 }
 
 sub parse_opts {
     my %opts = ();
 
-    getopts("?aB:c:D:f:Fh:no:p:rs:S:T:vw", \%opts) or help(1);
+    getopts("?B:c:C:D:f:Fh:no:p:rs:S:T:vw", \%opts) or help(1);
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
 	switch ($key) {
 	    case '?' {
 		help(0);
-	    }
-	    case 'a' {
-		$use_aio = 1;
 	    }
 	    case 'B' {
 		($lblk, $hblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
@@ -213,6 +214,10 @@ sub parse_opts {
 		    error("\"$val\" is not valid\n");
 		}
 		$cache = $val;
+	    }
+	    case 'C' {
+		error("\"$val\" is not valid\n")  if ($val <= 0);
+		$concurrency = $val;
 	    }
 	    case 'D' {
 		($rrate, $wrate) = ($val =~ /(\d+)\%?:?(\d*)\%?/);
@@ -328,6 +333,10 @@ sub vdi_main {
 	my $pattern;
 	my $ptn_length = 0;
 
+	while ($nr_outstanding_aio >= $concurrency) {
+	    wait_aio_requests();
+	}
+
 	print "$i: "  if $verbose;
 
 	if (rand($rrate + $wrate) < $rrate) {
@@ -373,9 +382,6 @@ sub vdi_main {
 	    vdi_flush();
 	} elsif ($flush_interval > 0 && $i % $flush_interval == 0) {
 	    vdi_flush();
-	} elsif ($nr_outstanding_aio > 500) { # FIXME
-	    vdi_flush();
-	    $nr_outstanding_aio = 0;
 	}
 
 	($sec, $microsec) = gettimeofday();
@@ -417,10 +423,10 @@ sub help {
 Usage: $program [OPTION] vdiname
 
   -?                   display this help text and exit.
-  -a                   use asynchronous I/O for testing.
   -B lblk[:hblk]       set the block transfer size.
   -c cache             specify how to use the host cache.
                        cache is "none", "writeback", or "writethrough".
+  -C concurrency       set the maximum number of concurrent I/O requests
   -D r%:w%             duty cycle used while reading and/or writing.
   -f flush_interval    specify that a flush should occur at flush_interval
                        number of IO operations.
