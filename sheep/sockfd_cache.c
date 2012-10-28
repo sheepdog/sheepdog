@@ -305,15 +305,15 @@ static void do_grow_fds(struct work *work)
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 }
 
-static bool fds_in_grow;
+static uatomic_bool fds_in_grow;
 static int fds_high_watermark = DEFAULT_FDS_WATERMARK;
 
 static void grow_fds_done(struct work *work)
 {
-	fds_in_grow = false;
 	fds_count *= 2;
 	fds_high_watermark = fds_count * 3 / 4;
 	dprintf("fd count has been grown into %d\n", fds_count);
+	uatomic_set_false(&fds_in_grow);
 	free(work);
 }
 
@@ -323,13 +323,12 @@ static inline void check_idx(int idx)
 
 	if (idx <= fds_high_watermark)
 		return;
-	if (fds_in_grow)
+	if (!uatomic_set_true(&fds_in_grow))
 		return;
 
 	w = xmalloc(sizeof(*w));
 	w->fn = do_grow_fds;
 	w->done = grow_fds_done;
-	fds_in_grow = true;
 	queue_work(sys->sockfd_wqueue, w);
 }
 
