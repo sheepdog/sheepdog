@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <urcu/uatomic.h>
 
 #include "bitops.h"
 #include "list.h"
@@ -102,5 +103,27 @@ void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
 #define assert(expr) ((void)0)
 
 #endif	/* NDEBUG */
+
+/* urcu helpers */
+
+/* Boolean data type which can be accessed by multiple threads */
+typedef unsigned long uatomic_bool;
+
+static inline bool uatomic_is_true(uatomic_bool *val)
+{
+	return uatomic_read(val) == 1;
+}
+
+/* success if the old value is false */
+static inline bool uatomic_set_true(uatomic_bool *val)
+{
+	return uatomic_cmpxchg(val, 0, 1) == 0;
+}
+
+static inline void uatomic_set_false(uatomic_bool *val)
+{
+	assert(uatomic_is_true(val));
+	uatomic_set(val, 0);
+}
 
 #endif

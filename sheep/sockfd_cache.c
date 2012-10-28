@@ -65,7 +65,7 @@ static int fds_count = DEFAULT_FDS_COUNT;
 
 struct sockfd_cache_fd {
 	int fd;
-	uint8_t in_use;
+	uatomic_bool in_use;
 };
 
 struct sockfd_cache_entry {
@@ -128,7 +128,7 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
 	int idx = -1, i;
 
 	for (i = 0; i < fds_count; i++) {
-		if (uatomic_cmpxchg(&entry->fds[i].in_use, 0, 1))
+		if (!uatomic_set_true(&entry->fds[i].in_use))
 			continue;
 		idx = i;
 		break;
@@ -165,7 +165,7 @@ static inline bool slots_all_free(struct sockfd_cache_entry *entry)
 {
 	int i;
 	for (i = 0; i < fds_count; i++)
-		if (uatomic_read(&entry->fds[i].in_use))
+		if (uatomic_is_true(&entry->fds[i].in_use))
 			return false;
 	return true;
 }
@@ -299,7 +299,7 @@ static void do_grow_fds(struct work *work)
 		entry->fds = xrealloc(entry->fds, new_size);
 		for (i = old_fds_count; i < new_fds_count; i++) {
 			entry->fds[i].fd = -1;
-			entry->fds[i].in_use = 0;
+			entry->fds[i].in_use = false;
 		}
 	}
 	pthread_rwlock_unlock(&sockfd_cache.lock);
@@ -354,7 +354,7 @@ static struct sockfd *sockfd_cache_get(const struct node_id *nid, char *name)
 	dprintf("create connection %s:%d idx %d\n", name, nid->port, idx);
 	fd = connect_to(name, nid->port);
 	if (fd < 0) {
-		uatomic_dec(&entry->fds[idx].in_use);
+		uatomic_set_false(&entry->fds[idx].in_use);
 		return NULL;
 	}
 	entry->fds[idx].fd = fd;
@@ -370,7 +370,6 @@ static void sockfd_cache_put(const struct node_id *nid, int idx)
 {
 	struct sockfd_cache_entry *entry;
 	char name[INET6_ADDRSTRLEN];
-	int refcnt;
 
 	addr_to_str(name, sizeof(name), nid->addr, 0);
 	dprintf("%s:%d idx %d\n", name, nid->port, idx);
@@ -380,8 +379,7 @@ static void sockfd_cache_put(const struct node_id *nid, int idx)
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 
 	assert(entry);
-	refcnt = uatomic_cmpxchg(&entry->fds[idx].in_use, 1, 0);
-	assert(refcnt == 1);
+	uatomic_set_false(&entry->fds[idx].in_use);
 }
 
 /*

@@ -49,7 +49,7 @@
 
 struct global_cache {
 	uint32_t cache_size;
-	int in_reclaim;
+	uatomic_bool in_reclaim;
 	struct cds_list_head cache_lru_list;
 };
 
@@ -89,15 +89,6 @@ static pthread_mutex_t hashtable_lock[HASH_SIZE] = {
 };
 
 static struct hlist_head cache_hashtable[HASH_SIZE];
-
-/*
- * If the cache is already in reclaim, return 1, otherwise return 0
- * and set sys_cache.in_reclaim to 1
- */
-static inline int mark_cache_in_reclaim(void)
-{
-	return uatomic_cmpxchg(&sys_cache.in_reclaim, 0, 1);
-}
 
 static inline bool entry_is_dirty(const struct object_cache_entry *entry)
 {
@@ -558,7 +549,7 @@ static void do_reclaim(struct work *work)
 
 static void reclaim_done(struct work *work)
 {
-	uatomic_set(&sys_cache.in_reclaim, 0);
+	uatomic_set_false(&sys_cache.in_reclaim);
 	free(work);
 }
 
@@ -626,7 +617,8 @@ void object_cache_try_to_reclaim(void)
 	if (uatomic_read(&sys_cache.cache_size) < sys->object_cache_size)
 		return;
 
-	if (mark_cache_in_reclaim())
+	if (!uatomic_set_true(&sys_cache.in_reclaim))
+		/* the cache is already in reclaim, */
 		return;
 
 	work = xzalloc(sizeof(struct work));
@@ -1236,7 +1228,7 @@ int object_cache_init(const char *p)
 
 	CDS_INIT_LIST_HEAD(&sys_cache.cache_lru_list);
 	uatomic_set(&sys_cache.cache_size, 0);
-	uatomic_set(&sys_cache.in_reclaim, 0);
+	sys_cache.in_reclaim = false;
 
 	ret = load_existing_cache();
 err:

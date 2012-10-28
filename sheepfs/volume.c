@@ -56,7 +56,7 @@ struct vdi_inode {
  * to simulate aysnc read. All sockets point to the same gateway
  */
 	int socket_pool[SOCKET_POOL_SIZE];
-	char socket_in_use[SOCKET_POOL_SIZE]; /* 1 means in use */
+	uatomic_bool socket_in_use[SOCKET_POOL_SIZE];
 	unsigned socket_poll_adder;
 };
 
@@ -120,8 +120,8 @@ static inline int get_socket_fd(struct vdi_inode *vdi, int *idx)
 retry:
 	sock_idx = uatomic_add_return(&vdi->socket_poll_adder, 1) %
 		   SOCKET_POOL_SIZE;
-	/* if socket_in_use[sock_idx] == 0, set it to 1, otherwise, retry */
-	if (uatomic_cmpxchg(&vdi->socket_in_use[sock_idx], 0, 1))
+	/* if socket_in_use[sock_idx] is false, set it to true, otherwise, retry */
+	if (uatomic_set_true(&vdi->socket_in_use[sock_idx]))
 		goto retry;
 	fd = vdi->socket_pool[sock_idx];
 	*idx = sock_idx;
@@ -131,7 +131,7 @@ retry:
 
 static inline void put_socket_fd(struct vdi_inode *vdi, int idx)
 {
-	uatomic_dec(&vdi->socket_in_use[idx]);
+	uatomic_set_false(&vdi->socket_in_use[idx]);
 }
 
 static int volume_rw_object(char *buf, uint64_t oid, size_t size,
