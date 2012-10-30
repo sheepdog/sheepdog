@@ -826,6 +826,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 	socklen_t namesize;
 	int fd, ret;
 	struct client_info *ci;
+	bool is_inet_socket = *(bool *)data;
 
 	if (sys->status == SD_STATUS_SHUTDOWN) {
 		dprintf("unregistering connection %d\n", listen_fd);
@@ -840,16 +841,18 @@ static void listen_handler(int listen_fd, int events, void *data)
 		return;
 	}
 
-	ret = set_keepalive(fd);
-	if (ret) {
-		close(fd);
-		return;
-	}
+	if (is_inet_socket) {
+		ret = set_keepalive(fd);
+		if (ret) {
+			close(fd);
+			return;
+		}
 
-	ret = set_nodelay(fd);
-	if (ret) {
-		close(fd);
-		return;
+		ret = set_nodelay(fd);
+		if (ret) {
+			close(fd);
+			return;
+		}
 	}
 
 	ret = set_nonblocking(fd);
@@ -878,9 +881,24 @@ static int create_listen_port_fn(int fd, void *data)
 	return register_event(fd, listen_handler, data);
 }
 
-int create_listen_port(char *bindaddr, int port, void *data)
+int create_listen_port(char *bindaddr, int port)
 {
-	return create_listen_ports(bindaddr, port, create_listen_port_fn, data);
+	static bool is_inet_socket = true;
+
+	return create_listen_ports(bindaddr, port, create_listen_port_fn,
+				   &is_inet_socket);
+}
+
+int init_unix_domain_socket(const char *dir)
+{
+	static bool is_inet_socket = false;
+	char unix_path[PATH_MAX];
+
+	snprintf(unix_path, sizeof(unix_path), "%s/sock", dir);
+	unlink(unix_path);
+
+	return create_unix_domain_socket(unix_path, create_listen_port_fn,
+					 &is_inet_socket);
 }
 
 static void req_handler(int listen_fd, int events, void *data)

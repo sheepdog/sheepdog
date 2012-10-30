@@ -479,7 +479,11 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = create_listen_port(bindaddr, port, sys);
+	ret = create_listen_port(bindaddr, port);
+	if (ret)
+		exit(1);
+
+	ret = init_unix_domain_socket(dir);
 	if (ret)
 		exit(1);
 

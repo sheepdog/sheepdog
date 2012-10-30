@@ -45,6 +45,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen);
 int exec_req(int sockfd, struct sd_req *hdr, void *data);
 int create_listen_ports(const char *bindaddr, int port,
 			int (*callback)(int fd, void *), void *data);
+int create_unix_domain_socket(const char *unix_path,
+			      int (*callback)(int, void *), void *data);
 
 char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port);
 uint8_t *str_to_addr(int af, const char *ipstr, uint8_t *addr);

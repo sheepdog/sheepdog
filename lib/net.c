@@ -22,6 +22,7 @@
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 
@@ -536,4 +537,46 @@ int get_local_addr(uint8_t *bytes)
 out:
 	freeifaddrs(ifaddr);
 	return ret;
+}
+
+int create_unix_domain_socket(const char *unix_path,
+			      int (*callback)(int, void *), void *data)
+{
+	int fd, ret;
+	struct sockaddr_un addr;
+
+	addr.sun_family = AF_UNIX;
+	pstrcpy(addr.sun_path, sizeof(addr.sun_path), unix_path);
+
+	fd = socket(addr.sun_family, SOCK_STREAM, 0);
+	if (fd < 0) {
+		eprintf("failed to create socket, %m\n");
+		return -1;
+	}
+
+	ret = bind(fd, &addr, sizeof(addr));
+	if (ret) {
+		eprintf("failed to bind socket: %m\n");
+		goto err;
+	}
+
+	ret = listen(fd, SOMAXCONN);
+	if (ret) {
+		eprintf("failed to listen on socket: %m\n");
+		goto err;
+	}
+
+	ret = set_nonblocking(fd);
+	if (ret < 0)
+		goto err;
+
+	ret = callback(fd, data);
+	if (ret)
+		goto err;
+
+	return 0;
+err:
+	close(fd);
+
+	return -1;
 }
