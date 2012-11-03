@@ -20,9 +20,12 @@
 
 static char stale_dir[PATH_MAX];
 
-static int get_open_flags(uint64_t oid, bool create)
+static int get_open_flags(uint64_t oid, bool create, int fl)
 {
 	int flags = O_DSYNC | O_RDWR;
+
+	if (fl & SD_FLAG_CMD_CACHE && is_disk_cache_enabled())
+		flags &= ~O_DSYNC;
 
 	if (is_data_obj(oid))
 		flags |= O_DIRECT;
@@ -129,7 +132,8 @@ static int err_to_sderr(uint64_t oid, int err)
 
 int default_write(uint64_t oid, const struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, false), fd, ret = SD_RES_SUCCESS;
+	int flags = get_open_flags(oid, false, iocb->flags), fd,
+	    ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 	ssize_t size;
 
@@ -139,8 +143,6 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	}
 
 	get_obj_path(oid, path);
-	if (iocb->flags & SD_FLAG_CMD_CACHE && is_disk_cache_enabled())
-		flags &= ~O_DSYNC;
 	fd = open(path, flags, def_fmode);
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
@@ -172,7 +174,7 @@ int default_cleanup(void)
 static int init_vdi_copy_number(uint64_t oid)
 {
 	char path[PATH_MAX];
-	int fd, flags = get_open_flags(oid, false), ret;
+	int fd, flags = get_open_flags(oid, false, 0), ret;
 	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
 
 	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
@@ -233,7 +235,8 @@ int default_init(const char *p)
 static int default_read_from_path(uint64_t oid, const char *path,
 				  const struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, false), fd, ret = SD_RES_SUCCESS;
+	int flags = get_open_flags(oid, false, iocb->flags), fd,
+	    ret = SD_RES_SUCCESS;
 	ssize_t size;
 
 	fd = open(path, flags);
@@ -295,15 +298,12 @@ int prealloc(int fd, uint32_t size)
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
-	int flags = get_open_flags(oid, true);
+	int flags = get_open_flags(oid, true, iocb->flags);
 	int ret, fd;
 	uint32_t len = iocb->length;
 
 	get_obj_path(oid, path);
 	get_tmp_obj_path(oid, tmp_path);
-
-	if (iocb->flags & SD_FLAG_CMD_CACHE && is_disk_cache_enabled())
-		flags &= ~O_DSYNC;
 
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
