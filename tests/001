@@ -24,6 +24,7 @@ _wait_for_sheep 2
 
 # start Sheepdog with two nodes
 $COLLIE cluster format
+sleep 1
 
 # kill the master node
 _kill_sheep 0
@@ -52,6 +53,8 @@ for i in 0 1; do
     _start_sheep $i
     sleep 1
 done
+
+_wait_for_sheep 3
 
 echo check whether all nodes have the same cluster info
 for i in 0 1 2; do
