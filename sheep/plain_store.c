@@ -28,6 +28,12 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 	    uatomic_is_true(&sys->use_journal))
 		flags &= ~O_DSYNC;
 
+	/*
+	 * We can not use DIO for inode object because it is not 512B aligned.
+	 */
+	if (sys->backend_dio && is_data_obj(oid))
+		flags |= O_DIRECT;
+
 	if (create)
 		flags |= O_CREAT | O_EXCL;
 

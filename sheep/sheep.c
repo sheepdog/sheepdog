@@ -43,6 +43,7 @@ static struct option const long_options[] = {
 	{"bindaddr", required_argument, NULL, 'b'},
 	{"cluster", required_argument, NULL, 'c'},
 	{"debug", no_argument, NULL, 'd'},
+	{"directio", no_argument, NULL, 'D'},
 	{"foreground", no_argument, NULL, 'f'},
 	{"gateway", no_argument, NULL, 'g'},
 	{"help", no_argument, NULL, 'h'},
@@ -74,6 +75,7 @@ Options:\n\
   -b, --bindaddr          specify IP address of interface to listen on\n\
   -c, --cluster           specify the cluster driver\n\
   -d, --debug             include debug messages in the log\n\
+  -D, --directio          use direct IO for backend store\n\
   -f, --foreground        make the program run in the foreground\n\
   -g, --gateway           make the progam run as a gateway mode\n\
   -h, --help              display this help and exit\n\
@@ -406,6 +408,9 @@ int main(int argc, char **argv)
 		case 'd':
 			/* removed soon. use loglevel instead */
 			log_level = SDOG_DEBUG;
+			break;
+		case 'D':
+			sys->backend_dio = true;
 			break;
 		case 'g':
 			/* same as '-v 0' */

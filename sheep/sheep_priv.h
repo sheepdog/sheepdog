@@ -123,6 +123,7 @@ struct cluster_info {
 	bool object_cache_directio;
 
 	uatomic_bool use_journal;
+	bool backend_dio;
 	bool upgrade; /* upgrade data layout before starting service
 		       * if necessary*/
 };
