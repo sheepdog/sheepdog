@@ -3346,6 +3346,10 @@ sub process {
 			WARN("EXPORTED_WORLD_WRITABLE",
 			     "Exporting world writable files is usually an error. Consider more restrictive permissions.\n" . $herecurr);
 		}
+
+		if ($line =~ /\bbzero\(/) {
+			ERROR("BZERO", "bzero() is obsolete, use memset()");
+		}
 	}
 
 	# If we have no input at all, then there is nothing to report on
