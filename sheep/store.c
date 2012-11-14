@@ -247,7 +247,7 @@ int init_base_path(const char *d)
 
 #define OBJ_PATH "/obj/"
 
-static int init_obj_path(const char *base_path)
+int init_obj_path(const char *base_path)
 {
 	int len;
 
@@ -405,10 +405,6 @@ out:
 int init_store(const char *d)
 {
 	int ret;
-
-	ret = init_obj_path(d);
-	if (ret)
-		return ret;
 
 	ret = init_epoch_path(d);
 	if (ret)

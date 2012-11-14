@@ -46,7 +46,7 @@ static struct option const long_options[] = {
 	{"foreground", no_argument, NULL, 'f'},
 	{"gateway", no_argument, NULL, 'g'},
 	{"help", no_argument, NULL, 'h'},
-	{"journal", no_argument, NULL, 'j'},
+	{"journal", required_argument, NULL, 'j'},
 	{"loglevel", required_argument, NULL, 'l'},
 	{"myaddr", required_argument, NULL, 'y'},
 	{"stdout", no_argument, NULL, 'o'},
@@ -59,7 +59,7 @@ static struct option const long_options[] = {
 	{NULL, 0, NULL, 0},
 };
 
-static const char *short_options = "b:c:dDfghjl:op:P:s:uw:y:z:";
+static const char *short_options = "b:c:dDfghj:l:op:P:s:uw:y:z:";
 
 static void usage(int status)
 {
@@ -77,7 +77,7 @@ Options:\n\
   -f, --foreground        make the program run in the foreground\n\
   -g, --gateway           make the progam run as a gateway mode\n\
   -h, --help              display this help and exit\n\
-  -j, --journal           use jouranl to update vdi objects\n\
+  -j, --journal           use jouranl file to log all the write operations\n\
   -l, --loglevel          specify the level of logging detail\n\
   -o, --stdout            log to stdout instead of shared logger\n\
   -p, --port              specify the TCP port on which to listen\n\
@@ -311,6 +311,36 @@ static void init_cache_type(char *arg)
 	}
 }
 
+static char jpath[PATH_MAX];
+static bool jskip;
+static ssize_t jsize;
+#define MIN_JOURNAL_SIZE (64) /* 64M */
+
+static void init_journal_arg(char *arg)
+{
+	const char *d = "dir=", *sz = "size=", *sp = "skip";
+	int dl = strlen(d), szl = strlen(sz), spl = strlen(sp);
+
+	if (!strncmp(d, arg, dl)) {
+		arg += dl;
+		sprintf(jpath, "%s", arg);
+	} else if (!strncmp(sz, arg, szl)) {
+		arg += szl;
+		jsize = strtoll(arg, NULL, 10);
+		if (jsize < MIN_JOURNAL_SIZE || jsize == LLONG_MAX) {
+			fprintf(stderr, "invalid size %s, "
+				"must be bigger than %u(M)\n", arg,
+				MIN_JOURNAL_SIZE);
+			exit(1);
+		}
+	} else if (!strncmp(sp, arg, spl)) {
+		jskip = true;
+	} else {
+		fprintf(stderr, "invalid paramters %s\n", arg);
+		exit(1);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex;
@@ -426,7 +456,13 @@ int main(int argc, char **argv)
 			init_cache_type(optarg);
 			break;
 		case 'j':
-			sys->use_journal = true;
+			uatomic_set_true(&sys->use_journal);
+			parse_arg(optarg, ",", init_journal_arg);
+			if (!jsize) {
+				fprintf(stderr,
+					"you must specify size for journal\n");
+				exit(1);
+			}
 			break;
 		case 'b':
 			/* validate provided address using inet_pton */
@@ -470,6 +506,21 @@ int main(int argc, char **argv)
 	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level, path);
 	if (ret)
 		exit(1);
+
+	ret = init_obj_path(dir);
+	if (ret)
+		exit(1);
+
+	/* We should init journal file before backend init */
+	if (uatomic_is_true(&sys->use_journal)) {
+		if (!strlen(jpath))
+			/* internal journal */
+			memcpy(jpath, dir, strlen(dir));
+		dprintf("%s, %zu, %d\n", jpath, jsize, jskip);
+		ret = journal_file_init(jpath, jsize, jskip);
+		if (ret)
+			exit(1);
+	}
 
 	ret = init_store(dir);
 	if (ret)

@@ -38,6 +38,7 @@
 #endif
 
 #define notrace __attribute__((no_instrument_function))
+#define __packed __attribute((packed))
 
 #define uninitialized_var(x) (x = x)
 

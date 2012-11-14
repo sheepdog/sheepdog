@@ -24,11 +24,9 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 {
 	int flags = O_DSYNC | O_RDWR;
 
-	if (fl & SD_FLAG_CMD_CACHE && is_disk_cache_enabled())
+	if ((fl & SD_FLAG_CMD_CACHE && is_disk_cache_enabled()) ||
+	    uatomic_is_true(&sys->use_journal))
 		flags &= ~O_DSYNC;
-
-	if (is_data_obj(oid))
-		flags |= O_DIRECT;
 
 	if (create)
 		flags |= O_CREAT | O_EXCL;
@@ -108,7 +106,7 @@ bool default_exist(uint64_t oid)
 	return true;
 }
 
-static int err_to_sderr(uint64_t oid, int err)
+int err_to_sderr(uint64_t oid, int err)
 {
 	struct stat s;
 
@@ -143,6 +141,17 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	}
 
 	get_obj_path(oid, path);
+
+	if (uatomic_is_true(&sys->use_journal) &&
+	    journal_file_write(oid, iocb->buf, iocb->length, iocb->offset,
+			       false)
+	    != SD_RES_SUCCESS) {
+		eprintf("turn off journaling\n");
+		uatomic_set_false(&sys->use_journal);
+		flags |= O_DSYNC;
+		sync();
+	}
+
 	fd = open(path, flags, def_fmode);
 	if (fd < 0)
 		return err_to_sderr(oid, errno);
@@ -304,6 +313,15 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 
 	get_obj_path(oid, path);
 	get_tmp_obj_path(oid, tmp_path);
+
+	if (uatomic_is_true(&sys->use_journal) &&
+	    journal_file_write(oid, iocb->buf, iocb->length, iocb->offset, true)
+	    != SD_RES_SUCCESS) {
+		eprintf("turn off journaling\n");
+		uatomic_set_false(&sys->use_journal);
+		flags |= O_DSYNC;
+		sync();
+	}
 
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {

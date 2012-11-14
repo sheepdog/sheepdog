@@ -801,46 +801,19 @@ static int do_create_and_write_obj(struct siocb *iocb, struct sd_req *hdr,
 	return sd_store->create_and_write(hdr->obj.oid, iocb);
 }
 
-static int do_write_obj(struct siocb *iocb, struct sd_req *hdr, uint32_t epoch,
-			void *data)
-{
-	uint64_t oid = hdr->obj.oid;
-	int ret = SD_RES_SUCCESS;
-	void *jd = NULL;
-
-	iocb->buf = data;
-	iocb->length = hdr->data_length;
-	iocb->offset = hdr->obj.offset;
-
-	if (is_vdi_obj(oid) && sys->use_journal) {
-		struct strbuf buf = STRBUF_INIT;
-
-		strbuf_addf(&buf, "%s%016" PRIx64, obj_path, oid);
-		jd = jrnl_begin(data, hdr->data_length, hdr->obj.offset,
-				buf.buf, jrnl_path);
-		if (!jd) {
-			strbuf_release(&buf);
-			return SD_RES_EIO;
-		}
-		ret = sd_store->write(oid, iocb);
-		jrnl_end(jd);
-		strbuf_release(&buf);
-	} else
-		ret = sd_store->write(oid, iocb);
-
-	return ret;
-}
-
 int peer_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
-	uint32_t epoch = hdr->epoch;
-	struct siocb iocb;
+	struct siocb iocb = { };
+	uint64_t oid = hdr->obj.oid;
 
-	memset(&iocb, 0, sizeof(iocb));
-	iocb.epoch = epoch;
+	iocb.epoch = hdr->epoch;
 	iocb.flags = hdr->flags;
-	return do_write_obj(&iocb, hdr, epoch, req->data);
+	iocb.buf = req->data;
+	iocb.length = hdr->data_length;
+	iocb.offset = hdr->obj.offset;
+
+	return sd_store->write(oid, &iocb);
 }
 
 int peer_create_and_write_obj(struct request *req)
