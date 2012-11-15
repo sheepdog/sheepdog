@@ -148,6 +148,11 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 		return -1;
 	}
 
+	if (jd->create) {
+		ret = prealloc(fd, get_objsize(jd->oid));
+		if (ret < 0)
+			goto out;
+	}
 	buf = xmalloc(jd->size);
 	p += JOURNAL_DESC_SIZE;
 	memcpy(buf, p, jd->size);
