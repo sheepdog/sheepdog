@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Test journal file replay
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+_start_sheep 0 "-j size=64"
+
+_wait_for_sheep 1
+
+$COLLIE cluster format -c 1
+sleep 1
+
+$COLLIE vdi create test 4G
+
+# write something to vdi 'test'
+echo "hello" | $COLLIE vdi write test 0 512
+echo "sheepdog" | $COLLIE vdi write test 4M 512
+# corrupt the vdi...
+_kill_sheep 0
+rm $STORE/0/obj/807c2b2500000000
+rm $STORE/0/obj/007c2b25*
+# do the journal replay
+_start_sheep 0 "-j size=64"
+_wait_for_sheep 1
+
+sleep 3
+
+$COLLIE vdi list | _filter_short_date
+$COLLIE vdi read test 0 512 | tr -d [:cntrl:]
+echo -n ' '
+$COLLIE vdi read test 4M 512 | tr -d [:cntrl:]
+echo ''
