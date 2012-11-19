@@ -83,7 +83,7 @@ static int get_old_new_jfile(const char *p, int *old, int *new)
 	sprintf(path, "%s/%s", p, jfile_name[0]);
 	fd1 = open(path, flags);
 	if (fd1 < 0) {
-		if (errno != EEXIST)
+		if (errno == ENOENT)
 			return 0;
 
 		eprintf("open1 %m\n");
