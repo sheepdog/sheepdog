@@ -11,7 +11,6 @@
 
 #include "../include/config.h"
 
-#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -31,6 +30,7 @@
 #include "sheep_priv.h"
 #include "trace/trace.h"
 #include "util.h"
+#include "option.h"
 
 #define EPOLL_SIZE 4096
 #define DEFAULT_OBJECT_DIR "/tmp"
@@ -39,73 +39,60 @@
 LIST_HEAD(cluster_drivers);
 static const char program_name[] = "sheep";
 
-static struct option const long_options[] = {
-	{"bindaddr", required_argument, NULL, 'b'},
-	{"cluster", required_argument, NULL, 'c'},
-	{"debug", no_argument, NULL, 'd'},
-	{"directio", no_argument, NULL, 'D'},
-	{"foreground", no_argument, NULL, 'f'},
-	{"gateway", no_argument, NULL, 'g'},
-	{"help", no_argument, NULL, 'h'},
-	{"journal", required_argument, NULL, 'j'},
-	{"loglevel", required_argument, NULL, 'l'},
-	{"myaddr", required_argument, NULL, 'y'},
-	{"stdout", no_argument, NULL, 'o'},
-	{"port", required_argument, NULL, 'p'},
-	{"disk-space", required_argument, NULL, 's'},
-	{"upgrade", no_argument, NULL, 'u'},
-	{"zone", required_argument, NULL, 'z'},
-	{"pidfile", required_argument, NULL, 'P'},
-	{"write-cache", required_argument, NULL, 'w'},
-	{NULL, 0, NULL, 0},
+static struct sd_option sheep_options[] = {
+	{'b', "bindaddr", true, "specify IP address of interface to listen on"},
+	{'c', "cluster", true, "specify the cluster driver"},
+	{'d', "debug", false, "include debug messages in the log"},
+	{'D', "directio", false, "use direct IO for backend store"},
+	{'f', "foreground", false, "make the program run in the foreground"},
+	{'g', "gateway", false, "make the progam run as a gateway mode"},
+	{'h', "help", false, "display this help and exit"},
+	{'j', "journal", true, "use jouranl file to log all the write operations"},
+	{'l', "loglevel", true, "specify the level of logging detail"},
+	{'o', "stdout", false, "log to stdout instead of shared logger"},
+	{'p', "port", true, "specify the TCP port on which to listen"},
+	{'P', "pidfile", true, "create a pid file"},
+	{'s', "disk-space", true, "specify the free disk space in megabytes"},
+	{'u', "upgrade", false, "upgrade to the latest data layout"},
+	{'w', "write-cache", true, "specify the cache type"},
+	{'y', "myaddr", true, "specify the address advertised to other sheep"},
+	{'z', "zone", true, "specify the zone id"},
+	{ 0, NULL, false, NULL },
 };
-
-static const char *short_options = "b:c:dDfghj:l:op:P:s:uw:y:z:";
 
 static void usage(int status)
 {
 	if (status)
 		fprintf(stderr, "Try `%s --help' for more information.\n",
 			program_name);
-	else
-		printf("\
-Sheepdog daemon (version %s)\n\
-Usage: %s [OPTION]... [PATH]\n\
-Options:\n\
-  -b, --bindaddr          specify IP address of interface to listen on\n\
-  -c, --cluster           specify the cluster driver\n\
-  -d, --debug             include debug messages in the log\n\
-  -D, --directio          use direct IO for backend store\n\
-  -f, --foreground        make the program run in the foreground\n\
-  -g, --gateway           make the progam run as a gateway mode\n\
-  -h, --help              display this help and exit\n\
-  -j, --journal           use jouranl file to log all the write operations\n\
-  -l, --loglevel          specify the level of logging detail\n\
-  -o, --stdout            log to stdout instead of shared logger\n\
-  -p, --port              specify the TCP port on which to listen\n\
-  -P, --pidfile           create a pid file\n\
-  -s, --disk-space        specify the free disk space in megabytes\n\
-  -u, --upgrade           upgrade to the latest data layout\n\
-  -y, --myaddr            specify the address advertised to other sheep\n\
-  -z, --zone              specify the zone id\n\
-  -w, --write-cache       specify the cache type\n\
-", PACKAGE_VERSION, program_name);
+	else {
+		struct sd_option *opt;
+
+		printf("Sheepdog daemon (version %s)\n"
+		       "Usage: %s [OPTION]... [PATH]\n"
+		       "Options:\n", PACKAGE_VERSION, program_name);
+
+		sd_for_each_option(opt, sheep_options) {
+			printf("  -%c, --%-18s%s\n", opt->ch, opt->name,
+			       opt->desc);
+		}
+	}
+
 	exit(status);
 }
 
 static void sdlog_help(void)
 {
-	printf("\
-Available log levels:\n\
-  #    Level           Description\n\
-  0    SDOG_EMERG      system has failed and is unusable\n\
-  1    SDOG_ALERT      action must be taken immediately\n\
-  2    SDOG_CRIT       critical conditions\n\
-  3    SDOG_ERR        error conditions\n\
-  4    SDOG_WARNING    warning conditions\n\
-  5    SDOG_NOTICE     normal but significant conditions\n\
-  6    SDOG_INFO       informational notices\n\
-  7    SDOG_DEBUG      debugging messages\n");
+	printf("Available log levels:\n"
+	       "  #    Level           Description\n"
+	       "  0    SDOG_EMERG      system has failed and is unusable\n"
+	       "  1    SDOG_ALERT      action must be taken immediately\n"
+	       "  2    SDOG_CRIT       critical conditions\n"
+	       "  3    SDOG_ERR        error conditions\n"
+	       "  4    SDOG_WARNING    warning conditions\n"
+	       "  5    SDOG_NOTICE     normal but significant conditions\n"
+	       "  6    SDOG_INFO       informational notices\n"
+	       "  7    SDOG_DEBUG      debugging messages\n");
 }
 
 static int create_pidfile(const char *filename)
@@ -364,9 +351,13 @@ int main(int argc, char **argv)
 	unsigned char buf[sizeof(struct in6_addr)];
 	int ipv4 = 0;
 	int ipv6 = 0;
+	struct option *long_options;
+	const char *short_options;
 
 	signal(SIGPIPE, SIG_IGN);
 
+	long_options = build_long_options(sheep_options);
+	short_options = build_short_options(sheep_options);
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
 		switch (ch) {
