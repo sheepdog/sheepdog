@@ -20,6 +20,7 @@
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "exits.h"
+#include "option.h"
 
 #define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
 #define SUBCMD_FLAG_NEED_THIRD_ARG (1 << 1)
@@ -28,13 +29,6 @@
 #define TEXT_BOLD   "\033[1m"
 
 #define UINT64_DECIMAL_SIZE 21
-
-struct sd_option {
-	int val;
-	const char *name;
-	bool has_arg;
-	const char *desc;
-};
 
 struct command {
 	const char *name;

@@ -8,7 +8,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <getopt.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,27 +116,22 @@ static struct sd_option *command_options;
 
 static const struct sd_option *find_opt(int ch)
 {
-	int i;
-	struct sd_option *opt;
+	const struct sd_option *opt;
 
 	/* search for common options */
-	for (i = 0; i < ARRAY_SIZE(collie_options); i++) {
-		if (collie_options[i].val == ch)
-			return collie_options + i;
+	sd_for_each_option(opt, collie_options) {
+		if (opt->ch == ch)
+			return opt;
 	}
 
 	/* search for self options */
-	if (!command_options)
-		goto out;
-
-	opt = command_options;
-	while (opt->val) {
-		if (opt->val == ch)
-			return opt;
-		opt++;
+	if (command_options) {
+		sd_for_each_option(opt, command_options) {
+			if (opt->ch == ch)
+				return opt;
+		}
 	}
 
-out:
 	fprintf(stderr, "Internal error\n");
 	exit(EXIT_SYSFAIL);
 }
@@ -181,44 +175,6 @@ static const struct subcommand *find_subcmd(const char *cmd, const char *subcmd)
 	}
 
 	return NULL;
-}
-
-static char *build_short_options(const char *opts)
-{
-	static char sopts[256], *p;
-	const struct sd_option *sd_opt;
-	int i, len = strlen(opts);
-
-	p = sopts;
-	for (i = 0; i < len; i++) {
-		sd_opt = find_opt(opts[i]);
-		*p++ = sd_opt->val;
-		if (sd_opt->has_arg)
-			*p++ = ':';
-	}
-	*p = '\0';
-
-	return sopts;
-}
-
-static struct option *build_long_options(const char *opts)
-{
-	static struct option lopts[256], *p;
-	const struct sd_option *sd_opt;
-	int i, len = strlen(opts);
-
-	p = lopts;
-	for (i = 0; i < len; i++) {
-		sd_opt = find_opt(opts[i]);
-		p->name = sd_opt->name;
-		p->has_arg = sd_opt->has_arg;
-		p->flag = NULL;
-		p->val = sd_opt->val;
-		p++;
-	}
-	memset(p, 0, sizeof(struct option));
-
-	return lopts;
 }
 
 static unsigned long setup_commands(const struct command *commands,
@@ -321,9 +277,9 @@ void subcommand_usage(char *cmd, char *subcmd, int status)
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_opts[i]);
 		if (sd_opt->has_arg)
-			printf(" [-%c %s]", sd_opt->val, sd_opt->name);
+			printf(" [-%c %s]", sd_opt->ch, sd_opt->name);
 		else
-			printf(" [-%c]", sd_opt->val);
+			printf(" [-%c]", sd_opt->ch);
 	}
 	if (command_arg)
 		printf(" %s", command_arg);
@@ -339,11 +295,24 @@ void subcommand_usage(char *cmd, char *subcmd, int status)
 	printf("Options:\n");
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_opts[i]);
-		sprintf(name, "-%c, --%s", sd_opt->val, sd_opt->name);
+		sprintf(name, "-%c, --%s", sd_opt->ch, sd_opt->name);
 		printf("  %-24s%s\n", name, sd_opt->desc);
 	}
 
 	exit(status);
+}
+
+static const struct sd_option *build_sd_options(const char *opts)
+{
+	static struct sd_option sd_opts[256], *p;
+	int i, len = strlen(opts);
+
+	p = sd_opts;
+	for (i = 0; i < len; i++)
+		*p++ = *find_opt(opts[i]);
+	memset(p, 0, sizeof(struct sd_option));
+
+	return sd_opts;
 }
 
 int main(int argc, char **argv)
@@ -354,6 +323,7 @@ int main(int argc, char **argv)
 	const struct command *commands;
 	const char *short_options;
 	char *p;
+	const struct sd_option *sd_opts;
 
 	init_commands(&commands);
 
@@ -364,8 +334,9 @@ int main(int argc, char **argv)
 
 	optind = 3;
 
-	long_options = build_long_options(command_opts);
-	short_options = build_short_options(command_opts);
+	sd_opts = build_sd_options(command_opts);
+	long_options = build_long_options(sd_opts);
+	short_options = build_short_options(sd_opts);
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				&longindex)) >= 0) {
