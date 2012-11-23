@@ -273,6 +273,7 @@ void sockfd_cache_add(const struct node_id *nid)
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
 	if (sockfd_cache_insert(new)) {
+		free(new->fds);
 		free(new);
 		pthread_rwlock_unlock(&sockfd_cache.lock);
 		return;
