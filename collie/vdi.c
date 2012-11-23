@@ -49,6 +49,7 @@ struct get_vdi_info {
 	const char *tag;
 	uint32_t vid;
 	uint32_t snapid;
+	uint8_t nr_copies;
 };
 
 static int parse_option_size(const char *value, uint64_t *ret)
@@ -205,14 +206,22 @@ static void get_oid(uint32_t vid, const char *name, const char *tag,
 
 	if (info->name) {
 		if (info->tag && info->tag[0]) {
-			if (!strcmp(name, info->name) && !strcmp(tag, info->tag))
+			if (!strcmp(name, info->name) &&
+			    !strcmp(tag, info->tag)) {
 				info->vid = vid;
+			info->nr_copies = i->nr_copies;
+			}
 		} else if (info->snapid) {
-			if (!strcmp(name, info->name) && snapid == info->snapid)
+			if (!strcmp(name, info->name) &&
+			    snapid == info->snapid) {
 				info->vid = vid;
+				info->nr_copies = i->nr_copies;
+			}
 		} else {
-			if (!strcmp(name, info->name))
+			if (!strcmp(name, info->name)) {
 				info->vid = vid;
+				info->nr_copies = i->nr_copies;
+			}
 		}
 	}
 }
@@ -855,7 +864,7 @@ static int vdi_object(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int print_obj_epoch(uint64_t oid)
+static int print_obj_epoch(uint64_t oid, uint8_t nr_copies)
 {
 	int i, j, fd, ret;
 	struct sd_req hdr;
@@ -896,10 +905,20 @@ again:
 
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = nr_logs - 1; i >= 0; i--) {
-		vnodes_nr = nodes_to_vnodes(logs[i].nodes, logs[i].nr_nodes, vnodes);
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
-		       oid, logs[i].epoch, logs[i].nr_copies);
+		       oid, logs[i].epoch, nr_copies);
 		printf("---------------------------------------------------\n");
+		if (logs[i].nr_nodes < nr_copies) {
+			for (j = 0; j < logs[i].nr_nodes; j++) {
+				addr_to_str(host, sizeof(host),
+					    logs[i].nodes[j].nid.addr,
+					    logs[i].nodes[j].nid.port);
+				printf("%s\n", host);
+			}
+			continue;
+		}
+		vnodes_nr = nodes_to_vnodes(logs[i].nodes,
+					    logs[i].nr_nodes, vnodes);
 		oid_to_vnodes(vnodes, vnodes_nr, oid, logs[i].nr_copies,
 			      vnode_buf);
 		for (j = 0; j < logs[i].nr_copies; j++) {
@@ -922,6 +941,7 @@ static int vdi_track(int argc, char **argv)
 	unsigned idx = vdi_cmd_data.index;
 	struct get_vdi_info info;
 	uint32_t vid;
+	uint8_t nr_copies;
 
 	memset(&info, 0, sizeof(info));
 	info.name = vdiname;
@@ -933,6 +953,7 @@ static int vdi_track(int argc, char **argv)
 		return EXIT_SYSFAIL;
 
 	vid = info.vid;
+	nr_copies = info.nr_copies;
 	if (vid == 0) {
 		fprintf(stderr, "VDI not found\n");
 		return EXIT_MISSING;
@@ -941,7 +962,7 @@ static int vdi_track(int argc, char **argv)
 	if (idx == ~0) {
 		printf("Tracking the inode object 0x%" PRIx32 " with %d nodes\n",
 		       vid, sd_nodes_nr);
-		print_obj_epoch(vid_to_vdi_oid(vid));
+		print_obj_epoch(vid_to_vdi_oid(vid), nr_copies);
 	} else {
 		struct get_data_oid_info oid_info = {0};
 
@@ -962,7 +983,7 @@ static int vdi_track(int argc, char **argv)
 				       " (the inode vid 0x%" PRIx32 " idx %u)"
 					   " with %d nodes\n",
 				       oid_info.data_oid, vid, idx, sd_nodes_nr);
-				print_obj_epoch(oid_info.data_oid);
+				print_obj_epoch(oid_info.data_oid, nr_copies);
 
 			} else
 				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
