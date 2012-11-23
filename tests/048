@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Test some collie commands
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+	_start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format
+sleep 1
+
+$COLLIE vdi create test 1G
+
+echo hello | $COLLIE vdi write test 4M 512
+# kill the master gracefully
+$COLLIE node kill 0
+_wait_for_sheep_recovery 1
+$COLLIE node list -p 7001
+
+for i in 3 4 0; do
+	_start_sheep $i
+	sleep 1
+done
+_wait_for_sheep 5
+_wait_for_sheep_recovery 0
+
+$COLLIE vdi track test
+$COLLIE vdi track -i 1 test
+$COLLIE vdi list test | _filter_short_date
+$COLLIE vdi list -r test | awk '{$7="MASKED";print $0}'
+
+$COLLIE vdi check test
+# clear the 'first' data block
+dd if=/dev/zero of=$STORE/0/obj/007c2b2500000001 bs=1M count=4 > /dev/null 2>&1
+# 'check' is rather dumb, it just restores 'first' data object
+$COLLIE vdi check test
+# We should get nothing
+$COLLIE vdi read test 4M 512 | tr -d [:cntrl:]
+echo ''
