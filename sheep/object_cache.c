@@ -932,12 +932,14 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 			dprintf("failed to push %"PRIx64"\n",
 				idx_to_oid(vid, idx));
 			ret = -1;
-			goto out;
+			goto out_close_dir;
 		}
 	}
 
 	object_cache_delete(vid);
 
+out_close_dir:
+	closedir(dir);
 out:
 	strbuf_release(&p);
 	return ret;
@@ -1170,6 +1172,7 @@ static int load_existing_cache_object(struct object_cache *cache)
 			cache->vid, idx);
 	}
 
+	closedir(dir);
 out:
 	strbuf_release(&idx_buf);
 	return ret;
@@ -1205,6 +1208,7 @@ static int load_existing_cache(void)
 		load_existing_cache_object(cache);
 	}
 
+	closedir(dir);
 out:
 	strbuf_release(&vid_buf);
 	return ret;
