@@ -438,6 +438,30 @@ int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
 			     create_time);
 }
 
+static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
+{
+	struct sd_req hdr;
+	int ret = SD_RES_SUCCESS;
+	char *buf;
+
+	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_ADD);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = sizeof(vdi_id) + sizeof(nr_copies);
+
+	buf = xmalloc(sizeof(vdi_id) + sizeof(nr_copies));
+	memcpy(buf, &vdi_id, sizeof(vdi_id));
+	memcpy(buf + sizeof(vdi_id), &nr_copies, sizeof(nr_copies));
+
+	ret = exec_local_req(&hdr, buf);
+	if (ret != SD_RES_SUCCESS)
+		eprintf("fail to notify vdi add event(%" PRIx32 ", %d)\n",
+			vdi_id, nr_copies);
+
+	free(buf);
+
+	return ret;
+}
+
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 {
 	uint32_t cur_vid = 0;
@@ -478,6 +502,8 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 	}
 
 	*new_vid = nr;
+
+	notify_vdi_add(nr, iocb->nr_copies);
 
 	vprintf(SDOG_INFO, "creating new %s %s: size %" PRIu64 ", vid %"
 		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 ", copies %d\n",

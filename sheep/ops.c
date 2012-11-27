@@ -137,10 +137,8 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	int ret = rsp->result;
 
 	vprintf(SDOG_INFO, "done %d %ld\n", ret, nr);
-	if (ret == SD_RES_SUCCESS) {
+	if (ret == SD_RES_SUCCESS)
 		set_bit(nr, sys->vdi_inuse);
-		add_vdi_copy_number(nr, rsp->vdi.copies);
-	}
 
 	return ret;
 }
@@ -560,6 +558,17 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
+static int cluster_notify_vdi_add(const struct sd_req *req, struct sd_rsp *rsp,
+				  void *data)
+{
+	uint32_t vid = *(uint32_t *)data;
+	uint32_t nr_copies = *(uint32_t *)((char *)data + sizeof(vid));
+
+	add_vdi_copy_number(vid, nr_copies);
+
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_notify_vdi_del(const struct sd_req *req, struct sd_rsp *rsp,
 				  void *data)
 {
@@ -960,6 +969,13 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = true,
 		.process_main = cluster_notify_vdi_del,
+	},
+
+	[SD_OP_NOTIFY_VDI_ADD] = {
+		.name = "NOTIFY_VDI_ADD",
+		.type = SD_OP_TYPE_CLUSTER,
+		.force = true,
+		.process_main = cluster_notify_vdi_add,
 	},
 
 	[SD_OP_COMPLETE_RECOVERY] = {
