@@ -539,17 +539,11 @@ static void screen_object_list(struct recovery_work *rw,
 	int i, j;
 
 	for (i = 0; i < nr_oids; i++) {
-again:
 		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
 		if (!nr_objs) {
-			dprintf("can not find copy number for object %" PRIx64
-				"\n", oids[i]);
-			dprintf("probably, vdi was created but "
-				"post_cluster_new_vdi() is not called yet\n");
-			/* FIXME: can we wait for post_cluster_new_vdi
-			 *        with a better way? */
-			sleep(1);
-			goto again;
+			eprintf("ERROR: can not find copy number for object %"
+				PRIx64 "\n", oids[i]);
+			continue;
 		}
 		oid_to_vnodes(rw->cur_vinfo->vnodes, rw->cur_vinfo->nr_vnodes,
 			      oids[i], nr_objs, vnodes);
