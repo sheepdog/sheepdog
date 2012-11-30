@@ -3348,7 +3348,7 @@ sub process {
 		}
 
 		if ($line =~ /\bbzero\(/) {
-			ERROR("BZERO", "bzero() is obsolete, use memset()");
+			ERROR("BZERO", "bzero() is obsolete, use memset()" . $herecurr);
 		}
 	}
 
