@@ -250,7 +250,7 @@ static inline int node_id_cmp(const void *a, const void *b)
 
 static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 {
-	return node_id_cmp(a, b) == 0;
+	return node_id_cmp(&a->nid, &b->nid) == 0;
 }
 
 static inline int vnode_cmp(const void *a, const void *b)
