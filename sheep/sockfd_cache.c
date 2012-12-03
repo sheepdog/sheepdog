@@ -265,7 +265,7 @@ void sockfd_cache_add(const struct node_id *nid)
 	char name[INET6_ADDRSTRLEN];
 	int n, i;
 
-	pthread_rwlock_rdlock(&sockfd_cache.lock);
+	pthread_rwlock_wrlock(&sockfd_cache.lock);
 	new = xmalloc(sizeof(*new));
 	new->fds = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
 	for (i = 0; i < fds_count; i++)
