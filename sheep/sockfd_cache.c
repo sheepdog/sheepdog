@@ -333,15 +333,40 @@ static inline void check_idx(int idx)
 	queue_work(sys->sockfd_wqueue, w);
 }
 
+/* Add the node back if it is still alive */
+static inline int revalidate_node(const struct node_id *nid, char *name)
+{
+	int fd;
+
+	fd = connect_to(name, nid->port);
+	if (fd < 0)
+		return -1;
+	close(fd);
+	sockfd_cache_add(nid);
+
+	return 0;
+}
+
 static struct sockfd *sockfd_cache_get(const struct node_id *nid, char *name)
 {
 	struct sockfd_cache_entry *entry;
 	struct sockfd *sfd;
 	int fd, idx;
 
+grab:
 	entry = sockfd_cache_grab(nid, name, &idx);
-	if (!entry)
-		return NULL;
+	if (!entry) {
+		/*
+		 * The node is deleted, but someone askes us to grab it.
+		 * The nid is not in the sockfd cache but probably it might be
+		 * still alive due to broken network connection or was just too
+		 * busy to serve any request that makes other nodes deleted it
+		 * from the sockfd cache. In such cases, we need to add it back.
+		 */
+		if (revalidate_node(nid, name) < 0)
+			return NULL;
+		goto grab;
+	}
 
 	check_idx(idx);
 
