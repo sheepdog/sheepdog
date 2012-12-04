@@ -206,7 +206,6 @@ static inline struct store_driver *find_store_driver(const char *name)
 extern struct cluster_info *sys;
 extern struct store_driver *sd_store;
 extern char *obj_path;
-extern char *mnt_path;
 extern char *jrnl_path;
 extern char *epoch_path;
 extern mode_t def_fmode;

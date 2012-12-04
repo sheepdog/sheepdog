@@ -276,37 +276,6 @@ static int init_epoch_path(const char *base_path)
 	return init_path(epoch_path, NULL);
 }
 
-static int init_mnt_path(const char *base_path)
-{
-	int ret;
-	FILE *fp;
-	struct mntent *mnt;
-	struct stat s, ms;
-
-	ret = stat(base_path, &s);
-	if (ret)
-		return 1;
-
-	fp = setmntent(MOUNTED, "r");
-	if (!fp)
-		return 1;
-
-	while ((mnt = getmntent(fp))) {
-		ret = stat(mnt->mnt_dir, &ms);
-		if (ret)
-			continue;
-
-		if (ms.st_dev == s.st_dev) {
-			mnt_path = strdup(mnt->mnt_dir);
-			break;
-		}
-	}
-
-	endmntent(fp);
-
-	return 0;
-}
-
 #define JRNL_PATH "/journal/"
 
 static int init_jrnl_path(const char *base_path)
@@ -407,10 +376,6 @@ int init_store(const char *d)
 	int ret;
 
 	ret = init_epoch_path(d);
-	if (ret)
-		return ret;
-
-	ret = init_mnt_path(d);
 	if (ret)
 		return ret;
 
