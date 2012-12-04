@@ -184,13 +184,9 @@ retest:
 	pthread_exit(NULL);
 }
 
-static int init_eventfd(void)
+int init_wqueue_eventfd(void)
 {
 	int ret;
-	static bool done;
-
-	if (done)
-		return 0;
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
@@ -205,8 +201,6 @@ static int init_eventfd(void)
 		return 1;
 	}
 
-	done = true;
-
 	return 0;
 }
 
@@ -214,10 +208,6 @@ struct work_queue *init_work_queue(const char *name, bool ordered)
 {
 	int ret;
 	struct worker_info *wi;
-
-	ret = init_eventfd();
-	if (ret)
-		return NULL;
 
 	wi = zalloc(sizeof(*wi));
 	if (!wi)

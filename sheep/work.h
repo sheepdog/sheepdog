@@ -47,5 +47,6 @@ extern int total_ordered_workers;
 /* if 'ordered' is true, the work queue are processes in order. */
 struct work_queue *init_work_queue(const char *name, bool ordered);
 void queue_work(struct work_queue *q, struct work *work);
+int init_wqueue_eventfd(void);
 
 #endif

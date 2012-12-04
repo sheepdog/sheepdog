@@ -332,6 +332,9 @@ static void init_journal_arg(char *arg)
 
 static int init_work_queues(void)
 {
+	if (init_wqueue_eventfd())
+		return -1;
+
 	sys->gateway_wqueue = init_work_queue("gway", false);
 	sys->io_wqueue = init_work_queue("io", false);
 	sys->recovery_wqueue = init_work_queue("rw", false);
