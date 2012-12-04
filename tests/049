@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Test object cache reclaim at startup
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    _start_sheep $i "-w object:size=30"
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format -c 1
+sleep 1
+
+$COLLIE vdi create test 20M
+dd if=/dev/urandom | $COLLIE vdi write -w test
+
+$COLLIE cluster shutdown
+sleep 1
+
+#trigger an object reclaim at startup
+for i in `seq 0 2`; do
+    _start_sheep $i "-w object:size=10"
+done
+
+_wait_for_sheep 3
