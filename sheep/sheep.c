@@ -330,6 +330,25 @@ static void init_journal_arg(char *arg)
 	}
 }
 
+static int init_work_queues(void)
+{
+	sys->gateway_wqueue = init_work_queue("gway", false);
+	sys->io_wqueue = init_work_queue("io", false);
+	sys->recovery_wqueue = init_work_queue("rw", false);
+	sys->deletion_wqueue = init_work_queue("deletion", true);
+	sys->block_wqueue = init_work_queue("block", true);
+	sys->sockfd_wqueue = init_work_queue("sockfd", true);
+	if (is_object_cache_enabled()) {
+		sys->reclaim_wqueue = init_work_queue("reclaim", true);
+		if (!sys->reclaim_wqueue)
+			return -1;
+	}
+	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
+	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->sockfd_wqueue)
+			return -1;
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex;
@@ -510,9 +529,38 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
+	ret = init_event(EPOLL_SIZE);
+	if (ret)
+		exit(1);
+
 	ret = init_global_pathnames(dir);
 	if (ret)
 		exit(1);
+
+	ret = create_listen_port(bindaddr, port);
+	if (ret)
+		exit(1);
+
+	ret = init_unix_domain_socket(dir);
+	if (ret)
+		exit(1);
+
+	local_req_init();
+
+	ret = init_signal();
+	if (ret)
+		exit(1);
+
+	/* This function must be called before create_cluster() */
+	ret = init_disk_space(dir);
+	if (ret)
+		exit(1);
+
+	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
+	if (ret) {
+		eprintf("failed to create sheepdog cluster\n");
+		exit(1);
+	}
 
 	/* We should init journal file before backend init */
 	if (uatomic_is_true(&sys->use_journal)) {
@@ -525,47 +573,19 @@ int main(int argc, char **argv)
 			exit(1);
 	}
 
+	/*
+	 * After this function, we are multi-threaded.
+	 *
+	 * Put those init functions that need single threaded environment, for
+	 * e.g, signal handling, above this call and those need multi-threaded
+	 * environment, for e.g, work queues below.
+	 */
+	ret = init_work_queues();
+	if (ret)
+		exit(1);
+
 	ret = init_store(dir);
 	if (ret)
-		exit(1);
-
-	ret = init_event(EPOLL_SIZE);
-	if (ret)
-		exit(1);
-
-	ret = create_listen_port(bindaddr, port);
-	if (ret)
-		exit(1);
-
-	ret = init_unix_domain_socket(dir);
-	if (ret)
-		exit(1);
-
-	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
-	if (ret) {
-		eprintf("failed to create sheepdog cluster\n");
-		exit(1);
-	}
-
-	local_req_init();
-
-	ret = init_signal();
-	if (ret)
-		exit(1);
-
-	sys->gateway_wqueue = init_work_queue("gway", false);
-	sys->io_wqueue = init_work_queue("io", false);
-	sys->recovery_wqueue = init_work_queue("rw", false);
-	sys->deletion_wqueue = init_work_queue("deletion", true);
-	sys->block_wqueue = init_work_queue("block", true);
-	sys->sockfd_wqueue = init_work_queue("sockfd", true);
-	if (is_object_cache_enabled()) {
-		sys->reclaim_wqueue = init_work_queue("reclaim", true);
-		if (!sys->reclaim_wqueue)
-			exit(1);
-	}
-	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
-	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->sockfd_wqueue)
 		exit(1);
 
 	ret = trace_init();

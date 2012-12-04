@@ -337,7 +337,7 @@ static int init_store_driver(void)
 	return sd_store->init(obj_path);
 }
 
-static int init_disk_space(const char *base_path)
+int init_disk_space(const char *base_path)
 {
 	int ret = SD_RES_SUCCESS;
 	uint64_t space_size = 0;
@@ -398,10 +398,6 @@ int init_global_pathnames(const char *d)
 int init_store(const char *d)
 {
 	int ret;
-
-	ret = init_disk_space(d);
-	if (ret)
-		return ret;
 
 	if (!sys->gateway_only) {
 		ret = init_store_driver();
