@@ -334,7 +334,8 @@ int main(int argc, char **argv)
 {
 	int ch, longindex;
 	int ret, port = SD_LISTEN_PORT;
-	const char *dir = DEFAULT_OBJECT_DIR;
+	const char *dirp = DEFAULT_OBJECT_DIR;
+	char *dir;
 	bool is_daemon = true;
 	bool to_stdout = false;
 	int log_level = SDOG_INFO;
@@ -486,17 +487,23 @@ int main(int argc, char **argv)
 	}
 
 	if (optind != argc)
-		dir = argv[optind];
+		dirp = argv[optind];
+
+	ret = init_base_path(dirp);
+	if (ret)
+		exit(1);
+
+	dir = realpath(dirp, NULL);
+	if (!dir) {
+		fprintf(stderr, "%m\n");
+		exit(1);
+	}
 
 	snprintf(path, sizeof(path), "%s/" LOG_FILE_NAME, dir);
 
 	srandom(port);
 
 	if (is_daemon && daemon(0, 0))
-		exit(1);
-
-	ret = init_base_path(dir);
-	if (ret)
 		exit(1);
 
 	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level, path);
@@ -576,6 +583,7 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	free(dir);
 	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
 
 	while (sys->nr_outstanding_reqs != 0 ||
