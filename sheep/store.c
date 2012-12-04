@@ -371,9 +371,14 @@ out:
 	return ret;
 }
 
-int init_store(const char *d)
+/* Initilize all the global pathnames used internally */
+int init_global_pathnames(const char *d)
 {
 	int ret;
+
+	ret = init_obj_path(d);
+	if (ret)
+		return ret;
 
 	ret = init_epoch_path(d);
 	if (ret)
@@ -386,6 +391,13 @@ int init_store(const char *d)
 	ret = init_config_path(d);
 	if (ret)
 		return ret;
+
+	return 0;
+}
+
+int init_store(const char *d)
+{
+	int ret;
 
 	ret = init_disk_space(d);
 	if (ret)

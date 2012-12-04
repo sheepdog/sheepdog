@@ -221,6 +221,7 @@ int create_listen_port(char *bindaddr, int port);
 int init_unix_domain_socket(const char *dir);
 
 int init_store(const char *dir);
+int init_global_pathnames(const char *d);
 int init_base_path(const char *dir);
 int init_obj_path(const char *base_path);
 

@@ -510,7 +510,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_obj_path(dir);
+	ret = init_global_pathnames(dir);
 	if (ret)
 		exit(1);
 
