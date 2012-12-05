@@ -131,19 +131,12 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 
 int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 {
-	int ret, fd, count;
-	struct vdi_copy *vc;
+	int ret, fd;
 	unsigned long nr;
 	static struct sheepdog_inode i;
 	struct sd_req req;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req;
-	unsigned int rlen = SD_DATA_OBJ_SIZE; /* FIXME */
-
-	vc = zalloc(rlen);
-	if (!vc) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		return -1;
-	}
+	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	unsigned int rlen = sizeof(vdi_inuse);
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0) {
@@ -152,10 +145,10 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 		goto out;
 	}
 
-	sd_init_req(&req, SD_OP_GET_VDI_COPIES);
-	req.data_length = rlen;
+	sd_init_req(&req, SD_OP_READ_VDIS);
+	req.data_length = sizeof(vdi_inuse);
 
-	ret = exec_req(fd, &req, (char *)vc);
+	ret = exec_req(fd, &req, &vdi_inuse);
 	if (ret < 0) {
 		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
 			sdhost, sdport);
@@ -164,11 +157,13 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	}
 	close(fd);
 
-	count = rsp->data_length / sizeof(*vc);
-	for (nr = 0; nr < count; nr++) {
+	for (nr = 0; nr < SD_NR_VDIS; nr++) {
 		uint64_t oid;
 
-		oid = vid_to_vdi_oid(vc[nr].vid);
+		if (!test_bit(nr, vdi_inuse))
+			continue;
+
+		oid = vid_to_vdi_oid(nr);
 
 		memset(&i, 0, sizeof(i));
 		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0, true);
@@ -199,8 +194,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	}
 
 out:
-	free(vc);
-	return 0;
+	return ret;
 }
 
 int send_light_req_get_response(struct sd_req *hdr, const char *host, int port)
