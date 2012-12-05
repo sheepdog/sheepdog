@@ -399,7 +399,9 @@ static notrace void logger(char *log_dir, char *outfile)
 		sleep(1);
 	}
 
+	log_flush();
 	free(log_buff);
+	free_logarea();
 	exit(0);
 }
 
@@ -451,8 +453,7 @@ notrace void log_close(void)
 		la->active = false;
 		waitpid(logger_pid, NULL, 0);
 
-		vprintf(SDOG_WARNING, "logger pid %d stopped\n", logger_pid);
-		log_flush();
+		syslog(LOG_WARNING, "logger pid %d stopped\n", logger_pid);
 		closelog();
 		free_logarea();
 	}
