@@ -54,6 +54,7 @@ static struct sd_option sheep_options[] = {
 	{'P', "pidfile", true, "create a pid file"},
 	{'s', "disk-space", true, "specify the free disk space in megabytes"},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
+	{'v', "version", false, "show the version"},
 	{'w', "write-cache", true, "specify the cache type"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep"},
 	{'z', "zone", true, "specify the zone id"},
@@ -497,6 +498,11 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			usage(0);
+			break;
+		case 'v':
+			fprintf(stdout, "Sheepdog daemon version %s\n",
+				PACKAGE_VERSION);
+			exit(0);
 			break;
 		default:
 			usage(1);
