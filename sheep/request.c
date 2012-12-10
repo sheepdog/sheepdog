@@ -18,6 +18,7 @@
 #include <netinet/tcp.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include "sheep_priv.h"
 #include "util.h"
@@ -473,7 +474,10 @@ again:
 	ret = eventfd_read(req->wait_efd, &value);
 	if (ret < 0) {
 		eprintf("%m\n");
-		goto again;
+		if (errno == EINTR)
+			goto again;
+		/* Fake the result to ask for retry */
+		req->rp.result = SD_RES_NETWORK_ERROR;
 	}
 
 	/* fill rq with response header as exec_req does */
