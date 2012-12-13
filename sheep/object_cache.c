@@ -721,13 +721,11 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd;
 	int ret = SD_RES_OID_EXIST;
-	struct strbuf buf;
+	char path[PATH_MAX], tmp_path[PATH_MAX];
 
-	strbuf_init(&buf, PATH_MAX);
-	strbuf_addstr(&buf, cache_dir);
-	strbuf_addf(&buf, "/%06"PRIx32"/%08"PRIx32, oc->vid, idx);
-
-	fd = open(buf.buf, flags, def_fmode);
+	sprintf(tmp_path, "%s/%06"PRIx32"/%08"PRIx32".tmp", cache_dir,
+		oc->vid, idx);
+	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
 		if (errno == EEXIST) {
 			dprintf("%08"PRIx32" already created\n", idx);
@@ -738,6 +736,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out;
 	}
 
+	/* We need to extend it if the buffer is trimmed */
 	if (offset != 0 || buf_size != obj_size) {
 		ret = prealloc(fd, obj_size);
 		if (ret < 0) {
@@ -753,12 +752,24 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		eprintf("failed, vid %"PRIx32", idx %"PRIx32"\n", oc->vid, idx);
 		goto out_close;
 	}
+	/* This is intended to take care of partial write due to crash */
+	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, oc->vid, idx);
+	ret = link(tmp_path, path);
+	if (ret < 0) {
+		if (errno == EEXIST) {
+			ret = SD_RES_OID_EXIST;
+			goto out_close;
+		}
+		dprintf("failed to link %s to %s: %m\n", tmp_path, path);
+		ret = err_to_sderr(idx_to_oid(oc->vid, idx), errno);
+		goto out_close;
+	}
 	ret = SD_RES_SUCCESS;
-	dprintf("%08"PRIx32" size %zu\n", idx, buf_size);
+	dprintf("%08"PRIx32" size %zu\n", idx, obj_size);
 out_close:
 	close(fd);
+	unlink(tmp_path);
 out:
-	strbuf_release(&buf);
 	return ret;
 }
 
@@ -924,6 +935,13 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 	while ((d = readdir(dir))) {
 		if (!strncmp(d->d_name, ".", 1))
 			continue;
+		if (strcmp(d->d_name + 8, ".tmp") == 0) {
+			dprintf("try to del %s\n", d->d_name);
+			if (unlinkat(dirfd(dir), d->d_name, 0) < 0)
+				eprintf("%m\n");
+			continue;
+		}
+
 		idx = strtoul(d->d_name, NULL, 16);
 		if (idx == ULLONG_MAX)
 			continue;
@@ -1163,6 +1181,14 @@ static int load_existing_cache_object(struct object_cache *cache)
 	while ((d = readdir(dir))) {
 		if (!strncmp(d->d_name, ".", 1))
 			continue;
+
+		if (strcmp(d->d_name + 8, ".tmp") == 0) {
+			dprintf("try to del %s\n", d->d_name);
+			if (unlinkat(dirfd(dir), d->d_name, 0) < 0)
+				eprintf("%m\n");
+			continue;
+		}
+
 		idx = strtoul(d->d_name, NULL, 16);
 		if (idx == ULLONG_MAX)
 			continue;
