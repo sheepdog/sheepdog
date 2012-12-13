@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include "util.h"
 #include "logger.h"
@@ -328,4 +329,19 @@ void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
 
 	if (offset + len < requested_len)
 		memset(p + offset + len, 0, requested_len - offset - len);
+}
+
+int is_numeric(const char *s)
+{
+	const char *p = s;
+
+	if (*p) {
+		char c;
+
+		while ((c=*p++))
+			if (!isdigit(c))
+				return 0;
+		return 1;
+	}
+	return 0;
 }

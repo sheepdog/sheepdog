@@ -185,8 +185,15 @@ static int node_kill(int argc, char **argv)
 	char host[128];
 	int node_id, ret;
 	struct sd_node_req req;
+	const char *p = argv[optind++];
 
-	node_id = strtol(argv[optind++], NULL, 10);
+	if (!is_numeric(p)) {
+		fprintf(stderr, "Invalid node id '%s', "
+			"please specify a numeric value\n", p);
+		exit(EXIT_USAGE);
+	}
+
+	node_id = strtol(p, NULL, 10);
 	if (node_id < 0 || node_id >= sd_nodes_nr) {
 		fprintf(stderr, "Invalid node id '%d'\n", node_id);
 		exit(EXIT_USAGE);
