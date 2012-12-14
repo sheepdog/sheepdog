@@ -73,6 +73,14 @@ static int list_store(void)
 	return EXIT_SYSFAIL;
 }
 
+#define FORMAT_PRINT \
+"\
+    __   \n\
+   ()'`; \n\
+   /\\|`  \n\
+  /  |   Caution! The cluster is not empty.\n\
+(/_)_|_  Are you sure you want to continue? [yes/no]: "
+
 static int cluster_format(int argc, char **argv)
 {
 	int fd, ret;
@@ -80,10 +88,42 @@ static int cluster_format(int argc, char **argv)
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
 	struct timeval tv;
 	char store_name[STORE_LEN];
+	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	unsigned long nr;
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		return EXIT_SYSFAIL;
+
+	sd_init_req((struct sd_req *)&hdr, SD_OP_READ_VDIS);
+	hdr.data_length = sizeof(vdi_inuse);
+
+	ret = exec_req(fd, (struct sd_req *)&hdr, &vdi_inuse);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
+			sdhost, sdport);
+		close(fd);
+		return EXIT_SYSFAIL;
+	}
+
+	for (nr = 0; nr < SD_NR_VDIS; nr++)
+		if (test_bit(nr, vdi_inuse))
+			break;
+
+	if (nr != SD_NR_VDIS) {
+		int i, l;
+		char str[123] = {'\0'};
+
+		printf(FORMAT_PRINT);
+		ret = scanf("%s", str);
+		if (ret < 0)
+			return EXIT_SYSFAIL;
+		l = strlen(str);
+		for (i = 0; i < l; i++)
+			str[i] = tolower(str[i]);
+		if (strncmp(str, "yes", 3) != 0)
+			return EXIT_SUCCESS;
+	}
 
 	gettimeofday(&tv, NULL);
 
