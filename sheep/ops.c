@@ -577,6 +577,16 @@ static int cluster_notify_vdi_del(const struct sd_req *req, struct sd_rsp *rsp,
 	return objlist_cache_cleanup(vid);
 }
 
+static int cluster_delete_cache(const struct sd_req *req, struct sd_rsp *rsp,
+				void *data)
+{
+	uint32_t vid = oid_to_vid(req->obj.oid);
+
+	object_cache_delete(vid);
+
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_recovery_completion(const struct sd_req *req,
 				       struct sd_rsp *rsp,
 				       void *data)
@@ -976,6 +986,12 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = true,
 		.process_main = cluster_notify_vdi_add,
+	},
+
+	[SD_OP_DELETE_CACHE] = {
+		.name = "DELETE_CACHE",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_main = cluster_delete_cache,
 	},
 
 	[SD_OP_COMPLETE_RECOVERY] = {

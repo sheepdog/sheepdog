@@ -1884,9 +1884,38 @@ out:
 	return ret;
 }
 
+static int vdi_cache_delete(int argc, char **argv)
+{
+	const char *vdiname = argv[optind++];
+	struct sd_req hdr;
+	uint32_t vid;
+	int ret = EXIT_SUCCESS;
+
+	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+			    vdi_cmd_data.snapshot_tag, &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	sd_init_req(&hdr, SD_OP_DELETE_CACHE);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
+		return EXIT_FAILURE;
+	}
+out:
+	return ret;
+}
+
 static struct subcommand vdi_cache_cmd[] = {
 	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
 	 NULL, 0, vdi_cache_flush},
+	{"delete", NULL, NULL, "delete the cache of the vdi specified in all nodes.",
+	 NULL, 0, vdi_cache_delete},
 	{NULL,},
 };
 
