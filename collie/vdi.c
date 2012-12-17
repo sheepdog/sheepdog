@@ -1857,6 +1857,54 @@ out:
 	return ret;
 }
 
+static int vdi_cache_flush(int argc, char **argv)
+{
+	const char *vdiname = argv[optind++];
+	struct sd_req hdr;
+	uint32_t vid;
+	int ret = EXIT_SUCCESS;
+
+	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+			    vdi_cmd_data.snapshot_tag, &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	sd_init_req(&hdr, SD_OP_FLUSH_DEL_CACHE);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
+		return EXIT_FAILURE;
+	}
+out:
+	return ret;
+}
+
+static struct subcommand vdi_cache_cmd[] = {
+	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
+	 NULL, 0, vdi_cache_flush},
+	{NULL,},
+};
+
+static int vdi_cache(int argc, char **argv)
+{
+	int i;
+
+	for (i = 0; vdi_cache_cmd[i].name; i++) {
+		if (!strcmp(vdi_cache_cmd[i].name, argv[3])) {
+			optind++;
+			return vdi_cache_cmd[i].fn(argc, argv);
+		}
+	}
+
+	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
+	return EXIT_FAILURE;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
@@ -1912,6 +1960,9 @@ static struct subcommand vdi_cmd[] = {
 	{"restore", "<vdiname> <backup>", "saph", "restore snapshot images from a backup",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_restore, vdi_options},
+	{"cache", NULL, "saph", "Run 'collie vdi cache' for more information\n",
+	 vdi_cache_cmd, SUBCMD_FLAG_NEED_THIRD_ARG,
+	 vdi_cache, vdi_options},
 	{NULL,},
 };
 
