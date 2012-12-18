@@ -50,7 +50,6 @@ enum zk_event_type {
 
 struct zk_node {
 	struct rb_node rb;
-	clientid_t clientid;
 	struct sd_node node;
 };
 
@@ -510,32 +509,18 @@ static int leave_event(struct zk_node *znode)
 static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		       void *ctx)
 {
-	eventfd_t value = 1;
-	const clientid_t *cid;
 	char str[256], *p;
 	int ret;
 	struct zk_node znode;
 
 	dprintf("path:%s, type:%d\n", path, type);
 
-	/* discard useless event */
-	if (type < 0 || type == ZOO_CHILD_EVENT)
-		return;
-
-	if (type == ZOO_SESSION_EVENT) {
-		cid = zoo_client_id(zh);
-		assert(cid != NULL);
-		this_node.clientid = *cid;
-		dprintf("session change, clientid:%"PRId64"\n", cid->client_id);
-	}
-
 	if (type == ZOO_CREATED_EVENT || type == ZOO_CHANGED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
 		if (ret == 1)
 			zk_node_exists(path);
-	}
-
-	if (type == ZOO_DELETED_EVENT) {
+		eventfd_write(efd, 1);
+	} else if (type == ZOO_DELETED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
 		if (ret != 1)
 			return;
@@ -549,7 +534,6 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		return;
 	}
 
-	eventfd_write(efd, value);
 }
 
 static int zk_join(const struct sd_node *myself,
@@ -557,7 +541,6 @@ static int zk_join(const struct sd_node *myself,
 {
 	int rc;
 	char path[256];
-	const clientid_t *cid;
 
 	this_node.node = *myself;
 
@@ -568,12 +551,6 @@ static int zk_join(const struct sd_node *myself,
 			"Wait for a while and restart me again\n");
 		exit(1);
 	}
-
-	cid = zoo_client_id(zhandle);
-	assert(cid != NULL);
-	this_node.clientid = *cid;
-
-	dprintf("clientid:%"PRId64"\n", cid->client_id);
 
 	return add_event(EVENT_JOIN_REQUEST, &this_node,
 			 opaque, opaque_len);
