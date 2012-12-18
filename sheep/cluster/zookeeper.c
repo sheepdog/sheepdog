@@ -49,7 +49,6 @@ enum zk_event_type {
 };
 
 struct zk_node {
-	bool joined;
 	struct rb_node rb;
 	clientid_t clientid;
 	struct sd_node node;
@@ -570,7 +569,6 @@ static int zk_join(const struct sd_node *myself,
 		exit(1);
 	}
 
-	this_node.joined = false;
 	cid = zoo_client_id(zhandle);
 	assert(cid != NULL);
 	this_node.clientid = *cid;
@@ -628,8 +626,7 @@ static void zk_handle_join_request(struct zk_event *ev)
 {
 	enum cluster_join_result res;
 
-	dprintf("sender: %s, joined: %d\n", node_to_str(&ev->sender.node),
-		ev->sender.joined);
+	dprintf("sender: %s\n", node_to_str(&ev->sender.node));
 
 	if (!is_master()) {
 		/* Let's await master acking the join-request */
@@ -640,7 +637,6 @@ static void zk_handle_join_request(struct zk_event *ev)
 	res = sd_check_join_cb(&ev->sender.node, ev->buf);
 	ev->join_result = res;
 	ev->type = EVENT_JOIN_RESPONSE;
-	ev->sender.joined = true;
 
 	zk_queue_push_back(ev);
 
@@ -690,8 +686,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 		zk_tree_destroy();
 
 	zk_tree_add(&ev->sender);
-	dprintf("sender:%s, joined:%d\n", node_to_str(&ev->sender.node),
-		ev->sender.joined);
+	dprintf("sender:%s\n", node_to_str(&ev->sender.node));
 
 	switch (ev->join_result) {
 	case CJ_RES_SUCCESS:
