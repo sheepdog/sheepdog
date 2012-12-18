@@ -180,7 +180,7 @@ static bool zk_queue_empty(zhandle_t *zh)
 	int rc;
 	char path[256];
 
-	sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
+	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
 	rc = zk_node_exists(zh, path, 1, NULL);
 	if (rc == ZOK)
@@ -200,13 +200,13 @@ static void zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 	sprintf(path, "%s/", QUEUE_ZNODE);
 	zk_create_node(zh, path, (char *)ev, len,
 		       &ZOO_OPEN_ACL_UNSAFE, ZOO_SEQUENCE, buf, sizeof(buf));
-	dprintf("create path:%s, nr_nodes:%zu, queue_pos:%010d, len:%d\n", buf,
-		nr_zk_nodes, queue_pos, len);
+	dprintf("create path:%s, nr_nodes:%zu, queue_pos:%010"PRId32", len:%d\n"
+		, buf,nr_zk_nodes, queue_pos, len);
 
 	if (first_push) {
-		int32_t seq;
+		uint32_t seq;
 
-		sscanf(buf, QUEUE_ZNODE "/%d", &seq);
+		sscanf(buf, QUEUE_ZNODE "/%"PRId32, &seq);
 		queue_pos = seq;
 		eventfd_write(efd, value);
 		first_push = false;
@@ -223,14 +223,14 @@ static int zk_queue_push_back(zhandle_t *zh, struct zk_event *ev)
 	char path[256];
 
 	queue_pos--;
-	dprintf("queue_pos:%010d\n", queue_pos);
+	dprintf("queue_pos:%010"PRId32"\n", queue_pos);
 
 	if (ev) {
 		len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
-		sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
+		sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 		zk_set_data(zh, path, (char *)ev, len, -1);
-		dprintf("update path:%s, queue_pos:%010d, len:%d\n", path,
-			queue_pos, len);
+		dprintf("update path:%s, queue_pos:%010"PRId32", len:%d\n",
+			path, queue_pos, len);
 	}
 
 	return 0;
@@ -272,16 +272,16 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 		 * and it have blocked whole cluster, we should ignore it.
 		 */
 		len = sizeof(*ev);
-		sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
+		sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 		rc = zk_get_data(zh, path, 1, (char *)ev, &len, NULL);
 		if (rc == ZOK &&
 		    node_eq(&ev->sender.node, &lev->sender.node) &&
 		    is_blocking_event(ev)) {
-			dprintf("this queue_pos:%010d have blocked whole "
-				"cluster, ignore it\n", queue_pos);
+			dprintf("this queue_pos:%010"PRId32" have blocked whole"
+				" cluster, ignore it\n", queue_pos);
 			queue_pos++;
 
-			sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
+			sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 			zk_queue_peek_next_notify(zh, path);
 		}
 
@@ -307,7 +307,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 		return -1;
 
 	len = sizeof(*ev);
-	sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
+	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 	rc = zk_get_data(zh, path, 1, (char *)ev, &len, NULL);
 	if (rc != ZOK)
 		panic("failed to zk_get_data path:%s, rc:%d\n", path, rc);
@@ -324,7 +324,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	if (is_blocking_event(ev))
 		return 0;
 
-	sprintf(path, QUEUE_ZNODE "/%010d", queue_pos);
+	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 	zk_queue_peek_next_notify(zh, path);
 	return 0;
 }
