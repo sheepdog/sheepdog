@@ -21,6 +21,7 @@
 #include "event.h"
 #include "work.h"
 #include "util.h"
+#include "rbtree.h"
 
 #define SESSION_TIMEOUT 30000		/* millisecond */
 #define MEMBER_CREATE_TIMEOUT SESSION_TIMEOUT
@@ -49,6 +50,7 @@ enum zk_event_type {
 
 struct zk_node {
 	bool joined;
+	struct rb_node rb;
 	clientid_t clientid;
 	struct sd_node node;
 };
@@ -72,15 +74,64 @@ static unsigned zk_levent_head;
 static unsigned zk_levent_tail;
 static bool called_by_zk_unblock;
 
-static void *zk_node_btroot;
-static struct zk_node *zk_master;
 static struct sd_node sd_nodes[SD_MAX_NODES];
 static size_t nr_sd_nodes;
-static size_t nr_zk_nodes;
+
+struct rb_root zk_node_root = RB_ROOT;
 
 static inline bool is_blocking_event(struct zk_event *ev)
 {
 	return ev->type == EVENT_BLOCK || ev->type == EVENT_JOIN_REQUEST;
+}
+
+static struct zk_node *zk_tree_insert(struct zk_node *new)
+{
+	struct rb_node **p = &zk_node_root.rb_node;
+	struct rb_node *parent = NULL;
+	struct zk_node *entry;
+
+	while (*p) {
+		int cmp;
+
+		parent = *p;
+		entry = rb_entry(parent, struct zk_node, rb);
+
+		cmp = node_id_cmp(&new->node.nid, &entry->node.nid);
+		if (cmp < 0)
+			p = &(*p)->rb_left;
+		else if (cmp > 0)
+			p = &(*p)->rb_right;
+		else
+			/* already has this entry */
+			return entry;
+	}
+
+	rb_link_node(&new->rb, parent, p);
+	rb_insert_color(&new->rb, &zk_node_root);
+
+	return NULL; /* insert successfully */
+}
+
+static struct zk_node *zk_tree_search(const struct node_id *nid)
+{
+	struct rb_node *n = zk_node_root.rb_node;
+	struct zk_node *t;
+
+	while (n) {
+		int cmp;
+
+		t = rb_entry(n, struct zk_node, rb);
+		cmp = node_id_cmp(nid, &t->node.nid);
+
+		if (cmp < 0)
+			n = n->rb_left;
+		else if (cmp > 0)
+			n = n->rb_right;
+		else
+			return t; /* found it */
+	}
+
+	return NULL;
 }
 
 /* zookeeper API wrapper */
@@ -200,8 +251,8 @@ static void zk_queue_push(struct zk_event *ev)
 	sprintf(path, "%s/", QUEUE_ZNODE);
 	zk_create_node(path, (char *)ev, len,
 		       &ZOO_OPEN_ACL_UNSAFE, ZOO_SEQUENCE, buf, sizeof(buf));
-	dprintf("create path:%s, nr_nodes:%zu, queue_pos:%010"PRId32", len:%d\n"
-		, buf,nr_zk_nodes, queue_pos, len);
+	dprintf("create:%s, queue_pos:%010"PRId32", len:%d\n", buf, queue_pos,
+		len);
 
 	if (first_push) {
 		uint32_t seq;
@@ -308,8 +359,8 @@ static int zk_queue_pop(struct zk_event *ev)
 	rc = zk_get_data(path, 1, (char *)ev, &len, NULL);
 	if (rc != ZOK)
 		panic("failed to zk_get_data path:%s, rc:%d\n", path, rc);
-	dprintf("read path:%s, nr_nodes:%zu, type:%d, len:%d, rc:%d\n", path,
-		nr_zk_nodes, ev->type, len, rc);
+	dprintf("read path:%s, type:%d, len:%d, rc:%d\n", path, ev->type,
+		len, rc);
 
 	queue_pos++;
 
@@ -331,119 +382,63 @@ static int zk_member_empty(void)
 	struct String_vector strs;
 
 	zk_get_children(MEMBER_ZNODE, 1, &strs);
-
 	return (strs.count == 0);
 }
 
-static inline int zk_node_cmp(const void *a, const void *b)
+static inline void zk_tree_add(struct zk_node *node)
 {
-	const struct zk_node *znode1 = a;
-	const struct zk_node *znode2 = b;
-	return node_id_cmp(&znode1->node.nid, &znode2->node.nid);
+	struct zk_node *zk = malloc(sizeof(*zk));
+	*zk = *node;
+	if (zk_tree_insert(zk))
+		free(zk);
 }
 
-static void node_btree_add(void **btroot, struct zk_node *znode)
+static inline void zk_tree_del(struct zk_node *node)
 {
-	struct zk_node *n, **p;
-
-	n = (struct zk_node *)malloc(sizeof(struct zk_node));
-	if (n == NULL)
-		panic("malloc, oom\n");
-
-	*n = *znode;
-
-	p = (struct zk_node **)tsearch((void *)n, btroot, zk_node_cmp);
-	if (p == NULL)
-		panic("tsearch, oom\n");
-	else if (*p != n) {
-		**p = *n;
-		free(n);
-	} else
-		nr_zk_nodes++;
+	rb_erase(&node->rb, &zk_node_root);
+	free(node);
 }
 
-static inline void node_btree_del(void **btroot, struct zk_node *znode)
+static inline void zk_tree_destroy(void)
 {
-	tdelete((void *)znode, btroot, zk_node_cmp);
-	free(znode);
-	nr_zk_nodes--;
-}
+	struct zk_node *zk;
+	int i;
 
-static inline void node_btree_clear(void **btroot)
-{
-	tdestroy(*btroot, free);
-	*btroot = NULL;
-	nr_zk_nodes = 0;
-}
-
-static struct zk_node *node_btree_find(void **btroot, struct zk_node *znode)
-{
-	struct zk_node **p;
-
-	p = (struct zk_node **)tfind((void *)znode, btroot, zk_node_cmp);
-	if (p)
-		return *p;
-
-	return NULL;
-}
-
-static void node_btree_build_list_fn(const void *nodep,
-		const VISIT which, const int depth)
-{
-	struct zk_node *znode;
-
-	switch (which) {
-	case preorder:
-		break;
-	case postorder:
-	case leaf:
-		znode = *(struct zk_node **) nodep;
-		sd_nodes[nr_sd_nodes++] = znode->node;
-		break;
-	case endorder:
-		break;
+	for (i = 0; i < nr_sd_nodes; i++) {
+		zk = zk_tree_search(&sd_nodes[i].nid);
+		if (zk)
+			zk_tree_del(zk);
 	}
 }
 
-static inline void build_node_list(void *btroot)
+static inline void build_node_list(void)
 {
+	struct rb_node *n;
+	struct zk_node *zk;
+
 	nr_sd_nodes = 0;
-	twalk(btroot, node_btree_build_list_fn);
-	assert(nr_sd_nodes == nr_zk_nodes);
+	for (n = rb_first(&zk_node_root); n; n = rb_next(n)) {
+		zk = rb_entry(n, struct zk_node, rb);
+		sd_nodes[nr_sd_nodes++] = zk->node;
+	}
 	dprintf("nr_sd_nodes:%zu\n", nr_sd_nodes);
 }
 
-static void node_btree_find_master_fn(const void *nodep,
-		const VISIT which, const int depth)
+static bool is_master(void)
 {
-	switch (which) {
-	case preorder:
-		break;
-	case postorder:
-	case leaf:
-		if (zk_master)
-			break;
-		zk_master = *(struct zk_node **) nodep;
-		dprintf("master:%s\n", node_to_str(&zk_master->node));
-		break;
-	case endorder:
-		break;
-	}
-}
+	struct rb_node *n;
+	struct zk_node *zk;
 
-static bool is_master(struct zk_node *znode)
-{
-	zk_master = NULL;
-
-	if (!zk_node_btroot) {
+	if (!nr_sd_nodes) {
 		if (zk_member_empty())
 			return true;
 		else
 			return false;
 	}
 
-	twalk(zk_node_btroot, node_btree_find_master_fn);
-	if (node_eq(&zk_master->node, &znode->node))
+	n = rb_first(&zk_node_root);
+	zk = rb_entry(n, struct zk_node, rb);
+	if (node_eq(&zk->node, &this_node.node))
 		return true;
 
 	return false;
@@ -478,7 +473,7 @@ static void zk_member_init(void)
 
 			switch (rc) {
 			case ZOK:
-				node_btree_add(&zk_node_btroot, &znode);
+				zk_tree_add(&znode);
 			case ZNONODE:
 				break;
 			default:
@@ -486,7 +481,6 @@ static void zk_member_init(void)
 			}
 		}
 	}
-	dprintf("nr_nodes:%zu\n", nr_zk_nodes);
 }
 
 static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,
@@ -645,11 +639,11 @@ static void zk_handle_join_request(struct zk_event *ev)
 {
 	enum cluster_join_result res;
 
-	dprintf("nr_nodes: %zu, sender: %s, joined: %d\n",
-		nr_zk_nodes, node_to_str(&ev->sender.node),
+	dprintf("sender: %s, joined: %d\n", node_to_str(&ev->sender.node),
 		ev->sender.joined);
 
-	if (!is_master(&this_node)) {
+	if (!is_master()) {
+		/* Let's await master acking the join-request */
 		queue_pos--;
 		return;
 	}
@@ -659,7 +653,6 @@ static void zk_handle_join_request(struct zk_event *ev)
 	ev->type = EVENT_JOIN_RESPONSE;
 	ev->sender.joined = true;
 
-	dprintf("I'm master, push back join event\n");
 	zk_queue_push_back(ev);
 
 	if (res == CJ_RES_MASTER_TRANSFER) {
@@ -668,6 +661,7 @@ static void zk_handle_join_request(struct zk_event *ev)
 		zk_leave();
 		exit(1);
 	}
+	dprintf("I'm the master now\n");
 }
 
 static void zk_handle_join_response(struct zk_event *ev)
@@ -676,7 +670,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 	int rc;
 
 	dprintf("JOIN RESPONSE\n");
-	if (is_master(&this_node) &&
+	if (is_master() &&
 	    !node_eq(&ev->sender.node, &this_node.node)) {
 		/* wait util the member node has been created */
 		int retry =
@@ -691,7 +685,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 			retry--;
 		}
 		if (retry <= 0) {
-			dprintf("Sender:%s failed to create member, ignore it\n",
+			dprintf("%s failed to create member, ignore it\n",
 				node_to_str(&ev->sender.node));
 			return;
 		}
@@ -706,11 +700,11 @@ static void zk_handle_join_response(struct zk_event *ev)
 		 * itself) is alive in MASTER_TRANSFER scenario. So only
 		 * the joining sheep will run into here.
 		 */
-		node_btree_clear(&zk_node_btroot);
+		zk_tree_destroy();
 
-	node_btree_add(&zk_node_btroot, &ev->sender);
-	dprintf("nr_nodes:%zu, sender:%s, joined:%d\n", nr_zk_nodes,
-		node_to_str(&ev->sender.node), ev->sender.joined);
+	zk_tree_add(&ev->sender);
+	dprintf("sender:%s, joined:%d\n", node_to_str(&ev->sender.node),
+		ev->sender.joined);
 
 	switch (ev->join_result) {
 	case CJ_RES_SUCCESS:
@@ -733,24 +727,21 @@ static void zk_handle_join_response(struct zk_event *ev)
 		break;
 	}
 
-	build_node_list(zk_node_btroot);
+	build_node_list();
 	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes,
 			ev->join_result, ev->buf);
 }
 
 static void zk_handle_leave(struct zk_event *ev)
 {
-	struct zk_node *n =  node_btree_find(&zk_node_btroot, &ev->sender);
+	struct zk_node *n = zk_tree_search(&ev->sender.node.nid);
 	if (!n) {
 		dprintf("can't find this leave node:%s, ignore it.\n",
 			node_to_str(&ev->sender.node));
 		return;
 	}
-
-	node_btree_del(&zk_node_btroot, n);
-	dprintf("one sheep left, nr_nodes:%zu\n", nr_zk_nodes);
-
-	build_node_list(zk_node_btroot);
+	zk_tree_del(n);
+	build_node_list();
 	sd_leave_handler(&ev->sender.node, sd_nodes, nr_sd_nodes);
 }
 
