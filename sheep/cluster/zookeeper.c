@@ -543,15 +543,16 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path,
 
 	dprintf("path:%s, type:%d\n", path, type);
 
-	if (type == -1) {
-		cid = zoo_client_id(zh);
-		assert(cid != NULL);
-		dprintf("session change, clientid:%"PRId64"\n", cid->client_id);
-	}
-
 	/* discard useless event */
 	if (type < 0 || type == ZOO_CHILD_EVENT)
 		return;
+
+	if (type == ZOO_SESSION_EVENT) {
+		cid = zoo_client_id(zh);
+		assert(cid != NULL);
+		this_node.clientid = *cid;
+		dprintf("session change, clientid:%"PRId64"\n", cid->client_id);
+	}
 
 	if (type == ZOO_CREATED_EVENT || type == ZOO_CHANGED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
@@ -575,7 +576,6 @@ static void watcher(zhandle_t *zh, int type, int state, const char *path,
 		return;
 	}
 
-	dprintf("write event to efd:%d\n", efd);
 	eventfd_write(efd, value);
 }
 
