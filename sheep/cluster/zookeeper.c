@@ -31,8 +31,8 @@
 #define MEMBER_ZNODE BASE_ZNODE "/member"
 
 /* iterate child znodes */
-#define FOR_EACH_ZNODE(zh, parent, path, strs)			       \
-	for (zk_get_children(zh, parent, 1, strs),		       \
+#define FOR_EACH_ZNODE(parent, path, strs)			       \
+	for (zk_get_children(parent, 1, strs),		               \
 		     (strs)->data += (strs)->count;		       \
 	     (strs)->count-- ?					       \
 		     sprintf(path, "%s/%s", parent, *--(strs)->data) : \
@@ -84,13 +84,14 @@ static inline bool is_blocking_event(struct zk_event *ev)
 }
 
 /* zookeeper API wrapper */
+static zhandle_t *zhandle;
+static struct zk_node this_node;
 
-static inline ZOOAPI int zk_delete_node(zhandle_t *zh, const char *path,
-					int version)
+static inline ZOOAPI int zk_delete_node(const char *path, int version)
 {
 	int rc;
 	do {
-		rc = zoo_delete(zh, path, version);
+		rc = zoo_delete(zhandle, path, version);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 	if (rc != ZOK)
 		eprintf("failed, path:%s, rc:%d\n", path, rc);
@@ -98,13 +99,13 @@ static inline ZOOAPI int zk_delete_node(zhandle_t *zh, const char *path,
 }
 
 static inline ZOOAPI void
-zk_init_node(zhandle_t *zh, const char *path, const char *value, int valuelen,
+zk_init_node(const char *path, const char *value, int valuelen,
 	     const struct ACL_vector *acl, int flags, char *path_buffer,
 	     int path_buffer_len)
 {
 	int rc;
 	do {
-		rc = zoo_create(zh, path, value, valuelen, acl,
+		rc = zoo_create(zhandle, path, value, valuelen, acl,
 				flags, path_buffer, path_buffer_len);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 
@@ -113,36 +114,35 @@ zk_init_node(zhandle_t *zh, const char *path, const char *value, int valuelen,
 }
 
 static inline ZOOAPI void
-zk_create_node(zhandle_t *zh, const char *path, const char *value, int valuelen,
+zk_create_node(const char *path, const char *value, int valuelen,
 	       const struct ACL_vector *acl, int flags, char *path_buffer,
 	       int path_buffer_len)
 {
 	int rc;
 	do {
-		rc = zoo_create(zh, path, value, valuelen, acl,
+		rc = zoo_create(zhandle, path, value, valuelen, acl,
 				flags, path_buffer, path_buffer_len);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 	if (rc != ZOK)
 		panic("failed, path:%s, rc:%d\n", path, rc);
 }
 
-static inline ZOOAPI int zk_get_data(zhandle_t *zh, const char *path, int watch,
-		char *buffer, int *buffer_len, struct Stat *stat)
+static inline ZOOAPI int zk_get_data(const char *path, int watch, char *buffer,
+				     int *buffer_len, struct Stat *stat)
 {
 	int rc;
 	do {
-		rc = zoo_get(zh, path, watch, buffer, buffer_len, stat);
+		rc = zoo_get(zhandle, path, watch, buffer, buffer_len, stat);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 	return rc;
 }
 
 static inline ZOOAPI int
-zk_set_data(zhandle_t *zh, const char *path, const char *buffer, int buflen,
-	    int version)
+zk_set_data(const char *path, const char *buffer, int buflen, int version)
 {
 	int rc;
 	do {
-		rc = zoo_set(zh, path, buffer, buflen, version);
+		rc = zoo_set(zhandle, path, buffer, buflen, version);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 	if (rc != ZOK)
 		panic("failed, path:%s, rc:%d\n", path, rc);
@@ -150,24 +150,24 @@ zk_set_data(zhandle_t *zh, const char *path, const char *buffer, int buflen,
 }
 
 static inline ZOOAPI int
-zk_node_exists(zhandle_t *zh, const char *path, int watch, struct Stat *stat)
+zk_node_exists(const char *path, int watch, struct Stat *stat)
 {
 	int rc;
 	do {
-		rc = zoo_exists(zh, path, watch, stat);
+		rc = zoo_exists(zhandle, path, watch, stat);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 	return rc;
 }
 
-static inline ZOOAPI void zk_get_children(zhandle_t *zh, const char *path,
-		int watch, struct String_vector *strings)
+static inline ZOOAPI void zk_get_children(const char *path, int watch,
+					  struct String_vector *strings)
 {
 	int rc;
 	do {
-		rc = zoo_get_children(zh, path, watch, strings);
+		rc = zoo_get_children(zhandle, path, watch, strings);
 	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 	if (rc != ZOK)
-		panic("failed, path:%s, rc:%d\n", path, rc);
+		panic("failed:%s, rc:%d\n", path, rc);
 }
 
 /* ZooKeeper-based queue */
@@ -175,21 +175,21 @@ static inline ZOOAPI void zk_get_children(zhandle_t *zh, const char *path,
 static int efd;
 static int32_t queue_pos;
 
-static bool zk_queue_empty(zhandle_t *zh)
+static bool zk_queue_empty(void)
 {
 	int rc;
 	char path[256];
 
 	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
-	rc = zk_node_exists(zh, path, 1, NULL);
+	rc = zk_node_exists(path, 1, NULL);
 	if (rc == ZOK)
 		return false;
 
 	return true;
 }
 
-static void zk_queue_push(zhandle_t *zh, struct zk_event *ev)
+static void zk_queue_push(struct zk_event *ev)
 {
 	static bool first_push = true;
 	int len;
@@ -198,7 +198,7 @@ static void zk_queue_push(zhandle_t *zh, struct zk_event *ev)
 
 	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
 	sprintf(path, "%s/", QUEUE_ZNODE);
-	zk_create_node(zh, path, (char *)ev, len,
+	zk_create_node(path, (char *)ev, len,
 		       &ZOO_OPEN_ACL_UNSAFE, ZOO_SEQUENCE, buf, sizeof(buf));
 	dprintf("create path:%s, nr_nodes:%zu, queue_pos:%010"PRId32", len:%d\n"
 		, buf,nr_zk_nodes, queue_pos, len);
@@ -217,7 +217,7 @@ static void zk_queue_push(zhandle_t *zh, struct zk_event *ev)
  * Change the event in place and expect the dedicated handler to be called
  * via zk_watcher which wakes up one of the zk_event_handlers.
  */
-static int zk_queue_push_back(zhandle_t *zh, struct zk_event *ev)
+static int zk_queue_push_back(struct zk_event *ev)
 {
 	int len;
 	char path[256];
@@ -228,7 +228,7 @@ static int zk_queue_push_back(zhandle_t *zh, struct zk_event *ev)
 	if (ev) {
 		len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
 		sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-		zk_set_data(zh, path, (char *)ev, len, -1);
+		zk_set_data(path, (char *)ev, len, -1);
 		dprintf("update path:%s, queue_pos:%010"PRId32", len:%d\n",
 			path, queue_pos, len);
 	}
@@ -240,16 +240,16 @@ static int zk_queue_push_back(zhandle_t *zh, struct zk_event *ev)
  * Peek next queue event and if it exists, we must watch it and manually notify
  * it in order not to lose it.
  */
-static void zk_queue_peek_next_notify(zhandle_t *zh, const char *path)
+static void zk_queue_peek_next_notify(const char *path)
 {
-	int rc = zk_node_exists(zh, path, 1, NULL);
+	int rc = zk_node_exists(path, 1, NULL);
 	if (rc == ZOK) {
 		dprintf("%s\n", path);
 		eventfd_write(efd, 1);
 	}
 }
 
-static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
+static int zk_queue_pop(struct zk_event *ev)
 {
 	int rc, len;
 	int nr_levents;
@@ -273,7 +273,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 		 */
 		len = sizeof(*ev);
 		sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-		rc = zk_get_data(zh, path, 1, (char *)ev, &len, NULL);
+		rc = zk_get_data(path, 1, (char *)ev, &len, NULL);
 		if (rc == ZOK &&
 		    node_eq(&ev->sender.node, &lev->sender.node) &&
 		    is_blocking_event(ev)) {
@@ -282,7 +282,7 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 			queue_pos++;
 
 			sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-			zk_queue_peek_next_notify(zh, path);
+			zk_queue_peek_next_notify(path);
 		}
 
 		memcpy(ev, lev, sizeof(*ev));
@@ -303,12 +303,12 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 	if (!called_by_zk_unblock && uatomic_is_true(&zk_notify_blocked))
 		return -1;
 
-	if (zk_queue_empty(zh))
+	if (zk_queue_empty())
 		return -1;
 
 	len = sizeof(*ev);
 	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-	rc = zk_get_data(zh, path, 1, (char *)ev, &len, NULL);
+	rc = zk_get_data(path, 1, (char *)ev, &len, NULL);
 	if (rc != ZOK)
 		panic("failed to zk_get_data path:%s, rc:%d\n", path, rc);
 	dprintf("read path:%s, nr_nodes:%zu, type:%d, len:%d, rc:%d\n", path,
@@ -325,15 +325,15 @@ static int zk_queue_pop(zhandle_t *zh, struct zk_event *ev)
 		return 0;
 
 	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-	zk_queue_peek_next_notify(zh, path);
+	zk_queue_peek_next_notify(path);
 	return 0;
 }
 
-static int zk_member_empty(zhandle_t *zh)
+static int zk_member_empty(void)
 {
 	struct String_vector strs;
 
-	zk_get_children(zh, MEMBER_ZNODE, 1, &strs);
+	zk_get_children(MEMBER_ZNODE, 1, &strs);
 
 	return (strs.count == 0);
 }
@@ -434,12 +434,12 @@ static void node_btree_find_master_fn(const void *nodep,
 	}
 }
 
-static bool is_master(zhandle_t *zh, struct zk_node *znode)
+static bool is_master(struct zk_node *znode)
 {
 	zk_master = NULL;
 
 	if (!zk_node_btroot) {
-		if (zk_member_empty(zh))
+		if (zk_member_empty())
 			return true;
 		else
 			return false;
@@ -452,14 +452,14 @@ static bool is_master(zhandle_t *zh, struct zk_node *znode)
 	return false;
 }
 
-static void zk_queue_init(zhandle_t *zh)
+static void zk_queue_init(void)
 {
-	zk_init_node(zh, BASE_ZNODE, "", 0, &ZOO_OPEN_ACL_UNSAFE, 0, NULL, 0);
-	zk_init_node(zh, QUEUE_ZNODE, "", 0, &ZOO_OPEN_ACL_UNSAFE, 0, NULL, 0);
-	zk_init_node(zh, MEMBER_ZNODE, "", 0, &ZOO_OPEN_ACL_UNSAFE, 0, NULL, 0);
+	zk_init_node(BASE_ZNODE, "", 0, &ZOO_OPEN_ACL_UNSAFE, 0, NULL, 0);
+	zk_init_node(QUEUE_ZNODE, "", 0, &ZOO_OPEN_ACL_UNSAFE, 0, NULL, 0);
+	zk_init_node(MEMBER_ZNODE, "", 0, &ZOO_OPEN_ACL_UNSAFE, 0, NULL, 0);
 }
 
-static void zk_member_init(zhandle_t *zh)
+static void zk_member_init(void)
 {
 	static bool finished;
 	int rc, len;
@@ -472,10 +472,10 @@ static void zk_member_init(zhandle_t *zh)
 
 	finished = true;
 
-	if (!zk_member_empty(zh)) {
-		FOR_EACH_ZNODE(zh, MEMBER_ZNODE, path, &strs) {
+	if (!zk_member_empty()) {
+		FOR_EACH_ZNODE(MEMBER_ZNODE, path, &strs) {
 			len = sizeof(znode);
-			rc = zk_get_data(zh, path, 1, (char *)&znode, &len, NULL);
+			rc = zk_get_data(path, 1, (char *)&znode, &len, NULL);
 			if (rc != ZOK)
 				continue;
 
@@ -492,14 +492,7 @@ static void zk_member_init(zhandle_t *zh)
 	dprintf("nr_nodes:%zu\n", nr_zk_nodes);
 }
 
-
-/* ZooKeeper driver APIs */
-
-static zhandle_t *zhandle;
-static struct zk_node this_node;
-
-static int add_event(zhandle_t *zh, enum zk_event_type type,
-		     struct zk_node *znode, void *buf,
+static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,
 		     size_t buf_len)
 {
 	struct zk_event ev;
@@ -509,11 +502,11 @@ static int add_event(zhandle_t *zh, enum zk_event_type type,
 	ev.buf_len = buf_len;
 	if (buf)
 		memcpy(ev.buf, buf, buf_len);
-	zk_queue_push(zh, &ev);
+	zk_queue_push(&ev);
 	return 0;
 }
 
-static int leave_event(zhandle_t *zh, struct zk_node *znode)
+static int leave_event(struct zk_node *znode)
 {
 	int nr_levents;
 	struct zk_event *ev;
@@ -534,7 +527,7 @@ static int leave_event(zhandle_t *zh, struct zk_node *znode)
 }
 
 static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
-		    void *ctx)
+		       void *ctx)
 {
 	eventfd_t value = 1;
 	const clientid_t *cid;
@@ -558,7 +551,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 	if (type == ZOO_CREATED_EVENT || type == ZOO_CHANGED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
 		if (ret == 1) {
-			rc = zk_node_exists(zh, path, 1, NULL);
+			rc = zk_node_exists(path, 1, NULL);
 			dprintf("watch path:%s, exists:%d\n", path, (rc == ZOK));
 		}
 	}
@@ -573,7 +566,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		str_to_node(p, &znode.node);
 		dprintf("zk_nodes leave:%s\n", node_to_str(&znode.node));
 
-		leave_event(zh, &znode);
+		leave_event(&znode);
 		return;
 	}
 
@@ -590,7 +583,7 @@ static int zk_join(const struct sd_node *myself,
 	this_node.node = *myself;
 
 	sprintf(path, MEMBER_ZNODE "/%s", node_to_str(myself));
-	rc = zk_node_exists(zhandle, path, 1, NULL);
+	rc = zk_node_exists(path, 1, NULL);
 	if (rc == ZOK) {
 		eprintf("Previous zookeeper session exist, shoot myself.\n"
 			"Wait for a while and restart me again\n");
@@ -604,7 +597,7 @@ static int zk_join(const struct sd_node *myself,
 
 	dprintf("clientid:%"PRId64"\n", cid->client_id);
 
-	return add_event(zhandle, EVENT_JOIN_REQUEST, &this_node,
+	return add_event(EVENT_JOIN_REQUEST, &this_node,
 			 opaque, opaque_len);
 }
 
@@ -613,17 +606,17 @@ static int zk_leave(void)
 	char path[256];
 	sprintf(path, MEMBER_ZNODE "/%s", node_to_str(&this_node.node));
 	dprintf("try to delete member path:%s\n", path);
-	return zk_delete_node(zhandle, path, -1);
+	return zk_delete_node(path, -1);
 }
 
 static int zk_notify(void *msg, size_t msg_len)
 {
-	return add_event(zhandle, EVENT_NOTIFY, &this_node, msg, msg_len);
+	return add_event(EVENT_NOTIFY, &this_node, msg, msg_len);
 }
 
 static void zk_block(void)
 {
-	add_event(zhandle, EVENT_BLOCK, &this_node, NULL, 0);
+	add_event(EVENT_BLOCK, &this_node, NULL, 0);
 }
 
 static void zk_unblock(void *msg, size_t msg_len)
@@ -633,7 +626,7 @@ static void zk_unblock(void *msg, size_t msg_len)
 	eventfd_t value = 1;
 
 	called_by_zk_unblock = true;
-	rc = zk_queue_pop(zhandle, &ev);
+	rc = zk_queue_pop(&ev);
 	called_by_zk_unblock = false;
 	assert(rc == 0);
 
@@ -642,7 +635,7 @@ static void zk_unblock(void *msg, size_t msg_len)
 	if (msg)
 		memcpy(ev.buf, msg, msg_len);
 
-	zk_queue_push_back(zhandle, &ev);
+	zk_queue_push_back(&ev);
 
 	uatomic_set_false(&zk_notify_blocked);
 
@@ -659,8 +652,8 @@ static void zk_handle_join_request(struct zk_event *ev)
 		nr_zk_nodes, node_to_str(&ev->sender.node),
 		ev->sender.joined);
 
-	if (!is_master(zhandle, &this_node)) {
-		zk_queue_push_back(zhandle, NULL);
+	if (!is_master(&this_node)) {
+		zk_queue_push_back(NULL);
 		return;
 	}
 
@@ -670,7 +663,7 @@ static void zk_handle_join_request(struct zk_event *ev)
 	ev->sender.joined = true;
 
 	dprintf("I'm master, push back join event\n");
-	zk_queue_push_back(zhandle, ev);
+	zk_queue_push_back(ev);
 
 	if (res == CJ_RES_MASTER_TRANSFER) {
 		eprintf("failed to join sheepdog cluster: "
@@ -686,7 +679,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 	int rc;
 
 	dprintf("JOIN RESPONSE\n");
-	if (is_master(zhandle, &this_node) &&
+	if (is_master(&this_node) &&
 	    !node_eq(&ev->sender.node, &this_node.node)) {
 		/* wait util the member node has been created */
 		int retry =
@@ -696,7 +689,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 			node_to_str(&ev->sender.node));
 
 		while (retry &&
-		       zk_node_exists(zhandle, path, 1, NULL) == ZNONODE) {
+		       zk_node_exists(path, 1, NULL) == ZNONODE) {
 			usleep(MEMBER_CREATE_INTERVAL * 1000);
 			retry--;
 		}
@@ -708,7 +701,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 	}
 
 	if (node_eq(&ev->sender.node, &this_node.node))
-		zk_member_init(zhandle);
+		zk_member_init();
 
 	if (ev->join_result == CJ_RES_MASTER_TRANSFER)
 		/*
@@ -730,13 +723,12 @@ static void zk_handle_join_response(struct zk_event *ev)
 			node_to_str(&ev->sender.node));
 		if (node_eq(&ev->sender.node, &this_node.node)) {
 			dprintf("create path:%s\n", path);
-			zk_create_node(zhandle, path,
-				       (char *)&ev->sender,
+			zk_create_node(path, (char *)&ev->sender,
 				       sizeof(ev->sender),
 				       &ZOO_OPEN_ACL_UNSAFE,
 				       ZOO_EPHEMERAL, NULL, 0);
 		} else {
-			rc = zk_node_exists(zhandle, path, 1, NULL);
+			rc = zk_node_exists(path, 1, NULL);
 			dprintf("watch:%s, exists:%d\n", path, (rc == ZOK));
 		}
 		break;
@@ -768,7 +760,7 @@ static void zk_handle_leave(struct zk_event *ev)
 static void zk_handle_block(struct zk_event *ev)
 {
 	dprintf("BLOCK\n");
-	zk_queue_push_back(zhandle, NULL);
+	zk_queue_push_back(NULL);
 	if (sd_block_handler(&ev->sender.node))
 		assert(uatomic_set_true(&zk_notify_blocked));
 }
@@ -803,7 +795,7 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 	if (eventfd_read(efd, &value) < 0)
 		return;
 
-	if (zk_queue_pop(zhandle, &ev) < 0)
+	if (zk_queue_pop(&ev) < 0)
 		return;
 
 	if (ev.type < zk_max_event_handlers && zk_event_handlers[ev.type])
@@ -834,7 +826,7 @@ static int zk_init(const char *option)
 		"negotiated session timeout:%dms\n",
 		SESSION_TIMEOUT, zoo_recv_timeout(zhandle));
 
-	zk_queue_init(zhandle);
+	zk_queue_init();
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
