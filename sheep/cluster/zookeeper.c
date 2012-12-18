@@ -223,15 +223,12 @@ static int zk_queue_push_back(struct zk_event *ev)
 	char path[256];
 
 	queue_pos--;
-	dprintf("queue_pos:%010"PRId32"\n", queue_pos);
 
-	if (ev) {
-		len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
-		sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-		zk_set_data(path, (char *)ev, len, -1);
-		dprintf("update path:%s, queue_pos:%010"PRId32", len:%d\n",
-			path, queue_pos, len);
-	}
+	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
+	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
+	zk_set_data(path, (char *)ev, len, -1);
+	dprintf("update path:%s, queue_pos:%010"PRId32", len:%d\n",
+		path, queue_pos, len);
 
 	return 0;
 }
@@ -653,7 +650,7 @@ static void zk_handle_join_request(struct zk_event *ev)
 		ev->sender.joined);
 
 	if (!is_master(&this_node)) {
-		zk_queue_push_back(NULL);
+		queue_pos--;
 		return;
 	}
 
@@ -760,7 +757,7 @@ static void zk_handle_leave(struct zk_event *ev)
 static void zk_handle_block(struct zk_event *ev)
 {
 	dprintf("BLOCK\n");
-	zk_queue_push_back(NULL);
+	queue_pos--;
 	if (sd_block_handler(&ev->sender.node))
 		assert(uatomic_set_true(&zk_notify_blocked));
 }
