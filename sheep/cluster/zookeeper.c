@@ -453,32 +453,27 @@ static void zk_queue_init(void)
 
 static void zk_member_init(void)
 {
-	static bool finished;
 	int rc, len;
 	struct String_vector strs;
 	struct zk_node znode;
 	char path[256];
 
-	if (finished)
+	if (zk_member_empty())
 		return;
 
-	finished = true;
+	FOR_EACH_ZNODE(MEMBER_ZNODE, path, &strs) {
+		len = sizeof(znode);
+		rc = zk_get_data(path, 1, (char *)&znode, &len, NULL);
+		if (rc != ZOK)
+			continue;
 
-	if (!zk_member_empty()) {
-		FOR_EACH_ZNODE(MEMBER_ZNODE, path, &strs) {
-			len = sizeof(znode);
-			rc = zk_get_data(path, 1, (char *)&znode, &len, NULL);
-			if (rc != ZOK)
-				continue;
-
-			switch (rc) {
-			case ZOK:
-				zk_tree_add(&znode);
-			case ZNONODE:
-				break;
-			default:
-				panic("failed to zk_get_data path:%s, rc:%d\n", path, rc);
-			}
+		switch (rc) {
+		case ZOK:
+			zk_tree_add(&znode);
+		case ZNONODE:
+			break;
+		default:
+			panic("zk_get_data failed:%s, rc:%d\n", path, rc);
 		}
 	}
 }
