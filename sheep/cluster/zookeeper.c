@@ -1,6 +1,8 @@
 /*
  * Copyright (C) 2011 Nippon Telegraph and Telephone Corporation.
  *
+ * Copyright (C) 2012 Taobao Inc.
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
  * 2 as published by the Free Software Foundation.
@@ -21,7 +23,7 @@
 #include "util.h"
 #include "rbtree.h"
 
-#define SESSION_TIMEOUT 30000		/* millisecond */
+#define SESSION_TIMEOUT 10000		/* millisecond */
 #define MEMBER_CREATE_TIMEOUT SESSION_TIMEOUT
 #define MEMBER_CREATE_INTERVAL 10	/* millisecond */
 
@@ -668,25 +670,30 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 
 static int zk_init(const char *option)
 {
-	int ret;
+	char *hosts, *to, *p;
+	int ret, timeout = SESSION_TIMEOUT;
 
 	if (!option) {
-		eprintf("specify comma separated host:port pairs, "
-			"each corresponding to a zk server.\n");
-		eprintf("e.g. sheep /store -c zookeeper:127.0.0.1:"
-			"3000,127.0.0.1:3001,127.0.0.1:3002\n");
+		eprintf("You must specify zookeeper servers.\n");
 		return -1;
 	}
 
-	zhandle = zookeeper_init(option, zk_watcher, SESSION_TIMEOUT, NULL, NULL,
-				 0);
+	hosts = strtok((char *)option, "=");
+	if ((to = strtok(NULL, "="))) {
+		if (sscanf(to, "%u", &timeout) != 1) {
+			eprintf("Invalid paramter for timeout\n");
+			return -1;
+		}
+		p = strstr(hosts, "timeout");
+		*--p = '\0';
+	}
+	dprintf("version %d.%d.%d, address %s, timeout %d\n", ZOO_MAJOR_VERSION,
+		ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, timeout);
+	zhandle = zookeeper_init(hosts, zk_watcher, timeout, NULL, NULL, 0);
 	if (!zhandle) {
 		eprintf("failed to connect to zk server %s\n", option);
 		return -1;
 	}
-	dprintf("request session timeout:%dms, "
-		"negotiated session timeout:%dms\n",
-		SESSION_TIMEOUT, zoo_recv_timeout(zhandle));
 
 	zk_queue_init();
 
