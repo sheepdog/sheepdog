@@ -674,9 +674,10 @@ static int local_get_snap_file(struct request *req)
 	return ret;
 }
 
+/* Return SD_RES_INVALID_PARMS to ask client not to send flush req again */
 static int local_flush_vdi(struct request *req)
 {
-	int ret = SD_RES_SUCCESS;
+	int ret = SD_RES_INVALID_PARMS;
 
 	if (is_object_cache_enabled()) {
 		ret = object_cache_flush_vdi(req);
