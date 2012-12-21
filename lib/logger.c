@@ -59,7 +59,6 @@ struct logarea {
 };
 
 struct logmsg {
-	time_t t;
 	int prio;
 	char str[0];
 };
@@ -155,6 +154,13 @@ static notrace int log_vsnprintf(char *buff, size_t size, int prio,
 				 va_list ap)
 {
 	char *p = buff;
+	time_t t = time(NULL);
+	struct tm tm;
+
+	localtime_r(&t, &tm);
+
+	strftime(p, size, "%b %2d %H:%M:%S ", &tm);
+	p += strlen(p);
 
 	if (worker_name && worker_idx)
 		snprintf(p, size, "[%s %d] ", worker_name, worker_idx);
@@ -180,13 +186,7 @@ static notrace int log_vsnprintf(char *buff, size_t size, int prio,
  */
 static notrace void log_syslog(const struct logmsg *msg)
 {
-	char str[MAX_MSG_SIZE];
-	struct tm tm;
-	size_t len;
-
-	localtime_r(&msg->t, &tm);
-	len = strftime(str, sizeof(str), "%b %2d %H:%M:%S ", &tm);
-	pstrcpy(str + len, sizeof(str) - len, msg->str);
+	char *str = (char *)msg->str;
 
 	if (log_fd >= 0)
 		xwrite(log_fd, str, strlen(str));
@@ -205,7 +205,6 @@ static notrace void dolog(int prio, const char *func, int line,
 	if (la) {
 		struct sembuf ops;
 		struct logmsg *msg;
-		time_t t = time(NULL);
 
 		ops.sem_num = 0;
 		ops.sem_flg = SEM_UNDO;
@@ -222,7 +221,6 @@ static notrace void dolog(int prio, const char *func, int line,
 		else {
 			/* ok, we can stage the msg in the area */
 			msg = (struct logmsg *)la->tail;
-			msg->t = t;
 			msg->prio = prio;
 			memcpy(msg->str, str, len + 1);
 			la->tail += sizeof(struct logmsg) + len + 1;
