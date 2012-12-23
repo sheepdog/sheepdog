@@ -18,20 +18,21 @@ _cleanup
 
 # create a node who has wrong epoch
 _start_sheep 1
-sleep 1
+_wait_for_sheep 1 1
 $COLLIE cluster format -p 7001 -c 1
 $COLLIE cluster shutdown -p 7001
-sleep 1
+sleep 2
 
 # start Sheepdog with one node
 _start_sheep 0
-sleep 1
+_wait_for_sheep 1
 $COLLIE cluster format -p 7000 -c 1
 
 for i in `seq 0 5`; do
     _start_sheep 1  # should fail
-    _start_sheep 2  # should succeed
     sleep 1
+    _start_sheep 2  # should succeed
+    _wait_for_sheep 2
 
     if [ "`$COLLIE node list -p 7002 -r | wc -l`" -ne 2 ]; then
 	echo "test failed"

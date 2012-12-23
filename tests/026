@@ -15,6 +15,10 @@ status=1        # failure is the default!
 
 _cleanup
 
+if [[ "$DRIVER" == zoo* ]];then
+    DRIVER=${DRIVER/1000/5000}
+fi
+
 for i in `seq 0 7`; do
     _start_sheep $i
 done
@@ -32,10 +36,13 @@ done
 
 # kill nodes and join them back
 for i in 1 2; do _kill_sheep $i;done
+sleep 3
 _wait_for_sheep_recovery 0
 for i in 3 4; do _kill_sheep $i;done
+sleep 3
 _wait_for_sheep_recovery 0
 for i in 5; do _kill_sheep $i;done
+sleep 3
 _wait_for_sheep_recovery 0
 for i in `seq 1 5`; do _start_sheep $i;done
 

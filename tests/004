@@ -17,9 +17,9 @@ _cleanup
 
 for i in 0 1; do
     _start_sheep $i
-    sleep 1
 done
 
+_wait_for_sheep 2
 # start Sheepdog with two nodes
 $COLLIE cluster format -c 2
 
@@ -29,7 +29,7 @@ for i in 2 3 4; do
     sleep 1
 
     _start_sheep $i
-    sleep 1
+    sleep 2
 done
 
 # kill all existing nodes

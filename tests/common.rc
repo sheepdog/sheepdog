@@ -132,6 +132,10 @@ _cleanup()
     for i in $STORE/??; do
         rm -rf $i
     done
+
+    if [[ "$DRIVER" == zoo* ]];then
+        sleep 5 # wait for zookeeper ephemeral node to be deleted
+    fi
 }
 
 _count_sheep_processes()
@@ -142,14 +146,18 @@ _count_sheep_processes()
 # wait for all sheep to join completely
 _wait_for_sheep()
 {
+    PORT=7000
+    if [ $2 ]; then
+        PORT=$((7000 + $2))
+    fi
     while true; do
-        sleep 1
+        sleep 2
 
         if [ $(_count_sheep_processes) != $1 ]; then
-            _die "there are not enough sheep processes"
+            _die "should have $1, but have $(_count_sheep_processes) sheep"
         fi
 
-        node_list="$($COLLIE node list 2> /dev/null)"
+        node_list="$($COLLIE node list -p $PORT 2> /dev/null)"
 
         if [ $? != 0 ]; then
             # sheep is not ready yet
@@ -249,6 +257,10 @@ _kill_sheep()
     while [ $? == 0 ]; do
 	pgrep -f "$SHEEP_PROG $STORE/$1" > /dev/null
     done
+
+    if [[ "$DRIVER" == zoo* ]];then
+        sleep 3 # wait for zookeeper ephemeral node to be deleted
+    fi
 }
 
 _wait_for_sheep_recovery()

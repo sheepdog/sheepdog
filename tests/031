@@ -27,7 +27,7 @@ done
 $COLLIE vdi list | _filter_short_date
 
 $COLLIE cluster shutdown
-sleep 1
+sleep 2
 
 _start_sheep 0
 _wait_for_sheep 1

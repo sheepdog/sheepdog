@@ -13,6 +13,10 @@ status=1        # failure is the default!
 . ./common.rc
 . ./common.filter
 
+if [[ "$DRIVER" == zoo* ]];then
+    DRIVER=${DRIVER/1000/5000}
+fi
+
 _cleanup
 
 for i in 0 1 2; do

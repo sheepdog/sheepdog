@@ -22,6 +22,7 @@ done
 _wait_for_sheep 2
 
 $COLLIE cluster format -c 2
+sleep 1
 $COLLIE vdi create test 539545600
 $COLLIE vdi setattr test lock 1 -x &
 $COLLIE vdi setattr test lock 1 -x &

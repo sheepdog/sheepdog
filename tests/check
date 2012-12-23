@@ -138,6 +138,7 @@ common options
 check options
     -sheepdog           test sheepdog
     -corosync           use corosync driver (default: local)
+    -zk                 use zookeeper driver
     -valgrind           use valgrind
     -xdiff		graphical mode diff
     -e			exit immediately on test failure
@@ -156,6 +157,11 @@ testlist options
 
 	-corosync)
 	    DRIVER="corosync"
+	    xpand=false
+	    ;;
+
+	-zk)
+	    DRIVER="zookeeper:localhost:2181,timeout=1000"
 	    xpand=false
 	    ;;
 

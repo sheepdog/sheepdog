@@ -15,20 +15,24 @@ status=1        # failure is the default!
 
 _cleanup
 
+if [[ "$DRIVER" == zoo* ]];then
+	DRIVER=${DRIVER/1000/5000}
+fi
+
 VDI_NAME="test"
 VDI_SIZE="300M"
 
 echo "starting first sheep"
-for i in `seq 0 0`; do
-    _start_sheep $i
-done
-_wait_for_sheep "1"
+_start_sheep 0
+_wait_for_sheep 1
 
 echo "formatting cluster"
 $COLLIE cluster format -c 1
+sleep 1
 
 echo "creating vdi ${NAME}"
 $COLLIE vdi create ${VDI_NAME} ${VDI_SIZE}
+sleep 1
 
 echo "filling ${VDI_NAME} with data"
 qemu-io -c "write 0 ${VDI_SIZE}" sheepdog:${VDI_NAME} | _filter_qemu_io
@@ -37,10 +41,8 @@ echo "reading back ${VDI_NAME}"
 qemu-io -c "read 0 1m" sheepdog:${VDI_NAME} | _filter_qemu_io
 
 echo "starting second sheep"
-for i in `seq 1 1`; do
-    _start_sheep $i
-done
-_wait_for_sheep "2"
+_start_sheep 1
+_wait_for_sheep 2
 
 echo "reading data from second sheep"
 qemu-io -c "read 0 ${VDI_SIZE}" sheepdog:localhost:7001:${VDI_NAME} | _filter_qemu_io

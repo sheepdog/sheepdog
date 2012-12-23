@@ -17,7 +17,6 @@ _cleanup
 
 for i in 0 1; do
     _start_sheep $i
-    sleep 1
 done
 
 _wait_for_sheep 2
@@ -32,12 +31,12 @@ sleep 1
 
 # start another sheep
 _start_sheep 2
-sleep 1
+_wait_for_sheep 2 2
 
 # kill all sheeps
 for i in 1 2; do
     _kill_sheep $i
-    sleep 2
+    sleep 1
 done
 
 for i in 0 1 2; do
@@ -45,17 +44,16 @@ for i in 0 1 2; do
     sleep 1
 done
 
+_wait_for_sheep 1 2
 echo check whether Sheepdog is running with only one node
 $COLLIE cluster info -p 7002 | _filter_cluster_info
 
 # add the other nodes
 for i in 0 1; do
     _start_sheep $i
-    sleep 1
 done
 
 _wait_for_sheep 3
-
 echo check whether all nodes have the same cluster info
 for i in 0 1 2; do
     $COLLIE cluster info -p 700$i | _filter_cluster_info

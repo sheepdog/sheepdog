@@ -28,7 +28,7 @@ $COLLIE vdi create test 20M
 dd if=/dev/urandom | $COLLIE vdi write -w test
 
 $COLLIE cluster shutdown
-sleep 1
+sleep 2
 
 #trigger an object reclaim at startup
 for i in `seq 0 2`; do

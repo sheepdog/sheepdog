@@ -29,6 +29,7 @@ $COLLIE vdi create test 1G
 echo hello | $COLLIE vdi write test 4M 512
 # kill the master gracefully
 $COLLIE node kill 0
+sleep 2
 _wait_for_sheep_recovery 1
 $COLLIE node list -p 7001
 
