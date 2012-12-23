@@ -69,6 +69,7 @@ static struct sd_node sd_nodes[SD_MAX_NODES];
 static size_t nr_sd_nodes;
 struct rb_root zk_node_root = RB_ROOT;
 static LIST_HEAD(zk_block_event_list);
+static bool joined;
 
 static struct zk_node *zk_tree_insert(struct zk_node *new)
 {
@@ -276,12 +277,14 @@ static int zk_queue_pop(struct zk_event *ev)
 	len = sizeof(*ev);
 	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
 	assert(zk_get_data(path, ev, &len) == ZOK);
-	dprintf("read path:%s, type:%d, len:%d\n", path, ev->type, len);
+	dprintf("%s, type:%d, len:%d, pos:%"PRId32"\n",
+		path, ev->type, len, queue_pos);
 
-	/* watch next and kick next event if any */
+	/* watch next */
 	queue_pos++;
 	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
-	if (zk_node_exists(path) == ZOK)
+	/* If not joined, we must wait for join response. No kick. */
+	if (zk_node_exists(path) == ZOK && joined)
 		/* Someone has created this node, go kick event handler */
 		eventfd_write(efd, 1);
 
@@ -551,6 +554,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 			zk_create_node(path, (char *)&ev->sender,
 				       sizeof(ev->sender), &ZOO_OPEN_ACL_UNSAFE,
 				       ZOO_EPHEMERAL, NULL, 0);
+			joined = true;
 		} else {
 			zk_node_exists(path);
 		}
@@ -663,8 +667,10 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 		exit(1);
 	}
 
-	if (eventfd_read(efd, &value) < 0)
+	if (eventfd_read(efd, &value) < 0) {
+		eprintf("%m\n");
 		return;
+	}
 
 	if (zk_queue_pop(&ev) < 0)
 		return;
