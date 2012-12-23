@@ -24,8 +24,6 @@
 #include "rbtree.h"
 
 #define SESSION_TIMEOUT 10000		/* millisecond */
-#define MEMBER_CREATE_TIMEOUT SESSION_TIMEOUT
-#define MEMBER_CREATE_INTERVAL 10	/* millisecond */
 
 #define BASE_ZNODE "/sheepdog"
 #define QUEUE_ZNODE BASE_ZNODE "/queue"
@@ -514,22 +512,6 @@ static void zk_handle_join_response(struct zk_event *ev)
 	char path[256];
 
 	dprintf("JOIN RESPONSE\n");
-	if (is_master() &&
-	    !node_eq(&ev->sender.node, &this_node.node)) {
-		/* wait util the member node has been created */
-		int retry = MEMBER_CREATE_TIMEOUT / MEMBER_CREATE_INTERVAL;
-		sprintf(path, MEMBER_ZNODE"/%s", node_to_str(&ev->sender.node));
-		while (retry && zk_node_exists(path) == ZNONODE) {
-			usleep(MEMBER_CREATE_INTERVAL * 1000);
-			retry--;
-		}
-		if (retry <= 0) {
-			dprintf("%s failed to create member, ignore it\n",
-				node_to_str(&ev->sender.node));
-			return;
-		}
-	}
-
 	if (node_eq(&ev->sender.node, &this_node.node))
 		zk_member_init();
 
@@ -541,9 +523,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 		 */
 		zk_tree_destroy();
 
-	zk_tree_add(&ev->sender);
-	dprintf("sender:%s\n", node_to_str(&ev->sender.node));
-
+	dprintf("%s, %d\n", node_to_str(&ev->sender.node), ev->join_result);
 	switch (ev->join_result) {
 	case CJ_RES_SUCCESS:
 	case CJ_RES_JOIN_LATER:
@@ -555,9 +535,10 @@ static void zk_handle_join_response(struct zk_event *ev)
 				       sizeof(ev->sender), &ZOO_OPEN_ACL_UNSAFE,
 				       ZOO_EPHEMERAL, NULL, 0);
 			joined = true;
-		} else {
+		} else
 			zk_node_exists(path);
-		}
+
+		zk_tree_add(&ev->sender);
 		break;
 	default:
 		break;
