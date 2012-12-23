@@ -354,12 +354,9 @@ static bool is_master(void)
 	struct zk_node *zk;
 
 	if (!nr_sd_nodes) {
-		if (zk_member_empty()) {
-			if (zk_master_create() == ZOK)
-				return true;
-			else
-				return false;
-		} else
+		if (zk_member_empty())
+			return true;
+		else
 			return false;
 	}
 
@@ -460,6 +457,10 @@ static int zk_join(const struct sd_node *myself,
 		eprintf("Previous zookeeper session exist, shoot myself.\n");
 		exit(1);
 	}
+
+	/* For concurrent nodes setup, we allow only one to continue */
+	while (zk_member_empty() && zk_master_create() != ZOK)
+		;/* wait */
 
 	return add_event(EVENT_JOIN_REQUEST, &this_node, opaque, opaque_len);
 }
