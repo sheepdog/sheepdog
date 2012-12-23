@@ -24,7 +24,7 @@
 #include "logger.h"
 
 /* maximum payload size sent in ->notify and ->unblock */
-#define SD_MAX_EVENT_BUF_SIZE (64 * 1024)
+#define SD_MAX_EVENT_BUF_SIZE (128 * 1024) /* 128k */
 
 enum cluster_join_result {
 	CJ_RES_SUCCESS, /* Success */
