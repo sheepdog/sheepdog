@@ -300,8 +300,15 @@ static inline void zk_tree_add(struct zk_node *node)
 {
 	struct zk_node *zk = malloc(sizeof(*zk));
 	*zk = *node;
-	if (zk_tree_insert(zk))
+	if (zk_tree_insert(zk)) {
 		free(zk);
+		return;
+	}
+	/*
+	 * Even node list will be built later, we need this because in master
+	 * transfer case, we need this information to destroy the tree.
+	 */
+	sd_nodes[nr_sd_nodes++] = zk->node;
 }
 
 static inline void zk_tree_del(struct zk_node *node)
@@ -525,9 +532,9 @@ static void zk_handle_join_response(struct zk_event *ev)
 
 	if (ev->join_result == CJ_RES_MASTER_TRANSFER)
 		/*
-		 * Sheepdog assumes that only one sheep(master will kill
-		 * itself) is alive in MASTER_TRANSFER scenario. So only
-		 * the joining sheep will run into here.
+		 * Sheepdog assumes that only one sheep is alive in
+		 * MASTER_TRANSFER scenario. So only the joining sheep is
+		 * supposed to return single node view to sd_join_handler().
 		 */
 		zk_tree_destroy();
 
