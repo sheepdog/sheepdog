@@ -16,6 +16,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <zookeeper/zookeeper.h>
+#include <pthread.h>
 
 #include "cluster.h"
 #include "event.h"
@@ -67,7 +68,8 @@ struct zk_event {
 
 static struct sd_node sd_nodes[SD_MAX_NODES];
 static size_t nr_sd_nodes;
-struct rb_root zk_node_root = RB_ROOT;
+static struct rb_root zk_node_root = RB_ROOT;
+static pthread_rwlock_t zk_tree_lock = PTHREAD_RWLOCK_INITIALIZER;
 static LIST_HEAD(zk_block_list);
 static bool joined;
 
@@ -97,7 +99,7 @@ static struct zk_node *zk_tree_insert(struct zk_node *new)
 	return NULL; /* insert successfully */
 }
 
-static struct zk_node *zk_tree_search(const struct node_id *nid)
+static struct zk_node *zk_tree_search_nolock(const struct node_id *nid)
 {
 	struct rb_node *n = zk_node_root.rb_node;
 	struct zk_node *t;
@@ -116,6 +118,17 @@ static struct zk_node *zk_tree_search(const struct node_id *nid)
 			return t; /* found it */
 	}
 	return NULL;
+}
+
+
+static inline struct zk_node *zk_tree_search(const struct node_id *nid)
+{
+	struct zk_node *n;
+
+	pthread_rwlock_rdlock(&zk_tree_lock);
+	n = zk_tree_search_nolock(nid);
+	pthread_rwlock_unlock(&zk_tree_lock);
+	return n;
 }
 
 /* zookeeper API wrapper */
@@ -314,21 +327,31 @@ static inline void zk_tree_add(struct zk_node *node)
 {
 	struct zk_node *zk = malloc(sizeof(*zk));
 	*zk = *node;
+	pthread_rwlock_wrlock(&zk_tree_lock);
 	if (zk_tree_insert(zk)) {
 		free(zk);
-		return;
+		goto out;
 	}
 	/*
 	 * Even node list will be built later, we need this because in master
 	 * transfer case, we need this information to destroy the tree.
 	 */
 	sd_nodes[nr_sd_nodes++] = zk->node;
+out:
+	pthread_rwlock_unlock(&zk_tree_lock);
+}
+
+static inline void zk_tree_del_nolock(struct zk_node *node)
+{
+	rb_erase(&node->rb, &zk_node_root);
+	free(node);
 }
 
 static inline void zk_tree_del(struct zk_node *node)
 {
-	rb_erase(&node->rb, &zk_node_root);
-	free(node);
+	pthread_rwlock_wrlock(&zk_tree_lock);
+	zk_tree_del_nolock(node);
+	pthread_rwlock_unlock(&zk_tree_lock);
 }
 
 static inline void zk_tree_destroy(void)
@@ -336,11 +359,13 @@ static inline void zk_tree_destroy(void)
 	struct zk_node *zk;
 	int i;
 
+	pthread_rwlock_wrlock(&zk_tree_lock);
 	for (i = 0; i < nr_sd_nodes; i++) {
-		zk = zk_tree_search(&sd_nodes[i].nid);
+		zk = zk_tree_search_nolock(&sd_nodes[i].nid);
 		if (zk)
-			zk_tree_del(zk);
+			zk_tree_del_nolock(zk);
 	}
+	pthread_rwlock_unlock(&zk_tree_lock);
 }
 
 static inline void build_node_list(void)
@@ -424,7 +449,8 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		p++;
 		str_to_node(p, &znode.node);
 		/* FIXME: remove redundant leave events */
-		add_event(EVENT_LEAVE, &znode, NULL, 0);
+		if (zk_tree_search(&znode.node.nid))
+			add_event(EVENT_LEAVE, &znode, NULL, 0);
 	}
 
 }
