@@ -54,6 +54,7 @@ struct zk_node {
 	struct rb_node rb;
 	struct sd_node node;
 	bool callbacked;
+	bool gone;
 };
 
 struct zk_event {
@@ -71,7 +72,6 @@ static size_t nr_sd_nodes;
 static struct rb_root zk_node_root = RB_ROOT;
 static pthread_rwlock_t zk_tree_lock = PTHREAD_RWLOCK_INITIALIZER;
 static LIST_HEAD(zk_block_list);
-static bool joined;
 
 static struct zk_node *zk_tree_insert(struct zk_node *new)
 {
@@ -389,7 +389,8 @@ static inline int zk_master_create(void)
 
 static bool is_master(void)
 {
-	struct zk_node *zk;
+	struct rb_node *n;
+	struct zk_node *zk = NULL;
 
 	if (!nr_sd_nodes) {
 		if (zk_member_empty())
@@ -398,8 +399,12 @@ static bool is_master(void)
 			return false;
 	}
 
-	zk = rb_entry(rb_first(&zk_node_root), struct zk_node, rb);
-	if (node_eq(&zk->node, &this_node.node))
+	for (n = rb_first(&zk_node_root); n; n = rb_next(n)) {
+		zk = rb_entry(n, struct zk_node, rb);
+		if (!zk->gone)
+			break;
+	}
+	if (zk && node_eq(&zk->node, &this_node.node))
 		return true;
 
 	return false;
@@ -442,6 +447,8 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		/* kick off the event handler */
 		eventfd_write(efd, 1);
 	} else if (type == ZOO_DELETED_EVENT) {
+		struct zk_node *n;
+
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
 		if (ret != 1)
 			return;
@@ -449,7 +456,12 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		p++;
 		str_to_node(p, &znode.node);
 		/* FIXME: remove redundant leave events */
-		if (zk_tree_search(&znode.node.nid))
+		pthread_rwlock_rdlock(&zk_tree_lock);
+		n = zk_tree_search_nolock(&znode.node.nid);
+		if (n)
+			n->gone = true;
+		pthread_rwlock_unlock(&zk_tree_lock);
+		if (n)
 			add_event(EVENT_LEAVE, &znode, NULL, 0);
 	}
 
@@ -600,7 +612,6 @@ static void zk_handle_join_response(struct zk_event *ev)
 			zk_create_node(path, (char *)&ev->sender,
 				       sizeof(ev->sender), &ZOO_OPEN_ACL_UNSAFE,
 				       ZOO_EPHEMERAL, NULL, 0);
-			joined = true;
 		} else
 			zk_node_exists(path);
 
@@ -725,7 +736,7 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 		panic("unhandled type %d\n", ev.type);
 
 	 /* Someone has created next event, go kick event handler. */
-	if (zk_queue_peek() && joined) {
+	if (zk_queue_peek()) {
 		eventfd_write(efd, 1);
 		return;
 	}
