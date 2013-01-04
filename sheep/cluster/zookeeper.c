@@ -120,7 +120,6 @@ static struct zk_node *zk_tree_search_nolock(const struct node_id *nid)
 	return NULL;
 }
 
-
 static inline struct zk_node *zk_tree_search(const struct node_id *nid)
 {
 	struct zk_node *n;
@@ -325,7 +324,7 @@ static int zk_member_empty(void)
 
 static inline void zk_tree_add(struct zk_node *node)
 {
-	struct zk_node *zk = malloc(sizeof(*zk));
+	struct zk_node *zk = xzalloc(sizeof(*zk));
 	*zk = *node;
 	pthread_rwlock_wrlock(&zk_tree_lock);
 	if (zk_tree_insert(zk)) {
@@ -666,11 +665,10 @@ static void zk_handle_leave(struct zk_event *ev)
 
 static void zk_handle_block(struct zk_event *ev)
 {
-	struct zk_node *block = xmalloc(sizeof(*block));
+	struct zk_node *block = xzalloc(sizeof(*block));
 
 	dprintf("BLOCK\n");
 	block->node = ev->sender.node;
-	block->callbacked = false;
 	list_add_tail(&block->list, &zk_block_list);
 	block = list_first_entry(&zk_block_list, typeof(*block), list);
 	if (!block->callbacked)
