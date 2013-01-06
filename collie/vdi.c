@@ -1379,7 +1379,7 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
 	fd = connect_to(name, vnode->nid.port);
 	if (fd < 0) {
-		fprintf(stderr, "failed to connect to %s:%"PRIu32"\n",
+		fprintf(stderr, "FATAL: failed to connect to %s:%"PRIu32"\n",
 			name, vnode->nid.port);
 		exit(EXIT_FAILURE);
 	}
@@ -1395,24 +1395,28 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "Failed to execute request\n");
+		fprintf(stderr, "FATAL: failed to execute request\n");
 		exit(EXIT_FAILURE);
 	}
 
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read, %s\n",
+	switch (rsp->result)  {
+	case SD_RES_SUCCESS:
+		set_trimmed_sectors(buf, rsp->obj.offset, rsp->data_length,
+				    SD_DATA_OBJ_SIZE);
+		break;
+	case SD_RES_NO_OBJ:
+		free(buf);
+		return NULL;
+	default:
+		fprintf(stderr, "FATAL: failed to read, %s\n",
 			sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
-
-	set_trimmed_sectors(buf, rsp->obj.offset, rsp->data_length,
-			    SD_DATA_OBJ_SIZE);
-
 	return buf;
 }
 
 static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
-			    void *buf)
+			    void *buf, bool create)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1422,28 +1426,30 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
 	fd = connect_to(name, vnode->nid.port);
 	if (fd < 0) {
-		fprintf(stderr, "failed to connect to %s:%"PRIu32"\n",
+		fprintf(stderr, "FATAL: failed to connect to %s:%"PRIu32"\n",
 			name, vnode->nid.port);
 		exit(EXIT_FAILURE);
 	}
 
-	sd_init_req(&hdr, SD_OP_WRITE_PEER);
+	if (create)
+		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_PEER);
+	else
+		sd_init_req(&hdr, SD_OP_WRITE_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = SD_DATA_OBJ_SIZE;
-
 	hdr.obj.oid = oid;
 
 	ret = exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {
-		fprintf(stderr, "Failed to execute request\n");
+		fprintf(stderr, "FATAL: failed to execute request\n");
 		exit(EXIT_FAILURE);
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read, %s\n",
+		fprintf(stderr, "FATAL: failed to write, %s\n",
 			sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
@@ -1452,33 +1458,37 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 /*
  * Fix consistency of the replica of oid.
  *
- * XXX: The fix is rather dumb, just read the first copy and write it
+ * XXX: The fix is rather dumb, just read the random copy and write it
  * to other replica.
  */
 static void do_check_repair(uint64_t oid, int nr_copies)
 {
 	const struct sd_vnode *tgt_vnodes[SD_MAX_COPIES];
-	void *buf, *buf_cmp;
-	int i;
+	void *buf = xmalloc(SD_DATA_OBJ_SIZE), *buf_cmp;
+	int i, ret;
+
+	ret = sd_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0, true);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "FATAL: read %"PRIx64" failed\n", oid);
+		exit(EXIT_FAILURE);
+	}
 
 	oid_to_vnodes(sd_vnodes, sd_vnodes_nr, oid, nr_copies, tgt_vnodes);
-	buf = read_object_from(tgt_vnodes[0], oid);
-	for (i = 1; i < nr_copies; i++) {
+	for (i = 0; i < nr_copies; i++) {
 		buf_cmp = read_object_from(tgt_vnodes[i], oid);
+		if (!buf_cmp) {
+			write_object_to(tgt_vnodes[i], oid, buf, true);
+			fprintf(stdout, "fixed missing %"PRIx64"\n", oid);
+			continue;
+		}
 		if (memcmp(buf, buf_cmp, SD_DATA_OBJ_SIZE)) {
-			free(buf_cmp);
-			goto fix_consistency;
+			write_object_to(tgt_vnodes[i], oid, buf, false);
+			fprintf(stdout, "fixed replica %"PRIx64"\n", oid);
 		}
 		free(buf_cmp);
 	}
 	free(buf);
 	return;
-
-fix_consistency:
-	for (i = 1; i < nr_copies; i++)
-		write_object_to(tgt_vnodes[i], oid, buf);
-	fprintf(stdout, "fix %"PRIx64" success\n", oid);
-	free(buf);
 }
 
 static int vdi_check(int argc, char **argv)
@@ -1490,11 +1500,14 @@ static int vdi_check(int argc, char **argv)
 	struct sheepdog_inode *inode = xmalloc(sizeof(*inode));
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
-			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   vdi_cmd_data.snapshot_tag, &vid, inode,
 			   SD_INODE_SIZE);
-	if (ret != EXIT_SUCCESS)
+	if (ret != EXIT_SUCCESS) {
+		fprintf(stderr, "FATAL: no inode objects\n");
 		goto out;
+	}
 
+	do_check_repair(vid_to_vdi_oid(vid), inode->nr_copies);
 	total = inode->vdi_size;
 	while (done < total) {
 		vid = inode->data_vdi_id[idx];

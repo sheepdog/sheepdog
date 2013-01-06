@@ -67,6 +67,7 @@ obj 7c2b2500000001 locations at epoch 5, copies = 3
   test         1  1.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3              
 = test 1 1073741824 4194304 0 MASKED 7c2b25 3
 finish check&repair test
-fix 7c2b2500000001 success
+fixed replica 7c2b2500000001
+fixed replica 7c2b2500000001
 finish check&repair test
 

@@ -35,7 +35,7 @@ $COLLIE node list -p 7001
 
 for i in 3 4 0; do
 	_start_sheep $i
-	sleep 1
+	sleep 2
 done
 _wait_for_sheep 5
 _wait_for_sheep_recovery 0
