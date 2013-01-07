@@ -208,22 +208,17 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 
 static int remove_cache_object(struct object_cache *oc, uint32_t idx)
 {
-	struct strbuf buf;
 	int ret = SD_RES_SUCCESS;
+	char path[PATH_MAX];
 
-	strbuf_init(&buf, PATH_MAX);
-	strbuf_addstr(&buf, cache_dir);
-	strbuf_addf(&buf, "/%06"PRIx32"/%08"PRIx32, oc->vid, idx);
-
+	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, oc->vid, idx);
 	dprintf("removing cache object %"PRIx64"\n", idx_to_oid(oc->vid, idx));
-	if (unlink(buf.buf) < 0) {
+	if (unlink(path) < 0) {
 		ret = SD_RES_EIO;
 		eprintf("failed to remove cached object %m\n");
 		goto out;
 	}
 out:
-	strbuf_release(&buf);
-
 	return ret;
 }
 
@@ -292,16 +287,14 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
-	struct strbuf p;
+	char p[PATH_MAX];
 
-	strbuf_init(&p, PATH_MAX);
-	strbuf_addstr(&p, cache_dir);
-	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
+	sprintf(p, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, vid, idx);
 
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
-	fd = open(p.buf, flags, def_fmode);
+	fd = open(p, flags, def_fmode);
 	if (fd < 0) {
 		eprintf("%m\n");
 		ret = SD_RES_EIO;
@@ -320,7 +313,6 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 out_close:
 	close(fd);
 out:
-	strbuf_release(&p);
 	return ret;
 }
 
@@ -329,16 +321,13 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
-	struct strbuf p;
+	char p[PATH_MAX];
 
-	strbuf_init(&p, PATH_MAX);
-	strbuf_addstr(&p, cache_dir);
-	strbuf_addf(&p, "/%06"PRIx32"/%08"PRIx32, vid, idx);
-
+	sprintf(p, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, vid, idx);
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
-	fd = open(p.buf, flags, def_fmode);
+	fd = open(p, flags, def_fmode);
 	if (fd < 0) {
 		eprintf("%m\n");
 		ret = SD_RES_EIO;
@@ -357,7 +346,6 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 out_close:
 	close(fd);
 out:
-	strbuf_release(&p);
 	return ret;
 }
 
@@ -670,16 +658,13 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			       bool create, bool writeback)
 {
-	struct strbuf buf;
 	int fd, ret = SD_RES_SUCCESS, flags = def_open_flags;
 	unsigned data_length;
+	char path[PATH_MAX];
 
-	strbuf_init(&buf, PATH_MAX);
-	strbuf_addstr(&buf, cache_dir);
-	strbuf_addf(&buf, "/%06"PRIx32"/%08"PRIx32, oc->vid, idx);
-
+	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, oc->vid, idx);
 	if (!create) {
-		if (access(buf.buf, R_OK | W_OK) < 0) {
+		if (access(path, R_OK | W_OK) < 0) {
 			if (errno != ENOENT) {
 				dprintf("%m\n");
 				ret = SD_RES_EIO;
@@ -692,7 +677,7 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 
 	flags |= O_CREAT | O_TRUNC;
 
-	fd = open(buf.buf, flags, def_fmode);
+	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -711,7 +696,6 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 
 	close(fd);
 out:
-	strbuf_release(&buf);
 	return ret;
 }
 
@@ -858,7 +842,7 @@ void object_cache_delete(uint32_t vid)
 	struct object_cache *cache;
 	int h = hash(vid);
 	struct object_cache_entry *entry, *t;
-	struct strbuf buf = STRBUF_INIT;
+	char path[PATH_MAX];
 
 	cache = find_object_cache(vid, false);
 	if (!cache)
@@ -880,10 +864,8 @@ void object_cache_delete(uint32_t vid)
 	free(cache);
 
 	/* Then we free disk */
-	strbuf_addf(&buf, "%s/%06"PRIx32, cache_dir, vid);
-	rmdir_r(buf.buf);
-
-	strbuf_release(&buf);
+	sprintf(path, "%s/%06"PRIx32, cache_dir, vid);
+	rmdir_r(path);
 }
 
 static struct object_cache_entry *
@@ -917,15 +899,12 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 	uint32_t vid = oc->vid;
 	uint32_t idx;
 	uint64_t all = UINT64_MAX;
-	struct strbuf p;
 	int ret = 0;
-
-	strbuf_init(&p, PATH_MAX);
-	strbuf_addstr(&p, cache_dir);
-	strbuf_addf(&p, "/%06"PRIx32, vid);
+	char p[PATH_MAX];
 
 	dprintf("%"PRIx32"\n", vid);
-	dir = opendir(p.buf);
+	sprintf(p, "%s/%06"PRIx32, cache_dir, vid);
+	dir = opendir(p);
 	if (!dir) {
 		dprintf("%m\n");
 		ret = -1;
@@ -959,7 +938,6 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 out_close_dir:
 	closedir(dir);
 out:
-	strbuf_release(&p);
 	return ret;
 }
 
