@@ -215,6 +215,15 @@ static void object_cache_directio_set(char *s)
 	sys->object_cache_directio = true;
 }
 
+static char ocpath[PATH_MAX];
+static void object_cache_dir_set(char *s)
+{
+	char *p = s;
+
+	p = p + strlen("dir=");
+	sprintf(ocpath, "%s", p);
+}
+
 static void _object_cache_set(char *s)
 {
 	int i;
@@ -228,6 +237,7 @@ static void _object_cache_set(char *s)
 	struct object_cache_arg object_cache_args[] = {
 		{ "size=", object_cache_size_set },
 		{ "directio", object_cache_directio_set },
+		{ "dir=", object_cache_dir_set },
 		{ NULL, NULL },
 	};
 
@@ -593,9 +603,20 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_store(dir);
-	if (ret)
-		exit(1);
+	if (!sys->gateway_only) {
+		ret = init_store_driver();
+		if (ret)
+			exit(1);
+	}
+
+	if (is_object_cache_enabled()) {
+		if (!strlen(ocpath))
+			/* use object cache internally */
+			memcpy(ocpath, dir, strlen(dir));
+		ret = object_cache_init(ocpath);
+		if (ret)
+			exit(1);
+	}
 
 	ret = trace_init();
 	if (ret)

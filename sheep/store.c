@@ -301,7 +301,7 @@ static int init_jrnl_path(const char *base_path)
 	return 0;
 }
 
-static int init_store_driver(void)
+int init_store_driver(void)
 {
 	char driver_name[STORE_LEN], *p;
 	int ret;
@@ -393,25 +393,6 @@ int init_global_pathnames(const char *d)
 		return ret;
 
 	return 0;
-}
-
-int init_store(const char *d)
-{
-	int ret;
-
-	if (!sys->gateway_only) {
-		ret = init_store_driver();
-		if (ret)
-			return ret;
-	}
-
-	if (is_object_cache_enabled()) {
-		ret = object_cache_init(d);
-		if (ret)
-			return 1;
-	}
-
-	return ret;
 }
 
 /*

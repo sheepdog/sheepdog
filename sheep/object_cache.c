@@ -1224,10 +1224,17 @@ int object_cache_init(const char *p)
 	struct strbuf buf = STRBUF_INIT;
 
 	strbuf_addstr(&buf, p);
+	if (mkdir(buf.buf, def_dmode) < 0) {
+		if (errno != EEXIST) {
+			eprintf("%s %m\n", buf.buf);
+			ret = -1;
+			goto err;
+		}
+	}
 	strbuf_addstr(&buf, "/cache");
 	if (mkdir(buf.buf, def_dmode) < 0) {
 		if (errno != EEXIST) {
-			eprintf("%m\n");
+			eprintf("%s %m\n", buf.buf);
 			ret = -1;
 			goto err;
 		}
