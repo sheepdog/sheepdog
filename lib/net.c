@@ -246,12 +246,6 @@ int connect_to(const char *name, int port)
 			continue;
 		}
 
-		ret = set_keepalive(fd);
-		if (ret) {
-			close(fd);
-			break;
-		}
-
 		ret = set_nodelay(fd);
 		if (ret) {
 			eprintf("%m\n");
