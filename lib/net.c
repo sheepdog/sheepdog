@@ -406,13 +406,12 @@ char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
 	return str;
 }
 
-uint8_t *str_to_addr(int af, const char *ipstr, uint8_t *addr)
+uint8_t *str_to_addr(const char *ipstr, uint8_t *addr)
 {
-	int addr_start_idx = 0;
+	int addr_start_idx = 0, af = strstr(ipstr, ":") ? AF_INET6 : AF_INET;
 
 	if (af == AF_INET)
 		addr_start_idx = 12;
-
 	memset(addr, 0, addr_start_idx);
 	if (!inet_pton(af, ipstr, addr + addr_start_idx))
 		return NULL;

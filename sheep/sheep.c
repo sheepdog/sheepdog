@@ -387,7 +387,7 @@ static int init_work_queues(void)
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
-	int log_level = SDOG_INFO, af, nr_vnodes = SD_DEFAULT_VNODES;
+	int log_level = SDOG_INFO, nr_vnodes = SD_DEFAULT_VNODES;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX];
 	bool is_daemon = true, to_stdout = false, explicit_addr = false;
@@ -427,8 +427,7 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'y':
-			af = strstr(optarg, ":") ? AF_INET6 : AF_INET;
-			if (!str_to_addr(af, optarg, sys->this_node.nid.addr)) {
+			if (!str_to_addr(optarg, sys->this_node.nid.addr)) {
 				fprintf(stderr, "Invalid address: '%s'\n",
 					optarg);
 				exit(1);
@@ -492,9 +491,7 @@ int main(int argc, char **argv)
 			break;
 		case 'i':
 			parse_arg(optarg, ",", init_io_arg);
-			af = strstr(io_addr, ":") ? AF_INET6 : AF_INET;
-			if (!str_to_addr(af, io_addr,
-					 sys->this_node.nid.io_addr)) {
+			if (!str_to_addr(io_addr, sys->this_node.nid.io_addr)) {
 				fprintf(stderr, "Bad addr: '%s'\n",
 					io_addr);
 				exit(1);

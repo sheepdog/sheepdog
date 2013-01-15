@@ -178,16 +178,12 @@ static inline char *node_to_str(const struct sd_node *id)
 
 static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
 {
-	int port, af = AF_INET6;
+	int port;
 	char v[8], ip[256];
 
 	sscanf(str, "%s ip:%s port:%d", v, ip, &port);
 	id->nid.port = port;
-
-	if (strcmp(v, "IPv4") == 0)
-		af = AF_INET;
-
-	if (!str_to_addr(af, ip, id->nid.addr))
+	if (!str_to_addr(ip, id->nid.addr))
 		return NULL;
 
 	return id;
