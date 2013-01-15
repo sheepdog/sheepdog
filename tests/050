@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Test IO NIC function
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+trap "_uninit; exit \$status" 0 1 2 3 15
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_uninit()
+{
+	iptables -D INPUT -p tcp --sport 8001 -j DROP
+	iptables -D INPUT -p tcp --dport 8001 -j DROP
+}
+
+_cleanup
+
+for i in `seq 0 2`; do
+	_start_sheep $i "-i host=127.0.0.1,port=$((8000+$i))"
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format
+
+$COLLIE vdi create test 100M
+dd if=/dev/zero | $COLLIE vdi write test &
+
+sleep 1
+# simulate IO NIC down of sheep 1
+iptables -A INPUT -p tcp --sport 8001 -j DROP
+iptables -A INPUT -p tcp --dport 8001 -j DROP
+
+# wait for collie to finish
+wait
+
+if [ "`grep fallback $STORE/0/sheep.log`" ];then
+	echo fallback done
+fi
+$COLLIE vdi check test
+
+status=0
