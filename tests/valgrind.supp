@@ -27,3 +27,26 @@
 	fun:corosync_cfg_initialize
 	fun:corosync_init
 }
+{
+	zookeeper
+	Memcheck:Param
+	socketcall.sendto(msg)
+	fun:send
+	obj:*libzookeeper_mt.so*
+	fun:zookeeper_process
+}
+{
+	zookeeper
+	Memcheck:Cond
+	...
+	fun:zk_tree_search_nolock
+	fun:zk_watcher
+}
+{
+	zookeeper
+	Memcheck:Cond
+	fun:zk_handle_join_request
+	fun:zk_event_handler
+	fun:event_loop
+	fun:main
+}
