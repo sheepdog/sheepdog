@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Taobao Inc.
+ * Copyright (C) 2012-2013 Taobao Inc.
  *
  * Liu Yuan <namei.unix@gmail.com>
  *
@@ -51,14 +51,14 @@ static struct sockfd_cache sockfd_cache = {
 /*
  * Suppose request size from Guest is 512k, then 4M / 512k = 8, so at
  * most 8 requests can be issued to the same sheep object. Based on this
- * assumption, '16' would be effecient for servers that only host 2~4
+ * assumption, '8' would be effecient for servers that only host 2~4
  * Guests.
  *
  * This fd count will be dynamically grown when the idx reaches watermark which
  * is calculated as FDS_COUNT * 0.75
  */
-#define DEFAULT_FDS_COUNT	16
-#define DEFAULT_FDS_WATERMARK	12
+#define DEFAULT_FDS_COUNT	8
+#define DEFAULT_FDS_WATERMARK	6
 
 /* How many FDs we cache for one node */
 static int fds_count = DEFAULT_FDS_COUNT;
@@ -142,13 +142,16 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
  * If no free slot available, this typically means we should use short FD.
  */
 static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
-						    char *name, int *ret_idx)
+						    int *ret_idx)
 {
 	struct sockfd_cache_entry *entry;
 
 	pthread_rwlock_rdlock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
 	if (!entry) {
+		char name[INET6_ADDRSTRLEN];
+
+		addr_to_str(name, sizeof(name), nid->addr, 0);
 		dprintf("failed node %s:%d\n", name, nid->port);
 		goto out;
 	}
@@ -334,10 +337,12 @@ static inline void check_idx(int idx)
 }
 
 /* Add the node back if it is still alive */
-static inline int revalidate_node(const struct node_id *nid, char *name)
+static inline int revalidate_node(const struct node_id *nid)
 {
+	char name[INET6_ADDRSTRLEN];
 	int fd;
 
+	addr_to_str(name, sizeof(name), nid->addr, 0);
 	fd = connect_to(name, nid->port);
 	if (fd < 0)
 		return -1;
@@ -347,14 +352,16 @@ static inline int revalidate_node(const struct node_id *nid, char *name)
 	return 0;
 }
 
-static struct sockfd *sockfd_cache_get(const struct node_id *nid, char *name)
+static struct sockfd *sockfd_cache_get(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *entry;
 	struct sockfd *sfd;
+	char name[INET6_ADDRSTRLEN];
 	int fd, idx;
 
+	addr_to_str(name, sizeof(name), nid->addr, 0);
 grab:
-	entry = sockfd_cache_grab(nid, name, &idx);
+	entry = sockfd_cache_grab(nid, &idx);
 	if (!entry) {
 		/*
 		 * The node is deleted, but someone askes us to grab it.
@@ -363,13 +370,11 @@ grab:
 		 * busy to serve any request that makes other nodes deleted it
 		 * from the sockfd cache. In such cases, we need to add it back.
 		 */
-		if (revalidate_node(nid, name) < 0)
+		if (revalidate_node(nid) < 0)
 			return NULL;
 		goto grab;
 	}
-
 	check_idx(idx);
-
 	if (entry->fds[idx].fd != -1) {
 		dprintf("%s:%d, idx %d\n", name, nid->port, idx);
 		goto out;
@@ -383,7 +388,6 @@ grab:
 		return NULL;
 	}
 	entry->fds[idx].fd = fd;
-
 out:
 	sfd = xmalloc(sizeof(*sfd));
 	sfd->fd = entry->fds[idx].fd;
@@ -422,12 +426,12 @@ struct sockfd *sheep_get_sockfd(const struct node_id *nid)
 	struct sockfd *sfd;
 	int fd;
 
-	addr_to_str(name, sizeof(name), nid->addr, 0);
-	sfd = sockfd_cache_get(nid, name);
+	sfd = sockfd_cache_get(nid);
 	if (sfd)
 		return sfd;
 
 	/* Create a fd that is to be closed */
+	addr_to_str(name, sizeof(name), nid->addr, 0);
 	fd = connect_to(name, nid->port);
 	if (fd < 0) {
 		dprintf("failed connect to %s:%d\n", name, nid->port);
