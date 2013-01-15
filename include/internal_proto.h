@@ -18,8 +18,9 @@
  */
 
 #include <stdint.h>
+#include <netinet/in.h>
 
-#define SD_SHEEP_PROTO_VER 0x06
+#define SD_SHEEP_PROTO_VER 0x07
 
 #define SD_DEFAULT_COPIES 3
 #define SD_MAX_COPIES 8
@@ -175,6 +176,9 @@ struct sd_node_rsp {
 struct node_id {
 	uint8_t addr[16];
 	uint16_t port;
+	uint8_t io_addr[16];
+	uint16_t io_port;
+	uint8_t pad[4];
 };
 
 struct sd_node {

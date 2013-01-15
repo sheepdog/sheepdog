@@ -574,3 +574,16 @@ err:
 
 	return -1;
 }
+
+bool inetaddr_is_valid(char *addr)
+{
+	unsigned char buf[INET6_ADDRSTRLEN];
+	int af;
+
+	af = strstr(addr, ":") ? AF_INET6 : AF_INET;
+	if (!inet_pton(af, addr, buf)) {
+		eprintf("Bad address '%s'\n", addr);
+		return false;
+	}
+	return true;
+}

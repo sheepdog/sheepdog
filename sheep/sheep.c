@@ -47,6 +47,7 @@ static struct sd_option sheep_options[] = {
 	{'f', "foreground", false, "make the program run in the foreground"},
 	{'g', "gateway", false, "make the progam run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
+	{'i', "ioaddr", true, "use separate network card to handle IO requests"},
 	{'j', "journal", true, "use jouranl file to log all the write operations"},
 	{'l', "loglevel", true, "specify the level of logging detail"},
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
@@ -341,6 +342,26 @@ static void init_journal_arg(char *arg)
 	}
 }
 
+static char *io_addr, *io_pt;
+static void init_io_arg(char *arg)
+{
+	const char *host = "host=", *port = "port=";
+	int hl = strlen(host), pl = strlen(port);
+
+	if (!strncmp(host, arg, hl)) {
+		arg += hl;
+		io_addr = arg;
+	} else if (!strncmp(port, arg, pl)) {
+		arg += hl;
+		io_pt = arg;
+	} else {
+		fprintf(stderr, "invalid paramters %s. "
+			"Use '-i host=a.b.c.d,port=xxx'\n",
+			arg);
+		exit(1);
+	}
+}
+
 static int init_work_queues(void)
 {
 	if (init_wqueue_eventfd())
@@ -365,28 +386,14 @@ static int init_work_queues(void)
 
 int main(int argc, char **argv)
 {
-	int ch, longindex;
-	int ret, port = SD_LISTEN_PORT;
-	const char *dirp = DEFAULT_OBJECT_DIR;
-	char *dir;
-	bool is_daemon = true;
-	bool to_stdout = false;
-	int log_level = SDOG_INFO;
-	char path[PATH_MAX];
-	int64_t zone = -1;
-	int64_t free_space = 0;
-	int nr_vnodes = SD_DEFAULT_VNODES;
-	bool explicit_addr = false;
-	int af;
-	char *p;
+	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
+	int log_level = SDOG_INFO, af, nr_vnodes = SD_DEFAULT_VNODES;
+	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
+	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX];
+	bool is_daemon = true, to_stdout = false, explicit_addr = false;
+	int64_t zone = -1, free_space = 0;
 	struct cluster_driver *cdrv;
-	char *pid_file = NULL;
-	char *bindaddr = NULL;
-	unsigned char buf[sizeof(struct in6_addr)];
-	int ipv4 = 0;
-	int ipv6 = 0;
 	struct option *long_options;
-	const char *short_options;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -422,10 +429,8 @@ int main(int argc, char **argv)
 		case 'y':
 			af = strstr(optarg, ":") ? AF_INET6 : AF_INET;
 			if (!str_to_addr(af, optarg, sys->this_node.nid.addr)) {
-				fprintf(stderr,
-					"Invalid address: '%s'\n",
+				fprintf(stderr, "Invalid address: '%s'\n",
 					optarg);
-				sdlog_help();
 				exit(1);
 			}
 			explicit_addr = true;
@@ -485,6 +490,24 @@ int main(int argc, char **argv)
 		case 'w':
 			init_cache_type(optarg);
 			break;
+		case 'i':
+			parse_arg(optarg, ",", init_io_arg);
+			af = strstr(io_addr, ":") ? AF_INET6 : AF_INET;
+			if (!str_to_addr(af, io_addr,
+					 sys->this_node.nid.io_addr)) {
+				fprintf(stderr, "Bad addr: '%s'\n",
+					io_addr);
+				exit(1);
+			}
+
+			if (io_pt)
+				if (sscanf(io_pt, "%u", &io_port) != 1) {
+					fprintf(stderr, "Bad port '%s'\n",
+						io_pt);
+					exit(1);
+				}
+			sys->this_node.nid.io_port = io_port;
+			break;
 		case 'j':
 			uatomic_set_true(&sys->use_journal);
 			parse_arg(optarg, ",", init_journal_arg);
@@ -495,16 +518,9 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'b':
-			/* validate provided address using inet_pton */
-			ipv4 = inet_pton(AF_INET, optarg, buf);
-			ipv6 = inet_pton(AF_INET6, optarg, buf);
-			if (ipv4 || ipv6) {
-				bindaddr = optarg;
-			} else {
-				fprintf(stderr,
-					"Invalid bind address '%s'\n", optarg);
+			if (!inetaddr_is_valid(optarg))
 				exit(1);
-			}
+			bindaddr = optarg;
 			break;
 		case 'h':
 			usage(0);
@@ -558,6 +574,9 @@ int main(int argc, char **argv)
 
 	ret = create_listen_port(bindaddr, port);
 	if (ret)
+		exit(1);
+
+	if (io_addr && create_listen_port(io_addr, io_port))
 		exit(1);
 
 	ret = init_unix_domain_socket(dir);

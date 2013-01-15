@@ -56,5 +56,6 @@ int set_keepalive(int fd);
 int set_snd_timeout(int fd);
 int set_timeout(int fd);
 int get_local_addr(uint8_t *bytes);
+bool inetaddr_is_valid(char *addr);
 
 #endif
