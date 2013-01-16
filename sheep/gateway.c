@@ -149,12 +149,21 @@ static inline void pfd_info_init(struct write_info *wi, struct pfd_info *pi)
  */
 static int wait_forward_request(struct write_info *wi, struct request *req)
 {
-	int nr_sent, err_ret = SD_RES_SUCCESS, ret, pollret, i;
+/*
+ * We observed that for a busy node, the response could be as long as 15s, so
+ * wait 30s would be a safe value. Even we are false timeouted, the gateway will
+ * retry the request and sockfd cache module will repair the false-closes.
+ */
+#define MAX_POLLTIME 30 /* seconds */
+#define POLL_TIMEOUT 5 /* seconds */
+#define MAX_RETRY_COUNT (MAX_POLLTIME / POLL_TIMEOUT)
+	int nr_sent, err_ret = SD_RES_SUCCESS, ret, pollret, i,
+	    repeat = MAX_RETRY_COUNT;
 	struct pfd_info pi;
 	struct sd_rsp *rsp = &req->rp;
 again:
 	pfd_info_init(wi, &pi);
-	pollret = poll(pi.pfds, pi.nr, 5000);
+	pollret = poll(pi.pfds, pi.nr, 1000 * POLL_TIMEOUT);
 	if (pollret < 0) {
 		if (errno == EINTR)
 			goto again;
@@ -162,9 +171,14 @@ again:
 		panic("%m\n");
 	} else if (pollret == 0) {
 		eprintf("poll timeout %d\n", wi->nr_sent);
-
-		if (req->rq.epoch == sys_epoch())
+		/*
+		 * If IO NIC is down, epoch isn't incremented, so we can't retry
+		 * for ever.
+		 */
+		if (req->rq.epoch == sys_epoch() && repeat) {
+			repeat--;
 			goto again;
+		}
 
 		nr_sent = wi->nr_sent;
 		/* XXX Blinedly close all the connections */
