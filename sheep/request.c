@@ -666,7 +666,7 @@ static inline int begin_tx(struct client_info *ci)
 
 	switch (ci->conn.c_tx_state) {
 	case C_IO_HEADER:
-		ret = tx(&ci->conn, C_IO_DATA_INIT, 0);
+		ret = tx(&ci->conn, C_IO_DATA_INIT);
 		if (!ret)
 			break;
 
@@ -679,7 +679,7 @@ static inline int begin_tx(struct client_info *ci)
 			break;
 		}
 	case C_IO_DATA:
-		ret = tx(&ci->conn, C_IO_END, 0);
+		ret = tx(&ci->conn, C_IO_END);
 		if (!ret)
 			break;
 	default:

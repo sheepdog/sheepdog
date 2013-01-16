@@ -94,11 +94,11 @@ int rx(struct connection *conn, enum conn_state next_state)
 	return ret;
 }
 
-notrace int tx(struct connection *conn, enum conn_state next_state, int flags)
+notrace int tx(struct connection *conn, enum conn_state next_state)
 {
 	int ret;
 
-	ret = send(conn->fd, conn->tx_buf, conn->tx_length, flags);
+	ret = write(conn->fd, conn->tx_buf, conn->tx_length);
 	if (ret < 0) {
 		if (errno != EAGAIN)
 			conn->c_tx_state = C_IO_CLOSED;
