@@ -56,10 +56,10 @@ static struct sockfd_cache sockfd_cache = {
  * Guests.
  *
  * This fd count will be dynamically grown when the idx reaches watermark which
- * is calculated as FDS_COUNT * 0.75
+ * is calculated by FDS_WATERMARK
  */
+#define FDS_WATERMARK(x) ((x) * 3 / 4)
 #define DEFAULT_FDS_COUNT	8
-#define DEFAULT_FDS_WATERMARK	6
 
 /* How many FDs we cache for one node */
 static int fds_count = DEFAULT_FDS_COUNT;
@@ -311,12 +311,12 @@ static void do_grow_fds(struct work *work)
 }
 
 static uatomic_bool fds_in_grow;
-static int fds_high_watermark = DEFAULT_FDS_WATERMARK;
+static int fds_high_watermark = FDS_WATERMARK(DEFAULT_FDS_COUNT);
 
 static void grow_fds_done(struct work *work)
 {
 	fds_count *= 2;
-	fds_high_watermark = fds_count * 3 / 4;
+	fds_high_watermark = FDS_WATERMARK(fds_count);
 	dprintf("fd count has been grown into %d\n", fds_count);
 	uatomic_set_false(&fds_in_grow);
 	free(work);
