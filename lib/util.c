@@ -94,7 +94,7 @@ void *xcalloc(size_t nmemb, size_t size)
 static ssize_t _read(int fd, void *buf, size_t len)
 {
 	ssize_t nr;
-	while (1) {
+	while (true) {
 		nr = read(fd, buf, len);
 		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
@@ -105,7 +105,7 @@ static ssize_t _read(int fd, void *buf, size_t len)
 static ssize_t _write(int fd, const void *buf, size_t len)
 {
 	ssize_t nr;
-	while (1) {
+	while (true) {
 		nr = write(fd, buf, len);
 		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
@@ -156,7 +156,7 @@ ssize_t xwrite(int fd, const void *buf, size_t count)
 static ssize_t _pread(int fd, void *buf, size_t len, off_t offset)
 {
 	ssize_t nr;
-	while (1) {
+	while (true) {
 		nr = pread(fd, buf, len, offset);
 		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
@@ -167,7 +167,7 @@ static ssize_t _pread(int fd, void *buf, size_t len, off_t offset)
 static ssize_t _pwrite(int fd, const void *buf, size_t len, off_t offset)
 {
 	ssize_t nr;
-	while (1) {
+	while (true) {
 		nr = pwrite(fd, buf, len, offset);
 		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
@@ -331,7 +331,7 @@ void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
 		memset(p + offset + len, 0, requested_len - offset - len);
 }
 
-int is_numeric(const char *s)
+bool is_numeric(const char *s)
 {
 	const char *p = s;
 
@@ -340,8 +340,8 @@ int is_numeric(const char *s)
 
 		while ((c=*p++))
 			if (!isdigit(c))
-				return 0;
-		return 1;
+				return false;
+		return true;
 	}
-	return 0;
+	return false;
 }
