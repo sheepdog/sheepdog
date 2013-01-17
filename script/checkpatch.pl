@@ -1715,18 +1715,6 @@ sub process {
 			     "CVS style keyword markers, these will _not_ be updated\n". $herecurr);
 		}
 
-# Blackfin: don't use __builtin_bfin_[cs]sync
-		if ($line =~ /__builtin_bfin_csync/) {
-			my $herevet = "$here\n" . cat_vet($line) . "\n";
-			ERROR("CSYNC",
-			      "use the CSYNC() macro in asm/blackfin.h\n" . $herevet);
-		}
-		if ($line =~ /__builtin_bfin_ssync/) {
-			my $herevet = "$here\n" . cat_vet($line) . "\n";
-			ERROR("SSYNC",
-			      "use the SSYNC() macro in asm/blackfin.h\n" . $herevet);
-		}
-
 # Check for potential 'bare' types
 		my ($stat, $cond, $line_nr_next, $remain_next, $off_next,
 		    $realline_next);
