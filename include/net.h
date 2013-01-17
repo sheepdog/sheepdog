@@ -52,6 +52,7 @@ int tx(struct connection *conn, enum conn_state next_state);
 int connect_to(const char *name, int port);
 int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen);
 int exec_req(int sockfd, struct sd_req *hdr, void *data);
+int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain);
 int create_listen_ports(const char *bindaddr, int port,
 			int (*callback)(int fd, void *), void *data);
 int create_unix_domain_socket(const char *unix_path,

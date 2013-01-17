@@ -53,7 +53,7 @@ static int list_store(void)
 	sd_init_req(&hdr, SD_OP_GET_STORE_LIST);
 	hdr.data_length = 512;
 
-	ret = exec_req(fd, &hdr, buf);
+	ret = collie_exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {
@@ -98,7 +98,7 @@ static int cluster_format(int argc, char **argv)
 	sd_init_req((struct sd_req *)&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, &vdi_inuse);
+	ret = collie_exec_req(fd, (struct sd_req *)&hdr, &vdi_inuse);
 	if (ret < 0) {
 		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
 			sdhost, sdport);
@@ -144,7 +144,7 @@ static int cluster_format(int argc, char **argv)
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
 	printf("using backend %s store\n", store_name);
-	ret = exec_req(fd, (struct sd_req *)&hdr, store_name);
+	ret = collie_exec_req(fd, (struct sd_req *)&hdr, store_name);
 	close(fd);
 
 	if (ret) {
@@ -194,7 +194,7 @@ again:
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	ret = exec_req(fd, &hdr, logs);
+	ret = collie_exec_req(fd, &hdr, logs);
 	close(fd);
 
 	if (ret != 0)
@@ -311,7 +311,7 @@ static int list_snap(void)
 	sd_init_req(&hdr, SD_OP_GET_SNAP_FILE);
 	hdr.data_length = SD_DATA_OBJ_SIZE;
 
-	ret = exec_req(fd, &hdr, buf);
+	ret = collie_exec_req(fd, &hdr, buf);
 	close(fd);
 
 	if (ret) {

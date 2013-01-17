@@ -68,7 +68,7 @@ static int update_node_list(int max_nodes, uint32_t epoch)
 
 	hdr.data_length = size;
 
-	ret = exec_req(fd, (struct sd_req *)&hdr, buf);
+	ret = collie_exec_req(fd, (struct sd_req *)&hdr, buf);
 	if (ret) {
 		ret = -1;
 		goto out;

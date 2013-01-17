@@ -63,7 +63,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	if (direct)
 		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
-	ret = exec_req(fd, &hdr, data);
+	ret = collie_exec_req(fd, &hdr, data);
 	close(fd);
 
 	if (ret) {
@@ -113,7 +113,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	hdr.obj.cow_oid = cow_oid;
 	hdr.obj.offset = offset;
 
-	ret = exec_req(fd, &hdr, data);
+	ret = collie_exec_req(fd, &hdr, data);
 	close(fd);
 
 	if (ret) {
@@ -148,7 +148,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
 
-	ret = exec_req(fd, &req, &vdi_inuse);
+	ret = collie_exec_req(fd, &req, &vdi_inuse);
 	if (ret < 0) {
 		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
 			sdhost, sdport);
@@ -206,7 +206,7 @@ int send_light_req_get_response(struct sd_req *hdr, const char *host, int port)
 	if (fd < 0)
 		return -1;
 
-	ret = exec_req(fd, hdr, NULL);
+	ret = collie_exec_req(fd, hdr, NULL);
 	close(fd);
 	if (ret) {
 		fprintf(stderr, "failed to connect to  %s:%d\n",
@@ -237,4 +237,9 @@ int send_light_req(struct sd_req *hdr, const char *host, int port)
 	}
 
 	return 0;
+}
+
+int collie_exec_req(int sockfd, struct sd_req *hdr, void *data)
+{
+	return net_exec_req(sockfd, hdr, data, true);
 }

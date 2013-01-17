@@ -73,6 +73,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    int copies, bool create, bool direct);
 int send_light_req(struct sd_req *hdr, const char *host, int port);
 int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
+int collie_exec_req(int sockfd, struct sd_req *hdr, void *data);
 
 extern struct command vdi_command;
 extern struct command node_command;

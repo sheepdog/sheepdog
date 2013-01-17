@@ -268,7 +268,7 @@ success:
 	return fd;
 }
 
-int do_read(int sockfd, void *buf, int len)
+static int net_do_read(int sockfd, void *buf, int len, bool retry_eagain)
 {
 	int ret;
 reread:
@@ -276,7 +276,10 @@ reread:
 	if (ret < 0 || !ret) {
 		if (errno == EINTR)
 			goto reread;
-		eprintf("failed to read from socket: %d\n", ret);
+		if (retry_eagain && errno == EAGAIN)
+			goto reread;
+
+		eprintf("failed to read from socket: %d, %d(%m)\n", ret, errno);
 		return 1;
 	}
 
@@ -286,6 +289,11 @@ reread:
 		goto reread;
 
 	return 0;
+}
+
+int do_read(int sockfd, void *buf, int len)
+{
+	return net_do_read(sockfd, buf, len, false);
 }
 
 static void forward_iov(struct msghdr *msg, int len)
@@ -352,7 +360,7 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen)
 	return ret;
 }
 
-int exec_req(int sockfd, struct sd_req *hdr, void *data)
+int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
 {
 	int ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
@@ -369,7 +377,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data)
 	if (send_req(sockfd, hdr, data, wlen))
 		return 1;
 
-	ret = do_read(sockfd, rsp, sizeof(*rsp));
+	ret = net_do_read(sockfd, rsp, sizeof(*rsp), retry_eagain);
 	if (ret) {
 		eprintf("failed to read a response\n");
 		return 1;
@@ -379,7 +387,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data)
 		rlen = rsp->data_length;
 
 	if (rlen) {
-		ret = do_read(sockfd, data, rlen);
+		ret = net_do_read(sockfd, data, rlen, retry_eagain);
 		if (ret) {
 			eprintf("failed to read the response data\n");
 			return 1;
@@ -387,6 +395,11 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data)
 	}
 
 	return 0;
+}
+
+int exec_req(int sockfd, struct sd_req *hdr, void *data)
+{
+	return net_exec_req(sockfd, hdr, data, false);
 }
 
 char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)

@@ -94,7 +94,7 @@ read_buffer:
 	sd_init_req(&hdr, SD_OP_TRACE_READ_BUF);
 	hdr.data_length = TRACE_BUF_LEN;
 
-	ret = exec_req(fd, &hdr, buf);
+	ret = collie_exec_req(fd, &hdr, buf);
 
 	if (ret) {
 		fprintf(stderr, "Failed to connect\n");

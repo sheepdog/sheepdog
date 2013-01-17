@@ -161,7 +161,7 @@ static int node_cache(int argc, char **argv)
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = sizeof(cache_size);
 
-	ret = exec_req(fd, &hdr, (void *)&cache_size);
+	ret = collie_exec_req(fd, &hdr, (void *)&cache_size);
 	close(fd);
 
 	if (ret) {
