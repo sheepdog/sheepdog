@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test sockfd keepalive
+# Test sockfd connection
 
 seq=`basename $0`
 echo "QA output created by $seq"
@@ -17,7 +17,7 @@ trap "_uninit; exit \$status" 0 1 2 3 15
 
 _uninit()
 {
-	for i in `seq 1 4`; do
+	for i in `seq 1 7`; do
 		_cleanup_machine_simulation $i
 	done
 }
@@ -36,15 +36,33 @@ $COLLIE vdi create test 40M
 dd if=/dev/urandom | $COLLIE vdi write test &
 
 sleep 3
+# Test write timeout
 for i in `seq 1 4`; do
 	_simulate_machine_down $i
 done
 
 # wait for collie to finish
 wait
+_wait_for_sheep_recovery 0
+
+$COLLIE vdi read test | md5sum > /tmp/csum.1
 
 for i in `seq 0 9`; do
 	$COLLIE vdi object -i $i test
 done
 
+for i in 6 7 8; do
+	_start_sheep $i
+done
+
+_wait_for_sheep_recovery 0
+
+# Test read timeout
+$COLLIE vdi read test | md5sum > /tmp/csum.2 &
+for i in `seq 5 7`; do
+	_simulate_machine_down $i
+done
+wait
+
+diff -u /tmp/csum.1 /tmp/csum.2
 status=0
