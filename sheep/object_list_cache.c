@@ -164,7 +164,7 @@ out:
 	if (hdr->data_length < obj_list_cache.cache_size * sizeof(uint64_t)) {
 		pthread_rwlock_unlock(&obj_list_cache.lock);
 		eprintf("GET_OBJ_LIST buffer too small\n");
-		return SD_RES_EIO;
+		return SD_RES_BUFFER_SMALL;
 	}
 
 	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);

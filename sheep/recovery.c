@@ -45,6 +45,9 @@ struct recovery_work {
 
 static struct recovery_work *next_rw;
 static struct recovery_work *recovering_work;
+/* Dynamically grown list buffer default as 4M (2T storage) */
+#define DEFAULT_LIST_BUFFER_SIZE (UINT64_C(1) << 22)
+static size_t list_buffer_size = DEFAULT_LIST_BUFFER_SIZE;
 
 static int obj_cmp(const void *oid1, const void *oid2)
 {
@@ -380,7 +383,7 @@ static inline void finish_schedule_oids(struct recovery_work *rw)
 	if (nr_recovered == rw->count - 1)
 		goto done;
 
-	new_oids = xmalloc(1 << 20); /* FIXME */
+	new_oids = xmalloc(list_buffer_size);
 	memcpy(new_oids, rw->oids, nr_recovered * sizeof(uint64_t));
 	memcpy(new_oids + nr_recovered, rw->prio_oids,
 	       rw->nr_prio_oids * sizeof(uint64_t));
@@ -503,35 +506,45 @@ static void finish_object_list(struct work *work)
 }
 
 /* Fetch the object list from all the nodes in the cluster */
-static int fetch_object_list(struct sd_node *e, uint32_t epoch,
-			     uint8_t *buf, size_t buf_size)
+static uint64_t *fetch_object_list(struct sd_node *e, uint32_t epoch,
+				   size_t *nr_oids)
 {
 	char name[128];
 	struct sd_list_req hdr;
 	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&hdr;
+	size_t buf_size = list_buffer_size;
+	uint64_t *buf = xmalloc(buf_size);
 	int ret;
 
 	addr_to_str(name, sizeof(name), e->nid.addr, 0);
-
 	dprintf("%s %"PRIu32"\n", name, e->nid.port);
 
+retry:
 	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.tgt_epoch = epoch - 1;
 	hdr.data_length = buf_size;
-
 	ret = sheep_exec_req(&e->nid, (struct sd_req *)&hdr, buf);
 
-	if (ret != SD_RES_SUCCESS)
-		return -1;
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_BUFFER_SMALL:
+		buf_size *= 2;
+		buf = xrealloc(buf, buf_size);
+		goto retry;
+	default:
+		free(buf);
+		return NULL;
+	}
 
-	dprintf("%zu\n", rsp->data_length / sizeof(uint64_t));
-
-	return rsp->data_length / sizeof(uint64_t);
+	*nr_oids = rsp->data_length / sizeof(uint64_t);
+	dprintf("%zu\n", *nr_oids);
+	return buf;
 }
 
 /* Screen out objects that don't belong to this node */
 static void screen_object_list(struct recovery_work *rw,
-			       uint64_t *oids, int nr_oids)
+			       uint64_t *oids, size_t nr_oids)
 {
 	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 	int old_count = rw->count;
@@ -555,6 +568,11 @@ static void screen_object_list(struct recovery_work *rw,
 				continue;
 
 			rw->oids[rw->count++] = oids[i];
+			/* enlarge the list buffer if full */
+			if (rw->count == list_buffer_size / sizeof(uint64_t)) {
+				list_buffer_size *= 2;
+				rw->oids = xrealloc(rw->oids, list_buffer_size);
+			}
 			break;
 		}
 	}
@@ -575,35 +593,32 @@ static void prepare_object_list(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work,
 						work);
-	uint8_t *buf = NULL;
-	size_t buf_size = SD_DATA_OBJ_SIZE; /* FIXME */
 	struct sd_node *cur = rw->cur_vinfo->nodes;
 	int cur_nr = rw->cur_vinfo->nr_nodes;
 	int start = random() % cur_nr, i, end = cur_nr;
+	uint64_t *oids;
 
 	dprintf("%u\n", rw->epoch);
-
 	wait_get_vdis_done();
-
-	buf = xmalloc(buf_size);
 again:
 	/* We need to start at random node for better load balance */
 	for (i = start; i < end; i++) {
-		int buf_nr;
+		size_t nr_oids;
 		struct sd_node *node = cur + i;
 
 		if (next_rw) {
 			dprintf("go to the next recovery\n");
-			goto out;
+			return;
 		}
 		if (newly_joined(node, rw))
 			/* new node doesn't have a list file */
 			continue;
 
-		buf_nr = fetch_object_list(node, rw->epoch, buf, buf_size);
-		if (buf_nr < 0)
+		oids = fetch_object_list(node, rw->epoch, &nr_oids);
+		if (!oids)
 			continue;
-		screen_object_list(rw, (uint64_t *)buf, buf_nr);
+		screen_object_list(rw, oids, nr_oids);
+		free(oids);
 	}
 
 	if (start != 0) {
@@ -613,8 +628,6 @@ again:
 	}
 
 	dprintf("%d\n", rw->count);
-out:
-	free(buf);
 }
 
 static inline bool node_is_gateway_only(void)
@@ -636,7 +649,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 	}
 
 	rw->state = RW_INIT;
-	rw->oids = xmalloc(1 << 20); /* FIXME */
+	rw->oids = xmalloc(list_buffer_size);
 	rw->epoch = sys->epoch;
 	rw->count = 0;
 

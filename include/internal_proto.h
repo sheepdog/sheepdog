@@ -86,6 +86,7 @@
 #define SD_RES_INVALID_EPOCH 0x85 /* Invalid epoch */
 #define SD_RES_NETWORK_ERROR 0x86 /* Network error between sheep */
 #define SD_RES_NO_CACHE      0x87 /* No cache object found */
+#define SD_RES_BUFFER_SMALL  0x88 /* The buffer is too small */
 
 #define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
 #define SD_FLAG_QUORUM       0x0008 /* Serve the IO rquest as long we are quorate */
