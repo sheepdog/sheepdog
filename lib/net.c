@@ -238,6 +238,13 @@ int connect_to(const char *name, int port)
 			break;
 		}
 
+		ret = set_rcv_timeout(fd);
+		if (ret) {
+			eprintf("failed to set recv timeout: %m\n");
+			close(fd);
+			break;
+		}
+
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
 			eprintf("failed to connect to %s:%d: %m\n",
@@ -436,15 +443,28 @@ int set_nonblocking(int fd)
 	return ret;
 }
 
-/* Send timeout for 5 second */
 int set_snd_timeout(int fd)
 {
 	struct timeval timeout;
 
-	timeout.tv_sec = 5;
+	timeout.tv_sec = POLL_TIMEOUT;
 	timeout.tv_usec = 0;
 
 	return setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, (char *)&timeout,
+			  sizeof(timeout));
+}
+
+int set_rcv_timeout(int fd)
+{
+	struct timeval timeout;
+/*
+ * We should wait longer for read than write because the target node might be
+ * busy doing IO
+ */
+	timeout.tv_sec = MAX_POLLTIME;
+	timeout.tv_usec = 0;
+
+	return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
 			  sizeof(timeout));
 }
 

@@ -6,6 +6,15 @@
 
 #include "sheepdog_proto.h"
 
+/*
+ * We observed that for a busy node, the response could be as long as 15s, so
+ * wait 30s would be a safe value. Even we are false timeouted, the gateway will
+ * retry the request and sockfd cache module will repair the false-closes.
+ */
+#define MAX_POLLTIME 30 /* seconds */
+#define POLL_TIMEOUT 5 /* seconds */
+#define MAX_RETRY_COUNT (MAX_POLLTIME / POLL_TIMEOUT)
+
 enum conn_state {
 	C_IO_HEADER = 0,
 	C_IO_DATA_INIT,
@@ -54,7 +63,7 @@ int set_nonblocking(int fd);
 int set_nodelay(int fd);
 int set_keepalive(int fd);
 int set_snd_timeout(int fd);
-int set_timeout(int fd);
+int set_rcv_timeout(int fd);
 int get_local_addr(uint8_t *bytes);
 bool inetaddr_is_valid(char *addr);
 
