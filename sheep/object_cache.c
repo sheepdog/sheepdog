@@ -46,6 +46,7 @@
 
 #define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
 
+#define CACHE_OBJECT_SIZE (SD_DATA_OBJ_SIZE / 1024 / 1024) /* M */
 
 struct global_cache {
 	uint32_t cache_size;
@@ -460,7 +461,6 @@ static void do_reclaim(struct work *work)
 
 	list_for_each_entry_revert_safe_rcu(entry, n,
 		       &sys_cache.cache_lru_list, lru_list) {
-		unsigned data_length;
 		/* Reclaim cache to 80% of max size */
 		if (uatomic_read(&sys_cache.cache_size) <=
 			sys->object_cache_size * 8 / 10)
@@ -468,13 +468,7 @@ static void do_reclaim(struct work *work)
 
 		if (do_reclaim_object(entry) < 0)
 			continue;
-		if (idx_has_vdi_bit(entry_idx(entry)))
-			data_length = SD_INODE_SIZE;
-		else
-			data_length = SD_DATA_OBJ_SIZE;
-
-		data_length = data_length / 1024 / 1024;
-		uatomic_sub(&sys_cache.cache_size, data_length);
+		uatomic_sub(&sys_cache.cache_size, CACHE_OBJECT_SIZE);
 	}
 
 	dprintf("cache reclaim complete\n");
@@ -560,16 +554,9 @@ void object_cache_try_to_reclaim(void)
 }
 
 static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
-				bool writeback)
+				bool create)
 {
 	struct object_cache_entry *entry, *old;
-	uint32_t data_length;
-
-	if (idx_has_vdi_bit(idx))
-		data_length = SD_INODE_SIZE;
-	else
-		data_length = SD_DATA_OBJ_SIZE;
-	data_length = data_length / 1024 / 1024;
 
 	entry = xzalloc(sizeof(*entry));
 	entry->oc = oc;
@@ -582,14 +569,14 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
 	old = object_cache_insert(&oc->object_tree, entry);
 	if (!old) {
 		dprintf("oid %"PRIx64"\n", idx_to_oid(oc->vid, idx));
-		uatomic_add(&sys_cache.cache_size, data_length);
+		uatomic_add(&sys_cache.cache_size, CACHE_OBJECT_SIZE);
 		list_add(&entry->object_list, &oc->object_list);
 		cds_list_add_rcu(&entry->lru_list, &sys_cache.cache_lru_list);
 	} else {
 		free(entry);
 		entry = old;
 	}
-	if (writeback) {
+	if (create) {
 		entry->bmap = UINT64_MAX;
 		entry->idx |= CACHE_CREATE_BIT;
 		list_add(&entry->dirty_list, &oc->dirty_list);
@@ -804,6 +791,7 @@ void object_cache_delete(uint32_t vid)
 	pthread_rwlock_wrlock(&cache->lock);
 	list_for_each_entry_safe(entry, t, &cache->object_list, object_list) {
 		del_from_object_tree_and_list(entry, &cache->object_tree);
+		uatomic_sub(&sys_cache.cache_size, CACHE_OBJECT_SIZE);
 	}
 	pthread_rwlock_unlock(&cache->lock);
 	free(cache);
