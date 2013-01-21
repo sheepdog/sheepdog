@@ -76,7 +76,7 @@ struct object_cache {
 };
 
 static struct global_cache sys_cache;
-static char cache_dir[PATH_MAX];
+static char object_cache_dir[PATH_MAX];
 static int def_open_flags = O_RDWR;
 
 #define HASH_BITS	5
@@ -204,7 +204,8 @@ static int remove_cache_object(struct object_cache *oc, uint32_t idx)
 	int ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 
-	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, oc->vid, idx);
+	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
+		oc->vid, idx);
 	dprintf("removing cache object %"PRIx64"\n", idx_to_oid(oc->vid, idx));
 	if (unlink(path) < 0) {
 		eprintf("failed to remove cached object %m\n");
@@ -230,7 +231,7 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	char p[PATH_MAX];
 
-	sprintf(p, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, vid, idx);
+	sprintf(p, "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir, vid, idx);
 
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
@@ -264,7 +265,7 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	char p[PATH_MAX];
 
-	sprintf(p, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, vid, idx);
+	sprintf(p, "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir, vid, idx);
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
 		flags |= O_DIRECT;
 
@@ -490,11 +491,11 @@ static int create_dir_for(uint32_t vid)
 	int ret = 0;
 	struct strbuf buf = STRBUF_INIT;
 
-	strbuf_addstr(&buf, cache_dir);
+	strbuf_addstr(&buf, object_cache_dir);
 	strbuf_addf(&buf, "/%06"PRIx32, vid);
 	if (mkdir(buf.buf, def_dmode) < 0)
 		if (errno != EEXIST) {
-			eprintf("%m\n");
+			eprintf("%s, %m\n", buf.buf);
 			ret = -1;
 			goto err;
 		}
@@ -606,7 +607,8 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 	unsigned data_length;
 	char path[PATH_MAX];
 
-	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, oc->vid, idx);
+	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
+		oc->vid, idx);
 	if (!create) {
 		if (access(path, R_OK | W_OK) < 0) {
 			if (errno != ENOENT) {
@@ -623,6 +625,7 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
+		dprintf("%s, %m\n", path);
 		ret = SD_RES_EIO;
 		goto out;
 	}
@@ -651,7 +654,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 	int ret = SD_RES_OID_EXIST;
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 
-	sprintf(tmp_path, "%s/%06"PRIx32"/%08"PRIx32".tmp", cache_dir,
+	sprintf(tmp_path, "%s/%06"PRIx32"/%08"PRIx32".tmp", object_cache_dir,
 		oc->vid, idx);
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
@@ -681,7 +684,8 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out_close;
 	}
 	/* This is intended to take care of partial write due to crash */
-	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, cache_dir, oc->vid, idx);
+	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
+		oc->vid, idx);
 	ret = link(tmp_path, path);
 	if (ret < 0) {
 		if (errno == EEXIST) {
@@ -805,7 +809,7 @@ void object_cache_delete(uint32_t vid)
 	free(cache);
 
 	/* Then we free disk */
-	sprintf(path, "%s/%06"PRIx32, cache_dir, vid);
+	sprintf(path, "%s/%06"PRIx32, object_cache_dir, vid);
 	rmdir_r(path);
 }
 
@@ -842,7 +846,7 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 	char p[PATH_MAX];
 
 	dprintf("%"PRIx32"\n", vid);
-	sprintf(p, "%s/%06"PRIx32, cache_dir, vid);
+	sprintf(p, "%s/%06"PRIx32, object_cache_dir, vid);
 	dir = opendir(p);
 	if (!dir) {
 		dprintf("%m\n");
@@ -1073,7 +1077,7 @@ static int load_existing_cache_object(struct object_cache *cache)
 	int ret = 0;
 
 	strbuf_init(&idx_buf, PATH_MAX);
-	strbuf_addstr(&idx_buf, cache_dir);
+	strbuf_addstr(&idx_buf, object_cache_dir);
 	strbuf_addf(&idx_buf, "/%06"PRIx32, cache->vid);
 
 	dir = opendir(idx_buf.buf);
@@ -1119,7 +1123,7 @@ static int load_existing_cache(void)
 	int ret = 0;
 
 	strbuf_init(&vid_buf, PATH_MAX);
-	strbuf_addstr(&vid_buf, cache_dir);
+	strbuf_addstr(&vid_buf, object_cache_dir);
 
 	dir = opendir(vid_buf.buf);
 	if (!dir) {
@@ -1166,7 +1170,7 @@ int object_cache_init(const char *p)
 			goto err;
 		}
 	}
-	strbuf_copyout(&buf, cache_dir, sizeof(cache_dir));
+	strbuf_copyout(&buf, object_cache_dir, sizeof(object_cache_dir));
 
 	CDS_INIT_LIST_HEAD(&sys_cache.cache_lru_list);
 	uatomic_set(&sys_cache.cache_size, 0);
@@ -1176,4 +1180,19 @@ int object_cache_init(const char *p)
 err:
 	strbuf_release(&buf);
 	return ret;
+}
+
+void object_cache_format(void)
+{
+	struct object_cache *cache;
+	struct hlist_node *node, *t;
+	int i;
+
+	for (i = 0; i < HASH_SIZE; i++) {
+		struct hlist_head *head = cache_hashtable + i;
+		hlist_for_each_entry_safe(cache, node, t, head, hash) {
+			object_cache_delete(cache->vid);
+		}
+	}
+	uatomic_set(&sys_cache.cache_size, 0);
 }

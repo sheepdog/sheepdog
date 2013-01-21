@@ -472,6 +472,8 @@ int default_format(void)
 		eprintf("%m\n");
 		return SD_RES_EIO;
 	}
+	if (is_object_cache_enabled())
+		object_cache_format();
 
 	return SD_RES_SUCCESS;
 }

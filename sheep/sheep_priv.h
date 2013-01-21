@@ -379,6 +379,7 @@ int default_flush(void);
 
 /* object_cache */
 
+void object_cache_format(void);
 bool bypass_object_cache(const struct request *req);
 bool object_is_cached(uint64_t oid);
 
