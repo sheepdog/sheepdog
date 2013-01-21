@@ -421,6 +421,7 @@ static int do_reclaim_object(struct object_cache_entry *entry)
 	struct object_cache *oc = entry->oc;
 	uint64_t oid;
 	int ret = 0;
+	uint32_t size;
 
 	oid = idx_to_oid(oc->vid, entry_idx(entry));
 	pthread_rwlock_wrlock(&oc->lock);
@@ -441,8 +442,9 @@ static int do_reclaim_object(struct object_cache_entry *entry)
 		goto out;
 	}
 
+	size = uatomic_sub_return(&sys_cache.cache_size, CACHE_OBJECT_SIZE);
 	dprintf("oid %"PRIx64" reclaimed successfully, cache_size: %"PRId32"\n",
-		oid, uatomic_read(&sys_cache.cache_size));
+		oid, size);
 	del_from_object_tree_and_list(entry, &oc->object_tree);
 out:
 	pthread_rwlock_unlock(&oc->lock);
@@ -468,7 +470,6 @@ static void do_reclaim(struct work *work)
 
 		if (do_reclaim_object(entry) < 0)
 			continue;
-		uatomic_sub(&sys_cache.cache_size, CACHE_OBJECT_SIZE);
 	}
 
 	dprintf("cache reclaim complete\n");
@@ -583,8 +584,6 @@ static void add_to_object_cache(struct object_cache *oc, uint32_t idx,
 	}
 	pthread_rwlock_unlock(&oc->lock);
 	lru_move_entry(entry);
-
-	object_cache_try_to_reclaim();
 }
 
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
@@ -623,10 +622,12 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		data_length = SD_DATA_OBJ_SIZE;
 
 	ret = prealloc(fd, data_length);
-	if (ret < 0)
+	if (ret < 0) {
 		ret = SD_RES_EIO;
-	else
+	} else {
 		add_to_object_cache(oc, idx, writeback);
+		object_cache_try_to_reclaim();
+	}
 
 	close(fd);
 out:
@@ -727,6 +728,11 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 
 		ret = create_cache_object(oc, idx, buf, rsp->data_length,
 					  rsp->obj.offset, data_length);
+		/*
+		 * We don't try to reclaim objects to avoid object ping-pong
+		 * because the pulled object is clean and likely to be reclaimed
+		 * in a full cache.
+		 */
 		if (ret == SD_RES_SUCCESS)
 			add_to_object_cache(oc, idx, false);
 		else if (ret == SD_RES_OID_EXIST)
@@ -927,12 +933,15 @@ int object_cache_handle_request(struct request *req)
 retry:
 	ret = object_cache_lookup(cache, idx, create,
 				  hdr->flags & SD_FLAG_CMD_CACHE);
-	if (ret == SD_RES_NO_CACHE) {
+	switch (ret) {
+	case SD_RES_NO_CACHE:
 		ret = object_cache_pull(cache, idx);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
-	} else if (ret == SD_RES_EIO)
+		break;
+	case SD_RES_EIO:
 		return ret;
+	}
 
 	entry = get_cache_entry(cache, idx);
 	if (!entry) {
@@ -1015,7 +1024,7 @@ int object_cache_flush_vdi(const struct request *req)
 
 	cache = find_object_cache(vid, false);
 	if (!cache) {
-		dprintf("%"PRIX32" not found\n", vid);
+		dprintf("%"PRIx32" not found\n", vid);
 		return SD_RES_SUCCESS;
 	}
 
@@ -1090,9 +1099,14 @@ static int load_existing_cache_object(struct object_cache *cache)
 		if (idx == ULLONG_MAX)
 			continue;
 
-		add_to_object_cache(cache, idx, false);
-		dprintf("load cache %06" PRIx32 "/%08" PRIx32 "\n",
-			cache->vid, idx);
+		/*
+		 * We don't know VM's cache type after restarting, so we assume
+		 * that it is writeback and mark all the objects diry to avoid
+		 * false reclaim. Donot try to reclaim at loading phase becaue
+		 * cluster isn't fully working.
+		 */
+		add_to_object_cache(cache, idx, true);
+		dprintf("%"PRIx64"\n", idx_to_oid(cache->vid, idx));
 	}
 
 	closedir(dir);
@@ -1105,8 +1119,7 @@ static int load_existing_cache(void)
 {
 	DIR *dir;
 	struct dirent *d;
-	uint32_t vid;
-	struct object_cache *cache;
+	uint32_t vid; struct object_cache *cache;
 	struct strbuf vid_buf;
 	int ret = 0;
 
