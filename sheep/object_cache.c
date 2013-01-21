@@ -450,12 +450,21 @@ static void do_reclaim_object(struct object_cache *oc)
 	pthread_yield();
 }
 
+struct reclaim_work {
+	struct work work;
+	int delay;
+};
+
 static void do_reclaim(struct work *work)
 {
+	struct reclaim_work *rw = container_of(work, struct reclaim_work,
+					       work);
 	struct object_cache *cache;
 	struct hlist_node *node;
 	int i, j;
 
+	if (rw->delay)
+		sleep(rw->delay);
 	/* We choose a random victim to avoid reclaim the same one every time */
 	j = random();
 	for (i = 0; i < HASH_SIZE; i++) {
@@ -542,9 +551,9 @@ out:
 	return cache;
 }
 
-void object_cache_try_to_reclaim(void)
+void object_cache_try_to_reclaim(int delay)
 {
-	struct work *work;
+	struct reclaim_work *rw;
 
 	if (!sys->object_cache_size)
 		return;
@@ -556,10 +565,11 @@ void object_cache_try_to_reclaim(void)
 		/* the cache is already in reclaim, */
 		return;
 
-	work = xzalloc(sizeof(struct work));
-	work->fn = do_reclaim;
-	work->done = reclaim_done;
-	queue_work(sys->reclaim_wqueue, work);
+	rw = xzalloc(sizeof(struct reclaim_work));
+	rw->delay = delay;
+	rw->work.fn = do_reclaim;
+	rw->work.done = reclaim_done;
+	queue_work(sys->reclaim_wqueue, &rw->work);
 }
 
 static inline struct object_cache_entry *
@@ -634,7 +644,7 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 		ret = SD_RES_EIO;
 	} else {
 		add_to_lru_cache(oc, idx, writeback);
-		object_cache_try_to_reclaim();
+		object_cache_try_to_reclaim(0);
 	}
 
 	close(fd);
@@ -737,14 +747,21 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		ret = create_cache_object(oc, idx, buf, rsp->data_length,
 					  rsp->obj.offset, data_length);
 		/*
-		 * We don't try to reclaim objects to avoid object ping-pong
+		 * We try to delay reclaim objects to avoid object ping-pong
 		 * because the pulled object is clean and likely to be reclaimed
-		 * in a full cache.
+		 * in a cache over high watermark. We can't simply pass without
+		 * waking up reclaimer because the cache is easy to be filled
+		 * full with a read storm.
 		 */
-		if (ret == SD_RES_SUCCESS)
+		switch (ret) {
+		case SD_RES_SUCCESS:
 			add_to_lru_cache(oc, idx, false);
-		else if (ret == SD_RES_OID_EXIST)
+			object_cache_try_to_reclaim(1);
+			break;
+		case SD_RES_OID_EXIST:
 			ret = SD_RES_SUCCESS;
+			break;
+		}
 	}
 	free(buf);
 out:

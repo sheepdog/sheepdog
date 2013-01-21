@@ -642,7 +642,7 @@ static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
 	uatomic_set(&sys->object_cache_size, cache_size);
 	dprintf("Max cache size set to %dM\n", cache_size);
 
-	object_cache_try_to_reclaim();
+	object_cache_try_to_reclaim(0);
 
 	return SD_RES_SUCCESS;
 }
