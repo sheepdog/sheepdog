@@ -22,7 +22,6 @@
 #include <sys/file.h>
 #include <dirent.h>
 #include <urcu/uatomic.h>
-#include <urcu/rculist.h>
 
 #include "sheep_priv.h"
 #include "util.h"
@@ -414,7 +413,12 @@ out:
  *  - skip the dirty object if it is not in push(writeback) phase.
  *  - wait on the dirty object if it is in push phase.
  */
-#define HIGH_WATERMARK (sys->object_cache_size * 8 / 10)
+
+/*
+ * 90% is targeted for a large cache quota such as 200G, then we have 20G
+ * buffer which is large enough to prevent cache overrun.
+ */
+#define HIGH_WATERMARK (sys->object_cache_size * 9 / 10)
 static void do_reclaim_object(struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
@@ -604,49 +608,47 @@ static void add_to_lru_cache(struct object_cache *oc, uint32_t idx, bool create)
 	pthread_rwlock_unlock(&oc->lock);
 }
 
+static inline int lookup_path(char *path)
+{
+	int ret = SD_RES_SUCCESS;
+
+	if (access(path, R_OK | W_OK) < 0) {
+		if (errno != ENOENT) {
+			dprintf("%m\n");
+			ret = SD_RES_EIO;
+		} else {
+			ret = SD_RES_NO_CACHE;
+		}
+	}
+	return ret;
+}
+
 static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 			       bool create, bool writeback)
 {
-	int fd, ret = SD_RES_SUCCESS, flags = def_open_flags;
-	unsigned data_length;
+	int fd, ret, flags = def_open_flags;
 	char path[PATH_MAX];
 
 	sprintf(path, "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
 		oc->vid, idx);
-	if (!create) {
-		if (access(path, R_OK | W_OK) < 0) {
-			if (errno != ENOENT) {
-				dprintf("%m\n");
-				ret = SD_RES_EIO;
-			} else {
-				ret = SD_RES_NO_CACHE;
-			}
-		}
-		goto out;
-	}
+	if (!create)
+		return lookup_path(path);
 
 	flags |= O_CREAT | O_TRUNC;
-
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		dprintf("%s, %m\n", path);
 		ret = SD_RES_EIO;
 		goto out;
 	}
-
-	if (idx_has_vdi_bit(idx))
-		data_length = SD_INODE_SIZE;
-	else
-		data_length = SD_DATA_OBJ_SIZE;
-
-	ret = prealloc(fd, data_length);
+	ret = prealloc(fd, get_objsize(idx_to_oid(oc->vid, idx)));
 	if (ret < 0) {
 		ret = SD_RES_EIO;
-	} else {
-		add_to_lru_cache(oc, idx, writeback);
-		object_cache_try_to_reclaim(0);
+		goto out_close;
 	}
-
+	add_to_lru_cache(oc, idx, writeback);
+	object_cache_try_to_reclaim(0);
+out_close:
 	close(fd);
 out:
 	return ret;
@@ -717,54 +719,45 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret = SD_RES_NO_MEM;
-	uint64_t oid;
-	uint32_t data_length;
+	uint64_t oid = idx_to_oid(oc->vid, idx);
+	uint32_t data_length = get_objsize(oid);
 	void *buf;
 
-	if (idx_has_vdi_bit(idx)) {
-		oid = vid_to_vdi_oid(oc->vid);
-		data_length = SD_INODE_SIZE;
-	} else {
-		oid = vid_to_data_oid(oc->vid, idx);
-		data_length = SD_DATA_OBJ_SIZE;
-	}
-
 	buf = valloc(data_length);
-	if (buf == NULL) {
-		eprintf("failed to allocate memory\n");
-		goto out;
-	}
+	if (!buf)
+		panic("%m\n");
 
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
 	hdr.data_length = data_length;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = 0;
 	ret = exec_local_req(&hdr, buf);
+	if (ret != SD_RES_SUCCESS)
+		goto err;
 
-	if (ret == SD_RES_SUCCESS) {
-		dprintf("oid %"PRIx64" pulled successfully\n", oid);
-
-		ret = create_cache_object(oc, idx, buf, rsp->data_length,
-					  rsp->obj.offset, data_length);
-		/*
-		 * We try to delay reclaim objects to avoid object ping-pong
-		 * because the pulled object is clean and likely to be reclaimed
-		 * in a cache over high watermark. We can't simply pass without
-		 * waking up reclaimer because the cache is easy to be filled
-		 * full with a read storm.
-		 */
-		switch (ret) {
-		case SD_RES_SUCCESS:
-			add_to_lru_cache(oc, idx, false);
-			object_cache_try_to_reclaim(1);
-			break;
-		case SD_RES_OID_EXIST:
-			ret = SD_RES_SUCCESS;
-			break;
-		}
+	dprintf("oid %"PRIx64" pulled successfully\n", oid);
+	ret = create_cache_object(oc, idx, buf, rsp->data_length,
+				  rsp->obj.offset, data_length);
+	/*
+	 * We try to delay reclaim objects to avoid object ping-pong
+	 * because the pulled object is clean and likely to be reclaimed
+	 * in a cache over high watermark. We can't simply pass without
+	 * waking up reclaimer because the cache is easy to be filled
+	 * full with a read storm.
+	 */
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		add_to_lru_cache(oc, idx, false);
+		object_cache_try_to_reclaim(1);
+		break;
+	case SD_RES_OID_EXIST:
+		ret = SD_RES_SUCCESS;
+		break;
+	default:
+		break;
 	}
+err:
 	free(buf);
-out:
 	return ret;
 }
 
