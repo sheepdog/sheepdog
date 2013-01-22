@@ -461,8 +461,7 @@ struct reclaim_work {
 
 static void do_reclaim(struct work *work)
 {
-	struct reclaim_work *rw = container_of(work, struct reclaim_work,
-					       work);
+	struct reclaim_work *rw = container_of(work, struct reclaim_work, work);
 	struct object_cache *cache;
 	struct hlist_node *node;
 	int i, j;
@@ -494,8 +493,9 @@ static void do_reclaim(struct work *work)
 
 static void reclaim_done(struct work *work)
 {
+	struct reclaim_work *rw = container_of(work, struct reclaim_work, work);
 	uatomic_set_false(&gcache.in_reclaim);
-	free(work);
+	free(rw);
 }
 
 static int create_dir_for(uint32_t vid)
