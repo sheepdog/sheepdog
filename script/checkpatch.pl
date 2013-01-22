@@ -2841,8 +2841,42 @@ sub process {
 			}
 		}
 
+# forbid bzero()
 		if ($line =~ /\bbzero\(/) {
-			ERROR("BZERO", "bzero() is obsolete, use memset()" . $herecurr);
+			ERROR("BZERO", "bzero() is obsolete, use memset()\n" . $herecurr);
+		}
+
+# 1. forbid empty lines after break; of a switch statement
+# e.g.
+# +        break;
+# +
+# +    case XXX:
+#
+# 2. forbid empty lines after break; of a compound statement
+# e.g.
+# +	for ( ; ; ) {
+# +		if (0) {
+# +			printf("asdf");
+# +			break;	/* treated as an error */
+# +
+# +		}
+# +	}
+		if ($line =~ /\bbreak;/) {
+		    my $ln = $linenr;
+		    while ($lines[$ln] =~ /^\+$/) { $ln++; }
+		    my $sline = $lines[$ln];
+
+		    if ($linenr < $ln) {
+			if ($sline =~ /\b(case|default)/) {
+			    ERROR("NL_AFTER_BREAK_IN_SWITCH",
+				  "don't insert empty lines after break; of a switch statement\n" . $herecurr);
+			}
+
+			if ($sline =~ /}/) {
+			    ERROR("NL_AFTER_LAST_BREAK",
+				  "don't insert empty lines after break; of a compound statement\n" . $herecurr);
+			}
+		    }
 		}
 	}
 
