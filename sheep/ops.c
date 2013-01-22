@@ -761,7 +761,7 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	ret = gateway_read_obj(&read_req);
 
 	if (ret == SD_RES_SUCCESS)
-		set_trimmed_sectors(buf, rsp->obj.offset, rsp->data_length,
+		untrim_zero_sectors(buf, rsp->obj.offset, rsp->data_length,
 				    SD_DATA_OBJ_SIZE);
 
 	return ret;

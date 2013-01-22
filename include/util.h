@@ -85,7 +85,7 @@ extern int rmdir_r(char *dir_path);
 extern bool is_numeric(const char *p);
 
 void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
-void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
+void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
 			 uint32_t requested_len);
 
 #ifdef assert

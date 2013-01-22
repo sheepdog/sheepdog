@@ -77,7 +77,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		return rsp->result;
 	}
 
-	set_trimmed_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
+	untrim_zero_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
 
 	return SD_RES_SUCCESS;
 }

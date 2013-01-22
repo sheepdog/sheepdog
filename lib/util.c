@@ -316,8 +316,8 @@ void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len)
 	}
 }
 
-/* Set trimmed zero sectors to the beginning and end of buffer */
-void set_trimmed_sectors(void *buf, uint64_t offset, uint32_t len,
+/* Untrim zero sectors to the beginning and end of buffer */
+void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
 			 uint32_t requested_len)
 {
 	uint8_t *p = buf;
