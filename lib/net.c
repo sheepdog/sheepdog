@@ -25,7 +25,6 @@
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "util.h"
@@ -131,7 +130,7 @@ int create_listen_ports(const char *bindaddr, int port,
 
 	ret = getaddrinfo(bindaddr, servname, &hints, &res0);
 	if (ret) {
-		eprintf("failed to get address info: %m\n");
+		sd_eprintf("failed to get address info: %m\n");
 		return 1;
 	}
 
@@ -144,7 +143,7 @@ int create_listen_ports(const char *bindaddr, int port,
 		ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt,
 				 sizeof(opt));
 		if (ret)
-			eprintf("failed to set SO_REUSEADDR: %m\n");
+			sd_eprintf("failed to set SO_REUSEADDR: %m\n");
 
 		opt = 1;
 		if (res->ai_family == AF_INET6) {
@@ -158,14 +157,14 @@ int create_listen_ports(const char *bindaddr, int port,
 
 		ret = bind(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
-			eprintf("failed to bind server socket: %m\n");
+			sd_eprintf("failed to bind server socket: %m\n");
 			close(fd);
 			continue;
 		}
 
 		ret = listen(fd, SOMAXCONN);
 		if (ret) {
-			eprintf("failed to listen on server socket: %m\n");
+			sd_eprintf("failed to listen on server socket: %m\n");
 			close(fd);
 			continue;
 		}
@@ -188,7 +187,7 @@ int create_listen_ports(const char *bindaddr, int port,
 	freeaddrinfo(res0);
 
 	if (!success)
-		eprintf("failed to create a listening port\n");
+		sd_eprintf("failed to create a listening port\n");
 
 	return !success;
 }
@@ -208,7 +207,7 @@ int connect_to(const char *name, int port)
 
 	ret = getaddrinfo(name, buf, &hints, &res0);
 	if (ret) {
-		eprintf("failed to get address info: %m\n");
+		sd_eprintf("failed to get address info: %m\n");
 		return -1;
 	}
 
@@ -226,28 +225,28 @@ int connect_to(const char *name, int port)
 		ret = setsockopt(fd, SOL_SOCKET, SO_LINGER, &linger_opt,
 				 sizeof(linger_opt));
 		if (ret) {
-			eprintf("failed to set SO_LINGER: %m\n");
+			sd_eprintf("failed to set SO_LINGER: %m\n");
 			close(fd);
 			continue;
 		}
 
 		ret = set_snd_timeout(fd);
 		if (ret) {
-			eprintf("failed to set send timeout: %m\n");
+			sd_eprintf("failed to set send timeout: %m\n");
 			close(fd);
 			break;
 		}
 
 		ret = set_rcv_timeout(fd);
 		if (ret) {
-			eprintf("failed to set recv timeout: %m\n");
+			sd_eprintf("failed to set recv timeout: %m\n");
 			close(fd);
 			break;
 		}
 
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
-			eprintf("failed to connect to %s:%d: %m\n",
+			sd_eprintf("failed to connect to %s:%d: %m\n",
 				name, port);
 			close(fd);
 			continue;
@@ -255,7 +254,7 @@ int connect_to(const char *name, int port)
 
 		ret = set_nodelay(fd);
 		if (ret) {
-			eprintf("%m\n");
+			sd_eprintf("%m\n");
 			close(fd);
 			break;
 		} else
@@ -264,7 +263,7 @@ int connect_to(const char *name, int port)
 	fd = -1;
 success:
 	freeaddrinfo(res0);
-	dprintf("%d, %s:%d\n", fd, name, port);
+	sd_dprintf("%d, %s:%d\n", fd, name, port);
 	return fd;
 }
 
@@ -279,7 +278,8 @@ reread:
 		if (retry_eagain && errno == EAGAIN)
 			goto reread;
 
-		eprintf("failed to read from socket: %d, %d(%m)\n", ret, errno);
+		sd_eprintf("failed to read from socket: %d, %d(%m)\n",
+			ret, errno);
 		return 1;
 	}
 
@@ -317,7 +317,7 @@ rewrite:
 	if (ret < 0) {
 		if (errno == EINTR)
 			goto rewrite;
-		eprintf("failed to write to socket: %m\n");
+		sd_eprintf("failed to write to socket: %m\n");
 		return 1;
 	}
 
@@ -352,7 +352,7 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen)
 
 	ret = do_write(sockfd, &msg, sizeof(*hdr) + wlen);
 	if (ret) {
-		eprintf("failed to send request %x, %d: %m\n", hdr->opcode,
+		sd_eprintf("failed to send request %x, %d: %m\n", hdr->opcode,
 			wlen);
 		ret = -1;
 	}
@@ -379,7 +379,7 @@ int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
 
 	ret = net_do_read(sockfd, rsp, sizeof(*rsp), retry_eagain);
 	if (ret) {
-		eprintf("failed to read a response\n");
+		sd_eprintf("failed to read a response\n");
 		return 1;
 	}
 
@@ -389,7 +389,7 @@ int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
 	if (rlen) {
 		ret = net_do_read(sockfd, data, rlen, retry_eagain);
 		if (ret) {
-			eprintf("failed to read the response data\n");
+			sd_eprintf("failed to read the response data\n");
 			return 1;
 		}
 	}
@@ -445,12 +445,12 @@ int set_nonblocking(int fd)
 
 	ret = fcntl(fd, F_GETFL);
 	if (ret < 0) {
-		eprintf("fcntl F_GETFL failed: %m\n");
+		sd_eprintf("fcntl F_GETFL failed: %m\n");
 		close(fd);
 	} else {
 		ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
 		if (ret < 0)
-			eprintf("fcntl O_NONBLOCK failed: %m\n");
+			sd_eprintf("fcntl O_NONBLOCK failed: %m\n");
 	}
 
 	return ret;
@@ -501,22 +501,22 @@ int set_keepalive(int fd)
 	int val = 1;
 
 	if (setsockopt(fd, SOL_SOCKET, SO_KEEPALIVE, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 	val = 5;
 	if (setsockopt(fd, SOL_TCP, TCP_KEEPIDLE, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 	val = 1;
 	if (setsockopt(fd, SOL_TCP, TCP_KEEPINTVL, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 	val = 3;
 	if (setsockopt(fd, SOL_TCP, TCP_KEEPCNT, &val, sizeof(val)) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 	return 0;
@@ -528,7 +528,7 @@ int get_local_addr(uint8_t *bytes)
 	int ret = 0;
 
 	if (getifaddrs(&ifaddr) == -1) {
-		eprintf("getifaddrs failed: %m\n");
+		sd_eprintf("getifaddrs failed: %m\n");
 		return -1;
 	}
 
@@ -548,17 +548,17 @@ int get_local_addr(uint8_t *bytes)
 			memset(bytes, 0, 12);
 			memcpy(bytes + 12, &sin->sin_addr, 4);
 			memcpy(bytes + 12, &sin->sin_addr, 4);
-			eprintf("found IPv4 address\n");
+			sd_eprintf("found IPv4 address\n");
 			goto out;
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 			memcpy(bytes, &sin6->sin6_addr, 16);
-			eprintf("found IPv6 address\n");
+			sd_eprintf("found IPv6 address\n");
 			goto out;
 		}
 	}
 
-	eprintf("no valid interface found\n");
+	sd_eprintf("no valid interface found\n");
 	ret = -1;
 out:
 	freeifaddrs(ifaddr);
@@ -576,19 +576,19 @@ int create_unix_domain_socket(const char *unix_path,
 
 	fd = socket(addr.sun_family, SOCK_STREAM, 0);
 	if (fd < 0) {
-		eprintf("failed to create socket, %m\n");
+		sd_eprintf("failed to create socket, %m\n");
 		return -1;
 	}
 
 	ret = bind(fd, &addr, sizeof(addr));
 	if (ret) {
-		eprintf("failed to bind socket: %m\n");
+		sd_eprintf("failed to bind socket: %m\n");
 		goto err;
 	}
 
 	ret = listen(fd, SOMAXCONN);
 	if (ret) {
-		eprintf("failed to listen on socket: %m\n");
+		sd_eprintf("failed to listen on socket: %m\n");
 		goto err;
 	}
 
@@ -614,7 +614,7 @@ bool inetaddr_is_valid(char *addr)
 
 	af = strstr(addr, ":") ? AF_INET6 : AF_INET;
 	if (!inet_pton(af, addr, buf)) {
-		eprintf("Bad address '%s'\n", addr);
+		sd_eprintf("Bad address '%s'\n", addr);
 		return false;
 	}
 	return true;

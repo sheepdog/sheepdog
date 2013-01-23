@@ -131,13 +131,13 @@ static void signal_handler(int listen_fd, int events, void *data)
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));
-	dprintf("signal %d\n", siginfo.ssi_signo);
+	sd_dprintf("signal %d\n", siginfo.ssi_signo);
 	switch (siginfo.ssi_signo) {
 	case SIGTERM:
 		sys->status = SD_STATUS_KILLED;
 		break;
 	default:
-		eprintf("signal %d unhandled\n", siginfo.ssi_signo);
+		sd_eprintf("signal %d unhandled\n", siginfo.ssi_signo);
 		break;
 	}
 }
@@ -157,17 +157,17 @@ static int init_signal(void)
 
 	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
 	if (sigfd < 0) {
-		eprintf("failed to create a signal fd: %m\n");
+		sd_eprintf("failed to create a signal fd: %m\n");
 		return -1;
 	}
 
 	ret = register_event(sigfd, signal_handler, NULL);
 	if (ret) {
-		eprintf("failed to register signal handler (%d)\n", ret);
+		sd_eprintf("failed to register signal handler (%d)\n", ret);
 		return -1;
 	}
 
-	dprintf("register signal_handler for %d\n", sigfd);
+	sd_dprintf("register signal_handler for %d\n", sigfd);
 
 	return 0;
 }
@@ -593,7 +593,7 @@ int main(int argc, char **argv)
 
 	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
 	if (ret) {
-		eprintf("failed to create sheepdog cluster\n");
+		sd_eprintf("failed to create sheepdog cluster\n");
 		exit(1);
 	}
 
@@ -602,7 +602,7 @@ int main(int argc, char **argv)
 		if (!strlen(jpath))
 			/* internal journal */
 			memcpy(jpath, dir, strlen(dir));
-		dprintf("%s, %zu, %d\n", jpath, jsize, jskip);
+		sd_dprintf("%s, %zu, %d\n", jpath, jsize, jskip);
 		ret = journal_file_init(jpath, jsize, jskip);
 		if (ret)
 			exit(1);
@@ -650,14 +650,15 @@ int main(int argc, char **argv)
 	}
 
 	free(dir);
-	vprintf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n", PACKAGE_VERSION);
+	sd_printf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n",
+		PACKAGE_VERSION);
 
 	while (sys->nr_outstanding_reqs != 0 ||
 	       (sys->status != SD_STATUS_KILLED &&
 		sys->status != SD_STATUS_SHUTDOWN))
 		event_loop(-1);
 
-	vprintf(SDOG_INFO, "shutdown\n");
+	sd_printf(SDOG_INFO, "shutdown\n");
 
 	leave_cluster();
 	log_close();

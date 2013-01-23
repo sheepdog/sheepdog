@@ -55,7 +55,7 @@ int gateway_read_obj(struct request *req)
 		if (ret == SD_RES_SUCCESS)
 			goto out;
 
-		eprintf("local read fail %x\n", ret);
+		sd_eprintf("local read fail %x\n", ret);
 		break;
 	}
 
@@ -108,7 +108,7 @@ struct write_info {
 
 static inline void write_info_update(struct write_info *wi, int pos)
 {
-	dprintf("%d, %d\n", wi->nr_sent, pos);
+	sd_dprintf("%d, %d\n", wi->nr_sent, pos);
 	wi->nr_sent--;
 	memmove(wi->ent + pos, wi->ent + pos + 1,
 		sizeof(struct write_info_entry) * (wi->nr_sent - pos));
@@ -162,7 +162,7 @@ again:
 
 		panic("%m\n");
 	} else if (pollret == 0) {
-		eprintf("poll timeout %d\n", wi->nr_sent);
+		sd_eprintf("poll timeout %d\n", wi->nr_sent);
 		/*
 		 * If IO NIC is down, epoch isn't incremented, so we can't retry
 		 * for ever.
@@ -187,14 +187,14 @@ again:
 			break;
 	if (i < nr_sent) {
 		int re = pi.pfds[i].revents;
-		dprintf("%d, revents %x\n", i, re);
+		sd_dprintf("%d, revents %x\n", i, re);
 		if (re & (POLLERR | POLLHUP | POLLNVAL)) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
 			goto finish_write;
 		}
 		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp))) {
-			eprintf("remote node might have gone away\n");
+			sd_eprintf("remote node might have gone away\n");
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
 			goto finish_write;
@@ -202,7 +202,7 @@ again:
 
 		ret = rsp->result;
 		if (ret != SD_RES_SUCCESS) {
-			eprintf("fail %"PRIx32"\n", ret);
+			sd_eprintf("fail %"PRIx32"\n", ret);
 			err_ret = ret;
 		}
 		finish_one_write(wi, i);
@@ -265,7 +265,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
 
-	dprintf("%"PRIx64"\n", oid);
+	sd_dprintf("%"PRIx64"\n", oid);
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
 	op = get_sd_op(hdr.opcode);
@@ -294,7 +294,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 		if (ret) {
 			sheep_del_sockfd(nid, sfd);
 			err_ret = SD_RES_NETWORK_ERROR;
-			dprintf("fail %d\n", ret);
+			sd_dprintf("fail %d\n", ret);
 			break;
 		}
 		write_info_advance(&wi, nid, sfd);
@@ -305,12 +305,12 @@ static int gateway_forward_request(struct request *req, bool all_node)
 		ret = sheep_do_op_work(op, req);
 
 		if (ret != SD_RES_SUCCESS) {
-			eprintf("fail to write local %"PRIx32"\n", ret);
+			sd_eprintf("fail to write local %"PRIx32"\n", ret);
 			err_ret = ret;
 		}
 	}
 
-	dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
+	sd_dprintf("nr_sent %d, err %x\n", wi.nr_sent, err_ret);
 	if (wi.nr_sent > 0) {
 		ret = wait_forward_request(&wi, req);
 		if (ret != SD_RES_SUCCESS)

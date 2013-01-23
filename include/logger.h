@@ -41,27 +41,30 @@ extern void get_thread_name(char *name);
 #define	SDOG_INFO		LOG_INFO
 #define	SDOG_DEBUG		LOG_DEBUG
 
-#define vprintf(level, fmt, args...)						\
-do {									\
-	log_write(level, __func__, __LINE__, fmt, ##args);		\
-} while (0)
+#define sd_printf(level, fmt, args...)					\
+	do {								\
+		log_write(level, __func__, __LINE__, fmt, ##args);	\
+	} while (0)
 
-#define panic(fmt, args...)			\
-({						\
-	vprintf(SDOG_EMERG, "PANIC: " fmt, ##args);	\
-	abort();				\
-})
+#define panic(fmt, args...)					\
+	({							\
+		sd_printf(SDOG_EMERG, "PANIC: " fmt, ##args);	\
+		abort();					\
+	})
 
-/* don't use the following obsolete functions. use vprintf instead. */
+#define sd_iprintf(fmt, args...)					\
+	do {								\
+		log_write(SDOG_INFO, __func__, __LINE__, fmt, ##args);	\
+	} while (0)
 
-#define eprintf(fmt, args...)						\
-do {									\
-	log_write(LOG_ERR, __func__, __LINE__, fmt, ##args);		\
-} while (0)
+#define sd_eprintf(fmt, args...)					\
+	do {								\
+		log_write(SDOG_ERR, __func__, __LINE__, fmt, ##args);	\
+	} while (0)
 
-#define dprintf(fmt, args...)						\
-do {									\
-	log_write(LOG_DEBUG, __func__, __LINE__, fmt, ##args);		\
-} while (0)
+#define sd_dprintf(fmt, args...)					\
+	do {								\
+		log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args);	\
+	} while (0)
 
 #endif	/* LOG_H */

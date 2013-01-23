@@ -178,7 +178,7 @@ static void shm_queue_notify(void)
 	nr = get_nodes(lnodes);
 
 	for (i = 0; i < nr; i++) {
-		dprintf("send signal to %s\n", lnode_to_str(lnodes + i));
+		sd_dprintf("send signal to %s\n", lnode_to_str(lnodes + i));
 		kill(lnodes[i].pid, SIGUSR1);
 	}
 }
@@ -285,9 +285,10 @@ static void add_event(enum local_event_type type, struct local_node *lnode,
 		abort();
 	}
 
-	dprintf("type = %d, sender = %s\n", ev.type, lnode_to_str(&ev.sender));
+	sd_dprintf("type = %d, sender = %s\n",
+		ev.type, lnode_to_str(&ev.sender));
 	for (i = 0; i < ev.nr_lnodes; i++)
-		dprintf("%d: %s\n", i, lnode_to_str(ev.lnodes + i));
+		sd_dprintf("%d: %s\n", i, lnode_to_str(ev.lnodes + i));
 
 	shm_queue_push(&ev);
 
@@ -403,13 +404,14 @@ static bool local_process_event(void)
 	if (!ev)
 		return false;
 
-	dprintf("type = %d, sender = %s\n", ev->type,
-		lnode_to_str(&ev->sender));
-	dprintf("callbacked = %d, removed = %d\n", ev->callbacked, ev->removed);
+	sd_dprintf("type = %d, sender = %s\n",
+		ev->type, lnode_to_str(&ev->sender));
+	sd_dprintf("callbacked = %d, removed = %d\n",
+		ev->callbacked, ev->removed);
 
 	nr_nodes = 0;
 	for (i = 0; i < ev->nr_lnodes; i++) {
-		dprintf("%d: %s\n", i, lnode_to_str(ev->lnodes + i));
+		sd_dprintf("%d: %s\n", i, lnode_to_str(ev->lnodes + i));
 		if (!ev->lnodes[i].gateway)
 			nodes[nr_nodes++] = ev->lnodes[i].node;
 	}
@@ -422,7 +424,7 @@ static bool local_process_event(void)
 
 	if (ev->type == EVENT_JOIN_RESPONSE &&
 	    lnode_eq(&this_node, &ev->sender)) {
-		dprintf("join Sheepdog\n");
+		sd_dprintf("join Sheepdog\n");
 		joined = true;
 	}
 
@@ -434,8 +436,8 @@ static bool local_process_event(void)
 			get_nodes(lnodes);
 
 			if (!lnode_eq(&this_node, &lnodes[0])) {
-				dprintf("wait for another node to accept this "
-					"node\n");
+				sd_dprintf("wait for another node"
+					" to accept this node\n");
 				return false;
 			}
 		} else
@@ -452,7 +454,7 @@ static bool local_process_event(void)
 		shm_queue_notify();
 
 		if (res == CJ_RES_MASTER_TRANSFER) {
-			eprintf("failed to join sheepdog cluster: "
+			sd_eprintf("failed to join sheepdog cluster: "
 				"please retry when master is up\n");
 			shm_queue_unlock();
 			exit(1);
@@ -496,12 +498,12 @@ static void local_handler(int listen_fd, int events, void *data)
 	int ret;
 
 	if (events & EPOLLHUP) {
-		eprintf("local driver received EPOLLHUP event, exiting.\n");
+		sd_eprintf("local driver received EPOLLHUP event, exiting.\n");
 		log_close();
 		exit(1);
 	}
 
-	dprintf("read siginfo\n");
+	sd_dprintf("read siginfo\n");
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));
@@ -543,7 +545,7 @@ static int local_init(const char *option)
 
 	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
 	if (sigfd < 0) {
-		eprintf("failed to create a signal fd: %m\n");
+		sd_eprintf("failed to create a signal fd: %m\n");
 		return -1;
 	}
 
@@ -551,7 +553,8 @@ static int local_init(const char *option)
 
 	ret = register_event(sigfd, local_handler, NULL);
 	if (ret) {
-		eprintf("failed to register local event handler (%d)\n", ret);
+		sd_eprintf("failed to register local event handler (%d)\n",
+			ret);
 		return -1;
 	}
 

@@ -67,7 +67,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
 
 	dir = opendir(obj_path);
 	if (!dir) {
-		eprintf("failed to open %s, %m\n", obj_path);
+		sd_eprintf("failed to open %s, %m\n", obj_path);
 		return SD_RES_EIO;
 	}
 
@@ -84,7 +84,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
 		    strcmp(d->d_name + 16, ".tmp") == 0) {
 			if (cleanup) {
 				get_tmp_obj_path(oid, path);
-				dprintf("remove tmp object %s\n", path);
+				sd_dprintf("remove tmp object %s\n", path);
 				unlink(path);
 			}
 			continue;
@@ -105,7 +105,8 @@ bool default_exist(uint64_t oid)
 	get_obj_path(oid, path);
 	if (access(path, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
-			eprintf("failed to check object %"PRIx64", %m\n", oid);
+			sd_eprintf("failed to check object %"PRIx64", %m\n",
+				oid);
 		return false;
 	}
 
@@ -119,17 +120,17 @@ int err_to_sderr(uint64_t oid, int err)
 	switch (err) {
 	case ENOENT:
 		if (stat(obj_path, &s) < 0) {
-			eprintf("corrupted\n");
+			sd_eprintf("corrupted\n");
 			return SD_RES_EIO;
 		}
-		dprintf("object %016" PRIx64 " not found locally\n", oid);
+		sd_dprintf("object %016" PRIx64 " not found locally\n", oid);
 		return SD_RES_NO_OBJ;
 	case ENOSPC:
 		/* TODO: stop automatic recovery */
-		eprintf("diskfull, oid=%"PRIx64"\n", oid);
+		sd_eprintf("diskfull, oid=%"PRIx64"\n", oid);
 		return SD_RES_NO_SPACE;
 	default:
-		eprintf("oid=%"PRIx64", %m\n", oid);
+		sd_eprintf("oid=%"PRIx64", %m\n", oid);
 		return SD_RES_EIO;
 	}
 }
@@ -142,7 +143,8 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	ssize_t size;
 
 	if (iocb->epoch < sys_epoch()) {
-		dprintf("%"PRIu32" sys %"PRIu32"\n", iocb->epoch, sys_epoch());
+		sd_dprintf("%"PRIu32" sys %"PRIu32"\n",
+			iocb->epoch, sys_epoch());
 		return SD_RES_OLD_NODE_VER;
 	}
 
@@ -152,7 +154,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	    journal_file_write(oid, iocb->buf, iocb->length, iocb->offset,
 			       false)
 	    != SD_RES_SUCCESS) {
-		eprintf("turn off journaling\n");
+		sd_eprintf("turn off journaling\n");
 		uatomic_set_false(&sys->use_journal);
 		flags |= O_DSYNC;
 		sync();
@@ -164,7 +166,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
-		eprintf("failed to write object %"PRIx64", path=%s, offset=%"
+		sd_eprintf("failed to write object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
 			iocb->offset, iocb->length, size);
 		ret = err_to_sderr(oid, errno);
@@ -179,7 +181,7 @@ int default_cleanup(void)
 {
 	rmdir_r(stale_dir);
 	if (mkdir(stale_dir, 0755) < 0) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		return SD_RES_EIO;
 	}
 
@@ -196,14 +198,14 @@ static int init_vdi_copy_number(uint64_t oid)
 
 	fd = open(path, flags);
 	if (fd < 0) {
-		eprintf("failed to open %s, %m\n", path);
+		sd_eprintf("failed to open %s, %m\n", path);
 		ret = SD_RES_EIO;
 		goto out;
 	}
 
 	ret = xpread(fd, inode, SD_INODE_HEADER_SIZE, 0);
 	if (ret != SD_INODE_HEADER_SIZE) {
-		eprintf("failed to read inode header, path=%s, %m\n", path);
+		sd_eprintf("failed to read inode header, path=%s, %m\n", path);
 		ret = SD_RES_EIO;
 		goto out;
 	}
@@ -222,7 +224,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, void *arg)
 	objlist_cache_insert(oid);
 
 	if (is_vdi_obj(oid)) {
-		vprintf(SDOG_DEBUG, "found the VDI object %" PRIx64 "\n", oid);
+		sd_dprintf("found the VDI object %" PRIx64 "\n", oid);
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
 		ret = init_vdi_copy_number(oid);
 		if (ret != SD_RES_SUCCESS)
@@ -233,13 +235,13 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, void *arg)
 
 int default_init(const char *p)
 {
-	dprintf("use plain store driver\n");
+	sd_dprintf("use plain store driver\n");
 
 	/* create a stale directory */
 	snprintf(stale_dir, sizeof(stale_dir), "%s/.stale", p);
 	if (mkdir(stale_dir, 0755) < 0) {
 		if (errno != EEXIST) {
-			eprintf("%m\n");
+			sd_eprintf("%m\n");
 			return SD_RES_EIO;
 		}
 	}
@@ -261,7 +263,7 @@ static int default_read_from_path(uint64_t oid, const char *path,
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
-		eprintf("failed to read object %"PRIx64", path=%s, offset=%"
+		sd_eprintf("failed to read object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m\n", oid, path,
 			iocb->offset, iocb->length, size);
 		ret = err_to_sderr(oid, errno);
@@ -300,7 +302,7 @@ int prealloc(int fd, uint32_t size)
 	int ret = fallocate(fd, 0, 0, size);
 	if (ret < 0) {
 		if (errno != ENOSYS && errno != EOPNOTSUPP) {
-			eprintf("failed to preallocate space, %m\n");
+			sd_eprintf("failed to preallocate space, %m\n");
 			return ret;
 		}
 
@@ -323,7 +325,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_file_write(oid, iocb->buf, iocb->length, iocb->offset, true)
 	    != SD_RES_SUCCESS) {
-		eprintf("turn off journaling\n");
+		sd_eprintf("turn off journaling\n");
 		uatomic_set_false(&sys->use_journal);
 		flags |= O_DSYNC;
 		sync();
@@ -337,11 +339,11 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 			 * recovery process could also recover the object at the
 			 * same time.  They should try to write the same date,
 			 * so it is okay to simply return success here. */
-			dprintf("%s exists\n", tmp_path);
+			sd_dprintf("%s exists\n", tmp_path);
 			return SD_RES_SUCCESS;
 		}
 
-		eprintf("failed to open %s: %m\n", tmp_path);
+		sd_eprintf("failed to open %s: %m\n", tmp_path);
 		return err_to_sderr(oid, errno);
 	}
 
@@ -355,18 +357,18 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 
 	ret = xpwrite(fd, iocb->buf, len, iocb->offset);
 	if (ret != len) {
-		eprintf("failed to write object. %m\n");
+		sd_eprintf("failed to write object. %m\n");
 		ret = err_to_sderr(oid, errno);
 		goto out;
 	}
 
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
-		eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
+		sd_eprintf("failed to rename %s to %s: %m\n", tmp_path, path);
 		ret = err_to_sderr(oid, errno);
 		goto out;
 	}
-	dprintf("%"PRIx64"\n", oid);
+	sd_dprintf("%"PRIx64"\n", oid);
 	ret = SD_RES_SUCCESS;
 out:
 	if (ret != SD_RES_SUCCESS)
@@ -379,14 +381,14 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 
-	dprintf("try link %"PRIx64" from snapshot with epoch %d\n", oid,
+	sd_dprintf("try link %"PRIx64" from snapshot with epoch %d\n", oid,
 		tgt_epoch);
 
 	get_obj_path(oid, path);
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (link(stale_path, path) < 0) {
-		eprintf("failed to link from %s to %s, %m\n", stale_path,
+		sd_eprintf("failed to link from %s to %s, %m\n", stale_path,
 			path);
 		return err_to_sderr(oid, errno);
 	}
@@ -432,12 +434,12 @@ static int move_object_to_stale_dir(uint64_t oid, void *arg)
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (rename(path, stale_path) < 0) {
-		eprintf("failed to move stale object %"PRIX64" to %s, %m\n",
+		sd_eprintf("failed to move stale object %"PRIX64" to %s, %m\n",
 			oid, path);
 		return SD_RES_EIO;
 	}
 
-	dprintf("moved object %"PRIx64"\n", oid);
+	sd_dprintf("moved object %"PRIx64"\n", oid);
 	return SD_RES_SUCCESS;
 }
 
@@ -462,14 +464,15 @@ int default_format(void)
 {
 	unsigned ret;
 
-	dprintf("try get a clean store\n");
+	sd_dprintf("try get a clean store\n");
 	ret = rmdir_r(obj_path);
 	if (ret && ret != -ENOENT) {
-		eprintf("failed to remove %s: %s\n", obj_path, strerror(-ret));
+		sd_eprintf("failed to remove %s: %s\n",
+			obj_path, strerror(-ret));
 		return SD_RES_EIO;
 	}
 	if (mkdir(obj_path, def_dmode) < 0) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		return SD_RES_EIO;
 	}
 	if (is_object_cache_enabled())
@@ -488,7 +491,7 @@ int default_remove_object(uint64_t oid)
 		if (errno == ENOENT)
 			return SD_RES_NO_OBJ;
 
-		eprintf("failed to remove object %"PRIx64", %m\n", oid);
+		sd_eprintf("failed to remove object %"PRIx64", %m\n", oid);
 		return SD_RES_EIO;
 	}
 
@@ -516,12 +519,13 @@ int default_flush(void)
 
 	fd = open(obj_path, O_RDONLY);
 	if (fd < 0) {
-		eprintf("error at open() %s, %s\n", obj_path, strerror(errno));
+		sd_eprintf("error at open() %s, %s\n",
+			obj_path, strerror(errno));
 		return SD_RES_NO_OBJ;
 	}
 
 	if (syncfs(fd)) {
-		eprintf("error at syncfs(), %s\n", strerror(errno));
+		sd_eprintf("error at syncfs(), %s\n", strerror(errno));
 		ret = SD_RES_EIO;
 	}
 

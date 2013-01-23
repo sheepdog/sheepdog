@@ -90,7 +90,7 @@ static int put_sha1_file(char *name)
 
 	if (getxattr(name, CNAME, &count, CSIZE) < 0) {
 		if (errno == ENOENT) {
-			dprintf("sha1 file doesn't exist\n");
+			sd_dprintf("sha1 file doesn't exist\n");
 			return -1;
 		} else {
 			panic("%m\n");
@@ -100,10 +100,10 @@ static int put_sha1_file(char *name)
 	count--;
 	if (count == 0) {
 		if (unlink(name) < 0) {
-			dprintf("%m\n");
+			sd_dprintf("%m\n");
 			return -1;
 		}
-		dprintf("%s deleted\n", name);
+		sd_dprintf("%s deleted\n", name);
 	} else {
 		if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
 			panic("%m\n");
@@ -124,7 +124,7 @@ static int sha1_buffer_write(const unsigned char *sha1, void *buf, unsigned int 
 	}
 	len = xwrite(fd, buf, size);
 	if (len != size) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		close(fd);
 		return -1;
 	}
@@ -163,14 +163,14 @@ static void *map_sha1_file(const unsigned char *sha1, unsigned long *size)
 		return NULL;
 	}
 	if (fstat(fd, &st) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		close(fd);
 		return NULL;
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return NULL;
 	}
 	*size = st.st_size;
@@ -186,7 +186,7 @@ static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file
 	hdr_len = sizeof(*hdr);
 	buf = valloc(hdr->size);
 	if (!buf) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return NULL;
 	}
 
@@ -204,7 +204,7 @@ static int verify_sha1_file(const unsigned char *sha1, void *buf, unsigned long 
 	sha1_final(&c, tmp);
 
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
-		dprintf("failed, %s != %s\n", sha1_to_hex(sha1),
+		sd_dprintf("failed, %s != %s\n", sha1_to_hex(sha1),
 			sha1_to_hex(tmp));
 		return -1;
 	}

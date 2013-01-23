@@ -57,7 +57,7 @@ int snap_log_write(uint32_t epoch, unsigned char *sha1)
 
 	fd = open(buf.buf, O_WRONLY | O_APPEND);
 	if (fd < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		goto out;
 	}
 
@@ -85,11 +85,11 @@ void *snap_log_read(int *out_nr)
 
 	fd = open(buf.buf, O_RDONLY);
 	if (fd < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		goto out;
 	}
 	if (fstat(fd, &st) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		goto out_close;
 	}
 
@@ -113,7 +113,7 @@ void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 {
 	void *buffer = NULL;
 
-	dprintf("%s\n", sha1_to_hex(sha1));
+	sd_dprintf("%s\n", sha1_to_hex(sha1));
 	buffer = sha1_file_read(sha1, outhdr);
 	if (!buffer)
 		return NULL;
@@ -145,7 +145,8 @@ int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
 		goto err;
 	}
 
-	dprintf("epoch: %" PRIu32 ", sha1: %s\n", epoch, sha1_to_hex(outsha1));
+	sd_dprintf("epoch: %" PRIu32 ", sha1: %s\n", epoch,
+		sha1_to_hex(outsha1));
 err:
 	strbuf_release(&buf);
 	return ret;

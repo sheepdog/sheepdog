@@ -124,14 +124,14 @@ notrace struct caller *trace_lookup_ip(unsigned long ip, bool create)
 	}
 not_found:
 	if (get_ipinfo(ip, &info) < 0) {
-		dprintf("ip: %lx not found\n", ip);
+		sd_dprintf("ip: %lx not found\n", ip);
 		new = NULL;
 		goto out;
 	}
 	if (create) {
 		new = malloc(sizeof(*new));
 		if (!new) {
-			eprintf("out of memory\n");
+			sd_eprintf("out of memory\n");
 			goto out;
 		}
 		new->mcount = ip;
@@ -139,9 +139,9 @@ not_found:
 		new->name = info.fn_name;
 		hlist_add_head(&new->hash, head);
 		list_add(&new->list, &caller_list);
-		dprintf("add %.*s\n", info.fn_namelen, info.fn_name);
+		sd_dprintf("add %.*s\n", info.fn_namelen, info.fn_name);
 	} else {
-		dprintf("%.*s\n not found", info.fn_namelen, info.fn_name);
+		sd_dprintf("%.*s\n not found", info.fn_namelen, info.fn_name);
 		new = NULL;
 	}
 out:
@@ -187,7 +187,7 @@ static notrace void suspend_worker_threads(void)
 	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
 		if (wi->ordered &&
 		    pthread_kill(wi->worker_thread, SIGUSR2) != 0)
-			dprintf("%m\n");
+			sd_dprintf("%m\n");
 	}
 
 wait_for_worker_suspend:
@@ -247,7 +247,7 @@ static notrace void enable_tracer(int fd, int events, void *data)
 	 * expected to be waken up by epoll again.
 	 */
 	if (ret < 0) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		return;
 	}
 
@@ -259,7 +259,7 @@ static notrace void enable_tracer(int fd, int events, void *data)
 	resume_worker_threads();
 	unregister_event(trace_efd);
 	trace_in_patch = false;
-	dprintf("tracer enabled\n");
+	sd_dprintf("tracer enabled\n");
 }
 
 static notrace void disable_tracer(int fd, int events, void *data)
@@ -269,7 +269,7 @@ static notrace void disable_tracer(int fd, int events, void *data)
 
 	ret = eventfd_read(fd, &value);
 	if (ret < 0) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		return;
 	}
 
@@ -281,13 +281,13 @@ static notrace void disable_tracer(int fd, int events, void *data)
 	resume_worker_threads();
 	unregister_event(trace_efd);
 	trace_in_patch = false;
-	dprintf("tracer disabled\n");
+	sd_dprintf("tracer disabled\n");
 }
 
 notrace int trace_enable(void)
 {
 	if (trace_func == trace_call) {
-		dprintf("no tracer available\n");
+		sd_dprintf("no tracer available\n");
 		return SD_RES_NO_TAG;
 	}
 
@@ -313,7 +313,7 @@ int trace_init_signal(void)
 	act.sa_handler = suspend;
 	/* trace uses this signal to suspend the worker threads */
 	if (sigaction(SIGUSR2, &act, NULL) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 	return 0;
@@ -370,12 +370,12 @@ notrace int trace_init(void)
 	sigemptyset(&block);
 	sigaddset(&block, SIGUSR2);
 	if (pthread_sigmask(SIG_BLOCK, &block, NULL) != 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 
 	if (make_text_writable((unsigned long)mcount_call) < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		return -1;
 	}
 
@@ -388,6 +388,6 @@ notrace int trace_init(void)
 
 	trace_efd = eventfd(0, EFD_NONBLOCK);
 
-	dprintf("trace support enabled. cpu count %d.\n", nr_cpu);
+	sd_dprintf("trace support enabled. cpu count %d.\n", nr_cpu);
 	return 0;
 }

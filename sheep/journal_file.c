@@ -61,11 +61,11 @@ static int create_journal_file(const char *root, const char *name)
 	sprintf(path, "%s/%s", root, name);
 	fd = open(path, flags, 0644);
 	if (fd < 0) {
-		eprintf("open %s %m\n", name);
+		sd_eprintf("open %s %m\n", name);
 		return -1;
 	}
 	if (prealloc(fd, jfile_size) < 0) {
-		eprintf("prealloc %s %m\n", name);
+		sd_eprintf("prealloc %s %m\n", name);
 		return -1;
 	}
 
@@ -86,19 +86,19 @@ static int get_old_new_jfile(const char *p, int *old, int *new)
 		if (errno == ENOENT)
 			return 0;
 
-		eprintf("open1 %m\n");
+		sd_eprintf("open1 %m\n");
 		return -1;
 	}
 	sprintf(path, "%s/%s", p, jfile_name[1]);
 	fd2 = open(path, flags);
 	if (fd2 < 0) {
-		eprintf("open2 %m\n");
+		sd_eprintf("open2 %m\n");
 		close(fd1);
 		return -1;
 	}
 
 	if (fstat(fd1, &st1) < 0 || fstat(fd2, &st2) < 0) {
-		eprintf("stat %m\n");
+		sd_eprintf("stat %m\n");
 		goto out;
 	}
 
@@ -136,7 +136,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	void *buf;
 	char *p = (char *)jd;
 
-	dprintf("%"PRIx64", size %"PRIu64", off %"PRIu64", %d\n",
+	sd_dprintf("%"PRIx64", size %"PRIu64", off %"PRIu64", %d\n",
 		jd->oid, jd->size, jd->offset, jd->create);
 
 	if (jd->create)
@@ -144,7 +144,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	sprintf(path, "%s%016" PRIx64, obj_path, jd->oid);
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
-		eprintf("open %m\n");
+		sd_eprintf("open %m\n");
 		return -1;
 	}
 
@@ -158,7 +158,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	memcpy(buf, p, jd->size);
 	size = xpwrite(fd, buf, jd->size, jd->offset);
 	if (size != jd->size) {
-		eprintf("write %zd, size %zu, errno %m\n", size, jd->size);
+		sd_eprintf("write %zd, size %zu, errno %m\n", size, jd->size);
 		ret = -1;
 		goto out;
 	}
@@ -175,14 +175,14 @@ static int do_recover(int fd)
 	struct stat st;
 
 	if (fstat(fd, &st) < 0) {
-		eprintf("fstat %m\n");
+		sd_eprintf("fstat %m\n");
 		return -1;
 	}
 
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		return -1;
 	}
 
@@ -296,7 +296,7 @@ static void switch_journal_file(void)
 
 retry:
 	if (!uatomic_set_true(&jfile.in_commit)) {
-		eprintf("journal file in committing, "
+		sd_eprintf("journal file in committing, "
 			"you might need enlarge jfile size\n");
 		usleep(100000); /* Wait until committing is finished */
 		goto retry;
@@ -351,7 +351,7 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 	}
 	memcpy(p, &marker, JOURNAL_MARKER_SIZE);
 
-	dprintf("oid %lx, pos %zu, wsize %zu\n", oid, jfile.pos, wsize);
+	sd_dprintf("oid %lx, pos %zu, wsize %zu\n", oid, jfile.pos, wsize);
 	/*
 	 * Concurrent writes with the same FD is okay because we don't have any
 	 * critical sections that need lock inside kernel write path, since we
@@ -361,7 +361,7 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 	 */
 	written = xpwrite(jfile.fd, wbuffer, wsize, woff);
 	if (written != wsize) {
-		eprintf("failed, written %zd, len %zu\n", written, wsize);
+		sd_eprintf("failed, written %zd, len %zu\n", written, wsize);
 		ret = err_to_sderr(oid, errno);
 		goto out;
 	}

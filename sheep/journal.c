@@ -43,7 +43,7 @@ static int jrnl_open(struct jrnl_descriptor *jd, const char *path)
 	jd->fd = open(path, O_RDONLY);
 
 	if (jd->fd < 0) {
-		eprintf("failed to open %s: %m\n", jd->path);
+		sd_eprintf("failed to open %s: %m\n", jd->path);
 		if (errno == ENOENT)
 			return SD_RES_NO_OBJ;
 		else
@@ -67,7 +67,7 @@ static int jrnl_create(struct jrnl_descriptor *jd, const char *jrnl_dir)
 	jd->fd = mkostemp(jd->path, O_DSYNC);
 
 	if (jd->fd < 0) {
-		eprintf("failed to create %s: %m\n", jd->path);
+		sd_eprintf("failed to create %s: %m\n", jd->path);
 		return SD_RES_UNKNOWN;
 	}
 
@@ -80,7 +80,7 @@ static int jrnl_remove(struct jrnl_descriptor *jd)
 
 	ret = unlink(jd->path);
 	if (ret) {
-		eprintf("failed to remove %s: %m\n", jd->path);
+		sd_eprintf("failed to remove %s: %m\n", jd->path);
 		ret = SD_RES_EIO;
 	} else
 		ret = SD_RES_SUCCESS;
@@ -227,12 +227,12 @@ int jrnl_recover(const char *jrnl_dir)
 	struct dirent *d;
 	char jrnl_file_path[PATH_MAX];
 
-	eprintf("opening the directory %s\n", jrnl_dir);
+	sd_eprintf("opening the directory %s\n", jrnl_dir);
 	dir = opendir(jrnl_dir);
 	if (!dir)
 		return -1;
 
-	vprintf(SDOG_NOTICE, "starting journal recovery\n");
+	sd_printf(SDOG_NOTICE, "starting journal recovery\n");
 	while ((d = readdir(dir))) {
 		struct jrnl_descriptor jd;
 		uint32_t end_mark = 0;
@@ -245,22 +245,22 @@ int jrnl_recover(const char *jrnl_dir)
 			 jrnl_dir, d->d_name);
 		ret = jrnl_open(&jd, jrnl_file_path);
 		if (ret) {
-			eprintf("unable to open the journal file %s for reading\n",
-				jrnl_file_path);
+			sd_eprintf("unable to open the journal file %s for"
+				" reading\n", jrnl_file_path);
 			goto end_while_3;
 		}
 
 		ret = xpread(jd.fd, &jd.head, sizeof(jd.head), 0);
 		if (ret != sizeof(jd.head)) {
-			eprintf("can't read journal head\n");
+			sd_eprintf("can't read journal head\n");
 			goto end_while_2;
 		}
 
 		ret = xpread(jd.fd, &end_mark, sizeof(end_mark),
 				sizeof(jd.head) + jd.head.size);
 		if (ret != sizeof(end_mark)) {
-			eprintf("can't read journal end mark for object %s\n",
-				jd.head.target_path);
+			sd_eprintf("can't read journal end mark for object"
+				" %s\n", jd.head.target_path);
 			goto end_while_2;
 		}
 
@@ -269,13 +269,13 @@ int jrnl_recover(const char *jrnl_dir)
 
 		jd.target_fd = open(jd.head.target_path, O_DSYNC | O_RDWR);
 		if (jd.target_fd < 0) {
-			eprintf("unable to open the object file %s for recovery\n",
-				jd.head.target_path);
+			sd_eprintf("unable to open the object file %s for"
+				" recovery\n", jd.head.target_path);
 			goto end_while_2;
 		}
 		ret = jrnl_apply_to_target_object(&jd);
 		if (ret)
-			eprintf("unable to recover the object %s\n",
+			sd_eprintf("unable to recover the object %s\n",
 				jd.head.target_path);
 
 		close(jd.target_fd);
@@ -283,12 +283,12 @@ int jrnl_recover(const char *jrnl_dir)
 end_while_2:
 		jrnl_close(&jd);
 end_while_3:
-		vprintf(SDOG_INFO, "recovered the object %s from the journal\n",
-			jrnl_file_path);
+		sd_printf(SDOG_INFO, "recovered the object %s from"
+			" the journal\n", jrnl_file_path);
 		jrnl_remove(&jd);
 	}
 	closedir(dir);
-	vprintf(SDOG_NOTICE, "journal recovery complete\n");
+	sd_printf(SDOG_NOTICE, "journal recovery complete\n");
 
 	return 0;
 }

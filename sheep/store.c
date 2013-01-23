@@ -45,7 +45,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 	time_t t;
 	char path[PATH_MAX];
 
-	dprintf("update epoch: %d, %zd\n", epoch, nr_nodes);
+	sd_dprintf("update epoch: %d, %zd\n", epoch, nr_nodes);
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDWR | O_CREAT | O_DSYNC, def_fmode);
@@ -71,7 +71,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 err:
 	close(fd);
 err_open:
-	dprintf("%s\n", strerror(errno));
+	sd_dprintf("%s\n", strerror(errno));
 	return -1;
 }
 
@@ -121,7 +121,7 @@ int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
-		eprintf("failed to open epoch %"PRIu32" log\n", epoch);
+		sd_eprintf("failed to open epoch %"PRIu32" log\n", epoch);
 		return -1;
 	}
 
@@ -130,7 +130,7 @@ int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
 	close(fd);
 
 	if (len < 0) {
-		eprintf("failed to read epoch %"PRIu32" log\n", epoch);
+		sd_eprintf("failed to read epoch %"PRIu32" log\n", epoch);
 		return -1;
 	}
 	return len / sizeof(*nodes);
@@ -145,7 +145,7 @@ uint32_t get_latest_epoch(void)
 
 	dir = opendir(epoch_path);
 	if (!dir) {
-		vprintf(SDOG_EMERG, "failed to get the latest epoch: %m\n");
+		sd_printf(SDOG_EMERG, "failed to get the latest epoch: %m\n");
 		abort();
 	}
 
@@ -176,13 +176,13 @@ again:
 	ret = stat(d, &s);
 	if (ret) {
 		if (retry || errno != ENOENT) {
-			eprintf("cannot handle the directory %s: %m\n", d);
+			sd_eprintf("cannot handle the directory %s: %m\n", d);
 			return 1;
 		}
 
 		ret = mkdir(d, def_dmode);
 		if (ret) {
-			eprintf("cannot create the directory %s: %m\n", d);
+			sd_eprintf("cannot create the directory %s: %m\n", d);
 			return 1;
 		} else {
 			if (new)
@@ -193,7 +193,7 @@ again:
 	}
 
 	if (!S_ISDIR(s.st_mode)) {
-		eprintf("%s is not a directory\n", d);
+		sd_eprintf("%s is not a directory\n", d);
 		return 1;
 	}
 
@@ -213,7 +213,7 @@ static int lock_base_dir(const char *d)
 
 	fd = open(lock_path, O_WRONLY|O_CREAT, def_fmode);
 	if (fd < 0) {
-		eprintf("failed to open lock file %s (%s)\n",
+		sd_eprintf("failed to open lock file %s (%s)\n",
 			lock_path, strerror(errno));
 		ret = -1;
 		goto out;
@@ -221,9 +221,9 @@ static int lock_base_dir(const char *d)
 
 	if (lockf(fd, F_TLOCK, 1) < 0) {
 		if (errno == EACCES || errno == EAGAIN) {
-			eprintf("another sheep daemon is using %s\n", d);
+			sd_eprintf("another sheep daemon is using %s\n", d);
 		} else {
-			eprintf("unable to get base dir lock (%s)\n",
+			sd_eprintf("unable to get base dir lock (%s)\n",
 				strerror(errno));
 		}
 		ret = -1;
@@ -256,7 +256,7 @@ int init_obj_path(const char *base_path)
 	 * HEX_LEN + 3 = '/' + hex(2) + '/' + hex(38) + '\0'
 	 */
 	if (len + HEX_LEN + 3 > PATH_MAX) {
-		eprintf("insanely long object directory %s", base_path);
+		sd_eprintf("insanely long object directory %s", base_path);
 		return -1;
 	}
 
@@ -317,7 +317,7 @@ int init_store_driver(void)
 		 * If the driver name is not NUL terminated we are in deep
 		 * trouble, let's get out here.
 		 */
-		dprintf("store name not NUL terminated\n");
+		sd_dprintf("store name not NUL terminated\n");
 		return SD_RES_NO_STORE;
 	}
 
@@ -330,7 +330,7 @@ int init_store_driver(void)
 
 	sd_store = find_store_driver(driver_name);
 	if (!sd_store) {
-		dprintf("store %s not found\n", driver_name);
+		sd_dprintf("store %s not found\n", driver_name);
 		return SD_RES_NO_STORE;
 	}
 
@@ -359,7 +359,7 @@ int init_disk_space(const char *base_path)
 
 	ret = statvfs(base_path, &fs);
 	if (ret < 0) {
-		dprintf("get disk space failed %m\n");
+		sd_dprintf("get disk space failed %m\n");
 		ret = SD_RES_EIO;
 		goto out;
 	}
@@ -367,7 +367,7 @@ int init_disk_space(const char *base_path)
 	sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bfree;
 	ret = set_cluster_space(sys->disk_space);
 out:
-	dprintf("disk free space is %" PRIu64 "\n", sys->disk_space);
+	sd_dprintf("disk free space is %" PRIu64 "\n", sys->disk_space);
 	return ret;
 }
 
@@ -411,7 +411,7 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 			goto forward_write;
 
 		if (ret != 0) {
-			eprintf("write cache failed %"PRIx64" %"PRIx32"\n",
+			sd_eprintf("write cache failed %"PRIx64" %"PRIx32"\n",
 				oid, ret);
 			return ret;
 		}
@@ -431,7 +431,8 @@ forward_write:
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to write object %" PRIx64 ", %x\n", oid, ret);
+		sd_eprintf("failed to write object %" PRIx64 ", %x\n",
+			oid, ret);
 
 	return ret;
 }
@@ -451,7 +452,7 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
+		sd_eprintf("failed to read object %" PRIx64 ", %x\n", oid, ret);
 
 	untrim_zero_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
 
@@ -470,7 +471,7 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 	if (is_object_cache_enabled() && object_is_cached(oid)) {
 		ret = object_cache_read(oid, data, datalen, offset);
 		if (ret != SD_RES_SUCCESS) {
-			eprintf("try forward read %"PRIx64" %"PRIx32"\n",
+			sd_eprintf("try forward read %"PRIx64" %"PRIx32"\n",
 				oid, ret);
 			goto forward_read;
 		}
@@ -494,7 +495,8 @@ int remove_object(uint64_t oid, int copies)
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to remove object %" PRIx64 ", %x\n", oid, ret);
+		sd_eprintf("failed to remove object %" PRIx64 ", %x\n",
+			oid, ret);
 
 	return ret;
 }

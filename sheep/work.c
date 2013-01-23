@@ -190,13 +190,13 @@ int init_wqueue_eventfd(void)
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
-		eprintf("failed to create an event fd: %m\n");
+		sd_eprintf("failed to create an event fd: %m\n");
 		return 1;
 	}
 
 	ret = register_event(efd, bs_thread_request_done, NULL);
 	if (ret) {
-		eprintf("failed to register event fd %m\n");
+		sd_eprintf("failed to register event fd %m\n");
 		close(efd);
 		return 1;
 	}
@@ -232,7 +232,7 @@ struct work_queue *init_work_queue(const char *name, bool ordered)
 		ret = pthread_create(&wi->worker_thread, NULL, worker_routine,
 				     wi);
 		if (ret) {
-			eprintf("failed to create worker thread: %s\n",
+			sd_eprintf("failed to create worker thread: %s\n",
 				strerror(ret));
 			goto destroy_threads;
 		}
@@ -249,7 +249,7 @@ destroy_threads:
 	wi->q.wq_state |= WQ_DEAD;
 	pthread_mutex_unlock(&wi->startup_lock);
 	pthread_join(wi->worker_thread, NULL);
-	eprintf("stopped worker thread\n");
+	sd_eprintf("stopped worker thread\n");
 
 /* destroy_cond_mutex: */
 	pthread_cond_destroy(&wi->pending_cond);

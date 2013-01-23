@@ -40,19 +40,19 @@ static int write_config(void)
 
 	fd = open(config_path, O_DSYNC | O_WRONLY | O_CREAT, def_fmode);
 	if (fd < 0) {
-		eprintf("failed to open config file, %m\n");
+		sd_eprintf("failed to open config file, %m\n");
 		return SD_RES_EIO;
 	}
 
 	jd = jrnl_begin(&config, sizeof(config), 0, config_path, jrnl_path);
 	if (!jd) {
-		eprintf("failed to write config data to journal, %m\n");
+		sd_eprintf("failed to write config data to journal, %m\n");
 		ret = SD_RES_EIO;
 		goto out;
 	}
 	ret = xwrite(fd, &config, sizeof(config));
 	if (ret != sizeof(config)) {
-		eprintf("failed to write config data, %m\n");
+		sd_eprintf("failed to write config data, %m\n");
 		ret = SD_RES_EIO;
 	} else
 		ret = SD_RES_SUCCESS;
@@ -74,7 +74,7 @@ int init_config_path(const char *base_path)
 	fd = open(config_path, O_RDONLY);
 	if (fd < 0) {
 		if (errno != ENOENT) {
-			eprintf("failed to read config file, %m\n");
+			sd_eprintf("failed to read config file, %m\n");
 			return -1;
 		}
 		goto create;
@@ -86,13 +86,13 @@ int init_config_path(const char *base_path)
 		goto create;
 	}
 	if (ret < 0) {
-		eprintf("failed to read config file, %m\n");
+		sd_eprintf("failed to read config file, %m\n");
 		goto out;
 	}
 
 	if (config.version != SD_FORMAT_VERSION) {
-		eprintf("This sheep version is not compatible with the existing "
-			"data layout, %d\n", config.version);
+		sd_eprintf("This sheep version is not compatible with"
+			" the existing data layout, %d\n", config.version);
 		if (sys->upgrade) {
 			/* upgrade sheep store */
 			ret = sd_migrate_store(config.version, SD_FORMAT_VERSION);
@@ -100,8 +100,8 @@ int init_config_path(const char *base_path)
 				/* reload config file */
 				ret = xpread(fd, &config, sizeof(config), 0);
 				if (ret != sizeof(config)) {
-					eprintf("failed to reload config file,"
-						" %m\n");
+					sd_eprintf("failed to reload config"
+						" file, %m\n");
 					ret = -1;
 				} else
 					ret = 0;
@@ -109,7 +109,7 @@ int init_config_path(const char *base_path)
 			goto out;
 		}
 
-		eprintf("use '-u' option to upgrade sheep store\n");
+		sd_eprintf("use '-u' option to upgrade sheep store\n");
 		ret = -1;
 		goto out;
 	}

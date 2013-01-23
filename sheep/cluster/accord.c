@@ -111,7 +111,7 @@ again:
 	if (rc == ACRD_SUCCESS)
 		return;
 	else if (rc == ACRD_ERR_EXIST) {
-		dprintf("retry\n");
+		sd_dprintf("retry\n");
 		usleep(10000); /* FIXME: use acrd notification */
 		goto again;
 	} else
@@ -457,12 +457,12 @@ static void acrd_handler(int listen_fd, int events, void *data)
 	enum cluster_join_result res;
 
 	if (events & EPOLLHUP) {
-		eprintf("accord driver received EPOLLHUP event, exiting.\n");
+		sd_eprintf("accord driver received EPOLLHUP event, exiting.\n");
 		log_close();
 		exit(1);
 	}
 
-	dprintf("read event\n");
+	sd_dprintf("read event\n");
 
 	ret = eventfd_read(efd, &value);
 	if (ret < 0)
@@ -487,7 +487,7 @@ static void acrd_handler(int listen_fd, int events, void *data)
 		acrd_queue_push_back(ahandle, &ev);
 
 		if (res == CJ_RES_MASTER_TRANSFER) {
-			eprintf("failed to join sheepdog cluster: "
+			sd_eprintf("failed to join sheepdog cluster: "
 				"please retry when master is up\n");
 			exit(1);
 		}
@@ -526,8 +526,8 @@ static int accord_init(const char *option)
 	int ret;
 
 	if (!option) {
-		eprintf("specify one of the accord servers.\n");
-		eprintf("e.g. sheep /store -c accord:127.0.0.1\n");
+		sd_eprintf("specify one of the accord servers.\n");
+		sd_eprintf("e.g. sheep /store -c accord:127.0.0.1\n");
 		return -1;
 	}
 
@@ -535,19 +535,19 @@ static int accord_init(const char *option)
 
 	ahandle = acrd_init(option, 9090, acrd_join_fn, acrd_leave_fn, NULL);
 	if (!ahandle) {
-		eprintf("failed to connect to accrd server %s\n", option);
+		sd_eprintf("failed to connect to accrd server %s\n", option);
 		return -1;
 	}
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
-		eprintf("failed to create an event fd: %m\n");
+		sd_eprintf("failed to create an event fd: %m\n");
 		return -1;
 	}
 
 	acrd_wq = init_work_queue("accord", true);
 	if (!acrd_wq) {
-		eprintf("failed to create accord workqueue: %m\n");
+		sd_eprintf("failed to create accord workqueue: %m\n");
 		return -1;
 	}
 
@@ -568,7 +568,8 @@ static int accord_init(const char *option)
 
 	ret = register_event(efd, acrd_handler, NULL);
 	if (ret) {
-		eprintf("failed to register accord event handler (%d)\n", ret);
+		sd_eprintf("failed to register accord event handler (%d)\n",
+			ret);
 		return -1;
 	}
 

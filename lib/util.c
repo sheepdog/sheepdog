@@ -256,7 +256,7 @@ int rmdir_r(char *dir_path)
 	dir = opendir(dir_path);
 	if (!dir) {
 		if (errno != ENOENT)
-			eprintf("failed to open %s: %m\n", dir_path);
+			sd_eprintf("failed to open %s: %m\n", dir_path);
 		return -errno;
 	}
 
@@ -267,7 +267,7 @@ int rmdir_r(char *dir_path)
 		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
 		ret = stat(path, &s);
 		if (ret) {
-			eprintf("failed to stat %s: %m\n", path);
+			sd_eprintf("failed to stat %s: %m\n", path);
 			goto out;
 		}
 		if (S_ISDIR(s.st_mode))
@@ -276,7 +276,7 @@ int rmdir_r(char *dir_path)
 			ret = unlink(path);
 
 		if (ret != 0) {
-			eprintf("failed to remove %s %s: %m\n",
+			sd_eprintf("failed to remove %s %s: %m\n",
 					S_ISDIR(s.st_mode) ? "directory" : "file",
 					path);
 			goto out;

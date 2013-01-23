@@ -115,7 +115,7 @@ int objlist_cache_insert(uint64_t oid)
 	entry = zalloc(sizeof(*entry));
 
 	if (!entry) {
-		eprintf("no memory to allocate cache entry.\n");
+		sd_eprintf("no memory to allocate cache entry.\n");
 		return -1;
 	}
 
@@ -163,7 +163,7 @@ int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *d
 out:
 	if (hdr->data_length < obj_list_cache.cache_size * sizeof(uint64_t)) {
 		pthread_rwlock_unlock(&obj_list_cache.lock);
-		eprintf("GET_OBJ_LIST buffer too small\n");
+		sd_eprintf("GET_OBJ_LIST buffer too small\n");
 		return SD_RES_BUFFER_SMALL;
 	}
 
@@ -187,8 +187,8 @@ static void objlist_deletion_work(struct work *work)
 	 * again, in which case we should not reclaim the cached entry.
 	 */
 	if (vdi_exist(vid)) {
-		eprintf("VDI (%" PRIx32 ") is still in use, can not be deleted\n",
-			vid);
+		sd_eprintf("VDI (%" PRIx32 ") is still in use, can not be"
+			" deleted\n", vid);
 		return;
 	}
 
@@ -197,7 +197,7 @@ static void objlist_deletion_work(struct work *work)
 		entry_vid = oid_to_vid(entry->oid);
 		if (entry_vid != vid)
 			continue;
-		dprintf("delete object entry %" PRIx64 "\n", entry->oid);
+		sd_dprintf("delete object entry %" PRIx64 "\n", entry->oid);
 		list_del(&entry->list);
 		rb_erase(&entry->node, &obj_list_cache.root);
 		free(entry);

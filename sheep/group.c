@@ -95,7 +95,7 @@ bool have_enough_zones(void)
 
 	max_copies = get_max_copy_number();
 
-	dprintf("flags %d, nr_zones %d, min copies %d\n",
+	sd_dprintf("flags %d, nr_zones %d, min copies %d\n",
 		sys->flags, current_vnode_info->nr_zones, max_copies);
 
 	if (!current_vnode_info->nr_zones)
@@ -240,7 +240,7 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 
 	msg = zalloc(size);
 	if (!msg) {
-		eprintf("failed to allocate memory\n");
+		sd_eprintf("failed to allocate memory\n");
 		return NULL;
 	}
 
@@ -262,7 +262,7 @@ static void cluster_op_done(struct work *work)
 
 	cluster_op_running = false;
 
-	dprintf("%s (%p)\n", op_name(req->op), req);
+	sd_dprintf("%s (%p)\n", op_name(req->op), req);
 
 	msg = prepare_cluster_msg(req, &size);
 	if (!msg)
@@ -312,7 +312,7 @@ bool sd_block_handler(const struct sd_node *sender)
  */
 void queue_cluster_request(struct request *req)
 {
-	eprintf("%s (%p)\n", op_name(req->op), req);
+	sd_eprintf("%s (%p)\n", op_name(req->op), req);
 
 	if (has_process_work(req->op)) {
 		list_add_tail(&req->pending_list, &sys->pending_block_list);
@@ -466,32 +466,32 @@ static int cluster_sanity_check(struct join_message *jm)
 	uint8_t local_nr_copies;
 
 	if (get_cluster_copies(&local_nr_copies)) {
-		eprintf("failed to get nr_copies\n");
+		sd_eprintf("failed to get nr_copies\n");
 		return CJ_RES_FAIL;
 	}
 
 	if (jm->ctime != local_ctime) {
-		eprintf("joining node ctime doesn't match: %"
+		sd_eprintf("joining node ctime doesn't match: %"
 			PRIu64 " vs %" PRIu64 "\n",
 			jm->ctime, local_ctime);
 		return CJ_RES_FAIL;
 	}
 
 	if (jm->epoch > local_epoch) {
-		eprintf("joining node epoch too large: %"
+		sd_eprintf("joining node epoch too large: %"
 			PRIu32 " vs %" PRIu32 "\n",
 			jm->epoch, local_epoch);
 		return CJ_RES_FAIL;
 	}
 
 	if (jm->nr_copies != local_nr_copies) {
-		eprintf("joining node nr_copies doesn't match: %u vs %u\n",
+		sd_eprintf("joining node nr_copies doesn't match: %u vs %u\n",
 			jm->nr_copies, local_nr_copies);
 		return CJ_RES_FAIL;
 	}
 
 	if (jm->cluster_flags != sys->flags) {
-		eprintf("joining node cluster_flags don't match: %u vs %u\n",
+		sd_eprintf("joining node cluster_flags don't match: %u vs %u\n",
 			jm->cluster_flags, sys->flags);
 		return CJ_RES_FAIL;
 	}
@@ -513,7 +513,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 	ret = cluster_sanity_check(jm);
 	if (ret != CJ_RES_SUCCESS)  {
 		if (jm->epoch > sys->epoch) {
-			eprintf("transfer mastership (%d, %d)\n",
+			sd_eprintf("transfer mastership (%d, %d)\n",
 				jm->epoch, sys->epoch);
 			return CJ_RES_MASTER_TRANSFER;
 		}
@@ -526,7 +526,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 		return CJ_RES_FAIL;
 
 	if (jm->epoch < local_epoch) {
-		eprintf("joining node epoch too small: %"
+		sd_eprintf("joining node epoch too small: %"
 			PRIu32 " vs %" PRIu32 "\n",
 			jm->epoch, local_epoch);
 
@@ -537,7 +537,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 	}
 
 	if (jm->nr_nodes != nr_local_entries) {
-		eprintf("epoch log entries do not match: %d vs %d\n",
+		sd_eprintf("epoch log entries do not match: %d vs %d\n",
 			jm->nr_nodes, nr_local_entries);
 		return CJ_RES_FAIL;
 	}
@@ -545,7 +545,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 
 	if (memcmp(jm->nodes, local_entries,
 		   sizeof(jm->nodes[0]) * jm->nr_nodes) != 0) {
-		eprintf("epoch log entries does not match\n");
+		sd_eprintf("epoch log entries does not match\n");
 		return CJ_RES_FAIL;
 	}
 
@@ -617,7 +617,7 @@ static int get_vdis_from(struct sd_node *node)
 	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
 	vc = zalloc(rlen);
 	if (!vc) {
-		vprintf(SDOG_ERR, "unable to allocate memory\n");
+		sd_printf(SDOG_ERR, "unable to allocate memory\n");
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
@@ -752,14 +752,14 @@ static void get_vdis(const struct sd_node *nodes, size_t nr_nodes)
 
 void wait_get_vdis_done(void)
 {
-	dprintf("waiting for vdi list\n");
+	sd_dprintf("waiting for vdi list\n");
 
 	pthread_mutex_lock(&wait_vdis_lock);
 	while (!is_vdi_list_ready)
 		pthread_cond_wait(&wait_vdis_cond, &wait_vdis_lock);
 	pthread_mutex_unlock(&wait_vdis_lock);
 
-	dprintf("vdi list ready\n");
+	sd_dprintf("vdi list ready\n");
 }
 
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
@@ -783,7 +783,7 @@ void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
 	for (i = 0; i < nr_nodes; i++) {
 		factor = (float)nodes[i].space / (float)avg_size;
 		nodes[i].nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
-		dprintf("node %d has %d vnodes, free space %" PRIu64 "\n",
+		sd_dprintf("node %d has %d vnodes, free space %" PRIu64 "\n",
 			nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
 	}
 }
@@ -795,8 +795,8 @@ static void update_cluster_info(const struct join_message *msg,
 {
 	struct vnode_info *old_vnode_info;
 
-	eprintf("status = %d, epoch = %d, finished: %d\n", msg->cluster_status,
-		msg->epoch, sys->join_finished);
+	sd_eprintf("status = %d, epoch = %d, finished: %d\n",
+		msg->cluster_status, msg->epoch, sys->join_finished);
 
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
@@ -866,7 +866,7 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
 	int ret = msg->rsp.result;
 	struct request *req = NULL;
 
-	dprintf("op %s, size: %zd, from: %s\n",
+	sd_dprintf("op %s, size: %zd, from: %s\n",
 		op_name(op), data_len, node_to_str(sender));
 
 	if (node_is_local(sender)) {
@@ -901,7 +901,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 	int ret;
 
 	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
-		eprintf("%s: invalid protocol version: %d\n", __func__,
+		sd_eprintf("%s: invalid protocol version: %d\n", __func__,
 			jm->proto_ver);
 		return CJ_RES_FAIL;
 	}
@@ -916,7 +916,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		 * becomes the master without sending JOIN.
 		 */
 
-		vprintf(SDOG_DEBUG, "%s\n", node_to_str(&sys->this_node));
+		sd_printf(SDOG_DEBUG, "%s\n", node_to_str(&sys->this_node));
 
 		jm->cluster_status = sys->status;
 
@@ -925,7 +925,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 			return CJ_RES_SUCCESS;
 
 		if (sys->status != SD_STATUS_WAIT_FOR_JOIN) {
-			eprintf("unexpected cluster status 0x%x\n",
+			sd_eprintf("unexpected cluster status 0x%x\n",
 				sys->status);
 			return CJ_RES_FAIL;
 		}
@@ -965,11 +965,11 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		ret = cluster_running_check(jm);
 		break;
 	default:
-		eprintf("invalid system status: 0x%x\n", sys->status);
+		sd_eprintf("invalid system status: 0x%x\n", sys->status);
 		abort();
 	}
 
-	eprintf("%s: ret = 0x%x, cluster_status = 0x%x\n",
+	sd_eprintf("%s: ret = 0x%x, cluster_status = 0x%x\n",
 		addr_to_str(str, sizeof(str), joining->nid.addr, joining->nid.port),
 		ret, jm->cluster_status);
 
@@ -1011,7 +1011,7 @@ static int send_join_request(struct sd_node *ent)
 
 	ret = sys->cdrv->join(ent, msg, get_join_message_size(msg));
 
-	vprintf(SDOG_INFO, "%s\n", node_to_str(&sys->this_node));
+	sd_printf(SDOG_INFO, "%s\n", node_to_str(&sys->this_node));
 
 	free(msg);
 
@@ -1030,7 +1030,7 @@ void sd_join_handler(const struct sd_node *joined,
 
 	if (node_eq(joined, &sys->this_node)) {
 		if (result == CJ_RES_FAIL) {
-			eprintf("Failed to join, exiting.\n");
+			sd_eprintf("Failed to join, exiting.\n");
 			sys->cdrv->leave();
 			exit(1);
 		}
@@ -1041,9 +1041,9 @@ void sd_join_handler(const struct sd_node *joined,
 		add_delayed_node(le, joined);
 		/*FALLTHRU*/
 	case CJ_RES_SUCCESS:
-		dprintf("join %s\n", node_to_str(joined));
+		sd_dprintf("join %s\n", node_to_str(joined));
 		for (i = 0; i < nr_members; i++)
-			dprintf("[%x] %s\n", i, node_to_str(members + i));
+			sd_dprintf("[%x] %s\n", i, node_to_str(members + i));
 
 		if (sys->status == SD_STATUS_SHUTDOWN)
 			break;
@@ -1052,7 +1052,7 @@ void sd_join_handler(const struct sd_node *joined,
 
 		if (node_eq(joined, &sys->this_node))
 			/* this output is used for testing */
-			vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
+			sd_printf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;
 	case CJ_RES_FAIL:
 		if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
@@ -1066,7 +1066,7 @@ void sd_join_handler(const struct sd_node *joined,
 		nr_failed = get_nodes_nr_from(&sys->failed_nodes);
 		nr_delayed_nodes = get_nodes_nr_from(&sys->delayed_nodes);
 
-		dprintf("%d == %d + %d\n", nr_local, nr, nr_failed);
+		sd_dprintf("%d == %d + %d\n", nr_local, nr, nr_failed);
 		if (nr_local == nr + nr_failed - nr_delayed_nodes) {
 			sys->status = SD_STATUS_OK;
 			log_current_epoch();
@@ -1091,7 +1091,7 @@ void sd_join_handler(const struct sd_node *joined,
 		nr_failed = get_nodes_nr_from(&sys->failed_nodes);
 		nr_delayed_nodes = get_nodes_nr_from(&sys->delayed_nodes);
 
-		dprintf("%d == %d + %d\n", nr_local, nr, nr_failed);
+		sd_dprintf("%d == %d + %d\n", nr_local, nr, nr_failed);
 		if (nr_local == nr + nr_failed - nr_delayed_nodes) {
 			sys->status = SD_STATUS_OK;
 			log_current_epoch();
@@ -1099,7 +1099,7 @@ void sd_join_handler(const struct sd_node *joined,
 
 		if (node_eq(joined, &sys->this_node))
 			/* this output is used for testing */
-			vprintf(SDOG_DEBUG, "join Sheepdog cluster\n");
+			sd_printf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;
 	}
 }
@@ -1110,9 +1110,9 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	struct vnode_info *old_vnode_info;
 	int i;
 
-	dprintf("leave %s\n", node_to_str(left));
+	sd_dprintf("leave %s\n", node_to_str(left));
 	for (i = 0; i < nr_members; i++)
-		dprintf("[%x] %s\n", i, node_to_str(members + i));
+		sd_dprintf("[%x] %s\n", i, node_to_str(members + i));
 
 	if (sys->status == SD_STATUS_SHUTDOWN)
 		return;
@@ -1147,11 +1147,11 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	if (!sys->cdrv) {
 		sys->cdrv = find_cdrv("corosync");
 		if (sys->cdrv)
-			dprintf("use corosync cluster driver as default\n");
+			sd_dprintf("use corosync cluster driver as default\n");
 		else {
 			/* corosync cluster driver is not compiled */
 			sys->cdrv = find_cdrv("local");
-			dprintf("use local cluster driver as default\n");
+			sd_dprintf("use local cluster driver as default\n");
 		}
 	}
 
@@ -1176,7 +1176,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		sys->this_node.zone = b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24;
 	} else
 		sys->this_node.zone = zone;
-	dprintf("zone id = %u\n", sys->this_node.zone);
+	sd_dprintf("zone id = %u\n", sys->this_node.zone);
 
 	sys->this_node.space = sys->disk_space;
 

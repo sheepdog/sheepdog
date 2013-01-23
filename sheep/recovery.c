@@ -82,7 +82,7 @@ static int recover_object_from_replica(uint64_t oid,
 	rlen = get_objsize(oid);
 	buf = valloc(rlen);
 	if (!buf) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		goto out;
 	}
 
@@ -103,7 +103,7 @@ static int recover_object_from_replica(uint64_t oid,
 	ret = sd_store->create_and_write(oid, &iocb);
 out:
 	if (ret == SD_RES_SUCCESS) {
-		dprintf("recovered oid %"PRIx64" from %d to epoch %d\n", oid,
+		sd_dprintf("recovered oid %"PRIx64" from %d to epoch %d\n", oid,
 			tgt_epoch, epoch);
 		objlist_cache_insert(oid);
 	}
@@ -139,7 +139,7 @@ static int do_recover_object(struct recovery_work *rw)
 	old = grab_vnode_info(rw->old_vinfo);
 
 again:
-	dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n",
+	sd_dprintf("try recover object %"PRIx64" from epoch %"PRIu32"\n",
 		oid, tgt_epoch);
 
 	/* Let's do a breadth-first search */
@@ -171,7 +171,7 @@ again:
 rollback:
 		tgt_epoch--;
 		if (tgt_epoch < 1) {
-			eprintf("can not recover oid %"PRIx64"\n", oid);
+			sd_eprintf("can not recover oid %"PRIx64"\n", oid);
 			ret = -1;
 			goto err;
 		}
@@ -197,17 +197,17 @@ static void recover_object_work(struct work *work)
 	uint64_t oid = rw->oids[rw->done];
 	int ret;
 
-	eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n",
+	sd_eprintf("done:%"PRIu32" count:%"PRIu32", oid:%"PRIx64"\n",
 		rw->done, rw->count, oid);
 
 	if (sd_store->exist(oid)) {
-		dprintf("the object is already recovered\n");
+		sd_dprintf("the object is already recovered\n");
 		return;
 	}
 
 	ret = do_recover_object(rw);
 	if (ret < 0)
-		eprintf("failed to recover object %"PRIx64"\n", oid);
+		sd_eprintf("failed to recover object %"PRIx64"\n", oid);
 }
 
 bool node_in_recovery(void)
@@ -236,8 +236,8 @@ static inline void prepare_schedule_oid(uint64_t oid)
 	 */
 	for (i = 0; i < rw->done; i++)
 		if (rw->oids[i] == oid) {
-			dprintf("%"PRIx64" not recovered, don't schedule it\n",
-				oid);
+			sd_dprintf("%"PRIx64" not recovered, don't"
+				" schedule it\n", oid);
 			return;
 		}
 	/* When auto recovery is enabled, the oid is currently being
@@ -250,7 +250,7 @@ static inline void prepare_schedule_oid(uint64_t oid)
 	rw->prio_oids[rw->nr_prio_oids - 1] = oid;
 	resume_suspended_recovery();
 
-	dprintf("%"PRIx64" nr_prio_oids %d\n", oid, rw->nr_prio_oids);
+	sd_dprintf("%"PRIx64" nr_prio_oids %d\n", oid, rw->nr_prio_oids);
 }
 
 bool oid_in_recovery(uint64_t oid)
@@ -262,7 +262,7 @@ bool oid_in_recovery(uint64_t oid)
 		return false;
 
 	if (sd_store->exist(oid)) {
-		dprintf("the object %" PRIx64 " is already recoverd\n", oid);
+		sd_dprintf("the object %" PRIx64 " is already recoverd\n", oid);
 		return false;
 	}
 
@@ -287,7 +287,7 @@ bool oid_in_recovery(uint64_t oid)
 	 * in the list
 	 */
 	if (i == rw->count) {
-		eprintf("%"PRIx64" is not in the recovery list\n", oid);
+		sd_eprintf("%"PRIx64" is not in the recovery list\n", oid);
 		return false;
 	}
 
@@ -311,7 +311,7 @@ static inline void run_next_rw(struct recovery_work *rw)
 	recovering_work = rw;
 	flush_wait_obj_requests();
 	queue_work(sys->recovery_wqueue, &rw->work);
-	dprintf("recovery work is superseded\n");
+	sd_dprintf("recovery work is superseded\n");
 }
 
 static void notify_recovery_completion_work(struct work *work)
@@ -328,7 +328,7 @@ static void notify_recovery_completion_work(struct work *work)
 
 	ret = exec_local_req(&hdr, &sys->this_node);
 	if (ret != SD_RES_SUCCESS)
-		eprintf("failed to notify recovery completion, %d\n",
+		sd_eprintf("failed to notify recovery completion, %d\n",
 			rw->epoch);
 }
 
@@ -352,7 +352,7 @@ static inline void finish_recovery(struct recovery_work *rw)
 	rw->work.done = notify_recovery_completion_main;
 	queue_work(sys->recovery_wqueue, &rw->work);
 
-	dprintf("recovery complete: new epoch %"PRIu32"\n",
+	sd_dprintf("recovery complete: new epoch %"PRIu32"\n",
 		sys->recovered_epoch);
 }
 
@@ -395,7 +395,7 @@ static inline void finish_schedule_oids(struct recovery_work *rw)
 		new_oids[new_idx++] = rw->oids[i];
 	}
 	/* rw->count should eq new_idx, otherwise something is wrong */
-	dprintf("%snr_recovered %d, nr_prio_oids %d, count %d = new %d\n",
+	sd_dprintf("%snr_recovered %d, nr_prio_oids %d, count %d = new %d\n",
 		rw->count == new_idx ? "" : "WARN: ", nr_recovered,
 		rw->nr_prio_oids, rw->count, new_idx);
 
@@ -431,7 +431,7 @@ static void recover_next_object(struct recovery_work *rw)
 		finish_schedule_oids(rw);
 
 	if (sys->disable_recovery && !has_scheduled_objects(rw)) {
-		dprintf("suspended\n");
+		sd_dprintf("suspended\n");
 		rw->suspended = true;
 		/* suspend until resume_suspended_recovery() is called */
 		return;
@@ -465,7 +465,7 @@ static void recover_object_main(struct work *work)
 		 * requests
 		 */
 		flush_wait_obj_requests();
-		dprintf("recovery is stopped\n");
+		sd_dprintf("recovery is stopped\n");
 		return;
 	}
 
@@ -517,7 +517,7 @@ static uint64_t *fetch_object_list(struct sd_node *e, uint32_t epoch,
 	int ret;
 
 	addr_to_str(name, sizeof(name), e->nid.addr, 0);
-	dprintf("%s %"PRIu32"\n", name, e->nid.port);
+	sd_dprintf("%s %"PRIu32"\n", name, e->nid.port);
 
 retry:
 	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_OBJ_LIST);
@@ -538,7 +538,7 @@ retry:
 	}
 
 	*nr_oids = rsp->data_length / sizeof(uint64_t);
-	dprintf("%zu\n", *nr_oids);
+	sd_dprintf("%zu\n", *nr_oids);
 	return buf;
 }
 
@@ -554,8 +554,8 @@ static void screen_object_list(struct recovery_work *rw,
 	for (i = 0; i < nr_oids; i++) {
 		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
 		if (!nr_objs) {
-			eprintf("ERROR: can not find copy number for object %"
-				PRIx64 "\n", oids[i]);
+			sd_eprintf("ERROR: can not find copy number for object"
+				" %" PRIx64 "\n", oids[i]);
 			continue;
 		}
 		oid_to_vnodes(rw->cur_vinfo->vnodes, rw->cur_vinfo->nr_vnodes,
@@ -598,7 +598,7 @@ static void prepare_object_list(struct work *work)
 	int start = random() % cur_nr, i, end = cur_nr;
 	uint64_t *oids;
 
-	dprintf("%u\n", rw->epoch);
+	sd_dprintf("%u\n", rw->epoch);
 	wait_get_vdis_done();
 again:
 	/* We need to start at random node for better load balance */
@@ -607,7 +607,7 @@ again:
 		struct sd_node *node = cur + i;
 
 		if (next_rw) {
-			dprintf("go to the next recovery\n");
+			sd_dprintf("go to the next recovery\n");
 			return;
 		}
 		if (newly_joined(node, rw))
@@ -627,7 +627,7 @@ again:
 		goto again;
 	}
 
-	dprintf("%d\n", rw->count);
+	sd_dprintf("%d\n", rw->count);
 }
 
 static inline bool node_is_gateway_only(void)
@@ -644,7 +644,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 
 	rw = zalloc(sizeof(struct recovery_work));
 	if (!rw) {
-		eprintf("%m\n");
+		sd_eprintf("%m\n");
 		return -1;
 	}
 
@@ -669,7 +669,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 		/* skip the previous epoch recovery */
 		if (next_rw)
 			free_recovery_work(next_rw);
-		dprintf("recovery skipped\n");
+		sd_dprintf("recovery skipped\n");
 		next_rw = rw;
 
 		/* This is necesary to invoke run_next_rw when

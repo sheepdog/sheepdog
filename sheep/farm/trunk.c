@@ -41,12 +41,12 @@ static int fill_entry_new_sha1(struct trunk_entry *entry)
 	strbuf_reset(&buf);
 
 	if (fd < 0) {
-		dprintf("%m\n");
+		sd_dprintf("%m\n");
 		ret = -1;
 		goto out;
 	}
 	if (!strbuf_read(&buf, fd, SD_DATA_OBJ_SIZE) == SD_DATA_OBJ_SIZE) {
-		dprintf("strbuf_read fail to read full\n");
+		sd_dprintf("strbuf_read fail to read full\n");
 		ret = -1;
 		goto out_close;
 	}
@@ -57,7 +57,7 @@ static int fill_entry_new_sha1(struct trunk_entry *entry)
 		ret = -1;
 		goto out_close;
 	}
-	dprintf("data sha1:%s, %"PRIx64"\n", sha1_to_hex(entry->sha1),
+	sd_dprintf("data sha1:%s, %"PRIx64"\n", sha1_to_hex(entry->sha1),
 		entry->oid);
 out_close:
 	close(fd);
@@ -120,7 +120,7 @@ int trunk_file_write(unsigned char *outsha1)
 		ret = -1;
 		goto out;
 	}
-	dprintf("trunk sha1: %s\n", sha1_to_hex(outsha1));
+	sd_dprintf("trunk sha1: %s\n", sha1_to_hex(outsha1));
 out:
 	closedir(dir);
 	strbuf_release(&buf);
@@ -131,7 +131,7 @@ void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 {
 	void *buffer;
 
-	dprintf("%s\n", sha1_to_hex(sha1));
+	sd_dprintf("%s\n", sha1_to_hex(sha1));
 	buffer = sha1_file_read(sha1, outhdr);
 	if (!buffer)
 		return NULL;

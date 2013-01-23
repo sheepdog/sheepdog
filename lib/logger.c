@@ -315,13 +315,13 @@ static notrace void log_flush(void)
 static notrace void crash_handler(int signo)
 {
 	if (signo == SIGSEGV) {
-		vprintf(SDOG_ERR, "logger pid %d segfaulted.\n",
+		sd_printf(SDOG_ERR, "logger pid %d segfaulted.\n",
 			getpid());
 	} else if (signo == SIGHUP) {
-		vprintf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n",
+		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n",
 			sheep_pid);
 	} else {
-		vprintf(SDOG_ERR, "logger pid %d got unexpected signal %d.\n",
+		sd_printf(SDOG_ERR, "logger pid %d got unexpected signal %d.\n",
 			getpid(), signo);
 	}
 
