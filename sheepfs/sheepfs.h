@@ -20,10 +20,10 @@ enum sheepfs_opcode {
 #define COMMAND_LEN  512
 
 extern char sheepfs_shadow[];
-int sheepfs_page_cache;
-int sheepfs_object_cache;
+extern int sheepfs_page_cache;
+extern int sheepfs_object_cache;
 extern char sdhost[];
-int sdport;
+extern int sdport;
 
 struct strbuf *sheepfs_run_cmd(const char *command);
 int sheepfs_set_op(const char *path, unsigned opcode);

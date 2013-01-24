@@ -40,8 +40,9 @@ struct trunk_entry {
 };
 
 /* farm.c */
-char farm_dir[PATH_MAX];
-char farm_obj_dir[PATH_MAX];
+extern char farm_dir[PATH_MAX];
+extern char farm_obj_dir[PATH_MAX];
+
 /* sha1_file.c */
 char *sha1_to_path(const unsigned char *sha1);
 int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
