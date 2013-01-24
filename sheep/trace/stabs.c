@@ -28,10 +28,10 @@ struct stab {
 	uint32_t value;		/* value of symbol */
 };
 
-extern const struct stab __STAB_BEGIN__[];
-extern const struct stab __STAB_END__[];
-extern const char __STABSTR_BEGIN__[];
-extern const char __STABSTR_END__[];
+const struct stab __STAB_BEGIN__[];
+const struct stab __STAB_END__[];
+const char __STABSTR_BEGIN__[];
+const char __STABSTR_END__[];
 
 /*
    stab_bsearch(stabs, region_left, region_right, type, addr)

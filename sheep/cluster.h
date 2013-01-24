@@ -114,7 +114,7 @@ struct cluster_driver {
 	struct list_head list;
 };
 
-extern struct list_head cluster_drivers;
+struct list_head cluster_drivers;
 
 #define cdrv_register(driver)						\
 static void __attribute__((constructor)) regist_ ## driver(void) {	\

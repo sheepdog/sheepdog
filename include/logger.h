@@ -20,14 +20,14 @@
 #define LOG_SPACE_SIZE (32 * 1024 * 1024)
 #define MAX_MSG_SIZE 256
 
-extern int log_init(const char *progname, int size, bool to_stdout, int level,
+int log_init(const char *progname, int size, bool to_stdout, int level,
 		    char *outfile);
-extern void log_close(void);
-extern void dump_logmsg(void *);
-extern void log_write(int prio, const char *func, int line, const char *fmt, ...)
+void log_close(void);
+void dump_logmsg(void *);
+void log_write(int prio, const char *func, int line, const char *fmt, ...)
 	__attribute__ ((format (printf, 4, 5)));
-extern void set_thread_name(const char *name, int idx);
-extern void get_thread_name(char *name);
+void set_thread_name(const char *name, int idx);
+void get_thread_name(char *name);
 
 /*
 + * sheep log priorities, comliant with syslog spec

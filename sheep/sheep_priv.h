@@ -186,7 +186,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
 			  void *arg);
 int err_to_sderr(uint64_t oid, int err);
 
-extern struct list_head store_drivers;
+struct list_head store_drivers;
 #define add_store_driver(driver)                                 \
 static void __attribute__((constructor)) add_ ## driver(void) {  \
 	list_add(&driver.list, &store_drivers);                  \
@@ -203,13 +203,13 @@ static inline struct store_driver *find_store_driver(const char *name)
 	return NULL;
 }
 
-extern struct cluster_info *sys;
-extern struct store_driver *sd_store;
-extern char *obj_path;
-extern char *jrnl_path;
-extern char *epoch_path;
-extern mode_t def_fmode;
-extern mode_t def_dmode;
+struct cluster_info *sys;
+struct store_driver *sd_store;
+char *obj_path;
+char *jrnl_path;
+char *epoch_path;
+mode_t def_fmode;
+mode_t def_dmode;
 
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)
@@ -275,7 +275,7 @@ void queue_cluster_request(struct request *req);
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 int log_current_epoch(void);
 
-extern char *config_path;
+char *config_path;
 int set_cluster_copies(uint8_t copies);
 int get_cluster_copies(uint8_t *copies);
 int set_cluster_flags(uint16_t flags);

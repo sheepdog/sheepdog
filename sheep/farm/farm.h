@@ -40,28 +40,28 @@ struct trunk_entry {
 };
 
 /* farm.c */
-extern char farm_dir[PATH_MAX];
-extern char farm_obj_dir[PATH_MAX];
+char farm_dir[PATH_MAX];
+char farm_obj_dir[PATH_MAX];
 /* sha1_file.c */
-extern char *sha1_to_path(const unsigned char *sha1);
-extern int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
-extern void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *);
-extern char *sha1_to_hex(const unsigned char *sha1);
-extern int get_sha1_hex(const char *hex, unsigned char *sha1);
-extern int sha1_file_try_delete(const unsigned char *sha1);
+char *sha1_to_path(const unsigned char *sha1);
+int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
+void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *);
+char *sha1_to_hex(const unsigned char *sha1);
+int get_sha1_hex(const char *hex, unsigned char *sha1);
+int sha1_file_try_delete(const unsigned char *sha1);
 
 /* trunk.c */
-extern int trunk_init(void);
-extern int trunk_file_write(unsigned char *outsha1);
-extern void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
+int trunk_init(void);
+int trunk_file_write(unsigned char *outsha1);
+void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
 
 /* snap.c */
-extern int snap_init(void);
-extern void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
-extern int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
+int snap_init(void);
+void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
+int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
 		unsigned char *trunksha1, unsigned char *outsha1);
-extern int snap_log_truncate(void);
-extern void *snap_log_read(int *);
-extern int snap_log_write(uint32_t epoch, unsigned char *sha1);
+int snap_log_truncate(void);
+void *snap_log_read(int *);
+int snap_log_write(uint32_t epoch, unsigned char *sha1);
 
 #endif

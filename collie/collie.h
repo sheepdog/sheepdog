@@ -48,16 +48,16 @@ struct subcommand {
 };
 void subcommand_usage(char *cmd, char *subcmd, int status);
 
-extern const char *sdhost;
-extern int sdport;
-extern bool highlight;
-extern bool raw_output;
+const char *sdhost;
+int sdport;
+bool highlight;
+bool raw_output;
 
-extern uint32_t sd_epoch;
-extern struct sd_node sd_nodes[SD_MAX_NODES];
-extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
-extern int sd_nodes_nr, sd_vnodes_nr;
-extern unsigned master_idx;
+uint32_t sd_epoch;
+struct sd_node sd_nodes[SD_MAX_NODES];
+struct sd_vnode sd_vnodes[SD_MAX_VNODES];
+int sd_nodes_nr, sd_vnodes_nr;
+unsigned master_idx;
 
 bool is_current(const struct sheepdog_inode *i);
 char *size_to_str(uint64_t _size, char *str, int str_size);
@@ -75,12 +75,12 @@ int send_light_req(struct sd_req *hdr, const char *host, int port);
 int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
 int collie_exec_req(int sockfd, struct sd_req *hdr, void *data);
 
-extern struct command vdi_command;
-extern struct command node_command;
-extern struct command cluster_command;
+struct command vdi_command;
+struct command node_command;
+struct command cluster_command;
 
 #ifdef ENABLE_TRACE
-  extern struct command debug_command;
+  struct command debug_command;
 #else
   #define debug_command {}
 #endif /* ENABLE_TRACE */

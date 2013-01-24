@@ -70,19 +70,19 @@ static inline void *zalloc(size_t size)
 }
 
 typedef void (*try_to_free_t)(size_t);
-extern try_to_free_t set_try_to_free_routine(try_to_free_t);
+try_to_free_t set_try_to_free_routine(try_to_free_t);
 
-extern void *xmalloc(size_t size);
-extern void *xzalloc(size_t size);
-extern void *xrealloc(void *ptr, size_t size);
-extern void *xcalloc(size_t nmemb, size_t size);
-extern ssize_t xread(int fd, void *buf, size_t len);
-extern ssize_t xwrite(int fd, const void *buf, size_t len);
-extern ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
-extern ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
-extern void pstrcpy(char *buf, int buf_size, const char *str);
-extern int rmdir_r(char *dir_path);
-extern bool is_numeric(const char *p);
+void *xmalloc(size_t size);
+void *xzalloc(size_t size);
+void *xrealloc(void *ptr, size_t size);
+void *xcalloc(size_t nmemb, size_t size);
+ssize_t xread(int fd, void *buf, size_t len);
+ssize_t xwrite(int fd, const void *buf, size_t len);
+ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
+ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
+void pstrcpy(char *buf, int buf_size, const char *str);
+int rmdir_r(char *dir_path);
+bool is_numeric(const char *p);
 
 void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
 void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,

@@ -36,29 +36,29 @@ typedef void (*trace_func_graph_ent_t)(struct trace_graph_item *);
 /* graph.c */
 
 /* stabs.c */
-extern int get_ipinfo(unsigned long ip, struct ipinfo *info);
+int get_ipinfo(unsigned long ip, struct ipinfo *info);
 
 /* mcount.S */
-extern void mcount(void);
-extern void mcount_call(void);
-extern void trace_caller(void);
-extern void trace_call(unsigned long, unsigned long *);
+void mcount(void);
+void mcount_call(void);
+void trace_caller(void);
+void trace_call(unsigned long, unsigned long *);
 extern const unsigned char NOP5[];
-extern void trace_return_caller(void);
-extern unsigned long trace_return_call(void);
+void trace_return_caller(void);
+unsigned long trace_return_call(void);
 
 /* trace.c */
 #ifdef ENABLE_TRACE
-  extern int trace_init_signal(void);
-  extern int trace_init(void);
-  extern int register_trace_function(trace_func_t func);
-  extern int trace_enable(void);
-  extern int trace_disable(void);
-  extern struct caller *trace_lookup_ip(unsigned long ip, bool create);
-  extern int trace_buffer_pop(void *buf, uint32_t len);
-  extern void trace_buffer_push(int cpuid, struct trace_graph_item *item);
-  extern void short_thread_begin(void);
-  extern void short_thread_end(void);
+  int trace_init_signal(void);
+  int trace_init(void);
+  int register_trace_function(trace_func_t func);
+  int trace_enable(void);
+  int trace_disable(void);
+  struct caller *trace_lookup_ip(unsigned long ip, bool create);
+  int trace_buffer_pop(void *buf, uint32_t len);
+  void trace_buffer_push(int cpuid, struct trace_graph_item *item);
+  void short_thread_begin(void);
+  void short_thread_end(void);
 #else
   static inline int trace_init_signal(void) { return 0; }
   static inline int trace_init(void) { return 0; }

@@ -20,18 +20,18 @@ enum sheepfs_opcode {
 #define COMMAND_LEN  512
 
 extern char sheepfs_shadow[];
-extern int sheepfs_page_cache;
-extern int sheepfs_object_cache;
+int sheepfs_page_cache;
+int sheepfs_object_cache;
 extern char sdhost[];
-extern int sdport;
+int sdport;
 
-extern struct strbuf *sheepfs_run_cmd(const char *command);
-extern int sheepfs_set_op(const char *path, unsigned opcode);
+struct strbuf *sheepfs_run_cmd(const char *command);
+int sheepfs_set_op(const char *path, unsigned opcode);
 
 typedef void (*printf_fn)(const char *func, int line, const char *, ...)
 __attribute__ ((format (__printf__, 3, 4)));
 
-extern printf_fn fs_printf;
+printf_fn fs_printf;
 
 #define sheepfs_pr(fmt, args...)			\
 ({							\
@@ -39,61 +39,61 @@ extern printf_fn fs_printf;
 })
 
 /* shadow_file.c */
-extern size_t shadow_file_write(const char *path, char *buf, size_t size);
-extern int shadow_file_read(const char *, char *buf, size_t size, off_t);
-extern int shadow_dir_create(const char *path);
-extern int shadow_file_create(const char *path);
-extern int shadow_file_setxattr(const char *path, const char *name,
+size_t shadow_file_write(const char *path, char *buf, size_t size);
+int shadow_file_read(const char *, char *buf, size_t size, off_t);
+int shadow_dir_create(const char *path);
+int shadow_file_create(const char *path);
+int shadow_file_setxattr(const char *path, const char *name,
 				const void *value, size_t size);
-extern int shadow_file_getxattr(const char *path, const char *name,
+int shadow_file_getxattr(const char *path, const char *name,
 				void *value, size_t size);
-extern int shadow_file_delete(const char *path);
-extern bool shadow_file_exsit(const char *path);
+int shadow_file_delete(const char *path);
+bool shadow_file_exsit(const char *path);
 
 /* volume.c */
-extern int create_volume_layout(void);
-extern int volume_read(const char *path, char *buf, size_t size, off_t offset);
-extern int volume_write(const char *, const char *buf, size_t size, off_t);
-extern size_t volume_get_size(const char *);
-extern int volume_create_entry(const char *entry);
-extern int volume_remove_entry(const char *entry);
-extern int volume_sync(const char *path);
-extern int volume_open(const char *path, struct fuse_file_info *);
-extern int reset_socket_pool(void);
+int create_volume_layout(void);
+int volume_read(const char *path, char *buf, size_t size, off_t offset);
+int volume_write(const char *, const char *buf, size_t size, off_t);
+size_t volume_get_size(const char *);
+int volume_create_entry(const char *entry);
+int volume_remove_entry(const char *entry);
+int volume_sync(const char *path);
+int volume_open(const char *path, struct fuse_file_info *);
+int reset_socket_pool(void);
 
 /* cluster.c */
-extern int cluster_info_read(const char *path, char *buf, size_t size, off_t);
-extern size_t cluster_info_get_size(const char *path);
-extern int create_cluster_layout(void);
+int cluster_info_read(const char *path, char *buf, size_t size, off_t);
+size_t cluster_info_get_size(const char *path);
+int create_cluster_layout(void);
 
 /* vdi.c */
-extern int create_vdi_layout(void);
-extern int vdi_list_read(const char *path, char *buf, size_t size, off_t);
-extern size_t vdi_list_get_size(const char *path);
+int create_vdi_layout(void);
+int vdi_list_read(const char *path, char *buf, size_t size, off_t);
+size_t vdi_list_get_size(const char *path);
 
-extern int vdi_mount_write(const char *, const char *buf, size_t size, off_t);
-extern int vdi_unmount_write(const char *, const char *buf, size_t, off_t);
+int vdi_mount_write(const char *, const char *buf, size_t size, off_t);
+int vdi_unmount_write(const char *, const char *buf, size_t, off_t);
 
 /* node.c */
-extern int node_list_read(const char *path, char *buf, size_t size, off_t);
-extern size_t node_list_get_size(const char *path);
-extern int node_info_read(const char *path, char *buf, size_t size, off_t);
-extern size_t node_info_get_size(const char *path);
-extern int create_node_layout(void);
+int node_list_read(const char *path, char *buf, size_t size, off_t);
+size_t node_list_get_size(const char *path);
+int node_info_read(const char *path, char *buf, size_t size, off_t);
+size_t node_info_get_size(const char *path);
+int create_node_layout(void);
 
 /* config.c */
-extern int create_config_layout(void);
+int create_config_layout(void);
 
-extern int config_pcache_read(const char *path, char *buf, size_t size, off_t);
-extern int config_pcache_write(const char *path, const char *, size_t, off_t);
-extern size_t config_pcache_get_size(const char *path);
+int config_pcache_read(const char *path, char *buf, size_t size, off_t);
+int config_pcache_write(const char *path, const char *, size_t, off_t);
+size_t config_pcache_get_size(const char *path);
 
-extern int config_ocache_read(const char *path, char *buf, size_t size, off_t);
-extern int config_ocache_write(const char *path, const char *, size_t, off_t);
-extern size_t config_ocache_get_size(const char *path);
+int config_ocache_read(const char *path, char *buf, size_t size, off_t);
+int config_ocache_write(const char *path, const char *, size_t, off_t);
+size_t config_ocache_get_size(const char *path);
 
-extern int config_sheep_info_read(const char *path, char *, size_t size, off_t);
-extern int config_sheep_info_write(const char *, const char *, size_t, off_t);
-extern size_t config_sheep_info_get_size(const char *path);
+int config_sheep_info_read(const char *path, char *, size_t size, off_t);
+int config_sheep_info_write(const char *, const char *, size_t, off_t);
+size_t config_sheep_info_get_size(const char *path);
 
 #endif
