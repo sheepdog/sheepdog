@@ -22,6 +22,7 @@
 #include <sys/file.h>
 #include <dirent.h>
 #include <urcu/uatomic.h>
+#include <sys/eventfd.h>
 
 #include "sheep_priv.h"
 #include "util.h"
@@ -48,29 +49,32 @@
 #define CACHE_OBJECT_SIZE (SD_DATA_OBJ_SIZE / 1024 / 1024) /* M */
 
 struct global_cache {
-	uint32_t capacity;
-	uatomic_bool in_reclaim;
+	uint32_t capacity; /* The real capacity of object cache of this node */
+	uatomic_bool in_reclaim; /* If the relcaimer is working */
 };
 
 struct object_cache_entry {
-	uint32_t idx;
-	int refcnt;
-	uint64_t bmap; /* each bit represents one dirty block in object */
-	struct object_cache *oc;
-	struct rb_node node;
-	struct list_head dirty_list;
-	struct list_head lru_list;
+	uint32_t idx; /* Index of this entry */
+	int refcnt; /* Reference count of this entry */
+	uint64_t bmap; /* Each bit represents one dirty block in object */
+	struct object_cache *oc; /* Object cache this entry belongs to */
+	struct rb_node node; /* For lru tree of object cache */
+	struct list_head dirty_list; /* For dirty list of object cache */
+	struct list_head lru_list; /* For lru list of object cache */
+
+	pthread_rwlock_t lock; /* Entry lock */
 };
 
 struct object_cache {
-	uint32_t vid;
-	struct hlist_node hash;
-
-	struct rb_root lru_tree;
+	uint32_t vid; /* The VID of this VDI */
+	uint32_t push_count; /* How many push threads queued in push phase. */
+	struct hlist_node hash; /* VDI is linked to the global hash lists */
+	struct rb_root lru_tree; /* For faster object search */
 	struct list_head lru_head; /* Per VDI LRU list for reclaimer */
-	struct list_head dirty_head;
+	struct list_head dirty_head; /* Dirty objects linked to this list */
+	int push_efd; /* Used to synchronize between pusher and push threads */
 
-	pthread_rwlock_t lock;
+	pthread_rwlock_t lock; /* Cache lock */
 };
 
 static struct global_cache gcache;
@@ -172,6 +176,21 @@ static inline void unlock_cache(struct object_cache *oc)
 	pthread_rwlock_unlock(&oc->lock);
 }
 
+static inline void read_lock_entry(struct object_cache_entry *entry)
+{
+	pthread_rwlock_rdlock(&entry->lock);
+}
+
+static inline void write_lock_entry(struct object_cache_entry *entry)
+{
+	pthread_rwlock_wrlock(&entry->lock);
+}
+
+static inline void unlock_entry(struct object_cache_entry *entry)
+{
+	pthread_rwlock_unlock(&entry->lock);
+}
+
 static struct object_cache_entry *
 lru_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 {
@@ -228,6 +247,7 @@ free_cache_entry(struct object_cache_entry *entry)
 	list_del_init(&entry->lru_list);
 	if (!list_empty(&entry->dirty_list))
 		list_del_init(&entry->dirty_list);
+	pthread_rwlock_destroy(&entry->lock);
 	free(entry);
 }
 
@@ -352,9 +372,13 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 	struct sd_req hdr;
 	int ret;
 
+	write_lock_entry(entry);
+
 	ret = write_cache_object_noupdate(vid, idx, buf, count, offset);
-	if (ret != SD_RES_SUCCESS)
+	if (ret != SD_RES_SUCCESS) {
+		unlock_entry(entry);
 		return ret;
+	}
 	write_lock_cache(oc);
 	if (writeback) {
 		entry->bmap |= calc_object_bmap(count, offset);
@@ -363,6 +387,8 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 	}
 	list_move_tail(&entry->lru_list, &oc->lru_head);
 	unlock_cache(oc);
+
+	unlock_entry(entry);
 
 	if (writeback)
 		goto out;
@@ -571,6 +597,7 @@ not_found:
 		cache->vid = vid;
 		cache->lru_tree = RB_ROOT;
 		create_dir_for(vid);
+		cache->push_efd = eventfd(0, 0);
 
 		INIT_LIST_HEAD(&cache->dirty_head);
 		INIT_LIST_HEAD(&cache->lru_head);
@@ -791,26 +818,80 @@ err:
 	return ret;
 }
 
-/* Push back all the dirty objects to sheep cluster storage */
+struct push_work {
+	struct work work;
+	struct object_cache_entry *entry;
+};
+
+static void do_push_object(struct work *work)
+{
+	struct push_work *pw = container_of(work, struct push_work, work);
+	struct object_cache_entry *entry = pw->entry;
+	struct object_cache *oc = entry->oc;
+	uint64_t oid = idx_to_oid(oc->vid, entry_idx(entry));
+
+	sd_dprintf("%"PRIx64"\n", oid);
+
+	read_lock_entry(entry);
+	if (push_cache_object(oc->vid, entry_idx(entry), entry->bmap,
+			      !!(entry->idx & CACHE_CREATE_BIT))
+	    != SD_RES_SUCCESS)
+		panic("push failed but should never fail\n");
+	if (uatomic_sub_return(&oc->push_count, 1) == 0)
+		eventfd_write(oc->push_efd, 1);
+	entry->idx &= ~CACHE_CREATE_BIT;
+	entry->bmap = 0;
+	unlock_entry(entry);
+
+	sd_dprintf("%"PRIx64" done\n", oid);
+	put_cache_entry(entry);
+}
+
+static void push_object_done(struct work *work)
+{
+	struct push_work *pw = container_of(work, struct push_work, work);
+	free(pw);
+}
+
+/*
+ * Push back all the dirty objects before the FLUSH request to sheep replicated
+ * storage synchronously.
+ *
+ * 1. Don't grab cache lock tight so we can serve RW requests while pushing.
+ *    It is okay for allow subsequent RW after FLUSH because we only need to
+ *    garantee the dirty objects before FLUSH to be pushed.
+ * 2. Use threaded AIO to boost push performance, such as fsync(2) from VM.
+ */
 static int object_cache_push(struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
-
-	int ret = SD_RES_SUCCESS;
+	eventfd_t value;
 
 	write_lock_cache(oc);
+	if (list_empty(&oc->dirty_head)) {
+		unlock_cache(oc);
+		return SD_RES_SUCCESS;
+	}
 	list_for_each_entry_safe(entry, t, &oc->dirty_head, dirty_list) {
-		ret = push_cache_object(oc->vid, entry_idx(entry), entry->bmap,
-					!!(entry->idx & CACHE_CREATE_BIT));
-		if (ret != SD_RES_SUCCESS)
-			goto push_failed;
-		entry->idx &= ~CACHE_CREATE_BIT;
-		entry->bmap = 0;
+		struct push_work *pw;
+
+		get_cache_entry(entry);
+		uatomic_inc(&oc->push_count);
+		pw = xzalloc(sizeof(struct push_work));
+		pw->work.fn = do_push_object;
+		pw->work.done = push_object_done;
+		pw->entry = entry;
+		queue_work(sys->oc_push_wqueue, &pw->work);
 		list_del_init(&entry->dirty_list);
 	}
-push_failed:
 	unlock_cache(oc);
-	return ret;
+reread:
+	if (eventfd_read(oc->push_efd, &value) < 0) {
+		sd_eprintf("eventfd read failed, %m\n");
+		goto reread;
+	}
+	sd_dprintf("%"PRIx32" completed\n", oc->vid);
+	return SD_RES_SUCCESS;
 }
 
 bool object_is_cached(uint64_t oid)
@@ -849,6 +930,7 @@ void object_cache_delete(uint32_t vid)
 	}
 	unlock_cache(cache);
 	pthread_rwlock_destroy(&cache->lock);
+	close(cache->push_efd);
 	free(cache);
 
 	/* Then we free disk */
