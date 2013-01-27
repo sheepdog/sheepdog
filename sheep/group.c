@@ -238,12 +238,7 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 
 	assert(size <= SD_MAX_EVENT_BUF_SIZE);
 
-	msg = zalloc(size);
-	if (!msg) {
-		sd_eprintf("failed to allocate memory\n");
-		return NULL;
-	}
-
+	msg = xzalloc(size);
 	memcpy(&msg->req, &req->rq, sizeof(struct sd_req));
 	memcpy(&msg->rsp, &req->rp, sizeof(struct sd_rsp));
 
@@ -265,9 +260,6 @@ static void cluster_op_done(struct work *work)
 	sd_dprintf("%s (%p)\n", op_name(req->op), req);
 
 	msg = prepare_cluster_msg(req, &size);
-	if (!msg)
-		panic();
-
 	sys->cdrv->unblock(msg, size);
 
 	free(msg);
@@ -322,9 +314,6 @@ void queue_cluster_request(struct request *req)
 		size_t size;
 
 		msg = prepare_cluster_msg(req, &size);
-		if (!msg)
-			return;
-
 		list_add_tail(&req->pending_list, &sys->pending_notify_list);
 
 		msg->rsp.result = SD_RES_SUCCESS;
@@ -615,13 +604,7 @@ static int get_vdis_from(struct sd_node *node)
 		goto out;
 
 	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
-	vc = zalloc(rlen);
-	if (!vc) {
-		sd_printf(SDOG_ERR, "unable to allocate memory\n");
-		ret = SD_RES_NO_MEM;
-		goto out;
-	}
-
+	vc = xzalloc(rlen);
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
 	hdr.data_length = rlen;
 	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc);

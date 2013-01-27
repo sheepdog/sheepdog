@@ -166,12 +166,7 @@ int vdi_exist(uint32_t vid)
 	int ret = 1;
 	int nr_copies;
 
-	inode = zalloc(sizeof(*inode));
-	if (!inode) {
-		ret = 0;
-		goto out;
-	}
-
+	inode = xzalloc(sizeof(*inode));
 	nr_copies = get_vdi_copy_number(vid);
 
 	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
@@ -203,27 +198,12 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
 	const char *name = iocb->name;
 
-	new = zalloc(sizeof(*new));
-	if (!new) {
-		sd_eprintf("failed to allocate memory\n");
-		goto out;
-	}
+	new = xzalloc(sizeof(*new));
+	if (iocb->base_vid)
+		base = xzalloc(sizeof(*base));
 
-	if (iocb->base_vid) {
-		base = zalloc(sizeof(*base));
-		if (!base) {
-			sd_eprintf("failed to allocate memory\n");
-			goto out;
-		}
-	}
-
-	if (iocb->create_snapshot && cur_vid != iocb->base_vid) {
-		cur = zalloc(SD_INODE_HEADER_SIZE);
-		if (!cur) {
-			sd_eprintf("failed to allocate memory\n");
-			goto out;
-		}
-	}
+	if (iocb->create_snapshot && cur_vid != iocb->base_vid)
+		cur = xzalloc(SD_INODE_HEADER_SIZE);
 
 	if (iocb->base_vid) {
 		ret = read_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
@@ -576,12 +556,7 @@ static int delete_inode(struct deletion_work *dw)
 	struct sheepdog_inode *inode = NULL;
 	int ret = SD_RES_SUCCESS;
 
-	inode = zalloc(sizeof(*inode));
-	if (!inode) {
-		sd_eprintf("no memory to allocate inode.\n");
-		goto out;
-	}
-
+	inode = xzalloc(sizeof(*inode));
 	ret = read_object(vid_to_vdi_oid(dw->vid), (char *)inode,
 			  SD_INODE_HEADER_SIZE, 0, dw->nr_copies);
 	if (ret != SD_RES_SUCCESS) {
@@ -808,15 +783,9 @@ static int start_deletion(struct request *req, uint32_t vid)
 	bool cloned;
 	uint32_t root_vid;
 
-	dw = zalloc(sizeof(struct deletion_work));
-	if (!dw)
-		goto err;
-
+	dw = xzalloc(sizeof(struct deletion_work));
 	/* buf is to store vdi id of every object */
-	dw->buf = zalloc(SD_INODE_SIZE - SD_INODE_HEADER_SIZE);
-	if (!dw->buf)
-		goto err;
-
+	dw->buf = xzalloc(SD_INODE_SIZE - SD_INODE_HEADER_SIZE);
 	dw->count = 0;
 	dw->vid = vid;
 	dw->req = req;

@@ -296,12 +296,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 	int i, fd, ret, cb_ret;
 	char *buf;
 
-	buf = zalloc(size);
-	if (!buf) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		return;
-	}
-
+	buf = xzalloc(size);
 	for (i = 0; i < sd_nodes_nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -647,13 +642,7 @@ static int vdi_clone(int argc, char **argv)
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
-	buf = zalloc(SD_DATA_OBJ_SIZE);
-	if (!buf) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		ret = EXIT_SYSFAIL;
-		goto out;
-	}
-
+	buf = xzalloc(SD_DATA_OBJ_SIZE);
 	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
 
 	for (idx = 0; idx < max_idx; idx++) {

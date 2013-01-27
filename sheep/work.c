@@ -209,10 +209,7 @@ struct work_queue *init_work_queue(const char *name, bool ordered)
 	int ret;
 	struct worker_info *wi;
 
-	wi = zalloc(sizeof(*wi));
-	if (!wi)
-		return NULL;
-
+	wi = xzalloc(sizeof(*wi));
 	wi->name = name;
 	wi->ordered = ordered;
 

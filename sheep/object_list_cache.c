@@ -112,13 +112,7 @@ int objlist_cache_insert(uint64_t oid)
 {
 	struct objlist_cache_entry *entry, *p;
 
-	entry = zalloc(sizeof(*entry));
-
-	if (!entry) {
-		sd_eprintf("no memory to allocate cache entry.\n");
-		return -1;
-	}
-
+	entry = xzalloc(sizeof(*entry));
 	entry->oid = oid;
 	rb_init_node(&entry->node);
 

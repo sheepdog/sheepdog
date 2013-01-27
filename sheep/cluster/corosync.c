@@ -492,10 +492,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		/* fall through */
 	case COROSYNC_MSG_TYPE_BLOCK:
 	case COROSYNC_MSG_TYPE_NOTIFY:
-		cevent = zalloc(sizeof(*cevent));
-		if (!cevent)
-			panic("failed to allocate memory\n");
-
+		cevent = xzalloc(sizeof(*cevent));
 		if (cmsg->type == COROSYNC_MSG_TYPE_BLOCK)
 			cevent->type = COROSYNC_EVENT_TYPE_BLOCK;
 		else
@@ -504,9 +501,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		cevent->sender = cmsg->sender;
 		cevent->msg_len = cmsg->msg_len;
 		if (cmsg->msg_len) {
-			cevent->msg = zalloc(cmsg->msg_len);
-			if (!cevent->msg)
-				panic("failed to allocate memory\n");
+			cevent->msg = xzalloc(cmsg->msg_len);
 			memcpy(cevent->msg, cmsg->msg, cmsg->msg_len);
 		} else
 			cevent->msg = NULL;
@@ -514,9 +509,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		queue_event(cevent);
 		break;
 	case COROSYNC_MSG_TYPE_LEAVE:
-		cevent = zalloc(sizeof(*cevent));
-		if (!cevent)
-			panic("failed to allocate memory\n");
+		cevent = xzalloc(sizeof(*cevent));
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
 
 		master = is_master(&cmsg->sender);
@@ -628,10 +621,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 			free(cevent);
 		}
 
-		cevent = zalloc(sizeof(*cevent));
-		if (!cevent)
-			panic("failed to allocate memory\n");
-
+		cevent = xzalloc(sizeof(*cevent));
 		master = is_master(&left_sheep[i]);
 		if (master >= 0)
 		/* Master is down before new nodes finish joining.
@@ -647,10 +637,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 
 	/* dispatch join_handler */
 	for (i = 0; i < joined_list_entries; i++) {
-		cevent = zalloc(sizeof(*cevent));
-		if (!cevent)
-			panic("failed to allocate memory\n");
-
+		cevent = xzalloc(sizeof(*cevent));
 		cevent->type = COROSYNC_EVENT_TYPE_JOIN_REQUEST;
 		cevent->sender = joined_sheep[i];
 		queue_event(cevent);

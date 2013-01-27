@@ -98,10 +98,7 @@ int register_event(int fd, event_handler_t h, void *data)
 	struct epoll_event ev;
 	struct event_info *ei;
 
-	ei = zalloc(sizeof(*ei));
-	if (!ei)
-		return -ENOMEM;
-
+	ei = xzalloc(sizeof(*ei));
 	ei->fd = fd;
 	ei->handler = h;
 	ei->data = data;

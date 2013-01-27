@@ -57,12 +57,7 @@ static int update_node_list(int max_nodes, uint32_t epoch)
 		return -1;
 
 	size = sizeof(*ent) * max_nodes;
-	buf = zalloc(size);
-	if (!buf) {
-		ret = -1;
-		goto out;
-	}
-
+	buf = xzalloc(size);
 	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_NODE_LIST);
 	hdr.request_ver = epoch;
 
