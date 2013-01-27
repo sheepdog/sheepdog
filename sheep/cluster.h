@@ -180,7 +180,7 @@ static inline char *node_to_str(const struct sd_node *id)
 static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
 {
 	int port;
-	char v[8], ip[256];
+	char v[8], ip[MAX_NODE_STR_LEN];
 
 	sscanf(str, "%s ip:%s port:%d", v, ip, &port);
 	id->nid.port = port;

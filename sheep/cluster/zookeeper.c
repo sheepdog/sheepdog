@@ -244,7 +244,7 @@ static int32_t queue_pos;
 static bool zk_queue_peek(void)
 {
 	int rc;
-	char path[256];
+	char path[MAX_NODE_STR_LEN];
 
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
@@ -259,7 +259,7 @@ static void zk_queue_push(struct zk_event *ev)
 {
 	static bool first_push = true;
 	int len;
-	char path[256], buf[256];
+	char path[MAX_NODE_STR_LEN], buf[MAX_NODE_STR_LEN];
 
 	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
 	snprintf(path, sizeof(path), "%s/", QUEUE_ZNODE);
@@ -285,7 +285,7 @@ static inline void *zk_event_sd_nodes(struct zk_event *ev)
 /* Change the join event in place and piggyback the nodes information. */
 static void push_join_response(struct zk_event *ev)
 {
-	char path[256];
+	char path[MAX_NODE_STR_LEN];
 	int len;
 
 	ev->type = EVENT_JOIN_RESPONSE;
@@ -304,7 +304,7 @@ static void push_join_response(struct zk_event *ev)
 static void zk_queue_pop_advance(struct zk_event *ev)
 {
 	int len;
-	char path[256];
+	char path[MAX_NODE_STR_LEN];
 
 	len = sizeof(*ev);
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
@@ -434,7 +434,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		       void *ctx)
 {
 	struct zk_node znode;
-	char str[256], *p;
+	char str[MAX_NODE_STR_LEN], *p;
 	int ret;
 
 /* CREATED_EVENT 1, DELETED_EVENT 2, CHANGED_EVENT 3, CHILD_EVENT 4 */
@@ -490,7 +490,7 @@ static int zk_join(const struct sd_node *myself,
 		   void *opaque, size_t opaque_len)
 {
 	int rc;
-	char path[256];
+	char path[MAX_NODE_STR_LEN];
 
 	this_node.node = *myself;
 
@@ -555,7 +555,7 @@ static void watch_all_nodes(void)
 {
 	struct String_vector strs;
 	struct zk_node znode;
-	char path[256];
+	char path[MAX_NODE_STR_LEN];
 	int len = sizeof(znode);
 
 	if (zk_member_empty())
@@ -585,7 +585,7 @@ static void init_node_list(struct zk_event *ev)
 
 static void zk_handle_join_response(struct zk_event *ev)
 {
-	char path[256];
+	char path[MAX_NODE_STR_LEN];
 
 	sd_dprintf("JOIN RESPONSE\n");
 	if (node_eq(&ev->sender.node, &this_node.node))

@@ -880,7 +880,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 					  void *opaque)
 {
 	struct join_message *jm = opaque;
-	char str[256];
+	char str[MAX_NODE_STR_LEN];
 	int ret;
 
 	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
