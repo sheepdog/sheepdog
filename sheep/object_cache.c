@@ -572,7 +572,7 @@ void object_cache_try_to_reclaim(int delay)
 	rw->delay = delay;
 	rw->work.fn = do_reclaim;
 	rw->work.done = reclaim_done;
-	queue_work(sys->reclaim_wqueue, &rw->work);
+	queue_work(sys->oc_reclaim_wqueue, &rw->work);
 }
 
 static inline struct object_cache_entry *

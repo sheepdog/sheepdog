@@ -374,8 +374,9 @@ static int init_work_queues(void)
 	sys->block_wqueue = init_work_queue("block", true);
 	sys->sockfd_wqueue = init_work_queue("sockfd", true);
 	if (is_object_cache_enabled()) {
-		sys->reclaim_wqueue = init_work_queue("reclaim", true);
-		if (!sys->reclaim_wqueue)
+		sys->oc_reclaim_wqueue = init_work_queue("oc_reclaim", true);
+		sys->oc_push_wqueue = init_work_queue("oc_push", false);
+		if (!sys->oc_reclaim_wqueue || !sys->oc_push_wqueue)
 			return -1;
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||

@@ -113,7 +113,8 @@ struct cluster_info {
 	struct work_queue *recovery_notify_wqueue;
 	struct work_queue *block_wqueue;
 	struct work_queue *sockfd_wqueue;
-	struct work_queue *reclaim_wqueue;
+	struct work_queue *oc_reclaim_wqueue;
+	struct work_queue *oc_push_wqueue;
 
 #define CACHE_TYPE_OBJECT 0x1
 #define CACHE_TYPE_DISK   0x2
