@@ -380,12 +380,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 	if (is_vdi_obj(oid) && (offset + data_length) > SD_INODE_SIZE)
 		data_length = SD_INODE_SIZE - offset;
 
-	buf = valloc(data_length);
-	if (buf == NULL) {
-		sd_eprintf("failed to allocate memory\n");
-		goto out;
-	}
-
+	buf = xvalloc(data_length);
 	ret = read_cache_object_noupdate(vid, idx, buf, data_length, offset);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
@@ -728,10 +723,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 	uint32_t data_length = get_objsize(oid);
 	void *buf;
 
-	buf = valloc(data_length);
-	if (!buf)
-		panic("%m\n");
-
+	buf = xvalloc(data_length);
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
 	hdr.data_length = data_length;
 	hdr.obj.oid = oid;

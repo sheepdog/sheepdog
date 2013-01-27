@@ -338,9 +338,7 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 	jfile.pos += wsize;
 	pthread_spin_unlock(&jfile_lock);
 
-	p = wbuffer = valloc(wsize);
-	if (!wbuffer)
-		panic("%m\n");
+	p = wbuffer = xvalloc(wsize);
 	memcpy(p, &jd, JOURNAL_DESC_SIZE);
 	p += JOURNAL_DESC_SIZE;
 	memcpy(p, buf, size);

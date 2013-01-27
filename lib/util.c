@@ -49,7 +49,7 @@ void *xmalloc(size_t size)
 		if (!ret && !size)
 			ret = malloc(1);
 		if (!ret)
-			panic("Out of memory");
+			panic("Out of memory\n");
 	}
 	return ret;
 }
@@ -70,7 +70,7 @@ notrace void *xrealloc(void *ptr, size_t size)
 		if (!ret && !size)
 			ret = realloc(ptr, 1);
 		if (!ret)
-			panic("Out of memory");
+			panic("Out of memory\n");
 	}
 	return ret;
 }
@@ -86,8 +86,16 @@ void *xcalloc(size_t nmemb, size_t size)
 		if (!ret && (!nmemb || !size))
 			ret = calloc(1, 1);
 		if (!ret)
-			panic("Out of memory");
+			panic("Out of memory\n");
 	}
+	return ret;
+}
+
+void *xvalloc(size_t size)
+{
+	void *ret = valloc(size);
+	if (!ret)
+		panic("Out of memory\n");
 	return ret;
 }
 

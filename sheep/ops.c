@@ -853,11 +853,7 @@ int peer_create_and_write_obj(struct request *req)
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		sd_dprintf("%" PRIx64 ", %" PRIx64 "\n", oid, hdr->obj.cow_oid);
 
-		buf = valloc(SD_DATA_OBJ_SIZE);
-		if (!buf) {
-			sd_eprintf("can not allocate memory\n");
-			goto out;
-		}
+		buf = xvalloc(SD_DATA_OBJ_SIZE);
 		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
 			ret = read_copy_from_replica(req, hdr->epoch,
 						     hdr->obj.cow_oid, buf);
