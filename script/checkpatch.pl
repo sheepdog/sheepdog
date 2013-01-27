@@ -2846,6 +2846,11 @@ sub process {
 			ERROR("BZERO", "bzero() is obsolete, use memset()\n" . $herecurr);
 		}
 
+# forbid sprintf()
+		if ($line =~ /\bsprintf\(/) {
+			ERROR("SPRINTF", "sprintf() is not buffer safe, use snprintf()\n" . $herecurr);
+		}
+
 # 1. forbid empty lines after break; of a switch statement
 # e.g.
 # +        break;
