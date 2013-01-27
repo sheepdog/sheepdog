@@ -35,9 +35,6 @@ endif
 if BUILD_ZOOKEEPER
 sheep_SOURCES		+= cluster/zookeeper.c
 endif
-if BUILD_ACCORD
-sheep_SOURCES		+= cluster/accord.c
-endif
 
 sheep_SOURCES		+= farm/sha1_file.c farm/trunk.c farm/snap.c farm/farm.c
 
