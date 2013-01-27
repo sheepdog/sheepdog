@@ -95,10 +95,7 @@ void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
 #ifndef NDEBUG
 
 #define assert(expr) ((expr) ?						\
-			(void)0 :					\
-			panic("assert: %s:%d: %s: "			\
-				"Asserting `%s' failed.\n",		\
-				__FILE__, __LINE__, __func__, #expr))
+			(void)0 : panic("Asserting `%s' failed.\n", #expr))
 
 #else
 
