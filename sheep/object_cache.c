@@ -815,6 +815,7 @@ void object_cache_delete(uint32_t vid)
 		uatomic_sub(&gcache.capacity, CACHE_OBJECT_SIZE);
 	}
 	pthread_rwlock_unlock(&cache->lock);
+	pthread_rwlock_destroy(&cache->lock);
 	free(cache);
 
 	/* Then we free disk */
