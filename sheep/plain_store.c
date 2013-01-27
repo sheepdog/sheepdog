@@ -42,17 +42,19 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 
 static int get_obj_path(uint64_t oid, char *path)
 {
-	return sprintf(path, "%s%016" PRIx64, obj_path, oid);
+	return snprintf(path, PATH_MAX, "%s%016" PRIx64, obj_path, oid);
 }
 
 static int get_tmp_obj_path(uint64_t oid, char *path)
 {
-	return sprintf(path, "%s%016"PRIx64".tmp", obj_path, oid);
+	return snprintf(path, PATH_MAX, "%s%016"PRIx64".tmp",
+			obj_path, oid);
 }
 
 static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 {
-	return sprintf(path, "%s/%016"PRIx64".%"PRIu32, stale_dir, oid, epoch);
+	return snprintf(path, PATH_MAX, "%s/%016"PRIx64".%"PRIu32,
+			stale_dir, oid, epoch);
 }
 
 /* If cleanup is true, temporary objects will be removed */

@@ -25,6 +25,7 @@
 
 /* maximum payload size sent in ->notify and ->unblock */
 #define SD_MAX_EVENT_BUF_SIZE (128 * 1024) /* 128k */
+#define MAX_NODE_STR_LEN 256
 
 enum cluster_join_result {
 	CJ_RES_SUCCESS, /* Success */
@@ -155,8 +156,8 @@ static inline const char *get_cdrv_option(const struct cluster_driver *cdrv,
 
 static inline char *node_to_str(const struct sd_node *id)
 {
-	static char str[256];
-	char name[256];
+	static char str[MAX_NODE_STR_LEN];
+	char name[MAX_NODE_STR_LEN];
 	int af = AF_INET6;
 	const uint8_t *addr = id->nid.addr;
 

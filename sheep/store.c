@@ -206,10 +206,10 @@ static int lock_base_dir(const char *d)
 {
 	char *lock_path;
 	int ret = 0;
-	int fd;
+	int fd, len = strlen(d) + strlen(LOCK_PATH) + 1;
 
-	lock_path = zalloc(strlen(d) + strlen(LOCK_PATH) + 1);
-	sprintf(lock_path, "%s" LOCK_PATH, d);
+	lock_path = xzalloc(len);
+	snprintf(lock_path, len, "%s" LOCK_PATH, d);
 
 	fd = open(lock_path, O_WRONLY|O_CREAT, def_fmode);
 	if (fd < 0) {
@@ -260,8 +260,9 @@ int init_obj_path(const char *base_path)
 		return -1;
 	}
 
-	obj_path = zalloc(strlen(base_path) + strlen(OBJ_PATH) + 1);
-	sprintf(obj_path, "%s" OBJ_PATH, base_path);
+	len = strlen(base_path) + strlen(OBJ_PATH) + 1;
+	obj_path = xzalloc(len);
+	snprintf(obj_path, len, "%s" OBJ_PATH, base_path);
 
 	return init_path(obj_path, NULL);
 }
@@ -270,8 +271,9 @@ int init_obj_path(const char *base_path)
 
 static int init_epoch_path(const char *base_path)
 {
-	epoch_path = zalloc(strlen(base_path) + strlen(EPOCH_PATH) + 1);
-	sprintf(epoch_path, "%s" EPOCH_PATH, base_path);
+	int len = strlen(base_path) + strlen(EPOCH_PATH) + 1;
+	epoch_path = xzalloc(len);
+	snprintf(epoch_path, len, "%s" EPOCH_PATH, base_path);
 
 	return init_path(epoch_path, NULL);
 }
@@ -280,12 +282,12 @@ static int init_epoch_path(const char *base_path)
 
 static int init_jrnl_path(const char *base_path)
 {
-	int ret;
+	int ret, len = strlen(base_path) + strlen(JRNL_PATH) + 1;
 	bool new;
 
 	/* Create journal directory */
-	jrnl_path = zalloc(strlen(base_path) + strlen(JRNL_PATH) + 1);
-	sprintf(jrnl_path, "%s" JRNL_PATH, base_path);
+	jrnl_path = xzalloc(len);
+	snprintf(jrnl_path, len, "%s" JRNL_PATH, base_path);
 
 	ret = init_path(jrnl_path, &new);
 	/* Error during directory creation */

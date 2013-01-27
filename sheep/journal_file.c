@@ -58,7 +58,7 @@ static int create_journal_file(const char *root, const char *name)
 	int fd, flags = O_DSYNC | O_RDWR | O_TRUNC | O_CREAT | O_DIRECT;
 	char path[PATH_MAX];
 
-	sprintf(path, "%s/%s", root, name);
+	snprintf(path, sizeof(path), "%s/%s", root, name);
 	fd = open(path, flags, 0644);
 	if (fd < 0) {
 		sd_eprintf("open %s %m\n", name);
@@ -80,7 +80,7 @@ static int get_old_new_jfile(const char *p, int *old, int *new)
 	char path[PATH_MAX];
 	struct stat st1, st2;
 
-	sprintf(path, "%s/%s", p, jfile_name[0]);
+	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[0]);
 	fd1 = open(path, flags);
 	if (fd1 < 0) {
 		if (errno == ENOENT)
@@ -89,7 +89,7 @@ static int get_old_new_jfile(const char *p, int *old, int *new)
 		sd_eprintf("open1 %m\n");
 		return -1;
 	}
-	sprintf(path, "%s/%s", p, jfile_name[1]);
+	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[1]);
 	fd2 = open(path, flags);
 	if (fd2 < 0) {
 		sd_eprintf("open2 %m\n");
@@ -141,7 +141,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 
 	if (jd->create)
 		flags |= O_CREAT;
-	sprintf(path, "%s%016" PRIx64, obj_path, jd->oid);
+	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, jd->oid);
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		sd_eprintf("open %m\n");

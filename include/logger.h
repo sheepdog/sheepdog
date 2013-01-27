@@ -19,6 +19,7 @@
 
 #define LOG_SPACE_SIZE (32 * 1024 * 1024)
 #define MAX_MSG_SIZE 256
+#define MAX_THREAD_NAME_LEN	20
 
 int log_init(const char *progname, int size, bool to_stdout, int level,
 		    char *outfile);

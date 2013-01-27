@@ -394,8 +394,8 @@ static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 	struct vdi_inode *inode = NULL, *dummy;
 	char command[COMMAND_LEN];
 
-	sprintf(command, "collie vdi list -r %s -a %s -p %d",
-		entry, sdhost, sdport);
+	snprintf(command, sizeof(command), "collie vdi list -r %s -a %s -p %d",
+		 entry, sdhost, sdport);
 	buf = sheepfs_run_cmd(command);
 	if (!buf)
 		return -1;
@@ -451,7 +451,7 @@ int volume_create_entry(const char *entry)
 	if (ch != NULL)
 		*ch = '\0';
 
-	sprintf(path, "%s/%s", PATH_VOLUME, entry);
+	snprintf(path, sizeof(path), "%s/%s", PATH_VOLUME, entry);
 	if (shadow_file_exsit(path))
 		return 0;
 
@@ -511,7 +511,7 @@ int volume_remove_entry(const char *entry)
 	if (ch != NULL)
 		*ch = '\0';
 
-	sprintf(path, "%s/%s", PATH_VOLUME, entry);
+	snprintf(path, sizeof(path), "%s/%s", PATH_VOLUME, entry);
 	if (!shadow_file_exsit(path))
 		return -1;
 

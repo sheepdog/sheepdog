@@ -232,7 +232,8 @@ static void usage(const struct command *commands, int status)
 		printf("\nAvailable commands:\n");
 		for (i = 0; commands[i].name; i++) {
 			for (s = commands[i].sub; s->name; s++) {
-				sprintf(name, "%s %s", commands[i].name, s->name);
+				snprintf(name, sizeof(name), "%s %s",
+					 commands[i].name, s->name);
 				printf("  %-24s%s\n", name, s->desc);
 			}
 		}
@@ -290,7 +291,8 @@ void subcommand_usage(char *cmd, char *subcmd, int status)
 	printf("Options:\n");
 	for (i = 0; i < len; i++) {
 		sd_opt = find_opt(command_opts[i]);
-		sprintf(name, "-%c, --%s", sd_opt->ch, sd_opt->name);
+		snprintf(name, sizeof(name), "-%c, --%s",
+			 sd_opt->ch, sd_opt->name);
 		printf("  %-24s%s\n", name, sd_opt->desc);
 	}
 

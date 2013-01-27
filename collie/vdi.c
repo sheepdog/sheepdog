@@ -317,7 +317,8 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		ret = collie_exec_req(fd, &hdr, buf);
 		close(fd);
 
-		sprintf(name + strlen(name), ":%d", sd_nodes[i].nid.port);
+		snprintf(name + strlen(name), sizeof(name) - strlen(name),
+			 ":%d", sd_nodes[i].nid.port);
 
 		if (ret)
 			fprintf(stderr, "Failed to connect to %s\n", name);

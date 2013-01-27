@@ -66,10 +66,10 @@ out:
 
 int init_config_path(const char *base_path)
 {
-	int fd, ret;
+	int fd, ret, len = strlen(base_path) + strlen(CONFIG_PATH) + 1;
 
-	config_path = zalloc(strlen(base_path) + strlen(CONFIG_PATH) + 1);
-	sprintf(config_path, "%s" CONFIG_PATH, base_path);
+	config_path = xzalloc(len);
+	snprintf(config_path, len, "%s" CONFIG_PATH, base_path);
 
 	fd = open(config_path, O_RDONLY);
 	if (fd < 0) {

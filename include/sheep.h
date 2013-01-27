@@ -45,7 +45,7 @@ struct vdi_copy {
 #define TRACE_GRAPH_RETURN 0x02
 
 #define TRACE_FNAME_LEN    36
-#define TRACE_THREAD_LEN   20
+#define TRACE_THREAD_LEN   MAX_THREAD_NAME_LEN
 
 struct trace_graph_item {
 	char tname[TRACE_THREAD_LEN];

@@ -222,7 +222,7 @@ static void object_cache_dir_set(char *s)
 	char *p = s;
 
 	p = p + strlen("dir=");
-	sprintf(ocpath, "%s", p);
+	snprintf(ocpath, sizeof(ocpath), "%s", p);
 }
 
 static void _object_cache_set(char *s)
@@ -324,7 +324,7 @@ static void init_journal_arg(char *arg)
 
 	if (!strncmp(d, arg, dl)) {
 		arg += dl;
-		sprintf(jpath, "%s", arg);
+		snprintf(jpath, sizeof(jpath), "%s", arg);
 	} else if (!strncmp(sz, arg, szl)) {
 		arg += szl;
 		jsize = strtoll(arg, NULL, 10);

@@ -36,8 +36,8 @@
 	for (zk_get_children(parent, strs),		               \
 		     (strs)->data += (strs)->count;		       \
 	     (strs)->count-- ?					       \
-		     sprintf(path, "%s/%s", parent, *--(strs)->data) : \
-		     (free((strs)->data), 0);			       \
+		     snprintf(path, sizeof(path), "%s/%s", parent,     \
+			      *--(strs)->data) : (free((strs)->data), 0); \
 	     free(*(strs)->data))
 
 enum zk_event_type {
@@ -246,7 +246,7 @@ static bool zk_queue_peek(void)
 	int rc;
 	char path[256];
 
-	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
+	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
 	rc = zk_node_exists(path);
 	if (rc == ZOK)
@@ -262,7 +262,7 @@ static void zk_queue_push(struct zk_event *ev)
 	char path[256], buf[256];
 
 	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
-	sprintf(path, "%s/", QUEUE_ZNODE);
+	snprintf(path, sizeof(path), "%s/", QUEUE_ZNODE);
 	zk_create_seq_node(path, (char *)ev, len, buf, sizeof(buf));
 	if (first_push) {
 		int32_t seq;
@@ -295,7 +295,7 @@ static void push_join_response(struct zk_event *ev)
 	queue_pos--;
 
 	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
-	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
+	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 	zk_set_data(path, (char *)ev, len, -1);
 	sd_dprintf("update path:%s, queue_pos:%010"PRId32", len:%d\n",
 		path, queue_pos, len);
@@ -307,7 +307,7 @@ static void zk_queue_pop_advance(struct zk_event *ev)
 	char path[256];
 
 	len = sizeof(*ev);
-	sprintf(path, QUEUE_ZNODE "/%010"PRId32, queue_pos);
+	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 	assert(zk_get_data(path, ev, &len) == ZOK);
 	sd_dprintf("%s, type:%d, len:%d, pos:%"PRId32"\n",
 		path, ev->type, len, queue_pos);
@@ -494,7 +494,7 @@ static int zk_join(const struct sd_node *myself,
 
 	this_node.node = *myself;
 
-	sprintf(path, MEMBER_ZNODE "/%s", node_to_str(myself));
+	snprintf(path, sizeof(path), MEMBER_ZNODE "/%s", node_to_str(myself));
 	rc = zk_node_exists(path);
 	if (rc == ZOK) {
 		sd_eprintf("Previous zookeeper session exist, shoot myself.\n");
@@ -605,7 +605,8 @@ static void zk_handle_join_response(struct zk_event *ev)
 	case CJ_RES_SUCCESS:
 	case CJ_RES_JOIN_LATER:
 	case CJ_RES_MASTER_TRANSFER:
-		sprintf(path, MEMBER_ZNODE"/%s", node_to_str(&ev->sender.node));
+		snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
+			 node_to_str(&ev->sender.node));
 		if (node_eq(&ev->sender.node, &this_node.node)) {
 			sd_dprintf("create path:%s\n", path);
 			zk_create_node(path, (char *)&ev->sender,

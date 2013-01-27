@@ -53,7 +53,7 @@ int create_config_layout(void)
 
 int config_pcache_read(const char *path, char *buf, size_t size, off_t ignore)
 {
-	sprintf(buf, "%d\n", sheepfs_page_cache);
+	snprintf(buf, size, "%d\n", sheepfs_page_cache);
 	return strlen(buf);
 }
 
@@ -76,7 +76,7 @@ size_t config_pcache_get_size(const char *path)
 
 int config_ocache_read(const char *path, char *buf, size_t size, off_t ignore)
 {
-	sprintf(buf, "%d\n", sheepfs_object_cache);
+	snprintf(buf, size, "%d\n", sheepfs_object_cache);
 	return strlen(buf);
 }
 
@@ -100,7 +100,7 @@ size_t config_ocache_get_size(const char *path)
 int config_sheep_info_read(const char *path, char *buf, size_t size,
 			   off_t ignore)
 {
-	sprintf(buf, "%s:%d\n", sdhost, sdport);
+	snprintf(buf, size, "%s:%d\n", sdhost, sdport);
 	return strlen(buf);
 }
 

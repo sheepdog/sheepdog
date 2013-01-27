@@ -32,7 +32,7 @@ int shadow_file_read(const char *path, char *buf, size_t size, off_t offset)
 	char p[PATH_MAX];
 	int fd, len;
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	fd = open(p, O_RDONLY);
 	if (fd < 0) {
 		sheepfs_pr("%m\n");
@@ -49,7 +49,7 @@ size_t shadow_file_write(const char *path, char *buf, size_t size)
 	int fd;
 	size_t len = 0;
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	fd = open(p, O_WRONLY | O_TRUNC);
 	if (fd < 0) {
 		sheepfs_pr("%m\n");
@@ -68,7 +68,7 @@ int shadow_file_create(const char *path)
 {
 	char p[PATH_MAX];
 	int fd;
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	fd = creat(p, 0644);
 	if (fd < 0) {
 		if (errno != EEXIST) {
@@ -84,7 +84,7 @@ int shadow_dir_create(const char *path)
 {
 	char p[PATH_MAX];
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	if (mkdir(p, 0755) < 0) {
 		if (errno != EEXIST) {
 			sheepfs_pr("%m\n");
@@ -99,7 +99,7 @@ int shadow_file_setxattr(const char *path, const char *name,
 {
 	char p[PATH_MAX];
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	if (setxattr(p, name, value, size, 0) < 0) {
 		sheepfs_pr("%m\n");
 		return -1;
@@ -112,7 +112,7 @@ int shadow_file_getxattr(const char *path, const char *name,
 {
 	char p[PATH_MAX];
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	if (getxattr(p, name, value, size) < 0) {
 		sheepfs_pr("%m\n");
 		return -1;
@@ -124,7 +124,7 @@ int shadow_file_delete(const char *path)
 {
 	char p[PATH_MAX];
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	if (unlink(p) < 0) {
 		if (errno != ENOENT) {
 			sheepfs_pr("%m\n");
@@ -138,7 +138,7 @@ bool shadow_file_exsit(const char *path)
 {
 	char p[PATH_MAX];
 
-	sprintf(p, "%s%s", sheepfs_shadow, path);
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	if (access(p, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
 			sheepfs_pr("%m\n");

@@ -44,7 +44,8 @@ static char *lnode_to_str(struct local_node *lnode)
 {
 	char *s = node_to_str(&lnode->node);
 
-	sprintf(s + strlen(s), " pid:%d", lnode->pid);
+	snprintf(s + strlen(s), MAX_NODE_STR_LEN - strlen(s), " pid:%d",
+		 lnode->pid);
 
 	return s;
 }

@@ -247,9 +247,10 @@ static notrace void rotate_log(void)
 		struct tm tm;
 		time(&t);
 		localtime_r((const time_t *)&t, &tm);
-		sprintf(old_logfile, "%s.%04d-%02d-%02d-%02d-%02d",
-				log_nowname, tm.tm_year + 1900, tm.tm_mon + 1,
-				tm.tm_mday, tm.tm_hour, tm.tm_min);
+		snprintf(old_logfile, sizeof(old_logfile),
+			 "%s.%04d-%02d-%02d-%02d-%02d",
+			 log_nowname, tm.tm_year + 1900, tm.tm_mon + 1,
+			 tm.tm_mday, tm.tm_hour, tm.tm_min);
 		rename(log_nowname, old_logfile);
 	}
 	new_fd = open(log_nowname, O_RDWR | O_CREAT | O_APPEND, 0644);
@@ -466,9 +467,10 @@ notrace void set_thread_name(const char *name, int idx)
 notrace void get_thread_name(char *name)
 {
 	if (worker_name && worker_idx)
-		sprintf(name, "%s %d", worker_name, worker_idx);
+		snprintf(name, MAX_THREAD_NAME_LEN, "%s %d",
+			 worker_name, worker_idx);
 	else if (worker_name)
-		sprintf(name, "%s", worker_name);
+		snprintf(name, MAX_THREAD_NAME_LEN, "%s", worker_name);
 	else
-		sprintf(name, "%s", "main");
+		snprintf(name, MAX_THREAD_NAME_LEN, "%s", "main");
 }

@@ -50,7 +50,8 @@ size_t cluster_info_get_size(const char *path)
 	size_t len;
 	char cmd[COMMAND_LEN];
 
-	sprintf(cmd, "collie cluster info -a %s -p %d", sdhost, sdport);
+	snprintf(cmd, sizeof(cmd), "collie cluster info -a %s -p %d",
+		 sdhost, sdport);
 	buf = sheepfs_run_cmd(cmd);
 	if (!buf)
 		return 0;
