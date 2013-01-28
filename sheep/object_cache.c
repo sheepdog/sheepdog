@@ -643,6 +643,7 @@ alloc_cache_entry(struct object_cache *oc, uint32_t idx)
 	entry = xzalloc(sizeof(*entry));
 	entry->oc = oc;
 	entry->idx = idx;
+	pthread_rwlock_init(&entry->lock, NULL);
 	INIT_LIST_HEAD(&entry->dirty_list);
 	INIT_LIST_HEAD(&entry->lru_list);
 
