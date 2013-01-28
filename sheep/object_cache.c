@@ -1172,27 +1172,6 @@ int object_cache_flush_and_del(const struct request *req)
 	return SD_RES_SUCCESS;
 }
 
-void object_cache_remove(uint64_t oid)
-{
-	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = object_cache_oid_to_idx(oid);
-	struct object_cache *oc;
-	struct object_cache_entry *entry;
-
-	oc = find_object_cache(vid, false);
-	if (!oc)
-		return;
-
-	write_lock_cache(oc);
-	entry = lru_tree_search(&oc->lru_tree, idx);
-	if (!entry)
-		goto out;
-	free_cache_entry(entry);
-out:
-	unlock_cache(oc);
-	return;
-}
-
 static int load_cache_object(struct object_cache *cache)
 {
 	DIR *dir;

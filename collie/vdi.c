@@ -727,6 +727,22 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
+	uint32_t vid;
+
+	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid, 0);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	sd_init_req(&hdr, SD_OP_DELETE_CACHE);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret) {
+		fprintf(stderr, "failed to execute request\n");
+		return EXIT_FAILURE;
+	}
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
