@@ -621,7 +621,7 @@ void object_cache_try_to_reclaim(int delay)
 	if (!sys->object_cache_size)
 		return;
 
-	if (uatomic_read(&gcache.capacity) < sys->object_cache_size)
+	if (uatomic_read(&gcache.capacity) < HIGH_WATERMARK)
 		return;
 
 	if (!uatomic_set_true(&gcache.in_reclaim))
