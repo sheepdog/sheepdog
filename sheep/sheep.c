@@ -405,7 +405,8 @@ int main(int argc, char **argv)
 		switch (ch) {
 		case 'p':
 			port = strtol(optarg, &p, 10);
-			if (optarg == p || port < 1 || port > UINT16_MAX) {
+			if (optarg == p || port < 1 || UINT16_MAX < port
+				|| *p != '\0') {
 				fprintf(stderr, "Invalid port number '%s'\n",
 					optarg);
 				exit(1);
@@ -420,7 +421,7 @@ int main(int argc, char **argv)
 		case 'l':
 			log_level = strtol(optarg, &p, 10);
 			if (optarg == p || log_level < SDOG_EMERG ||
-			    log_level > SDOG_DEBUG) {
+			    SDOG_DEBUG < log_level || *p != '\0') {
 				fprintf(stderr, "Invalid log level '%s'\n",
 					optarg);
 				sdlog_help();
@@ -451,7 +452,8 @@ int main(int argc, char **argv)
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
-			if (optarg == p || zone < 0 || UINT32_MAX < zone) {
+			if (optarg == p || zone < 0 || UINT32_MAX < zone
+				|| *p != '\0') {
 				fprintf(stderr, "Invalid zone id '%s': "
 					"must be an integer between 0 and %u\n",
 					optarg, UINT32_MAX);
@@ -462,7 +464,7 @@ int main(int argc, char **argv)
 		case 's':
 			free_space = strtoll(optarg, &p, 10);
 			if (optarg == p || free_space <= 0 ||
-			    UINT64_MAX < free_space) {
+			    UINT64_MAX < free_space || *p != '\0') {
 				fprintf(stderr, "Invalid free space size '%s': "
 					"must be an integer between 0 and "
 					"%"PRIu64"\n", optarg, UINT64_MAX);
