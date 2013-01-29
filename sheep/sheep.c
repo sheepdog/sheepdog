@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <arpa/inet.h>
+#include <sys/resource.h>
 
 #include "sheep_priv.h"
 #include "trace/trace.h"
@@ -384,6 +385,40 @@ static int init_work_queues(void)
 	return 0;
 }
 
+/*
+ * FIXME: Teach sheep handle EMFILE gracefully.
+ *
+ * For now we only set a large enough vaule to run sheep safely.
+ *
+ * We just estimate we at most run 100 VMs for each node and each VM consumes 10
+ * FDs at peak rush hour.
+ */
+#define SD_RLIM_NOFILE (SD_MAX_NODES * 100 * 10)
+
+static void check_host_env(void)
+{
+	struct rlimit r;
+
+	if (getrlimit(RLIMIT_NOFILE, &r) < 0)
+		sd_eprintf("failed to get nofile %m\n");
+	/*
+	 * 1024 is default for NOFILE on most distributions, which is very
+	 * dangerous to run Sheepdog cluster.
+	 */
+	else if (r.rlim_cur == 1024)
+		sd_eprintf("WARN: Allowed open files 1024 too small, "
+			   "suggested %u\n", SD_RLIM_NOFILE);
+	else if (r.rlim_cur < SD_RLIM_NOFILE)
+		sd_iprintf("Allowed open files %lu, suggested %u\n",
+			   r.rlim_cur, SD_RLIM_NOFILE);
+
+	if (getrlimit(RLIMIT_CORE, &r) < 0)
+		sd_eprintf("failed to get core %m\n");
+	else if (r.rlim_cur < RLIM_INFINITY)
+		sd_iprintf("Allowed core file size %lu, suggested unlimited\n",
+			   r.rlim_cur);
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
@@ -650,6 +685,7 @@ int main(int argc, char **argv)
 	}
 
 	free(dir);
+	check_host_env();
 	sd_printf(SDOG_NOTICE, "sheepdog daemon (version %s) started\n",
 		PACKAGE_VERSION);
 
