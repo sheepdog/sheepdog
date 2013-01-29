@@ -46,6 +46,7 @@ static struct sd_option sheep_options[] = {
 	{'d', "debug", false, "include debug messages in the log"},
 	{'D', "directio", false, "use direct IO for backend store"},
 	{'f', "foreground", false, "make the program run in the foreground"},
+	{'F', "log-format", true, "specify log format"},
 	{'g', "gateway", false, "make the progam run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
 	{'i', "ioaddr", true, "use separate network card to handle IO requests"},
@@ -430,6 +431,7 @@ int main(int argc, char **argv)
 	int64_t zone = -1, free_space = 0;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
+	const char *log_format = "default";
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -565,6 +567,9 @@ int main(int argc, char **argv)
 				PACKAGE_VERSION);
 			exit(0);
 			break;
+		case 'F':
+			log_format = optarg;
+			break;
 		default:
 			usage(1);
 			break;
@@ -596,7 +601,7 @@ int main(int argc, char **argv)
 		exit(1);
 
 	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level, path,
-		"default");
+		log_format);
 	if (ret)
 		exit(1);
 
