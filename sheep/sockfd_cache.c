@@ -304,7 +304,7 @@ static void do_grow_fds(struct work *work)
 		entry->fds = xrealloc(entry->fds, new_size);
 		for (i = old_fds_count; i < new_fds_count; i++) {
 			entry->fds[i].fd = -1;
-			entry->fds[i].in_use = false;
+			uatomic_set_false(&entry->fds[i].in_use);
 		}
 	}
 	pthread_rwlock_unlock(&sockfd_cache.lock);

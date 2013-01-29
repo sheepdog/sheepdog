@@ -1274,7 +1274,7 @@ int object_cache_init(const char *p)
 	strbuf_copyout(&buf, object_cache_dir, sizeof(object_cache_dir));
 
 	uatomic_set(&gcache.capacity, 0);
-	gcache.in_reclaim = false;
+	uatomic_set_false(&gcache.in_reclaim);
 
 	ret = load_cache();
 err:
