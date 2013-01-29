@@ -107,23 +107,23 @@ void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
 /* urcu helpers */
 
 /* Boolean data type which can be accessed by multiple threads */
-typedef unsigned long uatomic_bool;
+typedef struct { unsigned long val; } uatomic_bool;
 
 static inline bool uatomic_is_true(uatomic_bool *val)
 {
-	return uatomic_read(val) == 1;
+	return uatomic_read(&val->val) == 1;
 }
 
 /* success if the old value is false */
 static inline bool uatomic_set_true(uatomic_bool *val)
 {
-	return uatomic_cmpxchg(val, 0, 1) == 0;
+	return uatomic_cmpxchg(&val->val, 0, 1) == 0;
 }
 
 static inline void uatomic_set_false(uatomic_bool *val)
 {
 	assert(uatomic_is_true(val));
-	uatomic_set(val, 0);
+	uatomic_set(&val->val, 0);
 }
 
 #endif
