@@ -122,7 +122,6 @@ static inline bool uatomic_set_true(uatomic_bool *val)
 
 static inline void uatomic_set_false(uatomic_bool *val)
 {
-	assert(uatomic_is_true(val));
 	uatomic_set(&val->val, 0);
 }
 
