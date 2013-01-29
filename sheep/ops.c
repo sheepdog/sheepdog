@@ -359,6 +359,22 @@ static int cluster_get_vdi_attr(struct request *req)
 	return ret;
 }
 
+static int local_release_vdi(struct request *req)
+{
+	uint32_t vid = req->rq.vdi.base_vdi_id;
+
+	if (!vid) {
+		sd_iprintf("Some VDI failed to release the object cache. "
+			   "Probably you are running old QEMU.\n");
+		return SD_RES_SUCCESS;
+	}
+
+	object_cache_flush_vdi(vid);
+	object_cache_delete(vid);
+
+	return SD_RES_SUCCESS;
+}
+
 static int local_get_store_list(struct request *req)
 {
 	struct strbuf buf = STRBUF_INIT;
@@ -680,7 +696,8 @@ static int local_flush_vdi(struct request *req)
 	int ret = SD_RES_INVALID_PARMS;
 
 	if (is_object_cache_enabled()) {
-		ret = object_cache_flush_vdi(req);
+		uint32_t vid = oid_to_vid(req->rq.obj.oid);
+		ret = object_cache_flush_vdi(vid);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
@@ -996,6 +1013,7 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_RELEASE_VDI] = {
 		.name = "RELEASE_VDI",
 		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_release_vdi,
 	},
 
 	[SD_OP_GET_STORE_LIST] = {

@@ -390,7 +390,7 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, uint16_t flags, bool create);
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset);
-int object_cache_flush_vdi(const struct request *req);
+int object_cache_flush_vdi(uint32_t vid);
 int object_cache_flush_and_del(const struct request *req);
 void object_cache_delete(uint32_t vid);
 int object_cache_init(const char *p);

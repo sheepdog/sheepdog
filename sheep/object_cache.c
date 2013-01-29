@@ -1145,9 +1145,8 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 	return ret;
 }
 
-int object_cache_flush_vdi(const struct request *req)
+int object_cache_flush_vdi(uint32_t vid)
 {
-	uint32_t vid = oid_to_vid(req->rq.obj.oid);
 	struct object_cache *cache;
 
 	cache = find_object_cache(vid, false);
