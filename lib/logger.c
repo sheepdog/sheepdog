@@ -31,13 +31,11 @@
 #include <sys/sem.h>
 #include <pthread.h>
 #include <libgen.h>
+#include <sys/time.h>
 
 #include "logger.h"
 #include "util.h"
 
-static int log_vsnprintf(char *buff, size_t size, int prio,
-			 const char *func, int line, const char *fmt,
-			 va_list ap) __attribute__ ((format (printf, 6, 0)));
 static void dolog(int prio, const char *func, int line, const char *fmt,
 		  va_list ap) __attribute__ ((format (printf, 4, 0)));
 
@@ -58,8 +56,15 @@ struct logarea {
 	int fd;
 };
 
+#define FUNC_NAME_SIZE 32 /* according to C89, including '\0' */
 struct logmsg {
+	struct timeval tv;
 	int prio;
+	char func[FUNC_NAME_SIZE];
+	int line;
+	char worker_name[MAX_THREAD_NAME_LEN];
+	int worker_idx;
+
 	char str[0];
 };
 
@@ -149,33 +154,31 @@ static void notrace free_logarea(void)
 	shmdt(la);
 }
 
-static notrace int log_vsnprintf(char *buff, size_t size, int prio,
-				 const char *func, int line, const char *fmt,
-				 va_list ap)
+static notrace int default_log_format(char *buff, size_t size,
+				const struct logmsg *msg)
 {
 	char *p = buff;
-	time_t t = time(NULL);
 	struct tm tm;
+	int worker_name_len = strlen(msg->worker_name);
 
-	localtime_r(&t, &tm);
-
-	strftime(p, size, "%b %2d %H:%M:%S ", &tm);
+	localtime_r(&msg->tv.tv_sec, &tm);
+	strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
 	p += strlen(p);
 
-	if (worker_name && worker_idx)
-		snprintf(p, size, "[%s %d] ", worker_name, worker_idx);
-	else if (worker_name)
-		snprintf(p, size, "[%s] ", worker_name);
+	if (worker_name_len && msg->worker_idx)
+		snprintf(p, size, "[%s %d] ", msg->worker_name,
+			msg->worker_idx);
+	else if (worker_name_len)
+		snprintf(p, size, "[%s] ", msg->worker_name);
 	else
 		pstrcpy(p, size, "[main] ");
 
 	p += strlen(p);
-	snprintf(p, size - strlen(buff), "%s(%d) ", func, line);
 
+	snprintf(p, size - strlen(buff), "%s(%d) ", msg->func, msg->line);
 	p += strlen(p);
 
-	vsnprintf(p, size - strlen(buff), fmt, ap);
-
+	snprintf(p, size - strlen(buff), "%s", (char *)msg->str);
 	p += strlen(p);
 
 	return p - buff;
@@ -186,25 +189,42 @@ static notrace int log_vsnprintf(char *buff, size_t size, int prio,
  */
 static notrace void log_syslog(const struct logmsg *msg)
 {
-	char *str = (char *)msg->str;
+	char str[MAX_MSG_SIZE];
 
+	memset(str, 0, MAX_MSG_SIZE);
+	default_log_format(str, MAX_MSG_SIZE, msg);
 	if (log_fd >= 0)
 		xwrite(log_fd, str, strlen(str));
 	else
 		syslog(msg->prio, "%s", str);
 }
 
+static void init_logmsg(struct logmsg *msg, struct timeval *tv, int prio,
+			const char *func, int line)
+{
+	msg->tv = *tv;
+	msg->prio = prio;
+	pstrcpy(msg->func, FUNC_NAME_SIZE, func);
+	msg->line = line;
+	if (worker_name)
+		pstrcpy(msg->worker_name, MAX_THREAD_NAME_LEN, worker_name);
+	msg->worker_idx = worker_idx;
+}
+
 static notrace void dolog(int prio, const char *func, int line,
 		const char *fmt, va_list ap)
 {
-	char str[MAX_MSG_SIZE];
-	int len;
+	char buf[sizeof(struct logmsg) + MAX_MSG_SIZE];
+	char *str = buf + sizeof(struct logmsg);
+	struct logmsg *msg = (struct logmsg *)buf;
+	int len = 0;
+	struct timeval tv;
 
-	len = log_vsnprintf(str, sizeof(str), prio, func, line, fmt, ap);
+	gettimeofday(&tv, NULL);
+	len = vsnprintf(str, MAX_MSG_SIZE, fmt, ap);
 
 	if (la) {
 		struct sembuf ops;
-		struct logmsg *msg;
 
 		ops.sem_num = 0;
 		ops.sem_flg = SEM_UNDO;
@@ -221,7 +241,7 @@ static notrace void dolog(int prio, const char *func, int line,
 		else {
 			/* ok, we can stage the msg in the area */
 			msg = (struct logmsg *)la->tail;
-			msg->prio = prio;
+			init_logmsg(msg, &tv, prio, func, line);
 			memcpy(msg->str, str, len + 1);
 			la->tail += sizeof(struct logmsg) + len + 1;
 		}
@@ -232,7 +252,13 @@ static notrace void dolog(int prio, const char *func, int line,
 			return;
 		}
 	} else {
-		xwrite(fileno(stderr), str, len);
+		char str_final[MAX_MSG_SIZE];
+
+		memset(str_final, 0, MAX_MSG_SIZE);
+		memset(msg, 0, sizeof(struct logmsg));
+		init_logmsg(msg, &tv, prio, func, line);
+		len = format->formatter(str_final, MAX_MSG_SIZE, msg);
+		xwrite(fileno(stderr), str_final, len);
 		fflush(stderr);
 	}
 }
