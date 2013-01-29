@@ -200,7 +200,7 @@ static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
-static int cluster_get_vdi_info(struct request *req)
+static int local_get_vdi_info(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
@@ -906,18 +906,6 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = post_cluster_del_vdi,
 	},
 
-	[SD_OP_GET_VDI_INFO] = {
-		.name = "GET_VDI_INFO",
-		.type = SD_OP_TYPE_CLUSTER,
-		.process_work = cluster_get_vdi_info,
-	},
-
-	[SD_OP_LOCK_VDI] = {
-		.name = "LOCK_VDI",
-		.type = SD_OP_TYPE_CLUSTER,
-		.process_work = cluster_get_vdi_info,
-	},
-
 	[SD_OP_MAKE_FS] = {
 		.name = "MAKE_FS",
 		.type = SD_OP_TYPE_CLUSTER,
@@ -935,11 +923,6 @@ static struct sd_op_template sd_ops[] = {
 		.name = "GET_VDI_ATTR",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_get_vdi_attr,
-	},
-
-	[SD_OP_RELEASE_VDI] = {
-		.name = "RELEASE_VDI",
-		.type = SD_OP_TYPE_CLUSTER,
 	},
 
 	[SD_OP_FORCE_RECOVER] = {
@@ -998,6 +981,23 @@ static struct sd_op_template sd_ops[] = {
 	},
 
 	/* local operations */
+	[SD_OP_GET_VDI_INFO] = {
+		.name = "GET_VDI_INFO",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_get_vdi_info,
+	},
+
+	[SD_OP_LOCK_VDI] = {
+		.name = "LOCK_VDI",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_get_vdi_info,
+	},
+
+	[SD_OP_RELEASE_VDI] = {
+		.name = "RELEASE_VDI",
+		.type = SD_OP_TYPE_LOCAL,
+	},
+
 	[SD_OP_GET_STORE_LIST] = {
 		.name = "GET_STORE_LIST",
 		.type = SD_OP_TYPE_LOCAL,
