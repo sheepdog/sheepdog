@@ -595,7 +595,8 @@ int main(int argc, char **argv)
 	if (is_daemon && daemon(0, 0))
 		exit(1);
 
-	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level, path);
+	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level, path,
+		"default");
 	if (ret)
 		exit(1);
 

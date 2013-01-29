@@ -68,6 +68,23 @@ struct logmsg {
 	char str[0];
 };
 
+struct log_format {
+	const char *name;
+	int (*formatter)(char *, size_t, const struct logmsg *);
+	struct list_head list;
+};
+
+#define log_format_register(n, formatter_fn)				\
+	static void __attribute__((constructor))			\
+	regist_ ## formatter_fn(void) {					\
+		static struct log_format f =				\
+			{ .name = n, .formatter = formatter_fn };	\
+		list_add(&f.list, &log_formats);			\
+}
+
+static LIST_HEAD(log_formats);
+static struct log_format *format;
+
 static int log_fd = -1;
 static __thread const char *worker_name;
 static __thread int worker_idx;
@@ -154,7 +171,7 @@ static void notrace free_logarea(void)
 	shmdt(la);
 }
 
-static notrace int default_log_format(char *buff, size_t size,
+static notrace int default_log_formatter(char *buff, size_t size,
 				const struct logmsg *msg)
 {
 	char *p = buff;
@@ -183,6 +200,58 @@ static notrace int default_log_format(char *buff, size_t size,
 
 	return p - buff;
 }
+log_format_register("default", default_log_formatter);
+
+static notrace int json_log_formatter(char *buff, size_t size,
+				const struct logmsg *msg)
+{
+	int i, body_len;
+	char *p = buff;
+
+	snprintf(p, size, "{");
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), "\"second\": %lu", msg->tv.tv_sec);
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), ", \"usecond\": %lu", msg->tv.tv_usec);
+	p += strlen(p);
+
+	if (strlen(msg->worker_name))
+		snprintf(p, size - strlen(buff), ", \"worker_name\": \"%s\"",
+			msg->worker_name);
+	else
+		snprintf(p, size - strlen(buff), ", \"worker_name\": \"main\"");
+
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), ", \"worker_idx\": %d",
+		msg->worker_idx);
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), ", \"func\": \"%s\"", msg->func);
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), ", \"line\": %d", msg->line);
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), ", \"body\": \"");
+	p += strlen(p);
+
+	body_len = strlen(msg->str) - 1;
+	/* this - 1 eliminates '\n', dirty... */
+	for (i = 0; i < body_len; i++) {
+		if (msg->str[i] == '"')
+			*p++ = '\\';
+		*p++ = msg->str[i];
+	}
+
+	snprintf(p, size - strlen(buff), "\"}\n");
+	p += strlen(p);
+
+	return p - buff;
+}
+log_format_register("json", json_log_formatter);
 
 /*
  * this one can block under memory pressure
@@ -192,7 +261,7 @@ static notrace void log_syslog(const struct logmsg *msg)
 	char str[MAX_MSG_SIZE];
 
 	memset(str, 0, MAX_MSG_SIZE);
-	default_log_format(str, MAX_MSG_SIZE, msg);
+	format->formatter(str, MAX_MSG_SIZE, msg);
 	if (log_fd >= 0)
 		xwrite(log_fd, str, strlen(str));
 	else
@@ -431,9 +500,17 @@ static notrace void logger(char *log_dir, char *outfile)
 }
 
 notrace int log_init(const char *program_name, int size, bool to_stdout,
-		     int level, char *outfile)
+		int level, char *outfile, const char *format_name)
 {
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
+
+	list_for_each_entry(format, &log_formats, list) {
+		if (!strcmp(format->name, format_name))
+			goto format_found;
+	}
+
+	panic("invalid format: %s\n", format_name);
+format_found:
 
 	log_level = level;
 

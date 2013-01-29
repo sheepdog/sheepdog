@@ -22,7 +22,7 @@
 #define MAX_THREAD_NAME_LEN	20
 
 int log_init(const char *progname, int size, bool to_stdout, int level,
-		    char *outfile);
+	char *outfile, const char *format_name);
 void log_close(void);
 void dump_logmsg(void *);
 void log_write(int prio, const char *func, int line, const char *fmt, ...)
