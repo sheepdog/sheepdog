@@ -607,6 +607,7 @@ static int get_vdis_from(struct sd_node *node)
 	vc = xzalloc(rlen);
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
 	hdr.data_length = rlen;
+	hdr.epoch = sys_epoch();
 	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc);
 	if (ret != SD_RES_SUCCESS)
 		goto out;

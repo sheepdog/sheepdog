@@ -99,6 +99,7 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 		sd_init_req(&hdr, SD_OP_GET_EPOCH);
 		hdr.data_length = len;
 		hdr.obj.tgt_epoch = epoch;
+		hdr.epoch = sys_epoch();
 		ret = sheep_exec_req(&local_nodes[i].nid, &hdr, nodes);
 		if (ret != SD_RES_SUCCESS)
 			continue;
