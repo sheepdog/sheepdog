@@ -239,7 +239,9 @@ int send_light_req(struct sd_req *hdr, const char *host, int port)
 	return 0;
 }
 
+
 int collie_exec_req(int sockfd, struct sd_req *hdr, void *data)
 {
-	return net_exec_req(sockfd, hdr, data, true);
+	/* Retry hard for collie because we can't get the newest epoch */
+	return exec_req(sockfd, hdr, data, NULL, 0);
 }

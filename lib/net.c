@@ -267,7 +267,8 @@ success:
 	return fd;
 }
 
-static int net_do_read(int sockfd, void *buf, int len, bool retry_eagain)
+int do_read(int sockfd, void *buf, int len, bool (*need_retry)(uint32_t epoch),
+	    uint32_t epoch)
 {
 	int ret;
 reread:
@@ -275,7 +276,14 @@ reread:
 	if (ret < 0 || !ret) {
 		if (errno == EINTR)
 			goto reread;
-		if (retry_eagain && errno == EAGAIN)
+		/*
+		 * Since we set timeout for read, we'll get EAGAIN even for
+		 * blocking sockfd.
+		 *
+		 * Always retry if need_retry is NULL
+		 */
+		if (errno == EAGAIN &&
+		    (need_retry == NULL || need_retry(epoch)))
 			goto reread;
 
 		sd_eprintf("failed to read from socket: %d, %d(%m)\n",
@@ -289,11 +297,6 @@ reread:
 		goto reread;
 
 	return 0;
-}
-
-int do_read(int sockfd, void *buf, int len)
-{
-	return net_do_read(sockfd, buf, len, false);
 }
 
 static void forward_iov(struct msghdr *msg, int len)
@@ -360,7 +363,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen)
 	return ret;
 }
 
-int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
+int exec_req(int sockfd, struct sd_req *hdr, void *data,
+	     bool (*need_retry)(uint32_t epoch), uint32_t epoch)
 {
 	int ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
@@ -377,7 +381,7 @@ int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
 	if (send_req(sockfd, hdr, data, wlen))
 		return 1;
 
-	ret = net_do_read(sockfd, rsp, sizeof(*rsp), retry_eagain);
+	ret = do_read(sockfd, rsp, sizeof(*rsp), need_retry, epoch);
 	if (ret) {
 		sd_eprintf("failed to read a response\n");
 		return 1;
@@ -387,7 +391,7 @@ int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
 		rlen = rsp->data_length;
 
 	if (rlen) {
-		ret = net_do_read(sockfd, data, rlen, retry_eagain);
+		ret = do_read(sockfd, data, rlen, need_retry, epoch);
 		if (ret) {
 			sd_eprintf("failed to read the response data\n");
 			return 1;
@@ -395,11 +399,6 @@ int net_exec_req(int sockfd, struct sd_req *hdr, void *data, bool retry_eagain)
 	}
 
 	return 0;
-}
-
-int exec_req(int sockfd, struct sd_req *hdr, void *data)
-{
-	return net_exec_req(sockfd, hdr, data, false);
 }
 
 char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
