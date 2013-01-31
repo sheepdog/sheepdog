@@ -270,7 +270,7 @@ success:
 int do_read(int sockfd, void *buf, int len, bool (*need_retry)(uint32_t epoch),
 	    uint32_t epoch)
 {
-	int ret;
+	int ret, repeat = MAX_RETRY_COUNT;
 reread:
 	ret = read(sockfd, buf, len);
 	if (ret < 0 || !ret) {
@@ -279,12 +279,12 @@ reread:
 		/*
 		 * Since we set timeout for read, we'll get EAGAIN even for
 		 * blocking sockfd.
-		 *
-		 * Always retry if need_retry is NULL
 		 */
-		if (errno == EAGAIN &&
-		    (need_retry == NULL || need_retry(epoch)))
+		if (errno == EAGAIN && repeat &&
+		    (need_retry == NULL || need_retry(epoch))) {
+			repeat--;
 			goto reread;
+		}
 
 		sd_eprintf("failed to read from socket: %d, %d(%m)\n",
 			ret, errno);
@@ -312,14 +312,25 @@ static void forward_iov(struct msghdr *msg, int len)
 }
 
 
-static int do_write(int sockfd, struct msghdr *msg, int len)
+static int do_write(int sockfd, struct msghdr *msg, int len,
+		    bool (*need_retry)(uint32_t), uint32_t epoch)
 {
-	int ret;
+	int ret, repeat = MAX_RETRY_COUNT;
 rewrite:
 	ret = sendmsg(sockfd, msg, 0);
 	if (ret < 0) {
 		if (errno == EINTR)
 			goto rewrite;
+		/*
+		 * Since we set timeout for write, we'll get EAGAIN even for
+		 * blocking sockfd.
+		 */
+		if (errno == EAGAIN && repeat &&
+		    (need_retry == NULL || need_retry(epoch))) {
+			repeat--;
+			goto rewrite;
+		}
+
 		sd_eprintf("failed to write to socket: %m\n");
 		return 1;
 	}
@@ -333,7 +344,8 @@ rewrite:
 	return 0;
 }
 
-int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen)
+int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen,
+	     bool (*need_retry)(uint32_t epoch), uint32_t epoch)
 {
 	int ret;
 	struct msghdr msg;
@@ -353,7 +365,7 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen)
 		iov[1].iov_len = wlen;
 	}
 
-	ret = do_write(sockfd, &msg, sizeof(*hdr) + wlen);
+	ret = do_write(sockfd, &msg, sizeof(*hdr) + wlen, need_retry, epoch);
 	if (ret) {
 		sd_eprintf("failed to send request %x, %d: %m\n", hdr->opcode,
 			wlen);
@@ -378,7 +390,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 		rlen = hdr->data_length;
 	}
 
-	if (send_req(sockfd, hdr, data, wlen))
+	if (send_req(sockfd, hdr, data, wlen, need_retry, epoch))
 		return 1;
 
 	ret = do_read(sockfd, rsp, sizeof(*rsp), need_retry, epoch);

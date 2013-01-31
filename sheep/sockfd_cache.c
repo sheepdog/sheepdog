@@ -521,7 +521,7 @@ int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 	if (!sfd)
 		return SD_RES_NETWORK_ERROR;
 
-	ret = exec_req(sfd->fd, hdr, buf, NULL, 0);
+	ret = exec_req(sfd->fd, hdr, buf, sheep_need_retry, hdr->epoch);
 	if (ret) {
 		sd_dprintf("remote node might have gone away\n");
 		sheep_del_sockfd(nid, sfd);
@@ -533,4 +533,9 @@ int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 
 	sheep_put_sockfd(nid, sfd);
 	return ret;
+}
+
+bool sheep_need_retry(uint32_t epoch)
+{
+	return sys_epoch() == epoch;
 }
