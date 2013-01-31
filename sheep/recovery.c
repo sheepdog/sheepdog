@@ -523,6 +523,7 @@ retry:
 	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.tgt_epoch = epoch - 1;
 	hdr.data_length = buf_size;
+	hdr.epoch = sys_epoch();
 	ret = sheep_exec_req(&e->nid, (struct sd_req *)&hdr, buf);
 
 	switch (ret) {
