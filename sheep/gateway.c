@@ -193,7 +193,7 @@ again:
 			finish_one_write_err(wi, i);
 			goto finish_write;
 		}
-		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp))) {
+		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp), NULL, 0)) {
 			sd_eprintf("remote node might have gone away\n");
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
