@@ -412,6 +412,7 @@ struct sockfd *sheep_get_sockfd(const struct node_id *);
 void sheep_put_sockfd(const struct node_id *, struct sockfd *);
 void sheep_del_sockfd(const struct node_id *, struct sockfd *);
 int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *data);
+bool sheep_need_retry(uint32_t epoch);
 
 static inline bool is_object_cache_enabled(void)
 {
