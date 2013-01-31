@@ -79,7 +79,7 @@ int rx(struct connection *conn, enum conn_state next_state)
 	}
 
 	if (ret < 0) {
-		if (errno != EAGAIN)
+		if (errno != EAGAIN && errno != EINTR)
 			conn->c_rx_state = C_IO_CLOSED;
 		return 0;
 	}
@@ -99,7 +99,7 @@ notrace int tx(struct connection *conn, enum conn_state next_state)
 
 	ret = write(conn->fd, conn->tx_buf, conn->tx_length);
 	if (ret < 0) {
-		if (errno != EAGAIN)
+		if (errno != EAGAIN && errno != EINTR)
 			conn->c_tx_state = C_IO_CLOSED;
 		return 0;
 	}
