@@ -268,8 +268,8 @@ static notrace void log_syslog(const struct logmsg *msg)
 		syslog(msg->prio, "%s", str);
 }
 
-static void init_logmsg(struct logmsg *msg, struct timeval *tv, int prio,
-			const char *func, int line)
+static notrace void init_logmsg(struct logmsg *msg, struct timeval *tv,
+				int prio, const char *func, int line)
 {
 	msg->tv = *tv;
 	msg->prio = prio;

@@ -235,7 +235,7 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset)
  * @param buf_size size of destination buffer
  * @param str source string
  */
-void pstrcpy(char *buf, int buf_size, const char *str)
+void notrace pstrcpy(char *buf, int buf_size, const char *str)
 {
 	int c;
 	char *q = buf;
