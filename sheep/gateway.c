@@ -175,7 +175,7 @@ again:
 		nr_sent = wi->nr_sent;
 		/* XXX Blinedly close all the connections */
 		for (i = 0; i < nr_sent; i++)
-			finish_one_write_err(wi, i);
+			sheep_del_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
 
 		err_ret = SD_RES_NETWORK_ERROR;
 		goto finish_write;
