@@ -499,18 +499,30 @@ static notrace void logger(char *log_dir, char *outfile)
 	exit(0);
 }
 
-notrace int log_init(const char *program_name, int size, bool to_stdout,
-		int level, char *outfile, const char *format_name)
+void select_log_formatter(const char *format_name)
 {
-	char log_dir[PATH_MAX], tmp[PATH_MAX];
+	struct log_format *f;
 
-	list_for_each_entry(format, &log_formats, list) {
-		if (!strcmp(format->name, format_name))
-			goto format_found;
+	list_for_each_entry(f, &log_formats, list) {
+		if (!strcmp(f->name, format_name)) {
+			format = f;
+			return;
+		}
 	}
 
-	panic("invalid format: %s\n", format_name);
-format_found:
+	fprintf(stderr, "invalid log format: %s\n", format_name);
+	fprintf(stderr, "valid options are:\n");
+	list_for_each_entry(f, &log_formats, list) {
+		fprintf(stderr, "\t%s\n", f->name);
+	}
+
+	exit(1);
+}
+
+notrace int log_init(const char *program_name, int size, bool to_stdout,
+		int level, char *outfile)
+{
+	char log_dir[PATH_MAX], tmp[PATH_MAX];
 
 	log_level = level;
 

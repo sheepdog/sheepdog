@@ -575,6 +575,13 @@ int main(int argc, char **argv)
 			break;
 		}
 	}
+
+	/*
+	 * select_log_formatter() must be called before any calling of
+	 * sd_printf() series
+	 */
+	select_log_formatter(log_format);
+
 	if (nr_vnodes == 0) {
 		sys->gateway_only = true;
 		sys->disk_space = 0;
@@ -600,8 +607,8 @@ int main(int argc, char **argv)
 	if (is_daemon && daemon(0, 0))
 		exit(1);
 
-	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level, path,
-		log_format);
+	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level,
+		path);
 	if (ret)
 		exit(1);
 
