@@ -136,7 +136,7 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	unsigned long nr = rsp->vdi.vdi_id;
 	int ret = rsp->result;
 
-	sd_printf(SDOG_INFO, "done %d %ld\n", ret, nr);
+	sd_dprintf("done %d %ld\n", ret, nr);
 	if (ret == SD_RES_SUCCESS)
 		set_bit(nr, sys->vdi_inuse);
 

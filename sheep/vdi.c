@@ -370,7 +370,7 @@ static int do_lookup_vdi(const char *name, int namelen, uint32_t *vid,
 
 	start_nr = fnv_64a_buf(name, namelen, FNV1A_64_INIT) & (SD_NR_VDIS - 1);
 
-	sd_printf(SDOG_INFO, "looking for %s (%lx)\n", name, start_nr);
+	sd_dprintf("looking for %s (%lx)\n", name, start_nr);
 
 	/* bitmap search from the hash point */
 	nr = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, start_nr);
@@ -486,10 +486,10 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 
 	notify_vdi_add(nr, iocb->nr_copies);
 
-	sd_printf(SDOG_INFO, "creating new %s %s: size %" PRIu64 ", vid %"
-		PRIx32 ", base %" PRIx32 ", cur %" PRIx32 ", copies %d\n",
-		iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
-		*new_vid, iocb->base_vid, cur_vid, iocb->nr_copies);
+	sd_iprintf("creating new %s %s: size %" PRIu64 ", vid %"
+		   PRIx32 ", base %" PRIx32 ", cur %" PRIx32 ", copies %d\n",
+		   iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
+		   *new_vid, iocb->base_vid, cur_vid, iocb->nr_copies);
 
 	return create_vdi_obj(iocb, *new_vid, cur_vid, next_snapid);
 }
@@ -603,7 +603,7 @@ static void delete_one(struct work *work)
 	struct sheepdog_inode *inode = NULL;
 	int nr_copies;
 
-	sd_eprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
+	sd_dprintf("%d %d, %16x\n", dw->done, dw->count, vdi_id);
 
 	inode = malloc(sizeof(*inode));
 	if (!inode) {
