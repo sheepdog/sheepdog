@@ -312,7 +312,6 @@ sub parse {
 sub vdi_main {
     my $roffset = $offset;
     my $woffset = $offset;
-    my $i = 1;
     my ($cur_time, $start_time, $end_time, $hbeat_time);
 
     $start_time = $cur_time = get_current_time();
@@ -327,8 +326,6 @@ sub vdi_main {
 	while ($nr_outstanding_aio >= $concurrency) {
 	    wait_aio_requests();
 	}
-
-	print "$i: "  if $verbose;
 
 	if (rand($rrate + $wrate) < $rrate) {
 	    # read
@@ -354,9 +351,11 @@ sub vdi_main {
 	    } else {
 		$woffset = get_aligned_blk($sblk, $eblk - 512);
 	    }
-	}
 
-	vdi_flush() if $flush_interval > 0 && $i % $flush_interval == 0;
+	    if ($flush_interval > 0 && $wr_ops % $flush_interval == 0) {
+		vdi_flush();
+	    }
+	}
 
 	$cur_time = get_current_time();
 	if ($hbeat > 0 && $hbeat_time <= $cur_time) {
@@ -368,7 +367,6 @@ sub vdi_main {
 
 	    $hbeat_time += $hbeat * 1000000;
 	}
-	$i++;
     }
 
     print_result('Total read', $total_rd_bytes, $total_rd_ops, $runtime) if $rrate;
