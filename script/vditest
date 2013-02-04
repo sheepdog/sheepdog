@@ -30,7 +30,7 @@ my $seek_pattern = "linear";
 my $seed = time();
 my ($sblk, $eblk) = (0, 0);
 my $file = 0;
-my $flush_interval = -1;
+my $flush_interval = 0;
 my $verbose = 0;
 my ($read_test, $write_test) = (0,0);
 my $hbeat = 0;
@@ -378,11 +378,7 @@ sub vdi_main {
 
 	%written_data = ()  if %written_data > 1000000;
 
-	if ($flush_interval == 0) {
-	    vdi_flush();
-	} elsif ($flush_interval > 0 && $i % $flush_interval == 0) {
-	    vdi_flush();
-	}
+	vdi_flush() if $flush_interval > 0 && $i % $flush_interval == 0;
 
 	($sec, $microsec) = gettimeofday();
 	$cur_time = $sec * 1000000 + $microsec;
