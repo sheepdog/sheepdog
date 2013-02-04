@@ -154,14 +154,9 @@ sub vdi_close {
 }
 
 sub vdi_read {
-    my ($offset, $length, $ptn, $ptn_length) = @_;
+    my ($offset, $length) = @_;
 
-    if ($length == $ptn_length) {
-	print_qemu("aio_read -P $ptn $offset $length\n");
-    } else {
-	# partial check is not supported
-	print_qemu("aio_read $offset $length\n");
-    }
+    print_qemu("aio_read $offset $length\n");
 
     $nr_outstanding_aio++;
     $rd_ops++;
@@ -171,9 +166,9 @@ sub vdi_read {
 }
 
 sub vdi_write {
-    my ($offset, $length, $ptn) = @_;
+    my ($offset, $length) = @_;
 
-    print_qemu("aio_write -P $ptn $offset $length\n");
+    print_qemu("aio_write $offset $length\n");
 
     $nr_outstanding_aio++;
     $wr_ops++;
@@ -317,7 +312,6 @@ sub parse {
 sub vdi_main {
     my $roffset = $offset;
     my $woffset = $offset;
-    my %written_data = ();
     my $i = 1;
     my ($sec, $microsec, $cur_time, $start_time, $end_time, $hbeat_time);
 
@@ -330,8 +324,6 @@ sub vdi_main {
 
     while (1) {
 	my $length = get_aligned_blk($lblk, $hblk);
-	my $pattern;
-	my $ptn_length = 0;
 
 	while ($nr_outstanding_aio >= $concurrency) {
 	    wait_aio_requests();
@@ -342,14 +334,8 @@ sub vdi_main {
 	if (rand($rrate + $wrate) < $rrate) {
 	    # read
 	    $length = $eblk - $roffset  if $roffset + $length > $eblk;
-	    $pattern = $written_data{$roffset};
 
-	    for (my $n = $roffset; $n < $roffset + $length; $n += 512) {
-		last  if $pattern != $written_data{$n} || $pattern == 0;
-		$ptn_length += 512;
-	    }
-
-	    vdi_read($roffset, $length, $pattern, $ptn_length);
+	    vdi_read($roffset, $length);
 
 	    if ($seek_pattern eq 'linear') {
 		$roffset += $length;
@@ -360,13 +346,8 @@ sub vdi_main {
 	} else {
 	    # write
 	    $length = $eblk - $woffset  if $woffset + $length > $eblk;
-	    $pattern = $i % 251 + 1;
 
-	    vdi_write($woffset, $length, $pattern);
-
-	    for (my $n = $woffset; $n < $woffset + $length; $n += 512) {
-		$written_data{$n} = $pattern;
-	    }
+	    vdi_write($woffset, $length);
 
 	    if ($seek_pattern eq 'linear') {
 		$woffset += $length;
@@ -375,8 +356,6 @@ sub vdi_main {
 		$woffset = get_aligned_blk($sblk, $eblk - 512);
 	    }
 	}
-
-	%written_data = ()  if %written_data > 1000000;
 
 	vdi_flush() if $flush_interval > 0 && $i % $flush_interval == 0;
 
