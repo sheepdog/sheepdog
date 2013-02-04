@@ -37,9 +37,6 @@ noinst_HEADERS		= treeview.h collie.h
 
 EXTRA_DIST		= 
 
-lint:
-	-splint $(INCLUDES) $(LINT_FLAGS) $(CFLAGS) *.c
-
 all-local: 
 	@echo Built collie
 

@@ -51,9 +51,6 @@ noinst_HEADERS		= work.h sheep_priv.h cluster.h farm/farm.h trace/trace.h
 
 EXTRA_DIST		= 
 
-lint:
-	-splint $(INCLUDES) $(LINT_FLAGS) $(CFLAGS) *.c
-
 all-local: 
 	@echo Built sheep
 
