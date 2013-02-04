@@ -9,9 +9,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+use feature 'switch';
 use strict;
 use Getopt::Std;
-use Switch;
 use Time::HiRes qw(gettimeofday);
 use IPC::Open2;
 
@@ -58,10 +58,10 @@ sub get_aligned_blk {
 sub to_bytes {
     my ($size) = @_;
 
-    switch ($size) {
-	case /K/i { $size *= 1024; }
-	case /M/i { $size *= 1024 ** 2; }
-	case /G/i { $size *= 1024 ** 3; }
+    given ($size) {
+	when (/k$/i) { $size *= 1024; }
+	when (/m$/i) { $size *= 1024 ** 2; }
+	when (/g$/i) { $size *= 1024 ** 3; }
     }
 
     $_[0] = $size;
@@ -193,11 +193,11 @@ sub parse_opts {
 
     foreach my $key (keys %opts) {
 	my $val = $opts{$key};
-	switch ($key) {
-	    case '?' {
+	given ($key) {
+	    when ('?') {
 		help(0);
 	    }
-	    case 'B' {
+	    when ('B') {
 		($lblk, $hblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
 		to_bytes($lblk);
 		to_bytes($hblk);
@@ -209,38 +209,38 @@ sub parse_opts {
 		error("$hblk is too large\n")  if $lblk > (64 * 1024 ** 2);
 		error("transfer range is invalid\n")  if $lblk > $hblk;
 	    }
-	    case 'c' {
+	    when ('c') {
 		if ($val !~ /(none|write(back|through))/) {
 		    error("\"$val\" is not valid\n");
 		}
 		$cache = $val;
 	    }
-	    case 'C' {
+	    when ('C') {
 		error("\"$val\" is not valid\n")  if ($val <= 0);
 		$concurrency = $val;
 	    }
-	    case 'D' {
+	    when ('D') {
 		($rrate, $wrate) = ($val =~ /(\d+)\%?:?(\d*)\%?/);
 	    }
-	    case 'f' {
+	    when ('f') {
 		$flush_interval = $val;
 	    }
-	    case 'F' {
+	    when ('F') {
 		$file = 1;
 	    }
-	    case 'h' {
+	    when ('h') {
 		error("\"$val\" is not valid\n")  if ($val <= 0);
 		$hbeat = $val;
 	    }
-	    case 'n' {
+	    when ('n') {
 		$no_act = 1;
 		$verbose = 1;
 	    }
-	    case 'o' {
+	    when ('o') {
 		error("\"$val\" is not valid\n")  if ($val < 0);
 		$offset = $val;
 	    }
-	    case 'p' {
+	    when ('p') {
 		if ($val =~ /^l/) {
 		    $seek_pattern = "linear";
 		} elsif ($val =~ /^r/) {
@@ -249,7 +249,7 @@ sub parse_opts {
 		    error("\"$val\" is not valid\n");
 		}
 	    }
-	    case 'r' {
+	    when ('r') {
 		$read_test = 1;
 		if ($write_test) {
 		    ($rrate, $wrate) = (50, 50);
@@ -257,10 +257,10 @@ sub parse_opts {
 		    ($rrate, $wrate) = (100, 0);
 		}
 	    }
-	    case 's' {
+	    when ('s') {
 		$seed = $val;
 	    }
-	    case 'S' {
+	    when ('S') {
 		($sblk, $eblk) = ($val =~ /(\d+[kmg]?):?(\d*[kmg]?)/i);
 		to_bytes($sblk);
 		to_bytes($eblk);
@@ -268,14 +268,14 @@ sub parse_opts {
 		error("$sblk is not sector aligned\n")  if $sblk % 512 != 0;
 		error("$eblk is not sector aligned\n")  if $eblk % 512 != 0;
 	    }
-	    case 'T' {
+	    when ('T') {
 		error("\"$val\" is not valid\n")  if ($val < 0);
 		$runtime = $val;
 	    }
-	    case 'v' {
+	    when ('v') {
 		$verbose = 1;
 	    }
-	    case 'w' {
+	    when ('w') {
 		$write_test = 1;
 		if ($read_test) {
 		    ($rrate, $wrate) = (50, 50);
