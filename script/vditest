@@ -313,16 +313,15 @@ sub vdi_main {
     my $roffset = $offset;
     my $woffset = $offset;
     my $i = 1;
-    my ($sec, $microsec, $cur_time, $start_time, $end_time, $hbeat_time);
+    my ($cur_time, $start_time, $end_time, $hbeat_time);
 
-    ($sec, $microsec) = gettimeofday();
-    $start_time = $sec * 1000000 + $microsec;
+    $start_time = $cur_time = get_current_time();
     $hbeat_time = $start_time + $hbeat * 1000000;
     $end_time = $start_time + $runtime * 1000000;
 
     srand($seed);
 
-    while (1) {
+    while ($cur_time < $end_time) {
 	my $length = get_aligned_blk($lblk, $hblk);
 
 	while ($nr_outstanding_aio >= $concurrency) {
@@ -359,37 +358,32 @@ sub vdi_main {
 
 	vdi_flush() if $flush_interval > 0 && $i % $flush_interval == 0;
 
-	($sec, $microsec) = gettimeofday();
-	$cur_time = $sec * 1000000 + $microsec;
+	$cur_time = get_current_time();
 	if ($hbeat > 0 && $hbeat_time <= $cur_time) {
-	    if ($rrate) {
-		printf "Heartbeat read throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
-		$rd_bytes / $hbeat, to_str($rd_bytes / $hbeat), $rd_ops / $hbeat;
-	    }
-	    if ($wrate) {
-		printf "Heartbeat write throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
-		$wr_bytes / $hbeat, to_str($wr_bytes / $hbeat), $wr_ops / $hbeat;
-	    }
+	    print_result('Heartbeat read', $rd_bytes, $rd_ops, $hbeat) if $rrate;
+	    print_result('Heartbeat write', $wr_bytes, $wr_ops, $hbeat) if $wrate;
 
 	    $rd_ops = $wr_ops = 0;
 	    $rd_bytes = $wr_bytes = 0;
 
 	    $hbeat_time += $hbeat * 1000000;
 	}
-	last if ($end_time <= $cur_time);
 	$i++;
     }
 
-    if ($rrate) {
-	printf "Total read throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
-	$total_rd_bytes / $runtime, to_str($total_rd_bytes / $runtime),
-	$total_rd_ops / $runtime;
-    }
-    if ($wrate) {
-	printf "Total write throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
-	$total_wr_bytes / $runtime, to_str($total_wr_bytes / $runtime),
-	$total_wr_ops / $runtime;
-    }
+    print_result('Total read', $total_rd_bytes, $total_rd_ops, $runtime) if $rrate;
+    print_result('Total write', $total_wr_bytes, $total_wr_ops, $runtime) if $wrate;
+}
+
+sub get_current_time {
+    my ($sec, $microsec) = gettimeofday();
+    return $sec * 1000000 + $microsec;
+}
+
+sub print_result {
+    my ($label, $bytes, $ops, $t) = @_;
+    printf "$label throughput: %.1fB/s (%s/s), IOPS %.1f/s.\n",
+	   $bytes / $t, to_str($bytes / $t), $ops / $t;
 }
 
 sub help {
