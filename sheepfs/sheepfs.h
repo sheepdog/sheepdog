@@ -31,7 +31,7 @@ int sheepfs_set_op(const char *path, unsigned opcode);
 typedef void (*printf_fn)(const char *func, int line, const char *, ...)
 __attribute__ ((format (__printf__, 3, 4)));
 
-printf_fn fs_printf;
+extern printf_fn fs_printf;
 
 #define sheepfs_pr(fmt, args...)			\
 ({							\

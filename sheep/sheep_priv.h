@@ -187,7 +187,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
 			  void *arg);
 int err_to_sderr(uint64_t oid, int err);
 
-struct list_head store_drivers;
+extern struct list_head store_drivers;
 #define add_store_driver(driver)                                 \
 static void __attribute__((constructor)) add_ ## driver(void) {  \
 	list_add(&driver.list, &store_drivers);                  \
