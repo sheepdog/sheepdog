@@ -143,7 +143,7 @@ sub vdi_open {
     } else {
 	$cmd = "stdbuf -o0 qemu-io -t $cache sheepdog:$vdiname";
     }
-    open2 *QEMU_OUT, *QEMU, $cmd or die "cannot run qemu-io\n"  if !$no_act;
+    open2 *QEMU_OUT, *QEMU, $cmd or die "cannot run qemu-io" if !$no_act;
     <QEMU_OUT>;
 }
 
@@ -203,20 +203,20 @@ sub parse_opts {
 		to_bytes($hblk);
 		$hblk = $lblk  if $hblk == 0;
 
-		error("$lblk is not sector aligned\n")  if $lblk % 512 != 0;
-		error("$lblk is not valid\n")  if $lblk == 0;
-		error("$hblk is not sector aligned\n")  if $hblk % 512 != 0;
-		error("$hblk is too large\n")  if $lblk > (64 * 1024 ** 2);
-		error("transfer range is invalid\n")  if $lblk > $hblk;
+		die "$lblk is not sector aligned" if $lblk % 512 != 0;
+		die "$lblk is not valid" if $lblk == 0;
+		die "$hblk is not sector aligned" if $hblk % 512 != 0;
+		die "$hblk is too large" if $lblk > (64 * 1024 ** 2);
+		die "transfer range is invalid" if $lblk > $hblk;
 	    }
 	    when ('c') {
 		if ($val !~ /(none|write(back|through))/) {
-		    error("\"$val\" is not valid\n");
+		    die "'$val' is not valid";
 		}
 		$cache = $val;
 	    }
 	    when ('C') {
-		error("\"$val\" is not valid\n")  if ($val <= 0);
+		die "'$val' is not valid"  if $val <= 0;
 		$concurrency = $val;
 	    }
 	    when ('D') {
@@ -229,7 +229,7 @@ sub parse_opts {
 		$file = 1;
 	    }
 	    when ('h') {
-		error("\"$val\" is not valid\n")  if ($val <= 0);
+		die "'$val' is not valid" if $val <= 0;
 		$hbeat = $val;
 	    }
 	    when ('n') {
@@ -237,7 +237,7 @@ sub parse_opts {
 		$verbose = 1;
 	    }
 	    when ('o') {
-		error("\"$val\" is not valid\n")  if ($val < 0);
+		die "'$val' is not valid" if $val < 0;
 		$offset = $val;
 	    }
 	    when ('p') {
@@ -246,7 +246,7 @@ sub parse_opts {
 		} elsif ($val =~ /^r/) {
 		    $seek_pattern = "random";
 		} else {
-		    error("\"$val\" is not valid\n");
+		    die "'$val' is not valid";
 		}
 	    }
 	    when ('r') {
@@ -265,11 +265,11 @@ sub parse_opts {
 		to_bytes($sblk);
 		to_bytes($eblk);
 
-		error("$sblk is not sector aligned\n")  if $sblk % 512 != 0;
-		error("$eblk is not sector aligned\n")  if $eblk % 512 != 0;
+		die "$sblk is not sector aligned" if $sblk % 512 != 0;
+		die "$eblk is not sector aligned" if $eblk % 512 != 0;
 	    }
 	    when ('T') {
-		error("\"$val\" is not valid\n")  if ($val < 0);
+		die "'$val' is not valid" if $val < 0;
 		$runtime = $val;
 	    }
 	    when ('v') {
@@ -290,14 +290,14 @@ sub parse_opts {
 sub parse {
     parse_opts();
     if (@ARGV == 0) {
-	error("vdiname must be specified\n");
+	die "vdiname must be specified";
     } else {
 	$vdiname = shift @ARGV;
 
 	# process the rest of options
 	parse_opts()  if (@ARGV > 0);
     }
-    error("too many arguments\n")  if @ARGV > 0;
+    die "too many arguments" if @ARGV > 0;
 
     if ($file) {
 	$vdisize = `qemu-io -c length $vdiname`;
@@ -306,12 +306,12 @@ sub parse {
     }
     to_bytes($vdisize);
 
-    error("cannot get vdi size\n")  if $vdisize == 0;
+    die "cannot get vdi size" if $vdisize == 0;
 
     $eblk = $vdisize  if $eblk == 0;
 
-    error("test block range is invalid\n")  if $sblk >= $eblk;
-    error("transfer size is too large\n")  if $hblk > $eblk - $sblk;
+    die "test block range is invalid" if $sblk >= $eblk;
+    die "transfer size is too large" if $hblk > $eblk - $sblk;
 }
 
 sub vdi_main {
@@ -441,12 +441,4 @@ Usage: $program [OPTION] vdiname
 
 END_OF_HELP
     exit($status);
-}
-
-sub error {
-    my ($msg) = @_;
-
-    print STDERR $msg;
-
-    exit(1);
 }
