@@ -69,7 +69,7 @@ rpm: clean
 	rpmbuild $(RPMBUILDOPTS) -ba $(SPEC)
 
 CGCC=cgcc
-CGCC_CFLAGS=-Wbitwise -Wno-return-void $(ARCH)
+CGCC_CFLAGS=-Wbitwise -Wno-return-void $(ARCH) -fno-common
 
 sparse-check: ARCH=$(shell sh script/checkarch.sh)
 sparse-check:
