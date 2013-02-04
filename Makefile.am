@@ -71,6 +71,6 @@ rpm: clean
 CGCC=cgcc
 CGCC_CFLAGS=-Wbitwise -Wno-return-void $(ARCH) -fno-common
 
-sparse-check: ARCH=$(shell sh script/checkarch.sh)
-sparse-check:
+sparse: ARCH=$(shell sh script/checkarch.sh)
+sparse:
 	$(MAKE) CC=$(CGCC) CFLAGS="$(CFLAGS) $(CGCC_CFLAGS)"
