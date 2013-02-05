@@ -221,7 +221,7 @@ _start_sheep()
         _die "sheep $1 is still running"
     fi
 
-    $SHEEP $STORE/$1 -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2
+    $SHEEP $STORE/$1 -n -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2
 
     if [ $? != 0 ]; then
         _die "cannot start sheep $1"
