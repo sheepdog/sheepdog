@@ -39,10 +39,15 @@ done
 sleep 3
 
 echo begin kill
-for i in `seq 1 5`; do
-    _kill_sheep $i
-    sleep 3
-done
+
+_kill_sheep 1
+_kill_sheep 2
+_wait_for_sheep_recovery 0
+_kill_sheep 3
+_kill_sheep 4
+_wait_for_sheep_recovery 0
+_kill_sheep 5
+_wait_for_sheep_recovery 0
 
 for i in `seq 1 5`; do
     _start_sheep $i
