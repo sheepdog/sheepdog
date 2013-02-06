@@ -25,7 +25,8 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 	int flags = O_DSYNC | O_RDWR;
 
 	if ((fl & SD_FLAG_CMD_CACHE && is_disk_cache_enabled()) ||
-	    uatomic_is_true(&sys->use_journal))
+	    uatomic_is_true(&sys->use_journal) ||
+	    sys->nosync == true)
 		flags &= ~O_DSYNC;
 
 	/*

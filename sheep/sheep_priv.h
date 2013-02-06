@@ -105,6 +105,7 @@ struct cluster_info {
 
 	bool gateway_only;
 	bool disable_recovery;
+	bool nosync;
 
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
