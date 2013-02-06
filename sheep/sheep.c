@@ -432,7 +432,6 @@ int main(int argc, char **argv)
 	int64_t zone = -1, free_space = 0;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
-	const char *log_format = "default";
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -572,19 +571,13 @@ int main(int argc, char **argv)
 			exit(0);
 			break;
 		case 'F':
-			log_format = optarg;
+			select_log_formatter(optarg);
 			break;
 		default:
 			usage(1);
 			break;
 		}
 	}
-
-	/*
-	 * select_log_formatter() must be called before any calling of
-	 * sd_printf() series
-	 */
-	select_log_formatter(log_format);
 
 	if (nr_vnodes == 0) {
 		sys->gateway_only = true;

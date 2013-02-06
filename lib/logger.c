@@ -101,6 +101,25 @@ static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
 
 static pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
 
+/*
+ * We need to set default log formatter because collie doesn't want to call
+ * select_log_formatter().
+ */
+static void __attribute__((constructor))
+init_log_formatter(void)
+{
+	struct log_format *f;
+
+	list_for_each_entry(f, &log_formats, list) {
+		if (!strcmp(f->name, "default")) {
+			format = f;
+			return;
+		}
+	}
+	syslog(LOG_ERR, "failed to set default formatter\n");
+	exit(1);
+}
+
 static notrace int logarea_init(int size)
 {
 	int shmid;
