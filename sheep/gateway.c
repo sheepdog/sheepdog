@@ -177,8 +177,7 @@ again:
 		for (i = 0; i < nr_sent; i++)
 			sheep_del_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
 
-		err_ret = SD_RES_NETWORK_ERROR;
-		goto finish_write;
+		return SD_RES_NETWORK_ERROR;
 	}
 
 	nr_sent = wi->nr_sent;
