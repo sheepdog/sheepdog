@@ -74,3 +74,9 @@ CGCC_CFLAGS=-Wbitwise -Wno-return-void $(ARCH) -fno-common
 sparse: ARCH=$(shell sh script/checkarch.sh)
 sparse:
 	$(MAKE) CC=$(CGCC) CFLAGS="$(CFLAGS) $(CGCC_CFLAGS)"
+
+CHECK_STYLE=../script/checkpatch.pl -f --no-summary --terse
+check-style:
+	@for dir in lib collie sheep include sheepfs; do \
+		make -C $$dir check-style CHECK_STYLE="$(CHECK_STYLE)"; \
+	done

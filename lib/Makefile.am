@@ -10,3 +10,6 @@ libsheepdog_a_SOURCES	= event.c logger.c net.c util.c rbtree.c strbuf.c \
 # support for GNU Flymake
 check-syntax:
 	$(COMPILE) -fsyntax-only $(CHK_SOURCES)
+
+check-style:
+	@$(CHECK_STYLE) $(libsheepdog_a_SOURCES)

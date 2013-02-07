@@ -46,3 +46,6 @@ clean-local:
 # support for GNU Flymake
 check-syntax:
 	$(COMPILE) -fsyntax-only $(CHK_SOURCES)
+
+check-style:
+	@$(CHECK_STYLE) $(collie_SOURCES) $(noinst_HEADERS)
