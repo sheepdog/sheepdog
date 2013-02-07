@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009-2011 Nippon Telegraph and Telephone Corporation.
+ * Copyright (C) 2012-2013 Taobao Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -323,7 +324,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 
 int gateway_write_obj(struct request *req)
 {
-	if (is_object_cache_enabled() && !req->local && !bypass_object_cache(req))
+	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
 	return gateway_forward_request(req, false);
@@ -331,7 +332,7 @@ int gateway_write_obj(struct request *req)
 
 int gateway_create_and_write_obj(struct request *req)
 {
-	if (is_object_cache_enabled() && !req->local && !bypass_object_cache(req))
+	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
 	return gateway_forward_request(req, false);
