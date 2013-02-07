@@ -34,13 +34,14 @@ $COLLIE cluster format
 $COLLIE vdi create test 100M
 dd if=/dev/zero | $COLLIE vdi write test &
 
-sleep 1
 # simulate IO NIC down of sheep 1
 iptables -A INPUT -p tcp --sport 8001 -j DROP
 iptables -A INPUT -p tcp --dport 8001 -j DROP
 
 # wait for collie to finish
 wait
+# Logger flush in 1 second internval. We need assure log is flushed.
+sleep 1
 
 if [ "`grep fallback $STORE/0/sheep.log`" ];then
 	echo fallback done
