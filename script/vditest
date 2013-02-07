@@ -59,9 +59,9 @@ sub to_bytes {
     my ($size) = @_;
 
     given ($size) {
-	when (/k$/i) { $size *= 1024; }
-	when (/m$/i) { $size *= 1024 ** 2; }
-	when (/g$/i) { $size *= 1024 ** 3; }
+	when (/k(i?b)?$/i) { $size *= 1024; }
+	when (/m(i?b)?$/i) { $size *= 1024 ** 2; }
+	when (/g(i?b)?$/i) { $size *= 1024 ** 3; }
     }
 
     $_[0] = $size;
