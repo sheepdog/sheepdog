@@ -75,7 +75,7 @@ struct log_format {
 };
 
 #define log_format_register(n, formatter_fn)				\
-	static void __attribute__((constructor))			\
+	static void __attribute__((constructor(101)))			\
 	regist_ ## formatter_fn(void) {					\
 		static struct log_format f =				\
 			{ .name = n, .formatter = formatter_fn };	\
@@ -105,7 +105,7 @@ static pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
  * We need to set default log formatter because collie doesn't want to call
  * select_log_formatter().
  */
-static void __attribute__((constructor))
+static void __attribute__((constructor(65535)))
 init_log_formatter(void)
 {
 	struct log_format *f;
