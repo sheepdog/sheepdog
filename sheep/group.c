@@ -1085,6 +1085,10 @@ void sd_join_handler(const struct sd_node *joined,
 			/* this output is used for testing */
 			sd_printf(SDOG_DEBUG, "join Sheepdog cluster\n");
 		break;
+	default:
+		/* this means sd_check_join_cb() is buggy */
+		panic("unknown cluster join result: %d\n", result);
+		break;
 	}
 }
 
