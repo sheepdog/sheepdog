@@ -18,7 +18,7 @@
 #include <sys/syslog.h>
 
 #define LOG_SPACE_SIZE (32 * 1024 * 1024)
-#define MAX_MSG_SIZE 256
+#define MAX_MSG_SIZE 1024
 #define MAX_THREAD_NAME_LEN	20
 
 struct logger_user_info {
