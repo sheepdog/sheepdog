@@ -432,6 +432,8 @@ int main(int argc, char **argv)
 	int64_t zone = -1, free_space = 0;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
+	const char *log_format = "default";
+	static struct logger_user_info sheep_info;
 
 	signal(SIGPIPE, SIG_IGN);
 
@@ -571,13 +573,20 @@ int main(int argc, char **argv)
 			exit(0);
 			break;
 		case 'F':
-			select_log_formatter(optarg);
+			log_format = optarg;
 			break;
 		default:
 			usage(1);
 			break;
 		}
 	}
+
+	/*
+	 * early_log_init() must be called before any calling of
+	 * sd_printf() series
+	 */
+	sheep_info.port = port;
+	early_log_init(log_format, &sheep_info);
 
 	if (nr_vnodes == 0) {
 		sys->gateway_only = true;

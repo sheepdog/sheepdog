@@ -21,7 +21,12 @@
 #define MAX_MSG_SIZE 256
 #define MAX_THREAD_NAME_LEN	20
 
-void select_log_formatter(const char *format_name);
+struct logger_user_info {
+	int port;
+};
+
+void early_log_init(const char *format_name,
+		struct logger_user_info *user_info);
 int log_init(const char *progname, int size, bool to_stdout, int level,
 	char *outfile);
 void log_close(void);

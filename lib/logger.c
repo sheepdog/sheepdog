@@ -36,6 +36,8 @@
 #include "logger.h"
 #include "util.h"
 
+struct logger_user_info *logger_user_info;
+
 static void dolog(int prio, const char *func, int line, const char *fmt,
 		  va_list ap) __attribute__ ((format (printf, 4, 0)));
 
@@ -227,7 +229,22 @@ static notrace int json_log_formatter(char *buff, size_t size,
 	int i, body_len;
 	char *p = buff;
 
-	snprintf(p, size, "{");
+	snprintf(p, size, "{ \"user_info\": {");
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), "\"program_name\": \"%s\", ",
+		log_name);
+	p += strlen(p);
+
+	assert(logger_user_info);
+	snprintf(p, size - strlen(buff), "\"port\": %d",
+		logger_user_info->port);
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), "},");
+	p += strlen(p);
+
+	snprintf(p, size - strlen(buff), "\"body\": {");
 	p += strlen(p);
 
 	snprintf(p, size - strlen(buff), "\"second\": %lu", msg->tv.tv_sec);
@@ -254,7 +271,7 @@ static notrace int json_log_formatter(char *buff, size_t size,
 	snprintf(p, size - strlen(buff), ", \"line\": %d", msg->line);
 	p += strlen(p);
 
-	snprintf(p, size - strlen(buff), ", \"body\": \"");
+	snprintf(p, size - strlen(buff), ", \"msg\": \"");
 	p += strlen(p);
 
 	body_len = strlen(msg->str) - 1;
@@ -265,7 +282,7 @@ static notrace int json_log_formatter(char *buff, size_t size,
 		*p++ = msg->str[i];
 	}
 
-	snprintf(p, size - strlen(buff), "\"}\n");
+	snprintf(p, size - strlen(buff), "\"} }\n");
 	p += strlen(p);
 
 	return p - buff;
@@ -518,9 +535,11 @@ static notrace void logger(char *log_dir, char *outfile)
 	exit(0);
 }
 
-void select_log_formatter(const char *format_name)
+void early_log_init(const char *format_name, struct logger_user_info *user_info)
 {
 	struct log_format *f;
+
+	logger_user_info = user_info;
 
 	list_for_each_entry(f, &log_formats, list) {
 		if (!strcmp(f->name, format_name)) {
