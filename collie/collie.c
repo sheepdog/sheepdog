@@ -15,6 +15,7 @@
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "collie.h"
+#include "util.h"
 
 static const char program_name[] = "collie";
 const char *sdhost = "localhost";
@@ -143,7 +144,7 @@ static void init_commands(const struct command **commands)
 	};
 
 	if (!cmds) {
-		cmds = (struct command *)malloc(sizeof(command_list));
+		cmds = (struct command *)xmalloc(sizeof(command_list));
 		memcpy(cmds, command_list, sizeof(command_list));
 	}
 
@@ -312,6 +313,16 @@ static const struct sd_option *build_sd_options(const char *opts)
 	return sd_opts;
 }
 
+static void crash_handler(int signo)
+{
+	if (signo == SIGABRT)
+		fprintf(stderr, "collie abort.\n");
+	else
+		fprintf(stderr, "collie got unexpected signal %d.\n", signo);
+
+	exit(EXIT_SYSFAIL);
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret;
@@ -321,8 +332,16 @@ int main(int argc, char **argv)
 	const char *short_options;
 	char *p;
 	const struct sd_option *sd_opts;
+	struct sigaction sa_old;
+	struct sigaction sa_new;
 
 	init_commands(&commands);
+
+	sa_new.sa_handler = crash_handler;
+	sa_new.sa_flags = 0;
+	sigemptyset(&sa_new.sa_mask);
+
+	sigaction(SIGABRT, &sa_new, &sa_old);
 
 	if (argc < 3)
 		usage(commands, 0);
