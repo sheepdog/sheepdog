@@ -11,6 +11,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
