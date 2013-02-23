@@ -37,6 +37,7 @@ void log_write(int prio, const char *func, int line, const char *fmt, ...)
 	__printf(4, 5);
 void set_thread_name(const char *name, int idx);
 void get_thread_name(char *name);
+void sd_backtrace(void);
 
 /*
 + * sheep log priorities, comliant with syslog spec

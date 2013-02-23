@@ -32,6 +32,7 @@
 #include <pthread.h>
 #include <libgen.h>
 #include <sys/time.h>
+#include <execinfo.h>
 
 #include "logger.h"
 #include "util.h"
@@ -626,4 +627,43 @@ notrace void get_thread_name(char *name)
 		snprintf(name, MAX_THREAD_NAME_LEN, "%s", worker_name);
 	else
 		snprintf(name, MAX_THREAD_NAME_LEN, "%s", "main");
+}
+
+
+#define SD_MAX_STACK_DEPTH 1024
+
+notrace void sd_backtrace(void)
+{
+	void *addrs[SD_MAX_STACK_DEPTH];
+	int i, n = backtrace(addrs, ARRAY_SIZE(addrs));
+
+	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
+		void *addr = addrs[i];
+		char cmd[1024], path[256] = {0}, info[256] = {0}, **str;
+		FILE *f;
+
+		/* the called function is at the previous address
+		 * because addr contains a return address */
+		addr = (void *)((char *)addr - 1);
+
+		/* try to get a line number with addr2line if possible */
+		readlink("/proc/self/exe", path, sizeof(path));
+		snprintf(cmd, sizeof(cmd), "addr2line -s -e %s -f -i %p | "
+			"perl -e '@a=<>; chomp @a; print \"$a[1]: $a[0]\"'",
+			path, addr);
+		f = popen(cmd, "r");
+		if (f != NULL) {
+			fgets(info, sizeof(info), f);
+			if (info[0] != '?' && info[0] != '\0') {
+				sd_printf(SDOG_EMERG, "%s\n", info);
+				continue;
+			}
+		}
+
+		/* failed to get a line number, so simply use
+		 * backtrace_symbols instead */
+		str = backtrace_symbols(&addr, 1);
+		sd_printf(SDOG_EMERG, "%s\n", *str);
+		free(str);
+	}
 }
