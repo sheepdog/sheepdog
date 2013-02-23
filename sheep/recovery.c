@@ -147,7 +147,7 @@ again:
 	for (i = 0; i < nr_copies; i++) {
 		const struct sd_vnode *tgt_vnode;
 
-		tgt_vnode = oid_to_vnode(old->vnodes,old->nr_vnodes, oid, i);
+		tgt_vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, i);
 
 		if (is_invalid_vnode(tgt_vnode, rw->cur_vinfo->nodes,
 				     rw->cur_vinfo->nr_nodes))

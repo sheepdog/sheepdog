@@ -7,7 +7,7 @@
 
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
-	(type *)( (char *)__mptr - offsetof(type,member) );})
+	(type *)( (char *)__mptr - offsetof(type, member) ); })
 
 struct list_head {
 	struct list_head *next, *prev;
@@ -217,7 +217,7 @@ static inline void hlist_add_after(struct hlist_node *n,
 		next->next->pprev  = &next->next;
 }
 
-#define hlist_entry(ptr, type, member) container_of(ptr,type,member)
+#define hlist_entry(ptr, type, member) container_of(ptr, type, member)
 
 #define hlist_for_each(pos, head) \
         for (pos = (head)->first; pos ; pos = pos->next)
@@ -236,7 +236,7 @@ static inline void hlist_add_after(struct hlist_node *n,
 #define hlist_for_each_entry(tpos, pos, head, member)                    \
         for (pos = (head)->first;                                        \
              pos &&                                                      \
-                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
              pos = pos->next)
 
 /**
@@ -250,7 +250,7 @@ static inline void hlist_add_after(struct hlist_node *n,
 #define hlist_for_each_entry_safe(tpos, pos, n, head, member)            \
         for (pos = (head)->first;                                        \
              pos && ({ n = pos->next; 1; }) &&                           \
-                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
              pos = n)
 
 #endif

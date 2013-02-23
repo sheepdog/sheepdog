@@ -1485,8 +1485,8 @@ static int vdi_check(int argc, char **argv)
 		fprintf(stderr, "FATAL: no inode objects\n");
 		goto out;
 	}
-	if (sd_nodes_nr < inode->nr_copies){
-		fprintf(stderr,"ABORT: Not enough active nodes for "
+	if (sd_nodes_nr < inode->nr_copies) {
+		fprintf(stderr, "ABORT: Not enough active nodes for "
 			"consistency-check\n");
 		return EXIT_FAILURE;
 	}

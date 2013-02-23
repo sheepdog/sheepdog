@@ -346,7 +346,7 @@ bool is_numeric(const char *s)
 	if (*p) {
 		char c;
 
-		while ((c=*p++))
+		while ((c = *p++))
 			if (!isdigit(c))
 				return false;
 		return true;
