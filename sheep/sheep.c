@@ -175,6 +175,14 @@ static int init_signal(void)
 	return 0;
 }
 
+static void crash_handler(int signo)
+{
+	sd_printf(SDOG_EMERG, "sheep exits unexpectedly (%s).\n",
+		  strsignal(signo));
+
+	sd_backtrace();
+}
+
 static struct cluster_info __sys;
 struct cluster_info *sys = &__sys;
 
@@ -435,6 +443,7 @@ int main(int argc, char **argv)
 	const char *log_format = "default";
 	static struct logger_user_info sheep_info;
 
+	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
 
 	long_options = build_long_options(sheep_options);

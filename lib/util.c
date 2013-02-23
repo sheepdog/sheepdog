@@ -366,3 +366,12 @@ int install_sighandler(int signum, void (*handler)(int), bool once)
 
 	return sigaction(signum, &sa, NULL);
 }
+
+int install_crash_handler(void (*handler)(int))
+{
+	return install_sighandler(SIGSEGV, handler, true) ||
+		install_sighandler(SIGABRT, handler, true) ||
+		install_sighandler(SIGBUS, handler, true) ||
+		install_sighandler(SIGILL, handler, true) ||
+		install_sighandler(SIGFPE, handler, true);
+}

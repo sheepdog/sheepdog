@@ -316,10 +316,9 @@ static const struct sd_option *build_sd_options(const char *opts)
 
 static void crash_handler(int signo)
 {
-	if (signo == SIGABRT)
-		fprintf(stderr, "collie abort.\n");
-	else
-		fprintf(stderr, "collie got unexpected signal %d.\n", signo);
+	fprintf(stderr, "collie exits unexpectedly (%s).\n", strsignal(signo));
+
+	sd_backtrace();
 
 	exit(EXIT_SYSFAIL);
 }
@@ -334,7 +333,7 @@ int main(int argc, char **argv)
 	char *p;
 	const struct sd_option *sd_opts;
 
-	install_sighandler(SIGABRT, crash_handler, true);
+	install_crash_handler(crash_handler);
 
 	init_commands(&commands);
 

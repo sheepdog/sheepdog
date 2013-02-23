@@ -447,15 +447,13 @@ static notrace void log_flush(void)
 
 static notrace void crash_handler(int signo)
 {
-	if (signo == SIGSEGV) {
-		sd_printf(SDOG_ERR, "logger pid %d segfaulted.\n",
-			getpid());
-	} else if (signo == SIGHUP) {
+	if (signo == SIGHUP) {
 		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n",
 			sheep_pid);
 	} else {
-		sd_printf(SDOG_ERR, "logger pid %d got unexpected signal %d.\n",
-			getpid(), signo);
+		sd_printf(SDOG_ERR, "logger pid %d exits unexpectedly (%s).\n",
+			  getpid(), strsignal(signo));
+		sd_backtrace();
 	}
 
 	log_flush();
@@ -493,7 +491,7 @@ static notrace void logger(char *log_dir, char *outfile)
 	}
 
 	/* flush when either the logger or its parent dies */
-	install_sighandler(SIGSEGV, crash_handler, true);
+	install_crash_handler(crash_handler);
 	install_sighandler(SIGHUP, crash_handler, false);
 
 	prctl(PR_SET_PDEATHSIG, SIGHUP);
