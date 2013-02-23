@@ -466,8 +466,6 @@ static notrace void crash_handler(int signo)
 
 static notrace void logger(char *log_dir, char *outfile)
 {
-	struct sigaction sa_old;
-	struct sigaction sa_new;
 	int fd;
 
 	log_buff = xzalloc(la->end - la->start);
@@ -495,12 +493,8 @@ static notrace void logger(char *log_dir, char *outfile)
 	}
 
 	/* flush when either the logger or its parent dies */
-	sa_new.sa_handler = crash_handler;
-	sa_new.sa_flags = 0;
-	sigemptyset(&sa_new.sa_mask);
-
-	sigaction(SIGSEGV, &sa_new, &sa_old);
-	sigaction(SIGHUP, &sa_new, &sa_old);
+	install_sighandler(SIGSEGV, crash_handler, true);
+	install_sighandler(SIGHUP, crash_handler, false);
 
 	prctl(PR_SET_PDEATHSIG, SIGHUP);
 

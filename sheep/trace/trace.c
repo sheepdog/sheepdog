@@ -307,12 +307,8 @@ notrace int trace_disable(void)
 
 int trace_init_signal(void)
 {
-	struct sigaction act;
-
-	memset(&act, 0, sizeof(act));
-	act.sa_handler = suspend;
 	/* trace uses this signal to suspend the worker threads */
-	if (sigaction(SIGUSR2, &act, NULL) < 0) {
+	if (install_sighandler(SIGUSR2, suspend, false) < 0) {
 		sd_dprintf("%m\n");
 		return -1;
 	}

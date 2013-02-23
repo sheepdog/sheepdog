@@ -85,6 +85,7 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 void pstrcpy(char *buf, int buf_size, const char *str);
 int rmdir_r(char *dir_path);
 bool is_numeric(const char *p);
+int install_sighandler(int signum, void (*handler)(int), bool once);
 
 void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
 void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,

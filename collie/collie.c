@@ -333,16 +333,10 @@ int main(int argc, char **argv)
 	const char *short_options;
 	char *p;
 	const struct sd_option *sd_opts;
-	struct sigaction sa_old;
-	struct sigaction sa_new;
+
+	install_sighandler(SIGABRT, crash_handler, true);
 
 	init_commands(&commands);
-
-	sa_new.sa_handler = crash_handler;
-	sa_new.sa_flags = 0;
-	sigemptyset(&sa_new.sa_mask);
-
-	sigaction(SIGABRT, &sa_new, &sa_old);
 
 	if (argc < 3)
 		usage(commands, 0);

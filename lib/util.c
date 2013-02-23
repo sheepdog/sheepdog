@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>
+#include <signal.h>
 
 #include "util.h"
 #include "logger.h"
@@ -352,4 +353,16 @@ bool is_numeric(const char *s)
 		return true;
 	}
 	return false;
+}
+
+int install_sighandler(int signum, void (*handler)(int), bool once)
+{
+	struct sigaction sa = {};
+
+	sa.sa_handler = handler;
+	if (once)
+		sa.sa_flags = SA_RESETHAND;
+	sigemptyset(&sa.sa_mask);
+
+	return sigaction(signum, &sa, NULL);
 }
