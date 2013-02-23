@@ -118,7 +118,8 @@ struct cluster_driver {
 extern struct list_head cluster_drivers;
 
 #define cdrv_register(driver)						\
-static void __attribute__((constructor)) regist_ ## driver(void) {	\
+static void __attribute__((constructor)) regist_ ## driver(void)	\
+{									\
 	if (!driver.init || !driver.join || !driver.leave || !driver.notify) \
 		panic("the driver '%s' is incomplete\n", driver.name);	\
 	list_add(&driver.list, &cluster_drivers);			\

@@ -73,13 +73,12 @@ static int list_store(void)
 	return EXIT_SYSFAIL;
 }
 
-#define FORMAT_PRINT \
-"\
-    __   \n\
-   ()'`; \n\
-   /\\|`  \n\
-  /  |   Caution! The cluster is not empty.\n\
-(/_)_|_  Are you sure you want to continue? [yes/no]: "
+#define FORMAT_PRINT				\
+	"    __\n"				\
+	"   ()'`;\n"				\
+	"   /\\|`\n"				\
+	"  /  |   Caution! The cluster is not empty.\n" \
+	"(/_)_|_  Are you sure you want to continue? [yes/no]: "
 
 static int cluster_format(int argc, char **argv)
 {
@@ -359,12 +358,12 @@ static int cluster_snapshot(int argc, char **argv)
 }
 
 #define RECOVER_PRINT \
-"Caution! Please try starting all the cluster nodes normally before\n\
-running this command.\n\n\
-The cluster may need to be force recovered if:\n\
-  - the master node fails to start because of epoch mismatch; or\n\
-  - some nodes fail to start after a cluster shutdown.\n\n\
-Are you sure you want to continue? [yes/no]: "
+	"Caution! Please try starting all the cluster nodes normally before\n" \
+	"running this command.\n\n" \
+	"The cluster may need to be force recovered if:\n" \
+	"  - the master node fails to start because of epoch mismatch; or\n" \
+	"  - some nodes fail to start after a cluster shutdown.\n\n" \
+	"Are you sure you want to continue? [yes/no]: "
 
 static int cluster_force_recover(int argc, char **argv)
 {

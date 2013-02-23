@@ -40,13 +40,13 @@ static inline int list_empty(const struct list_head *head)
 
 #define list_for_each_entry(pos, head, member)				\
 	for (pos = list_entry((head)->next, typeof(*pos), member);	\
-	     &pos->member != (head);				 	\
+	     &pos->member != (head);					\
 	     pos = list_entry(pos->member.next, typeof(*pos), member))
 
 #define list_for_each_entry_safe(pos, n, head, member)			\
 	for (pos = list_entry((head)->next, typeof(*pos), member),	\
 		n = list_entry(pos->member.next, typeof(*pos), member);	\
-	     &pos->member != (head); 					\
+	     &pos->member != (head);					\
 	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
 
 static inline void __list_add(struct list_head *new,
@@ -220,11 +220,11 @@ static inline void hlist_add_after(struct hlist_node *n,
 #define hlist_entry(ptr, type, member) container_of(ptr, type, member)
 
 #define hlist_for_each(pos, head) \
-        for (pos = (head)->first; pos ; pos = pos->next)
+	for (pos = (head)->first; pos ; pos = pos->next)
 
 #define hlist_for_each_safe(pos, n, head) \
-        for (pos = (head)->first; pos && ({ n = pos->next; 1; }); \
-             pos = n)
+	for (pos = (head)->first; pos && ({ n = pos->next; 1; });	\
+	     pos = n)
 
 /**
  * hlist_for_each_entry - iterate over list of given type
@@ -233,11 +233,10 @@ static inline void hlist_add_after(struct hlist_node *n,
  * @head:       the head for your list.
  * @member:     the name of the hlist_node within the struct.
  */
-#define hlist_for_each_entry(tpos, pos, head, member)                    \
-        for (pos = (head)->first;                                        \
-             pos &&                                                      \
-                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
-             pos = pos->next)
+#define hlist_for_each_entry(tpos, pos, head, member)			\
+	for (pos = (head)->first;					\
+	     pos && ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
+	     pos = pos->next)
 
 /**
  * hlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
@@ -247,12 +246,11 @@ static inline void hlist_add_after(struct hlist_node *n,
  * @head:       the head for your list.
  * @member:     the name of the hlist_node within the struct.
  */
-#define hlist_for_each_entry_safe(tpos, pos, n, head, member)            \
-        for (pos = (head)->first;                                        \
-             pos && ({ n = pos->next; 1; }) &&                           \
-                ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
-             pos = n)
-
+#define hlist_for_each_entry_safe(tpos, pos, n, head, member)		\
+	for (pos = (head)->first;					\
+	     pos && ({ n = pos->next; 1; }) &&				\
+		     ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
+	     pos = n)
 #endif
 
 

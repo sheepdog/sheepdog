@@ -624,9 +624,9 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		cevent = xzalloc(sizeof(*cevent));
 		master = is_master(&left_sheep[i]);
 		if (master >= 0)
-		/* Master is down before new nodes finish joining.
-		 * We have to revoke its mastership to avoid cluster hanging
-		 */
+			/* Master is down before new nodes finish joining.
+			 * We have to revoke its mastership to avoid cluster
+			 * hanging */
 			cpg_nodes[master].gone = 1;
 
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
