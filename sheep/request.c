@@ -59,7 +59,6 @@ static void io_op_done(struct work *work)
 	default:
 		sd_dprintf("unhandled error %d\n", req->rp.result);
 		break;
-
 	}
 
 	put_request(req);
