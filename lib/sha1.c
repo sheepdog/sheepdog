@@ -61,7 +61,7 @@ static void sha1_transform(uint32_t *state, const uint8_t *in)
 
 	/* convert/copy data to workspace */
 	for (a = 0; a < sizeof(block32)/sizeof(uint32_t); a++)
-	  block32[a] = ntohl (((const uint32_t *)in)[a]);
+	  block32[a] = ntohl(((const uint32_t *)in)[a]);
 
 	/* Copy context->state[] to working vars */
 	a = state[0];
@@ -191,7 +191,7 @@ void sha1_final(void *ctx, uint8_t *out)
 		out[j+3] = t2 & 0xff; t2 >>= 8;
 		out[j+2] = t2 & 0xff; t2 >>= 8;
 		out[j+1] = t2 & 0xff; t2 >>= 8;
-		out[j  ] = t2 & 0xff;
+		out[j] = t2 & 0xff;
 	}
 
 	/* Wipe context */

@@ -81,8 +81,8 @@ struct corosync_event {
 
 struct corosync_message {
 	struct cpg_node sender;
-	enum corosync_message_type type : 4;
-	enum cluster_join_result result : 4;
+	enum corosync_message_type type:4;
+	enum cluster_join_result result:4;
 	uint32_t msg_len;
 	uint32_t nr_nodes;
 	struct cpg_node nodes[SD_MAX_NODES];
