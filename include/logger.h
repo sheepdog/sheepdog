@@ -17,6 +17,8 @@
 #include <stdbool.h>
 #include <sys/syslog.h>
 
+#include "util.h"
+
 #define LOG_SPACE_SIZE (32 * 1024 * 1024)
 #define MAX_MSG_SIZE 1024
 #define MAX_THREAD_NAME_LEN	20
@@ -32,7 +34,7 @@ int log_init(const char *progname, int size, bool to_stdout, int level,
 void log_close(void);
 void dump_logmsg(void *);
 void log_write(int prio, const char *func, int line, const char *fmt, ...)
-	__attribute__ ((format (printf, 4, 5)));
+	__printf(4, 5);
 void set_thread_name(const char *name, int idx);
 void get_thread_name(char *name);
 

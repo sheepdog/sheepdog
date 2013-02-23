@@ -78,7 +78,7 @@ static struct sheepfs_file_operation {
 				volume_sync, volume_open },
 };
 
-__attribute__ ((format (__printf__, 3, 4)))
+__printf(3, 4)
 static void fg_printf(const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
@@ -89,7 +89,7 @@ static void fg_printf(const char *func, int line, const char *fmt, ...)
 	va_end(ap);
 }
 
-__attribute__ ((format (__printf__, 3, 4)))
+__printf(3, 4)
 static void bg_printf(const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;

@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "util.h"
+#include "logger.h"
 
 struct strbuf {
 	size_t alloc;
@@ -88,8 +88,7 @@ static inline void strbuf_addbuf(struct strbuf *sb, struct strbuf *sb2)
 	strbuf_add(sb, sb2->buf, sb2->len);
 }
 
-__attribute__((format(printf, 2, 3)))
-void strbuf_addf(struct strbuf *sb, const char *fmt, ...);
+void strbuf_addf(struct strbuf *sb, const char *fmt, ...) __printf(2, 3);
 
 size_t strbuf_fread(struct strbuf *, size_t, FILE *);
 /* XXX: if read fails, any partial read is undone */

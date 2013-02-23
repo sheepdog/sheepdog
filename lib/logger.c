@@ -39,7 +39,7 @@
 struct logger_user_info *logger_user_info;
 
 static void dolog(int prio, const char *func, int line, const char *fmt,
-		  va_list ap) __attribute__ ((format (printf, 4, 0)));
+		  va_list ap) __printf(4, 0);
 
 union semun {
 	int val;
