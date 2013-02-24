@@ -300,9 +300,7 @@ static int list_snap(void)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	void *buf;
 
-	buf = malloc(SD_DATA_OBJ_SIZE);
-	if (!buf)
-		return EXIT_SYSFAIL;
+	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)

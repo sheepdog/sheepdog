@@ -57,11 +57,7 @@ static struct vdi_tree *new_vdi(const char *name, const char *label,
 {
 	struct vdi_tree *vdi;
 
-	vdi = malloc(sizeof(struct vdi_tree));
-	if (!vdi) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		return NULL;
-	}
+	vdi = xmalloc(sizeof(struct vdi_tree));
 	pstrcpy(vdi->name, sizeof(vdi->name), name);
 	pstrcpy(vdi->label, sizeof(vdi->label), label);
 	vdi->vid = vid;

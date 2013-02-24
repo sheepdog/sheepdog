@@ -534,12 +534,7 @@ static int vdi_create(int argc, char **argv)
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
-	inode = malloc(sizeof(*inode));
-	if (!inode) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		ret = EXIT_SYSFAIL;
-		goto out;
-	}
+	inode = xmalloc(sizeof(*inode));
 
 	ret = sd_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode), 0, true);
 	if (ret != SD_RES_SUCCESS) {
@@ -626,12 +621,7 @@ static int vdi_clone(int argc, char **argv)
 		goto out;
 	}
 
-	inode = malloc(sizeof(*inode));
-	if (!inode) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		ret = EXIT_SYSFAIL;
-		goto out;
-	}
+	inode = xmalloc(sizeof(*inode));
 
 	ret = read_vdi_obj(src_vdi, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, &base_vid, inode,
@@ -1075,11 +1065,7 @@ static int vdi_setattr(int argc, char **argv)
 
 	value = argv[optind++];
 	if (!value && !vdi_cmd_data.delete) {
-		value = malloc(SD_MAX_VDI_ATTR_VALUE_LEN);
-		if (!value) {
-			fprintf(stderr, "Failed to allocate memory\n");
-			return EXIT_SYSFAIL;
-		}
+		value = xmalloc(SD_MAX_VDI_ATTR_VALUE_LEN);
 
 		offset = 0;
 reread:
@@ -1189,12 +1175,7 @@ static int vdi_read(int argc, char **argv)
 	}
 
 	inode = malloc(sizeof(*inode));
-	buf = malloc(SD_DATA_OBJ_SIZE);
-	if (!inode || !buf) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		ret = EXIT_SYSFAIL;
-		goto out;
-	}
+	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, NULL, inode,
@@ -1276,13 +1257,8 @@ static int vdi_write(int argc, char **argv)
 		}
 	}
 
-	inode = malloc(sizeof(*inode));
-	buf = malloc(SD_DATA_OBJ_SIZE);
-	if (!inode || !buf) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		ret = EXIT_SYSFAIL;
-		goto out;
-	}
+	inode = xmalloc(sizeof(*inode));
+	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
 	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS)
@@ -1377,11 +1353,7 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 	char name[128];
 	void *buf;
 
-	buf = malloc(SD_DATA_OBJ_SIZE);
-	if (!buf) {
-		fprintf(stderr, "Failed to allocate memory\n");
-		exit(EXIT_SYSFAIL);
-	}
+	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
 	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
 	fd = connect_to(name, vnode->nid.port);
