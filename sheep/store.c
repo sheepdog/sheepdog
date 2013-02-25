@@ -71,7 +71,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 err:
 	close(fd);
 err_open:
-	sd_dprintf("%s", strerror(errno));
+	sd_dprintf("%m");
 	return -1;
 }
 
@@ -212,8 +212,7 @@ static int lock_base_dir(const char *d)
 
 	fd = open(lock_path, O_WRONLY|O_CREAT, def_fmode);
 	if (fd < 0) {
-		sd_eprintf("failed to open lock file %s (%s)", lock_path,
-			   strerror(errno));
+		sd_eprintf("failed to open lock file %s (%m)", lock_path);
 		ret = -1;
 		goto out;
 	}
@@ -222,8 +221,7 @@ static int lock_base_dir(const char *d)
 		if (errno == EACCES || errno == EAGAIN) {
 			sd_eprintf("another sheep daemon is using %s", d);
 		} else {
-			sd_eprintf("unable to get base dir lock (%s)",
-				   strerror(errno));
+			sd_eprintf("unable to get base dir lock (%m)");
 		}
 		ret = -1;
 		goto out;

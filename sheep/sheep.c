@@ -705,8 +705,7 @@ int main(int argc, char **argv)
 		exit(1);
 
 	if (pid_file && (create_pidfile(pid_file) != 0)) {
-		fprintf(stderr, "failed to pid file '%s' - %s\n", pid_file,
-			strerror(errno));
+		fprintf(stderr, "failed to pid file '%s' - %m\n", pid_file);
 		exit(1);
 	}
 

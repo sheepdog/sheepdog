@@ -519,12 +519,12 @@ int default_flush(void)
 
 	fd = open(obj_path, O_RDONLY);
 	if (fd < 0) {
-		sd_eprintf("error at open() %s, %s", obj_path, strerror(errno));
+		sd_eprintf("error at open() %s, %m", obj_path);
 		return SD_RES_NO_OBJ;
 	}
 
 	if (syncfs(fd)) {
-		sd_eprintf("error at syncfs(), %s", strerror(errno));
+		sd_eprintf("error at syncfs(), %m");
 		ret = SD_RES_EIO;
 	}
 
