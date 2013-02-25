@@ -631,7 +631,8 @@ notrace void sd_backtrace(void)
 
 	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
 		void *addr = addrs[i];
-		char cmd[1024], path[256] = {0}, info[256] = {0}, **str;
+		char cmd[PATH_MAX], path[PATH_MAX] = {0}, info[256] = {0},
+		     **str;
 		FILE *f;
 
 		/* the called function is at the previous address
@@ -639,21 +640,30 @@ notrace void sd_backtrace(void)
 		addr = (void *)((char *)addr - 1);
 
 		/* try to get a line number with addr2line if possible */
-		readlink("/proc/self/exe", path, sizeof(path));
+		if (readlink("/proc/self/exe", path, sizeof(path)) < 0)
+			goto fallback;
+
 		snprintf(cmd, sizeof(cmd), "addr2line -s -e %s -f -i %p | "
 			"perl -e '@a=<>; chomp @a; print \"$a[1]: $a[0]\"'",
 			path, addr);
 		f = popen(cmd, "r");
-		if (f != NULL) {
-			fgets(info, sizeof(info), f);
-			if (info[0] != '?' && info[0] != '\0') {
-				sd_printf(SDOG_EMERG, "%s\n", info);
-				continue;
-			}
-		}
+		if (!f)
+			goto fallback;
+		if (fgets(info, sizeof(info), f) == NULL)
+			goto fallback_close;
 
+		if (info[0] != '?' && info[0] != '\0')
+			sd_printf(SDOG_EMERG, "%s\n", info);
+		else
+			goto fallback_close;
+
+		pclose(f);
+		continue;
 		/* failed to get a line number, so simply use
 		 * backtrace_symbols instead */
+fallback_close:
+		pclose(f);
+fallback:
 		str = backtrace_symbols(&addr, 1);
 		sd_printf(SDOG_EMERG, "%s\n", *str);
 		free(str);
