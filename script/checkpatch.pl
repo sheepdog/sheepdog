@@ -2889,6 +2889,11 @@ sub process {
 		    WARN("NEWLINE_IN_SDPRINTF",
 			 "'\\n' is not required for $1 format string\n" . $herecurr);
 		}
+# check for strerror(errno)
+		if ($line =~ /\bstrerror\(errno\)/) {
+		    WARN("STRERROR",
+			 "use %m instead of strerror(errno)\n" . $herecurr);
+		}
 	}
 
 	# If we have no input at all, then there is nothing to report on
