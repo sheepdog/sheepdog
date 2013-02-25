@@ -179,7 +179,7 @@ static void shm_queue_notify(void)
 	nr = get_nodes(lnodes);
 
 	for (i = 0; i < nr; i++) {
-		sd_dprintf("send signal to %s\n", lnode_to_str(lnodes + i));
+		sd_dprintf("send signal to %s", lnode_to_str(lnodes + i));
 		kill(lnodes[i].pid, SIGUSR1);
 	}
 }
@@ -208,7 +208,7 @@ static void shm_queue_init(void)
 
 	shmfd = open(shmfile, O_CREAT | O_RDWR, 0644);
 	if (shmfd < 0)
-		panic("cannot open shared file, %s\n", shmfile);
+		panic("cannot open shared file, %s", shmfile);
 
 	shm_queue_lock();
 
@@ -244,7 +244,7 @@ static struct local_node *find_lnode(struct local_node *key, size_t nr_lnodes,
 		if (lnode_eq(key, lnodes + i))
 			return lnodes + i;
 
-	panic("internal error\n");
+	panic("internal error");
 }
 
 static void add_event(enum local_event_type type, struct local_node *lnode,
@@ -286,10 +286,9 @@ static void add_event(enum local_event_type type, struct local_node *lnode,
 		abort();
 	}
 
-	sd_dprintf("type = %d, sender = %s\n",
-		ev.type, lnode_to_str(&ev.sender));
+	sd_dprintf("type = %d, sender = %s", ev.type, lnode_to_str(&ev.sender));
 	for (i = 0; i < ev.nr_lnodes; i++)
-		sd_dprintf("%d: %s\n", i, lnode_to_str(ev.lnodes + i));
+		sd_dprintf("%d: %s", i, lnode_to_str(ev.lnodes + i));
 
 	shm_queue_push(&ev);
 
@@ -405,14 +404,14 @@ static bool local_process_event(void)
 	if (!ev)
 		return false;
 
-	sd_dprintf("type = %d, sender = %s\n",
-		ev->type, lnode_to_str(&ev->sender));
-	sd_dprintf("callbacked = %d, removed = %d\n",
-		ev->callbacked, ev->removed);
+	sd_dprintf("type = %d, sender = %s", ev->type,
+		   lnode_to_str(&ev->sender));
+	sd_dprintf("callbacked = %d, removed = %d", ev->callbacked,
+		   ev->removed);
 
 	nr_nodes = 0;
 	for (i = 0; i < ev->nr_lnodes; i++) {
-		sd_dprintf("%d: %s\n", i, lnode_to_str(ev->lnodes + i));
+		sd_dprintf("%d: %s", i, lnode_to_str(ev->lnodes + i));
 		if (!ev->lnodes[i].gateway)
 			nodes[nr_nodes++] = ev->lnodes[i].node;
 	}
@@ -425,7 +424,7 @@ static bool local_process_event(void)
 
 	if (ev->type == EVENT_JOIN_RESPONSE &&
 	    lnode_eq(&this_node, &ev->sender)) {
-		sd_dprintf("join Sheepdog\n");
+		sd_dprintf("join Sheepdog");
 		joined = true;
 	}
 
@@ -438,7 +437,7 @@ static bool local_process_event(void)
 
 			if (!lnode_eq(&this_node, &lnodes[0])) {
 				sd_dprintf("wait for another node"
-					" to accept this node\n");
+					   " to accept this node");
 				return false;
 			}
 		} else
@@ -456,7 +455,7 @@ static bool local_process_event(void)
 
 		if (res == CJ_RES_MASTER_TRANSFER) {
 			sd_eprintf("failed to join sheepdog cluster: "
-				"please retry when master is up\n");
+				   "please retry when master is up");
 			shm_queue_unlock();
 			exit(1);
 		}
@@ -499,12 +498,12 @@ static void local_handler(int listen_fd, int events, void *data)
 	int ret;
 
 	if (events & EPOLLHUP) {
-		sd_eprintf("local driver received EPOLLHUP event, exiting.\n");
+		sd_eprintf("local driver received EPOLLHUP event, exiting.");
 		log_close();
 		exit(1);
 	}
 
-	sd_dprintf("read siginfo\n");
+	sd_dprintf("read siginfo");
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));
@@ -546,7 +545,7 @@ static int local_init(const char *option)
 
 	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
 	if (sigfd < 0) {
-		sd_eprintf("failed to create a signal fd: %m\n");
+		sd_eprintf("failed to create a signal fd: %m");
 		return -1;
 	}
 
@@ -554,8 +553,7 @@ static int local_init(const char *option)
 
 	ret = register_event(sigfd, local_handler, NULL);
 	if (ret) {
-		sd_eprintf("failed to register local event handler (%d)\n",
-			ret);
+		sd_eprintf("failed to register local event handler (%d)", ret);
 		return -1;
 	}
 

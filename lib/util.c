@@ -50,7 +50,7 @@ void *xmalloc(size_t size)
 		if (!ret && !size)
 			ret = malloc(1);
 		if (!ret)
-			panic("Out of memory\n");
+			panic("Out of memory");
 	}
 	return ret;
 }
@@ -71,7 +71,7 @@ notrace void *xrealloc(void *ptr, size_t size)
 		if (!ret && !size)
 			ret = realloc(ptr, 1);
 		if (!ret)
-			panic("Out of memory\n");
+			panic("Out of memory");
 	}
 	return ret;
 }
@@ -87,7 +87,7 @@ void *xcalloc(size_t nmemb, size_t size)
 		if (!ret && (!nmemb || !size))
 			ret = calloc(1, 1);
 		if (!ret)
-			panic("Out of memory\n");
+			panic("Out of memory");
 	}
 	return ret;
 }
@@ -96,7 +96,7 @@ void *xvalloc(size_t size)
 {
 	void *ret = valloc(size);
 	if (!ret)
-		panic("Out of memory\n");
+		panic("Out of memory");
 	return ret;
 }
 
@@ -265,7 +265,7 @@ int rmdir_r(char *dir_path)
 	dir = opendir(dir_path);
 	if (!dir) {
 		if (errno != ENOENT)
-			sd_eprintf("failed to open %s: %m\n", dir_path);
+			sd_eprintf("failed to open %s: %m", dir_path);
 		return -errno;
 	}
 
@@ -276,7 +276,7 @@ int rmdir_r(char *dir_path)
 		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
 		ret = stat(path, &s);
 		if (ret) {
-			sd_eprintf("failed to stat %s: %m\n", path);
+			sd_eprintf("failed to stat %s: %m", path);
 			goto out;
 		}
 		if (S_ISDIR(s.st_mode))
@@ -285,9 +285,9 @@ int rmdir_r(char *dir_path)
 			ret = unlink(path);
 
 		if (ret != 0) {
-			sd_eprintf("failed to remove %s %s: %m\n",
-					S_ISDIR(s.st_mode) ? "directory" : "file",
-					path);
+			sd_eprintf("failed to remove %s %s: %m",
+				   S_ISDIR(s.st_mode) ? "directory" : "file",
+				   path);
 			goto out;
 		}
 	}

@@ -136,7 +136,7 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	unsigned long nr = rsp->vdi.vdi_id;
 	int ret = rsp->result;
 
-	sd_dprintf("done %d %ld\n", ret, nr);
+	sd_dprintf("done %d %ld", ret, nr);
 	if (ret == SD_RES_SUCCESS)
 		set_bit(nr, sys->vdi_inuse);
 
@@ -231,18 +231,18 @@ static int remove_epoch(uint32_t epoch)
 	int ret;
 	char path[PATH_MAX];
 
-	sd_dprintf("remove epoch %"PRIu32"\n", epoch);
+	sd_dprintf("remove epoch %"PRIu32, epoch);
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	ret = unlink(path);
 	if (ret && ret != -ENOENT) {
-		sd_eprintf("failed to remove %s: %s\n", path, strerror(-ret));
+		sd_eprintf("failed to remove %s: %s", path, strerror(-ret));
 		return SD_RES_EIO;
 	}
 
 	snprintf(path, sizeof(path), "%s%08u/", jrnl_path, epoch);
 	ret = rmdir_r(path);
 	if (ret && ret != -ENOENT) {
-		sd_eprintf("failed to remove %s: %s\n", path, strerror(-ret));
+		sd_eprintf("failed to remove %s: %s", path, strerror(-ret));
 		return SD_RES_EIO;
 	}
 	return 0;
@@ -365,7 +365,7 @@ static int local_release_vdi(struct request *req)
 
 	if (!vid) {
 		sd_iprintf("Some VDI failed to release the object cache. "
-			   "Probably you are running old QEMU.\n");
+			   "Probably you are running old QEMU.");
 		return SD_RES_SUCCESS;
 	}
 
@@ -478,7 +478,7 @@ static int local_get_epoch(struct request *req)
 	uint32_t epoch = req->rq.obj.tgt_epoch;
 	int nr_nodes;
 
-	sd_dprintf("%d\n", epoch);
+	sd_dprintf("%d", epoch);
 
 	nr_nodes = epoch_log_read(epoch, req->data, req->rq.data_length);
 	if (nr_nodes == -1)
@@ -516,7 +516,7 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 
 	old_vnode_info = get_vnode_info_epoch(sys->epoch);
 	if (!old_vnode_info) {
-		sd_eprintf("cannot get vnode info for epoch %d\n", sys->epoch);
+		sd_eprintf("cannot get vnode info for epoch %d", sys->epoch);
 		return SD_RES_EIO;
 	}
 
@@ -620,7 +620,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 		return SD_RES_SUCCESS;
 
 	if (latest_epoch < epoch) {
-		sd_dprintf("new epoch %d\n", epoch);
+		sd_dprintf("new epoch %d", epoch);
 		latest_epoch = epoch;
 		nr_recovereds = 0;
 	}
@@ -628,9 +628,9 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	recovereds[nr_recovereds++] = *(struct sd_node *)node;
 	qsort(recovereds, nr_recovereds, sizeof(*recovereds), node_id_cmp);
 
-	sd_dprintf("%s is recovered at epoch %d\n", node_to_str(node), epoch);
+	sd_dprintf("%s is recovered at epoch %d", node_to_str(node), epoch);
 	for (i = 0; i < nr_recovereds; i++)
-		sd_dprintf("[%x] %s\n", i, node_to_str(recovereds + i));
+		sd_dprintf("[%x] %s", i, node_to_str(recovereds + i));
 
 	if (sys->epoch != latest_epoch)
 		return SD_RES_SUCCESS;
@@ -640,7 +640,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	if (vnode_info->nr_nodes == nr_recovereds &&
 	    memcmp(vnode_info->nodes, recovereds,
 		   sizeof(*recovereds) * nr_recovereds) == 0) {
-		sd_dprintf("all nodes are recovered at epoch %d\n", epoch);
+		sd_dprintf("all nodes are recovered at epoch %d", epoch);
 		if (sd_store->cleanup)
 			sd_store->cleanup();
 	}
@@ -656,7 +656,7 @@ static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
 	uint32_t cache_size = *(uint32_t *)data;
 
 	uatomic_set(&sys->object_cache_size, cache_size);
-	sd_dprintf("Max cache size set to %dM\n", cache_size);
+	sd_dprintf("Max cache size set to %dM", cache_size);
 
 	object_cache_try_to_reclaim(0);
 
@@ -742,7 +742,7 @@ static int local_trace_read_buf(struct request *request)
 		return SD_RES_AGAIN;
 
 	rsp->data_length = ret;
-	sd_dprintf("%u\n", rsp->data_length);
+	sd_dprintf("%u", rsp->data_length);
 	return SD_RES_SUCCESS;
 }
 
@@ -867,14 +867,14 @@ int peer_create_and_write_obj(struct request *req)
 	iocb.flags = hdr->flags;
 	iocb.length = get_objsize(oid);
 	if (hdr->flags & SD_FLAG_CMD_COW) {
-		sd_dprintf("%" PRIx64 ", %" PRIx64 "\n", oid, hdr->obj.cow_oid);
+		sd_dprintf("%" PRIx64 ", %" PRIx64, oid, hdr->obj.cow_oid);
 
 		buf = xvalloc(SD_DATA_OBJ_SIZE);
 		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
 			ret = read_copy_from_replica(req, hdr->epoch,
 						     hdr->obj.cow_oid, buf);
 			if (ret != SD_RES_SUCCESS) {
-				sd_eprintf("failed to read cow object\n");
+				sd_eprintf("failed to read cow object");
 				goto out;
 			}
 		}
@@ -1248,15 +1248,15 @@ void do_process_work(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	int ret = SD_RES_SUCCESS;
 
-	sd_dprintf("%x, %" PRIx64", %"PRIu32"\n",
-		req->rq.opcode, req->rq.obj.oid, req->rq.epoch);
+	sd_dprintf("%x, %" PRIx64", %"PRIu32, req->rq.opcode, req->rq.obj.oid,
+		   req->rq.epoch);
 
 	if (req->op->process_work)
 		ret = req->op->process_work(req);
 
 	if (ret != SD_RES_SUCCESS) {
-		sd_dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32"\n",
-			req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
+		sd_dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32,
+			   req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
 	}
 
 	req->rp.result = ret;

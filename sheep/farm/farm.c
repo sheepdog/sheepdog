@@ -35,7 +35,7 @@ static int create_directory(const char *p)
 	strbuf_addstr(&buf, ".farm");
 	if (mkdir(buf.buf, 0755) < 0) {
 		if (errno != EEXIST) {
-			sd_eprintf("%m\n");
+			sd_eprintf("%m");
 			ret = -1;
 			goto err;
 		}
@@ -47,7 +47,7 @@ static int create_directory(const char *p)
 	strbuf_addstr(&buf, "/objects");
 	if (mkdir(buf.buf, 0755) < 0) {
 		if (errno != EEXIST) {
-			sd_eprintf("%m\n");
+			sd_eprintf("%m");
 			ret = -1;
 			goto err;
 		}
@@ -56,7 +56,7 @@ static int create_directory(const char *p)
 		strbuf_addf(&buf, "/%02x", i);
 		if (mkdir(buf.buf, 0755) < 0) {
 			if (errno != EEXIST) {
-				sd_eprintf("%m\n");
+				sd_eprintf("%m");
 				ret = -1;
 				goto err;
 			}
@@ -79,7 +79,7 @@ static int get_trunk_sha1(uint32_t epoch, unsigned char *outsha1)
 	struct sha1_file_hdr hdr;
 
 	log_free = log_buf = snap_log_read(&nr_logs);
-	sd_dprintf("%d\n", nr_logs);
+	sd_dprintf("%d", nr_logs);
 	if (nr_logs < 0)
 		goto out;
 
@@ -110,12 +110,12 @@ static bool is_xattr_enabled(const char *path)
 
 static int farm_init(const char *p)
 {
-	sd_dprintf("use farm store driver\n");
+	sd_dprintf("use farm store driver");
 	if (create_directory(p) < 0)
 		goto err;
 
 	if (!is_xattr_enabled(p)) {
-		sd_eprintf("xattrs are not enabled on %s\n", p);
+		sd_eprintf("xattrs are not enabled on %s", p);
 		goto err;
 	}
 
@@ -144,7 +144,7 @@ static int farm_snapshot(const struct siocb *iocb)
 		goto out;
 
 	epoch = log_nr + 1;
-	sd_dprintf("user epoch %d\n", epoch);
+	sd_dprintf("user epoch %d", epoch);
 
 	nr_nodes = epoch_log_read(sys->epoch, nodes, sizeof(nodes));
 	if (nr_nodes < 0)
@@ -171,7 +171,7 @@ static int cleanup_working_dir(void)
 	DIR *dir;
 	struct dirent *d;
 
-	sd_dprintf("try clean up working dir\n");
+	sd_dprintf("try clean up working dir");
 	dir = opendir(obj_path);
 	if (!dir)
 		return -1;
@@ -182,10 +182,10 @@ static int cleanup_working_dir(void)
 			continue;
 		snprintf(p, sizeof(p), "%s%s", obj_path, d->d_name);
 		if (unlink(p) < 0) {
-			sd_eprintf("%s:%m\n", p);
+			sd_eprintf("%s:%m", p);
 			continue;
 		}
-		sd_dprintf("remove file %s\n", d->d_name);
+		sd_dprintf("remove file %s", d->d_name);
 	}
 	closedir(dir);
 	return 0;
@@ -217,17 +217,17 @@ static int restore_objects_from_snap(uint32_t epoch)
 		oid = trunk_buf->oid;
 		buffer = sha1_file_read(trunk_buf->sha1, &h);
 		if (!buffer) {
-			sd_eprintf("oid %"PRIx64" not restored\n", oid);
+			sd_eprintf("oid %"PRIx64" not restored", oid);
 			goto out;
 		}
 		io.length = h.size;
 		io.buf = buffer;
 		ret = default_create_and_write(oid, &io);
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("oid %"PRIx64" not restored\n", oid);
+			sd_eprintf("oid %"PRIx64" not restored", oid);
 			goto out;
 		} else
-			sd_dprintf("oid %"PRIx64" restored\n", oid);
+			sd_dprintf("oid %"PRIx64" restored", oid);
 
 		free(buffer);
 	}
@@ -240,10 +240,10 @@ static int farm_restore(const struct siocb *iocb)
 {
 	int ret = SD_RES_EIO, epoch = iocb->epoch;
 
-	sd_dprintf("try recover user epoch %d\n", epoch);
+	sd_dprintf("try recover user epoch %d", epoch);
 
 	if (cleanup_working_dir() < 0) {
-		sd_eprintf("failed to clean up the working dir %m\n");
+		sd_eprintf("failed to clean up the working dir %m");
 		goto out;
 	}
 
@@ -261,7 +261,7 @@ static int farm_get_snap_file(struct siocb *iocb)
 	size_t size;
 	int nr;
 
-	sd_dprintf("try get snap file\n");
+	sd_dprintf("try get snap file");
 	buffer = snap_log_read(&nr);
 	if (!buffer)
 		goto out;

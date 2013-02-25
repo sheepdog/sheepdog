@@ -68,7 +68,7 @@ static void *run_short_thread(void *arg)
 	/* Tell runtime to release resources after termination */
 	err = pthread_detach(pthread_self());
 	if (err)
-		panic("%s\n", strerror(err));
+		panic("%s", strerror(err));
 
 	set_thread_name(sw->wi->name, uatomic_add_return(&idx, 1));
 
@@ -95,7 +95,7 @@ static inline void create_short_thread(struct worker_info *wi,
 
 	err = pthread_create(&thread, NULL, run_short_thread, sw);
 	if (err)
-		panic("%s\n", strerror(err));
+		panic("%s", strerror(err));
 	short_thread_begin();
 }
 
@@ -190,13 +190,13 @@ int init_wqueue_eventfd(void)
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
-		sd_eprintf("failed to create an event fd: %m\n");
+		sd_eprintf("failed to create an event fd: %m");
 		return 1;
 	}
 
 	ret = register_event(efd, bs_thread_request_done, NULL);
 	if (ret) {
-		sd_eprintf("failed to register event fd %m\n");
+		sd_eprintf("failed to register event fd %m");
 		close(efd);
 		return 1;
 	}
@@ -229,8 +229,8 @@ struct work_queue *init_work_queue(const char *name, bool ordered)
 		ret = pthread_create(&wi->worker_thread, NULL, worker_routine,
 				     wi);
 		if (ret) {
-			sd_eprintf("failed to create worker thread: %s\n",
-				strerror(ret));
+			sd_eprintf("failed to create worker thread: %s",
+				   strerror(ret));
 			goto destroy_threads;
 		}
 
@@ -246,7 +246,7 @@ destroy_threads:
 	wi->q.wq_state |= WQ_DEAD;
 	pthread_mutex_unlock(&wi->startup_lock);
 	pthread_join(wi->worker_thread, NULL);
-	sd_eprintf("stopped worker thread\n");
+	sd_eprintf("stopped worker thread");
 
 /* destroy_cond_mutex: */
 	pthread_cond_destroy(&wi->pending_cond);

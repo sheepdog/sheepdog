@@ -105,7 +105,7 @@ static inline int get_vnode_next_idx(const struct sd_vnode *entries,
 	for (;;) {
 		idx = (idx + 1) % nr_entries;
 		if (idx == first_idx)
-			panic("can't find next new idx\n");
+			panic("can't find next new idx");
 
 		for (found = false, i = 0; i < nr_prev_idxs; i++) {
 			if (same_zone(entries, idx, prev_idxs[i])) {

@@ -119,7 +119,7 @@ static inline void del_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 
 	idx = find_cpg_node(nodes, nr_nodes, deled);
 	if (idx < 0) {
-		sd_dprintf("cannot find node\n");
+		sd_dprintf("cannot find node");
 		return;
 	}
 
@@ -139,12 +139,12 @@ static int corosync_get_local_addr(uint8_t *addr)
 	ret = corosync_cfg_get_node_addrs(cfg_handle, this_node.nodeid, 1,
 					  &nr, &caddr);
 	if (ret != CS_OK) {
-		sd_printf(SDOG_ERR, "failed to get node addresses (%d)\n", ret);
+		sd_printf(SDOG_ERR, "failed to get node addresses (%d)", ret);
 		return -1;
 	}
 
 	if (!nr) {
-		sd_printf(SDOG_ERR, "no node addresses found\n");
+		sd_printf(SDOG_ERR, "no node addresses found");
 		return -1;
 	}
 
@@ -156,7 +156,7 @@ static int corosync_get_local_addr(uint8_t *addr)
 		memset(addr, 0, 16);
 		memcpy(addr + 12, saddr, 4);
 	} else {
-		sd_printf(SDOG_ERR, "unknown protocol %d\n", ss->ss_family);
+		sd_printf(SDOG_ERR, "unknown protocol %d", ss->ss_family);
 		return -1;
 	}
 
@@ -194,11 +194,11 @@ retry:
 	case CS_OK:
 		break;
 	case CS_ERR_TRY_AGAIN:
-		sd_dprintf("failed to send message: retrying\n");
+		sd_dprintf("failed to send message: retrying");
 		sleep(1);
 		goto retry;
 	default:
-		sd_eprintf("failed to send message (%d)\n", ret);
+		sd_eprintf("failed to send message (%d)", ret);
 		return -1;
 	}
 	return 0;
@@ -306,8 +306,8 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			     cevent->msg, cevent->msg_len);
 
 		if (res == CJ_RES_MASTER_TRANSFER) {
-			sd_eprintf("failed to join sheepdog cluster:"	\
-				" please retry when master is up\n");
+			sd_eprintf("failed to join sheepdog cluster:"
+				   " please retry when master is up");
 			exit(1);
 		}
 
@@ -369,7 +369,7 @@ static void __corosync_dispatch(void)
 		 * when network partition has occured.  To count the
 		 * number of alive nodes correctly, we postpone
 		 * processsing events if there are incoming ones. */
-		sd_dprintf("wait for a next dispatch event\n");
+		sd_dprintf("wait for a next dispatch event");
 		return;
 	}
 
@@ -442,7 +442,7 @@ update_event(enum corosync_event_type type, struct cpg_node *sender, void *msg,
 	if (msg_len) {
 		cevent->msg = realloc(cevent->msg, msg_len);
 		if (!cevent->msg)
-			panic("failed to allocate memory\n");
+			panic("failed to allocate memory");
 		memcpy(cevent->msg, msg, msg_len);
 	} else {
 		free(cevent->msg);
@@ -469,7 +469,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 	struct corosync_message *cmsg = msg;
 	int master;
 
-	sd_dprintf("%d\n", cmsg->type);
+	sd_dprintf("%d", cmsg->type);
 
 	switch (cmsg->type) {
 	case COROSYNC_MSG_TYPE_JOIN_REQUEST:
@@ -574,9 +574,8 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	struct cpg_node left_sheep[SD_MAX_NODES];
 	bool promote = true;
 
-	sd_dprintf("mem:%zu, joined:%zu, left:%zu\n",
-		member_list_entries, joined_list_entries,
-		left_list_entries);
+	sd_dprintf("mem:%zu, joined:%zu, left:%zu", member_list_entries,
+		   joined_list_entries, left_list_entries);
 
 	/* check network partition */
 	if (left_list_entries) {
@@ -590,9 +589,9 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		}
 
 		if (member_list_entries == 0)
-			panic("NIC failure?\n");
+			panic("NIC failure?");
 		if (member_list_entries < nr_majority)
-			panic("Network partition is detected\n");
+			panic("Network partition is detected");
 	}
 
 	/* convert cpg_address to cpg_node */
@@ -653,7 +652,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 					    &member_sheep[i]);
 			if (!cevent) {
 				sd_dprintf("Not promoting because member is "
-					"not in our event list.\n");
+					   "not in our event list.");
 				promote = false;
 				break;
 			}
@@ -680,14 +679,14 @@ retry:
 	case CS_OK:
 		break;
 	case CS_ERR_TRY_AGAIN:
-		sd_dprintf("failed to join the sheepdog group: retrying\n");
+		sd_dprintf("failed to join the sheepdog group: retrying");
 		sleep(1);
 		goto retry;
 	case CS_ERR_SECURITY:
-		sd_eprintf("permission denied to join the sheepdog group\n");
+		sd_eprintf("permission denied to join the sheepdog group");
 		return -1;
 	default:
-		sd_eprintf("failed to join the sheepdog group (%d)\n", ret);
+		sd_eprintf("failed to join the sheepdog group (%d)", ret);
 		return -1;
 	}
 
@@ -728,14 +727,13 @@ static void corosync_handler(int listen_fd, int events, void *data)
 	int ret;
 
 	if (events & EPOLLHUP) {
-		sd_eprintf("corosync driver received EPOLLHUP event,"	\
-			" exiting.\n");
+		sd_eprintf("corosync driver received EPOLLHUP event, exiting.");
 		goto out;
 	}
 
 	ret = cpg_dispatch(cpg_handle, CS_DISPATCH_ALL);
 	if (ret != CS_OK) {
-		sd_eprintf("cpg_dispatch returned %d\n", ret);
+		sd_eprintf("cpg_dispatch returned %d", ret);
 		goto out;
 	}
 
@@ -763,27 +761,27 @@ again:
 	case CS_ERR_TRY_AGAIN:
 		if (retry_cnt++ == CPG_INIT_RETRY_CNT) {
 			sd_eprintf("failed to initialize cpg (%d) - "
-				"is corosync running?\n", ret);
+				   "is corosync running?", ret);
 			return -1;
 		}
-		sd_dprintf("retry cpg_initialize\n");
+		sd_dprintf("retry cpg_initialize");
 		usleep(200000);
 		goto again;
 	default:
 		sd_eprintf("failed to initialize cpg (%d) - "
-			"is corosync running?\n", ret);
+			   "is corosync running?", ret);
 		return -1;
 	}
 
 	ret = corosync_cfg_initialize(&cfg_handle, NULL);
 	if (ret != CS_OK) {
-		sd_printf(SDOG_ERR, "failed to initialize cfg (%d)\n", ret);
+		sd_printf(SDOG_ERR, "failed to initialize cfg (%d)", ret);
 		return -1;
 	}
 
 	ret = corosync_cfg_local_get(cfg_handle, &nodeid);
 	if (ret != CS_OK) {
-		sd_printf(SDOG_ERR, "failed to get node id (%d)\n", ret);
+		sd_printf(SDOG_ERR, "failed to get node id (%d)", ret);
 		return -1;
 	}
 
@@ -792,14 +790,14 @@ again:
 
 	ret = cpg_fd_get(cpg_handle, &cpg_fd);
 	if (ret != CS_OK) {
-		sd_eprintf("failed to get cpg file descriptor (%d)\n", ret);
+		sd_eprintf("failed to get cpg file descriptor (%d)", ret);
 		return -1;
 	}
 
 	ret = register_event(cpg_fd, corosync_handler, NULL);
 	if (ret) {
-		sd_eprintf("failed to register corosync event handler (%d)\n",
-			ret);
+		sd_eprintf("failed to register corosync event handler (%d)",
+			   ret);
 		return -1;
 	}
 

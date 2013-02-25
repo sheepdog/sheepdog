@@ -121,7 +121,7 @@ extern struct list_head cluster_drivers;
 static void __attribute__((constructor)) regist_ ## driver(void)	\
 {									\
 	if (!driver.init || !driver.join || !driver.leave || !driver.notify) \
-		panic("the driver '%s' is incomplete\n", driver.name);	\
+		panic("the driver '%s' is incomplete", driver.name);	\
 	list_add(&driver.list, &cluster_drivers);			\
 }
 

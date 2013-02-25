@@ -74,14 +74,14 @@ static void get_sha1_file(char *name)
 		if (errno == ENODATA) {
 			count = 1;
 			if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
-				panic("%m\n");
+				panic("%m");
 			return;
 		} else
-			panic("%m\n");
+			panic("%m");
 	}
 	count++;
 	if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
-			panic("%m\n");
+		panic("%m");
 }
 
 static int put_sha1_file(char *name)
@@ -90,23 +90,22 @@ static int put_sha1_file(char *name)
 
 	if (getxattr(name, CNAME, &count, CSIZE) < 0) {
 		if (errno == ENOENT) {
-			sd_dprintf("sha1 file doesn't exist\n");
+			sd_dprintf("sha1 file doesn't exist");
 			return -1;
-		} else {
-			panic("%m\n");
-		}
+		} else
+			panic("%m");
 	}
 
 	count--;
 	if (count == 0) {
 		if (unlink(name) < 0) {
-			sd_dprintf("%m\n");
+			sd_dprintf("%m");
 			return -1;
 		}
-		sd_dprintf("%s deleted\n", name);
+		sd_dprintf("%s deleted", name);
 	} else {
 		if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
-			panic("%m\n");
+			panic("%m");
 	}
 	return 0;
 }
@@ -124,7 +123,7 @@ static int sha1_buffer_write(const unsigned char *sha1, void *buf, unsigned int 
 	}
 	len = xwrite(fd, buf, size);
 	if (len != size) {
-		sd_dprintf("%m\n");
+		sd_dprintf("%m");
 		close(fd);
 		return -1;
 	}
@@ -163,14 +162,14 @@ static void *map_sha1_file(const unsigned char *sha1, unsigned long *size)
 		return NULL;
 	}
 	if (fstat(fd, &st) < 0) {
-		sd_dprintf("%m\n");
+		sd_dprintf("%m");
 		close(fd);
 		return NULL;
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
-		sd_dprintf("%m\n");
+		sd_dprintf("%m");
 		return NULL;
 	}
 	*size = st.st_size;
@@ -186,7 +185,7 @@ static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file
 	hdr_len = sizeof(*hdr);
 	buf = valloc(hdr->size);
 	if (!buf) {
-		sd_dprintf("%m\n");
+		sd_dprintf("%m");
 		return NULL;
 	}
 
@@ -204,8 +203,8 @@ static int verify_sha1_file(const unsigned char *sha1, void *buf, unsigned long 
 	sha1_final(&c, tmp);
 
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
-		sd_dprintf("failed, %s != %s\n", sha1_to_hex(sha1),
-			sha1_to_hex(tmp));
+		sd_dprintf("failed, %s != %s", sha1_to_hex(sha1),
+			   sha1_to_hex(tmp));
 		return -1;
 	}
 	return 0;

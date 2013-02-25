@@ -451,11 +451,11 @@ static notrace void log_flush(void)
 
 static notrace void crash_handler(int signo)
 {
-	if (signo == SIGHUP) {
-		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.\n",
-			sheep_pid);
-	} else {
-		sd_printf(SDOG_ERR, "logger pid %d exits unexpectedly (%s).\n",
+	if (signo == SIGHUP)
+		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.",
+			  sheep_pid);
+	else {
+		sd_printf(SDOG_ERR, "logger pid %d exits unexpectedly (%s).",
 			  getpid(), strsignal(signo));
 		sd_backtrace();
 	}
@@ -657,7 +657,7 @@ notrace void sd_backtrace(void)
 			goto fallback_close;
 
 		if (info[0] != '?' && info[0] != '\0')
-			sd_printf(SDOG_EMERG, "%s\n", info);
+			sd_printf(SDOG_EMERG, "%s", info);
 		else
 			goto fallback_close;
 
@@ -669,7 +669,7 @@ fallback_close:
 		pclose(f);
 fallback:
 		str = backtrace_symbols(&addr, 1);
-		sd_printf(SDOG_EMERG, "%s\n", *str);
+		sd_printf(SDOG_EMERG, "%s", *str);
 		free(str);
 	}
 }

@@ -51,13 +51,13 @@ static void io_op_done(struct work *work)
 	case SD_RES_EIO:
 		req->rp.result = SD_RES_NETWORK_ERROR;
 
-		sd_eprintf("leaving sheepdog cluster\n");
+		sd_eprintf("leaving sheepdog cluster");
 		leave_cluster();
 		break;
 	case SD_RES_SUCCESS:
 		break;
 	default:
-		sd_dprintf("unhandled error %d\n", req->rp.result);
+		sd_dprintf("unhandled error %d", req->rp.result);
 		break;
 	}
 
@@ -87,16 +87,13 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_WAIT_FOR_JOIN:
 	case SD_RES_WAIT_FOR_FORMAT:
 	case SD_RES_KILLED:
-		sd_dprintf("retrying failed I/O request "
-			"op %s result %x epoch %"PRIu32", sys epoch %"PRIu32"\n",
-			op_name(req->op),
-			req->rp.result,
-			req->rq.epoch,
-			sys->epoch);
+		sd_dprintf("retrying failed I/O request op %s result %x epoch %"
+			   PRIu32", sys epoch %"PRIu32, op_name(req->op),
+			   req->rp.result, req->rq.epoch, sys->epoch);
 		goto retry;
 	case SD_RES_EIO:
 		if (is_access_local(req, hdr->obj.oid)) {
-			sd_eprintf("leaving sheepdog cluster\n");
+			sd_eprintf("leaving sheepdog cluster");
 			leave_cluster();
 			goto retry;
 		}
@@ -104,7 +101,7 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_SUCCESS:
 		break;
 	default:
-		sd_dprintf("unhandled error %d\n", req->rp.result);
+		sd_dprintf("unhandled error %d", req->rp.result);
 		break;
 	}
 
@@ -129,16 +126,16 @@ static void local_op_done(struct work *work)
 static int check_request_epoch(struct request *req)
 {
 	if (before(req->rq.epoch, sys->epoch)) {
-		sd_eprintf("old node version %u, %u (%s)\n",
-			sys->epoch, req->rq.epoch, op_name(req->op));
+		sd_eprintf("old node version %u, %u (%s)",
+			   sys->epoch, req->rq.epoch, op_name(req->op));
 		/* ask gateway to retry. */
 		req->rp.result = SD_RES_OLD_NODE_VER;
 		req->rp.epoch = sys->epoch;
 		put_request(req);
 		return -1;
 	} else if (after(req->rq.epoch, sys->epoch)) {
-		sd_eprintf("new node version %u, %u (%s)\n",
-			sys->epoch, req->rq.epoch, op_name(req->op));
+		sd_eprintf("new node version %u, %u (%s)",
+			   sys->epoch, req->rq.epoch, op_name(req->op));
 
 		/* put on local wait queue, waiting for local epoch
 		   to be lifted */
@@ -173,14 +170,12 @@ static bool request_in_recovery(struct request *req)
 		 * Put request on wait queues of local node
 		 */
 		if (is_recovery_init()) {
-			sd_dprintf("%"PRIx64" on rw_queue\n", req->local_oid);
+			sd_dprintf("%"PRIx64" on rw_queue", req->local_oid);
 			req->rp.result = SD_RES_OBJ_RECOVERING;
-			list_add_tail(&req->request_list,
-				      &sys->wait_rw_queue);
+			list_add_tail(&req->request_list, &sys->wait_rw_queue);
 		} else {
-			sd_dprintf("%"PRIx64" on obj_queue\n", req->local_oid);
-			list_add_tail(&req->request_list,
-				      &sys->wait_obj_queue);
+			sd_dprintf("%"PRIx64" on obj_queue", req->local_oid);
+			list_add_tail(&req->request_list, &sys->wait_obj_queue);
 		}
 		return true;
 	}
@@ -231,7 +226,7 @@ void resume_wait_recovery_requests(void)
 		if (req->rp.result != SD_RES_OBJ_RECOVERING)
 			continue;
 
-		sd_dprintf("resume wait oid %" PRIx64 "\n", req->local_oid);
+		sd_dprintf("resume wait oid %" PRIx64, req->local_oid);
 		list_del(&req->request_list);
 		requeue_request(req);
 	}
@@ -252,7 +247,7 @@ void resume_wait_obj_requests(uint64_t oid)
 
 		/* the object requested by a pending request has been
 		 * recovered, notify the pending request. */
-		sd_dprintf("retry %" PRIx64 "\n", req->local_oid);
+		sd_dprintf("retry %" PRIx64, req->local_oid);
 		list_del(&req->request_list);
 		requeue_request(req);
 	}
@@ -346,12 +341,12 @@ static void queue_request(struct request *req)
 
 	req->op = get_sd_op(hdr->opcode);
 	if (!req->op) {
-		sd_eprintf("invalid opcode %d\n", hdr->opcode);
+		sd_eprintf("invalid opcode %d", hdr->opcode);
 		rsp->result = SD_RES_INVALID_PARMS;
 		goto done;
 	}
 
-	sd_dprintf("%s, %d\n", op_name(req->op), sys->status);
+	sd_dprintf("%s, %d", op_name(req->op), sys->status);
 
 	switch (sys->status) {
 	case SD_STATUS_KILLED:
@@ -402,7 +397,7 @@ static void queue_request(struct request *req)
 		hdr->epoch = sys->epoch;
 		queue_cluster_request(req);
 	} else {
-		sd_eprintf("unknown operation %d\n", hdr->opcode);
+		sd_eprintf("unknown operation %d", hdr->opcode);
 		rsp->result = SD_RES_SYSTEM_ERROR;
 		goto done;
 	}
@@ -472,7 +467,7 @@ again:
 	/* In error case (for e.g, EINTR) just retry read */
 	ret = eventfd_read(req->wait_efd, &value);
 	if (ret < 0) {
-		sd_eprintf("%m\n");
+		sd_eprintf("%m");
 		if (errno == EINTR)
 			goto again;
 		/* Fake the result to ask for retry */
@@ -592,7 +587,7 @@ static inline int begin_rx(struct client_info *ci)
 		ret = rx(conn, C_IO_END);
 		break;
 	default:
-		sd_eprintf("bug: unknown state %d\n", conn->c_rx_state);
+		sd_eprintf("bug: unknown state %d", conn->c_rx_state);
 	}
 
 	if (is_conn_dead(conn)) {
@@ -614,7 +609,7 @@ static inline void finish_rx(struct client_info *ci)
 	req = ci->rx_req;
 	init_rx_hdr(ci);
 
-	sd_dprintf("%d, %s:%d\n", ci->conn.fd, ci->conn.ipstr, ci->conn.port);
+	sd_dprintf("%d, %s:%d", ci->conn.fd, ci->conn.ipstr, ci->conn.port);
 	queue_request(req);
 }
 
@@ -700,8 +695,8 @@ static inline int finish_tx(struct client_info *ci)
 {
 	/* Finish sending one response */
 	if (ci->conn.c_tx_state == C_IO_END) {
-		sd_dprintf("connection from: %d, %s:%d\n", ci->conn.fd,
-			ci->conn.ipstr, ci->conn.port);
+		sd_dprintf("connection from: %d, %s:%d", ci->conn.fd,
+			   ci->conn.ipstr, ci->conn.port);
 		free_request(ci->tx_req);
 		ci->tx_req = NULL;
 	}
@@ -731,7 +726,7 @@ static void do_client_tx(struct client_info *ci)
 
 static void destroy_client(struct client_info *ci)
 {
-	sd_dprintf("connection from: %s:%d\n", ci->conn.ipstr, ci->conn.port);
+	sd_dprintf("connection from: %s:%d", ci->conn.ipstr, ci->conn.port);
 	close(ci->conn.fd);
 	free(ci);
 }
@@ -740,7 +735,7 @@ static void clear_client_info(struct client_info *ci)
 {
 	struct request *req, *t;
 
-	sd_dprintf("connection seems to be dead\n");
+	sd_dprintf("connection seems to be dead");
 
 	if (ci->rx_req) {
 		free_request(ci->rx_req);
@@ -759,9 +754,8 @@ static void clear_client_info(struct client_info *ci)
 
 	unregister_event(ci->conn.fd);
 
-	sd_dprintf("refcnt:%d, fd:%d, %s:%d\n",
-		ci->refcnt, ci->conn.fd,
-		ci->conn.ipstr, ci->conn.port);
+	sd_dprintf("refcnt:%d, fd:%d, %s:%d", ci->refcnt, ci->conn.fd,
+		   ci->conn.ipstr, ci->conn.port);
 
 	if (ci->refcnt)
 		return;
@@ -810,8 +804,8 @@ static void client_handler(int fd, int events, void *data)
 {
 	struct client_info *ci = (struct client_info *)data;
 
-	sd_dprintf("%x, rx %d, tx %d\n", events, ci->conn.c_rx_state,
-		ci->conn.c_tx_state);
+	sd_dprintf("%x, rx %d, tx %d", events, ci->conn.c_rx_state,
+		   ci->conn.c_tx_state);
 
 	if (events & (EPOLLERR | EPOLLHUP) || is_conn_dead(&ci->conn))
 		return clear_client_info(ci);
@@ -832,7 +826,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 	bool is_inet_socket = *(bool *)data;
 
 	if (sys->status == SD_STATUS_SHUTDOWN) {
-		sd_dprintf("unregistering connection %d\n", listen_fd);
+		sd_dprintf("unregistering connection %d", listen_fd);
 		unregister_event(listen_fd);
 		return;
 	}
@@ -840,7 +834,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 	namesize = sizeof(from);
 	fd = accept(listen_fd, (struct sockaddr *)&from, &namesize);
 	if (fd < 0) {
-		sd_eprintf("failed to accept a new connection: %m\n");
+		sd_eprintf("failed to accept a new connection: %m");
 		return;
 	}
 
@@ -870,7 +864,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 		return;
 	}
 
-	sd_dprintf("accepted a new connection: %d\n", fd);
+	sd_dprintf("accepted a new connection: %d", fd);
 }
 
 static int create_listen_port_fn(int fd, void *data)
@@ -906,7 +900,7 @@ static void req_handler(int listen_fd, int events, void *data)
 	int ret;
 
 	if (events & EPOLLERR)
-		sd_eprintf("request handler error\n");
+		sd_eprintf("request handler error");
 
 	ret = eventfd_read(listen_fd, &value);
 	if (ret < 0)

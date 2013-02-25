@@ -73,7 +73,7 @@ static int backup_file(char *fname, char *suffix)
 	fd = open(fname, O_RDONLY);
 	if (fd < 0) {
 		if (errno != ENOENT) {
-			sd_eprintf("failed to open %s, %m\n", fname);
+			sd_eprintf("failed to open %s, %m", fname);
 			ret = -1;
 		} else
 			ret = 0;
@@ -82,7 +82,7 @@ static int backup_file(char *fname, char *suffix)
 
 	ret = stat(fname, &stbuf);
 	if (ret < 0) {
-		sd_eprintf("failed to stat %s, %m\n", fname);
+		sd_eprintf("failed to stat %s, %m", fname);
 		goto out;
 	}
 	len = stbuf.st_size;
@@ -90,7 +90,7 @@ static int backup_file(char *fname, char *suffix)
 	buf = xmalloc(len);
 	ret = xread(fd, buf, len);
 	if (ret != len) {
-		sd_eprintf("failed to read %s, %d %m\n", fname, ret);
+		sd_eprintf("failed to read %s, %d %m", fname, ret);
 		ret = -1;
 		goto out;
 	}
@@ -99,14 +99,14 @@ static int backup_file(char *fname, char *suffix)
 
 	fd = open(dst_file, O_CREAT | O_WRONLY | O_DSYNC, 0644);
 	if (fd < 0) {
-		sd_eprintf("failed to create %s, %m\n", dst_file);
+		sd_eprintf("failed to create %s, %m", dst_file);
 		ret = -1;
 		goto out;
 	}
 
 	ret = xwrite(fd, buf, len);
 	if (ret != len) {
-		sd_eprintf("failed to write to %s, %d %m\n", dst_file, ret);
+		sd_eprintf("failed to write to %s, %d %m", dst_file, ret);
 		ret = -1;
 	}
 out:
@@ -154,14 +154,14 @@ static int migrate_from_v0_to_v1(void)
 
 	fd = open(config_path, O_RDWR);
 	if (fd < 0) {
-		sd_eprintf("failed to open config file, %m\n");
+		sd_eprintf("failed to open config file, %m");
 		return -1;
 	}
 
 	memset(&config, 0, sizeof(config));
 	ret = xread(fd, &config, sizeof(config));
 	if (ret < 0) {
-		sd_eprintf("failed to read config file, %m\n");
+		sd_eprintf("failed to read config file, %m");
 		close(fd);
 		return ret;
 	}
@@ -169,7 +169,7 @@ static int migrate_from_v0_to_v1(void)
 	config.version = 1;
 	ret = xpwrite(fd, &config, sizeof(config), 0);
 	if (ret != sizeof(config)) {
-		sd_eprintf("failed to write config data, %m\n");
+		sd_eprintf("failed to write config data, %m");
 		close(fd);
 		return -1;
 	}
@@ -177,7 +177,7 @@ static int migrate_from_v0_to_v1(void)
 	/* 0.5.1 could wrongly extend the config file, so truncate it here */
 	ret = ftruncate(fd, sizeof(config));
 	if (ret != 0) {
-		sd_eprintf("failed to truncate config data, %m\n");
+		sd_eprintf("failed to truncate config data, %m");
 		close(fd);
 		return -1;
 	}
@@ -205,15 +205,13 @@ static int migrate_from_v0_to_v1(void)
 			if (errno == ENOENT)
 				continue;
 
-			sd_eprintf("failed to open epoch %"PRIu32" log\n",
-				epoch);
+			sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
 			return -1;
 		}
 
 		ret = xread(fd, nodes_v0, sizeof(nodes_v0));
 		if (ret < 0) {
-			sd_eprintf("failed to read epoch %"PRIu32" log\n",
-				epoch);
+			sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
 			close(fd);
 			return ret;
 		}
@@ -230,8 +228,8 @@ static int migrate_from_v0_to_v1(void)
 		len = sizeof(nodes_v1[0]) * nr_nodes;
 		ret = xpwrite(fd, nodes_v1, len, 0);
 		if (ret != len) {
-			sd_eprintf("failed to write epoch %"PRIu32" log\n",
-				epoch);
+			sd_eprintf("failed to write epoch %"PRIu32" log",
+				   epoch);
 			close(fd);
 			return -1;
 		}
@@ -241,7 +239,7 @@ static int migrate_from_v0_to_v1(void)
 		ret = xpwrite(fd, t, sizeof(*t), len);
 		if (ret != sizeof(*t)) {
 			sd_eprintf("failed to write time to epoch %"
-				PRIu32" log\n", epoch);
+				   PRIu32" log", epoch);
 			close(fd);
 			return -1;
 		}
@@ -264,7 +262,7 @@ int sd_migrate_store(int from, int to)
 
 	ret = backup_store();
 	if (ret != 0) {
-		sd_eprintf("failed to backup the old store\n");
+		sd_eprintf("failed to backup the old store");
 		return ret;
 	}
 
