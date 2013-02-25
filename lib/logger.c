@@ -328,6 +328,10 @@ static notrace void dolog(int prio, const char *func, int line,
 
 	gettimeofday(&tv, NULL);
 	len = vsnprintf(str, MAX_MSG_SIZE, fmt, ap);
+	if (len + 1 < MAX_MSG_SIZE && str[len - 1] != '\n') {
+		str[len++] = '\n';
+		str[len] = '\0';
+	}
 
 	if (la) {
 		struct sembuf ops;
