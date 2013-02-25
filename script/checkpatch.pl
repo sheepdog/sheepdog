@@ -2883,6 +2883,12 @@ sub process {
 			}
 		    }
 		}
+
+# check for a newline in sd_printf
+		if ($rawline =~ /\b(sd_.?printf|panic).+[^\\]\\n"/) {
+		    WARN("NEWLINE_IN_SDPRINTF",
+			 "'\\n' is not required for $1 format string\n" . $herecurr);
+		}
 	}
 
 	# If we have no input at all, then there is nothing to report on
