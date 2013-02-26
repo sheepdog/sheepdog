@@ -390,6 +390,11 @@ static bool add_delayed_node(uint32_t epoch, const struct sd_node *node)
 	return true;
 }
 
+static bool is_delayed_node(const struct sd_node *node)
+{
+	return !!find_entry_list(node, &sys->delayed_nodes);
+}
+
 /*
  * For a node that failed to join check if was part of the original
  * epoch, and if so add it to the list of node expected to be present
@@ -446,6 +451,44 @@ static void clear_exceptional_node_lists(void)
 		list_del(&n->list);
 	list_for_each_entry_safe(n, t, &sys->delayed_nodes, list)
 		list_del(&n->list);
+}
+
+int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
+{
+	int i, nr, ret;
+	struct vnode_info *vinfo = get_vnode_info();
+
+	nr = vinfo->nr_vnodes;
+	for (i = 0; i < nr; i++) {
+		struct sd_req hdr;
+		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+		const struct sd_node *node = vinfo->nodes + i;
+
+		if (node_is_local(node))
+			continue;
+
+		/* delayed nodes don't have epoch log */
+		if (is_delayed_node(node))
+			continue;
+
+		sd_init_req(&hdr, SD_OP_GET_EPOCH);
+		hdr.data_length = len;
+		hdr.obj.tgt_epoch = epoch;
+		hdr.epoch = sys_epoch();
+		ret = sheep_exec_req(&node->nid, &hdr, nodes);
+		if (ret != SD_RES_SUCCESS)
+			continue;
+
+		put_vnode_info(vinfo);
+		return rsp->data_length / sizeof(*nodes);
+	}
+
+	/*
+	 * If no node has targeted epoch log, return 0 here to at least
+	 * allow reading older epoch logs.
+	 */
+	put_vnode_info(vinfo);
+	return 0;
 }
 
 static int cluster_sanity_check(struct join_message *jm)

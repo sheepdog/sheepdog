@@ -75,45 +75,6 @@ err_open:
 	return -1;
 }
 
-int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
-{
-	int i, ret;
-	unsigned int nr, le;
-	struct sd_node local_nodes[SD_MAX_NODES];
-
-	le = get_latest_epoch();
-	if (!le)
-		return 0;
-
-	nr = epoch_log_read(le, local_nodes, sizeof(local_nodes));
-	if (nr < 0)
-		return -1;
-
-	for (i = 0; i < nr; i++) {
-		struct sd_req hdr;
-		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-
-		if (node_is_local(&local_nodes[i]))
-			continue;
-
-		sd_init_req(&hdr, SD_OP_GET_EPOCH);
-		hdr.data_length = len;
-		hdr.obj.tgt_epoch = epoch;
-		hdr.epoch = sys_epoch();
-		ret = sheep_exec_req(&local_nodes[i].nid, &hdr, nodes);
-		if (ret != SD_RES_SUCCESS)
-			continue;
-
-		return rsp->data_length / sizeof(*nodes);
-	}
-
-	/*
-	 * If no node has targeted epoch log, return 0 here to at least
-	 * allow reading older epoch logs.
-	 */
-	return 0;
-}
-
 int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
 {
 	int fd;
