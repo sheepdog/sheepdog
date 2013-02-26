@@ -1,0 +1,23 @@
+QA output created by 051
+using backend farm store
+Cluster status: IO has halted as there are too few living nodes
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
+Cluster status: IO has halted as there are too few living nodes
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
