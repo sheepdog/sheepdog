@@ -882,6 +882,8 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 	char str[MAX_NODE_STR_LEN];
 	int ret;
 
+	sd_dprintf("check %s, %d", node_to_str(joining), sys->status);
+
 	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
 		sd_eprintf("invalid protocol version: %d", jm->proto_ver);
 		return CJ_RES_FAIL;
