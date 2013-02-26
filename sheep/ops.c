@@ -505,27 +505,31 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 		return SD_RES_FORCE_RECOVER;
 
 	ret = get_cluster_copies(&c);
-	if (ret)
-		return ret;
+	if (ret) {
+		sd_printf(SDOG_EMERG, "cannot get cluster copies");
+		goto err;
+	}
 	ret = get_cluster_flags(&f);
-	if (ret)
-		return ret;
+	if (ret) {
+		sd_printf(SDOG_EMERG, "cannot get cluster flags");
+		goto err;
+	}
 
 	sys->nr_copies = c;
 	sys->flags = f;
 
 	old_vnode_info = get_vnode_info_epoch(sys->epoch);
 	if (!old_vnode_info) {
-		sd_eprintf("cannot get vnode info for epoch %d", sys->epoch);
-		return SD_RES_EIO;
+		sd_printf(SDOG_EMERG, "cannot get vnode info for epoch %d",
+			  sys->epoch);
+		goto err;
 	}
 
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
 	ret = log_current_epoch();
 	if (ret) {
-		ret = SD_RES_EIO;
-		sys->epoch--;
-		goto out;
+		sd_printf(SDOG_EMERG, "cannot update epoch log");
+		goto err;
 	}
 
 	if (have_enough_zones())
@@ -536,9 +540,10 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	vnode_info = get_vnode_info();
 	start_recovery(vnode_info, old_vnode_info);
 	put_vnode_info(vnode_info);
-out:
 	put_vnode_info(old_vnode_info);
 	return ret;
+err:
+	panic("failed in force recovery");
 }
 
 static int cluster_snapshot(const struct sd_req *req, struct sd_rsp *rsp,
