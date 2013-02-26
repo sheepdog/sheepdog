@@ -111,7 +111,12 @@ int get_req_copy_number(struct request *req)
 
 int get_max_copy_number(void)
 {
-	return uatomic_read(&max_copies);
+	int nr_copies = uatomic_read(&max_copies);
+
+	if (nr_copies == 0)
+		nr_copies = sys->nr_copies;
+
+	return nr_copies;
 }
 
 int add_vdi_copy_number(uint32_t vid, int nr_copies)
