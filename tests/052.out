@@ -1,0 +1,138 @@
+QA output created by 052
+using backend farm store
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+Cluster status: Waiting for other nodes to join cluster
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
+Failed to read inode header
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+Cluster status: Waiting for other nodes to join cluster
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
+Failed to read inode header
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+Cluster status: Waiting for other nodes to join cluster
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
+Failed to read inode header
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+Cluster status: Waiting for other nodes to join cluster
+Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
+Failed to read inode header
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+Caution! Please try starting all the cluster nodes normally before
+running this command.
+
+The cluster may need to be force recovered if:
+  - the master node fails to start because of epoch mismatch; or
+  - some nodes fail to start after a cluster shutdown.
+
+Are you sure you want to continue? [yes/no]: 
+fixed missing 7c2b2500000001
+fixed missing 7c2b2500000002
+fixed missing 7c2b2500000003
+fixed missing 7c2b2500000004
+finish check&repair test
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         1   20 MB   20 MB  0.0 MB DATE   7c2b25     3              

@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Test force cluster recovery with new nodes
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2 3; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+$COLLIE cluster format
+sleep 1
+$COLLIE vdi create test 20M -P
+$COLLIE cluster info | _filter_cluster_info
+
+$COLLIE cluster shutdown
+sleep 1
+
+for i in 0 1 2 4; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+for i in 0 1 2 4; do
+    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $COLLIE vdi list | _filter_short_date
+done
+
+echo yes | $COLLIE cluster recover force
+echo ""
+
+$COLLIE vdi check test
+
+for i in 0 1 2 4; do
+    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $COLLIE vdi list | _filter_short_date
+done
+
+_start_sheep 3
+_wait_for_sheep 5
+for i in 0 1 2 3 4; do
+    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $COLLIE vdi list | _filter_short_date
+done
