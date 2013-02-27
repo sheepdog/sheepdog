@@ -629,6 +629,7 @@ notrace void get_thread_name(char *name)
 
 #define SD_MAX_STACK_DEPTH 1024
 
+__attribute__ ((__noinline__))
 notrace void sd_backtrace(void)
 {
 	void *addrs[SD_MAX_STACK_DEPTH];
