@@ -629,6 +629,90 @@ notrace void get_thread_name(char *name)
 
 #define SD_MAX_STACK_DEPTH 1024
 
+static int get_my_path(char *path, size_t size)
+{
+	/* readlink doesn't append '\0', so initialize here */
+	memset(path, 0, size);
+
+	return readlink("/proc/self/exe", path, size);
+}
+
+static bool check_gdb(void)
+{
+	return system("which gdb > /dev/null") == 0;
+}
+
+#define dump_stack_frames() ({			\
+	register void *current_sp asm("rsp");	\
+	__dump_stack_frames(current_sp);	\
+})
+
+__attribute__ ((__noinline__))
+static notrace int __dump_stack_frames(const void *base_sp)
+{
+	char path[PATH_MAX];
+	int i, stack_no = 0;
+
+	if (!check_gdb()) {
+		sd_eprintf("cannot find gdb");
+		return -1;
+	}
+
+	if (get_my_path(path, sizeof(path)) < 0)
+		return -1;
+
+	for (i = 1; i < SD_MAX_STACK_DEPTH; i++) {
+		char cmd[ARG_MAX], info[256];
+		FILE *f = NULL;
+		bool found = false;
+
+		snprintf(cmd, sizeof(cmd), "gdb -nw %s %d -batch"
+			 " -ex 'set width 80' -ex 'select-frame %p'"
+			 " -ex 'up %d' -ex 'info locals' 2> /dev/null",
+			 path, getpid(), base_sp, i);
+		f = popen(cmd, "r");
+		if (f == NULL)
+			return -1;
+		/*
+		 * The expected outputs of gdb are:
+		 *
+		 *  [some info we don't need]
+		 *  #<stack no> <addr> in <func>(<arg>) at <file>:<line>
+		 *  <line>   <source>
+		 *  <local variables>
+		 */
+		while (fgets(info, sizeof(info), f) != NULL) {
+			int no;
+			if (sscanf(info, "#%d ", &no) == 1) {
+				if (no <= stack_no) {
+					/* reached to the end of the stacks */
+					pclose(f);
+					return 0;
+				}
+				stack_no = no;
+				found = true;
+				sd_printf(SDOG_EMERG, "%s", info);
+				break;
+			}
+		}
+
+		if (!found) {
+			sd_eprintf("Cannot get info from GDB");
+			sd_eprintf("Set /proc/sys/kernel/yama/ptrace_scope to"
+				   " zero if you are using Ubuntu.");
+			pclose(f);
+			return -1;
+		}
+
+		while (fgets(info, sizeof(info), f) != NULL)
+			sd_printf(SDOG_EMERG, "%s", info);
+
+		pclose(f);
+	}
+
+	return 0;
+}
+
 __attribute__ ((__noinline__))
 notrace void sd_backtrace(void)
 {
@@ -637,7 +721,7 @@ notrace void sd_backtrace(void)
 
 	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
 		void *addr = addrs[i];
-		char cmd[ARG_MAX], path[PATH_MAX] = {0}, info[256], **str;
+		char cmd[ARG_MAX], path[PATH_MAX], info[256], **str;
 		FILE *f;
 
 		/* the called function is at the previous address
@@ -645,7 +729,7 @@ notrace void sd_backtrace(void)
 		addr = (void *)((char *)addr - 1);
 
 		/* try to get a line number with addr2line if possible */
-		if (readlink("/proc/self/exe", path, sizeof(path)) < 0)
+		if (get_my_path(path, sizeof(path)) < 0)
 			goto fallback;
 
 		snprintf(cmd, sizeof(cmd), "addr2line -s -e %s -f -i %p | "
@@ -673,4 +757,7 @@ fallback:
 		sd_printf(SDOG_EMERG, "%s", *str);
 		free(str);
 	}
+
+	/* dump the stack frames if possible*/
+	dump_stack_frames();
 }
