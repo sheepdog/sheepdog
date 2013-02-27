@@ -33,6 +33,7 @@
 #include <libgen.h>
 #include <sys/time.h>
 #include <execinfo.h>
+#include <linux/limits.h>
 
 #include "logger.h"
 #include "util.h"
@@ -635,8 +636,7 @@ notrace void sd_backtrace(void)
 
 	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
 		void *addr = addrs[i];
-		char cmd[PATH_MAX], path[PATH_MAX] = {0}, info[256] = {0},
-		     **str;
+		char cmd[ARG_MAX], path[PATH_MAX] = {0}, info[256], **str;
 		FILE *f;
 
 		/* the called function is at the previous address
