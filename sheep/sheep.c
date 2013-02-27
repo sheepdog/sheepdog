@@ -181,6 +181,7 @@ static void crash_handler(int signo)
 		  strsignal(signo));
 
 	sd_backtrace();
+	sd_dump_variable(__sys);
 }
 
 static struct cluster_info __sys;

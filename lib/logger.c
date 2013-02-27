@@ -642,6 +642,51 @@ static bool check_gdb(void)
 	return system("which gdb > /dev/null") == 0;
 }
 
+__attribute__ ((__noinline__))
+notrace int __sd_dump_variable(const char *var, const void *base_sp)
+{
+	char cmd[ARG_MAX], path[PATH_MAX], info[256];
+	FILE *f = NULL;
+
+	if (!check_gdb()) {
+		sd_eprintf("cannot find gdb");
+		return -1;
+	}
+
+	if (get_my_path(path, sizeof(path)) < 0)
+		return -1;
+
+	snprintf(cmd, sizeof(cmd), "gdb -nw %s %d -batch -ex 'set width 80'"
+		 " -ex 'select-frame %p' -ex 'up 1' -ex 'p %s' 2> /dev/null",
+		 path, getpid(), base_sp, var);
+	f = popen(cmd, "r");
+	if (f == NULL) {
+		sd_eprintf("failed to run gdb");
+		return -1;
+	}
+
+	/*
+	 * The expected outputs of gdb are:
+	 *
+	 *  [some info we don't need]
+	 *  $1 = {
+	 *    <variable info>
+	 *  }
+	 */
+	sd_printf(SDOG_EMERG, "dump %s", var);
+	while (fgets(info, sizeof(info), f) != NULL) {
+		if (info[0] == '$') {
+			sd_printf(SDOG_EMERG, "%s", info);
+			break;
+		}
+	}
+	while (fgets(info, sizeof(info), f) != NULL)
+		sd_printf(SDOG_EMERG, "%s", info);
+
+	pclose(f);
+	return 0;
+}
+
 #define dump_stack_frames() ({			\
 	register void *current_sp asm("rsp");	\
 	__dump_stack_frames(current_sp);	\

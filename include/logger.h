@@ -37,6 +37,12 @@ void log_write(int prio, const char *func, int line, const char *fmt, ...)
 	__printf(4, 5);
 void set_thread_name(const char *name, int idx);
 void get_thread_name(char *name);
+
+#define sd_dump_variable(var) ({		\
+	register void *current_sp asm("rsp");	\
+	__sd_dump_variable(#var, current_sp);	\
+})
+int __sd_dump_variable(const char *var, const void *base_sp);
 void sd_backtrace(void);
 
 /*
