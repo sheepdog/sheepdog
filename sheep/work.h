@@ -36,6 +36,8 @@ struct worker_info {
 	size_t nr_pending;
 	size_t nr_running;
 	size_t nr_threads;
+	/* we cannot shrink work queue till this time */
+	uint64_t tm_end_of_protection;
 
 	pthread_mutex_t startup_lock;
 

@@ -24,6 +24,7 @@
 #include <syscall.h>
 #include <sys/types.h>
 #include <sys/eventfd.h>
+#include <sys/time.h>
 #include <linux/types.h>
 
 #include "list.h"
@@ -32,6 +33,11 @@
 #include "logger.h"
 #include "event.h"
 #include "trace/trace.h"
+
+/* The protection period from shrinking work queue.  This is necessary
+ * to avoid many calls of pthread_create.  Without it, threads are
+ * frequently created and deleted and it leads poor performance. */
+#define WQ_PROTECTION_PERIOD 1000 /* ms */
 
 static int efd;
 int total_ordered_workers;
@@ -43,10 +49,33 @@ enum wq_state {
 
 static void *worker_routine(void *arg);
 
+static uint64_t get_msec_time(void)
+{
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
 static bool wq_need_grow(struct worker_info *wi)
 {
+	wi->tm_end_of_protection = get_msec_time() + WQ_PROTECTION_PERIOD;
+
 	return wi->nr_threads < wi->nr_pending + wi->nr_running &&
 		wi->nr_threads < wi->max_threads;
+}
+
+/* return true if more than half of threads are not used more than
+ * WQ_PROTECTION_PERIOD seconds */
+static bool wq_need_shrink(struct worker_info *wi)
+{
+	if (wi->nr_pending + wi->nr_running <= wi->nr_threads / 2)
+		/* we cannot shrink work queue during protection period. */
+		return wi->tm_end_of_protection <= get_msec_time();
+
+	/* update the end of protection time */
+	wi->tm_end_of_protection = get_msec_time() + WQ_PROTECTION_PERIOD;
+	return false;
 }
 
 static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
@@ -134,6 +163,15 @@ static void *worker_routine(void *arg)
 	while (!(wi->q.wq_state & WQ_DEAD)) {
 
 		pthread_mutex_lock(&wi->pending_lock);
+		if (wq_need_shrink(wi)) {
+			wi->nr_running--;
+			wi->nr_threads--;
+			pthread_mutex_unlock(&wi->pending_lock);
+			pthread_detach(pthread_self());
+			sd_dprintf("destroy thread %s %d, %zd", wi->name,
+				   gettid(), wi->nr_threads);
+			break;
+		}
 retest:
 		if (list_empty(&wi->q.pending_list)) {
 			wi->nr_running--;
