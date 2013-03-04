@@ -24,8 +24,6 @@ struct worker_info {
 
 	struct list_head worker_info_siblings;
 
-	bool ordered;
-
 	pthread_mutex_t finished_lock;
 	struct list_head finished_list;
 
@@ -35,17 +33,20 @@ struct worker_info {
 	pthread_mutex_t pending_lock;
 	/* protected by pending_lock */
 	struct work_queue q;
+	size_t nr_pending;
+	size_t nr_running;
+	size_t nr_threads;
 
 	pthread_mutex_t startup_lock;
 
-	pthread_t worker_thread; /* used for an ordered work queue */
+	size_t max_threads;
 };
 
 extern struct list_head worker_info_list;
 extern int total_ordered_workers;
 
-/* if 'ordered' is true, the work queue are processes in order. */
-struct work_queue *init_work_queue(const char *name, bool ordered);
+struct work_queue *init_work_queue(const char *name, int max_threads);
+struct work_queue *init_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);
 int init_wqueue_eventfd(void);
 
