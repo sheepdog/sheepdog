@@ -171,13 +171,8 @@ struct work_queue *init_work_queue(const char *name, bool ordered)
 
 	return &wi->q;
 destroy_threads:
-
 	wi->q.wq_state |= WQ_DEAD;
 	pthread_mutex_unlock(&wi->startup_lock);
-	pthread_join(wi->worker_thread, NULL);
-	sd_eprintf("stopped worker thread");
-
-/* destroy_cond_mutex: */
 	pthread_cond_destroy(&wi->pending_cond);
 	pthread_mutex_destroy(&wi->pending_lock);
 	pthread_mutex_destroy(&wi->startup_lock);
@@ -185,20 +180,3 @@ destroy_threads:
 
 	return NULL;
 }
-
-#ifdef COMPILE_UNUSED_CODE
-static void exit_work_queue(struct work_queue *q)
-{
-	struct worker_info *wi = container_of(q, struct worker_info, q);
-
-	q->wq_state |= WQ_DEAD;
-	pthread_cond_broadcast(&wi->pending_cond);
-
-	pthread_join(wi->worker_thread, NULL);
-
-	pthread_cond_destroy(&wi->pending_cond);
-	pthread_mutex_destroy(&wi->pending_lock);
-	pthread_mutex_destroy(&wi->startup_lock);
-	pthread_mutex_destroy(&wi->finished_lock);
-}
-#endif
