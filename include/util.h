@@ -87,6 +87,7 @@ int rmdir_r(char *dir_path);
 bool is_numeric(const char *p);
 int install_sighandler(int signum, void (*handler)(int), bool once);
 int install_crash_handler(void (*handler)(int));
+pid_t gettid(void);
 
 void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
 void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,

@@ -609,10 +609,11 @@ notrace void log_close(void)
 	}
 }
 
-notrace void set_thread_name(const char *name, int idx)
+notrace void set_thread_name(const char *name, bool show_idx)
 {
 	worker_name = name;
-	worker_idx = idx;
+	if (show_idx)
+		worker_idx = gettid();
 }
 
 notrace void get_thread_name(char *name)

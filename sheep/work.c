@@ -84,7 +84,7 @@ static void *worker_routine(void *arg)
 	struct work *work;
 	eventfd_t value = 1;
 
-	set_thread_name(wi->name, 0);
+	set_thread_name(wi->name, false);
 
 	pthread_mutex_lock(&wi->startup_lock);
 	/* started this thread */

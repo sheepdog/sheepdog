@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -374,4 +375,9 @@ int install_crash_handler(void (*handler)(int))
 		install_sighandler(SIGBUS, handler, true) ||
 		install_sighandler(SIGILL, handler, true) ||
 		install_sighandler(SIGFPE, handler, true);
+}
+
+pid_t gettid(void)
+{
+	return syscall(SYS_gettid);
 }
