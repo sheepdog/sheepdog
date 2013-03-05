@@ -19,6 +19,12 @@ struct work_queue {
 	struct list_head pending_list;
 };
 
+enum wq_thread_control {
+	WQ_ORDERED, /* Only 1 thread created for work queue */
+	WQ_DYNAMIC, /* # of threads proportional to nr_nodes created */
+	WQ_UNLIMITED, /* Unlimited # of threads created */
+};
+
 struct worker_info {
 	const char *name;
 
@@ -41,13 +47,13 @@ struct worker_info {
 
 	pthread_mutex_t startup_lock;
 
-	size_t max_threads;
+	enum wq_thread_control tc;
 };
 
 extern struct list_head worker_info_list;
 extern int total_ordered_workers;
 
-struct work_queue *init_work_queue(const char *name, int max_threads);
+struct work_queue *init_work_queue(const char *name, enum wq_thread_control);
 struct work_queue *init_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);
 int init_wqueue_eventfd(void);

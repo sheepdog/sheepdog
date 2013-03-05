@@ -379,15 +379,15 @@ static int init_work_queues(void)
 	if (init_wqueue_eventfd())
 		return -1;
 
-	sys->gateway_wqueue = init_work_queue("gway", -1);
-	sys->io_wqueue = init_work_queue("io", -1);
-	sys->recovery_wqueue = init_work_queue("rw", -1);
+	sys->gateway_wqueue = init_work_queue("gway", WQ_UNLIMITED);
+	sys->io_wqueue = init_work_queue("io", WQ_UNLIMITED);
+	sys->recovery_wqueue = init_work_queue("rw", WQ_UNLIMITED);
 	sys->deletion_wqueue = init_ordered_work_queue("deletion");
 	sys->block_wqueue = init_ordered_work_queue("block");
 	sys->sockfd_wqueue = init_ordered_work_queue("sockfd");
 	if (is_object_cache_enabled()) {
 		sys->oc_reclaim_wqueue = init_ordered_work_queue("oc_reclaim");
-		sys->oc_push_wqueue = init_work_queue("oc_push", -1);
+		sys->oc_push_wqueue = init_work_queue("oc_push", WQ_DYNAMIC);
 		if (!sys->oc_reclaim_wqueue || !sys->oc_push_wqueue)
 			return -1;
 	}

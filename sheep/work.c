@@ -33,6 +33,7 @@
 #include "logger.h"
 #include "event.h"
 #include "trace/trace.h"
+#include "sheep_priv.h"
 
 /* The protection period from shrinking work queue.  This is necessary
  * to avoid many calls of pthread_create.  Without it, threads are
@@ -57,16 +58,47 @@ static uint64_t get_msec_time(void)
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-static bool wq_need_grow(struct worker_info *wi)
+static inline uint64_t wq_get_roof(enum wq_thread_control tc)
 {
-	wi->tm_end_of_protection = get_msec_time() + WQ_PROTECTION_PERIOD;
+	struct vnode_info *vinfo;
+	int nr_nodes;
+	uint64_t nr = 1;
 
-	return wi->nr_threads < wi->nr_pending + wi->nr_running &&
-		wi->nr_threads < wi->max_threads;
+	switch (tc) {
+	case WQ_ORDERED:
+		break;
+	case WQ_DYNAMIC:
+		vinfo = get_vnode_info();
+		nr_nodes = vinfo->nr_nodes;
+		put_vnode_info(vinfo);
+		/* FIXME: 2 * nr_nodes threads. No rationale yet. */
+		nr = nr_nodes * 2;
+		break;
+	case WQ_UNLIMITED:
+		nr = SIZE_MAX;
+		break;
+	default:
+		panic("Invalid threads control %d", tc);
+	}
+	return nr;
 }
 
-/* return true if more than half of threads are not used more than
- * WQ_PROTECTION_PERIOD seconds */
+static bool wq_need_grow(struct worker_info *wi)
+{
+	if (wi->nr_threads < wi->nr_pending + wi->nr_running &&
+	    wi->nr_threads * 2 <= wq_get_roof(wi->tc)) {
+		wi->tm_end_of_protection = get_msec_time() +
+			WQ_PROTECTION_PERIOD;
+		return true;
+	}
+
+	return false;
+}
+
+/*
+ * Return true if more than half of threads are not used more than
+ * WQ_PROTECTION_PERIOD seconds
+ */
 static bool wq_need_shrink(struct worker_info *wi)
 {
 	if (wi->nr_pending + wi->nr_running <= wi->nr_threads / 2)
@@ -109,8 +141,7 @@ void queue_work(struct work_queue *q, struct work *work)
 
 	if (wq_need_grow(wi))
 		/* double the thread pool size */
-		create_worker_threads(wi,
-				      min(wi->nr_threads * 2, wi->max_threads));
+		create_worker_threads(wi, wi->nr_threads * 2);
 
 	list_add_tail(&work->w_list, &wi->q.pending_list);
 	pthread_mutex_unlock(&wi->pending_lock);
@@ -150,7 +181,7 @@ static void *worker_routine(void *arg)
 	struct work *work;
 	eventfd_t value = 1;
 
-	set_thread_name(wi->name, (wi->max_threads > 1));
+	set_thread_name(wi->name, (wi->tc != WQ_ORDERED));
 
 	pthread_mutex_lock(&wi->startup_lock);
 	/* started this thread */
@@ -224,8 +255,8 @@ int init_wqueue_eventfd(void)
 }
 
 /*
- * max_threads = -1 allows unlimited threads to be created.
- * This option is necessary to solve the following problems:
+ * Allowing unlimited threads to be created is necessary to solve the following
+ * problems:
  *
  *  1. timeout of IO requests from guests. With on-demand short threads, we
  *     guarantee that there is always one thread available to execute the
@@ -234,17 +265,14 @@ int init_wqueue_eventfd(void)
  *     local requests that ask for creation of another thread to execute the
  *     requests and sleep-wait for responses.
  */
-struct work_queue *init_work_queue(const char *name, int max_threads)
+struct work_queue *init_work_queue(const char *name, enum wq_thread_control tc)
 {
 	int ret;
 	struct worker_info *wi;
 
 	wi = xzalloc(sizeof(*wi));
 	wi->name = name;
-	if (max_threads == -1)
-		wi->max_threads = SIZE_MAX;
-	else
-		wi->max_threads = max_threads;
+	wi->tc = tc;
 
 	INIT_LIST_HEAD(&wi->q.pending_list);
 	INIT_LIST_HEAD(&wi->finished_list);
@@ -275,5 +303,5 @@ destroy_threads:
 
 struct work_queue *init_ordered_work_queue(const char *name)
 {
-	return init_work_queue(name, 1);
+	return init_work_queue(name, WQ_ORDERED);
 }
