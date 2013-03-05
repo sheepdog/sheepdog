@@ -24,9 +24,7 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 {
 	int flags = O_DSYNC | O_RDWR;
 
-	if ((fl & SD_FLAG_CMD_CACHE && is_disk_cache_enabled()) ||
-	    uatomic_is_true(&sys->use_journal) ||
-	    sys->nosync == true)
+	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
 		flags &= ~O_DSYNC;
 
 	/*
@@ -475,7 +473,7 @@ int default_format(void)
 		sd_eprintf("%m");
 		return SD_RES_EIO;
 	}
-	if (is_object_cache_enabled())
+	if (sys->enable_object_cache)
 		object_cache_format();
 
 	return SD_RES_SUCCESS;
@@ -505,34 +503,6 @@ int default_purge_obj(void)
 	return for_each_object_in_wd(move_object_to_stale_dir, true, &tgt_epoch);
 }
 
-#ifndef HAVE_SYNCFS
-static int syncfs(int fd)
-{
-	sync();
-	return 0;
-}
-#endif
-
-int default_flush(void)
-{
-	int fd, ret = SD_RES_SUCCESS;
-
-	fd = open(obj_path, O_RDONLY);
-	if (fd < 0) {
-		sd_eprintf("error at open() %s, %m", obj_path);
-		return SD_RES_NO_OBJ;
-	}
-
-	if (syncfs(fd)) {
-		sd_eprintf("error at syncfs(), %m");
-		ret = SD_RES_EIO;
-	}
-
-	close(fd);
-
-	return ret;
-}
-
 static struct store_driver plain_store = {
 	.name = "plain",
 	.init = default_init,
@@ -546,7 +516,6 @@ static struct store_driver plain_store = {
 	.format = default_format,
 	.remove_object = default_remove_object,
 	.purge_obj = default_purge_obj,
-	.flush = default_flush,
 };
 
 add_store_driver(plain_store);

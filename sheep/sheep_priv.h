@@ -117,9 +117,7 @@ struct cluster_info {
 	struct work_queue *oc_reclaim_wqueue;
 	struct work_queue *oc_push_wqueue;
 
-#define CACHE_TYPE_OBJECT 0x1
-#define CACHE_TYPE_DISK   0x2
-	int enabled_cache_type;
+	bool enable_object_cache;
 
 	uint32_t object_cache_size;
 	bool object_cache_directio;
@@ -169,7 +167,6 @@ struct store_driver {
 	int (*cleanup)(void);
 	int (*restore)(const struct siocb *);
 	int (*get_snap_file)(struct siocb *);
-	int (*flush)(void);
 };
 
 int default_init(const char *p);
@@ -369,14 +366,12 @@ int gateway_read_obj(struct request *req);
 int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
 int gateway_remove_obj(struct request *req);
-int gateway_flush_nodes(struct request *req);
 
 /* backend store */
 int peer_read_obj(struct request *req);
 int peer_write_obj(struct request *req);
 int peer_create_and_write_obj(struct request *req);
 int peer_remove_obj(struct request *req);
-int peer_flush(struct request *req);
 
 int default_flush(void);
 
@@ -415,16 +410,6 @@ void sheep_put_sockfd(const struct node_id *, struct sockfd *);
 void sheep_del_sockfd(const struct node_id *, struct sockfd *);
 int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *data);
 bool sheep_need_retry(uint32_t epoch);
-
-static inline bool is_object_cache_enabled(void)
-{
-	return !!(sys->enabled_cache_type & CACHE_TYPE_OBJECT);
-}
-
-static inline bool is_disk_cache_enabled(void)
-{
-	return !!(sys->enabled_cache_type & CACHE_TYPE_DISK);
-}
 
 /* journal_file.c */
 int journal_file_init(const char *path, size_t size, bool skip);

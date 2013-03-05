@@ -16,7 +16,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in `seq 0 2`; do
-    _start_sheep $i "-w object:size=30"
+    _start_sheep $i "-w size=30"
 done
 
 _wait_for_sheep 3
@@ -32,7 +32,7 @@ sleep 2
 
 #trigger an object reclaim at startup
 for i in `seq 0 2`; do
-    _start_sheep $i "-w object:size=10"
+    _start_sheep $i "-w size=10"
 done
 
 _wait_for_sheep 3

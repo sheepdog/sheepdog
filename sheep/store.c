@@ -364,7 +364,7 @@ int write_object(uint64_t oid, char *data, unsigned int datalen,
 	struct sd_req hdr;
 	int ret;
 
-	if (is_object_cache_enabled() && object_is_cached(oid)) {
+	if (sys->enable_object_cache && object_is_cached(oid)) {
 		ret = object_cache_write(oid, data, datalen, offset,
 					 flags, create);
 		if (ret == SD_RES_NO_CACHE)
@@ -427,7 +427,7 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 {
 	int ret;
 
-	if (is_object_cache_enabled() && object_is_cached(oid)) {
+	if (sys->enable_object_cache && object_is_cached(oid)) {
 		ret = object_cache_read(oid, data, datalen, offset);
 		if (ret != SD_RES_SUCCESS) {
 			sd_eprintf("try forward read %"PRIx64" %"PRIx32, oid,

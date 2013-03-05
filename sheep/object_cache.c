@@ -1006,7 +1006,7 @@ bool bypass_object_cache(const struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
-	if (!is_object_cache_enabled() || req->local)
+	if (!sys->enable_object_cache || req->local)
 		return true;
 
 	if (req->rq.flags & SD_FLAG_CMD_DIRECT) {

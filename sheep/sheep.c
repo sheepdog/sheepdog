@@ -59,7 +59,7 @@ static struct sd_option sheep_options[] = {
 	{'s', "disk-space", true, "specify the free disk space in megabytes"},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
-	{'w', "write-cache", true, "specify the cache type"},
+	{'w', "enable-cache", true, "enable object cache"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep"},
 	{'z', "zone", true, "specify the zone id"},
 	{ 0, NULL, false, NULL },
@@ -240,7 +240,6 @@ static void object_cache_dir_set(char *s)
 static void _object_cache_set(char *s)
 {
 	int i;
-	static bool first = true;
 
 	struct object_cache_arg {
 		const char *name;
@@ -253,12 +252,6 @@ static void _object_cache_set(char *s)
 		{ "dir=", object_cache_dir_set },
 		{ NULL, NULL },
 	};
-
-	if (first) {
-		assert(!strcmp(s, "object"));
-		first = false;
-		return;
-	}
 
 	for (i = 0; object_cache_args[i].name; i++) {
 		const char *n = object_cache_args[i].name;
@@ -273,52 +266,14 @@ static void _object_cache_set(char *s)
 	exit(1);
 }
 
-static void object_cache_set(char *s)
+static void object_cache_set(char *arg)
 {
-	sys->enabled_cache_type |= CACHE_TYPE_OBJECT;
-	parse_arg(s, ":", _object_cache_set);
-}
-
-static void disk_cache_set(char *s)
-{
-	assert(!strcmp(s, "disk"));
-	sys->enabled_cache_type |= CACHE_TYPE_DISK;
-}
-
-static void do_cache_type(char *s)
-{
-	int i;
-
-	struct cache_type {
-		const char *name;
-		void (*set)(char *);
-	};
-	struct cache_type cache_types[] = {
-		{ "object", object_cache_set },
-		{ "disk", disk_cache_set },
-		{ NULL, NULL },
-	};
-
-	for (i = 0; cache_types[i].name; i++) {
-		const char *n = cache_types[i].name;
-
-		if (!strncmp(s, n, strlen(n))) {
-			cache_types[i].set(s);
-			return;
-		}
-	}
-
-	fprintf(stderr, "invalid cache type: %s\n", s);
-	exit(1);
-}
-
-static void init_cache_type(char *arg)
-{
+	sys->enable_object_cache = true;
 	sys->object_cache_size = 0;
 
-	parse_arg(arg, ",", do_cache_type);
+	parse_arg(arg, ",", _object_cache_set);
 
-	if (is_object_cache_enabled() && sys->object_cache_size == 0) {
+	if (sys->object_cache_size == 0) {
 		fprintf(stderr, "object cache size is not set\n");
 		exit(1);
 	}
@@ -385,7 +340,7 @@ static int init_work_queues(void)
 	sys->deletion_wqueue = init_ordered_work_queue("deletion");
 	sys->block_wqueue = init_ordered_work_queue("block");
 	sys->sockfd_wqueue = init_ordered_work_queue("sockfd");
-	if (is_object_cache_enabled()) {
+	if (sys->enable_object_cache) {
 		sys->oc_reclaim_wqueue = init_ordered_work_queue("oc_reclaim");
 		sys->oc_push_wqueue = init_work_queue("oc_push", WQ_DYNAMIC);
 		if (!sys->oc_reclaim_wqueue || !sys->oc_push_wqueue)
@@ -542,7 +497,7 @@ int main(int argc, char **argv)
 			sys->cdrv_option = get_cdrv_option(sys->cdrv, optarg);
 			break;
 		case 'w':
-			init_cache_type(optarg);
+			object_cache_set(optarg);
 			break;
 		case 'i':
 			parse_arg(optarg, ",", init_io_arg);
@@ -692,7 +647,7 @@ int main(int argc, char **argv)
 			exit(1);
 	}
 
-	if (is_object_cache_enabled()) {
+	if (sys->enable_object_cache) {
 		if (!strlen(ocpath))
 			/* use object cache internally */
 			memcpy(ocpath, dir, strlen(dir));

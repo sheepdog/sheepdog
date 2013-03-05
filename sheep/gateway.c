@@ -39,7 +39,7 @@ int gateway_read_obj(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies, j;
 
-	if (is_object_cache_enabled() && !req->local &&
+	if (sys->enable_object_cache && !req->local &&
 	    !bypass_object_cache(req)) {
 		ret = object_cache_handle_request(req);
 		goto out;
@@ -234,28 +234,20 @@ write_info_advance(struct write_info *wi, const struct node_id *nid,
 	wi->nr_sent++;
 }
 
-static int init_target_nodes(struct request *req, bool all_node,
-			     uint64_t oid, const struct sd_node **target_nodes)
+static int init_target_nodes(struct request *req, uint64_t oid,
+			     const struct sd_node **target_nodes)
 {
-	int i, nr_to_send;
+	int nr_to_send;
 	const struct vnode_info *vinfo = req->vinfo;
-
-	if (all_node) {
-		nr_to_send = vinfo->nr_nodes;
-		for (i = 0; i < nr_to_send; i++)
-			target_nodes[i] = &vinfo->nodes[i];
-
-		return nr_to_send;
-	}
 
 	nr_to_send = get_req_copy_number(req);
 	oid_to_nodes(vinfo->vnodes, vinfo->nr_vnodes, oid, nr_to_send,
-		vinfo->nodes, target_nodes);
+		     vinfo->nodes, target_nodes);
 
 	return nr_to_send;
 }
 
-static int gateway_forward_request(struct request *req, bool all_node)
+static int gateway_forward_request(struct request *req)
 {
 	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
 	unsigned wlen;
@@ -272,7 +264,7 @@ static int gateway_forward_request(struct request *req, bool all_node)
 	op = get_sd_op(hdr.opcode);
 
 	wlen = hdr.data_length;
-	nr_to_send = init_target_nodes(req, all_node, oid, target_nodes);
+	nr_to_send = init_target_nodes(req, oid, target_nodes);
 	write_info_init(&wi, nr_to_send);
 
 	for (i = 0; i < nr_to_send; i++) {
@@ -327,7 +319,7 @@ int gateway_write_obj(struct request *req)
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	return gateway_forward_request(req, false);
+	return gateway_forward_request(req);
 }
 
 int gateway_create_and_write_obj(struct request *req)
@@ -335,15 +327,10 @@ int gateway_create_and_write_obj(struct request *req)
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	return gateway_forward_request(req, false);
+	return gateway_forward_request(req);
 }
 
 int gateway_remove_obj(struct request *req)
 {
-	return gateway_forward_request(req, false);
-}
-
-int gateway_flush_nodes(struct request *req)
-{
-	return gateway_forward_request(req, true);
+	return gateway_forward_request(req);
 }

@@ -20,7 +20,7 @@ fi
 _cleanup
 
 for i in 0 1 2; do
-    _start_sheep $i '-s 4096 -w object:size=1000'
+    _start_sheep $i '-s 4096 -w size=1000'
 done
 
 _wait_for_sheep 3
