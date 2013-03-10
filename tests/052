@@ -39,6 +39,7 @@ done
 echo yes | $COLLIE cluster recover force
 echo ""
 
+sleep 1
 $COLLIE vdi check test
 
 for i in 0 1 2 4; do
