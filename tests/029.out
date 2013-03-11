@@ -1,9 +1,9 @@
 QA output created by 029
 using backend farm store
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test4        1   20 MB   20 MB  0.0 MB DATE   fd2de3     4              
-  test3        1   20 MB   20 MB  0.0 MB DATE   fd3662     3              
-  test2        2   20 MB  0.0 MB   20 MB DATE   fd3816     2              
+  test4        0   20 MB   20 MB  0.0 MB DATE   fd2de3     4              
+  test3        0   20 MB   20 MB  0.0 MB DATE   fd3662     3              
+  test2        0   20 MB  0.0 MB   20 MB DATE   fd3816     2              
 Looking for the object 0xfd381500000001 (the inode vid 0xfd3816 idx 1) with 7 nodes
 
 127.0.0.1:7000 doesn't have the object

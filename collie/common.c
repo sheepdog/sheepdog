@@ -159,6 +159,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
 		uint64_t oid;
+		uint32_t snapid;
 
 		if (!test_bit(nr, vdi_inuse))
 			continue;
@@ -190,7 +191,8 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 			}
 		}
 
-		func(i.vdi_id, i.name, i.tag, i.snap_id, 0, &i, data);
+		snapid = is_current(&i) ? 0 : i.snap_id;
+		func(i.vdi_id, i.name, i.tag, snapid, 0, &i, data);
 	}
 
 out:
