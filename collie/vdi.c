@@ -866,7 +866,7 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	int i, j, fd, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct sd_vnode vnodes[SD_MAX_VNODES];
+	struct sd_vnode *vnodes;
 	const struct sd_vnode *vnode_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
 	int vnodes_nr, nr_logs, log_length;
@@ -874,6 +874,7 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 
 	log_length = sd_epoch * sizeof(struct epoch_log);
 	logs = xmalloc(log_length);
+	vnodes = xmalloc(sizeof(*vnodes) * SD_MAX_VNODES);
 	fd = connect_to(sdhost, sdport);
 	if (fd < 0)
 		goto error;
@@ -922,9 +923,11 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	}
 
 	free(logs);
+	free(vnodes);
 	return EXIT_SUCCESS;
 error:
 	free(logs);
+	free(vnodes);
 	return EXIT_SYSFAIL;
 }
 

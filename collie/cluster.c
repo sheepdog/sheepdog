@@ -87,7 +87,7 @@ static int cluster_format(int argc, char **argv)
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
 	struct timeval tv;
 	char store_name[STORE_LEN];
-	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	unsigned long nr;
 
 	fd = connect_to(sdhost, sdport);
