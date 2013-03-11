@@ -792,8 +792,8 @@ static int vdi_rollback(int argc, char **argv)
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, &base_vid, inode,
 			   SD_INODE_HEADER_SIZE);
-	if (ret < 0)
-		return EXIT_FAILURE;
+	if (ret != EXIT_SUCCESS)
+		return ret;
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != SD_RES_SUCCESS) {
@@ -1828,9 +1828,8 @@ static int vdi_restore(int argc, char **argv)
 	}
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
-	if (ret != SD_RES_SUCCESS) {
+	if (ret != EXIT_SUCCESS) {
 		fprintf(stderr, "Failed to delete the current state\n");
-		ret = EXIT_FAILURE;
 		goto out;
 	}
 	need_current_recovery = true;
