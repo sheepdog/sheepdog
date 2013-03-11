@@ -261,7 +261,9 @@ static int init_jrnl_path(const char *base_path)
 	return 0;
 }
 
-int init_store_driver(void)
+/* if the node is gateway, this function only finds the store driver.
+ * Otherwise, this function initializes the backend store*/
+int init_store_driver(bool is_gateway)
 {
 	char driver_name[STORE_LEN], *p;
 	int ret;
@@ -293,6 +295,9 @@ int init_store_driver(void)
 		sd_dprintf("store %s not found", driver_name);
 		return SD_RES_NO_STORE;
 	}
+
+	if (is_gateway)
+		return SD_RES_SUCCESS;
 
 	return sd_store->init(obj_path);
 }

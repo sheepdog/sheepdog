@@ -641,11 +641,9 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	if (!sys->gateway_only) {
-		ret = init_store_driver();
-		if (ret)
-			exit(1);
-	}
+	ret = init_store_driver(sys->gateway_only);
+	if (ret)
+		exit(1);
 
 	if (sys->enable_object_cache) {
 		if (!strlen(ocpath))

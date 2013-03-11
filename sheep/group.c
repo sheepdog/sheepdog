@@ -723,37 +723,57 @@ static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
 	return alloc_vnode_info(old_nodes, count);
 }
 
+static void setup_backend_store(const char *store, bool need_purge)
+{
+	int ret;
+
+	if (!sd_store) {
+		sd_store = find_store_driver(store);
+		if (!sd_store)
+			panic("backend store %s not supported", store);
+
+		ret = sd_store->init(obj_path);
+		if (ret != SD_RES_SUCCESS)
+			panic("failed to initialize store");
+
+		ret = set_cluster_store(sd_store->name);
+		if (ret != SD_RES_SUCCESS)
+			panic("failed to store into config file");
+	}
+
+	/* We need to purge the stale objects for sheep joining back
+	 * after crash */
+	if (need_purge && sd_store->purge_obj) {
+		ret = sd_store->purge_obj();
+		if (ret != SD_RES_SUCCESS)
+			panic("can't remove stale objects");
+	}
+}
+
 static void finish_join(const struct join_message *msg,
 			const struct sd_node *joined,
 			const struct sd_node *nodes, size_t nr_nodes)
 {
+	int ret;
+
 	sys->join_finished = true;
 	sys->epoch = msg->epoch;
 
 	if (msg->cluster_status != SD_STATUS_OK)
 		update_exceptional_node_list(get_latest_epoch(), msg);
 
-	/* We don't need backend for gateway-only node */
-	if (!sys->gateway_only && !sd_store && strlen((char *)msg->store)) {
-		sd_store = find_store_driver((char *)msg->store);
-		if (sd_store) {
-			if (sd_store->init(obj_path) != SD_RES_SUCCESS)
-				panic("failed to initialize store");
-			if (set_cluster_store(sd_store->name) != SD_RES_SUCCESS)
+	if (msg->store[0]) {
+		/* We don't need backend for gateway-only node, but need to save
+		 * store name.  Otherwise, the node cannot notify the store name
+		 * when it become master */
+		if (sys->gateway_only) {
+			ret = set_cluster_store((char *)msg->store);
+			if (ret != SD_RES_SUCCESS)
 				panic("failed to store into config file");
 		} else
-				panic("backend store %s not supported",
-				      msg->store);
+			setup_backend_store((char *)msg->store,
+					    !!msg->inc_epoch);
 	}
-
-	/* We need to purge the stale objects for sheep joining back
-	 * after crash
-	 */
-	if (msg->inc_epoch)
-		if (!sys->gateway_only &&
-		    sd_store->purge_obj &&
-		    sd_store->purge_obj() != SD_RES_SUCCESS)
-			panic("can't remove stale objects");
 
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
