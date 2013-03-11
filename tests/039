@@ -57,6 +57,10 @@ $COLLIE vdi snapshot test -s snap3
 qemu-io -c "write 0 512 -P 4" sheepdog:test | _filter_qemu_io
 $COLLIE vdi snapshot test -s snap4
 
+# these fail since the snap ids don't belong to snapshots
+$COLLIE vdi rollback test -s 0
+$COLLIE vdi rollback test -s 5
+
 $COLLIE vdi rollback test -s snap3
 qemu-io -c "read 0 512 -P 3" sheepdog:test | _filter_qemu_io
 $COLLIE vdi tree | _filter_short_date
