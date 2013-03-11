@@ -2013,6 +2013,10 @@ static int vdi_parser(int ch, char *opt)
 			vdi_cmd_data.snapshot_id = 0;
 			pstrcpy(vdi_cmd_data.snapshot_tag,
 				sizeof(vdi_cmd_data.snapshot_tag), opt);
+		} else if (vdi_cmd_data.snapshot_id == 0) {
+			fprintf(stderr,
+				"The snapshot id must be larger than zero\n");
+			exit(EXIT_FAILURE);
 		}
 		break;
 	case 'x':
