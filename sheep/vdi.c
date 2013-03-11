@@ -341,8 +341,17 @@ static int find_first_vdi(unsigned long start, unsigned long end,
 			if (tag && tag[0] &&
 			    strncmp(inode->tag, tag, sizeof(inode->tag)) != 0)
 				continue;
-			if (snapid && snapid != inode->snap_id)
-				continue;
+			if (snapid) {
+				if (snapid != inode->snap_id)
+					continue;
+
+				if (inode->snap_ctime == 0) {
+					sd_dprintf("vdi %" PRIx32 " is not a "
+						   "snapshot\n", inode->vdi_id);
+					ret = SD_RES_INVALID_PARMS;
+					goto out_free_inode;
+				}
+			}
 
 			*vid = inode->vdi_id;
 			*inode_nr_copies = inode->nr_copies;
