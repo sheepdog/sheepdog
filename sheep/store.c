@@ -29,7 +29,6 @@
 #include "farm/farm.h"
 
 char *obj_path;
-char *mnt_path;
 char *jrnl_path;
 char *epoch_path;
 
