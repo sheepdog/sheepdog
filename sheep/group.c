@@ -458,7 +458,7 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 	int i, nr, ret;
 	struct vnode_info *vinfo = get_vnode_info();
 
-	nr = vinfo->nr_vnodes;
+	nr = vinfo->nr_nodes;
 	for (i = 0; i < nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
