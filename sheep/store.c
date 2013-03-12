@@ -205,22 +205,38 @@ int init_base_path(const char *d)
 
 #define OBJ_PATH "/obj/"
 
-int init_obj_path(const char *base_path)
+/*
+ * farm needs extra HEX_LEN + 3 chars to store snapshot objects.
+ * HEX_LEN + 3 = '/' + hex(2) + '/' + hex(38) + '\0'
+ */
+static inline int check_path_len(const char *path)
 {
-	int len;
-
-	len = strlen(base_path);
-	/* farm needs extra HEX_LEN + 3 chars to store snapshot objects.
-	 * HEX_LEN + 3 = '/' + hex(2) + '/' + hex(38) + '\0'
-	 */
+	int len = strlen(path);
 	if (len + HEX_LEN + 3 > PATH_MAX) {
-		sd_eprintf("insanely long object directory %s", base_path);
+		sd_eprintf("insanely long object directory %s", path);
 		return -1;
 	}
+
+	return 0;
+}
+
+static int init_obj_path(const char *base_path, char *argp)
+{
+	char *p;
+	int len;
+
+	if (check_path_len(base_path) < 0)
+		return -1;
 
 	len = strlen(base_path) + strlen(OBJ_PATH) + 1;
 	obj_path = xzalloc(len);
 	snprintf(obj_path, len, "%s" OBJ_PATH, base_path);
+
+	/* Eat up the first component */
+	strtok(argp, ",");
+	while ((p = strtok(NULL, ",")))
+		if (md_init_disk(p) < 0)
+			return -1;
 
 	return init_path(obj_path, NULL);
 }
@@ -305,31 +321,40 @@ int init_store_driver(bool is_gateway)
 int init_disk_space(const char *base_path)
 {
 	int ret = SD_RES_SUCCESS;
-	uint64_t space_size = 0;
+	uint64_t space_size = 0, mds;
 	struct statvfs fs;
 
 	if (sys->gateway_only)
 		goto out;
 
+	/* We need to init md even we don't need to update sapce */
+	mds = md_init_space();
+
+	/* If it is restarted */
 	ret = get_cluster_space(&space_size);
 	if (space_size != 0) {
 		sys->disk_space = space_size;
 		goto out;
 	}
 
+	/* User has specified the space at startup */
 	if (sys->disk_space) {
 		ret = set_cluster_space(sys->disk_space);
 		goto out;
 	}
 
-	ret = statvfs(base_path, &fs);
-	if (ret < 0) {
-		sd_dprintf("get disk space failed %m");
-		ret = SD_RES_EIO;
-		goto out;
+	if (mds) {
+		sys->disk_space = mds;
+	} else {
+		ret = statvfs(base_path, &fs);
+		if (ret < 0) {
+			sd_dprintf("get disk space failed %m");
+			ret = SD_RES_EIO;
+			goto out;
+		}
+		sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bfree;
 	}
 
-	sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bfree;
 	ret = set_cluster_space(sys->disk_space);
 out:
 	sd_dprintf("disk free space is %" PRIu64, sys->disk_space);
@@ -337,11 +362,11 @@ out:
 }
 
 /* Initilize all the global pathnames used internally */
-int init_global_pathnames(const char *d)
+int init_global_pathnames(const char *d, char *argp)
 {
 	int ret;
 
-	ret = init_obj_path(d);
+	ret = init_obj_path(d, argp);
 	if (ret)
 		return ret;
 

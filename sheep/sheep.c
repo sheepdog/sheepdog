@@ -391,7 +391,8 @@ int main(int argc, char **argv)
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
 	int log_level = SDOG_INFO, nr_vnodes = SD_DEFAULT_VNODES;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
-	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX];
+	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX],
+	     *argp = NULL;
 	bool is_daemon = true, to_stdout = false, explicit_addr = false;
 	int64_t zone = -1, free_space = 0;
 	struct cluster_driver *cdrv;
@@ -558,8 +559,10 @@ int main(int argc, char **argv)
 		sys->disk_space = 0;
 	}
 
-	if (optind != argc)
-		dirp = argv[optind];
+	if (optind != argc) {
+		argp = strdup(argv[optind]);
+		dirp = strtok(argv[optind], ",");
+	}
 
 	ret = init_base_path(dirp);
 	if (ret)
@@ -587,7 +590,8 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_global_pathnames(dir);
+	ret = init_global_pathnames(dir, argp);
+	free(argp);
 	if (ret)
 		exit(1);
 

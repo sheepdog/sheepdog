@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <signal.h>
+#include <sys/xattr.h>
 
 #include "util.h"
 #include "logger.h"
@@ -380,4 +381,13 @@ int install_crash_handler(void (*handler)(int))
 pid_t gettid(void)
 {
 	return syscall(SYS_gettid);
+}
+
+bool is_xattr_enabled(const char *path)
+{
+	int ret, dummy;
+
+	ret = getxattr(path, "user.dummy", &dummy, sizeof(dummy));
+
+	return !(ret == -1 && errno == ENOTSUP);
 }

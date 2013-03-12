@@ -221,9 +221,8 @@ int create_listen_port(char *bindaddr, int port);
 int init_unix_domain_socket(const char *dir);
 
 int init_store_driver(bool is_gateway);
-int init_global_pathnames(const char *d);
+int init_global_pathnames(const char *d, char *);
 int init_base_path(const char *dir);
-int init_obj_path(const char *d);
 int init_disk_space(const char *d);
 
 int fill_vdi_copy_list(void *data);
@@ -414,4 +413,9 @@ bool sheep_need_retry(uint32_t epoch);
 /* journal_file.c */
 int journal_file_init(const char *path, size_t size, bool skip);
 int journal_file_write(uint64_t oid, const char *buf, size_t size, off_t, bool);
+
+/* md.c */
+int md_init_disk(char *path);
+uint64_t md_init_space(void);
+
 #endif

@@ -99,15 +99,6 @@ out:
 	return ret;
 }
 
-static bool is_xattr_enabled(const char *path)
-{
-	int ret, dummy;
-
-	ret = getxattr(path, "user.dummy", &dummy, sizeof(dummy));
-
-	return !(ret == -1 && errno == ENOTSUP);
-}
-
 static int farm_init(const char *p)
 {
 	sd_dprintf("use farm store driver");
