@@ -217,7 +217,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, void *arg)
 	return SD_RES_SUCCESS;
 }
 
-int default_init(const char *p)
+int default_init(void)
 {
 	int ret;
 

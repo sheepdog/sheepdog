@@ -255,7 +255,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (set_cluster_store(store_name) < 0)
 		return SD_RES_EIO;
 
-	ret = sd_store->init(obj_path);
+	ret = sd_store->init();
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 

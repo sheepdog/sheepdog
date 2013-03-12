@@ -732,7 +732,7 @@ static void setup_backend_store(const char *store, bool need_purge)
 		if (!sd_store)
 			panic("backend store %s not supported", store);
 
-		ret = sd_store->init(obj_path);
+		ret = sd_store->init();
 		if (ret != SD_RES_SUCCESS)
 			panic("failed to initialize store");
 

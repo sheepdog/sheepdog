@@ -315,7 +315,7 @@ int init_store_driver(bool is_gateway)
 	if (is_gateway)
 		return SD_RES_SUCCESS;
 
-	return sd_store->init(obj_path);
+	return sd_store->init();
 }
 
 int init_disk_space(const char *base_path)

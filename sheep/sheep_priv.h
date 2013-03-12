@@ -149,7 +149,7 @@ struct vdi_iocb {
 struct store_driver {
 	struct list_head list;
 	const char *name;
-	int (*init)(const char *path);
+	int (*init)(void);
 	bool (*exist)(uint64_t oid);
 	/* create_and_write must be an atomic operation*/
 	int (*create_and_write)(uint64_t oid, const struct siocb *);
@@ -170,7 +170,7 @@ struct store_driver {
 	int (*get_snap_file)(struct siocb *);
 };
 
-int default_init(const char *p);
+int default_init(void);
 bool default_exist(uint64_t oid);
 int default_create_and_write(uint64_t oid, const struct siocb *iocb);
 int default_write(uint64_t oid, const struct siocb *iocb);

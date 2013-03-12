@@ -98,21 +98,21 @@ out:
 	return ret;
 }
 
-static int farm_init(const char *p)
+static int farm_init(void)
 {
 	sd_dprintf("use farm store driver");
-	if (create_directory(p) < 0)
+	if (create_directory(obj_path) < 0)
 		goto err;
 
-	if (!is_xattr_enabled(p)) {
-		sd_eprintf("xattrs are not enabled on %s", p);
+	if (!is_xattr_enabled(obj_path)) {
+		sd_eprintf("xattrs are not enabled on %s", obj_path);
 		goto err;
 	}
 
 	if (snap_init() < 0)
 		goto err;
 
-	if (default_init(p) < 0)
+	if (default_init() < 0)
 		goto err;
 
 	return SD_RES_SUCCESS;
