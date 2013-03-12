@@ -20,9 +20,6 @@
 #define MAX_DEPTH    100
 #endif
 
-#define TEXT_NORMAL "\033[0m"
-#define TEXT_BOLD   "\033[1m"
-
 struct vdi_tree {
 	char name[1024];
 	char label[256];

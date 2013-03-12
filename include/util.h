@@ -131,4 +131,25 @@ static inline void uatomic_set_false(uatomic_bool *val)
 	uatomic_set(&val->val, 0);
 }
 
+/* colors */
+#define TEXT_NORMAL         "\033[0m"
+#define TEXT_BOLD           "\033[1m"
+#define TEXT_RED            "\033[0;31m"
+#define TEXT_BOLD_RED       "\033[1;31m"
+#define TEXT_GREEN          "\033[0;32m"
+#define TEXT_BOLD_GREEN     "\033[1;32m"
+#define TEXT_YELLOW         "\033[0;33m"
+#define TEXT_BOLD_YELLOW    "\033[1;33m"
+#define TEXT_BLUE           "\033[0;34m"
+#define TEXT_BOLD_BLUE      "\033[1;34m"
+#define TEXT_MAGENTA        "\033[0;35m"
+#define TEXT_BOLD_MAGENTA   "\033[1;35m"
+#define TEXT_CYAN           "\033[0;36m"
+#define TEXT_BOLD_CYAN      "\033[1;36m"
+
+static inline bool is_stdout_console(void)
+{
+	return isatty(STDOUT_FILENO);
+}
+
 #endif

@@ -25,9 +25,6 @@
 #define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
 #define SUBCMD_FLAG_NEED_THIRD_ARG (1 << 1)
 
-#define TEXT_NORMAL "\033[0m"
-#define TEXT_BOLD   "\033[1m"
-
 #define UINT64_DECIMAL_SIZE 21
 
 struct command {

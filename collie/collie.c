@@ -380,7 +380,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (!isatty(STDOUT_FILENO) || raw_output)
+	if (!is_stdout_console() || raw_output)
 		highlight = false;
 
 	if (flags & SUBCMD_FLAG_NEED_NODELIST) {

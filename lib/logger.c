@@ -38,6 +38,18 @@
 #include "logger.h"
 #include "util.h"
 
+static bool colorize;
+static const char *log_color[] = {
+	[SDOG_EMERG] = TEXT_BOLD_RED,
+	[SDOG_ALERT] = TEXT_BOLD_RED,
+	[SDOG_CRIT] = TEXT_BOLD_RED,
+	[SDOG_ERR] = TEXT_BOLD_RED,
+	[SDOG_WARNING] = TEXT_BOLD_YELLOW,
+	[SDOG_NOTICE] = TEXT_BOLD_CYAN,
+	[SDOG_INFO] = TEXT_CYAN,
+	[SDOG_DEBUG] = TEXT_GREEN,
+};
+
 struct logger_user_info *logger_user_info;
 
 static void dolog(int prio, const char *func, int line, const char *fmt,
@@ -205,21 +217,36 @@ static notrace int default_log_formatter(char *buff, size_t size,
 	strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
 	p += strlen(p);
 
+	if (colorize) {
+		pstrcpy(p, size - strlen(buff), TEXT_YELLOW);
+		p += strlen(p);
+	}
+
 	if (worker_name_len && msg->worker_idx)
-		snprintf(p, size, "[%s %d] ", msg->worker_name,
-			msg->worker_idx);
+		snprintf(p, size - strlen(buff), "[%s %d] ", msg->worker_name,
+			 msg->worker_idx);
 	else if (worker_name_len)
-		snprintf(p, size, "[%s] ", msg->worker_name);
+		snprintf(p, size - strlen(buff), "[%s] ", msg->worker_name);
 	else
-		pstrcpy(p, size, "[main] ");
+		pstrcpy(p, size - strlen(buff), "[main] ");
 
 	p += strlen(p);
 
 	snprintf(p, size - strlen(buff), "%s(%d) ", msg->func, msg->line);
 	p += strlen(p);
 
+	if (colorize) {
+		pstrcpy(p, size - strlen(buff), log_color[msg->prio]);
+		p += strlen(p);
+	}
+
 	snprintf(p, size - strlen(buff), "%s", (char *)msg->str);
 	p += strlen(p);
+
+	if (colorize) {
+		pstrcpy(p, size - strlen(buff), "\033[m");
+		p += strlen(p);
+	}
 
 	return p - buff;
 }
@@ -569,7 +596,10 @@ notrace int log_init(const char *program_name, int size, bool to_stdout,
 
 	semkey = random();
 
-	if (!to_stdout) {
+	if (to_stdout) {
+		if (is_stdout_console())
+			colorize = true;
+	} else {
 		if (logarea_init(size)) {
 			syslog(LOG_ERR, "failed to initialize the logger\n");
 			return 1;
