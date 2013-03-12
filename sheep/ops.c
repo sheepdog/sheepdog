@@ -61,38 +61,23 @@ struct sd_op_template {
 	int (*process_main)(const struct sd_req *req, struct sd_rsp *rsp, void *data);
 };
 
-static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch)
+static int get_total_object_size(uint64_t oid, char *ignore, void *total)
 {
-	int ret;
-	DIR *dir;
-	struct dirent *d;
+	uint64_t *t = total;
+	*t += get_objsize(oid);
+
+	return SD_RES_SUCCESS;
+}
+
+static int stat_sheep(uint64_t *store_size, uint64_t *store_free,
+		      uint32_t epoch)
+{
 	uint64_t used = 0;
-	struct stat s;
-	char path[1024];
-	struct strbuf store_dir = STRBUF_INIT;
+	int ret;
 
-	strbuf_addf(&store_dir, "%s", obj_path);
-	dir = opendir(store_dir.buf);
-	if (!dir) {
-		ret = SD_RES_EIO;
+	ret = for_each_object_in_wd(get_total_object_size, false, &used);
+	if (ret != SD_RES_SUCCESS)
 		goto out;
-	}
-
-	while ((d = readdir(dir))) {
-		if (!strcmp(d->d_name, ".") || !strcmp(d->d_name, ".."))
-			continue;
-
-		snprintf(path, sizeof(path), "%s/%s", store_dir.buf, d->d_name);
-
-		ret = stat(path, &s);
-		if (ret)
-			continue;
-
-		used += s.st_size;
-	}
-
-	closedir(dir);
-	ret = SD_RES_SUCCESS;
 
 	*store_size = sys->disk_space;
 	if (sys->gateway_only)
@@ -100,7 +85,6 @@ static int stat_sheep(uint64_t *store_size, uint64_t *store_free, uint32_t epoch
 	else
 		*store_free = sys->disk_space - used;
 out:
-	strbuf_release(&store_dir);
 	return ret;
 }
 
