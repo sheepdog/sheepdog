@@ -255,10 +255,10 @@ void notrace pstrcpy(char *buf, int buf_size, const char *str)
 	*q = '\0';
 }
 
-/* remove directory recursively */
-int rmdir_r(char *dir_path)
+/* Purge directory recursively */
+int purge_directory(char *dir_path)
 {
-	int ret;
+	int ret = 0;
 	struct stat s;
 	DIR *dir;
 	struct dirent *d;
@@ -293,10 +293,20 @@ int rmdir_r(char *dir_path)
 			goto out;
 		}
 	}
-
-	ret = rmdir(dir_path);
 out:
 	closedir(dir);
+	return ret;
+}
+
+/* remove directory recursively */
+int rmdir_r(char *dir_path)
+{
+	int ret;
+
+	ret = purge_directory(dir_path);
+	if (ret == 0)
+		ret = rmdir(dir_path);
+
 	return ret;
 }
 
