@@ -17,7 +17,6 @@
  * flat directory structure.
  */
 #include <pthread.h>
-#include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -35,16 +34,15 @@ static int fill_entry_new_sha1(struct trunk_entry *entry)
 	struct sha1_file_hdr hdr = { .priv = 0 };
 
 	memcpy(hdr.tag, TAG_DATA, TAG_LEN);
-	strbuf_addstr(&buf, obj_path);
-	strbuf_addf(&buf, "%016" PRIx64, entry->oid);
+	strbuf_addstr(&buf, get_object_path(entry->oid));
+	strbuf_addf(&buf, "/%016" PRIx64, entry->oid);
 	fd = open(buf.buf, O_RDONLY);
-	strbuf_reset(&buf);
-
 	if (fd < 0) {
-		sd_dprintf("%m");
+		sd_dprintf("%m, %s", buf.buf);
 		ret = -1;
 		goto out;
 	}
+	strbuf_reset(&buf);
 	if (!strbuf_read(&buf, fd, SD_DATA_OBJ_SIZE) == SD_DATA_OBJ_SIZE) {
 		sd_dprintf("strbuf_read fail to read full");
 		ret = -1;
@@ -66,27 +64,41 @@ out:
 	return ret;
 }
 
-static int inc_object_nr(uint64_t oid, void *arg)
+static int inc_object_nr(uint64_t oid, char *wd, void *arg)
 {
 	uint64_t *object_nr = arg;
 
 	(*object_nr)++;
 
-	return 0;
+	return SD_RES_SUCCESS;
+}
+
+static int init_trunk_entry(uint64_t oid, char *path, void *arg)
+{
+	struct trunk_entry entry = {};
+	struct strbuf *buf = arg;
+
+	entry.oid = oid;
+	if (fill_entry_new_sha1(&entry) < 0)
+		return SD_RES_UNKNOWN;
+
+	strbuf_add(buf, &entry, sizeof(struct trunk_entry));
+	return SD_RES_SUCCESS;
 }
 
 int trunk_file_write(unsigned char *outsha1)
 {
 	struct strbuf buf;
 	struct sha1_file_hdr hdr = {};
-	struct trunk_entry entry = {};
-	struct dirent *d;
-	DIR *dir;
-	uint64_t data_size, oid, object_nr = 0;
+	uint64_t data_size, object_nr = 0;
 	int ret = 0;
 
 	/* Add the hdr first */
 	for_each_object_in_wd(inc_object_nr, false, &object_nr);
+	if (ret != SD_RES_SUCCESS) {
+		ret = -1;
+		goto out;
+	}
 	data_size = sizeof(struct trunk_entry) * object_nr;
 	hdr.size = data_size;
 	hdr.priv = object_nr;
@@ -94,26 +106,10 @@ int trunk_file_write(unsigned char *outsha1)
 	strbuf_init(&buf, sizeof(hdr) + data_size);
 	strbuf_add(&buf, &hdr, sizeof(hdr));
 
-	dir = opendir(obj_path);
-	if (!dir) {
+	ret = for_each_object_in_wd(init_trunk_entry, false,  &buf);
+	if (ret != SD_RES_SUCCESS) {
 		ret = -1;
 		goto out;
-	}
-
-	while ((d = readdir(dir))) {
-		if (!strncmp(d->d_name, ".", 1))
-			continue;
-
-		oid = strtoull(d->d_name, NULL, 16);
-		if (oid == 0 || oid == ULLONG_MAX)
-			continue;
-
-		entry.oid = oid;
-		if (fill_entry_new_sha1(&entry) < 0) {
-			ret = -1;
-			goto out;
-		}
-		strbuf_add(&buf, &entry, sizeof(struct trunk_entry));
 	}
 
 	if (sha1_file_write((void *)buf.buf, buf.len, outsha1) < 0) {
@@ -122,7 +118,6 @@ int trunk_file_write(unsigned char *outsha1)
 	}
 	sd_dprintf("trunk sha1: %s", sha1_to_hex(outsha1));
 out:
-	closedir(dir);
 	strbuf_release(&buf);
 	return ret;
 }

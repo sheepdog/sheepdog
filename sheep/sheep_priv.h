@@ -124,8 +124,9 @@ struct cluster_info {
 
 	uatomic_bool use_journal;
 	bool backend_dio;
-	bool upgrade; /* upgrade data layout before starting service
-		       * if necessary*/
+	/* upgrade data layout before starting service if necessary*/
+	bool upgrade;
+	bool enable_md;
 };
 
 struct siocb {
@@ -181,8 +182,8 @@ int default_cleanup(void);
 int default_format(void);
 int default_remove_object(uint64_t oid);
 int default_purge_obj(void);
-int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
-			  void *arg);
+int for_each_object_in_wd(int (*func)(uint64_t, char *, void *), bool, void *);
+int for_each_obj_path(int (*func)(char *path));
 int err_to_sderr(uint64_t oid, int err);
 
 extern struct list_head store_drivers;
@@ -417,5 +418,6 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size, off_t, bool);
 /* md.c */
 int md_init_disk(char *path);
 uint64_t md_init_space(void);
+char *get_object_path(uint64_t oid);
 
 #endif

@@ -13,12 +13,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <dirent.h>
 
 #include "sheep_priv.h"
 #include "config.h"
-
-static char stale_dir[PATH_MAX];
 
 static int get_open_flags(uint64_t oid, bool create, int fl)
 {
@@ -41,62 +38,20 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 
 static int get_obj_path(uint64_t oid, char *path)
 {
-	return snprintf(path, PATH_MAX, "%s%016" PRIx64, obj_path, oid);
+	return snprintf(path, PATH_MAX, "%s/%016" PRIx64,
+			get_object_path(oid), oid);
 }
 
 static int get_tmp_obj_path(uint64_t oid, char *path)
 {
-	return snprintf(path, PATH_MAX, "%s%016"PRIx64".tmp",
-			obj_path, oid);
+	return snprintf(path, PATH_MAX, "%s/%016"PRIx64".tmp",
+			get_object_path(oid), oid);
 }
 
 static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 {
-	return snprintf(path, PATH_MAX, "%s/%016"PRIx64".%"PRIu32,
-			stale_dir, oid, epoch);
-}
-
-/* If cleanup is true, temporary objects will be removed */
-int for_each_object_in_wd(int (*func)(uint64_t oid, void *arg), bool cleanup,
-			  void *arg)
-{
-	DIR *dir;
-	struct dirent *d;
-	uint64_t oid;
-	int ret = SD_RES_SUCCESS;
-	char path[PATH_MAX];
-
-	dir = opendir(obj_path);
-	if (!dir) {
-		sd_eprintf("failed to open %s, %m", obj_path);
-		return SD_RES_EIO;
-	}
-
-	while ((d = readdir(dir))) {
-		if (!strncmp(d->d_name, ".", 1))
-			continue;
-
-		oid = strtoull(d->d_name, NULL, 16);
-		if (oid == 0 || oid == ULLONG_MAX)
-			continue;
-
-		/* don't call callback against temporary objects */
-		if (strlen(d->d_name) == 20 &&
-		    strcmp(d->d_name + 16, ".tmp") == 0) {
-			if (cleanup) {
-				get_tmp_obj_path(oid, path);
-				sd_dprintf("remove tmp object %s", path);
-				unlink(path);
-			}
-			continue;
-		}
-
-		ret = func(oid, arg);
-		if (ret != SD_RES_SUCCESS)
-			break;
-	}
-	closedir(dir);
-	return ret;
+	return snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+			get_object_path(oid), oid, epoch);
 }
 
 bool default_exist(uint64_t oid)
@@ -119,7 +74,7 @@ int err_to_sderr(uint64_t oid, int err)
 
 	switch (err) {
 	case ENOENT:
-		if (stat(obj_path, &s) < 0) {
+		if (stat(get_object_path(oid), &s) < 0) {
 			sd_eprintf("corrupted");
 			return SD_RES_EIO;
 		}
@@ -176,24 +131,54 @@ out:
 	return ret;
 }
 
-int default_cleanup(void)
+static int make_stale_dir(char *path)
 {
-	rmdir_r(stale_dir);
-	if (mkdir(stale_dir, 0755) < 0) {
-		sd_eprintf("%m");
-		return SD_RES_EIO;
+	char p[PATH_MAX];
+
+	snprintf(p, PATH_MAX, "%s/.stale", path);
+	if (mkdir(p, def_dmode) < 0) {
+		if (errno != EEXIST) {
+			sd_eprintf("%s failed, %m", p);
+			return SD_RES_EIO;
+		}
 	}
+	return SD_RES_SUCCESS;
+}
+
+static int purge_dir(char *path)
+{
+	if (purge_directory(path) < 0)
+		return SD_RES_EIO;
 
 	return SD_RES_SUCCESS;
 }
 
-static int init_vdi_copy_number(uint64_t oid)
+static int purge_stale_dir(char *path)
+{
+	char p[PATH_MAX];
+
+	snprintf(p, PATH_MAX, "%s/.stale", path);
+	return purge_dir(p);
+}
+
+int default_cleanup(void)
+{
+	int ret;
+
+	ret = for_each_obj_path(purge_stale_dir);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	return SD_RES_SUCCESS;
+}
+
+static int init_vdi_copy_number(uint64_t oid, char *wd)
 {
 	char path[PATH_MAX];
 	int fd, flags = get_open_flags(oid, false, 0), ret;
 	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
 
-	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, oid);
+	snprintf(path, sizeof(path), "%s/%016"PRIx64, wd, oid);
 
 	fd = open(path, flags);
 	if (fd < 0) {
@@ -217,7 +202,7 @@ out:
 	return SD_RES_SUCCESS;
 }
 
-static int init_objlist_and_vdi_bitmap(uint64_t oid, void *arg)
+static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, void *arg)
 {
 	int ret;
 	objlist_cache_insert(oid);
@@ -225,7 +210,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, void *arg)
 	if (is_vdi_obj(oid)) {
 		sd_dprintf("found the VDI object %" PRIx64, oid);
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
-		ret = init_vdi_copy_number(oid);
+		ret = init_vdi_copy_number(oid, wd);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
@@ -234,16 +219,12 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, void *arg)
 
 int default_init(const char *p)
 {
-	sd_dprintf("use plain store driver");
+	int ret;
 
-	/* create a stale directory */
-	snprintf(stale_dir, sizeof(stale_dir), "%s/.stale", p);
-	if (mkdir(stale_dir, 0755) < 0) {
-		if (errno != EEXIST) {
-			sd_eprintf("%m");
-			return SD_RES_EIO;
-		}
-	}
+	sd_dprintf("use plain store driver");
+	ret = for_each_obj_path(make_stale_dir);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
 
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
@@ -424,13 +405,14 @@ out:
 	return ret;
 }
 
-static int move_object_to_stale_dir(uint64_t oid, void *arg)
+static int move_object_to_stale_dir(uint64_t oid, char *wd, void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 	uint32_t tgt_epoch = *(int *)arg;
 
-	get_obj_path(oid, path);
-	get_stale_obj_path(oid, tgt_epoch, stale_path);
+	snprintf(path, PATH_MAX, "%s/%016" PRIx64, wd, oid);
+	snprintf(stale_path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32, wd,
+		 oid, tgt_epoch);
 
 	if (rename(path, stale_path) < 0) {
 		sd_eprintf("failed to move stale object %"PRIX64" to %s, %m",
@@ -442,10 +424,10 @@ static int move_object_to_stale_dir(uint64_t oid, void *arg)
 	return SD_RES_SUCCESS;
 }
 
-static int check_stale_objects(uint64_t oid, void *arg)
+static int check_stale_objects(uint64_t oid, char *wd, void *arg)
 {
 	if (oid_stale(oid))
-		return move_object_to_stale_dir(oid, arg);
+		return move_object_to_stale_dir(oid, wd, arg);
 
 	return SD_RES_SUCCESS;
 }
@@ -464,15 +446,10 @@ int default_format(void)
 	unsigned ret;
 
 	sd_dprintf("try get a clean store");
-	ret = rmdir_r(obj_path);
-	if (ret && ret != -ENOENT) {
-		sd_eprintf("failed to remove %s: %s", obj_path, strerror(-ret));
-		return SD_RES_EIO;
-	}
-	if (mkdir(obj_path, def_dmode) < 0) {
-		sd_eprintf("%m");
-		return SD_RES_EIO;
-	}
+	ret = for_each_obj_path(purge_dir);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
 	if (sys->enable_object_cache)
 		object_cache_format();
 

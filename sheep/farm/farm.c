@@ -11,7 +11,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <dirent.h>
 #include <pthread.h>
 #include <linux/limits.h>
 #include <sys/file.h>
@@ -157,31 +156,6 @@ out:
 	return ret;
 }
 
-static int cleanup_working_dir(void)
-{
-	DIR *dir;
-	struct dirent *d;
-
-	sd_dprintf("try clean up working dir");
-	dir = opendir(obj_path);
-	if (!dir)
-		return -1;
-
-	while ((d = readdir(dir))) {
-		char p[PATH_MAX];
-		if (!strncmp(d->d_name, ".", 1))
-			continue;
-		snprintf(p, sizeof(p), "%s%s", obj_path, d->d_name);
-		if (unlink(p) < 0) {
-			sd_eprintf("%s:%m", p);
-			continue;
-		}
-		sd_dprintf("remove file %s", d->d_name);
-	}
-	closedir(dir);
-	return 0;
-}
-
 static int restore_objects_from_snap(uint32_t epoch)
 {
 	struct sha1_file_hdr hdr;
@@ -227,16 +201,33 @@ out:
 	return ret;
 }
 
+static int rm_object(uint64_t oid, char *path, void *arg)
+{
+	char p[PATH_MAX];
+	int ret = SD_RES_SUCCESS;
+
+	snprintf(p, sizeof(p), "%s/%"PRIx64, path, oid);
+	if (unlink(path) < 0) {
+		sd_eprintf("failed to remove cached object %m");
+		if (errno == ENOENT)
+			return SD_RES_SUCCESS;
+		ret = SD_RES_EIO;
+		goto out;
+	}
+out:
+	return ret;
+}
+
 static int farm_restore(const struct siocb *iocb)
 {
 	int ret = SD_RES_EIO, epoch = iocb->epoch;
 
 	sd_dprintf("try recover user epoch %d", epoch);
 
-	if (cleanup_working_dir() < 0) {
-		sd_eprintf("failed to clean up the working dir %m");
-		goto out;
-	}
+	/* Remove all the objects of WD and object cache */
+	for_each_object_in_wd(rm_object, true, NULL);
+	if (sys->enable_object_cache)
+		object_cache_format();
 
 	ret = restore_objects_from_snap(epoch);
 	if (ret != SD_RES_SUCCESS)

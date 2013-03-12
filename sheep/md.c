@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <math.h>
 #include <sys/xattr.h>
+#include <dirent.h>
 
 #include "sheep_priv.h"
 
@@ -179,6 +180,94 @@ uint64_t md_init_space(void)
 	}
 	calculate_vdisks(md_disks, md_nr_disks, total);
 	md_nr_vds = disks_to_vdisks(md_disks, md_nr_disks, md_vds);
+	sys->enable_md = true;
 
 	return total;
+}
+
+char *get_object_path(uint64_t oid)
+{
+	struct vdisk *vd;
+
+	if (!sys->enable_md)
+		return obj_path;
+	vd = oid_to_vdisk(oid);
+	return md_disks[vd->idx].path;
+}
+
+/* If cleanup is true, temporary objects will be removed */
+static int for_each_object_in_path(char *path,
+				   int (*func)(uint64_t, char *, void *),
+				   bool cleanup, void *arg)
+{
+	DIR *dir;
+	struct dirent *d;
+	uint64_t oid;
+	int ret = SD_RES_SUCCESS;
+	char p[PATH_MAX];
+
+	dir = opendir(path);
+	if (!dir) {
+		sd_eprintf("failed to open %s, %m", path);
+		return SD_RES_EIO;
+	}
+
+	while ((d = readdir(dir))) {
+		if (!strncmp(d->d_name, ".", 1))
+			continue;
+
+		oid = strtoull(d->d_name, NULL, 16);
+		if (oid == 0 || oid == ULLONG_MAX)
+			continue;
+
+		/* don't call callback against temporary objects */
+		if (strlen(d->d_name) == 20 &&
+		    strcmp(d->d_name + 16, ".tmp") == 0) {
+			if (cleanup) {
+				snprintf(p, PATH_MAX, "%s/%016"PRIx64".tmp",
+					 path, oid);
+				sd_dprintf("remove tmp object %s", p);
+				unlink(p);
+			}
+			continue;
+		}
+
+		ret = func(oid, path, arg);
+		if (ret != SD_RES_SUCCESS)
+			break;
+	}
+	closedir(dir);
+	return ret;
+}
+
+int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
+			  bool cleanup, void *arg)
+{
+	int i, ret;
+
+	if (!sys->enable_md)
+		return for_each_object_in_path(obj_path, func, cleanup, arg);
+
+	for (i = 0; i < md_nr_disks; i++) {
+		ret = for_each_object_in_path(md_disks[i].path, func,
+					      cleanup, arg);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+	}
+	return SD_RES_SUCCESS;
+}
+
+int for_each_obj_path(int (*func)(char *path))
+{
+	int i, ret;
+
+	if (!sys->enable_md)
+		return func(obj_path);
+
+	for (i = 0; i < md_nr_disks; i++) {
+		ret = func(md_disks[i].path);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+	}
+	return SD_RES_SUCCESS;
 }
