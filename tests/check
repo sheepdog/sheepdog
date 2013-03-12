@@ -64,6 +64,9 @@ expunge=true
 have_test_arg=false
 randomize=false
 valgrind=false
+
+export md=false
+
 rm -f $tmp.list $tmp.tmp $tmp.sed
 
 for r
@@ -141,6 +144,7 @@ check options
     -zk                 use zookeeper driver
     -valgrind           use valgrind
     -xdiff		graphical mode diff
+    -md                 enable md for backend
     -e			exit immediately on test failure
     -n			show me, do not run tests
     -T			output timestamps
@@ -162,6 +166,11 @@ testlist options
 
 	-zk)
 	    DRIVER="zookeeper:localhost:2181,timeout=1000"
+	    xpand=false
+	    ;;
+
+	-md)
+	    md=true
 	    xpand=false
 	    ;;
 
