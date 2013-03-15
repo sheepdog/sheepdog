@@ -514,7 +514,7 @@ static int vdi_create(int argc, char **argv)
 	uint64_t size;
 	uint32_t vid;
 	uint64_t oid;
-	int idx, max_idx, ret;
+	int idx, max_idx, ret, nr_copies = vdi_cmd_data.nr_copies;
 	struct sheepdog_inode *inode = NULL;
 
 	if (!argv[optind]) {
@@ -526,6 +526,12 @@ static int vdi_create(int argc, char **argv)
 		return EXIT_USAGE;
 	if (size > SD_MAX_VDI_SIZE) {
 		fprintf(stderr, "VDI size is too large\n");
+		return EXIT_USAGE;
+	}
+
+	if (nr_copies > sd_nodes_nr) {
+		fprintf(stderr, "There are not enough nodes(%d) to hold "
+			"the copies(%d)\n", sd_nodes_nr, nr_copies);
 		return EXIT_USAGE;
 	}
 
@@ -1938,7 +1944,7 @@ static struct subcommand vdi_cmd[] = {
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_check, vdi_options},
 	{"create", "<vdiname> <size>", "Pcaph", "create an image",
-	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
+	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
 	 vdi_create, vdi_options},
 	{"snapshot", "<vdiname>", "saph", "create a snapshot",
 	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG,
