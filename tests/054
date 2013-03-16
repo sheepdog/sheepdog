@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Test stale objects purging with different disk size.
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+#start three in different size
+for i in 0 1 2; do
+	_start_sheep $i "-s $(($i+1))000"
+done
+_wait_for_sheep 3
+$COLLIE cluster format
+sleep 1
+
+$COLLIE vdi create test 100M -P
+$COLLIE cluster info | _filter_cluster_info
+
+#start recovery
+ _start_sheep 3 "-s 3000"
+
+_wait_for_sheep 4
+_wait_for_sheep_recovery 0
+$COLLIE cluster info | _filter_cluster_info
+
+#test no object in .stale
+ls $STORE/*/*/.stale | grep ^- | wc -l
