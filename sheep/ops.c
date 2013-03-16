@@ -626,12 +626,17 @@ static int cluster_recovery_completion(const struct sd_req *req,
 
 	vnode_info = get_vnode_info();
 
-	if (vnode_info->nr_nodes == nr_recovereds &&
-	    memcmp(vnode_info->nodes, recovereds,
-		   sizeof(*recovereds) * nr_recovereds) == 0) {
-		sd_dprintf("all nodes are recovered at epoch %d", epoch);
-		if (sd_store->cleanup)
-			sd_store->cleanup();
+	if (vnode_info->nr_nodes == nr_recovereds) {
+		for (i = 0; i < nr_recovereds; ++i) {
+			if (node_id_cmp(&vnode_info->nodes[i].nid,
+					&recovereds[i].nid))
+				break;
+		}
+		if (i == nr_recovereds) {
+			sd_dprintf("all nodes are recovered, epoch %d", epoch);
+			if (sd_store->cleanup)
+				sd_store->cleanup();
+		}
 	}
 
 	put_vnode_info(vnode_info);
