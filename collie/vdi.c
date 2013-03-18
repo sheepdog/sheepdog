@@ -1923,7 +1923,7 @@ static int vdi_cache(int argc, char **argv)
 	int i;
 
 	for (i = 0; vdi_cache_cmd[i].name; i++) {
-		if (!strcmp(vdi_cache_cmd[i].name, argv[3])) {
+		if (!strcmp(vdi_cache_cmd[i].name, argv[optind])) {
 			optind++;
 			return vdi_cache_cmd[i].fn(argc, argv);
 		}

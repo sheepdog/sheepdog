@@ -211,7 +211,7 @@ static int debug_trace(int argc, char **argv)
 	int i;
 
 	for (i = 0; trace_cmd[i].name; i++) {
-		if (!strcmp(trace_cmd[i].name, argv[3]))
+		if (!strcmp(trace_cmd[i].name, argv[optind]))
 			return trace_cmd[i].fn(argc, argv);
 	}
 

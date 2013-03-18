@@ -442,7 +442,7 @@ static int cluster_recover(int argc, char **argv)
 	int i;
 
 	for (i = 0; cluster_recover_cmd[i].name; i++) {
-		if (!strcmp(cluster_recover_cmd[i].name, argv[3]))
+		if (!strcmp(cluster_recover_cmd[i].name, argv[optind]))
 			return cluster_recover_cmd[i].fn(argc, argv);
 	}
 
