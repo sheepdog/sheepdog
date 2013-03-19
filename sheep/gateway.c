@@ -56,7 +56,8 @@ int gateway_read_obj(struct request *req)
 		if (ret == SD_RES_SUCCESS)
 			goto out;
 
-		sd_eprintf("local read fail %x", ret);
+		sd_eprintf("local read %"PRIx64" failed, %s", oid,
+			   sd_strerror(ret));
 		break;
 	}
 
@@ -203,7 +204,8 @@ again:
 
 		ret = rsp->result;
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("fail %"PRIx32, ret);
+			sd_eprintf("fail %"PRIx64", %s", req->rq.obj.oid,
+				   sd_strerror(ret));
 			err_ret = ret;
 		}
 		finish_one_write(wi, i);
@@ -299,7 +301,8 @@ static int gateway_forward_request(struct request *req)
 		ret = sheep_do_op_work(op, req);
 
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("fail to write local %"PRIx32, ret);
+			sd_eprintf("fail to write local %"PRIx64", %s", oid,
+				   sd_strerror(ret));
 			err_ret = ret;
 		}
 	}
