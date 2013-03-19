@@ -14,6 +14,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <urcu/uatomic.h>
+#include <time.h>
 
 #include "sheepdog_proto.h"
 #include "event.h"
@@ -289,7 +290,10 @@ int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
 
 int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len);
-int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len);
+int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
+				int len, time_t *timestamp);
+int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
+			time_t *timestamp);
 uint32_t get_latest_epoch(void);
 int init_config_path(const char *base_path);
 int set_cluster_ctime(uint64_t ctime);

@@ -421,17 +421,17 @@ static int local_stat_cluster(struct request *req)
 		memset(log, 0, sizeof(*log));
 		log->epoch = epoch;
 		log->ctime = get_cluster_ctime();
-		log->nr_nodes = epoch_log_read(epoch, log->nodes,
-					       sizeof(log->nodes));
+		log->nr_nodes = epoch_log_read_with_timestamp(epoch, log->nodes,
+							sizeof(log->nodes),
+							(time_t *)&log->time);
 		if (log->nr_nodes == -1)
 			log->nr_nodes = epoch_log_read_remote(epoch, log->nodes,
-							      sizeof(log->nodes));
+							sizeof(log->nodes),
+							(time_t *)&log->time);
 
 		log->nr_copies = sys->nr_copies;
 
 		rsp->data_length += sizeof(*log);
-		/* FIXME: this hack would require sizeof(time_t) < sizeof(log->nodes[0]) */
-		log->time = *(uint64_t *)(&log->nodes[log->nr_nodes]);
 		epoch--;
 	}
 
@@ -460,15 +460,22 @@ static int local_get_obj_list(struct request *req)
 static int local_get_epoch(struct request *req)
 {
 	uint32_t epoch = req->rq.obj.tgt_epoch;
-	int nr_nodes;
+	int nr_nodes, nodes_len;
+	time_t timestamp;
 
 	sd_dprintf("%d", epoch);
 
-	nr_nodes = epoch_log_read(epoch, req->data, req->rq.data_length);
+	nr_nodes =
+		epoch_log_read_with_timestamp(epoch, req->data,
+					req->rq.data_length - sizeof(timestamp),
+					&timestamp);
 	if (nr_nodes == -1)
 		return SD_RES_NO_TAG;
 
-	req->rp.data_length = nr_nodes * sizeof(struct sd_node) + sizeof(time_t);
+	nodes_len = nr_nodes * sizeof(struct sd_node);
+	memcpy((void *)((char *)req->data + nodes_len), &timestamp,
+		sizeof(timestamp));
+	req->rp.data_length = nodes_len + sizeof(time_t);
 	return SD_RES_SUCCESS;
 }
 

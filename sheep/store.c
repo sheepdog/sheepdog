@@ -74,27 +74,62 @@ err_open:
 	return -1;
 }
 
-int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
+static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
+			time_t *timestamp)
 {
-	int fd;
+	int fd, ret, nr_nodes;
 	char path[PATH_MAX];
+	struct stat epoch_stat;
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDONLY);
-	if (fd < 0) {
-		sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
-		return -1;
+	if (fd < 0)
+		goto err;
+
+	memset(&epoch_stat, 0, sizeof(epoch_stat));
+	ret = fstat(fd, &epoch_stat);
+	if (ret < 0)
+		goto err;
+
+	if (len < epoch_stat.st_size - sizeof(time_t))
+		goto err;
+
+	ret = xread(fd, nodes, epoch_stat.st_size - sizeof(timestamp));
+	if (ret < 0)
+		goto err;
+
+	assert(ret % sizeof(struct sd_node) == 0);
+	nr_nodes = ret / sizeof(struct sd_node);
+
+	if (timestamp) {
+		ret = xread(fd, timestamp, sizeof(timestamp));
+		if (ret != sizeof(timestamp))
+			goto err;
 	}
 
-	len = read(fd, nodes, len);
+	ret = nr_nodes;
+	goto end;
 
-	close(fd);
+err:
+	sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
+	ret = -1;
 
-	if (len < 0) {
-		sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
-		return -1;
-	}
-	return len / sizeof(*nodes);
+end:
+	if (0 <= fd)
+		close(fd);
+
+	return ret;
+}
+
+int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
+{
+	return do_epoch_log_read(epoch, nodes, len, NULL);
+}
+
+int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
+				int len, time_t *timestamp)
+{
+	return do_epoch_log_read(epoch, nodes, len, timestamp);
 }
 
 uint32_t get_latest_epoch(void)

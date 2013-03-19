@@ -19,6 +19,7 @@
 #include <pthread.h>
 #include <urcu/uatomic.h>
 #include <math.h>
+#include <time.h>
 
 #include "sheepdog_proto.h"
 #include "sheep_priv.h"
@@ -189,7 +190,8 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch)
 
 	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
 	if (nr_nodes < 0) {
-		nr_nodes = epoch_log_read_remote(epoch, nodes, sizeof(nodes));
+		nr_nodes = epoch_log_read_remote(epoch, nodes, sizeof(nodes),
+						NULL);
 		if (nr_nodes == 0)
 			return NULL;
 	}
@@ -453,16 +455,19 @@ static void clear_exceptional_node_lists(void)
 		list_del(&n->list);
 }
 
-int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
+int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
+			time_t *timestamp)
 {
 	int i, nr, ret;
 	struct vnode_info *vinfo = get_vnode_info();
+	char buf[SD_MAX_NODES * sizeof(struct sd_node) + sizeof(time_t)];
 
 	nr = vinfo->nr_nodes;
 	for (i = 0; i < nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 		const struct sd_node *node = vinfo->nodes + i;
+		int nodes_len;
 
 		if (node_is_local(node))
 			continue;
@@ -475,12 +480,17 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len)
 		hdr.data_length = len;
 		hdr.obj.tgt_epoch = epoch;
 		hdr.epoch = sys_epoch();
-		ret = sheep_exec_req(&node->nid, &hdr, nodes);
+		ret = sheep_exec_req(&node->nid, &hdr, buf);
 		if (ret != SD_RES_SUCCESS)
 			continue;
 
+		nodes_len = rsp->data_length - sizeof(timestamp);
+		memcpy((void *)nodes, buf, nodes_len);
+		if (timestamp)
+			memcpy(timestamp, buf + nodes_len, sizeof(timestamp));
+
 		put_vnode_info(vinfo);
-		return rsp->data_length / sizeof(*nodes);
+		return nodes_len / sizeof(struct sd_node);
 	}
 
 	/*

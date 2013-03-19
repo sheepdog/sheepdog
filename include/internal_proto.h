@@ -191,7 +191,7 @@ struct sd_node {
 
 struct epoch_log {
 	uint64_t ctime;
-	uint64_t time;
+	uint64_t time;		/* treated as time_t */
 	uint32_t epoch;
 	uint32_t nr_nodes;
 	uint32_t nr_copies;
