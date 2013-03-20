@@ -643,12 +643,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 	if (node_is_gateway_only())
 		return 0;
 
-	rw = zalloc(sizeof(struct recovery_work));
-	if (!rw) {
-		sd_eprintf("%m");
-		return -1;
-	}
-
+	rw = xzalloc(sizeof(struct recovery_work));
 	rw->state = RW_INIT;
 	rw->oids = xmalloc(list_buffer_size);
 	rw->epoch = sys->epoch;
