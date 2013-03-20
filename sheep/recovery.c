@@ -660,12 +660,6 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 	rw->work.fn = prepare_object_list;
 	rw->work.done = finish_object_list;
 
-	if (sd_store->begin_recover) {
-		struct siocb iocb = { 0 };
-		iocb.epoch = rw->epoch;
-		sd_store->begin_recover(&iocb);
-	}
-
 	if (recovering_work != NULL) {
 		/* skip the previous epoch recovery */
 		if (next_rw)

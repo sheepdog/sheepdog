@@ -160,7 +160,7 @@ struct store_driver {
 	int (*remove_object)(uint64_t oid);
 	/* Operations in recovery */
 	int (*link)(uint64_t oid, uint32_t tgt_epoch);
-	int (*begin_recover)(const struct siocb *);
+	/* int (*begin_recover)(const struct siocb *); */
 	int (*end_recover)(uint32_t epoch,
 			   const struct vnode_info *old_vnode_info);
 	int (*purge_obj)(void);
