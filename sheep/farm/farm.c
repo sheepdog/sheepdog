@@ -32,33 +32,27 @@ static int create_directory(const char *p)
 
 	strbuf_addstr(&buf, p);
 	strbuf_addstr(&buf, ".farm");
-	if (mkdir(buf.buf, 0755) < 0) {
-		if (errno != EEXIST) {
-			sd_eprintf("%m");
-			ret = -1;
-			goto err;
-		}
+	if (xmkdir(buf.buf, 0755) < 0) {
+		sd_eprintf("%m");
+		ret = -1;
+		goto err;
 	}
 
 	if (!strlen(farm_dir))
 		strbuf_copyout(&buf, farm_dir, sizeof(farm_dir));
 
 	strbuf_addstr(&buf, "/objects");
-	if (mkdir(buf.buf, 0755) < 0) {
-		if (errno != EEXIST) {
-			sd_eprintf("%m");
-			ret = -1;
-			goto err;
-		}
+	if (xmkdir(buf.buf, 0755) < 0) {
+		sd_eprintf("%m");
+		ret = -1;
+		goto err;
 	}
 	for (i = 0; i < 256; i++) {
 		strbuf_addf(&buf, "/%02x", i);
-		if (mkdir(buf.buf, 0755) < 0) {
-			if (errno != EEXIST) {
-				sd_eprintf("%m");
-				ret = -1;
-				goto err;
-			}
+		if (xmkdir(buf.buf, 0755) < 0) {
+			sd_eprintf("%m");
+			ret = -1;
+			goto err;
 		}
 		strbuf_remove(&buf, buf.len - 3, 3);
 	}

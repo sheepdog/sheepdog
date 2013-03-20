@@ -561,13 +561,10 @@ static int create_dir_for(uint32_t vid)
 	char p[PATH_MAX];
 
 	snprintf(p, sizeof(p), "%s/%06"PRIx32, object_cache_dir, vid);
-	if (mkdir(p, def_dmode) < 0)
-		if (errno != EEXIST) {
-			sd_eprintf("%s, %m", p);
-			ret = -1;
-			goto err;
-		}
-err:
+	if (xmkdir(p, def_dmode) < 0) {
+		sd_eprintf("%s, %m", p);
+		ret = -1;
+	}
 	return ret;
 }
 
@@ -1254,20 +1251,16 @@ int object_cache_init(const char *p)
 	struct strbuf buf = STRBUF_INIT;
 
 	strbuf_addstr(&buf, p);
-	if (mkdir(buf.buf, def_dmode) < 0) {
-		if (errno != EEXIST) {
-			sd_eprintf("%s %m", buf.buf);
-			ret = -1;
-			goto err;
-		}
+	if (xmkdir(buf.buf, def_dmode) < 0) {
+		sd_eprintf("%s %m", buf.buf);
+		ret = -1;
+		goto err;
 	}
 	strbuf_addstr(&buf, "/cache");
-	if (mkdir(buf.buf, def_dmode) < 0) {
-		if (errno != EEXIST) {
-			sd_eprintf("%s %m", buf.buf);
-			ret = -1;
-			goto err;
-		}
+	if (xmkdir(buf.buf, def_dmode) < 0) {
+		sd_eprintf("%s %m", buf.buf);
+		ret = -1;
+		goto err;
 	}
 	strbuf_copyout(&buf, object_cache_dir, sizeof(object_cache_dir));
 

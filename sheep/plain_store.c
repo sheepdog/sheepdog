@@ -136,11 +136,9 @@ static int make_stale_dir(char *path)
 	char p[PATH_MAX];
 
 	snprintf(p, PATH_MAX, "%s/.stale", path);
-	if (mkdir(p, def_dmode) < 0) {
-		if (errno != EEXIST) {
-			sd_eprintf("%s failed, %m", p);
-			return SD_RES_EIO;
-		}
+	if (xmkdir(p, def_dmode) < 0) {
+		sd_eprintf("%s failed, %m", p);
+		return SD_RES_EIO;
 	}
 	return SD_RES_SUCCESS;
 }

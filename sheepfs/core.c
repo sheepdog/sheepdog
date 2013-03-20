@@ -364,11 +364,9 @@ int main(int argc, char **argv)
 	strbuf_addf(&path, "%s/%s", cwd, ".sheepfs");
 	free(cwd);
 	memcpy(sheepfs_shadow, path.buf, path.len);
-	if (mkdir(sheepfs_shadow, 0755) < 0) {
-		if (errno != EEXIST) {
-			fprintf(stderr, "%m\n");
-			exit(1);
-		}
+	if (xmkdir(sheepfs_shadow, 0755) < 0) {
+		fprintf(stderr, "%m\n");
+		exit(1);
 	}
 
 	strbuf_release(&path);

@@ -85,17 +85,15 @@ int shadow_dir_create(const char *path)
 	char p[PATH_MAX];
 
 	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
-	if (mkdir(p, 0755) < 0) {
-		if (errno != EEXIST) {
-			sheepfs_pr("%m\n");
-			return -1;
-		}
+	if (xmkdir(p, 0755) < 0) {
+		sheepfs_pr("%m\n");
+		return -1;
 	}
 	return 0;
 }
 
 int shadow_file_setxattr(const char *path, const char *name,
-		const void *value, size_t size)
+			 const void *value, size_t size)
 {
 	char p[PATH_MAX];
 

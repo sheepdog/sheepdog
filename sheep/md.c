@@ -114,8 +114,7 @@ int md_init_disk(char *path)
 {
 	md_nr_disks++;
 
-	if (mkdir(path, def_dmode) < 0)
-		if (errno != EEXIST)
+	if (xmkdir(path, def_dmode) < 0)
 			panic("%s, %m", path);
 	pstrcpy(md_disks[md_nr_disks - 1].path, PATH_MAX, path);
 	sd_iprintf("%s added to md, nr %d", md_disks[md_nr_disks - 1].path,
