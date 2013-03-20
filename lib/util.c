@@ -228,6 +228,13 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset)
 	return total;
 }
 
+int xmkdir(const char *pathname, mode_t mode)
+{
+	if (mkdir(pathname, mode) < 0 && errno != EEXIST)
+		return -1;
+	return 0;
+}
+
 /**
  * Copy the string str to buf. If str length is bigger than buf_size -
  * 1 then it is clamped to buf_size - 1.
