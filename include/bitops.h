@@ -113,7 +113,7 @@ static inline void clear_bit(unsigned int nr, unsigned long *addr)
 	addr[nr / BITS_PER_LONG] &= ~(1UL << (nr % BITS_PER_LONG));
 }
 
-/**
+/*
  * fls - find last (most-significant) bit set
  * @x: the word to search
  *
@@ -150,7 +150,7 @@ static __always_inline int fls(int x)
 	return r;
 }
 
-/**
+/*
  * __fls - find last (most-significant) set bit in a long word
  * @word: the word to search
  *
@@ -187,7 +187,7 @@ static __always_inline unsigned long __fls(unsigned long word)
 	return num;
 }
 
-/**
+/*
  * fls64 - find last set bit in a 64-bit word
  * @x: the word to search
  *

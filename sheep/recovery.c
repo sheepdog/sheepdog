@@ -30,8 +30,11 @@ struct recovery_work {
 
 	bool stop;
 	struct work work;
-	bool suspended; /* true when automatic recovery is disabled
-			 * and recovery process is suspended */
+	/*
+	 * true when automatic recovery is disabled
+	 * and recovery process is suspended
+	 */
+	bool suspended;
 
 	int count;
 	uint64_t *oids;
@@ -240,8 +243,10 @@ static inline void prepare_schedule_oid(uint64_t oid)
 				   oid);
 			return;
 		}
-	/* When auto recovery is enabled, the oid is currently being
-	 * recovered */
+	/*
+	 * When auto recovery is enabled, the oid is currently being
+	 * recovered
+	 */
 	if (!sys->disable_recovery && rw->oids[rw->done] == oid)
 		return;
 	rw->nr_prio_oids++;
@@ -662,8 +667,10 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 		sd_dprintf("recovery skipped");
 		next_rw = rw;
 
-		/* This is necesary to invoke run_next_rw when
-		 * recovery work is suspended. */
+		/*
+		 * This is necesary to invoke run_next_rw when
+		 * recovery work is suspended.
+		 */
 		resume_suspended_recovery();
 	} else {
 		recovering_work = rw;

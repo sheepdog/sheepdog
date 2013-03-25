@@ -222,9 +222,7 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 	return SD_RES_SUCCESS;
 }
 
-/*
- * Indicator if a cluster operation is currently running.
- */
+/* Indicator if a cluster operation is currently running. */
 static bool cluster_op_running;
 
 static struct vdi_op_message *prepare_cluster_msg(struct request *req,
@@ -432,9 +430,7 @@ static void update_exceptional_node_list(uint32_t epoch,
 		add_delayed_node(epoch, &jm->nodes[i]);
 }
 
-/*
- * Format the lists of failed or delayed nodes into the join message.
- */
+/* Format the lists of failed or delayed nodes into the join message. */
 static void format_exceptional_node_list(struct join_message *jm)
 {
 	struct node *n;
@@ -751,8 +747,10 @@ static void setup_backend_store(const char *store, bool need_purge)
 			panic("failed to store into config file");
 	}
 
-	/* We need to purge the stale objects for sheep joining back
-	 * after crash */
+	/*
+	 * We need to purge the stale objects for sheep joining back
+	 * after crash
+	 */
 	if (need_purge && sd_store->purge_obj) {
 		ret = sd_store->purge_obj();
 		if (ret != SD_RES_SUCCESS)
@@ -773,9 +771,11 @@ static void finish_join(const struct join_message *msg,
 		update_exceptional_node_list(get_latest_epoch(), msg);
 
 	if (msg->store[0]) {
-		/* We don't need backend for gateway-only node, but need to save
+		/*
+		 * We don't need backend for gateway-only node, but need to save
 		 * store name.  Otherwise, the node cannot notify the store name
-		 * when it become master */
+		 * when it become master
+		 */
 		if (sys->gateway_only) {
 			ret = set_cluster_store((char *)msg->store);
 			if (ret != SD_RES_SUCCESS)
@@ -1131,7 +1131,8 @@ void sd_join_handler(const struct sd_node *joined,
 	case CJ_RES_MASTER_TRANSFER:
 		update_exceptional_node_list(le, jm);
 
-		/* Sheep needs this to identify itself as master.
+		/*
+		 * Sheep needs this to identify itself as master.
 		 * Now mastership transfer is done.
 		 */
 		if (!sys->join_finished) {
@@ -1267,7 +1268,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	return 0;
 }
 
-/* We will call this function for two reason:
+/*
+ * We will call this function for two reason:
  * 1) make this node working as a gateway, or
  * 2) the program is going to shutdown itself.
  */

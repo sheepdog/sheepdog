@@ -235,7 +235,7 @@ int xmkdir(const char *pathname, mode_t mode)
 	return 0;
 }
 
-/**
+/*
  * Copy the string str to buf. If str length is bigger than buf_size -
  * 1 then it is clamped to buf_size - 1.
  * NOTE: this function does what strncpy should have done to be

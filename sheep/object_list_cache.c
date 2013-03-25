@@ -174,7 +174,8 @@ static void objlist_deletion_work(struct work *work)
 	struct objlist_cache_entry *entry, *t;
 	uint32_t vid = ow->vid, entry_vid;
 
-	/* Before reclaiming the cache belonging to the VDI just deleted,
+	/*
+	 * Before reclaiming the cache belonging to the VDI just deleted,
 	 * we should test whether the VDI is exist, because after some node
 	 * deleting it and before the notification is sent to all the node,
 	 * another node may issus a VDI creation event and reused the VDI id

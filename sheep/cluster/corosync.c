@@ -342,8 +342,10 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 		break;
 	case COROSYNC_EVENT_TYPE_BLOCK:
 		if (cevent->callbacked)
-			/* block events until the unblock message
-			   removes this event */
+			/*
+			 * block events until the unblock message
+			 * removes this event
+			 */
 			return false;
 		cevent->callbacked = sd_block_handler(&cevent->sender.ent);
 		return false;
@@ -365,10 +367,12 @@ static void __corosync_dispatch(void)
 	};
 
 	if (poll(&pfd, 1, 0)) {
-		/* Corosync dispatches leave events one by one even
+		/*
+		 * Corosync dispatches leave events one by one even
 		 * when network partition has occured.  To count the
 		 * number of alive nodes correctly, we postpone
-		 * processsing events if there are incoming ones. */
+		 * processsing events if there are incoming ones.
+		 */
 		sd_dprintf("wait for a next dispatch event");
 		return;
 	}
@@ -514,9 +518,11 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 		master = is_master(&cmsg->sender);
 		if (master >= 0)
-			/* Master is down before new nodes finish joining.
+			/*
+			 * Master is down before new nodes finish joining.
 			 * We have to revoke its mastership to avoid cluster
-			 * hanging */
+			 * hanging
+			 */
 			cpg_nodes[master].gone = 1;
 
 		cevent->sender = cmsg->sender;
@@ -582,8 +588,10 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		if (nr_majority == 0) {
 			size_t total = member_list_entries + left_list_entries;
 
-			/* we need at least 3 nodes to handle network
-			 * partition failure */
+			/*
+			 * we need at least 3 nodes to handle network
+			 * partition failure
+			 */
 			if (total > 2)
 				nr_majority = total / 2 + 1;
 		}
@@ -623,9 +631,11 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		cevent = xzalloc(sizeof(*cevent));
 		master = is_master(&left_sheep[i]);
 		if (master >= 0)
-			/* Master is down before new nodes finish joining.
+			/*
+			 * Master is down before new nodes finish joining.
 			 * We have to revoke its mastership to avoid cluster
-			 * hanging */
+			 * hanging
+			 */
 			cpg_nodes[master].gone = 1;
 
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;

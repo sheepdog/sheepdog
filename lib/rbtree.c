@@ -319,9 +319,7 @@ void rb_augment_erase_end(struct rb_node *node, rb_augment_f func, void *data)
 		rb_augment_path(node, func, data);
 }
 
-/*
- * This function returns the first node (in sort order) of the tree.
- */
+/* This function returns the first node (in sort order) of the tree. */
 struct rb_node *rb_first(const struct rb_root *root)
 {
 	struct rb_node	*n;
@@ -353,8 +351,10 @@ struct rb_node *rb_next(const struct rb_node *node)
 	if (rb_parent(node) == node)
 		return NULL;
 
-	/* If we have a right-hand child, go down and then left as far
-	   as we can. */
+	/*
+	 * If we have a right-hand child, go down and then left as far
+	 * as we can.
+	 */
 	if (node->rb_right) {
 		node = node->rb_right;
 		while (node->rb_left)
@@ -362,12 +362,14 @@ struct rb_node *rb_next(const struct rb_node *node)
 		return (struct rb_node *)node;
 	}
 
-	/* No right-hand children.  Everything down and left is
-	   smaller than us, so any 'next' node must be in the general
-	   direction of our parent. Go up the tree; any time the
-	   ancestor is a right-hand child of its parent, keep going
-	   up. First time it's a left-hand child of its parent, said
-	   parent is our 'next' node. */
+	/*
+	 * No right-hand children.  Everything down and left is
+	 * smaller than us, so any 'next' node must be in the general
+	 * direction of our parent. Go up the tree; any time the
+	 * ancestor is a right-hand child of its parent, keep going
+	 * up. First time it's a left-hand child of its parent, said
+	 * parent is our 'next' node.
+	 */
 	while ((parent = rb_parent(node)) && node == parent->rb_right)
 		node = parent;
 
@@ -381,8 +383,10 @@ struct rb_node *rb_prev(const struct rb_node *node)
 	if (rb_parent(node) == node)
 		return NULL;
 
-	/* If we have a left-hand child, go down and then right as far
-	   as we can. */
+	/*
+	 * If we have a left-hand child, go down and then right as far
+	 * as we can.
+	 */
 	if (node->rb_left) {
 		node = node->rb_left;
 		while (node->rb_right)
@@ -390,8 +394,10 @@ struct rb_node *rb_prev(const struct rb_node *node)
 		return (struct rb_node *)node;
 	}
 
-	/* No left-hand children. Go up till we find an ancestor which
-	   is a right-hand child of its parent */
+	/*
+	 * No left-hand children. Go up till we find an ancestor which
+	 * is a right-hand child of its parent
+	 */
 	while ((parent = rb_parent(node)) && node == parent->rb_left)
 		node = parent;
 

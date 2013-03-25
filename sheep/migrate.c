@@ -184,9 +184,11 @@ static int migrate_from_v0_to_v1(void)
 
 	close(fd);
 
-	/* If the config file contains a space field, the store layout
+	/*
+	 * If the config file contains a space field, the store layout
 	 * is compatible with v1.  In this case, what we need to do is
-	 * only adding version number to the config file. */
+	 * only adding version number to the config file.
+	 */
 	if (config.space > 0)
 		return 0;
 

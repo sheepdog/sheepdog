@@ -311,8 +311,10 @@ static int init_jrnl_path(const char *base_path)
 	return 0;
 }
 
-/* if the node is gateway, this function only finds the store driver.
- * Otherwise, this function initializes the backend store*/
+/*
+ * If the node is gateway, this function only finds the store driver.
+ * Otherwise, this function initializes the backend store
+ */
 int init_store_driver(bool is_gateway)
 {
 	char driver_name[STORE_LEN], *p;
@@ -419,9 +421,7 @@ int init_global_pathnames(const char *d, char *argp)
 	return 0;
 }
 
-/*
- * Write data to both local object cache (if enabled) and backends
- */
+/* Write data to both local object cache (if enabled) and backends */
 int write_object(uint64_t oid, char *data, unsigned int datalen,
 		 uint64_t offset, uint16_t flags, bool create, int nr_copies)
 {

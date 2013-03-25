@@ -1027,9 +1027,7 @@ bool bypass_object_cache(const struct request *req)
 		}
 	}
 
-	/*
-	 * For vmstate && vdi_attr object, we don't do caching
-	 */
+	/* For vmstate && vdi_attr object, we don't do caching */
 	if (is_vmstate_obj(oid) || is_vdi_attr_obj(oid) ||
 	    req->rq.flags & SD_FLAG_CMD_COW)
 		return true;

@@ -318,9 +318,7 @@ static notrace int json_log_formatter(char *buff, size_t size,
 }
 log_format_register("json", json_log_formatter);
 
-/*
- * this one can block under memory pressure
- */
+/* this one can block under memory pressure */
 static notrace void log_syslog(const struct logmsg *msg)
 {
 	char str[MAX_MSG_SIZE];
@@ -528,8 +526,10 @@ static notrace void logger(char *log_dir, char *outfile)
 
 	prctl(PR_SET_PDEATHSIG, SIGHUP);
 
-	/* we need to check the aliveness of the sheep process since
-	 * it could die before the logger call prctl. */
+	/*
+	 * we need to check the aliveness of the sheep process since
+	 * it could die before the logger call prctl.
+	 */
 	if (kill(sheep_pid, 0) < 0)
 		kill(logger_pid, SIGHUP);
 
@@ -800,8 +800,10 @@ notrace void sd_backtrace(void)
 		char cmd[ARG_MAX], path[PATH_MAX], info[256], **str;
 		FILE *f;
 
-		/* the called function is at the previous address
-		 * because addr contains a return address */
+		/*
+		 * The called function is at the previous address
+		 * because addr contains a return address
+		 */
 		addr = (void *)((char *)addr - 1);
 
 		/* try to get a line number with addr2line if possible */
@@ -824,8 +826,10 @@ notrace void sd_backtrace(void)
 
 		pclose(f);
 		continue;
-		/* failed to get a line number, so simply use
-		 * backtrace_symbols instead */
+		/*
+		 * Failed to get a line number, so simply use
+		 * backtrace_symbols instead
+		 */
 fallback_close:
 		pclose(f);
 fallback:

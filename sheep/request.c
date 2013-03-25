@@ -137,8 +137,10 @@ static int check_request_epoch(struct request *req)
 		sd_eprintf("new node version %u, %u (%s)",
 			   sys->epoch, req->rq.epoch, op_name(req->op));
 
-		/* put on local wait queue, waiting for local epoch
-		   to be lifted */
+		/*
+		 * put on local wait queue, waiting for local epoch
+		 * to be lifted
+		 */
 		req->rp.result = SD_RES_NEW_NODE_VER;
 		list_add_tail(&req->request_list, &sys->wait_rw_queue);
 		return -1;
@@ -166,9 +168,7 @@ static bool request_in_recovery(struct request *req)
 	 */
 	if (oid_in_recovery(req->local_oid) &&
 	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
-		/*
-		 * Put request on wait queues of local node
-		 */
+		/* Put request on wait queues of local node */
 		if (is_recovery_init()) {
 			sd_dprintf("%"PRIx64" on rw_queue", req->local_oid);
 			req->rp.result = SD_RES_OBJ_RECOVERING;
@@ -245,8 +245,10 @@ void resume_wait_obj_requests(uint64_t oid)
 		if (req->local_oid != oid)
 			continue;
 
-		/* the object requested by a pending request has been
-		 * recovered, notify the pending request. */
+		/*
+		 * the object requested by a pending request has been
+		 * recovered, notify the pending request.
+		 */
 		sd_dprintf("retry %" PRIx64, req->local_oid);
 		list_del(&req->request_list);
 		requeue_request(req);

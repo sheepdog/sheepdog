@@ -816,8 +816,10 @@ static int start_deletion(struct request *req, uint32_t vid)
 
 	ret = fill_vdi_list(dw, root_vid);
 	if (ret) {
-		/* if the VDI is a cloned VDI, delete its objects
-		 * no matter whether the VDI tree is clear. */
+		/*
+		 * if the VDI is a cloned VDI, delete its objects
+		 * no matter whether the VDI tree is clear.
+		 */
 		if (cloned) {
 			dw->buf[0] = vid;
 			dw->count = 1;

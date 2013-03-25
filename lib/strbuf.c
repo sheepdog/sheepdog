@@ -1,4 +1,5 @@
-/* Taken from git by Liu Yuan <namei.unix@gmail.com>
+/*
+ * Taken from git by Liu Yuan <namei.unix@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version

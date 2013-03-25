@@ -222,9 +222,7 @@ int send_light_req_get_response(struct sd_req *hdr, const char *host, int port)
 	return SD_RES_SUCCESS;
 }
 
-/*
- * Light request only contains header, without body content.
- */
+/* Light request only contains header, without body content. */
 int send_light_req(struct sd_req *hdr, const char *host, int port)
 {
 	int ret = send_light_req_get_response(hdr, host, port);

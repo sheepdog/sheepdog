@@ -45,9 +45,7 @@ void get_thread_name(char *name);
 int __sd_dump_variable(const char *var, const void *base_sp);
 void sd_backtrace(void);
 
-/*
-+ * sheep log priorities, comliant with syslog spec
-+ */
+/* sheep log priorities, comliant with syslog spec */
 #define	SDOG_EMERG		LOG_EMERG
 #define	SDOG_ALERT		LOG_ALERT
 #define	SDOG_CRIT		LOG_CRIT

@@ -223,10 +223,9 @@ static inline void hlist_add_after(struct hlist_node *n,
 	for (pos = (head)->first; pos ; pos = pos->next)
 
 #define hlist_for_each_safe(pos, n, head) \
-	for (pos = (head)->first; pos && ({ n = pos->next; 1; });	\
-	     pos = n)
+	for (pos = (head)->first; pos && ({ n = pos->next; 1; }); pos = n)
 
-/**
+/*
  * hlist_for_each_entry - iterate over list of given type
  * @tpos:       the type * to use as a loop cursor.
  * @pos:        the &struct hlist_node to use as a loop cursor.
@@ -238,8 +237,9 @@ static inline void hlist_add_after(struct hlist_node *n,
 	     pos && ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
 	     pos = pos->next)
 
-/**
- * hlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
+/*
+ * hlist_for_each_entry_safe - iterate over list of given type safe against
+ * removal of list entry
  * @tpos:       the type * to use as a loop cursor.
  * @pos:        the &struct hlist_node to use as a loop cursor.
  * @n:          another &struct hlist_node to use as temporary storage

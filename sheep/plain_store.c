@@ -24,9 +24,7 @@ static int get_open_flags(uint64_t oid, bool create, int fl)
 	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
 		flags &= ~O_DSYNC;
 
-	/*
-	 * We can not use DIO for inode object because it is not 512B aligned.
-	 */
+	/* We can not use DIO for inode object because it is not 512B aligned */
 	if (sys->backend_dio && is_data_obj(oid))
 		flags |= O_DIRECT;
 
@@ -261,8 +259,10 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	get_obj_path(oid, path);
 	ret = default_read_from_path(oid, path, iocb);
 
-	/* If the request is againt the older epoch, try to read from
-	 * the stale directory */
+	/*
+	 * If the request is againt the older epoch, try to read from
+	 * the stale directory
+	 */
 	while (ret == SD_RES_NO_OBJ && iocb->epoch < epoch) {
 		epoch--;
 		get_stale_obj_path(oid, epoch, path);
@@ -272,9 +272,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	return ret;
 }
 
-/*
- * Preallocate the whole object to get a better filesystem layout.
- */
+/* Preallocate the whole object to get a better filesystem layout. */
 int prealloc(int fd, uint32_t size)
 {
 	int ret = fallocate(fd, 0, 0, size);
@@ -312,11 +310,13 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	fd = open(tmp_path, flags, def_fmode);
 	if (fd < 0) {
 		if (errno == EEXIST) {
-			/* This happens if node membership changes during object
+			/*
+			 * This happens if node membership changes during object
 			 * creation; while gateway retries a CREATE request,
 			 * recovery process could also recover the object at the
 			 * same time.  They should try to write the same date,
-			 * so it is okay to simply return success here. */
+			 * so it is okay to simply return success here.
+			 */
 			sd_dprintf("%s exists", tmp_path);
 			return SD_RES_SUCCESS;
 		}

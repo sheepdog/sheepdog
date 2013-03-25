@@ -195,14 +195,10 @@ struct snap_log {
 	unsigned char sha1[SHA1_LEN];
 };
 
-/*
- * 64 bit FNV-1a non-zero initial basis
- */
+/* 64 bit FNV-1a non-zero initial basis */
 #define FNV1A_64_INIT ((uint64_t) 0xcbf29ce484222325ULL)
 
-/*
- * 64 bit Fowler/Noll/Vo FNV-1a hash code
- */
+/* 64 bit Fowler/Noll/Vo FNV-1a hash code */
 static inline uint64_t fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
 {
 	unsigned char *bp = (unsigned char *) buf;

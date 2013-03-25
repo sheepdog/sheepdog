@@ -35,9 +35,11 @@
 #include "trace/trace.h"
 #include "sheep_priv.h"
 
-/* The protection period from shrinking work queue.  This is necessary
+/*
+ * The protection period from shrinking work queue.  This is necessary
  * to avoid many calls of pthread_create.  Without it, threads are
- * frequently created and deleted and it leads poor performance. */
+ * frequently created and deleted and it leads poor performance.
+ */
 #define WQ_PROTECTION_PERIOD 1000 /* ms */
 
 static int efd;

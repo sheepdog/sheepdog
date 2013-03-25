@@ -46,13 +46,15 @@ struct vdi_inode {
 	struct rb_node rb;
 	uint32_t vid;
 	struct sheepdog_inode *inode;
-/* FIXME
+/*
+ * FIXME
  * 1) Consider various VM request queue depth.
  * 2) Most drive presents 31 to Linux, I set it as 31 to expect that VM's
  *    real queue depth never exceed 31
  */
 #define SOCKET_POOL_SIZE  31
-/* Socket pool is used for FUSE read threads, which use threads
+/*
+ * Socket pool is used for FUSE read threads, which use threads
  * to simulate aysnc read. All sockets point to the same gateway
  */
 	int socket_pool[SOCKET_POOL_SIZE];

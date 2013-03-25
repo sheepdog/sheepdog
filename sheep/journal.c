@@ -169,9 +169,7 @@ static int jrnl_apply_to_target_object(struct jrnl_descriptor *jd)
 	return res;
 }
 
-/*
- * We cannot use this function for concurrent write operations
- */
+/* We cannot use this function for concurrent write operations */
 struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
 		 const char *path, const char *jrnl_dir)
 {

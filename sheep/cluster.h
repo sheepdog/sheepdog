@@ -30,11 +30,16 @@
 enum cluster_join_result {
 	CJ_RES_SUCCESS, /* Success */
 	CJ_RES_FAIL, /* Fail to join.  The joining node has an invalidepoch. */
-	CJ_RES_JOIN_LATER, /* Fail to join.  The joining node should
-			    * be added after the cluster start working. */
-	CJ_RES_MASTER_TRANSFER, /* Transfer mastership.  The joining
-				 * node has a newer epoch, so this node
-				 * will leave the cluster (restart later). */
+	/*
+	 * Fail to join. The joining node should be added after the cluster
+	 * start working.
+	 */
+	CJ_RES_JOIN_LATER,
+	/*
+	 * Transfer mastership.  The joining node has a newer epoch, so this
+	 * node will leave the cluster (restart later).
+	 */
+	CJ_RES_MASTER_TRANSFER,
 };
 
 struct cluster_driver {
@@ -172,8 +177,9 @@ static inline char *node_to_str(const struct sd_node *id)
 	}
 
 	snprintf(str, sizeof(str), "%s ip:%s port:%d",
-		(af == AF_INET) ? "IPv4" : "IPv6",
-		addr_to_str(name, sizeof(name), id->nid.addr, 0), id->nid.port);
+		 (af == AF_INET) ? "IPv4" : "IPv6",
+		 addr_to_str(name, sizeof(name), id->nid.addr, 0),
+		 id->nid.port);
 
 	return str;
 }
@@ -201,7 +207,7 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
-		void *opaque);
+					  void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 
 #endif

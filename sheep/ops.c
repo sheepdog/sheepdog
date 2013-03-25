@@ -326,8 +326,10 @@ static int cluster_get_vdi_attr(struct request *req)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	/* the current VDI id can change if we take a snapshot,
-	   so we use the hash value of the VDI name as the VDI id */
+	/*
+	 * the current VDI id can change if we take a snapshot,
+	 * so we use the hash value of the VDI name as the VDI id
+	 */
 	vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 	vid &= SD_NR_VDIS - 1;
 	ret = get_vdi_attr(req->data, hdr->data_length,
@@ -487,7 +489,8 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	uint8_t c;
 	uint16_t f;
 
-	/* We should manually recover the cluster when
+	/*
+	 * We should manually recover the cluster when
 	 * 1) the master is physically down (different epoch condition).
 	 * 2) some nodes are physically down (same epoch condition).
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.

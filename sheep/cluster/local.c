@@ -389,9 +389,7 @@ static void local_unblock(void *msg, size_t msg_len)
 	shm_queue_unlock();
 }
 
-/*
- * Returns true if an event is processed
- */
+/* Returns true if an event is processed */
 static bool local_process_event(void)
 {
 	struct local_event *ev;

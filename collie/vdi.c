@@ -1562,9 +1562,7 @@ struct obj_backup {
 	uint8_t data[SD_DATA_OBJ_SIZE];
 };
 
-/*
- * discards redundant area from backup data
- */
+/* discards redundant area from backup data */
 static void compact_obj_backup(struct obj_backup *backup, uint8_t *from_data)
 {
 	uint8_t *p1, *p2;
@@ -1822,8 +1820,10 @@ static int vdi_restore(int argc, char **argv)
 		goto out;
 	}
 
-	/* delete the current vdi temporarily first to avoid making
-	 * the current state become snapshot */
+	/*
+	 * delete the current vdi temporarily first to avoid making
+	 * the current state become snapshot
+	 */
 	ret = read_vdi_obj(vdiname, 0, "", NULL, current_inode,
 			   SD_INODE_HEADER_SIZE);
 	if (ret != EXIT_SUCCESS)
