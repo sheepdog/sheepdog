@@ -1695,6 +1695,54 @@ sub process {
 			     "please, no space before tabs\n" . $herevet);
 		}
 
+# check for block comment.
+#
+# A:
+#    /* foo
+#     * bar */
+# B:
+#    /*
+#     * foo
+#     * bar */
+# C:
+#    /*
+#     * one-liner
+#     */
+# D:
+#    /* one-liner
+#     */
+# E:
+#    /* foo
+#     * bar
+#     * baz
+#     */
+#   above is not preferred
+#
+#   /*
+#    * This block comments style
+#    * is preferred
+#    */
+
+		if ($line =~ /^\+/ && $rawline =~ /\*\/$/ && $rawline !~ /\/\*/) {
+			if ($rawline !~ /^\+\s*\*\/$/) {
+				# case A and B
+				WARN("BLOCK_COMMENT_STYLE",
+				     "[BCS] put the trailing */ on a separate line\n" . $hereprev);
+			} elsif ($prevrawline =~ /^\+\s*\/\*/ || $rawlines[$linenr - 3] =~ /^\+\s*\/\*/) {
+				# case C and D
+				WARN("BLOCK_COMMENT_STYLE",
+				     "[BCS] don't use block comments for one liner comment\n" . $hereprev);
+			} else {
+				# case E
+				my $ln = $linenr;
+				while ($rawlines[$ln] !~ /^\+\s*\/\*/ && $ln >= 0) { $ln--; }
+				if ($rawlines[$ln] !~ /^\+\s*\/\*$/) {
+					WARN("BLOCK_COMMENT_STYLE",
+					     "[BCS] don't comment at first line in block comments\n" . $hereprev);
+				}
+			}
+		}
+
 # check for spaces at the beginning of a line.
 # Exceptions:
 #  1) within comments
