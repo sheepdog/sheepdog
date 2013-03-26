@@ -98,8 +98,7 @@ struct cluster_info {
 
 	pthread_mutex_t local_req_lock;
 	struct list_head local_req_queue;
-	struct list_head wait_rw_queue;
-	struct list_head wait_obj_queue;
+	struct list_head req_wait_queue;
 	int nr_outstanding_reqs;
 
 	uint32_t recovered_epoch;
@@ -261,10 +260,9 @@ void wait_get_vdis_done(void);
 int get_nr_copies(struct vnode_info *vnode_info);
 
 void resume_pending_requests(void);
-void resume_wait_epoch_requests(void);
-void resume_wait_obj_requests(uint64_t oid);
-void resume_wait_recovery_requests(void);
-void flush_wait_obj_requests(void);
+void wakeup_requests_on_epoch(void);
+void wakeup_requests_on_oid(uint64_t oid);
+void wakeup_all_requests(void);
 void resume_suspended_recovery(void);
 
 int create_cluster(int port, int64_t zone, int nr_vnodes,
@@ -304,7 +302,6 @@ int objlist_cache_cleanup(uint32_t vid);
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo);
 void resume_recovery_work(void);
 bool oid_in_recovery(uint64_t oid);
-bool is_recovery_init(void);
 bool node_in_recovery(void);
 
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,

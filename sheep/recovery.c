@@ -218,13 +218,6 @@ bool node_in_recovery(void)
 	return !!recovering_work;
 }
 
-bool is_recovery_init(void)
-{
-	struct recovery_work *rw = recovering_work;
-
-	return rw->state == RW_INIT;
-}
-
 static inline void prepare_schedule_oid(uint64_t oid)
 {
 	struct recovery_work *rw = recovering_work;
@@ -314,7 +307,7 @@ static inline void run_next_rw(struct recovery_work *rw)
 	rw = next_rw;
 	next_rw = NULL;
 	recovering_work = rw;
-	flush_wait_obj_requests();
+	wakeup_all_requests();
 	queue_work(sys->recovery_wqueue, &rw->work);
 	sd_dprintf("recovery work is superseded");
 }
@@ -351,6 +344,8 @@ static inline void finish_recovery(struct recovery_work *rw)
 
 	if (sd_store->end_recover)
 		sd_store->end_recover(sys->epoch - 1, rw->old_vinfo);
+
+	wakeup_all_requests();
 
 	/* notify recovery completion to other nodes */
 	rw->work.fn = notify_recovery_completion_work;
@@ -466,16 +461,15 @@ static void recover_object_main(struct work *work)
 	if (rw->stop) {
 		/*
 		 * Stop this recovery process and wait for epoch to be
-		 * lifted and flush wait_obj queue to requeue those
+		 * lifted and flush wait queue to requeue those
 		 * requests
 		 */
-		flush_wait_obj_requests();
+		wakeup_all_requests();
 		sd_dprintf("recovery is stopped");
 		return;
 	}
 
-	resume_wait_obj_requests(rw->oids[rw->done++]);
-
+	wakeup_requests_on_oid(rw->oids[rw->done++]);
 	if (rw->done < rw->count) {
 		recover_next_object(rw);
 		return;
@@ -497,13 +491,6 @@ static void finish_object_list(struct work *work)
 		finish_recovery(rw);
 		return;
 	}
-	/*
-	 * We have got the object list to be recovered locally, most of
-	 * objects are actually already being there, so let's resume
-	 * requests in the hope that most requests will be processed
-	 * without any problem.
-	 */
-	resume_wait_recovery_requests();
 	rw->work.fn = recover_object_work;
 	rw->work.done = recover_object_main;
 	recover_next_object(rw);
@@ -677,7 +664,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 		queue_work(sys->recovery_wqueue, &rw->work);
 	}
 
-	resume_wait_epoch_requests();
+	wakeup_requests_on_epoch();
 
 	return 0;
 }
