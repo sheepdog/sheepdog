@@ -224,7 +224,8 @@ retest:
 		list_del(&work->w_list);
 		pthread_mutex_unlock(&wi->pending_lock);
 
-		work->fn(work);
+		if (work->fn)
+			work->fn(work);
 
 		pthread_mutex_lock(&wi->finished_lock);
 		list_add_tail(&work->w_list, &wi->finished_list);
