@@ -1178,16 +1178,18 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	if (sys->status == SD_STATUS_SHUTDOWN)
 		return;
 
+	if (node_is_local(left))
+		/* Mark leave node as gateway only node */
+		sys->this_node.nr_vnodes = 0;
+
 	old_vnode_info = current_vnode_info;
 	current_vnode_info = alloc_vnode_info(members, nr_members);
-
 	switch (sys->status) {
 	case SD_STATUS_HALT:
 	case SD_STATUS_OK:
 		uatomic_inc(&sys->epoch);
 		log_current_epoch();
 		start_recovery(current_vnode_info, old_vnode_info);
-
 		if (!have_enough_zones())
 			sys->status = SD_STATUS_HALT;
 		break;

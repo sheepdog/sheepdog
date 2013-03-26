@@ -633,7 +633,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 	struct recovery_work *rw;
 
 	if (node_is_gateway_only())
-		return 0;
+		goto out;
 
 	rw = xzalloc(sizeof(struct recovery_work));
 	rw->state = RW_INIT;
@@ -663,8 +663,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 		recovering_work = rw;
 		queue_work(sys->recovery_wqueue, &rw->work);
 	}
-
+out:
 	wakeup_requests_on_epoch();
-
 	return 0;
 }
