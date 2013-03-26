@@ -360,7 +360,8 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 	written = xpwrite(jfile.fd, wbuffer, wsize, woff);
 	if (written != wsize) {
 		sd_eprintf("failed, written %zd, len %zu", written, wsize);
-		ret = err_to_sderr(oid, errno);
+		/* FIXME: teach journal file handle EIO gracefully */
+		ret = SD_RES_EIO;
 		goto out;
 	}
 out:

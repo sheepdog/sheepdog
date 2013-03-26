@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <libgen.h>
 
 #include "sheep_priv.h"
 #include "config.h"
@@ -66,14 +67,15 @@ bool default_exist(uint64_t oid)
 	return true;
 }
 
-int err_to_sderr(uint64_t oid, int err)
+static int err_to_sderr(char *path, uint64_t oid, int err)
 {
 	struct stat s;
+	char *dir = dirname(path);
 
 	switch (err) {
 	case ENOENT:
-		if (stat(get_object_path(oid), &s) < 0) {
-			sd_eprintf("corrupted");
+		if (stat(dir, &s) < 0) {
+			sd_eprintf("%s corrupted", dir);
 			return SD_RES_EIO;
 		}
 		sd_dprintf("object %016" PRIx64 " not found locally", oid);
@@ -114,14 +116,14 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 
 	fd = open(path, flags, def_fmode);
 	if (fd < 0)
-		return err_to_sderr(oid, errno);
+		return err_to_sderr(path, oid, errno);
 
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
 		sd_eprintf("failed to write object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m", oid, path,
 			iocb->offset, iocb->length, size);
-		ret = err_to_sderr(oid, errno);
+		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
 out:
@@ -225,7 +227,7 @@ int default_init(void)
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 
-static int default_read_from_path(uint64_t oid, const char *path,
+static int default_read_from_path(uint64_t oid, char *path,
 				  const struct siocb *iocb)
 {
 	int flags = get_open_flags(oid, false, iocb->flags), fd,
@@ -235,14 +237,14 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	fd = open(path, flags);
 
 	if (fd < 0)
-		return err_to_sderr(oid, errno);
+		return err_to_sderr(path, oid, errno);
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
 		sd_eprintf("failed to read object %"PRIx64", path=%s, offset=%"
 			PRId64", size=%"PRId32", result=%zd, %m", oid, path,
 			iocb->offset, iocb->length, size);
-		ret = err_to_sderr(oid, errno);
+		ret = err_to_sderr(path, oid, errno);
 	}
 
 	close(fd);
@@ -322,13 +324,13 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		}
 
 		sd_eprintf("failed to open %s: %m", tmp_path);
-		return err_to_sderr(oid, errno);
+		return err_to_sderr(path, oid, errno);
 	}
 
 	if (iocb->offset != 0 || iocb->length != get_objsize(oid)) {
 		ret = prealloc(fd, get_objsize(oid));
 		if (ret < 0) {
-			ret = err_to_sderr(oid, errno);
+			ret = err_to_sderr(path, oid, errno);
 			goto out;
 		}
 	}
@@ -336,14 +338,14 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	ret = xpwrite(fd, iocb->buf, len, iocb->offset);
 	if (ret != len) {
 		sd_eprintf("failed to write object. %m");
-		ret = err_to_sderr(oid, errno);
+		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
 
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
 		sd_eprintf("failed to rename %s to %s: %m", tmp_path, path);
-		ret = err_to_sderr(oid, errno);
+		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
 	sd_dprintf("%"PRIx64, oid);
@@ -368,7 +370,7 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 	if (link(stale_path, path) < 0) {
 		sd_eprintf("failed to link from %s to %s, %m", stale_path,
 			   path);
-		return err_to_sderr(oid, errno);
+		return err_to_sderr(path, oid, errno);
 	}
 
 	return SD_RES_SUCCESS;

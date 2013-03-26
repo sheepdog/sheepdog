@@ -184,7 +184,6 @@ int default_remove_object(uint64_t oid);
 int default_purge_obj(void);
 int for_each_object_in_wd(int (*func)(uint64_t, char *, void *), bool, void *);
 int for_each_obj_path(int (*func)(char *path));
-int err_to_sderr(uint64_t oid, int err);
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)				\

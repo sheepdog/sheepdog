@@ -757,7 +757,8 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 			goto out_close;
 		}
 		sd_dprintf("failed to link %s to %s: %m", tmp_path, path);
-		ret = err_to_sderr(idx_to_oid(oc->vid, idx), errno);
+		/* FIXME: teach object cache handle EIO gracefully */
+		ret = SD_RES_EIO;
 		goto out_close;
 	}
 	ret = SD_RES_SUCCESS;
