@@ -1257,7 +1257,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	INIT_LIST_HEAD(&sys->failed_nodes);
 	INIT_LIST_HEAD(&sys->delayed_nodes);
 
-	INIT_LIST_HEAD(&sys->wait_req_queue);
+	INIT_LIST_HEAD(&sys->local_req_queue);
 	INIT_LIST_HEAD(&sys->wait_rw_queue);
 	INIT_LIST_HEAD(&sys->wait_obj_queue);
 

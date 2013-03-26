@@ -457,17 +457,17 @@ int exec_local_req(struct sd_req *rq, void *data)
 
 	req = alloc_local_request(data, rq->data_length);
 	req->rq = *rq;
-	req->wait_efd = eventfd(0, 0);
+	req->local_req_efd = eventfd(0, 0);
 
-	pthread_mutex_lock(&sys->wait_req_lock);
-	list_add_tail(&req->request_list, &sys->wait_req_queue);
-	pthread_mutex_unlock(&sys->wait_req_lock);
+	pthread_mutex_lock(&sys->local_req_lock);
+	list_add_tail(&req->request_list, &sys->local_req_queue);
+	pthread_mutex_unlock(&sys->local_req_lock);
 
-	eventfd_write(sys->req_efd, value);
+	eventfd_write(sys->local_req_efd, value);
 
 again:
 	/* In error case (for e.g, EINTR) just retry read */
-	ret = eventfd_read(req->wait_efd, &value);
+	ret = eventfd_read(req->local_req_efd, &value);
 	if (ret < 0) {
 		sd_eprintf("%m");
 		if (errno == EINTR)
@@ -479,7 +479,7 @@ again:
 	/* fill rq with response header as exec_req does */
 	memcpy(rq, &req->rp, sizeof(req->rp));
 
-	close(req->wait_efd);
+	close(req->local_req_efd);
 	ret = req->rp.result;
 	free_local_request(req);
 
@@ -532,7 +532,7 @@ void put_request(struct request *req)
 		return;
 
 	if (req->local)
-		eventfd_write(req->wait_efd, value);
+		eventfd_write(req->local_req_efd, value);
 	else {
 		if (conn_tx_on(&ci->conn)) {
 			clear_client_info(ci);
@@ -894,7 +894,7 @@ int init_unix_domain_socket(const char *dir)
 					 &is_inet_socket);
 }
 
-static void req_handler(int listen_fd, int events, void *data)
+static void local_req_handler(int listen_fd, int events, void *data)
 {
 	eventfd_t value;
 	struct request *req, *t;
@@ -908,9 +908,9 @@ static void req_handler(int listen_fd, int events, void *data)
 	if (ret < 0)
 		return;
 
-	pthread_mutex_lock(&sys->wait_req_lock);
-	list_splice_init(&sys->wait_req_queue, &pending_list);
-	pthread_mutex_unlock(&sys->wait_req_lock);
+	pthread_mutex_lock(&sys->local_req_lock);
+	list_splice_init(&sys->local_req_queue, &pending_list);
+	pthread_mutex_unlock(&sys->local_req_lock);
 
 	list_for_each_entry_safe(req, t, &pending_list, request_list) {
 		list_del(&req->request_list);
@@ -920,7 +920,9 @@ static void req_handler(int listen_fd, int events, void *data)
 
 void local_req_init(void)
 {
-	pthread_mutex_init(&sys->wait_req_lock, NULL);
-	sys->req_efd = eventfd(0, EFD_NONBLOCK);
-	register_event(sys->req_efd, req_handler, NULL);
+	pthread_mutex_init(&sys->local_req_lock, NULL);
+	sys->local_req_efd = eventfd(0, EFD_NONBLOCK);
+	if (sys->local_req_efd < 0)
+		panic("failed to init local req efd");
+	register_event(sys->local_req_efd, local_req_handler, NULL);
 }

@@ -53,7 +53,7 @@ struct request {
 
 	int refcnt;
 	bool local;
-	int wait_efd;
+	int local_req_efd;
 
 	uint64_t local_oid;
 
@@ -94,10 +94,10 @@ struct cluster_info {
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
 	uint8_t nr_copies;
-	int req_efd;
+	int local_req_efd;
 
-	pthread_mutex_t wait_req_lock;
-	struct list_head wait_req_queue;
+	pthread_mutex_t local_req_lock;
+	struct list_head local_req_queue;
 	struct list_head wait_rw_queue;
 	struct list_head wait_obj_queue;
 	int nr_outstanding_reqs;
