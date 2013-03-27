@@ -116,6 +116,7 @@ struct cluster_info {
 	struct work_queue *sockfd_wqueue;
 	struct work_queue *oc_reclaim_wqueue;
 	struct work_queue *oc_push_wqueue;
+	struct work_queue *md_wqueue;
 
 	bool enable_object_cache;
 
@@ -419,5 +420,7 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size, off_t, bool);
 int md_init_disk(char *path);
 uint64_t md_init_space(void);
 char *get_object_path(uint64_t oid);
+int md_handle_eio(char *);
+bool md_exist(uint64_t oid);
 
 #endif

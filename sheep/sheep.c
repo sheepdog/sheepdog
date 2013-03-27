@@ -340,6 +340,7 @@ static int init_work_queues(void)
 	sys->deletion_wqueue = init_ordered_work_queue("deletion");
 	sys->block_wqueue = init_ordered_work_queue("block");
 	sys->sockfd_wqueue = init_ordered_work_queue("sockfd");
+	sys->md_wqueue = init_ordered_work_queue("md");
 	if (sys->enable_object_cache) {
 		sys->oc_reclaim_wqueue = init_ordered_work_queue("oc_reclaim");
 		sys->oc_push_wqueue = init_work_queue("oc_push", WQ_DYNAMIC);
@@ -347,7 +348,8 @@ static int init_work_queues(void)
 			return -1;
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
-	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->sockfd_wqueue)
+	    !sys->deletion_wqueue || !sys->block_wqueue ||
+	    !sys->sockfd_wqueue || !sys->md_wqueue)
 			return -1;
 	return 0;
 }

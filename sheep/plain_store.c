@@ -55,16 +55,7 @@ static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 
 bool default_exist(uint64_t oid)
 {
-	char path[PATH_MAX];
-
-	get_obj_path(oid, path);
-	if (access(path, R_OK | W_OK) < 0) {
-		if (errno != ENOENT)
-			sd_eprintf("failed to check object %"PRIx64", %m", oid);
-		return false;
-	}
-
-	return true;
+	return md_exist(oid);
 }
 
 static int err_to_sderr(char *path, uint64_t oid, int err)
@@ -72,11 +63,12 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 	struct stat s;
 	char *dir = dirname(path);
 
+	sd_dprintf("%s", dir);
 	switch (err) {
 	case ENOENT:
 		if (stat(dir, &s) < 0) {
 			sd_eprintf("%s corrupted", dir);
-			return SD_RES_EIO;
+			return md_handle_eio(dir);
 		}
 		sd_dprintf("object %016" PRIx64 " not found locally", oid);
 		return SD_RES_NO_OBJ;
@@ -86,7 +78,7 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 		return SD_RES_NO_SPACE;
 	default:
 		sd_eprintf("oid=%"PRIx64", %m", oid);
-		return SD_RES_EIO;
+		return md_handle_eio(dir);
 	}
 }
 
