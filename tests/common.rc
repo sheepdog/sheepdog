@@ -223,7 +223,7 @@ _start_sheep()
     fi
 
     if $md; then
-	MD=",$STORE/$1/d0,$STORE/$1/d1"
+	MD=",$STORE/$1/d0,$STORE/$1/d1,$STORE/$1/d2"
     fi
 
     $SHEEP $STORE/$1$MD -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2 -F $LOG_FORMAT
