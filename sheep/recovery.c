@@ -77,7 +77,7 @@ static int recover_object_from_replica(uint64_t oid,
 	void *buf = NULL;
 	struct siocb iocb = { 0 };
 
-	if (vnode_is_local(vnode)) {
+	if (vnode_is_local(vnode) && tgt_epoch < sys_epoch()) {
 		ret = sd_store->link(oid, tgt_epoch);
 		goto out;
 	}
@@ -136,7 +136,7 @@ static int do_recover_object(struct recovery_work *rw)
 {
 	struct vnode_info *old;
 	uint64_t oid = rw->oids[rw->done];
-	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch - 1;
+	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch;
 	int nr_copies, ret, i;
 
 	old = grab_vnode_info(rw->old_vinfo);
