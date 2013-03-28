@@ -49,8 +49,7 @@ static int get_tmp_obj_path(uint64_t oid, char *path)
 
 static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
 {
-	return snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
-			get_object_path(oid), oid, epoch);
+	return md_get_stale_path(oid, epoch, path);
 }
 
 bool default_exist(uint64_t oid)

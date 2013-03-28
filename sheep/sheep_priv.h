@@ -422,5 +422,6 @@ uint64_t md_init_space(void);
 char *get_object_path(uint64_t oid);
 int md_handle_eio(char *);
 bool md_exist(uint64_t oid);
+int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path);
 
 #endif

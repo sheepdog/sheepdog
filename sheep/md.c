@@ -389,32 +389,49 @@ static inline bool md_access(char *path)
 	return true;
 }
 
-static int check_and_move(uint64_t oid, char *path)
+static int get_old_new_path(uint64_t oid, uint32_t epoch, char *path,
+			    char *old, char *new)
+{
+	if (!epoch) {
+		snprintf(old, PATH_MAX, "%s/%016" PRIx64, path, oid);
+		snprintf(new, PATH_MAX, "%s/%016" PRIx64,
+			 get_object_path_nolock(oid), oid);
+	} else {
+		snprintf(old, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32, path,
+			 oid, epoch);
+		snprintf(new, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+			 get_object_path_nolock(oid), oid, epoch);
+	}
+
+	if (!md_access(old))
+		return -1;
+
+	return 0;
+}
+
+static int check_and_move(uint64_t oid, uint32_t epoch, char *path)
 {
 	char old[PATH_MAX], new[PATH_MAX];
 
-	snprintf(old, PATH_MAX, "%s/%016" PRIx64, path, oid);
-	if (!md_access(old))
+	if (get_old_new_path(oid, epoch, path, old, new) < 0)
 		return SD_RES_EIO;
 
-	snprintf(new, PATH_MAX, "%s/%016" PRIx64, get_object_path_nolock(oid),
-		 oid);
 	if (rename(old, new) < 0) {
-		sd_eprintf("%"PRIx64 " failed, %m", oid);
+		sd_eprintf("old %s, new %s: %m", old, new);
 		return SD_RES_EIO;
 	}
 
-	sd_dprintf("%"PRIx64" from %s to %s", oid, old, new);
+	sd_dprintf("from %s to %s", old, new);
 	return SD_RES_SUCCESS;
 }
 
-static int scan_wd(uint64_t oid)
+static int scan_wd(uint64_t oid, uint32_t epoch)
 {
 	int i, ret = SD_RES_EIO;
 
 	pthread_rwlock_rdlock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
-		ret = check_and_move(oid, md_disks[i].path);
+		ret = check_and_move(oid, epoch, md_disks[i].path);
 		if (ret == SD_RES_SUCCESS)
 			break;
 	}
@@ -434,8 +451,22 @@ bool md_exist(uint64_t oid)
 	 * track to locate the objects for multiple disk failure. Simply do
 	 * hard iteration simplify the code a lot.
 	 */
-	if (scan_wd(oid) == SD_RES_SUCCESS)
+	if (scan_wd(oid, 0) == SD_RES_SUCCESS)
 		return true;
 
 	return false;
+}
+
+int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path)
+{
+	snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+		get_object_path(oid), oid, epoch);
+	if (md_access(path))
+		return SD_RES_SUCCESS;
+
+	assert(epoch);
+	if (scan_wd(oid, epoch) == SD_RES_SUCCESS)
+		return SD_RES_SUCCESS;
+
+	return SD_RES_NO_OBJ;
 }
