@@ -422,7 +422,7 @@ static int scan_wd(uint64_t oid)
 	return ret;
 }
 
-static bool md_handle_exist(uint64_t oid)
+bool md_exist(uint64_t oid)
 {
 	char path[PATH_MAX];
 
@@ -438,15 +438,4 @@ static bool md_handle_exist(uint64_t oid)
 		return true;
 
 	return false;
-}
-
-bool md_exist(uint64_t oid)
-{
-	char path[PATH_MAX];
-	if (!sys->enable_md) {
-		snprintf(path, PATH_MAX, "%s/%016" PRIx64, obj_path, oid);
-		return md_access(path);
-	}
-
-	return md_handle_exist(oid);
 }
