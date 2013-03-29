@@ -259,7 +259,6 @@ void wait_get_vdis_done(void);
 
 int get_nr_copies(struct vnode_info *vnode_info);
 
-void resume_pending_requests(void);
 void wakeup_requests_on_epoch(void);
 void wakeup_requests_on_oid(uint64_t oid);
 void wakeup_all_requests(void);
@@ -300,7 +299,6 @@ int get_obj_list(const struct sd_list_req *, struct sd_list_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
 
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo);
-void resume_recovery_work(void);
 bool oid_in_recovery(uint64_t oid);
 bool node_in_recovery(void);
 
@@ -373,8 +371,6 @@ int peer_read_obj(struct request *req);
 int peer_write_obj(struct request *req);
 int peer_create_and_write_obj(struct request *req);
 int peer_remove_obj(struct request *req);
-
-int default_flush(void);
 
 /* object_cache */
 
