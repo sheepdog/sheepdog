@@ -1243,13 +1243,12 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	sys->this_node.space = sys->disk_space;
 
-	if (get_latest_epoch() > 0) {
+	sys->epoch = get_latest_epoch();
+	if (sys->epoch) {
 		sys->status = SD_STATUS_WAIT_FOR_JOIN;
-
 		get_cluster_copies(&sys->nr_copies);
 		get_cluster_flags(&sys->flags);
 
-		sys->epoch = get_latest_epoch();
 	} else {
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	}
