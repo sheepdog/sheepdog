@@ -101,8 +101,6 @@ struct cluster_info {
 	struct list_head req_wait_queue;
 	int nr_outstanding_reqs;
 
-	uint32_t recovered_epoch;
-
 	bool gateway_only;
 	bool disable_recovery;
 	bool nosync;

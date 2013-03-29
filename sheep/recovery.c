@@ -339,8 +339,8 @@ static void notify_recovery_completion_main(struct work *work)
 
 static inline void finish_recovery(struct recovery_work *rw)
 {
+	uint32_t recovered_epoch = rw->epoch;
 	recovering_work = NULL;
-	sys->recovered_epoch = rw->epoch;
 
 	if (sd_store->end_recover)
 		sd_store->end_recover(sys->epoch - 1, rw->old_vinfo);
@@ -352,8 +352,7 @@ static inline void finish_recovery(struct recovery_work *rw)
 	rw->work.done = notify_recovery_completion_main;
 	queue_work(sys->recovery_wqueue, &rw->work);
 
-	sd_dprintf("recovery complete: new epoch %"PRIu32,
-		   sys->recovered_epoch);
+	sd_dprintf("recovery complete: new epoch %"PRIu32, recovered_epoch);
 }
 
 static inline bool oid_in_prio_oids(struct recovery_work *rw, uint64_t oid)
