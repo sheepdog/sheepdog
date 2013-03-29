@@ -251,14 +251,5 @@ static inline void hlist_add_after(struct hlist_node *n,
 	     pos && ({ n = pos->next; 1; }) &&				\
 		     ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
 	     pos = n)
-#endif
 
-
-#define list_for_each_entry_revert_safe_rcu(pos, n, head, member)          \
-	for (pos = cds_list_entry(rcu_dereference((head)->prev),           \
-				  typeof(*pos), member),                   \
-	     n = cds_list_entry(rcu_dereference(pos->member.prev),         \
-				typeof(*pos), member);                     \
-				&pos->member != (head);                    \
-	     pos = n, n = cds_list_entry(rcu_dereference(pos->member.prev),\
-					 typeof(*pos), member))
+#endif	/* __LIST_H__ */
