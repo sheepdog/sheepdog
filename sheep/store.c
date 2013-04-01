@@ -91,10 +91,10 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 	if (ret < 0)
 		goto err;
 
-	if (len < epoch_stat.st_size - sizeof(time_t))
+	if (len < epoch_stat.st_size - sizeof(*timestamp))
 		goto err;
 
-	ret = xread(fd, nodes, epoch_stat.st_size - sizeof(timestamp));
+	ret = xread(fd, nodes, epoch_stat.st_size - sizeof(*timestamp));
 	if (ret < 0)
 		goto err;
 
@@ -105,8 +105,8 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 	nr_nodes = ret / sizeof(struct sd_node);
 
 	if (timestamp) {
-		ret = xread(fd, timestamp, sizeof(timestamp));
-		if (ret != sizeof(timestamp))
+		ret = xread(fd, timestamp, sizeof(*timestamp));
+		if (ret != sizeof(*timestamp))
 			goto err;
 	}
 
