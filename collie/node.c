@@ -11,6 +11,10 @@
 
 #include "collie.h"
 
+static struct node_cmd_data {
+	bool all_nodes;
+} node_cmd_data;
+
 static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
 			       uint32_t snapid, uint32_t flags,
 			       const struct sheepdog_inode *i, void *data)
@@ -213,6 +217,159 @@ static int node_kill(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int node_md_info(struct node_id *nid)
+{
+	struct sd_md_info info = {};
+	char size_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE];
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	int fd, ret, i;
+
+	fd = connect_to_addr(nid->addr, nid->port);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to connect %d\n", fd);
+		return EXIT_FAILURE;
+	}
+
+	sd_init_req(&hdr, SD_OP_MD_INFO);
+	hdr.data_length = sizeof(info);
+
+	ret = collie_exec_req(fd, &hdr, &info);
+	close(fd);
+	if (ret) {
+		fprintf(stderr, "Failed to connect\n");
+		return EXIT_FAILURE;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to get multi-disk infomation: %s\n",
+			sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	for (i = 0; i < info.nr; i++) {
+		size_to_str(info.disk[i].size, size_str, sizeof(size_str));
+		size_to_str(info.disk[i].used, used_str, sizeof(used_str));
+		fprintf(stdout, "%2d\t%s\t%s\t%s\n", info.disk[i].idx, size_str,
+			used_str, info.disk[i].path);
+	}
+	return EXIT_SUCCESS;
+}
+
+static int md_info(int argc, char **argv)
+{
+	int i, ret;
+
+	fprintf(stdout, "Id\tSize\tUse\tPath\n");
+
+	if (!node_cmd_data.all_nodes) {
+		struct node_id nid = {.port = sdport};
+
+		if (!str_to_addr(sdhost, nid.addr)) {
+			fprintf(stderr, "Invalid address %s\n", sdhost);
+			return EXIT_FAILURE;
+		}
+
+		return node_md_info(&nid);
+	}
+
+	for (i = 0; i < sd_nodes_nr; i++) {
+		fprintf(stdout, "Node %d:\n", i);
+		ret = node_md_info(&sd_nodes[i].nid);
+		if (ret != EXIT_SUCCESS)
+			return EXIT_FAILURE;
+	}
+	return EXIT_SUCCESS;
+}
+
+static int do_plug_unplug(char *disks, bool plug)
+{
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	int fd, ret;
+
+	fd = connect_to(sdhost, sdport);
+	if (fd < 0) {
+		fprintf(stderr, "Failed to connect %s:%d\n", sdhost, sdport);
+		return EXIT_FAILURE;
+	}
+
+	if (plug)
+		sd_init_req(&hdr, SD_OP_MD_PLUG);
+	else
+		sd_init_req(&hdr, SD_OP_MD_UNPLUG);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = strlen(disks) + 1;
+
+	ret = collie_exec_req(fd, &hdr, disks);
+	close(fd);
+	if (ret) {
+		fprintf(stderr, "Failed to connect\n");
+		return EXIT_FAILURE;
+	}
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to execute request, look for sheep.log"
+			" for more information\n");
+		return EXIT_FAILURE;
+	}
+
+	return EXIT_SUCCESS;
+}
+
+static int md_plug(int argc, char **argv)
+{
+	return do_plug_unplug(argv[optind], true);
+}
+
+static int md_unplug(int argc, char **argv)
+{
+	return do_plug_unplug(argv[optind], false);
+}
+
+static struct subcommand node_md_cmd[] = {
+	{"info", NULL, NULL, "show multi-disk information",
+	 NULL, 0, md_info},
+	{"plug", NULL, NULL, "plug more disk(s) into node",
+	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG, md_plug},
+	{"unplug", NULL, NULL, "unplug disk(s) from node",
+	 NULL, 0, md_unplug},
+	{NULL},
+};
+
+static int node_md(int argc, char **argv)
+{
+	int i;
+
+	for (i = 0; node_md_cmd[i].name; i++) {
+		if (!strcmp(node_md_cmd[i].name, argv[optind])) {
+			optind++;
+			return node_md_cmd[i].fn(argc, argv);
+		}
+	}
+
+	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
+	return EXIT_FAILURE;
+}
+
+
+static int node_parser(int ch, char *opt)
+{
+	switch (ch) {
+	case 'A':
+		node_cmd_data.all_nodes = true;
+		break;
+	}
+
+	return 0;
+}
+
+static struct sd_option node_options[] = {
+	{'A', "all", false, "show md information of all the nodes"},
+
+	{ 0, NULL, false, NULL },
+};
+
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprh", "kill node", NULL,
 	 SUBCMD_FLAG_NEED_THIRD_ARG | SUBCMD_FLAG_NEED_NODELIST, node_kill},
@@ -224,10 +381,14 @@ static struct subcommand node_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
 	{"cache", "<cache size>", "aprh", "specify max cache size", NULL,
 	 SUBCMD_FLAG_NEED_THIRD_ARG, node_cache},
+	{"md", NULL, "apAh", "See 'collie node md' for more information",
+	 node_md_cmd, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
+	 node_md, node_options},
 	{NULL,},
 };
 
 struct command node_command = {
 	"node",
 	node_cmd,
+	node_parser
 };
