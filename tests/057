@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Test md hot-plug and hot-unplug
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+md=true
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+	_start_sheep $i
+done
+_wait_for_sheep 3
+$COLLIE cluster format
+sleep 1
+$COLLIE vdi create test 100M -P
+
+$COLLIE node md info | awk '{$2="MASKED";print $0}'
+
+# plug during node event
+_start_sheep 3
+_wait_for_sheep 4
+$COLLIE node md plug  $STORE/0/d3,$STORE/0/d4
+_wait_for_sheep_recovery 0
+$COLLIE node md info | awk '{$2="MASKED";print $0}'
+$COLLIE vdi check test
+$COLLIE cluster info | _filter_cluster_info
+
+# plug duplicate path
+$COLLIE node md plug  $STORE/0/d3
+$COLLIE node recovery
+$COLLIE node md info | awk '{$2="MASKED";print $0}'
+
+# unplug
+$COLLIE node md unplug  $STORE/0/d0,$STORE/0/d1
+_wait_for_sheep_recovery 0
+$COLLIE node md info | awk '{$2="MASKED";print $0}'
+$COLLIE vdi check test
+$COLLIE cluster info | _filter_cluster_info
+
+
+# unplug invalid path
+$COLLIE node md unplug  $STORE/0/d0
+$COLLIE node recovery
+$COLLIE node md info | awk '{$2="MASKED";print $0}'
+$COLLIE cluster info | _filter_cluster_info
+
+# check stale object purging
+find $STORE/*/d*/.stale/ -type f
