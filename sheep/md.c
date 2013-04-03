@@ -154,40 +154,77 @@ static inline void calculate_vdisks(struct disk *disks, int nr_disks,
 #define MDNAME	"user.md.size"
 #define MDSIZE	sizeof(uint64_t)
 
+/*
+ * If path is broken during initilization or not support xattr return 0. We can
+ * safely use 0 to represent failure case  because 0 space path can be
+ * considered as broken path.
+ */
 static uint64_t init_path_space(char *path)
 {
 	struct statvfs fs;
 	uint64_t size;
 
+	if (!is_xattr_enabled(path)) {
+		sd_iprintf("multi-disk support need xattr feature");
+		goto broken_path;
+	}
+
 	if (getxattr(path, MDNAME, &size, MDSIZE) < 0) {
-		if (errno == ENODATA)
+		if (errno == ENODATA) {
 			goto create;
-		else
-			panic("%s, %m", path);
+		} else {
+			sd_eprintf("%s, %m", path);
+			goto broken_path;
+		}
 	}
 
 	return size;
 create:
-	if (statvfs(path, &fs) < 0)
-		panic("get disk %s space failed %m", path);
+	if (statvfs(path, &fs) < 0) {
+		sd_eprintf("get disk %s space failed %m", path);
+		goto broken_path;
+	}
 	size = (int64_t)fs.f_frsize * fs.f_bfree;
-	if (setxattr(path, MDNAME, &size, MDSIZE, 0) < 0)
-		panic("%s, %m", path);
+	if (setxattr(path, MDNAME, &size, MDSIZE, 0) < 0) {
+		sd_eprintf("%s, %m", path);
+		goto broken_path;
+	}
 	return size;
+broken_path:
+	return 0;
+}
+
+static inline void remove_disk(int idx)
+{
+	int i;
+
+	sd_iprintf("%s from multi-disk array", md_disks[idx].path);
+	/*
+	 * We need to keep last disk path to generate EIO when all disks are
+	 * broken
+	 */
+	for (i = idx; i < md_nr_disks - 1; i++)
+		md_disks[i] = md_disks[i + 1];
+
+	md_nr_disks--;
 }
 
 uint64_t md_init_space(void)
 {
-	uint64_t total = 0;
+	uint64_t total;
 	int i;
 
+reinit:
 	if (!md_nr_disks)
 		return 0;
+	total = 0;
 
 	for (i = 0; i < md_nr_disks; i++) {
-		if (!is_xattr_enabled(md_disks[i].path))
-			panic("multi-disk support need xattr feature");
 		md_disks[i].space = init_path_space(md_disks[i].path);
+		if (!md_disks[i].space) {
+			remove_disk(i);
+			goto reinit;
+		}
 		total += md_disks[i].space;
 	}
 	calculate_vdisks(md_disks, md_nr_disks, total);
@@ -329,15 +366,8 @@ static inline void kick_recover(void)
 
 static void unplug_disk(int idx)
 {
-	int i;
 
-	/*
-	 * We need to keep last disk path to generate EIO when all disks are
-	 * broken
-	 */
-	for (i = idx; i < md_nr_disks - 1; i++)
-		md_disks[i] = md_disks[i + 1];
-	md_nr_disks--;
+	remove_disk(idx);
 	sys->disk_space = md_init_space();
 	if (md_nr_disks > 0)
 		kick_recover();
