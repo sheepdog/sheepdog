@@ -69,6 +69,9 @@
 #define SD_OP_FLUSH_PEER 0xAE
 #define SD_OP_NOTIFY_VDI_ADD  0xAF
 #define SD_OP_DELETE_CACHE    0xB0
+#define SD_OP_MD_INFO   0xB1
+#define SD_OP_MD_PLUG   0xB2
+#define SD_OP_MD_UNPLUG 0xB3
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
@@ -227,6 +230,19 @@ struct vdi_op_message {
 	struct sd_req req;
 	struct sd_rsp rsp;
 	uint8_t data[0];
+};
+
+struct md_info {
+	int idx;
+	uint64_t size;
+	uint64_t used;
+	char path[PATH_MAX];
+};
+
+#define MD_MAX_DISK 64 /* FIXME remove roof and make it dynamic */
+struct sd_md_info {
+	struct md_info disk[MD_MAX_DISK];
+	int nr;
 };
 
 #endif /* __INTERNAL_PROTO_H__ */

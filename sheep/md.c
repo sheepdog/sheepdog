@@ -21,11 +21,12 @@
 #include <sys/xattr.h>
 #include <dirent.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "sheep_priv.h"
+#include "util.h"
 
 #define MD_DEFAULT_VDISKS 128
-#define MD_MAX_DISK 64 /* FIXME remove roof and make it dynamic */
 #define MD_MAX_VDISK (MD_MAX_DISK * MD_DEFAULT_VDISKS)
 
 struct disk {
@@ -123,20 +124,38 @@ static inline struct vdisk *oid_to_vdisk(uint64_t oid)
 	return oid_to_vdisk_from(md_vds, md_nr_vds, oid);
 }
 
-int md_init_disk(char *path)
+static int path_to_disk_idx(char *path)
 {
+	int i;
+
+	for (i = 0; i < md_nr_disks; i++)
+		if (strcmp(md_disks[i].path, path) == 0)
+			return i;
+
+	return -1;
+}
+
+void md_add_disk(char *path)
+{
+	if (path_to_disk_idx(path) != -1) {
+		sd_eprintf("duplicate path %s", path);
+		return;
+	}
+
+	if (xmkdir(path, def_dmode) < 0) {
+		sd_eprintf("can't mkdir for %s, %m", path);
+		return;
+	}
+
 	md_nr_disks++;
 
-	if (xmkdir(path, def_dmode) < 0)
-			panic("%s, %m", path);
 	pstrcpy(md_disks[md_nr_disks - 1].path, PATH_MAX, path);
-	sd_iprintf("%s added to md, nr %d", md_disks[md_nr_disks - 1].path,
+	sd_iprintf("%s, nr %d", md_disks[md_nr_disks - 1].path,
 		   md_nr_disks);
-	return 0;
 }
 
 static inline void calculate_vdisks(struct disk *disks, int nr_disks,
-			     uint64_t total)
+				    uint64_t total)
 {
 	uint64_t avg_size = total / nr_disks;
 	float factor;
@@ -154,109 +173,12 @@ static inline void calculate_vdisks(struct disk *disks, int nr_disks,
 #define MDNAME	"user.md.size"
 #define MDSIZE	sizeof(uint64_t)
 
-/*
- * If path is broken during initilization or not support xattr return 0. We can
- * safely use 0 to represent failure case  because 0 space path can be
- * considered as broken path.
- */
-static uint64_t init_path_space(char *path)
+static int get_total_object_size(uint64_t oid, char *ignore, void *total)
 {
-	struct statvfs fs;
-	uint64_t size;
+	uint64_t *t = total;
+	*t += get_objsize(oid);
 
-	if (!is_xattr_enabled(path)) {
-		sd_iprintf("multi-disk support need xattr feature");
-		goto broken_path;
-	}
-
-	if (getxattr(path, MDNAME, &size, MDSIZE) < 0) {
-		if (errno == ENODATA) {
-			goto create;
-		} else {
-			sd_eprintf("%s, %m", path);
-			goto broken_path;
-		}
-	}
-
-	return size;
-create:
-	if (statvfs(path, &fs) < 0) {
-		sd_eprintf("get disk %s space failed %m", path);
-		goto broken_path;
-	}
-	size = (int64_t)fs.f_frsize * fs.f_bfree;
-	if (setxattr(path, MDNAME, &size, MDSIZE, 0) < 0) {
-		sd_eprintf("%s, %m", path);
-		goto broken_path;
-	}
-	return size;
-broken_path:
-	return 0;
-}
-
-static inline void remove_disk(int idx)
-{
-	int i;
-
-	sd_iprintf("%s from multi-disk array", md_disks[idx].path);
-	/*
-	 * We need to keep last disk path to generate EIO when all disks are
-	 * broken
-	 */
-	for (i = idx; i < md_nr_disks - 1; i++)
-		md_disks[i] = md_disks[i + 1];
-
-	md_nr_disks--;
-}
-
-uint64_t md_init_space(void)
-{
-	uint64_t total;
-	int i;
-
-reinit:
-	if (!md_nr_disks)
-		return 0;
-	total = 0;
-
-	for (i = 0; i < md_nr_disks; i++) {
-		md_disks[i].space = init_path_space(md_disks[i].path);
-		if (!md_disks[i].space) {
-			remove_disk(i);
-			goto reinit;
-		}
-		total += md_disks[i].space;
-	}
-	calculate_vdisks(md_disks, md_nr_disks, total);
-	md_nr_vds = disks_to_vdisks(md_disks, md_nr_disks, md_vds);
-	sys->enable_md = true;
-
-	return total;
-}
-
-char *get_object_path(uint64_t oid)
-{
-	struct vdisk *vd;
-	char *p;
-
-	if (!sys->enable_md)
-		return obj_path;
-
-	pthread_rwlock_rdlock(&md_lock);
-	vd = oid_to_vdisk(oid);
-	p = md_disks[vd->idx].path;
-	pthread_rwlock_unlock(&md_lock);
-	sd_dprintf("%d, %s", vd->idx, p);
-
-	return p;
-}
-
-static char *get_object_path_nolock(uint64_t oid)
-{
-	struct vdisk *vd;
-
-	vd = oid_to_vdisk(oid);
-	return md_disks[vd->idx].path;
+	return SD_RES_SUCCESS;
 }
 
 /* If cleanup is true, temporary objects will be removed */
@@ -304,6 +226,129 @@ static int for_each_object_in_path(char *path,
 	return ret;
 }
 
+static uint64_t get_path_size(char *path, uint64_t *used)
+{
+	struct statvfs fs;
+	uint64_t size;
+
+	if (statvfs(path, &fs) < 0) {
+		sd_eprintf("get disk %s space failed %m", path);
+		return 0;
+	}
+	size = (int64_t)fs.f_frsize * fs.f_bfree;
+
+	if (!used)
+		goto out;
+	if (for_each_object_in_path(path, get_total_object_size, false, used)
+	    != SD_RES_SUCCESS)
+		return 0;
+out:
+	return size;
+}
+
+/*
+ * If path is broken during initilization or not support xattr return 0. We can
+ * safely use 0 to represent failure case  because 0 space path can be
+ * considered as broken path.
+ */
+static uint64_t init_path_space(char *path)
+{
+	uint64_t size;
+
+	if (!is_xattr_enabled(path)) {
+		sd_iprintf("multi-disk support need xattr feature");
+		goto broken_path;
+	}
+
+	if (getxattr(path, MDNAME, &size, MDSIZE) < 0) {
+		if (errno == ENODATA) {
+			goto create;
+		} else {
+			sd_eprintf("%s, %m", path);
+			goto broken_path;
+		}
+	}
+
+	return size;
+create:
+	size = get_path_size(path, NULL);
+	if (!size)
+		goto broken_path;
+	if (setxattr(path, MDNAME, &size, MDSIZE, 0) < 0) {
+		sd_eprintf("%s, %m", path);
+		goto broken_path;
+	}
+	return size;
+broken_path:
+	return 0;
+}
+
+static inline void remove_disk(int idx)
+{
+	int i;
+
+	sd_iprintf("%s from multi-disk array", md_disks[idx].path);
+	/*
+	 * We need to keep last disk path to generate EIO when all disks are
+	 * broken
+	 */
+	for (i = idx; i < md_nr_disks - 1; i++)
+		md_disks[i] = md_disks[i + 1];
+
+	md_nr_disks--;
+}
+
+uint64_t md_init_space(void)
+{
+	uint64_t total;
+	int i;
+
+reinit:
+	if (!md_nr_disks)
+		return 0;
+	total = 0;
+
+	for (i = 0; i < md_nr_disks; i++) {
+		md_disks[i].space = init_path_space(md_disks[i].path);
+		if (!md_disks[i].space) {
+			remove_disk(i);
+			goto reinit;
+		}
+		total += md_disks[i].space;
+	}
+	calculate_vdisks(md_disks, md_nr_disks, total);
+	md_nr_vds = disks_to_vdisks(md_disks, md_nr_disks, md_vds);
+	if (!sys->enable_md)
+		sys->enable_md = true;
+
+	return total;
+}
+
+char *get_object_path(uint64_t oid)
+{
+	struct vdisk *vd;
+	char *p;
+
+	if (!sys->enable_md)
+		return obj_path;
+
+	pthread_rwlock_rdlock(&md_lock);
+	vd = oid_to_vdisk(oid);
+	p = md_disks[vd->idx].path;
+	pthread_rwlock_unlock(&md_lock);
+	sd_dprintf("%d, %s", vd->idx, p);
+
+	return p;
+}
+
+static char *get_object_path_nolock(uint64_t oid)
+{
+	struct vdisk *vd;
+
+	vd = oid_to_vdisk(oid);
+	return md_disks[vd->idx].path;
+}
+
 int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
 			  bool cleanup, void *arg)
 {
@@ -345,32 +390,12 @@ struct md_work {
 	char path[PATH_MAX];
 };
 
-static int path_to_disk_idx(char *path)
-{
-	int i;
-
-	for (i = 0; i < md_nr_disks; i++)
-		if (strcmp(md_disks[i].path, path) == 0)
-			return i;
-
-	return -1;
-}
-
 static inline void kick_recover(void)
 {
 	struct vnode_info *vinfo = get_vnode_info();
 
 	start_recovery(vinfo, vinfo);
 	put_vnode_info(vinfo);
-}
-
-static void unplug_disk(int idx)
-{
-
-	remove_disk(idx);
-	sys->disk_space = md_init_space();
-	if (md_nr_disks > 0)
-		kick_recover();
 }
 
 static void md_do_recover(struct work *work)
@@ -383,7 +408,10 @@ static void md_do_recover(struct work *work)
 	if (idx < 0)
 		/* Just ignore the duplicate EIO of the same path */
 		goto out;
-	unplug_disk(idx);
+	remove_disk(idx);
+	sys->disk_space = md_init_space();
+	if (md_nr_disks > 0)
+		kick_recover();
 out:
 	pthread_rwlock_unlock(&md_lock);
 	free(mw);
@@ -499,4 +527,78 @@ int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path)
 		return SD_RES_SUCCESS;
 
 	return SD_RES_NO_OBJ;
+}
+
+uint32_t md_get_info(struct sd_md_info *info)
+{
+	uint32_t ret = sizeof(*info);
+	int i;
+
+	memset(info, 0, ret);
+	pthread_rwlock_rdlock(&md_lock);
+	for (i = 0; i < md_nr_disks; i++) {
+		info->disk[i].idx = i;
+		pstrcpy(info->disk[i].path, PATH_MAX, md_disks[i].path);
+		/* FIXME: better handling failure case. */
+		info->disk[i].size = get_path_size(info->disk[i].path,
+						   &info->disk[i].used);
+	}
+	info->nr = md_nr_disks;
+	pthread_rwlock_unlock(&md_lock);
+	return ret;
+}
+
+static inline void md_del_disk(char *path)
+{
+	int idx = path_to_disk_idx(path);
+
+	if (idx < 0) {
+		sd_eprintf("invalid path %s", path);
+		return;
+	}
+	remove_disk(idx);
+}
+
+static int do_plug_unplug(char *disks, bool plug)
+{
+	char *path;
+	int old_nr, ret = SD_RES_UNKNOWN;
+
+	pthread_rwlock_wrlock(&md_lock);
+	old_nr = md_nr_disks;
+	path = strtok(disks, ",");
+	do {
+		if (plug)
+			md_add_disk(path);
+		else
+			md_del_disk(path);
+	} while ((path = strtok(NULL, ",")));
+
+	/* If no disks change, bail out */
+	if (old_nr == md_nr_disks)
+		goto out;
+
+	sys->disk_space = md_init_space();
+	/*
+	 * We have to kick recover aggressively because there is possibility
+	 * that nr of disks are removed during md_init_space() happens to equal
+	 * nr of disks we added.
+	 */
+	if (md_nr_disks > 0)
+		kick_recover();
+
+	ret = SD_RES_SUCCESS;
+out:
+	pthread_rwlock_unlock(&md_lock);
+	return ret;
+}
+
+int md_plug_disks(char *disks)
+{
+	return do_plug_unplug(disks, true);
+}
+
+int md_unplug_disks(char *disks)
+{
+	return do_plug_unplug(disks, false);
 }

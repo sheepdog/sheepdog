@@ -411,11 +411,14 @@ int journal_file_init(const char *path, size_t size, bool skip);
 int journal_file_write(uint64_t oid, const char *buf, size_t size, off_t, bool);
 
 /* md.c */
-int md_init_disk(char *path);
+void md_add_disk(char *path);
 uint64_t md_init_space(void);
 char *get_object_path(uint64_t oid);
 int md_handle_eio(char *);
 bool md_exist(uint64_t oid);
 int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path);
+uint32_t md_get_info(struct sd_md_info *info);
+int md_plug_disks(char *disks);
+int md_unplug_disks(char *disks);
 
 #endif

@@ -666,6 +666,33 @@ static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
 	return SD_RES_SUCCESS;
 }
 
+static int local_md_info(struct request *request)
+{
+	struct sd_rsp *rsp = &request->rp;
+	struct sd_req *req = &request->rq;
+
+	assert(req->data_length == sizeof(struct sd_md_info));
+	rsp->data_length = md_get_info((struct sd_md_info *)request->data);
+
+	return rsp->data_length ? SD_RES_SUCCESS : SD_RES_UNKNOWN;
+}
+
+static int local_md_plug(const struct sd_req *req, struct sd_rsp *rsp,
+			 void *data)
+{
+	char *disks = (char *)data;
+
+	return md_plug_disks(disks);
+}
+
+static int local_md_unplug(const struct sd_req *req, struct sd_rsp *rsp,
+			   void *data)
+{
+	char *disks = (char *)data;
+
+	return md_unplug_disks(disks);
+}
+
 static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
@@ -1107,6 +1134,24 @@ static struct sd_op_template sd_ops[] = {
 		.name = "SET_CACHE_SIZE",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_set_cache_size,
+	},
+
+	[SD_OP_MD_INFO] = {
+		.name = "MD_INFO",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_md_info,
+	},
+
+	[SD_OP_MD_PLUG] = {
+		.name = "MD_PLUG_DISKS",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_md_plug,
+	},
+
+	[SD_OP_MD_UNPLUG] = {
+		.name = "MD_UNPLUG_DISKS",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_md_unplug,
 	},
 
 	/* gateway I/O operations */

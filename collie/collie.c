@@ -19,7 +19,7 @@
 #include "util.h"
 
 static const char program_name[] = "collie";
-const char *sdhost = "localhost";
+const char *sdhost = "127.0.0.1";
 int sdport = SD_LISTEN_PORT;
 bool highlight = true;
 bool raw_output;

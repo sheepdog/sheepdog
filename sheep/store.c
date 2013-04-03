@@ -267,8 +267,7 @@ static int init_obj_path(const char *base_path, char *argp)
 	/* Eat up the first component */
 	strtok(argp, ",");
 	while ((p = strtok(NULL, ",")))
-		if (md_init_disk(p) < 0)
-			return -1;
+		md_add_disk(p);
 
 	return init_path(obj_path, NULL);
 }

@@ -13,6 +13,8 @@
 
 #include <inttypes.h>
 #include <stdint.h>
+#include <linux/limits.h>
+
 #include "util.h"
 
 #define SD_PROTO_VER 0x02
