@@ -42,6 +42,13 @@ $COLLIE cluster info | _filter_cluster_info
 
 # simulate all disks failure
 rm $STORE/1/d2 -rf
+dd if=/dev/urandom | $COLLIE vdi write test
+$COLLIE vdi check test
+$COLLIE cluster info | _filter_cluster_info
+
+# simulate simultaneous multiple disks failure
+rm $STORE/2/d0 -rf
+rm $STORE/2/d1 -rf
 dd if=/dev/zero | $COLLIE vdi write test
 $COLLIE vdi check test
 $COLLIE cluster info | _filter_cluster_info
