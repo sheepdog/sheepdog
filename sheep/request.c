@@ -61,9 +61,10 @@ static void io_op_done(struct work *work)
 		leave_cluster();
 		break;
 	case SD_RES_SUCCESS:
+	case SD_RES_NETWORK_ERROR:
 		break;
 	default:
-		sd_dprintf("unhandled error %d", req->rp.result);
+		sd_dprintf("unhandled error %x", req->rp.result);
 		break;
 	}
 
@@ -133,7 +134,7 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_SUCCESS:
 		break;
 	default:
-		sd_dprintf("unhandled error %d", req->rp.result);
+		sd_dprintf("unhandled error %x", req->rp.result);
 		break;
 	}
 
