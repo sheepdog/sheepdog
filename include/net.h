@@ -72,4 +72,12 @@ int set_rcv_timeout(int fd);
 int get_local_addr(uint8_t *bytes);
 bool inetaddr_is_valid(char *addr);
 
+static inline int connect_to_addr(const uint8_t *addr, int port)
+{
+	char name[INET6_ADDRSTRLEN];
+
+	addr_to_str(name, sizeof(name), addr, 0);
+	return connect_to(name, port);
+}
+
 #endif

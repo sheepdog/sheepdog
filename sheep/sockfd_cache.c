@@ -337,14 +337,6 @@ static inline void check_idx(int idx)
 	queue_work(sys->sockfd_wqueue, w);
 }
 
-static inline int connect_to_addr(const uint8_t *addr, int port)
-{
-	char name[INET6_ADDRSTRLEN];
-
-	addr_to_str(name, sizeof(name), addr, 0);
-	return connect_to(name, port);
-}
-
 /* Add the node back if it is still alive */
 static inline int revalidate_node(const struct node_id *nid)
 {
