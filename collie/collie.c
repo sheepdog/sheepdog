@@ -45,7 +45,7 @@ struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 int sd_nodes_nr, sd_vnodes_nr;
 unsigned master_idx;
 
-static int update_node_list(int max_nodes, uint32_t epoch)
+int update_node_list(int max_nodes, uint32_t epoch)
 {
 	int fd, ret;
 	unsigned int size;

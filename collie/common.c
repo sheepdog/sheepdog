@@ -245,3 +245,32 @@ int collie_exec_req(int sockfd, struct sd_req *hdr, void *data)
 	/* Retry hard for collie because we can't get the newest epoch */
 	return exec_req(sockfd, hdr, data, NULL, 0);
 }
+
+int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
+{
+	int i, ret;
+
+	for (i = 0; sub[i].name; i++) {
+		if (!strcmp(sub[i].name, argv[optind])) {
+			unsigned long flags = sub[i].flags;
+
+			if (flags & SUBCMD_FLAG_NEED_NODELIST) {
+				ret = update_node_list(SD_MAX_NODES, 0);
+				if (ret < 0) {
+					fprintf(stderr,
+						"Failed to get node list\n");
+					exit(EXIT_SYSFAIL);
+				}
+			}
+
+			if (flags & SUBCMD_FLAG_NEED_ARG
+			    && argc != 5)
+				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+			optind++;
+			return sub[i].fn(argc, argv);
+		}
+	}
+
+	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
+	return EXIT_FAILURE;
+}
