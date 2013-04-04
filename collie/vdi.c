@@ -1918,25 +1918,15 @@ out:
 
 static struct subcommand vdi_cache_cmd[] = {
 	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
-	 NULL, 0, vdi_cache_flush},
+	 NULL, SUBCMD_FLAG_NEED_ARG, vdi_cache_flush},
 	{"delete", NULL, NULL, "delete the cache of the vdi specified in all nodes.",
-	 NULL, 0, vdi_cache_delete},
+	 NULL, SUBCMD_FLAG_NEED_ARG, vdi_cache_delete},
 	{NULL,},
 };
 
 static int vdi_cache(int argc, char **argv)
 {
-	int i;
-
-	for (i = 0; vdi_cache_cmd[i].name; i++) {
-		if (!strcmp(vdi_cache_cmd[i].name, argv[optind])) {
-			optind++;
-			return vdi_cache_cmd[i].fn(argc, argv);
-		}
-	}
-
-	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
-	return EXIT_FAILURE;
+	return do_generic_subcommand(vdi_cache_cmd, argc, argv);
 }
 
 static struct subcommand vdi_cmd[] = {
@@ -1994,7 +1984,7 @@ static struct subcommand vdi_cmd[] = {
 	{"restore", "<vdiname> <backup>", "saph", "restore snapshot images from a backup",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_ARG,
 	 vdi_restore, vdi_options},
-	{"cache", NULL, "saph", "Run 'collie vdi cache' for more information\n",
+	{"cache", "<vdiname>", "saph", "Run 'collie vdi cache' for more information\n",
 	 vdi_cache_cmd, SUBCMD_FLAG_NEED_ARG,
 	 vdi_cache, vdi_options},
 	{NULL,},

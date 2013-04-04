@@ -329,27 +329,17 @@ static int md_unplug(int argc, char **argv)
 
 static struct subcommand node_md_cmd[] = {
 	{"info", NULL, NULL, "show multi-disk information",
-	 NULL, 0, md_info},
+	 NULL, SUBCMD_FLAG_NEED_NODELIST, md_info},
 	{"plug", NULL, NULL, "plug more disk(s) into node",
 	 NULL, SUBCMD_FLAG_NEED_ARG, md_plug},
 	{"unplug", NULL, NULL, "unplug disk(s) from node",
-	 NULL, 0, md_unplug},
+	 NULL, SUBCMD_FLAG_NEED_ARG, md_unplug},
 	{NULL},
 };
 
 static int node_md(int argc, char **argv)
 {
-	int i;
-
-	for (i = 0; node_md_cmd[i].name; i++) {
-		if (!strcmp(node_md_cmd[i].name, argv[optind])) {
-			optind++;
-			return node_md_cmd[i].fn(argc, argv);
-		}
-	}
-
-	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
-	return EXIT_FAILURE;
+	return do_generic_subcommand(node_md_cmd, argc, argv);
 }
 
 
@@ -381,9 +371,8 @@ static struct subcommand node_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
 	{"cache", "<cache size>", "aprh", "specify max cache size", NULL,
 	 SUBCMD_FLAG_NEED_ARG, node_cache},
-	{"md", NULL, "apAh", "See 'collie node md' for more information",
-	 node_md_cmd, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_ARG,
-	 node_md, node_options},
+	{"md", "[disks]", "apAh", "See 'collie node md' for more information",
+	 node_md_cmd, SUBCMD_FLAG_NEED_ARG, node_md, node_options},
 	{NULL,},
 };
 

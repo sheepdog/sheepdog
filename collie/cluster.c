@@ -439,15 +439,7 @@ static struct subcommand cluster_recover_cmd[] = {
 
 static int cluster_recover(int argc, char **argv)
 {
-	int i;
-
-	for (i = 0; cluster_recover_cmd[i].name; i++) {
-		if (!strcmp(cluster_recover_cmd[i].name, argv[optind]))
-			return cluster_recover_cmd[i].fn(argc, argv);
-	}
-
-	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
-	return EXIT_FAILURE;
+	return do_generic_subcommand(cluster_recover_cmd, argc, argv);
 }
 
 static struct subcommand cluster_cmd[] = {
