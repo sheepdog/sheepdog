@@ -23,7 +23,7 @@
 #include "option.h"
 
 #define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
-#define SUBCMD_FLAG_NEED_THIRD_ARG (1 << 1)
+#define SUBCMD_FLAG_NEED_ARG (1 << 1)
 
 #define UINT64_DECIMAL_SIZE 21
 

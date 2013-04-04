@@ -221,7 +221,7 @@ static int debug_trace(int argc, char **argv)
 
 static struct subcommand debug_cmd[] = {
 	{"trace", NULL, "aph", "trace the node",
-	 trace_cmd, SUBCMD_FLAG_NEED_THIRD_ARG, debug_trace},
+	 trace_cmd, SUBCMD_FLAG_NEED_ARG, debug_trace},
 	{NULL,},
 };
 

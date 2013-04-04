@@ -461,7 +461,7 @@ static struct subcommand cluster_cmd[] = {
 	 NULL, 0, cluster_snapshot, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",
-	 cluster_recover_cmd, SUBCMD_FLAG_NEED_THIRD_ARG,
+	 cluster_recover_cmd, SUBCMD_FLAG_NEED_ARG,
 	 cluster_recover, cluster_options},
 	{NULL,},
 };

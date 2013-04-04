@@ -331,7 +331,7 @@ static struct subcommand node_md_cmd[] = {
 	{"info", NULL, NULL, "show multi-disk information",
 	 NULL, 0, md_info},
 	{"plug", NULL, NULL, "plug more disk(s) into node",
-	 NULL, SUBCMD_FLAG_NEED_THIRD_ARG, md_plug},
+	 NULL, SUBCMD_FLAG_NEED_ARG, md_plug},
 	{"unplug", NULL, NULL, "unplug disk(s) from node",
 	 NULL, 0, md_unplug},
 	{NULL},
@@ -372,7 +372,7 @@ static struct sd_option node_options[] = {
 
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprh", "kill node", NULL,
-	 SUBCMD_FLAG_NEED_THIRD_ARG | SUBCMD_FLAG_NEED_NODELIST, node_kill},
+	 SUBCMD_FLAG_NEED_ARG | SUBCMD_FLAG_NEED_NODELIST, node_kill},
 	{"list", NULL, "aprh", "list nodes", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node", NULL,
@@ -380,9 +380,9 @@ static struct subcommand node_cmd[] = {
 	{"recovery", NULL, "aprh", "show nodes in recovery", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
 	{"cache", "<cache size>", "aprh", "specify max cache size", NULL,
-	 SUBCMD_FLAG_NEED_THIRD_ARG, node_cache},
+	 SUBCMD_FLAG_NEED_ARG, node_cache},
 	{"md", NULL, "apAh", "See 'collie node md' for more information",
-	 node_md_cmd, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_THIRD_ARG,
+	 node_md_cmd, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_ARG,
 	 node_md, node_options},
 	{NULL,},
 };
