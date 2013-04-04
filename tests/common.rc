@@ -199,10 +199,12 @@ _valgrind_collie()
 {
     logfile=$(mktemp)
     valgrind --log-file=$logfile --error-exitcode=99 $COLLIE_PROG "$@"
-    if [ $? == 99 ]; then
+    ret=$?
+    if [ $ret == 99 ]; then
         cat $logfile 1>&2
     fi
     rm $logfile
+    return $ret
 }
 
 _start_sheep()
