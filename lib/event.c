@@ -69,10 +69,17 @@ struct event_info {
 	int fd;
 	void *data;
 	struct list_head ei_list;
+	int prio;
 };
+
+static struct epoll_event *events;
+static int nr_events;
 
 int init_event(int nr)
 {
+	nr_events = nr;
+	events = xcalloc(nr_events, sizeof(struct epoll_event));
+
 	efd = epoll_create(nr);
 	if (efd < 0) {
 		sd_eprintf("failed to create epoll fd");
@@ -92,7 +99,7 @@ static struct event_info *lookup_event(int fd)
 	return NULL;
 }
 
-int register_event(int fd, event_handler_t h, void *data)
+int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 {
 	int ret;
 	struct epoll_event ev;
@@ -102,6 +109,7 @@ int register_event(int fd, event_handler_t h, void *data)
 	ei->fd = fd;
 	ei->handler = h;
 	ei->data = data;
+	ei->prio = prio;
 
 	memset(&ev, 0, sizeof(ev));
 	ev.events = EPOLLIN;
@@ -134,7 +142,7 @@ void unregister_event(int fd)
 	free(ei);
 }
 
-int modify_event(int fd, unsigned int events)
+int modify_event(int fd, unsigned int new_events)
 {
 	int ret;
 	struct epoll_event ev;
@@ -147,7 +155,7 @@ int modify_event(int fd, unsigned int events)
 	}
 
 	memset(&ev, 0, sizeof(ev));
-	ev.events = events;
+	ev.events = new_events;
 	ev.data.ptr = ei;
 
 	ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
@@ -158,12 +166,38 @@ int modify_event(int fd, unsigned int events)
 	return 0;
 }
 
-void event_loop(int timeout)
+static bool event_loop_refresh;
+
+void event_force_refresh(void)
+{
+	event_loop_refresh = true;
+}
+
+static int epoll_event_cmp(const void *_a, const void *_b)
+{
+	struct event_info *a, *b;
+
+	a = (struct event_info *)((struct epoll_event *)_a)->data.ptr;
+	b = (struct event_info *)((struct epoll_event *)_b)->data.ptr;
+
+	/* we need sort event_info array in reverse order */
+	if (a->prio < b->prio)
+		return 1;
+	else if (b->prio < a->prio)
+		return -1;
+
+	return 0;
+}
+
+static void do_event_loop(int timeout, bool sort_with_prio)
 {
 	int i, nr;
-	struct epoll_event events[128];
 
-	nr = epoll_wait(efd, events, ARRAY_SIZE(events), TICK * 1000);
+refresh:
+	nr = epoll_wait(efd, events, nr_events, TICK * 1000);
+	if (sort_with_prio)
+		qsort(events, nr, sizeof(struct epoll_event), epoll_event_cmp);
+
 	if (nr < 0) {
 		if (errno == EINTR)
 			return;
@@ -175,6 +209,21 @@ void event_loop(int timeout)
 
 			ei = (struct event_info *)events[i].data.ptr;
 			ei->handler(ei->fd, events[i].events, ei->data);
+
+			if (event_loop_refresh) {
+				event_loop_refresh = false;
+				goto refresh;
+			}
 		}
 	}
+}
+
+void event_loop(int timeout)
+{
+	do_event_loop(timeout, false);
+}
+
+void event_loop_prio(int timeout)
+{
+	do_event_loop(timeout, true);
 }
