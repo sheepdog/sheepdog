@@ -60,7 +60,7 @@
 044 auto quick vdi md
 045 auto quick store md
 046 auto quick vdi md
-047 auto quick vdi
+047 auto quick vdi md
 048 auto quick collie
 049 auto quick cache md
 050 auto quick cluster md

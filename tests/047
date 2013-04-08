@@ -29,8 +29,14 @@ echo "hello" | $COLLIE vdi write test 0 512
 echo "sheepdog" | $COLLIE vdi write test 4M 512
 # corrupt the vdi...
 _kill_sheep 0
-rm $STORE/0/obj/807c2b2500000000
-rm $STORE/0/obj/007c2b25*
+if $md; then
+	rm $STORE/0/d2/807c2b2500000000
+	rm $STORE/0/d2/007c2b25*
+else
+	rm $STORE/0/obj/807c2b2500000000
+	rm $STORE/0/obj/007c2b25*
+fi
+
 # do the journal replay
 _start_sheep 0 "-j size=64"
 _wait_for_sheep 1
