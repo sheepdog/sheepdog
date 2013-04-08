@@ -436,6 +436,25 @@ char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
 	return str;
 }
 
+char *sockaddr_in_to_str(struct sockaddr_in *sockaddr)
+{
+	int i, si;
+	static char str[32];
+	uint8_t *addr;
+
+	si = 0;
+	memset(str, 0, 32);
+
+	addr = (uint8_t *)&sockaddr->sin_addr.s_addr;
+	for (i = 0; i < 4; i++) {
+		si += snprintf(str + si, 32 - si,
+			i != 3 ? "%d." : "%d", addr[i]);
+	}
+	snprintf(str + si, 32 - si, ":%u", sockaddr->sin_port);
+
+	return str;
+}
+
 uint8_t *str_to_addr(const char *ipstr, uint8_t *addr)
 {
 	int addr_start_idx = 0, af = strstr(ipstr, ":") ? AF_INET6 : AF_INET;

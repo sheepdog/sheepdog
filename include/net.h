@@ -64,6 +64,7 @@ int create_unix_domain_socket(const char *unix_path,
 
 char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port);
 uint8_t *str_to_addr(const char *ipstr, uint8_t *addr);
+char *sockaddr_in_to_str(struct sockaddr_in *sockaddr);
 int set_nonblocking(int fd);
 int set_nodelay(int fd);
 int set_keepalive(int fd);
