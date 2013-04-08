@@ -290,7 +290,8 @@ int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 			time_t *timestamp);
 uint32_t get_latest_epoch(void);
-int init_config_path(const char *base_path);
+void init_config_path(const char *base_path);
+int init_config_file(void);
 int set_cluster_ctime(uint64_t ctime);
 uint64_t get_cluster_ctime(void);
 int get_obj_list(const struct sd_list_req *, struct sd_list_rsp *, void *);

@@ -411,9 +411,7 @@ int init_global_pathnames(const char *d, char *argp)
 	if (ret)
 		return ret;
 
-	ret = init_config_path(d);
-	if (ret)
-		return ret;
+	init_config_path(d);
 
 	return 0;
 }

@@ -36,7 +36,14 @@ char *config_path;
 static int write_config(void)
 {
 	int fd, ret;
-	void *jd;
+
+	if (uatomic_is_true(&sys->use_journal) &&
+	    journal_write_config((char *)&config, sizeof(config))
+	    != SD_RES_SUCCESS) {
+		sd_eprintf("turn off journaling");
+		uatomic_set_false(&sys->use_journal);
+		sync();
+	}
 
 	fd = open(config_path, O_DSYNC | O_WRONLY | O_CREAT, def_fmode);
 	if (fd < 0) {
@@ -44,32 +51,20 @@ static int write_config(void)
 		return SD_RES_EIO;
 	}
 
-	jd = jrnl_begin(&config, sizeof(config), 0, config_path, jrnl_path);
-	if (!jd) {
-		sd_eprintf("failed to write config data to journal, %m");
-		ret = SD_RES_EIO;
-		goto out;
-	}
 	ret = xwrite(fd, &config, sizeof(config));
 	if (ret != sizeof(config)) {
 		sd_eprintf("failed to write config data, %m");
 		ret = SD_RES_EIO;
 	} else
 		ret = SD_RES_SUCCESS;
-
-	jrnl_end(jd);
-out:
 	close(fd);
 
 	return ret;
 }
 
-int init_config_path(const char *base_path)
+int init_config_file(void)
 {
-	int fd, ret, len = strlen(base_path) + strlen(CONFIG_PATH) + 1;
-
-	config_path = xzalloc(len);
-	snprintf(config_path, len, "%s" CONFIG_PATH, base_path);
+	int fd, ret;
 
 	fd = open(config_path, O_RDONLY);
 	if (fd < 0) {
@@ -124,6 +119,14 @@ create:
 		return -1;
 
 	return 0;
+}
+
+void init_config_path(const char *base_path)
+{
+	int len = strlen(base_path) + strlen(CONFIG_PATH) + 1;
+
+	config_path = xzalloc(len);
+	snprintf(config_path, len, "%s" CONFIG_PATH, base_path);
 }
 
 int set_cluster_ctime(uint64_t ct)
