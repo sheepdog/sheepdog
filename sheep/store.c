@@ -136,6 +136,27 @@ int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
 	return do_epoch_log_read(epoch, nodes, len, timestamp);
 }
 
+static bool check_epoch(uint32_t epoch)
+{
+	char path[PATH_MAX];
+	struct stat st;
+
+	snprintf(path, PATH_MAX, "%s/%08"PRIu32, epoch_path, epoch);
+
+	if (stat(path, &st) < 0)
+		goto err;
+
+	/* Both empty file and ill-sized case are handled */
+	if ((st.st_size - sizeof(time_t)) % sizeof(struct sd_node))
+		goto err;
+
+	return true;
+err:
+	sd_iprintf("remove broken epoch file %s", path);
+	unlink(path);
+	return false;
+}
+
 uint32_t get_latest_epoch(void)
 {
 	DIR *dir;
@@ -155,7 +176,7 @@ uint32_t get_latest_epoch(void)
 		if (strlen(d->d_name) != 8)
 			continue;
 
-		if (e > epoch)
+		if (check_epoch(e) && e > epoch)
 			epoch = e;
 	}
 	closedir(dir);
