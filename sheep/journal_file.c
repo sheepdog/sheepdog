@@ -141,7 +141,8 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 
 	if (jd->create)
 		flags |= O_CREAT;
-	snprintf(path, sizeof(path), "%s%016" PRIx64, obj_path, jd->oid);
+	snprintf(path, sizeof(path), "%s/%016" PRIx64, get_object_path(jd->oid),
+		 jd->oid);
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		sd_eprintf("open %m");
