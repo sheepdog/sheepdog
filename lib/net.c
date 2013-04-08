@@ -25,6 +25,8 @@
 #include <sys/un.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/uio.h>
+
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "util.h"
@@ -647,4 +649,17 @@ bool inetaddr_is_valid(char *addr)
 		return false;
 	}
 	return true;
+}
+
+int do_writev2(int fd, void *hdr, size_t hdr_len, void *body, size_t body_len)
+{
+	struct iovec iov[2];
+
+	iov[0].iov_base = hdr;
+	iov[0].iov_len = hdr_len;
+
+	iov[1].iov_base = body;
+	iov[1].iov_len = body_len;
+
+	return writev(fd, iov, 2);
 }

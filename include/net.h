@@ -72,6 +72,11 @@ int set_snd_timeout(int fd);
 int set_rcv_timeout(int fd);
 int get_local_addr(uint8_t *bytes);
 bool inetaddr_is_valid(char *addr);
+int do_writev2(int fd, void *hdr, size_t hdr_len, void *body, size_t body_len);
+
+/* for typical usage of do_writev2() */
+#define writev2(fd, hdr, body, body_len)	\
+	do_writev2(fd, hdr, sizeof(*hdr), body, body_len)
 
 static inline int connect_to_addr(const uint8_t *addr, int port)
 {
