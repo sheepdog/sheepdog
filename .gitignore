@@ -31,6 +31,7 @@ GSYMS
 collie/collie
 sheep/sheep
 sheepfs/sheepfs
+shepherd/shepherd
 
 # directories
 .deps
