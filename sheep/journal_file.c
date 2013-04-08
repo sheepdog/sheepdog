@@ -30,8 +30,12 @@ struct journal_file {
 
 struct journal_descriptor {
 	uint32_t magic;
-	uint32_t reserved;
-	uint64_t oid;
+	uint16_t flag;
+	uint16_t reserved;
+	union {
+		uint32_t epoch;
+		uint64_t oid;
+	};
 	uint64_t offset;
 	uint64_t size;
 	uint8_t create;
@@ -45,6 +49,10 @@ struct journal_descriptor {
 #define JOURNAL_META_SIZE (JOURNAL_DESC_SIZE + JOURNAL_MARKER_SIZE)
 
 #define JOURNAL_END_MARKER 0xdeadbeef
+
+#define JF_STORE 0
+#define JF_EPOCH 1
+#define JF_CONFIG 2
 
 static const char *jfile_name[2] = { "journal_file0", "journal_file1", };
 static int jfile_fds[2];
@@ -128,28 +136,46 @@ static bool journal_entry_full_write(struct journal_descriptor *jd)
 	return true;
 }
 
+static void journal_get_path(struct journal_descriptor *jd, char *path)
+{
+	switch (jd->flag) {
+	case JF_STORE:
+		snprintf(path, PATH_MAX, "%s/%016"PRIx64,
+			 get_object_path(jd->oid), jd->oid);
+		sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
+			   path, jd->size, jd->offset, jd->create);
+		break;
+	case JF_EPOCH:
+		snprintf(path, PATH_MAX, "%s/%08"PRIu32, epoch_path, jd->epoch);
+		sd_iprintf("%s, %"PRIu32" size %"PRIu64,
+			   path, jd->epoch, jd->size);
+		break;
+	case JF_CONFIG:
+		snprintf(path, PATH_MAX, "%s", config_path);
+		sd_iprintf("%s, size %"PRIu64, path, jd->size);
+		break;
+	}
+}
+
 static int replay_journal_entry(struct journal_descriptor *jd)
 {
 	char path[PATH_MAX];
 	ssize_t size;
 	int fd, flags = O_WRONLY, ret = 0;
-	void *buf;
+	void *buf = NULL;
 	char *p = (char *)jd;
-
-	sd_dprintf("%"PRIx64", size %"PRIu64", off %"PRIu64", %d", jd->oid,
-		   jd->size, jd->offset, jd->create);
 
 	if (jd->create)
 		flags |= O_CREAT;
-	snprintf(path, sizeof(path), "%s/%016" PRIx64, get_object_path(jd->oid),
-		 jd->oid);
+
+	journal_get_path(jd, path);
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		sd_eprintf("open %m");
 		return -1;
 	}
 
-	if (jd->create) {
+	if (jd->create && jd->flag == JF_STORE) {
 		ret = prealloc(fd, get_objsize(jd->oid));
 		if (ret < 0)
 			goto out;
@@ -164,6 +190,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 		goto out;
 	}
 out:
+	free(buf);
 	close(fd);
 	return ret;
 }
@@ -211,6 +238,8 @@ skip:
 }
 
 /*
+ * FIXME: clear jfile at shutdown command.
+ *
  * We recover the journal file in order of wall time in the corner case that
  * sheep crashes while in the middle of journal committing. For most of cases,
  * we actually only recover one jfile, the other would be empty. This process
@@ -315,22 +344,15 @@ retry:
 		panic("%s", strerror(err));
 }
 
-int journal_file_write(uint64_t oid, const char *buf, size_t size,
-		       off_t offset, bool create)
+static int journal_file_write(struct journal_descriptor *jd, const char *buf)
 {
 	uint32_t marker = JOURNAL_END_MARKER;
 	int ret = SD_RES_SUCCESS;
+	uint64_t size = jd->size;
 	ssize_t written, rusize = roundup(size, SECTOR_SIZE),
 		wsize = JOURNAL_META_SIZE + rusize;
 	off_t woff;
 	char *wbuffer, *p;
-	struct journal_descriptor jd = {
-		.magic = JOURNAL_DESC_MAGIC,
-		.offset = offset,
-		.size = size,
-		.oid = oid,
-		.create = create,
-	};
 
 	pthread_spin_lock(&jfile_lock);
 	if (!jfile_enough_space(wsize))
@@ -340,7 +362,7 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 	pthread_spin_unlock(&jfile_lock);
 
 	p = wbuffer = xvalloc(wsize);
-	memcpy(p, &jd, JOURNAL_DESC_SIZE);
+	memcpy(p, jd, JOURNAL_DESC_SIZE);
 	p += JOURNAL_DESC_SIZE;
 	memcpy(p, buf, size);
 	p += size;
@@ -349,8 +371,6 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 		p += rusize - size;
 	}
 	memcpy(p, &marker, JOURNAL_MARKER_SIZE);
-
-	sd_dprintf("oid %lx, pos %zu, wsize %zu", oid, jfile.pos, wsize);
 	/*
 	 * Concurrent writes with the same FD is okay because we don't have any
 	 * critical sections that need lock inside kernel write path, since we
@@ -368,4 +388,44 @@ int journal_file_write(uint64_t oid, const char *buf, size_t size,
 out:
 	free(wbuffer);
 	return ret;
+}
+
+int journal_write_store(uint64_t oid, const char *buf, size_t size,
+			off_t offset, bool create)
+{
+	struct journal_descriptor jd = {
+		.magic = JOURNAL_DESC_MAGIC,
+		.flag = JF_STORE,
+		.offset = offset,
+		.size = size,
+		.create = create,
+	};
+	/* We have to explicitly do assignment to get all GCC compatible */
+	jd.oid = oid;
+	return journal_file_write(&jd, buf);
+}
+
+int journal_write_epoch(const char *buf, size_t size, uint32_t epoch)
+{
+	struct journal_descriptor jd = {
+		.magic = JOURNAL_DESC_MAGIC,
+		.flag = JF_EPOCH,
+		.offset = 0,
+		.size = size,
+		.create = true,
+	};
+	jd.epoch = epoch;
+	return journal_file_write(&jd, buf);
+}
+
+int journal_write_config(const char *buf, size_t size)
+{
+	struct journal_descriptor jd = {
+		.magic = JOURNAL_DESC_MAGIC,
+		.flag = JF_CONFIG,
+		.offset = 0,
+		.size = size,
+		.create = true,
+	};
+	return journal_file_write(&jd, buf);
 }

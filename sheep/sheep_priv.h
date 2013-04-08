@@ -408,7 +408,10 @@ bool sheep_need_retry(uint32_t epoch);
 
 /* journal_file.c */
 int journal_file_init(const char *path, size_t size, bool skip);
-int journal_file_write(uint64_t oid, const char *buf, size_t size, off_t, bool);
+int
+journal_write_store(uint64_t oid, const char *buf, size_t size, off_t, bool);
+int journal_write_epoch(const char *buf, size_t size, uint32_t epoch);
+int journal_write_config(const char *buf, size_t size);
 
 /* md.c */
 void md_add_disk(char *path);

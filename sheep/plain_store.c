@@ -96,8 +96,8 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	get_obj_path(oid, path);
 
 	if (uatomic_is_true(&sys->use_journal) &&
-	    journal_file_write(oid, iocb->buf, iocb->length, iocb->offset,
-			       false)
+	    journal_write_store(oid, iocb->buf, iocb->length, iocb->offset,
+				false)
 	    != SD_RES_SUCCESS) {
 		sd_eprintf("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
@@ -292,7 +292,8 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	get_tmp_obj_path(oid, tmp_path);
 
 	if (uatomic_is_true(&sys->use_journal) &&
-	    journal_file_write(oid, iocb->buf, iocb->length, iocb->offset, true)
+	    journal_write_store(oid, iocb->buf, iocb->length,
+				iocb->offset, true)
 	    != SD_RES_SUCCESS) {
 		sd_eprintf("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
