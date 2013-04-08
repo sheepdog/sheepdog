@@ -39,38 +39,45 @@ LIST_HEAD(store_drivers);
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 {
-	int fd, ret, len;
+	int fd, ret, len, nodes_len, flags = O_RDWR | O_CREAT | O_DSYNC;
 	time_t t;
-	char path[PATH_MAX];
+	char path[PATH_MAX], *buf;
 
 	sd_dprintf("update epoch: %d, %zd", epoch, nr_nodes);
 
-	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
-	fd = open(path, O_RDWR | O_CREAT | O_DSYNC, def_fmode);
-	if (fd < 0) {
-		ret = fd;
-		goto err_open;
-	}
-
-	len = nr_nodes * sizeof(struct sd_node);
-	ret = xwrite(fd, (char *)nodes, len);
-	if (ret != len)
-		goto err;
-
 	/* Piggyback the epoch creation time for 'collie cluster info' */
 	time(&t);
-	len = sizeof(t);
-	ret = xwrite(fd, (char *)&t, len);
-	if (ret != len)
-		goto err;
+	nodes_len = nr_nodes * sizeof(struct sd_node);
+	len = nodes_len + sizeof(time_t);
+	buf = xmalloc(len);
+	memcpy(buf, nodes, nodes_len);
+	memcpy(buf + nodes_len, &t, sizeof(time_t));
 
-	close(fd);
-	return 0;
+	if (uatomic_is_true(&sys->use_journal) &&
+	    journal_write_epoch(buf, len, epoch) != SD_RES_SUCCESS) {
+		sd_eprintf("turn off journaling");
+		uatomic_set_false(&sys->use_journal);
+		sync();
+	}
+
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	fd = open(path, flags, def_fmode);
+	if (fd < 0) {
+		free(buf);
+		return -1;
+	}
+
+	ret = xwrite(fd, buf, len);
+	if (ret != len) {
+		sd_eprintf("write failed %d, len %d", ret, len);
+		ret = -1;
+		goto err;
+	}
+	ret = 0;
 err:
+	free(buf);
 	close(fd);
-err_open:
-	sd_dprintf("%m");
-	return -1;
+	return ret;
 }
 
 static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
