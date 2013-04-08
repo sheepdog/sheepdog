@@ -223,13 +223,7 @@ static int remove_epoch(uint32_t epoch)
 		return SD_RES_EIO;
 	}
 
-	snprintf(path, sizeof(path), "%s%08u/", jrnl_path, epoch);
-	ret = rmdir_r(path);
-	if (ret && ret != -ENOENT) {
-		sd_eprintf("failed to remove %s: %s", path, strerror(-ret));
-		return SD_RES_EIO;
-	}
-	return 0;
+	return SD_RES_EIO;
 }
 
 static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,

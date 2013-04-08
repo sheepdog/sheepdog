@@ -29,7 +29,6 @@
 #include "farm/farm.h"
 
 char *obj_path;
-char *jrnl_path;
 char *epoch_path;
 
 mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
@@ -283,31 +282,6 @@ static int init_epoch_path(const char *base_path)
 	return init_path(epoch_path, NULL);
 }
 
-#define JRNL_PATH "/journal/"
-
-static int init_jrnl_path(const char *base_path)
-{
-	int ret, len = strlen(base_path) + strlen(JRNL_PATH) + 1;
-	bool new;
-
-	/* Create journal directory */
-	jrnl_path = xzalloc(len);
-	snprintf(jrnl_path, len, "%s" JRNL_PATH, base_path);
-
-	ret = init_path(jrnl_path, &new);
-	/* Error during directory creation */
-	if (ret)
-		return ret;
-
-	/* If journal is newly created */
-	if (new)
-		return 0;
-
-	jrnl_recover(jrnl_path);
-
-	return 0;
-}
-
 /*
  * If the node is gateway, this function only finds the store driver.
  * Otherwise, this function initializes the backend store
@@ -404,10 +378,6 @@ int init_global_pathnames(const char *d, char *argp)
 		return ret;
 
 	ret = init_epoch_path(d);
-	if (ret)
-		return ret;
-
-	ret = init_jrnl_path(d);
 	if (ret)
 		return ret;
 

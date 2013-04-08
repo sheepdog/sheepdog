@@ -205,7 +205,6 @@ static inline struct store_driver *find_store_driver(const char *name)
 extern struct cluster_info *sys;
 extern struct store_driver *sd_store;
 extern char *obj_path;
-extern char *jrnl_path;
 extern char *epoch_path;
 extern mode_t def_fmode;
 extern mode_t def_dmode;
@@ -335,12 +334,6 @@ int do_process_main(const struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
 int sheep_do_op_work(const struct sd_op_template *op, struct request *req);
 int gateway_to_peer_opcode(int opcode);
-
-/* Journal */
-struct jrnl_descriptor *jrnl_begin(const void *buf, size_t count, off_t offset,
-				   const char *path, const char *jrnl_dir);
-int jrnl_end(struct jrnl_descriptor *jd);
-int jrnl_recover(const char *jrnl_dir);
 
 static inline bool is_myself(const uint8_t *addr, uint16_t port)
 {
