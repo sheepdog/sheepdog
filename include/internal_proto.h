@@ -245,4 +245,24 @@ struct sd_md_info {
 	int nr;
 };
 
+enum cluster_join_result {
+	/* Success */
+	CJ_RES_SUCCESS,
+
+	/* Fail to join. The joining node has an invalid epoch. */
+	CJ_RES_FAIL,
+
+	/*
+	 * Fail to join. The joining node should be added after the cluster
+	 * start working.
+	 */
+	CJ_RES_JOIN_LATER,
+
+	/*
+	 * Transfer mastership.  The joining node has a newer epoch, so this
+	 * node will leave the cluster (restart later).
+	 */
+	CJ_RES_MASTER_TRANSFER,
+};
+
 #endif /* __INTERNAL_PROTO_H__ */

@@ -26,21 +26,6 @@
 /* maximum payload size sent in ->notify and ->unblock */
 #define SD_MAX_EVENT_BUF_SIZE (128 * 1024) /* 128k */
 
-enum cluster_join_result {
-	CJ_RES_SUCCESS, /* Success */
-	CJ_RES_FAIL, /* Fail to join.  The joining node has an invalidepoch. */
-	/*
-	 * Fail to join. The joining node should be added after the cluster
-	 * start working.
-	 */
-	CJ_RES_JOIN_LATER,
-	/*
-	 * Transfer mastership.  The joining node has a newer epoch, so this
-	 * node will leave the cluster (restart later).
-	 */
-	CJ_RES_MASTER_TRANSFER,
-};
-
 struct cluster_driver {
 	const char *name;
 
