@@ -1839,6 +1839,12 @@ static int vdi_restore(int argc, char **argv)
 		goto out;
 	}
 
+	if (is_stdin_console()) {
+		fprintf(stderr, "stdin must be pipe\n");
+		ret = EXIT_USAGE;
+		goto out;
+	}
+
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != EXIT_SUCCESS) {
 		fprintf(stderr, "Failed to delete the current state\n");

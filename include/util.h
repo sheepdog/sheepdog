@@ -148,6 +148,11 @@ static inline void uatomic_set_false(uatomic_bool *val)
 #define TEXT_CYAN           "\033[0;36m"
 #define TEXT_BOLD_CYAN      "\033[1;36m"
 
+static inline bool is_stdin_console(void)
+{
+	return isatty(STDIN_FILENO);
+}
+
 static inline bool is_stdout_console(void)
 {
 	return isatty(STDOUT_FILENO);
