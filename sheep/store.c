@@ -61,6 +61,10 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 	}
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+
+	if (uatomic_is_true(&sys->use_journal))
+		flags &= ~O_DSYNC;
+
 	fd = open(path, flags, def_fmode);
 	if (fd < 0) {
 		free(buf);
