@@ -109,20 +109,8 @@ static int cluster_format(int argc, char **argv)
 		if (test_bit(nr, vdi_inuse))
 			break;
 
-	if (nr != SD_NR_VDIS) {
-		int i, l;
-		char str[123] = {'\0'};
-
-		printf(FORMAT_PRINT);
-		ret = scanf("%s", str);
-		if (ret < 0)
-			return EXIT_SYSFAIL;
-		l = strlen(str);
-		for (i = 0; i < l; i++)
-			str[i] = tolower(str[i]);
-		if (strncmp(str, "yes", 3) != 0)
-			return EXIT_SUCCESS;
-	}
+	if (nr != SD_NR_VDIS)
+		confirm(FORMAT_PRINT);
 
 	gettimeofday(&tv, NULL);
 

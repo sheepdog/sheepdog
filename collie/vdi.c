@@ -801,6 +801,9 @@ static int vdi_rollback(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		return ret;
 
+	confirm("This operation dicards any changes made since the previous\n"
+		"snapshot was taken.  Continue? [yes/no]: ");
+
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to delete the current state\n");

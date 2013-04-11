@@ -73,6 +73,7 @@ int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
 int collie_exec_req(int sockfd, struct sd_req *hdr, void *data);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
 int update_node_list(int max_nodes, uint32_t epoch);
+void confirm(const char *message);
 
 extern struct command vdi_command;
 extern struct command node_command;

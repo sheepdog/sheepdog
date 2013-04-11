@@ -274,3 +274,14 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
 	return EXIT_FAILURE;
 }
+
+void confirm(const char *message)
+{
+	char input[8] = "";
+	char *ret;
+
+	printf("%s", message);
+	ret = fgets(input, sizeof(input), stdin);
+	if (ret == NULL || strncasecmp(input, "yes", 3) != 0)
+		exit(EXIT_SUCCESS);
+}
