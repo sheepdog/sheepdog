@@ -31,7 +31,8 @@
 
 /*
  * Operations with opcodes above 0x80 are considered part of the inter-sheep
- * protocol and are versioned using SD_SHEEP_PROTO_VER instead of SD_PROTO_VER.
+ * include sheep-collie protocol and are versioned using SD_SHEEP_PROTO_VER
+ * instead of SD_PROTO_VER.
  *
  * These same applies for the above 0x80 flags and error values below.
  */
@@ -90,6 +91,13 @@
 #define SD_RES_NETWORK_ERROR 0x86 /* Network error between sheep */
 #define SD_RES_NO_CACHE      0x87 /* No cache object found */
 #define SD_RES_BUFFER_SMALL  0x88 /* The buffer is too small */
+#define SD_RES_FORCE_RECOVER    0x89 /* Users should not force recover this cluster */
+#define SD_RES_NO_STORE         0x8A /* No targeted backend store */
+#define SD_RES_NO_SUPPORT       0x8B /* Operation is not supported by backend store */
+#define SD_RES_NODE_IN_RECOVERY 0x8C /*	Targeted node is in recovery */
+#define SD_RES_KILLED           0x8D /* Node is killed */
+#define SD_RES_OID_EXIST        0x8E /* Object ID exists already */
+#define SD_RES_AGAIN            0x8F /* Ask to try again */
 
 #define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
 #define SD_FLAG_QUORUM       0x0008 /* Serve the IO rquest as long we are quorate */
