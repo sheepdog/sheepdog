@@ -689,7 +689,7 @@ notrace int __sd_dump_variable(const char *var, const void *base_sp)
 
 	snprintf(cmd, sizeof(cmd), "gdb -nw %s %d -batch -ex 'set width 80'"
 		 " -ex 'select-frame %p' -ex 'up 1' -ex 'p %s' 2> /dev/null",
-		 path, getpid(), base_sp, var);
+		 path, gettid(), base_sp, var);
 	f = popen(cmd, "r");
 	if (f == NULL) {
 		sd_eprintf("failed to run gdb");
@@ -745,7 +745,7 @@ static notrace int __dump_stack_frames(const void *base_sp)
 		snprintf(cmd, sizeof(cmd), "gdb -nw %s %d -batch"
 			 " -ex 'set width 80' -ex 'select-frame %p'"
 			 " -ex 'up %d' -ex 'info locals' 2> /dev/null",
-			 path, getpid(), base_sp, i);
+			 path, gettid(), base_sp, i);
 		f = popen(cmd, "r");
 		if (f == NULL)
 			return -1;
