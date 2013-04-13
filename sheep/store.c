@@ -420,14 +420,14 @@ int init_global_pathnames(const char *d, char *argp)
 
 /* Write data to both local object cache (if enabled) and backends */
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, bool create, int nr_copies)
+		 uint64_t offset, bool create, int nr_copies)
 {
 	struct sd_req hdr;
 	int ret;
 
 	if (sys->enable_object_cache && object_is_cached(oid)) {
 		ret = object_cache_write(oid, data, datalen, offset,
-					 flags, create);
+					 create);
 		if (ret == SD_RES_NO_CACHE)
 			goto forward_write;
 
@@ -443,7 +443,7 @@ forward_write:
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
 	else
 		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
-	hdr.flags = flags | SD_FLAG_CMD_WRITE;
+	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = datalen;
 
 	hdr.obj.oid = oid;

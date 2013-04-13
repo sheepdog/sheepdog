@@ -303,7 +303,7 @@ bool node_in_recovery(void);
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, int nr_copies);
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, uint16_t flags, bool create, int nr_copies);
+		 uint64_t offset, bool create, int nr_copies);
 int read_object(uint64_t oid, char *data, unsigned int datalen,
 		uint64_t offset, int nr_copies);
 int remove_object(uint64_t oid, int nr_copies);
@@ -373,7 +373,7 @@ bool object_is_cached(uint64_t oid);
 void object_cache_try_to_reclaim(int);
 int object_cache_handle_request(struct request *req);
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, uint16_t flags, bool create);
+		       uint64_t offset, bool create);
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset);
 int object_cache_flush_vdi(uint32_t vid);

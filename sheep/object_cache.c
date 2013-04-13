@@ -1097,7 +1097,7 @@ err:
 }
 
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, uint16_t flags, bool create)
+		       uint64_t offset, bool create)
 {
 	uint32_t vid = oid_to_vid(oid);
 	uint32_t idx = object_cache_oid_to_idx(oid);
