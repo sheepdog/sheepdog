@@ -207,6 +207,16 @@ static int do_recover(int fd)
 		return -1;
 	}
 
+	if (!st.st_size) {
+		/*
+		 * An empty journal file can be produced when sheep crashes
+		 * between ftruncate() and prealloc() of commit_data().
+		 * Such a file should be ignored simply.
+		 */
+		close(fd);
+		return 0;
+	}
+
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
@@ -245,31 +255,29 @@ skip:
  * we actually only recover one jfile, the other would be empty. This process
  * is fast with buffered IO that only take several secends at most.
  */
-static int check_recover_journal_file(const char *p)
+static void check_recover_journal_file(const char *p)
 {
 	int old = 0, new = 0;
 
 	if (get_old_new_jfile(p, &old, &new) < 0)
-		return -1;
+		return;
 
 	/* No journal file found */
 	if (old == 0)
-		return 0;
+		return;
 
 	if (do_recover(old) < 0)
-		return -1;
+		panic("recoverying from journal file (old) failed");
 	if (do_recover(new) < 0)
-		return -1;
-
-	return 0;
+		panic("recoverying from journal file (new) failed");
 }
 
 int journal_file_init(const char *path, size_t size, bool skip)
 {
 	int fd;
 
-	if (!skip && check_recover_journal_file(path) < 0)
-		return -1;
+	if (!skip)
+		check_recover_journal_file(path);
 
 	jfile_size = (size * 1024 * 1024) / 2;
 
