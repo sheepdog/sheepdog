@@ -691,6 +691,12 @@ int main(int argc, char **argv)
 	sd_printf(SDOG_INFO, "shutdown");
 
 	leave_cluster();
+
+	if (uatomic_is_true(&sys->use_journal)) {
+		sd_iprintf("cleaning journal file");
+		clean_journal_file(jpath);
+	}
+
 	log_close();
 
 	if (pid_file)

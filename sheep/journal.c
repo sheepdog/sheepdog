@@ -248,8 +248,6 @@ skip:
 }
 
 /*
- * FIXME: clear jfile at shutdown command.
- *
  * We recover the journal file in order of wall time in the corner case that
  * sheep crashes while in the middle of journal committing. For most of cases,
  * we actually only recover one jfile, the other would be empty. This process
@@ -291,6 +289,24 @@ int journal_file_init(const char *path, size_t size, bool skip)
 
 	pthread_spin_init(&jfile_lock, PTHREAD_PROCESS_PRIVATE);
 	return 0;
+}
+
+void clean_journal_file(const char *p)
+{
+	int ret;
+	char path[PATH_MAX];
+
+	sync();
+
+	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[0]);
+	ret = unlink(path);
+	if (ret < 0)
+		sd_eprintf("unlink(%s): %m", path);
+
+	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[1]);
+	ret = unlink(path);
+	if (ret < 0)
+		sd_eprintf("unlink(%s): %m", path);
 }
 
 static inline bool jfile_enough_space(size_t size)
