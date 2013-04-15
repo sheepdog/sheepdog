@@ -475,9 +475,14 @@ static notrace void log_flush(void)
 	}
 }
 
+static bool is_sheep_dead(int signo)
+{
+	return signo == SIGHUP;
+}
+
 static notrace void crash_handler(int signo)
 {
-	if (signo == SIGHUP)
+	if (is_sheep_dead(signo))
 		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.",
 			  sheep_pid);
 	else {
@@ -489,7 +494,12 @@ static notrace void crash_handler(int signo)
 	log_flush();
 	closelog();
 	free_logarea();
-	exit(1);
+
+	/* If the signal isn't caused by the logger crash, we simply exit. */
+	if (is_sheep_dead(signo))
+		exit(1);
+
+	reraise_crash_signal(signo, 1);
 }
 
 static notrace void logger(char *log_dir, char *outfile)

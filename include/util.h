@@ -89,6 +89,7 @@ int purge_directory(char *dir_path);
 bool is_numeric(const char *p);
 int install_sighandler(int signum, void (*handler)(int), bool once);
 int install_crash_handler(void (*handler)(int));
+void reraise_crash_signal(int signo, int status);
 pid_t gettid(void);
 bool is_xattr_enabled(const char *path);
 

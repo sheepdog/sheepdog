@@ -320,7 +320,15 @@ static void crash_handler(int signo)
 
 	sd_backtrace();
 
-	exit(EXIT_SYSFAIL);
+	/*
+	 * OOM raises SIGABRT in xmalloc but the administrator expects
+	 * that collie exits with EXIT_SYSFAIL.  We have to give up
+	 * dumping a core file in this case.
+	 */
+	if (signo == SIGABRT)
+		exit(EXIT_SYSFAIL);
+
+	reraise_crash_signal(signo, EXIT_SYSFAIL);
 }
 
 int main(int argc, char **argv)

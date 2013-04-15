@@ -374,13 +374,17 @@ bool is_numeric(const char *s)
 	return false;
 }
 
+/*
+ * If 'once' is true, the signal will be restored to the default state
+ * after 'handler' is called.
+ */
 int install_sighandler(int signum, void (*handler)(int), bool once)
 {
 	struct sigaction sa = {};
 
 	sa.sa_handler = handler;
 	if (once)
-		sa.sa_flags = SA_RESETHAND;
+		sa.sa_flags = SA_RESETHAND | SA_NODEFER;
 	sigemptyset(&sa.sa_mask);
 
 	return sigaction(signum, &sa, NULL);
@@ -393,6 +397,28 @@ int install_crash_handler(void (*handler)(int))
 		install_sighandler(SIGBUS, handler, true) ||
 		install_sighandler(SIGILL, handler, true) ||
 		install_sighandler(SIGFPE, handler, true);
+}
+
+/*
+ * Re-raise the signal 'signo' for the default signal handler to dump
+ * a core file, and exit with 'status' if the default handler cannot
+ * terminate the process.  This function is expected to be called in
+ * the installed signal handlers with install_crash_handler().
+ */
+void reraise_crash_signal(int signo, int status)
+{
+	int ret = raise(signo);
+
+	/* We won't get here normally. */
+	if (ret != 0)
+		sd_printf(SDOG_EMERG, "failed to re-raise signal %d (%s).",
+			  signo, strsignal(signo));
+	else
+		sd_printf(SDOG_EMERG, "default handler for the re-raised "
+			  "signal %d (%s) didn't work expectedly", signo,
+			  strsignal(signo));
+
+	exit(status);
 }
 
 pid_t gettid(void)
