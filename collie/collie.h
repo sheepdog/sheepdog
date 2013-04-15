@@ -68,9 +68,8 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    unsigned int datalen, uint64_t offset, uint32_t flags,
 		    int copies, bool create, bool direct);
+int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data);
 int send_light_req(struct sd_req *hdr, const char *host, int port);
-int send_light_req_get_response(struct sd_req *hdr, const char *host, int port);
-int collie_exec_req(int sockfd, struct sd_req *hdr, void *data);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
 int update_node_list(int max_nodes, uint32_t epoch);
 void confirm(const char *message);

@@ -129,8 +129,8 @@ static int node_recovery(int argc, char **argv)
 
 		sd_init_req((struct sd_req *)&req, SD_OP_STAT_RECOVERY);
 
-		ret = send_light_req_get_response((struct sd_req *)&req, host,
-						  sd_nodes[i].nid.port);
+		ret = collie_exec_req(host, sd_nodes[i].nid.port,
+				      (struct sd_req *)&req, NULL);
 		if (ret == SD_RES_NODE_IN_RECOVERY) {
 			addr_to_str(host, sizeof(host),
 					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
@@ -146,7 +146,7 @@ static int node_recovery(int argc, char **argv)
 static int node_cache(int argc, char **argv)
 {
 	char *p;
-	int fd, ret;
+	int ret;
 	uint32_t cache_size;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -157,21 +157,13 @@ static int node_cache(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_FAILURE;
-
 	sd_init_req(&hdr, SD_OP_SET_CACHE_SIZE);
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = sizeof(cache_size);
 
-	ret = collie_exec_req(fd, &hdr, (void *)&cache_size);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
+	ret = collie_exec_req(sdhost, sdport, &hdr, (void *)&cache_size);
+	if (ret < 0)
 		return EXIT_FAILURE;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "specify max cache size failed: %s\n",
@@ -223,23 +215,16 @@ static int node_md_info(struct node_id *nid)
 	char size_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE];
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret, i;
-
-	fd = connect_to_addr(nid->addr, nid->port);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect %d\n", fd);
-		return EXIT_FAILURE;
-	}
+	int ret, i;
+	char host[HOST_NAME_MAX];
 
 	sd_init_req(&hdr, SD_OP_MD_INFO);
 	hdr.data_length = sizeof(info);
 
-	ret = collie_exec_req(fd, &hdr, &info);
-	close(fd);
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_FAILURE;
-	}
+	addr_to_str(host, sizeof(host), nid->addr, 0);
+	ret = collie_exec_req(host, nid->port, &hdr, &info);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "failed to get multi-disk infomation: %s\n",
@@ -286,13 +271,7 @@ static int do_plug_unplug(char *disks, bool plug)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect %s:%d\n", sdhost, sdport);
-		return EXIT_FAILURE;
-	}
+	int ret;
 
 	if (plug)
 		sd_init_req(&hdr, SD_OP_MD_PLUG);
@@ -301,12 +280,9 @@ static int do_plug_unplug(char *disks, bool plug)
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = strlen(disks) + 1;
 
-	ret = collie_exec_req(fd, &hdr, disks);
-	close(fd);
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_FAILURE;
-	}
+	ret = collie_exec_req(sdhost, sdport, &hdr, disks);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to execute request, look for sheep.log"

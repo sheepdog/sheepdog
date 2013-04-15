@@ -47,13 +47,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect\n");
-		return SD_RES_EIO;
-	}
+	int ret;
 
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
 	hdr.data_length = datalen;
@@ -63,10 +57,8 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	if (direct)
 		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
-	ret = collie_exec_req(fd, &hdr, data);
-	close(fd);
-
-	if (ret) {
+	ret = collie_exec_req(sdhost, sdport, &hdr, data);
+	if (ret < 0) {
 		fprintf(stderr, "Failed to read object %" PRIx64 "\n", oid);
 		return SD_RES_EIO;
 	}
@@ -88,13 +80,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect\n");
-		return SD_RES_EIO;
-	}
+	int ret;
 
 	if (create)
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
@@ -113,10 +99,8 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	hdr.obj.cow_oid = cow_oid;
 	hdr.obj.offset = offset;
 
-	ret = collie_exec_req(fd, &hdr, data);
-	close(fd);
-
-	if (ret) {
+	ret = collie_exec_req(sdhost, sdport, &hdr, data);
+	if (ret < 0) {
 		fprintf(stderr, "Failed to write object %" PRIx64 "\n", oid);
 		return SD_RES_EIO;
 	}
@@ -131,31 +115,19 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 
 int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 {
-	int ret, fd;
+	int ret;
 	unsigned long nr;
 	static struct sheepdog_inode i;
 	struct sd_req req;
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	unsigned int rlen = sizeof(vdi_inuse);
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect to %s:%d\n", sdhost, sdport);
-		ret = -1;
-		goto out;
-	}
-
 	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
 
-	ret = collie_exec_req(fd, &req, &vdi_inuse);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
-			sdhost, sdport);
-		close(fd);
+	ret = collie_exec_req(sdhost, sdport, &req, &vdi_inuse);
+	if (ret < 0)
 		goto out;
-	}
-	close(fd);
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++) {
 		uint64_t oid;
@@ -199,33 +171,32 @@ out:
 	return ret;
 }
 
-int send_light_req_get_response(struct sd_req *hdr, const char *host, int port)
+int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
 {
 	int fd, ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 
 	fd = connect_to(host, port);
-	if (fd < 0)
-		return -1;
-
-	ret = collie_exec_req(fd, hdr, NULL);
-	close(fd);
-	if (ret) {
-		fprintf(stderr, "failed to connect to  %s:%d\n",
+	if (fd < 0) {
+		fprintf(stderr, "Failed to connect to %s:%d\n",
 			host, port);
 		return -1;
 	}
 
-	if (rsp->result != SD_RES_SUCCESS)
-		return rsp->result;
+	/* Retry hard for collie because we can't get the newest epoch */
+	ret = exec_req(fd, hdr, data, NULL, 0);
+	close(fd);
 
-	return SD_RES_SUCCESS;
+	if (ret)
+		return -1;
+
+	return rsp->result;
 }
 
 /* Light request only contains header, without body content. */
 int send_light_req(struct sd_req *hdr, const char *host, int port)
 {
-	int ret = send_light_req_get_response(hdr, host, port);
+	int ret = collie_exec_req(host, port, hdr, NULL);
 
 	if (ret == -1)
 		return -1;
@@ -237,13 +208,6 @@ int send_light_req(struct sd_req *hdr, const char *host, int port)
 	}
 
 	return 0;
-}
-
-
-int collie_exec_req(int sockfd, struct sd_req *hdr, void *data)
-{
-	/* Retry hard for collie because we can't get the newest epoch */
-	return exec_req(sockfd, hdr, data, NULL, 0);
 }
 
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)

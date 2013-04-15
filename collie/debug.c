@@ -74,7 +74,7 @@ static const char *tracefile = "/tmp/tracefile";
 
 static int trace_read_buffer(void)
 {
-	int fd, ret, tfd;
+	int ret, tfd;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 #define TRACE_BUF_LEN      (1024 * 1024 * 20)
@@ -86,21 +86,13 @@ static int trace_read_buffer(void)
 		return EXIT_SYSFAIL;
 	}
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
-
 read_buffer:
 	sd_init_req(&hdr, SD_OP_TRACE_READ_BUF);
 	hdr.data_length = TRACE_BUF_LEN;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
-		close(fd);
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	if (ret < 0)
 		return EXIT_SYSFAIL;
-	}
 
 	if (rsp->result == SD_RES_AGAIN)
 		goto read_buffer;
@@ -108,7 +100,6 @@ read_buffer:
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Trace failed: %s\n",
 				sd_strerror(rsp->result));
-		close(fd);
 		return EXIT_FAILURE;
 	}
 
@@ -118,7 +109,6 @@ read_buffer:
 		goto read_buffer;
 	}
 
-	close(fd);
 	free(buf);
 	return EXIT_SUCCESS;
 }

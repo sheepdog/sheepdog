@@ -41,25 +41,17 @@ static struct cluster_cmd_data {
 
 static int list_store(void)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char buf[512] = { 0 };
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
-
 	sd_init_req(&hdr, SD_OP_GET_STORE_LIST);
 	hdr.data_length = 512;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	if (ret < 0)
 		return EXIT_SYSFAIL;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Restore failed: %s\n",
@@ -82,7 +74,7 @@ static int list_store(void)
 
 static int cluster_format(int argc, char **argv)
 {
-	int fd, ret;
+	int ret;
 	struct sd_so_req hdr;
 	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
 	struct timeval tv;
@@ -90,20 +82,13 @@ static int cluster_format(int argc, char **argv)
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	unsigned long nr;
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
-
 	sd_init_req((struct sd_req *)&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
-	ret = collie_exec_req(fd, (struct sd_req *)&hdr, &vdi_inuse);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to read VDIs from %s:%d\n",
-			sdhost, sdport);
-		close(fd);
+	ret = collie_exec_req(sdhost, sdport, (struct sd_req *)&hdr,
+			      &vdi_inuse);
+	if (ret < 0)
 		return EXIT_SYSFAIL;
-	}
 
 	for (nr = 0; nr < SD_NR_VDIS; nr++)
 		if (test_bit(nr, vdi_inuse))
@@ -131,13 +116,10 @@ static int cluster_format(int argc, char **argv)
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
 	printf("using backend %s store\n", store_name);
-	ret = collie_exec_req(fd, (struct sd_req *)&hdr, store_name);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
+	ret = collie_exec_req(sdhost, sdport, (struct sd_req *)&hdr,
+			      store_name);
+	if (ret < 0)
 		return EXIT_SYSFAIL;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Format failed: %s\n",
@@ -153,7 +135,7 @@ static int cluster_format(int argc, char **argv)
 
 static int cluster_info(int argc, char **argv)
 {
-	int i, fd, ret;
+	int i, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct epoch_log *logs;
@@ -174,17 +156,11 @@ again:
 		goto again;
 	}
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		goto error;
-
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	ret = collie_exec_req(fd, &hdr, logs);
-	close(fd);
-
-	if (ret != 0)
+	ret = collie_exec_req(sdhost, sdport, &hdr, logs);
+	if (ret < 0)
 		goto error;
 
 	if (!raw_output)
@@ -282,27 +258,19 @@ static void print_list(void *buf, unsigned len)
 
 static int list_snap(void)
 {
-	int fd, ret = EXIT_SYSFAIL;
+	int ret = EXIT_SYSFAIL;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	void *buf;
 
 	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		goto out;
-
 	sd_init_req(&hdr, SD_OP_GET_SNAP_FILE);
 	hdr.data_length = SD_DATA_OBJ_SIZE;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	if (ret < 0)
 		goto out;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Listing snapshots failed: %s\n",

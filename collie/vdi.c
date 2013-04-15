@@ -293,19 +293,13 @@ static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigned size)
 {
 	char name[128];
-	int i, fd, ret, cb_ret;
+	int i, ret, cb_ret;
 	char *buf;
 
 	buf = xzalloc(size);
 	for (i = 0; i < sd_nodes_nr; i++) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-
-		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr, 0);
-
-		fd = connect_to(name, sd_nodes[i].nid.port);
-		if (fd < 0)
-			break;
 
 		sd_init_req(&hdr, SD_OP_READ_PEER);
 		hdr.data_length = size;
@@ -314,21 +308,19 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 		hdr.obj.oid = oid;
 
-		ret = collie_exec_req(fd, &hdr, buf);
-		close(fd);
+		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr, 0);
+		ret = collie_exec_req(name, sd_nodes[i].nid.port, &hdr, buf);
+		if (ret < 0)
+			continue;
 
 		snprintf(name + strlen(name), sizeof(name) - strlen(name),
 			 ":%d", sd_nodes[i].nid.port);
 
-		if (ret)
-			fprintf(stderr, "Failed to connect to %s\n", name);
-		else {
-			untrim_zero_sectors(buf, rsp->obj.offset,
-					    rsp->data_length, size);
-			cb_ret = func(name, oid, rsp, buf, data);
-			if (cb_ret)
-				break;
-		}
+		untrim_zero_sectors(buf, rsp->obj.offset,
+				    rsp->data_length, size);
+		cb_ret = func(name, oid, rsp, buf, data);
+		if (cb_ret)
+			break;
 	}
 
 	free(buf);
@@ -385,14 +377,10 @@ static int vdi_graph(int argc, char **argv)
 static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 			 uint32_t *vid, int for_snapshot)
 {
-	int ret, fd;
+	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char buf[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return -1;
 
 	memset(buf, 0, sizeof(buf));
 	pstrcpy(buf, SD_MAX_VDI_LEN, vdiname);
@@ -407,24 +395,18 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.vdi.snapid = snapid;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-	if (ret) {
-		ret = -1;
-		goto out;
-	}
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	if (ret < 0)
+		return -1;
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Cannot get VDI info for %s %d %s: %s\n",
 			vdiname, snapid, tag, sd_strerror(rsp->result));
-		ret = -1;
-		goto out;
+		return -1;
 	}
 	*vid = rsp->vdi.vdi_id;
 
-	ret = 0;
-out:
-	close(fd);
-	return ret;
+	return 0;
 }
 
 static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
@@ -466,14 +448,8 @@ static int do_vdi_create(const char *vdiname, int64_t vdi_size,
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
+	int ret;
 	char buf[SD_MAX_VDI_LEN];
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect\n");
-		return EXIT_SYSFAIL;
-	}
 
 	memset(buf, 0, sizeof(buf));
 	pstrcpy(buf, SD_MAX_VDI_LEN, vdiname);
@@ -487,14 +463,9 @@ static int do_vdi_create(const char *vdiname, int64_t vdi_size,
 	hdr.vdi.vdi_size = roundup(vdi_size, 512);
 	hdr.vdi.copies = nr_copies;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to send a request\n");
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	if (ret < 0)
 		return EXIT_SYSFAIL;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to create VDI %s: %s\n", vdiname,
@@ -720,7 +691,7 @@ static int vdi_resize(int argc, char **argv)
 
 static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 {
-	int fd, ret;
+	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
@@ -741,10 +712,6 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 		return EXIT_FAILURE;
 	}
 
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return EXIT_SYSFAIL;
-
 	sd_init_req(&hdr, SD_OP_DEL_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = sizeof(data);
@@ -754,13 +721,9 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	if (snap_tag)
 		pstrcpy(data + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, snap_tag);
 
-	ret = collie_exec_req(fd, &hdr, data);
-	close(fd);
-
-	if (ret) {
-		fprintf(stderr, "Failed to connect\n");
+	ret = collie_exec_req(sdhost, sdport, &hdr, data);
+	if (ret < 0)
 		return EXIT_SYSFAIL;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to delete %s: %s\n", vdiname,
@@ -872,7 +835,7 @@ static int vdi_object(int argc, char **argv)
 
 static int do_track_object(uint64_t oid, uint8_t nr_copies)
 {
-	int i, j, fd, ret;
+	int i, j, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct sd_vnode *vnodes;
@@ -884,17 +847,12 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	log_length = sd_epoch * sizeof(struct epoch_log);
 	logs = xmalloc(log_length);
 	vnodes = xmalloc(sizeof(*vnodes) * SD_MAX_VNODES);
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		goto error;
 
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	ret = collie_exec_req(fd, &hdr, logs);
-	close(fd);
-
-	if (ret != 0)
+	ret = collie_exec_req(sdhost, sdport, &hdr, logs);
+	if (ret < 0)
 		goto error;
 
 	if (rsp->result != SD_RES_SUCCESS) {
@@ -1008,7 +966,7 @@ static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snap
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
+	int ret;
 	struct sheepdog_vdi_attr vattr;
 
 	memset(&vattr, 0, sizeof(vattr));
@@ -1019,12 +977,6 @@ static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snap
 	if (value && value_len) {
 		vattr.value_len = value_len;
 		memcpy(vattr.value, value, value_len);
-	}
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect\n\n");
-		return SD_RES_EIO;
 	}
 
 	sd_init_req(&hdr, SD_OP_GET_VDI_ATTR);
@@ -1039,25 +991,18 @@ static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snap
 	if (delete)
 		hdr.flags |= SD_FLAG_CMD_DEL;
 
-	ret = collie_exec_req(fd, &hdr, &vattr);
-	if (ret) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
+	ret = collie_exec_req(sdhost, sdport, &hdr, &vattr);
+	if (ret < 0)
+		return SD_RES_EIO;
 
-	if (rsp->result != SD_RES_SUCCESS) {
-		ret = rsp->result;
-		goto out;
-	}
+	if (rsp->result != SD_RES_SUCCESS)
+		return rsp->result;
 
 	*vid = rsp->vdi.vdi_id;
 	*oid = vid_to_attr_oid(rsp->vdi.vdi_id, rsp->vdi.attr_id);
 	*nr_copies = rsp->vdi.copies;
 
-	ret = SD_RES_SUCCESS;
-out:
-	close(fd);
-	return ret;
+	return SD_RES_SUCCESS;
 }
 
 static int vdi_setattr(int argc, char **argv)
@@ -1361,19 +1306,11 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
+	int ret;
 	char name[128];
 	void *buf;
 
 	buf = xmalloc(SD_DATA_OBJ_SIZE);
-
-	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
-	fd = connect_to(name, vnode->nid.port);
-	if (fd < 0) {
-		fprintf(stderr, "FATAL: failed to connect to %s:%"PRIu32"\n",
-			name, vnode->nid.port);
-		exit(EXIT_FAILURE);
-	}
 
 	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = sd_epoch;
@@ -1382,15 +1319,13 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 
 	hdr.obj.oid = oid;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-	close(fd);
+	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
+	ret = collie_exec_req(name, vnode->nid.port, &hdr, buf);
 
-	if (ret) {
-		fprintf(stderr, "FATAL: failed to execute request\n");
-		exit(EXIT_FAILURE);
-	}
+	if (ret < 0)
+		exit(EXIT_SYSFAIL);
 
-	switch (rsp->result)  {
+	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		untrim_zero_sectors(buf, rsp->obj.offset, rsp->data_length,
 				    SD_DATA_OBJ_SIZE);
@@ -1411,16 +1346,8 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int fd, ret;
+	int ret;
 	char name[128];
-
-	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
-	fd = connect_to(name, vnode->nid.port);
-	if (fd < 0) {
-		fprintf(stderr, "FATAL: failed to connect to %s:%"PRIu32"\n",
-			name, vnode->nid.port);
-		exit(EXIT_FAILURE);
-	}
 
 	if (create)
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_PEER);
@@ -1431,13 +1358,11 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	hdr.data_length = SD_DATA_OBJ_SIZE;
 	hdr.obj.oid = oid;
 
-	ret = collie_exec_req(fd, &hdr, buf);
-	close(fd);
+	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
+	ret = collie_exec_req(name, vnode->nid.port, &hdr, buf);
 
-	if (ret) {
-		fprintf(stderr, "FATAL: failed to execute request\n");
-		exit(EXIT_FAILURE);
-	}
+	if (ret < 0)
+		exit(EXIT_SYSFAIL);
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "FATAL: failed to write, %s\n",

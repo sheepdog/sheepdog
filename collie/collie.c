@@ -47,16 +47,12 @@ unsigned master_idx;
 
 int update_node_list(int max_nodes, uint32_t epoch)
 {
-	int fd, ret;
+	int ret;
 	unsigned int size;
 	char *buf = NULL;
 	struct sd_node *ent;
 	struct sd_node_req hdr;
 	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&hdr;
-
-	fd = connect_to(sdhost, sdport);
-	if (fd < 0)
-		return -1;
 
 	size = sizeof(*ent) * max_nodes;
 	buf = xzalloc(size);
@@ -65,11 +61,9 @@ int update_node_list(int max_nodes, uint32_t epoch)
 
 	hdr.data_length = size;
 
-	ret = collie_exec_req(fd, (struct sd_req *)&hdr, buf);
-	if (ret) {
-		ret = -1;
+	ret = collie_exec_req(sdhost, sdport, (struct sd_req *)&hdr, buf);
+	if (ret < 0)
 		goto out;
-	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to update node list: %s\n",
@@ -98,8 +92,6 @@ int update_node_list(int max_nodes, uint32_t epoch)
 out:
 	if (buf)
 		free(buf);
-	if (fd >= 0)
-		close(fd);
 
 	return ret;
 }
