@@ -28,6 +28,7 @@
 #define SD_OP_READ_OBJ       0x02
 #define SD_OP_WRITE_OBJ      0x03
 #define SD_OP_REMOVE_OBJ     0x04
+#define SD_OP_DISCARD_OBJ    0x05
 
 #define SD_OP_NEW_VDI        0x11
 #define SD_OP_LOCK_VDI       0x12

@@ -741,6 +741,26 @@ static int local_flush_vdi(struct request *req)
 	return ret;
 }
 
+static int local_discard_obj(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+	uint32_t vid = oid_to_vid(oid), zero = 0;
+	int ret, cp = get_vdi_copy_number(vid), idx = data_oid_to_idx(oid);
+
+	sd_dprintf("%"PRIx64, oid);
+	ret = write_object(vid_to_vdi_oid(vid), (char *)&zero, sizeof(zero),
+			   SD_INODE_HEADER_SIZE + sizeof(vid) * idx, false, cp);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+	if (remove_object(oid, cp) != SD_RES_SUCCESS)
+		sd_eprintf("failed to remove %"PRIx64, oid);
+	/*
+	 * Return success even if remove_object fails because we have updated
+	 * inode successfully.
+	 */
+	return SD_RES_SUCCESS;
+}
+
 static int local_flush_and_del(struct request *req)
 {
 	if (!sys->enable_object_cache)
@@ -1107,6 +1127,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "FLUSH_VDI",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_flush_vdi,
+	},
+
+	[SD_OP_DISCARD_OBJ] = {
+		.name = "DISCARD_OBJ",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_discard_obj,
 	},
 
 	[SD_OP_FLUSH_DEL_CACHE] = {
