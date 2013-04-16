@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Test discard/trim
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+	_start_sheep $i "-s 1000"
+done
+_wait_for_sheep 3
+$COLLIE cluster format
+sleep 1
+$COLLIE vdi create test 100M -P
+$COLLIE node info
+qemu-io -c "discard 0 100m" sheepdog:test | _filter_qemu_io
+$COLLIE vdi check test
+for i in `seq 0 24`; do
+	$COLLIE vdi object test -i $i;
+done
+$COLLIE node info
