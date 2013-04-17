@@ -40,7 +40,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 	time_t t;
 	char path[PATH_MAX], *buf;
 
-	sd_dprintf("update epoch: %d, %zd", epoch, nr_nodes);
+	sd_dprintf("update epoch: %d, %zu", epoch, nr_nodes);
 
 	/* Piggyback the epoch creation time for 'collie cluster info' */
 	time(&t);

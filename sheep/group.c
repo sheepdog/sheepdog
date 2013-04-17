@@ -921,7 +921,7 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
 	int ret = msg->rsp.result;
 	struct request *req = NULL;
 
-	sd_dprintf("op %s, size: %zd, from: %s", op_name(op), data_len,
+	sd_dprintf("op %s, size: %zu, from: %s", op_name(op), data_len,
 		   node_to_str(sender));
 
 	if (node_is_local(sender)) {

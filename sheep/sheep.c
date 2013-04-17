@@ -636,7 +636,7 @@ int main(int argc, char **argv)
 		if (!strlen(jpath))
 			/* internal journal */
 			memcpy(jpath, dir, strlen(dir));
-		sd_dprintf("%s, %zu, %d", jpath, jsize, jskip);
+		sd_dprintf("%s, %zd, %d", jpath, jsize, jskip);
 		ret = journal_file_init(jpath, jsize, jskip);
 		if (ret)
 			exit(1);

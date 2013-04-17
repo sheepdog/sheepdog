@@ -180,7 +180,8 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	memcpy(buf, p, jd->size);
 	size = xpwrite(fd, buf, jd->size, jd->offset);
 	if (size != jd->size) {
-		sd_eprintf("write %zd, size %zu, errno %m", size, jd->size);
+		sd_eprintf("write %zd, size %" PRIu64 ", errno %m", size,
+			   jd->size);
 		ret = -1;
 		goto out;
 	}
@@ -399,7 +400,7 @@ static int journal_file_write(struct journal_descriptor *jd, const char *buf)
 	 */
 	written = xpwrite(jfile.fd, wbuffer, wsize, woff);
 	if (written != wsize) {
-		sd_eprintf("failed, written %zd, len %zu", written, wsize);
+		sd_eprintf("failed, written %zd, len %zd", written, wsize);
 		/* FIXME: teach journal file handle EIO gracefully */
 		ret = SD_RES_EIO;
 		goto out;

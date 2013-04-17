@@ -127,7 +127,7 @@ static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
 			pthread_mutex_unlock(&wi->startup_lock);
 			return -1;
 		}
-		sd_dprintf("create thread %s %zd", wi->name, wi->nr_threads);
+		sd_dprintf("create thread %s %zu", wi->name, wi->nr_threads);
 	}
 	pthread_mutex_unlock(&wi->startup_lock);
 
@@ -201,7 +201,7 @@ static void *worker_routine(void *arg)
 			wi->nr_threads--;
 			pthread_mutex_unlock(&wi->pending_lock);
 			pthread_detach(pthread_self());
-			sd_dprintf("destroy thread %s %d, %zd", wi->name,
+			sd_dprintf("destroy thread %s %d, %zu", wi->name,
 				   gettid(), wi->nr_threads);
 			break;
 		}

@@ -211,7 +211,7 @@ static void remove_handler(int fd, int events, void *data)
 	if (ret < 0)
 		panic("eventfd_read() failed: %m");
 
-	sd_dprintf("removed sheeps: %lu", val);
+	sd_dprintf("removed sheeps: %" PRIu64, val);
 	assert(0 < val);
 
 
