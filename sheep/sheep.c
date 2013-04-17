@@ -599,17 +599,6 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	/* We should init journal file before config file init */
-	if (uatomic_is_true(&sys->use_journal)) {
-		if (!strlen(jpath))
-			/* internal journal */
-			memcpy(jpath, dir, strlen(dir));
-		sd_dprintf("%s, %zu, %d", jpath, jsize, jskip);
-		ret = journal_file_init(jpath, jsize, jskip);
-		if (ret)
-			exit(1);
-	}
-
 	ret = init_config_file();
 	if (ret)
 		exit(1);
@@ -640,6 +629,17 @@ int main(int argc, char **argv)
 	if (ret) {
 		sd_eprintf("failed to create sheepdog cluster");
 		exit(1);
+	}
+
+	/* We should init journal file before backend init */
+	if (uatomic_is_true(&sys->use_journal)) {
+		if (!strlen(jpath))
+			/* internal journal */
+			memcpy(jpath, dir, strlen(dir));
+		sd_dprintf("%s, %zu, %d", jpath, jsize, jskip);
+		ret = journal_file_init(jpath, jsize, jskip);
+		if (ret)
+			exit(1);
 	}
 
 	/*
