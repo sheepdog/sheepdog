@@ -22,9 +22,11 @@
 #include <dirent.h>
 #include <pthread.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "sheep_priv.h"
 #include "util.h"
+#include "strbuf.h"
 
 #define MD_DEFAULT_VDISKS 128
 #define MD_MAX_VDISK (MD_MAX_DISK * MD_DEFAULT_VDISKS)
@@ -474,6 +476,39 @@ static int get_old_new_path(uint64_t oid, uint32_t epoch, char *path,
 	return 0;
 }
 
+static int move_object(uint64_t oid, char *old, char *new)
+{
+	struct strbuf buf = STRBUF_INIT;
+	int fd, ret = -1;
+	size_t sz = get_objsize(oid);
+
+	fd = open(old, O_RDONLY);
+	if (fd < 0) {
+		sd_eprintf("failed to open %s", old);
+		goto out;
+	}
+
+	ret = strbuf_read(&buf, fd, sz);
+	if (ret != sz) {
+		sd_eprintf("failed to read %s, %d", old, ret);
+		ret = -1;
+		goto out_close;
+	}
+
+	if (atomic_create_and_write(new, buf.buf, buf.len) < 0) {
+		sd_eprintf("failed to create %s", new);
+		ret = -1;
+		goto out_close;
+	}
+	unlink(old);
+	ret = 0;
+out_close:
+	close(fd);
+out:
+	strbuf_release(&buf);
+	return ret;
+}
+
 static int check_and_move(uint64_t oid, uint32_t epoch, char *path)
 {
 	char old[PATH_MAX], new[PATH_MAX];
@@ -481,8 +516,9 @@ static int check_and_move(uint64_t oid, uint32_t epoch, char *path)
 	if (get_old_new_path(oid, epoch, path, old, new) < 0)
 		return SD_RES_EIO;
 
-	if (rename(old, new) < 0) {
-		sd_eprintf("old %s, new %s: %m", old, new);
+	/* We can't use rename(2) accross device */
+	if (move_object(oid, old, new) < 0) {
+		sd_eprintf("move old %s to new %s failed", old, new);
 		return SD_RES_EIO;
 	}
 
