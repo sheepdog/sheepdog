@@ -52,7 +52,6 @@ struct journal_descriptor {
 
 #define JF_STORE 0
 #define JF_EPOCH 1
-#define JF_CONFIG 2
 
 static const char *jfile_name[2] = { "journal_file0", "journal_file1", };
 static int jfile_fds[2];
@@ -149,10 +148,6 @@ static void journal_get_path(struct journal_descriptor *jd, char *path)
 		snprintf(path, PATH_MAX, "%s/%08"PRIu32, epoch_path, jd->epoch);
 		sd_iprintf("%s, %"PRIu32" size %"PRIu64,
 			   path, jd->epoch, jd->size);
-		break;
-	case JF_CONFIG:
-		snprintf(path, PATH_MAX, "%s", config_path);
-		sd_iprintf("%s, size %"PRIu64, path, jd->size);
 		break;
 	}
 }
@@ -439,17 +434,5 @@ int journal_write_epoch(const char *buf, size_t size, uint32_t epoch)
 		.create = true,
 	};
 	jd.epoch = epoch;
-	return journal_file_write(&jd, buf);
-}
-
-int journal_write_config(const char *buf, size_t size)
-{
-	struct journal_descriptor jd = {
-		.magic = JOURNAL_DESC_MAGIC,
-		.flag = JF_CONFIG,
-		.offset = 0,
-		.size = size,
-		.create = true,
-	};
 	return journal_file_write(&jd, buf);
 }

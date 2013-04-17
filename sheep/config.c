@@ -36,20 +36,8 @@ char *config_path;
 static int write_config(void)
 {
 	int fd, ret;
-	int flags = O_RDWR | O_CREAT | O_DSYNC;
 
-	if (uatomic_is_true(&sys->use_journal) &&
-	    journal_write_config((char *)&config, sizeof(config))
-	    != SD_RES_SUCCESS) {
-		sd_eprintf("turn off journaling");
-		uatomic_set_false(&sys->use_journal);
-		sync();
-	}
-
-	if (uatomic_is_true(&sys->use_journal))
-		flags &= ~O_DSYNC;
-
-	fd = open(config_path, flags, def_fmode);
+	fd = open(config_path, O_RDWR | O_CREAT | O_DSYNC, def_fmode);
 	if (fd < 0) {
 		sd_eprintf("failed to open config file, %m");
 		return SD_RES_EIO;
