@@ -35,28 +35,37 @@ char *config_path;
 
 static int write_config(void)
 {
-	int fd, ret;
+	int ret;
 
-	fd = open(config_path, O_RDWR | O_CREAT | O_DSYNC, sd_def_fmode);
-	if (fd < 0) {
-		sd_eprintf("failed to open config file, %m");
+	ret = atomic_create_and_write(config_path, (char *)&config,
+				sizeof(config));
+	if (ret < 0) {
+		sd_eprintf("atomic_create_and_write() failed");
 		return SD_RES_EIO;
 	}
 
-	ret = xwrite(fd, &config, sizeof(config));
-	if (ret != sizeof(config)) {
-		sd_eprintf("failed to write config data, %m");
-		ret = SD_RES_EIO;
-	} else
-		ret = SD_RES_SUCCESS;
-	close(fd);
+	return SD_RES_SUCCESS;
+}
 
-	return ret;
+static void check_tmp_config(void)
+{
+	int ret;
+	char tmp_config_path[PATH_MAX];
+
+	snprintf(tmp_config_path, PATH_MAX, "%s.tmp", config_path);
+
+	ret = unlink(tmp_config_path);
+	if (!ret || ret != ENOENT)
+		return;
+
+	sd_iprintf("removed temporal config file");
 }
 
 int init_config_file(void)
 {
 	int fd, ret;
+
+	check_tmp_config();
 
 	fd = open(config_path, O_RDONLY);
 	if (fd < 0) {
