@@ -159,4 +159,7 @@ static inline bool is_stdout_console(void)
 	return isatty(STDOUT_FILENO);
 }
 
+extern mode_t sd_def_fmode;
+extern mode_t sd_def_dmode;
+
 #endif

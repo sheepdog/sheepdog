@@ -206,8 +206,6 @@ extern struct cluster_info *sys;
 extern struct store_driver *sd_store;
 extern char *obj_path;
 extern char *epoch_path;
-extern mode_t def_fmode;
-extern mode_t def_dmode;
 
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)

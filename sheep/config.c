@@ -37,7 +37,7 @@ static int write_config(void)
 {
 	int fd, ret;
 
-	fd = open(config_path, O_RDWR | O_CREAT | O_DSYNC, def_fmode);
+	fd = open(config_path, O_RDWR | O_CREAT | O_DSYNC, sd_def_fmode);
 	if (fd < 0) {
 		sd_eprintf("failed to open config file, %m");
 		return SD_RES_EIO;

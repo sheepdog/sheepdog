@@ -105,7 +105,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		sync();
 	}
 
-	fd = open(path, flags, def_fmode);
+	fd = open(path, flags, sd_def_fmode);
 	if (fd < 0)
 		return err_to_sderr(path, oid, errno);
 
@@ -127,7 +127,7 @@ static int make_stale_dir(char *path)
 	char p[PATH_MAX];
 
 	snprintf(p, PATH_MAX, "%s/.stale", path);
-	if (xmkdir(p, def_dmode) < 0) {
+	if (xmkdir(p, sd_def_dmode) < 0) {
 		sd_eprintf("%s failed, %m", p);
 		return SD_RES_EIO;
 	}
@@ -301,7 +301,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		sync();
 	}
 
-	fd = open(tmp_path, flags, def_fmode);
+	fd = open(tmp_path, flags, sd_def_fmode);
 	if (fd < 0) {
 		if (errno == EEXIST) {
 			/*

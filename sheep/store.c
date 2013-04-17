@@ -31,9 +31,6 @@
 char *obj_path;
 char *epoch_path;
 
-mode_t def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
-mode_t def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
-
 struct store_driver *sd_store;
 LIST_HEAD(store_drivers);
 
@@ -65,7 +62,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 	if (uatomic_is_true(&sys->use_journal))
 		flags &= ~O_DSYNC;
 
-	fd = open(path, flags, def_fmode);
+	fd = open(path, flags, sd_def_fmode);
 	if (fd < 0) {
 		free(buf);
 		return -1;
@@ -203,7 +200,7 @@ again:
 			return 1;
 		}
 
-		ret = mkdir(d, def_dmode);
+		ret = mkdir(d, sd_def_dmode);
 		if (ret) {
 			sd_eprintf("cannot create the directory %s: %m", d);
 			return 1;
@@ -234,7 +231,7 @@ static int lock_base_dir(const char *d)
 	lock_path = xzalloc(len);
 	snprintf(lock_path, len, "%s" LOCK_PATH, d);
 
-	fd = open(lock_path, O_WRONLY|O_CREAT, def_fmode);
+	fd = open(lock_path, O_WRONLY|O_CREAT, sd_def_fmode);
 	if (fd < 0) {
 		sd_eprintf("failed to open lock file %s (%m)", lock_path);
 		ret = -1;

@@ -142,7 +142,7 @@ void md_add_disk(char *path)
 		return;
 	}
 
-	if (xmkdir(path, def_dmode) < 0) {
+	if (xmkdir(path, sd_def_dmode) < 0) {
 		sd_eprintf("can't mkdir for %s, %m", path);
 		return;
 	}
