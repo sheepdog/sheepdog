@@ -22,6 +22,7 @@
 #include <ctype.h>
 #include <signal.h>
 #include <sys/xattr.h>
+#include <fcntl.h>
 
 #include "util.h"
 #include "logger.h"
@@ -436,4 +437,37 @@ bool is_xattr_enabled(const char *path)
 	ret = getxattr(path, "user.dummy", &dummy, sizeof(dummy));
 
 	return !(ret == -1 && errno == ENOTSUP);
+}
+
+int atomic_create_and_write(const char *path, char *buf, size_t len)
+{
+	int fd, ret;
+	char tmp_path[PATH_MAX];
+
+	snprintf(tmp_path, PATH_MAX, "%s.tmp", path);
+
+	fd = open(tmp_path, O_WRONLY | O_CREAT | O_SYNC, sd_def_fmode);
+	if (fd < 0) {
+		sd_eprintf("failed to open temporal file, %m");
+		ret = -1;
+		goto end;
+	}
+
+	ret = xwrite(fd, buf, len);
+	if (ret != len) {
+		sd_eprintf("failed to write, %m");
+		ret = -1;
+		goto close_fd;
+	}
+
+	ret = rename(tmp_path, path);
+	if (ret < 0) {
+		sd_eprintf("failed to rename, %m");
+		ret = -1;
+	}
+
+close_fd:
+	close(fd);
+end:
+	return ret;
 }

@@ -96,6 +96,7 @@ bool is_xattr_enabled(const char *path);
 void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
 void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
 			 uint32_t requested_len);
+int atomic_create_and_write(const char *path, char *buf, size_t len);
 
 #ifdef assert
 #undef assert
