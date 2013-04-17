@@ -31,7 +31,7 @@ static int create_directory(const char *p)
 	struct strbuf buf = STRBUF_INIT;
 
 	strbuf_addstr(&buf, p);
-	strbuf_addstr(&buf, ".farm");
+	strbuf_addstr(&buf, "/.farm");
 	if (xmkdir(buf.buf, 0755) < 0) {
 		sd_eprintf("%m");
 		ret = -1;

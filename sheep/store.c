@@ -263,7 +263,7 @@ int init_base_path(const char *d)
 	return lock_base_dir(d);
 }
 
-#define OBJ_PATH "/obj/"
+#define OBJ_PATH "/obj"
 
 /*
  * farm needs extra HEX_LEN + 3 chars to store snapshot objects.
