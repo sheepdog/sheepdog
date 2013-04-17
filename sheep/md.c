@@ -254,9 +254,16 @@ out:
 static uint64_t init_path_space(char *path)
 {
 	uint64_t size;
+	char stale[PATH_MAX];
 
 	if (!is_xattr_enabled(path)) {
 		sd_iprintf("multi-disk support need xattr feature");
+		goto broken_path;
+	}
+
+	snprintf(stale, PATH_MAX, "%s/.stale", path);
+	if (xmkdir(stale, sd_def_dmode) < 0) {
+		sd_eprintf("can't mkdir for %s, %m", stale);
 		goto broken_path;
 	}
 
