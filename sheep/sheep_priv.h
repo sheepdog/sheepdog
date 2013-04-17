@@ -125,7 +125,6 @@ struct cluster_info {
 	bool backend_dio;
 	/* upgrade data layout before starting service if necessary*/
 	bool upgrade;
-	bool enable_md;
 };
 
 struct siocb {

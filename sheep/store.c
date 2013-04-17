@@ -294,9 +294,19 @@ static int init_obj_path(const char *base_path, char *argp)
 
 	/* Eat up the first component */
 	strtok(argp, ",");
-	while ((p = strtok(NULL, ",")))
-		md_add_disk(p);
-
+	p = strtok(NULL, ",");
+	if (!p) {
+		/*
+		 * If We have only one path, meta-store and object-store share
+		 * it. This is helpful to upgrade old sheep cluster to
+		 * the MD-enabled.
+		 */
+		md_add_disk(obj_path);
+	} else {
+		do {
+			md_add_disk(p);
+		} while ((p = strtok(NULL, ",")));
+	}
 	return init_path(obj_path, NULL);
 }
 

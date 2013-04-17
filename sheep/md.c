@@ -327,8 +327,6 @@ reinit:
 	}
 	calculate_vdisks(md_disks, md_nr_disks, total);
 	md_nr_vds = disks_to_vdisks(md_disks, md_nr_disks, md_vds);
-	if (!sys->enable_md)
-		sys->enable_md = true;
 
 	return total;
 }
@@ -337,9 +335,6 @@ char *get_object_path(uint64_t oid)
 {
 	struct vdisk *vd;
 	char *p;
-
-	if (!sys->enable_md)
-		return obj_path;
 
 	pthread_rwlock_rdlock(&md_lock);
 	vd = oid_to_vdisk(oid);
@@ -363,9 +358,6 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
 {
 	int i, ret = SD_RES_SUCCESS;
 
-	if (!sys->enable_md)
-		return for_each_object_in_path(obj_path, func, cleanup, arg);
-
 	pthread_rwlock_rdlock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		ret = for_each_object_in_path(md_disks[i].path, func,
@@ -380,9 +372,6 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
 int for_each_obj_path(int (*func)(char *path))
 {
 	int i, ret = SD_RES_SUCCESS;
-
-	if (!sys->enable_md)
-		return func(obj_path);
 
 	pthread_rwlock_rdlock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
@@ -429,9 +418,6 @@ out:
 int md_handle_eio(char *fault_path)
 {
 	struct md_work *mw;
-
-	if (!sys->enable_md)
-		return SD_RES_EIO;
 
 	if (nr_online_disks() == 0)
 		return SD_RES_EIO;
