@@ -168,6 +168,9 @@ static int trace_cat(int argc, char **argv)
 		return EXIT_SYSFAIL;
 	}
 
+	if (st.st_size == 0)
+		return EXIT_SUCCESS;
+
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
