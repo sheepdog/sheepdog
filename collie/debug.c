@@ -201,15 +201,7 @@ static struct subcommand trace_cmd[] = {
 
 static int debug_trace(int argc, char **argv)
 {
-	int i;
-
-	for (i = 0; trace_cmd[i].name; i++) {
-		if (!strcmp(trace_cmd[i].name, argv[optind]))
-			return trace_cmd[i].fn(argc, argv);
-	}
-
-	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
-	return EXIT_FAILURE;
+	return do_generic_subcommand(trace_cmd, argc, argv);
 }
 
 static struct subcommand debug_cmd[] = {
