@@ -185,7 +185,7 @@ _valgrind_sheep()
             echo \"core dumped (${dir}/core)\"; kill \$PPID"
     opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp"
 
-    sh -c "echo y | valgrind ${opts} $SHEEP_PROG $@ -f -o 2>> ${dir}/sheep.log &"
+    sh -c "echo y | valgrind ${opts} $SHEEP_PROG $* -f -o 2>> ${dir}/sheep.log &"
 
     # wait for sheep to start up
     while true; do
@@ -198,7 +198,7 @@ _valgrind_sheep()
 _valgrind_collie()
 {
     logfile=$(mktemp)
-    valgrind --log-file=$logfile --error-exitcode=99 $COLLIE_PROG "$@"
+    valgrind --log-file=$logfile --error-exitcode=99 $COLLIE_PROG $*
     ret=$?
     if [ $ret == 99 ]; then
         cat $logfile 1>&2
