@@ -183,7 +183,7 @@ _valgrind_sheep()
     # Dump a core file and stop the script on the first valgrind error.
     db_cmd="gdb -nw --ex \"generate-core-file ${dir}/core\" %f %p > /dev/null; \
             echo \"core dumped (${dir}/core)\"; kill \$PPID"
-    opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp"
+    opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp -q"
 
     sh -c "echo y | valgrind ${opts} $SHEEP_PROG $* -f -o 2>> ${dir}/sheep.log &"
 
@@ -198,7 +198,7 @@ _valgrind_sheep()
 _valgrind_collie()
 {
     logfile=$(mktemp)
-    valgrind --log-file=$logfile --error-exitcode=99 $COLLIE_PROG $*
+    valgrind --log-file=$logfile --error-exitcode=99 -q $COLLIE_PROG $*
     ret=$?
     if [ $ret == 99 ]; then
         cat $logfile 1>&2
