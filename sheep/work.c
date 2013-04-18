@@ -43,7 +43,6 @@
 #define WQ_PROTECTION_PERIOD 1000 /* ms */
 
 static int efd;
-int total_ordered_workers;
 LIST_HEAD(worker_info_list);
 
 static void *worker_routine(void *arg);
@@ -115,14 +114,14 @@ static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
 
 	pthread_mutex_lock(&wi->startup_lock);
 	while (wi->nr_threads < nr_threads) {
-		wi->nr_threads++;
 		ret = pthread_create(&thread, NULL, worker_routine, wi);
 		if (ret != 0) {
 			sd_eprintf("failed to create worker thread: %m");
-			wi->nr_threads--;
 			pthread_mutex_unlock(&wi->startup_lock);
 			return -1;
 		}
+		trace_register_thread(thread);
+		wi->nr_threads++;
 		sd_dprintf("create thread %s %zu", wi->name, wi->nr_threads);
 	}
 	pthread_mutex_unlock(&wi->startup_lock);
@@ -195,6 +194,7 @@ static void *worker_routine(void *arg)
 		if (wq_need_shrink(wi)) {
 			wi->nr_running--;
 			wi->nr_threads--;
+			trace_unregister_thread(pthread_self());
 			pthread_mutex_unlock(&wi->pending_lock);
 			pthread_detach(pthread_self());
 			sd_dprintf("destroy thread %s %d, %zu", wi->name,

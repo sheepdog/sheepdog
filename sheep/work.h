@@ -28,10 +28,11 @@ enum wq_thread_control {
 struct worker_info {
 	const char *name;
 
+	struct list_head finished_list;
 	struct list_head worker_info_siblings;
 
 	pthread_mutex_t finished_lock;
-	struct list_head finished_list;
+	pthread_mutex_t startup_lock;
 
 	/* wokers sleep on this and signaled by tgtd */
 	pthread_cond_t pending_cond;
@@ -44,14 +45,10 @@ struct worker_info {
 	size_t nr_threads;
 	/* we cannot shrink work queue till this time */
 	uint64_t tm_end_of_protection;
-
-	pthread_mutex_t startup_lock;
-
 	enum wq_thread_control tc;
 };
 
 extern struct list_head worker_info_list;
-extern int total_ordered_workers;
 
 struct work_queue *init_work_queue(const char *name, enum wq_thread_control);
 struct work_queue *init_ordered_work_queue(const char *name);
