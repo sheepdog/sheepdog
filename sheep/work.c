@@ -46,10 +46,6 @@ static int efd;
 int total_ordered_workers;
 LIST_HEAD(worker_info_list);
 
-enum wq_state {
-	WQ_DEAD = (1U << 1),
-};
-
 static void *worker_routine(void *arg);
 
 static uint64_t get_msec_time(void)
@@ -193,7 +189,7 @@ static void *worker_routine(void *arg)
 	wi->nr_running++;
 	pthread_mutex_unlock(&wi->pending_lock);
 
-	while (!(wi->q.wq_state & WQ_DEAD)) {
+	while (true) {
 
 		pthread_mutex_lock(&wi->pending_lock);
 		if (wq_need_shrink(wi)) {
@@ -209,10 +205,6 @@ retest:
 		if (list_empty(&wi->q.pending_list)) {
 			wi->nr_running--;
 			pthread_cond_wait(&wi->pending_cond, &wi->pending_lock);
-			if (wi->q.wq_state & WQ_DEAD) {
-				pthread_mutex_unlock(&wi->pending_lock);
-				pthread_exit(NULL);
-			}
 			wi->nr_running++;
 			goto retest;
 		}
@@ -294,7 +286,6 @@ struct work_queue *init_work_queue(const char *name, enum wq_thread_control tc)
 
 	return &wi->q;
 destroy_threads:
-	wi->q.wq_state |= WQ_DEAD;
 	pthread_mutex_unlock(&wi->startup_lock);
 	pthread_cond_destroy(&wi->pending_cond);
 	pthread_mutex_destroy(&wi->pending_lock);
