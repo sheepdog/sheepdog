@@ -185,45 +185,9 @@ uint32_t get_latest_epoch(void)
 	return epoch;
 }
 
-static int init_path(const char *d, bool *new)
-{
-	int ret, retry = 0;
-	struct stat s;
-
-	if (new)
-		*new = false;
-again:
-	ret = stat(d, &s);
-	if (ret) {
-		if (retry || errno != ENOENT) {
-			sd_eprintf("cannot handle the directory %s: %m", d);
-			return 1;
-		}
-
-		ret = mkdir(d, sd_def_dmode);
-		if (ret) {
-			sd_eprintf("cannot create the directory %s: %m", d);
-			return 1;
-		} else {
-			if (new)
-				*new = true;
-			retry++;
-			goto again;
-		}
-	}
-
-	if (!S_ISDIR(s.st_mode)) {
-		sd_eprintf("%s is not a directory", d);
-		return 1;
-	}
-
-	return 0;
-}
-
-#define LOCK_PATH "/lock"
-
 static int lock_base_dir(const char *d)
 {
+#define LOCK_PATH "/lock"
 	char *lock_path;
 	int ret = 0;
 	int fd, len = strlen(d) + strlen(LOCK_PATH) + 1;
@@ -255,15 +219,13 @@ out:
 
 int init_base_path(const char *d)
 {
-	int ret;
+	if (xmkdir(d, sd_def_dmode) < 0) {
+		fprintf(stderr, "cannot create the directory %s (%m)\n", d);
+		return -1;
+	}
 
-	ret = init_path(d, NULL);
-	if (ret)
-		return ret;
 	return lock_base_dir(d);
 }
-
-#define OBJ_PATH "/obj"
 
 /*
  * farm needs extra HEX_LEN + 3 chars to store snapshot objects.
@@ -288,6 +250,7 @@ static int init_obj_path(const char *base_path, char *argp)
 	if (check_path_len(base_path) < 0)
 		return -1;
 
+#define OBJ_PATH "/obj"
 	len = strlen(base_path) + strlen(OBJ_PATH) + 1;
 	obj_path = xzalloc(len);
 	snprintf(obj_path, len, "%s" OBJ_PATH, base_path);
@@ -307,18 +270,17 @@ static int init_obj_path(const char *base_path, char *argp)
 			md_add_disk(p);
 		} while ((p = strtok(NULL, ",")));
 	}
-	return init_path(obj_path, NULL);
+	return xmkdir(obj_path, sd_def_dmode);
 }
-
-#define EPOCH_PATH "/epoch/"
 
 static int init_epoch_path(const char *base_path)
 {
+#define EPOCH_PATH "/epoch/"
 	int len = strlen(base_path) + strlen(EPOCH_PATH) + 1;
 	epoch_path = xzalloc(len);
 	snprintf(epoch_path, len, "%s" EPOCH_PATH, base_path);
 
-	return init_path(epoch_path, NULL);
+	return xmkdir(epoch_path, sd_def_dmode);
 }
 
 /*
