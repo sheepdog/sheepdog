@@ -206,6 +206,16 @@ extern struct store_driver *sd_store;
 extern char *obj_path;
 extern char *epoch_path;
 
+static inline bool is_main_thread(void)
+{
+	return gettid() == getpid();
+}
+
+static inline bool is_worker_thread(void)
+{
+	return !is_main_thread();
+}
+
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)
 {
