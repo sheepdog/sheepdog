@@ -88,9 +88,6 @@ struct cluster_info {
 	 */
 	struct list_head delayed_nodes;
 
-	struct list_head pending_block_list;
-	struct list_head pending_notify_list;
-
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
 	uint8_t nr_copies;
