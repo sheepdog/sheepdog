@@ -509,6 +509,8 @@ int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 	struct sockfd *sfd;
 	int ret;
 
+	assert(is_worker_thread());
+
 	sfd = sheep_get_sockfd(nid);
 	if (!sfd)
 		return SD_RES_NETWORK_ERROR;

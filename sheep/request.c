@@ -451,6 +451,8 @@ int exec_local_req(struct sd_req *rq, void *data)
 	eventfd_t value = 1;
 	int ret;
 
+	assert(is_worker_thread());
+
 	req = alloc_local_request(data, rq->data_length);
 	req->rq = *rq;
 	req->local_req_efd = eventfd(0, 0);
