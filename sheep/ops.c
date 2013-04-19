@@ -480,13 +480,10 @@ static int local_get_epoch(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
-static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
-				void *data)
+static int cluster_force_recover_work(struct request *req)
 {
-	struct vnode_info *old_vnode_info, *vnode_info;
-	int ret = SD_RES_SUCCESS;
-	uint8_t c;
-	uint16_t f;
+	struct vnode_info *old_vnode_info;
+	uint32_t epoch = sys_epoch();
 
 	/*
 	 * We should manually recover the cluster when
@@ -494,8 +491,48 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	 * 2) some nodes are physically down (same epoch condition).
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
 	 */
-	if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
+	if (sys->status != SD_STATUS_WAIT_FOR_JOIN || req->vinfo == NULL)
 		return SD_RES_FORCE_RECOVER;
+
+	old_vnode_info = get_vnode_info_epoch(epoch, req->vinfo);
+	if (!old_vnode_info) {
+		sd_printf(SDOG_EMERG, "cannot get vnode info for epoch %d",
+			  epoch);
+		put_vnode_info(old_vnode_info);
+		return SD_RES_FORCE_RECOVER;
+	}
+
+	if (req->rq.data_length <
+	    sizeof(*old_vnode_info->nodes) * old_vnode_info->nr_nodes) {
+		sd_eprintf("too small buffer size, %d", req->rq.data_length);
+		return SD_RES_INVALID_PARMS;
+	}
+
+	req->rp.epoch = epoch;
+	req->rp.data_length = sizeof(*old_vnode_info->nodes) *
+		old_vnode_info->nr_nodes;
+	memcpy(req->data, old_vnode_info->nodes, req->rp.data_length);
+
+	put_vnode_info(old_vnode_info);
+
+	return SD_RES_SUCCESS;
+}
+
+static int cluster_force_recover_main(const struct sd_req *req,
+				      struct sd_rsp *rsp,
+				      void *data)
+{
+	struct vnode_info *old_vnode_info, *vnode_info;
+	int ret = SD_RES_SUCCESS;
+	uint8_t c;
+	uint16_t f;
+	struct sd_node *nodes = data;
+	size_t nr_nodes = rsp->data_length / sizeof(*nodes);
+
+	if (rsp->epoch != sys->epoch) {
+		sd_eprintf("epoch was incremented while cluster_force_recover");
+		return SD_RES_FORCE_RECOVER;
+	}
 
 	ret = get_cluster_copies(&c);
 	if (ret) {
@@ -511,14 +548,6 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->nr_copies = c;
 	sys->flags = f;
 
-	vnode_info = get_vnode_info();
-	old_vnode_info = get_vnode_info_epoch(sys->epoch, vnode_info);
-	if (!old_vnode_info) {
-		sd_printf(SDOG_EMERG, "cannot get vnode info for epoch %d",
-			  sys->epoch);
-		goto err;
-	}
-
 	sys->epoch++; /* some nodes are left, so we get a new epoch */
 	ret = log_current_epoch();
 	if (ret) {
@@ -531,6 +560,8 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	else
 		sys->status = SD_STATUS_HALT;
 
+	vnode_info = get_vnode_info();
+	old_vnode_info = alloc_vnode_info(nodes, nr_nodes);
 	start_recovery(vnode_info, old_vnode_info);
 	put_vnode_info(vnode_info);
 	put_vnode_info(old_vnode_info);
@@ -993,7 +1024,8 @@ static struct sd_op_template sd_ops[] = {
 		.name = "FORCE_RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = true,
-		.process_main = cluster_force_recover,
+		.process_work = cluster_force_recover_work,
+		.process_main = cluster_force_recover_main,
 	},
 
 	[SD_OP_SNAPSHOT] = {

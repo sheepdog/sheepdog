@@ -325,7 +325,9 @@ static int cluster_force_recover(int argc, char **argv)
 {
 	int ret;
 	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char str[123] = {'\0'};
+	struct sd_node nodes[SD_MAX_NODES];
 
 	if (!cluster_cmd_data.force) {
 		int i, l;
@@ -341,10 +343,15 @@ static int cluster_force_recover(int argc, char **argv)
 	}
 
 	sd_init_req(&hdr, SD_OP_FORCE_RECOVER);
+	hdr.data_length = sizeof(nodes);
 
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
+	ret = collie_exec_req(sdhost, sdport, &hdr, nodes);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to execute request, %s\n",
+			sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 

@@ -166,8 +166,8 @@ void put_vnode_info(struct vnode_info *vnode_info)
 	}
 }
 
-static struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
-					   size_t nr_nodes)
+struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
+				    size_t nr_nodes)
 {
 	struct vnode_info *vnode_info;
 
