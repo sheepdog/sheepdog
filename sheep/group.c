@@ -143,12 +143,14 @@ struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info)
 /*
  * Get a reference to the currently active vnode information structure,
  * this must only be called from the main thread.
+ * This can return NULL if cluster is not started yet.
  */
 struct vnode_info *get_vnode_info(void)
 {
 	struct vnode_info *cur_vinfo = thread_unsafe_get(current_vnode_info);
 
-	assert(cur_vinfo);
+	if (cur_vinfo == NULL)
+		return NULL;
 
 	return grab_vnode_info(cur_vinfo);
 }

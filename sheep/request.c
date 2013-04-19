@@ -381,13 +381,7 @@ static void queue_request(struct request *req)
 		break;
 	}
 
-	/*
-	 * force operations shouldn't access req->vnodes in their
-	 * process_work() and process_main() because they can be
-	 * called before we set up current_vnode_info
-	 */
-	if (!is_force_op(req->op))
-		req->vinfo = get_vnode_info();
+	req->vinfo = get_vnode_info();
 
 	if (is_peer_op(req->op)) {
 		queue_peer_request(req);
