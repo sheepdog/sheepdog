@@ -13,6 +13,8 @@ status=1        # failure is the default!
 . ./common.rc
 . ./common.filter
 
+_need_to_be_root
+
 _cleanup
 
 _make_device 0 $((2 * 1024 ** 3))

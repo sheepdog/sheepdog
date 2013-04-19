@@ -30,6 +30,17 @@ fi
 # make sure we have a standard umask
 umask 022
 
+# check if run as root
+#
+_need_to_be_root()
+{
+    id=`id | $SED_PROG -e 's/(.*//' -e 's/.*=//'`
+    if [ "$id" -ne 0 ]
+    then
+	_notrun "you need to be root (not uid=$id) to run this test"
+    fi
+}
+
 # Do a command, log it to $seq.full, optionally test return status
 # and die if command fails. If called with one argument _do executes the
 # command, logs it, and returns its exit status. With two arguments _do
