@@ -232,10 +232,23 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset)
 	return total;
 }
 
+/* Return EEXIST when path exists but not a directory */
 int xmkdir(const char *pathname, mode_t mode)
 {
-	if (mkdir(pathname, mode) < 0 && errno != EEXIST)
-		return -1;
+	if (mkdir(pathname, mode) < 0) {
+		struct stat st;
+
+		if (errno != EEXIST)
+			return -1;
+
+		if (stat(pathname, &st) < 0)
+			return -1;
+
+		if (!S_ISDIR(st.st_mode)) {
+			errno = EEXIST;
+			return -1;
+		}
+	}
 	return 0;
 }
 
