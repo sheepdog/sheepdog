@@ -271,7 +271,8 @@ bool have_enough_zones(void);
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vinfo);
-struct vnode_info *get_vnode_info_epoch(uint32_t epoch);
+struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
+					struct vnode_info *cur_vinfo);
 void wait_get_vdis_done(void);
 
 int get_nr_copies(struct vnode_info *vnode_info);
@@ -307,7 +308,7 @@ int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len);
 int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
 				int len, time_t *timestamp);
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
-			time_t *timestamp);
+			  time_t *timestamp, struct vnode_info *vinfo);
 uint32_t get_latest_epoch(void);
 void init_config_path(const char *base_path);
 int init_config_file(void);

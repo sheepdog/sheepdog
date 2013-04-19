@@ -186,7 +186,8 @@ static struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
 	return vnode_info;
 }
 
-struct vnode_info *get_vnode_info_epoch(uint32_t epoch)
+struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
+					struct vnode_info *cur_vinfo)
 {
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
@@ -194,7 +195,7 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch)
 	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
 	if (nr_nodes < 0) {
 		nr_nodes = epoch_log_read_remote(epoch, nodes, sizeof(nodes),
-						NULL);
+						 NULL, cur_vinfo);
 		if (nr_nodes == 0)
 			return NULL;
 	}
@@ -457,10 +458,9 @@ static void clear_exceptional_node_lists(void)
 }
 
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
-			time_t *timestamp)
+			  time_t *timestamp, struct vnode_info *vinfo)
 {
 	int i, nr, ret;
-	struct vnode_info *vinfo = get_vnode_info();
 	char buf[SD_MAX_NODES * sizeof(struct sd_node) + sizeof(time_t)];
 
 	nr = vinfo->nr_nodes;
@@ -490,7 +490,6 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 		if (timestamp)
 			memcpy(timestamp, buf + nodes_len, sizeof(timestamp));
 
-		put_vnode_info(vinfo);
 		return nodes_len / sizeof(struct sd_node);
 	}
 
@@ -498,7 +497,6 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 	 * If no node has targeted epoch log, return 0 here to at least
 	 * allow reading older epoch logs.
 	 */
-	put_vnode_info(vinfo);
 	return 0;
 }
 

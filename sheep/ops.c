@@ -406,6 +406,11 @@ static int local_stat_cluster(struct request *req)
 	int i, max_logs;
 	uint32_t epoch;
 
+	if (req->vinfo == NULL) {
+		sd_dprintf("cluster is not started up");
+		goto out;
+	}
+
 	max_logs = req->rq.data_length / sizeof(*log);
 	epoch = get_latest_epoch();
 	for (i = 0; i < max_logs; i++) {
@@ -422,14 +427,15 @@ static int local_stat_cluster(struct request *req)
 		if (log->nr_nodes == -1)
 			log->nr_nodes = epoch_log_read_remote(epoch, log->nodes,
 							sizeof(log->nodes),
-							(time_t *)&log->time);
+							(time_t *)&log->time,
+							req->vinfo);
 
 		log->nr_copies = sys->nr_copies;
 
 		rsp->data_length += sizeof(*log);
 		epoch--;
 	}
-
+out:
 	switch (sys->status) {
 	case SD_STATUS_OK:
 		return SD_RES_SUCCESS;
@@ -505,7 +511,8 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->nr_copies = c;
 	sys->flags = f;
 
-	old_vnode_info = get_vnode_info_epoch(sys->epoch);
+	vnode_info = get_vnode_info();
+	old_vnode_info = get_vnode_info_epoch(sys->epoch, vnode_info);
 	if (!old_vnode_info) {
 		sd_printf(SDOG_EMERG, "cannot get vnode info for epoch %d",
 			  sys->epoch);
@@ -524,7 +531,6 @@ static int cluster_force_recover(const struct sd_req *req, struct sd_rsp *rsp,
 	else
 		sys->status = SD_STATUS_HALT;
 
-	vnode_info = get_vnode_info();
 	start_recovery(vnode_info, old_vnode_info);
 	put_vnode_info(vnode_info);
 	put_vnode_info(old_vnode_info);

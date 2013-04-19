@@ -180,7 +180,7 @@ rollback:
 			goto err;
 		}
 
-		new_old = get_vnode_info_epoch(tgt_epoch);
+		new_old = get_vnode_info_epoch(tgt_epoch, rw->cur_vinfo);
 		if (!new_old)
 			/* We rollback in case we don't get a valid epoch */
 			goto rollback;
