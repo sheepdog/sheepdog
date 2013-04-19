@@ -134,6 +134,19 @@ static inline void uatomic_set_false(uatomic_bool *val)
 	uatomic_set(&val->val, 0);
 }
 
+/*
+ * uatomic_xchg_ptr - uatomic_xchg for pointers
+ *
+ * Swaps the old value stored at location p with new value given by
+ * val.  Returns old value.
+ */
+#define uatomic_xchg_ptr(p, val)			\
+({							\
+	uintptr_t ret;					\
+	ret = uatomic_xchg((uintptr_t *)(p), (val));	\
+	(typeof(*(p)))ret;				\
+})
+
 /* colors */
 #define TEXT_NORMAL         "\033[0m"
 #define TEXT_BOLD           "\033[1m"
