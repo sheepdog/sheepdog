@@ -46,6 +46,7 @@ struct worker_info {
 	/* we cannot shrink work queue till this time */
 	uint64_t tm_end_of_protection;
 	enum wq_thread_control tc;
+	size_t nr_nodes;
 };
 
 extern struct list_head worker_info_list;

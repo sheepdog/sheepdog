@@ -55,27 +55,22 @@ static uint64_t get_msec_time(void)
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-static inline uint64_t wq_get_roof(enum wq_thread_control tc)
+static inline uint64_t wq_get_roof(struct worker_info *wi)
 {
-	struct vnode_info *vinfo;
-	int nr_nodes;
 	uint64_t nr = 1;
 
-	switch (tc) {
+	switch (wi->tc) {
 	case WQ_ORDERED:
 		break;
 	case WQ_DYNAMIC:
-		vinfo = get_vnode_info();
-		nr_nodes = vinfo->nr_nodes;
-		put_vnode_info(vinfo);
 		/* FIXME: 2 * nr_nodes threads. No rationale yet. */
-		nr = nr_nodes * 2;
+		nr = wi->nr_nodes * 2;
 		break;
 	case WQ_UNLIMITED:
 		nr = SIZE_MAX;
 		break;
 	default:
-		panic("Invalid threads control %d", tc);
+		panic("Invalid threads control %d", wi->tc);
 	}
 	return nr;
 }
@@ -83,7 +78,7 @@ static inline uint64_t wq_get_roof(enum wq_thread_control tc)
 static bool wq_need_grow(struct worker_info *wi)
 {
 	if (wi->nr_threads < wi->nr_pending + wi->nr_running &&
-	    wi->nr_threads * 2 <= wq_get_roof(wi->tc)) {
+	    wi->nr_threads * 2 <= wq_get_roof(wi)) {
 		wi->tm_end_of_protection = get_msec_time() +
 			WQ_PROTECTION_PERIOD;
 		return true;
@@ -153,12 +148,22 @@ static void bs_thread_request_done(int fd, int events, void *data)
 	struct work *work;
 	eventfd_t value;
 	LIST_HEAD(list);
+	struct vnode_info *vinfo;
+	size_t nr_nodes;
 
 	ret = eventfd_read(fd, &value);
 	if (ret < 0)
 		return;
 
+	vinfo = get_vnode_info();
+	if (vinfo != NULL)
+		nr_nodes = vinfo->nr_nodes;
+	else
+		nr_nodes = 1; /* cluster doesn't start yet */
+
 	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+		wi->nr_nodes = nr_nodes;
+
 		pthread_mutex_lock(&wi->finished_lock);
 		list_splice_init(&wi->finished_list, &list);
 		pthread_mutex_unlock(&wi->finished_lock);
@@ -170,6 +175,8 @@ static void bs_thread_request_done(int fd, int events, void *data)
 			work->done(work);
 		}
 	}
+
+	put_vnode_info(vinfo);
 }
 
 static void *worker_routine(void *arg)
