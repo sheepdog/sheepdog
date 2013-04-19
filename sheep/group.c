@@ -236,9 +236,11 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 	size_t size;
 
 	if (has_process_main(req->op) && req->rq.flags & SD_FLAG_CMD_WRITE)
+		/* notify data that was received from the sender */
 		size = sizeof(*msg) + req->rq.data_length;
 	else
-		size = sizeof(*msg);
+		/* notify data that was set in process_work */
+		size = sizeof(*msg) + req->rp.data_length;
 
 	assert(size <= SD_MAX_EVENT_BUF_SIZE);
 
@@ -246,8 +248,8 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 	memcpy(&msg->req, &req->rq, sizeof(struct sd_req));
 	memcpy(&msg->rsp, &req->rp, sizeof(struct sd_rsp));
 
-	if (has_process_main(req->op) && req->rq.flags & SD_FLAG_CMD_WRITE)
-		memcpy(msg->data, req->data, req->rq.data_length);
+	if (has_process_main(req->op) && size > sizeof(*msg))
+		memcpy(msg->data, req->data, size - sizeof(*msg));
 
 	*sizep = size;
 	return msg;
