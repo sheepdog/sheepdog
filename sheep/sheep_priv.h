@@ -216,6 +216,22 @@ static inline bool is_worker_thread(void)
 	return !is_main_thread();
 }
 
+/*
+ * Helper macros to guard variables from being accessed out of the
+ * main thread.  Note that we can use these only for pointers.
+ */
+#define thread_unsafe(type) struct { type __val; }
+#define thread_unsafe_get(var)			\
+({						\
+	assert(is_main_thread());		\
+	(var).__val;				\
+})
+#define thread_unsafe_set(var, val)		\
+({						\
+	assert(is_main_thread());		\
+	(var).__val = (val);			\
+})
+
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)
 {
