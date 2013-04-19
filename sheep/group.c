@@ -148,11 +148,7 @@ struct vnode_info *get_vnode_info(void)
 	return grab_vnode_info(current_vnode_info);
 }
 
-/*
- * Release a reference to the current vnode information.
- *
- * Must be called from the main thread.
- */
+/* Release a reference to the current vnode information. */
 void put_vnode_info(struct vnode_info *vnode_info)
 {
 	if (vnode_info) {
