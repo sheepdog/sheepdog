@@ -21,7 +21,7 @@ _start_sheep 1
 _wait_for_sheep 1 1
 $COLLIE cluster format -p 7001 -c 1
 $COLLIE cluster shutdown -p 7001
-sleep 2
+_wait_for_sheep_stop
 
 # start Sheepdog with one node
 _start_sheep 0

@@ -154,6 +154,29 @@ _count_sheep_processes()
     pgrep -f "$SHEEP_PROG $STORE/" -l | awk '{ $1=""; print }' | sort | uniq | wc -l
 }
 
+# Wait for the specified sheep to be stopped.  If no argument is
+# passed, this waits for all the sheeps to be stopped
+_wait_for_sheep_stop()
+{
+    local cnt
+    for cnt in `seq 60`; do # wait at most 60 seconds
+	# make sure that the sheep port is available
+	if [ "$1" == "" ]; then
+	    netstat -an | grep tcp | grep :70[0-9][0-9] | \
+		grep LISTEN > /dev/null 2>&1
+	else
+	    netstat -an | grep tcp | grep :$((7000 + $1)) | \
+		grep LISTEN > /dev/null 2>&1
+	fi
+	if [ $? != 0 ]; then
+	    return
+	fi
+	sleep 1
+    done
+
+    _die "sheep $1 is expected to be stopped, but not."
+}
+
 # wait for all sheep to join completely
 _wait_for_sheep()
 {
@@ -259,9 +282,7 @@ _kill_all_sheeps()
 {
     pkill -9 -f "$SHEEP_PROG $STORE"
 
-    while [ $? == 0 ]; do
-        pgrep -f "$SHEEP_PROG $STORE" > /dev/null
-    done
+    _wait_for_sheep_stop
 }
 
 _kill_sheep()
@@ -272,9 +293,7 @@ _kill_sheep()
         _die "cannot kill sheep $1"
     fi
 
-    while [ $? == 0 ]; do
-	pgrep -f "$SHEEP_PROG $STORE/$1" > /dev/null
-    done
+    _wait_for_sheep_stop $1
 
     if [[ "$DRIVER" == zoo* ]];then
         sleep 3 # wait for zookeeper ephemeral node to be deleted

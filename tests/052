@@ -25,7 +25,7 @@ $COLLIE vdi create test 20M -P
 $COLLIE cluster info | _filter_cluster_info
 
 $COLLIE cluster shutdown
-sleep 1
+_wait_for_sheep_stop
 
 for i in 0 1 2 4; do
     _start_sheep $i

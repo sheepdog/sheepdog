@@ -34,12 +34,16 @@ done
 _wait_for_sheep 2 4
 
 $COLLIE cluster shutdown -p 7004
-sleep 2
+_wait_for_sheep_stop
 
 for i in 0 1 2 3 4; do
     _start_sheep $i
     sleep 1
 done
+
+_wait_for_sheep_stop 0
+_wait_for_sheep_stop 1
+_wait_for_sheep_stop 2
 
 _wait_for_sheep 2 4
 
