@@ -34,7 +34,7 @@ umask 022
 #
 _need_to_be_root()
 {
-    id=`id | $SED_PROG -e 's/(.*//' -e 's/.*=//'`
+    local id=`id | $SED_PROG -e 's/(.*//' -e 's/.*=//'`
     if [ "$id" -ne 0 ]
     then
 	_notrun "you need to be root (not uid=$id) to run this test"
@@ -131,6 +131,7 @@ _die()
 
 _cleanup()
 {
+    local i
     _kill_all_collies
     _kill_all_sheeps
 
@@ -180,7 +181,7 @@ _wait_for_sheep_stop()
 # wait for all sheep to join completely
 _wait_for_sheep()
 {
-    PORT=7000
+    local PORT=7000
     if [ $2 ]; then
         PORT=$((7000 + $2))
     fi
@@ -211,13 +212,13 @@ _wait_for_sheep()
 
 _valgrind_sheep()
 {
-    dir=$(echo $1 | sed -e s/,.*//)
+    local dir=$(echo $1 | sed -e s/,.*//)
     mkdir ${dir} > /dev/null 2>&1
 
     # Dump a core file and stop the script on the first valgrind error.
-    db_cmd="gdb -nw --ex \"generate-core-file ${dir}/core\" %f %p > /dev/null; \
+    local db_cmd="gdb -nw --ex \"generate-core-file ${dir}/core\" %f %p > /dev/null; \
             echo \"core dumped (${dir}/core)\"; kill \$PPID"
-    opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp -q"
+    local opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp -q"
 
     rm -f ${dir}/lock
     sh -c "echo y | valgrind ${opts} $SHEEP_PROG $* -f -o 2>> ${dir}/sheep.log &"
@@ -237,9 +238,9 @@ _valgrind_sheep()
 
 _valgrind_collie()
 {
-    logfile=$(mktemp)
+    local logfile=$(mktemp)
     valgrind --log-file=$logfile --error-exitcode=99 -q $COLLIE_PROG $*
-    ret=$?
+    local ret=$?
     if [ $ret == 99 ]; then
         cat $logfile 1>&2
     fi
@@ -250,7 +251,8 @@ _valgrind_collie()
 _start_sheep()
 {
     # ensure that sheep is not running
-    running=true
+    local running=true
+    local cnt
     for cnt in `seq 1 10`; do  # wait at most 10 seconds
         pgrep -f "$SHEEP_PROG $STORE/$1" > /dev/null
         if [ $? != 0 ]; then
@@ -346,9 +348,9 @@ _cleanup_machine_simulation()
 
 _make_device()
 {
-    idx=$1; shift
-    size=$1; shift
-    args=$@
+    local idx=$1; shift
+    local size=$1; shift
+    local args=$@
 
     dd if=/dev/zero of=$STORE/$idx.img seek=$(($size - 1)) bs=1 count=1 > $seq.full 2>&1
     if [ $? != 0 ]; then
@@ -381,6 +383,7 @@ _make_device()
 
 _cleanup_devices()
 {
+    local d
     for d in `mount | grep -o $STORE/. | sort | uniq`; do
         umount -l $d
         rm -f $d.img
