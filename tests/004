@@ -48,6 +48,8 @@ _wait_for_sheep_stop 1
 _wait_for_sheep_stop 2
 _wait_for_sheep_stop 3
 
+_wait_for_sheep 1 4
+
 echo check whether Sheepdog is running with only one node
 $COLLIE cluster info -p 7004 | _filter_cluster_info
 
@@ -57,6 +59,7 @@ for i in 0 1 2 3; do
     sleep 1
 done
 
+_wait_for_sheep 5
 echo check whether all nodes have the same cluster info
 for i in 0 1 2 3 4; do
     $COLLIE cluster info -p 700$i | _filter_cluster_info
