@@ -219,10 +219,16 @@ _valgrind_sheep()
             echo \"core dumped (${dir}/core)\"; kill \$PPID"
     opts="--db-attach=yes --db-command='${db_cmd}' --suppressions=valgrind.supp -q"
 
+    rm -f ${dir}/lock
     sh -c "echo y | valgrind ${opts} $SHEEP_PROG $* -f -o 2>> ${dir}/sheep.log &"
 
     # wait for sheep to start up
     while true; do
+	pgrep -f "$SHEEP_PROG $1" > /dev/null
+	if [ $? != 0 ]; then
+	    # failed to start sheep $1
+	    break
+	fi
         if [ -a ${dir}/lock ]; then
             break
         fi
