@@ -425,6 +425,7 @@ seq="check"
 
 for seq in $list
 do
+    STORE="$WD/$seq"
     err=false
     echo -n "$seq"
     if [ -n "$TESTS_REMAINING_LOG" ] ; then
