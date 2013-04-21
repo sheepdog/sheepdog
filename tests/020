@@ -28,7 +28,7 @@ $COLLIE vdi create test 40M
 dd if=/dev/urandom | $COLLIE vdi write test
 
 # check cache size, should be 20 * 80%
-nr=`ls /tmp/sheepdog/0/cache/7c2b25 | wc -l`
+nr=`ls $STORE/0/cache/7c2b25 | wc -l`
 if [ $nr -gt 4 ]; then
     echo "reclaim failed"
 fi

@@ -57,4 +57,4 @@ for i in `seq 0 3`; do
     $COLLIE node info -p 700$i
     $COLLIE node list -p 700$i
 done
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort

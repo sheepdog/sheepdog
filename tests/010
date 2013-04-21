@@ -31,14 +31,14 @@ for i in `seq 0 7`; do
     echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
 
 _kill_sheep 3
 _kill_sheep 4
 
 sleep 2
 $COLLIE cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
 
 # overwrite the objects to invoke object recovery
 for i in `seq 4 7`; do
@@ -47,12 +47,12 @@ for i in `seq 4 7`; do
 done
 
 $COLLIE cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
 
 $COLLIE cluster recover enable
 _wait_for_sheep_recovery 0
 $COLLIE cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
 
 $COLLIE cluster recover disable
 for i in `seq 3 7`; do
@@ -62,7 +62,7 @@ done
 _wait_for_sheep 8
 sleep 2
 $COLLIE cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
 
 # overwrite the objects to invoke object recovery
 for i in `seq 0 3`; do
@@ -71,9 +71,9 @@ for i in `seq 0 3`; do
 done
 
 $COLLIE cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
 
 $COLLIE cluster recover enable
 _wait_for_sheep_recovery 0
 $COLLIE cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | sort
+ls $STORE/*/obj/* | _filter_store | sort
