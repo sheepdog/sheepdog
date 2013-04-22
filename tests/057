@@ -13,6 +13,10 @@ md=true
 . ./common.rc
 . ./common.filter
 
+if [ "$STORE" != "/tmp/sheepdog/057" ]; then
+    _notrun "This test cannot be run when WD is manually set"
+fi
+
 _cleanup
 
 for i in 0 1 2; do

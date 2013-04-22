@@ -1,15 +1,15 @@
 QA output created by 057
 using backend farm store
 Id MASKED Use Path
-0 MASKED GB 48 MB STORE/0/d0
-1 MASKED GB 24 MB STORE/0/d1
-2 MASKED GB 32 MB STORE/0/d2
+0 MASKED GB 32 MB STORE/0/d0
+1 MASKED GB 32 MB STORE/0/d1
+2 MASKED GB 40 MB STORE/0/d2
 Id MASKED Use Path
-0 MASKED GB 16 MB STORE/0/d0
-1 MASKED GB 12 MB STORE/0/d1
-2 MASKED GB 32 MB STORE/0/d2
-3 MASKED GB 8.0 MB STORE/0/d3
-4 MASKED GB 28 MB STORE/0/d4
+0 MASKED GB 4.0 MB STORE/0/d0
+1 MASKED GB 20 MB STORE/0/d1
+2 MASKED GB 28 MB STORE/0/d2
+3 MASKED GB 20 MB STORE/0/d3
+4 MASKED GB 24 MB STORE/0/d4
 finish check&repair test
 Cluster status: running
 
@@ -22,15 +22,15 @@ Failed to execute request, look for sheep.log for more information
 Nodes In Recovery:
   Id   Host:Port         V-Nodes       Zone
 Id MASKED Use Path
-0 MASKED GB 16 MB STORE/0/d0
-1 MASKED GB 12 MB STORE/0/d1
-2 MASKED GB 32 MB STORE/0/d2
-3 MASKED GB 8.0 MB STORE/0/d3
-4 MASKED GB 28 MB STORE/0/d4
+0 MASKED GB 4.0 MB STORE/0/d0
+1 MASKED GB 20 MB STORE/0/d1
+2 MASKED GB 28 MB STORE/0/d2
+3 MASKED GB 20 MB STORE/0/d3
+4 MASKED GB 24 MB STORE/0/d4
 Id MASKED Use Path
-0 MASKED GB 32 MB STORE/0/d2
-1 MASKED GB 24 MB STORE/0/d3
-2 MASKED GB 40 MB STORE/0/d4
+0 MASKED GB 28 MB STORE/0/d2
+1 MASKED GB 32 MB STORE/0/d3
+2 MASKED GB 36 MB STORE/0/d4
 finish check&repair test
 Cluster status: running
 
@@ -43,9 +43,9 @@ Failed to execute request, look for sheep.log for more information
 Nodes In Recovery:
   Id   Host:Port         V-Nodes       Zone
 Id MASKED Use Path
-0 MASKED GB 32 MB STORE/0/d2
-1 MASKED GB 24 MB STORE/0/d3
-2 MASKED GB 40 MB STORE/0/d4
+0 MASKED GB 28 MB STORE/0/d2
+1 MASKED GB 32 MB STORE/0/d3
+2 MASKED GB 36 MB STORE/0/d4
 Cluster status: running
 
 Cluster created at DATE
