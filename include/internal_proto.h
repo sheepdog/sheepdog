@@ -36,7 +36,6 @@
  *
  * These same applies for the above 0x80 flags and error values below.
  */
-#define SD_OP_DEL_VDI        0x81
 #define SD_OP_GET_NODE_LIST  0x82
 #define SD_OP_MAKE_FS        0x84
 #define SD_OP_SHUTDOWN       0x85

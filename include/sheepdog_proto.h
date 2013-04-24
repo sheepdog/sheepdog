@@ -36,6 +36,7 @@
 #define SD_OP_GET_VDI_INFO   0x14
 #define SD_OP_READ_VDIS      0x15
 #define SD_OP_FLUSH_VDI      0x16
+#define SD_OP_DEL_VDI        0x17
 
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
