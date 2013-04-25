@@ -134,12 +134,19 @@ struct siocb {
 
 struct vdi_iocb {
 	const char *name;
+	const char *tag;
 	uint32_t data_len;
 	uint64_t size;
 	uint32_t base_vid;
 	uint32_t snapid;
 	bool create_snapshot;
 	int nr_copies;
+};
+
+struct vdi_info {
+	uint32_t vid;
+	uint32_t free_bit;
+	uint64_t create_time;
 };
 
 struct store_driver {
@@ -251,11 +258,9 @@ int get_max_copy_number(void);
 int get_req_copy_number(struct request *req);
 int add_vdi_copy_number(uint32_t vid, int nr_copies);
 int vdi_exist(uint32_t vid);
-int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid);
-int del_vdi(struct vdi_iocb *iocb, struct request *req);
-
-int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
-	       uint32_t snapid, uint64_t *ctime);
+int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid);
+int vdi_delete(struct vdi_iocb *iocb, struct request *req);
+int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 

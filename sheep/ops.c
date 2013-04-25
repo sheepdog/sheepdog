@@ -92,21 +92,21 @@ static int cluster_new_vdi(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid = 0;
-	struct vdi_iocb iocb;
+	uint32_t vid;
 	int ret;
+	struct vdi_iocb iocb = {
+		.name = req->data,
+		.data_len = hdr->data_length,
+		.size = hdr->vdi.vdi_size,
+		.base_vid = hdr->vdi.base_vdi_id,
+		.create_snapshot = !!hdr->vdi.snapid,
+		.nr_copies = hdr->vdi.copies ? hdr->vdi.copies : sys->nr_copies,
+	};
 
-	iocb.name = req->data;
-	iocb.data_len = hdr->data_length;
-	iocb.size = hdr->vdi.vdi_size;
-	iocb.base_vid = hdr->vdi.base_vdi_id;
-	iocb.create_snapshot = !!hdr->vdi.snapid;
-	iocb.nr_copies = hdr->vdi.copies;
+	if (hdr->data_length != SD_MAX_VDI_LEN)
+		return SD_RES_INVALID_PARMS;
 
-	if (!iocb.nr_copies)
-		iocb.nr_copies = sys->nr_copies;
-
-	ret = add_vdi(&iocb, &vid);
+	ret = vdi_create(&iocb, &vid);
 
 	rsp->vdi.vdi_id = vid;
 	rsp->vdi.copies = iocb.nr_copies;
@@ -120,23 +120,39 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	unsigned long nr = rsp->vdi.vdi_id;
 	int ret = rsp->result;
 
-	sd_dprintf("done %d %ld", ret, nr);
+	sd_dprintf("done %d %lx", ret, nr);
 	if (ret == SD_RES_SUCCESS)
 		set_bit(nr, sys->vdi_inuse);
 
 	return ret;
 }
 
+static int vdi_init_tag(const char **tag, const char *buf, uint32_t len)
+{
+	if (len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
+		*tag = buf + SD_MAX_VDI_LEN;
+	else if (len == SD_MAX_VDI_LEN)
+		*tag = NULL;
+	else
+		return -1;
+
+	return 0;
+}
+
 static int cluster_del_vdi(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
-	struct vdi_iocb iocb;
+	uint32_t data_len = hdr->data_length;
+	struct vdi_iocb iocb = {
+		.name = req->data,
+		.data_len = data_len,
+		.snapid = hdr->vdi.snapid,
+	};
 
-	iocb.name = req->data;
-	iocb.data_len = hdr->data_length;
-	iocb.snapid = hdr->vdi.snapid;
+	if (vdi_init_tag(&iocb.tag, req->data, data_len) < 0)
+		return SD_RES_INVALID_PARMS;
 
-	return del_vdi(&iocb, req);
+	return vdi_delete(&iocb, req);
 }
 
 struct cache_deletion_work {
@@ -184,24 +200,24 @@ static int local_get_vdi_info(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid;
-	void *tag;
+	uint32_t data_len = hdr->data_length;
 	int ret;
+	struct vdi_info info = {};
+	struct vdi_iocb iocb = {
+		.name = req->data,
+		.data_len = data_len,
+		.snapid = hdr->vdi.snapid,
+	};
 
-	if (hdr->data_length == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
-		tag = (char *)req->data + SD_MAX_VDI_LEN;
-	else if (hdr->data_length == SD_MAX_VDI_LEN)
-		tag = NULL;
-	else
+	if (vdi_init_tag(&iocb.tag, req->data, data_len) < 0)
 		return SD_RES_INVALID_PARMS;
 
-	ret = lookup_vdi(req->data, tag, &vid,
-			 hdr->vdi.snapid, NULL);
+	ret = vdi_lookup(&iocb, &info);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	rsp->vdi.vdi_id = vid;
-	rsp->vdi.copies = get_vdi_copy_number(vid);
+	rsp->vdi.vdi_id = info.vid;
+	rsp->vdi.copies = get_vdi_copy_number(info.vid);
 
 	return ret;
 }
@@ -304,17 +320,19 @@ static int cluster_get_vdi_attr(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid = 0, attrid = 0;
-	uint64_t created_time = 0;
-	int ret;
+	uint32_t vid, attrid = 0;
 	struct sheepdog_vdi_attr *vattr;
+	struct vdi_iocb iocb = {};
+	struct vdi_info info = {};
+	int ret;
 
 	vattr = req->data;
-	ret = lookup_vdi(vattr->name, vattr->tag, &vid,
-			 hdr->vdi.snapid, &created_time);
+	iocb.name = vattr->name;
+	iocb.tag = vattr->tag;
+	iocb.snapid = hdr->vdi.snapid;
+	ret = vdi_lookup(&iocb, &info);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
-
 	/*
 	 * the current VDI id can change if we take a snapshot,
 	 * so we use the hash value of the VDI name as the VDI id
@@ -322,7 +340,7 @@ static int cluster_get_vdi_attr(struct request *req)
 	vid = fnv_64a_buf(vattr->name, strlen(vattr->name), FNV1A_64_INIT);
 	vid &= SD_NR_VDIS - 1;
 	ret = get_vdi_attr(req->data, hdr->data_length,
-			   vid, &attrid, created_time,
+			   vid, &attrid, info.create_time,
 			   !!(hdr->flags & SD_FLAG_CMD_CREAT),
 			   !!(hdr->flags & SD_FLAG_CMD_EXCL),
 			   !!(hdr->flags & SD_FLAG_CMD_DEL));

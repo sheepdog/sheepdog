@@ -165,6 +165,11 @@ int fill_vdi_copy_list(void *data)
 	return nr * sizeof(*vc);
 }
 
+static inline bool vdi_is_deleted(struct sheepdog_inode *inode)
+{
+	return *inode->name == '\0';
+}
+
 int vdi_exist(uint32_t vid)
 {
 	struct sheepdog_inode *inode;
@@ -182,7 +187,7 @@ int vdi_exist(uint32_t vid)
 		goto out;
 	}
 
-	if (*inode->name == '\0') {
+	if (vdi_is_deleted(inode)) {
 		ret = 0;
 		goto out;
 	}
@@ -299,137 +304,164 @@ out:
 	return ret;
 }
 
-static int find_first_vdi(unsigned long start, unsigned long end,
-			  const char *name, const char *tag, uint32_t snapid,
-			  uint32_t *vid, unsigned long *deleted_nr,
-			  uint32_t *next_snap, uint64_t *create_time)
+/*
+ * Return SUCCESS (range of bits set):
+ * Iff we get a bitmap range [left, right) that VDI might be set between. if
+ * right < start, this means a wrap around case where we should examine the
+ * two split ranges, [left, SD_NR_VDIS - 1] and [0, right). 'Right' is the free
+ * bit that might be used by newly created VDI.
+ *
+ * Otherwise:
+ * Return NO_VDI (bit not set) or FULL_VDI (bitmap fully set)
+ */
+static int get_vdi_bitmap_range(const char *name, unsigned long *left,
+				unsigned long *right)
 {
-	struct sheepdog_inode *inode = NULL;
-	unsigned long i;
-	int ret = SD_RES_NO_MEM;
+	*left = fnv_64a_buf(name, strlen(name), FNV1A_64_INIT) &
+		(SD_NR_VDIS - 1);
+	*right = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, *left);
+	if (*left == *right)
+		return SD_RES_NO_VDI;
+
+	if (*right == SD_NR_VDIS) {
+		/* Wrap around */
+		*right = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, 0);
+		if (*right == SD_NR_VDIS)
+			return SD_RES_FULL_VDI;
+	}
+	return SD_RES_SUCCESS;
+}
+
+static inline bool vdi_is_snapshot(struct sheepdog_inode *inode)
+{
+	return !!inode->snap_ctime;
+}
+
+static inline bool vdi_has_tag(struct vdi_iocb *iocb)
+{
+	if ((iocb->tag && iocb->tag[0]) || iocb->snapid)
+		return true;
+	return false;
+}
+
+static inline bool vdi_tag_match(struct vdi_iocb *iocb,
+			     struct sheepdog_inode *inode)
+{
+	const char *tag = iocb->tag;
+
+	if (inode->tag[0] && !strncmp(inode->tag, tag, sizeof(inode->tag)))
+		return true;
+	if (iocb->snapid == inode->snap_id)
+		return true;
+	return false;
+}
+
+static int fill_vdi_info_range(uint32_t left, uint32_t right,
+			      struct vdi_iocb *iocb, struct vdi_info *info)
+{
+	struct sheepdog_inode *inode;
 	bool vdi_found = false;
-	int nr_copies;
+	int nr_copies, ret;
+	uint32_t i;
+	const char *name = iocb->name;
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
 		sd_eprintf("failed to allocate memory");
+		ret = SD_RES_NO_MEM;
 		goto out;
 	}
-
-	for (i = start; i >= end; i--) {
+	for (i = right - 1; i >= left; i--) {
 		nr_copies = get_vdi_copy_number(i);
 		ret = read_object(vid_to_vdi_oid(i), (char *)inode,
 				  SD_INODE_HEADER_SIZE, 0, nr_copies);
-		if (ret != SD_RES_SUCCESS) {
-			ret = SD_RES_EIO;
-			goto out_free_inode;
-		}
+		if (ret != SD_RES_SUCCESS)
+			goto out;
 
-		if (inode->name[0] == '\0') {
-			*deleted_nr = i;
-			continue; /* deleted */
+		if (vdi_is_deleted(inode)) {
+			/* Recycle the deleted inode for fresh vdi create */
+			if (!iocb->create_snapshot)
+				info->free_bit = i;
+			continue;
 		}
 
 		if (!strncmp(inode->name, name, strlen(inode->name))) {
-			*next_snap = inode->snap_id + 1;
-
-			if (!(tag && tag[0]) && !snapid && inode->snap_ctime)
-				break;
-
-			vdi_found = true;
-			if (tag && tag[0] &&
-			    strncmp(inode->tag, tag, sizeof(inode->tag)) != 0)
-				continue;
-			if (snapid) {
-				if (snapid != inode->snap_id)
+			sd_dprintf("%s = %s, %u = %u", iocb->tag, inode->tag,
+				   iocb->snapid, inode->snap_id);
+			if (vdi_has_tag(iocb)) {
+				/* Read, delete, clone on snapshots */
+				if (!vdi_is_snapshot(inode)) {
+					vdi_found = true;
 					continue;
-
-				if (inode->snap_ctime == 0) {
-					sd_dprintf("vdi %" PRIx32 " is not a "
-						   "snapshot\n", inode->vdi_id);
-					ret = SD_RES_INVALID_PARMS;
-					goto out_free_inode;
 				}
+				if (!vdi_tag_match(iocb, inode))
+					continue;
+			} else {
+				/*
+				 * Rollback & snap create, read, delete on
+				 * current working VDI
+				 */
+				iocb->snapid = inode->snap_id + 1;
+				if (vdi_is_snapshot(inode))
+					/* Current workding VDI is deleted */
+					break;
 			}
-
-			*vid = inode->vdi_id;
-			if (create_time)
-				*create_time = inode->create_time;
-			ret = SD_RES_SUCCESS;
-			goto out_free_inode;
+			info->create_time = inode->create_time;
+			info->vid = inode->vdi_id;
+			goto out;
 		}
 	}
-
-	if (vdi_found)
-		ret = SD_RES_NO_TAG;
-	else
-		ret = SD_RES_NO_VDI;
-
-out_free_inode:
-	free(inode);
+	ret = vdi_found ? SD_RES_NO_TAG : SD_RES_NO_VDI;
 out:
+	free(inode);
 	return ret;
 }
 
-static int do_lookup_vdi(const char *name, int namelen, uint32_t *vid,
-			 const char *tag, uint32_t snapid,
-			 uint32_t *next_snapid, unsigned long *right_nr,
-			 unsigned long *deleted_nr, uint64_t *create_time)
+/* Fill the VDI information from right to left in the bitmap */
+static int fill_vdi_info(unsigned long left, unsigned long right,
+			 struct vdi_iocb *iocb, struct vdi_info *info)
 {
 	int ret;
-	unsigned long nr, start_nr;
 
-	start_nr = fnv_64a_buf(name, namelen, FNV1A_64_INIT) & (SD_NR_VDIS - 1);
+	if (left < right)
+		return fill_vdi_info_range(left, right, iocb, info);
 
-	sd_dprintf("looking for %s (%lx)", name, start_nr);
-
-	/* bitmap search from the hash point */
-	nr = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, start_nr);
-	*right_nr = nr;
-	if (nr == start_nr) {
-		return SD_RES_NO_VDI;
-	} else if (nr < SD_NR_VDIS) {
-right_side:
-		/* look up on the right side of the hash point */
-		ret = find_first_vdi(nr - 1, start_nr, name, tag, snapid, vid,
-				     deleted_nr, next_snapid, create_time);
-		return ret;
-	} else {
-		/* round up... bitmap search from the head of the bitmap */
-		nr = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, 0);
-		*right_nr = nr;
-		if (nr >= SD_NR_VDIS)
-			return SD_RES_FULL_VDI;
-		else if (nr) {
-			/* look up on the left side of the hash point */
-			ret = find_first_vdi(nr - 1, 0, name, tag, snapid, vid,
-					     deleted_nr, next_snapid,
-					     create_time);
-			if (ret == SD_RES_NO_VDI)
-				; /* we need to go to the right side */
-			else
-				return ret;
-		}
-
-		nr = SD_NR_VDIS;
-		goto right_side;
+	ret = fill_vdi_info_range(0, right, iocb, info);
+	switch (ret) {
+	case SD_RES_NO_VDI:
+	case SD_RES_NO_TAG:
+		ret = fill_vdi_info_range(left, SD_NR_VDIS - 1, iocb, info);
+		break;
+	default:
+		break;
 	}
+	return ret;
 }
 
-int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
-	       uint32_t snapid, uint64_t *create_time)
+/* Return SUCCESS if we find targeted VDI specified by iocb and fill info */
+int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info)
 {
-	uint32_t dummy0;
-	unsigned long dummy1, dummy2;
+	unsigned long left, right;
+	int ret;
 
-	return do_lookup_vdi(name, strlen(name), vid, tag, snapid, &dummy0,
-			     &dummy1, &dummy2, create_time);
+
+	ret = get_vdi_bitmap_range(iocb->name, &left, &right);
+	info->free_bit = right;
+	sd_dprintf("%s left %lx right %lx, %x", iocb->name, left, right, ret);
+	switch (ret) {
+	case SD_RES_NO_VDI:
+	case SD_RES_FULL_VDI:
+		return ret;
+	case SD_RES_SUCCESS:
+		break;
+	}
+	return fill_vdi_info(left, right, iocb, info);
 }
 
 static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 {
-	struct sd_req hdr;
 	int ret = SD_RES_SUCCESS;
+	struct sd_req hdr;
 	char *buf;
 
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_ADD);
@@ -450,83 +482,60 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 	return ret;
 }
 
-int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
+/*
+ * There are 3 create operation in SD:
+ * 1. fresh create (expect NO_VDI returned from vdi_lookup)
+ * 2. snapshot create (expect SUCCESS)
+ * 3. rollback create (expect NO_VDI)
+ *
+ * Fresh create started with id = 1. Both rollback & snap create started with
+ * current working VDI's snap_id + 1. Working VDI always has the highest snapid.
+ */
+int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 {
-	uint32_t cur_vid = 0;
-	unsigned long nr, deleted_nr = SD_NR_VDIS, right_nr = SD_NR_VDIS;
+	const char *name = iocb->name;
+	struct vdi_info info = {};
 	int ret;
-	const char *name;
-	iocb->snapid = 1;
 
-	if (iocb->data_len != SD_MAX_VDI_LEN)
-		return SD_RES_INVALID_PARMS;
-
-	name = iocb->name;
-
-	ret = do_lookup_vdi(name, strlen(name), &cur_vid,
-			    NULL, 0, &iocb->snapid, &right_nr, &deleted_nr,
-			    NULL);
-
+	ret = vdi_lookup(iocb, &info);
 	if (iocb->create_snapshot) {
-		if (ret != SD_RES_SUCCESS) {
-			if (ret == SD_RES_NO_VDI)
-				sd_printf(SDOG_CRIT, "VDI %s does not exist",
-					  name);
+		/* We should have base vdi, otherwise error happens */
+		if (ret != SD_RES_SUCCESS)
 			return ret;
-		}
-		nr = right_nr;
 	} else {
-		/* we already have the same VDI or met other errors. */
+		/* If we already have the same VDI or met other errors. */
 		if (ret != SD_RES_NO_VDI) {
 			if (ret == SD_RES_SUCCESS)
 				ret = SD_RES_VDI_EXIST;
 			return ret;
 		}
-
-		if (deleted_nr == SD_NR_VDIS)
-			nr = right_nr;
-		else
-			nr = deleted_nr; /* we can recycle a deleted VDI */
 	}
+	if (!iocb->snapid)
+		iocb->snapid = 1;
+	*new_vid = info.free_bit;
+	notify_vdi_add(*new_vid, iocb->nr_copies);
 
-	*new_vid = nr;
-
-	notify_vdi_add(nr, iocb->nr_copies);
-
-	sd_iprintf("creating new %s %s: size %" PRIu64 ", vid %"
-		   PRIx32 ", base %" PRIx32 ", cur %" PRIx32 ", copies %d",
+	sd_dprintf("%s %s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32
+		   ", cur %" PRIx32 ", copies %d, snapid %"PRIu32,
 		   iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
-		   *new_vid, iocb->base_vid, cur_vid, iocb->nr_copies);
+		   *new_vid, iocb->base_vid, info.vid, iocb->nr_copies,
+		   iocb->snapid);
 
-	return create_vdi_obj(iocb, *new_vid, cur_vid);
+	return create_vdi_obj(iocb, *new_vid, info.vid);
 }
 
 static int start_deletion(struct request *req, uint32_t vid);
 
-int del_vdi(struct vdi_iocb *iocb, struct request *req)
+int vdi_delete(struct vdi_iocb *iocb, struct request *req)
 {
-	const char *name = iocb->name, *tag;
-	uint32_t dummy0;
-	unsigned long dummy1, dummy2;
+	struct vdi_info info;
 	int ret;
-	uint32_t vid, data_len = iocb->data_len;
 
-	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN) {
-		tag = (char *)req->data + SD_MAX_VDI_LEN;
-	} else if (data_len == SD_MAX_VDI_LEN) {
-		tag = NULL;
-	} else {
-		ret = SD_RES_INVALID_PARMS;
-		goto out;
-	}
-
-	ret = do_lookup_vdi(name, strlen(name), &vid, tag,
-			    iocb->snapid, &dummy0, &dummy1, &dummy2,
-			    NULL);
+	ret = vdi_lookup(iocb, &info);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	ret = start_deletion(req, vid);
+	ret = start_deletion(req, info.vid);
 out:
 	return ret;
 }
@@ -615,7 +624,7 @@ static void delete_one(struct work *work)
 	inode = malloc(sizeof(*inode));
 	if (!inode) {
 		sd_eprintf("failed to allocate memory");
-		goto out;
+		return;
 	}
 
 	nr_copies = get_vdi_copy_number(vdi_id);
@@ -627,7 +636,7 @@ static void delete_one(struct work *work)
 		goto out;
 	}
 
-	if (inode->vdi_size == 0 && inode->name[0] == '\0')
+	if (inode->vdi_size == 0 && vdi_is_deleted(inode))
 		goto out;
 
 	for (nr_deleted = 0, i = 0; i < MAX_DATA_OBJS; i++) {
@@ -655,7 +664,7 @@ static void delete_one(struct work *work)
 	if (nr_deleted)
 		notify_vdi_deletion(vdi_id);
 
-	if (*(inode->name) == '\0')
+	if (vdi_is_deleted(inode))
 		goto out;
 
 	inode->vdi_size = 0;
@@ -719,7 +728,7 @@ again:
 		goto err;
 	}
 
-	if (inode->name[0] != '\0' && vid != dw->vid)
+	if (!vdi_is_deleted(inode) && vid != dw->vid)
 		goto out;
 
 	for (i = 0; i < ARRAY_SIZE(inode->child_vdi_id); i++) {
