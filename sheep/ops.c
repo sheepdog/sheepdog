@@ -130,17 +130,10 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_del_vdi(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
-	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid = 0, nr_copies = sys->nr_copies;
-	int ret;
+	uint32_t vid;
 
-	ret = del_vdi(req, req->data, hdr->data_length,
-		      &vid, hdr->vdi.snapid, &nr_copies);
-
-	rsp->vdi.vdi_id = vid;
-	rsp->vdi.copies = nr_copies;
-
-	return ret;
+	return del_vdi(req, req->data, hdr->data_length,
+		       &vid, hdr->vdi.snapid);
 }
 
 struct cache_deletion_work {
@@ -188,7 +181,7 @@ static int local_get_vdi_info(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid = 0, nr_copies = sys->nr_copies;
+	uint32_t vid;
 	void *tag;
 	int ret;
 
@@ -200,12 +193,12 @@ static int local_get_vdi_info(struct request *req)
 		return SD_RES_INVALID_PARMS;
 
 	ret = lookup_vdi(req->data, tag, &vid,
-			 hdr->vdi.snapid, &nr_copies, NULL);
+			 hdr->vdi.snapid, NULL);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	rsp->vdi.vdi_id = vid;
-	rsp->vdi.copies = nr_copies;
+	rsp->vdi.copies = get_vdi_copy_number(vid);
 
 	return ret;
 }
@@ -308,14 +301,14 @@ static int cluster_get_vdi_attr(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
-	uint32_t vid = 0, attrid = 0, nr_copies = sys->nr_copies;
+	uint32_t vid = 0, attrid = 0;
 	uint64_t created_time = 0;
 	int ret;
 	struct sheepdog_vdi_attr *vattr;
 
 	vattr = req->data;
 	ret = lookup_vdi(vattr->name, vattr->tag, &vid,
-			 hdr->vdi.snapid, &nr_copies, &created_time);
+			 hdr->vdi.snapid, &created_time);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -333,7 +326,7 @@ static int cluster_get_vdi_attr(struct request *req)
 
 	rsp->vdi.vdi_id = vid;
 	rsp->vdi.attr_id = attrid;
-	rsp->vdi.copies = nr_copies;
+	rsp->vdi.copies = get_vdi_copy_number(vid);
 
 	return ret;
 }

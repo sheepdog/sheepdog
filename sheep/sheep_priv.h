@@ -253,10 +253,10 @@ int vdi_exist(uint32_t vid);
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid);
 
 int del_vdi(struct request *req, char *data, int data_len, uint32_t *vid,
-	    uint32_t snapid, unsigned int *nr_copies);
+	    uint32_t snapid);
 
 int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
-	       uint32_t snapid, unsigned int *nr_copies, uint64_t *ctime);
+	       uint32_t snapid, uint64_t *ctime);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
