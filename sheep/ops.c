@@ -130,10 +130,13 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_del_vdi(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
-	uint32_t vid;
+	struct vdi_iocb iocb;
 
-	return del_vdi(req, req->data, hdr->data_length,
-		       &vid, hdr->vdi.snapid);
+	iocb.name = req->data;
+	iocb.data_len = hdr->data_length;
+	iocb.snapid = hdr->vdi.snapid;
+
+	return del_vdi(&iocb, req);
 }
 
 struct cache_deletion_work {
@@ -620,7 +623,8 @@ static int cluster_delete_cache(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	uint32_t vid = oid_to_vid(req->obj.oid);
 
-	object_cache_delete(vid);
+	if (sys->enable_object_cache)
+		object_cache_delete(vid);
 
 	return SD_RES_SUCCESS;
 }

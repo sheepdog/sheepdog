@@ -503,30 +503,30 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 
 static int start_deletion(struct request *req, uint32_t vid);
 
-int del_vdi(struct request *req, char *data, int data_len,
-	    uint32_t *vid, uint32_t snapid)
+int del_vdi(struct vdi_iocb *iocb, struct request *req)
 {
-	const char *name = data, *tag;
+	const char *name = iocb->name, *tag;
 	uint32_t dummy0;
 	unsigned long dummy1, dummy2;
 	int ret;
+	uint32_t vid, data_len = iocb->data_len;
 
-	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN)
-		tag = data + SD_MAX_VDI_LEN;
-	else if (data_len == SD_MAX_VDI_LEN)
+	if (data_len == SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN) {
+		tag = (char *)req->data + SD_MAX_VDI_LEN;
+	} else if (data_len == SD_MAX_VDI_LEN) {
 		tag = NULL;
-	else {
+	} else {
 		ret = SD_RES_INVALID_PARMS;
 		goto out;
 	}
 
-	ret = do_lookup_vdi(name, strlen(name), vid, tag,
-			    snapid, &dummy0, &dummy1, &dummy2,
+	ret = do_lookup_vdi(name, strlen(name), &vid, tag,
+			    iocb->snapid, &dummy0, &dummy1, &dummy2,
 			    NULL);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	ret = start_deletion(req, *vid);
+	ret = start_deletion(req, vid);
 out:
 	return ret;
 }

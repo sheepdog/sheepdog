@@ -252,9 +252,7 @@ int get_req_copy_number(struct request *req);
 int add_vdi_copy_number(uint32_t vid, int nr_copies);
 int vdi_exist(uint32_t vid);
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid);
-
-int del_vdi(struct request *req, char *data, int data_len, uint32_t *vid,
-	    uint32_t snapid);
+int del_vdi(struct vdi_iocb *iocb, struct request *req);
 
 int lookup_vdi(const char *name, const char *tag, uint32_t *vid,
 	       uint32_t snapid, uint64_t *ctime);
