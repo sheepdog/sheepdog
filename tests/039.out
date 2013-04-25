@@ -46,7 +46,7 @@ wrote 512/512 bytes at offset 0
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 The snapshot id must be larger than zero
-Cannot get VDI info for test 5 : Invalid parameters
+Cannot get VDI info for test 5 : Failed to find requested tag
 Failed to open VDI test
 This operation dicards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
