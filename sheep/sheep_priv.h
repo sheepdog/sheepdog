@@ -137,6 +137,7 @@ struct vdi_iocb {
 	uint32_t data_len;
 	uint64_t size;
 	uint32_t base_vid;
+	uint32_t snapid;
 	bool create_snapshot;
 	int nr_copies;
 };

@@ -194,7 +194,7 @@ out:
 
 /* TODO: should be performed atomically */
 static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
-			  uint32_t cur_vid, uint32_t snapid)
+			  uint32_t cur_vid)
 {
 	/* we are not called concurrently */
 	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
@@ -246,7 +246,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 	new->copy_policy = 0;
 	new->nr_copies = iocb->nr_copies;
 	new->block_size_shift = find_next_bit(&block_size, BITS_PER_LONG, 0);
-	new->snap_id = snapid;
+	new->snap_id = iocb->snapid;
 
 	if (iocb->base_vid) {
 		int i;
@@ -453,10 +453,10 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 {
 	uint32_t cur_vid = 0;
-	uint32_t next_snapid = 1;
 	unsigned long nr, deleted_nr = SD_NR_VDIS, right_nr = SD_NR_VDIS;
 	int ret;
 	const char *name;
+	iocb->snapid = 1;
 
 	if (iocb->data_len != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
@@ -464,7 +464,7 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 	name = iocb->name;
 
 	ret = do_lookup_vdi(name, strlen(name), &cur_vid,
-			    NULL, 0, &next_snapid, &right_nr, &deleted_nr,
+			    NULL, 0, &iocb->snapid, &right_nr, &deleted_nr,
 			    NULL);
 
 	if (iocb->create_snapshot) {
@@ -498,7 +498,7 @@ int add_vdi(struct vdi_iocb *iocb, uint32_t *new_vid)
 		   iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
 		   *new_vid, iocb->base_vid, cur_vid, iocb->nr_copies);
 
-	return create_vdi_obj(iocb, *new_vid, cur_vid, next_snapid);
+	return create_vdi_obj(iocb, *new_vid, cur_vid);
 }
 
 static int start_deletion(struct request *req, uint32_t vid);
