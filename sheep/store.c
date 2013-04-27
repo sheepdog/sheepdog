@@ -90,31 +90,43 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDONLY);
-	if (fd < 0)
+	if (fd < 0) {
+		sd_eprintf("failed to open epoch %"PRIu32" log, %m", epoch);
 		goto err;
+	}
 
 	memset(&epoch_stat, 0, sizeof(epoch_stat));
 	ret = fstat(fd, &epoch_stat);
-	if (ret < 0)
+	if (ret < 0) {
+		sd_eprintf("failed to stat epoch %"PRIu32" log, %m", epoch);
 		goto err;
+	}
 
-	if (len < epoch_stat.st_size - sizeof(*timestamp))
+	if (len < epoch_stat.st_size - sizeof(*timestamp)) {
+		sd_eprintf("invalid epoch %"PRIu32" log", epoch);
 		goto err;
+	}
 
 	ret = xread(fd, nodes, epoch_stat.st_size - sizeof(*timestamp));
-	if (ret < 0)
+	if (ret < 0) {
+		sd_eprintf("failed to read epoch %"PRIu32" log, %m", epoch);
 		goto err;
+	}
 
 	/* Broken epoch, just ignore */
-	if (ret % sizeof(struct sd_node) != 0)
+	if (ret % sizeof(struct sd_node) != 0) {
+		sd_eprintf("invalid epoch %"PRIu32" log", epoch);
 		goto err;
+	}
 
 	nr_nodes = ret / sizeof(struct sd_node);
 
 	if (timestamp) {
 		ret = xread(fd, timestamp, sizeof(*timestamp));
-		if (ret != sizeof(*timestamp))
+		if (ret != sizeof(*timestamp)) {
+			sd_eprintf("invalid epoch %"PRIu32" log", epoch);
 			goto err;
+		}
 	}
 
 	close(fd);
@@ -122,7 +134,6 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 err:
 	if (fd >= 0)
 		close(fd);
-	sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
 	return -1;
 }
 
