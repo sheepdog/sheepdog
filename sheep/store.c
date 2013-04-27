@@ -421,7 +421,8 @@ forward_write:
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed to write object %" PRIx64 ", %x", oid, ret);
+		sd_eprintf("failed to write object %" PRIx64 ", %s", oid,
+			   sd_strerror(ret));
 
 	return ret;
 }
@@ -441,7 +442,8 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed to read object %" PRIx64 ", %x", oid, ret);
+		sd_eprintf("failed to read object %" PRIx64 ", %s", oid,
+			   sd_strerror(ret));
 
 	untrim_zero_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
 
@@ -460,8 +462,8 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 	if (sys->enable_object_cache && object_is_cached(oid)) {
 		ret = object_cache_read(oid, data, datalen, offset);
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("try forward read %"PRIx64" %"PRIx32, oid,
-				   ret);
+			sd_eprintf("try forward read %"PRIx64" %s", oid,
+				   sd_strerror(ret));
 			goto forward_read;
 		}
 		return ret;
@@ -482,7 +484,8 @@ int remove_object(uint64_t oid)
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed to remove object %" PRIx64 ", %x", oid, ret);
+		sd_eprintf("failed to remove object %" PRIx64 ", %s", oid,
+			   sd_strerror(ret));
 
 	return ret;
 }

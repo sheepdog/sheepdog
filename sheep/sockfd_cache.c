@@ -523,7 +523,7 @@ int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 	}
 	ret = rsp->result;
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed %x", ret);
+		sd_eprintf("failed %s", sd_strerror(ret));
 
 	sheep_put_sockfd(nid, sfd);
 	return ret;

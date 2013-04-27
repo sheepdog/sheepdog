@@ -407,7 +407,8 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 
 	ret = exec_local_req(&hdr, buf);
 	if (ret != SD_RES_SUCCESS) {
-		sd_eprintf("failed to write object %" PRIx64 ", %x", oid, ret);
+		sd_eprintf("failed to write object %" PRIx64 ", %s", oid,
+			   sd_strerror(ret));
 		return ret;
 	}
 out:
@@ -463,7 +464,7 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 
 	ret = exec_local_req(&hdr, buf);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed to push object %x", ret);
+		sd_eprintf("failed to push object %s", sd_strerror(ret));
 out:
 	free(buf);
 	return ret;

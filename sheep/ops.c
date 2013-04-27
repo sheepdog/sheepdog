@@ -1371,8 +1371,9 @@ void do_process_work(struct work *work)
 		ret = req->op->process_work(req);
 
 	if (ret != SD_RES_SUCCESS) {
-		sd_dprintf("failed: %x, %" PRIx64" , %u, %"PRIx32,
-			   req->rq.opcode, req->rq.obj.oid, req->rq.epoch, ret);
+		sd_dprintf("failed: %x, %" PRIx64" , %u, %s",
+			   req->rq.opcode, req->rq.obj.oid, req->rq.epoch,
+			   sd_strerror(ret));
 	}
 
 	req->rp.result = ret;

@@ -245,8 +245,8 @@ static int do_print_obj(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 		fprintf(stderr, "The node list has changed: please try again\n");
 		break;
 	default:
-		fprintf(stderr, "%s: hit an unexpected error (%d)\n",
-		       sheep, rsp->result);
+		fprintf(stderr, "%s: hit an unexpected error (%s)\n",
+			sheep, sd_strerror(rsp->result));
 		break;
 	}
 
@@ -282,8 +282,8 @@ static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 		fprintf(stderr, "The node list has changed: please try again\n");
 		break;
 	default:
-		fprintf(stderr, "%s: hit an unexpected error (%d)\n",
-		       sheep, rsp->result);
+		fprintf(stderr, "%s: hit an unexpected error (%s)\n",
+			sheep, sd_strerror(rsp->result));
 		break;
 	}
 
