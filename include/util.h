@@ -176,4 +176,8 @@ static inline bool is_stdout_console(void)
 extern mode_t sd_def_fmode;
 extern mode_t sd_def_dmode;
 
+
+/* Force a compilation error if the condition is true */
+#define BUILD_BUG_ON(condition) ((void)sizeof(struct { int: -!!(condition); }))
+
 #endif
