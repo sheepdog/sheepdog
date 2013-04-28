@@ -66,7 +66,7 @@ static int create_journal_file(const char *root, const char *name)
 	char path[PATH_MAX];
 
 	snprintf(path, sizeof(path), "%s/%s", root, name);
-	fd = open(path, flags, 0644);
+	fd = open(path, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (fd < 0) {
 		sd_eprintf("open %s %m", name);
 		return -1;
