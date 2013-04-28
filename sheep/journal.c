@@ -437,3 +437,9 @@ int journal_write_epoch(const char *buf, size_t size, uint32_t epoch)
 	jd.epoch = epoch;
 	return journal_file_write(&jd, buf);
 }
+
+static __attribute__((used)) void journal_c_build_bug_ons(void)
+{
+	/* never called, only for checking BUILD_BUG_ON()s */
+	BUILD_BUG_ON(sizeof(struct journal_descriptor) != JOURNAL_DESC_SIZE);
+}
