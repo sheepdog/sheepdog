@@ -237,19 +237,17 @@ static inline void prepare_schedule_oid(uint64_t oid)
 				   oid);
 			return;
 		}
-	/*
-	 * When auto recovery is enabled, the oid is currently being
-	 * recovered
-	 */
-	if (!sys->disable_recovery && rw->oids[rw->done] == oid)
+	/* When recovery is not suspended, oid is currently being recovered */
+	if (!rw->suspended && rw->oids[rw->done] == oid)
 		return;
+
 	rw->nr_prio_oids++;
 	rw->prio_oids = xrealloc(rw->prio_oids,
 				 rw->nr_prio_oids * sizeof(uint64_t));
 	rw->prio_oids[rw->nr_prio_oids - 1] = oid;
-	resume_suspended_recovery();
-
 	sd_dprintf("%"PRIx64" nr_prio_oids %d", oid, rw->nr_prio_oids);
+
+	resume_suspended_recovery();
 }
 
 bool oid_in_recovery(uint64_t oid)
