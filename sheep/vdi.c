@@ -165,14 +165,14 @@ int fill_vdi_copy_list(void *data)
 	return nr * sizeof(*vc);
 }
 
-static inline bool vdi_is_deleted(struct sheepdog_inode *inode)
+static inline bool vdi_is_deleted(struct sd_inode *inode)
 {
 	return *inode->name == '\0';
 }
 
 int vdi_exist(uint32_t vid)
 {
-	struct sheepdog_inode *inode;
+	struct sd_inode *inode;
 	int ret = 1;
 	int nr_copies;
 
@@ -202,7 +202,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 			  uint32_t cur_vid)
 {
 	/* we are not called concurrently */
-	struct sheepdog_inode *new = NULL, *base = NULL, *cur = NULL;
+	struct sd_inode *new = NULL, *base = NULL, *cur = NULL;
 	struct timeval tv;
 	int ret = SD_RES_NO_MEM;
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
@@ -332,7 +332,7 @@ static int get_vdi_bitmap_range(const char *name, unsigned long *left,
 	return SD_RES_SUCCESS;
 }
 
-static inline bool vdi_is_snapshot(struct sheepdog_inode *inode)
+static inline bool vdi_is_snapshot(struct sd_inode *inode)
 {
 	return !!inode->snap_ctime;
 }
@@ -345,7 +345,7 @@ static inline bool vdi_has_tag(struct vdi_iocb *iocb)
 }
 
 static inline bool vdi_tag_match(struct vdi_iocb *iocb,
-			     struct sheepdog_inode *inode)
+			     struct sd_inode *inode)
 {
 	const char *tag = iocb->tag;
 
@@ -359,7 +359,7 @@ static inline bool vdi_tag_match(struct vdi_iocb *iocb,
 static int fill_vdi_info_range(uint32_t left, uint32_t right,
 			      struct vdi_iocb *iocb, struct vdi_info *info)
 {
-	struct sheepdog_inode *inode;
+	struct sd_inode *inode;
 	bool vdi_found = false;
 	int nr_copies, ret;
 	uint32_t i;
@@ -569,7 +569,7 @@ static LIST_HEAD(deletion_work_list);
 
 static int delete_inode(struct deletion_work *dw)
 {
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 	int ret = SD_RES_SUCCESS;
 
 	inode = xzalloc(sizeof(*inode));
@@ -616,7 +616,7 @@ static void delete_one(struct work *work)
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
 	int ret, i, nr_deleted;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 	int nr_copies;
 
 	sd_dprintf("%d %d, %16x", dw->done, dw->count, vdi_id);
@@ -705,7 +705,7 @@ static void delete_one_done(struct work *work)
 static int fill_vdi_list(struct deletion_work *dw, uint32_t root_vid)
 {
 	int ret, i;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 	int done = dw->count;
 	uint32_t vid;
 	int nr_copies;
@@ -751,7 +751,7 @@ out:
 static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
 {
 	int ret, nr_copies;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 
 	*cloned = false;
 

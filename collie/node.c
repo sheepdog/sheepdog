@@ -17,7 +17,7 @@ static struct node_cmd_data {
 
 static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
 			       uint32_t snapid, uint32_t flags,
-			       const struct sheepdog_inode *i, void *data)
+			       const struct sd_inode *i, void *data)
 {
 	uint64_t *size = data;
 

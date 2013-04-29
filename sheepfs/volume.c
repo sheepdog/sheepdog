@@ -45,7 +45,7 @@
 struct vdi_inode {
 	struct rb_node rb;
 	uint32_t vid;
-	struct sheepdog_inode *inode;
+	struct sd_inode *inode;
 /*
  * FIXME
  * 1) Consider various VM request queue depth.

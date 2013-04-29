@@ -165,7 +165,7 @@ static int init_vdi_copy_number(uint64_t oid, char *wd)
 {
 	char path[PATH_MAX];
 	int fd, flags = get_open_flags(oid, false, 0), ret;
-	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
+	struct sd_inode *inode = xzalloc(sizeof(*inode));
 
 	snprintf(path, sizeof(path), "%s/%016"PRIx64, wd, oid);
 

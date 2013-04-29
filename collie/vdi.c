@@ -84,7 +84,7 @@ static int parse_option_size(const char *value, uint64_t *ret)
 
 static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			   uint32_t snapid, uint32_t flags,
-			   const struct sheepdog_inode *i, void *data)
+			   const struct sd_inode *i, void *data)
 {
 	int idx;
 	bool is_clone = false;
@@ -145,7 +145,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 
 static void print_vdi_tree(uint32_t vid, const char *name, const char *tag,
 			   uint32_t snapid, uint32_t flags,
-			   const struct sheepdog_inode *i, void *data)
+			   const struct sd_inode *i, void *data)
 {
 	time_t ti;
 	struct tm tm;
@@ -166,7 +166,7 @@ static void print_vdi_tree(uint32_t vid, const char *name, const char *tag,
 
 static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 			    uint32_t snapid, uint32_t flags,
-			    const struct sheepdog_inode *i, void *data)
+			    const struct sd_inode *i, void *data)
 {
 	time_t ti;
 	struct tm tm;
@@ -200,7 +200,7 @@ static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 
 static void get_oid(uint32_t vid, const char *name, const char *tag,
 		    uint32_t snapid, uint32_t flags,
-		    const struct sheepdog_inode *i, void *data)
+		    const struct sd_inode *i, void *data)
 {
 	struct get_vdi_info *info = data;
 
@@ -263,7 +263,7 @@ static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 			 char *buf, void *data)
 {
 	struct get_data_oid_info *info = data;
-	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
@@ -410,7 +410,7 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 }
 
 static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
-			uint32_t *pvid, struct sheepdog_inode *inode,
+			uint32_t *pvid, struct sd_inode *inode,
 			size_t size)
 {
 	int ret;
@@ -486,7 +486,7 @@ static int vdi_create(int argc, char **argv)
 	uint32_t vid;
 	uint64_t oid;
 	int idx, max_idx, ret, nr_copies = vdi_cmd_data.nr_copies;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 
 	if (!argv[optind]) {
 		fprintf(stderr, "Please specify the VDI size\n");
@@ -552,7 +552,7 @@ static int vdi_snapshot(int argc, char **argv)
 	uint32_t vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
-	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	if (vdi_cmd_data.snapshot_id != 0) {
 		fprintf(stderr, "Please specify a non-integer value for "
@@ -567,7 +567,7 @@ static int vdi_snapshot(int argc, char **argv)
 	if (vdi_cmd_data.snapshot_tag[0]) {
 		ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
 				      SD_MAX_VDI_TAG_LEN,
-				      offsetof(struct sheepdog_inode, tag),
+				      offsetof(struct sd_inode, tag),
 				      0, inode->nr_copies, false, true);
 	}
 
@@ -581,7 +581,7 @@ static int vdi_clone(int argc, char **argv)
 	uint32_t base_vid, new_vid;
 	uint64_t oid;
 	int idx, max_idx, ret;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 	char *buf = NULL;
 
 	dst_vdi = argv[optind];
@@ -655,7 +655,7 @@ static int vdi_resize(int argc, char **argv)
 	uint32_t vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
-	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	if (!argv[optind]) {
 		fprintf(stderr, "Please specify the new size for the VDI\n");
@@ -751,7 +751,7 @@ static int vdi_rollback(int argc, char **argv)
 	uint32_t base_vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
-	struct sheepdog_inode *inode = (struct sheepdog_inode *)buf;
+	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
 		fprintf(stderr, "Please specify the '-s' option\n");
@@ -1111,7 +1111,7 @@ static int vdi_read(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
 	int ret, idx;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
 	unsigned int len, remain;
 	char *buf = NULL;
@@ -1193,7 +1193,7 @@ static int vdi_write(int argc, char **argv)
 	const char *vdiname = argv[optind++];
 	uint32_t vid, flags;
 	int ret, idx;
-	struct sheepdog_inode *inode = NULL;
+	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
 	unsigned int len, remain;
 	char *buf = NULL;
@@ -1413,7 +1413,7 @@ static int vdi_check(int argc, char **argv)
 	int ret;
 	uint64_t total, done = 0, oid;
 	uint32_t idx = 0, vid;
-	struct sheepdog_inode *inode = xmalloc(sizeof(*inode));
+	struct sd_inode *inode = xmalloc(sizeof(*inode));
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, &vid, inode,
@@ -1555,8 +1555,8 @@ static int vdi_backup(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
 	int ret = EXIT_SUCCESS, idx, nr_objs;
-	struct sheepdog_inode *from_inode = xzalloc(sizeof(*from_inode));
-	struct sheepdog_inode *to_inode = xzalloc(sizeof(*to_inode));
+	struct sd_inode *from_inode = xzalloc(sizeof(*from_inode));
+	struct sd_inode *to_inode = xzalloc(sizeof(*to_inode));
 	struct backup_hdr hdr = {
 		.version = VDI_BACKUP_FORMAT_VERSION,
 		.magic = VDI_BACKUP_MAGIC,
@@ -1644,7 +1644,7 @@ out:
 
 /* restore backup data to vdi */
 static int restore_obj(struct obj_backup *backup, uint32_t vid,
-		       struct sheepdog_inode *parent_inode)
+		       struct sd_inode *parent_inode)
 {
 	int ret;
 	uint32_t parent_vid = parent_inode->data_vdi_id[backup->idx];
@@ -1671,7 +1671,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 	uint32_t vid;
 	struct backup_hdr hdr;
 	struct obj_backup *backup = xzalloc(sizeof(*backup));
-	struct sheepdog_inode *inode = xzalloc(sizeof(*inode));
+	struct sd_inode *inode = xzalloc(sizeof(*inode));
 
 	ret = xread(STDIN_FILENO, &hdr, sizeof(hdr));
 	if (ret != sizeof(hdr))
@@ -1736,8 +1736,8 @@ static int vdi_restore(int argc, char **argv)
 	const char *vdiname = argv[optind++];
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE] = {0};
-	struct sheepdog_inode *current_inode = xzalloc(sizeof(*current_inode));
-	struct sheepdog_inode *parent_inode = (struct sheepdog_inode *)buf;
+	struct sd_inode *current_inode = xzalloc(sizeof(*current_inode));
+	struct sd_inode *parent_inode = (struct sd_inode *)buf;
 	bool need_current_recovery = false;
 
 	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {

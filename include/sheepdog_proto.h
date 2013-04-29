@@ -97,8 +97,8 @@
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
 
-#define SD_INODE_SIZE (sizeof(struct sheepdog_inode))
-#define SD_INODE_HEADER_SIZE (sizeof(struct sheepdog_inode) - \
+#define SD_INODE_SIZE (sizeof(struct sd_inode))
+#define SD_INODE_HEADER_SIZE (sizeof(struct sd_inode) - \
 			      sizeof(uint32_t) * MAX_DATA_OBJS)
 #define SD_ATTR_OBJ_SIZE (sizeof(struct sheepdog_vdi_attr))
 #define CURRENT_VDI_ID 0
@@ -155,7 +155,7 @@ struct sd_rsp {
 	};
 };
 
-struct sheepdog_inode {
+struct sd_inode {
 	char name[SD_MAX_VDI_LEN];
 	char tag[SD_MAX_VDI_TAG_LEN];
 	uint64_t create_time;
@@ -214,7 +214,7 @@ static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 	return hash & ((1 << bits) - 1);
 }
 
-static inline bool is_data_obj_writeable(const struct sheepdog_inode *inode,
+static inline bool is_data_obj_writeable(const struct sd_inode *inode,
 					 int idx)
 {
 	return inode->vdi_id == inode->data_vdi_id[idx];

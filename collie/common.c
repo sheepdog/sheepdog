@@ -11,7 +11,7 @@
 
 #include "collie.h"
 
-bool is_current(const struct sheepdog_inode *i)
+bool is_current(const struct sd_inode *i)
 {
 	return !i->snap_ctime;
 }
@@ -122,7 +122,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 {
 	int ret;
 	unsigned long nr;
-	static struct sheepdog_inode i;
+	static struct sd_inode i;
 	struct sd_req req;
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	unsigned int rlen = sizeof(vdi_inuse);
