@@ -494,17 +494,18 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 	int ret;
 
 	ret = vdi_lookup(iocb, &info);
-	if (iocb->create_snapshot) {
-		/* We should have base vdi, otherwise error happens */
-		if (ret != SD_RES_SUCCESS)
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		if (!iocb->create_snapshot)
+			return SD_RES_VDI_EXIST;
+		break;
+	case SD_RES_NO_VDI:
+		if (iocb->create_snapshot)
 			return ret;
-	} else {
-		/* If we already have the same VDI or met other errors. */
-		if (ret != SD_RES_NO_VDI) {
-			if (ret == SD_RES_SUCCESS)
-				ret = SD_RES_VDI_EXIST;
-			return ret;
-		}
+		break;
+	default:
+		sd_eprintf("%s", sd_strerror(ret));
+		return ret;
 	}
 	if (!iocb->snapid)
 		iocb->snapid = 1;
