@@ -532,24 +532,6 @@ do
     seq="after_$seq"
 done
 
-# collect log files
-log_dir=logs.`date +%Y-%m-%d-%H-%M-%S`
-
-if [ ! -d $log_dir ]
-then
-    mkdir $log_dir
-
-    max_nr_sheeps=`find $STORE -name sheep.log | wc -l`
-    max_nr_sheeps=`expr $max_nr_sheeps - 1`
-    for i in `seq 0 $max_nr_sheeps`;
-    do
-	cp $STORE/$i/sheep.log $log_dir/$i.log
-    done
-else
-    echo "directory $log_dir already exists"
-    echo "skip collecting log files"
-fi
-
 interrupt=false
 status=`expr $n_bad`
 exit

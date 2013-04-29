@@ -61,6 +61,5 @@ tests/check.log
 tests/check.time
 tests/atconfig
 tests/*.out.bad
-tests/logs.*
 
 *.patch
