@@ -551,7 +551,7 @@ struct deletion_work {
 	uint32_t done;
 
 	struct work work;
-	struct list_head dw_siblings;
+	struct list_head list;
 	struct request *req;
 
 	uint32_t vid;
@@ -680,7 +680,7 @@ static void delete_one_done(struct work *work)
 		return;
 	}
 
-	list_del(&dw->dw_siblings);
+	list_del(&dw->list);
 
 	put_request(req);
 
@@ -689,7 +689,7 @@ static void delete_one_done(struct work *work)
 
 	if (!list_empty(&deletion_work_list)) {
 		dw = list_first_entry(&deletion_work_list,
-				      struct deletion_work, dw_siblings);
+				      struct deletion_work, list);
 
 		queue_work(sys->deletion_wqueue, &dw->work);
 	}
@@ -831,10 +831,10 @@ static int start_deletion(struct request *req, uint32_t vid)
 	uatomic_inc(&req->refcnt);
 
 	if (list_empty(&deletion_work_list)) {
-		list_add_tail(&dw->dw_siblings, &deletion_work_list);
+		list_add_tail(&dw->list, &deletion_work_list);
 		queue_work(sys->deletion_wqueue, &dw->work);
 	} else
-		list_add_tail(&dw->dw_siblings, &deletion_work_list);
+		list_add_tail(&dw->list, &deletion_work_list);
 out:
 	return SD_RES_SUCCESS;
 err:
