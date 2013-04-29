@@ -591,7 +591,7 @@ not_found:
 	if (create) {
 		cache = xzalloc(sizeof(*cache));
 		cache->vid = vid;
-		cache->lru_tree = RB_ROOT;
+		INIT_RB_ROOT(&cache->lru_tree);
 		create_dir_for(vid);
 		cache->push_efd = eventfd(0, 0);
 
