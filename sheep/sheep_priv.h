@@ -328,12 +328,12 @@ bool oid_in_recovery(uint64_t oid);
 bool node_in_recovery(void);
 
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, int nr_copies);
+		       uint64_t offset);
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, bool create, int nr_copies);
+		 uint64_t offset, bool create);
 int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int nr_copies);
-int remove_object(uint64_t oid, int nr_copies);
+		uint64_t offset);
+int remove_object(uint64_t oid);
 
 int exec_local_req(struct sd_req *rq, void *data);
 void local_req_init(void);

@@ -389,7 +389,7 @@ int init_global_pathnames(const char *d, char *argp)
 
 /* Write data to both local object cache (if enabled) and backends */
 int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, bool create, int nr_copies)
+		 uint64_t offset, bool create)
 {
 	struct sd_req hdr;
 	int ret;
@@ -417,7 +417,7 @@ forward_write:
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = nr_copies;
+	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -427,7 +427,7 @@ forward_write:
 }
 
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, int nr_copies)
+			uint64_t offset)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -437,7 +437,7 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 	hdr.data_length = datalen;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = nr_copies;
+	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -453,7 +453,7 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
  * try read backends
  */
 int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset, int nr_copies)
+		uint64_t offset)
 {
 	int ret;
 
@@ -468,19 +468,17 @@ int read_object(uint64_t oid, char *data, unsigned int datalen,
 	}
 
 forward_read:
-	ret = read_backend_object(oid, data, datalen, offset, nr_copies);
-
-	return ret;
+	return read_backend_object(oid, data, datalen, offset);
 }
 
-int remove_object(uint64_t oid, int copies)
+int remove_object(uint64_t oid)
 {
 	struct sd_req hdr;
 	int ret;
 
 	sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 	hdr.obj.oid = oid;
-	hdr.obj.copies = copies;
+	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)

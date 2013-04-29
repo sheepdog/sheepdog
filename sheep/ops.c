@@ -797,14 +797,14 @@ static int local_discard_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid), zero = 0;
-	int ret, cp = get_vdi_copy_number(vid), idx = data_oid_to_idx(oid);
+	int ret, idx = data_oid_to_idx(oid);
 
 	sd_dprintf("%"PRIx64, oid);
 	ret = write_object(vid_to_vdi_oid(vid), (char *)&zero, sizeof(zero),
-			   SD_INODE_HEADER_SIZE + sizeof(vid) * idx, false, cp);
+			   SD_INODE_HEADER_SIZE + sizeof(vid) * idx, false);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
-	if (remove_object(oid, cp) != SD_RES_SUCCESS)
+	if (remove_object(oid) != SD_RES_SUCCESS)
 		sd_eprintf("failed to remove %"PRIx64, oid);
 	/*
 	 * Return success even if remove_object fails because we have updated
