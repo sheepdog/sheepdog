@@ -65,6 +65,11 @@ static int list_store(void)
 	return EXIT_SYSFAIL;
 }
 
+static bool no_vdi(const unsigned long *vdis)
+{
+	return find_next_bit(vdis, SD_NR_VDIS, 0) == SD_NR_VDIS;
+}
+
 #define FORMAT_PRINT				\
 	"    __\n"				\
 	"   ()'`;\n"				\
@@ -80,7 +85,6 @@ static int cluster_format(int argc, char **argv)
 	struct timeval tv;
 	char store_name[STORE_LEN];
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
-	unsigned long nr;
 
 	sd_init_req((struct sd_req *)&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
@@ -90,11 +94,7 @@ static int cluster_format(int argc, char **argv)
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
-	for (nr = 0; nr < SD_NR_VDIS; nr++)
-		if (test_bit(nr, vdi_inuse))
-			break;
-
-	if (nr != SD_NR_VDIS)
+	if (!no_vdi(vdi_inuse))
 		confirm(FORMAT_PRINT);
 
 	gettimeofday(&tv, NULL);
