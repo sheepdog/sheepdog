@@ -80,17 +80,16 @@ static bool no_vdi(const unsigned long *vdis)
 static int cluster_format(int argc, char **argv)
 {
 	int ret;
-	struct sd_so_req hdr;
-	struct sd_so_rsp *rsp = (struct sd_so_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct timeval tv;
 	char store_name[STORE_LEN];
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	sd_init_req((struct sd_req *)&hdr, SD_OP_READ_VDIS);
+	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
-	ret = collie_exec_req(sdhost, sdport, (struct sd_req *)&hdr,
-			      &vdi_inuse);
+	ret = collie_exec_req(sdhost, sdport, &hdr, &vdi_inuse);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -99,14 +98,14 @@ static int cluster_format(int argc, char **argv)
 
 	gettimeofday(&tv, NULL);
 
-	sd_init_req((struct sd_req *)&hdr, SD_OP_MAKE_FS);
-	hdr.copies = cluster_cmd_data.copies;
+	sd_init_req(&hdr, SD_OP_MAKE_FS);
+	hdr.cluster.copies = cluster_cmd_data.copies;
 	if (cluster_cmd_data.nohalt)
 		hdr.flags |= SD_FLAG_NOHALT;
 	if (cluster_cmd_data.quorum)
 		hdr.flags |= SD_FLAG_QUORUM;
 
-	hdr.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
+	hdr.cluster.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
 		pstrcpy(store_name, STORE_LEN, cluster_cmd_data.name);
@@ -116,8 +115,7 @@ static int cluster_format(int argc, char **argv)
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
 	printf("using backend %s store\n", store_name);
-	ret = collie_exec_req(sdhost, sdport, (struct sd_req *)&hdr,
-			      store_name);
+	ret = collie_exec_req(sdhost, sdport, &hdr, store_name);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 

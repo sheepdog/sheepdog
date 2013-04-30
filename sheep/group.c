@@ -206,7 +206,6 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 			       void *data)
 {
-	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)rsp;
 	int nr_nodes;
 	struct vnode_info *cur_vinfo = thread_unsafe_get(current_vnode_info);
 
@@ -214,15 +213,15 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		nr_nodes = cur_vinfo->nr_nodes;
 		memcpy(data, cur_vinfo->nodes,
 			sizeof(struct sd_node) * nr_nodes);
-		node_rsp->data_length = nr_nodes * sizeof(struct sd_node);
-		node_rsp->nr_nodes = nr_nodes;
-		node_rsp->local_idx = get_node_idx(cur_vinfo, &sys->this_node);
+		rsp->data_length = nr_nodes * sizeof(struct sd_node);
+		rsp->node.nr_nodes = nr_nodes;
+		rsp->node.local_idx = get_node_idx(cur_vinfo, &sys->this_node);
 	} else {
-		node_rsp->nr_nodes = 0;
-		node_rsp->local_idx = 0;
+		rsp->node.nr_nodes = 0;
+		rsp->node.local_idx = 0;
 	}
 
-	node_rsp->master_idx = -1;
+	rsp->node.master_idx = -1;
 	return SD_RES_SUCCESS;
 }
 

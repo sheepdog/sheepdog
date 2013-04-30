@@ -71,7 +71,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data);
 int send_light_req(struct sd_req *hdr, const char *host, int port);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
-int update_node_list(int max_nodes, uint32_t epoch);
+int update_node_list(int max_nodes);
 void confirm(const char *message);
 
 extern struct command vdi_command;

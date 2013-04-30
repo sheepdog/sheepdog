@@ -503,8 +503,8 @@ static uint64_t *fetch_object_list(struct sd_node *e, uint32_t epoch,
 				   size_t *nr_oids)
 {
 	char name[128];
-	struct sd_list_req hdr;
-	struct sd_list_rsp *rsp = (struct sd_list_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	size_t buf_size = list_buffer_size;
 	uint64_t *buf = xmalloc(buf_size);
 	int ret;
@@ -513,11 +513,10 @@ static uint64_t *fetch_object_list(struct sd_node *e, uint32_t epoch,
 	sd_dprintf("%s %"PRIu32, name, e->nid.port);
 
 retry:
-	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_OBJ_LIST);
-	hdr.tgt_epoch = epoch - 1;
+	sd_init_req(&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.data_length = buf_size;
 	hdr.epoch = sys_epoch();
-	ret = sheep_exec_req(&e->nid, (struct sd_req *)&hdr, buf);
+	ret = sheep_exec_req(&e->nid, &hdr, buf);
 
 	switch (ret) {
 	case SD_RES_SUCCESS:

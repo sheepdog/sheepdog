@@ -130,7 +130,7 @@ int objlist_cache_insert(uint64_t oid)
 	return 0;
 }
 
-int get_obj_list(const struct sd_list_req *hdr, struct sd_list_rsp *rsp, void *data)
+int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 {
 	int nr = 0;
 	struct objlist_cache_entry *entry;

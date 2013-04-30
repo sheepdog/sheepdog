@@ -45,23 +45,22 @@ struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 int sd_nodes_nr, sd_vnodes_nr;
 unsigned master_idx;
 
-int update_node_list(int max_nodes, uint32_t epoch)
+int update_node_list(int max_nodes)
 {
 	int ret;
 	unsigned int size;
 	char *buf = NULL;
 	struct sd_node *ent;
-	struct sd_node_req hdr;
-	struct sd_node_rsp *rsp = (struct sd_node_rsp *)&hdr;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
 	size = sizeof(*ent) * max_nodes;
 	buf = xzalloc(size);
-	sd_init_req((struct sd_req *)&hdr, SD_OP_GET_NODE_LIST);
-	hdr.request_ver = epoch;
+	sd_init_req(&hdr, SD_OP_GET_NODE_LIST);
 
 	hdr.data_length = size;
 
-	ret = collie_exec_req(sdhost, sdport, (struct sd_req *)&hdr, buf);
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
 	if (ret < 0)
 		goto out;
 
@@ -88,7 +87,7 @@ int update_node_list(int max_nodes, uint32_t epoch)
 	memcpy(sd_nodes, buf, size);
 	sd_vnodes_nr = nodes_to_vnodes(sd_nodes, sd_nodes_nr, sd_vnodes);
 	sd_epoch = hdr.epoch;
-	master_idx = rsp->master_idx;
+	master_idx = rsp->node.master_idx;
 out:
 	if (buf)
 		free(buf);
@@ -384,7 +383,7 @@ int main(int argc, char **argv)
 		highlight = false;
 
 	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
-		ret = update_node_list(SD_MAX_NODES, 0);
+		ret = update_node_list(SD_MAX_NODES);
 		if (ret < 0) {
 			fprintf(stderr, "Failed to get node list\n");
 			exit(EXIT_SYSFAIL);

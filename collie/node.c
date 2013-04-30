@@ -65,30 +65,31 @@ static int node_info(int argc, char **argv)
 
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char host[128];
-		struct sd_node_req req;
-		struct sd_node_rsp *rsp = (struct sd_node_rsp *)&req;
+		struct sd_req req;
+		struct sd_rsp *rsp = (struct sd_rsp *)&req;
 		char store_str[UINT64_DECIMAL_SIZE], free_str[UINT64_DECIMAL_SIZE];
 
 		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
-		sd_init_req((struct sd_req *)&req, SD_OP_STAT_SHEEP);
+		sd_init_req(&req, SD_OP_STAT_SHEEP);
 
-		ret = send_light_req((struct sd_req *)&req, host,
-				     sd_nodes[i].nid.port);
+		ret = send_light_req(&req, host, sd_nodes[i].nid.port);
 
-		size_to_str(rsp->store_size, store_str, sizeof(store_str));
-		size_to_str(rsp->store_size - rsp->store_free, free_str,
-			    sizeof(free_str));
+		size_to_str(rsp->node.store_size, store_str, sizeof(store_str));
+		size_to_str(rsp->node.store_size - rsp->node.store_free,
+			    free_str, sizeof(free_str));
 		if (!ret) {
+			int ratio = (int)(((double)(rsp->node.store_size -
+						    rsp->node.store_free) /
+					   rsp->node.store_size) * 100);
 			printf(raw_output ? "%d %s %s %d%%\n" : "%2d\t%s\t%s\t%3d%%\n",
 			       i, store_str, free_str,
-			       rsp->store_size == 0 ? 0 :
-			       (int)(((double)(rsp->store_size - rsp->store_free) / rsp->store_size) * 100));
+			       rsp->node.store_size == 0 ? 0 : ratio);
 			success++;
 		}
 
-		total_size += rsp->store_size;
-		total_avail += rsp->store_free;
+		total_size += rsp->node.store_size;
+		total_avail += rsp->node.store_free;
 	}
 
 	if (success == 0) {
@@ -123,14 +124,13 @@ static int node_recovery(int argc, char **argv)
 
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char host[128];
-		struct sd_node_req req;
+		struct sd_req req;
 
 		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
-		sd_init_req((struct sd_req *)&req, SD_OP_STAT_RECOVERY);
+		sd_init_req(&req, SD_OP_STAT_RECOVERY);
 
-		ret = collie_exec_req(host, sd_nodes[i].nid.port,
-				      (struct sd_req *)&req, NULL);
+		ret = collie_exec_req(host, sd_nodes[i].nid.port, &req, NULL);
 		if (ret == SD_RES_NODE_IN_RECOVERY) {
 			addr_to_str(host, sizeof(host),
 					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
@@ -180,7 +180,7 @@ static int node_kill(int argc, char **argv)
 {
 	char host[128];
 	int node_id, ret;
-	struct sd_node_req req;
+	struct sd_req req;
 	const char *p = argv[optind++];
 
 	if (!is_numeric(p)) {
@@ -197,10 +197,9 @@ static int node_kill(int argc, char **argv)
 
 	addr_to_str(host, sizeof(host), sd_nodes[node_id].nid.addr, 0);
 
-	sd_init_req((struct sd_req *)&req, SD_OP_KILL_NODE);
+	sd_init_req(&req, SD_OP_KILL_NODE);
 
-	ret = send_light_req((struct sd_req *)&req, host,
-			     sd_nodes[node_id].nid.port);
+	ret = send_light_req(&req, host, sd_nodes[node_id].nid.port);
 	if (ret) {
 		fprintf(stderr, "Failed to execute request\n");
 		exit(EXIT_FAILURE);

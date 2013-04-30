@@ -241,7 +241,6 @@ static int remove_epoch(uint32_t epoch)
 static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
-	const struct sd_so_req *hdr = (const struct sd_so_req *)req;
 	int i, ret;
 	uint32_t latest_epoch;
 	uint64_t created_time;
@@ -265,12 +264,12 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	sys->nr_copies = hdr->copies;
-	sys->flags = hdr->flags;
+	sys->nr_copies = req->cluster.copies;
+	sys->flags = req->flags;
 	if (!sys->nr_copies)
 		sys->nr_copies = SD_DEFAULT_COPIES;
 
-	created_time = hdr->ctime;
+	created_time = req->cluster.ctime;
 	set_cluster_ctime(created_time);
 	set_cluster_copies(sys->nr_copies);
 	set_cluster_flags(sys->flags);
@@ -398,10 +397,10 @@ static int local_get_vdi_copies(const struct sd_req *req, struct sd_rsp *rsp,
 
 static int local_stat_sheep(struct request *req)
 {
-	struct sd_node_rsp *node_rsp = (struct sd_node_rsp *)&req->rp;
+	struct sd_rsp *rsp = &req->rp;
 	uint32_t epoch = req->rq.epoch;
 
-	return stat_sheep(&node_rsp->store_size, &node_rsp->store_free, epoch);
+	return stat_sheep(&rsp->node.store_size, &rsp->node.store_free, epoch);
 }
 
 static int local_stat_recovery(const struct sd_req *req, struct sd_rsp *rsp,
@@ -468,8 +467,7 @@ out:
 
 static int local_get_obj_list(struct request *req)
 {
-	return get_obj_list((const struct sd_list_req *)&req->rq,
-			    (struct sd_list_rsp *)&req->rp, req->data);
+	return get_obj_list(&req->rq, &req->rp, req->data);
 }
 
 static int local_get_epoch(struct request *req)

@@ -105,6 +105,9 @@
 
 #define STORE_LEN 16
 
+#define SD_REQ_SIZE 48
+#define SD_RSP_SIZE 48
+
 struct sd_req {
 	uint8_t		proto_ver;
 	uint8_t		opcode;
@@ -126,6 +129,15 @@ struct sd_req {
 			uint32_t	copies;
 			uint32_t	snapid;
 		} vdi;
+
+		/* sheepdog-internal */
+		struct {
+			uint64_t	oid;
+			uint64_t	ctime;
+			uint32_t	copies;
+			uint32_t	tag;
+		} cluster;
+
 		uint32_t		__pad[8];
 	};
 };
@@ -151,6 +163,17 @@ struct sd_rsp {
 			uint32_t	attr_id;
 			uint32_t	copies;
 		} vdi;
+
+		/* sheepdog-internal */
+		struct {
+			uint32_t	__pad;
+			uint32_t	nr_nodes;
+			uint32_t	local_idx;
+			uint32_t	master_idx;
+			uint64_t	store_size;
+			uint64_t	store_free;
+		} node;
+
 		uint32_t		__pad[8];
 	};
 };
@@ -280,6 +303,13 @@ static inline uint64_t vid_to_attr_oid(uint32_t vid, uint32_t attrid)
 static inline uint32_t attr_oid_to_vid(uint64_t oid)
 {
 	return (~VDI_ATTR_BIT & oid) >> VDI_SPACE_SHIFT;
+}
+
+static inline __attribute__((used)) void __sd_proto_build_bug_ons(void)
+{
+        /* never called, only for checking BUILD_BUG_ON()s */
+        BUILD_BUG_ON(sizeof(struct sd_req) != SD_REQ_SIZE);
+        BUILD_BUG_ON(sizeof(struct sd_rsp) != SD_RSP_SIZE);
 }
 
 #endif

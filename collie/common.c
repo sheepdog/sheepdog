@@ -221,7 +221,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 			unsigned long flags = sub[i].flags;
 
 			if (flags & SUBCMD_FLAG_NEED_NODELIST) {
-				ret = update_node_list(SD_MAX_NODES, 0);
+				ret = update_node_list(SD_MAX_NODES);
 				if (ret < 0) {
 					fprintf(stderr,
 						"Failed to get node list\n");
