@@ -5,5 +5,5 @@ Formatting 'sheepdog:test2', fmt=raw size=4294967296
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]---[DATE]---[DATE]---(you are here)
-test2---[DATE]-+-[DATE]---[DATE]
+test2---[DATE]-+-[DATE]
                            `-[DATE]---(you are here)
