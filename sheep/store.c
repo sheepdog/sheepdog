@@ -185,7 +185,7 @@ uint32_t get_latest_epoch(void)
 	return epoch;
 }
 
-static int lock_base_dir(const char *d)
+int lock_base_dir(const char *d)
 {
 #define LOCK_PATH "/lock"
 	char *lock_path;
@@ -224,7 +224,7 @@ int init_base_path(const char *d)
 		return -1;
 	}
 
-	return lock_base_dir(d);
+	return 0;
 }
 
 /*

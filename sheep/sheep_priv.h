@@ -250,6 +250,7 @@ int init_store_driver(bool is_gateway);
 int init_global_pathnames(const char *d, char *);
 int init_base_path(const char *dir);
 int init_disk_space(const char *d);
+int lock_base_dir(const char *d);
 
 int fill_vdi_copy_list(void *data);
 int get_vdi_copy_number(uint32_t vid);

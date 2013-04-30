@@ -390,6 +390,65 @@ static void check_host_env(void)
 			   r.rlim_cur);
 }
 
+static int lock_and_daemon(bool daemonize, const char *base_dir)
+{
+	int ret, devnull_fd;
+
+	if (daemonize) {
+		switch (fork()) {
+		case 0:
+			break;
+		case -1:
+			panic("fork() failed during daemonize: %m");
+			break;
+		default:
+			exit(0);
+			break;
+		}
+
+		if (setsid() == -1)
+			panic("becoming a leader of a new session failed: %m");
+
+		switch (fork()) {
+		case 0:
+			break;
+		case -1:
+			panic("fork() failed during daemonize: %m");
+			break;
+		default:
+			exit(0);
+			break;
+		}
+
+		if (chdir("/"))
+			panic("chdir to / failed: %m");
+
+		devnull_fd = open("/dev/null", O_RDWR);
+		if (devnull_fd < 0)
+			panic("opening /dev/null failed: %m");
+	}
+
+	ret = lock_base_dir(base_dir);
+	if (ret < 0) {
+		sd_eprintf("locking directory: %s failed", base_dir);
+		return -1;
+	}
+
+	if (daemonize) {
+		/*
+		 * now we can use base_dir/sheep.log for logging error messages,
+		 * we can close 0, 1, and 2 safely
+		 */
+		dup2(devnull_fd, 0);
+		dup2(devnull_fd, 1);
+		dup2(devnull_fd, 2);
+
+		close(devnull_fd);
+	}
+
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
@@ -582,7 +641,7 @@ int main(int argc, char **argv)
 
 	srandom(port);
 
-	if (is_daemon && daemon(0, 0))
+	if (lock_and_daemon(is_daemon, dirp))
 		exit(1);
 
 	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level,
