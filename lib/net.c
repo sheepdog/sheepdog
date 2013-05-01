@@ -275,7 +275,11 @@ int do_read(int sockfd, void *buf, int len, bool (*need_retry)(uint32_t epoch),
 	int ret, repeat = MAX_RETRY_COUNT;
 reread:
 	ret = read(sockfd, buf, len);
-	if (ret < 0 || !ret) {
+	if (ret == 0) {
+		sd_eprintf("connection is closed (%d bytes left)", len);
+		return 1;
+	}
+	if (ret < 0) {
 		if (errno == EINTR)
 			goto reread;
 		/*
