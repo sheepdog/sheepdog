@@ -75,6 +75,13 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 		/* TODO: stop automatic recovery */
 		sd_eprintf("diskfull, oid=%"PRIx64, oid);
 		return SD_RES_NO_SPACE;
+	case EMFILE:
+	case ENFILE:
+	case EINTR:
+	case EAGAIN:
+		sd_eprintf("%m, oid=%"PRIx64, oid);
+		/* make gateway try again */
+		return SD_RES_NETWORK_ERROR;
 	default:
 		sd_eprintf("oid=%"PRIx64", %m", oid);
 		return md_handle_eio(dir);
