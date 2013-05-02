@@ -260,6 +260,7 @@ int init_disk_space(const char *d);
 int lock_base_dir(const char *d);
 
 int fill_vdi_state_list(void *data);
+bool oid_is_readonly(uint64_t oid);
 int get_vdi_copy_number(uint32_t vid);
 int get_obj_copy_number(uint64_t oid, int nr_zones);
 int get_max_copy_number(void);

@@ -319,6 +319,11 @@ static int gateway_forward_request(struct request *req)
 
 int gateway_write_obj(struct request *req)
 {
+	uint64_t oid = req->rq.obj.oid;
+
+	if (oid_is_readonly(oid))
+		return SD_RES_READONLY;
+
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
@@ -327,6 +332,11 @@ int gateway_write_obj(struct request *req)
 
 int gateway_create_and_write_obj(struct request *req)
 {
+	uint64_t oid = req->rq.obj.oid;
+
+	if (oid_is_readonly(oid))
+		return SD_RES_READONLY;
+
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 

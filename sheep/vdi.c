@@ -71,6 +71,31 @@ static struct vdi_state_entry *vdi_state_insert(struct rb_root *root,
 	return NULL; /* insert successfully */
 }
 
+static bool vid_is_snapshot(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+
+	pthread_rwlock_rdlock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	pthread_rwlock_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		sd_eprintf("No VDI entry for %" PRIx32 " found", vid);
+		return 0;
+	}
+
+	return entry->snapshot;
+}
+
+bool oid_is_readonly(uint64_t oid)
+{
+	/* we allow changing snapshot attributes */
+	if (!is_data_obj(oid))
+	    return false;
+
+	return vid_is_snapshot(oid_to_vid(oid));
+}
+
 int get_vdi_copy_number(uint32_t vid)
 {
 	struct vdi_state_entry *entry;
