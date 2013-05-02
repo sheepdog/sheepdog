@@ -149,6 +149,13 @@ struct vdi_info {
 	uint64_t create_time;
 };
 
+struct vdi_state {
+	uint32_t vid;
+	uint8_t nr_copies;
+	uint8_t snapshot;
+	uint16_t _pad;
+};
+
 struct store_driver {
 	struct list_head list;
 	const char *name;
@@ -252,12 +259,12 @@ int init_base_path(const char *dir);
 int init_disk_space(const char *d);
 int lock_base_dir(const char *d);
 
-int fill_vdi_copy_list(void *data);
+int fill_vdi_state_list(void *data);
 int get_vdi_copy_number(uint32_t vid);
 int get_obj_copy_number(uint64_t oid, int nr_zones);
 int get_max_copy_number(void);
 int get_req_copy_number(struct request *req);
-int add_vdi_copy_number(uint32_t vid, int nr_copies);
+int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot);
 int vdi_exist(uint32_t vid);
 int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid);
 int vdi_delete(struct vdi_iocb *iocb, struct request *req);

@@ -647,7 +647,7 @@ static int get_vdis_from(struct sd_node *node)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct vdi_copy *vc = NULL;
+	struct vdi_state *vs = NULL;
 	int i, ret = SD_RES_SUCCESS;
 	unsigned int rlen;
 	int count;
@@ -656,21 +656,21 @@ static int get_vdis_from(struct sd_node *node)
 		goto out;
 
 	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
-	vc = xzalloc(rlen);
+	vs = xzalloc(rlen);
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
 	hdr.data_length = rlen;
 	hdr.epoch = sys_epoch();
-	ret = sheep_exec_req(&node->nid, &hdr, (char *)vc);
+	ret = sheep_exec_req(&node->nid, &hdr, (char *)vs);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	count = rsp->data_length / sizeof(*vc);
+	count = rsp->data_length / sizeof(*vs);
 	for (i = 0; i < count; i++) {
-		set_bit(vc[i].vid, sys->vdi_inuse);
-		add_vdi_copy_number(vc[i].vid, vc[i].nr_copies);
+		set_bit(vs[i].vid, sys->vdi_inuse);
+		add_vdi_state(vs[i].vid, vs[i].nr_copies, vs[i].snapshot);
 	}
 out:
-	free(vc);
+	free(vs);
 	return ret;
 }
 

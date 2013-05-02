@@ -168,7 +168,7 @@ int default_cleanup(void)
 	return SD_RES_SUCCESS;
 }
 
-static int init_vdi_copy_number(uint64_t oid, char *wd)
+static int init_vdi_state(uint64_t oid, char *wd)
 {
 	char path[PATH_MAX];
 	int fd, flags = get_open_flags(oid, false, 0), ret;
@@ -190,7 +190,8 @@ static int init_vdi_copy_number(uint64_t oid, char *wd)
 		goto out;
 	}
 
-	add_vdi_copy_number(oid_to_vid(oid), inode->nr_copies);
+	add_vdi_state(oid_to_vid(oid), inode->nr_copies,
+		      vdi_is_snapshot(inode));
 
 	ret = SD_RES_SUCCESS;
 out:
@@ -206,7 +207,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, void *arg)
 	if (is_vdi_obj(oid)) {
 		sd_dprintf("found the VDI object %" PRIx64, oid);
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
-		ret = init_vdi_copy_number(oid, wd);
+		ret = init_vdi_state(oid, wd);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}

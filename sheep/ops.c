@@ -390,7 +390,7 @@ static int local_read_vdis(const struct sd_req *req, struct sd_rsp *rsp,
 static int local_get_vdi_copies(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
-	rsp->data_length = fill_vdi_copy_list(data);
+	rsp->data_length = fill_vdi_state_list(data);
 
 	return SD_RES_SUCCESS;
 }
@@ -618,10 +618,13 @@ static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_notify_vdi_add(const struct sd_req *req, struct sd_rsp *rsp,
 				  void *data)
 {
-	uint32_t vid = *(uint32_t *)data;
-	uint32_t nr_copies = *(uint32_t *)((char *)data + sizeof(vid));
+	if (req->vdi_state.old_vid)
+		/* make the previous working vdi a snapshot */
+		add_vdi_state(req->vdi_state.old_vid,
+			      get_vdi_copy_number(req->vdi_state.old_vid),
+			      true);
 
-	add_vdi_copy_number(vid, nr_copies);
+	add_vdi_state(req->vdi_state.new_vid, req->vdi_state.copies, false);
 
 	return SD_RES_SUCCESS;
 }

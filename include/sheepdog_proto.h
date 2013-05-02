@@ -138,6 +138,11 @@ struct sd_req {
 			uint32_t	copies;
 			uint32_t	tag;
 		} cluster;
+		struct {
+			uint32_t	old_vid;
+			uint32_t	new_vid;
+			uint32_t	copies;
+		} vdi_state;
 
 		uint32_t		__pad[8];
 	};

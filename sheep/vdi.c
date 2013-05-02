@@ -16,24 +16,25 @@
 #include "sheepdog_proto.h"
 #include "sheep_priv.h"
 
-struct vdi_copy_entry {
+struct vdi_state_entry {
 	uint32_t vid;
 	unsigned int nr_copies;
+	bool snapshot;
 	struct rb_node node;
 };
 
 static uint32_t max_copies;
-static struct rb_root vdi_copy_root = RB_ROOT;
-static pthread_rwlock_t vdi_copy_lock = PTHREAD_RWLOCK_INITIALIZER;
+static struct rb_root vdi_state_root = RB_ROOT;
+static pthread_rwlock_t vdi_state_lock = PTHREAD_RWLOCK_INITIALIZER;
 
-static struct vdi_copy_entry *vdi_copy_search(struct rb_root *root,
-					      uint32_t vid)
+static struct vdi_state_entry *vdi_state_search(struct rb_root *root,
+						uint32_t vid)
 {
 	struct rb_node *n = root->rb_node;
-	struct vdi_copy_entry *t;
+	struct vdi_state_entry *t;
 
 	while (n) {
-		t = rb_entry(n, struct vdi_copy_entry, node);
+		t = rb_entry(n, struct vdi_state_entry, node);
 
 		if (vid < t->vid)
 			n = n->rb_left;
@@ -46,16 +47,16 @@ static struct vdi_copy_entry *vdi_copy_search(struct rb_root *root,
 	return NULL;
 }
 
-static struct vdi_copy_entry *vdi_copy_insert(struct rb_root *root,
-					      struct vdi_copy_entry *new)
+static struct vdi_state_entry *vdi_state_insert(struct rb_root *root,
+						struct vdi_state_entry *new)
 {
 	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
-	struct vdi_copy_entry *entry;
+	struct vdi_state_entry *entry;
 
 	while (*p) {
 		parent = *p;
-		entry = rb_entry(parent, struct vdi_copy_entry, node);
+		entry = rb_entry(parent, struct vdi_state_entry, node);
 
 		if (new->vid < entry->vid)
 			p = &(*p)->rb_left;
@@ -72,11 +73,11 @@ static struct vdi_copy_entry *vdi_copy_insert(struct rb_root *root,
 
 int get_vdi_copy_number(uint32_t vid)
 {
-	struct vdi_copy_entry *entry;
+	struct vdi_state_entry *entry;
 
-	pthread_rwlock_rdlock(&vdi_copy_lock);
-	entry = vdi_copy_search(&vdi_copy_root, vid);
-	pthread_rwlock_unlock(&vdi_copy_lock);
+	pthread_rwlock_rdlock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	pthread_rwlock_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_eprintf("No VDI copy entry for %" PRIx32 " found", vid);
@@ -113,50 +114,54 @@ int get_max_copy_number(void)
 	return nr_copies;
 }
 
-int add_vdi_copy_number(uint32_t vid, int nr_copies)
+int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 {
-	struct vdi_copy_entry *entry, *old;
+	struct vdi_state_entry *entry, *old;
 
 	entry = xzalloc(sizeof(*entry));
 	entry->vid = vid;
 	entry->nr_copies = nr_copies;
+	entry->snapshot = snapshot;
 
 	sd_dprintf("%" PRIx32 ", %d", vid, nr_copies);
 
-	pthread_rwlock_wrlock(&vdi_copy_lock);
-	old = vdi_copy_insert(&vdi_copy_root, entry);
+	pthread_rwlock_wrlock(&vdi_state_lock);
+	old = vdi_state_insert(&vdi_state_root, entry);
 	if (old) {
 		free(entry);
 		entry = old;
 		entry->nr_copies = nr_copies;
+		entry->snapshot = snapshot;
 	}
 
 	if (uatomic_read(&max_copies) == 0 ||
 	    nr_copies > uatomic_read(&max_copies))
 		uatomic_set(&max_copies, nr_copies);
-	pthread_rwlock_unlock(&vdi_copy_lock);
+	pthread_rwlock_unlock(&vdi_state_lock);
 
 	return SD_RES_SUCCESS;
 }
 
-int fill_vdi_copy_list(void *data)
+int fill_vdi_state_list(void *data)
 {
 	int nr = 0;
 	struct rb_node *n;
-	struct vdi_copy *vc = data;
-	struct vdi_copy_entry *entry;
+	struct vdi_state *vs = data;
+	struct vdi_state_entry *entry;
 
-	pthread_rwlock_rdlock(&vdi_copy_lock);
-	for (n = rb_first(&vdi_copy_root); n; n = rb_next(n)) {
-		entry = rb_entry(n, struct vdi_copy_entry, node);
-		vc->vid = entry->vid;
-		vc->nr_copies = entry->nr_copies;
-		vc++;
+	pthread_rwlock_rdlock(&vdi_state_lock);
+	for (n = rb_first(&vdi_state_root); n; n = rb_next(n)) {
+		entry = rb_entry(n, struct vdi_state_entry, node);
+		memset(vs, 0, sizeof(*vs));
+		vs->vid = entry->vid;
+		vs->nr_copies = entry->nr_copies;
+		vs->snapshot = entry->snapshot;
+		vs++;
 		nr++;
 	}
-	pthread_rwlock_unlock(&vdi_copy_lock);
+	pthread_rwlock_unlock(&vdi_state_lock);
 
-	return nr * sizeof(*vc);
+	return nr * sizeof(*vs);
 }
 
 static inline bool vdi_is_deleted(struct sd_inode *inode)
@@ -443,26 +448,20 @@ int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info)
 	return fill_vdi_info(left, right, iocb, info);
 }
 
-static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
+static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid)
 {
 	int ret = SD_RES_SUCCESS;
 	struct sd_req hdr;
-	char *buf;
 
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_ADD);
-	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = sizeof(vdi_id) + sizeof(nr_copies);
+	hdr.vdi_state.old_vid = old_vid;
+	hdr.vdi_state.new_vid = vdi_id;
+	hdr.vdi_state.copies = nr_copies;
 
-	buf = xmalloc(sizeof(vdi_id) + sizeof(nr_copies));
-	memcpy(buf, &vdi_id, sizeof(vdi_id));
-	memcpy(buf + sizeof(vdi_id), &nr_copies, sizeof(nr_copies));
-
-	ret = exec_local_req(&hdr, buf);
+	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("fail to notify vdi add event(%" PRIx32 ", %d)",
-			   vdi_id, nr_copies);
-
-	free(buf);
+		sd_eprintf("fail to notify vdi add event(%" PRIx32 ", %d, %"
+			   PRIx32 ")", vdi_id, nr_copies, old_vid);
 
 	return ret;
 }
@@ -499,7 +498,7 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 	if (!iocb->snapid)
 		iocb->snapid = 1;
 	*new_vid = info.free_bit;
-	notify_vdi_add(*new_vid, iocb->nr_copies);
+	notify_vdi_add(*new_vid, iocb->nr_copies, info.vid);
 
 	sd_dprintf("%s %s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32
 		   ", cur %" PRIx32 ", copies %d, snapid %"PRIu32,
