@@ -392,7 +392,7 @@ static void check_host_env(void)
 
 static int lock_and_daemon(bool daemonize, const char *base_dir)
 {
-	int ret, devnull_fd;
+	int ret, devnull_fd = 0;
 
 	if (daemonize) {
 		switch (fork()) {
