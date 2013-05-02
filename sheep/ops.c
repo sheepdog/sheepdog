@@ -196,7 +196,15 @@ static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	return ret;
 }
 
-static int local_get_vdi_info(struct request *req)
+/*
+ * Look up vid and copy number from vdi name
+ *
+ * This must be a cluster operation.  If QEMU reads the vdi object
+ * while sheep snapshots the vdi, sheep can return SD_RES_NO_VDI.  To
+ * avoid this problem, SD_OP_GET_INFO must be ordered with
+ * SD_OP_NEW_VDI.
+ */
+static int cluster_get_vdi_info(struct request *req)
 {
 	const struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
@@ -1092,19 +1100,19 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = cluster_recovery_completion,
 	},
 
-	/* local operations */
 	[SD_OP_GET_VDI_INFO] = {
 		.name = "GET_VDI_INFO",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_work = local_get_vdi_info,
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_work = cluster_get_vdi_info,
 	},
 
 	[SD_OP_LOCK_VDI] = {
 		.name = "LOCK_VDI",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_work = local_get_vdi_info,
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_work = cluster_get_vdi_info,
 	},
 
+	/* local operations */
 	[SD_OP_RELEASE_VDI] = {
 		.name = "RELEASE_VDI",
 		.type = SD_OP_TYPE_LOCAL,
