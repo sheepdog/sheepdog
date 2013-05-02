@@ -88,13 +88,7 @@ int get_vdi_copy_number(uint32_t vid)
 
 int get_obj_copy_number(uint64_t oid, int nr_zones)
 {
-	uint32_t vid;
-	if (is_vdi_attr_obj(oid))
-		vid = attr_oid_to_vid(oid);
-	else
-		vid = oid_to_vid(oid);
-
-	return min(get_vdi_copy_number(vid), nr_zones);
+	return min(get_vdi_copy_number(oid_to_vid(oid)), nr_zones);
 }
 
 int get_req_copy_number(struct request *req)

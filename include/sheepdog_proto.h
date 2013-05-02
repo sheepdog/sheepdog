@@ -84,6 +84,7 @@
  */
 
 #define VDI_SPACE_SHIFT   32
+#define SD_VDI_MASK 0x00FFFFFF00000000
 #define VDI_BIT (UINT64_C(1) << 63)
 #define VMSTATE_BIT (UINT64_C(1) << 62)
 #define VDI_ATTR_BIT (UINT64_C(1) << 61)
@@ -292,17 +293,12 @@ static inline uint64_t vid_to_data_oid(uint32_t vid, uint32_t idx)
 
 static inline uint32_t oid_to_vid(uint64_t oid)
 {
-	return (~VDI_BIT & oid) >> VDI_SPACE_SHIFT;
+	return (oid & SD_VDI_MASK) >> VDI_SPACE_SHIFT;
 }
 
 static inline uint64_t vid_to_attr_oid(uint32_t vid, uint32_t attrid)
 {
 	return ((uint64_t)vid << VDI_SPACE_SHIFT) | VDI_ATTR_BIT | attrid;
-}
-
-static inline uint32_t attr_oid_to_vid(uint64_t oid)
-{
-	return (~VDI_ATTR_BIT & oid) >> VDI_SPACE_SHIFT;
 }
 
 static inline bool vdi_is_snapshot(const struct sd_inode *inode)
