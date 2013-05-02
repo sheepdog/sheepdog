@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Test live snapshot
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format -c 3
+$COLLIE vdi create test 4M
+
+_input()
+{
+    for i in `seq 1 10`; do
+	echo "multiwrite -P $i 0 1k ; 2k 1k ; 4k 1k ; 8k 1k"
+	sleep 1
+	$COLLIE vdi snapshot test -s snap$i
+    done
+
+    echo quit
+}
+
+_input | qemu-io sheepdog:test > /dev/null
+
+$COLLIE vdi list | _filter_short_date
+$COLLIE vdi tree | _filter_short_date
+
+for i in `seq 1 10`; do
+    $COLLIE vdi read test -s snap$i | md5sum
+done

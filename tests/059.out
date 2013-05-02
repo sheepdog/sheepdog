@@ -1,0 +1,25 @@
+QA output created by 059
+using backend farm store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test         1  4.0 MB  4.0 MB  0.0 MB DATE   7c2b25     3         snap1
+s test         2  4.0 MB  4.0 MB  0.0 MB DATE   7c2b26     3         snap2
+s test         3  4.0 MB  4.0 MB  0.0 MB DATE   7c2b27     3         snap3
+s test         4  4.0 MB  4.0 MB  0.0 MB DATE   7c2b28     3         snap4
+s test         5  4.0 MB  4.0 MB  0.0 MB DATE   7c2b29     3         snap5
+s test         6  4.0 MB  4.0 MB  0.0 MB DATE   7c2b2a     3         snap6
+s test         7  4.0 MB  4.0 MB  0.0 MB DATE   7c2b2b     3         snap7
+s test         8  4.0 MB  4.0 MB  0.0 MB DATE   7c2b2c     3         snap8
+s test         9  4.0 MB  4.0 MB  0.0 MB DATE   7c2b2d     3         snap9
+s test        10  4.0 MB  4.0 MB  0.0 MB DATE   7c2b2e     3        snap10
+  test         0  4.0 MB  0.0 MB  4.0 MB DATE   7c2b2f     3              
+test---[DATE]---[DATE]---[DATE]---[DATE]---[DATE]---[DATE]---[DATE]---[DATE]---[DATE]---[DATE]---(you are here)
+4a05c5b1cc8b68058475dc9b07ddb012  -
+12775f311aea71153b7259d33735db26  -
+c444cb984d237149fff9ac81344c1c4c  -
+7caccccbe3f5f45dd8d081e13533c1a3  -
+7aa9135c03d6e9ae45f13cdf3c4108b8  -
+9a49f9ab047d216e73fe36555d3f48cb  -
+32d5e290baf0545a58a96fe731fc38d1  -
+cefd77da2d1ad90e7c041730ce3dd347  -
+696d60bae05faebc7890b5239f33c3bf  -
+2dd0d4ec25d3d6416309790c59f9b83a  -
