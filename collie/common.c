@@ -11,11 +11,6 @@
 
 #include "collie.h"
 
-bool is_current(const struct sd_inode *i)
-{
-	return !i->snap_ctime;
-}
-
 char *size_to_str(uint64_t _size, char *str, int str_size)
 {
 	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
@@ -165,7 +160,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 			}
 		}
 
-		snapid = is_current(&i) ? 0 : i.snap_id;
+		snapid = vdi_is_snapshot(&i) ? i.snap_id : 0;
 		func(i.vdi_id, i.name, i.tag, snapid, 0, &i, data);
 	}
 

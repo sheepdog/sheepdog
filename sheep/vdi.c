@@ -329,11 +329,6 @@ static int get_vdi_bitmap_range(const char *name, unsigned long *left,
 	return SD_RES_SUCCESS;
 }
 
-static inline bool vdi_is_snapshot(struct sd_inode *inode)
-{
-	return !!inode->snap_ctime;
-}
-
 static inline bool vdi_has_tag(struct vdi_iocb *iocb)
 {
 	if ((iocb->tag && iocb->tag[0]) || iocb->snapid)

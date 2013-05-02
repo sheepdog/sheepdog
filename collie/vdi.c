@@ -126,7 +126,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 		is_clone = true;
 
 	if (raw_output) {
-		printf("%c ", is_current(i) ? (is_clone ? 'c' : '=') : 's');
+		printf("%c ", vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : '='));
 		while (*name) {
 			if (isspace(*name) || *name == '\\')
 				putchar('\\');
@@ -137,7 +137,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 				i->nr_copies, i->tag);
 	} else {
 		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 " %5d %13s\n",
-				is_current(i) ? (is_clone ? 'c' : ' ') : 's',
+				vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
 				name, snapid, vdi_size_str, my_objs_str, cow_objs_str,
 				dbuf, vid, i->nr_copies, i->tag);
 	}
@@ -151,17 +151,17 @@ static void print_vdi_tree(uint32_t vid, const char *name, const char *tag,
 	struct tm tm;
 	char buf[128];
 
-	if (is_current(i))
-		pstrcpy(buf, sizeof(buf), "(you are here)");
-	else {
+	if (vdi_is_snapshot(i)) {
 		ti = i->create_time >> 32;
 		localtime_r(&ti, &tm);
 
 		strftime(buf, sizeof(buf),
 			 "[%Y-%m-%d %H:%M]", &tm);
-	}
+	} else
+		pstrcpy(buf, sizeof(buf), "(you are here)");
 
-	add_vdi_tree(name, buf, vid, i->parent_vdi_id, highlight && is_current(i));
+	add_vdi_tree(name, buf, vid, i->parent_vdi_id,
+		     highlight && !vdi_is_snapshot(i));
 }
 
 static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
@@ -191,10 +191,10 @@ static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 	       "Time: %10s",
 	       name, snapid, size_str, dbuf, tbuf);
 
-	if (is_current(i))
-		printf("\",\n    color=\"red\"\n  ];\n\n");
-	else
+	if (vdi_is_snapshot(i))
 		printf("\"\n  ];\n\n");
+	else
+		printf("\",\n    color=\"red\"\n  ];\n\n");
 
 }
 

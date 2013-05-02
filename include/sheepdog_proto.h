@@ -305,6 +305,11 @@ static inline uint32_t attr_oid_to_vid(uint64_t oid)
 	return (~VDI_ATTR_BIT & oid) >> VDI_SPACE_SHIFT;
 }
 
+static inline bool vdi_is_snapshot(const struct sd_inode *inode)
+{
+	return !!inode->snap_ctime;
+}
+
 static inline __attribute__((used)) void __sd_proto_build_bug_ons(void)
 {
         /* never called, only for checking BUILD_BUG_ON()s */

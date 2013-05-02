@@ -21,7 +21,7 @@ static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
 {
 	uint64_t *size = data;
 
-	if (is_current(i))
+	if (!vdi_is_snapshot(i))
 		*size += i->vdi_size;
 }
 
