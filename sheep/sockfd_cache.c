@@ -428,6 +428,27 @@ static void sockfd_cache_put(const struct node_id *nid, int idx)
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 }
 
+static void sockfd_cache_close(const struct node_id *nid, int idx)
+{
+	bool use_io = nid->io_port ? true : false;
+	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
+	int port = use_io ? nid->io_port : nid->port;
+	struct sockfd_cache_entry *entry;
+	char name[INET6_ADDRSTRLEN];
+
+	addr_to_str(name, sizeof(name), addr, 0);
+	sd_dprintf("%s:%d idx %d", name, port, idx);
+
+	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	entry = sockfd_cache_search(nid);
+	if (entry) {
+		close(entry->fds[idx].fd);
+		entry->fds[idx].fd = -1;
+		uatomic_set_false(&entry->fds[idx].in_use);
+	}
+	pthread_rwlock_unlock(&sockfd_cache.lock);
+}
+
 /*
  * Return a sockfd connected to the vnode to the caller
  *
@@ -498,7 +519,7 @@ void sheep_del_sockfd(const struct node_id *nid, struct sockfd *sfd)
 		return;
 	}
 
-	sockfd_cache_put(nid, sfd->idx);
+	sockfd_cache_close(nid, sfd->idx);
 	sockfd_cache_del(nid);
 	free(sfd);
 }
