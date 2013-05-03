@@ -641,7 +641,7 @@ int main(int argc, char **argv)
 
 	srandom(port);
 
-	if (lock_and_daemon(is_daemon, dirp))
+	if (lock_and_daemon(is_daemon, dir))
 		exit(1);
 
 	ret = log_init(program_name, LOG_SPACE_SIZE, to_stdout, log_level,
