@@ -245,9 +245,11 @@ int connect_to(const char *name, int port)
 			close(fd);
 			break;
 		}
-
+reconnect:
 		ret = connect(fd, res->ai_addr, res->ai_addrlen);
 		if (ret) {
+			if (errno == EINTR)
+				goto reconnect;
 			sd_eprintf("failed to connect to %s:%d: %m", name,
 				   port);
 			close(fd);
