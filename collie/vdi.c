@@ -1309,13 +1309,14 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 	int ret;
 	char name[128];
 	void *buf;
+	size_t size = get_objsize(oid);
 
-	buf = xmalloc(SD_DATA_OBJ_SIZE);
+	buf = xmalloc(size);
 
 	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = 0;
-	hdr.data_length = SD_DATA_OBJ_SIZE;
+	hdr.data_length = size;
 
 	hdr.obj.oid = oid;
 
@@ -1328,7 +1329,7 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		untrim_zero_sectors(buf, rsp->obj.offset, rsp->data_length,
-				    SD_DATA_OBJ_SIZE);
+				    size);
 		break;
 	case SD_RES_NO_OBJ:
 		free(buf);
@@ -1355,7 +1356,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 		sd_init_req(&hdr, SD_OP_WRITE_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = SD_DATA_OBJ_SIZE;
+	hdr.data_length = get_objsize(oid);
 	hdr.obj.oid = oid;
 
 	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
@@ -1380,10 +1381,11 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 static void do_check_repair(uint64_t oid, int nr_copies)
 {
 	const struct sd_vnode *tgt_vnodes[SD_MAX_COPIES];
-	void *buf = xmalloc(SD_DATA_OBJ_SIZE), *buf_cmp;
+	size_t size = get_objsize(oid);
+	void *buf = xmalloc(size), *buf_cmp;
 	int i, ret;
 
-	ret = sd_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0, true);
+	ret = sd_read_object(oid, buf, size, 0, true);
 	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "FATAL: read %"PRIx64" failed\n", oid);
 		exit(EXIT_FAILURE);
@@ -1397,7 +1399,7 @@ static void do_check_repair(uint64_t oid, int nr_copies)
 			fprintf(stdout, "fixed missing %"PRIx64"\n", oid);
 			continue;
 		}
-		if (memcmp(buf, buf_cmp, SD_DATA_OBJ_SIZE)) {
+		if (memcmp(buf, buf_cmp, size)) {
 			write_object_to(tgt_vnodes[i], oid, buf, false);
 			fprintf(stdout, "fixed replica %"PRIx64"\n", oid);
 		}
