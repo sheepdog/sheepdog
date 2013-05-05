@@ -253,6 +253,19 @@ static inline int check_path_len(const char *path)
 	return 0;
 }
 
+static int is_meta_store(const char *path)
+{
+	char conf[PATH_MAX];
+	char epoch[PATH_MAX];
+
+	snprintf(conf, PATH_MAX, "%s/config", path);
+	snprintf(epoch, PATH_MAX, "%s/epoch", path);
+	if (!access(conf, R_OK) && !access(epoch, R_OK))
+		return true;
+
+	return false;
+}
+
 static int init_obj_path(const char *base_path, char *argp)
 {
 	char *p;
@@ -278,6 +291,10 @@ static int init_obj_path(const char *base_path, char *argp)
 		md_add_disk(obj_path);
 	} else {
 		do {
+			if (is_meta_store(p)) {
+				sd_eprintf("%s is meta-store, abort", p);
+				return -1;
+			}
 			md_add_disk(p);
 		} while ((p = strtok(NULL, ",")));
 	}
