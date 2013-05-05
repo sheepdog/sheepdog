@@ -605,6 +605,9 @@ static int do_plug_unplug(char *disks, bool plug)
 	old_nr = md_nr_disks;
 	path = strtok(disks, ",");
 	do {
+		if (purge_directory(path) < 0)
+			goto out;
+
 		if (plug)
 			md_add_disk(path);
 		else
