@@ -452,10 +452,14 @@ static void clear_exceptional_node_lists(void)
 {
 	struct node *n, *t;
 
-	list_for_each_entry_safe(n, t, &sys->failed_nodes, list)
+	list_for_each_entry_safe(n, t, &sys->failed_nodes, list) {
 		list_del(&n->list);
-	list_for_each_entry_safe(n, t, &sys->delayed_nodes, list)
+		free(n);
+	}
+	list_for_each_entry_safe(n, t, &sys->delayed_nodes, list) {
 		list_del(&n->list);
+		free(n);
+	}
 }
 
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
