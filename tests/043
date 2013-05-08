@@ -35,7 +35,7 @@ for i in 0 1 2 3 4; do
 done
 
 # remove obj directory to occur EIO
-rm -rf $STORE/4/obj
+_safe_remove $STORE/4/obj
 
 for i in `seq 0 10`; do
     echo $(($i + 100)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
@@ -66,5 +66,5 @@ for i in 0 1 2 4; do
 done
 
 # check whether we can write to a gateway after EIO
-rm -rf $STORE/0/obj
+_safe_remove $STORE/0/obj
 echo hello | $COLLIE vdi write test 0 512

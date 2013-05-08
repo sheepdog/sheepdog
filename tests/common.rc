@@ -41,6 +41,15 @@ _need_to_be_root()
     fi
 }
 
+# To remove directory successfully always, we have to rename it first
+# so that new files are not created in the directory while we remove it.
+_safe_remove()
+{
+    local dir=$1
+    mv ${dir} ${dir}.tmp
+    rm -rf ${dir}.tmp
+}
+
 # Do a command, log it to $seq.full, optionally test return status
 # and die if command fails. If called with one argument _do executes the
 # command, logs it, and returns its exit status. With two arguments _do
