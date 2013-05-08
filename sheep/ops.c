@@ -1032,6 +1032,7 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_SHUTDOWN] = {
 		.name = "SHUTDOWN",
 		.type = SD_OP_TYPE_CLUSTER,
+		.force = true,
 		.process_main = cluster_shutdown,
 	},
 
