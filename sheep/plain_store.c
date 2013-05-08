@@ -18,7 +18,7 @@
 #include "sheep_priv.h"
 #include "config.h"
 
-static int get_open_flags(uint64_t oid, bool create, int fl)
+static int get_open_flags(uint64_t oid, bool create)
 {
 	int flags = O_DSYNC | O_RDWR;
 
@@ -90,7 +90,7 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 
 int default_write(uint64_t oid, const struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, false, iocb->flags), fd,
+	int flags = get_open_flags(oid, false), fd,
 	    ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 	ssize_t size;
@@ -171,7 +171,7 @@ int default_cleanup(void)
 static int init_vdi_state(uint64_t oid, char *wd)
 {
 	char path[PATH_MAX];
-	int fd, flags = get_open_flags(oid, false, 0), ret;
+	int fd, flags = get_open_flags(oid, false), ret;
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
 
 	snprintf(path, sizeof(path), "%s/%016"PRIx64, wd, oid);
@@ -229,7 +229,7 @@ int default_init(void)
 static int default_read_from_path(uint64_t oid, char *path,
 				  const struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, false, iocb->flags), fd,
+	int flags = get_open_flags(oid, false), fd,
 	    ret = SD_RES_SUCCESS;
 	ssize_t size;
 
@@ -292,7 +292,7 @@ int prealloc(int fd, uint32_t size)
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
-	int flags = get_open_flags(oid, true, iocb->flags);
+	int flags = get_open_flags(oid, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
 

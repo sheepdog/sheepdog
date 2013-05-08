@@ -125,7 +125,6 @@ struct cluster_info {
 };
 
 struct siocb {
-	uint16_t flags;
 	uint32_t epoch;
 	void *buf;
 	uint32_t length;

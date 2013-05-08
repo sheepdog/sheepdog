@@ -916,7 +916,6 @@ int peer_read_obj(struct request *req)
 
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
-	iocb.flags = hdr->flags;
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
@@ -954,7 +953,6 @@ int peer_write_obj(struct request *req)
 	uint64_t oid = hdr->obj.oid;
 
 	iocb.epoch = hdr->epoch;
-	iocb.flags = hdr->flags;
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
@@ -974,7 +972,6 @@ int peer_create_and_write_obj(struct request *req)
 
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
-	iocb.flags = hdr->flags;
 	iocb.length = get_objsize(oid);
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		sd_dprintf("%" PRIx64 ", %" PRIx64, oid, hdr->obj.cow_oid);
