@@ -460,6 +460,9 @@ int default_remove_object(uint64_t oid)
 {
 	char path[PATH_MAX];
 
+	if (uatomic_is_true(&sys->use_journal))
+		journal_remove_object(oid);
+
 	get_obj_path(oid, path);
 
 	if (unlink(path) < 0) {

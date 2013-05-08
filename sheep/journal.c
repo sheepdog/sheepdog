@@ -52,6 +52,7 @@ struct journal_descriptor {
 
 #define JF_STORE 0
 #define JF_EPOCH 1
+#define JF_REMOVE_OBJ 2
 
 static const char *jfile_name[2] = { "journal_file0", "journal_file1", };
 static int jfile_fds[2];
@@ -139,15 +140,22 @@ static void journal_get_path(struct journal_descriptor *jd, char *path)
 {
 	switch (jd->flag) {
 	case JF_STORE:
+	case JF_REMOVE_OBJ:
 		snprintf(path, PATH_MAX, "%s/%016"PRIx64,
 			 get_object_path(jd->oid), jd->oid);
-		sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
-			   path, jd->size, jd->offset, jd->create);
+		if (jd->flag == JF_STORE)
+			sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
+				path, jd->size, jd->offset, jd->create);
+		else		/* JF_REMOVE_OBJ */
+			sd_iprintf("%s (remove)", path);
 		break;
 	case JF_EPOCH:
 		snprintf(path, PATH_MAX, "%s/%08"PRIu32, epoch_path, jd->epoch);
 		sd_iprintf("%s, %"PRIu32" size %"PRIu64,
 			   path, jd->epoch, jd->size);
+		break;
+	default:
+		panic("unknown type of journal flag: %d", jd->flag);
 		break;
 	}
 }
@@ -159,6 +167,12 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	int fd, flags = O_WRONLY, ret = 0;
 	void *buf = NULL;
 	char *p = (char *)jd;
+
+	if (jd->flag == JF_REMOVE_OBJ) {
+		journal_get_path(jd, path);
+		unlink(path);
+		return 0;
+	}
 
 	if (jd->create)
 		flags |= O_CREAT;
@@ -436,6 +450,17 @@ int journal_write_epoch(const char *buf, size_t size, uint32_t epoch)
 	};
 	jd.epoch = epoch;
 	return journal_file_write(&jd, buf);
+}
+
+int journal_remove_object(uint64_t oid)
+{
+	struct journal_descriptor jd = {
+		.magic = JOURNAL_DESC_MAGIC,
+		.flag = JF_REMOVE_OBJ,
+		.size = 0,
+	};
+	jd.oid = oid;
+	return journal_file_write(&jd, NULL);
 }
 
 static __attribute__((used)) void journal_c_build_bug_ons(void)
