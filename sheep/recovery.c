@@ -47,7 +47,7 @@ struct recovery_work {
 };
 
 struct recovery_work *next_rw;
-static thread_unsafe(struct recovery_work *) recovering_work;
+static main_thread(struct recovery_work *) recovering_work;
 
 /* Dynamically grown list buffer default as 4M (2T storage) */
 #define DEFAULT_LIST_BUFFER_SIZE (UINT64_C(1) << 22)
@@ -216,12 +216,12 @@ static void recover_object_work(struct work *work)
 
 bool node_in_recovery(void)
 {
-	return thread_unsafe_get(recovering_work) != NULL;
+	return main_thread_get(recovering_work) != NULL;
 }
 
 static inline void prepare_schedule_oid(uint64_t oid)
 {
-	struct recovery_work *rw = thread_unsafe_get(recovering_work);
+	struct recovery_work *rw = main_thread_get(recovering_work);
 	int i;
 
 	for (i = 0; i < rw->nr_prio_oids; i++)
@@ -252,7 +252,7 @@ static inline void prepare_schedule_oid(uint64_t oid)
 
 bool oid_in_recovery(uint64_t oid)
 {
-	struct recovery_work *rw = thread_unsafe_get(recovering_work);
+	struct recovery_work *rw = main_thread_get(recovering_work);
 	int i;
 
 	if (!node_in_recovery())
@@ -309,7 +309,7 @@ static inline bool run_next_rw(struct recovery_work *rw)
 		return false;
 
 	free_recovery_work(rw);
-	thread_unsafe_set(recovering_work, nrw);
+	main_thread_set(recovering_work, nrw);
 	wakeup_all_requests();
 	queue_work(sys->recovery_wqueue, &nrw->work);
 	sd_dprintf("recovery work is superseded");
@@ -344,7 +344,7 @@ static void notify_recovery_completion_main(struct work *work)
 static inline void finish_recovery(struct recovery_work *rw)
 {
 	uint32_t recovered_epoch = rw->epoch;
-	thread_unsafe_set(recovering_work, NULL);
+	main_thread_set(recovering_work, NULL);
 
 	if (sd_store->end_recover)
 		sd_store->end_recover(sys->epoch - 1, rw->old_vinfo);
@@ -444,7 +444,7 @@ static void recover_next_object(struct recovery_work *rw)
 
 void resume_suspended_recovery(void)
 {
-	struct recovery_work *rw = thread_unsafe_get(recovering_work);
+	struct recovery_work *rw = main_thread_get(recovering_work);
 
 	if (rw && rw->suspended) {
 		rw->suspended = false;
@@ -647,7 +647,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 	rw->work.fn = prepare_object_list;
 	rw->work.done = finish_object_list;
 
-	if (thread_unsafe_get(recovering_work) != NULL) {
+	if (main_thread_get(recovering_work) != NULL) {
 		/* skip the previous epoch recovery */
 		struct recovery_work *nrw = uatomic_xchg_ptr(&next_rw, rw);
 		if (nrw)
@@ -660,7 +660,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 		 */
 		resume_suspended_recovery();
 	} else {
-		thread_unsafe_set(recovering_work, rw);
+		main_thread_set(recovering_work, rw);
 		queue_work(sys->recovery_wqueue, &rw->work);
 	}
 out:

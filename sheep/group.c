@@ -45,9 +45,9 @@ static pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t wait_vdis_cond = PTHREAD_COND_INITIALIZER;
 static bool is_vdi_list_ready = true;
 
-static thread_unsafe(struct vnode_info *) current_vnode_info;
-static thread_unsafe(struct list_head *) pending_block_list;
-static thread_unsafe(struct list_head *) pending_notify_list;
+static main_thread(struct vnode_info *) current_vnode_info;
+static main_thread(struct list_head *) pending_block_list;
+static main_thread(struct list_head *) pending_notify_list;
 
 static size_t get_join_message_size(struct join_message *jm)
 {
@@ -89,7 +89,7 @@ static int get_zones_nr_from(const struct sd_node *nodes, int nr_nodes)
 bool have_enough_zones(void)
 {
 	int max_copies;
-	struct vnode_info *cur_vinfo = thread_unsafe_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
 	if (sys->flags & SD_FLAG_NOHALT)
 		return true;
@@ -147,7 +147,7 @@ struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info)
  */
 struct vnode_info *get_vnode_info(void)
 {
-	struct vnode_info *cur_vinfo = thread_unsafe_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
 	if (cur_vinfo == NULL)
 		return NULL;
@@ -207,7 +207,7 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 			       void *data)
 {
 	int nr_nodes;
-	struct vnode_info *cur_vinfo = thread_unsafe_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
 	if (cur_vinfo) {
 		nr_nodes = cur_vinfo->nr_nodes;
@@ -291,7 +291,7 @@ bool sd_block_handler(const struct sd_node *sender)
 
 	cluster_op_running = true;
 
-	req = list_first_entry(thread_unsafe_get(pending_block_list),
+	req = list_first_entry(main_thread_get(pending_block_list),
 				struct request, pending_list);
 	req->work.fn = do_process_work;
 	req->work.done = cluster_op_done;
@@ -313,7 +313,7 @@ void queue_cluster_request(struct request *req)
 
 	if (has_process_work(req->op)) {
 		list_add_tail(&req->pending_list,
-			      thread_unsafe_get(pending_block_list));
+			      main_thread_get(pending_block_list));
 		sys->cdrv->block();
 	} else {
 		struct vdi_op_message *msg;
@@ -321,7 +321,7 @@ void queue_cluster_request(struct request *req)
 
 		msg = prepare_cluster_msg(req, &size);
 		list_add_tail(&req->pending_list,
-			      thread_unsafe_get(pending_notify_list));
+			      main_thread_get(pending_notify_list));
 
 		msg->rsp.result = SD_RES_SUCCESS;
 		sys->cdrv->notify(msg, size);
@@ -589,7 +589,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 		return CJ_RES_FAIL;
 	}
 
-	cur_vinfo = thread_unsafe_get(current_vnode_info);
+	cur_vinfo = main_thread_get(current_vnode_info);
 	if (!cur_vinfo)
 		nr = 1;
 	else
@@ -714,7 +714,7 @@ static void get_vdis_done(struct work *work)
 
 int log_current_epoch(void)
 {
-	struct vnode_info *cur_vinfo = thread_unsafe_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
 	if (!cur_vinfo)
 		return update_epoch_log(sys->epoch, NULL, 0);
@@ -864,8 +864,8 @@ static void update_cluster_info(const struct join_message *msg,
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 
-	old_vnode_info = thread_unsafe_get(current_vnode_info);
-	thread_unsafe_set(current_vnode_info,
+	old_vnode_info = main_thread_get(current_vnode_info);
+	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(nodes, nr_nodes));
 
 	switch (msg->cluster_status) {
@@ -900,7 +900,7 @@ static void update_cluster_info(const struct join_message *msg,
 						nodes, nr_nodes);
 			}
 
-			start_recovery(thread_unsafe_get(current_vnode_info),
+			start_recovery(main_thread_get(current_vnode_info),
 				       old_vnode_info);
 		}
 
@@ -937,11 +937,11 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
 	if (node_is_local(sender)) {
 		if (has_process_work(op))
 			req = list_first_entry(
-				thread_unsafe_get(pending_block_list),
+				main_thread_get(pending_block_list),
 				struct request, pending_list);
 		else
 			req = list_first_entry(
-				thread_unsafe_get(pending_notify_list),
+				main_thread_get(pending_notify_list),
 				struct request, pending_list);
 		list_del(&req->pending_list);
 	}
@@ -1151,8 +1151,8 @@ void sd_join_handler(const struct sd_node *joined,
 			sys->join_finished = true;
 			sys->epoch = get_latest_epoch();
 
-			put_vnode_info(thread_unsafe_get(current_vnode_info));
-			thread_unsafe_set(current_vnode_info,
+			put_vnode_info(main_thread_get(current_vnode_info));
+			main_thread_set(current_vnode_info,
 					  alloc_vnode_info(&sys->this_node, 1));
 		}
 
@@ -1195,15 +1195,15 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 		/* Mark leave node as gateway only node */
 		sys->this_node.nr_vnodes = 0;
 
-	old_vnode_info = thread_unsafe_get(current_vnode_info);
-	thread_unsafe_set(current_vnode_info,
+	old_vnode_info = main_thread_get(current_vnode_info);
+	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(members, nr_members));
 	switch (sys->status) {
 	case SD_STATUS_HALT:
 	case SD_STATUS_OK:
 		uatomic_inc(&sys->epoch);
 		log_current_epoch();
-		start_recovery(thread_unsafe_get(current_vnode_info),
+		start_recovery(main_thread_get(current_vnode_info),
 			       old_vnode_info);
 		if (!have_enough_zones())
 			sys->status = SD_STATUS_HALT;
@@ -1268,12 +1268,12 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	}
 
-	thread_unsafe_set(pending_block_list,
+	main_thread_set(pending_block_list,
 			  xzalloc(sizeof(struct list_head)));
-	INIT_LIST_HEAD(thread_unsafe_get(pending_block_list));
-	thread_unsafe_set(pending_notify_list,
+	INIT_LIST_HEAD(main_thread_get(pending_block_list));
+	main_thread_set(pending_notify_list,
 			  xzalloc(sizeof(struct list_head)));
-	INIT_LIST_HEAD(thread_unsafe_get(pending_notify_list));
+	INIT_LIST_HEAD(main_thread_get(pending_notify_list));
 	INIT_LIST_HEAD(&sys->failed_nodes);
 	INIT_LIST_HEAD(&sys->delayed_nodes);
 

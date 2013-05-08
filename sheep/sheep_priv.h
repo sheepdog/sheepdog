@@ -231,13 +231,13 @@ static inline bool is_worker_thread(void)
  * Helper macros to guard variables from being accessed out of the
  * main thread.  Note that we can use these only for pointers.
  */
-#define thread_unsafe(type) struct { type __val; }
-#define thread_unsafe_get(var)			\
+#define main_thread(type) struct { type __val; }
+#define main_thread_get(var)			\
 ({						\
 	assert(is_main_thread());		\
 	(var).__val;				\
 })
-#define thread_unsafe_set(var, val)		\
+#define main_thread_set(var, val)		\
 ({						\
 	assert(is_main_thread());		\
 	(var).__val = (val);			\
