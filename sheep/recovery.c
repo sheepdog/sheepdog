@@ -104,9 +104,12 @@ static int recover_object_from_replica(uint64_t oid, struct vnode_info *old,
 		if (is_invalid_vnode(vnode, cur->nodes, cur->nr_nodes))
 			continue;
 
-		if (vnode_is_local(vnode) && tgt_epoch < sys_epoch())
-			ret = sd_store->link(oid, tgt_epoch);
-		else {
+		if (vnode_is_local(vnode)) {
+			if (tgt_epoch < sys_epoch())
+				ret = sd_store->link(oid, tgt_epoch);
+			else
+				ret = SD_RES_NO_OBJ;
+		} else {
 			sd_init_req(&hdr, SD_OP_READ_PEER);
 			hdr.epoch = epoch;
 			hdr.flags = SD_FLAG_CMD_RECOVERY;
