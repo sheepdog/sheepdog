@@ -338,7 +338,7 @@ static int init_work_queues(void)
 
 	sys->gateway_wqueue = init_work_queue("gway", WQ_UNLIMITED);
 	sys->io_wqueue = init_work_queue("io", WQ_UNLIMITED);
-	sys->recovery_wqueue = init_work_queue("rw", WQ_UNLIMITED);
+	sys->recovery_wqueue = init_ordered_work_queue("rw");
 	sys->deletion_wqueue = init_ordered_work_queue("deletion");
 	sys->block_wqueue = init_ordered_work_queue("block");
 	sys->sockfd_wqueue = init_ordered_work_queue("sockfd");
