@@ -168,9 +168,7 @@ struct store_driver {
 	int (*remove_object)(uint64_t oid);
 	/* Operations in recovery */
 	int (*link)(uint64_t oid, uint32_t tgt_epoch);
-	/* int (*begin_recover)(const struct siocb *); */
-	int (*end_recover)(uint32_t epoch,
-			   const struct vnode_info *old_vnode_info);
+	int (*update_epoch)(uint32_t epoch);
 	int (*purge_obj)(void);
 	/* Operations for snapshot */
 	int (*snapshot)(const struct siocb *);
@@ -185,8 +183,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb);
 int default_write(uint64_t oid, const struct siocb *iocb);
 int default_read(uint64_t oid, const struct siocb *iocb);
 int default_link(uint64_t oid, uint32_t tgt_epoch);
-int default_end_recover(uint32_t old_epoch,
-			const struct vnode_info *old_vnode_info);
+int default_update_epoch(uint32_t epoch);
 int default_cleanup(void);
 int default_format(void);
 int default_remove_object(uint64_t oid);

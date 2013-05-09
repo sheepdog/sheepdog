@@ -328,6 +328,10 @@ static inline bool run_next_rw(struct recovery_work *rw)
 		return false;
 
 	free_recovery_work(rw);
+
+	if (sd_store->update_epoch)
+		sd_store->update_epoch(nrw->epoch);
+
 	main_thread_set(recovering_work, nrw);
 	wakeup_all_requests();
 	queue_work(sys->recovery_wqueue, &nrw->work);
@@ -364,9 +368,6 @@ static inline void finish_recovery(struct recovery_work *rw)
 {
 	uint32_t recovered_epoch = rw->epoch;
 	main_thread_set(recovering_work, NULL);
-
-	if (sd_store->end_recover)
-		sd_store->end_recover(sys->epoch - 1, rw->old_vinfo);
 
 	wakeup_all_requests();
 
@@ -665,6 +666,9 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 
 	rw->work.fn = prepare_object_list;
 	rw->work.done = finish_object_list;
+
+	if (sd_store->update_epoch)
+		sd_store->update_epoch(rw->epoch);
 
 	if (main_thread_get(recovering_work) != NULL) {
 		/* skip the previous epoch recovery */

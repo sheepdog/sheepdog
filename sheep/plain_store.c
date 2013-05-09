@@ -432,9 +432,10 @@ static int check_stale_objects(uint64_t oid, char *wd, void *arg)
 	return SD_RES_SUCCESS;
 }
 
-int default_end_recover(uint32_t old_epoch,
-			const struct vnode_info *old_vnode_info)
+int default_update_epoch(uint32_t epoch)
 {
+	uint32_t old_epoch = epoch - 1;
+
 	if (old_epoch == 0)
 		return SD_RES_SUCCESS;
 
@@ -491,7 +492,7 @@ static struct store_driver plain_store = {
 	.write = default_write,
 	.read = default_read,
 	.link = default_link,
-	.end_recover = default_end_recover,
+	.update_epoch = default_update_epoch,
 	.cleanup = default_cleanup,
 	.format = default_format,
 	.remove_object = default_remove_object,
