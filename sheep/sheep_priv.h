@@ -77,7 +77,7 @@ struct cluster_info {
 	uint64_t disk_space;
 
 	/*
-	 * List of nodes that were past of the last epoch before a shutdown,
+	 * List of nodes that were part of the last epoch before a shutdown,
 	 * but failed to join.
 	 */
 	struct list_head failed_nodes;

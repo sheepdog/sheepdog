@@ -388,7 +388,7 @@ grab:
 		goto out;
 	}
 
-	/* Create a new cached connection for this vnode */
+	/* Create a new cached connection for this node */
 	sd_dprintf("create cache connection %s:%d idx %d", name, port, idx);
 	fd = connect_to(name, port);
 	if (fd < 0) {
@@ -450,7 +450,7 @@ static void sockfd_cache_close(const struct node_id *nid, int idx)
 }
 
 /*
- * Return a sockfd connected to the vnode to the caller
+ * Return a sockfd connected to the node to the caller
  *
  * Try to get a 'long' FD as best, which is cached and never closed. If no FD
  * available, we return a 'short' FD which is supposed to be closed by
@@ -480,7 +480,7 @@ struct sockfd *sheep_get_sockfd(const struct node_id *nid)
 }
 
 /*
- * Rlease a sockfd connected to the vnode, which is acquired from
+ * Release a sockfd connected to the node, which is acquired from
  * sheep_get_sockfd()
  *
  * If it is a long FD, just decrease the refcount to make it available again.
@@ -504,10 +504,10 @@ void sheep_put_sockfd(const struct node_id *nid, struct sockfd *sfd)
 }
 
 /*
- * Delete a sockfd connected to the vnode, when vnode is crashed.
+ * Delete a sockfd connected to the node, when node is crashed.
  *
  * If it is a long FD, de-refcount it and tres to destroy all the cached FDs of
- * this vnode in the cache.
+ * this node in the cache.
  * If it is a short FD, just close it.
  */
 void sheep_del_sockfd(const struct node_id *nid, struct sockfd *sfd)

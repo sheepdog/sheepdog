@@ -980,7 +980,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		uint32_t epoch;
 
 		/*
-		 * If I'm the first sheep joins in colosync, I
+		 * If I'm the first sheep joins in corosync, I
 		 * becomes the master without sending JOIN.
 		 */
 
