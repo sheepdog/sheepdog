@@ -407,7 +407,7 @@ static inline void kick_recover(void)
 static void md_do_recover(struct work *work)
 {
 	struct md_work *mw = container_of(work, struct md_work, work);
-	int idx;
+	int idx, nr = 0;
 
 	pthread_rwlock_wrlock(&md_lock);
 	idx = path_to_disk_idx(mw->path);
@@ -416,10 +416,13 @@ static void md_do_recover(struct work *work)
 		goto out;
 	remove_disk(idx);
 	sys->disk_space = md_init_space();
-	if (md_nr_disks > 0)
-		kick_recover();
+	nr = md_nr_disks;
 out:
 	pthread_rwlock_unlock(&md_lock);
+
+	if (nr > 0)
+		kick_recover();
+
 	free(mw);
 }
 
@@ -599,7 +602,7 @@ static inline void md_del_disk(char *path)
 static int do_plug_unplug(char *disks, bool plug)
 {
 	char *path;
-	int old_nr, ret = SD_RES_UNKNOWN;
+	int old_nr, cur_nr = 0, ret = SD_RES_UNKNOWN;
 
 	pthread_rwlock_wrlock(&md_lock);
 	old_nr = md_nr_disks;
@@ -619,17 +622,20 @@ static int do_plug_unplug(char *disks, bool plug)
 		goto out;
 
 	sys->disk_space = md_init_space();
+	cur_nr = md_nr_disks;
+
+	ret = SD_RES_SUCCESS;
+out:
+	pthread_rwlock_unlock(&md_lock);
+
 	/*
 	 * We have to kick recover aggressively because there is possibility
 	 * that nr of disks are removed during md_init_space() happens to equal
 	 * nr of disks we added.
 	 */
-	if (md_nr_disks > 0)
+	if (cur_nr > 0)
 		kick_recover();
 
-	ret = SD_RES_SUCCESS;
-out:
-	pthread_rwlock_unlock(&md_lock);
 	return ret;
 }
 
