@@ -221,6 +221,7 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_KILLED] = "Node is killed",
 		[SD_RES_OID_EXIST] = "Object ID exists already",
 		[SD_RES_AGAIN] = "Ask to try again",
+		[SD_RES_STALE_OBJ] = "Object may be stale",
 	};
 
 	if (descs[err] == NULL) {

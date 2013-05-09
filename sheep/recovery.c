@@ -122,6 +122,7 @@ static int recover_object_from_replica(uint64_t oid, struct vnode_info *old,
 	int nr_copies, ret = SD_RES_SUCCESS, start = 0;
 	void *buf = NULL;
 	struct siocb iocb = { 0 };
+	bool fully_replicated = true;
 
 	nr_copies = get_obj_copy_number(oid, old->nr_zones);
 
@@ -182,10 +183,23 @@ static int recover_object_from_replica(uint64_t oid, struct vnode_info *old,
 		case SD_RES_OLD_NODE_VER:
 			/* move to the next epoch recovery */
 			goto out;
+		case SD_RES_NO_OBJ:
+			fully_replicated = false;
+			/* fall through */
 		default:
 			break;
 		}
 	}
+
+	/*
+	 * sheep would return a stale object when
+	 *  - all the nodes hold the copies, and
+	 *  - all the nodes are gone
+	 * at the some epoch
+	 */
+	if (fully_replicated && ret != SD_RES_SUCCESS)
+		ret = SD_RES_STALE_OBJ;
+
 out:
 	free(buf);
 	return ret;
@@ -220,6 +234,11 @@ again:
 	case SD_RES_OLD_NODE_VER:
 		row->stop = true;
 		break;
+	case SD_RES_STALE_OBJ:
+		sd_printf(SDOG_ALERT, "cannot access any replicas of "
+			  "%"PRIx64" at epoch %d", oid, tgt_epoch);
+		sd_printf(SDOG_ALERT, "clients may see old data");
+		/* fall through */
 	default:
 		/* No luck, roll back to an older configuration and try again */
 rollback:
@@ -231,9 +250,12 @@ rollback:
 		}
 
 		new_old = get_vnode_info_epoch(tgt_epoch, rw->cur_vinfo);
-		if (!new_old)
+		if (!new_old) {
 			/* We rollback in case we don't get a valid epoch */
+			sd_printf(SDOG_ALERT, "cannot get epoch %d", tgt_epoch);
+			sd_printf(SDOG_ALERT, "clients may see old data");
 			goto rollback;
+		}
 
 		put_vnode_info(cur);
 		cur = old;
@@ -623,6 +645,10 @@ retry:
 		buf = xrealloc(buf, buf_size);
 		goto retry;
 	default:
+		sd_printf(SDOG_ALERT, "cannot get object list from %s:%d", name,
+			  e->nid.port);
+		sd_printf(SDOG_ALERT, "some objects may be not recovered at "
+			  "epoch %d", epoch);
 		free(buf);
 		return NULL;
 	}
