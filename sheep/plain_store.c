@@ -255,7 +255,6 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 {
 	int ret;
 	char path[PATH_MAX];
-	uint32_t epoch = sys_epoch();
 
 	get_obj_path(oid, path);
 	ret = default_read_from_path(oid, path, iocb);
@@ -264,9 +263,8 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	 * If the request is againt the older epoch, try to read from
 	 * the stale directory
 	 */
-	while (ret == SD_RES_NO_OBJ && iocb->epoch < epoch) {
-		epoch--;
-		get_stale_obj_path(oid, epoch, path);
+	if (ret == SD_RES_NO_OBJ && iocb->epoch < sys_epoch()) {
+		get_stale_obj_path(oid, iocb->epoch, path);
 		ret = default_read_from_path(oid, path, iocb);
 	}
 
