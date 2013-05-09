@@ -67,54 +67,6 @@ static int obj_cmp(const void *oid1, const void *oid2)
 	return 0;
 }
 
-static int recover_object_from_replica(uint64_t oid,
-				       const struct sd_vnode *vnode,
-				       uint32_t epoch, uint32_t tgt_epoch)
-{
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	unsigned rlen;
-	int ret = SD_RES_NO_MEM;
-	void *buf = NULL;
-	struct siocb iocb = { 0 };
-
-	if (vnode_is_local(vnode) && tgt_epoch < sys_epoch()) {
-		ret = sd_store->link(oid, tgt_epoch);
-		goto out;
-	}
-
-	rlen = get_objsize(oid);
-	buf = valloc(rlen);
-	if (!buf) {
-		sd_eprintf("%m");
-		goto out;
-	}
-
-	sd_init_req(&hdr, SD_OP_READ_PEER);
-	hdr.epoch = epoch;
-	hdr.flags = SD_FLAG_CMD_RECOVERY;
-	hdr.data_length = rlen;
-	hdr.obj.oid = oid;
-	hdr.obj.tgt_epoch = tgt_epoch;
-
-	ret = sheep_exec_req(&vnode->nid, &hdr, buf);
-	if (ret != SD_RES_SUCCESS)
-		goto out;
-	iocb.epoch = epoch;
-	iocb.length = rsp->data_length;
-	iocb.offset = rsp->obj.offset;
-	iocb.buf = buf;
-	ret = sd_store->create_and_write(oid, &iocb);
-out:
-	if (ret == SD_RES_SUCCESS) {
-		sd_dprintf("recovered oid %"PRIx64" from %d to epoch %d", oid,
-			tgt_epoch, epoch);
-		objlist_cache_insert(oid);
-	}
-	free(buf);
-	return ret;
-}
-
 /*
  * A virtual node that does not match any node in current node list
  * means the node has left the cluster, then it's an invalid virtual node.
@@ -128,6 +80,68 @@ static bool is_invalid_vnode(const struct sd_vnode *entry,
 	return true;
 }
 
+static int recover_object_from_replica(uint64_t oid, struct vnode_info *old,
+				       struct vnode_info *cur,
+				       uint32_t epoch, uint32_t tgt_epoch)
+{
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	unsigned rlen;
+	int nr_copies, ret = SD_RES_SUCCESS;
+	void *buf = NULL;
+	struct siocb iocb = { 0 };
+
+	rlen = get_objsize(oid);
+	buf = xvalloc(rlen);
+
+	/* Let's do a breadth-first search */
+	nr_copies = get_obj_copy_number(oid, old->nr_zones);
+	for (int i = 0; i < nr_copies; i++) {
+		const struct sd_vnode *vnode;
+
+		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, i);
+
+		if (is_invalid_vnode(vnode, cur->nodes, cur->nr_nodes))
+			continue;
+
+		if (vnode_is_local(vnode) && tgt_epoch < sys_epoch())
+			ret = sd_store->link(oid, tgt_epoch);
+		else {
+			sd_init_req(&hdr, SD_OP_READ_PEER);
+			hdr.epoch = epoch;
+			hdr.flags = SD_FLAG_CMD_RECOVERY;
+			hdr.data_length = rlen;
+			hdr.obj.oid = oid;
+			hdr.obj.tgt_epoch = tgt_epoch;
+
+			ret = sheep_exec_req(&vnode->nid, &hdr, buf);
+			if (ret == SD_RES_SUCCESS) {
+				iocb.epoch = epoch;
+				iocb.length = rsp->data_length;
+				iocb.offset = rsp->obj.offset;
+				iocb.buf = buf;
+				ret = sd_store->create_and_write(oid, &iocb);
+			}
+		}
+
+		switch (ret) {
+		case SD_RES_SUCCESS:
+			sd_dprintf("recovered oid %"PRIx64" from %d "
+				   "to epoch %d", oid, tgt_epoch, epoch);
+			objlist_cache_insert(oid);
+			goto out;
+		case SD_RES_OLD_NODE_VER:
+			/* move to the next epoch recovery */
+			goto out;
+		default:
+			break;
+		}
+	}
+out:
+	free(buf);
+	return ret;
+}
+
 /*
  * Recover the object from its track in epoch history. That is,
  * the routine will try to recovery it from the nodes it has stayed,
@@ -135,49 +149,35 @@ static bool is_invalid_vnode(const struct sd_vnode *entry,
  */
 static int do_recover_object(struct recovery_work *rw)
 {
-	struct vnode_info *old;
+	struct vnode_info *old, *cur;
 	uint64_t oid = rw->oids[rw->done];
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->epoch;
-	int nr_copies, ret, i;
+	int ret;
+	struct vnode_info *new_old;
 
 	old = grab_vnode_info(rw->old_vinfo);
-
+	cur = grab_vnode_info(rw->cur_vinfo);
 again:
 	sd_dprintf("try recover object %"PRIx64" from epoch %"PRIu32, oid,
 		   tgt_epoch);
 
-	/* Let's do a breadth-first search */
-	nr_copies = get_obj_copy_number(oid, old->nr_zones);
-	for (i = 0; i < nr_copies; i++) {
-		const struct sd_vnode *tgt_vnode;
+	ret = recover_object_from_replica(oid, old, cur, epoch, tgt_epoch);
 
-		tgt_vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, i);
-
-		if (is_invalid_vnode(tgt_vnode, rw->cur_vinfo->nodes,
-				     rw->cur_vinfo->nr_nodes))
-			continue;
-		ret = recover_object_from_replica(oid, tgt_vnode,
-						  epoch, tgt_epoch);
-		if (ret == SD_RES_SUCCESS) {
-			/* Succeed */
-			break;
-		} else if (SD_RES_OLD_NODE_VER == ret) {
-			rw->stop = true;
-			goto err;
-		} else
-			ret = -1;
-	}
-
-	/* No luck, roll back to an older configuration and try again */
-	if (ret < 0) {
-		struct vnode_info *new_old;
-
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		/* Succeed */
+		break;
+	case SD_RES_OLD_NODE_VER:
+		rw->stop = true;
+		break;
+	default:
+		/* No luck, roll back to an older configuration and try again */
 rollback:
 		tgt_epoch--;
 		if (tgt_epoch < 1) {
 			sd_eprintf("can not recover oid %"PRIx64, oid);
 			ret = -1;
-			goto err;
+			break;
 		}
 
 		new_old = get_vnode_info_epoch(tgt_epoch, rw->cur_vinfo);
@@ -185,12 +185,14 @@ rollback:
 			/* We rollback in case we don't get a valid epoch */
 			goto rollback;
 
-		put_vnode_info(old);
+		put_vnode_info(cur);
+		cur = old;
 		old = new_old;
 		goto again;
 	}
-err:
+
 	put_vnode_info(old);
+	put_vnode_info(cur);
 	return ret;
 }
 
