@@ -87,19 +87,33 @@ static int recover_object_from_replica(uint64_t oid, struct vnode_info *old,
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	unsigned rlen;
-	int nr_copies, ret = SD_RES_SUCCESS;
+	int nr_copies, ret = SD_RES_SUCCESS, start = 0;
 	void *buf = NULL;
 	struct siocb iocb = { 0 };
+
+	nr_copies = get_obj_copy_number(oid, old->nr_zones);
+
+	/* find local node first to try to recover from local */
+	for (int i = 0; i < nr_copies; i++) {
+		const struct sd_vnode *vnode;
+
+		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, i);
+
+		if (vnode_is_local(vnode)) {
+			start = i;
+			break;
+		}
+	}
 
 	rlen = get_objsize(oid);
 	buf = xvalloc(rlen);
 
 	/* Let's do a breadth-first search */
-	nr_copies = get_obj_copy_number(oid, old->nr_zones);
 	for (int i = 0; i < nr_copies; i++) {
 		const struct sd_vnode *vnode;
+		int idx = (i + start) % nr_copies;
 
-		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, i);
+		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, idx);
 
 		if (is_invalid_vnode(vnode, cur->nodes, cur->nr_nodes))
 			continue;
