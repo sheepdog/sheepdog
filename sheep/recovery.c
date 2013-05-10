@@ -337,7 +337,7 @@ bool oid_in_recovery(uint64_t oid)
 		return false;
 	}
 
-	if (before(rinfo->epoch, sys->epoch))
+	if (uatomic_read(&next_rinfo))
 		return true;
 
 	/* If we are in preparation of object list, oid is not recovered yet */
