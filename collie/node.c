@@ -211,7 +211,7 @@ static int node_kill(int argc, char **argv)
 static int node_md_info(struct node_id *nid)
 {
 	struct sd_md_info info = {};
-	char size_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE];
+	char free_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE];
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, i;
@@ -232,10 +232,10 @@ static int node_md_info(struct node_id *nid)
 	}
 
 	for (i = 0; i < info.nr; i++) {
-		size_to_str(info.disk[i].size, size_str, sizeof(size_str));
+		size_to_str(info.disk[i].size, free_str, sizeof(free_str));
 		size_to_str(info.disk[i].used, used_str, sizeof(used_str));
-		fprintf(stdout, "%2d\t%s\t%s\t%s\n", info.disk[i].idx, size_str,
-			used_str, info.disk[i].path);
+		fprintf(stdout, "%2d\t%s\t%s\t%s\n", info.disk[i].idx, used_str,
+			free_str, info.disk[i].path);
 	}
 	return EXIT_SUCCESS;
 }
@@ -244,7 +244,7 @@ static int md_info(int argc, char **argv)
 {
 	int i, ret;
 
-	fprintf(stdout, "Id\tSize\tUse\tPath\n");
+	fprintf(stdout, "Id\tUsed\tFree\tPath\n");
 
 	if (!node_cmd_data.all_nodes) {
 		struct node_id nid = {.port = sdport};
