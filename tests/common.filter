@@ -163,5 +163,10 @@ _filter_store()
     sed -e "s|$STORE|STORE|g"
 }
 
+_filter_md_info()
+{
+	awk '{if ($4 ~ /^[0-9]+$/) $4="MASKED";print $0}' | _filter_store
+}
+
 # make sure this script returns success
 /bin/true
