@@ -473,6 +473,12 @@ static bool local_process_event(void)
 				ev->join_result, ev->buf);
 		break;
 	case EVENT_LEAVE:
+		if (ev->sender.gateway) {
+			sd_dprintf("gateway %s left sheepdog",
+				   lnode_to_str(&ev->sender));
+			break;
+		}
+		/* fall through */
 	case EVENT_GATEWAY:
 		sd_leave_handler(&ev->sender.node, nodes, nr_nodes);
 		break;
