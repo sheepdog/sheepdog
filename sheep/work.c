@@ -141,7 +141,7 @@ void queue_work(struct work_queue *q, struct work *work)
 	pthread_cond_signal(&wi->pending_cond);
 }
 
-static void bs_thread_request_done(int fd, int events, void *data)
+static void worker_thread_request_done(int fd, int events, void *data)
 {
 	int ret;
 	struct worker_info *wi;
@@ -246,7 +246,7 @@ int init_wqueue_eventfd(void)
 		return 1;
 	}
 
-	ret = register_event(efd, bs_thread_request_done, NULL);
+	ret = register_event(efd, worker_thread_request_done, NULL);
 	if (ret) {
 		sd_eprintf("failed to register event fd %m");
 		close(efd);
