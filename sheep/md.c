@@ -145,16 +145,16 @@ static int path_to_disk_idx(char *path)
 	return -1;
 }
 
-void md_add_disk(char *path)
+bool md_add_disk(char *path)
 {
 	if (path_to_disk_idx(path) != -1) {
 		sd_eprintf("duplicate path %s", path);
-		return;
+		return false;
 	}
 
 	if (xmkdir(path, sd_def_dmode) < 0) {
 		sd_eprintf("can't mkdir for %s, %m", path);
-		return;
+		return false;
 	}
 
 	md_nr_disks++;
@@ -162,6 +162,7 @@ void md_add_disk(char *path)
 	pstrcpy(md_disks[md_nr_disks - 1].path, PATH_MAX, path);
 	sd_iprintf("%s, nr %d", md_disks[md_nr_disks - 1].path,
 		   md_nr_disks);
+	return true;
 }
 
 static inline void calculate_vdisks(struct disk *disks, int nr_disks,
@@ -558,7 +559,7 @@ bool md_exist(uint64_t oid)
 int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path)
 {
 	snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
-		get_object_path(oid), oid, epoch);
+		 get_object_path(oid), oid, epoch);
 	if (md_access(path))
 		return SD_RES_SUCCESS;
 
@@ -608,13 +609,15 @@ static int do_plug_unplug(char *disks, bool plug)
 	old_nr = md_nr_disks;
 	path = strtok(disks, ",");
 	do {
-		if (purge_directory(path) < 0)
-			goto out;
-
-		if (plug)
-			md_add_disk(path);
-		else
+		if (plug) {
+			if (md_add_disk(path))
+				if (purge_directory(path) < 0) {
+					md_del_disk(path);
+					goto out;
+				}
+		} else {
 			md_del_disk(path);
+		}
 	} while ((path = strtok(NULL, ",")));
 
 	/* If no disks change, bail out */
@@ -633,7 +636,7 @@ out:
 	 * that nr of disks are removed during md_init_space() happens to equal
 	 * nr of disks we added.
 	 */
-	if (cur_nr > 0)
+	if (cur_nr > 0 && ret == SD_RES_SUCCESS)
 		kick_recover();
 
 	return ret;

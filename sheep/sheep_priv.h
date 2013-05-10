@@ -442,7 +442,7 @@ int journal_write_config(const char *buf, size_t size);
 int journal_remove_object(uint64_t oid);
 
 /* md.c */
-void md_add_disk(char *path);
+bool md_add_disk(char *path);
 uint64_t md_init_space(void);
 char *get_object_path(uint64_t oid);
 int md_handle_eio(char *);
