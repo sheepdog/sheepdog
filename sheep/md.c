@@ -610,11 +610,8 @@ static int do_plug_unplug(char *disks, bool plug)
 	path = strtok(disks, ",");
 	do {
 		if (plug) {
-			if (md_add_disk(path))
-				if (purge_directory(path) < 0) {
-					md_del_disk(path);
-					goto out;
-				}
+			if (md_add_disk(path) && purge_directory(path) < 0)
+				md_del_disk(path);
 		} else {
 			md_del_disk(path);
 		}
