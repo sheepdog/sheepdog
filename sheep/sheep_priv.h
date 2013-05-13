@@ -266,6 +266,7 @@ int vdi_exist(uint32_t vid);
 int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid);
 int vdi_delete(struct vdi_iocb *iocb, struct request *req);
 int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info);
+void clean_vdi_state(void);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 

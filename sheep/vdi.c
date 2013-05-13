@@ -933,3 +933,20 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 out:
 	return ret;
 }
+
+void clean_vdi_state(void)
+{
+	struct rb_node *current_node = rb_first(&vdi_state_root);
+	struct vdi_state_entry *entry = NULL;
+
+	pthread_rwlock_wrlock(&vdi_state_lock);
+	while (current_node) {
+		entry = rb_entry(current_node, struct vdi_state_entry, node);
+		rb_erase(current_node, &vdi_state_root);
+		free(entry);
+		entry = NULL;
+		current_node = rb_first(&vdi_state_root);
+	}
+	INIT_RB_ROOT(&vdi_state_root);
+	pthread_rwlock_unlock(&vdi_state_lock);
+}
