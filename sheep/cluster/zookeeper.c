@@ -510,7 +510,12 @@ static int zk_join(const struct sd_node *myself,
 
 static int zk_leave(void)
 {
-	return add_event(EVENT_LEAVE, &this_node, NULL, 0);
+	char path[PATH_MAX];
+	snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
+			node_to_str(&this_node.node));
+	add_event(EVENT_LEAVE, &this_node, NULL, 0);
+	zk_delete_node(path, -1);
+	return 0;
 }
 
 static int zk_notify(void *msg, size_t msg_len)
