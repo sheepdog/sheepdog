@@ -392,7 +392,12 @@ static void check_host_env(void)
 
 static int lock_and_daemon(bool daemonize, const char *base_dir)
 {
-	int ret, devnull_fd = 0;
+	int ret, devnull_fd = 0, status = 0;
+	int pipefd[2];
+
+	ret = pipe(pipefd);
+	if (ret < 0)
+		panic("pipe() for passing exit status failed: %m");
 
 	if (daemonize) {
 		switch (fork()) {
@@ -402,36 +407,52 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 			panic("fork() failed during daemonize: %m");
 			break;
 		default:
-			exit(0);
+			ret = read(pipefd[0], &status, sizeof(status));
+			if (ret != sizeof(status))
+				panic("read exit status failed: %m");
+
+			exit(status);
 			break;
 		}
 
-		if (setsid() == -1)
-			panic("becoming a leader of a new session failed: %m");
+		if (setsid() == -1) {
+			sd_eprintf("becoming a leader of a new session"
+				" failed: %m");
+			status = 1;
+			goto end;
+		}
 
 		switch (fork()) {
 		case 0:
 			break;
 		case -1:
-			panic("fork() failed during daemonize: %m");
-			break;
+			sd_eprintf("fork() failed during daemonize: %m");
+			status = 1;
+			goto end;
 		default:
 			exit(0);
 			break;
 		}
 
-		if (chdir("/"))
-			panic("chdir to / failed: %m");
+		if (chdir("/")) {
+			sd_eprintf("chdir to / failed: %m");
+			status = 1;
+			goto end;
+		}
 
 		devnull_fd = open("/dev/null", O_RDWR);
-		if (devnull_fd < 0)
-			panic("opening /dev/null failed: %m");
+		if (devnull_fd < 0) {
+			sd_eprintf("opening /dev/null failed: %m");
+			status = 1;
+			goto end;
+		}
 	}
 
 	ret = lock_base_dir(base_dir);
 	if (ret < 0) {
 		sd_eprintf("locking directory: %s failed", base_dir);
-		return -1;
+		status = 1;
+		goto end;
 	}
 
 	if (daemonize) {
@@ -446,7 +467,12 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 		close(devnull_fd);
 	}
 
-	return 0;
+end:
+	ret = write(pipefd[1], &status, sizeof(status));
+	if (ret != sizeof(status))
+		panic("writing exit status failed: %m");
+
+	return status;
 }
 
 int main(int argc, char **argv)
