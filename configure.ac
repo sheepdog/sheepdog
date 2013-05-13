@@ -296,7 +296,6 @@ WARNLIST="
 	missing-prototypes
 	missing-declarations
 	strict-prototypes
-	declaration-after-statement
 	pointer-arith
 	write-strings
 	cast-align
