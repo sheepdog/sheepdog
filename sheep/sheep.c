@@ -331,21 +331,22 @@ static void init_io_arg(char *arg)
 	}
 }
 
-static int init_work_queues(void)
+static int create_work_queues(void)
 {
-	if (init_wqueue_eventfd())
+	if (init_work_queue())
 		return -1;
 
-	sys->gateway_wqueue = init_work_queue("gway", WQ_UNLIMITED);
-	sys->io_wqueue = init_work_queue("io", WQ_UNLIMITED);
-	sys->recovery_wqueue = init_ordered_work_queue("rw");
-	sys->deletion_wqueue = init_ordered_work_queue("deletion");
-	sys->block_wqueue = init_ordered_work_queue("block");
-	sys->sockfd_wqueue = init_ordered_work_queue("sockfd");
-	sys->md_wqueue = init_ordered_work_queue("md");
+	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
+	sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
+	sys->recovery_wqueue = create_ordered_work_queue("rw");
+	sys->deletion_wqueue = create_ordered_work_queue("deletion");
+	sys->block_wqueue = create_ordered_work_queue("block");
+	sys->sockfd_wqueue = create_ordered_work_queue("sockfd");
+	sys->md_wqueue = create_ordered_work_queue("md");
 	if (sys->enable_object_cache) {
-		sys->oc_reclaim_wqueue = init_ordered_work_queue("oc_reclaim");
-		sys->oc_push_wqueue = init_work_queue("oc_push", WQ_DYNAMIC);
+		sys->oc_reclaim_wqueue =
+			create_ordered_work_queue("oc_reclaim");
+		sys->oc_push_wqueue = create_work_queue("oc_push", WQ_DYNAMIC);
 		if (!sys->oc_reclaim_wqueue || !sys->oc_push_wqueue)
 			return -1;
 	}
@@ -734,7 +735,7 @@ int main(int argc, char **argv)
 	 * e.g, signal handling, above this call and those need multi-threaded
 	 * environment, for e.g, work queues below.
 	 */
-	ret = init_work_queues();
+	ret = create_work_queues();
 	if (ret)
 		exit(1);
 

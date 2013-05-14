@@ -260,7 +260,7 @@ retest:
 	pthread_exit(NULL);
 }
 
-int init_wqueue_eventfd(void)
+int init_work_queue(void)
 {
 	int ret;
 
@@ -291,7 +291,8 @@ int init_wqueue_eventfd(void)
  *     local requests that ask for creation of another thread to execute the
  *     requests and sleep-wait for responses.
  */
-struct work_queue *init_work_queue(const char *name, enum wq_thread_control tc)
+struct work_queue *create_work_queue(const char *name,
+				     enum wq_thread_control tc)
 {
 	int ret;
 	struct worker_info *wi;
@@ -326,7 +327,7 @@ destroy_threads:
 	return NULL;
 }
 
-struct work_queue *init_ordered_work_queue(const char *name)
+struct work_queue *create_ordered_work_queue(const char *name)
 {
-	return init_work_queue(name, WQ_ORDERED);
+	return create_work_queue(name, WQ_ORDERED);
 }

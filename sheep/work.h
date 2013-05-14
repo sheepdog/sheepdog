@@ -24,9 +24,9 @@ enum wq_thread_control {
 	WQ_UNLIMITED, /* Unlimited # of threads created */
 };
 
-struct work_queue *init_work_queue(const char *name, enum wq_thread_control);
-struct work_queue *init_ordered_work_queue(const char *name);
+int init_work_queue(void);
+struct work_queue *create_work_queue(const char *name, enum wq_thread_control);
+struct work_queue *create_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);
-int init_wqueue_eventfd(void);
 
 #endif
