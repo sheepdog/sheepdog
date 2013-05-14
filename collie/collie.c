@@ -18,6 +18,8 @@
 #include "collie.h"
 #include "util.h"
 
+#define EPOLL_SIZE 4096
+
 static const char program_name[] = "collie";
 const char *sdhost = "127.0.0.1";
 int sdport = SD_LISTEN_PORT;
@@ -322,6 +324,11 @@ static void crash_handler(int signo)
 	reraise_crash_signal(signo, EXIT_SYSFAIL);
 }
 
+static size_t get_nr_nodes(void)
+{
+	return sd_nodes_nr;
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret;
@@ -392,6 +399,14 @@ int main(int argc, char **argv)
 
 	if (flags & SUBCMD_FLAG_NEED_ARG && argc == optind)
 		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+
+	if (init_event(EPOLL_SIZE) < 0)
+		exit(EXIT_SYSFAIL);
+
+	if (init_work_queue(get_nr_nodes, NULL, NULL) != 0) {
+		fprintf(stderr, "Failed to init work queue\n");
+		exit(EXIT_SYSFAIL);
+	}
 
 	return command_fn(argc, argv);
 }
