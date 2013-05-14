@@ -30,7 +30,7 @@ collie_SOURCES          += debug.c
 override CFLAGS         := $(subst -pg -gstabs,,$(CFLAGS))
 endif
 
-collie_LDADD	  	= ../lib/libsheepdog.a
+collie_LDADD	  	= ../lib/libsheepdog.a -lpthread
 collie_DEPENDENCIES	= ../lib/libsheepdog.a
 
 noinst_HEADERS		= treeview.h collie.h

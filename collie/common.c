@@ -246,3 +246,16 @@ void confirm(const char *message)
 	if (ret == NULL || strncasecmp(input, "yes", 3) != 0)
 		exit(EXIT_SUCCESS);
 }
+
+void work_queue_wait(struct work_queue *q)
+{
+	assert(is_main_thread());
+
+	while (!work_queue_empty(q))
+		event_loop(-1);
+	/*
+	 * We have to call event_loop() again because some works are remained in
+	 * the finished list.
+	 */
+	event_loop(-1);
+}

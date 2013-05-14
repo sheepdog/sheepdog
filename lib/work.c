@@ -333,3 +333,15 @@ struct work_queue *create_ordered_work_queue(const char *name)
 {
 	return create_work_queue(name, WQ_ORDERED);
 }
+
+bool work_queue_empty(struct work_queue *q)
+{
+	struct worker_info *wi = container_of(q, struct worker_info, q);
+	size_t nr_works;
+
+	pthread_mutex_lock(&wi->pending_lock);
+	nr_works = wi->nr_running + wi->nr_pending;
+	pthread_mutex_unlock(&wi->pending_lock);
+
+	return nr_works == 0;
+}

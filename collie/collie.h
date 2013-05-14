@@ -21,6 +21,8 @@
 #include "sheep.h"
 #include "exits.h"
 #include "option.h"
+#include "work.h"
+#include "event.h"
 
 #define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
 #define SUBCMD_FLAG_NEED_ARG (1 << 1)
@@ -73,6 +75,7 @@ int send_light_req(struct sd_req *hdr, const char *host, int port);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
 int update_node_list(int max_nodes);
 void confirm(const char *message);
+void work_queue_wait(struct work_queue *q);
 
 extern struct command vdi_command;
 extern struct command node_command;

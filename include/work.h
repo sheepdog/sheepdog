@@ -60,5 +60,6 @@ int init_work_queue(size_t (*get_nr_nodes)(void), void (*create_cb)(pthread_t),
 struct work_queue *create_work_queue(const char *name, enum wq_thread_control);
 struct work_queue *create_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);
+bool work_queue_empty(struct work_queue *q);
 
 #endif
