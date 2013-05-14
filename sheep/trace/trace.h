@@ -10,7 +10,6 @@
 #include "sheep.h"
 #include "list.h"
 #include "util.h"
-#include "../work.h"
 
 struct ipinfo {
 	const char *file;           /* Source code filename for EIP */

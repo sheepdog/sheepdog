@@ -24,7 +24,13 @@ enum wq_thread_control {
 	WQ_UNLIMITED, /* Unlimited # of threads created */
 };
 
-int init_work_queue(void);
+/*
+ * 'get_nr_nodes' is the function to get the current number of nodes and used
+ * for dynamic work queues.  'create_cb' will be called when worker threads are
+ * created and 'destroy_cb' will be called when worker threads are destroyed.
+ */
+int init_work_queue(size_t (*get_nr_nodes)(void), void (*create_cb)(pthread_t),
+		    void (*destroy_cb)(pthread_t));
 struct work_queue *create_work_queue(const char *name, enum wq_thread_control);
 struct work_queue *create_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);

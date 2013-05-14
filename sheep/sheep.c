@@ -331,9 +331,23 @@ static void init_io_arg(char *arg)
 	}
 }
 
+static size_t get_nr_nodes(void)
+{
+	struct vnode_info *vinfo;
+	size_t nr = 1;
+
+	vinfo = get_vnode_info();
+	if (vinfo != NULL)
+		nr = vinfo->nr_nodes;
+	put_vnode_info(vinfo);
+
+	return nr;
+}
+
 static int create_work_queues(void)
 {
-	if (init_work_queue())
+	if (init_work_queue(get_nr_nodes, trace_register_thread,
+			    trace_unregister_thread))
 		return -1;
 
 	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
