@@ -263,6 +263,9 @@ int init_work_queue(size_t (*get_nr_nodes)(void), void (*create_cb)(pthread_t),
 	wq_create_cb = create_cb;
 	wq_destroy_cb = destroy_cb;
 
+	if (wq_get_nr_nodes)
+		nr_nodes = wq_get_nr_nodes();
+
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
 		sd_eprintf("failed to create an event fd: %m");
