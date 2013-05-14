@@ -49,6 +49,18 @@ static main_thread(struct vnode_info *) current_vnode_info;
 static main_thread(struct list_head *) pending_block_list;
 static main_thread(struct list_head *) pending_notify_list;
 
+/*
+ * List of nodes that were part of the last epoch before a shutdown,
+ * but failed to join.
+ */
+static main_thread(struct list_head *) failed_nodes;
+
+/*
+ * List of nodes that weren't part of the last epoch, but joined
+ * before restarting the cluster.
+ */
+static main_thread(struct list_head *) delayed_nodes;
+
 static size_t get_join_message_size(struct join_message *jm)
 {
 	/*
@@ -387,19 +399,19 @@ static bool add_delayed_node(uint32_t epoch, const struct sd_node *node)
 {
 	struct node *n;
 
-	if (find_entry_list(node, &sys->delayed_nodes))
+	if (find_entry_list(node, main_thread_get(delayed_nodes)))
 		return false;
 	assert(!find_entry_epoch(node, epoch));
 
 	n = xmalloc(sizeof(*n));
 	n->ent = *node;
-	list_add_tail(&n->list, &sys->delayed_nodes);
+	list_add_tail(&n->list, main_thread_get(delayed_nodes));
 	return true;
 }
 
 static bool is_delayed_node(const struct sd_node *node)
 {
-	return !!find_entry_list(node, &sys->delayed_nodes);
+	return !!find_entry_list(node, main_thread_get(delayed_nodes));
 }
 
 /*
@@ -411,14 +423,14 @@ static bool add_failed_node(uint32_t epoch, const struct sd_node *node)
 {
 	struct node *n;
 
-	if (find_entry_list(node, &sys->failed_nodes))
+	if (find_entry_list(node, main_thread_get(failed_nodes)))
 		return false;
 	if (!find_entry_epoch(node, epoch))
 		return false;
 
 	n = xmalloc(sizeof(*n));
 	n->ent = *node;
-	list_add_tail(&n->list, &sys->failed_nodes);
+	list_add_tail(&n->list, main_thread_get(failed_nodes));
 	return true;
 }
 
@@ -442,9 +454,9 @@ static void format_exceptional_node_list(struct join_message *jm)
 {
 	struct node *n;
 
-	list_for_each_entry(n, &sys->failed_nodes, list)
+	list_for_each_entry(n, main_thread_get(failed_nodes), list)
 		jm->nodes[jm->nr_failed_nodes++] = n->ent;
-	list_for_each_entry(n, &sys->delayed_nodes, list)
+	list_for_each_entry(n, main_thread_get(delayed_nodes), list)
 		jm->nodes[jm->nr_failed_nodes + jm->nr_delayed_nodes++] = n->ent;
 }
 
@@ -452,11 +464,11 @@ static void clear_exceptional_node_lists(void)
 {
 	struct node *n, *t;
 
-	list_for_each_entry_safe(n, t, &sys->failed_nodes, list) {
+	list_for_each_entry_safe(n, t, main_thread_get(failed_nodes), list) {
 		list_del(&n->list);
 		free(n);
 	}
-	list_for_each_entry_safe(n, t, &sys->delayed_nodes, list) {
+	list_for_each_entry_safe(n, t, main_thread_get(delayed_nodes), list) {
 		list_del(&n->list);
 		free(n);
 	}
@@ -599,7 +611,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 	else
 		nr = cur_vinfo->nr_nodes + 1;
 
-	nr_delayed_nodes = get_nodes_nr_from(&sys->delayed_nodes);
+	nr_delayed_nodes = get_nodes_nr_from(main_thread_get(delayed_nodes));
 
 	/*
 	 * If we have all members from the last epoch log in the in-memory
@@ -615,7 +627,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 	 * If we reach the old node count, but some node failed we have to
 	 * update the epoch before setting the cluster live.
 	 */
-	nr_failed_entries = get_nodes_nr_from(&sys->failed_nodes);
+	nr_failed_entries = get_nodes_nr_from(main_thread_get(failed_nodes));
 	if (nr_local_entries == nr + nr_failed_entries - nr_delayed_nodes) {
 		jm->inc_epoch = 1;
 		jm->cluster_status = SD_STATUS_OK;
@@ -1096,7 +1108,7 @@ void sd_join_handler(const struct sd_node *joined,
 		     const void *opaque)
 {
 	int i;
-	int nr, nr_local, nr_failed, nr_delayed_nodes;
+	int nr, nr_local, nr_failed, nr_delayed;
 	const struct join_message *jm = opaque;
 	uint32_t le = get_latest_epoch();
 
@@ -1135,11 +1147,11 @@ void sd_join_handler(const struct sd_node *joined,
 
 		nr_local = get_nodes_nr_epoch(sys->epoch);
 		nr = nr_members;
-		nr_failed = get_nodes_nr_from(&sys->failed_nodes);
-		nr_delayed_nodes = get_nodes_nr_from(&sys->delayed_nodes);
+		nr_failed = get_nodes_nr_from(main_thread_get(failed_nodes));
+		nr_delayed = get_nodes_nr_from(main_thread_get(delayed_nodes));
 
 		sd_dprintf("%d == %d + %d", nr_local, nr, nr_failed);
-		if (nr_local == nr + nr_failed - nr_delayed_nodes) {
+		if (nr_local == nr + nr_failed - nr_delayed) {
 			sys->status = SD_STATUS_OK;
 			log_current_epoch();
 		}
@@ -1162,11 +1174,11 @@ void sd_join_handler(const struct sd_node *joined,
 
 		nr_local = get_nodes_nr_epoch(sys->epoch);
 		nr = nr_members;
-		nr_failed = get_nodes_nr_from(&sys->failed_nodes);
-		nr_delayed_nodes = get_nodes_nr_from(&sys->delayed_nodes);
+		nr_failed = get_nodes_nr_from(main_thread_get(failed_nodes));
+		nr_delayed = get_nodes_nr_from(main_thread_get(delayed_nodes));
 
 		sd_dprintf("%d == %d + %d", nr_local, nr, nr_failed);
-		if (nr_local == nr + nr_failed - nr_delayed_nodes) {
+		if (nr_local == nr + nr_failed - nr_delayed) {
 			sys->status = SD_STATUS_OK;
 			log_current_epoch();
 		}
@@ -1278,8 +1290,10 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	main_thread_set(pending_notify_list,
 			  xzalloc(sizeof(struct list_head)));
 	INIT_LIST_HEAD(main_thread_get(pending_notify_list));
-	INIT_LIST_HEAD(&sys->failed_nodes);
-	INIT_LIST_HEAD(&sys->delayed_nodes);
+	main_thread_set(failed_nodes, xzalloc(sizeof(struct list_head)));
+	INIT_LIST_HEAD(main_thread_get(failed_nodes));
+	main_thread_set(delayed_nodes, xzalloc(sizeof(struct list_head)));
+	INIT_LIST_HEAD(main_thread_get(delayed_nodes));
 
 	INIT_LIST_HEAD(&sys->local_req_queue);
 	INIT_LIST_HEAD(&sys->req_wait_queue);

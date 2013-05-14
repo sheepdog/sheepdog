@@ -76,18 +76,6 @@ struct cluster_info {
 
 	uint64_t disk_space;
 
-	/*
-	 * List of nodes that were part of the last epoch before a shutdown,
-	 * but failed to join.
-	 */
-	struct list_head failed_nodes;
-
-	/*
-	 * List of nodes that weren't part of the last epoch, but joined
-	 * before restarting the cluster.
-	 */
-	struct list_head delayed_nodes;
-
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
 	uint8_t nr_copies;
