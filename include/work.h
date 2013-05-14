@@ -24,6 +24,32 @@ enum wq_thread_control {
 	WQ_UNLIMITED, /* Unlimited # of threads created */
 };
 
+static inline bool is_main_thread(void)
+{
+	return gettid() == getpid();
+}
+
+static inline bool is_worker_thread(void)
+{
+	return !is_main_thread();
+}
+
+/*
+ * Helper macros to guard variables from being accessed out of the
+ * main thread.  Note that we can use these only for pointers.
+ */
+#define main_thread(type) struct { type __val; }
+#define main_thread_get(var)			\
+({						\
+	assert(is_main_thread());		\
+	(var).__val;				\
+})
+#define main_thread_set(var, val)		\
+({						\
+	assert(is_main_thread());		\
+	(var).__val = (val);			\
+})
+
 /*
  * 'get_nr_nodes' is the function to get the current number of nodes and used
  * for dynamic work queues.  'create_cb' will be called when worker threads are

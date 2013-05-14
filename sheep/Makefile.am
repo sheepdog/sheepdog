@@ -24,7 +24,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 sbin_PROGRAMS		= sheep
 
-sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c work.c \
+sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c \
 			  journal.c ops.c recovery.c cluster/local.c \
 			  object_cache.c object_list_cache.c sockfd_cache.c \
 			  plain_store.c config.c migrate.c md.c \
@@ -48,7 +48,7 @@ sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread -lm\
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= work.h sheep_priv.h cluster.h farm/farm.h trace/trace.h
+noinst_HEADERS		= sheep_priv.h cluster.h farm/farm.h trace/trace.h
 
 EXTRA_DIST		= 
 
