@@ -42,8 +42,32 @@
  */
 #define WQ_PROTECTION_PERIOD 1000 /* ms */
 
+struct worker_info {
+	const char *name;
+
+	struct list_head finished_list;
+	struct list_head worker_info_siblings;
+
+	pthread_mutex_t finished_lock;
+	pthread_mutex_t startup_lock;
+
+	/* wokers sleep on this and signaled by tgtd */
+	pthread_cond_t pending_cond;
+	/* locked by tgtd and workers */
+	pthread_mutex_t pending_lock;
+	/* protected by pending_lock */
+	struct work_queue q;
+	size_t nr_pending;
+	size_t nr_running;
+	size_t nr_threads;
+	/* we cannot shrink work queue till this time */
+	uint64_t tm_end_of_protection;
+	enum wq_thread_control tc;
+	size_t nr_nodes;
+};
+
 static int efd;
-LIST_HEAD(worker_info_list);
+static LIST_HEAD(worker_info_list);
 
 static void *worker_routine(void *arg);
 
