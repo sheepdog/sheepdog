@@ -764,6 +764,16 @@ static int set_listen_fd_cb(int fd, void *data)
 	return 0;
 }
 
+static void crash_handler(int signo)
+{
+	sd_printf(SDOG_EMERG, "shepherd exits unexpectedly (%s).",
+		  strsignal(signo));
+
+	sd_backtrace();
+
+	reraise_crash_signal(signo, 1);
+}
+
 int main(int argc, char **argv)
 {
 	int ch, ret, longindex;
@@ -781,6 +791,8 @@ int main(int argc, char **argv)
 	const char *short_options;
 
 	progname = argv[0];
+
+	install_crash_handler(crash_handler);
 
 	long_options = build_long_options(shepherd_options);
 	short_options = build_short_options(shepherd_options);
