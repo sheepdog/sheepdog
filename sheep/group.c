@@ -409,11 +409,6 @@ static bool add_delayed_node(uint32_t epoch, const struct sd_node *node)
 	return true;
 }
 
-static bool is_delayed_node(const struct sd_node *node)
-{
-	return !!find_entry_list(node, main_thread_get(delayed_nodes));
-}
-
 /*
  * For a node that failed to join check if was part of the original
  * epoch, and if so add it to the list of node expected to be present
@@ -488,10 +483,6 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 		int nodes_len;
 
 		if (node_is_local(node))
-			continue;
-
-		/* delayed nodes don't have epoch log */
-		if (is_delayed_node(node))
 			continue;
 
 		sd_init_req(&hdr, SD_OP_GET_EPOCH);
