@@ -761,6 +761,18 @@ static int local_md_unplug(const struct sd_req *req, struct sd_rsp *rsp,
 	return md_unplug_disks(disks);
 }
 
+static int local_get_hash(struct request *request)
+{
+	struct sd_req *req = &request->rq;
+	struct sd_rsp *rsp = &request->rp;
+
+	if (!sd_store->get_hash)
+		return SD_RES_NO_SUPPORT;
+
+	return sd_store->get_hash(req->obj.oid, req->obj.tgt_epoch,
+				  rsp->hash.digest);
+}
+
 static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
@@ -1245,6 +1257,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "MD_UNPLUG_DISKS",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_md_unplug,
+	},
+
+	[SD_OP_GET_HASH] = {
+		.name = "GET_HASH",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_get_hash,
 	},
 
 	/* gateway I/O operations */

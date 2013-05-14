@@ -266,6 +266,7 @@ static struct store_driver farm = {
 	.format = default_format,
 	.purge_obj = default_purge_obj,
 	.remove_object = default_remove_object,
+	.get_hash = default_get_hash,
 };
 
 add_store_driver(farm);

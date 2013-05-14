@@ -17,6 +17,7 @@
 
 #include "sheep_priv.h"
 #include "config.h"
+#include "sha1.h"
 
 static int get_open_flags(uint64_t oid, bool create)
 {
@@ -475,6 +476,45 @@ int default_remove_object(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
+int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
+{
+	int ret;
+	void *buf;
+	struct siocb iocb = {};
+	struct sha1_ctx c;
+	uint64_t offset = 0;
+	uint32_t length;
+
+	length = get_objsize(oid);
+	buf = malloc(length);
+	if (buf == NULL)
+		return SD_RES_NO_MEM;
+
+	iocb.epoch = epoch;
+	iocb.buf = buf;
+	iocb.length = length;
+
+	ret = default_read(oid, &iocb);
+	if (ret != SD_RES_SUCCESS) {
+		free(buf);
+		return ret;
+	}
+
+	trim_zero_sectors(buf, &offset, &length);
+
+	sha1_init(&c);
+	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));
+	sha1_update(&c, (uint8_t *)&length, sizeof(length));
+	sha1_update(&c, buf, length);
+	sha1_final(&c, sha1);
+	free(buf);
+
+	sd_dprintf("the message digest of %"PRIx64" at epoch %d is %s", oid,
+		   epoch, sha1_to_hex(sha1));
+
+	return ret;
+}
+
 int default_purge_obj(void)
 {
 	uint32_t tgt_epoch = get_latest_epoch();
@@ -494,6 +534,7 @@ static struct store_driver plain_store = {
 	.cleanup = default_cleanup,
 	.format = default_format,
 	.remove_object = default_remove_object,
+	.get_hash = default_get_hash,
 	.purge_obj = default_purge_obj,
 };
 

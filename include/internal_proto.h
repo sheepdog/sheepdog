@@ -72,6 +72,7 @@
 #define SD_OP_MD_INFO   0xB1
 #define SD_OP_MD_PLUG   0xB2
 #define SD_OP_MD_UNPLUG 0xB3
+#define SD_OP_GET_HASH       0xB4
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080

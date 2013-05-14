@@ -166,6 +166,7 @@ struct store_driver {
 	int (*read)(uint64_t oid, const struct siocb *);
 	int (*format)(void);
 	int (*remove_object)(uint64_t oid);
+	int (*get_hash)(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 	/* Operations in recovery */
 	int (*link)(uint64_t oid, uint32_t tgt_epoch);
 	int (*update_epoch)(uint32_t epoch);
@@ -187,6 +188,7 @@ int default_update_epoch(uint32_t epoch);
 int default_cleanup(void);
 int default_format(void);
 int default_remove_object(uint64_t oid);
+int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 int default_purge_obj(void);
 int for_each_object_in_wd(int (*func)(uint64_t, char *, void *), bool, void *);
 int for_each_obj_path(int (*func)(char *path));

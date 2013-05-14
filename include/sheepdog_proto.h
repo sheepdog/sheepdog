@@ -180,6 +180,11 @@ struct sd_rsp {
 			uint64_t	store_size;
 			uint64_t	store_free;
 		} node;
+		struct {
+			uint32_t	__pad1;
+			uint32_t	__pad2;
+			uint8_t		digest[20];
+		} hash;
 
 		uint32_t		__pad[8];
 	};

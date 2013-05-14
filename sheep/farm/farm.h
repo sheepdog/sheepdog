@@ -47,7 +47,6 @@ extern char farm_obj_dir[PATH_MAX];
 char *sha1_to_path(const unsigned char *sha1);
 int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
 void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *);
-char *sha1_to_hex(const unsigned char *sha1);
 int get_sha1_hex(const char *hex, unsigned char *sha1);
 int sha1_file_try_delete(const unsigned char *sha1);
 
