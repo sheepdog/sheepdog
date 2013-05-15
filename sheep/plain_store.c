@@ -225,6 +225,8 @@ int default_init(void)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
+	for_each_object_in_stale(init_objlist_and_vdi_bitmap, NULL);
+
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 

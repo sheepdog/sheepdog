@@ -731,14 +731,6 @@ static void screen_object_list(struct recovery_list_work *rlw,
 	qsort(rlw->oids, rlw->count, sizeof(uint64_t), obj_cmp);
 }
 
-static bool newly_joined(struct sd_node *node, struct recovery_work *rw)
-{
-	if (bsearch(node, rw->old_vinfo->nodes, rw->old_vinfo->nr_nodes,
-		    sizeof(struct sd_node), node_id_cmp))
-		return false;
-	return true;
-}
-
 /* Prepare the object list that belongs to this node */
 static void prepare_object_list(struct work *work)
 {
@@ -764,9 +756,6 @@ again:
 			sd_dprintf("go to the next recovery");
 			return;
 		}
-		if (newly_joined(node, rw))
-			/* new node doesn't have a list file */
-			continue;
 
 		oids = fetch_object_list(node, rw->epoch, &nr_oids);
 		if (!oids)

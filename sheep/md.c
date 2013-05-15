@@ -378,6 +378,25 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
 	return ret;
 }
 
+int for_each_object_in_stale(int (*func)(uint64_t oid, char *path, void *arg),
+			     void *arg)
+{
+	int i, ret = SD_RES_SUCCESS;
+	char path[PATH_MAX];
+
+	pthread_rwlock_rdlock(&md_lock);
+	for (i = 0; i < md_nr_disks; i++) {
+		snprintf(path, sizeof(path), "%s/.stale", md_disks[i].path);
+		sd_eprintf("%s", path);
+		ret = for_each_object_in_path(path, func, false, arg);
+		if (ret != SD_RES_SUCCESS)
+			break;
+	}
+	pthread_rwlock_unlock(&md_lock);
+	return ret;
+}
+
+
 int for_each_obj_path(int (*func)(char *path))
 {
 	int i, ret = SD_RES_SUCCESS;
