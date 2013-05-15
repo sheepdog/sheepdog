@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 #include <libgen.h>
 
@@ -476,6 +477,42 @@ int default_remove_object(uint64_t oid)
 	return SD_RES_SUCCESS;
 }
 
+#define SHA1NAME "user.obj.sha1"
+
+static int get_object_sha1(uint64_t oid, uint32_t epoch, uint8_t *sha1)
+{
+	char path[PATH_MAX];
+
+	if (default_exist(oid))
+		get_obj_path(oid, path);
+	else
+		get_stale_obj_path(oid, epoch, path);
+
+	if (getxattr(path, SHA1NAME, sha1, SHA1_LEN) != SHA1_LEN) {
+		sd_eprintf("fail to get sha1, %s", path);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int set_object_sha1(uint64_t oid, uint32_t epoch, const uint8_t *sha1)
+{
+	char path[PATH_MAX];
+	int ret;
+
+	if (default_exist(oid))
+		get_obj_path(oid, path);
+	else
+		get_stale_obj_path(oid, epoch, path);
+
+	ret = setxattr(path, SHA1NAME, sha1, SHA1_LEN, 0);
+	if (ret < 0)
+		sd_eprintf("fail to set sha1, %s", path);
+
+	return ret;
+}
+
 int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 {
 	int ret;
@@ -484,6 +521,15 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	struct sha1_ctx c;
 	uint64_t offset = 0;
 	uint32_t length;
+	bool is_readonly_obj = oid_is_readonly(oid);
+
+	if (is_readonly_obj) {
+		if (get_object_sha1(oid, epoch, sha1) == 0) {
+			sd_dprintf("use cached sha1 digest %s",
+				   sha1_to_hex(sha1));
+			return SD_RES_SUCCESS;
+		}
+	}
 
 	length = get_objsize(oid);
 	buf = malloc(length);
@@ -511,6 +557,9 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 
 	sd_dprintf("the message digest of %"PRIx64" at epoch %d is %s", oid,
 		   epoch, sha1_to_hex(sha1));
+
+	if (is_readonly_obj)
+		set_object_sha1(oid, epoch, sha1);
 
 	return ret;
 }
