@@ -24,8 +24,6 @@
 static int efd;
 static LIST_HEAD(events_list);
 
-#define TICK 1
-
 static void timer_handler(int fd, int events, void *data)
 {
 	struct timer *t = data;
@@ -194,7 +192,7 @@ static void do_event_loop(int timeout, bool sort_with_prio)
 	int i, nr;
 
 refresh:
-	nr = epoll_wait(efd, events, nr_events, TICK * 1000);
+	nr = epoll_wait(efd, events, nr_events, timeout);
 	if (sort_with_prio)
 		qsort(events, nr, sizeof(struct epoll_event), epoll_event_cmp);
 
