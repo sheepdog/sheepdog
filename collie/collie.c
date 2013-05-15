@@ -408,5 +408,8 @@ int main(int argc, char **argv)
 		exit(EXIT_SYSFAIL);
 	}
 
-	return command_fn(argc, argv);
+	ret = command_fn(argc, argv);
+	if (ret == EXIT_USAGE)
+		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+	return ret;
 }

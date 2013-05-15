@@ -228,7 +228,10 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 			    && argc != 5)
 				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 			optind++;
-			return sub[i].fn(argc, argv);
+			ret = sub[i].fn(argc, argv);
+			if (ret == EXIT_USAGE)
+				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+			return ret;
 		}
 	}
 
