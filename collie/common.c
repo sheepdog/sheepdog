@@ -252,13 +252,6 @@ void confirm(const char *message)
 
 void work_queue_wait(struct work_queue *q)
 {
-	assert(is_main_thread());
-
 	while (!work_queue_empty(q))
 		event_loop(-1);
-	/*
-	 * We have to call event_loop() again because some works are remained in
-	 * the finished list.
-	 */
-	event_loop(-1);
 }
