@@ -513,6 +513,14 @@ static int check_and_move(uint64_t oid, uint32_t epoch, char *path)
 
 	if (get_old_new_path(oid, epoch, path, old, new) < 0)
 		return SD_RES_EIO;
+	/*
+	 * Recovery thread and main thread might try to recover the same object.
+	 * Either one succeeds, the other will fail and proceed and end up
+	 * trying to move the object to where it is already in place, in this
+	 * case we simply return.
+	 */
+	if (!strcmp(old, new))
+		return SD_RES_SUCCESS;
 
 	/* We can't use rename(2) accross device */
 	if (move_object(oid, old, new) < 0) {
