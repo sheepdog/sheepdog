@@ -37,6 +37,7 @@ struct node {
 struct get_vdis_work {
 	struct work work;
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	struct sd_node joined;
 	size_t nr_members;
 	struct sd_node members[];
 };
@@ -687,6 +688,15 @@ static void do_get_vdis(struct work *work)
 		container_of(work, struct get_vdis_work, work);
 	int i, ret;
 
+	if (!node_eq(&w->joined, &sys->this_node)) {
+		switch (sys->status) {
+		case SD_STATUS_OK:
+		case SD_STATUS_HALT:
+			get_vdis_from(&w->joined);
+			return;
+		}
+	}
+
 	for (i = 0; i < w->nr_members; i++) {
 		/* We should not fetch vdi_bitmap and copy list from myself */
 		if (node_eq(&w->members[i], &sys->this_node))
@@ -803,12 +813,14 @@ static void finish_join(const struct join_message *msg,
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
 
-static void get_vdis(const struct sd_node *nodes, size_t nr_nodes)
+static void get_vdis(const struct sd_node *nodes, size_t nr_nodes,
+		     const struct sd_node *joined)
 {
 	int array_len = nr_nodes * sizeof(struct sd_node);
 	struct get_vdis_work *w;
 
 	w = xmalloc(sizeof(*w) + array_len);
+	w->joined = *joined;
 	w->nr_members = nr_nodes;
 	memcpy(w->members, nodes, array_len);
 
@@ -889,11 +901,12 @@ static void update_cluster_info(const struct join_message *msg,
 			/*FALLTHROUGH*/
 		case SD_STATUS_WAIT_FOR_JOIN:
 			sys->disable_recovery = msg->disable_recovery;
-			get_vdis(nodes, nr_nodes);
 			break;
 		default:
 			break;
 		}
+
+		get_vdis(nodes, nr_nodes, joined);
 
 		sys->status = msg->cluster_status;
 
