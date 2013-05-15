@@ -25,7 +25,7 @@ $COLLIE cluster format -c 2
 
 $COLLIE vdi create test 4M
 
-dd if=/dev/urandom | $COLLIE vdi write -w test
+_random | $COLLIE vdi write -w test
 
 $COLLIE vdi flush test
 

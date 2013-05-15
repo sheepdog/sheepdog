@@ -31,7 +31,7 @@ $COLLIE vdi create test 80M -P
 _kill_sheep 2
 
 # write data to the vdi
-cat /dev/urandom | $COLLIE vdi write test
+_random | $COLLIE vdi write test
 
 # restart the 3rd node
 _start_sheep 2

@@ -26,7 +26,7 @@ $COLLIE vdi create test 200M -P
 # node event after disk failure
 _safe_remove $STORE/0/d0
 
-dd if=/dev/urandom | $COLLIE vdi write test &
+_random | $COLLIE vdi write test &
 sleep 1
 _start_sheep 3
 _wait_for_sheep 4

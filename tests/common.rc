@@ -399,5 +399,10 @@ _cleanup_devices()
     done
 }
 
+_random()
+{
+	openssl enc -aes-256-ctr -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
+}
+
 # make sure this script returns success
 /bin/true

@@ -25,15 +25,15 @@ $COLLIE cluster format -c 2
 
 $COLLIE vdi create test 8M
 
-dd if=/dev/urandom | $COLLIE vdi write test
+_random | $COLLIE vdi write test
 $COLLIE cluster snapshot
 $COLLIE vdi read test | md5sum > /tmp/csum.1
 
-dd if=/dev/urandom | $COLLIE vdi write test
+_random | $COLLIE vdi write test
 $COLLIE cluster snapshot
 $COLLIE vdi read test | md5sum > /tmp/csum.2
 
-dd if=/dev/urandom | $COLLIE vdi write test
+_random | $COLLIE vdi write test
 $COLLIE cluster snapshot -l | _filter_date
 
 $COLLIE cluster snapshot -R 2

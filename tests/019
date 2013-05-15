@@ -25,7 +25,7 @@ $COLLIE cluster format -c 2
 
 $COLLIE vdi create test 4M
 
-dd if=/dev/urandom | $COLLIE vdi write test
+_random | $COLLIE vdi write test
 
 for port in `seq 0 2`; do
     $COLLIE vdi read test -p 700$port | md5sum > /tmp/csum.$port

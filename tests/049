@@ -25,7 +25,7 @@ $COLLIE cluster format -c 1
 sleep 1
 
 $COLLIE vdi create test 20M
-dd if=/dev/urandom | $COLLIE vdi write -w test
+_random | $COLLIE vdi write -w test
 
 $COLLIE cluster shutdown
 _wait_for_sheep_stop

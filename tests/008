@@ -33,7 +33,7 @@ for i in `seq 0 4`; do
 done
 
 for i in `seq 0 4`; do
-    dd if=/dev/urandom | $COLLIE vdi write test$i -p 7000 &
+    _random | $COLLIE vdi write test$i -p 7000 &
 done
 
 sleep 3

@@ -25,7 +25,7 @@ $COLLIE cluster format -c 2
 
 $COLLIE vdi create test 40M
 
-dd if=/dev/urandom | $COLLIE vdi write test
+_random | $COLLIE vdi write test
 
 # check cache size, should be 20 * 80%
 nr=`ls $STORE/0/cache/7c2b25 | wc -l`
