@@ -117,7 +117,7 @@ static void show_progress(uint64_t done, uint64_t total)
 	size_to_str(done, done_str, sizeof(done_str));
 	size_to_str(total, total_str, sizeof(total_str));
 
-	buf = xmalloc(screen_width);
+	buf = xmalloc(screen_width + 1);
 	snprintf(buf, screen_width, "%5.1lf %% [", (double)done / total * 100);
 
 	for (int i = 0; i < bar_length; i++) {
@@ -133,8 +133,8 @@ static void show_progress(uint64_t done, uint64_t total)
 		 "] %s / %s", done_str, total_str);
 
 	/* fill the rest of buffer with blank characters */
-	memset(buf + strlen(buf), ' ', screen_width - strlen(buf) - 1);
-	buf[screen_width - 1] = '\0';
+	memset(buf + strlen(buf), ' ', screen_width - strlen(buf));
+	buf[screen_width] = '\0';
 	printf("%s", buf);
 
 	if (done == total)
