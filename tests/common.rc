@@ -401,7 +401,7 @@ _cleanup_devices()
 
 _random()
 {
-	openssl enc -aes-256-ctr -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
+	openssl enc -aes-128-cbc -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
 }
 
 # make sure this script returns success
