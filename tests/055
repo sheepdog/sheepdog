@@ -24,31 +24,31 @@ sleep 1
 $COLLIE vdi create test 200M -P
 
 # simulate one disk failure
-rm $STORE/0/d0 -rf
+_safe_remove $STORE/0/d0
 _random | $COLLIE vdi write test
 _wait_for_sheep_recovery 0
 $COLLIE vdi check test
 $COLLIE cluster info | _filter_cluster_info
 
 # simulate multiple disk failure
-rm $STORE/1/d0 -rf
+_safe_remove $STORE/1/d0
 _random | $COLLIE vdi write test &
 sleep 1
-rm $STORE/1/d1 -rf
+_safe_remove $STORE/1/d1
 _wait_for_sheep_recovery 0
 wait
 $COLLIE vdi check test
 $COLLIE cluster info | _filter_cluster_info
 
 # simulate all disks failure
-rm $STORE/1/d2 -rf
+_safe_remove $STORE/1/d2
 _random | $COLLIE vdi write test
 $COLLIE vdi check test
 $COLLIE cluster info | _filter_cluster_info
 
 # simulate simultaneous multiple disks failure
-rm $STORE/2/d0 -rf
-rm $STORE/2/d1 -rf
+_safe_remove $STORE/2/d0
+_safe_remove $STORE/2/d1
 dd if=/dev/zero | $COLLIE vdi write test
 $COLLIE vdi check test
 $COLLIE cluster info | _filter_cluster_info
