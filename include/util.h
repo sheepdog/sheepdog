@@ -98,6 +98,21 @@ void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
 			 uint32_t requested_len);
 int atomic_create_and_write(const char *path, char *buf, size_t len);
 
+/* a type safe version of qsort() */
+#define xqsort(base, nmemb, compar)					\
+({									\
+	assert(compar(base, base) == 0);				\
+	qsort(base, nmemb, sizeof(*(base)), (comparison_fn_t)compar);	\
+})
+
+/* a type safe version of bsearch() */
+#define xbsearch(key, base, nmemb, compar)				\
+({									\
+	(void) (key == base);						\
+	assert(compar(base, base) == 0);				\
+	bsearch(key, base, nmemb, sizeof(*(base)), (comparison_fn_t)compar); \
+})
+
 #ifdef assert
 #undef assert
 #endif

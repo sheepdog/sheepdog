@@ -85,7 +85,7 @@ static struct zk_node *zk_tree_insert(struct zk_node *new)
 		parent = *p;
 		entry = rb_entry(parent, struct zk_node, rb);
 
-		cmp = node_id_cmp(&new->node.nid, &entry->node.nid);
+		cmp = node_cmp(&new->node, &entry->node);
 		if (cmp < 0)
 			p = &(*p)->rb_left;
 		else if (cmp > 0)

@@ -130,8 +130,7 @@ bool have_enough_zones(void)
 
 static int get_node_idx(struct vnode_info *vnode_info, struct sd_node *ent)
 {
-	ent = bsearch(ent, vnode_info->nodes, vnode_info->nr_nodes,
-		      sizeof(*ent), node_id_cmp);
+	ent = xbsearch(ent, vnode_info->nodes, vnode_info->nr_nodes, node_cmp);
 	if (!ent)
 		return -1;
 
@@ -188,7 +187,7 @@ struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
 
 	vnode_info->nr_nodes = nr_nodes;
 	memcpy(vnode_info->nodes, nodes, sizeof(*nodes) * nr_nodes);
-	qsort(vnode_info->nodes, nr_nodes, sizeof(*nodes), node_id_cmp);
+	xqsort(vnode_info->nodes, nr_nodes, node_cmp);
 
 	recalculate_vnodes(vnode_info->nodes, nr_nodes);
 
@@ -578,8 +577,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 		sd_eprintf("joining node epoch too small: %"
 			   PRIu32 " vs %" PRIu32, jm->epoch, local_epoch);
 
-		if (bsearch(joined, local_entries, nr_local_entries,
-			    sizeof(struct sd_node), node_id_cmp))
+		if (xbsearch(joined, local_entries, nr_local_entries, node_cmp))
 			return CJ_RES_FAIL;
 		return CJ_RES_JOIN_LATER;
 	}

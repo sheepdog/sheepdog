@@ -687,12 +687,12 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	 * to send notification
 	 */
 	for (i = 0; i < nr_recovereds; i++)
-		if (!node_id_cmp(&node->nid, &recovereds[i].nid)) {
+		if (!node_cmp(node, recovereds + i)) {
 			sd_dprintf("duplicate %s", node_to_str(node));
 			return SD_RES_SUCCESS;
 		}
 	recovereds[nr_recovereds++] = *node;
-	qsort(recovereds, nr_recovereds, sizeof(*recovereds), node_id_cmp);
+	xqsort(recovereds, nr_recovereds, node_cmp);
 
 	sd_dprintf("%s is recovered at epoch %d", node_to_str(node), epoch);
 	for (i = 0; i < nr_recovereds; i++)
@@ -705,8 +705,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 
 	if (vnode_info->nr_nodes == nr_recovereds) {
 		for (i = 0; i < nr_recovereds; ++i) {
-			if (node_id_cmp(&vnode_info->nodes[i].nid,
-					&recovereds[i].nid))
+			if (node_cmp(vnode_info->nodes + i, recovereds + i))
 				break;
 		}
 		if (i == nr_recovereds) {

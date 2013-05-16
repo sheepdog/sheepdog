@@ -171,12 +171,12 @@ void event_force_refresh(void)
 	event_loop_refresh = true;
 }
 
-static int epoll_event_cmp(const void *_a, const void *_b)
+static int epoll_event_cmp(const struct epoll_event *_a, struct epoll_event *_b)
 {
 	struct event_info *a, *b;
 
-	a = (struct event_info *)((struct epoll_event *)_a)->data.ptr;
-	b = (struct event_info *)((struct epoll_event *)_b)->data.ptr;
+	a = (struct event_info *)_a->data.ptr;
+	b = (struct event_info *)_b->data.ptr;
 
 	/* we need sort event_info array in reverse order */
 	if (a->prio < b->prio)
@@ -194,7 +194,7 @@ static void do_event_loop(int timeout, bool sort_with_prio)
 refresh:
 	nr = epoll_wait(efd, events, nr_events, timeout);
 	if (sort_with_prio)
-		qsort(events, nr, sizeof(struct epoll_event), epoll_event_cmp);
+		xqsort(events, nr, epoll_event_cmp);
 
 	if (nr < 0) {
 		if (errno == EINTR)

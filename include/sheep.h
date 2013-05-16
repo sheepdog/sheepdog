@@ -233,13 +233,10 @@ static inline const char *sd_strerror(int err)
 	return descs[err];
 }
 
-static inline int node_id_cmp(const void *a, const void *b)
+static inline int node_id_cmp(const struct node_id *node1,
+			      const struct node_id *node2)
 {
-	const struct node_id *node1 = a;
-	const struct node_id *node2 = b;
-	int cmp;
-
-	cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
+	int cmp = memcmp(node1->addr, node2->addr, sizeof(node1->addr));
 	if (cmp != 0)
 		return cmp;
 
@@ -250,16 +247,20 @@ static inline int node_id_cmp(const void *a, const void *b)
 	return 0;
 }
 
-static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
+static inline int node_cmp(const struct sd_node *node1,
+			   const struct sd_node *node2)
 {
-	return node_id_cmp(&a->nid, &b->nid) == 0;
+	return node_id_cmp(&node1->nid, &node2->nid);
 }
 
-static inline int vnode_cmp(const void *a, const void *b)
+static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 {
-	const struct sd_vnode *node1 = a;
-	const struct sd_vnode *node2 = b;
+	return node_cmp(a, b) == 0;
+}
 
+static inline int vnode_cmp(const struct sd_vnode *node1,
+			    const struct sd_vnode *node2)
+{
 	if (node1->id < node2->id)
 		return -1;
 	if (node1->id > node2->id)
@@ -297,7 +298,7 @@ static inline int nodes_to_vnodes(struct sd_node *nodes, int nr,
 	}
 
 	if (vnodes)
-		qsort(vnodes, nr_vnodes, sizeof(*vnodes), vnode_cmp);
+		xqsort(vnodes, nr_vnodes, vnode_cmp);
 
 	return nr_vnodes;
 }

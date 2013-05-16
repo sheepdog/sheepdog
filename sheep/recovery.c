@@ -89,12 +89,10 @@ static void queue_recovery_work(struct recovery_info *rinfo);
 #define DEFAULT_LIST_BUFFER_SIZE (UINT64_C(1) << 22)
 static size_t list_buffer_size = DEFAULT_LIST_BUFFER_SIZE;
 
-static int obj_cmp(const void *oid1, const void *oid2)
+static int obj_cmp(const uint64_t *oid1, const uint64_t *oid2)
 {
-	const uint64_t hval1 = fnv_64a_buf((void *)oid1, sizeof(uint64_t),
-					   FNV1A_64_INIT);
-	const uint64_t hval2 = fnv_64a_buf((void *)oid2, sizeof(uint64_t),
-					   FNV1A_64_INIT);
+	const uint64_t hval1 = fnv_64a_buf(oid1, sizeof(*oid1), FNV1A_64_INIT);
+	const uint64_t hval2 = fnv_64a_buf(oid2, sizeof(*oid2), FNV1A_64_INIT);
 
 	if (hval1 < hval2)
 		return -1;
@@ -713,8 +711,7 @@ static void screen_object_list(struct recovery_list_work *rlw,
 		for (j = 0; j < nr_objs; j++) {
 			if (!vnode_is_local(vnodes[j]))
 				continue;
-			if (bsearch(&oids[i], rlw->oids, old_count,
-				    sizeof(uint64_t), obj_cmp))
+			if (xbsearch(&oids[i], rlw->oids, old_count, obj_cmp))
 				continue;
 
 			rlw->oids[rlw->count++] = oids[i];
@@ -728,7 +725,7 @@ static void screen_object_list(struct recovery_list_work *rlw,
 		}
 	}
 
-	qsort(rlw->oids, rlw->count, sizeof(uint64_t), obj_cmp);
+	xqsort(rlw->oids, rlw->count, obj_cmp);
 }
 
 /* Prepare the object list that belongs to this node */

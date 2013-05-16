@@ -82,11 +82,8 @@ static struct vdisk *oid_to_vdisk_from(struct vdisk *vds, int nr, uint64_t oid)
 	}
 }
 
-static int vdisk_cmp(const void *a, const void *b)
+static int vdisk_cmp(const struct vdisk *d1, const struct vdisk *d2)
 {
-	const struct vdisk *d1 = a;
-	const struct vdisk *d2 = b;
-
 	if (d1->id < d2->id)
 		return -1;
 	if (d1->id > d2->id)
@@ -116,7 +113,7 @@ static inline int disks_to_vdisks(struct disk *ds, int nmds, struct vdisk *vds)
 
 		d_iter++;
 	}
-	qsort(vds, nr_vdisks, sizeof(*vds), vdisk_cmp);
+	xqsort(vds, nr_vdisks, vdisk_cmp);
 
 	return nr_vdisks;
 }
