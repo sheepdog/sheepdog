@@ -687,7 +687,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	 * to send notification
 	 */
 	for (i = 0; i < nr_recovereds; i++)
-		if (!node_cmp(node, recovereds + i)) {
+		if (node_eq(node, recovereds + i)) {
 			sd_dprintf("duplicate %s", node_to_str(node));
 			return SD_RES_SUCCESS;
 		}
@@ -705,7 +705,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 
 	if (vnode_info->nr_nodes == nr_recovereds) {
 		for (i = 0; i < nr_recovereds; ++i) {
-			if (node_cmp(vnode_info->nodes + i, recovereds + i))
+			if (!node_eq(vnode_info->nodes + i, recovereds + i))
 				break;
 		}
 		if (i == nr_recovereds) {

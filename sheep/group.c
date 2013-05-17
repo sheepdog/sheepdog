@@ -296,7 +296,7 @@ bool sd_block_handler(const struct sd_node *sender)
 {
 	struct request *req;
 
-	if (!node_eq(sender, &sys->this_node))
+	if (!node_is_local(sender))
 		return false;
 	if (cluster_op_running)
 		return false;
@@ -686,7 +686,7 @@ static void do_get_vdis(struct work *work)
 		container_of(work, struct get_vdis_work, work);
 	int i, ret;
 
-	if (!node_eq(&w->joined, &sys->this_node)) {
+	if (!node_is_local(&w->joined)) {
 		switch (sys->status) {
 		case SD_STATUS_OK:
 		case SD_STATUS_HALT:
@@ -697,7 +697,7 @@ static void do_get_vdis(struct work *work)
 
 	for (i = 0; i < w->nr_members; i++) {
 		/* We should not fetch vdi_bitmap and copy list from myself */
-		if (node_eq(&w->members[i], &sys->this_node))
+		if (node_is_local(&w->members[i]))
 			continue;
 
 		ret = get_vdis_from(&w->members[i]);
@@ -992,7 +992,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		return CJ_RES_FAIL;
 	}
 
-	if (node_eq(joining, &sys->this_node)) {
+	if (node_is_local(joining)) {
 		struct sd_node entries[SD_MAX_NODES];
 		int nr_entries;
 		uint32_t epoch;
@@ -1114,7 +1114,7 @@ void sd_join_handler(const struct sd_node *joined,
 	const struct join_message *jm = opaque;
 	uint32_t le = get_latest_epoch();
 
-	if (node_eq(joined, &sys->this_node)) {
+	if (node_is_local(joined)) {
 		if (result == CJ_RES_FAIL) {
 			sd_eprintf("Failed to join, exiting.");
 			sys->cdrv->leave();
@@ -1136,7 +1136,7 @@ void sd_join_handler(const struct sd_node *joined,
 
 		update_cluster_info(jm, joined, members, nr_members);
 
-		if (node_eq(joined, &sys->this_node))
+		if (node_is_local(joined))
 			/* this output is used for testing */
 			sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
 		break;
@@ -1185,7 +1185,7 @@ void sd_join_handler(const struct sd_node *joined,
 			log_current_epoch();
 		}
 
-		if (node_eq(joined, &sys->this_node))
+		if (node_is_local(joined))
 			/* this output is used for testing */
 			sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
 		break;

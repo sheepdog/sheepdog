@@ -334,21 +334,14 @@ int do_process_main(const struct sd_op_template *op, const struct sd_req *req,
 int sheep_do_op_work(const struct sd_op_template *op, struct request *req);
 int gateway_to_peer_opcode(int opcode);
 
-static inline bool is_myself(const uint8_t *addr, uint16_t port)
-{
-	return (memcmp(addr, sys->this_node.nid.addr,
-		       sizeof(sys->this_node.nid.addr)) == 0) &&
-		port == sys->this_node.nid.port;
-}
-
 static inline bool vnode_is_local(const struct sd_vnode *v)
 {
-	return is_myself(v->nid.addr, v->nid.port);
+	return node_id_cmp(&v->nid, &sys->this_node.nid) == 0;
 }
 
 static inline bool node_is_local(const struct sd_node *n)
 {
-	return is_myself(n->nid.addr, n->nid.port);
+	return node_eq(n, &sys->this_node);
 }
 
 /* gateway operations */
