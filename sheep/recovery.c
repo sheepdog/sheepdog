@@ -700,6 +700,10 @@ static void screen_object_list(struct recovery_list_work *rlw,
 	int i, j;
 
 	for (i = 0; i < nr_oids; i++) {
+		if (xbsearch(&oids[i], rlw->oids, old_count, obj_cmp))
+			/* the object is already scheduled to be recovered */
+			continue;
+
 		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
 		if (!nr_objs) {
 			sd_eprintf("ERROR: can not find copy number for object"
@@ -710,8 +714,6 @@ static void screen_object_list(struct recovery_list_work *rlw,
 			      oids[i], nr_objs, vnodes);
 		for (j = 0; j < nr_objs; j++) {
 			if (!vnode_is_local(vnodes[j]))
-				continue;
-			if (xbsearch(&oids[i], rlw->oids, old_count, obj_cmp))
 				continue;
 
 			rlw->oids[rlw->count++] = oids[i];
