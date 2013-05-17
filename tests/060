@@ -46,6 +46,7 @@ _reboot_without_collie_shutdown()
     _kill_sheep 0
     _wait_for_sheep_stop
     _start_sheep 0
+    _wait_for_sheep 1
 
     for i in `seq 1 7`; do
 	_start_sheep $i
