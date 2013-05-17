@@ -1,0 +1,34 @@
+#!/bin/bash
+
+# Test list preparation of sheep recovery logic
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format -c 1
+sleep 1
+
+$COLLIE vdi create test 40M -P
+
+_kill_sheep 2
+_wait_for_sheep_recovery 0
+_start_sheep 2
+_wait_for_sheep_recovery 0
+
+$COLLIE vdi check test
