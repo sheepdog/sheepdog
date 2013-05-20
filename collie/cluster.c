@@ -143,16 +143,7 @@ static int cluster_info(int argc, char **argv)
 	char time_str[128];
 
 	log_length = sd_epoch * sizeof(struct epoch_log);
-again:
-	logs = malloc(log_length);
-	if (!logs) {
-		if (log_length < 10) {
-			fprintf(stderr, "No memory to allocate.\n");
-			return EXIT_SYSFAIL;
-		}
-		log_length /= 2;
-		goto again;
-	}
+	logs = xmalloc(log_length);
 
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
