@@ -25,6 +25,12 @@
 #define TAG_TRUNK       "trunk\0"
 #define TAG_SNAP        "snap\0\0"
 
+struct trunk_entry {
+	uint64_t oid;
+	int nr_copies;
+	unsigned char sha1[SHA1_LEN];
+};
+
 struct sha1_file_hdr {
 	char tag[TAG_LEN];
 	uint64_t size;
@@ -42,6 +48,13 @@ static inline char *get_object_directory(void)
 
 typedef int (*object_handler_func_t)(uint64_t oid, int nr_copies, void *buf,
 				     size_t size, void *data);
+
+/* trunk.c */
+int trunk_init(void);
+int trunk_file_write(unsigned char *trunk_sha1, struct strbuf *trunk_entries);
+void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
+int for_each_object_in_trunk(unsigned char *trunk_sha1,
+			     object_handler_func_t func, void *data);
 
 /* snap.c */
 int snap_init(const char *path);
