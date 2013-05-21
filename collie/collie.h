@@ -76,6 +76,10 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
 int update_node_list(int max_nodes);
 void confirm(const char *message);
 void work_queue_wait(struct work_queue *q);
+int do_vdi_create(const char *vdiname, int64_t vdi_size,
+		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
+		  int nr_copies);
+
 
 extern struct command vdi_command;
 extern struct command node_command;

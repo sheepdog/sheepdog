@@ -505,7 +505,7 @@ static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 	return EXIT_SUCCESS;
 }
 
-static int do_vdi_create(const char *vdiname, int64_t vdi_size,
+int do_vdi_create(const char *vdiname, int64_t vdi_size,
 			 uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
 			 int nr_copies)
 {

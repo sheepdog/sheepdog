@@ -38,16 +38,15 @@ struct sha1_file_hdr {
 	uint64_t reserved;
 };
 
-static char farm_obj_dir[PATH_MAX];
-static char farm_dir[PATH_MAX];
-
-static inline char *get_object_directory(void)
-{
-	return farm_obj_dir;
-}
-
 typedef int (*object_handler_func_t)(uint64_t oid, int nr_copies, void *buf,
 				     size_t size, void *data);
+
+/* farm.c */
+int farm_init(const char *path);
+bool farm_contain_snapshot(uint32_t idx, const char *tag);
+int farm_save_snapshot(const char *tag);
+int farm_load_snapshot(uint32_t idx, const char *tag);
+char *get_object_directory(void);
 
 /* trunk.c */
 int trunk_init(void);
