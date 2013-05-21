@@ -591,20 +591,6 @@ err:
 	panic("failed in force recovery");
 }
 
-static int cluster_snapshot(const struct sd_req *req, struct sd_rsp *rsp,
-			    void *data)
-{
-	int ret;
-	struct siocb iocb = { 0 };
-
-	if (sd_store->snapshot)
-		ret = sd_store->snapshot(&iocb);
-	else
-		ret = SD_RES_NO_SUPPORT;
-
-	return ret;
-}
-
 static int cluster_cleanup(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data)
 {
@@ -770,33 +756,6 @@ static int local_get_hash(struct request *request)
 
 	return sd_store->get_hash(req->obj.oid, req->obj.tgt_epoch,
 				  rsp->hash.digest);
-}
-
-static int cluster_restore(const struct sd_req *req, struct sd_rsp *rsp,
-			   void *data)
-{
-	int ret;
-	struct siocb iocb = { .epoch = req->obj.tgt_epoch };
-
-	if (sd_store->restore)
-		ret = sd_store->restore(&iocb);
-	else
-		ret = SD_RES_NO_SUPPORT;
-	return ret;
-}
-
-static int local_get_snap_file(struct request *req)
-{
-	int ret;
-	struct siocb iocb = { .buf = req->data };
-
-	if (sd_store->get_snap_file) {
-		ret = sd_store->get_snap_file(&iocb);
-		req->rp.data_length = iocb.length;
-	} else
-		ret = SD_RES_NO_SUPPORT;
-
-	return ret;
 }
 
 /* Return SD_RES_INVALID_PARMS to ask client not to send flush req again */
@@ -1062,20 +1021,6 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = cluster_force_recover_main,
 	},
 
-	[SD_OP_SNAPSHOT] = {
-		.name = "SNAPSHOT",
-		.type = SD_OP_TYPE_CLUSTER,
-		.force = true,
-		.process_main = cluster_snapshot,
-	},
-
-	[SD_OP_RESTORE] = {
-		.name = "RESTORE",
-		.type = SD_OP_TYPE_CLUSTER,
-		.force = true,
-		.process_main = cluster_restore,
-	},
-
 	[SD_OP_CLEANUP] = {
 		.name = "CLEANUP",
 		.type = SD_OP_TYPE_CLUSTER,
@@ -1186,13 +1131,6 @@ static struct sd_op_template sd_ops[] = {
 		.name = "GET_EPOCH",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_epoch,
-	},
-
-	[SD_OP_GET_SNAP_FILE] = {
-		.name = "GET_SNAP_FILE",
-		.type = SD_OP_TYPE_LOCAL,
-		.force = true,
-		.process_work = local_get_snap_file,
 	},
 
 	[SD_OP_FLUSH_VDI] = {

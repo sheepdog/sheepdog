@@ -238,14 +238,10 @@ int init_base_path(const char *d)
 	return 0;
 }
 
-/*
- * farm needs extra HEX_LEN + 3 chars to store snapshot objects.
- * HEX_LEN + 3 = '/' + hex(2) + '/' + hex(38) + '\0'
- */
 static inline int check_path_len(const char *path)
 {
 	int len = strlen(path);
-	if (len + HEX_LEN + 3 > PATH_MAX) {
+	if (len > PATH_MAX) {
 		sd_eprintf("insanely long object directory %s", path);
 		return -1;
 	}

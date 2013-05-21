@@ -160,10 +160,7 @@ struct store_driver {
 	int (*update_epoch)(uint32_t epoch);
 	int (*purge_obj)(void);
 	/* Operations for snapshot */
-	int (*snapshot)(const struct siocb *);
 	int (*cleanup)(void);
-	int (*restore)(const struct siocb *);
-	int (*get_snap_file)(struct siocb *);
 };
 
 int default_init(void);
