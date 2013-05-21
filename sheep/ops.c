@@ -436,6 +436,8 @@ static int local_stat_cluster(struct request *req)
 	max_logs = req->rq.data_length / sizeof(*log);
 	epoch = get_latest_epoch();
 	for (i = 0; i < max_logs; i++) {
+		size_t nr_nodes;
+
 		if (epoch <= 0)
 			break;
 
@@ -443,14 +445,17 @@ static int local_stat_cluster(struct request *req)
 		memset(log, 0, sizeof(*log));
 		log->epoch = epoch;
 		log->ctime = get_cluster_ctime();
-		log->nr_nodes = epoch_log_read_with_timestamp(epoch, log->nodes,
-							sizeof(log->nodes),
-							(time_t *)&log->time);
-		if (log->nr_nodes == -1)
-			log->nr_nodes = epoch_log_read_remote(epoch, log->nodes,
-							sizeof(log->nodes),
-							(time_t *)&log->time,
-							req->vinfo);
+		nr_nodes = epoch_log_read_with_timestamp(epoch, log->nodes,
+							 sizeof(log->nodes),
+							 (time_t *)&log->time);
+		if (nr_nodes == -1)
+			nr_nodes = epoch_log_read_remote(epoch, log->nodes,
+							 sizeof(log->nodes),
+							 (time_t *)&log->time,
+							 req->vinfo);
+		assert(nr_nodes >= 0);
+		assert(nr_nodes <= SD_MAX_NODES);
+		log->nr_nodes = nr_nodes;
 
 		log->disable_recovery = sys->disable_recovery;
 
