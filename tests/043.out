@@ -1,42 +1,42 @@
 QA output created by 043
 using backend farm store
 e6fffdc037c9f623d1c03fda7ef9cabf  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
 Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 e6fffdc037c9f623d1c03fda7ef9cabf  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
 Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 e6fffdc037c9f623d1c03fda7ef9cabf  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
 Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 e6fffdc037c9f623d1c03fda7ef9cabf  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
 Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 e6fffdc037c9f623d1c03fda7ef9cabf  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
 Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 c2f72711cc1e4781841aa416f0b43e0d  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -44,7 +44,7 @@ Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 c2f72711cc1e4781841aa416f0b43e0d  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -52,7 +52,7 @@ Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 c2f72711cc1e4781841aa416f0b43e0d  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -60,7 +60,7 @@ Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 c2f72711cc1e4781841aa416f0b43e0d  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -68,7 +68,7 @@ Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 c2f72711cc1e4781841aa416f0b43e0d  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -76,7 +76,7 @@ Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 99970159bd855e83ced168eca46ae6c5  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -85,7 +85,7 @@ DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 99970159bd855e83ced168eca46ae6c5  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -94,7 +94,7 @@ DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 99970159bd855e83ced168eca46ae6c5  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -103,7 +103,7 @@ DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
 99970159bd855e83ced168eca46ae6c5  -
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 

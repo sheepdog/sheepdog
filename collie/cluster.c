@@ -155,7 +155,8 @@ static int cluster_info(int argc, char **argv)
 	if (!raw_output)
 		printf("Cluster status: ");
 	if (rsp->result == SD_RES_SUCCESS)
-		printf("running\n");
+		printf("running, auto-recovery %s\n", logs->disable_recovery ?
+		       "disabled" : "enabled");
 	else
 		printf("%s\n", sd_strerror(rsp->result));
 

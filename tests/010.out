@@ -28,7 +28,7 @@ STORE/4/obj/007c2b2500000003
 STORE/4/obj/007c2b2500000004
 STORE/4/obj/007c2b2500000005
 STORE/4/obj/007c2b2500000006
-Cluster status: running
+Cluster status: running, auto-recovery disabled
 
 Cluster created at DATE
 
@@ -65,7 +65,7 @@ a8775e30ddc5eda14d76e5361a514392  -
 8124234db4755d4772c3440f2cbd1ecb  -
 62630992718e77c73873ce1672d80786  -
 19b9d4d75a5a71bfad364628880fa913  -
-Cluster status: running
+Cluster status: running, auto-recovery disabled
 
 Cluster created at DATE
 
@@ -106,7 +106,7 @@ STORE/4/obj/007c2b2500000004
 STORE/4/obj/007c2b2500000005
 STORE/4/obj/007c2b2500000006
 Cluster recovery: enable
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -150,7 +150,7 @@ STORE/4/obj/007c2b2500000004
 STORE/4/obj/007c2b2500000005
 STORE/4/obj/007c2b2500000006
 Cluster recovery: disable
-Cluster status: running
+Cluster status: running, auto-recovery disabled
 
 Cluster created at DATE
 
@@ -173,7 +173,7 @@ e0b27e7466a3c21d0a4dedfed8bb9184  -
 f35835c0a25be5ee75a536d1816c1db4  -
 0faf5f38c28a38a6db1e6dfcdf259141  -
 83bffbfb00dbcb7d6b4a2fa9274175b9  -
-Cluster status: running
+Cluster status: running, auto-recovery disabled
 
 Cluster created at DATE
 
@@ -197,7 +197,7 @@ STORE/4/obj/007c2b2500000002
 STORE/6/obj/007c2b2500000003
 STORE/7/obj/007c2b2500000003
 Cluster recovery: enable
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 

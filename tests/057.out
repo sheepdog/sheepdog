@@ -11,7 +11,7 @@ Id	Used	Free	Path
 3 20 MB MASKED GB STORE/0/d3
 4 24 MB MASKED GB STORE/0/d4
 finish check&repair test
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -32,7 +32,7 @@ Id	Used	Free	Path
 1 32 MB MASKED GB STORE/0/d3
 2 36 MB MASKED GB STORE/0/d4
 finish check&repair test
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -46,7 +46,7 @@ Id	Used	Free	Path
 0 28 MB MASKED GB STORE/0/d2
 1 32 MB MASKED GB STORE/0/d3
 2 36 MB MASKED GB STORE/0/d4
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 

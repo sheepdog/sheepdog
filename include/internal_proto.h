@@ -130,7 +130,8 @@ struct epoch_log {
 	uint64_t time;		/* treated as time_t */
 	uint32_t epoch;
 	uint32_t nr_nodes;
-	uint32_t nr_copies;
+	uint8_t  disable_recovery;
+	uint8_t  __pad[3];
 	struct sd_node nodes[SD_MAX_NODES];
 };
 

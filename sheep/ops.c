@@ -452,7 +452,7 @@ static int local_stat_cluster(struct request *req)
 							(time_t *)&log->time,
 							req->vinfo);
 
-		log->nr_copies = sys->nr_copies;
+		log->disable_recovery = sys->disable_recovery;
 
 		rsp->data_length += sizeof(*log);
 		epoch--;

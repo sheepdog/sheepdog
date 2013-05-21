@@ -1,6 +1,6 @@
 QA output created by 052
 using backend farm store
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -50,7 +50,7 @@ fixed missing 7c2b2500000001
 fixed missing 7c2b2500000002
 fixed missing 7c2b2500000003
 fixed missing 7c2b2500000004
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -59,7 +59,7 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -68,7 +68,7 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -77,7 +77,7 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -86,17 +86,7 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
-
-Cluster created at DATE
-
-Epoch Time           Version
-DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
-DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
-DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -106,7 +96,7 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -116,7 +106,7 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
@@ -126,7 +116,17 @@ DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
-Cluster status: running
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7004]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25     3              
+Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
