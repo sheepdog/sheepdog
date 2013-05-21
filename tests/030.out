@@ -1,0 +1,37 @@
+QA output created by 030
+using backend plain store
+Index		Tag		Snapshot Time
+1		s1		DATE
+Index		Tag		Snapshot Time
+1		s1		DATE
+2		s2		DATE
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test1        1   10 MB   12 MB  0.0 MB DATE   fd32fc     3              
+s test1        2   10 MB   12 MB  0.0 MB DATE   fd32fd     3              
+  test1        0   10 MB  0.0 MB   12 MB DATE   fd32fe     3              
+s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815     3              
+s test2        2   10 MB   12 MB  0.0 MB DATE   fd3816     3              
+  test2        0   10 MB  0.0 MB   12 MB DATE   fd3817     3              
+using backend plain store
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test1        1   10 MB   12 MB  0.0 MB DATE   fd32fc     3              
+  test1        0   10 MB  0.0 MB   12 MB DATE   fd32fd     3              
+s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815     3              
+  test2        0   10 MB  0.0 MB   12 MB DATE   fd3816     3              
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test1        1   10 MB   12 MB  0.0 MB DATE   fd32fc     3              
+s test1        2   10 MB   12 MB  0.0 MB DATE   fd32fd     3              
+  test1        0   10 MB  0.0 MB   12 MB DATE   fd32fe     3              
+s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815     3              
+s test2        2   10 MB   12 MB  0.0 MB DATE   fd3816     3              
+  test2        0   10 MB  0.0 MB   12 MB DATE   fd3817     3              
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test1        1   10 MB   12 MB  0.0 MB DATE   fd32fc     3              
+s test1        2   10 MB   12 MB  0.0 MB DATE   fd32fd     3              
+  test1        0   10 MB  0.0 MB   12 MB DATE   fd32fe     3              
+s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815     3              
+s test2        2   10 MB   12 MB  0.0 MB DATE   fd3816     3              
+  test2        0   10 MB  0.0 MB   12 MB DATE   fd3817     3              
