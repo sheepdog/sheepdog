@@ -21,15 +21,11 @@ static struct sd_option cluster_options[] = {
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
 	{'m', "mode", true, "mode (safe, quorum, unsafe)"},
 	{'f', "force", false, "do not prompt for confirmation"},
-	{'R', "restore", true, "restore the cluster"},
-	{'l', "list", false, "list the user epoch information"},
 
 	{ 0, NULL, false, NULL },
 };
 
 static struct cluster_cmd_data {
-	uint32_t epoch;
-	bool list;
 	int copies;
 	bool nohalt;
 	bool quorum;
@@ -215,94 +211,6 @@ static int cluster_shutdown(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int restore_snap(uint32_t epoch)
-{
-	int ret;
-	struct sd_req hdr;
-
-	sd_init_req(&hdr, SD_OP_RESTORE);
-	hdr.obj.tgt_epoch = epoch;
-
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
-		return EXIT_FAILURE;
-	}
-
-	printf("Cluster restore to the snapshot %d\n", epoch);
-	return EXIT_SUCCESS;
-}
-
-static void print_list(void *buf, unsigned len)
-{
-	struct snap_log *log_buf = (struct snap_log *)buf;
-	unsigned nr = len / sizeof(struct snap_log), i;
-
-	printf("Index\t\tSnapshot Time\n");
-	for (i = 0; i < nr; i++, log_buf++) {
-		time_t *t = (time_t *)&log_buf->time;
-		printf("%d\t\t", log_buf->epoch);
-		printf("%s", ctime(t));
-	}
-}
-
-static int list_snap(void)
-{
-	int ret = EXIT_SYSFAIL;
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	void *buf;
-
-	buf = xmalloc(SD_DATA_OBJ_SIZE);
-
-	sd_init_req(&hdr, SD_OP_GET_SNAP_FILE);
-	hdr.data_length = SD_DATA_OBJ_SIZE;
-
-	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
-	if (ret < 0)
-		goto out;
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Listing snapshots failed: %s\n",
-				sd_strerror(rsp->result));
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	print_list(buf, rsp->data_length);
-out:
-	free(buf);
-	return EXIT_SUCCESS;
-}
-
-static int do_snapshot(void)
-{
-	int ret;
-	struct sd_req hdr;
-
-	sd_init_req(&hdr, SD_OP_SNAPSHOT);
-
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
-		return EXIT_FAILURE;
-	}
-
-	return EXIT_SUCCESS;
-}
-
-static int cluster_snapshot(int argc, char **argv)
-{
-	int ret, epoch = cluster_cmd_data.epoch;
-	if (epoch)
-		ret = restore_snap(epoch);
-	else if (cluster_cmd_data.list)
-		ret = list_snap();
-	else
-		ret = do_snapshot();
-	return ret;
-}
-
 #define RECOVER_PRINT \
 	"Caution! Please try starting all the cluster nodes normally before\n" \
 	"running this command.\n\n" \
@@ -402,8 +310,6 @@ static struct subcommand cluster_cmd[] = {
 	 NULL, 0, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
-	{"snapshot", NULL, "aRlph", "snapshot/restore the cluster",
-	 NULL, 0, cluster_snapshot, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",
 	 cluster_recover_cmd, SUBCMD_FLAG_NEED_ARG,
@@ -450,20 +356,6 @@ static int cluster_parser(int ch, char *opt)
 		break;
 	case 'f':
 		cluster_cmd_data.force = true;
-		break;
-	case 'R':
-		cluster_cmd_data.epoch = strtol(opt, &p, 10);
-		if (opt == p) {
-			fprintf(stderr, "The epoch must be an integer\n");
-			exit(EXIT_FAILURE);
-		}
-		if (cluster_cmd_data.epoch < 1) {
-			fprintf(stderr, "The epoch must be greater than 0\n");
-			exit(EXIT_FAILURE);
-		}
-		break;
-	case 'l':
-		cluster_cmd_data.list = true;
 		break;
 	}
 
