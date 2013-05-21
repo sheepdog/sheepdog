@@ -1,7 +1,9 @@
 /*
  * Copyright (C) 2011 Taobao Inc.
+ * Copyright (C) 2013 Zelin.io
  *
  * Liu Yuan <namei.unix@gmail.com>
+ * Kai Zhang <kyle@zelin.io>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -12,52 +14,54 @@
  */
 
 /*
- * Snap object is the meta data that describes the snapshot, either triggered
- * by recovery logic or end users.
+ * Snap object is the meta data that describes the cluster snapshot.
  */
 #include <time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "farm.h"
-#include "sheep_priv.h"
 
-int snap_init(void)
+static char snap_log_path[PATH_MAX];
+
+int snap_init(const char *farm_dir)
 {
-	int fd, ret = 0;
+	int fd, ret = -1;
 	struct strbuf buf = STRBUF_INIT;
 
 	strbuf_addstr(&buf, farm_dir);
 	strbuf_addf(&buf, "/%s", "user_snap");
 
-	fd = open(buf.buf, O_CREAT | O_EXCL, 0666);
+	if (!strlen(snap_log_path))
+		strbuf_copyout(&buf, snap_log_path, sizeof(snap_log_path));
+
+	fd = open(snap_log_path, O_CREAT | O_EXCL, 0666);
 	if (fd < 0) {
 		if (errno != EEXIST) {
-			ret = -1;
+			fprintf(stderr, "%m\n");
 			goto out;
 		}
-	} else
-		close(fd);
+	}
 
+	ret = 0;
+	close(fd);
 out:
 	strbuf_release(&buf);
 	return ret;
 }
 
-int snap_log_write(uint32_t epoch, unsigned char *sha1)
+int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1)
 {
 	int fd, ret = -1;
 	struct strbuf buf = STRBUF_INIT;
-	struct snap_log log = { .epoch = epoch,
+	struct snap_log log = { .idx = idx,
 				.time = time(NULL) };
-
+	pstrcpy(log.tag, SD_MAX_SNAPSHOT_TAG_LEN, tag);
 	memcpy(log.sha1, sha1, SHA1_LEN);
-	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", "user_snap");
 
-	fd = open(buf.buf, O_WRONLY | O_APPEND);
+	fd = open(snap_log_path, O_WRONLY | O_APPEND);
 	if (fd < 0) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		goto out;
 	}
 
@@ -65,8 +69,10 @@ int snap_log_write(uint32_t epoch, unsigned char *sha1)
 	strbuf_add(&buf, &log, sizeof(log));
 	ret = xwrite(fd, buf.buf, buf.len);
 	if (ret != buf.len)
-		ret = -1;
+		goto out_close;
 
+	ret = 0;
+out_close:
 	close(fd);
 out:
 	strbuf_release(&buf);
@@ -75,21 +81,17 @@ out:
 
 void *snap_log_read(int *out_nr)
 {
-	struct strbuf buf = STRBUF_INIT;
 	struct stat st;
 	void *buffer = NULL;
 	int len, fd;
 
-	strbuf_addstr(&buf, farm_dir);
-	strbuf_addf(&buf, "/%s", "user_snap");
-
-	fd = open(buf.buf, O_RDONLY);
+	fd = open(snap_log_path, O_RDONLY);
 	if (fd < 0) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		goto out;
 	}
 	if (fstat(fd, &st) < 0) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		goto out_close;
 	}
 
@@ -105,7 +107,6 @@ void *snap_log_read(int *out_nr)
 out_close:
 	close(fd);
 out:
-	strbuf_release(&buf);
 	return buffer;
 }
 
@@ -113,7 +114,6 @@ void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 {
 	void *buffer = NULL;
 
-	sd_dprintf("%s", sha1_to_hex(sha1));
 	buffer = sha1_file_read(sha1, outhdr);
 	if (!buffer)
 		return NULL;
@@ -125,28 +125,25 @@ void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 	return buffer;
 }
 
-int snap_file_write(uint32_t epoch, struct sd_node *nodes, int nr_nodes,
-		    unsigned char *trunksha1, unsigned char *outsha1)
+int snap_file_write(uint32_t idx, unsigned char *trunksha1,
+		    unsigned char *outsha1)
 {
-	int ret = 0;
-	struct strbuf buf = STRBUF_INIT;
+	int ret = -1;
 	struct sha1_file_hdr hdr = {};
+	struct strbuf buf = STRBUF_INIT;
 
 	memcpy(hdr.tag, TAG_SNAP, TAG_LEN);
-	hdr.size = nr_nodes * sizeof(*nodes) + SHA1_LEN;
-	hdr.priv = epoch;
+	hdr.size = SHA1_LEN;
+	hdr.priv = idx;
 	hdr.reserved = 0;
 
 	strbuf_add(&buf, &hdr, sizeof(hdr));
 	strbuf_add(&buf, trunksha1, SHA1_LEN);
-	strbuf_add(&buf, (char *)nodes, nr_nodes * sizeof(*nodes));
-	if (sha1_file_write((void *)buf.buf, buf.len, outsha1) < 0) {
-		ret = -1;
-		goto err;
-	}
+	if (sha1_file_write((void *)buf.buf, buf.len, outsha1) < 0)
+		goto out;
 
-	sd_dprintf("epoch: %" PRIu32 ", sha1: %s", epoch, sha1_to_hex(outsha1));
-err:
+	ret = 0;
+out:
 	strbuf_release(&buf);
 	return ret;
 }

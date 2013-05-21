@@ -95,6 +95,7 @@
 #define SD_MAX_VDI_TAG_LEN 256U
 #define SD_MAX_VDI_ATTR_KEY_LEN 256U
 #define SD_MAX_VDI_ATTR_VALUE_LEN 65536U
+#define SD_MAX_SNAPSHOT_TAG_LEN 256U
 #define SD_NR_VDIS   (1U << 24)
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
@@ -221,7 +222,8 @@ struct sheepdog_vdi_attr {
 #define SHA1_LEN        20
 
 struct snap_log {
-	uint32_t epoch;
+	uint32_t idx;
+	char tag[SD_MAX_SNAPSHOT_TAG_LEN];
 	uint64_t time;
 	unsigned char sha1[SHA1_LEN];
 };
@@ -319,9 +321,9 @@ static inline bool vdi_is_snapshot(const struct sd_inode *inode)
 
 static inline __attribute__((used)) void __sd_proto_build_bug_ons(void)
 {
-        /* never called, only for checking BUILD_BUG_ON()s */
-        BUILD_BUG_ON(sizeof(struct sd_req) != SD_REQ_SIZE);
-        BUILD_BUG_ON(sizeof(struct sd_rsp) != SD_RSP_SIZE);
+	/* never called, only for checking BUILD_BUG_ON()s */
+	BUILD_BUG_ON(sizeof(struct sd_req) != SD_REQ_SIZE);
+	BUILD_BUG_ON(sizeof(struct sd_rsp) != SD_RSP_SIZE);
 }
 
 #endif

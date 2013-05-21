@@ -43,6 +43,14 @@ static inline char *get_object_directory(void)
 typedef int (*object_handler_func_t)(uint64_t oid, int nr_copies, void *buf,
 				     size_t size, void *data);
 
+/* snap.c */
+int snap_init(const char *path);
+void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
+int snap_file_write(uint32_t idx, unsigned char *trunksha1,
+		    unsigned char *outsha1);
+void *snap_log_read(int *out_nr);
+int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1);
+
 /* sha1_file.c */
 int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
 void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *);
