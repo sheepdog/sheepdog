@@ -23,7 +23,7 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= collie
 
-collie_SOURCES		= farm/object_tree.c \
+collie_SOURCES		= farm/object_tree.c farm/sha1_file.c \
 			  collie.c common.c treeview.c vdi.c node.c cluster.c
 
 if BUILD_TRACE
@@ -31,14 +31,14 @@ collie_SOURCES          += debug.c
 override CFLAGS         := $(subst -pg -gstabs,,$(CFLAGS))
 endif
 
-collie_LDADD	  	= ../lib/libsheepdog.a -lpthread
+collie_LDADD		= ../lib/libsheepdog.a -lpthread
 collie_DEPENDENCIES	= ../lib/libsheepdog.a
 
 noinst_HEADERS		= treeview.h collie.h
 
-EXTRA_DIST		= 
+EXTRA_DIST		=
 
-all-local: 
+all-local:
 	@echo Built collie
 
 clean-local:

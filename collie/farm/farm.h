@@ -20,8 +20,34 @@
 #include "strbuf.h"
 #include "sha1.h"
 
+#define TAG_LEN         6
+#define TAG_DATA        "data\0\0"
+#define TAG_TRUNK       "trunk\0"
+#define TAG_SNAP        "snap\0\0"
+
+struct sha1_file_hdr {
+	char tag[TAG_LEN];
+	uint64_t size;
+	uint64_t priv;
+	uint64_t reserved;
+};
+
+static char farm_obj_dir[PATH_MAX];
+static char farm_dir[PATH_MAX];
+
+static inline char *get_object_directory(void)
+{
+	return farm_obj_dir;
+}
+
 typedef int (*object_handler_func_t)(uint64_t oid, int nr_copies, void *buf,
 				     size_t size, void *data);
+
+/* sha1_file.c */
+int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
+void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *);
+int get_sha1_hex(const char *hex, unsigned char *sha1);
+int sha1_file_try_delete(const unsigned char *sha1);
 
 /* object_tree.c */
 int object_tree_size(void);

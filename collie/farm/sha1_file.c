@@ -28,11 +28,6 @@
 #include "farm.h"
 #include "util.h"
 
-static inline char *get_object_directory(void)
-{
-	return farm_obj_dir;
-}
-
 static void fill_sha1_path(char *pathbuf, const unsigned char *sha1)
 {
 	int i;
@@ -45,9 +40,8 @@ static void fill_sha1_path(char *pathbuf, const unsigned char *sha1)
 	}
 }
 
-char *sha1_to_path(const unsigned char *sha1)
+static char *sha1_to_path(const unsigned char *sha1)
 {
-
 	static char buf[PATH_MAX];
 	const char *objdir;
 	int len;
@@ -90,7 +84,7 @@ static int put_sha1_file(char *name)
 
 	if (getxattr(name, CNAME, &count, CSIZE) < 0) {
 		if (errno == ENOENT) {
-			sd_dprintf("sha1 file doesn't exist");
+			fprintf(stderr, "sha1 file doesn't exist.\n");
 			return -1;
 		} else
 			panic("%m");
@@ -99,10 +93,9 @@ static int put_sha1_file(char *name)
 	count--;
 	if (count == 0) {
 		if (unlink(name) < 0) {
-			sd_dprintf("%m");
+			fprintf(stderr, "%m\n");
 			return -1;
 		}
-		sd_dprintf("%s deleted", name);
 	} else {
 		if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
 			panic("%m");
@@ -110,20 +103,25 @@ static int put_sha1_file(char *name)
 	return 0;
 }
 
-static int sha1_buffer_write(const unsigned char *sha1, void *buf, unsigned int size)
+static int sha1_buffer_write(const unsigned char *sha1,
+			     void *buf, unsigned int size)
 {
 	char *filename = sha1_to_path(sha1);
 	int fd, ret = 0, len;
 
 	fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0666);
 	if (fd < 0) {
-		if (errno != EEXIST)
+		if (errno != EEXIST) {
+			fprintf(stderr,
+				"failed to open file %s with error: %m\n",
+				filename);
 			ret = -1;
+		}
 		goto err_open;
 	}
 	len = xwrite(fd, buf, size);
 	if (len != size) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		close(fd);
 		return -1;
 	}
@@ -162,21 +160,22 @@ static void *map_sha1_file(const unsigned char *sha1, unsigned long *size)
 		return NULL;
 	}
 	if (fstat(fd, &st) < 0) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		close(fd);
 		return NULL;
 	}
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		return NULL;
 	}
 	*size = st.st_size;
 	return map;
 }
 
-static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file_hdr *hdr)
+static void *unpack_sha1_file(void *map, unsigned long mapsize,
+			      struct sha1_file_hdr *hdr)
 {
 	int hdr_len;
 	char *buf;
@@ -185,7 +184,7 @@ static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file
 	hdr_len = sizeof(*hdr);
 	buf = valloc(hdr->size);
 	if (!buf) {
-		sd_dprintf("%m");
+		fprintf(stderr, "%m\n");
 		return NULL;
 	}
 
@@ -193,7 +192,8 @@ static void *unpack_sha1_file(void *map, unsigned long mapsize, struct sha1_file
 	return buf;
 }
 
-static int verify_sha1_file(const unsigned char *sha1, void *buf, unsigned long len)
+static int verify_sha1_file(const unsigned char *sha1,
+			    void *buf, unsigned long len)
 {
 	unsigned char tmp[SHA1_LEN];
 	struct sha1_ctx c;
@@ -203,7 +203,7 @@ static int verify_sha1_file(const unsigned char *sha1, void *buf, unsigned long 
 	sha1_final(&c, tmp);
 
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
-		sd_dprintf("failed, %s != %s", sha1_to_hex(sha1),
+		fprintf(stderr, "failed, %s != %s\n", sha1_to_hex(sha1),
 			   sha1_to_hex(tmp));
 		return -1;
 	}
