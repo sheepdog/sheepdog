@@ -481,15 +481,8 @@ int default_remove_object(uint64_t oid)
 
 #define SHA1NAME "user.obj.sha1"
 
-static int get_object_sha1(uint64_t oid, uint32_t epoch, uint8_t *sha1)
+static int get_object_sha1(char *path, uint8_t *sha1)
 {
-	char path[PATH_MAX];
-
-	if (default_exist(oid))
-		get_obj_path(oid, path);
-	else
-		get_stale_obj_path(oid, epoch, path);
-
 	if (getxattr(path, SHA1NAME, sha1, SHA1_LEN) != SHA1_LEN) {
 		sd_eprintf("fail to get sha1, %s", path);
 		return -1;
@@ -498,21 +491,32 @@ static int get_object_sha1(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	return 0;
 }
 
-static int set_object_sha1(uint64_t oid, uint32_t epoch, const uint8_t *sha1)
+static int set_object_sha1(char *path, const uint8_t *sha1)
 {
-	char path[PATH_MAX];
 	int ret;
-
-	if (default_exist(oid))
-		get_obj_path(oid, path);
-	else
-		get_stale_obj_path(oid, epoch, path);
 
 	ret = setxattr(path, SHA1NAME, sha1, SHA1_LEN, 0);
 	if (ret < 0)
 		sd_eprintf("fail to set sha1, %s", path);
 
 	return ret;
+}
+
+static int get_object_path(uint64_t oid, uint32_t epoch, char *path)
+{
+	if (default_exist(oid)) {
+		get_obj_path(oid, path);
+	} else {
+		get_stale_obj_path(oid, epoch, path);
+		if (access(path, F_OK) < 0) {
+			if (errno == ENOENT)
+				return SD_RES_NO_OBJ;
+			return SD_RES_EIO;
+		}
+
+	}
+
+	return SD_RES_SUCCESS;
 }
 
 int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
@@ -524,9 +528,14 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	uint64_t offset = 0;
 	uint32_t length;
 	bool is_readonly_obj = oid_is_readonly(oid);
+	char path[PATH_MAX];
+
+	ret = get_object_path(oid, epoch, path);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
 
 	if (is_readonly_obj) {
-		if (get_object_sha1(oid, epoch, sha1) == 0) {
+		if (get_object_sha1(path, sha1) == 0) {
 			sd_dprintf("use cached sha1 digest %s",
 				   sha1_to_hex(sha1));
 			return SD_RES_SUCCESS;
@@ -542,7 +551,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	iocb.buf = buf;
 	iocb.length = length;
 
-	ret = default_read(oid, &iocb);
+	ret = default_read_from_path(oid, path, &iocb);
 	if (ret != SD_RES_SUCCESS) {
 		free(buf);
 		return ret;
@@ -561,7 +570,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 		   epoch, sha1_to_hex(sha1));
 
 	if (is_readonly_obj)
-		set_object_sha1(oid, epoch, sha1);
+		set_object_sha1(path, sha1);
 
 	return ret;
 }
