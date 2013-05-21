@@ -26,7 +26,6 @@
 #include "sheep_priv.h"
 #include "strbuf.h"
 #include "util.h"
-#include "farm/farm.h"
 
 char *obj_path;
 char *epoch_path;
