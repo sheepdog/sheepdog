@@ -40,13 +40,13 @@ static int get_open_flags(uint64_t oid, bool create)
 static int get_obj_path(uint64_t oid, char *path)
 {
 	return snprintf(path, PATH_MAX, "%s/%016" PRIx64,
-			get_object_path(oid), oid);
+			md_get_object_path(oid), oid);
 }
 
 static int get_tmp_obj_path(uint64_t oid, char *path)
 {
 	return snprintf(path, PATH_MAX, "%s/%016"PRIx64".tmp",
-			get_object_path(oid), oid);
+			md_get_object_path(oid), oid);
 }
 
 static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)

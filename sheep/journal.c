@@ -142,7 +142,7 @@ static void journal_get_path(struct journal_descriptor *jd, char *path)
 	case JF_STORE:
 	case JF_REMOVE_OBJ:
 		snprintf(path, PATH_MAX, "%s/%016"PRIx64,
-			 get_object_path(jd->oid), jd->oid);
+			 md_get_object_path(jd->oid), jd->oid);
 		if (jd->flag == JF_STORE)
 			sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
 				path, jd->size, jd->offset, jd->create);

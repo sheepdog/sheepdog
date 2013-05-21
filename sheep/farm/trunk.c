@@ -34,7 +34,7 @@ static int fill_entry_new_sha1(struct trunk_entry *entry)
 	struct sha1_file_hdr hdr = { .priv = 0 };
 
 	memcpy(hdr.tag, TAG_DATA, TAG_LEN);
-	strbuf_addstr(&buf, get_object_path(entry->oid));
+	strbuf_addstr(&buf, md_get_object_path(entry->oid));
 	strbuf_addf(&buf, "/%016" PRIx64, entry->oid);
 	fd = open(buf.buf, O_RDONLY);
 	if (fd < 0) {

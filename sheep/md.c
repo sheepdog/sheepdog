@@ -337,7 +337,7 @@ reinit:
 	return total;
 }
 
-char *get_object_path(uint64_t oid)
+char *md_get_object_path(uint64_t oid)
 {
 	struct vdisk *vd;
 	char *p;
@@ -351,7 +351,7 @@ char *get_object_path(uint64_t oid)
 	return p;
 }
 
-static char *get_object_path_nolock(uint64_t oid)
+static char *md_get_object_path_nolock(uint64_t oid)
 {
 	struct vdisk *vd;
 
@@ -476,12 +476,12 @@ static int get_old_new_path(uint64_t oid, uint32_t epoch, char *path,
 	if (!epoch) {
 		snprintf(old, PATH_MAX, "%s/%016" PRIx64, path, oid);
 		snprintf(new, PATH_MAX, "%s/%016" PRIx64,
-			 get_object_path_nolock(oid), oid);
+			 md_get_object_path_nolock(oid), oid);
 	} else {
 		snprintf(old, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32, path,
 			 oid, epoch);
 		snprintf(new, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
-			 get_object_path_nolock(oid), oid, epoch);
+			 md_get_object_path_nolock(oid), oid, epoch);
 	}
 
 	if (!md_access(old))
@@ -566,7 +566,8 @@ bool md_exist(uint64_t oid)
 {
 	char path[PATH_MAX];
 
-	snprintf(path, PATH_MAX, "%s/%016" PRIx64, get_object_path(oid), oid);
+	snprintf(path, PATH_MAX, "%s/%016" PRIx64, md_get_object_path(oid),
+		 oid);
 	if (md_access(path))
 		return true;
 	/*
@@ -583,7 +584,7 @@ bool md_exist(uint64_t oid)
 int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path)
 {
 	snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
-		 get_object_path(oid), oid, epoch);
+		 md_get_object_path(oid), oid, epoch);
 	if (md_access(path))
 		return SD_RES_SUCCESS;
 
