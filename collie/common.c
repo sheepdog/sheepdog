@@ -225,7 +225,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 			}
 
 			if (flags & SUBCMD_FLAG_NEED_ARG
-			    && argc != 5)
+			    && argc < 5)
 				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 			optind++;
 			ret = sub[i].fn(argc, argv);
