@@ -23,7 +23,8 @@ INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= collie
 
-collie_SOURCES		= collie.c common.c treeview.c vdi.c node.c cluster.c
+collie_SOURCES		= farm/object_tree.c \
+			  collie.c common.c treeview.c vdi.c node.c cluster.c
 
 if BUILD_TRACE
 collie_SOURCES          += debug.c
