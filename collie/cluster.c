@@ -15,6 +15,7 @@
 #include <sys/time.h>
 
 #include "collie.h"
+#include "farm/farm.h"
 
 static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
@@ -211,6 +212,143 @@ static int cluster_shutdown(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static void print_list(void *buf, unsigned len)
+{
+	struct snap_log *log_buf = (struct snap_log *)buf;
+	unsigned nr = len / sizeof(struct snap_log);
+
+	printf("Index\t\tTag\t\tSnapshot Time\n");
+	for (unsigned i = 0; i < nr; i++, log_buf++) {
+		time_t *t = (time_t *)&log_buf->time;
+		printf("%d\t\t", log_buf->idx);
+		printf("%s\t\t", log_buf->tag);
+		printf("%s", ctime(t));
+	}
+}
+
+static int list_snapshot(int argc, char **argv)
+{
+	char *path = argv[optind++];
+	void *buf = NULL;
+	int log_nr;
+	int ret = EXIT_SYSFAIL;
+
+	if (farm_init(path) != SD_RES_SUCCESS)
+		goto out;
+
+	buf = snap_log_read(&log_nr);
+	if (!buf)
+		goto out;
+
+	print_list(buf, log_nr * sizeof(struct snap_log));
+	ret = EXIT_SUCCESS;
+out:
+	if (ret)
+		fprintf(stderr, "Fail to list snapshot.\n");
+	free(buf);
+	return ret;
+}
+
+static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
+			  uint32_t snapid, uint32_t flags,
+			  const struct sd_inode *i, void *data)
+{
+	uint64_t vdi_oid = vid_to_vdi_oid(vid);
+
+	/* ignore active vdi */
+	if (!vdi_is_snapshot(i))
+		return;
+
+	object_tree_insert(vdi_oid, i->nr_copies);
+
+	for (uint64_t idx = 0; idx < MAX_DATA_OBJS; idx++) {
+		if (i->data_vdi_id[idx]) {
+			uint64_t oid = vid_to_data_oid(i->data_vdi_id[idx],
+						       idx);
+			object_tree_insert(oid, i->nr_copies);
+		}
+	}
+}
+
+static int save_snapshot(int argc, char **argv)
+{
+	char *tag = argv[optind++];
+	char *path, *p;
+	int ret = EXIT_SYSFAIL;
+
+	strtol(tag, &p, 10);
+	if (tag != p) {
+		fprintf(stderr, "Tag should not start with number.\n");
+		return EXIT_USAGE;
+	}
+
+	if (!argv[optind]) {
+		fprintf(stderr, "Please specify the path to save snapshot.\n");
+		return EXIT_USAGE;
+	}
+	path = argv[optind];
+
+	if (farm_init(path) != SD_RES_SUCCESS)
+		goto out;
+
+	if (farm_contain_snapshot(0, tag)) {
+		fprintf(stderr, "Snapshot tag has already been used for another"
+			" snapshot, please, use another one.\n");
+		goto out;
+	}
+
+	if (parse_vdi(fill_object_tree, SD_INODE_SIZE, NULL) != SD_RES_SUCCESS)
+		goto out;
+
+	if (farm_save_snapshot(tag) != SD_RES_SUCCESS)
+		goto out;
+
+	ret = EXIT_SUCCESS;
+out:
+	if (ret)
+		fprintf(stderr, "Fail to save snapshot to path: %s.\n", path);
+	object_tree_free();
+	return ret;
+}
+
+static int load_snapshot(int argc, char **argv)
+{
+	char *tag = argv[optind++];
+	char *path, *p;
+	uint32_t idx;
+	int ret = EXIT_SYSFAIL;
+
+	idx = strtol(tag, &p, 10);
+	if (tag == p)
+		idx = 0;
+
+	if (!argv[optind]) {
+		fprintf(stderr, "Please specify the path to save snapshot.\n");
+		return EXIT_USAGE;
+	}
+	path = argv[optind];
+
+	if (farm_init(path) != SD_RES_SUCCESS)
+		goto out;
+
+	if (!farm_contain_snapshot(idx, tag)) {
+		fprintf(stderr, "Snapshot index or tag does not exist.\n");
+		goto out;
+	}
+
+	if (cluster_format(0, NULL) != SD_RES_SUCCESS)
+		goto out;
+
+	if (farm_load_snapshot(idx, tag) != SD_RES_SUCCESS)
+		goto out;
+
+	ret = EXIT_SUCCESS;
+out:
+	if (ret)
+		fprintf(stderr, "Fail to load snapshot\n");
+	return ret;
+}
+
 #define RECOVER_PRINT \
 	"Caution! Please try starting all the cluster nodes normally before\n" \
 	"running this command.\n\n" \
@@ -303,6 +441,21 @@ static int cluster_recover(int argc, char **argv)
 	return do_generic_subcommand(cluster_recover_cmd, argc, argv);
 }
 
+/* Subcommand list of snapshot */
+static struct subcommand cluster_snapshot_cmd[] = {
+	{"save", NULL, "h", "save snapshot to localpath",
+	 NULL, SUBCMD_FLAG_NEED_ARG, save_snapshot, NULL},
+	{"list", NULL, "h", "list snapshot of localpath",
+	 NULL, SUBCMD_FLAG_NEED_ARG, list_snapshot, NULL},
+	{"load", NULL, "h", "list snapshot of localpath",
+	 NULL, SUBCMD_FLAG_NEED_ARG, load_snapshot, NULL}
+};
+
+static int cluster_snapshot(int argc, char **argv)
+{
+	return do_generic_subcommand(cluster_snapshot_cmd, argc, argv);
+}
+
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info, cluster_options},
@@ -310,6 +463,9 @@ static struct subcommand cluster_cmd[] = {
 	 NULL, 0, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
+	{"snapshot", "<tag|idx> <path>", "aph", "snapshot/restore the cluster",
+	 cluster_snapshot_cmd, SUBCMD_FLAG_NEED_ARG,
+	 cluster_snapshot, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",
 	 cluster_recover_cmd, SUBCMD_FLAG_NEED_ARG,
