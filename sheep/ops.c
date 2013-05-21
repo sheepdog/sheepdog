@@ -61,10 +61,17 @@ struct sd_op_template {
 	int (*process_main)(const struct sd_req *req, struct sd_rsp *rsp, void *data);
 };
 
-static int get_total_object_size(uint64_t oid, char *ignore, void *total)
+static int get_total_object_size(uint64_t oid, char *wd, void *total)
 {
 	uint64_t *t = total;
-	*t += get_objsize(oid);
+	struct stat s;
+	char path[PATH_MAX];
+
+	snprintf(path, PATH_MAX, "%s/%016" PRIx64, wd, oid);
+	if (stat(path, &s) == 0)
+		*t += s.st_blocks * SECTOR_SIZE;
+	else
+		*t += get_objsize(oid);
 
 	return SD_RES_SUCCESS;
 }
