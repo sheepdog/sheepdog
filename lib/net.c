@@ -422,8 +422,9 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 
 char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
 {
-	int  af = AF_INET6;
-	int  addr_start_idx = 0;
+	int af = AF_INET6;
+	int addr_start_idx = 0;
+	const char *ret;
 
 	/* Find address family type */
 	if (addr[12]) {
@@ -435,7 +436,10 @@ char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
 			addr_start_idx = 12;
 		}
 	}
-	inet_ntop(af, addr + addr_start_idx, str, size);
+	ret = inet_ntop(af, addr + addr_start_idx, str, size);
+	if (ret == NULL)
+		panic("failed to convert addr to string, %m");
+
 	if (port) {
 		int  len = strlen(str);
 		snprintf(str + len, size - len, ":%d", port);
