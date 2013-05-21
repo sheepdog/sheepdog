@@ -144,6 +144,8 @@ struct sd_req {
 			uint32_t	old_vid;
 			uint32_t	new_vid;
 			uint32_t	copies;
+			uint8_t		set_bitmap; /* 0 means false */
+						    /* others mean true */
 		} vdi_state;
 
 		uint32_t		__pad[8];

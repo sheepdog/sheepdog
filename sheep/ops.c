@@ -619,6 +619,9 @@ static int cluster_notify_vdi_add(const struct sd_req *req, struct sd_rsp *rsp,
 			      get_vdi_copy_number(req->vdi_state.old_vid),
 			      true);
 
+	if (req->vdi_state.set_bitmap)
+		set_bit(req->vdi_state.new_vid, sys->vdi_inuse);
+
 	add_vdi_state(req->vdi_state.new_vid, req->vdi_state.copies, false);
 
 	return SD_RES_SUCCESS;
