@@ -1,5 +1,5 @@
 QA output created by 051
-using backend farm store
+using backend plain store
 Cluster status: IO has halted as there are too few living nodes
 
 Cluster created at DATE

@@ -1,5 +1,5 @@
 QA output created by 042
-using backend farm store
+using backend plain store
 Failed to write object fd34af00000000: Server has no space for new objects
 Failed to write VDI
 Failed to write object fd32fc00000000: Server has no space for new objects

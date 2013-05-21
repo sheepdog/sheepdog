@@ -1,5 +1,5 @@
 QA output created by 016
-using backend farm store
+using backend plain store
 there should be no vdi
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 there should be no object

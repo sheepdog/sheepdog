@@ -37,7 +37,7 @@ static struct cluster_cmd_data {
 	char name[STORE_LEN];
 } cluster_cmd_data;
 
-#define DEFAULT_STORE	"farm"
+#define DEFAULT_STORE	"plain"
 
 static int list_store(void)
 {

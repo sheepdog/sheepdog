@@ -1,5 +1,5 @@
 QA output created by 037
-using backend farm store
+using backend plain store
 Cluster status: running, auto-recovery enabled
 M   Id   Host:Port         V-Nodes       Zone
 -    0   127.0.0.1:7000      	64          0

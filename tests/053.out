@@ -1,5 +1,5 @@
 QA output created by 053
-using backend farm store
+using backend plain store
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE

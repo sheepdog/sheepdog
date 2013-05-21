@@ -1,5 +1,5 @@
 QA output created by 039
-using backend farm store
+using backend plain store
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 wrote 512/512 bytes at offset 0

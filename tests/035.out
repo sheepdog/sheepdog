@@ -1,5 +1,5 @@
 QA output created by 035
-using backend farm store
+using backend plain store
 Looking for the object 0x7c2b2500000000 (the inode vid 0x7c2b25 idx 0) with 2 nodes
 
 127.0.0.1:7000 has the object (should be 2 copies)

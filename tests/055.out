@@ -1,5 +1,5 @@
 QA output created by 055
-using backend farm store
+using backend plain store
 finish check&repair test
 Cluster status: running, auto-recovery enabled
 

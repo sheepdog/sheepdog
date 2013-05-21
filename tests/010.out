@@ -1,5 +1,5 @@
 QA output created by 010
-using backend farm store
+using backend plain store
 Cluster recovery: disable
 STORE/0/obj/007c2b2500000000
 STORE/0/obj/007c2b2500000001

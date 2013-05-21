@@ -1,5 +1,5 @@
 QA output created by 005
-using backend farm store
+using backend plain store
 check whether Sheepdog is working with two nodes
 Cluster status: running, auto-recovery enabled
 

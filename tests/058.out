@@ -1,5 +1,5 @@
 QA output created by 058
-using backend farm store
+using backend plain store
 Id	Size	Used	Use%
  0	1000 MB	104 MB	 10%
  1	1000 MB	104 MB	 10%

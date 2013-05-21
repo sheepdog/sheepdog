@@ -1,7 +1,7 @@
 QA output created by 024
 starting first sheep
 formatting cluster
-using backend farm store
+using backend plain store
 creating vdi 
 filling test with data
 wrote 314572800/314572800 bytes at offset 0

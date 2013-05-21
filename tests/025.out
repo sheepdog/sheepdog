@@ -2,7 +2,7 @@ QA output created by 025
 starting two sheep in the first zone
 starting a sheep in the second zone
 formatting cluster
-using backend farm store
+using backend plain store
 creating vdi 
 filling test with data
 wrote 20971520/20971520 bytes at offset 0
