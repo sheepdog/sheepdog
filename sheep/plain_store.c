@@ -543,7 +543,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	}
 
 	length = get_objsize(oid);
-	buf = malloc(length);
+	buf = valloc(length);
 	if (buf == NULL)
 		return SD_RES_NO_MEM;
 
