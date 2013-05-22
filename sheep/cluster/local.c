@@ -213,11 +213,13 @@ static void shm_queue_init(void)
 	shm_queue_lock();
 
 	ret = ftruncate(shmfd, sizeof(*shm_queue));
-	assert(ret == 0);
+	if (ret != 0)
+		panic("failed to truncate shmfile, %m");
 
 	shm_queue = mmap(NULL, sizeof(*shm_queue),
 			 PROT_READ | PROT_WRITE, MAP_SHARED, shmfd, 0);
-	assert(shm_queue != MAP_FAILED);
+	if (shm_queue == MAP_FAILED)
+		panic("mmap error, %m");
 
 	if (is_shm_queue_valid()) {
 		block_event_pos = shm_queue->block_event_pos;
@@ -227,9 +229,11 @@ static void shm_queue_init(void)
 		block_event_pos = 0;
 		nonblock_event_pos = 0;
 		ret = ftruncate(shmfd, 0);
-		assert(ret == 0);
+		if (ret != 0)
+			panic("failed to truncate shmfile, %m");
 		ret = ftruncate(shmfd, sizeof(*shm_queue));
-		assert(ret == 0);
+		if (ret != 0)
+			panic("failed to truncate shmfile, %m");
 	}
 
 	shm_queue_unlock();
@@ -510,7 +514,8 @@ static void local_handler(int listen_fd, int events, void *data)
 	sd_dprintf("read siginfo");
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
-	assert(ret == sizeof(siginfo));
+	if (ret != sizeof(siginfo))
+		panic("failed to read from sigfd, %m");
 
 	shm_queue_lock();
 

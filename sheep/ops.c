@@ -730,9 +730,8 @@ static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
 static int local_md_info(struct request *request)
 {
 	struct sd_rsp *rsp = &request->rp;
-	struct sd_req *req = &request->rq;
 
-	assert(req->data_length == sizeof(struct sd_md_info));
+	assert(request->rq.data_length == sizeof(struct sd_md_info));
 	rsp->data_length = md_get_info((struct sd_md_info *)request->data);
 
 	return rsp->data_length ? SD_RES_SUCCESS : SD_RES_UNKNOWN;
