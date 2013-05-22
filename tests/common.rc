@@ -279,7 +279,7 @@ _start_sheep()
 	MD=",$STORE/$1/d0,$STORE/$1/d1,$STORE/$1/d2"
     fi
 
-    $SHEEP $STORE/$1$MD -z $1 -p $((7000+$1)) -c $DRIVER -y 127.0.0.1 -d $2 -F $LOG_FORMAT
+    $SHEEP $STORE/$1$MD -z $1 -p $((7000+$1)) -c $DRIVER $SHEEP_OPTIONS $2
 
     if [ $? != 0 ]; then
         _die "cannot start sheep $1"
