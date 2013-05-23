@@ -128,7 +128,7 @@ out:
 static bool journal_entry_full_write(struct journal_descriptor *jd)
 {
 	char *end = (char *)jd +
-		roundup(jd->size, SECTOR_SIZE) + JOURNAL_META_SIZE;
+		round_up(jd->size, SECTOR_SIZE) + JOURNAL_META_SIZE;
 	uint32_t marker = *(((uint32_t *)end) - 1);
 
 	if (marker != JOURNAL_END_MARKER)
@@ -249,7 +249,7 @@ static int do_recover(int fd)
 		if (replay_journal_entry(jd) < 0)
 			return -1;
 skip:
-		p += JOURNAL_META_SIZE + roundup(jd->size, SECTOR_SIZE);
+		p += JOURNAL_META_SIZE + round_up(jd->size, SECTOR_SIZE);
 	}
 	munmap(map, st.st_size);
 	/* Do a final sync() to assure data is reached to the disk */
@@ -383,7 +383,7 @@ static int journal_file_write(struct journal_descriptor *jd, const char *buf)
 	uint32_t marker = JOURNAL_END_MARKER;
 	int ret = SD_RES_SUCCESS;
 	uint64_t size = jd->size;
-	ssize_t written, rusize = roundup(size, SECTOR_SIZE),
+	ssize_t written, rusize = round_up(size, SECTOR_SIZE),
 		wsize = JOURNAL_META_SIZE + rusize;
 	off_t woff;
 	char *wbuffer, *p;
