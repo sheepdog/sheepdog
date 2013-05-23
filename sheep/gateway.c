@@ -164,13 +164,16 @@ again:
 
 		panic("%m");
 	} else if (pollret == 0) {
-		sd_eprintf("poll timeout %d", wi->nr_sent);
 		/*
 		 * If IO NIC is down, epoch isn't incremented, so we can't retry
 		 * for ever.
 		 */
 		if (sheep_need_retry(req->rq.epoch) && repeat) {
 			repeat--;
+			sd_printf(SDOG_WARNING,
+				  "poll timeout %d, disks of some nodes or"
+				   " network is busy. Going to poll-wait again",
+				   wi->nr_sent);
 			goto again;
 		}
 
