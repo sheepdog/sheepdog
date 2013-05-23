@@ -523,7 +523,7 @@ int do_vdi_create(const char *vdiname, int64_t vdi_size,
 
 	hdr.vdi.base_vdi_id = base_vid;
 	hdr.vdi.snapid = snapshot ? 1 : 0;
-	hdr.vdi.vdi_size = round_up(vdi_size, 512);
+	hdr.vdi.vdi_size = vdi_size;
 	hdr.vdi.copies = nr_copies;
 
 	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
@@ -1187,10 +1187,6 @@ static int vdi_read(int argc, char **argv)
 		ret = parse_option_size(argv[optind++], &offset);
 		if (ret < 0)
 			return EXIT_USAGE;
-		if (offset % 512 != 0) {
-			fprintf(stderr, "Read offset must be block-aligned\n");
-			return EXIT_USAGE;
-		}
 		if (argv[optind]) {
 			ret = parse_option_size(argv[optind++], &total);
 			if (ret < 0)
@@ -1214,7 +1210,6 @@ static int vdi_read(int argc, char **argv)
 	}
 
 	total = min(total, inode->vdi_size - offset);
-	total = round_up(total, 512);
 	idx = offset / SD_DATA_OBJ_SIZE;
 	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
@@ -1270,10 +1265,6 @@ static int vdi_write(int argc, char **argv)
 		ret = parse_option_size(argv[optind++], &offset);
 		if (ret < 0)
 			return EXIT_USAGE;
-		if (offset % 512 != 0) {
-			fprintf(stderr, "Write offset must be block-aligned\n");
-			return EXIT_USAGE;
-		}
 		if (argv[optind]) {
 			ret = parse_option_size(argv[optind++], &total);
 			if (ret < 0)
@@ -1295,7 +1286,6 @@ static int vdi_write(int argc, char **argv)
 	}
 
 	total = min(total, inode->vdi_size - offset);
-	total = round_up(total, 512);
 	idx = offset / SD_DATA_OBJ_SIZE;
 	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
