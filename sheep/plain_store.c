@@ -34,8 +34,7 @@ static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
 		flags &= ~O_DSYNC;
 
-	/* We can not use DIO for inode object because it is not 512B aligned */
-	if (sys->backend_dio && is_data_obj(oid) && iocb_is_aligned(iocb)) {
+	if (sys->backend_dio && iocb_is_aligned(iocb)) {
 		assert(is_aligned_to_pagesize(iocb->buf));
 		flags |= O_DIRECT;
 	}
