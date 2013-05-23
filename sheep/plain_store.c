@@ -90,6 +90,13 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 	}
 }
 
+#define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
+
+static inline bool iocb_is_aligned(const struct siocb *iocb)
+{
+	return  sector_algined(iocb->offset) && sector_algined(iocb->length);
+}
+
 int default_write(uint64_t oid, const struct siocb *iocb)
 {
 	int flags = get_open_flags(oid, false), fd,
@@ -102,7 +109,8 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		return SD_RES_OLD_NODE_VER;
 	}
 
-	get_obj_path(oid, path);
+	if (flags & O_DIRECT && !iocb_is_aligned(iocb))
+		flags &= ~O_DIRECT;
 
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_write_store(oid, iocb->buf, iocb->length, iocb->offset,
@@ -114,6 +122,8 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		sync();
 	}
 
+	get_obj_path(oid, path);
+
 	fd = open(path, flags, sd_def_fmode);
 	if (fd < 0)
 		return err_to_sderr(path, oid, errno);
@@ -121,8 +131,8 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
 		sd_eprintf("failed to write object %"PRIx64", path=%s, offset=%"
-			PRId64", size=%"PRId32", result=%zd, %m", oid, path,
-			iocb->offset, iocb->length, size);
+			   PRId64", size=%"PRId32", result=%zd, %m", oid, path,
+			   iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
@@ -237,6 +247,9 @@ static int default_read_from_path(uint64_t oid, char *path,
 	    ret = SD_RES_SUCCESS;
 	ssize_t size;
 
+	if (flags & O_DIRECT && !iocb_is_aligned(iocb))
+		flags &= ~O_DIRECT;
+
 	fd = open(path, flags);
 
 	if (fd < 0)
@@ -245,13 +258,11 @@ static int default_read_from_path(uint64_t oid, char *path,
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
 		sd_eprintf("failed to read object %"PRIx64", path=%s, offset=%"
-			PRId64", size=%"PRId32", result=%zd, %m", oid, path,
-			iocb->offset, iocb->length, size);
+			   PRId64", size=%"PRId32", result=%zd, %m", oid, path,
+			   iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
 	}
-
 	close(fd);
-
 	return ret;
 }
 
@@ -300,6 +311,10 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 
 	get_obj_path(oid, path);
 	get_tmp_obj_path(oid, tmp_path);
+
+	if (flags & O_DIRECT && !iocb_is_aligned(iocb))
+		/* Drop the O_DIRECT for create operation for simplicity */
+		flags &= ~O_DIRECT;
 
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_write_store(oid, iocb->buf, iocb->length,
