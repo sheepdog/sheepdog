@@ -288,8 +288,10 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
 		 vid, idx);
 
-	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
+	if (sys->object_cache_directio && !idx_has_vdi_bit(idx)) {
+		assert(is_aligned_to_pagesize(buf));
 		flags |= O_DIRECT;
+	}
 
 	fd = open(p, flags, sd_def_fmode);
 	if (fd < 0) {
@@ -322,8 +324,10 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 
 	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
 		 vid, idx);
-	if (sys->object_cache_directio && !idx_has_vdi_bit(idx))
+	if (sys->object_cache_directio && !idx_has_vdi_bit(idx)) {
+		assert(is_aligned_to_pagesize(buf));
 		flags |= O_DIRECT;
+	}
 
 	fd = open(p, flags, sd_def_fmode);
 	if (fd < 0) {

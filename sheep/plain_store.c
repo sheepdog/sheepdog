@@ -20,7 +20,14 @@
 #include "config.h"
 #include "sha1.h"
 
-static int get_open_flags(uint64_t oid, bool create)
+#define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
+
+static inline bool iocb_is_aligned(const struct siocb *iocb)
+{
+	return  sector_algined(iocb->offset) && sector_algined(iocb->length);
+}
+
+static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 {
 	int flags = O_DSYNC | O_RDWR;
 
@@ -28,8 +35,10 @@ static int get_open_flags(uint64_t oid, bool create)
 		flags &= ~O_DSYNC;
 
 	/* We can not use DIO for inode object because it is not 512B aligned */
-	if (sys->backend_dio && is_data_obj(oid))
+	if (sys->backend_dio && is_data_obj(oid) && iocb_is_aligned(iocb)) {
+		assert(is_aligned_to_pagesize(iocb->buf));
 		flags |= O_DIRECT;
+	}
 
 	if (create)
 		flags |= O_CREAT | O_EXCL;
@@ -90,16 +99,9 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 	}
 }
 
-#define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
-
-static inline bool iocb_is_aligned(const struct siocb *iocb)
-{
-	return  sector_algined(iocb->offset) && sector_algined(iocb->length);
-}
-
 int default_write(uint64_t oid, const struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, false), fd,
+	int flags = prepare_iocb(oid, iocb, false), fd,
 	    ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 	ssize_t size;
@@ -108,9 +110,6 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		sd_dprintf("%"PRIu32" sys %"PRIu32, iocb->epoch, sys_epoch());
 		return SD_RES_OLD_NODE_VER;
 	}
-
-	if (flags & O_DIRECT && !iocb_is_aligned(iocb))
-		flags &= ~O_DIRECT;
 
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_write_store(oid, iocb->buf, iocb->length, iocb->offset,
@@ -183,8 +182,8 @@ int default_cleanup(void)
 static int init_vdi_state(uint64_t oid, char *wd)
 {
 	char path[PATH_MAX];
-	int fd, flags = get_open_flags(oid, false), ret;
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
+	int fd, flags = O_RDONLY, ret;
 
 	snprintf(path, sizeof(path), "%s/%016"PRIx64, wd, oid);
 
@@ -243,12 +242,9 @@ int default_init(void)
 static int default_read_from_path(uint64_t oid, char *path,
 				  const struct siocb *iocb)
 {
-	int flags = get_open_flags(oid, false), fd,
+	int flags = prepare_iocb(oid, iocb, false), fd,
 	    ret = SD_RES_SUCCESS;
 	ssize_t size;
-
-	if (flags & O_DIRECT && !iocb_is_aligned(iocb))
-		flags &= ~O_DIRECT;
 
 	fd = open(path, flags);
 
@@ -305,16 +301,12 @@ int prealloc(int fd, uint32_t size)
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
-	int flags = get_open_flags(oid, true);
+	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
 
 	get_obj_path(oid, path);
 	get_tmp_obj_path(oid, tmp_path);
-
-	if (flags & O_DIRECT && !iocb_is_aligned(iocb))
-		/* Drop the O_DIRECT for create operation for simplicity */
-		flags &= ~O_DIRECT;
 
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_write_store(oid, iocb->buf, iocb->length,

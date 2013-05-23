@@ -209,6 +209,11 @@ static inline uint32_t sys_epoch(void)
 	return uatomic_read(&sys->epoch);
 }
 
+static inline bool is_aligned_to_pagesize(void *p)
+{
+	return ((uintptr_t)p & (getpagesize() - 1)) == 0;
+}
+
 int create_listen_port(char *bindaddr, int port);
 int init_unix_domain_socket(const char *dir);
 
