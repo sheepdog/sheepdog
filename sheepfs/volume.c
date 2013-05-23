@@ -153,11 +153,6 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	pthread_rwlock_unlock(&vdi_inode_tree_lock);
 
 	if (is_data_obj(oid)) {
-		if (off % SECTOR_SIZE || size % SECTOR_SIZE) {
-			sheepfs_pr("offset or size not aligned\n");
-			return -1;
-		}
-
 		idx = data_oid_to_idx(oid);
 		assert(vdi);
 		if (!vdi->inode->data_vdi_id[idx]) {
