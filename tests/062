@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Test unaligned collie vdi read/write
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$COLLIE cluster format
+sleep 1
+
+$COLLIE vdi create test 1234
+sleep 1
+$COLLIE vdi list -r test | awk '{$7="MASKED";print $0}'
+
+echo hello | $COLLIE vdi write test 1 6
+$COLLIE vdi read test 1 6
+echo world | $COLLIE vdi write test 1 6
+$COLLIE vdi read test 1 6
+
+echo h*** | $COLLIE vdi write test 510 512
+echo h!!! | $COLLIE vdi write test 510 512
+$COLLIE vdi read test 510 5
+echo ?? | $COLLIE vdi write test 511 2
+$COLLIE vdi read test 510 5
+echo xxx | $COLLIE vdi write test 1020 4
+$COLLIE vdi read test 1020 4
+$COLLIE vdi read test 510 5
+$COLLIE vdi read test 1 6
