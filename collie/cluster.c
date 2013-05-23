@@ -274,9 +274,9 @@ static int save_snapshot(int argc, char **argv)
 {
 	char *tag = argv[optind++];
 	char *path, *p;
-	int ret = EXIT_SYSFAIL;
+	int ret = EXIT_SYSFAIL, uninitialized_var(unused);
 
-	strtol(tag, &p, 10);
+	unused = strtol(tag, &p, 10);
 	if (tag != p) {
 		fprintf(stderr, "Tag should not start with number.\n");
 		return EXIT_USAGE;

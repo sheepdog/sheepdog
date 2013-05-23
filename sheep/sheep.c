@@ -130,7 +130,7 @@ static int sigfd;
 static void signal_handler(int listen_fd, int events, void *data)
 {
 	struct signalfd_siginfo siginfo;
-	int ret;
+	int uninitialized_var(ret);
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));

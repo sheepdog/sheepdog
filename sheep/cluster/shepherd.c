@@ -288,7 +288,8 @@ static void remove_one_block_event(void)
 		removed = ev->removed = true;
 		break;
 	}
-	assert(removed);
+	if (!removed)
+		panic("removed is not true");
 
 	eventfd_write(sph_event_fd, 1);
 

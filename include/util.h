@@ -41,7 +41,7 @@
 
 #define __printf(a, b)                  __attribute__((format(printf, a, b)))
 
-#define uninitialized_var(x) (x = x)
+#define uninitialized_var(x) x = x
 
 static inline int before(uint32_t seq1, uint32_t seq2)
 {
