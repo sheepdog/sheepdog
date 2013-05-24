@@ -448,7 +448,8 @@ static struct subcommand cluster_snapshot_cmd[] = {
 	{"list", NULL, "h", "list snapshot of localpath",
 	 NULL, SUBCMD_FLAG_NEED_ARG, list_snapshot, NULL},
 	{"load", NULL, "h", "list snapshot of localpath",
-	 NULL, SUBCMD_FLAG_NEED_ARG, load_snapshot, NULL}
+	 NULL, SUBCMD_FLAG_NEED_ARG, load_snapshot, NULL},
+	{NULL},
 };
 
 static int cluster_snapshot(int argc, char **argv)
