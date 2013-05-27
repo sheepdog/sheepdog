@@ -52,7 +52,7 @@ static struct sd_option sheep_options[] = {
 	{'i', "ioaddr", true, "use separate network card to handle IO requests"},
 	{'j', "journal", true, "use jouranl file to log all the write operations"},
 	{'l', "loglevel", true, "specify the level of logging detail"},
-	{'n', "nosync", false, "drop SYNC for write, only used for testing purpose"},
+	{'n', "nosync", false, "drop O_SYNC for write of backend"},
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen"},
 	{'P', "pidfile", true, "create a pid file"},
