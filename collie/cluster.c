@@ -457,6 +457,18 @@ static int cluster_snapshot(int argc, char **argv)
 	return do_generic_subcommand(cluster_snapshot_cmd, argc, argv);
 }
 
+static int cluster_reweight(int argc, char **argv)
+{
+	int ret;
+	struct sd_req hdr;
+
+	sd_init_req(&hdr, SD_OP_REWEIGHT);
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret)
+		return EXIT_FAILURE;
+	return EXIT_SUCCESS;
+}
+
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info, cluster_options},
@@ -471,6 +483,8 @@ static struct subcommand cluster_cmd[] = {
 	 "See 'collie cluster recover' for more information\n",
 	 cluster_recover_cmd, SUBCMD_FLAG_NEED_ARG,
 	 cluster_recover, cluster_options},
+	{"reweight", NULL, "aph", "reweight the cluster", NULL, 0,
+	 cluster_reweight, cluster_options},
 	{NULL,},
 };
 

@@ -1235,6 +1235,26 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	sockfd_cache_del(&left->nid);
 }
 
+void update_node_size(struct sd_node *node)
+{
+	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
+	int idx = get_node_idx(cur_vinfo, node);
+	assert(idx != -1);
+	cur_vinfo->nodes[idx].space = node->space;
+}
+
+void kick_node_recover(void)
+{
+	struct vnode_info *old = main_thread_get(current_vnode_info);
+
+	main_thread_set(current_vnode_info,
+			alloc_vnode_info(old->nodes, old->nr_nodes));
+	uatomic_inc(&sys->epoch);
+	log_current_epoch();
+	start_recovery(main_thread_get(current_vnode_info), old, true);
+	put_vnode_info(old);
+}
+
 int create_cluster(int port, int64_t zone, int nr_vnodes,
 		   bool explicit_addr)
 {
