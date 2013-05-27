@@ -278,8 +278,8 @@ int set_cluster_flags(uint16_t flags);
 int get_cluster_flags(uint16_t *flags);
 int set_cluster_store(const char *name);
 int get_cluster_store(char *buf);
-int set_cluster_space(uint64_t space);
-int get_cluster_space(uint64_t *space);
+int set_node_space(uint64_t space);
+int get_node_space(uint64_t *space);
 
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);

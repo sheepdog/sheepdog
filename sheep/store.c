@@ -362,7 +362,7 @@ int init_disk_space(const char *base_path)
 	mds = md_init_space();
 
 	/* If it is restarted */
-	ret = get_cluster_space(&space_size);
+	ret = get_node_space(&space_size);
 	if (space_size != 0) {
 		sys->disk_space = space_size;
 		goto out;
@@ -370,7 +370,7 @@ int init_disk_space(const char *base_path)
 
 	/* User has specified the space at startup */
 	if (sys->disk_space) {
-		ret = set_cluster_space(sys->disk_space);
+		ret = set_node_space(sys->disk_space);
 		goto out;
 	}
 
@@ -386,7 +386,7 @@ int init_disk_space(const char *base_path)
 		sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bfree;
 	}
 
-	ret = set_cluster_space(sys->disk_space);
+	ret = set_node_space(sys->disk_space);
 out:
 	sd_dprintf("disk free space is %" PRIu64, sys->disk_space);
 	return ret;

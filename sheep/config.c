@@ -185,14 +185,14 @@ int get_cluster_store(char *buf)
 	return SD_RES_SUCCESS;
 }
 
-int set_cluster_space(uint64_t space)
+int set_node_space(uint64_t space)
 {
 	config.space = space;
 
 	return write_config();
 }
 
-int get_cluster_space(uint64_t *space)
+int get_node_space(uint64_t *space)
 {
 	*space = config.space;
 
