@@ -189,7 +189,7 @@ static unsigned long setup_commands(const struct command *commands,
 		usage(commands, EXIT_USAGE);
 	}
 
-	for (s = commands[i].sub; s->name; s++) {
+	for (s = commands[i].sub; subcmd && s->name; s++) {
 		if (!strcmp(s->name, subcmd)) {
 			command_fn = s->fn;
 			command_opts = s->opts;
@@ -202,7 +202,8 @@ static unsigned long setup_commands(const struct command *commands,
 	}
 
 	if (!command_fn) {
-		if (strcmp(subcmd, "help") && strcmp(subcmd, "--help"))
+		if (subcmd && strcmp(subcmd, "help") &&
+		    strcmp(subcmd, "--help"))
 			fprintf(stderr, "Invalid command '%s %s'\n", cmd, subcmd);
 		fprintf(stderr, "Available %s commands:\n", cmd);
 		for (s = commands[i].sub; s->name; s++)
@@ -343,7 +344,7 @@ int main(int argc, char **argv)
 
 	init_commands(&commands);
 
-	if (argc < 3)
+	if (argc < 2)
 		usage(commands, 0);
 
 	flags = setup_commands(commands, argv[1], argv[2]);
