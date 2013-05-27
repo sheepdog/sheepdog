@@ -29,6 +29,7 @@ static struct sd_option vdi_options[] = {
 	{'w', "writeback", false, "use writeback mode"},
 	{'c', "copies", true, "specify the data redundancy (number of copies)"},
 	{'F', "from", true, "create a differential backup from the snapshot"},
+	{'f', "force", false, "do operation forcibly"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -43,6 +44,7 @@ static struct vdi_cmd_data {
 	bool writeback;
 	int from_snapshot_id;
 	char from_snapshot_tag[SD_MAX_VDI_TAG_LEN];
+	bool force;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -831,8 +833,9 @@ static int vdi_rollback(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		return ret;
 
-	confirm("This operation dicards any changes made since the previous\n"
-		"snapshot was taken.  Continue? [yes/no]: ");
+	if (!vdi_cmd_data.force)
+		confirm("This operation dicards any changes made since the"
+			" previous\nsnapshot was taken.  Continue? [yes/no]: ");
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != SD_RES_SUCCESS) {
@@ -2059,7 +2062,7 @@ static struct subcommand vdi_cmd[] = {
 	{"delete", "<vdiname>", "saph", "delete an image",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_delete, vdi_options},
-	{"rollback", "<vdiname>", "saph", "rollback to a snapshot",
+	{"rollback", "<vdiname>", "saphf", "rollback to a snapshot",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_rollback, vdi_options},
 	{"list", "[vdiname]", "aprh", "list images",
@@ -2157,6 +2160,8 @@ static int vdi_parser(int ch, char *opt)
 			pstrcpy(vdi_cmd_data.from_snapshot_tag,
 				sizeof(vdi_cmd_data.from_snapshot_tag), opt);
 		}
+	case 'f':
+		vdi_cmd_data.force = true;
 		break;
 	}
 
