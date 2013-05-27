@@ -241,7 +241,7 @@ static int for_each_object_in_path(char *path,
 	return ret;
 }
 
-static uint64_t get_path_size(char *path, uint64_t *used)
+static uint64_t get_path_free_size(char *path, uint64_t *used)
 {
 	struct statvfs fs;
 	uint64_t size;
@@ -293,7 +293,7 @@ static uint64_t init_path_space(char *path)
 
 	return size;
 create:
-	size = get_path_size(path, NULL);
+	size = get_path_free_size(path, NULL);
 	if (!size)
 		goto broken_path;
 	if (setxattr(path, MDNAME, &size, MDSIZE, 0) < 0) {
@@ -439,7 +439,7 @@ static void md_do_recover(struct work *work)
 		/* Just ignore the duplicate EIO of the same path */
 		goto out;
 	remove_disk(idx);
-	sys->disk_space = md_init_space();
+	md_init_space();
 	nr = md_nr_disks;
 out:
 	pthread_rwlock_unlock(&md_lock);
@@ -613,8 +613,8 @@ uint32_t md_get_info(struct sd_md_info *info)
 		info->disk[i].idx = i;
 		pstrcpy(info->disk[i].path, PATH_MAX, md_disks[i].path);
 		/* FIXME: better handling failure case. */
-		info->disk[i].size = get_path_size(info->disk[i].path,
-						   &info->disk[i].used);
+		info->disk[i].size = get_path_free_size(info->disk[i].path,
+							&info->disk[i].used);
 	}
 	info->nr = md_nr_disks;
 	pthread_rwlock_unlock(&md_lock);
@@ -653,7 +653,7 @@ static int do_plug_unplug(char *disks, bool plug)
 	if (old_nr == md_nr_disks)
 		goto out;
 
-	sys->disk_space = md_init_space();
+	md_init_space();
 	cur_nr = md_nr_disks;
 
 	ret = SD_RES_SUCCESS;
@@ -679,4 +679,17 @@ int md_plug_disks(char *disks)
 int md_unplug_disks(char *disks)
 {
 	return do_plug_unplug(disks, false);
+}
+
+uint64_t md_get_size(uint64_t *used)
+{
+	uint64_t fsize = 0;
+	*used = 0;
+
+	pthread_rwlock_rdlock(&md_lock);
+	for (int i = 0; i < md_nr_disks; i++)
+		fsize += get_path_free_size(md_disks[i].path, used);
+	pthread_rwlock_unlock(&md_lock);
+
+	return fsize + *used;
 }

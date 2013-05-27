@@ -58,16 +58,19 @@ static int node_info(int argc, char **argv)
 {
 	int i, ret, success = 0;
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
-	char total_str[UINT64_DECIMAL_SIZE], avail_str[UINT64_DECIMAL_SIZE], vdi_size_str[UINT64_DECIMAL_SIZE];
+	char total_str[UINT64_DECIMAL_SIZE], use_str[UINT64_DECIMAL_SIZE],
+	     avail_str[UINT64_DECIMAL_SIZE], vdi_size_str[UINT64_DECIMAL_SIZE];
 
 	if (!raw_output)
-		printf("Id\tSize\tUsed\tUse%%\n");
+		printf("Id\tSize\tUsed\tAvail\tUse%%\n");
 
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char host[128];
 		struct sd_req req;
 		struct sd_rsp *rsp = (struct sd_rsp *)&req;
-		char store_str[UINT64_DECIMAL_SIZE], free_str[UINT64_DECIMAL_SIZE];
+		char store_str[UINT64_DECIMAL_SIZE],
+		     used_str[UINT64_DECIMAL_SIZE],
+		     free_str[UINT64_DECIMAL_SIZE];
 
 		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
@@ -76,14 +79,16 @@ static int node_info(int argc, char **argv)
 		ret = send_light_req(&req, host, sd_nodes[i].nid.port);
 
 		size_to_str(rsp->node.store_size, store_str, sizeof(store_str));
+		size_to_str(rsp->node.store_free, free_str, sizeof(free_str));
 		size_to_str(rsp->node.store_size - rsp->node.store_free,
-			    free_str, sizeof(free_str));
+			    used_str, sizeof(used_str));
 		if (!ret) {
 			int ratio = (int)(((double)(rsp->node.store_size -
 						    rsp->node.store_free) /
 					   rsp->node.store_size) * 100);
-			printf(raw_output ? "%d %s %s %d%%\n" : "%2d\t%s\t%s\t%3d%%\n",
-			       i, store_str, free_str,
+			printf(raw_output ? "%d %s %s %s %d%%\n" :
+					"%2d\t%s\t%s\t%s\t%3d%%\n",
+			       i, store_str, used_str, free_str,
 			       rsp->node.store_size == 0 ? 0 : ratio);
 			success++;
 		}
@@ -102,11 +107,13 @@ static int node_info(int argc, char **argv)
 		return EXIT_SYSFAIL;
 
 	size_to_str(total_size, total_str, sizeof(total_str));
-	size_to_str(total_size - total_avail, avail_str, sizeof(avail_str));
+	size_to_str(total_avail, avail_str, sizeof(avail_str));
+	size_to_str(total_size - total_avail, use_str, sizeof(use_str));
 	size_to_str(total_vdi_size, vdi_size_str, sizeof(vdi_size_str));
-	printf(raw_output ? "Total %s %s %d%% %s\n"
-			  : "Total\t%s\t%s\t%3d%%\n\nTotal virtual image size\t%s\n",
-	       total_str, avail_str,
+	printf(raw_output ? "Total %s %s %s %d%% %s\n"
+			  : "Total\t%s\t%s\t%s\t%3d%%\n\n"
+			  "Total virtual image size\t%s\n",
+	       total_str, use_str, avail_str,
 	       (int)(((double)(total_size - total_avail) / total_size) * 100),
 	       vdi_size_str);
 

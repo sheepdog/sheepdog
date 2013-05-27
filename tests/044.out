@@ -3,10 +3,10 @@ using backend plain store
 there should be no vdi
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 there should be no object
-Id	Size	Used	Use%
-0 MASKED GB 144 MB MASKED
-1 MASKED GB 144 MB MASKED
-2 MASKED GB 144 MB MASKED
-Total MASKED GB 432 MB MASKED
+Id	Size	Used	Avail	Use%
+0 MASKED GB 144 MB MASKED GB MASTERD
+1 MASKED GB 144 MB MASKED GB MASTERD
+2 MASKED GB 144 MB MASKED GB MASTERD
+Total MASKED GB 433 MB MASKED GB MASTERD
 
 Total virtual image size	0.0 MB

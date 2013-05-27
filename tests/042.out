@@ -46,12 +46,12 @@ Failed to write object fd32fc0000000a: Server has no space for new objects
 Failed to write VDI
 Failed to create VDI test2: Failed to write to requested VDI
 Failed to create VDI test3: Failed to write to requested VDI
-Id	Size	Used	Use%
- 0	1007 MB	104 MB	 10%
- 1	1007 MB	104 MB	 10%
- 2	19 MB	4.0 MB	 20%
- 3	19 MB	4.0 MB	 20%
-Total	2.0 GB	216 MB	 10%
+Id	Size	Used	Avail	Use%
+0 MASKED MB 104 MB MASKED MB MASTERD
+1 MASKED MB 104 MB MASKED MB MASTERD
+2 MASKED MB 4.0 MB MASKED MB MASTERD
+3 MASKED MB 4.0 MB MASKED MB MASTERD
+Total MASKED GB 216 MB MASKED GB MASTERD
 
 Total virtual image size	200 MB
 M   Id   Host:Port         V-Nodes       Zone
@@ -59,12 +59,12 @@ M   Id   Host:Port         V-Nodes       Zone
 -    1   127.0.0.1:7001      	126          1
 -    2   127.0.0.1:7002      	 2          2
 -    3   127.0.0.1:7003      	 2          3
-Id	Size	Used	Use%
- 0	1007 MB	104 MB	 10%
- 1	1007 MB	104 MB	 10%
- 2	19 MB	4.0 MB	 20%
- 3	19 MB	4.0 MB	 20%
-Total	2.0 GB	216 MB	 10%
+Id	Size	Used	Avail	Use%
+0 MASKED MB 104 MB MASKED MB MASTERD
+1 MASKED MB 104 MB MASKED MB MASTERD
+2 MASKED MB 4.0 MB MASKED MB MASTERD
+3 MASKED MB 4.0 MB MASKED MB MASTERD
+Total MASKED GB 216 MB MASKED GB MASTERD
 
 Total virtual image size	200 MB
 M   Id   Host:Port         V-Nodes       Zone
@@ -72,12 +72,12 @@ M   Id   Host:Port         V-Nodes       Zone
 -    1   127.0.0.1:7001      	126          1
 -    2   127.0.0.1:7002      	 2          2
 -    3   127.0.0.1:7003      	 2          3
-Id	Size	Used	Use%
- 0	1007 MB	104 MB	 10%
- 1	1007 MB	104 MB	 10%
- 2	19 MB	4.0 MB	 20%
- 3	19 MB	4.0 MB	 20%
-Total	2.0 GB	216 MB	 10%
+Id	Size	Used	Avail	Use%
+0 MASKED MB 104 MB MASKED MB MASTERD
+1 MASKED MB 104 MB MASKED MB MASTERD
+2 MASKED MB 4.0 MB MASKED MB MASTERD
+3 MASKED MB 4.0 MB MASKED MB MASTERD
+Total MASKED GB 216 MB MASKED GB MASTERD
 
 Total virtual image size	200 MB
 M   Id   Host:Port         V-Nodes       Zone
@@ -85,12 +85,12 @@ M   Id   Host:Port         V-Nodes       Zone
 -    1   127.0.0.1:7001      	126          1
 -    2   127.0.0.1:7002      	 2          2
 -    3   127.0.0.1:7003      	 2          3
-Id	Size	Used	Use%
- 0	1007 MB	104 MB	 10%
- 1	1007 MB	104 MB	 10%
- 2	19 MB	4.0 MB	 20%
- 3	19 MB	4.0 MB	 20%
-Total	2.0 GB	216 MB	 10%
+Id	Size	Used	Avail	Use%
+0 MASKED MB 104 MB MASKED MB MASTERD
+1 MASKED MB 104 MB MASKED MB MASTERD
+2 MASKED MB 4.0 MB MASKED MB MASTERD
+3 MASKED MB 4.0 MB MASKED MB MASTERD
+Total MASKED GB 216 MB MASKED GB MASTERD
 
 Total virtual image size	200 MB
 M   Id   Host:Port         V-Nodes       Zone

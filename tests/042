@@ -54,7 +54,7 @@ $COLLIE vdi create test2 100M -p 7000
 $COLLIE vdi create test3 100M -p 7002
 
 for i in `seq 0 3`; do
-    $COLLIE node info -p 700$i
+    $COLLIE node info -p 700$i | _filter_node_info
     $COLLIE node list -p 700$i
 done
 ls $STORE/*/obj/* | _filter_store | sort
