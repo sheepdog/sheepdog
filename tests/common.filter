@@ -170,7 +170,7 @@ _filter_info()
 
 _filter_md_info()
 {
-	awk '{if ($4 ~ /^[0-9.]+$/) $4="MASKED";print $0}' | _filter_store
+	_filter_info | _filter_store
 }
 
 _filter_node_info()

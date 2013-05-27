@@ -613,7 +613,7 @@ uint32_t md_get_info(struct sd_md_info *info)
 		info->disk[i].idx = i;
 		pstrcpy(info->disk[i].path, PATH_MAX, md_disks[i].path);
 		/* FIXME: better handling failure case. */
-		info->disk[i].size = get_path_free_size(info->disk[i].path,
+		info->disk[i].free = get_path_free_size(info->disk[i].path,
 							&info->disk[i].used);
 	}
 	info->nr = md_nr_disks;

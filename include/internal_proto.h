@@ -168,7 +168,7 @@ struct vdi_op_message {
 
 struct md_info {
 	int idx;
-	uint64_t size;
+	uint64_t free;
 	uint64_t used;
 	char path[PATH_MAX];
 };

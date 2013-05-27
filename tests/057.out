@@ -1,15 +1,15 @@
 QA output created by 057
 using backend plain store
-Id	Used	Free	Path
-0 32 MB MASKED GB STORE/0/d0
-1 32 MB MASKED GB STORE/0/d1
-2 40 MB MASKED GB STORE/0/d2
-Id	Used	Free	Path
-0 4.0 MB MASKED GB STORE/0/d0
-1 20 MB MASKED GB STORE/0/d1
-2 28 MB MASKED GB STORE/0/d2
-3 20 MB MASKED GB STORE/0/d3
-4 24 MB MASKED GB STORE/0/d4
+Id	Size	Used	Avail	Use%	Path
+0 MASKED GB 32 MB MASKED GB MASTERD STORE/0/d0
+1 MASKED GB 32 MB MASKED GB MASTERD STORE/0/d1
+2 MASKED GB 40 MB MASKED GB MASTERD STORE/0/d2
+Id	Size	Used	Avail	Use%	Path
+0 MASKED GB 4.0 MB MASKED GB MASTERD STORE/0/d0
+1 MASKED GB 20 MB MASKED GB MASTERD STORE/0/d1
+2 MASKED GB 28 MB MASKED GB MASTERD STORE/0/d2
+3 MASKED GB 20 MB MASKED GB MASTERD STORE/0/d3
+4 MASKED GB 24 MB MASKED GB MASTERD STORE/0/d4
 finish check&repair test
 Cluster status: running, auto-recovery enabled
 
@@ -21,16 +21,16 @@ DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 Failed to execute request, look for sheep.log for more information
 Nodes In Recovery:
   Id   Host:Port         V-Nodes       Zone
-Id	Used	Free	Path
-0 4.0 MB MASKED GB STORE/0/d0
-1 20 MB MASKED GB STORE/0/d1
-2 28 MB MASKED GB STORE/0/d2
-3 20 MB MASKED GB STORE/0/d3
-4 24 MB MASKED GB STORE/0/d4
-Id	Used	Free	Path
-0 28 MB MASKED GB STORE/0/d2
-1 32 MB MASKED GB STORE/0/d3
-2 36 MB MASKED GB STORE/0/d4
+Id	Size	Used	Avail	Use%	Path
+0 MASKED GB 4.0 MB MASKED GB MASTERD STORE/0/d0
+1 MASKED GB 20 MB MASKED GB MASTERD STORE/0/d1
+2 MASKED GB 28 MB MASKED GB MASTERD STORE/0/d2
+3 MASKED GB 20 MB MASKED GB MASTERD STORE/0/d3
+4 MASKED GB 24 MB MASKED GB MASTERD STORE/0/d4
+Id	Size	Used	Avail	Use%	Path
+0 MASKED GB 28 MB MASKED GB MASTERD STORE/0/d2
+1 MASKED GB 32 MB MASKED GB MASTERD STORE/0/d3
+2 MASKED GB 36 MB MASKED GB MASTERD STORE/0/d4
 finish check&repair test
 Cluster status: running, auto-recovery enabled
 
@@ -42,10 +42,10 @@ DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 Failed to execute request, look for sheep.log for more information
 Nodes In Recovery:
   Id   Host:Port         V-Nodes       Zone
-Id	Used	Free	Path
-0 28 MB MASKED GB STORE/0/d2
-1 32 MB MASKED GB STORE/0/d3
-2 36 MB MASKED GB STORE/0/d4
+Id	Size	Used	Avail	Use%	Path
+0 MASKED GB 28 MB MASKED GB MASTERD STORE/0/d2
+1 MASKED GB 32 MB MASKED GB MASTERD STORE/0/d3
+2 MASKED GB 36 MB MASKED GB MASTERD STORE/0/d4
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
