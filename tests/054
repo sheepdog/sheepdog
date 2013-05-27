@@ -12,10 +12,18 @@ status=1        # failure is the default!
 . ./common.rc
 . ./common.filter
 
+_need_to_be_root
+
 _cleanup
+
+_make_device 0 $((1024 ** 3))
+_make_device 1 $((2 * 1024 ** 3))
+_make_device 2 $((3 * 1024 ** 3))
+_make_device 3 $((3 * 1024 ** 3))
+
 #start three in different size
 for i in 0 1 2; do
-	_start_sheep $i "-s $(($i+1))000"
+	_start_sheep $i
 done
 _wait_for_sheep 3
 $COLLIE cluster format
@@ -25,7 +33,7 @@ $COLLIE vdi create test 100M -P
 $COLLIE cluster info | _filter_cluster_info
 
 #start recovery
- _start_sheep 3 "-s 3000"
+_start_sheep 3
 
 _wait_for_sheep 4
 _wait_for_sheep_recovery 0

@@ -28,7 +28,7 @@ ln -s $STORE/0/sheep2.log $STORE/2/sheep.log
 ln -s $STORE/0/sheep3.log $STORE/3/sheep.log
 
 for i in `seq 0 3`; do
-    _start_sheep $i "-s $((1024 * 1024))"
+    _start_sheep $i
 done
 
 _wait_for_sheep 4

@@ -1,10 +1,10 @@
 QA output created by 058
 using backend plain store
 Id	Size	Used	Use%
- 0	1000 MB	104 MB	 10%
- 1	1000 MB	104 MB	 10%
- 2	1000 MB	104 MB	 10%
-Total	2.9 GB	312 MB	 10%
+0 MASKED GB 104 MB MASKED
+1 MASKED GB 104 MB MASKED
+2 MASKED GB 104 MB MASKED
+Total MASKED GB 312 MB MASKED
 
 Total virtual image size	100 MB
 discard 104857600/104857600 bytes at offset 0
@@ -36,9 +36,9 @@ The inode object 0x7c2b25 idx 22 is not allocated
 The inode object 0x7c2b25 idx 23 is not allocated
 The inode object 0x7c2b25 idx 24 is not allocated
 Id	Size	Used	Use%
- 0	1000 MB	4.0 MB	  0%
- 1	1000 MB	4.0 MB	  0%
- 2	1000 MB	4.0 MB	  0%
-Total	2.9 GB	12 MB	  0%
+0 MASKED GB 4.0 MB MASKED
+1 MASKED GB 4.0 MB MASKED
+2 MASKED GB 4.0 MB MASKED
+Total MASKED GB 12 MB MASKED
 
 Total virtual image size	100 MB

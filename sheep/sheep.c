@@ -56,7 +56,6 @@ static struct sd_option sheep_options[] = {
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen"},
 	{'P', "pidfile", true, "create a pid file"},
-	{'s', "disk-space", true, "specify the free disk space in megabytes"},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "enable-cache", true, "enable object cache"},
@@ -498,7 +497,7 @@ int main(int argc, char **argv)
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX],
 	     *argp = NULL;
 	bool is_daemon = true, to_stdout = false, explicit_addr = false;
-	int64_t zone = -1, free_space = 0;
+	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
 	const char *log_format = "default";
@@ -572,17 +571,6 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			sys->this_node.zone = zone;
-			break;
-		case 's':
-			free_space = strtoll(optarg, &p, 10);
-			if (optarg == p || free_space <= 0 ||
-			    UINT64_MAX < free_space || *p != '\0') {
-				fprintf(stderr, "Invalid free space size '%s': "
-					"must be an integer between 0 and "
-					"%"PRIu64"\n", optarg, UINT64_MAX);
-				exit(1);
-			}
-			sys->disk_space = free_space * 1024 * 1024;
 			break;
 		case 'u':
 			sys->upgrade = true;

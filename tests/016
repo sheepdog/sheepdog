@@ -16,7 +16,7 @@ status=1        # failure is the default!
 _cleanup
 
 for i in 0 1 2; do
-    _start_sheep $i "-s 4096"
+    _start_sheep $i
 done
 
 _wait_for_sheep 3
@@ -45,4 +45,4 @@ echo there should be no vdi
 $COLLIE vdi list
 
 echo there should be no object
-$COLLIE node info
+$COLLIE node info | _filter_node_info
