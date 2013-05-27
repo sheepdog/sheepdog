@@ -181,7 +181,8 @@ static inline void calculate_vdisks(struct disk *disks, int nr_disks,
 #define MDNAME	"user.md.size"
 #define MDSIZE	sizeof(uint64_t)
 
-static int get_total_object_size(uint64_t oid, char *wd, void *total)
+static int get_total_object_size(uint64_t oid, char *wd, uint32_t epoch,
+				 void *total)
 {
 	uint64_t *t = total;
 	struct stat s;
@@ -198,7 +199,8 @@ static int get_total_object_size(uint64_t oid, char *wd, void *total)
 
 /* If cleanup is true, temporary objects will be removed */
 static int for_each_object_in_path(char *path,
-				   int (*func)(uint64_t, char *, void *),
+				   int (*func)(uint64_t, char *, uint32_t,
+					       void *),
 				   bool cleanup, void *arg)
 {
 	DIR *dir;
@@ -214,6 +216,8 @@ static int for_each_object_in_path(char *path,
 	}
 
 	while ((d = readdir(dir))) {
+		uint32_t epoch = 0;
+
 		if (!strncmp(d->d_name, ".", 1))
 			continue;
 
@@ -233,7 +237,10 @@ static int for_each_object_in_path(char *path,
 			continue;
 		}
 
-		ret = func(oid, path, arg);
+		if (strlen(d->d_name) > 17 && d->d_name[16] == '.')
+			epoch = strtoul(d->d_name + 17, NULL, 10);
+
+		ret = func(oid, path, epoch, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
@@ -366,7 +373,8 @@ static char *md_get_object_path_nolock(uint64_t oid)
 	return md_disks[vd->idx].path;
 }
 
-int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
+int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, uint32_t epoch,
+				      void *arg),
 			  bool cleanup, void *arg)
 {
 	int i, ret = SD_RES_SUCCESS;
@@ -382,7 +390,8 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, void *arg),
 	return ret;
 }
 
-int for_each_object_in_stale(int (*func)(uint64_t oid, char *path, void *arg),
+int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
+					 uint32_t epoch, void *arg),
 			     void *arg)
 {
 	int i, ret = SD_RES_SUCCESS;

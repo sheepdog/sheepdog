@@ -209,7 +209,8 @@ out:
 	return SD_RES_SUCCESS;
 }
 
-static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, void *arg)
+static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, uint32_t epoch,
+				       void *arg)
 {
 	int ret;
 	objlist_cache_insert(oid);
@@ -413,7 +414,8 @@ out:
 	return ret;
 }
 
-static int move_object_to_stale_dir(uint64_t oid, char *wd, void *arg)
+static int move_object_to_stale_dir(uint64_t oid, char *wd, uint32_t epoch,
+				    void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 	uint32_t tgt_epoch = *(int *)arg;
@@ -432,10 +434,11 @@ static int move_object_to_stale_dir(uint64_t oid, char *wd, void *arg)
 	return SD_RES_SUCCESS;
 }
 
-static int check_stale_objects(uint64_t oid, char *wd, void *arg)
+static int check_stale_objects(uint64_t oid, char *wd, uint32_t epoch,
+			       void *arg)
 {
 	if (oid_stale(oid))
-		return move_object_to_stale_dir(oid, wd, arg);
+		return move_object_to_stale_dir(oid, wd, 0, arg);
 
 	return SD_RES_SUCCESS;
 }
@@ -581,7 +584,8 @@ int default_purge_obj(void)
 {
 	uint32_t tgt_epoch = get_latest_epoch();
 
-	return for_each_object_in_wd(move_object_to_stale_dir, true, &tgt_epoch);
+	return for_each_object_in_wd(move_object_to_stale_dir, true,
+				     &tgt_epoch);
 }
 
 static struct store_driver plain_store = {
