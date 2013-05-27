@@ -178,25 +178,20 @@ int default_cleanup(void)
 	return SD_RES_SUCCESS;
 }
 
-static int init_vdi_state(uint64_t oid, char *wd)
+static int init_vdi_state(uint64_t oid, char *wd, uint32_t epoch)
 {
-	char path[PATH_MAX];
-	struct sd_inode *inode = xzalloc(sizeof(*inode));
-	int fd, flags = O_RDONLY, ret;
+	int ret;
+	struct sd_inode *inode = xzalloc(SD_INODE_HEADER_SIZE);
+	struct siocb iocb = {
+		.epoch = epoch,
+		.buf = inode,
+		.length = SD_INODE_HEADER_SIZE,
+	};
 
-	snprintf(path, sizeof(path), "%s/%016"PRIx64, wd, oid);
-
-	fd = open(path, flags);
-	if (fd < 0) {
-		sd_eprintf("failed to open %s, %m", path);
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	ret = xpread(fd, inode, SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_INODE_HEADER_SIZE) {
-		sd_eprintf("failed to read inode header, path=%s, %m", path);
-		ret = SD_RES_EIO;
+	ret = default_read(oid, &iocb);
+	if (ret != SD_RES_SUCCESS) {
+		sd_eprintf("failed to read inode header %" PRIx64 " %" PRId32,
+			   oid, epoch);
 		goto out;
 	}
 
@@ -218,7 +213,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, uint32_t epoch,
 	if (is_vdi_obj(oid)) {
 		sd_dprintf("found the VDI object %" PRIx64, oid);
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
-		ret = init_vdi_state(oid, wd);
+		ret = init_vdi_state(oid, wd, epoch);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
@@ -274,7 +269,8 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	 * If the request is againt the older epoch, try to read from
 	 * the stale directory
 	 */
-	if (ret == SD_RES_NO_OBJ && iocb->epoch < sys_epoch()) {
+	if (ret == SD_RES_NO_OBJ && iocb->epoch > 0 &&
+	    iocb->epoch < sys_epoch()) {
 		get_stale_obj_path(oid, iocb->epoch, path);
 		ret = default_read_from_path(oid, path, iocb);
 	}
