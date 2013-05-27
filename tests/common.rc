@@ -366,24 +366,8 @@ _make_device()
         _die "failed to create $STORE/$idx.img"
     fi
 
-    fstype="$(df -T / | tail -1 | awk '{print $2}')"
-    case $fstype in
-        ext2)
-            mkops="-t $fstype -q -F"
-            mntops="-o user_xattr"
-            ;;
-        ext[3-4])
-            mkops="-t $fstype -q -F -J size=4"
-            mntops="-o user_xattr"
-            ;;
-        xfs)
-            mkops="-t $fstype -f"
-            mntops=""
-            ;;
-        *)
-            _die  "For now we only support xfs and ext*."
-            ;;
-    esac
+    mkops="-t ext4 -q -F -O ^has_journal"
+    mntops="-o user_xattr"
 
     mkfs $mkops $STORE/$idx.img > $seq.full 2>&1
     mkdir $STORE/$idx
