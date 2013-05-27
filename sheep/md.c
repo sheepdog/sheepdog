@@ -424,7 +424,7 @@ static inline void kick_recover(void)
 {
 	struct vnode_info *vinfo = get_vnode_info();
 
-	start_recovery(vinfo, vinfo);
+	start_recovery(vinfo, vinfo, false);
 	put_vnode_info(vinfo);
 }
 

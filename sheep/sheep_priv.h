@@ -297,7 +297,7 @@ uint64_t get_cluster_ctime(void);
 int get_obj_list(const struct sd_req *, struct sd_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
 
-int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo);
+int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *, bool);
 bool oid_in_recovery(uint64_t oid);
 bool node_in_recovery(void);
 

@@ -576,7 +576,7 @@ static int cluster_force_recover_main(const struct sd_req *req,
 
 	vnode_info = get_vnode_info();
 	old_vnode_info = alloc_vnode_info(nodes, nr_nodes);
-	start_recovery(vnode_info, old_vnode_info);
+	start_recovery(vnode_info, old_vnode_info, true);
 	put_vnode_info(vnode_info);
 	put_vnode_info(old_vnode_info);
 	return ret;

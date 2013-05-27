@@ -442,12 +442,8 @@ static int check_stale_objects(uint64_t oid, char *wd, void *arg)
 
 int default_update_epoch(uint32_t epoch)
 {
-	uint32_t old_epoch = epoch - 1;
-
-	if (old_epoch == 0)
-		return SD_RES_SUCCESS;
-
-	return for_each_object_in_wd(check_stale_objects, false, &old_epoch);
+	assert(epoch);
+	return for_each_object_in_wd(check_stale_objects, false, &epoch);
 }
 
 int default_format(void)

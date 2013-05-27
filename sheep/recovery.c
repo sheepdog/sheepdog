@@ -438,8 +438,7 @@ static inline bool run_next_rw(void)
 
 	free_recovery_info(main_thread_get(current_rinfo));
 
-	if (sd_store->update_epoch)
-		sd_store->update_epoch(nrinfo->epoch);
+	sd_store->update_epoch(nrinfo->epoch);
 
 	main_thread_set(current_rinfo, nrinfo);
 	wakeup_all_requests();
@@ -777,9 +776,11 @@ static inline bool node_is_gateway_only(void)
 	return sys->this_node.nr_vnodes == 0;
 }
 
-int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
+int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
+		   bool epoch_lifted)
 {
 	struct recovery_info *rinfo;
+	uint32_t old_epoch = epoch_lifted ? sys->epoch - 1 : sys->epoch;
 
 	if (node_is_gateway_only())
 		goto out;
@@ -792,8 +793,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo)
 	rinfo->cur_vinfo = grab_vnode_info(cur_vinfo);
 	rinfo->old_vinfo = grab_vnode_info(old_vinfo);
 
-	if (sd_store->update_epoch)
-		sd_store->update_epoch(rinfo->epoch);
+	sd_store->update_epoch(old_epoch);
 
 	if (main_thread_get(current_rinfo) != NULL) {
 		/* skip the previous epoch recovery */
