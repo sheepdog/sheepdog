@@ -69,6 +69,7 @@ struct recovery_info {
 	 * and no recovery work is running
 	 */
 	bool suspended;
+	bool notify_complete;
 
 	int count;
 	uint64_t *oids;
@@ -432,11 +433,19 @@ static void free_recovery_info(struct recovery_info *rinfo)
 static inline bool run_next_rw(void)
 {
 	struct recovery_info *nrinfo = uatomic_xchg_ptr(&next_rinfo, NULL);
+	struct recovery_info *cur = main_thread_get(current_rinfo);
 
 	if (nrinfo == NULL)
 		return false;
 
-	free_recovery_info(main_thread_get(current_rinfo));
+	/*
+	 * When md recovery supersed the reweight or node recovery, we need to
+	 * notify completion.
+	 */
+	if (!nrinfo->notify_complete && cur->notify_complete)
+		nrinfo->notify_complete = true;
+
+	free_recovery_info(cur);
 
 	sd_store->update_epoch(nrinfo->epoch);
 
@@ -479,10 +488,11 @@ static inline void finish_recovery(struct recovery_info *rinfo)
 
 	wakeup_all_requests();
 
-	rinfo->state = RW_NOTIFY_COMPLETION;
+	if (rinfo->notify_complete) {
+		rinfo->state = RW_NOTIFY_COMPLETION;
+		queue_recovery_work(rinfo);
+	}
 
-	/* notify recovery completion to other nodes */
-	queue_recovery_work(rinfo);
 	free_recovery_info(rinfo);
 
 	sd_dprintf("recovery complete: new epoch %"PRIu32, recovered_epoch);
@@ -789,6 +799,10 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 	rinfo->state = RW_PREPARE_LIST;
 	rinfo->epoch = sys->epoch;
 	rinfo->count = 0;
+	if (epoch_lifted)
+		rinfo->notify_complete = true; /* Reweight or node recovery */
+	else
+		rinfo->notify_complete = false; /* MD recovery */
 
 	rinfo->cur_vinfo = grab_vnode_info(cur_vinfo);
 	rinfo->old_vinfo = grab_vnode_info(old_vinfo);

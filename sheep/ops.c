@@ -661,18 +661,6 @@ static int cluster_recovery_completion(const struct sd_req *req,
 		nr_recovereds = 0;
 	}
 
-	/*
-	 * Disk failure might send duplicate notification, ingore it.
-	 *
-	 * We can't simply stop disk recovery from sending notication because
-	 * disk recovery might supersede node recovery, which indeed need
-	 * to send notification
-	 */
-	for (i = 0; i < nr_recovereds; i++)
-		if (node_eq(node, recovereds + i)) {
-			sd_dprintf("duplicate %s", node_to_str(node));
-			return SD_RES_SUCCESS;
-		}
 	recovereds[nr_recovereds++] = *node;
 	xqsort(recovereds, nr_recovereds, node_cmp);
 
