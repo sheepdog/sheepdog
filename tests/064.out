@@ -1,0 +1,53 @@
+QA output created by 064
+using backend plain store
+Id	Size	Used	Avail	Use%
+ 0	192 MB	72 MB	120 MB	 37%
+ 1	192 MB	52 MB	140 MB	 27%
+ 2	385 MB	84 MB	301 MB	 21%
+Total	769 MB	208 MB	561 MB	 27%
+
+Total virtual image size	100 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	48          0
+-    1   127.0.0.1:7001      	48          1
+-    2   127.0.0.1:7002      	96          2
+Id	Size	Used	Avail	Use%
+ 0	384 MB	72 MB	312 MB	 18%
+ 1	192 MB	52 MB	140 MB	 27%
+ 2	385 MB	84 MB	301 MB	 21%
+Total	961 MB	208 MB	753 MB	 21%
+
+Total virtual image size	100 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	48          0
+-    1   127.0.0.1:7001      	48          1
+-    2   127.0.0.1:7002      	96          2
+Id	Size	Used	Avail	Use%
+ 0	384 MB	104 MB	280 MB	 27%
+ 1	192 MB	104 MB	88 MB	 54%
+Total	576 MB	208 MB	368 MB	 36%
+
+Total virtual image size	100 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	64          0
+-    1   127.0.0.1:7001      	64          1
+Id	Size	Used	Avail	Use%
+ 0	384 MB	72 MB	312 MB	 18%
+ 1	192 MB	52 MB	140 MB	 27%
+ 2	385 MB	84 MB	301 MB	 21%
+Total	961 MB	208 MB	753 MB	 21%
+
+Total virtual image size	100 MB
+M   Id   Host:Port         V-Nodes       Zone
+-    0   127.0.0.1:7000      	48          0
+-    1   127.0.0.1:7001      	48          1
+-    2   127.0.0.1:7002      	96          2
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      4 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]

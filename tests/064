@@ -1,0 +1,53 @@
+#!/bin/bash
+
+# Test node failure while reweighting
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_need_to_be_root
+
+_cleanup
+
+_make_device 0 $((200 * 1024 ** 2)) # 200 MB
+_make_device 1 $((200 * 1024 ** 2)) # 200 MB
+_make_device 2 $((400 * 1024 ** 2)) # 400 MB
+_make_device 3 $((200 * 1024 ** 2))  # 200 MB
+
+#start three in different size
+for i in 0 1 2; do
+	_start_sheep $i
+done
+_wait_for_sheep 3
+$COLLIE cluster format -c 2
+sleep 1
+
+$COLLIE vdi create test 100M -P
+$COLLIE node info
+$COLLIE node list
+
+$COLLIE node md plug $STORE/3
+_wait_for_sheep_recovery 0
+$COLLIE node info
+$COLLIE node list
+
+$COLLIE cluster reweight
+
+# restart sheep1 while reweighting
+_kill_sheep 2
+_wait_for_sheep_recovery 0
+$COLLIE node info
+$COLLIE node list
+_start_sheep 2
+
+_wait_for_sheep_recovery 0
+$COLLIE node info
+$COLLIE node list
+$COLLIE cluster info | _filter_cluster_info
