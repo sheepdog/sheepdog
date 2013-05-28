@@ -168,7 +168,6 @@ static int recover_object_from(struct recovery_obj_work *row,
 
 static int recover_object_from_replica(struct recovery_obj_work *row,
 				       struct vnode_info *old,
-				       struct vnode_info *cur,
 				       uint32_t tgt_epoch)
 {
 	uint64_t oid = row->oid;
@@ -235,19 +234,18 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 static int do_recover_object(struct recovery_obj_work *row)
 {
 	struct recovery_work *rw = &row->base;
-	struct vnode_info *old, *cur;
+	struct vnode_info *old;
 	uint64_t oid = row->oid;
 	uint32_t tgt_epoch = rw->epoch;
 	int ret;
 	struct vnode_info *new_old;
 
 	old = grab_vnode_info(rw->old_vinfo);
-	cur = grab_vnode_info(rw->cur_vinfo);
 again:
 	sd_dprintf("try recover object %"PRIx64" from epoch %"PRIu32, oid,
 		   tgt_epoch);
 
-	ret = recover_object_from_replica(row, old, cur, tgt_epoch);
+	ret = recover_object_from_replica(row, old, tgt_epoch);
 
 	switch (ret) {
 	case SD_RES_SUCCESS:
@@ -279,14 +277,12 @@ rollback:
 			goto rollback;
 		}
 
-		put_vnode_info(cur);
-		cur = old;
+		put_vnode_info(old);
 		old = new_old;
 		goto again;
 	}
 
 	put_vnode_info(old);
-	put_vnode_info(cur);
 	return ret;
 }
 
