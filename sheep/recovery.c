@@ -670,7 +670,7 @@ static uint64_t *fetch_object_list(struct sd_node *e, uint32_t epoch,
 retry:
 	sd_init_req(&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.data_length = buf_size;
-	hdr.epoch = sys_epoch();
+	hdr.epoch = epoch;
 	ret = sheep_exec_req(&e->nid, &hdr, buf);
 
 	switch (ret) {
