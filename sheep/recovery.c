@@ -739,6 +739,11 @@ static void screen_object_list(struct recovery_list_work *rlw,
 	xqsort(rlw->oids, rlw->count, obj_cmp);
 }
 
+static inline bool node_is_gateway_only(void)
+{
+	return sys->this_node.nr_vnodes == 0;
+}
+
 /* Prepare the object list that belongs to this node */
 static void prepare_object_list(struct work *work)
 {
@@ -751,6 +756,9 @@ static void prepare_object_list(struct work *work)
 	int cur_nr = rw->cur_vinfo->nr_nodes;
 	int start = random() % cur_nr, i, end = cur_nr;
 	uint64_t *oids;
+
+	if (node_is_gateway_only())
+		return;
 
 	sd_dprintf("%u", rw->epoch);
 	wait_get_vdis_done();
@@ -781,19 +789,11 @@ again:
 	sd_dprintf("%d", rlw->count);
 }
 
-static inline bool node_is_gateway_only(void)
-{
-	return sys->this_node.nr_vnodes == 0;
-}
-
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 		   bool epoch_lifted)
 {
 	struct recovery_info *rinfo;
 	uint32_t old_epoch = epoch_lifted ? sys->epoch - 1 : sys->epoch;
-
-	if (node_is_gateway_only())
-		goto out;
 
 	rinfo = xzalloc(sizeof(struct recovery_info));
 	rinfo->state = RW_PREPARE_LIST;
@@ -826,7 +826,6 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 		main_thread_set(current_rinfo, rinfo);
 		queue_recovery_work(rinfo);
 	}
-out:
 	wakeup_requests_on_epoch();
 	return 0;
 }
