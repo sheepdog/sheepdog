@@ -2160,6 +2160,7 @@ static int vdi_parser(int ch, char *opt)
 			pstrcpy(vdi_cmd_data.from_snapshot_tag,
 				sizeof(vdi_cmd_data.from_snapshot_tag), opt);
 		}
+		break;
 	case 'f':
 		vdi_cmd_data.force = true;
 		break;
