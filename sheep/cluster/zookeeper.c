@@ -303,12 +303,14 @@ static void push_join_response(struct zk_event *ev)
 
 static void zk_queue_pop_advance(struct zk_event *ev)
 {
-	int len;
+	int rc, len;
 	char path[MAX_NODE_STR_LEN];
 
 	len = sizeof(*ev);
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
-	assert(zk_get_data(path, ev, &len) == ZOK);
+	rc = zk_get_data(path, ev, &len);
+	if (rc != ZOK)
+		panic("failed to get data from %s, %s", path, zerror(rc));
 	sd_dprintf("%s, type:%d, len:%d, pos:%"PRId32, path, ev->type, len,
 		   queue_pos);
 	queue_pos++;
