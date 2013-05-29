@@ -26,6 +26,7 @@ enum rw_state {
 /* base structure for the recovery thread */
 struct recovery_work {
 	uint32_t epoch;
+	uint32_t tgt_epoch;
 
 	struct vnode_info *old_vinfo;
 	struct vnode_info *cur_vinfo;
@@ -62,6 +63,7 @@ struct recovery_info {
 	enum rw_state state;
 
 	uint32_t epoch;
+	uint32_t tgt_epoch;
 	uint32_t done;
 
 	/*
@@ -236,7 +238,7 @@ static int do_recover_object(struct recovery_obj_work *row)
 	struct recovery_work *rw = &row->base;
 	struct vnode_info *old;
 	uint64_t oid = row->oid;
-	uint32_t tgt_epoch = rw->epoch;
+	uint32_t tgt_epoch = rw->tgt_epoch;
 	int ret;
 	struct vnode_info *new_old;
 
@@ -443,7 +445,7 @@ static inline bool run_next_rw(void)
 
 	free_recovery_info(cur);
 
-	sd_store->update_epoch(nrinfo->epoch);
+	sd_store->update_epoch(nrinfo->tgt_epoch);
 
 	main_thread_set(current_rinfo, nrinfo);
 	wakeup_all_requests();
@@ -789,11 +791,11 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 		   bool epoch_lifted)
 {
 	struct recovery_info *rinfo;
-	uint32_t old_epoch = epoch_lifted ? sys->epoch - 1 : sys->epoch;
 
 	rinfo = xzalloc(sizeof(struct recovery_info));
 	rinfo->state = RW_PREPARE_LIST;
 	rinfo->epoch = sys->epoch;
+	rinfo->tgt_epoch = epoch_lifted ? sys->epoch - 1 : sys->epoch;
 	rinfo->count = 0;
 	if (epoch_lifted)
 		rinfo->notify_complete = true; /* Reweight or node recovery */
@@ -803,7 +805,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 	rinfo->cur_vinfo = grab_vnode_info(cur_vinfo);
 	rinfo->old_vinfo = grab_vnode_info(old_vinfo);
 
-	sd_store->update_epoch(old_epoch);
+	sd_store->update_epoch(rinfo->tgt_epoch);
 
 	if (main_thread_get(current_rinfo) != NULL) {
 		/* skip the previous epoch recovery */
@@ -860,6 +862,7 @@ static void queue_recovery_work(struct recovery_info *rinfo)
 	}
 
 	rw->epoch = rinfo->epoch;
+	rw->tgt_epoch = rinfo->tgt_epoch;
 	rw->cur_vinfo = grab_vnode_info(rinfo->cur_vinfo);
 	rw->old_vinfo = grab_vnode_info(rinfo->old_vinfo);
 
