@@ -1127,6 +1127,18 @@ static struct sd_op_template sd_ops[] = {
 		.process_main = cluster_update_size,
 	},
 
+	[SD_OP_ENABLE_RECOVER] = {
+		.name = "ENABLE_RECOVER",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_main = cluster_enable_recover,
+	},
+
+	[SD_OP_DISABLE_RECOVER] = {
+		.name = "DISABLE_RECOVER",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_main = cluster_disable_recover,
+	},
+
 	/* local operations */
 	[SD_OP_RELEASE_VDI] = {
 		.name = "RELEASE_VDI",
@@ -1304,18 +1316,6 @@ static struct sd_op_template sd_ops[] = {
 		.name = "REMOVE_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_remove_obj,
-	},
-
-	[SD_OP_ENABLE_RECOVER] = {
-		.name = "ENABLE_RECOVER",
-		.type = SD_OP_TYPE_CLUSTER,
-		.process_main = cluster_enable_recover,
-	},
-
-	[SD_OP_DISABLE_RECOVER] = {
-		.name = "DISABLE_RECOVER",
-		.type = SD_OP_TYPE_CLUSTER,
-		.process_main = cluster_disable_recover,
 	},
 };
 
