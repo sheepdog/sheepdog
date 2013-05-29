@@ -272,8 +272,6 @@ static void cluster_op_done(struct work *work)
 	struct vdi_op_message *msg;
 	size_t size;
 
-	cluster_op_running = false;
-
 	sd_dprintf("%s (%p)", op_name(req->op), req);
 
 	msg = prepare_cluster_msg(req, &size);
@@ -976,6 +974,9 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
 
 		put_request(req);
 	}
+
+	if (has_process_work(op))
+		cluster_op_running = false;
 }
 
 enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
