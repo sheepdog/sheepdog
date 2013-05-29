@@ -150,39 +150,6 @@ static int node_recovery(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int node_cache(int argc, char **argv)
-{
-	char *p;
-	int ret;
-	uint32_t cache_size;
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-
-	cache_size = strtol(argv[optind], &p, 10);
-	if (argv[optind] == p || cache_size < 0) {
-		fprintf(stderr, "Invalid cache size %s\n", argv[optind]);
-		return EXIT_FAILURE;
-	}
-
-	sd_init_req(&hdr, SD_OP_SET_CACHE_SIZE);
-	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = sizeof(cache_size);
-
-	ret = collie_exec_req(sdhost, sdport, &hdr, (void *)&cache_size);
-	if (ret < 0)
-		return EXIT_FAILURE;
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "specify max cache size failed: %s\n",
-				sd_strerror(rsp->result));
-		return EXIT_FAILURE;
-	}
-
-	printf("Max cache size set to %dM\n", cache_size);
-
-	return EXIT_SUCCESS;
-}
-
 static int node_kill(int argc, char **argv)
 {
 	char host[128];
@@ -362,8 +329,6 @@ static struct subcommand node_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, node_info},
 	{"recovery", NULL, "aprh", "show nodes in recovery", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
-	{"cache", "<cache size>", "aprh", "specify max cache size", NULL,
-	 SUBCMD_FLAG_NEED_ARG, node_cache},
 	{"md", "[disks]", "apAh", "See 'collie node md' for more information",
 	 node_md_cmd, SUBCMD_FLAG_NEED_ARG, node_md, node_options},
 	{NULL,},

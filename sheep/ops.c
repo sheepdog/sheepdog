@@ -768,19 +768,6 @@ static int cluster_update_size(const struct sd_req *req, struct sd_rsp *rsp,
 	return SD_RES_SUCCESS;
 }
 
-static int local_set_cache_size(const struct sd_req *req, struct sd_rsp *rsp,
-				  void *data)
-{
-	uint32_t cache_size = *(uint32_t *)data;
-
-	uatomic_set(&sys->object_cache_size, cache_size);
-	sd_dprintf("Max cache size set to %dM", cache_size);
-
-	object_cache_try_to_reclaim(0);
-
-	return SD_RES_SUCCESS;
-}
-
 static int local_md_info(struct request *request)
 {
 	struct sd_rsp *rsp = &request->rp;
@@ -1243,12 +1230,6 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
 		.process_main = local_kill_node,
-	},
-
-	[SD_OP_SET_CACHE_SIZE] = {
-		.name = "SET_CACHE_SIZE",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_main = local_set_cache_size,
 	},
 
 	[SD_OP_MD_INFO] = {

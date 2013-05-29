@@ -60,7 +60,7 @@
 #define SD_OP_READ_PEER      0xA4
 #define SD_OP_WRITE_PEER     0xA5
 #define SD_OP_REMOVE_PEER    0xA6
-#define SD_OP_SET_CACHE_SIZE 0xA7
+/* #define SD_OP_SET_CACHE_SIZE 0xA7 deleted */
 #define SD_OP_ENABLE_RECOVER 0xA8
 #define SD_OP_DISABLE_RECOVER 0xA9
 #define SD_OP_GET_VDI_COPIES 0xAB
