@@ -497,10 +497,11 @@ static int zk_join(const struct sd_node *myself,
 	this_node.node = *myself;
 
 	snprintf(path, sizeof(path), MEMBER_ZNODE "/%s", node_to_str(myself));
-	rc = zk_node_exists(path);
-	if (rc == ZOK) {
-		sd_eprintf("Previous zookeeper session exist, shoot myself.");
-		exit(1);
+	rc = zk_delete_node(path, -1);
+	if (rc != ZOK && rc != ZNONODE) {
+		sd_eprintf("failed to delete previous zookeeper path"
+			   " before join cluster");
+		return -1;
 	}
 
 	/* For concurrent nodes setup, we allow only one to continue */
