@@ -297,7 +297,7 @@ static void zk_queue_push(struct zk_event *ev)
 	int rc, len;
 	char path[MAX_NODE_STR_LEN], buf[MAX_NODE_STR_LEN];
 
-	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
+	len = offsetof(typeof(*ev), buf) + ev->buf_len;
 	snprintf(path, sizeof(path), "%s/", QUEUE_ZNODE);
 again:
 	rc = zk_create_seq_node(path, (char *)ev, len, buf, sizeof(buf));
@@ -344,7 +344,7 @@ static void push_join_response(struct zk_event *ev)
 	       nr_sd_nodes * sizeof(struct sd_node));
 	queue_pos--;
 
-	len = (char *)(ev->buf) - (char *)ev + ev->buf_len;
+	len = offsetof(typeof(*ev), buf) + ev->buf_len;
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 	zk_set_data(path, (char *)ev, len, -1);
 	sd_dprintf("update path:%s, queue_pos:%010"PRId32", len:%d",
