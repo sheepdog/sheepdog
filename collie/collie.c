@@ -185,8 +185,12 @@ static unsigned long setup_commands(const struct command *commands,
 	}
 
 	if (!found) {
-		fprintf(stderr, "Invalid command '%s'\n", cmd);
-		usage(commands, EXIT_USAGE);
+		if (cmd && strcmp(cmd, "help") && strcmp(cmd, "--help") &&
+		    strcmp(cmd, "-h")) {
+			fprintf(stderr, "Invalid command '%s'\n", cmd);
+			usage(commands, EXIT_USAGE);
+		}
+		usage(commands, 0);
 	}
 
 	for (s = commands[i].sub; subcmd && s->name; s++) {
@@ -203,7 +207,7 @@ static unsigned long setup_commands(const struct command *commands,
 
 	if (!command_fn) {
 		if (subcmd && strcmp(subcmd, "help") &&
-		    strcmp(subcmd, "--help"))
+		    strcmp(subcmd, "--help") && strcmp(subcmd, "-h"))
 			fprintf(stderr, "Invalid command '%s %s'\n", cmd, subcmd);
 		fprintf(stderr, "Available %s commands:\n", cmd);
 		for (s = commands[i].sub; s->name; s++)
