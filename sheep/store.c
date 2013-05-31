@@ -213,11 +213,10 @@ int lock_base_dir(const char *d)
 	}
 
 	if (lockf(fd, F_TLOCK, 1) < 0) {
-		if (errno == EACCES || errno == EAGAIN) {
+		if (errno == EACCES || errno == EAGAIN)
 			sd_eprintf("another sheep daemon is using %s", d);
-		} else {
+		else
 			sd_eprintf("unable to get base dir lock (%m)");
-		}
 		ret = -1;
 		goto out;
 	}

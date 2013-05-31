@@ -882,7 +882,7 @@ int create_listen_port(char *bindaddr, int port)
 
 int init_unix_domain_socket(const char *dir)
 {
-	static bool is_inet_socket = false;
+	static bool is_inet_socket;
 	char unix_path[PATH_MAX];
 
 	snprintf(unix_path, sizeof(unix_path), "%s/sock", dir);

@@ -39,7 +39,7 @@
 #include "util.h"
 
 static bool colorize;
-static const char *log_color[] = {
+static const char * const log_color[] = {
 	[SDOG_EMERG] = TEXT_BOLD_RED,
 	[SDOG_ALERT] = TEXT_BOLD_RED,
 	[SDOG_CRIT] = TEXT_BOLD_RED,

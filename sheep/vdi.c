@@ -91,7 +91,7 @@ bool oid_is_readonly(uint64_t oid)
 {
 	/* we allow changing snapshot attributes */
 	if (!is_data_obj(oid))
-	    return false;
+		return false;
 
 	return vid_is_snapshot(oid_to_vid(oid));
 }

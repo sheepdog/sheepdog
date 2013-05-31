@@ -13,9 +13,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/*
- * Snap object is the meta data that describes the cluster snapshot.
- */
+/* Snap object is the meta data that describes the cluster snapshot. */
+
 #include <time.h>
 #include <sys/stat.h>
 #include <unistd.h>

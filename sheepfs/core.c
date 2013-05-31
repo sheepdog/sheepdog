@@ -34,7 +34,7 @@ char sheepfs_shadow[PATH_MAX];
 
 static int sheepfs_debug;
 static int sheepfs_fg;
-int sheepfs_page_cache = false;
+int sheepfs_page_cache;
 int sheepfs_object_cache = true;
 char sdhost[32] = "localhost";
 int sdport = SD_LISTEN_PORT;
