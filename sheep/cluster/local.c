@@ -62,6 +62,7 @@ enum local_event_type {
 	EVENT_GATEWAY,
 	EVENT_BLOCK,
 	EVENT_NOTIFY,
+	EVENT_UPDATE_NODE,
 };
 
 struct local_event {
@@ -286,6 +287,10 @@ static void add_event(enum local_event_type type, struct local_node *lnode,
 	case EVENT_NOTIFY:
 	case EVENT_BLOCK:
 		break;
+	case EVENT_UPDATE_NODE:
+		n = find_lnode(lnode, ev.nr_lnodes, ev.lnodes);
+		n->node = lnode->node;
+		break;
 	case EVENT_JOIN_RESPONSE:
 		abort();
 	}
@@ -493,6 +498,8 @@ static bool local_process_event(void)
 	case EVENT_NOTIFY:
 		sd_notify_handler(&ev->sender.node, ev->buf, ev->buf_len);
 		break;
+	case EVENT_UPDATE_NODE:
+		break;
 	}
 out:
 	shm_queue_remove(ev);
@@ -569,6 +576,20 @@ static int local_init(const char *option)
 	return 0;
 }
 
+/* FIXME: we have to call nr of nodes times to update nodes information */
+static void local_update_node(struct sd_node *node)
+{
+	struct local_node n = {
+		.node = *node,
+	};
+
+	shm_queue_lock();
+
+	add_event(EVENT_UPDATE_NODE, &n, NULL, 0);
+
+	shm_queue_unlock();
+}
+
 static struct cluster_driver cdrv_local = {
 	.name		= "local",
 
@@ -579,6 +600,7 @@ static struct cluster_driver cdrv_local = {
 	.notify		= local_notify,
 	.block		= local_block,
 	.unblock	= local_unblock,
+	.update_node    = local_update_node,
 };
 
 cdrv_register(cdrv_local);

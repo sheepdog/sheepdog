@@ -101,6 +101,9 @@ struct cluster_driver {
 	 */
 	void (*unblock)(void *msg, size_t msg_len);
 
+	/* Update the specific node in the driver's private copy of nodes */
+	void (*update_node)(struct sd_node *);
+
 	struct list_head list;
 };
 

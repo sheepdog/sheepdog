@@ -685,6 +685,13 @@ static void shepherd_unblock(void *msg, size_t msg_len)
 	do_shepherd_notify(true, msg, msg_len);
 }
 
+static void shepherd_update_node(struct sd_node *node)
+{
+	for (int i = 0; i < nr_nodes; i++)
+		if (node_eq(node, &nodes[i]))
+			nodes[i] = *node;
+}
+
 static struct cluster_driver cdrv_shepherd = {
 	.name		= "shepherd",
 
@@ -694,6 +701,7 @@ static struct cluster_driver cdrv_shepherd = {
 	.notify		= shepherd_notify,
 	.block		= shepherd_block,
 	.unblock	= shepherd_unblock,
+	.update_node	= shepherd_update_node,
 };
 
 cdrv_register(cdrv_shepherd);

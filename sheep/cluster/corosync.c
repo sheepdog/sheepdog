@@ -106,6 +106,18 @@ static inline int find_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 	return -1;
 }
 
+static inline int find_sd_node(struct cpg_node *nodes, size_t nr_nodes,
+			       struct sd_node *key)
+{
+	int i;
+
+	for (i = 0; i < nr_nodes; i++)
+		if (node_eq(&nodes[i].ent, key))
+			return i;
+
+	return -1;
+}
+
 static inline void add_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 				struct cpg_node *added)
 {
@@ -324,8 +336,8 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 		case CJ_RES_FAIL:
 			build_node_list(cpg_nodes, nr_cpg_nodes, entries);
 			sd_join_handler(&cevent->sender.ent, entries,
-						       nr_cpg_nodes, cevent->result,
-						       cevent->msg);
+					nr_cpg_nodes, cevent->result,
+					cevent->msg);
 			break;
 		}
 		break;
@@ -814,6 +826,16 @@ again:
 	return 0;
 }
 
+static void corosync_update_node(struct sd_node *node)
+{
+	int idx;
+
+	idx = find_sd_node(cpg_nodes, nr_cpg_nodes, node);
+	if (idx < 0)
+		return;
+	cpg_nodes[idx].ent = *node;
+}
+
 static struct cluster_driver cdrv_corosync = {
 	.name		= "corosync",
 
@@ -824,6 +846,7 @@ static struct cluster_driver cdrv_corosync = {
 	.notify		= corosync_notify,
 	.block		= corosync_block,
 	.unblock	= corosync_unblock,
+	.update_node	= corosync_update_node,
 };
 
 cdrv_register(cdrv_corosync);

@@ -870,6 +870,24 @@ static int zk_init(const char *option)
 	return 0;
 }
 
+static void zk_update_node(struct sd_node *node)
+{
+	struct zk_node n = {
+		.node = *node,
+	};
+	struct zk_node *t;
+
+	sd_dprintf("%s", node_to_str(&n.node));
+
+	pthread_rwlock_rdlock(&zk_tree_lock);
+	t = zk_tree_search_nolock(&n.node.nid);
+	if (t) {
+		t->node = n.node;
+		build_node_list();
+	}
+	pthread_rwlock_unlock(&zk_tree_lock);
+}
+
 static struct cluster_driver cdrv_zookeeper = {
 	.name       = "zookeeper",
 
@@ -879,6 +897,7 @@ static struct cluster_driver cdrv_zookeeper = {
 	.notify     = zk_notify,
 	.block      = zk_block,
 	.unblock    = zk_unblock,
+	.update_node = zk_update_node,
 };
 
 cdrv_register(cdrv_zookeeper);

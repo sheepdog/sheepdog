@@ -1242,6 +1242,7 @@ void update_node_size(struct sd_node *node)
 	int idx = get_node_idx(cur_vinfo, node);
 	assert(idx != -1);
 	cur_vinfo->nodes[idx].space = node->space;
+	sys->cdrv->update_node(node);
 }
 
 void kick_node_recover(void)
