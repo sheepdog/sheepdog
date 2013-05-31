@@ -17,11 +17,13 @@ sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
 sheepdogsysconf_DATA	= 
 
-SUBDIRS			= lib collie sheep include script man shepherd
+SUBDIRS			= lib collie sheep include script shepherd
 
 if BUILD_SHEEPFS
 SUBDIRS			+= sheepfs
 endif
+
+SUBDIRS			+= man
 
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/${localstatedir}/lib/sheepdog

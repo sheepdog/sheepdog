@@ -1,18 +1,18 @@
-.TH SHEEPDOG 8 2012-06-27
+.TH SHEEPDOG 8 @DATE@
 .SH NAME
 sheepfs \- A pseudo file system exports both Sheepdog's internal state as well as Sheepdog's storage
 .SH SYNOPSIS
 .B "sheepfs [OPTION]... MOUNTPOINT"
 .SH DESCRIPTION
 .B sheepfs
-- Sheepdog is a distributed storage system for KVM/QEMU. It provides
+- Sheepdog is a distributed storage system for QEMU. It provides
 highly available block level storage volumes to virtual machines.
 Sheepdog supports advanced volume management features such as snapshot,
 cloning, and thin provisioning. The architecture of Sheepdog is fully
 symmetric; there is no central node such as a meta-data server.
 
 The server daemon is called sheep(8).  A command line utility is available
-via collie(8). A pseudo file system is available via sheepfs(8). KVM/QEMU
+via collie(8). A pseudo file system is available via sheepfs(8). QEMU
 virtual machines use the sheep daemon via a block driver available in qemu(1).
 
 Sheepfs is a FUSE-based pseudo file system in userland to access both
@@ -37,28 +37,7 @@ can be used as
 
 This file abstraction integrates well into kernel's pagecache.
 .SH OPTIONS
-.TP
-.BI \-a "\fR, \fP" \--address
-This option specify the daemon address (default: localhost).
-.TP
-.BI \-p "\fR, \fP" \--port
-This option specify the daemon port (default: 7000).
-.TP
-.TP
-.BI \-d "\fR, \fP" \--debug
-This option enable debug output (implies -f).
-.TP
-.BI \-f "\fR, \fP" \--foreground
-This option let sheepfs run in the foreground.
-.TP
-.BI \-k "\fR, \fP" \--pagecache
-This option use local kernel's page cache to access volume.
-.TP
-.BI \-n "\fR, \fP" \--noobjectcache
-This option disable object cache of the attached volumes.
-.TP
-.BI \-h "\fR, \fP" \--help
-Display help and exit.
+@OPTIONS@
 
 .SH DEPENDENCIES
 \fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z.

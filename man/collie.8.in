@@ -1,0 +1,37 @@
+.TH SHEEPDOG 8 @DATE@
+.SH NAME
+collie \- Command line utility for the sheep daemon
+.SH SYNOPSIS
+.B "collie <command> <subcommand> [options]"
+.SH DESCRIPTION
+.B collie
+- Sheepdog is a distributed storage system for QEMU. It provides
+highly available block level storage volumes to virtual machines.
+Sheepdog supports advanced volume management features such as snapshot,
+cloning, and thin provisioning. The architecture of Sheepdog is fully
+symmetric; there is no central node such as a meta-data server.
+
+The server daemon is called sheep(8).  A command line utility is available
+via collie(8).  QEMU virtual machines use the sheep daemon via a block
+driver available in qemu(1).
+
+For more information, run 'collie <command> <subcommand> --help'.
+.SH COMMAND & SUBCOMMAND
+@OPTIONS@
+
+.SH DEPENDENCIES
+\fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z or 2.y.z.
+
+.SH FILES
+none
+
+.SH SEE ALSO
+.BR sheep(8),
+.BR qemu(1),
+.BR sheepfs(8),
+.BR corosync_overview(8)
+
+.SH AUTHORS
+This software is developed by the Sheepdog community which may be reached
+via mailing list at <sheepdog@lists.wpkg.org>.
+.PP
