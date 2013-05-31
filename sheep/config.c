@@ -18,6 +18,7 @@
 #include "sheep_priv.h"
 
 #define SD_FORMAT_VERSION 0x0002
+#define SD_CONFIG_SIZE 40
 
 static struct sheepdog_config {
 	uint64_t ctime;
@@ -197,4 +198,10 @@ int get_node_space(uint64_t *space)
 	*space = config.space;
 
 	return SD_RES_SUCCESS;
+}
+
+static inline __attribute__((used)) void __sd_config_format_build_bug_ons(void)
+{
+	/* never called, only for checking BUILD_BUG_ON()s */
+	BUILD_BUG_ON(sizeof(struct sheepdog_config) != SD_CONFIG_SIZE);
 }

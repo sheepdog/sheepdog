@@ -120,6 +120,8 @@ struct node_id {
 	uint8_t pad[4];
 };
 
+#define SD_NODE_SIZE 56
+
 struct sd_node {
 	struct node_id  nid;
 	uint16_t	nr_vnodes;
@@ -200,5 +202,11 @@ enum cluster_join_result {
 	 */
 	CJ_RES_MASTER_TRANSFER,
 };
+
+static inline __attribute__((used)) void __sd_epoch_format_build_bug_ons(void)
+{
+	/* never called, only for checking BUILD_BUG_ON()s */
+	BUILD_BUG_ON(sizeof(struct sd_node) != SD_NODE_SIZE);
+}
 
 #endif /* __INTERNAL_PROTO_H__ */
