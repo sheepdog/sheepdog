@@ -104,6 +104,11 @@ static int obj_cmp(const uint64_t *oid1, const uint64_t *oid2)
 	return 0;
 }
 
+static inline bool node_is_gateway_only(void)
+{
+	return sys->this_node.nr_vnodes == 0;
+}
+
 /* recover object from vnode */
 static int recover_object_from(struct recovery_obj_work *row,
 			       const struct sd_vnode *vnode, uint32_t tgt_epoch)
@@ -445,7 +450,8 @@ static inline bool run_next_rw(void)
 
 	free_recovery_info(cur);
 
-	sd_store->update_epoch(nrinfo->tgt_epoch);
+	if (!node_is_gateway_only())
+		sd_store->update_epoch(nrinfo->tgt_epoch);
 
 	main_thread_set(current_rinfo, nrinfo);
 	wakeup_all_requests();
@@ -737,11 +743,6 @@ static void screen_object_list(struct recovery_list_work *rlw,
 	xqsort(rlw->oids, rlw->count, obj_cmp);
 }
 
-static inline bool node_is_gateway_only(void)
-{
-	return sys->this_node.nr_vnodes == 0;
-}
-
 /* Prepare the object list that belongs to this node */
 static void prepare_object_list(struct work *work)
 {
@@ -805,7 +806,8 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 	rinfo->cur_vinfo = grab_vnode_info(cur_vinfo);
 	rinfo->old_vinfo = grab_vnode_info(old_vinfo);
 
-	sd_store->update_epoch(rinfo->tgt_epoch);
+	if (!node_is_gateway_only())
+		sd_store->update_epoch(rinfo->tgt_epoch);
 
 	if (main_thread_get(current_rinfo) != NULL) {
 		/* skip the previous epoch recovery */
