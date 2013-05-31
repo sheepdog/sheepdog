@@ -298,12 +298,12 @@ static void usage(int inval)
 		printf("\
 Usage: sheepfs [OPTION]... MOUNTPOINT\n\
 Options:\n\
-  -a  --address           specify the sheep address (default: localhost)\n\
+  -a, --address           specify the sheep address (default: localhost)\n\
   -d, --debug             enable debug output (implies -f)\n\
   -f, --foreground        sheepfs run in the foreground\n\
   -k, --pagecache         use local kernel's page cache to access volume\n\
-  -n  --noobjectcache     disable object cache of the attached volumes\n\
-  -p  --port              specify the sheep port (default: 7000)\n\
+  -n, --noobjectcache     disable object cache of the attached volumes\n\
+  -p, --port              specify the sheep port (default: 7000)\n\
   -h, --help              display this help and exit\n\
 ");
 	exit(inval);
