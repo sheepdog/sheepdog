@@ -60,12 +60,24 @@ struct sheepdog_config_v1 {
 	uint64_t space;
 };
 
+static size_t get_file_size(const char *path)
+{
+	struct stat stbuf;
+	int ret;
+
+	ret = stat(path, &stbuf);
+	if (ret < 0) {
+		sd_eprintf("failed to stat %s, %m", path);
+		return -1;
+	}
+	return stbuf.st_size;
+}
+
 /* copy file from 'fname' to 'fname.suffix' */
 static int backup_file(char *fname, char *suffix)
 {
 	char dst_file[PATH_MAX];
 	int fd = -1, ret, len;
-	struct stat stbuf;
 	void *buf = NULL;
 
 	snprintf(dst_file, sizeof(dst_file), "%s.%s", fname, suffix);
@@ -80,12 +92,9 @@ static int backup_file(char *fname, char *suffix)
 		goto out;
 	}
 
-	ret = stat(fname, &stbuf);
-	if (ret < 0) {
-		sd_eprintf("failed to stat %s, %m", fname);
+	len = get_file_size(fname);
+	if (len < 0)
 		goto out;
-	}
-	len = stbuf.st_size;
 
 	buf = xmalloc(len);
 	ret = xread(fd, buf, len);
