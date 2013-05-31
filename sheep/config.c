@@ -17,7 +17,7 @@
 
 #include "sheep_priv.h"
 
-#define SD_FORMAT_VERSION 0x0001
+#define SD_FORMAT_VERSION 0x0002
 
 static struct sheepdog_config {
 	uint64_t ctime;

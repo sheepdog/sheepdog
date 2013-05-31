@@ -61,6 +61,25 @@ struct sheepdog_config_v1 {
 	uint64_t space;
 };
 
+/* sheepdog 0.6.0 */
+struct node_id_v2 {
+	uint8_t addr[16];
+	uint16_t port;
+	uint8_t io_addr[16];
+	uint16_t io_port;
+	uint8_t pad[4];
+};
+
+struct sd_node_v2 {
+	struct node_id_v2  nid;
+	uint16_t	nr_vnodes;
+	uint32_t	zone;
+	uint64_t        space;
+};
+
+/* sheepdog_config_v2 is the same as v1 */
+#define sheepdog_config_v2 sheepdog_config_v1
+
 static size_t get_file_size(const char *path)
 {
 	struct stat stbuf;
@@ -299,8 +318,121 @@ static int migrate_from_v0_to_v1(void)
 	return ret;
 }
 
+static int update_epoch_from_v1_to_v2(uint32_t epoch)
+{
+	char path[PATH_MAX];
+	struct sd_node_v1 nodes_v1[SD_MAX_NODES];
+	struct sd_node_v2 nodes_v2[SD_MAX_NODES];
+	size_t nr_nodes;
+	time_t *t;
+	int len, fd, ret;
+
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	fd = open(path, O_RDWR | O_DSYNC);
+	if (fd < 0) {
+		if (errno == ENOENT)
+			return 0;
+
+		sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
+		return -1;
+	}
+
+	/*
+	 * sheepdog 0.5.6 was released without incrementing the config version.
+	 * We detect it by 1) checking the size of epoch file, and 2) checking
+	 * the value of sd_node.nid.port
+	 */
+	if ((get_file_size(path) - sizeof(time_t)) % sizeof(nodes_v1[0]) != 0) {
+		sd_dprintf("%s is not a v1 format", path);
+		close(fd);
+		return 0;
+	}
+
+	ret = xread(fd, nodes_v1, sizeof(nodes_v1));
+	if (ret < 0) {
+		sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
+		close(fd);
+		return ret;
+	}
+
+	nr_nodes = ret / sizeof(nodes_v1[0]);
+	for (int i = 0; i < nr_nodes; i++) {
+		if (nodes_v1[i].nid.port == 0) {
+			sd_dprintf("%s is not a v1 format", path);
+			return 0;
+		}
+		memset(&nodes_v2[i].nid, 0, sizeof(nodes_v2[i].nid));
+		memcpy(nodes_v2[i].nid.addr, nodes_v1[i].nid.addr,
+		       sizeof(nodes_v2[i].nid.addr));
+		nodes_v2[i].nid.port = nodes_v1[i].nid.port;
+		nodes_v2[i].nr_vnodes = nodes_v1[i].nr_vnodes;
+		nodes_v2[i].zone = nodes_v1[i].zone;
+		nodes_v2[i].space = nodes_v1[i].space;
+	}
+
+	len = sizeof(nodes_v2[0]) * nr_nodes;
+	ret = xpwrite(fd, nodes_v2, len, 0);
+	if (ret != len) {
+		sd_eprintf("failed to write epoch %"PRIu32" log",
+			   epoch);
+		close(fd);
+		return -1;
+	}
+
+	t = (time_t *)&nodes_v1[nr_nodes];
+
+	ret = xpwrite(fd, t, sizeof(*t), len);
+	if (ret != sizeof(*t)) {
+		sd_eprintf("failed to write time to epoch %"
+			   PRIu32" log", epoch);
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+static int migrate_from_v1_to_v2(void)
+{
+	int fd, ret;
+	uint16_t version = 2;
+	char store[STORE_LEN] = "plain"; /* we have only the plain driver */
+
+	fd = open(config_path, O_WRONLY | O_DSYNC);
+	if (fd < 0) {
+		sd_eprintf("failed to open config file, %m");
+		return -1;
+	}
+
+	ret = xpwrite(fd, &version, sizeof(version),
+		      offsetof(struct sheepdog_config_v2, version));
+	if (ret != sizeof(version)) {
+		sd_eprintf("failed to write config data, %m");
+		close(fd);
+		return -1;
+	}
+
+	ret = xpwrite(fd, store, sizeof(store),
+		      offsetof(struct sheepdog_config_v2, store));
+	if (ret != sizeof(store)) {
+		sd_eprintf("failed to write config data, %m");
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	/* upgrade epoch log */
+	for_each_epoch(update_epoch_from_v1_to_v2);
+
+	return ret;
+}
+
 static int (*migrate[])(void) = {
 	migrate_from_v0_to_v1, /* from 0.4.0 or 0.5.0 to 0.5.1 */
+	migrate_from_v1_to_v2, /* from 0.5.x to 0.6.0 */
 };
 
 int sd_migrate_store(int from, int to)
