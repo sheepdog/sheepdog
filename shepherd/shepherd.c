@@ -790,6 +790,9 @@ int main(int argc, char **argv)
 	struct option *long_options;
 	const char *short_options;
 
+	printf(TEXT_BOLD_RED "** WARNING: shepherd is still only suitable for "
+	       "testing and review **" TEXT_NORMAL "\n");
+
 	progname = argv[0];
 
 	install_crash_handler(crash_handler);

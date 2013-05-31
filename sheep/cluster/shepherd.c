@@ -111,6 +111,10 @@ retry:
 			exit(1);
 		}
 
+		/*
+		 * FIXME: member change events must be ordered with nonblocked
+		 *        events
+		 */
 		res = sd_check_join_cb(&join->node, join->opaque);
 		if (res == CJ_RES_FAIL) {
 			sd_eprintf("sd_check_join_cb() failed");
@@ -171,6 +175,7 @@ retry:
 		nr_nodes = join_reply->nr_nodes;
 	}
 
+	/* FIXME: member change events must be ordered with nonblocked events */
 	sd_join_handler(&this_node, nodes, nr_nodes,
 			join_reply->res, join_reply->opaque);
 
@@ -337,6 +342,7 @@ static void msg_new_node(struct sph_msg *rcv)
 		exit(1);
 	}
 
+	/* FIXME: member change events must be ordered with nonblocked events */
 	res = sd_check_join_cb(&join->node, join->opaque);
 
 	join->res = res;
@@ -379,6 +385,8 @@ static void msg_new_node_finish(struct sph_msg *rcv)
 
 	sd_iprintf("new node: %s",
 		node_to_str(&join_node_finish->new_node));
+
+	/* FIXME: member change events must be ordered with nonblocked events */
 	sd_join_handler(&join_node_finish->new_node, nodes, nr_nodes,
 			join_node_finish->res, jm);
 
@@ -452,6 +460,7 @@ static void do_leave_sheep(void)
 removed:
 	sd_dprintf("calling sd_leave_handler(), sender: %s",
 		node_to_str(&sender));
+	/* FIXME: member change events must be ordered with nonblocked events */
 	sd_leave_handler(&sender, nodes, nr_nodes);
 }
 
