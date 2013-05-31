@@ -51,7 +51,6 @@ struct journal_descriptor {
 #define JOURNAL_END_MARKER 0xdeadbeef
 
 #define JF_STORE 0
-#define JF_EPOCH 1
 #define JF_REMOVE_OBJ 2
 
 static const char *jfile_name[2] = { "journal_file0", "journal_file1", };
@@ -148,11 +147,6 @@ static void journal_get_path(struct journal_descriptor *jd, char *path)
 				path, jd->size, jd->offset, jd->create);
 		else		/* JF_REMOVE_OBJ */
 			sd_iprintf("%s (remove)", path);
-		break;
-	case JF_EPOCH:
-		snprintf(path, PATH_MAX, "%s/%08"PRIu32, epoch_path, jd->epoch);
-		sd_iprintf("%s, %"PRIu32" size %"PRIu64,
-			   path, jd->epoch, jd->size);
 		break;
 	default:
 		panic("unknown type of journal flag: %d", jd->flag);
@@ -436,19 +430,6 @@ int journal_write_store(uint64_t oid, const char *buf, size_t size,
 	};
 	/* We have to explicitly do assignment to get all GCC compatible */
 	jd.oid = oid;
-	return journal_file_write(&jd, buf);
-}
-
-int journal_write_epoch(const char *buf, size_t size, uint32_t epoch)
-{
-	struct journal_descriptor jd = {
-		.magic = JOURNAL_DESC_MAGIC,
-		.flag = JF_EPOCH,
-		.offset = 0,
-		.size = size,
-		.create = true,
-	};
-	jd.epoch = epoch;
 	return journal_file_write(&jd, buf);
 }
 

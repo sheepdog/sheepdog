@@ -401,8 +401,6 @@ int journal_file_init(const char *path, size_t size, bool skip);
 void clean_journal_file(const char *p);
 int
 journal_write_store(uint64_t oid, const char *buf, size_t size, off_t, bool);
-int journal_write_epoch(const char *buf, size_t size, uint32_t epoch);
-int journal_write_config(const char *buf, size_t size);
 int journal_remove_object(uint64_t oid);
 
 /* md.c */

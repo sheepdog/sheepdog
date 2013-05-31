@@ -35,7 +35,7 @@ LIST_HEAD(store_drivers);
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 {
-	int fd, ret, len, nodes_len, flags = O_RDWR | O_CREAT | O_DSYNC;
+	int ret, len, nodes_len;
 	time_t t;
 	char path[PATH_MAX], *buf;
 
@@ -49,34 +49,11 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 	memcpy(buf, nodes, nodes_len);
 	memcpy(buf + nodes_len, &t, sizeof(time_t));
 
-	if (uatomic_is_true(&sys->use_journal) &&
-	    journal_write_epoch(buf, len, epoch) != SD_RES_SUCCESS) {
-		sd_eprintf("turn off journaling");
-		uatomic_set_false(&sys->use_journal);
-		sync();
-	}
-
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 
-	if (uatomic_is_true(&sys->use_journal))
-		flags &= ~O_DSYNC;
+	ret = atomic_create_and_write(path, buf, len);
 
-	fd = open(path, flags, sd_def_fmode);
-	if (fd < 0) {
-		free(buf);
-		return -1;
-	}
-
-	ret = xwrite(fd, buf, len);
-	if (ret != len) {
-		sd_eprintf("write failed %d, len %d", ret, len);
-		ret = -1;
-		goto err;
-	}
-	ret = 0;
-err:
 	free(buf);
-	close(fd);
 	return ret;
 }
 
@@ -147,27 +124,6 @@ int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
 	return do_epoch_log_read(epoch, nodes, len, timestamp);
 }
 
-static bool check_epoch(uint32_t epoch)
-{
-	char path[PATH_MAX];
-	struct stat st;
-
-	snprintf(path, PATH_MAX, "%s/%08"PRIu32, epoch_path, epoch);
-
-	if (stat(path, &st) < 0)
-		goto err;
-
-	/* Both empty file and ill-sized case are handled */
-	if ((st.st_size - sizeof(time_t)) % sizeof(struct sd_node))
-		goto err;
-
-	return true;
-err:
-	sd_iprintf("remove broken epoch file %s", path);
-	unlink(path);
-	return false;
-}
-
 uint32_t get_latest_epoch(void)
 {
 	DIR *dir;
@@ -187,7 +143,7 @@ uint32_t get_latest_epoch(void)
 		if (strlen(d->d_name) != 8)
 			continue;
 
-		if (check_epoch(e) && e > epoch)
+		if (e > epoch)
 			epoch = e;
 	}
 	closedir(dir);
