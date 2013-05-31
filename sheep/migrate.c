@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <time.h>
+#include <dirent.h>
 
 #include "sheep_priv.h"
 
@@ -73,6 +74,31 @@ static size_t get_file_size(const char *path)
 	return stbuf.st_size;
 }
 
+static void for_each_epoch(int (*func)(uint32_t epoch))
+{
+	DIR *dir;
+	struct dirent *d;
+
+	dir = opendir(epoch_path);
+	if (!dir)
+		panic("failed to open %s: %m", epoch_path);
+
+	while ((d = readdir(dir))) {
+		uint32_t e;
+		char *p;
+		e = strtol(d->d_name, &p, 10);
+		if (d->d_name == p)
+			continue;
+
+		if (strlen(d->d_name) != 8)
+			continue;
+
+		if (func(e) != 0)
+			return;
+	}
+	closedir(dir);
+}
+
 /* copy file from 'fname' to 'fname.suffix' */
 static int backup_file(char *fname, char *suffix)
 {
@@ -126,13 +152,29 @@ out:
 	return ret;
 }
 
+static int backup_epoch(uint32_t epoch)
+{
+	char path[PATH_MAX];
+	char suffix[256];
+	struct timeval tv;
+	struct tm tm;
+
+	gettimeofday(&tv, NULL);
+	localtime_r(&tv.tv_sec, &tm);
+	strftime(suffix, sizeof(suffix), "%Y-%m-%d_%H%M%S", &tm);
+
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+
+	return backup_file(path, suffix);
+}
+
 /* backup config and epoch info */
 static int backup_store(void)
 {
 	char suffix[256];
 	struct timeval tv;
 	struct tm tm;
-	int ret, epoch, le;
+	int ret;
 
 	gettimeofday(&tv, NULL);
 	localtime_r(&tv.tv_sec, &tm);
@@ -142,23 +184,73 @@ static int backup_store(void)
 	if (ret < 0)
 		return ret;
 
-	le = get_latest_epoch();
-	for (epoch = 1; epoch <= le; epoch++) {
-		char path[PATH_MAX];
-		snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	for_each_epoch(backup_epoch);
 
-		ret = backup_file(path, suffix);
-		if (ret < 0)
-			return ret;
+	return 0;
+}
+
+static int update_epoch_from_v0_to_v1(uint32_t epoch)
+{
+	char path[PATH_MAX];
+	struct sd_node_v0 nodes_v0[SD_MAX_NODES];
+	struct sd_node_v1 nodes_v1[SD_MAX_NODES];
+	size_t nr_nodes;
+	time_t *t;
+	int len, fd, ret;
+
+	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
+	fd = open(path, O_RDWR | O_DSYNC);
+	if (fd < 0) {
+		if (errno == ENOENT)
+			return 0;
+
+		sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
+		return -1;
 	}
+
+	ret = xread(fd, nodes_v0, sizeof(nodes_v0));
+	if (ret < 0) {
+		sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
+		close(fd);
+		return ret;
+	}
+
+	nr_nodes = ret / sizeof(nodes_v0[0]);
+	for (int i = 0; i < nr_nodes; i++) {
+		memcpy(&nodes_v1[i].nid, &nodes_v0[i].nid,
+		       sizeof(struct node_id_v1));
+		nodes_v1[i].nr_vnodes = nodes_v0[i].nr_vnodes;
+		nodes_v1[i].zone = nodes_v0[i].zone;
+		nodes_v1[i].space = 0;
+	}
+
+	len = sizeof(nodes_v1[0]) * nr_nodes;
+	ret = xpwrite(fd, nodes_v1, len, 0);
+	if (ret != len) {
+		sd_eprintf("failed to write epoch %"PRIu32" log",
+			   epoch);
+		close(fd);
+		return -1;
+	}
+
+	t = (time_t *)&nodes_v0[nr_nodes];
+
+	ret = xpwrite(fd, t, sizeof(*t), len);
+	if (ret != sizeof(*t)) {
+		sd_eprintf("failed to write time to epoch %"
+			   PRIu32" log", epoch);
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
 
 	return 0;
 }
 
 static int migrate_from_v0_to_v1(void)
 {
-	int fd, ret, epoch, le, i;
-	char path[PATH_MAX];
+	int ret, fd;
 	struct sheepdog_config_v1 config;
 
 	fd = open(config_path, O_RDWR);
@@ -202,61 +294,7 @@ static int migrate_from_v0_to_v1(void)
 		return 0;
 
 	/* upgrade epoch log */
-	le = get_latest_epoch();
-	for (epoch = 1; epoch <= le; epoch++) {
-		struct sd_node_v0 nodes_v0[SD_MAX_NODES];
-		struct sd_node_v1 nodes_v1[SD_MAX_NODES];
-		size_t nr_nodes;
-		time_t *t;
-		int len;
-
-		snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
-		fd = open(path, O_RDWR | O_DSYNC);
-		if (fd < 0) {
-			if (errno == ENOENT)
-				continue;
-
-			sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
-			return -1;
-		}
-
-		ret = xread(fd, nodes_v0, sizeof(nodes_v0));
-		if (ret < 0) {
-			sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
-			close(fd);
-			return ret;
-		}
-
-		nr_nodes = ret / sizeof(nodes_v0[0]);
-		for (i = 0; i < nr_nodes; i++) {
-			memcpy(&nodes_v1[i].nid, &nodes_v0[i].nid,
-			       sizeof(struct node_id_v1));
-			nodes_v1[i].nr_vnodes = nodes_v0[i].nr_vnodes;
-			nodes_v1[i].zone = nodes_v0[i].zone;
-			nodes_v1[i].space = 0;
-		}
-
-		len = sizeof(nodes_v1[0]) * nr_nodes;
-		ret = xpwrite(fd, nodes_v1, len, 0);
-		if (ret != len) {
-			sd_eprintf("failed to write epoch %"PRIu32" log",
-				   epoch);
-			close(fd);
-			return -1;
-		}
-
-		t = (time_t *)&nodes_v0[nr_nodes];
-
-		ret = xpwrite(fd, t, sizeof(*t), len);
-		if (ret != sizeof(*t)) {
-			sd_eprintf("failed to write time to epoch %"
-				   PRIu32" log", epoch);
-			close(fd);
-			return -1;
-		}
-
-		close(fd);
-	}
+	for_each_epoch(update_epoch_from_v0_to_v1);
 
 	return ret;
 }
