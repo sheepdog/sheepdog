@@ -66,7 +66,7 @@ Compiling and installing from source
    an rpm package that can be installed on the local machine.  To use this
    installation method, use the following instructions:
 
-   $ git clone git://sheepdog.git.sf.net/gitroot/sheepdog/sheepdog
+   $ git clone git@github.com:collie/sheepdog.git
    $ cd sheepdog
    $ ./autogen.sh
    $ ./configure
