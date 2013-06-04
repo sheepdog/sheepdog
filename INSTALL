@@ -5,77 +5,68 @@ Sheepdog Installation Guide
 Run-time dependencies
 ---------------------
 * Three or more x86-64 machines.
-* The corosync and corosync lib package.
+* The corosync and corosync lib package or zookeeper equivalent
 * QEMU 0.13 or later
+* liburcu
 
 Compile-time dependencies
 -------------------------
 * GNU Autotools
 * corosync devel package
-* git (when compiling from source repo)
-* svn (when compiling from source repo)
-* nss devel packages (when compiling corosync from source)
+* liburcu devel package
+* git
+* optional:fuse-devel (for sheepfs)
+* optional:libzookeeper-mt-dev (for zookeeper support)
 
-Compiling and installing from source
+Installing from source
 ------------------------------------
 1. Compile or install the Corosync packages:
-
-   Nearly every modern Linux distribution has x86_64 corosync binaries
-   pre-built available via their repositories.  We recommend you use these
-   packages if they are available on your distribution.
+   Nearly every modern Linux distribution has x86_64 corosync binaries pre-built
+   available via their repositories. We recommend you use these packages if they
+   are available on your distribution.
 
    For debian package based systems:
-   $ sudo aptitude install corosync
+   $ sudo aptitude install corosync libcorosync-dev
 
    For RPM package based systems:
    $ sudo yum install corosynclib-devel
 
-   If your distribution doesn't provide the corosync packages, or you prefer
-   to compile from source:
-
-   $ svn co http://svn.fedorahosted.org/svn/corosync/branches/flatiron
-   $ cd flatiron
-   $ ./autogen.sh
-   $ ./configure
-   $ sudo make install
-   $ cd ..
+   For EL6 (RHEL, CentOS, SL, etc), the provided version of corosync is too old
+   and you must install corosync from source.
 
 2. Download, build and install QEMU with Sheepdog support:
 
-   QEMU 0.13 provides built-in support for sheepdog devices.  Some distributions
-   provide pre-built versions of this newer version of QEMU.  If your
-   distribution has an older version of QEMU or you prefer to compile from
+   QEMU 0.13 or later provides built-in support for sheepdog devices.  Some
+   distributions provide pre-built versions of this newer version of QEMU.  If
+   your distribution has an older version of QEMU or you prefer to compile from
    source, retrieve the latest QEMU and compile:
 
-   $ git clone git://git.sv.gnu.org/qemu.git
+   $ git clone git://git.qemu.org/qemu.git
    $ cd qemu
    $ ./configure
    $ sudo make install
-   $ cd ..
 
 3. Download, build and install the Sheepdog server and command line tools:
 
-   $ git clone git://sheepdog.git.sf.net/gitroot/sheepdog/sheepdog
+   $ git clone git://github.com/collie/sheepdog.git
    $ cd sheepdog
    $ ./autogen.sh
    $ ./configure
    $ sudo make install
-   $ cd ..
+
+   If your want to built-in sheepfs and zookeeper support, try:
+      $ ./configure --enable-zookeeper --enable-sheepfs
 
    Please note, sheepdog supports a "make rpm" target which will generate
    an rpm package that can be installed on the local machine.  To use this
    installation method, use the following instructions:
 
-   $ git clone git@github.com:collie/sheepdog.git
-   $ cd sheepdog
-   $ ./autogen.sh
-   $ ./configure
+   At sheepdog source directory
    $ make rpm
    $ sudo rpm -ivh x86_64/sheepdog-0.*
-   $ cd ..
 
-Please read the README file, the sheep(8) or collie(8) man page for further
-usage instructions.
+Please read the README file, the sheep(8), collie(8) or sheepfs(8) man page for
+further usage instructions.
 
 ===============================================================================
 Copyright (C) 2009-2011, Nippon Telegraph and Telephone Corporation.
