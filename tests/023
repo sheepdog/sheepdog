@@ -32,8 +32,8 @@ _wait_for_sheep "10"
 
 echo "comparing cluster info for all sheep.  Should be the same"
 for i in `seq 0 10`; do
-    $COLLIE cluster info > /tmp/cinfo.$i
+    $COLLIE cluster info > $STORE/cinfo.$i
 done
 for i in `seq 1 10`; do
-    diff -u /tmp/cinfo.0 /tmp/cinfo.$i
+    diff -u $STORE/cinfo.0 $STORE/cinfo.$i
 done

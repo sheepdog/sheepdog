@@ -59,10 +59,10 @@ wait
 
 for i in `seq 0 4`; do
     for port in `seq 0 7`; do
-        $COLLIE vdi read test$i -p 700$port | md5sum > /tmp/csum.$port &
+        $COLLIE vdi read test$i -p 700$port | md5sum > $STORE/csum.$port &
     done
     wait
     for port in `seq 1 7`; do
-        diff -u /tmp/csum.0 /tmp/csum.$port
+        diff -u $STORE/csum.0 $STORE/csum.$port
     done
 done

@@ -31,8 +31,8 @@ _wait_for_sheep 10
 
 echo check whether all nodes have the same cluster info
 for i in `seq 0 9`; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info > /tmp/cinfo.$i
+    $COLLIE cluster info -p 700$i | _filter_cluster_info > $STORE/cinfo.$i
 done
 for i in `seq 1 9`; do
-    diff -u /tmp/cinfo.0 /tmp/cinfo.$i
+    diff -u $STORE/cinfo.0 $STORE/cinfo.$i
 done

@@ -28,9 +28,9 @@ $COLLIE vdi create test 4M
 _random | $COLLIE vdi write test
 
 for port in `seq 0 2`; do
-    $COLLIE vdi read test -p 700$port | md5sum > /tmp/csum.$port
+    $COLLIE vdi read test -p 700$port | md5sum > $STORE/csum.$port
 done
 
 for port in `seq 1 2`; do
-    diff -u /tmp/csum.0 /tmp/csum.$port
+    diff -u $STORE/csum.0 $STORE/csum.$port
 done

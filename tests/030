@@ -20,7 +20,8 @@ for i in `seq 0 3`; do
 done
 _wait_for_sheep 4
 
-TMPDIR=`mktemp -d`
+TMPDIR="$STORE/tmp"
+rm -rf $TMPDIR
 
 $COLLIE cluster format -c 3
 
@@ -29,8 +30,8 @@ $COLLIE vdi create test2 10M
 
 _random | $COLLIE vdi write test1
 _random | $COLLIE vdi write test2
-$COLLIE vdi read test1 | md5sum > /tmp/csum.11.org
-$COLLIE vdi read test2 | md5sum > /tmp/csum.21.org
+$COLLIE vdi read test1 | md5sum > $STORE/csum.11.org
+$COLLIE vdi read test2 | md5sum > $STORE/csum.21.org
 $COLLIE vdi snapshot test1
 $COLLIE vdi snapshot test2
 $COLLIE cluster snapshot save s1 $TMPDIR
@@ -38,8 +39,8 @@ $COLLIE cluster snapshot list $TMPDIR | _filter_date
 
 _random | $COLLIE vdi write test1
 _random | $COLLIE vdi write test2
-$COLLIE vdi read test1 | md5sum > /tmp/csum.12.org
-$COLLIE vdi read test2 | md5sum > /tmp/csum.22.org
+$COLLIE vdi read test1 | md5sum > $STORE/csum.12.org
+$COLLIE vdi read test2 | md5sum > $STORE/csum.22.org
 $COLLIE vdi snapshot test1
 $COLLIE vdi snapshot test2
 $COLLIE cluster snapshot save s2 $TMPDIR
@@ -57,10 +58,10 @@ $COLLIE cluster format -c 3
 $COLLIE cluster snapshot load s1 $TMPDIR
 $COLLIE vdi list | _filter_short_date
 
-$COLLIE vdi read test1 | md5sum > /tmp/csum.11.new
-$COLLIE vdi read test2 | md5sum > /tmp/csum.21.new
-diff -u /tmp/csum.11.org /tmp/csum.11.new
-diff -u /tmp/csum.21.org /tmp/csum.21.new
+$COLLIE vdi read test1 | md5sum > $STORE/csum.11.new
+$COLLIE vdi read test2 | md5sum > $STORE/csum.21.new
+diff -u $STORE/csum.11.org $STORE/csum.11.new
+diff -u $STORE/csum.21.org $STORE/csum.21.new
 
 _cleanup
 for i in `seq 0 3`; do
@@ -80,19 +81,17 @@ _wait_for_sheep 4
 $COLLIE cluster snapshot load 2 $TMPDIR
 $COLLIE vdi list | _filter_short_date
 
-$COLLIE vdi read -s 2 test1 | md5sum > /tmp/csum.12.new
-$COLLIE vdi read -s 2 test2 | md5sum > /tmp/csum.22.new
-diff -u /tmp/csum.12.org /tmp/csum.12.new
-diff -u /tmp/csum.22.org /tmp/csum.22.new
+$COLLIE vdi read -s 2 test1 | md5sum > $STORE/csum.12.new
+$COLLIE vdi read -s 2 test2 | md5sum > $STORE/csum.22.new
+diff -u $STORE/csum.12.org $STORE/csum.12.new
+diff -u $STORE/csum.22.org $STORE/csum.22.new
 
-$COLLIE vdi read test1 | md5sum > /tmp/csum.12.new
-$COLLIE vdi read test2 | md5sum > /tmp/csum.22.new
-diff -u /tmp/csum.12.org /tmp/csum.12.new
-diff -u /tmp/csum.22.org /tmp/csum.22.new
+$COLLIE vdi read test1 | md5sum > $STORE/csum.12.new
+$COLLIE vdi read test2 | md5sum > $STORE/csum.22.new
+diff -u $STORE/csum.12.org $STORE/csum.12.new
+diff -u $STORE/csum.22.org $STORE/csum.22.new
 
-$COLLIE vdi read -s 1 test1 | md5sum > /tmp/csum.11.new
-$COLLIE vdi read -s 1 test2 | md5sum > /tmp/csum.21.new
-diff -u /tmp/csum.11.org /tmp/csum.11.new
-diff -u /tmp/csum.21.org /tmp/csum.21.new
-
-rm -rf $TMPDIR
+$COLLIE vdi read -s 1 test1 | md5sum > $STORE/csum.11.new
+$COLLIE vdi read -s 1 test2 | md5sum > $STORE/csum.21.new
+diff -u $STORE/csum.11.org $STORE/csum.11.new
+diff -u $STORE/csum.21.org $STORE/csum.21.new
