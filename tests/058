@@ -21,10 +21,10 @@ _wait_for_sheep 3
 $COLLIE cluster format
 sleep 1
 $COLLIE vdi create test 100M -P
-$COLLIE node info | _filter_node_info
+_node_info
 qemu-io -c "discard 0 100m" sheepdog:test | _filter_qemu_io
 $COLLIE vdi check test
 for i in `seq 0 24`; do
 	$COLLIE vdi object test -i $i;
 done
-$COLLIE node info | _filter_node_info
+_node_info
