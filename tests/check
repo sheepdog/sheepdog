@@ -34,6 +34,8 @@ timestamp=${TIMESTAMP:=false}
 # generic initialization
 iam=check
 
+cd $(readlink -f $(dirname $0))
+
 # we need common.config
 if ! . ./common.config
 then
