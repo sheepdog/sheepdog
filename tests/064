@@ -30,12 +30,12 @@ $COLLIE cluster format -c 2
 sleep 1
 
 $COLLIE vdi create test 100M -P
-$COLLIE node info
+_node_info
 $COLLIE node list
 
 $COLLIE node md plug $STORE/3
 _wait_for_sheep_recovery 0
-$COLLIE node info
+_node_info
 $COLLIE node list
 
 $COLLIE cluster reweight
@@ -43,11 +43,11 @@ $COLLIE cluster reweight
 # restart sheep1 while reweighting
 _kill_sheep 2
 _wait_for_sheep_recovery 0
-$COLLIE node info
+_node_info
 $COLLIE node list
 _start_sheep 2
 
 _wait_for_sheep_recovery 0
-$COLLIE node info
+_node_info
 $COLLIE node list
 $COLLIE cluster info | _filter_cluster_info

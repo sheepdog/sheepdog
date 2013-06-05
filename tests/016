@@ -45,4 +45,4 @@ echo there should be no vdi
 $COLLIE vdi list
 
 echo there should be no object
-$COLLIE node info | _filter_node_info
+_node_info

@@ -383,6 +383,56 @@ _cleanup_devices()
     done
 }
 
+_list_data_obj()
+{
+    find $STORE/$1 | grep -E /0[0-9a-f]\{15\} | grep -v .stale
+}
+
+_list_vdi_obj()
+{
+    find $STORE/$1 | grep -E /8[0-9a-f]\{15\} | grep -v .stale
+}
+
+_list_vmstate_obj()
+{
+    find $STORE/$1 | grep -E /4[0-9a-f]\{15\} | grep -v .stale
+}
+
+_list_attr_obj()
+{
+    find $STORE/$1 | grep -E /2[0-9a-f]\{15\} | grep -v .stale
+}
+
+_list_stale_obj()
+{
+    find $STORE/$1 | grep -E /[0-9a-f]\{16\} | grep .stale
+}
+
+_stat_store()
+{
+    local pattern=$1
+    local idx
+    echo -e "STORE\tDATA\tVDI\tVMSTATE\tATTR\tSTALE"
+    for idx in `ls -d $STORE/$pattern | sed s#$STORE/##g`; do
+	local data_obj=$(_list_data_obj $idx | wc -l)
+	local vdi_obj=$(_list_vdi_obj $idx | wc -l)
+	local vmstate_obj=$(_list_vmstate_obj $idx | wc -l)
+	local attr_obj=$(_list_attr_obj $idx | wc -l)
+	local stale_obj=$(_list_stale_obj $idx | wc -l)
+	echo -e "$idx\t$data_obj\t$vdi_obj\t$vmstate_obj\t$attr_obj\t$stale_obj"
+    done
+}
+
+_node_info()
+{
+    _stat_store '?'
+}
+
+_md_info()
+{
+    _stat_store '?/d?'
+}
+
 _random()
 {
 	openssl enc -aes-128-cbc -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
