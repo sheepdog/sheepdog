@@ -29,19 +29,19 @@ Total	576 MB	208 MB	368 MB	 36%
 
 Total virtual image size	100 MB
 M   Id   Host:Port         V-Nodes       Zone
--    0   127.0.0.1:7000      	64          0
--    1   127.0.0.1:7001      	64          1
+-    0   127.0.0.1:7000      	85          0
+-    1   127.0.0.1:7001      	43          1
 Id	Size	Used	Avail	Use%
- 0	384 MB	72 MB	312 MB	 18%
- 1	192 MB	52 MB	140 MB	 27%
- 2	385 MB	84 MB	301 MB	 21%
+ 0	384 MB	88 MB	296 MB	 22%
+ 1	192 MB	44 MB	148 MB	 22%
+ 2	385 MB	76 MB	309 MB	 19%
 Total	961 MB	208 MB	753 MB	 21%
 
 Total virtual image size	100 MB
 M   Id   Host:Port         V-Nodes       Zone
--    0   127.0.0.1:7000      	48          0
--    1   127.0.0.1:7001      	48          1
--    2   127.0.0.1:7002      	96          2
+-    0   127.0.0.1:7000      	77          0
+-    1   127.0.0.1:7001      	38          1
+-    2   127.0.0.1:7002      	77          2
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
