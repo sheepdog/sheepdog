@@ -32,7 +32,7 @@ interrupt=true
 timestamp=${TIMESTAMP:=false}
 
 # generic initialization
-iam=check
+export iam=check
 
 cd $(readlink -f $(dirname $0))
 
@@ -66,8 +66,6 @@ expunge=true
 have_test_arg=false
 randomize=false
 valgrind=false
-
-export md=false
 
 rm -f $tmp.list $tmp.tmp $tmp.sed
 
@@ -173,7 +171,7 @@ testlist options
 	    ;;
 
 	-md)
-	    md=true
+	    MD=true
 	    xpand=false
 	    ;;
 
