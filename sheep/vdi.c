@@ -492,6 +492,20 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid)
 	return ret;
 }
 
+static void vdi_flush(uint32_t vid)
+{
+	struct sd_req hdr;
+	int ret;
+
+	sd_init_req(&hdr, SD_OP_FLUSH_VDI);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
+
+	ret = exec_local_req(&hdr, NULL);
+	if (ret != SD_RES_SUCCESS)
+		sd_eprintf("fail to flush vdi %" PRIx32 ", %s", vid,
+			   sd_strerror(ret));
+}
+
 /*
  * There are 3 create operation in SD:
  * 1. fresh create (expect NO_VDI returned from vdi_lookup)
@@ -512,6 +526,8 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 	case SD_RES_SUCCESS:
 		if (!iocb->create_snapshot)
 			return SD_RES_VDI_EXIST;
+		if (sys->enable_object_cache)
+			vdi_flush(iocb->base_vid);
 		break;
 	case SD_RES_NO_VDI:
 		if (iocb->create_snapshot)
