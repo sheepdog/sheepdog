@@ -21,7 +21,6 @@ M   Id   Host:Port         V-Nodes       Zone
 STORE	DATA	VDI	VMSTATE	ATTR	STALE
 0	11	1	0	0	0
 1	25	1	0	0	0
-2	18	0	0	0	3
 3	14	0	0	0	0
 M   Id   Host:Port         V-Nodes       Zone
 -    0   127.0.0.1:7000      	85          0
