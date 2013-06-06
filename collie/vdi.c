@@ -1629,32 +1629,6 @@ out:
 	return ret;
 }
 
-static int vdi_flush(int argc, char **argv)
-{
-	const char *vdiname = argv[optind++];
-	struct sd_req hdr;
-	uint32_t vid;
-	int ret = EXIT_SUCCESS;
-
-	ret = find_vdi_name(vdiname, 0, "", &vid, 0);
-	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	sd_init_req(&hdr, SD_OP_FLUSH_VDI);
-	hdr.obj.oid = vid_to_vdi_oid(vid);
-
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
-		return EXIT_FAILURE;
-	}
-out:
-	return ret;
-}
-
 /* vdi backup format */
 
 #define VDI_BACKUP_FORMAT_VERSION 1
@@ -1994,7 +1968,7 @@ static int vdi_cache_flush(int argc, char **argv)
 		goto out;
 	}
 
-	sd_init_req(&hdr, SD_OP_FLUSH_DEL_CACHE);
+	sd_init_req(&hdr, SD_OP_FLUSH_VDI);
 	hdr.obj.oid = vid_to_vdi_oid(vid);
 
 	ret = send_light_req(&hdr, sdhost, sdport);
@@ -2092,9 +2066,6 @@ static struct subcommand vdi_cmd[] = {
 	{"write", "<vdiname> [<offset> [<len>]]", "apwh", "write data to an image",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_write, vdi_options},
-	{"flush", "<vdiname>", "aph", "flush data to cluster",
-	 NULL, SUBCMD_FLAG_NEED_ARG,
-	 vdi_flush, vdi_options},
 	{"backup", "<vdiname> <backup>", "sFaph", "create an incremental backup between two snapshots",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_ARG,
 	 vdi_backup, vdi_options},

@@ -27,7 +27,7 @@ $COLLIE vdi create test 4M
 
 _random | $COLLIE vdi write -w test
 
-$COLLIE vdi flush test
+$COLLIE vdi cache flush test
 
 for port in `seq 0 2`; do
     $COLLIE vdi read test -p 700$port | md5sum > $STORE/csum.$port
