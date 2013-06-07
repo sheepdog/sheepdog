@@ -261,16 +261,14 @@ static bool zk_queue_peek(void)
 }
 
 /* return true if there is a node with 'id' in the queue. */
-static bool zk_find_seq_node(uint64_t id)
+static bool zk_find_seq_node(uint64_t id, char *seq_path, int seq_path_len)
 {
 	int rc, len;
 
 	for (int seq = queue_pos; ; seq++) {
-		char seq_path[MAX_NODE_STR_LEN];
 		struct zk_event ev;
 
-		snprintf(seq_path, sizeof(seq_path), QUEUE_ZNODE"/%010"PRId32,
-			 seq);
+		snprintf(seq_path, seq_path_len, QUEUE_ZNODE"/%010"PRId32, seq);
 		len = offsetof(typeof(ev), id) + sizeof(ev.id);
 		rc = zk_get_data(seq_path, &ev, &len);
 		switch (rc) {
@@ -307,7 +305,7 @@ again:
 		break;
 	case ZOPERATIONTIMEOUT:
 	case ZCONNECTIONLOSS:
-		if (!zk_find_seq_node(ev->id))
+		if (!zk_find_seq_node(ev->id, buf, sizeof(buf)))
 			/* retry if seq_node was not created */
 			goto again;
 		break;
