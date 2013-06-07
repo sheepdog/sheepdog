@@ -112,9 +112,14 @@ int atomic_create_and_write(const char *path, char *buf, size_t len);
 /* a type safe version of bsearch() */
 #define xbsearch(key, base, nmemb, compar)				\
 ({									\
-	(void) (key == base);						\
-	assert(compar(key, key) == 0);					\
-	bsearch(key, base, nmemb, sizeof(*(base)), (comparison_fn_t)compar); \
+	typeof(&(base)[0]) __ret = NULL;				\
+	if (nmemb > 0) {						\
+		assert(compar(key, key) == 0);				\
+		assert(compar(base, base) == 0);			\
+		__ret = bsearch(key, base, nmemb, sizeof(*(base)),	\
+				(comparison_fn_t)compar);		\
+	}								\
+	__ret;								\
 })
 
 #ifdef assert
