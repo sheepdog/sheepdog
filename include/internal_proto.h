@@ -85,8 +85,8 @@
 #define SD_FLAG_CMD_DEL      0x0400
 
 /* internal error return values, must be above 0x80 */
-#define SD_RES_OLD_NODE_VER  0x81 /* Remote node has an old epoch */
-#define SD_RES_NEW_NODE_VER  0x82 /* Remote node has a new epoch */
+#define SD_RES_OLD_NODE_VER  0x81 /* Request has an old epoch */
+#define SD_RES_NEW_NODE_VER  0x82 /* Request has a new epoch */
 #define SD_RES_NOT_FORMATTED 0x83 /* Sheepdog is not formatted yet */
 #define SD_RES_INVALID_CTIME 0x84 /* Creation time of sheepdog is different */
 #define SD_RES_INVALID_EPOCH 0x85 /* Invalid epoch */

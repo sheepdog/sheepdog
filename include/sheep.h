@@ -206,8 +206,8 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_READONLY] = "Object is read-only",
 
 		/* from internal_proto.h */
-		[SD_RES_OLD_NODE_VER] = "Remote node has an old epoch",
-		[SD_RES_NEW_NODE_VER] = "Remote node has a new epoch",
+		[SD_RES_OLD_NODE_VER] = "Request has an old epoch",
+		[SD_RES_NEW_NODE_VER] = "Request has a new epoch",
 		[SD_RES_NOT_FORMATTED] = "Cluster has not been formatted",
 		[SD_RES_INVALID_CTIME] = "Creation times differ",
 		[SD_RES_INVALID_EPOCH] = "Invalid epoch",
