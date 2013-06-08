@@ -28,6 +28,24 @@
 #include "farm.h"
 #include "util.h"
 
+static void get_sha1(unsigned char *buf, unsigned len, unsigned char *sha1)
+{
+	struct sha1_ctx c;
+	uint64_t offset = 0;
+	uint32_t length = len;
+	void *tmp = valloc(length);
+
+	memcpy(tmp, buf, len);
+	trim_zero_sectors(tmp, &offset, &length);
+
+	sha1_init(&c);
+	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));
+	sha1_update(&c, (uint8_t *)&length, sizeof(length));
+	sha1_update(&c, tmp, length);
+	sha1_final(&c, sha1);
+	free(tmp);
+}
+
 static void fill_sha1_path(char *pathbuf, const unsigned char *sha1)
 {
 	int i;
@@ -135,12 +153,8 @@ err_open:
 int sha1_file_write(unsigned char *buf, size_t len, unsigned char *outsha1)
 {
 	unsigned char sha1[SHA1_LEN];
-	struct sha1_ctx c;
 
-	sha1_init(&c);
-	sha1_update(&c, buf, len);
-	sha1_final(&c, sha1);
-
+	get_sha1(buf, len, sha1);
 	if (sha1_buffer_write(sha1, buf, len) < 0)
 		return -1;
 	if (outsha1)
@@ -152,12 +166,8 @@ static int verify_sha1_file(const unsigned char *sha1,
 			    void *buf, unsigned long len)
 {
 	unsigned char tmp[SHA1_LEN];
-	struct sha1_ctx c;
 
-	sha1_init(&c);
-	sha1_update(&c, buf, len);
-	sha1_final(&c, tmp);
-
+	get_sha1(buf, len, tmp);
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
 		fprintf(stderr, "failed, %s != %s\n", sha1_to_hex(sha1),
 			   sha1_to_hex(tmp));
