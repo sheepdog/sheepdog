@@ -28,72 +28,49 @@
 #include "util.h"
 #include "sheepdog_proto.h"
 
-int trunk_file_write(unsigned char *trunk_sha1, struct strbuf *trunk_entries)
+int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
+		     unsigned char *trunk_sha1)
 {
-	struct strbuf buf;
-	struct sha1_file_hdr hdr = {};
-	uint64_t data_size, object_nr = 0;
-	int ret = -1;
-
-	/* Init trunk hdr */
-	object_nr = object_tree_size();
-	data_size = sizeof(struct trunk_entry) * object_nr;
-	hdr.size = data_size;
-	hdr.priv = object_nr;
-	memcpy(hdr.tag, TAG_TRUNK, TAG_LEN);
-	strbuf_init(&buf, sizeof(hdr) + data_size);
-	strbuf_add(&buf, &hdr, sizeof(hdr));
-
-	/* trunk entries */
-	strbuf_addbuf(&buf, trunk_entries);
-
-	/* write to sha1 file */
-	if (sha1_file_write((void *)buf.buf, buf.len, trunk_sha1) < 0)
-		goto out;
-
-	ret = 0;
-out:
-	strbuf_release(&buf);
-	return ret;
+	size_t size = sizeof(struct trunk_entry) * nr_entries;
+	return sha1_file_write((void *)entries, size, trunk_sha1);
 }
 
-void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
+struct trunk_file *trunk_file_read(unsigned char *sha1)
 {
-	void *buffer;
+	size_t size;
+	struct trunk_file *trunk = NULL;
+	void *buf = sha1_file_read(sha1, &size);
 
-	buffer = sha1_file_read(sha1, outhdr);
-	if (!buffer)
+	if (!buf)
 		return NULL;
-	if (strcmp(outhdr->tag, TAG_TRUNK) != 0) {
-		free(buffer);
-		return NULL;
-	}
+	trunk = xmalloc(sizeof(struct trunk_file));
+	trunk->nr_entries = size / sizeof(struct trunk_entry);
+	trunk->entries = (struct trunk_entry *)buf;
 
-	return buffer;
+	return trunk;
 }
 
 int for_each_entry_in_trunk(unsigned char *trunk_sha1,
 			    int (*func)(struct trunk_entry *entry, void *data),
 			    void *data)
 {
-	struct trunk_entry *trunk_entry, *trunk_free = NULL;
-	struct sha1_file_hdr trunk_hdr;
-	uint64_t nr_trunks;
+	struct trunk_file *trunk;
+	struct trunk_entry *entry;
 	int ret = -1;
 
-	trunk_free = trunk_entry = trunk_file_read(trunk_sha1, &trunk_hdr);
-
-	if (!trunk_entry)
+	trunk = trunk_file_read(trunk_sha1);
+	if (!trunk)
 		goto out;
 
-	nr_trunks = trunk_hdr.priv;
-	for (uint64_t i = 0; i < nr_trunks; i++, trunk_entry++) {
-		if (func(trunk_entry, data) < 0)
+	entry = trunk->entries;
+	for (uint64_t i = 0; i < trunk->nr_entries; i++, entry++) {
+		if (func(entry, data) < 0)
 			goto out;
 	}
 
 	ret = 0;
 out:
-	free(trunk_free);
+	free(trunk->entries);
+	free(trunk);
 	return ret;
 }

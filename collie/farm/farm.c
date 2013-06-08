@@ -153,8 +153,7 @@ static int get_trunk_sha1(uint32_t idx, const char *tag, unsigned char *outsha1)
 {
 	int nr_logs = -1, ret = -1;
 	struct snap_log *log_buf, *log_free = NULL;
-	void *snap_buf = NULL;
-	struct sha1_file_hdr hdr;
+	struct snap_file *snap_buf = NULL;
 
 	log_free = log_buf = snap_log_read(&nr_logs);
 	if (nr_logs < 0)
@@ -163,10 +162,10 @@ static int get_trunk_sha1(uint32_t idx, const char *tag, unsigned char *outsha1)
 	for (int i = 0; i < nr_logs; i++, log_buf++) {
 		if (log_buf->idx != idx && strcmp(log_buf->tag, tag))
 			continue;
-		snap_buf = snap_file_read(log_buf->sha1, &hdr);
+		snap_buf = snap_file_read(log_buf->sha1);
 		if (!snap_buf)
 			goto out;
-		memcpy(outsha1, snap_buf, SHA1_LEN);
+		memcpy(outsha1, snap_buf->trunk_sha1, SHA1_LEN);
 		ret = 0;
 		goto out;
 	}
@@ -220,33 +219,27 @@ bool farm_contain_snapshot(uint32_t idx, const char *tag)
 
 static void do_save_object(struct work *work)
 {
-	void *sha1_buf, *data_buf;
-	size_t sha1_size, data_size;
+	void *buf;
+	size_t size;
 	struct snapshot_work *sw;
-	struct sha1_file_hdr *hdr;
 
 	if (uatomic_is_true(&work_error))
 		return;
 
 	sw = container_of(work, struct snapshot_work, work);
-	data_size = get_objsize(sw->entry.oid);
-	sha1_size = data_size + sizeof(struct sha1_file_hdr);
-	hdr = sha1_buf = xmalloc(sha1_size);
-	data_buf = (char *)sha1_buf + sizeof(struct sha1_file_hdr);
+	size = get_objsize(sw->entry.oid);
+	buf = xmalloc(size);
 
-	if (sd_read_object(sw->entry.oid, data_buf, data_size, 0, true) < 0)
+	if (sd_read_object(sw->entry.oid, buf, size, 0, true) < 0)
 		goto error;
 
-	memcpy(hdr->tag, TAG_DATA, TAG_LEN);
-	hdr->size = data_size;
-
-	if (sha1_file_write(sha1_buf, sha1_size, sw->entry.sha1) < 0)
+	if (sha1_file_write(buf, size, sw->entry.sha1) < 0)
 		goto error;
 
-	free(sha1_buf);
+	free(buf);
 	return;
 error:
-	free(sha1_buf);
+	free(buf);
 	fprintf(stderr, "Fail to save object, oid %"PRIu64"\n",
 		sw->entry.oid);
 	uatomic_set_true(&work_error);
@@ -284,9 +277,10 @@ int farm_save_snapshot(const char *tag)
 {
 	unsigned char snap_sha1[SHA1_LEN];
 	unsigned char trunk_sha1[SHA1_LEN];
-	struct strbuf trunk_entries = STRBUF_INIT;
+	struct strbuf trunk_buf;
 	void *snap_log = NULL;
 	int log_nr, idx, ret = -1;
+	uint64_t nr_objects = object_tree_size();
 
 	snap_log = snap_log_read(&log_nr);
 	if (!snap_log)
@@ -294,16 +288,19 @@ int farm_save_snapshot(const char *tag)
 
 	idx = log_nr + 1;
 
+	strbuf_init(&trunk_buf, sizeof(struct trunk_entry) * nr_objects);
+
 	wq = create_work_queue("save snapshot", WQ_ORDERED);
 	if (for_each_object_in_tree(queue_save_snapshot_work,
-				    (void *)&trunk_entries) < 0)
+				    (void *)&trunk_buf) < 0)
 		goto out;
 
 	work_queue_wait(wq);
 	if (uatomic_is_true(&work_error))
 		goto out;
 
-	if (trunk_file_write(trunk_sha1, &trunk_entries) < 0)
+	if (trunk_file_write(nr_objects, (struct trunk_entry *)trunk_buf.buf,
+			     trunk_sha1) < 0)
 		goto out;
 
 	if (snap_file_write(idx, trunk_sha1, snap_sha1) < 0)
@@ -314,15 +311,15 @@ int farm_save_snapshot(const char *tag)
 
 	ret = 0;
 out:
+	strbuf_release(&trunk_buf);
 	free(snap_log);
-	strbuf_release(&trunk_entries);
 	return ret;
 }
 
 static void do_load_object(struct work *work)
 {
 	void *buffer = NULL;
-	struct sha1_file_hdr hdr;
+	size_t size;
 	struct snapshot_work *sw;
 
 	if (uatomic_is_true(&work_error))
@@ -330,12 +327,12 @@ static void do_load_object(struct work *work)
 
 	sw = container_of(work, struct snapshot_work, work);
 
-	buffer = sha1_file_read(sw->entry.sha1, &hdr);
+	buffer = sha1_file_read(sw->entry.sha1, &size);
 
 	if (!buffer)
 		goto error;
 
-	if (sd_write_object(sw->entry.oid, 0, buffer, hdr.size, 0, 0,
+	if (sd_write_object(sw->entry.oid, 0, buffer, size, 0, 0,
 			    sw->entry.nr_copies, true, true) != 0)
 		goto error;
 

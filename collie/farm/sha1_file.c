@@ -132,7 +132,7 @@ err_open:
 	return ret;
 }
 
-int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *outsha1)
+int sha1_file_write(unsigned char *buf, size_t len, unsigned char *outsha1)
 {
 	unsigned char sha1[SHA1_LEN];
 	struct sha1_ctx c;
@@ -146,50 +146,6 @@ int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *outsha1)
 	if (outsha1)
 		memcpy(outsha1, sha1, SHA1_LEN);
 	return 0;
-}
-
-static void *map_sha1_file(const unsigned char *sha1, unsigned long *size)
-{
-	char *filename = sha1_to_path(sha1);
-	int fd = open(filename, O_RDONLY);
-	struct stat st;
-	void *map;
-
-	if (fd < 0) {
-		perror(filename);
-		return NULL;
-	}
-	if (fstat(fd, &st) < 0) {
-		fprintf(stderr, "%m\n");
-		close(fd);
-		return NULL;
-	}
-	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-	close(fd);
-	if (map == MAP_FAILED) {
-		fprintf(stderr, "%m\n");
-		return NULL;
-	}
-	*size = st.st_size;
-	return map;
-}
-
-static void *unpack_sha1_file(void *map, unsigned long mapsize,
-			      struct sha1_file_hdr *hdr)
-{
-	int hdr_len;
-	char *buf;
-
-	memcpy(hdr, map, sizeof(*hdr));
-	hdr_len = sizeof(*hdr);
-	buf = valloc(hdr->size);
-	if (!buf) {
-		fprintf(stderr, "%m\n");
-		return NULL;
-	}
-
-	memcpy(buf, (char *)map + hdr_len, mapsize - hdr_len);
-	return buf;
 }
 
 static int verify_sha1_file(const unsigned char *sha1,
@@ -210,20 +166,42 @@ static int verify_sha1_file(const unsigned char *sha1,
 	return 0;
 }
 
-void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *hdr)
+void *sha1_file_read(const unsigned char *sha1, size_t *size)
 {
-	unsigned long mapsize;
-	void *map, *buf;
+	char *filename = sha1_to_path(sha1);
+	int fd = open(filename, O_RDONLY);
+	struct stat st;
+	void *buf = NULL;
 
-	map = map_sha1_file(sha1, &mapsize);
-	if (map) {
-		if (verify_sha1_file(sha1, map, mapsize) < 0)
-			return NULL;
-		buf = unpack_sha1_file(map, mapsize, hdr);
-		munmap(map, mapsize);
-		return buf;
+	if (fd < 0) {
+		perror(filename);
+		return NULL;
 	}
-	return NULL;
+	if (fstat(fd, &st) < 0) {
+		fprintf(stderr, "%m\n");
+		goto out;
+	}
+
+	buf = xmalloc(st.st_size);
+	if (!buf)
+		goto out;
+
+	if (xread(fd, buf, st.st_size) != st.st_size) {
+		free(buf);
+		buf = NULL;
+		goto out;
+	}
+
+	if (verify_sha1_file(sha1, buf, st.st_size) < 0) {
+		free(buf);
+		buf = NULL;
+		goto out;
+	}
+
+	*size = st.st_size;
+out:
+	close(fd);
+	return buf;
 }
 
 int sha1_file_try_delete(const unsigned char *sha1)

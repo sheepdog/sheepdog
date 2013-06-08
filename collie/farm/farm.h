@@ -20,22 +20,20 @@
 #include "strbuf.h"
 #include "sha1.h"
 
-#define TAG_LEN         6
-#define TAG_DATA        "data\0\0"
-#define TAG_TRUNK       "trunk\0"
-#define TAG_SNAP        "snap\0\0"
-
 struct trunk_entry {
 	uint64_t oid;
 	int nr_copies;
 	unsigned char sha1[SHA1_LEN];
 };
 
-struct sha1_file_hdr {
-	char tag[TAG_LEN];
-	uint64_t size;
-	uint64_t priv;
-	uint64_t reserved;
+struct trunk_file {
+	uint64_t nr_entries;
+	struct trunk_entry *entries;
+};
+
+struct snap_file {
+	int idx;
+	unsigned char trunk_sha1[SHA1_LEN];
 };
 
 /* farm.c */
@@ -47,23 +45,24 @@ char *get_object_directory(void);
 
 /* trunk.c */
 int trunk_init(void);
-int trunk_file_write(unsigned char *trunk_sha1, struct strbuf *trunk_entries);
-void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
+int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
+		     unsigned char *trunk_sha1);
+struct trunk_file *trunk_file_read(unsigned char *sha1);
 int for_each_entry_in_trunk(unsigned char *trunk_sha1,
 			    int (*func)(struct trunk_entry *entry, void *data),
 			    void *data);
 
 /* snap.c */
 int snap_init(const char *path);
-void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr);
-int snap_file_write(uint32_t idx, unsigned char *trunksha1,
+struct snap_file *snap_file_read(unsigned char *sha1);
+int snap_file_write(uint32_t idx, unsigned char *trunk_sha1,
 		    unsigned char *outsha1);
 void *snap_log_read(int *out_nr);
 int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1);
 
 /* sha1_file.c */
-int sha1_file_write(unsigned char *buf, unsigned len, unsigned char *);
-void *sha1_file_read(const unsigned char *sha1, struct sha1_file_hdr *);
+int sha1_file_write(unsigned char *buf, size_t len, unsigned char *sha1);
+void *sha1_file_read(const unsigned char *sha1, size_t *size);
 int get_sha1_hex(const char *hex, unsigned char *sha1);
 int sha1_file_try_delete(const unsigned char *sha1);
 

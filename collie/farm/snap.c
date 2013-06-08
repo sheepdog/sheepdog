@@ -109,40 +109,19 @@ out:
 	return buffer;
 }
 
-void *snap_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
+struct snap_file *snap_file_read(unsigned char *sha1)
 {
-	void *buffer = NULL;
-
-	buffer = sha1_file_read(sha1, outhdr);
-	if (!buffer)
-		return NULL;
-	if (strcmp(outhdr->tag, TAG_SNAP) != 0) {
-		free(buffer);
-		return NULL;
-	}
-
-	return buffer;
+	size_t size;
+	return (struct snap_file *)sha1_file_read(sha1, &size);
 }
 
-int snap_file_write(uint32_t idx, unsigned char *trunksha1,
+int snap_file_write(uint32_t idx, unsigned char *trunk_sha1,
 		    unsigned char *outsha1)
 {
-	int ret = -1;
-	struct sha1_file_hdr hdr = {};
-	struct strbuf buf = STRBUF_INIT;
+	struct snap_file snap;
+	snap.idx = idx;
+	memcpy(snap.trunk_sha1, trunk_sha1, SHA1_LEN);
 
-	memcpy(hdr.tag, TAG_SNAP, TAG_LEN);
-	hdr.size = SHA1_LEN;
-	hdr.priv = idx;
-	hdr.reserved = 0;
-
-	strbuf_add(&buf, &hdr, sizeof(hdr));
-	strbuf_add(&buf, trunksha1, SHA1_LEN);
-	if (sha1_file_write((void *)buf.buf, buf.len, outsha1) < 0)
-		goto out;
-
-	ret = 0;
-out:
-	strbuf_release(&buf);
-	return ret;
+	return sha1_file_write((void *)&snap, sizeof(struct snap_file),
+			       outsha1);
 }
