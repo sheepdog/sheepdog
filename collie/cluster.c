@@ -444,7 +444,8 @@ static int cluster_recover(int argc, char **argv)
 /* Subcommand list of snapshot */
 static struct subcommand cluster_snapshot_cmd[] = {
 	{"save", NULL, "h", "save snapshot to localpath",
-	 NULL, SUBCMD_FLAG_NEED_ARG, save_snapshot, NULL},
+	 NULL, SUBCMD_FLAG_NEED_ARG|SUBCMD_FLAG_NEED_NODELIST,
+	 save_snapshot, NULL},
 	{"list", NULL, "h", "list snapshot of localpath",
 	 NULL, SUBCMD_FLAG_NEED_ARG, list_snapshot, NULL},
 	{"load", NULL, "h", "list snapshot of localpath",

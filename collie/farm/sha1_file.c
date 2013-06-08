@@ -175,7 +175,7 @@ static int verify_sha1_file(const unsigned char *sha1,
 	get_sha1(buf, len, tmp);
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
 		fprintf(stderr, "failed, %s != %s\n", sha1_to_hex(sha1),
-			   sha1_to_hex(tmp));
+			sha1_to_hex(tmp));
 		return -1;
 	}
 	return 0;
