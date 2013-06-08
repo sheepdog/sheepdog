@@ -35,7 +35,7 @@ endif
 collie_LDADD		= ../lib/libsheepdog.a -lpthread
 collie_DEPENDENCIES	= ../lib/libsheepdog.a
 
-noinst_HEADERS		= treeview.h collie.h
+noinst_HEADERS		= treeview.h collie.h farm/farm.h
 
 EXTRA_DIST		=
 
