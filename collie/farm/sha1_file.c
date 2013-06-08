@@ -155,7 +155,7 @@ bool sha1_file_exist(const unsigned char *sha1)
 	return (access(sha1_to_path(sha1), R_OK) == 0);
 }
 
-int sha1_file_write(unsigned char *buf, size_t len, unsigned char *outsha1)
+int sha1_file_write(void *buf, size_t len, unsigned char *outsha1)
 {
 	unsigned char sha1[SHA1_LEN];
 

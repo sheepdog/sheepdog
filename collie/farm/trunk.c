@@ -32,7 +32,7 @@ int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
 		     unsigned char *trunk_sha1)
 {
 	size_t size = sizeof(struct trunk_entry) * nr_entries;
-	return sha1_file_write((void *)entries, size, trunk_sha1);
+	return sha1_file_write(entries, size, trunk_sha1);
 }
 
 struct trunk_file *trunk_file_read(unsigned char *sha1)

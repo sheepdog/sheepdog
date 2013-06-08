@@ -62,7 +62,7 @@ int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1);
 
 /* sha1_file.c */
 bool sha1_file_exist(const unsigned char *sha1);
-int sha1_file_write(unsigned char *buf, size_t len, unsigned char *sha1);
+int sha1_file_write(void *buf, size_t len, unsigned char *sha1);
 void *sha1_file_read(const unsigned char *sha1, size_t *size);
 int get_sha1_hex(const char *hex, unsigned char *sha1);
 int sha1_file_try_delete(const unsigned char *sha1);

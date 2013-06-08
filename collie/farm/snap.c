@@ -112,7 +112,7 @@ out:
 struct snap_file *snap_file_read(unsigned char *sha1)
 {
 	size_t size;
-	return (struct snap_file *)sha1_file_read(sha1, &size);
+	return sha1_file_read(sha1, &size);
 }
 
 int snap_file_write(uint32_t idx, unsigned char *trunk_sha1,
@@ -122,6 +122,6 @@ int snap_file_write(uint32_t idx, unsigned char *trunk_sha1,
 	snap.idx = idx;
 	memcpy(snap.trunk_sha1, trunk_sha1, SHA1_LEN);
 
-	return sha1_file_write((void *)&snap, sizeof(struct snap_file),
+	return sha1_file_write(&snap, sizeof(struct snap_file),
 			       outsha1);
 }

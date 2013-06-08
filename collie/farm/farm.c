@@ -302,7 +302,7 @@ int farm_save_snapshot(const char *tag)
 
 	wq = create_work_queue("save snapshot", WQ_ORDERED);
 	if (for_each_object_in_tree(queue_save_snapshot_work,
-				    (void *)&trunk_buf) < 0)
+				    &trunk_buf) < 0)
 		goto out;
 
 	work_queue_wait(wq);
