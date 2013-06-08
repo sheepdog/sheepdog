@@ -1,10 +1,12 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-dist_man_MANS = sheep.8 collie.8
+dist_man_MANS		= sheep.8 collie.8
 
 if BUILD_SHEEPFS
-dist_man_MANS += sheepfs.8
+dist_man_MANS 		+= sheepfs.8
 endif
+
+EXTRA_DIST		= sheep.8.in collie.8.in sheepfs.8.in
 
 sheep.8.options = $(shell ../sheep/sheep -h | \
 	perl -ne 'print ".TP\n.BI $$1 \"\\fR, \\fP\" $$2\n$$3\n" if /^  ([^,]+), (\S+)\s+(.+)/' | \
