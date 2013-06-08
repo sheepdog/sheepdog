@@ -72,8 +72,9 @@ void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *outhdr)
 	return buffer;
 }
 
-int for_each_object_in_trunk(unsigned char *trunk_sha1,
-			     object_handler_func_t func, void *data)
+int for_each_entry_in_trunk(unsigned char *trunk_sha1,
+			    int (*func)(struct trunk_entry *entry, void *data),
+			    void *data)
 {
 	struct trunk_entry *trunk_entry, *trunk_free = NULL;
 	struct sha1_file_hdr trunk_hdr;
@@ -87,15 +88,7 @@ int for_each_object_in_trunk(unsigned char *trunk_sha1,
 
 	nr_trunks = trunk_hdr.priv;
 	for (uint64_t i = 0; i < nr_trunks; i++, trunk_entry++) {
-		struct sha1_file_hdr hdr;
-		void *buffer = NULL;
-
-		buffer = sha1_file_read(trunk_entry->sha1, &hdr);
-		if (!buffer)
-			goto out;
-
-		if (func(trunk_entry->oid, trunk_entry->nr_copies,
-			 buffer, hdr.size, data) < 0)
+		if (func(trunk_entry, data) < 0)
 			goto out;
 	}
 

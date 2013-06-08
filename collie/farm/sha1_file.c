@@ -42,7 +42,7 @@ static void fill_sha1_path(char *pathbuf, const unsigned char *sha1)
 
 static char *sha1_to_path(const unsigned char *sha1)
 {
-	static char buf[PATH_MAX];
+	static __thread char buf[PATH_MAX];
 	const char *objdir;
 	int len;
 

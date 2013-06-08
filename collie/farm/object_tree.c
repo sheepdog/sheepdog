@@ -103,31 +103,22 @@ int object_tree_size()
 	return tree.nr_objs;
 }
 
-int for_each_object_in_tree(object_handler_func_t func, void *data)
+int for_each_object_in_tree(int (*func)(uint64_t oid, int nr_copies,
+					void *data), void *data)
 {
 	struct rb_node *p = rb_first(&tree.root);
 	struct object_tree_entry *entry;
-	uint64_t oid;
-	size_t size;
-	void *buf = xmalloc(max(SD_INODE_SIZE, SD_DATA_OBJ_SIZE));
 	int ret = -1;
 
 	while (p) {
 		entry = rb_entry(p, struct object_tree_entry, node);
-		oid = entry->oid;
-		size = get_objsize(oid);
 
-		if (sd_read_object(oid, buf, size, 0, true) < 0)
-			goto out;
-
-		if (func(oid, entry->nr_copies,
-			 buf, size, data) < 0)
+		if (func(entry->oid, entry->nr_copies, data) < 0)
 			goto out;
 
 		p = rb_next(p);
 	}
 	ret = 0;
 out:
-	free(buf);
 	return ret;
 }

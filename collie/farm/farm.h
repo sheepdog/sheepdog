@@ -38,9 +38,6 @@ struct sha1_file_hdr {
 	uint64_t reserved;
 };
 
-typedef int (*object_handler_func_t)(uint64_t oid, int nr_copies, void *buf,
-				     size_t size, void *data);
-
 /* farm.c */
 int farm_init(const char *path);
 bool farm_contain_snapshot(uint32_t idx, const char *tag);
@@ -52,8 +49,9 @@ char *get_object_directory(void);
 int trunk_init(void);
 int trunk_file_write(unsigned char *trunk_sha1, struct strbuf *trunk_entries);
 void *trunk_file_read(unsigned char *sha1, struct sha1_file_hdr *);
-int for_each_object_in_trunk(unsigned char *trunk_sha1,
-			     object_handler_func_t func, void *data);
+int for_each_entry_in_trunk(unsigned char *trunk_sha1,
+			    int (*func)(struct trunk_entry *entry, void *data),
+			    void *data);
 
 /* snap.c */
 int snap_init(const char *path);
@@ -74,6 +72,7 @@ int object_tree_size(void);
 void object_tree_insert(uint64_t oid, int nr_copies);
 void object_tree_free(void);
 void object_tree_print(void);
-int for_each_object_in_tree(object_handler_func_t func, void *data);
+int for_each_object_in_tree(int (*func)(uint64_t oid, int nr_copies,
+					void *data), void *data);
 
 #endif
