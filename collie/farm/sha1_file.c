@@ -49,7 +49,7 @@ static void get_sha1(unsigned char *buf, unsigned len, unsigned char *sha1)
 static void fill_sha1_path(char *pathbuf, const unsigned char *sha1)
 {
 	int i;
-	for (i = 0; i < SHA1_LEN; i++) {
+	for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
 		static const char hex[] = "0123456789abcdef";
 		unsigned int val = sha1[i];
 		char *pos = pathbuf + i*2 + (i > 0);
@@ -157,23 +157,23 @@ bool sha1_file_exist(const unsigned char *sha1)
 
 int sha1_file_write(void *buf, size_t len, unsigned char *outsha1)
 {
-	unsigned char sha1[SHA1_LEN];
+	unsigned char sha1[SHA1_DIGEST_SIZE];
 
 	get_sha1(buf, len, sha1);
 	if (sha1_buffer_write(sha1, buf, len) < 0)
 		return -1;
 	if (outsha1)
-		memcpy(outsha1, sha1, SHA1_LEN);
+		memcpy(outsha1, sha1, SHA1_DIGEST_SIZE);
 	return 0;
 }
 
 static int verify_sha1_file(const unsigned char *sha1,
 			    void *buf, unsigned long len)
 {
-	unsigned char tmp[SHA1_LEN];
+	unsigned char tmp[SHA1_DIGEST_SIZE];
 
 	get_sha1(buf, len, tmp);
-	if (memcmp((char *)tmp, (char *)sha1, SHA1_LEN) != 0) {
+	if (memcmp((char *)tmp, (char *)sha1, SHA1_DIGEST_SIZE) != 0) {
 		fprintf(stderr, "failed, %s != %s\n", sha1_to_hex(sha1),
 			sha1_to_hex(tmp));
 		return -1;
@@ -240,7 +240,7 @@ static unsigned hexval(char c)
 int get_sha1_hex(const char *hex, unsigned char *sha1)
 {
 	int i;
-	for (i = 0; i < SHA1_LEN; i++) {
+	for (i = 0; i < SHA1_DIGEST_SIZE; i++) {
 		unsigned int val = (hexval(hex[0]) << 4) | hexval(hex[1]);
 		if (val & ~0xff)
 			return -1;

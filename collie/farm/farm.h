@@ -14,7 +14,6 @@
 #include <linux/limits.h>
 
 #include "collie.h"
-#include "sheepdog_proto.h"
 #include "sheep.h"
 #include "logger.h"
 #include "strbuf.h"
@@ -23,7 +22,7 @@
 struct trunk_entry {
 	uint64_t oid;
 	int nr_copies;
-	unsigned char sha1[SHA1_LEN];
+	unsigned char sha1[SHA1_DIGEST_SIZE];
 };
 
 struct trunk_file {
@@ -33,7 +32,14 @@ struct trunk_file {
 
 struct snap_file {
 	int idx;
-	unsigned char trunk_sha1[SHA1_LEN];
+	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
+};
+
+struct snap_log {
+	uint32_t idx;
+	char tag[SD_MAX_SNAPSHOT_TAG_LEN];
+	uint64_t time;
+	unsigned char sha1[SHA1_DIGEST_SIZE];
 };
 
 /* farm.c */

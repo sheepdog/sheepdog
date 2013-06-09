@@ -15,7 +15,7 @@
 #include <sys/types.h>
 
 #include "sheep_priv.h"
-
+#include "sha1.h"
 
 enum rw_state {
 	RW_PREPARE_LIST, /* the recovery thread is preparing object list */
@@ -51,7 +51,7 @@ struct recovery_obj_work {
 
 	/* local replica in the stale directory */
 	uint32_t local_epoch;
-	uint8_t local_sha1[SHA1_LEN];
+	uint8_t local_sha1[SHA1_DIGEST_SIZE];
 };
 
 /*
@@ -140,7 +140,8 @@ static int recover_object_from(struct recovery_obj_work *row,
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 
-		if (memcmp(rsp->hash.digest, sha1, sizeof(SHA1_LEN)) == 0) {
+		if (memcmp(rsp->hash.digest, sha1,
+			   sizeof(SHA1_DIGEST_SIZE)) == 0) {
 			sd_dprintf("use local replica at epoch %d",
 				   local_epoch);
 			ret = sd_store->link(oid, local_epoch);

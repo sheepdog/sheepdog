@@ -165,7 +165,7 @@ static int get_trunk_sha1(uint32_t idx, const char *tag, unsigned char *outsha1)
 		snap_buf = snap_file_read(log_buf->sha1);
 		if (!snap_buf)
 			goto out;
-		memcpy(outsha1, snap_buf->trunk_sha1, SHA1_LEN);
+		memcpy(outsha1, snap_buf->trunk_sha1, SHA1_DIGEST_SIZE);
 		ret = 0;
 		goto out;
 	}
@@ -213,7 +213,7 @@ out:
 
 bool farm_contain_snapshot(uint32_t idx, const char *tag)
 {
-	unsigned char trunk_sha1[SHA1_LEN];
+	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 	return (get_trunk_sha1(idx, tag, trunk_sha1) == 0);
 }
 
@@ -222,7 +222,7 @@ static void do_save_object(struct work *work)
 	void *buf;
 	size_t size;
 	struct snapshot_work *sw;
-	unsigned char object_sha1[SHA1_LEN];
+	unsigned char object_sha1[SHA1_DIGEST_SIZE];
 
 	if (uatomic_is_true(&work_error))
 		return;
@@ -233,7 +233,7 @@ static void do_save_object(struct work *work)
 	if (sd_read_object_sha1(sw->entry.oid, sd_epoch, sw->entry.nr_copies,
 				object_sha1) == 0 &&
 	    sha1_file_exist(object_sha1)) {
-		memcpy(sw->entry.sha1, object_sha1, SHA1_LEN);
+		memcpy(sw->entry.sha1, object_sha1, SHA1_DIGEST_SIZE);
 		return;
 	}
 
@@ -285,8 +285,8 @@ static int queue_save_snapshot_work(uint64_t oid, int nr_copies, void *data)
 
 int farm_save_snapshot(const char *tag)
 {
-	unsigned char snap_sha1[SHA1_LEN];
-	unsigned char trunk_sha1[SHA1_LEN];
+	unsigned char snap_sha1[SHA1_DIGEST_SIZE];
+	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 	struct strbuf trunk_buf;
 	void *snap_log = NULL;
 	int log_nr, idx, ret = -1;
@@ -387,7 +387,7 @@ static int queue_load_snapshot_work(struct trunk_entry *entry, void *data)
 int farm_load_snapshot(uint32_t idx, const char *tag)
 {
 	int ret = -1;
-	unsigned char trunk_sha1[SHA1_LEN];
+	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 
 	if (get_trunk_sha1(idx, tag, trunk_sha1) < 0)
 		goto out;

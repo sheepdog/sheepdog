@@ -19,6 +19,7 @@
 
 #include "collie.h"
 #include "treeview.h"
+#include "sha1.h"
 
 static struct sd_option vdi_options[] = {
 	{'P', "prealloc", false, "preallocate all the data objects"},
@@ -1435,7 +1436,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 struct vdi_check_work {
 	struct vdi_check_info *info;
 	const struct sd_vnode *vnode;
-	uint8_t hash[SHA1_LEN];
+	uint8_t hash[SHA1_DIGEST_SIZE];
 	bool object_found;
 	struct work work;
 };

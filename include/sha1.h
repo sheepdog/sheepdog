@@ -14,10 +14,13 @@
 #include <string.h>
 #include <inttypes.h>
 
+#define SHA1_DIGEST_SIZE        20
+#define SHA1_BLOCK_SIZE         64
+
 struct sha1_ctx {
 	uint64_t count;
-	uint32_t state[5];
-	uint8_t buffer[64];
+	uint32_t state[SHA1_DIGEST_SIZE / 4];
+	uint8_t buffer[SHA1_BLOCK_SIZE];
 };
 
 void sha1_init(void *ctx);

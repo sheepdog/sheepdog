@@ -10,6 +10,7 @@
  */
 
 #include "collie.h"
+#include "sha1.h"
 
 char *size_to_str(uint64_t _size, char *str, int str_size)
 {
@@ -55,7 +56,7 @@ int sd_read_object_sha1(uint64_t oid, uint32_t epoch, int nr_copies,
 		addr_to_str(host, sizeof(host), vnode->nid.addr, 0);
 		port = vnode->nid.port;
 		if (collie_exec_req(host, port, &req, NULL) == 0) {
-			memcpy(sha1, rsp->hash.digest, SHA1_LEN);
+			memcpy(sha1, rsp->hash.digest, SHA1_DIGEST_SIZE);
 			ret = 0;
 			goto out;
 		}

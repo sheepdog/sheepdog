@@ -484,7 +484,8 @@ int default_remove_object(uint64_t oid)
 
 static int get_object_sha1(char *path, uint8_t *sha1)
 {
-	if (getxattr(path, SHA1NAME, sha1, SHA1_LEN) != SHA1_LEN) {
+	if (getxattr(path, SHA1NAME, sha1, SHA1_DIGEST_SIZE)
+	    != SHA1_DIGEST_SIZE) {
 		sd_eprintf("fail to get sha1, %s", path);
 		return -1;
 	}
@@ -496,7 +497,7 @@ static int set_object_sha1(char *path, const uint8_t *sha1)
 {
 	int ret;
 
-	ret = setxattr(path, SHA1NAME, sha1, SHA1_LEN, 0);
+	ret = setxattr(path, SHA1NAME, sha1, SHA1_DIGEST_SIZE, 0);
 	if (ret < 0)
 		sd_eprintf("fail to set sha1, %s", path);
 

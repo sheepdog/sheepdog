@@ -56,7 +56,7 @@ int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1)
 	struct snap_log log = { .idx = idx,
 				.time = time(NULL) };
 	pstrcpy(log.tag, SD_MAX_SNAPSHOT_TAG_LEN, tag);
-	memcpy(log.sha1, sha1, SHA1_LEN);
+	memcpy(log.sha1, sha1, SHA1_DIGEST_SIZE);
 
 	fd = open(snap_log_path, O_WRONLY | O_APPEND);
 	if (fd < 0) {
@@ -120,7 +120,7 @@ int snap_file_write(uint32_t idx, unsigned char *trunk_sha1,
 {
 	struct snap_file snap;
 	snap.idx = idx;
-	memcpy(snap.trunk_sha1, trunk_sha1, SHA1_LEN);
+	memcpy(snap.trunk_sha1, trunk_sha1, SHA1_DIGEST_SIZE);
 
 	return sha1_file_write(&snap, sizeof(struct snap_file),
 			       outsha1);
