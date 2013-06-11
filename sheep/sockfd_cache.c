@@ -288,6 +288,9 @@ void sockfd_cache_add(const struct node_id *nid)
 	sd_dprintf("%s:%d, count %d", name, nid->port, n);
 }
 
+static uatomic_bool fds_in_grow;
+static int fds_high_watermark = FDS_WATERMARK(DEFAULT_FDS_COUNT);
+
 static void do_grow_fds(struct work *work)
 {
 	struct sockfd_cache_entry *entry;
@@ -307,16 +310,14 @@ static void do_grow_fds(struct work *work)
 			uatomic_set_false(&entry->fds[i].in_use);
 		}
 	}
+
+	fds_count *= 2;
+	fds_high_watermark = FDS_WATERMARK(fds_count);
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 }
 
-static uatomic_bool fds_in_grow;
-static int fds_high_watermark = FDS_WATERMARK(DEFAULT_FDS_COUNT);
-
 static void grow_fds_done(struct work *work)
 {
-	fds_count *= 2;
-	fds_high_watermark = FDS_WATERMARK(fds_count);
 	sd_dprintf("fd count has been grown into %d", fds_count);
 	uatomic_set_false(&fds_in_grow);
 	free(work);
