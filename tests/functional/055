@@ -20,8 +20,7 @@ for i in 0 1 2; do
 	_start_sheep $i
 done
 _wait_for_sheep 3
-$COLLIE cluster format -c 2
-sleep 1
+_cluster_format -c 2
 $COLLIE vdi create test 200M -P
 
 # simulate one disk failure

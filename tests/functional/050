@@ -31,7 +31,7 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format
+_cluster_format
 
 $COLLIE vdi create test 100M
 dd if=/dev/zero | $COLLIE vdi write test &

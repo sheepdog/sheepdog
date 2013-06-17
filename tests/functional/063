@@ -29,8 +29,7 @@ for i in 0 1 2; do
 done
 _start_sheep 3 "-g"
 _wait_for_sheep 4
-$COLLIE cluster format -c 1
-sleep 1
+_cluster_format -c 1
 
 $COLLIE vdi create test 200M -P
 _node_info

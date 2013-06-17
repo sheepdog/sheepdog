@@ -19,8 +19,7 @@ for i in 0 1; do
     _start_sheep $i
 done
 _wait_for_sheep 2
-$COLLIE cluster format
-sleep 1
+_cluster_format
 $COLLIE cluster info | _filter_cluster_info
 
 _start_sheep 2

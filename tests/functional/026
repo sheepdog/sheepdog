@@ -25,7 +25,7 @@ done
 
 _wait_for_sheep "8"
 
-$COLLIE cluster format
+_cluster_format
 
 # create new vdis
 (

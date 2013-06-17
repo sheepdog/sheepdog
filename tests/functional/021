@@ -21,4 +21,4 @@ done
 
 _wait_for_sheep "3"
 
-$COLLIE cluster format -c 3
+_cluster_format -c 3

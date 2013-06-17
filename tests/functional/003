@@ -21,9 +21,8 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format
+_cluster_format
 
-sleep 1
 # kill all sheeps
 for i in 0 1 2; do
     _kill_sheep $i

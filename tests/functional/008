@@ -25,8 +25,7 @@ done
 
 _wait_for_sheep "8"
 
-$COLLIE cluster format -c 3
-sleep 1
+_cluster_format -c 3
 
 for i in `seq 0 4`; do
     $COLLIE vdi create test$i 100M
