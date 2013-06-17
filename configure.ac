@@ -134,7 +134,9 @@ AC_CONFIG_FILES([Makefile
 		script/Makefile
 		lib/Makefile
 		man/Makefile
-		shepherd/Makefile])
+		shepherd/Makefile
+		tests/unit/Makefile
+		tests/unit/collie/Makefile])
 
 ### Local business
 

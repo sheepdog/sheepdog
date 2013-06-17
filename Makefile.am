@@ -25,6 +25,10 @@ endif
 
 SUBDIRS			+= man
 
+if BUILD_UNITTEST
+SUBDIRS			+= tests/unit
+endif
+
 install-exec-local:
 	$(INSTALL) -d $(DESTDIR)/${localstatedir}/lib/sheepdog
 
@@ -88,12 +92,14 @@ if BUILD_COVERAGE
 coverage: clean check
 	@rm -rf coverage
 
-	@for dir in collie sheep ; do					\
+	@for dir in collie sheep tests/unit/collie ; do			\
 		$(MAKE) -C $$dir coverage;				\
 	done
 
 	@lcov -a collie/collie.info -a sheep/sheep.info			\
+	-a tests/unit/collie/collie.info				\
 	-o sheep.info &&						\
 	lcov -r sheep.info /usr/include/\* -o sheep.info &&		\
+	lcov -r sheep.info tests/unit/\* -o sheep.info &&		\
 	genhtml sheep.info -o coverage
 endif
