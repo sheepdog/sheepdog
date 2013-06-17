@@ -92,12 +92,12 @@ if BUILD_COVERAGE
 coverage: clean check
 	@rm -rf coverage
 
-	@for dir in collie sheep tests/unit/collie ; do			\
+	@for dir in collie sheep tests/unit/collie tests/unit/sheep ; do\
 		$(MAKE) -C $$dir coverage;				\
 	done
 
 	@lcov -a collie/collie.info -a sheep/sheep.info			\
-	-a tests/unit/collie/collie.info				\
+	-a tests/unit/collie/collie.info -a tests/unit/sheep/sheep.info	\
 	-o sheep.info &&						\
 	lcov -r sheep.info /usr/include/\* -o sheep.info &&		\
 	lcov -r sheep.info tests/unit/\* -o sheep.info &&		\

@@ -36,6 +36,7 @@ sheep/sheep
 sheepfs/sheepfs
 shepherd/shepherd
 tests/unit/collie/test_common
+tests/unit/sheep/test_vdi
 
 # directories
 .deps
