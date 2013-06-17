@@ -51,3 +51,6 @@ check-syntax:
 
 check-style:
 	@$(CHECK_STYLE) $(collie_SOURCES) $(noinst_HEADERS)
+
+coverage:
+	@lcov -d . -c -o collie.info

@@ -16,6 +16,9 @@
 *.orig
 *.rej
 cscope.*
+*.gcda
+*.gcno
+*.info
 
 #
 # for GLOBAL
@@ -36,6 +39,7 @@ shepherd/shepherd
 # directories
 .deps
 autom4te.cache
+coverage
 
 aclocal.m4
 Makefile

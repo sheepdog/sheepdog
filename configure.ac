@@ -179,9 +179,14 @@ AC_ARG_ENABLE([debug],
 	[  --enable-debug          : enable debug build. ],
 	[ default="no" ])
 
+AC_ARG_ENABLE([unittest],
+	[  --enable-unittest       : enable unittest. ],
+	[ default="no" ])
+
 AC_ARG_ENABLE([coverage],
 	[  --enable-coverage       : coverage analysis of the codebase. ],
 	[ default="no" ])
+AM_CONDITIONAL(BUILD_COVERAGE, test x$enable_coverage = xyes)
 
 AC_ARG_ENABLE([corosync],
 	[  --enable-corosync       : build corosync cluster driver ],,
@@ -326,10 +331,16 @@ if test "x${enable_coverage}" = xyes && \
 	COVERAGE_CFLAGS="-ftest-coverage -fprofile-arcs"
 	COVERAGE_LDFLAGS="-ftest-coverage -fprofile-arcs"
 	PACKAGE_FEATURES="$PACKAGE_FEATURES coverage"
+	enable_unittest="yes"
 else
 	COVERAGE_CFLAGS=""
 	COVERAGE_LDFLAGS=""
 fi
+
+if test "x${enable_unittest}" = xyes; then
+	PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+fi
+AM_CONDITIONAL(BUILD_UNITTEST, test x$enable_unittest = xyes)
 
 
 if test "x${enable_fatal_warnings}" = xyes && \

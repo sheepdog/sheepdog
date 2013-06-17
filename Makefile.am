@@ -37,6 +37,7 @@ dist-clean-local:
 clean-generic:
 	rm -rf $(SPEC) $(TARFILE) cscope*
 	find -name '*.orig' -or -name '*.rej' | xargs rm -f
+	find -name '*.gcno' -or -name '*.gcda' -or -name '*.info' | xargs rm -f
 
 cscope:
 	@echo create cscope.out
@@ -82,3 +83,17 @@ check-style:
 	@for dir in lib collie sheep include sheepfs; do \
 		make -C $$dir check-style CHECK_STYLE="$(CHECK_STYLE)"; \
 	done
+
+if BUILD_COVERAGE
+coverage: clean check
+	@rm -rf coverage
+
+	@for dir in collie sheep ; do					\
+		$(MAKE) -C $$dir coverage;				\
+	done
+
+	@lcov -a collie/collie.info -a sheep/sheep.info			\
+	-o sheep.info &&						\
+	lcov -r sheep.info /usr/include/\* -o sheep.info &&		\
+	genhtml sheep.info -o coverage
+endif

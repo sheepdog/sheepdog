@@ -62,3 +62,6 @@ check-syntax:
 
 check-style:
 	@$(CHECK_STYLE) $(sheep_SOURCES) $(noinst_HEADERS)
+
+coverage:
+	@lcov -d . -c -o sheep.info
