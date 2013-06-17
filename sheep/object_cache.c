@@ -48,6 +48,9 @@
 
 #define CACHE_OBJECT_SIZE (SD_DATA_OBJ_SIZE / 1024 / 1024) /* M */
 
+/* Kick background pusher if dirty_count greater than it */
+#define MAX_DIRTY_OBJECT_COUNT	10 /* Just a random number, no rationale */
+
 struct global_cache {
 	uint32_t capacity; /* The real capacity of object cache of this node */
 	uatomic_bool in_reclaim; /* If the relcaimer is working */
@@ -68,13 +71,21 @@ struct object_cache_entry {
 struct object_cache {
 	uint32_t vid; /* The VID of this VDI */
 	uint32_t push_count; /* How many push threads queued in push phase. */
+	uint32_t dirty_count; /* How many dirty object in this cache */
 	struct hlist_node hash; /* VDI is linked to the global hash lists */
 	struct rb_root lru_tree; /* For faster object search */
 	struct list_head lru_head; /* Per VDI LRU list for reclaimer */
 	struct list_head dirty_head; /* Dirty objects linked to this list */
 	int push_efd; /* Used to synchronize between pusher and push threads */
+	uatomic_bool in_push; /* Whether if pusher is running */
 
 	pthread_rwlock_t lock; /* Cache lock */
+};
+
+struct push_work {
+	struct work work;
+	struct object_cache_entry *entry;
+	struct object_cache *oc;
 };
 
 static struct global_cache gcache;
@@ -89,6 +100,8 @@ static pthread_rwlock_t hashtable_lock[HASH_SIZE] = {
 };
 
 static struct hlist_head cache_hashtable[HASH_SIZE];
+
+static int object_cache_push(struct object_cache *oc);
 
 static inline bool entry_is_dirty(const struct object_cache_entry *entry)
 {
@@ -238,6 +251,54 @@ static struct object_cache_entry *lru_tree_search(struct rb_root *root,
 	return NULL;
 }
 
+static void do_background_push(struct work *work)
+{
+	struct push_work *pw = container_of(work, struct push_work, work);
+	struct object_cache *oc = pw->oc;
+
+	if (!uatomic_set_true(&oc->in_push))
+		return;
+
+	object_cache_push(oc);
+	uatomic_set_false(&oc->in_push);
+}
+
+static void background_push_done(struct work *work)
+{
+	struct push_work *pw = container_of(work, struct push_work, work);
+	free(pw);
+}
+
+static void kick_background_pusher(struct object_cache *oc)
+{
+	struct push_work *pw;
+
+	pw = xzalloc(sizeof(struct push_work));
+	pw->oc = oc;
+	pw->work.fn = do_background_push;
+	pw->work.done = background_push_done;
+	queue_work(sys->oc_push_wqueue, &pw->work);
+}
+
+static void del_from_dirty_list(struct object_cache_entry *entry)
+{
+	struct object_cache *oc = entry->oc;
+
+	list_del_init(&entry->dirty_list);
+	uatomic_dec(&oc->dirty_count);
+}
+
+static void add_to_dirty_list(struct object_cache_entry *entry)
+{
+	struct object_cache *oc = entry->oc;
+
+	list_add_tail(&entry->dirty_list, &oc->dirty_head);
+	/* FIXME read sys->status atomically */
+	if (uatomic_add_return(&oc->dirty_count, 1) > MAX_DIRTY_OBJECT_COUNT
+	    && !uatomic_is_true(&oc->in_push) && sys->status == SD_STATUS_OK)
+		kick_background_pusher(oc);
+}
+
 static inline void
 free_cache_entry(struct object_cache_entry *entry)
 {
@@ -246,7 +307,7 @@ free_cache_entry(struct object_cache_entry *entry)
 	rb_erase(&entry->node, &oc->lru_tree);
 	list_del_init(&entry->lru_list);
 	if (!list_empty(&entry->dirty_list))
-		list_del_init(&entry->dirty_list);
+		del_from_dirty_list(entry);
 	pthread_rwlock_destroy(&entry->lock);
 	free(entry);
 }
@@ -389,7 +450,7 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 	if (writeback) {
 		entry->bmap |= calc_object_bmap(count, offset);
 		if (list_empty(&entry->dirty_list))
-			list_add_tail(&entry->dirty_list, &oc->dirty_head);
+			add_to_dirty_list(entry);
 	}
 	list_move_tail(&entry->lru_list, &oc->lru_head);
 	unlock_cache(oc);
@@ -664,7 +725,7 @@ static void add_to_lru_cache(struct object_cache *oc, uint32_t idx, bool create)
 		/* Cache lock assure it is not raced with pusher */
 		entry->bmap = UINT64_MAX;
 		entry->idx |= CACHE_CREATE_BIT;
-		list_add_tail(&entry->dirty_list, &oc->dirty_head);
+		add_to_dirty_list(entry);
 	}
 	unlock_cache(oc);
 }
@@ -820,11 +881,6 @@ err:
 	return ret;
 }
 
-struct push_work {
-	struct work work;
-	struct object_cache_entry *entry;
-};
-
 static void do_push_object(struct work *work)
 {
 	struct push_work *pw = container_of(work, struct push_work, work);
@@ -884,7 +940,7 @@ static int object_cache_push(struct object_cache *oc)
 		pw->work.done = push_object_done;
 		pw->entry = entry;
 		queue_work(sys->oc_push_wqueue, &pw->work);
-		list_del_init(&entry->dirty_list);
+		del_from_dirty_list(entry);
 	}
 	unlock_cache(oc);
 reread:
@@ -1148,6 +1204,7 @@ int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 int object_cache_flush_vdi(uint32_t vid)
 {
 	struct object_cache *cache;
+	int ret;
 
 	cache = find_object_cache(vid, false);
 	if (!cache) {
@@ -1155,7 +1212,16 @@ int object_cache_flush_vdi(uint32_t vid)
 		return SD_RES_SUCCESS;
 	}
 
-	return object_cache_push(cache);
+	if (!uatomic_set_true(&cache->in_push)) {
+		/* Guest expects synchronous flush, busy-wait for simplicity */
+		while (uatomic_is_true(&cache->in_push))
+			usleep(100000);
+		return SD_RES_SUCCESS;
+	}
+
+	ret = object_cache_push(cache);
+	uatomic_set_false(&cache->in_push);
+	return ret;
 }
 
 int object_cache_flush_and_del(const struct request *req)
