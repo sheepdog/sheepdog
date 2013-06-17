@@ -25,7 +25,7 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format
+_cluster_format
 $COLLIE vdi create base1 20M -p 7000
 $COLLIE vdi create base2 20M -p 7001
 $COLLIE vdi create base3 20M -p 7002

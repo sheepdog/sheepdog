@@ -433,6 +433,32 @@ _md_info()
     _stat_store '?/d?'
 }
 
+_cluster_format()
+{
+    local args=$*
+    local port_opt=$(echo $args | grep -oE '\-*p[^ ]* 7...')
+
+    $COLLIE cluster format $args
+    if [ $? != 0 ]; then
+	_die "failed to format cluster"
+    fi
+
+    # wait for all the sheeps to be running
+    local ports=$($COLLIE node list -r $port_opt | perl -ne 'print "$1\n" if /:(\d+)/')
+    local port
+    for port in $ports; do
+	local cnt
+	for cnt in `seq 10`; do # wait at most 10 seconds
+	    $COLLIE cluster info -p $port | grep -E running\|halt > /dev/null
+	    if [ $? == 0 ]; then
+		continue 2
+	    fi
+	    sleep 1
+	done
+	_die "sheepdog was not able to start"
+    done
+}
+
 _random()
 {
 	openssl enc -aes-128-cbc -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null

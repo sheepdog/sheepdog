@@ -22,7 +22,7 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format -c 2
+_cluster_format -c 2
 
 # create a pre-allocated vdi
 $COLLIE vdi create test 80M -P

@@ -21,7 +21,7 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format -c 1
+_cluster_format -c 1
 
 qemu-img create sheepdog:test 4G
 qemu-img snapshot -c tag1 sheepdog:test

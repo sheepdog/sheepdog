@@ -31,7 +31,7 @@ done
 _wait_for_sheep "3"
 
 echo "formatting cluster"
-$COLLIE cluster format -c 2
+_cluster_format -c 2
 
 echo "creating vdi ${NAME}"
 $COLLIE vdi create ${VDI_NAME} ${VDI_SIZE}

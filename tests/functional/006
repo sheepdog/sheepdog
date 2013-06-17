@@ -19,8 +19,7 @@ _start_sheep 0
 _wait_for_sheep 1
 
 # start Sheepdog with one node
-$COLLIE cluster format
-sleep 1
+_cluster_format
 
 # launch sheeps simultaneously
 for i in `seq 1 9`; do

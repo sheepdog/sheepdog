@@ -21,7 +21,7 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format -c 3
+_cluster_format -c 3
 $COLLIE vdi create base 100M -P
 
 qemu-img snapshot -c tag sheepdog:base

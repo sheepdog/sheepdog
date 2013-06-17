@@ -19,14 +19,14 @@ _cleanup
 # create a node who has wrong epoch
 _start_sheep 1
 _wait_for_sheep 1 1
-$COLLIE cluster format -p 7001 -c 1
+_cluster_format -p 7001 -c 1
 $COLLIE cluster shutdown -p 7001
 _wait_for_sheep_stop
 
 # start Sheepdog with one node
 _start_sheep 0
 _wait_for_sheep 1
-$COLLIE cluster format -p 7000 -c 1
+_cluster_format -p 7000 -c 1
 
 for i in `seq 0 5`; do
     _start_sheep 1  # should fail

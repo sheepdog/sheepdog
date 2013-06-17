@@ -19,8 +19,7 @@ _start_sheep 0 "-j size=64"
 
 _wait_for_sheep 1
 
-$COLLIE cluster format -c 1
-sleep 1
+_cluster_format -c 1
 
 $COLLIE vdi create test 4G
 

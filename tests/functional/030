@@ -23,7 +23,7 @@ _wait_for_sheep 4
 TMPDIR="$STORE/tmp"
 rm -rf $TMPDIR
 
-$COLLIE cluster format -c 3
+_cluster_format -c 3
 
 $COLLIE vdi create test1 10M
 $COLLIE vdi create test2 10M
@@ -54,7 +54,7 @@ for i in `seq 0 3`; do
 done
 _wait_for_sheep 4
 
-$COLLIE cluster format -c 3
+_cluster_format -c 3
 $COLLIE cluster snapshot load s1 $TMPDIR
 $COLLIE vdi list | _filter_short_date
 

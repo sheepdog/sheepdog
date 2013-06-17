@@ -18,8 +18,7 @@ for i in 0 1 2; do
 	_start_sheep $i
 done
 _wait_for_sheep 3
-$COLLIE cluster format
-sleep 1
+_cluster_format
 $COLLIE vdi create test 100M -P
 _node_info
 qemu-io -c "discard 0 100m" sheepdog:test | _filter_qemu_io

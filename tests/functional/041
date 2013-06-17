@@ -21,7 +21,7 @@ done
 
 _wait_for_sheep 5
 
-$COLLIE cluster format
+_cluster_format
 $COLLIE vdi create test 12M
 
 # create the first object

@@ -22,8 +22,7 @@ done
 _wait_for_sheep 3
 
 # start Sheepdog with three nodes
-$COLLIE cluster format
-sleep 1
+_cluster_format
 
 # kill all sheeps
 for i in 0 1 2; do

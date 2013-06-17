@@ -20,7 +20,7 @@ done
 
 _wait_for_sheep 8
 
-$COLLIE cluster format
+_cluster_format
 
 for i in `seq 0 3`; do
     $COLLIE vdi create test$i 100M

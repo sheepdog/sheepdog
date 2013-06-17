@@ -33,7 +33,7 @@ done
 
 _wait_for_sheep 4
 
-$COLLIE cluster format
+_cluster_format
 
 # create two VDIs before there are enough spaces
 $COLLIE vdi create test0 100M
