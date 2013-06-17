@@ -89,21 +89,17 @@ struct corosync_message {
 	uint8_t msg[0];
 };
 
-static bool cpg_node_equal(struct cpg_node *a, struct cpg_node *b)
+static int cpg_node_cmp(struct cpg_node *a, struct cpg_node *b)
 {
-	return (a->nodeid == b->nodeid && a->pid == b->pid);
+	int cmp = memcmp(&a->nodeid, &b->nodeid, sizeof(a->nodeid));
+	if (cmp == 0)
+		cmp = memcmp(&a->pid, &b->pid, sizeof(a->pid));
+	return cmp;
 }
 
-static inline int find_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
-				struct cpg_node *key)
+static bool cpg_node_equal(struct cpg_node *a, struct cpg_node *b)
 {
-	int i;
-
-	for (i = 0; i < nr_nodes; i++)
-		if (cpg_node_equal(nodes + i, key))
-			return i;
-
-	return -1;
+	return cpg_node_cmp(a, b) == 0;
 }
 
 static inline int find_sd_node(struct cpg_node *nodes, size_t nr_nodes,
@@ -127,16 +123,7 @@ static inline void add_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 static inline void del_cpg_node(struct cpg_node *nodes, size_t nr_nodes,
 				struct cpg_node *deled)
 {
-	int idx;
-
-	idx = find_cpg_node(nodes, nr_nodes, deled);
-	if (idx < 0) {
-		sd_dprintf("cannot find node");
-		return;
-	}
-
-	nr_nodes--;
-	memmove(nodes + idx, nodes + idx + 1, sizeof(*nodes) * (nr_nodes - idx));
+	xlremove(deled, nodes, &nr_nodes, cpg_node_cmp);
 }
 
 static int corosync_get_local_addr(uint8_t *addr)
@@ -293,7 +280,7 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 {
 	enum cluster_join_result res;
 	struct sd_node entries[SD_MAX_NODES];
-	int idx;
+	struct cpg_node *n;
 
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
@@ -342,10 +329,11 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 		}
 		break;
 	case COROSYNC_EVENT_TYPE_LEAVE:
-		idx = find_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
-		if (idx < 0)
+		n = xlfind(&cevent->sender, cpg_nodes, nr_cpg_nodes,
+			   cpg_node_cmp);
+		if (n == NULL)
 			break;
-		cevent->sender.ent = cpg_nodes[idx].ent;
+		cevent->sender.ent = n->ent;
 
 		del_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 		nr_cpg_nodes--;

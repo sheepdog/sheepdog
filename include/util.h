@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <search.h>
 #include <urcu/uatomic.h>
 
 #include "bitops.h"
@@ -120,6 +121,41 @@ int atomic_create_and_write(const char *path, char *buf, size_t len);
 				(comparison_fn_t)compar);		\
 	}								\
 	__ret;								\
+})
+
+/* a type safe version of lfind() */
+#define xlfind(key, base, nmemb, compar)				\
+({									\
+	typeof(&(base)[0]) __ret = NULL;				\
+	if (nmemb > 0) {						\
+		size_t __n = nmemb;					\
+		assert(compar(key, key) == 0);				\
+		assert(compar(base, base) == 0);			\
+		__ret = lfind(key, base, &__n, sizeof(*(base)),		\
+			      (comparison_fn_t)compar);			\
+	}								\
+	__ret;								\
+})
+
+/*
+ * Search 'key' in the array 'base' linearly and remove it if it found.
+ *
+ * If 'key' is found in 'base', this function increments *nmemb and returns
+ * true.
+ */
+#define xlremove(key, base, nmemb, compar)				\
+({									\
+	bool __removed = false;						\
+	typeof(&(base)[0]) __e;						\
+									\
+	__e = xlfind(key, base, *(nmemb), compar);			\
+	if (__e != NULL) {						\
+		(*(nmemb))--;						\
+		memmove(__e, __e + 1,					\
+			sizeof(*(base)) * (*(nmemb) - (__e - (base)))); \
+		__removed = true;					\
+	}								\
+	__removed;							\
 })
 
 #ifdef assert

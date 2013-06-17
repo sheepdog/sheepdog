@@ -50,9 +50,14 @@ static char *lnode_to_str(struct local_node *lnode)
 	return s;
 }
 
+static bool lnode_cmp(const struct local_node *a, const struct local_node *b)
+{
+	return node_cmp(&a->node, &b->node);
+}
+
 static bool lnode_eq(const struct local_node *a, const struct local_node *b)
 {
-	return node_eq(&a->node, &b->node);
+	return lnode_cmp(a, b) == 0;
 }
 
 enum local_event_type {
@@ -240,22 +245,9 @@ static void shm_queue_init(void)
 	shm_queue_unlock();
 }
 
-static struct local_node *find_lnode(struct local_node *key, size_t nr_lnodes,
-				     struct local_node *lnodes)
-{
-	int i;
-
-	for (i = 0; i < nr_lnodes; i++)
-		if (lnode_eq(key, lnodes + i))
-			return lnodes + i;
-
-	panic("internal error");
-}
-
 static void add_event(enum local_event_type type, struct local_node *lnode,
 		void *buf, size_t buf_len)
 {
-	int idx, i;
 	struct local_node *n;
 	struct local_event ev = {
 		.type = type,
@@ -274,21 +266,17 @@ static void add_event(enum local_event_type type, struct local_node *lnode,
 		ev.nr_lnodes++;
 		break;
 	case EVENT_LEAVE:
-		n = find_lnode(lnode, ev.nr_lnodes, ev.lnodes);
-		idx = n - ev.lnodes;
-
-		ev.nr_lnodes--;
-		memmove(n, n + 1, sizeof(*n) * (ev.nr_lnodes - idx));
+		xlremove(lnode, ev.lnodes, &ev.nr_lnodes, lnode_cmp);
 		break;
 	case EVENT_GATEWAY:
-		n = find_lnode(lnode, ev.nr_lnodes, ev.lnodes);
+		n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp);
 		n->gateway = true;
 		break;
 	case EVENT_NOTIFY:
 	case EVENT_BLOCK:
 		break;
 	case EVENT_UPDATE_NODE:
-		n = find_lnode(lnode, ev.nr_lnodes, ev.lnodes);
+		n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp);
 		n->node = lnode->node;
 		break;
 	case EVENT_JOIN_RESPONSE:
@@ -296,7 +284,7 @@ static void add_event(enum local_event_type type, struct local_node *lnode,
 	}
 
 	sd_dprintf("type = %d, sender = %s", ev.type, lnode_to_str(&ev.sender));
-	for (i = 0; i < ev.nr_lnodes; i++)
+	for (int i = 0; i < ev.nr_lnodes; i++)
 		sd_dprintf("%d: %s", i, lnode_to_str(ev.lnodes + i));
 
 	shm_queue_push(&ev);

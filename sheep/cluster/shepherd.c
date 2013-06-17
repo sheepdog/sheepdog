@@ -431,7 +431,7 @@ static void msg_block_forward(struct sph_msg *rcv)
 
 static void do_leave_sheep(void)
 {
-	int i, j, ret;
+	int ret;
 	struct sd_node sender;
 
 	ret = xread(sph_comm_fd, &sender, sizeof(sender));
@@ -442,16 +442,8 @@ static void do_leave_sheep(void)
 
 	sd_iprintf("removing node: %s", node_to_str(&sender));
 
-	for (i = 0; i < nr_nodes; i++) {
-		if (node_eq(&sender, &nodes[i])) {
-			for (j = i; j < nr_nodes; j++)
-				nodes[j] = nodes[j + 1];
-
-			nr_nodes--;
-
-			goto removed;
-		}
-	}
+	if (xlremove(&sender, nodes, &nr_nodes, node_cmp))
+		goto removed;
 
 	sd_iprintf("leave message from unknown node: %s",
 		node_to_str(&sender));
@@ -687,9 +679,8 @@ static void shepherd_unblock(void *msg, size_t msg_len)
 
 static void shepherd_update_node(struct sd_node *node)
 {
-	for (int i = 0; i < nr_nodes; i++)
-		if (node_eq(node, &nodes[i]))
-			nodes[i] = *node;
+	struct sd_node *n = xlfind(node, nodes, nr_nodes, node_cmp);
+	*n = *nodes;
 }
 
 static struct cluster_driver cdrv_shepherd = {

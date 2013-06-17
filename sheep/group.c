@@ -373,18 +373,14 @@ static const struct sd_node *find_entry_epoch(const struct sd_node *entry,
 					      uint32_t epoch)
 {
 	struct sd_node nodes[SD_MAX_NODES];
-	int nr, i;
+	int nr;
 
 	if (!epoch)
 		return NULL;
 
 	nr = epoch_log_read(epoch, nodes, sizeof(nodes));
 
-	for (i = 0; i < nr; i++)
-		if (node_eq(&nodes[i], entry))
-			return entry;
-
-	return NULL;
+	return xlfind(entry, nodes, nr, node_cmp);
 }
 
 /*
@@ -740,14 +736,12 @@ static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
 					       size_t nr_nodes)
 {
 	struct sd_node old_nodes[SD_MAX_NODES];
-	size_t count = 0, i;
 
 	/* exclude the newly added one */
-	for (i = 0; i < nr_nodes; i++) {
-		if (!node_eq(nodes + i, joined))
-			old_nodes[count++] = nodes[i];
-	}
-	return alloc_vnode_info(old_nodes, count);
+	memcpy(old_nodes, nodes, sizeof(*nodes) * nr_nodes);
+	xlremove(joined, old_nodes, &nr_nodes, node_cmp);
+
+	return alloc_vnode_info(old_nodes, nr_nodes);
 }
 
 static void setup_backend_store(const char *store, bool need_purge)
