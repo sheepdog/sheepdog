@@ -36,7 +36,7 @@ static void get_sha1(unsigned char *buf, unsigned len, unsigned char *sha1)
 	void *tmp = valloc(length);
 
 	memcpy(tmp, buf, len);
-	trim_zero_sectors(tmp, &offset, &length);
+	trim_zero_blocks(tmp, &offset, &length);
 
 	sha1_init(&c);
 	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));

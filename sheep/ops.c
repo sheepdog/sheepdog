@@ -908,8 +908,8 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	ret = gateway_read_obj(&read_req);
 
 	if (ret == SD_RES_SUCCESS)
-		untrim_zero_sectors(buf, rsp->obj.offset, rsp->data_length,
-				    SD_DATA_OBJ_SIZE);
+		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
+				   SD_DATA_OBJ_SIZE);
 
 	return ret;
 }
@@ -945,7 +945,7 @@ int peer_read_obj(struct request *req)
 
 	rsp->data_length = hdr->data_length;
 	rsp->obj.offset = 0;
-	trim_zero_sectors(req->data, &rsp->obj.offset, &rsp->data_length);
+	trim_zero_blocks(req->data, &rsp->obj.offset, &rsp->data_length);
 
 	if (hdr->obj.copies)
 		rsp->obj.copies = hdr->obj.copies;
@@ -1010,8 +1010,8 @@ int peer_create_and_write_obj(struct request *req)
 		memcpy(&cow_hdr, hdr, sizeof(cow_hdr));
 		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
 		cow_hdr.obj.offset = 0;
-		trim_zero_sectors(buf, &cow_hdr.obj.offset,
-				  &cow_hdr.data_length);
+		trim_zero_blocks(buf, &cow_hdr.obj.offset,
+				 &cow_hdr.data_length);
 
 		ret = do_create_and_write_obj(&iocb, &cow_hdr, epoch, buf);
 	} else

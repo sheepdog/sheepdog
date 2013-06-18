@@ -423,7 +423,7 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 		sd_eprintf("failed to read object %" PRIx64 ", %s", oid,
 			   sd_strerror(ret));
 
-	untrim_zero_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
+	untrim_zero_blocks(data, rsp->obj.offset, rsp->data_length, datalen);
 
 	return ret;
 }

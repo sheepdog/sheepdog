@@ -92,7 +92,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		return rsp->result;
 	}
 
-	untrim_zero_sectors(data, rsp->obj.offset, rsp->data_length, datalen);
+	untrim_zero_blocks(data, rsp->obj.offset, rsp->data_length, datalen);
 
 	return SD_RES_SUCCESS;
 }

@@ -567,7 +567,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 		return ret;
 	}
 
-	trim_zero_sectors(buf, &offset, &length);
+	trim_zero_blocks(buf, &offset, &length);
 
 	sha1_init(&c);
 	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));

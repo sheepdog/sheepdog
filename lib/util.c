@@ -356,36 +356,65 @@ int rmdir_r(char *dir_path)
 	return ret;
 }
 
-/* Trim zero sectors from the beginning and end of buffer */
-void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len)
+/*
+ * Trim zero blocks from the beginning and end of buffer
+ *
+ * The caller passes the offset of 'buf' with 'poffset' so that this funciton
+ * can align the return values to BLOCK_SIZE.  'plen' points the length of the
+ * buffer.  If there are zero blocks at the beginning of the buffer, this
+ * function increases the offset and decreases the length on condition that
+ * '*poffset' is block-aligned.  If there are zero blocks at the end of the
+ * buffer, this function also decreases the length on condition that '*plen' is
+ * block-aligned.
+ */
+void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
 {
-	const uint8_t zero[SECTOR_SIZE] = {0};
+	const uint8_t zero[BLOCK_SIZE] = {0};
 	uint8_t *p = buf;
+	uint64_t start = *poffset;
+	uint64_t offset = 0;
+	uint32_t len = *plen;
 
-	assert(*offset == 0);
+	/* trim zero blocks from the beginning of buffer */
+	while (len >= BLOCK_SIZE) {
+		size_t size = (start + offset) % BLOCK_SIZE;
+		if (size == 0)
+			size = BLOCK_SIZE;
 
-	/* trim zero sectors from the beginning of buffer */
-	while (*len >= SECTOR_SIZE) {
-		if (memcmp(p + *offset, zero, SECTOR_SIZE) != 0)
+		if (memcmp(p + offset, zero, size) != 0)
 			break;
 
-		*offset += SECTOR_SIZE;
-		*len -= SECTOR_SIZE;
+		offset += size;
+		len -= size;
 	}
-	memmove(buf, p + *offset, *len);
+	if (offset > 0)
+		memmove(buf, p + offset, len);
 
 	/* trim zero sectors from the end of buffer */
-	while (*len >= SECTOR_SIZE) {
-		if (memcmp(p + *len - SECTOR_SIZE, zero, SECTOR_SIZE) != 0)
+	while (len >= BLOCK_SIZE) {
+		size_t size = (start + len) % BLOCK_SIZE;
+		if (size == 0)
+			size = BLOCK_SIZE;
+
+		if (memcmp(p + len - size, zero, size) != 0)
 			break;
 
-		*len -= SECTOR_SIZE;
+		len -= size;
 	}
+
+	*plen = len;
+	*poffset = start + offset;
 }
 
-/* Untrim zero sectors to the beginning and end of buffer */
-void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
-			 uint32_t requested_len)
+/*
+ * Untrim zero blocks to the beginning and end of buffer
+ *
+ * 'offset' is the offset of 'buf' in the original buffer, 'len' is the length
+ * of 'buf', and 'requested_len' is the length of the original buffer.  'buf'
+ * must have enough spaces to contain 'requested_len' bytes.
+ */
+void untrim_zero_blocks(void *buf, uint64_t offset, uint32_t len,
+			uint32_t requested_len)
 {
 	uint8_t *p = buf;
 

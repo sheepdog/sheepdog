@@ -15,6 +15,7 @@
 #include "list.h"
 
 #define SECTOR_SIZE (1U << 9)
+#define BLOCK_SIZE (1U << 12)
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define round_up(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
@@ -97,9 +98,9 @@ void reraise_crash_signal(int signo, int status);
 pid_t gettid(void);
 bool is_xattr_enabled(const char *path);
 
-void trim_zero_sectors(void *buf, uint64_t *offset, uint32_t *len);
-void untrim_zero_sectors(void *buf, uint64_t offset, uint32_t len,
-			 uint32_t requested_len);
+void trim_zero_blocks(void *buf, uint64_t *offset, uint32_t *len);
+void untrim_zero_blocks(void *buf, uint64_t offset, uint32_t len,
+			uint32_t requested_len);
 int atomic_create_and_write(const char *path, char *buf, size_t len);
 
 /* a type safe version of qsort() */
