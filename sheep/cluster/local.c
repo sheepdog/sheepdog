@@ -50,7 +50,7 @@ static char *lnode_to_str(struct local_node *lnode)
 	return s;
 }
 
-static bool lnode_cmp(const struct local_node *a, const struct local_node *b)
+static int lnode_cmp(const struct local_node *a, const struct local_node *b)
 {
 	return node_cmp(&a->node, &b->node);
 }
