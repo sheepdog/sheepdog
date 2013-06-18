@@ -84,6 +84,8 @@ ssize_t xwrite(int fd, const void *buf, size_t len);
 ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
 ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 int xmkdir(const char *pathname, mode_t mode);
+int xfallocate(int fd, int mode, off_t offset, off_t len);
+int xftruncate(int fd, off_t length);
 void pstrcpy(char *buf, int buf_size, const char *str);
 int rmdir_r(char *dir_path);
 int purge_directory(char *dir_path);

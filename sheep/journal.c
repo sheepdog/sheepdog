@@ -336,7 +336,7 @@ static void *commit_data(void *ignored)
 		panic("%s", strerror(err));
 
 	sync();
-	if (ftruncate(jfile.commit_fd, 0) < 0)
+	if (xftruncate(jfile.commit_fd, 0) < 0)
 		panic("truncate %m");
 	if (prealloc(jfile.commit_fd, jfile_size) < 0)
 		panic("prealloc");

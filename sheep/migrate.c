@@ -295,7 +295,7 @@ static int migrate_from_v0_to_v1(void)
 	}
 
 	/* 0.5.1 could wrongly extend the config file, so truncate it here */
-	ret = ftruncate(fd, sizeof(config));
+	ret = xftruncate(fd, sizeof(config));
 	if (ret != 0) {
 		sd_eprintf("failed to truncate config data, %m");
 		close(fd);

@@ -282,14 +282,14 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 /* Preallocate the whole object to get a better filesystem layout. */
 int prealloc(int fd, uint32_t size)
 {
-	int ret = fallocate(fd, 0, 0, size);
+	int ret = xfallocate(fd, 0, 0, size);
 	if (ret < 0) {
 		if (errno != ENOSYS && errno != EOPNOTSUPP) {
 			sd_eprintf("failed to preallocate space, %m");
 			return ret;
 		}
 
-		return ftruncate(fd, size);
+		return xftruncate(fd, size);
 	}
 
 	return 0;
