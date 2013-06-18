@@ -252,6 +252,28 @@ int xmkdir(const char *pathname, mode_t mode)
 	return 0;
 }
 
+int xfallocate(int fd, int mode, off_t offset, off_t len)
+{
+	int ret;
+
+	do {
+		ret = fallocate(fd, mode, offset, len);
+	} while (ret < 0 && (errno == EAGAIN || errno == EINTR));
+
+	return ret;
+}
+
+int xftruncate(int fd, off_t length)
+{
+	int ret;
+
+	do {
+		ret = ftruncate(fd, length);
+	} while (ret < 0 && (errno == EAGAIN || errno == EINTR));
+
+	return ret;
+}
+
 /*
  * Copy the string str to buf. If str length is bigger than buf_size -
  * 1 then it is clamped to buf_size - 1.

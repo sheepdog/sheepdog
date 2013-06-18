@@ -218,7 +218,7 @@ static void shm_queue_init(void)
 
 	shm_queue_lock();
 
-	ret = ftruncate(shmfd, sizeof(*shm_queue));
+	ret = xftruncate(shmfd, sizeof(*shm_queue));
 	if (ret != 0)
 		panic("failed to truncate shmfile, %m");
 
@@ -234,10 +234,10 @@ static void shm_queue_init(void)
 		/* initialize shared memory */
 		block_event_pos = 0;
 		nonblock_event_pos = 0;
-		ret = ftruncate(shmfd, 0);
+		ret = xftruncate(shmfd, 0);
 		if (ret != 0)
 			panic("failed to truncate shmfile, %m");
-		ret = ftruncate(shmfd, sizeof(*shm_queue));
+		ret = xftruncate(shmfd, sizeof(*shm_queue));
 		if (ret != 0)
 			panic("failed to truncate shmfile, %m");
 	}
