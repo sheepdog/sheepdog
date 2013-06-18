@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <sys/resource.h>
+#include <malloc.h>
 
 #include "sheep_priv.h"
 #include "trace/trace.h"
@@ -402,6 +403,22 @@ static void check_host_env(void)
 	else if (r.rlim_cur < RLIM_INFINITY)
 		sd_iprintf("Allowed core file size %lu, suggested unlimited",
 			   r.rlim_cur);
+
+	/*
+	 * Disable glibc's dynamic mmap threshold and set it as 512k.
+	 *
+	 * We have to disable dynamic threshold because its inefficiency to
+	 * release freed memory back to OS. Setting it as 512k practically means
+	 * allocation larger than or equal to 512k will use mmap() for malloc()
+	 * and munmap() for free(), guaranteeing allocated memory will not be
+	 * cached in the glibc's ptmalloc internal pool.
+	 *
+	 * 512k is not a well tested optimal value for IO request size, I choose
+	 * it because it is default value for disk drive that it can transfer at
+	 * a time. So default installation of guest will issue at most 512K
+	 * sized request.
+	 */
+	mallopt(M_MMAP_THRESHOLD, 512 * 1024);
 }
 
 static int lock_and_daemon(bool daemonize, const char *base_dir)
