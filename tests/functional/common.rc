@@ -209,12 +209,13 @@ _wait_for_sheep()
         fi
 
         nr_sheep="$(echo "$node_list" | wc -l)"
+        nr_sheep=$(($nr_sheep-1))
 
-        if [ ${nr_sheep} -eq $(($1+1)) ]; then
+        if [ ${nr_sheep} -eq $1 ]; then
             break
         fi
-        if [ ${nr_sheep} -gt $(($1+1)) ]; then
-            _die "ERROR: too many sheep in cluster: ${nr_sheep}"
+        if [ ${nr_sheep} -gt $1 ]; then
+            _die "ERROR: too many sheep in cluster: ${nr_sheep}, expect: $1"
         fi
     done
 }
