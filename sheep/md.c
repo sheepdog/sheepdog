@@ -312,7 +312,7 @@ broken_path:
 	return 0;
 }
 
-static inline void remove_disk(int idx)
+static inline void md_remove_disk(int idx)
 {
 	int i;
 
@@ -340,7 +340,7 @@ reinit:
 	for (i = 0; i < md_nr_disks; i++) {
 		md_disks[i].space = init_path_space(md_disks[i].path);
 		if (!md_disks[i].space) {
-			remove_disk(i);
+			md_remove_disk(i);
 			goto reinit;
 		}
 		total += md_disks[i].space;
@@ -447,7 +447,7 @@ static void md_do_recover(struct work *work)
 	if (idx < 0)
 		/* Just ignore the duplicate EIO of the same path */
 		goto out;
-	remove_disk(idx);
+	md_remove_disk(idx);
 	md_init_space();
 	nr = md_nr_disks;
 out:
@@ -506,7 +506,7 @@ static int get_old_new_path(uint64_t oid, uint32_t epoch, char *path,
 	return 0;
 }
 
-static int move_object(uint64_t oid, char *old, char *new)
+static int md_move_object(uint64_t oid, char *old, char *new)
 {
 	struct strbuf buf = STRBUF_INIT;
 	int fd, ret = -1;
@@ -539,7 +539,7 @@ out:
 	return ret;
 }
 
-static int check_and_move(uint64_t oid, uint32_t epoch, char *path)
+static int md_check_and_move(uint64_t oid, uint32_t epoch, char *path)
 {
 	char old[PATH_MAX], new[PATH_MAX];
 
@@ -555,7 +555,7 @@ static int check_and_move(uint64_t oid, uint32_t epoch, char *path)
 		return SD_RES_SUCCESS;
 
 	/* We can't use rename(2) accross device */
-	if (move_object(oid, old, new) < 0) {
+	if (md_move_object(oid, old, new) < 0) {
 		sd_eprintf("move old %s to new %s failed", old, new);
 		return SD_RES_EIO;
 	}
@@ -570,7 +570,7 @@ static int scan_wd(uint64_t oid, uint32_t epoch)
 
 	pthread_rwlock_rdlock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
-		ret = check_and_move(oid, epoch, md_disks[i].path);
+		ret = md_check_and_move(oid, epoch, md_disks[i].path);
 		if (ret == SD_RES_SUCCESS)
 			break;
 	}
@@ -638,7 +638,7 @@ static inline void md_del_disk(char *path)
 		sd_eprintf("invalid path %s", path);
 		return;
 	}
-	remove_disk(idx);
+	md_remove_disk(idx);
 }
 
 static int do_plug_unplug(char *disks, bool plug)
