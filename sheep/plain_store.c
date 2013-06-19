@@ -89,6 +89,7 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 	case ENFILE:
 	case EINTR:
 	case EAGAIN:
+	case EEXIST:
 		sd_eprintf("%m, oid=%"PRIx64, oid);
 		/* make gateway try again */
 		return SD_RES_NETWORK_ERROR;
