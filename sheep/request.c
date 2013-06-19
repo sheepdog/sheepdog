@@ -300,8 +300,12 @@ static void queue_gateway_request(struct request *req)
 	 * If we go for cache object, we don't care if it is being recovered
 	 * Even if it doesn't exist in cache, we'll rely on cache layer to pull
 	 * it.
+	 *
+	 * Not ture for local request because it might go for backend store
+	 * such as pushing cache object, in this case we should check if request
+	 * is in recovery.
 	 */
-	if (sys->enable_object_cache)
+	if (sys->enable_object_cache && !req->local)
 		goto queue_work;
 
 	if (req->local_oid)
