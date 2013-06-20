@@ -853,8 +853,7 @@ int main(int argc, char **argv)
 	shepherd_info.port = port;
 	early_log_init(log_format, &shepherd_info);
 
-	ret = log_init(progname, LOG_SPACE_SIZE, !daemonize,
-		log_level, (char *)log_file);
+	ret = log_init(progname, !daemonize, log_level, (char *)log_file);
 	if (ret)
 		panic("initialize logger failed: %m");
 

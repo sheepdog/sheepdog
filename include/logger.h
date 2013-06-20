@@ -19,7 +19,8 @@
 
 #include "util.h"
 
-#define LOG_SPACE_SIZE (32 * 1024 * 1024)
+#define LOG_SPACE_SIZE (1 * 1024 * 1024)
+#define LOG_SPACE_DEBUG_SIZE (32 * 1024 * 1024)
 #define MAX_MSG_SIZE 1024
 #define MAX_THREAD_NAME_LEN	20
 
@@ -29,8 +30,7 @@ struct logger_user_info {
 
 void early_log_init(const char *format_name,
 		struct logger_user_info *user_info);
-int log_init(const char *progname, int size, bool to_stdout, int level,
-	char *outfile);
+int log_init(const char *progname, bool to_stdout, int level, char *outfile);
 void log_close(void);
 void dump_logmsg(void *);
 void log_write(int prio, const char *func, int line, const char *fmt, ...)

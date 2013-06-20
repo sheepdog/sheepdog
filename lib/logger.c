@@ -592,10 +592,11 @@ void early_log_init(const char *format_name, struct logger_user_info *user_info)
 	exit(1);
 }
 
-notrace int log_init(const char *program_name, int size, bool to_stdout,
-		int level, char *outfile)
+notrace int log_init(const char *program_name, bool to_stdout, int level,
+		     char *outfile)
 {
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
+	int size = level == SDOG_DEBUG ? LOG_SPACE_DEBUG_SIZE : LOG_SPACE_SIZE;
 
 	log_level = level;
 
