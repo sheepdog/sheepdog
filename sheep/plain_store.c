@@ -374,11 +374,18 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
 
 	if (link(stale_path, path) < 0) {
+		/*
+		 * Recovery thread and main thread might try to recover the
+		 * same object and we might get EEXIST in such case.
+		 */
+		if (errno == EEXIST)
+			goto out;
+
 		sd_eprintf("failed to link from %s to %s, %m", stale_path,
 			   path);
 		return err_to_sderr(path, oid, errno);
 	}
-
+out:
 	return SD_RES_SUCCESS;
 }
 
