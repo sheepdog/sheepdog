@@ -459,23 +459,27 @@ int atomic_create_and_write(const char *path, char *buf, size_t len)
 
 	snprintf(tmp_path, PATH_MAX, "%s.tmp", path);
 
-	fd = open(tmp_path, O_WRONLY | O_CREAT | O_SYNC, sd_def_fmode);
+	fd = open(tmp_path, O_WRONLY | O_CREAT | O_SYNC | O_EXCL, sd_def_fmode);
 	if (fd < 0) {
-		sd_eprintf("failed to open temporal file, %m");
+		if (errno == EEXIST)
+			sd_dprintf("someone else is dealing with %s", tmp_path);
+		else
+			sd_eprintf("failed to open temporal file %s, %m",
+				   tmp_path);
 		ret = -1;
 		goto end;
 	}
 
 	ret = xwrite(fd, buf, len);
 	if (ret != len) {
-		sd_eprintf("failed to write, %m");
+		sd_eprintf("failed to write %s, %m", path);
 		ret = -1;
 		goto close_fd;
 	}
 
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
-		sd_eprintf("failed to rename, %m");
+		sd_eprintf("failed to rename %s, %m", path);
 		ret = -1;
 	}
 
