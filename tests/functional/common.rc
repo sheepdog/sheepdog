@@ -195,8 +195,6 @@ _wait_for_sheep()
         PORT=$((7000 + $2))
     fi
     while true; do
-        sleep 2
-
         if [ $(_count_sheep_processes) != $1 ]; then
             _die "should have $1, but have $(_count_sheep_processes) sheep"
         fi
@@ -205,6 +203,7 @@ _wait_for_sheep()
 
         if [ $? != 0 ]; then
             # sheep is not ready yet
+            sleep 1
             continue
         fi
 
@@ -217,6 +216,7 @@ _wait_for_sheep()
         if [ ${nr_sheep} -gt $1 ]; then
             _die "ERROR: too many sheep in cluster: ${nr_sheep}, expect: $1"
         fi
+        sleep 1
     done
 }
 
