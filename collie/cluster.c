@@ -253,20 +253,30 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 			  uint32_t snapid, uint32_t flags,
 			  const struct sd_inode *i, void *data)
 {
-	uint64_t vdi_oid = vid_to_vdi_oid(vid);
+	uint64_t vdi_oid = vid_to_vdi_oid(vid), vmstate_oid;
+	int nr_vmstate_object;
 
 	/* ignore active vdi */
 	if (!vdi_is_snapshot(i))
 		return;
 
+	/* fill vdi object id */
 	object_tree_insert(vdi_oid, i->nr_copies);
 
+	/* fill data object id */
 	for (uint64_t idx = 0; idx < MAX_DATA_OBJS; idx++) {
 		if (i->data_vdi_id[idx]) {
 			uint64_t oid = vid_to_data_oid(i->data_vdi_id[idx],
 						       idx);
 			object_tree_insert(oid, i->nr_copies);
 		}
+	}
+
+	/* fill vmstate object id */
+	nr_vmstate_object = (i->vm_state_size / SD_DATA_OBJ_SIZE) + 1;
+	for (int idx = 0; idx < nr_vmstate_object; idx++) {
+		vmstate_oid = vid_to_vmstate_oid(vid, idx);
+		object_tree_insert(vmstate_oid, i->nr_copies);
 	}
 }
 

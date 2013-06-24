@@ -307,6 +307,11 @@ static inline uint64_t vid_to_attr_oid(uint32_t vid, uint32_t attrid)
 	return ((uint64_t)vid << VDI_SPACE_SHIFT) | VDI_ATTR_BIT | attrid;
 }
 
+static inline uint64_t vid_to_vmstate_oid(uint32_t vid, uint32_t idx)
+{
+	return VMSTATE_BIT | ((uint64_t)vid << VDI_SPACE_SHIFT) | idx;
+}
+
 static inline bool vdi_is_snapshot(const struct sd_inode *inode)
 {
 	return !!inode->snap_ctime;
