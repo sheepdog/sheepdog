@@ -273,7 +273,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	}
 
 	/* fill vmstate object id */
-	nr_vmstate_object = (i->vm_state_size / SD_DATA_OBJ_SIZE) + 1;
+	nr_vmstate_object = DIV_ROUND_UP(i->vm_state_size, SD_DATA_OBJ_SIZE);
 	for (int idx = 0; idx < nr_vmstate_object; idx++) {
 		vmstate_oid = vid_to_vmstate_oid(vid, idx);
 		object_tree_insert(vmstate_oid, i->nr_copies);
