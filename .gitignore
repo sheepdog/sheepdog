@@ -63,3 +63,7 @@ tests/atconfig
 tests/*.out.bad
 
 *.patch
+
+man/sheep.8
+man/collie.8
+man/sheepfs.8
