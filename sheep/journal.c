@@ -135,25 +135,6 @@ static bool journal_entry_full_write(struct journal_descriptor *jd)
 	return true;
 }
 
-static void journal_get_path(struct journal_descriptor *jd, char *path)
-{
-	switch (jd->flag) {
-	case JF_STORE:
-	case JF_REMOVE_OBJ:
-		snprintf(path, PATH_MAX, "%s/%016"PRIx64,
-			 md_get_object_path(jd->oid), jd->oid);
-		if (jd->flag == JF_STORE)
-			sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
-				path, jd->size, jd->offset, jd->create);
-		else		/* JF_REMOVE_OBJ */
-			sd_iprintf("%s (remove)", path);
-		break;
-	default:
-		panic("unknown type of journal flag: %d", jd->flag);
-		break;
-	}
-}
-
 static int replay_journal_entry(struct journal_descriptor *jd)
 {
 	char path[PATH_MAX];
@@ -162,23 +143,29 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	void *buf = NULL;
 	char *p = (char *)jd;
 
+	snprintf(path, PATH_MAX, "%s/%016"PRIx64,
+		md_get_object_path(jd->oid), jd->oid);
+
 	if (jd->flag == JF_REMOVE_OBJ) {
-		journal_get_path(jd, path);
+		sd_iprintf("%s (remove)", path);
 		unlink(path);
+
 		return 0;
 	}
+
+	sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
+		path, jd->size, jd->offset, jd->create);
 
 	if (jd->create)
 		flags |= O_CREAT;
 
-	journal_get_path(jd, path);
 	fd = open(path, flags, sd_def_fmode);
 	if (fd < 0) {
 		sd_eprintf("open %m");
 		return -1;
 	}
 
-	if (jd->create && jd->flag == JF_STORE) {
+	if (jd->create) {
 		ret = prealloc(fd, get_objsize(jd->oid));
 		if (ret < 0)
 			goto out;
