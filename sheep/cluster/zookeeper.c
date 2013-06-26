@@ -676,10 +676,15 @@ static int zk_verify_last_sheep_join(int seq, int *last_sheep)
 		snprintf(path, MAX_NODE_STR_LEN, MASTER_ZNONE "/%010"PRId32,
 			 *last_sheep);
 		rc = zk_get_data(path, name, &len);
-		if (rc == ZNONODE)
+		switch (rc) {
+		case ZNONODE:
 			continue;
-		else
-			RETURN_IF_ERROR(rc, "");
+		case ZOK:
+			break;
+		default:
+			sd_eprintf("failed, %s", zerror(rc));
+			return rc;
+		}
 
 		if (!strcmp(name, node_to_str(&this_node.node)))
 			continue;
@@ -733,20 +738,16 @@ static void zk_compete_master(void)
 						MAX_NODE_STR_LEN, true);
 		} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
 		CHECK_ZK_RC(rc, MASTER_ZNONE "/");
-		if (rc != ZOK) {
-			sd_eprintf("failed");
+		if (rc != ZOK)
 			goto out_unlock;
-		}
 
 		sd_dprintf("my compete path: %s", my_compete_path);
 		sscanf(my_compete_path, MASTER_ZNONE "/%"PRId32,
 		       &my_seq);
 	}
 
-	if (zk_find_master(&master_seq, master_name) != ZOK) {
-		sd_eprintf("failed");
+	if (zk_find_master(&master_seq, master_name) != ZOK)
 		goto out_unlock;
-	}
 
 	if (!strcmp(master_name, node_to_str(&this_node.node)))
 		goto success;
@@ -755,10 +756,8 @@ static void zk_compete_master(void)
 		goto out_unlock;
 	} else {
 		if (zk_verify_last_sheep_join(my_seq,
-					      &last_joined_sheep) != ZOK) {
-			sd_eprintf("failed");
+					      &last_joined_sheep) != ZOK)
 			goto out_unlock;
-		}
 
 		if (last_joined_sheep < 0) {
 			/* all previous sheep has quit, i'm master */
