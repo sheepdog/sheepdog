@@ -465,5 +465,20 @@ _random()
 	openssl enc -aes-128-cbc -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
 }
 
+_kill_zk_session()
+{
+	local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:700$1"
+	if [[ "$DRIVER" == zoo* ]]; then
+		../../tools/kill_zk_session "$path"
+		if [ $? -ne 0 ]; then
+			_die "failed to kill session"
+		fi
+	else
+		_kill_sheep $1
+		_wait_for_sheep_stop $1
+		_start_sheep $1
+	fi
+}
+
 # make sure this script returns success
 /bin/true

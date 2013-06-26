@@ -1,0 +1,38 @@
+QA output created by 068
+using backend plain store
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7001, 127.0.0.1:7002]
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   10 MB  0.0 MB  0.0 MB DATE   7c2b25     3              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   10 MB  0.0 MB  0.0 MB DATE   7c2b25     3              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   10 MB  0.0 MB  0.0 MB DATE   7c2b25     3              
