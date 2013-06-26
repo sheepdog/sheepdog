@@ -1099,6 +1099,18 @@ static int send_join_request(struct sd_node *ent)
 	return ret;
 }
 
+int sd_reconnect_handler(void)
+{
+	sys->status = SD_STATUS_WAIT_FOR_JOIN;
+	sys->join_finished = false;
+	if (sys->cdrv->init(sys->cdrv_option) != 0)
+		return -1;
+	if (send_join_request(&sys->this_node) != 0)
+		return -1;
+
+	return 0;
+}
+
 void sd_join_handler(const struct sd_node *joined,
 		     const struct sd_node *members,
 		     size_t nr_members, enum cluster_join_result result,

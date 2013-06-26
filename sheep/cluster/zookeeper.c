@@ -77,6 +77,7 @@ static LIST_HEAD(zk_block_list);
 static uatomic_bool is_master;
 static uatomic_bool stop;
 static bool joined;
+static bool first_push = true;
 
 static void zk_compete_master(void);
 
@@ -300,7 +301,6 @@ static bool zk_find_seq_node(uint64_t id, char *seq_path, int seq_path_len)
 
 static void zk_queue_push(struct zk_event *ev)
 {
-	static bool first_push = true;
 	int rc, len;
 	char path[MAX_NODE_STR_LEN], buf[MAX_NODE_STR_LEN];
 
@@ -486,6 +486,11 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 	struct zk_node znode;
 	char str[MAX_NODE_STR_LEN], *p;
 	int ret;
+
+	if (type == ZOO_SESSION_EVENT && state == ZOO_EXPIRED_SESSION_STATE) {
+		eventfd_write(efd, 1);
+		return;
+	}
 
 /* CREATED_EVENT 1, DELETED_EVENT 2, CHANGED_EVENT 3, CHILD_EVENT 4 */
 	sd_dprintf("path:%s, type:%d", path, type);
@@ -828,8 +833,8 @@ static void zk_handle_join_response(struct zk_event *ev)
 		if (node_eq(&ev->sender.node, &this_node.node)) {
 			joined = true;
 			sd_dprintf("create path:%s", path);
-			zk_create_node(path, (char *)&ev->sender,
-				       sizeof(ev->sender), &ZOO_OPEN_ACL_UNSAFE,
+			zk_create_node(path, (char *)zoo_client_id(zhandle),
+				       sizeof(clientid_t), &ZOO_OPEN_ACL_UNSAFE,
 				       ZOO_EPHEMERAL, NULL, 0);
 		} else
 			zk_node_exists(path);
@@ -927,6 +932,23 @@ static void (*const zk_event_handlers[])(struct zk_event *ev) = {
 
 static const int zk_max_event_handlers = ARRAY_SIZE(zk_event_handlers);
 
+static inline void handle_session_expire(void)
+{
+	/* clean memory states */
+	close(efd);
+	zk_tree_destroy();
+	INIT_RB_ROOT(&zk_node_root);
+	INIT_LIST_HEAD(&zk_block_list);
+	nr_sd_nodes = 0;
+	first_push = true;
+	memset(sd_nodes, 0, sizeof(struct sd_node) * SD_MAX_NODES);
+
+	while (sd_reconnect_handler()) {
+		sd_eprintf("failed to reconnect. sleep and retry...");
+		sleep(1);
+	}
+}
+
 static void zk_event_handler(int listen_fd, int events, void *data)
 {
 	eventfd_t value;
@@ -942,6 +964,14 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 
 	if (eventfd_read(efd, &value) < 0) {
 		sd_eprintf("%m");
+		return;
+	}
+
+	if (zoo_state(zhandle) == ZOO_EXPIRED_SESSION_STATE) {
+		sd_eprintf("detect a session timeout. reconnecting...");
+		handle_session_expire();
+		sd_iprintf("reconnected");
+		eventfd_write(efd, 1);
 		return;
 	}
 
