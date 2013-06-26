@@ -17,7 +17,7 @@ sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
 sheepdogsysconf_DATA	= 
 
-SUBDIRS			= lib collie sheep include script shepherd
+SUBDIRS			= lib collie sheep include script shepherd tools
 
 if BUILD_SHEEPFS
 SUBDIRS			+= sheepfs

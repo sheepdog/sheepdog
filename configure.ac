@@ -137,7 +137,8 @@ AC_CONFIG_FILES([Makefile
 		shepherd/Makefile
 		tests/unit/Makefile
 		tests/unit/collie/Makefile
-		tests/unit/sheep/Makefile])
+		tests/unit/sheep/Makefile
+		tools/Makefile])
 
 ### Local business
 
