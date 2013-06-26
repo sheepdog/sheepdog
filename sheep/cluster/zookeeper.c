@@ -155,6 +155,24 @@ static struct zk_node this_node;
 	default:							\
 		panic("failed, path:%s, %s", path, zerror(rc));		\
 	}
+#define RETURN_IF_ERROR(stmt, fmt, ...)					\
+	do {								\
+		int __rc = stmt;					\
+		if (__rc != ZOK) {					\
+			sd_eprintf("failed, " fmt ", %s",		\
+				   ##__VA_ARGS__, zerror(__rc));	\
+			return __rc;					\
+		}							\
+	} while (0)
+#define RETURN_VOID_IF_ERROR(stmt, fmt, ...)				\
+	do {								\
+		int __rc = stmt;					\
+		if (__rc != ZOK) {					\
+			sd_eprintf("failed, " fmt ", %s",		\
+				   ##__VA_ARGS__, zerror(__rc));	\
+			return;						\
+		}							\
+	} while (0)
 
 static inline ZOOAPI int zk_delete_node(const char *path, int version)
 {
@@ -279,15 +297,17 @@ static int zk_queue_peek(bool *peek)
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
 	rc = zk_node_exists(path);
-	if (rc == ZOK)
+	switch (rc) {
+	case ZOK:
 		*peek = true;
-	else if (rc == ZNONODE) {
-		rc = ZOK;
+		return ZOK;
+	case ZNONODE:
 		*peek = false;
-	} else
+		return ZOK;
+	default:
 		sd_eprintf("failed, %s", zerror(rc));
-
-	return rc;
+		return rc;
+	}
 }
 
 /* return true if there is a node with 'id' in the queue. */
@@ -373,7 +393,7 @@ static inline void *zk_event_sd_nodes(struct zk_event *ev)
 static int push_join_response(struct zk_event *ev)
 {
 	char path[MAX_NODE_STR_LEN];
-	int len, rc;
+	int len;
 
 	ev->type = EVENT_JOIN_RESPONSE;
 	ev->nr_nodes = nr_sd_nodes;
@@ -383,32 +403,26 @@ static int push_join_response(struct zk_event *ev)
 
 	len = offsetof(typeof(*ev), buf) + ev->buf_len;
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
-	rc = zk_set_data(path, (char *)ev, len, -1);
-	if (rc == ZOK)
-		sd_dprintf("update path:%s, queue_pos:%010"PRId32", len:%d",
-			   path, queue_pos, len);
-	else
-		sd_eprintf("failed, %s", zerror(rc));
 
-	return rc;
+	RETURN_IF_ERROR(zk_set_data(path, (char *)ev, len, -1), "");
+	sd_dprintf("update path:%s, queue_pos:%010"PRId32", len:%d",
+		   path, queue_pos, len);
+	return ZOK;
 }
 
 static int zk_queue_pop_advance(struct zk_event *ev)
 {
-	int rc, len;
+	int len;
 	char path[MAX_NODE_STR_LEN];
 
 	len = sizeof(*ev);
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
-	rc = zk_get_data(path, ev, &len);
-	if (rc == ZOK) {
-		sd_dprintf("%s, type:%d, len:%d, pos:%"PRId32, path, ev->type,
-			   len, queue_pos);
-		queue_pos++;
-	} else
-		sd_eprintf("failed, path %s, %s", path, zerror(rc));
 
-	return rc;
+	RETURN_IF_ERROR(zk_get_data(path, ev, &len), "path %s", path);
+	sd_dprintf("%s, type:%d, len:%d, pos:%"PRId32, path, ev->type,
+		   len, queue_pos);
+	queue_pos++;
+	return ZOK;
 }
 
 static inline void zk_tree_add(struct zk_node *node)
@@ -471,27 +485,10 @@ static inline void build_node_list(void)
 
 static int zk_queue_init(void)
 {
-	int rc;
-	rc = zk_init_node(BASE_ZNODE);
-	if (rc != ZOK) {
-		sd_eprintf("failed, path %s, %s", BASE_ZNODE, zerror(rc));
-		return rc;
-	}
-	rc = zk_init_node(MASTER_ZNONE);
-	if (rc != ZOK) {
-		sd_eprintf("failed, path %s, %s", MASTER_ZNONE, zerror(rc));
-		return rc;
-	}
-	rc = zk_init_node(QUEUE_ZNODE);
-	if (rc != ZOK) {
-		sd_eprintf("failed, path %s, %s", QUEUE_ZNODE, zerror(rc));
-		return rc;
-	}
-	rc = zk_init_node(MEMBER_ZNODE);
-	if (rc != ZOK) {
-		sd_eprintf("failed, path %s, %s", MEMBER_ZNODE, zerror(rc));
-		return rc;
-	}
+	RETURN_IF_ERROR(zk_init_node(BASE_ZNODE), "path %s", BASE_ZNODE);
+	RETURN_IF_ERROR(zk_init_node(MASTER_ZNONE), "path %s", MASTER_ZNONE);
+	RETURN_IF_ERROR(zk_init_node(QUEUE_ZNODE), "path %s", QUEUE_ZNODE);
+	RETURN_IF_ERROR(zk_init_node(MEMBER_ZNODE), "path %s", MEMBER_ZNODE);
 	return ZOK;
 }
 
@@ -606,11 +603,7 @@ static int zk_get_least_seq(const char *parent, char *least_seq_path,
 	int rc, least_seq = INT_MAX , seq;
 
 	while (true) {
-		rc = zk_get_children(parent, &strs);
-		if (rc != ZOK) {
-			sd_eprintf("failed, %s", zerror(rc));
-			return rc;
-		}
+		RETURN_IF_ERROR(zk_get_children(parent, &strs), "");
 
 		FOR_EACH_ZNODE(parent, path, &strs) {
 			p = strrchr(path, '/');
@@ -622,13 +615,13 @@ static int zk_get_least_seq(const char *parent, char *least_seq_path,
 		snprintf(path, MAX_NODE_STR_LEN, "%s/%010"PRId32,
 			 parent, least_seq);
 		rc = zk_get_data(path, buf, buf_len);
-
-		if (rc == ZOK) {
+		switch (rc) {
+		case ZOK:
 			strncpy(least_seq_path, path, path_len);
 			return ZOK;
-		} else if (rc == ZNONODE)
-			continue;
-		else {
+		case ZNONODE:
+			break;
+		default:
 			sd_eprintf("failed, %s", zerror(rc));
 			return rc;
 		}
@@ -641,35 +634,33 @@ static int zk_find_master(int *master_seq, char *master_name)
 	char master_compete_path[MAX_NODE_STR_LEN];
 
 	if (*master_seq < 0) {
-		rc = zk_get_least_seq(MASTER_ZNONE, master_compete_path,
-				      MAX_NODE_STR_LEN, master_name, &len);
-		if (rc != ZOK) {
-			sd_eprintf("failed");
-			return rc;
-		}
+		RETURN_IF_ERROR(zk_get_least_seq(MASTER_ZNONE,
+						 master_compete_path,
+						 MAX_NODE_STR_LEN, master_name,
+						 &len), "");
 		sscanf(master_compete_path, MASTER_ZNONE "/%"PRId32,
 		       master_seq);
+		return ZOK;
 	} else {
 		while (true) {
 			snprintf(master_compete_path, len,
 				 MASTER_ZNONE "/%010"PRId32, *master_seq);
 			rc = zk_get_data(master_compete_path, master_name,
 					 &len);
-			if (rc == ZOK)
-				break;
-			else if (rc == ZNONODE) {
+			switch (rc) {
+			case ZOK:
+				return ZOK;
+			case ZNONODE:
 				sd_iprintf("detect master leave, "
 					   "start to compete master");
 				(*master_seq)++;
-				continue;
-			} else {
+				break;
+			default:
 				sd_eprintf("failed, %s", zerror(rc));
 				return rc;
 			}
 		}
 	}
-
-	return ZOK;
 }
 
 /*
@@ -687,22 +678,21 @@ static int zk_verify_last_sheep_join(int seq, int *last_sheep)
 		rc = zk_get_data(path, name, &len);
 		if (rc == ZNONODE)
 			continue;
-		else if (rc != ZOK) {
-			sd_eprintf("failed, %s", zerror(rc));
-			return rc;
-		}
+		else
+			RETURN_IF_ERROR(rc, "");
 
 		if (!strcmp(name, node_to_str(&this_node.node)))
 			continue;
 
 		snprintf(path, MAX_NODE_STR_LEN, MEMBER_ZNODE "/%s", name);
 		rc = zk_node_exists(path);
-		if (rc == ZOK)
-			break;
-		else if (rc == ZNONODE) {
+		switch (rc) {
+		case ZOK:
+			return ZOK;
+		case ZNONODE:
 			(*last_sheep)++;
-			continue;
-		} else {
+			break;
+		default:
 			sd_eprintf("failed, %s", zerror(rc));
 			return rc;
 		}
@@ -802,11 +792,9 @@ static int zk_join(const struct sd_node *myself,
 	}
 
 	zk_compete_master();
-	rc = add_join_event(opaque, opaque_len);
-	if (rc != ZOK)
-		sd_eprintf("failed, %s", zerror(rc));
+	RETURN_IF_ERROR(add_join_event(opaque, opaque_len), "");
 
-	return rc;
+	return ZOK;
 }
 
 static int zk_leave(void)
@@ -865,20 +853,12 @@ static void watch_all_nodes(void)
 {
 	struct String_vector strs;
 	char path[MAX_NODE_STR_LEN];
-	int rc;
 
-	rc = zk_get_children(MEMBER_ZNODE, &strs);
-	if (rc != ZOK)
-		goto error;
+	RETURN_VOID_IF_ERROR(zk_get_children(MEMBER_ZNODE, &strs), "");
 
 	FOR_EACH_ZNODE(MEMBER_ZNODE, path, &strs) {
-		rc = zk_node_exists(path);
-		if (rc != ZOK)
-			goto error;
+		RETURN_VOID_IF_ERROR(zk_node_exists(path), "");
 	}
-	return;
-error:
-	sd_eprintf("failed, %s", zerror(rc));
 }
 
 static void init_node_list(struct zk_event *ev)
@@ -931,10 +911,7 @@ static void zk_handle_join_response(struct zk_event *ev)
 					    sizeof(clientid_t),
 					    &ZOO_OPEN_ACL_UNSAFE,
 					    ZOO_EPHEMERAL, NULL, 0);
-			if (rc != ZOK) {
-				sd_eprintf("failed, %s", zerror(rc));
-				return;
-			}
+			RETURN_VOID_IF_ERROR(rc, "");
 		} else
 			zk_node_exists(path);
 
@@ -1083,41 +1060,22 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 		return;
 	}
 
-	switch (zk_queue_peek(&peek)) {
-	case ZOK:
-		if (!peek)
-			goto kick_block_event;
-		break;
-	default:
-		sd_eprintf("failed");
-		return;
-	}
+	RETURN_VOID_IF_ERROR(zk_queue_peek(&peek), "");
+	if (!peek)
+		goto kick_block_event;
 
-	if (zk_queue_pop_advance(&ev) != ZOK) {
-		sd_eprintf("failed");
-		return;
-	}
+	RETURN_VOID_IF_ERROR(zk_queue_pop_advance(&ev), "");
 	if (ev.type < zk_max_event_handlers && zk_event_handlers[ev.type])
 		zk_event_handlers[ev.type](&ev);
 	else
 		panic("unhandled type %d", ev.type);
 
-	switch (zk_queue_peek(&peek)) {
-	case ZOK:
-		if (peek) {
-			/*
-			 * Someone has created next event,
-			 * go kick event handler.
-			 */
-			eventfd_write(efd, 1);
-			return;
-		}
-		break;
-	default:
-		sd_eprintf("failed");
+	RETURN_VOID_IF_ERROR(zk_queue_peek(&peek), "");
+	if (peek) {
+		/* Someone has created next event, go kick event handler. */
+		eventfd_write(efd, 1);
 		return;
 	}
-
 kick_block_event:
 	/*
 	 * Kick block event only if there is no nonblock event. We perfer to
