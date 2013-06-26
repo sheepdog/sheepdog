@@ -691,7 +691,7 @@ notrace int __sd_dump_variable(const char *var, const void *base_sp)
 	FILE *f = NULL;
 
 	if (!check_gdb()) {
-		sd_eprintf("cannot find gdb");
+		sd_dprintf("cannot find gdb");
 		return -1;
 	}
 
@@ -741,7 +741,7 @@ static notrace int __dump_stack_frames(const void *base_sp)
 	int i, stack_no = 0;
 
 	if (!check_gdb()) {
-		sd_eprintf("cannot find gdb");
+		sd_dprintf("cannot find gdb");
 		return -1;
 	}
 
@@ -784,8 +784,8 @@ static notrace int __dump_stack_frames(const void *base_sp)
 		}
 
 		if (!found) {
-			sd_eprintf("Cannot get info from GDB");
-			sd_eprintf("Set /proc/sys/kernel/yama/ptrace_scope to"
+			sd_iprintf("Cannot get info from GDB");
+			sd_iprintf("Set /proc/sys/kernel/yama/ptrace_scope to"
 				   " zero if you are using Ubuntu.");
 			pclose(f);
 			return -1;

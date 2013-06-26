@@ -182,7 +182,7 @@ static void objlist_deletion_work(struct work *work)
 	 * again, in which case we should not reclaim the cached entry.
 	 */
 	if (vdi_exist(vid)) {
-		sd_eprintf("VDI (%" PRIx32 ") is still in use, can not be"
+		sd_dprintf("VDI (%" PRIx32 ") is still in use, can not be"
 			" deleted", vid);
 		return;
 	}

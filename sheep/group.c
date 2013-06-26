@@ -867,7 +867,7 @@ static void update_cluster_info(const struct join_message *msg,
 {
 	struct vnode_info *old_vnode_info;
 
-	sd_eprintf("status = %d, epoch = %d, finished: %d",
+	sd_dprintf("status = %d, epoch = %d, finished: %d",
 		   msg->cluster_status, msg->epoch, sys->join_finished);
 
 	if (!sys->join_finished)
@@ -1049,7 +1049,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		panic("invalid system status: 0x%x", sys->status);
 	}
 
-	sd_eprintf("%s: ret = 0x%x, cluster_status = 0x%x",
+	sd_dprintf("%s: ret = 0x%x, cluster_status = 0x%x",
 		   addr_to_str(str, sizeof(str), joining->nid.addr,
 			       joining->nid.port),
 		   ret, jm->cluster_status);

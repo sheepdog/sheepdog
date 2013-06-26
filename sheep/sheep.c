@@ -399,9 +399,9 @@ static void check_host_env(void)
 			   SD_RLIM_NOFILE);
 
 	if (getrlimit(RLIMIT_CORE, &r) < 0)
-		sd_eprintf("failed to get core %m");
+		sd_dprintf("failed to get core %m");
 	else if (r.rlim_cur < RLIM_INFINITY)
-		sd_iprintf("Allowed core file size %lu, suggested unlimited",
+		sd_dprintf("Allowed core file size %lu, suggested unlimited",
 			   r.rlim_cur);
 
 	/*

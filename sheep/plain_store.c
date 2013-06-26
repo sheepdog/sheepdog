@@ -381,7 +381,7 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 		if (errno == EEXIST)
 			goto out;
 
-		sd_eprintf("failed to link from %s to %s, %m", stale_path,
+		sd_dprintf("failed to link from %s to %s, %m", stale_path,
 			   path);
 		return err_to_sderr(path, oid, errno);
 	}
