@@ -576,7 +576,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 }
 
 /*
- * We plcaehode the enough space to piggyback the nodes information on join
+ * We placehold the enough space to piggyback the nodes information on join
  * response message so that every node can see the same membership view.
  */
 static int add_join_event(void *msg, size_t msg_len)
