@@ -47,7 +47,7 @@ for i in `seq 3 3`; do
     $SHEEP $STORE/$i -d -z 2 -p 700$i -c $DRIVER -y 127.0.0.1
 done
 
-sleep 10
+_wait_for_sheep 4
 
 echo "check that all sheep are alive"
 for i in `seq 0 3`; do

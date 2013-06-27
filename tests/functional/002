@@ -25,9 +25,11 @@ _wait_for_sheep 3
 _cluster_format
 
 # kill all sheeps
+nr=3
 for i in 0 1 2; do
+    _wait_for_sheep $nr $i
     _kill_sheep $i
-    sleep 1
+    nr=$(($nr - 1))
 done
 
 # master transfer will happen once

@@ -24,10 +24,11 @@ _wait_for_sheep 2
 _cluster_format -c 1
 
 for i in 2 3 4; do
+    _wait_for_sheep 2 $((i - 2))
     _kill_sheep $((i - 2))
-    sleep 1
+    _wait_for_sheep 1 $((i - 1))
+
     _start_sheep $i
-    sleep 2
 done
 
 _wait_for_sheep 2 4

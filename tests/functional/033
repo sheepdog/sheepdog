@@ -35,14 +35,16 @@ $COLLIE vdi read test | md5sum
 for i in 7 6 5; do
     _kill_sheep $i
 done
-sleep 1 # this is necessary to avoid network partition detection
+# this is necessary to avoid network partition detection
+nr=5
 for i in 4 3 2 1; do
+    _wait_for_sheep $nr $i
     _kill_sheep $i
-    sleep 1
+    nr=$(($nr - 1))
 done
 
 # make sheep 0 master to avoid master transfer
-sleep 1
+_wait_for_sheep 1
 _kill_sheep 0
 
 sleep 1

@@ -40,7 +40,7 @@ _safe_remove $STORE/1/d0
 dd if=/dev/zero | $COLLIE vdi write test &
 sleep 1
 _kill_sheep 2
-sleep 1
+_wait_for_sheep 3
 _safe_remove $STORE/1/d1
 _wait_for_sheep_recovery 0
 wait # collie

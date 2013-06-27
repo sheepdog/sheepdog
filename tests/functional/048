@@ -32,11 +32,12 @@ sleep 2
 _wait_for_sheep_recovery 1
 $COLLIE node list -p 7001
 
+nr=2
 for i in 3 4 0; do
 	_start_sheep $i
-	sleep 2
+	nr=$(($nr + 1))
+	_wait_for_sheep $nr $i
 done
-_wait_for_sheep 5
 _wait_for_sheep_recovery 0
 
 $COLLIE vdi track test

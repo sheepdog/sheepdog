@@ -25,17 +25,19 @@ _cluster_format -c 2
 
 for i in 2 3 4; do
     # add one node after killing existing one node
+    _wait_for_sheep 2 $((i - 2))
     _kill_sheep $((i - 2))
-    sleep 1
+    _wait_for_sheep 1 $((i - 1))
 
     _start_sheep $i
-    sleep 2
 done
 
 # kill all existing nodes
+nr=2
 for i in 3 4; do
+    _wait_for_sheep $nr $i
     _kill_sheep $i
-    sleep 1
+    nr=$(($nr - 1))
 done
 
 for i in 0 1 2 3 4; do

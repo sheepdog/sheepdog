@@ -42,7 +42,7 @@ for i in `seq 0 5`; do
     fi
 
     _kill_sheep 2
-    sleep 1
+    _wait_for_sheep 1
 done
 
 echo "success"

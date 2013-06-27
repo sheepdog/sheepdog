@@ -26,16 +26,17 @@ _cluster_format
 
 # kill the master node
 _kill_sheep 0
-sleep 1
+_wait_for_sheep 1 1
 
 # start another sheep
 _start_sheep 2
-_wait_for_sheep 2 2
 
 # kill all sheeps
+nr=2
 for i in 1 2; do
+    _wait_for_sheep $nr $i
     _kill_sheep $i
-    sleep 1
+    nr=$(($nr - 1))
 done
 
 for i in 0 1 2; do

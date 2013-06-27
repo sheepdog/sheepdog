@@ -213,9 +213,6 @@ _wait_for_sheep()
         if [ ${nr_sheep} -eq $1 ]; then
             break
         fi
-        if [ ${nr_sheep} -gt $1 ]; then
-            _die "ERROR: too many sheep in cluster: ${nr_sheep}, expect: $1"
-        fi
         sleep 1
     done
 }

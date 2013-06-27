@@ -35,11 +35,14 @@ for i in `seq 0 24`; do
 done
 
 # kill 5 nodes
+nr=8
 for i in `seq 3 7`; do
+    _wait_for_sheep $nr
     _wait_for_sheep_recovery 0
     _kill_sheep $i
-    sleep 3
+    nr=$(($nr - 1))
 done
+_wait_for_sheep 3
 
 # update vdi
 for i in `seq 0 24`; do
