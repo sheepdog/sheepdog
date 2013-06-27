@@ -351,6 +351,10 @@ static int cluster_get_vdi_attr(struct request *req)
 static int local_release_vdi(struct request *req)
 {
 	uint32_t vid = req->rq.vdi.base_vdi_id;
+	int ret;
+
+	if (!sys->enable_object_cache)
+		return SD_RES_SUCCESS;
 
 	if (!vid) {
 		sd_iprintf("Some VDI failed to release the object cache. "
@@ -358,10 +362,11 @@ static int local_release_vdi(struct request *req)
 		return SD_RES_SUCCESS;
 	}
 
-	object_cache_flush_vdi(vid);
-	object_cache_delete(vid);
+	ret = object_cache_flush_vdi(vid);
+	if (ret == SD_RES_SUCCESS)
+		object_cache_delete(vid);
 
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 static int local_get_store_list(struct request *req)
