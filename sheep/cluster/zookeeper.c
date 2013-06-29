@@ -19,6 +19,7 @@
 #include <pthread.h>
 
 #include "cluster.h"
+#include "config.h"
 #include "event.h"
 #include "work.h"
 #include "util.h"
@@ -152,6 +153,14 @@ static struct zk_node this_node;
 		sd_eprintf("failed, path:%s, %s", path, zerror(rc));	\
 	case ZOK:							\
 		break;							\
+	case ZNOCHILDRENFOREPHEMERALS:					\
+		/*							\
+		 * Because code has guaranteed that parent nodes are	\
+		 * always non-ephemeral, this could happen only when	\
+		 * sheep joins a cluster in an incompatible version.	\
+		 */							\
+		sd_eprintf("incompatible version of sheep %s",		\
+			   PACKAGE_VERSION);				\
 	default:							\
 		panic("failed, path:%s, %s", path, zerror(rc));		\
 	}
