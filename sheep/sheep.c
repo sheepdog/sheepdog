@@ -786,7 +786,7 @@ int main(int argc, char **argv)
 
 	free(dir);
 	check_host_env();
-	sd_printf(SDOG_NOTICE, "sheepdog daemon (version %s) started",
+	sd_printf(SDOG_INFO, "sheepdog daemon (version %s) started",
 		  PACKAGE_VERSION);
 
 	while (sys->nr_outstanding_reqs != 0 ||
