@@ -820,8 +820,6 @@ static int local_flush_vdi(struct request *req)
 	if (sys->enable_object_cache) {
 		uint32_t vid = oid_to_vid(req->rq.obj.oid);
 		ret = object_cache_flush_vdi(vid);
-		if (ret != SD_RES_SUCCESS)
-			return ret;
 	}
 
 	return ret;
