@@ -609,6 +609,14 @@ static int vdi_create(int argc, char **argv)
 	}
 	show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 	ret = EXIT_SUCCESS;
+
+	if (verbose) {
+		if (raw_output)
+			printf("%x\n", vid);
+		else
+			printf("VDI ID of newly created VDI: %x\n", vid);
+	}
+
 out:
 	free(inode);
 	return ret;
@@ -639,8 +647,17 @@ static int vdi_snapshot(int argc, char **argv)
 				      0, inode->nr_copies, false, true);
 	}
 
-	return do_vdi_create(vdiname, inode->vdi_size, vid, NULL, true,
+	ret = do_vdi_create(vdiname, inode->vdi_size, vid, NULL, true,
 			     inode->nr_copies);
+
+	if (ret == EXIT_SUCCESS && verbose) {
+		if (raw_output)
+			printf("%x\n", vid);
+		else
+			printf("VDI ID of newly created snapshot: %x\n", vid);
+	}
+
+	return ret;
 }
 
 static int vdi_clone(int argc, char **argv)
@@ -712,6 +729,13 @@ static int vdi_clone(int argc, char **argv)
 	}
 	show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 	ret = EXIT_SUCCESS;
+
+	if (verbose) {
+		if (raw_output)
+			printf("%x\n", new_vid);
+		else
+			printf("VDI ID of newly created clone: %x\n", new_vid);
+	}
 out:
 	free(inode);
 	free(buf);
@@ -818,7 +842,7 @@ static int vdi_delete(int argc, char **argv)
 static int vdi_rollback(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
-	uint32_t base_vid;
+	uint32_t base_vid, new_vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
@@ -844,8 +868,17 @@ static int vdi_rollback(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	return do_vdi_create(vdiname, inode->vdi_size, base_vid, NULL,
+	ret = do_vdi_create(vdiname, inode->vdi_size, base_vid, &new_vid,
 			     false, vdi_cmd_data.nr_copies);
+
+	if (ret == EXIT_SUCCESS && verbose) {
+		if (raw_output)
+			printf("%x\n", new_vid);
+		else
+			printf("New VDI ID of rollbacked VDI: %x\n", new_vid);
+	}
+
+	return ret;
 }
 
 static int vdi_object(int argc, char **argv)
@@ -2025,19 +2058,19 @@ static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_ARG,
 	 vdi_check, vdi_options},
-	{"create", "<vdiname> <size>", "Pcaph", "create an image",
+	{"create", "<vdiname> <size>", "Pcaphrv", "create an image",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST|SUBCMD_FLAG_NEED_ARG,
 	 vdi_create, vdi_options},
-	{"snapshot", "<vdiname>", "saph", "create a snapshot",
+	{"snapshot", "<vdiname>", "saphrv", "create a snapshot",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_snapshot, vdi_options},
-	{"clone", "<src vdi> <dst vdi>", "sPcaph", "clone an image",
+	{"clone", "<src vdi> <dst vdi>", "sPcaphrv", "clone an image",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_clone, vdi_options},
 	{"delete", "<vdiname>", "saph", "delete an image",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_delete, vdi_options},
-	{"rollback", "<vdiname>", "saphf", "rollback to a snapshot",
+	{"rollback", "<vdiname>", "saphfrv", "rollback to a snapshot",
 	 NULL, SUBCMD_FLAG_NEED_ARG,
 	 vdi_rollback, vdi_options},
 	{"list", "[vdiname]", "aprh", "list images",

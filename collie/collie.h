@@ -52,6 +52,7 @@ extern const char *sdhost;
 extern int sdport;
 extern bool highlight;
 extern bool raw_output;
+extern bool verbose;
 
 extern uint32_t sd_epoch;
 extern struct sd_node sd_nodes[SD_MAX_NODES];

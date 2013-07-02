@@ -25,6 +25,7 @@ const char *sdhost = "127.0.0.1";
 int sdport = SD_LISTEN_PORT;
 bool highlight = true;
 bool raw_output;
+bool verbose;
 
 static const struct sd_option collie_options[] = {
 
@@ -33,6 +34,7 @@ static const struct sd_option collie_options[] = {
 	{'p', "port", true, "specify the daemon port"},
 	{'r', "raw", false, "raw output mode: omit headers, separate fields with\n"
 	 "                          single spaces and print all sizes in decimal bytes"},
+	{'v', "verbose", false, "print more information than default"},
 	{'h', "help", false, "display this help and exit"},
 
 	{ 0, NULL, false, NULL },
@@ -375,6 +377,9 @@ int main(int argc, char **argv)
 			break;
 		case 'r':
 			raw_output = true;
+			break;
+		case 'v':
+			verbose = true;
 			break;
 		case 'h':
 			subcommand_usage(argv[1], argv[2], EXIT_SUCCESS);
