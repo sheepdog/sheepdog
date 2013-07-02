@@ -693,6 +693,7 @@ static struct cluster_driver cdrv_shepherd = {
 	.block		= shepherd_block,
 	.unblock	= shepherd_unblock,
 	.update_node	= shepherd_update_node,
+	.get_local_addr = get_local_addr,
 };
 
 cdrv_register(cdrv_shepherd);

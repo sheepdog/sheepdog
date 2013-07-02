@@ -1173,6 +1173,7 @@ static struct cluster_driver cdrv_zookeeper = {
 	.block      = zk_block,
 	.unblock    = zk_unblock,
 	.update_node = zk_update_node,
+	.get_local_addr = get_local_addr,
 };
 
 cdrv_register(cdrv_zookeeper);

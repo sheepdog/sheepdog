@@ -1284,10 +1284,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		return -1;
 
 	if (!explicit_addr) {
-		if (sys->cdrv->get_local_addr)
-			ret = sys->cdrv->get_local_addr(sys->this_node.nid.addr);
-		else
-			ret = get_local_addr(sys->this_node.nid.addr);
+		ret = sys->cdrv->get_local_addr(sys->this_node.nid.addr);
+
 		if (ret < 0)
 			return -1;
 	}
