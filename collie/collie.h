@@ -23,6 +23,7 @@
 #include "option.h"
 #include "work.h"
 #include "event.h"
+#include "config.h"
 
 #define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
 #define SUBCMD_FLAG_NEED_ARG (1 << 1)
@@ -87,10 +88,10 @@ extern struct command vdi_command;
 extern struct command node_command;
 extern struct command cluster_command;
 
-#ifdef ENABLE_TRACE
+#ifdef HAVE_TRACE
   extern struct command debug_command;
 #else
   #define debug_command {}
-#endif /* ENABLE_TRACE */
+#endif /* HAVE_TRACE */
 
 #endif

@@ -10,6 +10,7 @@
 #include "sheep.h"
 #include "list.h"
 #include "util.h"
+#include "config.h"
 
 struct ipinfo {
 	const char *file;           /* Source code filename for EIP */
@@ -48,7 +49,7 @@ void trace_return_caller(void);
 unsigned long trace_return_call(void);
 
 /* trace.c */
-#ifdef ENABLE_TRACE
+#ifdef HAVE_TRACE
   int trace_init_signal(void);
   int trace_init(void);
   int register_trace_function(trace_func_t func);
@@ -71,7 +72,7 @@ unsigned long trace_return_call(void);
   static inline void trace_register_thread(pthread_t id) { return; }
   static inline void trace_unregister_thread(pthread_t id) { return; }
 
-#endif /* ENABLE_TRACE */
+#endif /* HAVE_TRACE */
 
 #define register_tracer(new)			\
 static void __attribute__((constructor))	\

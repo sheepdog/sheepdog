@@ -360,7 +360,7 @@ if test "x${enable_trace}" = xyes && \
 		cc_supports_flag -pg && \
 		cc_supports_flag -gstabs ; then
 	AC_MSG_NOTICE([Enabling trace (-pg -gstabs)])
-	TRACE_CFLAGS="-pg -gstabs -DENABLE_TRACE"
+	TRACE_CFLAGS="-pg -gstabs"
 	TRACE_LDFLAGS="-T$(pwd)/sheep/trace/trace.ld"
 	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
 else
