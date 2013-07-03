@@ -677,10 +677,11 @@ static void shepherd_unblock(void *msg, size_t msg_len)
 	do_shepherd_notify(true, msg, msg_len);
 }
 
+/* FIXME: shepherd server also has to udpate node information */
 static void shepherd_update_node(struct sd_node *node)
 {
 	struct sd_node *n = xlfind(node, nodes, nr_nodes, node_cmp);
-	*n = *nodes;
+	*n = *node;
 }
 
 static struct cluster_driver cdrv_shepherd = {
