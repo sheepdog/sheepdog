@@ -111,6 +111,7 @@ int init_config_file(void)
 		goto out;
 	}
 	ret = 0;
+	get_cluster_config(&sys->cinfo);
 out:
 	close(fd);
 
@@ -131,57 +132,24 @@ void init_config_path(const char *base_path)
 	snprintf(config_path, len, "%s" CONFIG_PATH, base_path);
 }
 
-int set_cluster_ctime(uint64_t ct)
+int set_cluster_config(const struct cluster_info *cinfo)
 {
-	config.ctime = ct;
-
-	return write_config();
-}
-
-uint64_t get_cluster_ctime(void)
-{
-	return config.ctime;
-}
-
-int set_cluster_copies(uint8_t copies)
-{
-	config.copies = copies;
-
-	return write_config();
-}
-
-int get_cluster_copies(uint8_t *copies)
-{
-	*copies = config.copies;
-
-	return SD_RES_SUCCESS;
-}
-
-int set_cluster_flags(uint16_t flags)
-{
-	config.flags = flags;
-
-	return write_config();
-}
-
-int get_cluster_flags(uint16_t *flags)
-{
-	*flags = config.flags;
-
-	return SD_RES_SUCCESS;
-}
-
-int set_cluster_store(const char *name)
-{
+	config.ctime = cinfo->ctime;
+	config.copies = cinfo->nr_copies;
+	config.flags = cinfo->flags;
 	memset(config.store, 0, sizeof(config.store));
-	pstrcpy((char *)config.store, sizeof(config.store), name);
+	pstrcpy((char *)config.store, sizeof(config.store),
+		(char *)cinfo->store);
 
 	return write_config();
 }
 
-int get_cluster_store(char *buf)
+int get_cluster_config(struct cluster_info *cinfo)
 {
-	memcpy(buf, config.store, sizeof(config.store));
+	cinfo->ctime = config.ctime;
+	cinfo->nr_copies = config.copies;
+	cinfo->flags = config.flags;
+	memcpy(cinfo->store, config.store, sizeof(config.store));
 
 	return SD_RES_SUCCESS;
 }

@@ -275,12 +275,8 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 int log_current_epoch(void);
 
 extern char *config_path;
-int set_cluster_copies(uint8_t copies);
-int get_cluster_copies(uint8_t *copies);
-int set_cluster_flags(uint16_t flags);
-int get_cluster_flags(uint16_t *flags);
-int set_cluster_store(const char *name);
-int get_cluster_store(char *buf);
+int set_cluster_config(const struct cluster_info *cinfo);
+int get_cluster_config(struct cluster_info *cinfo);
 int set_node_space(uint64_t space);
 int get_node_space(uint64_t *space);
 
@@ -295,8 +291,6 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 uint32_t get_latest_epoch(void);
 void init_config_path(const char *base_path);
 int init_config_file(void);
-int set_cluster_ctime(uint64_t ctime);
-uint64_t get_cluster_ctime(void);
 int get_obj_list(const struct sd_req *, struct sd_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
 

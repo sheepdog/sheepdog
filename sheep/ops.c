@@ -255,8 +255,6 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	ret = sd_store->format();
 	if (ret != SD_RES_SUCCESS)
 		return ret;
-	if (set_cluster_store(store_name) < 0)
-		return SD_RES_EIO;
 
 	ret = sd_store->init();
 	if (ret != SD_RES_SUCCESS)
@@ -267,10 +265,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (!sys->cinfo.nr_copies)
 		sys->cinfo.nr_copies = SD_DEFAULT_COPIES;
 	sys->cinfo.ctime = req->cluster.ctime;
-
-	set_cluster_ctime(sys->cinfo.ctime);
-	set_cluster_copies(sys->cinfo.nr_copies);
-	set_cluster_flags(sys->cinfo.flags);
+	set_cluster_config(&sys->cinfo);
 
 	for (i = 1; i <= latest_epoch; i++)
 		remove_epoch(i);
@@ -439,7 +434,7 @@ static int local_stat_cluster(struct request *req)
 		log = (struct epoch_log *)req->data + i;
 		memset(log, 0, sizeof(*log));
 		log->epoch = epoch;
-		log->ctime = get_cluster_ctime();
+		log->ctime = sys->cinfo.ctime;
 		nr_nodes = epoch_log_read_with_timestamp(epoch, log->nodes,
 							 sizeof(log->nodes),
 							 (time_t *)&log->time);
@@ -545,8 +540,6 @@ static int cluster_force_recover_main(const struct sd_req *req,
 {
 	struct vnode_info *old_vnode_info, *vnode_info;
 	int ret = SD_RES_SUCCESS;
-	uint8_t c;
-	uint16_t f;
 	struct sd_node *nodes = data;
 	size_t nr_nodes = rsp->data_length / sizeof(*nodes);
 
@@ -554,20 +547,6 @@ static int cluster_force_recover_main(const struct sd_req *req,
 		sd_eprintf("epoch was incremented while cluster_force_recover");
 		return SD_RES_FORCE_RECOVER;
 	}
-
-	ret = get_cluster_copies(&c);
-	if (ret) {
-		sd_printf(SDOG_EMERG, "cannot get cluster copies");
-		goto err;
-	}
-	ret = get_cluster_flags(&f);
-	if (ret) {
-		sd_printf(SDOG_EMERG, "cannot get cluster flags");
-		goto err;
-	}
-
-	sys->cinfo.nr_copies = c;
-	sys->cinfo.flags = f;
 
 	sys->cinfo.epoch++; /* some nodes are left, so we get a new epoch */
 	ret = log_current_epoch();

@@ -496,18 +496,12 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 
 static int cluster_sanity_check(struct join_message *jm)
 {
-	uint64_t local_ctime = get_cluster_ctime();
 	uint32_t local_epoch = get_latest_epoch();
-	uint8_t local_nr_copies;
 
-	if (get_cluster_copies(&local_nr_copies)) {
-		sd_eprintf("failed to get nr_copies");
-		return CJ_RES_FAIL;
-	}
-
-	if (jm->cinfo.ctime != local_ctime) {
+	if (jm->cinfo.ctime != sys->cinfo.ctime) {
 		sd_eprintf("joining node ctime doesn't match: %"
-			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime, local_ctime);
+			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime,
+			   sys->cinfo.ctime);
 		return CJ_RES_FAIL;
 	}
 
@@ -517,9 +511,9 @@ static int cluster_sanity_check(struct join_message *jm)
 		return CJ_RES_FAIL;
 	}
 
-	if (jm->cinfo.nr_copies != local_nr_copies) {
+	if (jm->cinfo.nr_copies != sys->cinfo.nr_copies) {
 		sd_eprintf("joining node nr_copies doesn't match: %u vs %u",
-			   jm->cinfo.nr_copies, local_nr_copies);
+			   jm->cinfo.nr_copies, sys->cinfo.nr_copies);
 		return CJ_RES_FAIL;
 	}
 
@@ -753,10 +747,6 @@ static void setup_backend_store(const char *store, bool need_purge)
 		ret = sd_store->init();
 		if (ret != SD_RES_SUCCESS)
 			panic("failed to initialize store");
-
-		ret = set_cluster_store(sd_store->name);
-		if (ret != SD_RES_SUCCESS)
-			panic("failed to store into config file");
 	}
 
 	/*
@@ -774,8 +764,6 @@ static void finish_join(const struct join_message *msg,
 			const struct sd_node *joined,
 			const struct sd_node *nodes, size_t nr_nodes)
 {
-	int ret;
-
 	sys->join_finished = true;
 	sys->cinfo.epoch = msg->cinfo.epoch;
 
@@ -783,16 +771,7 @@ static void finish_join(const struct join_message *msg,
 		update_exceptional_node_list(get_latest_epoch(), msg);
 
 	if (msg->cinfo.store[0]) {
-		/*
-		 * We don't need backend for gateway-only node, but need to save
-		 * store name.  Otherwise, the node cannot notify the store name
-		 * when it become master
-		 */
-		if (sys->gateway_only) {
-			ret = set_cluster_store((char *)msg->cinfo.store);
-			if (ret != SD_RES_SUCCESS)
-				panic("failed to store into config file");
-		} else
+		if (!sys->gateway_only)
 			setup_backend_store((char *)msg->cinfo.store,
 					    !!msg->inc_epoch);
 	}
@@ -882,9 +861,7 @@ static void update_cluster_info(const struct join_message *msg,
 			sys->cinfo.nr_copies = msg->cinfo.nr_copies;
 			sys->cinfo.flags = msg->cinfo.flags;
 
-			set_cluster_copies(sys->cinfo.nr_copies);
-			set_cluster_flags(sys->cinfo.flags);
-			set_cluster_ctime(msg->cinfo.ctime);
+			set_cluster_config(&sys->cinfo);
 			/*FALLTHROUGH*/
 		case SD_STATUS_WAIT_FOR_JOIN:
 			sys->cinfo.disable_recovery =
@@ -1014,7 +991,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 			return CJ_RES_FAIL;
 
 		sys->cinfo.epoch = epoch;
-		jm->cinfo.ctime = get_cluster_ctime();
+		jm->cinfo.ctime = sys->cinfo.ctime;
 
 		if (nr_entries == 1)
 			jm->cluster_status = SD_STATUS_OK;
@@ -1288,10 +1265,6 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	sys->cinfo.epoch = get_latest_epoch();
 	if (sys->cinfo.epoch) {
 		sys->status = SD_STATUS_WAIT_FOR_JOIN;
-		get_cluster_copies(&sys->cinfo.nr_copies);
-		get_cluster_flags(&sys->cinfo.flags);
-		sys->cinfo.ctime = get_cluster_ctime();
-		get_cluster_store((char *)sys->cinfo.store);
 
 		sys->cinfo.nr_nodes = epoch_log_read(sys->cinfo.epoch,
 						     sys->cinfo.nodes,

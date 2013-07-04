@@ -268,11 +268,7 @@ static int init_epoch_path(const char *base_path)
 int init_store_driver(bool is_gateway)
 {
 	char driver_name[STORE_LEN], *p;
-	int ret;
 
-	ret = get_cluster_store((char *)sys->cinfo.store);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
 	pstrcpy(driver_name, sizeof(driver_name), (char *)sys->cinfo.store);
 
 	p = memchr(driver_name, '\0', STORE_LEN);
