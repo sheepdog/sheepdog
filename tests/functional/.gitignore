@@ -1,0 +1,4 @@
+*.bad
+*.full
+check.log
+check.time
