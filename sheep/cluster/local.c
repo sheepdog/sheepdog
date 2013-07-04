@@ -24,7 +24,7 @@
 #include "util.h"
 
 #define MAX_EVENTS 500
-#define PROCESS_CHECK_INTERVAL 200 /* ms */
+#define PROCESS_CHECK_INTERVAL 50 /* ms */
 
 static const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
