@@ -575,7 +575,7 @@ static void recover_next_object(struct recovery_info *rinfo)
 	if (rinfo->nr_prio_oids)
 		finish_schedule_oids(rinfo);
 
-	if (sys->disable_recovery && !has_scheduled_objects(rinfo)) {
+	if (sys->cinfo.disable_recovery && !has_scheduled_objects(rinfo)) {
 		sd_dprintf("suspended");
 		rinfo->suspended = true;
 		/* suspend until resume_suspended_recovery() is called */
@@ -796,8 +796,9 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 
 	rinfo = xzalloc(sizeof(struct recovery_info));
 	rinfo->state = RW_PREPARE_LIST;
-	rinfo->epoch = sys->epoch;
-	rinfo->tgt_epoch = epoch_lifted ? sys->epoch - 1 : sys->epoch;
+	rinfo->epoch = sys->cinfo.epoch;
+	rinfo->tgt_epoch = epoch_lifted ? sys->cinfo.epoch - 1 :
+		sys->cinfo.epoch;
 	rinfo->count = 0;
 	if (epoch_lifted)
 		rinfo->notify_complete = true; /* Reweight or node recovery */

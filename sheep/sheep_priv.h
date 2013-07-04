@@ -63,7 +63,7 @@ struct request {
 	struct work work;
 };
 
-struct cluster_info {
+struct system_info {
 	struct cluster_driver *cdrv;
 	const char *cdrv_option;
 
@@ -71,15 +71,13 @@ struct cluster_info {
 	bool join_finished;
 	struct sd_node this_node;
 
-	uint32_t epoch;
+	struct cluster_info cinfo;
 	uint32_t status;
-	uint16_t flags;
 
 	uint64_t disk_space;
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	uint8_t nr_copies;
 	int local_req_efd;
 
 	pthread_mutex_t local_req_lock;
@@ -88,7 +86,6 @@ struct cluster_info {
 	int nr_outstanding_reqs;
 
 	bool gateway_only;
-	bool disable_recovery;
 	bool nosync;
 
 	struct work_queue *gateway_wqueue;
@@ -204,7 +201,7 @@ static inline struct store_driver *find_store_driver(const char *name)
 	return NULL;
 }
 
-extern struct cluster_info *sys;
+extern struct system_info *sys;
 extern struct store_driver *sd_store;
 extern char *obj_path;
 extern char *epoch_path;
@@ -212,7 +209,7 @@ extern char *epoch_path;
 /* One should call this function to get sys->epoch outside main thread */
 static inline uint32_t sys_epoch(void)
 {
-	return uatomic_read(&sys->epoch);
+	return uatomic_read(&sys->cinfo.epoch);
 }
 
 static inline bool is_aligned_to_pagesize(void *p)

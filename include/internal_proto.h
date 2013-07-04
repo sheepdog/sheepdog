@@ -129,6 +129,20 @@ struct sd_node {
 	uint64_t        space;
 };
 
+struct cluster_info {
+	uint8_t nr_copies;
+	uint8_t disable_recovery;
+	int16_t nr_nodes;
+	uint32_t epoch;
+	uint64_t ctime;
+	uint16_t flags;
+	uint16_t __pad[3];
+	uint8_t store[STORE_LEN];
+
+	/* node list at cluster_info->epoch */
+	struct sd_node nodes[SD_MAX_NODES];
+};
+
 struct epoch_log {
 	uint64_t ctime;
 	uint64_t time;		/* treated as time_t */
@@ -141,27 +155,19 @@ struct epoch_log {
 
 struct join_message {
 	uint8_t proto_ver;
-	uint8_t nr_copies;
-	int16_t nr_nodes;
+	uint8_t __pad1[3];
 	uint16_t nr_failed_nodes;
 	uint16_t nr_delayed_nodes;
 	uint32_t cluster_status;
-	uint32_t epoch;
-	uint64_t ctime;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
-	uint8_t disable_recovery;
-	uint16_t cluster_flags;
-	uint32_t __pad;
-	uint8_t store[STORE_LEN];
+	uint8_t __pad2[3];
 
 	/*
-	 * A joining sheep puts the local node list here, which is nr_nodes
-	 * entries long.  After the master replies it will contain the list of
-	 * nodes that attempted to join but failed the join process.  The
-	 * number of entries in that case is nr_failed_nodes, which by
-	 * defintion must be smaller than nr_nodes.
+	 * A joining sheep puts the local cluster info here.  After the master
+	 * replies it will contain the latest cluster info which is shared among
+	 * the existing nodes.
 	 */
-	struct sd_node nodes[];
+	struct cluster_info cinfo;
 };
 
 struct vdi_op_message {

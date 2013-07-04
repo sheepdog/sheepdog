@@ -1,3 +1,3 @@
 #include "sheep_priv.h"
 
-struct cluster_info *sys;
+struct system_info *sys;

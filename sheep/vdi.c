@@ -134,7 +134,7 @@ int get_max_copy_number(void)
 	int nr_copies = uatomic_read(&max_copies);
 
 	if (nr_copies == 0)
-		nr_copies = sys->nr_copies;
+		nr_copies = sys->cinfo.nr_copies;
 
 	return nr_copies;
 }

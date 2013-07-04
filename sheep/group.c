@@ -62,15 +62,6 @@ static main_thread(struct list_head *) failed_nodes;
  */
 static main_thread(struct list_head *) delayed_nodes;
 
-static size_t get_join_message_size(struct join_message *jm)
-{
-	/*
-	 * jm->nr_nodes is guaranteed to be larger than jm->nr_failed_nodes,
-	 * so it is safe to unconditionally use jm->nr_nodes here.
-	 */
-	return sizeof(*jm) + jm->nr_nodes * sizeof(jm->nodes[0]);
-}
-
 static int get_zones_nr_from(const struct sd_node *nodes, int nr_nodes)
 {
 	int nr_zones = 0, i, j;
@@ -104,7 +95,7 @@ bool have_enough_zones(void)
 	int max_copies;
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
-	if (sys->flags & SD_FLAG_NOHALT)
+	if (sys->cinfo.flags & SD_FLAG_NOHALT)
 		return true;
 
 	if (!cur_vinfo)
@@ -113,12 +104,12 @@ bool have_enough_zones(void)
 	max_copies = get_max_copy_number();
 
 	sd_dprintf("flags %d, nr_zones %d, min copies %d",
-		   sys->flags, cur_vinfo->nr_zones, max_copies);
+		   sys->cinfo.flags, cur_vinfo->nr_zones, max_copies);
 
 	if (!cur_vinfo->nr_zones)
 		return false;
 
-	if (sys->flags & SD_FLAG_QUORUM) {
+	if (sys->cinfo.flags & SD_FLAG_QUORUM) {
 		if (cur_vinfo->nr_zones > (max_copies/2))
 			return true;
 	} else {
@@ -433,9 +424,9 @@ static void update_exceptional_node_list(uint32_t epoch,
 	int i;
 
 	for (i = 0; i < jm->nr_failed_nodes; i++)
-		add_failed_node(epoch, &jm->nodes[i]);
+		add_failed_node(epoch, &jm->cinfo.nodes[i]);
 	for ( ; i < jm->nr_failed_nodes + jm->nr_delayed_nodes; i++)
-		add_delayed_node(epoch, &jm->nodes[i]);
+		add_delayed_node(epoch, &jm->cinfo.nodes[i]);
 }
 
 /* Format the lists of failed or delayed nodes into the join message. */
@@ -444,9 +435,10 @@ static void format_exceptional_node_list(struct join_message *jm)
 	struct node *n;
 
 	list_for_each_entry(n, main_thread_get(failed_nodes), list)
-		jm->nodes[jm->nr_failed_nodes++] = n->ent;
+		jm->cinfo.nodes[jm->nr_failed_nodes++] = n->ent;
 	list_for_each_entry(n, main_thread_get(delayed_nodes), list)
-		jm->nodes[jm->nr_failed_nodes + jm->nr_delayed_nodes++] = n->ent;
+		jm->cinfo.nodes[jm->nr_failed_nodes +
+				jm->nr_delayed_nodes++] = n->ent;
 }
 
 static void clear_exceptional_node_lists(void)
@@ -513,27 +505,27 @@ static int cluster_sanity_check(struct join_message *jm)
 		return CJ_RES_FAIL;
 	}
 
-	if (jm->ctime != local_ctime) {
+	if (jm->cinfo.ctime != local_ctime) {
 		sd_eprintf("joining node ctime doesn't match: %"
-			   PRIu64 " vs %" PRIu64, jm->ctime, local_ctime);
+			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime, local_ctime);
 		return CJ_RES_FAIL;
 	}
 
-	if (jm->epoch > local_epoch) {
+	if (jm->cinfo.epoch > local_epoch) {
 		sd_eprintf("joining node epoch too large: %"
-			   PRIu32 " vs %" PRIu32, jm->epoch, local_epoch);
+			   PRIu32 " vs %" PRIu32, jm->cinfo.epoch, local_epoch);
 		return CJ_RES_FAIL;
 	}
 
-	if (jm->nr_copies != local_nr_copies) {
+	if (jm->cinfo.nr_copies != local_nr_copies) {
 		sd_eprintf("joining node nr_copies doesn't match: %u vs %u",
-			   jm->nr_copies, local_nr_copies);
+			   jm->cinfo.nr_copies, local_nr_copies);
 		return CJ_RES_FAIL;
 	}
 
-	if (jm->cluster_flags != sys->flags) {
+	if (jm->cinfo.flags != sys->cinfo.flags) {
 		sd_eprintf("joining node cluster_flags don't match: %u vs %u",
-			   jm->cluster_flags, sys->flags);
+			   jm->cinfo.flags, sys->cinfo.flags);
 		return CJ_RES_FAIL;
 	}
 
@@ -549,42 +541,42 @@ static int cluster_wait_for_join_check(const struct sd_node *joined,
 	int ret;
 	struct vnode_info *cur_vinfo;
 
-	if (jm->nr_nodes == 0)
+	if (jm->cinfo.nr_nodes == 0)
 		return CJ_RES_JOIN_LATER;
 
 	ret = cluster_sanity_check(jm);
 	if (ret != CJ_RES_SUCCESS)  {
-		if (jm->epoch > sys->epoch) {
-			sd_eprintf("transfer mastership (%d, %d)", jm->epoch,
-				   sys->epoch);
+		if (jm->cinfo.epoch > sys->cinfo.epoch) {
+			sd_eprintf("transfer mastership (%d, %d)",
+				   jm->cinfo.epoch, sys->cinfo.epoch);
 			return CJ_RES_MASTER_TRANSFER;
 		}
 		return ret;
 	}
 
-	nr_local_entries = epoch_log_read(jm->epoch, local_entries,
+	nr_local_entries = epoch_log_read(jm->cinfo.epoch, local_entries,
 					  sizeof(local_entries));
 	if (nr_local_entries == -1)
 		return CJ_RES_FAIL;
 
-	if (jm->epoch < local_epoch) {
+	if (jm->cinfo.epoch < local_epoch) {
 		sd_eprintf("joining node epoch too small: %"
-			   PRIu32 " vs %" PRIu32, jm->epoch, local_epoch);
+			   PRIu32 " vs %" PRIu32, jm->cinfo.epoch, local_epoch);
 
 		if (xbsearch(joined, local_entries, nr_local_entries, node_cmp))
 			return CJ_RES_FAIL;
 		return CJ_RES_JOIN_LATER;
 	}
 
-	if (jm->nr_nodes != nr_local_entries) {
+	if (jm->cinfo.nr_nodes != nr_local_entries) {
 		sd_eprintf("epoch log entries do not match: %d vs %d",
-			   jm->nr_nodes, nr_local_entries);
+			   jm->cinfo.nr_nodes, nr_local_entries);
 		return CJ_RES_FAIL;
 	}
 
 
-	if (memcmp(jm->nodes, local_entries,
-		   sizeof(jm->nodes[0]) * jm->nr_nodes) != 0) {
+	if (memcmp(jm->cinfo.nodes, local_entries,
+		   sizeof(jm->cinfo.nodes[0]) * jm->cinfo.nr_nodes) != 0) {
 		sd_eprintf("epoch log entries does not match");
 		return CJ_RES_FAIL;
 	}
@@ -633,7 +625,7 @@ static int cluster_running_check(struct join_message *jm)
 	 * When the joining node is newly created and we are not waiting for
 	 * join we do not need to check anything.
 	 */
-	if (jm->nr_nodes != 0) {
+	if (jm->cinfo.nr_nodes != 0) {
 		ret = cluster_sanity_check(jm);
 		if (ret != CJ_RES_SUCCESS)
 			return ret;
@@ -726,8 +718,13 @@ int log_current_epoch(void)
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
 	if (!cur_vinfo)
-		return update_epoch_log(sys->epoch, NULL, 0);
-	return update_epoch_log(sys->epoch, cur_vinfo->nodes,
+		return update_epoch_log(sys->cinfo.epoch, NULL, 0);
+
+	/* update cluster info to the latest state */
+	sys->cinfo.nr_nodes = cur_vinfo->nr_nodes;
+	memcpy(sys->cinfo.nodes, cur_vinfo->nodes,
+	       sizeof(cur_vinfo->nodes[0]) * cur_vinfo->nr_nodes);
+	return update_epoch_log(sys->cinfo.epoch, cur_vinfo->nodes,
 				cur_vinfo->nr_nodes);
 }
 
@@ -780,23 +777,23 @@ static void finish_join(const struct join_message *msg,
 	int ret;
 
 	sys->join_finished = true;
-	sys->epoch = msg->epoch;
+	sys->cinfo.epoch = msg->cinfo.epoch;
 
 	if (msg->cluster_status != SD_STATUS_OK)
 		update_exceptional_node_list(get_latest_epoch(), msg);
 
-	if (msg->store[0]) {
+	if (msg->cinfo.store[0]) {
 		/*
 		 * We don't need backend for gateway-only node, but need to save
 		 * store name.  Otherwise, the node cannot notify the store name
 		 * when it become master
 		 */
 		if (sys->gateway_only) {
-			ret = set_cluster_store((char *)msg->store);
+			ret = set_cluster_store((char *)msg->cinfo.store);
 			if (ret != SD_RES_SUCCESS)
 				panic("failed to store into config file");
 		} else
-			setup_backend_store((char *)msg->store,
+			setup_backend_store((char *)msg->cinfo.store,
 					    !!msg->inc_epoch);
 	}
 
@@ -868,7 +865,7 @@ static void update_cluster_info(const struct join_message *msg,
 	struct vnode_info *old_vnode_info;
 
 	sd_dprintf("status = %d, epoch = %d, finished: %d",
-		   msg->cluster_status, msg->epoch, sys->join_finished);
+		   msg->cluster_status, msg->cinfo.epoch, sys->join_finished);
 
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
@@ -882,15 +879,16 @@ static void update_cluster_info(const struct join_message *msg,
 	case SD_STATUS_HALT:
 		switch (sys->status) {
 		case SD_STATUS_WAIT_FOR_FORMAT:
-			sys->nr_copies = msg->nr_copies;
-			sys->flags = msg->cluster_flags;
+			sys->cinfo.nr_copies = msg->cinfo.nr_copies;
+			sys->cinfo.flags = msg->cinfo.flags;
 
-			set_cluster_copies(sys->nr_copies);
-			set_cluster_flags(sys->flags);
-			set_cluster_ctime(msg->ctime);
+			set_cluster_copies(sys->cinfo.nr_copies);
+			set_cluster_flags(sys->cinfo.flags);
+			set_cluster_ctime(msg->cinfo.ctime);
 			/*FALLTHROUGH*/
 		case SD_STATUS_WAIT_FOR_JOIN:
-			sys->disable_recovery = msg->disable_recovery;
+			sys->cinfo.disable_recovery =
+				msg->cinfo.disable_recovery;
 			break;
 		default:
 			break;
@@ -901,7 +899,7 @@ static void update_cluster_info(const struct join_message *msg,
 		sys->status = msg->cluster_status;
 
 		if (msg->inc_epoch) {
-			uatomic_inc(&sys->epoch);
+			uatomic_inc(&sys->cinfo.epoch);
 			log_current_epoch();
 			clear_exceptional_node_lists();
 
@@ -1015,8 +1013,8 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		if (nr_entries == -1)
 			return CJ_RES_FAIL;
 
-		sys->epoch = epoch;
-		jm->ctime = get_cluster_ctime();
+		sys->cinfo.epoch = epoch;
+		jm->cinfo.ctime = get_cluster_ctime();
 
 		if (nr_entries == 1)
 			jm->cluster_status = SD_STATUS_OK;
@@ -1031,7 +1029,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		ret = CJ_RES_FAIL;
 		break;
 	case SD_STATUS_WAIT_FOR_FORMAT:
-		if (jm->nr_nodes != 0) {
+		if (jm->cinfo.nr_nodes != 0) {
 			ret = CJ_RES_FAIL;
 			break;
 		}
@@ -1054,15 +1052,9 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 			       joining->nid.port),
 		   ret, jm->cluster_status);
 
-	jm->nr_copies = sys->nr_copies;
-	jm->cluster_flags = sys->flags;
-	jm->epoch = sys->epoch;
-	jm->ctime = get_cluster_ctime();
 	jm->nr_failed_nodes = 0;
-	jm->disable_recovery = sys->disable_recovery;
 
-	if (sd_store)
-		pstrcpy((char *)jm->store, sizeof(jm->store), sd_store->name);
+	jm->cinfo = sys->cinfo;
 
 	if (jm->cluster_status != SD_STATUS_OK &&
 	    (ret == CJ_RES_SUCCESS || ret == CJ_RES_JOIN_LATER))
@@ -1075,22 +1067,11 @@ static int send_join_request(struct sd_node *ent)
 	struct join_message *msg;
 	int ret;
 
-	msg = xzalloc(sizeof(*msg) + SD_MAX_NODES * sizeof(msg->nodes[0]));
+	msg = xzalloc(sizeof(*msg));
 	msg->proto_ver = SD_SHEEP_PROTO_VER;
-	msg->nr_copies = sys->nr_copies;
-	msg->cluster_flags = sys->flags;
-	msg->epoch = sys->epoch;
-	msg->ctime = get_cluster_ctime();
+	msg->cinfo = sys->cinfo;
 
-	if (msg->epoch) {
-		msg->nr_nodes = epoch_log_read(msg->epoch, msg->nodes,
-					       sizeof(struct sd_node) *
-					       SD_MAX_NODES);
-		if (msg->nr_nodes == -1)
-			return SD_RES_EIO;
-	}
-
-	ret = sys->cdrv->join(ent, msg, get_join_message_size(msg));
+	ret = sys->cdrv->join(ent, msg, sizeof(*msg));
 
 	sd_printf(SDOG_INFO, "%s", node_to_str(&sys->this_node));
 
@@ -1120,6 +1101,8 @@ void sd_join_handler(const struct sd_node *joined,
 	int nr, nr_local, nr_failed, nr_delayed;
 	const struct join_message *jm = opaque;
 	uint32_t le = get_latest_epoch();
+
+	sys->cinfo = jm->cinfo;
 
 	if (node_is_local(joined)) {
 		if (result == CJ_RES_FAIL) {
@@ -1154,7 +1137,7 @@ void sd_join_handler(const struct sd_node *joined,
 		if (!add_failed_node(le, joined))
 			break;
 
-		nr_local = get_nodes_nr_epoch(sys->epoch);
+		nr_local = get_nodes_nr_epoch(sys->cinfo.epoch);
 		nr = nr_members;
 		nr_failed = get_nodes_nr_from(main_thread_get(failed_nodes));
 		nr_delayed = get_nodes_nr_from(main_thread_get(delayed_nodes));
@@ -1174,14 +1157,14 @@ void sd_join_handler(const struct sd_node *joined,
 		 */
 		if (!sys->join_finished) {
 			sys->join_finished = true;
-			sys->epoch = get_latest_epoch();
+			sys->cinfo.epoch = get_latest_epoch();
 
 			put_vnode_info(main_thread_get(current_vnode_info));
 			main_thread_set(current_vnode_info,
 					  alloc_vnode_info(&sys->this_node, 1));
 		}
 
-		nr_local = get_nodes_nr_epoch(sys->epoch);
+		nr_local = get_nodes_nr_epoch(sys->cinfo.epoch);
 		nr = nr_members;
 		nr_failed = get_nodes_nr_from(main_thread_get(failed_nodes));
 		nr_delayed = get_nodes_nr_from(main_thread_get(delayed_nodes));
@@ -1226,7 +1209,7 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	switch (sys->status) {
 	case SD_STATUS_HALT:
 	case SD_STATUS_OK:
-		uatomic_inc(&sys->epoch);
+		uatomic_inc(&sys->cinfo.epoch);
 		log_current_epoch();
 		start_recovery(main_thread_get(current_vnode_info),
 			       old_vnode_info, true);
@@ -1257,7 +1240,7 @@ void kick_node_recover(void)
 
 	main_thread_set(current_vnode_info,
 			alloc_vnode_info(old->nodes, old->nr_nodes));
-	uatomic_inc(&sys->epoch);
+	uatomic_inc(&sys->cinfo.epoch);
 	log_current_epoch();
 	start_recovery(main_thread_get(current_vnode_info), old, true);
 	put_vnode_info(old);
@@ -1302,12 +1285,19 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	sys->this_node.space = sys->disk_space;
 
-	sys->epoch = get_latest_epoch();
-	if (sys->epoch) {
+	sys->cinfo.epoch = get_latest_epoch();
+	if (sys->cinfo.epoch) {
 		sys->status = SD_STATUS_WAIT_FOR_JOIN;
-		get_cluster_copies(&sys->nr_copies);
-		get_cluster_flags(&sys->flags);
+		get_cluster_copies(&sys->cinfo.nr_copies);
+		get_cluster_flags(&sys->cinfo.flags);
+		sys->cinfo.ctime = get_cluster_ctime();
+		get_cluster_store((char *)sys->cinfo.store);
 
+		sys->cinfo.nr_nodes = epoch_log_read(sys->cinfo.epoch,
+						     sys->cinfo.nodes,
+						     sizeof(sys->cinfo.nodes));
+		if (sys->cinfo.nr_nodes == -1)
+			return -1;
 	} else {
 		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	}

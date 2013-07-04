@@ -106,7 +106,7 @@ static void gateway_op_done(struct work *work)
 
 	switch (req->rp.result) {
 	case SD_RES_OLD_NODE_VER:
-		if (req->rp.epoch > sys->epoch) {
+		if (req->rp.epoch > sys->cinfo.epoch) {
 			/*
 			 * Gateway of this node is expected to process this
 			 * request later when epoch is lifted.
@@ -122,7 +122,7 @@ static void gateway_op_done(struct work *work)
 	case SD_RES_KILLED:
 		sd_dprintf("retrying failed I/O request op %s result %x epoch %"
 			   PRIu32", sys epoch %"PRIu32, op_name(req->op),
-			   req->rp.result, req->rq.epoch, sys->epoch);
+			   req->rp.result, req->rq.epoch, sys->cinfo.epoch);
 		goto retry;
 	case SD_RES_EIO:
 		if (is_access_local(req, hdr->obj.oid)) {
@@ -158,17 +158,17 @@ static void local_op_done(struct work *work)
 
 static int check_request_epoch(struct request *req)
 {
-	if (before(req->rq.epoch, sys->epoch)) {
+	if (before(req->rq.epoch, sys->cinfo.epoch)) {
 		sd_eprintf("old node version %u, %u (%s)",
-			   sys->epoch, req->rq.epoch, op_name(req->op));
+			   sys->cinfo.epoch, req->rq.epoch, op_name(req->op));
 		/* Ask for sleeping req on requester's wait queue */
 		req->rp.result = SD_RES_OLD_NODE_VER;
-		req->rp.epoch = sys->epoch;
+		req->rp.epoch = sys->cinfo.epoch;
 		put_request(req);
 		return -1;
-	} else if (after(req->rq.epoch, sys->epoch)) {
+	} else if (after(req->rq.epoch, sys->cinfo.epoch)) {
 		sd_eprintf("new node version %u, %u (%s)",
-			   sys->epoch, req->rq.epoch, op_name(req->op));
+			   sys->cinfo.epoch, req->rq.epoch, op_name(req->op));
 		/* Wait for local epoch to be lifted */
 		req->rp.result = SD_RES_NEW_NODE_VER;
 		sleep_on_wait_queue(req);
@@ -221,7 +221,7 @@ void wakeup_requests_on_epoch(void)
 			 */
 			assert(is_gateway_op(req->op));
 			sd_dprintf("gateway %"PRIx64, req->rq.obj.oid);
-			req->rq.epoch = sys->epoch;
+			req->rq.epoch = sys->cinfo.epoch;
 			del_requeue_request(req);
 			break;
 		case SD_RES_NEW_NODE_VER:
@@ -390,13 +390,13 @@ static void queue_request(struct request *req)
 	if (is_peer_op(req->op)) {
 		queue_peer_request(req);
 	} else if (is_gateway_op(req->op)) {
-		hdr->epoch = sys->epoch;
+		hdr->epoch = sys->cinfo.epoch;
 		queue_gateway_request(req);
 	} else if (is_local_op(req->op)) {
-		hdr->epoch = sys->epoch;
+		hdr->epoch = sys->cinfo.epoch;
 		queue_local_request(req);
 	} else if (is_cluster_op(req->op)) {
-		hdr->epoch = sys->epoch;
+		hdr->epoch = sys->cinfo.epoch;
 		queue_cluster_request(req);
 	} else {
 		sd_eprintf("unknown operation %d", hdr->opcode);
@@ -645,7 +645,7 @@ static void init_tx_hdr(struct client_info *ci)
 	/* use cpu_to_le */
 	memcpy(rsp, &req->rp, sizeof(*rsp));
 
-	rsp->epoch = sys->epoch;
+	rsp->epoch = sys->cinfo.epoch;
 	rsp->opcode = req->rq.opcode;
 	rsp->id = req->rq.id;
 }

@@ -187,8 +187,8 @@ static void crash_handler(int signo)
 	reraise_crash_signal(signo, 1);
 }
 
-static struct cluster_info __sys;
-struct cluster_info *sys = &__sys;
+static struct system_info __sys;
+struct system_info *sys = &__sys;
 
 static void parse_arg(char *arg, const char *delim, void (*fn)(char *))
 {
