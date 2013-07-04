@@ -295,28 +295,18 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			/* check_join() must be called only once */
 			return false;
 
-		res = sd_check_join_cb(&cevent->sender.ent,
-						     cevent->msg);
-		if (res == CJ_RES_MASTER_TRANSFER)
-			nr_cpg_nodes = 0;
-
+		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
+		res = sd_check_join_cb(&cevent->sender.ent, entries,
+				       nr_cpg_nodes, cevent->msg);
 		send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, res,
 			     &cevent->sender, cpg_nodes, nr_cpg_nodes,
 			     cevent->msg, cevent->msg_len);
-
-		if (res == CJ_RES_MASTER_TRANSFER) {
-			sd_eprintf("failed to join sheepdog cluster:"
-				   " please retry when master is up");
-			exit(1);
-		}
 
 		cevent->callbacked = true;
 		return false;
 	case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
 		switch (cevent->result) {
 		case CJ_RES_SUCCESS:
-		case CJ_RES_MASTER_TRANSFER:
-		case CJ_RES_JOIN_LATER:
 			add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 			nr_cpg_nodes++;
 			/* fall through */

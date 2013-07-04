@@ -845,15 +845,11 @@ static void zk_handle_join_request(struct zk_event *ev)
 		return;
 	}
 
-	res = sd_check_join_cb(&ev->sender.node, ev->buf);
+	res = sd_check_join_cb(&ev->sender.node, sd_nodes, nr_sd_nodes,
+			       ev->buf);
 	ev->join_result = res;
 	push_join_response(ev);
-	if (res == CJ_RES_MASTER_TRANSFER) {
-		sd_eprintf("failed to join sheepdog cluster: "
-			   "please retry when master is up");
-		zk_leave();
-		exit(1);
-	}
+
 	sd_dprintf("I'm the master now");
 }
 
@@ -896,19 +892,9 @@ static void zk_handle_join_response(struct zk_event *ev)
 		/* newly joined node */
 		init_node_list(ev);
 
-	if (ev->join_result == CJ_RES_MASTER_TRANSFER)
-		/*
-		 * Sheepdog assumes that only one sheep is alive in
-		 * MASTER_TRANSFER scenario. So only the joining sheep is
-		 * supposed to return single node view to sd_join_handler().
-		 */
-		zk_tree_destroy();
-
 	sd_dprintf("%s, %d", node_to_str(&ev->sender.node), ev->join_result);
 	switch (ev->join_result) {
 	case CJ_RES_SUCCESS:
-	case CJ_RES_JOIN_LATER:
-	case CJ_RES_MASTER_TRANSFER:
 		snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
 			 node_to_str(&ev->sender.node));
 		if (node_eq(&ev->sender.node, &this_node.node)) {

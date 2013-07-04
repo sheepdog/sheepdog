@@ -155,9 +155,7 @@ struct epoch_log {
 
 struct join_message {
 	uint8_t proto_ver;
-	uint8_t __pad1[3];
-	uint16_t nr_failed_nodes;
-	uint16_t nr_delayed_nodes;
+	uint8_t __pad1[7];
 	uint32_t cluster_status;
 	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
 	uint8_t __pad2[3];
@@ -195,18 +193,6 @@ enum cluster_join_result {
 
 	/* Fail to join. The joining node has an invalid epoch. */
 	CJ_RES_FAIL,
-
-	/*
-	 * Fail to join. The joining node should be added after the cluster
-	 * start working.
-	 */
-	CJ_RES_JOIN_LATER,
-
-	/*
-	 * Transfer mastership.  The joining node has a newer epoch, so this
-	 * node will leave the cluster (restart later).
-	 */
-	CJ_RES_MASTER_TRANSFER,
 };
 
 static inline __attribute__((used)) void __sd_epoch_format_build_bug_ons(void)

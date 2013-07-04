@@ -58,7 +58,7 @@ static int do_shepherd_join(void)
 	msg.body_len = msg_join_len;
 
 	msg_join = xzalloc(msg_join_len);
-	msg_join->node = this_node;
+	msg_join->new_node = this_node;
 	memcpy(msg_join->opaque, kept_opaque, kept_opaque_len);
 
 	ret = writev2(sph_comm_fd, &msg, msg_join, msg_join_len);
@@ -115,7 +115,7 @@ retry:
 		 * FIXME: member change events must be ordered with nonblocked
 		 *        events
 		 */
-		res = sd_check_join_cb(&join->node, join->opaque);
+		res = sd_check_join_cb(&join->new_node, NULL, 0, join->opaque);
 		if (res == CJ_RES_FAIL) {
 			sd_eprintf("sd_check_join_cb() failed");
 			exit(1);
@@ -161,19 +161,9 @@ retry:
 
 	sd_iprintf("join reply arrived, nr_nodes: %d", join_reply->nr_nodes);
 
-	if (join_reply->res == CJ_RES_MASTER_TRANSFER) {
-		is_master = true;
-
-		/* FIXME: This code is tricky, but Sheepdog assumes that */
-		/* nr_nodes = 1 when join_result = MASTER_TRANSFER... */
-		nr_nodes = 1;
-		nodes[0] = this_node;
-	} else {
-		memcpy(nodes, join_reply->nodes,
-			join_reply->nr_nodes * sizeof(struct sd_node));
-
-		nr_nodes = join_reply->nr_nodes;
-	}
+	memcpy(nodes, join_reply->nodes,
+	       join_reply->nr_nodes * sizeof(struct sd_node));
+	nr_nodes = join_reply->nr_nodes;
 
 	/* FIXME: member change events must be ordered with nonblocked events */
 	sd_join_handler(&this_node, nodes, nr_nodes,
@@ -343,7 +333,7 @@ static void msg_new_node(struct sph_msg *rcv)
 	}
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	res = sd_check_join_cb(&join->node, join->opaque);
+	res = sd_check_join_cb(&join->new_node, nodes, nr_nodes, join->opaque);
 
 	join->res = res;
 
@@ -357,12 +347,6 @@ static void msg_new_node(struct sph_msg *rcv)
 		exit(1);
 	}
 	free(join);
-
-	if (res == CJ_RES_MASTER_TRANSFER) {
-		sd_eprintf("failed to join sheepdog cluster: "
-			"please retry when master is up");
-		exit(1);
-	}
 }
 
 static void msg_new_node_finish(struct sph_msg *rcv)
@@ -380,11 +364,11 @@ static void msg_new_node_finish(struct sph_msg *rcv)
 
 	jm = (struct join_message *)join_node_finish->opaque;
 	memcpy(nodes, join_node_finish->nodes,
-		join_node_finish->nr_nodes * sizeof(struct sd_node));
+	       join_node_finish->nr_nodes * sizeof(struct sd_node));
 	nr_nodes = join_node_finish->nr_nodes;
 
 	sd_iprintf("new node: %s",
-		node_to_str(&join_node_finish->new_node));
+		   node_to_str(&join_node_finish->new_node));
 
 	/* FIXME: member change events must be ordered with nonblocked events */
 	sd_join_handler(&join_node_finish->new_node, nodes, nr_nodes,

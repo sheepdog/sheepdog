@@ -45,22 +45,6 @@ for i in 0 1 2 3 4; do
     sleep 1
 done
 
-_wait_for_sheep_stop 0
-_wait_for_sheep_stop 1
-_wait_for_sheep_stop 2
-_wait_for_sheep_stop 3
-
-_wait_for_sheep 1 4
-
-echo check whether Sheepdog is running with only one node
-$COLLIE cluster info -p 7004 | _filter_cluster_info
-
-# add the other nodes
-for i in 0 1 2 3; do
-    _start_sheep $i
-    sleep 1
-done
-
 _wait_for_sheep 5
 echo check whether all nodes have the same cluster info
 for i in 0 1 2 3 4; do

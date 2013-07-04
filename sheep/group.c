@@ -50,18 +50,6 @@ static main_thread(struct vnode_info *) current_vnode_info;
 static main_thread(struct list_head *) pending_block_list;
 static main_thread(struct list_head *) pending_notify_list;
 
-/*
- * List of nodes that were part of the last epoch before a shutdown,
- * but failed to join.
- */
-static main_thread(struct list_head *) failed_nodes;
-
-/*
- * List of nodes that weren't part of the last epoch, but joined
- * before restarting the cluster.
- */
-static main_thread(struct list_head *) delayed_nodes;
-
 static int get_zones_nr_from(const struct sd_node *nodes, int nr_nodes)
 {
 	int nr_zones = 0, i, j;
@@ -341,120 +329,6 @@ static inline int get_nodes_nr_from(struct list_head *l)
 	return nr;
 }
 
-static int get_nodes_nr_epoch(uint32_t epoch)
-{
-	struct sd_node nodes[SD_MAX_NODES];
-
-	return epoch_log_read(epoch, nodes, sizeof(nodes));
-}
-
-static const struct sd_node *find_entry_list(const struct sd_node *entry,
-					     struct list_head *head)
-{
-	struct node *n;
-	list_for_each_entry(n, head, list)
-		if (node_eq(&n->ent, entry))
-			return entry;
-
-	return NULL;
-
-}
-
-static const struct sd_node *find_entry_epoch(const struct sd_node *entry,
-					      uint32_t epoch)
-{
-	struct sd_node nodes[SD_MAX_NODES];
-	int nr;
-
-	if (!epoch)
-		return NULL;
-
-	nr = epoch_log_read(epoch, nodes, sizeof(nodes));
-
-	return xlfind(entry, nodes, nr, node_cmp);
-}
-
-/*
- * Add a node to the list of nodes that weren't part of the cluster before
- * it shut down, and thus do not count toward the nodes required to allow
- * an automated restart.  These nodes will become part of the cluster by
- * the time it does get restarted.
- */
-static bool add_delayed_node(uint32_t epoch, const struct sd_node *node)
-{
-	struct node *n;
-
-	if (find_entry_list(node, main_thread_get(delayed_nodes)))
-		return false;
-	assert(!find_entry_epoch(node, epoch));
-
-	n = xmalloc(sizeof(*n));
-	n->ent = *node;
-	list_add_tail(&n->list, main_thread_get(delayed_nodes));
-	return true;
-}
-
-/*
- * For a node that failed to join check if was part of the original
- * epoch, and if so add it to the list of node expected to be present
- * but failing to join.
- */
-static bool add_failed_node(uint32_t epoch, const struct sd_node *node)
-{
-	struct node *n;
-
-	if (find_entry_list(node, main_thread_get(failed_nodes)))
-		return false;
-	if (!find_entry_epoch(node, epoch))
-		return false;
-
-	n = xmalloc(sizeof(*n));
-	n->ent = *node;
-	list_add_tail(&n->list, main_thread_get(failed_nodes));
-	return true;
-}
-
-/*
- * Add the failed and delayed nodes in a join message to the local
- * lists of such nodes.
- */
-static void update_exceptional_node_list(uint32_t epoch,
-					 const struct join_message *jm)
-{
-	int i;
-
-	for (i = 0; i < jm->nr_failed_nodes; i++)
-		add_failed_node(epoch, &jm->cinfo.nodes[i]);
-	for ( ; i < jm->nr_failed_nodes + jm->nr_delayed_nodes; i++)
-		add_delayed_node(epoch, &jm->cinfo.nodes[i]);
-}
-
-/* Format the lists of failed or delayed nodes into the join message. */
-static void format_exceptional_node_list(struct join_message *jm)
-{
-	struct node *n;
-
-	list_for_each_entry(n, main_thread_get(failed_nodes), list)
-		jm->cinfo.nodes[jm->nr_failed_nodes++] = n->ent;
-	list_for_each_entry(n, main_thread_get(delayed_nodes), list)
-		jm->cinfo.nodes[jm->nr_failed_nodes +
-				jm->nr_delayed_nodes++] = n->ent;
-}
-
-static void clear_exceptional_node_lists(void)
-{
-	struct node *n, *t;
-
-	list_for_each_entry_safe(n, t, main_thread_get(failed_nodes), list) {
-		list_del(&n->list);
-		free(n);
-	}
-	list_for_each_entry_safe(n, t, main_thread_get(delayed_nodes), list) {
-		list_del(&n->list);
-		free(n);
-	}
-}
-
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 			  time_t *timestamp, struct vnode_info *vinfo)
 {
@@ -496,18 +370,10 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 
 static int cluster_sanity_check(struct join_message *jm)
 {
-	uint32_t local_epoch = get_latest_epoch();
-
 	if (jm->cinfo.ctime != sys->cinfo.ctime) {
 		sd_eprintf("joining node ctime doesn't match: %"
 			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime,
 			   sys->cinfo.ctime);
-		return CJ_RES_FAIL;
-	}
-
-	if (jm->cinfo.epoch > local_epoch) {
-		sd_eprintf("joining node epoch too large: %"
-			   PRIu32 " vs %" PRIu32, jm->cinfo.epoch, local_epoch);
 		return CJ_RES_FAIL;
 	}
 
@@ -526,88 +392,78 @@ static int cluster_sanity_check(struct join_message *jm)
 	return CJ_RES_SUCCESS;
 }
 
-static int cluster_wait_for_join_check(const struct sd_node *joined,
-				       struct join_message *jm)
+/*
+ * Check whether enough node members are gathered.
+ *
+ * Sheepdog can start automatically if and only if all the members in the latest
+ * epoch are gathered.
+ */
+static bool enough_nodes_gathered(struct join_message *jm,
+				  const struct sd_node *joining,
+				  const struct sd_node *nodes,
+				  size_t nr_nodes)
 {
-	struct sd_node local_entries[SD_MAX_NODES];
-	int nr, nr_local_entries, nr_failed_entries, nr_delayed_nodes;
-	uint32_t local_epoch = get_latest_epoch();
-	int ret;
-	struct vnode_info *cur_vinfo;
+	for (int i = 0; i < jm->cinfo.nr_nodes; i++) {
+		const struct sd_node *key = jm->cinfo.nodes + i, *n;
 
-	if (jm->cinfo.nr_nodes == 0)
-		return CJ_RES_JOIN_LATER;
-
-	ret = cluster_sanity_check(jm);
-	if (ret != CJ_RES_SUCCESS)  {
-		if (jm->cinfo.epoch > sys->cinfo.epoch) {
-			sd_eprintf("transfer mastership (%d, %d)",
-				   jm->cinfo.epoch, sys->cinfo.epoch);
-			return CJ_RES_MASTER_TRANSFER;
+		n = xlfind(key, nodes, nr_nodes, node_cmp);
+		if (n == NULL && !node_eq(key, joining)) {
+			sd_dprintf("%s doesn't join yet", node_to_str(key));
+			return false;
 		}
-		return ret;
 	}
 
-	nr_local_entries = epoch_log_read(jm->cinfo.epoch, local_entries,
-					  sizeof(local_entries));
-	if (nr_local_entries == -1)
-		return CJ_RES_FAIL;
+	sd_dprintf("all the nodes are gathered, %d, %zd", jm->cinfo.nr_nodes,
+		   nr_nodes);
+	return true;
+}
 
-	if (jm->cinfo.epoch < local_epoch) {
-		sd_eprintf("joining node epoch too small: %"
-			   PRIu32 " vs %" PRIu32, jm->cinfo.epoch, local_epoch);
+static int cluster_wait_for_join_check(const struct sd_node *joining,
+				       const struct sd_node *nodes,
+				       size_t nr_nodes, struct join_message *jm)
+{
+	int ret;
 
-		if (xbsearch(joined, local_entries, nr_local_entries, node_cmp))
-			return CJ_RES_FAIL;
-		return CJ_RES_JOIN_LATER;
+	if (jm->cinfo.epoch != 0 && sys->cinfo.epoch != 0) {
+		/* check whether joining node is valid or not */
+		ret = cluster_sanity_check(jm);
+		if (ret != CJ_RES_SUCCESS)
+			return ret;
 	}
 
-	if (jm->cinfo.nr_nodes != nr_local_entries) {
-		sd_eprintf("epoch log entries do not match: %d vs %d",
-			   jm->cinfo.nr_nodes, nr_local_entries);
-		return CJ_RES_FAIL;
-	}
-
-
-	if (memcmp(jm->cinfo.nodes, local_entries,
-		   sizeof(jm->cinfo.nodes[0]) * jm->cinfo.nr_nodes) != 0) {
+	if (jm->cinfo.epoch > sys->cinfo.epoch)
+		sys->cinfo = jm->cinfo;
+	else if (jm->cinfo.epoch < sys->cinfo.epoch) {
+		sd_dprintf("joining node has a smaller epoch, %" PRIu32 ", %"
+			   PRIu32, jm->cinfo.epoch, sys->cinfo.epoch);
+		jm->cinfo = sys->cinfo;
+	} else if (memcmp(jm->cinfo.nodes, sys->cinfo.nodes,
+			  sizeof(*jm->cinfo.nodes) * jm->cinfo.nr_nodes) != 0) {
 		sd_eprintf("epoch log entries does not match");
 		return CJ_RES_FAIL;
 	}
 
-	cur_vinfo = main_thread_get(current_vnode_info);
-	if (!cur_vinfo)
-		nr = 1;
-	else
-		nr = cur_vinfo->nr_nodes + 1;
-
-	nr_delayed_nodes = get_nodes_nr_from(main_thread_get(delayed_nodes));
-
 	/*
 	 * If we have all members from the last epoch log in the in-memory
-	 * node list, and no new nodes joining we can set the cluster live
-	 * now without incrementing the epoch.
+	 * node list, we can set the cluster live now.
 	 */
-	if (nr == nr_local_entries && !nr_delayed_nodes) {
+	if (sys->cinfo.epoch > 0 &&
+	    enough_nodes_gathered(jm, joining, nodes, nr_nodes)) {
+		/*
+		 * The number of current nodes is (nr_nodes + 1) because 'nodes'
+		 * doesn't contain the 'joining' node.
+		 */
+		size_t nr_current_nodes = nr_nodes + 1;
+
+		if (jm->cinfo.nr_nodes < nr_current_nodes)
+			/*
+			 * There are nodes which didn't exist in the previous
+			 * epoch, so we have to increment epoch.
+			 */
+			jm->inc_epoch = 1;
 		jm->cluster_status = SD_STATUS_OK;
-		return CJ_RES_SUCCESS;
 	}
 
-	/*
-	 * If we reach the old node count, but some node failed we have to
-	 * update the epoch before setting the cluster live.
-	 */
-	nr_failed_entries = get_nodes_nr_from(main_thread_get(failed_nodes));
-	if (nr_local_entries == nr + nr_failed_entries - nr_delayed_nodes) {
-		jm->inc_epoch = 1;
-		jm->cluster_status = SD_STATUS_OK;
-		return CJ_RES_SUCCESS;
-	}
-
-	/*
-	 * The join was successful, but we don't have enough nodes yet to set
-	 * the cluster live.
-	 */
 	return CJ_RES_SUCCESS;
 }
 
@@ -767,9 +623,6 @@ static void finish_join(const struct join_message *msg,
 	sys->join_finished = true;
 	sys->cinfo.epoch = msg->cinfo.epoch;
 
-	if (msg->cluster_status != SD_STATUS_OK)
-		update_exceptional_node_list(get_latest_epoch(), msg);
-
 	if (msg->cinfo.store[0]) {
 		if (!sys->gateway_only)
 			setup_backend_store((char *)msg->cinfo.store,
@@ -878,7 +731,6 @@ static void update_cluster_info(const struct join_message *msg,
 		if (msg->inc_epoch) {
 			uatomic_inc(&sys->cinfo.epoch);
 			log_current_epoch();
-			clear_exceptional_node_lists();
 
 			if (!old_vnode_info) {
 				old_vnode_info = alloc_old_vnode_info(joined,
@@ -948,8 +800,14 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
 		cluster_op_running = false;
 }
 
+/*
+ * Check whether the joining nodes can join the sheepdog cluster.
+ *
+ * Note that 'nodes' doesn't contain 'joining'.
+ */
 enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
-					  void *opaque)
+					  const struct sd_node *nodes,
+					  size_t nr_nodes, void *opaque)
 {
 	struct join_message *jm = opaque;
 	char str[MAX_NODE_STR_LEN];
@@ -1014,7 +872,7 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		ret = CJ_RES_SUCCESS;
 		break;
 	case SD_STATUS_WAIT_FOR_JOIN:
-		ret = cluster_wait_for_join_check(joining, jm);
+		ret = cluster_wait_for_join_check(joining, nodes, nr_nodes, jm);
 		break;
 	case SD_STATUS_OK:
 	case SD_STATUS_HALT:
@@ -1029,13 +887,8 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 			       joining->nid.port),
 		   ret, jm->cluster_status);
 
-	jm->nr_failed_nodes = 0;
-
 	jm->cinfo = sys->cinfo;
 
-	if (jm->cluster_status != SD_STATUS_OK &&
-	    (ret == CJ_RES_SUCCESS || ret == CJ_RES_JOIN_LATER))
-		format_exceptional_node_list(jm);
 	return ret;
 }
 
@@ -1075,9 +928,7 @@ void sd_join_handler(const struct sd_node *joined,
 		     const void *opaque)
 {
 	int i;
-	int nr, nr_local, nr_failed, nr_delayed;
 	const struct join_message *jm = opaque;
-	uint32_t le = get_latest_epoch();
 
 	sys->cinfo = jm->cinfo;
 
@@ -1090,9 +941,6 @@ void sd_join_handler(const struct sd_node *joined,
 	}
 
 	switch (result) {
-	case CJ_RES_JOIN_LATER:
-		add_delayed_node(le, joined);
-		/*FALLTHRU*/
 	case CJ_RES_SUCCESS:
 		sd_dprintf("join %s", node_to_str(joined));
 		for (i = 0; i < nr_members; i++)
@@ -1108,53 +956,6 @@ void sd_join_handler(const struct sd_node *joined,
 			sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
 		break;
 	case CJ_RES_FAIL:
-		if (sys->status != SD_STATUS_WAIT_FOR_JOIN)
-			break;
-
-		if (!add_failed_node(le, joined))
-			break;
-
-		nr_local = get_nodes_nr_epoch(sys->cinfo.epoch);
-		nr = nr_members;
-		nr_failed = get_nodes_nr_from(main_thread_get(failed_nodes));
-		nr_delayed = get_nodes_nr_from(main_thread_get(delayed_nodes));
-
-		sd_dprintf("%d == %d + %d", nr_local, nr, nr_failed);
-		if (nr_local == nr + nr_failed - nr_delayed) {
-			sys->status = SD_STATUS_OK;
-			log_current_epoch();
-		}
-		break;
-	case CJ_RES_MASTER_TRANSFER:
-		update_exceptional_node_list(le, jm);
-
-		/*
-		 * Sheep needs this to identify itself as master.
-		 * Now mastership transfer is done.
-		 */
-		if (!sys->join_finished) {
-			sys->join_finished = true;
-			sys->cinfo.epoch = get_latest_epoch();
-
-			put_vnode_info(main_thread_get(current_vnode_info));
-			main_thread_set(current_vnode_info,
-					  alloc_vnode_info(&sys->this_node, 1));
-		}
-
-		nr_local = get_nodes_nr_epoch(sys->cinfo.epoch);
-		nr = nr_members;
-		nr_failed = get_nodes_nr_from(main_thread_get(failed_nodes));
-		nr_delayed = get_nodes_nr_from(main_thread_get(delayed_nodes));
-
-		sd_dprintf("%d == %d + %d", nr_local, nr, nr_failed);
-		if (nr_local == nr + nr_failed - nr_delayed) {
-			sys->status = SD_STATUS_OK;
-			log_current_epoch();
-		}
-
-		if (node_is_local(joined))
-			/* this output is used for testing */
-			sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
 		break;
 	default:
 		/* this means sd_check_join_cb() is buggy */
@@ -1281,10 +1082,6 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	main_thread_set(pending_notify_list,
 			  xzalloc(sizeof(struct list_head)));
 	INIT_LIST_HEAD(main_thread_get(pending_notify_list));
-	main_thread_set(failed_nodes, xzalloc(sizeof(struct list_head)));
-	INIT_LIST_HEAD(main_thread_get(failed_nodes));
-	main_thread_set(delayed_nodes, xzalloc(sizeof(struct list_head)));
-	INIT_LIST_HEAD(main_thread_get(delayed_nodes));
 
 	INIT_LIST_HEAD(&sys->local_req_queue);
 	INIT_LIST_HEAD(&sys->req_wait_queue);

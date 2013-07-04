@@ -344,7 +344,7 @@ static void sph_handle_join(struct sph_msg *msg, struct sheep *sheep)
 		goto purge_current_sheep;
 	}
 
-	sheep->node = join->node;
+	sheep->node = join->new_node;
 
 	snd.type = SPH_SRV_MSG_NEW_NODE;
 	snd.body_len = msg->body_len;
@@ -412,13 +412,13 @@ static void sph_handle_new_node_reply(struct sph_msg *msg, struct sheep *sheep)
 
 	join_result = join->res;
 
-	sd_dprintf("joining node is %s", node_to_str(&join->node));
+	sd_dprintf("joining node is %s", node_to_str(&join->new_node));
 
-	joining_sheep = find_sheep_by_nid(&join->node.nid);
+	joining_sheep = find_sheep_by_nid(&join->new_node.nid);
 	if (!joining_sheep) {
 		/* master is broken */
 		sd_eprintf("invalid nid is required, %s",
-			node_to_str(&join->node));
+			node_to_str(&join->new_node));
 		sd_eprintf("purging master sheep: %s and joining one",
 			node_to_str(&master_sheep->node));
 

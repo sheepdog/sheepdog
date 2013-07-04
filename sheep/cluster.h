@@ -158,7 +158,8 @@ void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 int sd_reconnect_handler(void);
 enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
-					  void *opaque);
+					  const struct sd_node *nodes,
+					  size_t nr_nodes, void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 
 #endif

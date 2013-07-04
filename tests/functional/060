@@ -38,19 +38,16 @@ done
 _reboot_without_collie_shutdown()
 {
     local i
-    for i in `seq 1 7`; do
-	_kill_sheep $i
+    for i in `seq 0 7`; do
+	_kill_sheep $i &
     done
+    wait
 
-    _wait_for_sheep 1
-    _kill_sheep 0
-    _wait_for_sheep_stop
-    _start_sheep 0
-    _wait_for_sheep 1
-
-    for i in `seq 1 7`; do
-	_start_sheep $i
+    for i in `seq 0 7`; do
+	_start_sheep $i &
     done
+    wait
+
     _wait_for_sheep 8
 }
 

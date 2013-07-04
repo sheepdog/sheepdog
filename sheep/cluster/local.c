@@ -441,31 +441,18 @@ static bool local_process_event(void)
 
 	switch (ev->type) {
 	case EVENT_JOIN_REQUEST:
-		res = sd_check_join_cb(&ev->sender.node, ev->buf);
+		/* nodes[nr_nodes - 1] is a sender, so don't include it */
+		assert(node_eq(&ev->sender.node, &nodes[nr_nodes - 1]));
+		res = sd_check_join_cb(&ev->sender.node, nodes, nr_nodes - 1,
+				       ev->buf);
 		ev->join_result = res;
 		ev->type = EVENT_JOIN_RESPONSE;
 		msync(ev, sizeof(*ev), MS_SYNC);
 
 		shm_queue_notify();
 
-		if (res == CJ_RES_MASTER_TRANSFER) {
-			sd_eprintf("failed to join sheepdog cluster: "
-				   "please retry when master is up");
-			shm_queue_unlock();
-			exit(1);
-		}
 		return false;
 	case EVENT_JOIN_RESPONSE:
-		if (ev->join_result == CJ_RES_MASTER_TRANSFER) {
-			/* FIXME: This code is tricky, but Sheepdog assumes that */
-			/* nr_nodes = 1 when join_result = MASTER_TRANSFER... */
-			ev->nr_lnodes = 1;
-			ev->lnodes[0] = this_node;
-			nr_nodes = 1;
-			nodes[0] = this_node.node;
-			msync(ev, sizeof(*ev), MS_SYNC);
-		}
-
 		sd_join_handler(&ev->sender.node, nodes, nr_nodes,
 				ev->join_result, ev->buf);
 		break;

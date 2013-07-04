@@ -1,22 +1,12 @@
 QA output created by 002
 using backend plain store
-check whether Sheepdog is running with only one node
-Cluster status: running, auto-recovery enabled
-
-Cluster created at DATE
-
-Epoch Time           Version
-DATE      3 [127.0.0.1:7002]
-DATE      2 [127.0.0.1:7001, 127.0.0.1:7002]
-DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 check whether all nodes have the same cluster info
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
 Epoch Time           Version
-DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
-DATE      4 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 DATE      3 [127.0.0.1:7002]
 DATE      2 [127.0.0.1:7001, 127.0.0.1:7002]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
@@ -25,8 +15,7 @@ Cluster status: running, auto-recovery enabled
 Cluster created at DATE
 
 Epoch Time           Version
-DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
-DATE      4 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 DATE      3 [127.0.0.1:7002]
 DATE      2 [127.0.0.1:7001, 127.0.0.1:7002]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
@@ -35,8 +24,7 @@ Cluster status: running, auto-recovery enabled
 Cluster created at DATE
 
 Epoch Time           Version
-DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
-DATE      4 [127.0.0.1:7000, 127.0.0.1:7002]
+DATE      4 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 DATE      3 [127.0.0.1:7002]
 DATE      2 [127.0.0.1:7001, 127.0.0.1:7002]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
