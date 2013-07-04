@@ -146,6 +146,8 @@ static struct zk_node this_node;
 	switch (rc) {							\
 	case ZNONODE:							\
 	case ZNODEEXISTS:						\
+		sd_dprintf("failed, path:%s, %s", path, zerror(rc));	\
+		break;							\
 	case ZINVALIDSTATE:						\
 	case ZSESSIONEXPIRED:						\
 	case ZOPERATIONTIMEOUT:						\
@@ -735,7 +737,7 @@ static void zk_compete_master(void)
 		goto out_unlock;
 
 	if (!joined) {
-		sd_iprintf("start to compete master for the first time");
+		sd_dprintf("start to compete master for the first time");
 		do {
 			if (uatomic_is_true(&stop))
 				goto out_unlock;
@@ -761,7 +763,7 @@ static void zk_compete_master(void)
 	if (!strcmp(master_name, node_to_str(&this_node.node)))
 		goto success;
 	else if (joined) {
-		sd_iprintf("lost");
+		sd_dprintf("lost");
 		goto out_unlock;
 	} else {
 		if (zk_verify_last_sheep_join(my_seq,
@@ -773,13 +775,13 @@ static void zk_compete_master(void)
 			master_seq = my_seq;
 			goto success;
 		} else {
-			sd_iprintf("lost");
+			sd_dprintf("lost");
 			goto out_unlock;
 		}
 	}
 success:
 	uatomic_set_true(&is_master);
-	sd_iprintf("success");
+	sd_dprintf("success");
 out_unlock:
 	pthread_rwlock_unlock(&zk_compete_master_lock);
 }
