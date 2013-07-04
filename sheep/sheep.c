@@ -57,6 +57,7 @@ static struct sd_option sheep_options[] = {
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen"},
 	{'P', "pidfile", true, "create a pid file"},
+	{'r', "http", true, "enable http service"},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "enable-cache", true, "enable object cache"},
@@ -517,7 +518,7 @@ int main(int argc, char **argv)
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
-	const char *log_format = "default";
+	const char *log_format = "default", *http_address = NULL;
 	static struct logger_user_info sheep_info;
 
 	install_crash_handler(crash_handler);
@@ -539,6 +540,9 @@ int main(int argc, char **argv)
 			break;
 		case 'P':
 			pid_file = optarg;
+			break;
+		case 'r':
+			http_address = optarg;
 			break;
 		case 'f':
 			is_daemon = false;
@@ -772,6 +776,9 @@ int main(int argc, char **argv)
 
 	ret = trace_init();
 	if (ret)
+		exit(1);
+
+	if (http_address && http_init(http_address) != 0)
 		exit(1);
 
 	if (pid_file && (create_pidfile(pid_file) != 0)) {

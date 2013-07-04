@@ -30,6 +30,9 @@ sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c \
 			  plain_store.c config.c migrate.c md.c \
 			  cluster/shepherd.c
 
+if BUILD_HTTP
+sheep_SOURCES		+= http.c
+endif
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c
 endif

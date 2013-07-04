@@ -218,6 +218,11 @@ AC_ARG_ENABLE([sheepfs],
 	[ enable_sheepfs=$HAVE_FUSE ],)
 AM_CONDITIONAL(BUILD_SHEEPFS, test x$enable_sheepfs = xyes)
 
+AC_ARG_ENABLE([http],
+	[ --enable-http : enable http request service (default no) ],,
+	[ enable_http="no" ],)
+AM_CONDITIONAL(BUILD_HTTP, test x$enable_http = xyes)
+
 CP=cp
 OS_LDL="-ldl"
 case "$host_os" in
@@ -297,6 +302,14 @@ if test "x${enable_sheepfs}" = xyes; then
 	PACKAGE_FEATURES="$PACKAGE_FEATURES sheepfs"
 fi
 
+if test "x${enable_http}" = xyes; then
+	AC_CHECK_HEADERS([fcgiapp.h],,
+		AC_MSG_ERROR(fcgiapp.h header not found))
+	AC_CHECK_LIB([fcgi], [FCGX_Accept],,
+		AC_MSG_ERROR(libfcgi not found))
+	AC_DEFINE_UNQUOTED(HAVE_HTTP, 1, [have http])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES http"
+fi
 
 # extra warnings
 EXTRA_WARNINGS=""

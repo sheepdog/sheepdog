@@ -25,6 +25,7 @@
 #include "cluster.h"
 #include "rbtree.h"
 #include "strbuf.h"
+#include "config.h"
 
 struct client_info {
 	struct connection conn;
@@ -100,6 +101,9 @@ struct cluster_info {
 	struct work_queue *oc_reclaim_wqueue;
 	struct work_queue *oc_push_wqueue;
 	struct work_queue *md_wqueue;
+#ifdef HAVE_HTTP
+	struct work_queue *http_wqueue;
+#endif
 
 	bool enable_object_cache;
 
@@ -416,5 +420,16 @@ int md_unplug_disks(char *disks);
 uint64_t md_get_size(uint64_t *used);
 void kick_node_recover(void);
 void update_node_size(struct sd_node *node);
+
+/* http.c */
+#ifdef HAVE_HTTP
+int http_init(const char *address);
+#else
+static inline int http_init(const char *address)
+{
+	sd_printf(SDOG_NOTICE, "http service is not complied");
+	return 0;
+}
+#endif /* END BUILD_HTTP */
 
 #endif
