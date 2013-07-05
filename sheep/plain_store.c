@@ -8,17 +8,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <errno.h>
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/xattr.h>
-#include <unistd.h>
+
 #include <libgen.h>
 
 #include "sheep_priv.h"
-#include "config.h"
-#include "sha1.h"
 
 #define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
 

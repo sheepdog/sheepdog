@@ -8,14 +8,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
 
 #include "sheep_priv.h"
-#include "sha1.h"
 
 enum rw_state {
 	RW_PREPARE_LIST, /* the recovery thread is preparing object list */

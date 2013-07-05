@@ -9,14 +9,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/time.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <time.h>
-#include <dirent.h>
-
 #include "sheep_priv.h"
 
 /* sheepdog 0.4.0 */

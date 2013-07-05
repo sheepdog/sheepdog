@@ -10,23 +10,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <linux/limits.h>
-#include <sys/types.h>
-#include <sys/statvfs.h>
-#include <sys/stat.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <errno.h>
-#include <math.h>
-#include <sys/xattr.h>
-#include <dirent.h>
-#include <pthread.h>
-#include <string.h>
-#include <fcntl.h>
 
 #include "sheep_priv.h"
-#include "util.h"
-#include "strbuf.h"
 
 #define MD_DEFAULT_VDISKS 128
 #define MD_MAX_VDISK (MD_MAX_DISK * MD_DEFAULT_VDISKS)

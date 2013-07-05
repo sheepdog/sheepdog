@@ -9,29 +9,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "../include/config.h"
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <time.h>
-#include <signal.h>
-#include <linux/limits.h>
-#include <sys/syslog.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <sys/signalfd.h>
-#include <pthread.h>
-#include <sys/eventfd.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <arpa/inet.h>
 #include <sys/resource.h>
 #include <malloc.h>
 
 #include "sheep_priv.h"
 #include "trace/trace.h"
-#include "util.h"
 #include "option.h"
 
 #define EPOLL_SIZE 4096

@@ -8,26 +8,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/time.h>
-#include <sys/epoll.h>
-#include <sys/eventfd.h>
-#include <pthread.h>
-#include <urcu/uatomic.h>
-#include <math.h>
-#include <time.h>
 
-#include "sheepdog_proto.h"
 #include "sheep_priv.h"
-#include "list.h"
-#include "util.h"
-#include "logger.h"
-#include "work.h"
-#include "cluster.h"
 
 struct node {
 	struct sd_node ent;

@@ -11,15 +11,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <pthread.h>
-
 #include "sheep_priv.h"
-#include "strbuf.h"
-#include "util.h"
 
 struct objlist_cache_entry {
 	uint64_t oid;

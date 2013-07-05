@@ -4,13 +4,8 @@
 #define INSN_SIZE       5       /* call(1b) + offset(4b) = 5b */
 
 #ifndef __ASSEMBLY__
-#include <stdlib.h>
 
-#include "sheepdog_proto.h"
-#include "sheep.h"
-#include "list.h"
-#include "util.h"
-#include "config.h"
+#include "sheep_priv.h"
 
 struct ipinfo {
 	const char *file;           /* Source code filename for EIP */

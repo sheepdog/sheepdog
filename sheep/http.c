@@ -13,12 +13,8 @@
 
 /* This files implement RESTful interface to sheepdog storage via fastcgi */
 
-#include <string.h>
 #include <fcgiapp.h>
-#include <errno.h>
-#include <pthread.h>
 
-#include "util.h"
 #include "sheep_priv.h"
 
 struct http_request {

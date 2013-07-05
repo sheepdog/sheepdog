@@ -8,20 +8,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <pthread.h>
-#include <sys/eventfd.h>
-#include <arpa/inet.h>
+
 #include <netinet/tcp.h>
-#include <sys/epoll.h>
-#include <fcntl.h>
-#include <errno.h>
 
 #include "sheep_priv.h"
-#include "util.h"
 
 static void requeue_request(struct request *req);
 

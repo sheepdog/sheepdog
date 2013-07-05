@@ -26,17 +26,8 @@
  *    6 total 3 APIs: sheep_{get,put,del}_sockfd().
  *    7 support dual connections to a single node.
  */
-#include <urcu/uatomic.h>
-#include <pthread.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
 
 #include "sheep_priv.h"
-#include "list.h"
-#include "rbtree.h"
-#include "logger.h"
-#include "util.h"
 
 struct sockfd_cache {
 	struct rb_root root;

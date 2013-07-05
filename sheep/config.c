@@ -9,12 +9,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <errno.h>
-
 #include "sheep_priv.h"
 
 #define SD_FORMAT_VERSION 0x0002

@@ -12,8 +12,6 @@
  */
 
 #include <stab.h>
-#include <stdint.h>
-#include <string.h>
 
 #include "trace.h"
 

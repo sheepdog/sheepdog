@@ -11,17 +11,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <signal.h>
-
 #include "trace.h"
-#include "logger.h"
-#include "list.h"
-#include "sheepdog_proto.h"
-#include "strbuf.h"
 
 #define TRACE_HASH_BITS       7
 #define TRACE_HASH_SIZE       (1 << TRACE_HASH_BITS)

@@ -11,23 +11,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <errno.h>
-#include <sys/file.h>
-#include <dirent.h>
-#include <urcu/uatomic.h>
-#include <sys/eventfd.h>
-
 #include "sheep_priv.h"
-#include "util.h"
-#include "strbuf.h"
-#include "rbtree.h"
 
 /*
  * Object Cache ID

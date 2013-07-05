@@ -8,12 +8,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <sys/time.h>
 
-#include "sheepdog_proto.h"
 #include "sheep_priv.h"
 
 struct vdi_state_entry {

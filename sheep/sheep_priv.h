@@ -15,6 +15,21 @@
 #include <stdbool.h>
 #include <urcu/uatomic.h>
 #include <time.h>
+#include <pthread.h>
+#include <math.h>
+#include <errno.h>
+#include <poll.h>
+#include <sys/statvfs.h>
+#include <sys/stat.h>
+#include <sys/xattr.h>
+#include <dirent.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/eventfd.h>
+#include <sys/time.h>
+#include <sys/epoll.h>
+#include <signal.h>
 
 #include "sheepdog_proto.h"
 #include "event.h"
@@ -25,6 +40,7 @@
 #include "cluster.h"
 #include "rbtree.h"
 #include "strbuf.h"
+#include "sha1.h"
 #include "config.h"
 
 struct client_info {

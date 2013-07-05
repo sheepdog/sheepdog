@@ -11,12 +11,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <time.h>
-#include <sched.h>
-
 #include "trace.h"
-#include "logger.h"
-#include "util.h"
 
 static __thread int ret_stack_index;
 static __thread struct trace_ret_stack {
