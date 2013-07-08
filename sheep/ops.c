@@ -399,8 +399,8 @@ static int local_stat_recovery(const struct sd_req *req, struct sd_rsp *rsp,
 static int local_stat_cluster(struct request *req)
 {
 	struct sd_rsp *rsp = &req->rp;
-	struct epoch_log *log;
-	int i, max_logs;
+	struct epoch_log *elog;
+	int i, max_elogs;
 	uint32_t epoch;
 
 	if (req->vinfo == NULL) {
@@ -408,33 +408,33 @@ static int local_stat_cluster(struct request *req)
 		goto out;
 	}
 
-	max_logs = req->rq.data_length / sizeof(*log);
+	max_elogs = req->rq.data_length / sizeof(*elog);
 	epoch = get_latest_epoch();
-	for (i = 0; i < max_logs; i++) {
+	for (i = 0; i < max_elogs; i++) {
 		size_t nr_nodes;
 
 		if (epoch <= 0)
 			break;
 
-		log = (struct epoch_log *)req->data + i;
-		memset(log, 0, sizeof(*log));
-		log->epoch = epoch;
-		log->ctime = sys->cinfo.ctime;
-		nr_nodes = epoch_log_read_with_timestamp(epoch, log->nodes,
-							 sizeof(log->nodes),
-							 (time_t *)&log->time);
+		elog = (struct epoch_log *)req->data + i;
+		memset(elog, 0, sizeof(*elog));
+		elog->epoch = epoch;
+		elog->ctime = sys->cinfo.ctime;
+		nr_nodes = epoch_log_read_with_timestamp(epoch, elog->nodes,
+							 sizeof(elog->nodes),
+							 (time_t *)&elog->time);
 		if (nr_nodes == -1)
-			nr_nodes = epoch_log_read_remote(epoch, log->nodes,
-							 sizeof(log->nodes),
-							 (time_t *)&log->time,
+			nr_nodes = epoch_log_read_remote(epoch, elog->nodes,
+							 sizeof(elog->nodes),
+							 (time_t *)&elog->time,
 							 req->vinfo);
 		assert(nr_nodes >= 0);
 		assert(nr_nodes <= SD_MAX_NODES);
-		log->nr_nodes = nr_nodes;
+		elog->nr_nodes = nr_nodes;
 
-		log->disable_recovery = sys->cinfo.disable_recovery;
+		elog->disable_recovery = sys->cinfo.disable_recovery;
 
-		rsp->data_length += sizeof(*log);
+		rsp->data_length += sizeof(*elog);
 		epoch--;
 	}
 out:
