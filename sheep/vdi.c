@@ -540,7 +540,9 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 	if (!iocb->snapid)
 		iocb->snapid = 1;
 	*new_vid = info.free_bit;
-	notify_vdi_add(*new_vid, iocb->nr_copies, info.vid);
+	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
 
 	sd_dprintf("%s %s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32
 		   ", cur %" PRIx32 ", copies %d, snapid %"PRIu32,
