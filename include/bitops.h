@@ -17,8 +17,9 @@
 
 #define BITOP_WORD(nr)		((nr) / BITS_PER_LONG)
 
-static inline unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
-				 unsigned long offset)
+static inline unsigned long find_next_zero_bit(const unsigned long *addr,
+					       unsigned long size,
+					       unsigned long offset)
 {
 	const unsigned long *p = addr + BITOP_WORD(offset);
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
@@ -57,8 +58,9 @@ found_middle:
 	return result + ffz(tmp);
 }
 
-static inline unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
-			    unsigned long offset)
+static inline unsigned long find_next_bit(const unsigned long *addr,
+					  unsigned long size,
+					  unsigned long offset)
 {
 	const unsigned long *p = addr + BITOP_WORD(offset);
 	unsigned long result = offset & ~(BITS_PER_LONG-1);
