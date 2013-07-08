@@ -20,6 +20,13 @@ struct journal_file {
 	uatomic_bool in_commit;
 };
 
+/*
+ * CAUTION: This definition of struct journal_descriptor must be same
+ * to the definition in tests/dynamorio/journaling/journaling.c. We
+ * have to update the definition in the DR client definition if we
+ * update the below definition because there's no technique for
+ * keeping the consistency automatically.
+ */
 struct journal_descriptor {
 	uint32_t magic;
 	uint16_t flag;
