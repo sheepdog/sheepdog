@@ -978,8 +978,7 @@ static void zk_handle_unblock(struct zk_event *ev)
 	if (list_empty(&zk_block_list))
 		return;
 	block = list_first_entry(&zk_block_list, typeof(*block), list);
-	if (block->callbacked)
-		add_event(EVENT_NOTIFY, block, ev->buf, ev->buf_len);
+	sd_notify_handler(&ev->sender.node, ev->buf, ev->buf_len);
 
 	list_del(&block->list);
 	free(block);
