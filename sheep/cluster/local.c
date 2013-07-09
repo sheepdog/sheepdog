@@ -358,19 +358,21 @@ static int local_notify(void *msg, size_t msg_len)
 
 	shm_queue_unlock();
 
-	return 0;
+	return SD_RES_SUCCESS;
 }
 
-static void local_block(void)
+static int local_block(void)
 {
 	shm_queue_lock();
 
 	add_event(EVENT_BLOCK, &this_node, NULL, 0);
 
 	shm_queue_unlock();
+
+	return SD_RES_SUCCESS;
 }
 
-static void local_unblock(void *msg, size_t msg_len)
+static int local_unblock(void *msg, size_t msg_len)
 {
 	struct local_event *ev;
 
@@ -384,6 +386,8 @@ static void local_unblock(void *msg, size_t msg_len)
 	add_event(EVENT_NOTIFY, &this_node, msg, msg_len);
 
 	shm_queue_unlock();
+
+	return SD_RES_SUCCESS;
 }
 
 /* Returns true if an event is processed */

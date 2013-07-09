@@ -638,10 +638,11 @@ static int do_shepherd_notify(bool unblock, void *msg, size_t msg_len)
 
 static int shepherd_notify(void *msg, size_t msg_len)
 {
-	return do_shepherd_notify(false, msg, msg_len);
+	return do_shepherd_notify(false, msg, msg_len) == 0 ?
+		SD_RES_SUCCESS : SD_RES_CLUSTER_ERROR;
 }
 
-static void shepherd_block(void)
+static int shepherd_block(void)
 {
 	int ret;
 	struct sph_msg msg;
@@ -654,11 +655,14 @@ static void shepherd_block(void)
 		sd_eprintf("xwrite() failed: %m");
 		exit(1);
 	}
+
+	return SD_RES_SUCCESS;
 }
 
-static void shepherd_unblock(void *msg, size_t msg_len)
+static int shepherd_unblock(void *msg, size_t msg_len)
 {
-	do_shepherd_notify(true, msg, msg_len);
+	return do_shepherd_notify(true, msg, msg_len) == 0 ?
+		SD_RES_SUCCESS : SD_RES_CLUSTER_ERROR;
 }
 
 /* FIXME: shepherd server also has to udpate node information */

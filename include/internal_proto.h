@@ -101,6 +101,7 @@
 #define SD_RES_OID_EXIST        0x8E /* Object ID exists already */
 #define SD_RES_AGAIN            0x8F /* Ask to try again */
 #define SD_RES_STALE_OBJ        0x90 /* Object may be stale */
+#define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
 
 #define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
 #define SD_FLAG_QUORUM       0x0008 /* Serve the IO rquest as long we are quorate */

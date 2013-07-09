@@ -529,10 +529,10 @@ static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,
 		memcpy(ev.buf, buf, buf_len);
 	rc = zk_queue_push(&ev);
 	if (rc == ZOK)
-		return 0;
+		return SD_RES_SUCCESS;
 	else {
 		sd_eprintf("failed, type: %d, %s", type, zerror(rc));
-		return -1;
+		return SD_RES_CLUSTER_ERROR;
 	}
 }
 
@@ -826,14 +826,14 @@ static int zk_notify(void *msg, size_t msg_len)
 	return add_event(EVENT_NOTIFY, &this_node, msg, msg_len);
 }
 
-static void zk_block(void)
+static int zk_block(void)
 {
-	add_event(EVENT_BLOCK, &this_node, NULL, 0);
+	return add_event(EVENT_BLOCK, &this_node, NULL, 0);
 }
 
-static void zk_unblock(void *msg, size_t msg_len)
+static int zk_unblock(void *msg, size_t msg_len)
 {
-	add_event(EVENT_UNBLOCK, &this_node, msg, msg_len);
+	return add_event(EVENT_UNBLOCK, &this_node, msg, msg_len);
 }
 
 static void zk_handle_join_request(struct zk_event *ev)

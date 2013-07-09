@@ -198,9 +198,9 @@ retry:
 		goto retry;
 	default:
 		sd_eprintf("failed to send message (%d)", ret);
-		return -1;
+		return SD_RES_CLUSTER_ERROR;
 	}
-	return 0;
+	return SD_RES_SUCCESS;
 }
 
 static inline struct corosync_event *
@@ -704,22 +704,22 @@ static int corosync_leave(void)
 			    NULL, 0);
 }
 
-static void corosync_block(void)
+static int corosync_block(void)
 {
-	send_message(COROSYNC_MSG_TYPE_BLOCK, 0, &this_node, NULL, 0,
+	return send_message(COROSYNC_MSG_TYPE_BLOCK, 0, &this_node, NULL, 0,
 			    NULL, 0);
 }
 
-static void corosync_unblock(void *msg, size_t msg_len)
+static int corosync_unblock(void *msg, size_t msg_len)
 {
-	send_message(COROSYNC_MSG_TYPE_UNBLOCK, 0, &this_node, NULL, 0,
-		     msg, msg_len);
+	return send_message(COROSYNC_MSG_TYPE_UNBLOCK, 0, &this_node, NULL, 0,
+			    msg, msg_len);
 }
 
 static int corosync_notify(void *msg, size_t msg_len)
 {
 	return send_message(COROSYNC_MSG_TYPE_NOTIFY, 0, &this_node,
-			   NULL, 0, msg, msg_len);
+			    NULL, 0, msg, msg_len);
 }
 
 static void corosync_handler(int listen_fd, int events, void *data)

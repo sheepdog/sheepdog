@@ -232,11 +232,23 @@ static void cluster_op_done(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	struct vdi_op_message *msg;
 	size_t size;
+	int ret;
 
 	sd_dprintf("%s (%p)", op_name(req->op), req);
 
 	msg = prepare_cluster_msg(req, &size);
-	sys->cdrv->unblock(msg, size);
+
+	ret = sys->cdrv->unblock(msg, size);
+	if (ret != SD_RES_SUCCESS) {
+		/*
+		 * Failed to unblock, shoot myself to let other sheep
+		 * unblock the event.
+		 * FIXME: handle it gracefully.
+		 */
+		sd_printf(SDOG_EMERG, "Failed to unblock, %s, exiting.",
+			  sd_strerror(ret));
+		exit(1);
+	}
 
 	free(msg);
 }
@@ -280,25 +292,42 @@ bool sd_block_handler(const struct sd_node *sender)
  */
 void queue_cluster_request(struct request *req)
 {
+	int ret;
 	sd_dprintf("%s (%p)", op_name(req->op), req);
 
 	if (has_process_work(req->op)) {
+		ret = sys->cdrv->block();
+		if (ret != SD_RES_SUCCESS) {
+			sd_eprintf("failed to broadcast block to cluster, %s",
+				   sd_strerror(ret));
+			goto error;
+		}
 		list_add_tail(&req->pending_list,
 			      main_thread_get(pending_block_list));
-		sys->cdrv->block();
 	} else {
 		struct vdi_op_message *msg;
 		size_t size;
 
 		msg = prepare_cluster_msg(req, &size);
+		msg->rsp.result = SD_RES_SUCCESS;
+
+		ret = sys->cdrv->notify(msg, size);
+		if (ret != SD_RES_SUCCESS) {
+			sd_eprintf("failed to broadcast notify to cluster, %s",
+				   sd_strerror(ret));
+			goto error;
+		}
+
 		list_add_tail(&req->pending_list,
 			      main_thread_get(pending_notify_list));
 
-		msg->rsp.result = SD_RES_SUCCESS;
-		sys->cdrv->notify(msg, size);
-
 		free(msg);
 	}
+
+	return;
+error:
+	req->rp.result = ret;
+	put_request(req);
 }
 
 static inline int get_nodes_nr_from(struct list_head *l)

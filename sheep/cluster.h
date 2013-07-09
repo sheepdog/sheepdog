@@ -82,7 +82,7 @@ struct cluster_driver {
 	 * can be read through sd_notify_handler() and totally ordered with
 	 * node change events.
 	 *
-	 * Returns zero on success, -1 on error
+	 * Returns SD_RES_XXX
 	 */
 	int (*notify)(void *msg, size_t msg_len);
 
@@ -92,14 +92,18 @@ struct cluster_driver {
 	 * Once the cluster driver has ensured that events are blocked on all
 	 * nodes it needs to call sd_block_handler() on the node where ->block
 	 * was called.
+	 *
+	 * Returns SD_RES_XXX
 	 */
-	void (*block)(void);
+	int (*block)(void);
 
 	/*
 	 * Unblock events on all nodes, and send a total order message
 	 * to all nodes.
+	 *
+	 * Returns SD_RES_XXX
 	 */
-	void (*unblock)(void *msg, size_t msg_len);
+	int (*unblock)(void *msg, size_t msg_len);
 
 	/* Update the specific node in the driver's private copy of nodes */
 	void (*update_node)(struct sd_node *);

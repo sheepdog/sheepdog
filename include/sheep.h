@@ -222,6 +222,7 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_OID_EXIST] = "Object ID exists already",
 		[SD_RES_AGAIN] = "Ask to try again",
 		[SD_RES_STALE_OBJ] = "Object may be stale",
+		[SD_RES_CLUSTER_ERROR] = "Cluster driver error",
 	};
 
 	if (descs[err] == NULL) {
