@@ -234,6 +234,9 @@ static void cluster_op_done(struct work *work)
 	size_t size;
 	int ret;
 
+	if (req->status == REQUEST_DROPPED)
+		goto drop;
+
 	sd_dprintf("%s (%p)", op_name(req->op), req);
 
 	msg = prepare_cluster_msg(req, &size);
@@ -251,6 +254,13 @@ static void cluster_op_done(struct work *work)
 	}
 
 	free(msg);
+	req->status = REQUEST_DONE;
+	return;
+drop:
+	list_del(&req->pending_list);
+	req->rp.result = SD_RES_CLUSTER_ERROR;
+	put_request(req);
+	cluster_op_running = false;
 }
 
 /*
@@ -280,6 +290,7 @@ bool sd_block_handler(const struct sd_node *sender)
 	req->work.done = cluster_op_done;
 
 	queue_work(sys->block_wqueue, &req->work);
+	req->status = REQUEST_QUEUED;
 	return true;
 }
 
@@ -323,7 +334,7 @@ void queue_cluster_request(struct request *req)
 
 		free(msg);
 	}
-
+	req->status = REQUEST_INIT;
 	return;
 error:
 	req->rp.result = ret;
@@ -921,6 +932,71 @@ static int send_join_request(struct sd_node *ent)
 	return ret;
 }
 
+static void requeue_cluster_request(void)
+{
+	struct request *req, *p;
+	struct vdi_op_message *msg;
+	size_t size;
+
+	list_for_each_entry_safe(req, p, main_thread_get(pending_notify_list),
+				 pending_list) {
+		/*
+		 * ->notify() was called and succeeded but after that
+		 * this node session-timeouted and sd_notify_handler
+		 * wasn't called from notify event handler in cluster
+		 * driver. We manually call sd_notify_handler to finish
+		 * the request.
+		 */
+		sd_dprintf("finish pending notify request, op: %s",
+			   op_name(req->op));
+		msg = prepare_cluster_msg(req, &size);
+		sd_notify_handler(&sys->this_node, msg, size);
+		free(msg);
+	}
+
+	list_for_each_entry_safe(req, p, main_thread_get(pending_block_list),
+				 pending_list) {
+		switch (req->status) {
+		case REQUEST_INIT:
+			/* this request has never been executed, re-queue it */
+			sd_dprintf("requeue a block request, op: %s",
+				   op_name(req->op));
+			list_del(&req->pending_list);
+			queue_cluster_request(req);
+			break;
+		case REQUEST_QUEUED:
+			/*
+			 * This request is being handled by the 'block' thread
+			 * and ->unblock() isn't called yet. We can't call
+			 * ->unblock thereafter because other sheep has
+			 * unblocked themselves due to cluster driver session
+			 * timeout. Mark it as dropped to stop cluster_op_done()
+			 * from calling ->unblock.
+			 */
+			sd_dprintf("drop pending block request, op: %s",
+				   op_name(req->op));
+			req->status = REQUEST_DROPPED;
+			break;
+		case REQUEST_DONE:
+			/*
+			 * ->unblock() was called and succeeded but after that
+			 * this node session-timeouted and sd_notify_handler
+			 * wasn't called from unblock event handler in cluster
+			 * driver. We manually call sd_notify_handler to finish
+			 * the request.
+			 */
+			sd_dprintf("finish pending block request, op: %s",
+				   op_name(req->op));
+			msg = prepare_cluster_msg(req, &size);
+			sd_notify_handler(&sys->this_node, msg, size);
+			free(msg);
+			break;
+		default:
+			break;
+		}
+	}
+}
+
 int sd_reconnect_handler(void)
 {
 	sys->status = SD_STATUS_WAIT_FOR_JOIN;
@@ -929,7 +1005,7 @@ int sd_reconnect_handler(void)
 		return -1;
 	if (send_join_request(&sys->this_node) != 0)
 		return -1;
-
+	requeue_cluster_request();
 	return 0;
 }
 

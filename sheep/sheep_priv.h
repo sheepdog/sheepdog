@@ -55,6 +55,13 @@ struct client_info {
 	int refcnt;
 };
 
+enum REQUST_STATUS {
+	REQUEST_INIT,
+	REQUEST_QUEUED,
+	REQUEST_DONE,
+	REQUEST_DROPPED
+};
+
 struct request {
 	struct sd_req rq;
 	struct sd_rsp rp;
@@ -77,6 +84,7 @@ struct request {
 	struct vnode_info *vinfo;
 
 	struct work work;
+	enum REQUST_STATUS status;
 };
 
 struct system_info {
