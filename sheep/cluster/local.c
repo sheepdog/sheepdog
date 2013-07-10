@@ -245,8 +245,8 @@ static void shm_queue_init(void)
 	shm_queue_unlock();
 }
 
-static void add_event(enum local_event_type type, struct local_node *lnode,
-		void *buf, size_t buf_len)
+static int add_event(enum local_event_type type, struct local_node *lnode,
+		      void *buf, size_t buf_len)
 {
 	struct local_node *n;
 	struct local_event ev = {
@@ -290,6 +290,19 @@ static void add_event(enum local_event_type type, struct local_node *lnode,
 	shm_queue_push(&ev);
 
 	shm_queue_notify();
+
+	return SD_RES_SUCCESS;
+}
+
+static int add_event_lock(enum local_event_type type, struct local_node *lnode,
+			  void *buf, size_t buf_len)
+{
+	int ret;
+
+	shm_queue_lock();
+	ret = add_event(type, lnode, buf, buf_len);
+	shm_queue_unlock();
+	return ret;
 }
 
 static void check_pids(void *arg)
@@ -330,46 +343,24 @@ static int local_join(const struct sd_node *myself,
 	this_node.pid = getpid();
 	this_node.gateway = false;
 
-	shm_queue_lock();
-
-	add_event(EVENT_JOIN_REQUEST, &this_node, opaque, opaque_len);
-
-	shm_queue_unlock();
-
-	return 0;
+	return add_event_lock(EVENT_JOIN_REQUEST, &this_node, opaque,
+			      opaque_len);
 }
 
 static int local_leave(void)
 {
-	shm_queue_lock();
-
-	add_event(EVENT_GATEWAY, &this_node, NULL, 0);
-
-	shm_queue_unlock();
-
-	return 0;
+	return add_event_lock(EVENT_GATEWAY, &this_node, NULL, 0);
 }
 
 static int local_notify(void *msg, size_t msg_len)
 {
-	shm_queue_lock();
 
-	add_event(EVENT_NOTIFY, &this_node, msg, msg_len);
-
-	shm_queue_unlock();
-
-	return SD_RES_SUCCESS;
+	return add_event_lock(EVENT_NOTIFY, &this_node, msg, msg_len);
 }
 
 static int local_block(void)
 {
-	shm_queue_lock();
-
-	add_event(EVENT_BLOCK, &this_node, NULL, 0);
-
-	shm_queue_unlock();
-
-	return SD_RES_SUCCESS;
+	return add_event_lock(EVENT_BLOCK, &this_node, NULL, 0);
 }
 
 static int local_unblock(void *msg, size_t msg_len)
@@ -565,13 +556,7 @@ static int local_update_node(struct sd_node *node)
 
 	lnode.node = *node;
 
-	shm_queue_lock();
-
-	add_event(EVENT_UPDATE_NODE, &lnode, NULL, 0);
-
-	shm_queue_unlock();
-
-	return SD_RES_SUCCESS;
+	return add_event_lock(EVENT_UPDATE_NODE, &lnode, NULL, 0);
 }
 
 static struct cluster_driver cdrv_local = {
