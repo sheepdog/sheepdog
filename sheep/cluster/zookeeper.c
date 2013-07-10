@@ -47,6 +47,7 @@ enum zk_event_type {
 	EVENT_BLOCK,
 	EVENT_UNBLOCK,
 	EVENT_NOTIFY,
+	EVENT_UPDATE_NODE,
 };
 
 struct zk_node {
@@ -992,6 +993,25 @@ static void zk_handle_notify(struct zk_event *ev)
 	sd_notify_handler(&ev->sender.node, ev->buf, ev->buf_len);
 }
 
+static void zk_handle_update_node(struct zk_event *ev)
+{
+	struct zk_node *t;
+	struct sd_node *snode = &ev->sender.node;
+
+	sd_dprintf("%s", node_to_str(snode));
+
+	if (node_eq(snode, &this_node.node))
+		this_node.node = *snode;
+
+	pthread_rwlock_rdlock(&zk_tree_lock);
+	t = zk_tree_search_nolock(&snode->nid);
+	assert(t);
+	t->node = *snode;
+	build_node_list();
+	pthread_rwlock_unlock(&zk_tree_lock);
+	sd_update_node_handler(snode);
+}
+
 static void (*const zk_event_handlers[])(struct zk_event *ev) = {
 	[EVENT_JOIN_REQUEST]	= zk_handle_join_request,
 	[EVENT_JOIN_RESPONSE]	= zk_handle_join_response,
@@ -999,6 +1019,7 @@ static void (*const zk_event_handlers[])(struct zk_event *ev) = {
 	[EVENT_BLOCK]		= zk_handle_block,
 	[EVENT_UNBLOCK]		= zk_handle_unblock,
 	[EVENT_NOTIFY]		= zk_handle_notify,
+	[EVENT_UPDATE_NODE]	= zk_handle_update_node,
 };
 
 static const int zk_max_event_handlers = ARRAY_SIZE(zk_event_handlers);
@@ -1132,22 +1153,12 @@ static int zk_init(const char *option)
 	return 0;
 }
 
-static void zk_update_node(struct sd_node *node)
+static int zk_update_node(struct sd_node *node)
 {
-	struct zk_node n = {
+	struct zk_node znode = {
 		.node = *node,
 	};
-	struct zk_node *t;
-
-	sd_dprintf("%s", node_to_str(&n.node));
-
-	pthread_rwlock_rdlock(&zk_tree_lock);
-	t = zk_tree_search_nolock(&n.node.nid);
-	if (t) {
-		t->node = n.node;
-		build_node_list();
-	}
-	pthread_rwlock_unlock(&zk_tree_lock);
+	return add_event(EVENT_UPDATE_NODE, &znode, NULL, 0);
 }
 
 static struct cluster_driver cdrv_zookeeper = {

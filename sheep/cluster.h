@@ -105,8 +105,12 @@ struct cluster_driver {
 	 */
 	int (*unblock)(void *msg, size_t msg_len);
 
-	/* Update the specific node in the driver's private copy of nodes */
-	void (*update_node)(struct sd_node *);
+	/*
+	 * Update the specific node in the driver's private copy of nodes
+	 *
+	 * Returns SD_RES_XXX
+	 */
+	int (*update_node)(struct sd_node *);
 
 	struct list_head list;
 };
@@ -161,6 +165,7 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 int sd_reconnect_handler(void);
+void sd_update_node_handler(struct sd_node *);
 enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 					  const struct sd_node *nodes,
 					  size_t nr_nodes, void *opaque);

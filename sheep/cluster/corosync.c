@@ -51,6 +51,7 @@ enum corosync_event_type {
 	COROSYNC_EVENT_TYPE_LEAVE,
 	COROSYNC_EVENT_TYPE_BLOCK,
 	COROSYNC_EVENT_TYPE_NOTIFY,
+	COROSYNC_EVENT_TYPE_UPDATE_NODE,
 };
 
 /* multicast message type */
@@ -61,6 +62,7 @@ enum corosync_message_type {
 	COROSYNC_MSG_TYPE_NOTIFY,
 	COROSYNC_MSG_TYPE_BLOCK,
 	COROSYNC_MSG_TYPE_UNBLOCK,
+	COROSYNC_MSG_TYPE_UPDATE_NODE,
 };
 
 struct corosync_event {
@@ -279,8 +281,9 @@ static void build_node_list(const struct cpg_node *nodes, size_t nr_nodes,
 static bool __corosync_dispatch_one(struct corosync_event *cevent)
 {
 	enum cluster_join_result res;
-	struct sd_node entries[SD_MAX_NODES];
+	struct sd_node entries[SD_MAX_NODES], *node;
 	struct cpg_node *n;
+	int idx;
 
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
@@ -342,6 +345,17 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 	case COROSYNC_EVENT_TYPE_NOTIFY:
 		sd_notify_handler(&cevent->sender.ent, cevent->msg,
 						 cevent->msg_len);
+		break;
+	case COROSYNC_EVENT_TYPE_UPDATE_NODE:
+		node = &cevent->sender.ent;
+
+		if (cpg_node_equal(&cevent->sender, &this_node))
+			this_node = cevent->sender;
+
+		idx = find_sd_node(cpg_nodes, nr_cpg_nodes, node);
+		assert(idx >= 0);
+		cpg_nodes[idx].ent = *node;
+		sd_update_node_handler(node);
 		break;
 	}
 
@@ -486,11 +500,19 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 		/* fall through */
 	case COROSYNC_MSG_TYPE_BLOCK:
 	case COROSYNC_MSG_TYPE_NOTIFY:
+	case COROSYNC_MSG_TYPE_UPDATE_NODE:
 		cevent = xzalloc(sizeof(*cevent));
-		if (cmsg->type == COROSYNC_MSG_TYPE_BLOCK)
+		switch (cmsg->type) {
+		case COROSYNC_MSG_TYPE_BLOCK:
 			cevent->type = COROSYNC_EVENT_TYPE_BLOCK;
-		else
+			break;
+		case COROSYNC_MSG_TYPE_UPDATE_NODE:
+			cevent->type = COROSYNC_EVENT_TYPE_UPDATE_NODE;
+			break;
+		default:
 			cevent->type = COROSYNC_EVENT_TYPE_NOTIFY;
+			break;
+		}
 
 		cevent->sender = cmsg->sender;
 		cevent->msg_len = cmsg->msg_len;
@@ -544,7 +566,7 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 }
 
 static void build_cpg_node_list(struct cpg_node *nodes,
-		const struct cpg_address *list, size_t nr)
+				const struct cpg_address *list, size_t nr)
 {
 	int i;
 
@@ -804,14 +826,14 @@ again:
 	return 0;
 }
 
-static void corosync_update_node(struct sd_node *node)
+static int corosync_update_node(struct sd_node *node)
 {
-	int idx;
+	struct cpg_node cnode = this_node;
 
-	idx = find_sd_node(cpg_nodes, nr_cpg_nodes, node);
-	if (idx < 0)
-		return;
-	cpg_nodes[idx].ent = *node;
+	cnode.ent = *node;
+
+	return send_message(COROSYNC_MSG_TYPE_UPDATE_NODE, 0, &cnode,
+			    NULL, 0, NULL, 0);
 }
 
 static struct cluster_driver cdrv_corosync = {

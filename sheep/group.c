@@ -1086,16 +1086,15 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	sockfd_cache_del(&left->nid);
 }
 
-void update_node_size(struct sd_node *node)
+static void update_node_size(struct sd_node *node)
 {
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 	int idx = get_node_idx(cur_vinfo, node);
 	assert(idx != -1);
 	cur_vinfo->nodes[idx].space = node->space;
-	sys->cdrv->update_node(node);
 }
 
-void kick_node_recover(void)
+static void kick_node_recover(void)
 {
 	struct vnode_info *old = main_thread_get(current_vnode_info);
 
@@ -1105,6 +1104,12 @@ void kick_node_recover(void)
 	log_current_epoch();
 	start_recovery(main_thread_get(current_vnode_info), old, true);
 	put_vnode_info(old);
+}
+
+void sd_update_node_handler(struct sd_node *node)
+{
+	update_node_size(node);
+	kick_node_recover();
 }
 
 int create_cluster(int port, int64_t zone, int nr_vnodes,

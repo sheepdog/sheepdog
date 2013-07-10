@@ -478,6 +478,10 @@ static bool local_process_event(void)
 		sd_notify_handler(&ev->sender.node, ev->buf, ev->buf_len);
 		break;
 	case EVENT_UPDATE_NODE:
+		if (lnode_eq(&ev->sender, &this_node))
+			this_node = ev->sender;
+
+		sd_update_node_handler(&ev->sender.node);
 		break;
 	}
 out:
@@ -555,18 +559,19 @@ static int local_init(const char *option)
 	return 0;
 }
 
-/* FIXME: we have to call nr of nodes times to update nodes information */
-static void local_update_node(struct sd_node *node)
+static int local_update_node(struct sd_node *node)
 {
-	struct local_node n = {
-		.node = *node,
-	};
+	struct local_node lnode = this_node;
+
+	lnode.node = *node;
 
 	shm_queue_lock();
 
-	add_event(EVENT_UPDATE_NODE, &n, NULL, 0);
+	add_event(EVENT_UPDATE_NODE, &lnode, NULL, 0);
 
 	shm_queue_unlock();
+
+	return SD_RES_SUCCESS;
 }
 
 static struct cluster_driver cdrv_local = {

@@ -662,35 +662,6 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
-static void do_reweight(struct work *work)
-{
-	struct sd_req hdr;
-	int ret;
-
-	sd_init_req(&hdr, SD_OP_UPDATE_SIZE);
-	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = sizeof(sys->this_node);
-
-	ret = exec_local_req(&hdr, &sys->this_node);
-	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed to update node size");
-}
-
-static void reweight_done(struct work *work)
-{
-	free(work);
-}
-
-static void reweight_node(void)
-{
-	struct work *rw = xzalloc(sizeof(*rw));
-
-	rw->fn = do_reweight;
-	rw->done = reweight_done;
-
-	queue_work(sys->recovery_wqueue, rw);
-}
-
 static bool node_size_varied(void)
 {
 	uint64_t new, used, old = sys->this_node.space;
@@ -724,18 +695,7 @@ static int cluster_reweight(const struct sd_req *req, struct sd_rsp *rsp,
 			    void *data)
 {
 	if (node_size_varied())
-		reweight_node();
-
-	return SD_RES_SUCCESS;
-}
-
-static int cluster_update_size(const struct sd_req *req, struct sd_rsp *rsp,
-			       void *data)
-{
-	struct sd_node *node = (struct sd_node *)data;
-
-	update_node_size(node);
-	kick_node_recover();
+		return sys->cdrv->update_node(&sys->this_node);
 
 	return SD_RES_SUCCESS;
 }
@@ -1089,12 +1049,6 @@ static struct sd_op_template sd_ops[] = {
 		.name = "REWEIGHT",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_main = cluster_reweight,
-	},
-
-	[SD_OP_UPDATE_SIZE] = {
-		.name = "UPDATE_SIZE",
-		.type = SD_OP_TYPE_CLUSTER,
-		.process_main = cluster_update_size,
 	},
 
 	[SD_OP_ENABLE_RECOVER] = {
