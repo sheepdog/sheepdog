@@ -25,7 +25,7 @@ struct cpg_node {
 	uint32_t nodeid;
 	uint32_t pid;
 	uint32_t gone;
-	struct sd_node ent;
+	struct sd_node node;
 };
 
 static cpg_handle_t cpg_handle;
@@ -110,7 +110,7 @@ static inline int find_sd_node(struct cpg_node *nodes, size_t nr_nodes,
 	int i;
 
 	for (i = 0; i < nr_nodes; i++)
-		if (node_eq(&nodes[i].ent, key))
+		if (node_eq(&nodes[i].node, key))
 			return i;
 
 	return -1;
@@ -270,7 +270,7 @@ static void build_node_list(const struct cpg_node *nodes, size_t nr_nodes,
 	int i;
 
 	for (i = 0; i < nr_nodes; i++)
-		entries[i] = nodes[i].ent;
+		entries[i] = nodes[i].node;
 }
 
 /*
@@ -299,7 +299,7 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			return false;
 
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		res = sd_check_join_cb(&cevent->sender.ent, entries,
+		res = sd_check_join_cb(&cevent->sender.node, entries,
 				       nr_cpg_nodes, cevent->msg);
 		send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, res,
 			     &cevent->sender, cpg_nodes, nr_cpg_nodes,
@@ -315,7 +315,7 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			/* fall through */
 		case CJ_RES_FAIL:
 			build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-			sd_join_handler(&cevent->sender.ent, entries,
+			sd_join_handler(&cevent->sender.node, entries,
 					nr_cpg_nodes, cevent->result,
 					cevent->msg);
 			break;
@@ -326,12 +326,12 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			   cpg_node_cmp);
 		if (n == NULL)
 			break;
-		cevent->sender.ent = n->ent;
+		cevent->sender.node = n->node;
 
 		del_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 		nr_cpg_nodes--;
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_leave_handler(&cevent->sender.ent, entries, nr_cpg_nodes);
+		sd_leave_handler(&cevent->sender.node, entries, nr_cpg_nodes);
 		break;
 	case COROSYNC_EVENT_TYPE_BLOCK:
 		if (cevent->callbacked)
@@ -340,21 +340,21 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			 * removes this event
 			 */
 			return false;
-		cevent->callbacked = sd_block_handler(&cevent->sender.ent);
+		cevent->callbacked = sd_block_handler(&cevent->sender.node);
 		return false;
 	case COROSYNC_EVENT_TYPE_NOTIFY:
-		sd_notify_handler(&cevent->sender.ent, cevent->msg,
+		sd_notify_handler(&cevent->sender.node, cevent->msg,
 						 cevent->msg_len);
 		break;
 	case COROSYNC_EVENT_TYPE_UPDATE_NODE:
-		node = &cevent->sender.ent;
+		node = &cevent->sender.node;
 
 		if (cpg_node_equal(&cevent->sender, &this_node))
 			this_node = cevent->sender;
 
 		idx = find_sd_node(cpg_nodes, nr_cpg_nodes, node);
 		assert(idx >= 0);
-		cpg_nodes[idx].ent = *node;
+		cpg_nodes[idx].node = *node;
 		sd_update_node_handler(node);
 		break;
 	}
@@ -712,7 +712,7 @@ retry:
 		return -1;
 	}
 
-	this_node.ent = *myself;
+	this_node.node = *myself;
 
 	ret = send_message(COROSYNC_MSG_TYPE_JOIN_REQUEST, 0, &this_node,
 			   NULL, 0, opaque, opaque_len);
@@ -830,7 +830,7 @@ static int corosync_update_node(struct sd_node *node)
 {
 	struct cpg_node cnode = this_node;
 
-	cnode.ent = *node;
+	cnode.node = *node;
 
 	return send_message(COROSYNC_MSG_TYPE_UPDATE_NODE, 0, &cnode,
 			    NULL, 0, NULL, 0);
