@@ -424,6 +424,8 @@ static struct request *alloc_local_request(void *data, int data_length)
 
 	INIT_LIST_HEAD(&req->request_list);
 
+	refcount_set(&req->refcnt, 1);
+
 	return req;
 }
 
