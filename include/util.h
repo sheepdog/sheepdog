@@ -206,6 +206,36 @@ static inline void uatomic_set_false(uatomic_bool *val)
 	(typeof(*(p)))ret;				\
 })
 
+/*
+ * refcnt_t: reference counter which can be manipulated by multiple threads
+ * safely
+ */
+
+typedef struct {
+	int val;
+} refcnt_t;
+
+static inline void refcount_set(refcnt_t *rc, int val)
+{
+	uatomic_set(&rc->val, val);
+}
+
+static inline int refcount_read(refcnt_t *rc)
+{
+	return uatomic_read(&rc->val);
+}
+
+static inline int refcount_inc(refcnt_t *rc)
+{
+	return uatomic_add_return(&rc->val, 1);
+}
+
+static inline int refcount_dec(refcnt_t *rc)
+{
+	assert(1 <= uatomic_read(&rc->val));
+	return uatomic_sub_return(&rc->val, 1);
+}
+
 /* colors */
 #define TEXT_NORMAL         "\033[0m"
 #define TEXT_BOLD           "\033[1m"
