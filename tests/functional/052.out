@@ -46,10 +46,6 @@ The cluster may need to be force recovered if:
 
 Are you sure you want to continue? [yes/no]: 
 finish check&repair test
-fixed missing 7c2b2500000001
-fixed missing 7c2b2500000002
-fixed missing 7c2b2500000003
-fixed missing 7c2b2500000004
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE

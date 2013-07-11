@@ -541,12 +541,13 @@ static void do_get_vdis(struct work *work)
 	int i, ret;
 
 	if (!node_is_local(&w->joined)) {
-		switch (sys->status) {
-		case SD_STATUS_OK:
-		case SD_STATUS_HALT:
-			get_vdis_from(&w->joined);
-			return;
-		}
+		sd_dprintf("try to get vdi bitmap from %s",
+			   node_to_str(&w->joined));
+		ret = get_vdis_from(&w->joined);
+		if (ret != SD_RES_SUCCESS)
+			sd_printf(SDOG_ALERT, "failed to get vdi bitmap from "
+				  "%s", node_to_str(&w->joined));
+		return;
 	}
 
 	for (i = 0; i < w->nr_members; i++) {
@@ -554,17 +555,21 @@ static void do_get_vdis(struct work *work)
 		if (node_is_local(&w->members[i]))
 			continue;
 
+		sd_dprintf("try to get vdi bitmap from %s",
+			   node_to_str(&w->members[i]));
 		ret = get_vdis_from(&w->members[i]);
-		if (ret != SD_RES_SUCCESS)
+		if (ret != SD_RES_SUCCESS) {
 			/* try to read from another node */
+			sd_printf(SDOG_ALERT, "failed to get vdi bitmap from "
+				  "%s", node_to_str(&w->members[i]));
 			continue;
+		}
 
 		/*
-		 * If a new comer try to join the running cluster, it only
-		 * need read one copy of bitmap from one of other members.
+		 * TODO: If the target node has a valid vdi bitmap (the node has
+		 * already called do_get_vdis against all the nodes), we can
+		 * exit this loop here.
 		 */
-		if (sys->status == SD_STATUS_WAIT_FOR_FORMAT)
-			break;
 	}
 }
 
@@ -724,6 +729,8 @@ static void update_cluster_info(const struct join_message *msg,
 	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(nodes, nr_nodes));
 
+	get_vdis(nodes, nr_nodes, joined);
+
 	switch (msg->cluster_status) {
 	case SD_STATUS_OK:
 	case SD_STATUS_HALT:
@@ -741,8 +748,6 @@ static void update_cluster_info(const struct join_message *msg,
 		default:
 			break;
 		}
-
-		get_vdis(nodes, nr_nodes, joined);
 
 		sys->status = msg->cluster_status;
 
