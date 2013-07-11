@@ -923,7 +923,10 @@ static void update_cluster_info(const struct join_message *msg,
 
 			start_recovery(main_thread_get(current_vnode_info),
 				       old_vnode_info, true);
-		}
+		} else
+			start_recovery(main_thread_get(current_vnode_info),
+				       main_thread_get(current_vnode_info),
+				       false);
 
 		if (have_enough_zones())
 			sys->status = SD_STATUS_OK;
