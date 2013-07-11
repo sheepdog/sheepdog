@@ -42,7 +42,7 @@ struct global_cache {
 
 struct object_cache_entry {
 	uint32_t idx; /* Index of this entry */
-	int refcnt; /* Reference count of this entry */
+	refcnt_t refcnt; /* Reference count of this entry */
 	uint64_t bmap; /* Each bit represents one dirty block in object */
 	struct object_cache *oc; /* Object cache this entry belongs to */
 	struct rb_node node; /* For lru tree of object cache */
@@ -133,17 +133,17 @@ static uint64_t calc_object_bmap(size_t len, off_t offset)
 
 static inline void get_cache_entry(struct object_cache_entry *entry)
 {
-	uatomic_inc(&entry->refcnt);
+	refcount_inc(&entry->refcnt);
 }
 
 static inline void put_cache_entry(struct object_cache_entry *entry)
 {
-	uatomic_dec(&entry->refcnt);
+	refcount_dec(&entry->refcnt);
 }
 
 static inline bool entry_in_use(struct object_cache_entry *entry)
 {
-	return uatomic_read(&entry->refcnt) > 0;
+	return refcount_read(&entry->refcnt) > 0;
 }
 
 /*

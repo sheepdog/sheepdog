@@ -487,7 +487,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 		return NULL;
 
 	req->ci = ci;
-	ci->refcnt++;
+	refcount_inc(&ci->refcnt);
 	if (data_length) {
 		req->data_length = data_length;
 		req->data = valloc(data_length);
@@ -498,7 +498,7 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 	}
 
 	INIT_LIST_HEAD(&req->request_list);
-	uatomic_set(&req->refcnt, 1);
+	refcount_set(&req->refcnt, 1);
 
 	uatomic_inc(&sys->nr_outstanding_reqs);
 
@@ -509,7 +509,7 @@ static void free_request(struct request *req)
 {
 	uatomic_dec(&sys->nr_outstanding_reqs);
 
-	req->ci->refcnt--;
+	refcount_dec(&req->ci->refcnt);
 	put_vnode_info(req->vinfo);
 	free(req->data);
 	free(req);
@@ -520,7 +520,7 @@ void put_request(struct request *req)
 	struct client_info *ci = req->ci;
 	eventfd_t value = 1;
 
-	if (uatomic_sub_return(&req->refcnt, 1) > 0)
+	if (refcount_dec(&req->refcnt) > 0)
 		return;
 
 	if (req->local)
@@ -748,10 +748,10 @@ static void clear_client_info(struct client_info *ci)
 
 	unregister_event(ci->conn.fd);
 
-	sd_dprintf("refcnt:%d, fd:%d, %s:%d", ci->refcnt, ci->conn.fd,
-		   ci->conn.ipstr, ci->conn.port);
+	sd_dprintf("refcnt:%d, fd:%d, %s:%d", refcount_read(&ci->refcnt),
+		ci->conn.fd, ci->conn.ipstr, ci->conn.port);
 
-	if (ci->refcnt)
+	if (refcount_read(&ci->refcnt))
 		return;
 
 	destroy_client(ci);
@@ -785,7 +785,7 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 
 	ci->conn.fd = fd;
 	ci->conn.events = EPOLLIN;
-	ci->refcnt = 0;
+	refcount_set(&ci->refcnt, 0);
 
 	INIT_LIST_HEAD(&ci->done_reqs);
 

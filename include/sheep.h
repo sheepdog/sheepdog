@@ -33,7 +33,7 @@ struct vnode_info {
 	int nr_nodes;
 
 	int nr_zones;
-	int refcnt;
+	refcnt_t refcnt;
 };
 
 #define TRACE_GRAPH_ENTRY  0x01

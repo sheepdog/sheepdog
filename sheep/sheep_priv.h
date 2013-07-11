@@ -52,7 +52,7 @@ struct client_info {
 
 	struct list_head done_reqs;
 
-	int refcnt;
+	refcnt_t refcnt;
 };
 
 enum REQUST_STATUS {
@@ -75,7 +75,7 @@ struct request {
 	struct list_head request_list;
 	struct list_head pending_list;
 
-	int refcnt;
+	refcnt_t refcnt;
 	bool local;
 	int local_req_efd;
 

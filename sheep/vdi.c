@@ -856,7 +856,7 @@ static int start_deletion(struct request *req, uint32_t vid)
 	if (dw->count == 0)
 		goto out;
 
-	uatomic_inc(&req->refcnt);
+	refcount_inc(&req->refcnt);
 
 	if (list_empty(&deletion_work_list)) {
 		list_add_tail(&dw->list, &deletion_work_list);

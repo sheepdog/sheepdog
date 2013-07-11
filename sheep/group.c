@@ -107,9 +107,7 @@ static int get_node_idx(struct vnode_info *vnode_info, struct sd_node *ent)
  */
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info)
 {
-	assert(uatomic_read(&vnode_info->refcnt) > 0);
-
-	uatomic_inc(&vnode_info->refcnt);
+	refcount_inc(&vnode_info->refcnt);
 	return vnode_info;
 }
 
@@ -132,9 +130,7 @@ struct vnode_info *get_vnode_info(void)
 void put_vnode_info(struct vnode_info *vnode_info)
 {
 	if (vnode_info) {
-		assert(uatomic_read(&vnode_info->refcnt) > 0);
-
-		if (uatomic_sub_return(&vnode_info->refcnt, 1) == 0)
+		if (refcount_dec(&vnode_info->refcnt) == 0)
 			free(vnode_info);
 	}
 }
@@ -155,7 +151,7 @@ struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
 	vnode_info->nr_vnodes = nodes_to_vnodes(vnode_info->nodes, nr_nodes,
 						vnode_info->vnodes);
 	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
-	uatomic_set(&vnode_info->refcnt, 1);
+	refcount_set(&vnode_info->refcnt, 1);
 	return vnode_info;
 }
 
