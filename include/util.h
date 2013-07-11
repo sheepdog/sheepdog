@@ -13,6 +13,7 @@
 
 #include "bitops.h"
 #include "list.h"
+#include "compiler.h"
 
 #define SECTOR_SIZE (1U << 9)
 #define BLOCK_SIZE (1U << 12)
@@ -38,11 +39,6 @@
 #define __be64_to_cpu(x) (x)
 #define __cpu_to_le32(x) bswap_32(x)
 #endif
-
-#define notrace __attribute__((no_instrument_function))
-#define __packed __attribute((packed))
-
-#define __printf(a, b)                  __attribute__((format(printf, a, b)))
 
 #define uninitialized_var(x) x = x
 
@@ -167,8 +163,8 @@ int atomic_create_and_write(const char *path, char *buf, size_t len);
 
 #ifndef NDEBUG
 
-#define assert(expr) ((expr) ?						\
-			(void)0 : panic("Asserting `%s' failed.", #expr))
+#define assert(expr) ((expr) ?				\
+			(void)0 : do_assert(#expr, __func__, __LINE__))
 
 #else
 

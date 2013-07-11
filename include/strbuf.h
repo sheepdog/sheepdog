@@ -8,6 +8,7 @@
 #include <stdlib.h>
 
 #include "logger.h"
+#include "util.h"
 
 struct strbuf {
 	size_t alloc;

@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include <sys/syslog.h>
 
-#include "util.h"
+#include "compiler.h"
 
 #define LOG_SPACE_SIZE (1 * 1024 * 1024)
 #define LOG_SPACE_DEBUG_SIZE (32 * 1024 * 1024)
@@ -80,5 +80,11 @@ void sd_backtrace(void);
 	do {								\
 		log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args);	\
 	} while (0)
+
+static inline void do_assert(const char *expr, const char *func, int line)
+{
+	log_write(SDOG_EMERG, func, line, "Asserting `%s' failed.", expr);
+	abort();
+}
 
 #endif	/* LOG_H */
