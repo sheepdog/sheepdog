@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <netinet/in.h>
 
-#define SD_SHEEP_PROTO_VER 0x07
+#define SD_SHEEP_PROTO_VER 0x08
 
 #define SD_DEFAULT_COPIES 3
 #define SD_MAX_COPIES 8
@@ -155,10 +155,8 @@ struct epoch_log {
 
 struct join_message {
 	uint8_t proto_ver;
-	uint8_t __pad1[7];
+	uint8_t __pad[3];
 	uint32_t cluster_status;
-	uint8_t inc_epoch; /* set non-zero when we increment epoch of all nodes */
-	uint8_t __pad2[3];
 
 	/*
 	 * A joining sheep puts the local cluster info here.  After the master

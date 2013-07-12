@@ -466,21 +466,8 @@ static int cluster_wait_for_join_check(const struct sd_node *joining,
 	 * node list, we can set the cluster live now.
 	 */
 	if (sys->cinfo.epoch > 0 &&
-	    enough_nodes_gathered(jm, joining, nodes, nr_nodes)) {
-		/*
-		 * The number of current nodes is (nr_nodes + 1) because 'nodes'
-		 * doesn't contain the 'joining' node.
-		 */
-		size_t nr_current_nodes = nr_nodes + 1;
-
-		if (jm->cinfo.nr_nodes < nr_current_nodes)
-			/*
-			 * There are nodes which didn't exist in the previous
-			 * epoch, so we have to increment epoch.
-			 */
-			jm->inc_epoch = 1;
+	    enough_nodes_gathered(jm, joining, nodes, nr_nodes))
 		jm->cluster_status = SD_STATUS_OK;
-	}
 
 	return CJ_RES_SUCCESS;
 }
@@ -499,7 +486,6 @@ static int cluster_running_check(struct join_message *jm)
 			return ret;
 	}
 
-	jm->inc_epoch = 1;
 	return CJ_RES_SUCCESS;
 }
 
@@ -617,14 +603,15 @@ static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
 	return alloc_vnode_info(old_nodes, nr_nodes);
 }
 
-static void setup_backend_store(const char *store, bool need_purge)
+static void setup_backend_store(const struct join_message *jm)
 {
 	int ret;
 
 	if (!sd_store) {
-		sd_store = find_store_driver(store);
+		sd_store = find_store_driver((char *)jm->cinfo.store);
 		if (!sd_store)
-			panic("backend store %s not supported", store);
+			panic("backend store %s not supported",
+			      jm->cinfo.store);
 
 		ret = sd_store->init();
 		if (ret != SD_RES_SUCCESS)
@@ -635,7 +622,8 @@ static void setup_backend_store(const char *store, bool need_purge)
 	 * We need to purge the stale objects for sheep joining back
 	 * after crash
 	 */
-	if (need_purge && sd_store->purge_obj) {
+	if (xlfind(&sys->this_node, jm->cinfo.nodes, jm->cinfo.nr_nodes,
+		   node_cmp) == NULL) {
 		ret = sd_store->purge_obj();
 		if (ret != SD_RES_SUCCESS)
 			panic("can't remove stale objects");
@@ -651,8 +639,7 @@ static void finish_join(const struct join_message *msg,
 
 	if (msg->cinfo.store[0]) {
 		if (!sys->gateway_only)
-			setup_backend_store((char *)msg->cinfo.store,
-					    !!msg->inc_epoch);
+			setup_backend_store(msg);
 	}
 
 	sockfd_cache_add_group(nodes, nr_nodes);
@@ -754,7 +741,7 @@ static void update_cluster_info(const struct join_message *msg,
 
 		sys->status = msg->cluster_status;
 
-		if (msg->inc_epoch) {
+		if (nr_nodes != msg->cinfo.nr_nodes) {
 			int ret = inc_and_log_epoch();
 			if (ret != 0)
 				panic("cannot log current epoch %d",
@@ -888,7 +875,6 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 	}
 
 	jm->cluster_status = sys->status;
-	jm->inc_epoch = 0;
 
 	switch (sys->status) {
 	case SD_STATUS_SHUTDOWN:
