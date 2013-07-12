@@ -61,8 +61,8 @@ static bool lnode_eq(const struct local_node *a, const struct local_node *b)
 }
 
 enum local_event_type {
-	EVENT_JOIN_REQUEST = 1,
-	EVENT_JOIN_RESPONSE,
+	EVENT_JOIN = 1,
+	EVENT_ACCEPT,
 	EVENT_LEAVE,
 	EVENT_GATEWAY,
 	EVENT_BLOCK,
@@ -259,7 +259,7 @@ static int add_event(enum local_event_type type, struct local_node *lnode,
 	ev.nr_lnodes = get_nodes(ev.lnodes);
 
 	switch (type) {
-	case EVENT_JOIN_REQUEST:
+	case EVENT_JOIN:
 		ev.lnodes[ev.nr_lnodes] = *lnode;
 		ev.nr_lnodes++;
 		break;
@@ -277,7 +277,7 @@ static int add_event(enum local_event_type type, struct local_node *lnode,
 		n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp);
 		n->node = lnode->node;
 		break;
-	case EVENT_JOIN_RESPONSE:
+	case EVENT_ACCEPT:
 		abort();
 	}
 
@@ -341,8 +341,7 @@ static int local_join(const struct sd_node *myself,
 	this_node.pid = getpid();
 	this_node.gateway = false;
 
-	return add_event_lock(EVENT_JOIN_REQUEST, &this_node, opaque,
-			      opaque_len);
+	return add_event_lock(EVENT_JOIN, &this_node, opaque, opaque_len);
 }
 
 static int local_leave(void)
@@ -409,14 +408,13 @@ static bool local_process_event(void)
 	if (ev->callbacked)
 		return false; /* wait for unblock event */
 
-	if (ev->type == EVENT_JOIN_RESPONSE &&
-	    lnode_eq(&this_node, &ev->sender)) {
+	if (ev->type == EVENT_ACCEPT && lnode_eq(&this_node, &ev->sender)) {
 		sd_dprintf("join Sheepdog");
 		joined = true;
 	}
 
 	if (!joined) {
-		if (ev->type == EVENT_JOIN_REQUEST &&
+		if (ev->type == EVENT_JOIN &&
 		    lnode_eq(&this_node, &ev->sender)) {
 			struct local_node lnodes[SD_MAX_NODES];
 
@@ -432,18 +430,18 @@ static bool local_process_event(void)
 	}
 
 	switch (ev->type) {
-	case EVENT_JOIN_REQUEST:
+	case EVENT_JOIN:
 		/* nodes[nr_nodes - 1] is a sender, so don't include it */
 		assert(node_eq(&ev->sender.node, &nodes[nr_nodes - 1]));
-		sd_check_join_cb(&ev->sender.node, nodes, nr_nodes - 1,
-				 ev->buf);
-		ev->type = EVENT_JOIN_RESPONSE;
+		sd_accept_handler(&ev->sender.node, nodes, nr_nodes - 1,
+				  ev->buf);
+		ev->type = EVENT_ACCEPT;
 		msync(ev, sizeof(*ev), MS_SYNC);
 
 		shm_queue_notify();
 
 		return false;
-	case EVENT_JOIN_RESPONSE:
+	case EVENT_ACCEPT:
 		sd_join_handler(&ev->sender.node, nodes, nr_nodes, ev->buf);
 		break;
 	case EVENT_LEAVE:

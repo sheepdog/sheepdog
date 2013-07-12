@@ -4,7 +4,7 @@
 enum sph_cli_msg_type {
 	/* messages sent by a cluster driver, received by shepherd */
 	SPH_CLI_MSG_JOIN = 0,
-	SPH_CLI_MSG_NEW_NODE_REPLY,
+	SPH_CLI_MSG_ACCEPT,
 	SPH_CLI_MSG_NOTIFY,
 	SPH_CLI_MSG_BLOCK,
 	SPH_CLI_MSG_LEAVE,
@@ -84,7 +84,7 @@ static inline const char *sph_cli_msg_to_str(enum sph_cli_msg_type msg)
 		const char *desc;
 	} msgs[] = {
 		{ SPH_CLI_MSG_JOIN, "SPH_CLI_MSG_JOIN" },
-		{ SPH_CLI_MSG_NEW_NODE_REPLY, "SPH_CLI_MSG_NEW_NODE_REPLY" },
+		{ SPH_CLI_MSG_ACCEPT, "SPH_CLI_MSG_ACCEPT" },
 		{ SPH_CLI_MSG_NOTIFY, "SPH_CLI_MSG_NOTIFY" },
 		{ SPH_CLI_MSG_BLOCK, "SPH_CLI_MSG_BLOCK" },
 		{ SPH_CLI_MSG_LEAVE, "SPH_CLI_MSG_LEAVE" },

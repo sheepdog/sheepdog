@@ -52,7 +52,7 @@ struct cluster_driver {
 	 *
 	 * This function is used to join the cluster, and notifies a join
 	 * event to all the nodes.  The copy of 'opaque' is passed to
-	 * sd_check_join_cb() and sd_join_handler().
+	 * sd_accept_handler() and sd_join_handler().
 	 *
 	 * sd_check_join_cb() is called on one of the nodes which already
 	 * paticipate in the cluster.  If the content of 'opaque' is
@@ -172,9 +172,9 @@ void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 int sd_reconnect_handler(void);
 void sd_update_node_handler(struct sd_node *);
-void sd_check_join_cb(const struct sd_node *joining,
-		      const struct sd_node *nodes, size_t nr_nodes,
-		      void *opaque);
+void sd_accept_handler(const struct sd_node *joining,
+		       const struct sd_node *nodes, size_t nr_nodes,
+		       void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 
 #endif

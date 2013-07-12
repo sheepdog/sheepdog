@@ -114,13 +114,13 @@ retry:
 		 * FIXME: member change events must be ordered with nonblocked
 		 *        events
 		 */
-		sd_check_join_cb(&join->new_node, NULL, 0, join->opaque);
+		sd_accept_handler(&join->new_node, NULL, 0, join->opaque);
 
 		/* FIXME: join->master_elected is needed? */
 		assert(join->master_elected);
 		is_master = true;
 
-		snd.type = SPH_CLI_MSG_NEW_NODE_REPLY;
+		snd.type = SPH_CLI_MSG_ACCEPT;
 		snd.body_len = join_len;
 
 		ret = writev2(sph_comm_fd, &snd, join, join_len);
@@ -325,10 +325,10 @@ static void msg_new_node(struct sph_msg *rcv)
 	}
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	sd_check_join_cb(&join->new_node, nodes, nr_nodes, join->opaque);
+	sd_accept_handler(&join->new_node, nodes, nr_nodes, join->opaque);
 
 	memset(&snd, 0, sizeof(snd));
-	snd.type = SPH_CLI_MSG_NEW_NODE_REPLY;
+	snd.type = SPH_CLI_MSG_ACCEPT;
 	snd.body_len = rcv->body_len;
 
 	ret = writev2(sph_comm_fd, &snd, join, rcv->body_len);

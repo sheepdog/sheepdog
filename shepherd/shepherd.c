@@ -377,7 +377,7 @@ purge_current_sheep:
 	remove_sheep(sheep);
 }
 
-static void sph_handle_new_node_reply(struct sph_msg *msg, struct sheep *sheep)
+static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 {
 	int fd = sheep->fd, removed = 0;
 	ssize_t rbytes, wbytes;
@@ -627,7 +627,7 @@ fwd_leave_failed:
 
 static void (*msg_handlers[])(struct sph_msg*, struct sheep *) = {
 	[SPH_CLI_MSG_JOIN] = sph_handle_join,
-	[SPH_CLI_MSG_NEW_NODE_REPLY] = sph_handle_new_node_reply,
+	[SPH_CLI_MSG_ACCEPT] = sph_handle_accept,
 	[SPH_CLI_MSG_NOTIFY] = sph_handle_notify,
 	[SPH_CLI_MSG_BLOCK] = sph_handle_block,
 	[SPH_CLI_MSG_LEAVE] = sph_handle_leave,

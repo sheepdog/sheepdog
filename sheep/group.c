@@ -776,13 +776,13 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
 }
 
 /*
- * Check whether the joining nodes can join the sheepdog cluster.
+ * Accept the joining node and pass the cluster info to it.
  *
  * Note that 'nodes' doesn't contain 'joining'.
  */
-void sd_check_join_cb(const struct sd_node *joining,
-		      const struct sd_node *nodes, size_t nr_nodes,
-		      void *opaque)
+void sd_accept_handler(const struct sd_node *joining,
+		       const struct sd_node *nodes, size_t nr_nodes,
+		       void *opaque)
 {
 	struct join_message *jm = opaque;
 	char str[MAX_NODE_STR_LEN];

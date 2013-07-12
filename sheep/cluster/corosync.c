@@ -46,8 +46,8 @@ static size_t nr_majority; /* used for network partition detection */
 
 /* event types which are dispatched in corosync_dispatch() */
 enum corosync_event_type {
-	COROSYNC_EVENT_TYPE_JOIN_REQUEST,
-	COROSYNC_EVENT_TYPE_JOIN_RESPONSE,
+	COROSYNC_EVENT_TYPE_JOIN,
+	COROSYNC_EVENT_TYPE_ACCEPT,
 	COROSYNC_EVENT_TYPE_LEAVE,
 	COROSYNC_EVENT_TYPE_BLOCK,
 	COROSYNC_EVENT_TYPE_NOTIFY,
@@ -56,8 +56,8 @@ enum corosync_event_type {
 
 /* multicast message type */
 enum corosync_message_type {
-	COROSYNC_MSG_TYPE_JOIN_REQUEST,
-	COROSYNC_MSG_TYPE_JOIN_RESPONSE,
+	COROSYNC_MSG_TYPE_JOIN,
+	COROSYNC_MSG_TYPE_ACCEPT,
 	COROSYNC_MSG_TYPE_LEAVE,
 	COROSYNC_MSG_TYPE_NOTIFY,
 	COROSYNC_MSG_TYPE_BLOCK,
@@ -281,28 +281,28 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 	int idx;
 
 	switch (cevent->type) {
-	case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
+	case COROSYNC_EVENT_TYPE_JOIN:
 		if (is_master(&this_node) < 0)
 			return false;
 
 		if (!cevent->msg)
-			/* we haven't receive JOIN_REQUEST yet */
+			/* we haven't receive JOIN yet */
 			return false;
 
 		if (cevent->callbacked)
-			/* check_join() must be called only once */
+			/* sd_accept_handler() must be called only once */
 			return false;
 
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_check_join_cb(&cevent->sender.node, entries, nr_cpg_nodes,
-				 cevent->msg);
-		send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, &cevent->sender,
+		sd_accept_handler(&cevent->sender.node, entries, nr_cpg_nodes,
+				  cevent->msg);
+		send_message(COROSYNC_MSG_TYPE_ACCEPT, &cevent->sender,
 			     cpg_nodes, nr_cpg_nodes, cevent->msg,
 			     cevent->msg_len);
 
 		cevent->callbacked = true;
 		return false;
-	case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
+	case COROSYNC_EVENT_TYPE_ACCEPT:
 		add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 		nr_cpg_nodes++;
 
@@ -384,13 +384,13 @@ static void __corosync_dispatch(void)
 		/* update join status */
 		if (!join_finished) {
 			switch (cevent->type) {
-			case COROSYNC_EVENT_TYPE_JOIN_REQUEST:
+			case COROSYNC_EVENT_TYPE_JOIN:
 				if (self_elect) {
 					join_finished = true;
 					nr_cpg_nodes = 0;
 				}
 				break;
-			case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
+			case COROSYNC_EVENT_TYPE_ACCEPT:
 				if (cpg_node_equal(&cevent->sender,
 						   &this_node)) {
 					join_finished = true;
@@ -410,7 +410,7 @@ static void __corosync_dispatch(void)
 				return;
 		} else {
 			switch (cevent->type) {
-			case COROSYNC_MSG_TYPE_JOIN_REQUEST:
+			case COROSYNC_MSG_TYPE_JOIN:
 			case COROSYNC_MSG_TYPE_BLOCK:
 				return;
 			default:
@@ -469,9 +469,9 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 	sd_dprintf("%d", cmsg->type);
 
 	switch (cmsg->type) {
-	case COROSYNC_MSG_TYPE_JOIN_REQUEST:
-		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
-				      &cmsg->sender, cmsg->msg, cmsg->msg_len);
+	case COROSYNC_MSG_TYPE_JOIN:
+		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN, &cmsg->sender,
+				      cmsg->msg, cmsg->msg_len);
 		if (!cevent)
 			break;
 
@@ -536,13 +536,13 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 
 		queue_event(cevent);
 		break;
-	case COROSYNC_MSG_TYPE_JOIN_RESPONSE:
-		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
-				      &cmsg->sender, cmsg->msg, cmsg->msg_len);
+	case COROSYNC_MSG_TYPE_ACCEPT:
+		cevent = update_event(COROSYNC_EVENT_TYPE_JOIN, &cmsg->sender,
+				      cmsg->msg, cmsg->msg_len);
 		if (!cevent)
 			break;
 
-		cevent->type = COROSYNC_EVENT_TYPE_JOIN_RESPONSE;
+		cevent->type = COROSYNC_EVENT_TYPE_ACCEPT;
 		cevent->nr_nodes = cmsg->nr_nodes;
 		memcpy(cevent->nodes, cmsg->nodes,
 		       sizeof(*cmsg->nodes) * cmsg->nr_nodes);
@@ -610,8 +610,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
 		int master;
-		cevent = find_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
-				    left_sheep + i);
+		cevent = find_event(COROSYNC_EVENT_TYPE_JOIN, left_sheep + i);
 		if (cevent) {
 			/* the node left before joining */
 			list_del(&cevent->list);
@@ -647,7 +646,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	/* dispatch join_handler */
 	for (i = 0; i < joined_list_entries; i++) {
 		cevent = xzalloc(sizeof(*cevent));
-		cevent->type = COROSYNC_EVENT_TYPE_JOIN_REQUEST;
+		cevent->type = COROSYNC_EVENT_TYPE_JOIN;
 		cevent->sender = joined_sheep[i];
 		queue_event(cevent);
 	}
@@ -658,7 +657,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		 * all other members, because events are ordered.
 		 */
 		for (i = 0; i < member_list_entries; i++) {
-			cevent = find_event(COROSYNC_EVENT_TYPE_JOIN_REQUEST,
+			cevent = find_event(COROSYNC_EVENT_TYPE_JOIN,
 					    &member_sheep[i]);
 			if (!cevent) {
 				sd_dprintf("Not promoting because member is "
@@ -702,8 +701,8 @@ retry:
 
 	this_node.node = *myself;
 
-	ret = send_message(COROSYNC_MSG_TYPE_JOIN_REQUEST, &this_node, NULL, 0,
-			   opaque, opaque_len);
+	ret = send_message(COROSYNC_MSG_TYPE_JOIN, &this_node, NULL, 0, opaque,
+			   opaque_len);
 
 	return ret;
 }

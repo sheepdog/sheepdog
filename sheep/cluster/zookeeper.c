@@ -41,8 +41,8 @@
 	     free(*(strs)->data))
 
 enum zk_event_type {
-	EVENT_JOIN_REQUEST = 1,
-	EVENT_JOIN_RESPONSE,
+	EVENT_JOIN = 1,
+	EVENT_ACCEPT,
 	EVENT_LEAVE,
 	EVENT_BLOCK,
 	EVENT_UNBLOCK,
@@ -406,7 +406,7 @@ static int push_join_response(struct zk_event *ev)
 	char path[MAX_NODE_STR_LEN];
 	int len;
 
-	ev->type = EVENT_JOIN_RESPONSE;
+	ev->type = EVENT_ACCEPT;
 	ev->nr_nodes = nr_sd_nodes;
 	memcpy(zk_event_sd_nodes(ev), sd_nodes,
 	       nr_sd_nodes * sizeof(struct sd_node));
@@ -597,7 +597,7 @@ static int add_join_event(void *msg, size_t msg_len)
 
 	assert(len <= SD_MAX_EVENT_BUF_SIZE);
 	ev.id = get_uniq_id();
-	ev.type = EVENT_JOIN_REQUEST;
+	ev.type = EVENT_JOIN;
 	ev.sender = this_node;
 	ev.msg_len = msg_len;
 	ev.buf_len = len;
@@ -836,7 +836,7 @@ static int zk_unblock(void *msg, size_t msg_len)
 	return add_event(EVENT_UNBLOCK, &this_node, msg, msg_len);
 }
 
-static void zk_handle_join_request(struct zk_event *ev)
+static void zk_handle_join(struct zk_event *ev)
 {
 	sd_dprintf("sender: %s", node_to_str(&ev->sender.node));
 	if (!uatomic_is_true(&is_master)) {
@@ -845,7 +845,7 @@ static void zk_handle_join_request(struct zk_event *ev)
 		return;
 	}
 
-	sd_check_join_cb(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
+	sd_accept_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
 	push_join_response(ev);
 
 	sd_dprintf("I'm the master now");
@@ -880,12 +880,12 @@ static void init_node_list(struct zk_event *ev)
 	watch_all_nodes();
 }
 
-static void zk_handle_join_response(struct zk_event *ev)
+static void zk_handle_accept(struct zk_event *ev)
 {
 	char path[MAX_NODE_STR_LEN];
 	int rc;
 
-	sd_dprintf("JOIN RESPONSE");
+	sd_dprintf("ACCEPT");
 	if (node_eq(&ev->sender.node, &this_node.node))
 		/* newly joined node */
 		init_node_list(ev);
@@ -1002,8 +1002,8 @@ static void zk_handle_update_node(struct zk_event *ev)
 }
 
 static void (*const zk_event_handlers[])(struct zk_event *ev) = {
-	[EVENT_JOIN_REQUEST]	= zk_handle_join_request,
-	[EVENT_JOIN_RESPONSE]	= zk_handle_join_response,
+	[EVENT_JOIN]		= zk_handle_join,
+	[EVENT_ACCEPT]		= zk_handle_accept,
 	[EVENT_LEAVE]		= zk_handle_leave,
 	[EVENT_BLOCK]		= zk_handle_block,
 	[EVENT_UNBLOCK]		= zk_handle_unblock,
