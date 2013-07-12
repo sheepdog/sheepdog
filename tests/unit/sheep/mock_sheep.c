@@ -14,3 +14,4 @@
 #include "sheep_priv.h"
 
 struct system_info *sys;
+LIST_HEAD(cluster_drivers);

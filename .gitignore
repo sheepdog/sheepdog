@@ -38,6 +38,7 @@ shepherd/shepherd
 tools/kill_zk_session
 tests/unit/collie/test_common
 tests/unit/sheep/test_vdi
+tests/unit/sheep/test_cluster_driver
 
 # directories
 .deps
