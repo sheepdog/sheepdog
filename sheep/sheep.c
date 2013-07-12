@@ -118,7 +118,7 @@ static struct sd_option sheep_options[] = {
 	{'r', "http", true, "enable http service", http_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
-	{'w', "enable-cache", true, "enable object cache", cache_help},
+	{'w', "cache", true, "enable object cache", cache_help},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
 	{'z', "zone", true, "specify the zone id", zone_help},
