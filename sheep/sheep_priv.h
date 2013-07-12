@@ -296,7 +296,7 @@ int leave_cluster(void);
 void queue_cluster_request(struct request *req);
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
-int log_current_epoch(void);
+int inc_and_log_epoch(void);
 
 extern char *config_path;
 int set_cluster_config(const struct cluster_info *cinfo);

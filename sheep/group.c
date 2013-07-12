@@ -586,19 +586,22 @@ static void get_vdis_done(struct work *work)
 	free(w);
 }
 
-int log_current_epoch(void)
+int inc_and_log_epoch(void)
 {
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
-	if (!cur_vinfo)
-		return update_epoch_log(sys->cinfo.epoch, NULL, 0);
+	if (cur_vinfo) {
+		/* update cluster info to the latest state */
+		sys->cinfo.nr_nodes = cur_vinfo->nr_nodes;
+		memcpy(sys->cinfo.nodes, cur_vinfo->nodes,
+		       sizeof(cur_vinfo->nodes[0]) * cur_vinfo->nr_nodes);
+	} else
+		sys->cinfo.nr_nodes = 0;
 
-	/* update cluster info to the latest state */
-	sys->cinfo.nr_nodes = cur_vinfo->nr_nodes;
-	memcpy(sys->cinfo.nodes, cur_vinfo->nodes,
-	       sizeof(cur_vinfo->nodes[0]) * cur_vinfo->nr_nodes);
-	return update_epoch_log(sys->cinfo.epoch, cur_vinfo->nodes,
-				cur_vinfo->nr_nodes);
+	uatomic_inc(&sys->cinfo.epoch);
+
+	return update_epoch_log(sys->cinfo.epoch, sys->cinfo.nodes,
+				sys->cinfo.nr_nodes);
 }
 
 static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
@@ -752,8 +755,10 @@ static void update_cluster_info(const struct join_message *msg,
 		sys->status = msg->cluster_status;
 
 		if (msg->inc_epoch) {
-			uatomic_inc(&sys->cinfo.epoch);
-			log_current_epoch();
+			int ret = inc_and_log_epoch();
+			if (ret != 0)
+				panic("cannot log current epoch %d",
+				      sys->cinfo.epoch);
 
 			if (!old_vnode_info) {
 				old_vnode_info = alloc_old_vnode_info(joined,
@@ -1059,7 +1064,7 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 		      size_t nr_members)
 {
 	struct vnode_info *old_vnode_info;
-	int i;
+	int i, ret;
 
 	sd_dprintf("leave %s", node_to_str(left));
 	for (i = 0; i < nr_members; i++)
@@ -1078,8 +1083,9 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	switch (sys->status) {
 	case SD_STATUS_HALT:
 	case SD_STATUS_OK:
-		uatomic_inc(&sys->cinfo.epoch);
-		log_current_epoch();
+		ret = inc_and_log_epoch();
+		if (ret != 0)
+			panic("cannot log current epoch %d", sys->cinfo.epoch);
 		start_recovery(main_thread_get(current_vnode_info),
 			       old_vnode_info, true);
 		if (!have_enough_zones())
@@ -1105,11 +1111,13 @@ static void update_node_size(struct sd_node *node)
 static void kick_node_recover(void)
 {
 	struct vnode_info *old = main_thread_get(current_vnode_info);
+	int ret;
 
 	main_thread_set(current_vnode_info,
 			alloc_vnode_info(old->nodes, old->nr_nodes));
-	uatomic_inc(&sys->cinfo.epoch);
-	log_current_epoch();
+	ret = inc_and_log_epoch();
+	if (ret != 0)
+		panic("cannot log current epoch %d", sys->cinfo.epoch);
 	start_recovery(main_thread_get(current_vnode_info), old, true);
 	put_vnode_info(old);
 }

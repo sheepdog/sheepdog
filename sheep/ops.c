@@ -258,9 +258,9 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	memset(sys->vdi_inuse, 0, sizeof(sys->vdi_inuse));
 	clean_vdi_state();
 
-	sys->cinfo.epoch = 1;
+	sys->cinfo.epoch = 0;
 
-	ret = log_current_epoch();
+	ret = inc_and_log_epoch();
 	if (ret)
 		return SD_RES_EIO;
 
@@ -533,8 +533,7 @@ static int cluster_force_recover_main(const struct sd_req *req,
 		return SD_RES_FORCE_RECOVER;
 	}
 
-	sys->cinfo.epoch++; /* some nodes are left, so we get a new epoch */
-	ret = log_current_epoch();
+	ret = inc_and_log_epoch();
 	if (ret) {
 		sd_printf(SDOG_EMERG, "cannot update epoch log");
 		goto err;
