@@ -11,14 +11,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "mock.h"
 #include "sheep_priv.h"
 
-int exec_local_req(struct sd_req *rq, void *data)
-{
-	return 0;
-}
-
-void put_request(struct request *req)
-{
-	return;
-}
+MOCK_METHOD(exec_local_req, int, 0, struct sd_req *rq, void *data)
+MOCK_VOID_METHOD(put_request, struct request *req)

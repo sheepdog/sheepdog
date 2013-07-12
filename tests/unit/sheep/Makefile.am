@@ -6,9 +6,11 @@ check_PROGRAMS		= ${TESTS}
 
 INCLUDES		= -I$(top_srcdir)/include			\
 			  -I$(top_srcdir)/sheep				\
+			  -I../mock					\
 			  @CHECK_CFLAGS@
 
-LIBS			= $(top_srcdir)/lib/libsheepdog.a -lpthread	\
+LIBS			= $(top_srcdir)/lib/libsheepdog.a		\
+			  ../mock/libmock.a -lpthread			\
 			  @CHECK_LIBS@
 
 test_vdi_SOURCES	= test_vdi.c mock_sheep.c mock_store.c		\

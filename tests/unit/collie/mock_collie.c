@@ -12,6 +12,7 @@
  */
 
 #include "collie.h"
+#include "mock.h"
 
 /* collie mock */
 const char *sdhost = "127.0.0.1";
@@ -20,12 +21,5 @@ bool highlight = true;
 bool raw_output;
 struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 
-int update_node_list(int max_nodes)
-{
-	return 0;
-}
-
-void subcommand_usage(char *cmd, char *subcmd, int status)
-{
-	return;
-}
+MOCK_METHOD(update_node_list, int, 0, int max_nodes)
+MOCK_VOID_METHOD(subcommand_usage, char *cmd, char *subcmd, int status)
