@@ -136,6 +136,7 @@ AC_CONFIG_FILES([Makefile
 		man/Makefile
 		shepherd/Makefile
 		tests/unit/Makefile
+		tests/unit/mock/Makefile
 		tests/unit/collie/Makefile
 		tests/unit/sheep/Makefile
 		tools/Makefile])
