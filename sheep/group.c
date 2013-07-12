@@ -1126,14 +1126,9 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	int ret;
 
 	if (!sys->cdrv) {
-		sys->cdrv = find_cdrv("corosync");
-		if (sys->cdrv)
-			sd_dprintf("use corosync cluster driver as default");
-		else {
-			/* corosync cluster driver is not compiled */
-			sys->cdrv = find_cdrv("local");
-			sd_dprintf("use local cluster driver as default");
-		}
+		sys->cdrv = find_cdrv(DEFAULT_CLUSTER_DRIVER);
+		sd_dprintf("use %s cluster driver as default",
+			   DEFAULT_CLUSTER_DRIVER);
 	}
 
 	ret = sys->cdrv->init(sys->cdrv_option);

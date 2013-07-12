@@ -22,6 +22,7 @@
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "logger.h"
+#include "config.h"
 
 /* maximum payload size sent in ->notify and ->unblock */
 #define SD_MAX_EVENT_BUF_SIZE (128 * 1024) /* 128k */
@@ -116,6 +117,12 @@ struct cluster_driver {
 };
 
 extern struct list_head cluster_drivers;
+
+#ifdef HAVE_COROSYNC
+#define DEFAULT_CLUSTER_DRIVER "corosync"
+#else
+#define DEFAULT_CLUSTER_DRIVER "local"
+#endif /* HAVE_COROSYNC */
 
 #define cdrv_register(driver)						\
 static void __attribute__((constructor)) regist_ ## driver(void)	\

@@ -98,7 +98,8 @@ static const char cache_help[] =
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
 	 bind_help},
-	{'c', "cluster", true, "specify the cluster driver (default: corosync)",
+	{'c', "cluster", true,
+	 "specify the cluster driver (default: "DEFAULT_CLUSTER_DRIVER")",
 	 cluster_help},
 	{'d', "debug", false, "include debug messages in the log"},
 	{'D', "directio", false, "use direct IO for backend store"},
