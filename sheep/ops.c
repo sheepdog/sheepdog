@@ -441,10 +441,11 @@ out:
 	switch (sys->status) {
 	case SD_STATUS_OK:
 		return SD_RES_SUCCESS;
-	case SD_STATUS_WAIT_FOR_FORMAT:
-		return SD_RES_WAIT_FOR_FORMAT;
-	case SD_STATUS_WAIT_FOR_JOIN:
-		return SD_RES_WAIT_FOR_JOIN;
+	case SD_STATUS_WAIT:
+		if (sys->cinfo.ctime == 0)
+			return SD_RES_WAIT_FOR_FORMAT;
+		else
+			return SD_RES_WAIT_FOR_JOIN;
 	case SD_STATUS_SHUTDOWN:
 		return SD_RES_SHUTDOWN;
 	case SD_STATUS_HALT:
@@ -492,7 +493,7 @@ static int cluster_force_recover_work(struct request *req)
 	 * 2) some nodes are physically down (same epoch condition).
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
 	 */
-	if (sys->status != SD_STATUS_WAIT_FOR_JOIN || req->vinfo == NULL)
+	if (sys->status != SD_STATUS_WAIT || req->vinfo == NULL)
 		return SD_RES_FORCE_RECOVER;
 
 	old_vnode_info = get_vnode_info_epoch(epoch, req->vinfo);
@@ -538,6 +539,10 @@ static int cluster_force_recover_main(const struct sd_req *req,
 		sd_printf(SDOG_EMERG, "cannot update epoch log");
 		goto err;
 	}
+
+	if (!is_cluster_formatted())
+		/* initialize config file */
+		set_cluster_config(&sys->cinfo);
 
 	if (have_enough_zones())
 		sys->status = SD_STATUS_OK;

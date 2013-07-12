@@ -303,6 +303,7 @@ int set_cluster_config(const struct cluster_info *cinfo);
 int get_cluster_config(struct cluster_info *cinfo);
 int set_node_space(uint64_t space);
 int get_node_space(uint64_t *space);
+bool is_cluster_formatted(void);
 
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);

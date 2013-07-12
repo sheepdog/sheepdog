@@ -106,8 +106,7 @@
 #define SD_FLAG_QUORUM       0x0008 /* Serve the IO rquest as long we are quorate */
 
 #define SD_STATUS_OK                0x00000001
-#define SD_STATUS_WAIT_FOR_FORMAT   0x00000002
-#define SD_STATUS_WAIT_FOR_JOIN     0x00000004
+#define SD_STATUS_WAIT              0x00000004
 #define SD_STATUS_SHUTDOWN          0x00000008
 #define SD_STATUS_HALT              0x00000020
 #define SD_STATUS_KILLED            0x00000040

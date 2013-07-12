@@ -424,9 +424,9 @@ static bool enough_nodes_gathered(struct join_message *jm,
 	return true;
 }
 
-static int cluster_wait_for_join_check(const struct sd_node *joining,
-				       const struct sd_node *nodes,
-				       size_t nr_nodes, struct join_message *jm)
+static int cluster_wait_check(const struct sd_node *joining,
+			      const struct sd_node *nodes, size_t nr_nodes,
+			      struct join_message *jm)
 {
 	int ret;
 
@@ -595,6 +595,9 @@ static void setup_backend_store(const struct join_message *jm)
 {
 	int ret;
 
+	if (jm->cinfo.store[0] == '\0')
+		return;
+
 	if (!sd_store) {
 		sd_store = find_store_driver((char *)jm->cinfo.store);
 		if (!sd_store)
@@ -623,12 +626,6 @@ static void finish_join(const struct join_message *msg,
 			const struct sd_node *nodes, size_t nr_nodes)
 {
 	sys->join_finished = true;
-	sys->cinfo.epoch = msg->cinfo.epoch;
-
-	if (msg->cinfo.store[0]) {
-		if (!sys->gateway_only)
-			setup_backend_store(msg);
-	}
 
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
@@ -700,6 +697,9 @@ static void update_cluster_info(const struct join_message *msg,
 	sd_dprintf("status = %d, epoch = %d, finished: %d",
 		   msg->cluster_status, msg->cinfo.epoch, sys->join_finished);
 
+	if (!sys->gateway_only)
+		setup_backend_store(msg);
+
 	if (!sys->join_finished)
 		finish_join(msg, joined, nodes, nr_nodes);
 
@@ -712,19 +712,10 @@ static void update_cluster_info(const struct join_message *msg,
 	switch (msg->cluster_status) {
 	case SD_STATUS_OK:
 	case SD_STATUS_HALT:
-		switch (sys->status) {
-		case SD_STATUS_WAIT_FOR_FORMAT:
-			sys->cinfo.nr_copies = msg->cinfo.nr_copies;
-			sys->cinfo.flags = msg->cinfo.flags;
-
-			set_cluster_config(&sys->cinfo);
-			/*FALLTHROUGH*/
-		case SD_STATUS_WAIT_FOR_JOIN:
-			sys->cinfo.disable_recovery =
-				msg->cinfo.disable_recovery;
-			break;
-		default:
-			break;
+		if (sys->status == SD_STATUS_WAIT) {
+			if (!is_cluster_formatted())
+				/* initialize config file */
+				set_cluster_config(&sys->cinfo);
 		}
 
 		sys->status = msg->cluster_status;
@@ -844,12 +835,6 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		if (!epoch)
 			return CJ_RES_SUCCESS;
 
-		if (sys->status != SD_STATUS_WAIT_FOR_JOIN) {
-			sd_eprintf("unexpected cluster status 0x%x",
-				   sys->status);
-			return CJ_RES_FAIL;
-		}
-
 		nr_entries = epoch_log_read(epoch, entries, sizeof(entries));
 		if (nr_entries == -1)
 			return CJ_RES_FAIL;
@@ -868,16 +853,8 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 	case SD_STATUS_SHUTDOWN:
 		ret = CJ_RES_FAIL;
 		break;
-	case SD_STATUS_WAIT_FOR_FORMAT:
-		if (jm->cinfo.nr_nodes != 0) {
-			ret = CJ_RES_FAIL;
-			break;
-		}
-
-		ret = CJ_RES_SUCCESS;
-		break;
-	case SD_STATUS_WAIT_FOR_JOIN:
-		ret = cluster_wait_for_join_check(joining, nodes, nr_nodes, jm);
+	case SD_STATUS_WAIT:
+		ret = cluster_wait_check(joining, nodes, nr_nodes, jm);
 		break;
 	case SD_STATUS_OK:
 	case SD_STATUS_HALT:
@@ -982,7 +959,7 @@ static void requeue_cluster_request(void)
 
 int sd_reconnect_handler(void)
 {
-	sys->status = SD_STATUS_WAIT_FOR_JOIN;
+	sys->status = SD_STATUS_WAIT;
 	sys->join_finished = false;
 	if (sys->cdrv->init(sys->cdrv_option) != 0)
 		return -1;
@@ -1138,16 +1115,13 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	sys->cinfo.epoch = get_latest_epoch();
 	if (sys->cinfo.epoch) {
-		sys->status = SD_STATUS_WAIT_FOR_JOIN;
-
 		sys->cinfo.nr_nodes = epoch_log_read(sys->cinfo.epoch,
 						     sys->cinfo.nodes,
 						     sizeof(sys->cinfo.nodes));
 		if (sys->cinfo.nr_nodes == -1)
 			return -1;
-	} else {
-		sys->status = SD_STATUS_WAIT_FOR_FORMAT;
 	}
+	sys->status = SD_STATUS_WAIT;
 
 	main_thread_set(pending_block_list,
 			  xzalloc(sizeof(struct list_head)));

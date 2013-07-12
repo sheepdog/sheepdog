@@ -162,6 +162,15 @@ int get_node_space(uint64_t *space)
 	return SD_RES_SUCCESS;
 }
 
+bool is_cluster_formatted(void)
+{
+	struct cluster_info cinfo;
+
+	get_cluster_config(&cinfo);
+
+	return cinfo.ctime != 0;
+}
+
 static inline __attribute__((used)) void __sd_config_format_build_bug_ons(void)
 {
 	/* never called, only for checking BUILD_BUG_ON()s */

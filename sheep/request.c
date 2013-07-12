@@ -353,15 +353,12 @@ static void queue_request(struct request *req)
 	case SD_STATUS_SHUTDOWN:
 		rsp->result = SD_RES_SHUTDOWN;
 		goto done;
-	case SD_STATUS_WAIT_FOR_FORMAT:
+	case SD_STATUS_WAIT:
 		if (!is_force_op(req->op)) {
-			rsp->result = SD_RES_WAIT_FOR_FORMAT;
-			goto done;
-		}
-		break;
-	case SD_STATUS_WAIT_FOR_JOIN:
-		if (!is_force_op(req->op)) {
-			rsp->result = SD_RES_WAIT_FOR_JOIN;
+			if (sys->cinfo.ctime == 0)
+				rsp->result = SD_RES_WAIT_FOR_FORMAT;
+			else
+				rsp->result = SD_RES_WAIT_FOR_JOIN;
 			goto done;
 		}
 		break;
