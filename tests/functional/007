@@ -28,21 +28,11 @@ _start_sheep 0
 _wait_for_sheep 1
 _cluster_format -p 7000 -c 1
 
-for i in `seq 0 5`; do
-    _start_sheep 1  # should fail
-    sleep 1
-    _start_sheep 2  # should succeed
-    _wait_for_sheep 2
+_start_sheep 1  # should fail
+_wait_for_sheep_stop 1
+_wait_for_sheep 1
+_start_sheep 2  # should succeed
+_wait_for_sheep 2
 
-    if [ "`$COLLIE node list -p 7002 -r | wc -l`" -ne 2 ]; then
-	echo "test failed"
-	$COLLIE cluster info -p 7000 | _filter_cluster_info
-	$COLLIE cluster info -p 7002 | _filter_cluster_info
-	exit 1
-    fi
-
-    _kill_sheep 2
-    _wait_for_sheep 1
-done
-
-echo "success"
+$COLLIE cluster info -p 7000 | _filter_cluster_info
+$COLLIE cluster info -p 7002 | _filter_cluster_info

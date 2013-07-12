@@ -48,13 +48,12 @@ $COLLIE cluster shutdown
 _wait_for_sheep_stop
 
 # sheep 2 should fail to join because it was formatted at the different time
-for i in 1 2 0; do
-    _start_sheep $i
-    sleep 1
-done
-
-# sheepdog should start with sheep 0 and sheep 1
+_start_sheep 0
+_wait_for_sheep 1
+_start_sheep 2
 _wait_for_sheep_stop 2
+_wait_for_sheep 1
+_start_sheep 1
 _wait_for_sheep 2
 
 for i in 0 1; do
