@@ -33,7 +33,7 @@ static int write_config(void)
 	int ret;
 
 	ret = atomic_create_and_write(config_path, (char *)&config,
-				sizeof(config));
+				      sizeof(config), true);
 	if (ret < 0) {
 		sd_eprintf("atomic_create_and_write() failed");
 		return SD_RES_EIO;

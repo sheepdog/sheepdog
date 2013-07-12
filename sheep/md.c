@@ -510,7 +510,7 @@ static int md_move_object(uint64_t oid, char *old, char *new)
 		goto out_close;
 	}
 
-	if (atomic_create_and_write(new, buf.buf, buf.len) < 0) {
+	if (atomic_create_and_write(new, buf.buf, buf.len, false) < 0) {
 		sd_eprintf("failed to create %s", new);
 		ret = -1;
 		goto out_close;

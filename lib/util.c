@@ -503,18 +503,30 @@ bool is_xattr_enabled(const char *path)
 	return !(ret == -1 && errno == ENOTSUP);
 }
 
-int atomic_create_and_write(const char *path, char *buf, size_t len)
+/*
+ * If force_create is true, this function create the file even when the
+ * temporary file exists.
+ */
+int atomic_create_and_write(const char *path, char *buf, size_t len,
+			    bool force_create)
 {
 	int fd, ret;
 	char tmp_path[PATH_MAX];
 
 	snprintf(tmp_path, PATH_MAX, "%s.tmp", path);
-
+again:
 	fd = open(tmp_path, O_WRONLY | O_CREAT | O_SYNC | O_EXCL, sd_def_fmode);
 	if (fd < 0) {
-		if (errno == EEXIST)
-			sd_dprintf("someone else is dealing with %s", tmp_path);
-		else
+		if (errno == EEXIST) {
+			if (force_create) {
+				sd_dprintf("clean up a temporary file %s",
+					   tmp_path);
+				unlink(tmp_path);
+				goto again;
+			} else
+				sd_dprintf("someone else is dealing with %s",
+					   tmp_path);
+		} else
 			sd_eprintf("failed to open temporal file %s, %m",
 				   tmp_path);
 		ret = -1;
