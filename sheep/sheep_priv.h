@@ -91,8 +91,6 @@ struct system_info {
 	struct cluster_driver *cdrv;
 	const char *cdrv_option;
 
-	/* set after finishing the JOIN procedure */
-	bool join_finished;
 	struct sd_node this_node;
 
 	struct cluster_info cinfo;

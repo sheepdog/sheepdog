@@ -625,8 +625,6 @@ static void finish_join(const struct join_message *msg,
 			const struct sd_node *joined,
 			const struct sd_node *nodes, size_t nr_nodes)
 {
-	sys->join_finished = true;
-
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
 
@@ -694,13 +692,13 @@ static void update_cluster_info(const struct join_message *msg,
 {
 	struct vnode_info *old_vnode_info;
 
-	sd_dprintf("status = %d, epoch = %d, finished: %d",
-		   msg->cluster_status, msg->cinfo.epoch, sys->join_finished);
+	sd_dprintf("status = %d, epoch = %d", msg->cluster_status,
+		   msg->cinfo.epoch);
 
 	if (!sys->gateway_only)
 		setup_backend_store(msg);
 
-	if (!sys->join_finished)
+	if (node_is_local(joined))
 		finish_join(msg, joined, nodes, nr_nodes);
 
 	old_vnode_info = main_thread_get(current_vnode_info);
@@ -960,7 +958,6 @@ static void requeue_cluster_request(void)
 int sd_reconnect_handler(void)
 {
 	sys->status = SD_STATUS_WAIT;
-	sys->join_finished = false;
 	if (sys->cdrv->init(sys->cdrv_option) != 0)
 		return -1;
 	if (send_join_request(&sys->this_node) != 0)
