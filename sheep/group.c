@@ -386,24 +386,12 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 	return 0;
 }
 
-static int cluster_sanity_check(struct join_message *jm)
+static int cluster_ctime_check(const struct join_message *jm)
 {
 	if (jm->cinfo.ctime != sys->cinfo.ctime) {
 		sd_eprintf("joining node ctime doesn't match: %"
 			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime,
 			   sys->cinfo.ctime);
-		return CJ_RES_FAIL;
-	}
-
-	if (jm->cinfo.nr_copies != sys->cinfo.nr_copies) {
-		sd_eprintf("joining node nr_copies doesn't match: %u vs %u",
-			   jm->cinfo.nr_copies, sys->cinfo.nr_copies);
-		return CJ_RES_FAIL;
-	}
-
-	if (jm->cinfo.flags != sys->cinfo.flags) {
-		sd_eprintf("joining node cluster_flags don't match: %u vs %u",
-			   jm->cinfo.flags, sys->cinfo.flags);
 		return CJ_RES_FAIL;
 	}
 
@@ -444,7 +432,7 @@ static int cluster_wait_for_join_check(const struct sd_node *joining,
 
 	if (jm->cinfo.epoch != 0 && sys->cinfo.epoch != 0) {
 		/* check whether joining node is valid or not */
-		ret = cluster_sanity_check(jm);
+		ret = cluster_ctime_check(jm);
 		if (ret != CJ_RES_SUCCESS)
 			return ret;
 	}
@@ -481,7 +469,7 @@ static int cluster_running_check(struct join_message *jm)
 	 * join we do not need to check anything.
 	 */
 	if (jm->cinfo.nr_nodes != 0) {
-		ret = cluster_sanity_check(jm);
+		ret = cluster_ctime_check(jm);
 		if (ret != CJ_RES_SUCCESS)
 			return ret;
 	}
