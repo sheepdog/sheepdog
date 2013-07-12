@@ -351,6 +351,33 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 	return true;
 }
 
+static bool update_join_status(struct corosync_event *cevent)
+{
+	if (join_finished)
+		return true;
+
+	switch (cevent->type) {
+	case COROSYNC_EVENT_TYPE_JOIN:
+		if (self_elect) {
+			nr_cpg_nodes = 0;
+			return true;
+		}
+		break;
+	case COROSYNC_EVENT_TYPE_ACCEPT:
+		if (cpg_node_equal(&cevent->sender, &this_node)) {
+			nr_cpg_nodes = cevent->nr_nodes;
+			memcpy(cpg_nodes, cevent->nodes,
+			       sizeof(*cevent->nodes) * cevent->nr_nodes);
+			return true;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return false;
+}
+
 static void __corosync_dispatch(void)
 {
 	struct corosync_event *cevent;
@@ -381,29 +408,7 @@ static void __corosync_dispatch(void)
 			cevent = list_first_entry(&corosync_block_event_list,
 						  typeof(*cevent), list);
 
-		/* update join status */
-		if (!join_finished) {
-			switch (cevent->type) {
-			case COROSYNC_EVENT_TYPE_JOIN:
-				if (self_elect) {
-					join_finished = true;
-					nr_cpg_nodes = 0;
-				}
-				break;
-			case COROSYNC_EVENT_TYPE_ACCEPT:
-				if (cpg_node_equal(&cevent->sender,
-						   &this_node)) {
-					join_finished = true;
-					nr_cpg_nodes = cevent->nr_nodes;
-					memcpy(cpg_nodes, cevent->nodes,
-					       sizeof(*cevent->nodes) *
-					       cevent->nr_nodes);
-				}
-				break;
-			default:
-				break;
-			}
-		}
+		join_finished = update_join_status(cevent);
 
 		if (join_finished) {
 			if (!__corosync_dispatch_one(cevent))
