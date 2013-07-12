@@ -62,7 +62,6 @@ struct zk_event {
 	uint64_t id;
 	enum zk_event_type type;
 	struct zk_node sender;
-	enum cluster_join_result join_result;
 	size_t msg_len;
 	size_t nr_nodes;
 	size_t buf_len;
@@ -839,8 +838,6 @@ static int zk_unblock(void *msg, size_t msg_len)
 
 static void zk_handle_join_request(struct zk_event *ev)
 {
-	enum cluster_join_result res;
-
 	sd_dprintf("sender: %s", node_to_str(&ev->sender.node));
 	if (!uatomic_is_true(&is_master)) {
 		/* Let's await master acking the join-request */
@@ -848,9 +845,7 @@ static void zk_handle_join_request(struct zk_event *ev)
 		return;
 	}
 
-	res = sd_check_join_cb(&ev->sender.node, sd_nodes, nr_sd_nodes,
-			       ev->buf);
-	ev->join_result = res;
+	sd_check_join_cb(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
 	push_join_response(ev);
 
 	sd_dprintf("I'm the master now");
@@ -895,32 +890,26 @@ static void zk_handle_join_response(struct zk_event *ev)
 		/* newly joined node */
 		init_node_list(ev);
 
-	sd_dprintf("%s, %d", node_to_str(&ev->sender.node), ev->join_result);
-	switch (ev->join_result) {
-	case CJ_RES_SUCCESS:
-		snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
-			 node_to_str(&ev->sender.node));
-		if (node_eq(&ev->sender.node, &this_node.node)) {
-			joined = true;
-			sd_dprintf("create path:%s", path);
-			rc = zk_create_node(path,
-					    (char *)zoo_client_id(zhandle),
-					    sizeof(clientid_t),
-					    &ZOO_OPEN_ACL_UNSAFE,
-					    ZOO_EPHEMERAL, NULL, 0);
-			RETURN_VOID_IF_ERROR(rc, "");
-		} else
-			zk_node_exists(path);
+	sd_dprintf("%s", node_to_str(&ev->sender.node));
 
-		zk_tree_add(&ev->sender);
-		break;
-	default:
-		break;
-	}
+	snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
+		 node_to_str(&ev->sender.node));
+	if (node_eq(&ev->sender.node, &this_node.node)) {
+		joined = true;
+		sd_dprintf("create path:%s", path);
+		rc = zk_create_node(path,
+				    (char *)zoo_client_id(zhandle),
+				    sizeof(clientid_t),
+				    &ZOO_OPEN_ACL_UNSAFE,
+				    ZOO_EPHEMERAL, NULL, 0);
+		RETURN_VOID_IF_ERROR(rc, "");
+	} else
+		zk_node_exists(path);
+
+	zk_tree_add(&ev->sender);
 
 	build_node_list();
-	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes,
-			ev->join_result, ev->buf);
+	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
 }
 
 static void kick_block_event(void)

@@ -89,7 +89,6 @@ static void interpret_msg_pre_join(void)
 	int ret;
 	struct sph_msg snd, rcv;
 	struct sph_msg_join_reply *join_reply;
-	enum cluster_join_result res;
 
 retry:
 	read_msg(&rcv);
@@ -115,12 +114,7 @@ retry:
 		 * FIXME: member change events must be ordered with nonblocked
 		 *        events
 		 */
-		res = sd_check_join_cb(&join->new_node, NULL, 0, join->opaque);
-		if (res == CJ_RES_FAIL) {
-			sd_eprintf("sd_check_join_cb() failed");
-			exit(1);
-		}
-		assert(res == CJ_RES_SUCCESS);
+		sd_check_join_cb(&join->new_node, NULL, 0, join->opaque);
 
 		/* FIXME: join->master_elected is needed? */
 		assert(join->master_elected);
@@ -166,8 +160,7 @@ retry:
 	nr_nodes = join_reply->nr_nodes;
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	sd_join_handler(&this_node, nodes, nr_nodes,
-			join_reply->res, join_reply->opaque);
+	sd_join_handler(&this_node, nodes, nr_nodes, join_reply->opaque);
 
 	free(join_reply);
 
@@ -317,7 +310,6 @@ static void msg_new_node(struct sph_msg *rcv)
 	int ret;
 	struct sph_msg_join *join;
 	struct sph_msg snd;
-	enum cluster_join_result res;
 
 	if (!is_master) {
 		sd_printf(SDOG_EMERG, "I am not a master but received"
@@ -333,9 +325,7 @@ static void msg_new_node(struct sph_msg *rcv)
 	}
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	res = sd_check_join_cb(&join->new_node, nodes, nr_nodes, join->opaque);
-
-	join->res = res;
+	sd_check_join_cb(&join->new_node, nodes, nr_nodes, join->opaque);
 
 	memset(&snd, 0, sizeof(snd));
 	snd.type = SPH_CLI_MSG_NEW_NODE_REPLY;
@@ -371,8 +361,7 @@ static void msg_new_node_finish(struct sph_msg *rcv)
 		   node_to_str(&join_node_finish->new_node));
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	sd_join_handler(&join_node_finish->new_node, nodes, nr_nodes,
-			join_node_finish->res, jm);
+	sd_join_handler(&join_node_finish->new_node, nodes, nr_nodes, jm);
 
 	free(join_node_finish);
 }

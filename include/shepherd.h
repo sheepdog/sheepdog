@@ -38,7 +38,6 @@ struct sph_msg {
 #include "internal_proto.h"
 
 struct sph_msg_join {
-	uint32_t res;		/* original type: enum cluster_join_result */
 	struct sd_node new_node;
 	uint8_t master_elected;
 
@@ -48,14 +47,12 @@ struct sph_msg_join {
 };
 
 struct sph_msg_join_reply {
-	uint32_t res;		/* original type: enum cluster_join_result */
 	struct sd_node nodes[SD_MAX_NODES];
 	uint32_t nr_nodes;
 	uint8_t opaque[0];
 };
 
 struct sph_msg_join_node_finish {
-	uint32_t res;		/* original type: enum cluster_join_result */
 	struct sd_node new_node;
 
 	struct sd_node nodes[SD_MAX_NODES];

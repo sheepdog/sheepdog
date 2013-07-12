@@ -184,14 +184,6 @@ struct sd_md_info {
 	int nr;
 };
 
-enum cluster_join_result {
-	/* Success */
-	CJ_RES_SUCCESS,
-
-	/* Fail to join. The joining node has an invalid epoch. */
-	CJ_RES_FAIL,
-};
-
 static inline __attribute__((used)) void __sd_epoch_format_build_bug_ons(void)
 {
 	/* never called, only for checking BUILD_BUG_ON()s */

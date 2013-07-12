@@ -82,8 +82,6 @@ struct local_event {
 
 	size_t nr_lnodes; /* the number of sheep processes */
 	struct local_node lnodes[SD_MAX_NODES];
-
-	enum cluster_join_result join_result;
 };
 
 
@@ -385,7 +383,6 @@ static int local_unblock(void *msg, size_t msg_len)
 static bool local_process_event(void)
 {
 	struct local_event *ev;
-	enum cluster_join_result res;
 	int i;
 	struct sd_node nodes[SD_MAX_NODES];
 	size_t nr_nodes;
@@ -438,9 +435,8 @@ static bool local_process_event(void)
 	case EVENT_JOIN_REQUEST:
 		/* nodes[nr_nodes - 1] is a sender, so don't include it */
 		assert(node_eq(&ev->sender.node, &nodes[nr_nodes - 1]));
-		res = sd_check_join_cb(&ev->sender.node, nodes, nr_nodes - 1,
-				       ev->buf);
-		ev->join_result = res;
+		sd_check_join_cb(&ev->sender.node, nodes, nr_nodes - 1,
+				 ev->buf);
 		ev->type = EVENT_JOIN_RESPONSE;
 		msync(ev, sizeof(*ev), MS_SYNC);
 
@@ -448,8 +444,7 @@ static bool local_process_event(void)
 
 		return false;
 	case EVENT_JOIN_RESPONSE:
-		sd_join_handler(&ev->sender.node, nodes, nr_nodes,
-				ev->join_result, ev->buf);
+		sd_join_handler(&ev->sender.node, nodes, nr_nodes, ev->buf);
 		break;
 	case EVENT_LEAVE:
 		if (ev->sender.gateway) {

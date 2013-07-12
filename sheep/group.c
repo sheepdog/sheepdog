@@ -386,16 +386,19 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 	return 0;
 }
 
-static int cluster_ctime_check(const struct join_message *jm)
+static bool cluster_ctime_check(const struct join_message *jm)
 {
+	if (jm->cinfo.epoch == 0 || sys->cinfo.epoch == 0)
+		return true;
+
 	if (jm->cinfo.ctime != sys->cinfo.ctime) {
 		sd_eprintf("joining node ctime doesn't match: %"
 			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime,
 			   sys->cinfo.ctime);
-		return CJ_RES_FAIL;
+		return false;
 	}
 
-	return CJ_RES_SUCCESS;
+	return true;
 }
 
 /*
@@ -428,25 +431,19 @@ static int cluster_wait_check(const struct sd_node *joining,
 			      const struct sd_node *nodes, size_t nr_nodes,
 			      struct join_message *jm)
 {
-	int ret;
-
-	if (jm->cinfo.epoch != 0 && sys->cinfo.epoch != 0) {
-		/* check whether joining node is valid or not */
-		ret = cluster_ctime_check(jm);
-		if (ret != CJ_RES_SUCCESS)
-			return ret;
+	if (!cluster_ctime_check(jm)) {
+		sd_dprintf("joining node is invalid");
+		return sys->status;
 	}
 
-	if (jm->cinfo.epoch > sys->cinfo.epoch)
+	if (jm->cinfo.epoch > sys->cinfo.epoch) {
+		sd_dprintf("joining node has a larger epoch, %" PRIu32 ", %"
+			   PRIu32, jm->cinfo.epoch, sys->cinfo.epoch);
 		sys->cinfo = jm->cinfo;
-	else if (jm->cinfo.epoch < sys->cinfo.epoch) {
+	} else if (jm->cinfo.epoch < sys->cinfo.epoch) {
 		sd_dprintf("joining node has a smaller epoch, %" PRIu32 ", %"
 			   PRIu32, jm->cinfo.epoch, sys->cinfo.epoch);
 		jm->cinfo = sys->cinfo;
-	} else if (memcmp(jm->cinfo.nodes, sys->cinfo.nodes,
-			  sizeof(*jm->cinfo.nodes) * jm->cinfo.nr_nodes) != 0) {
-		sd_eprintf("epoch log entries does not match");
-		return CJ_RES_FAIL;
 	}
 
 	/*
@@ -455,26 +452,9 @@ static int cluster_wait_check(const struct sd_node *joining,
 	 */
 	if (sys->cinfo.epoch > 0 &&
 	    enough_nodes_gathered(jm, joining, nodes, nr_nodes))
-		jm->cluster_status = SD_STATUS_OK;
+		return SD_STATUS_OK;
 
-	return CJ_RES_SUCCESS;
-}
-
-static int cluster_running_check(struct join_message *jm)
-{
-	int ret;
-
-	/*
-	 * When the joining node is newly created and we are not waiting for
-	 * join we do not need to check anything.
-	 */
-	if (jm->cinfo.nr_nodes != 0) {
-		ret = cluster_ctime_check(jm);
-		if (ret != CJ_RES_SUCCESS)
-			return ret;
-	}
-
-	return CJ_RES_SUCCESS;
+	return sys->status;
 }
 
 static int get_vdis_from(struct sd_node *node)
@@ -800,46 +780,28 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
  *
  * Note that 'nodes' doesn't contain 'joining'.
  */
-enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
-					  const struct sd_node *nodes,
-					  size_t nr_nodes, void *opaque)
+void sd_check_join_cb(const struct sd_node *joining,
+		      const struct sd_node *nodes, size_t nr_nodes,
+		      void *opaque)
 {
 	struct join_message *jm = opaque;
 	char str[MAX_NODE_STR_LEN];
-	int ret;
 
 	sd_dprintf("check %s, %d", node_to_str(joining), sys->status);
 
-	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
-		sd_eprintf("invalid protocol version: %d", jm->proto_ver);
-		return CJ_RES_FAIL;
-	}
+	jm->proto_ver = SD_SHEEP_PROTO_VER;
 
-	jm->cluster_status = sys->status;
+	if (sys->status == SD_STATUS_WAIT)
+		jm->cluster_status = cluster_wait_check(joining, nodes,
+							nr_nodes, jm);
+	else
+		jm->cluster_status = sys->status;
 
-	switch (sys->status) {
-	case SD_STATUS_SHUTDOWN:
-		ret = CJ_RES_FAIL;
-		break;
-	case SD_STATUS_WAIT:
-		ret = cluster_wait_check(joining, nodes, nr_nodes, jm);
-		break;
-	case SD_STATUS_OK:
-	case SD_STATUS_HALT:
-		ret = cluster_running_check(jm);
-		break;
-	default:
-		panic("invalid system status: 0x%x", sys->status);
-	}
-
-	sd_dprintf("%s: ret = 0x%x, cluster_status = 0x%x",
+	sd_dprintf("%s: cluster_status = 0x%x",
 		   addr_to_str(str, sizeof(str), joining->nid.addr,
-			       joining->nid.port),
-		   ret, jm->cluster_status);
+			       joining->nid.port), jm->cluster_status);
 
 	jm->cinfo = sys->cinfo;
-
-	return ret;
 }
 
 static int send_join_request(struct sd_node *ent)
@@ -848,7 +810,6 @@ static int send_join_request(struct sd_node *ent)
 	int ret;
 
 	msg = xzalloc(sizeof(*msg));
-	msg->proto_ver = SD_SHEEP_PROTO_VER;
 	msg->cinfo = sys->cinfo;
 
 	ret = sys->cdrv->join(ent, msg, sizeof(*msg));
@@ -936,46 +897,53 @@ int sd_reconnect_handler(void)
 	return 0;
 }
 
+static bool cluster_join_check(const struct join_message *jm)
+{
+	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
+		sd_eprintf("invalid protocol version: %d, %d",
+			   jm->proto_ver, SD_SHEEP_PROTO_VER);
+		return false;
+	}
+
+	if (!cluster_ctime_check(jm))
+		return false;
+
+	if (jm->cinfo.epoch == sys->cinfo.epoch &&
+	    memcmp(jm->cinfo.nodes, sys->cinfo.nodes,
+		   sizeof(jm->cinfo.nodes[0]) * jm->cinfo.nr_nodes) != 0) {
+		sd_printf(SDOG_ALERT, "epoch log entries does not match");
+		return false;
+	}
+
+	return true;
+}
+
 void sd_join_handler(const struct sd_node *joined,
-		     const struct sd_node *members,
-		     size_t nr_members, enum cluster_join_result result,
+		     const struct sd_node *members, size_t nr_members,
 		     const void *opaque)
 {
 	int i;
 	const struct join_message *jm = opaque;
 
+	if (!cluster_join_check(jm)) {
+		sd_eprintf("failed to join Sheepdog");
+		exit(1);
+	}
+
 	sys->cinfo = jm->cinfo;
 
-	if (node_is_local(joined)) {
-		if (result == CJ_RES_FAIL) {
-			sd_eprintf("Failed to join, exiting.");
-			sys->cdrv->leave();
-			exit(1);
-		}
-	}
+	sd_dprintf("join %s", node_to_str(joined));
+	for (i = 0; i < nr_members; i++)
+		sd_dprintf("[%x] %s", i, node_to_str(members + i));
 
-	switch (result) {
-	case CJ_RES_SUCCESS:
-		sd_dprintf("join %s", node_to_str(joined));
-		for (i = 0; i < nr_members; i++)
-			sd_dprintf("[%x] %s", i, node_to_str(members + i));
+	if (sys->status == SD_STATUS_SHUTDOWN)
+		return;
 
-		if (sys->status == SD_STATUS_SHUTDOWN)
-			break;
+	update_cluster_info(jm, joined, members, nr_members);
 
-		update_cluster_info(jm, joined, members, nr_members);
-
-		if (node_is_local(joined))
-			/* this output is used for testing */
-			sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
-		break;
-	case CJ_RES_FAIL:
-		break;
-	default:
-		/* this means sd_check_join_cb() is buggy */
-		panic("unknown cluster join result: %d", result);
-		break;
-	}
+	if (node_is_local(joined))
+		/* this output is used for testing */
+		sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
 }
 
 void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,

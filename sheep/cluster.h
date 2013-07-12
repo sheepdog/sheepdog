@@ -164,8 +164,7 @@ static inline const char *get_cdrv_option(const struct cluster_driver *cdrv,
 
 /* callbacks back into sheepdog from the cluster drivers */
 void sd_join_handler(const struct sd_node *joined,
-		     const struct sd_node *members,
-		     size_t nr_members, enum cluster_join_result result,
+		     const struct sd_node *members, size_t nr_members,
 		     const void *opaque);
 void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 		      size_t nr_members);
@@ -173,9 +172,9 @@ void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 int sd_reconnect_handler(void);
 void sd_update_node_handler(struct sd_node *);
-enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
-					  const struct sd_node *nodes,
-					  size_t nr_nodes, void *opaque);
+void sd_check_join_cb(const struct sd_node *joining,
+		      const struct sd_node *nodes, size_t nr_nodes,
+		      void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 
 #endif

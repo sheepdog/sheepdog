@@ -72,7 +72,6 @@ struct corosync_event {
 	void *msg;
 	size_t msg_len;
 
-	enum cluster_join_result result;
 	uint32_t nr_nodes;
 	struct cpg_node nodes[SD_MAX_NODES];
 
@@ -83,10 +82,9 @@ struct corosync_event {
 
 struct corosync_message {
 	struct cpg_node sender;
-	enum corosync_message_type type:4;
-	enum cluster_join_result result:4;
+	enum corosync_message_type type:16;
+	uint16_t nr_nodes;
 	uint32_t msg_len;
-	uint32_t nr_nodes;
 	struct cpg_node nodes[SD_MAX_NODES];
 	uint8_t msg[0];
 };
@@ -165,7 +163,6 @@ static int corosync_get_local_addr(uint8_t *addr)
 }
 
 static int send_message(enum corosync_message_type type,
-			enum cluster_join_result result,
 			struct cpg_node *sender, struct cpg_node *nodes,
 			size_t nr_nodes, void *msg, size_t msg_len)
 {
@@ -174,7 +171,6 @@ static int send_message(enum corosync_message_type type,
 	struct corosync_message cmsg = {
 		.type = type,
 		.msg_len = msg_len,
-		.result = result,
 		.sender = *sender,
 		.nr_nodes = nr_nodes,
 	};
@@ -280,7 +276,6 @@ static void build_node_list(const struct cpg_node *nodes, size_t nr_nodes,
  */
 static bool __corosync_dispatch_one(struct corosync_event *cevent)
 {
-	enum cluster_join_result res;
 	struct sd_node entries[SD_MAX_NODES], *node;
 	struct cpg_node *n;
 	int idx;
@@ -299,27 +294,21 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			return false;
 
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		res = sd_check_join_cb(&cevent->sender.node, entries,
-				       nr_cpg_nodes, cevent->msg);
-		send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, res,
-			     &cevent->sender, cpg_nodes, nr_cpg_nodes,
-			     cevent->msg, cevent->msg_len);
+		sd_check_join_cb(&cevent->sender.node, entries, nr_cpg_nodes,
+				 cevent->msg);
+		send_message(COROSYNC_MSG_TYPE_JOIN_RESPONSE, &cevent->sender,
+			     cpg_nodes, nr_cpg_nodes, cevent->msg,
+			     cevent->msg_len);
 
 		cevent->callbacked = true;
 		return false;
 	case COROSYNC_EVENT_TYPE_JOIN_RESPONSE:
-		switch (cevent->result) {
-		case CJ_RES_SUCCESS:
-			add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
-			nr_cpg_nodes++;
-			/* fall through */
-		case CJ_RES_FAIL:
-			build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-			sd_join_handler(&cevent->sender.node, entries,
-					nr_cpg_nodes, cevent->result,
-					cevent->msg);
-			break;
-		}
+		add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
+		nr_cpg_nodes++;
+
+		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
+		sd_join_handler(&cevent->sender.node, entries, nr_cpg_nodes,
+				cevent->msg);
 		break;
 	case COROSYNC_EVENT_TYPE_LEAVE:
 		n = xlfind(&cevent->sender, cpg_nodes, nr_cpg_nodes,
@@ -554,7 +543,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 			break;
 
 		cevent->type = COROSYNC_EVENT_TYPE_JOIN_RESPONSE;
-		cevent->result = cmsg->result;
 		cevent->nr_nodes = cmsg->nr_nodes;
 		memcpy(cevent->nodes, cmsg->nodes,
 		       sizeof(*cmsg->nodes) * cmsg->nr_nodes);
@@ -714,34 +702,34 @@ retry:
 
 	this_node.node = *myself;
 
-	ret = send_message(COROSYNC_MSG_TYPE_JOIN_REQUEST, 0, &this_node,
-			   NULL, 0, opaque, opaque_len);
+	ret = send_message(COROSYNC_MSG_TYPE_JOIN_REQUEST, &this_node, NULL, 0,
+			   opaque, opaque_len);
 
 	return ret;
 }
 
 static int corosync_leave(void)
 {
-	return send_message(COROSYNC_MSG_TYPE_LEAVE, 0, &this_node, NULL, 0,
-			    NULL, 0);
+	return send_message(COROSYNC_MSG_TYPE_LEAVE, &this_node, NULL, 0, NULL,
+			    0);
 }
 
 static int corosync_block(void)
 {
-	return send_message(COROSYNC_MSG_TYPE_BLOCK, 0, &this_node, NULL, 0,
-			    NULL, 0);
+	return send_message(COROSYNC_MSG_TYPE_BLOCK, &this_node, NULL, 0, NULL,
+			    0);
 }
 
 static int corosync_unblock(void *msg, size_t msg_len)
 {
-	return send_message(COROSYNC_MSG_TYPE_UNBLOCK, 0, &this_node, NULL, 0,
-			    msg, msg_len);
+	return send_message(COROSYNC_MSG_TYPE_UNBLOCK, &this_node, NULL, 0, msg,
+			    msg_len);
 }
 
 static int corosync_notify(void *msg, size_t msg_len)
 {
-	return send_message(COROSYNC_MSG_TYPE_NOTIFY, 0, &this_node,
-			    NULL, 0, msg, msg_len);
+	return send_message(COROSYNC_MSG_TYPE_NOTIFY, &this_node, NULL, 0, msg,
+			    msg_len);
 }
 
 static void corosync_handler(int listen_fd, int events, void *data)
@@ -832,8 +820,8 @@ static int corosync_update_node(struct sd_node *node)
 
 	cnode.node = *node;
 
-	return send_message(COROSYNC_MSG_TYPE_UPDATE_NODE, 0, &cnode,
-			    NULL, 0, NULL, 0);
+	return send_message(COROSYNC_MSG_TYPE_UPDATE_NODE, &cnode, NULL, 0,
+			    NULL, 0);
 }
 
 static struct cluster_driver cdrv_corosync = {

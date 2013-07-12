@@ -391,8 +391,6 @@ static void sph_handle_new_node_reply(struct sph_msg *msg, struct sheep *sheep)
 	struct sph_msg_join_reply *join_reply_body;
 	struct sph_msg_join_node_finish *join_node_finish;
 
-	enum cluster_join_result join_result;
-
 	if (nr_joined_sheep && sheep != master_sheep) {
 		sd_eprintf("sheep which is not a master replied "
 			"SPH_CLI_MSG_NEW_NODE_REPLY");
@@ -409,8 +407,6 @@ static void sph_handle_new_node_reply(struct sph_msg *msg, struct sheep *sheep)
 
 		goto purge_current_sheep;
 	}
-
-	join_result = join->res;
 
 	sd_dprintf("joining node is %s", node_to_str(&join->new_node));
 
@@ -445,7 +441,6 @@ static void sph_handle_new_node_reply(struct sph_msg *msg, struct sheep *sheep)
 	join_reply_body->nodes[join_reply_body->nr_nodes++] =
 		joining_sheep->node;
 	memcpy(join_reply_body->opaque, opaque, opaque_len);
-	join_reply_body->res = join_result;
 
 	wbytes = writev2(joining_sheep->fd, &snd,
 			join_reply_body, snd.body_len);
@@ -468,7 +463,6 @@ static void sph_handle_new_node_reply(struct sph_msg *msg, struct sheep *sheep)
 	join_node_finish->nr_nodes = build_node_array(join_node_finish->nodes);
 	join_node_finish->nodes[join_node_finish->nr_nodes++] =
 		joining_sheep->node;
-	join_node_finish->res = join_result;
 
 	list_for_each_entry(s, &sheep_list_head, sheep_list) {
 		if (s->state != SHEEP_STATE_JOINED)
