@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Test joining sheep with wrong and newer epoch
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+# start Sheepdog with 3 nodes
+_cluster_format
+
+# kill sheep 0 so that sheep 2 has larger epoch
+_kill_sheep 0
+_wait_for_sheep_stop 0
+
+$COLLIE cluster shutdown -p 7001
+_wait_for_sheep_stop
+
+# clean up sheep 0 and sheep 1
+rm -rf $STORE/0
+rm -rf $STORE/1
+
+for i in 0 1; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 2
+
+# start Sheepdog with 2 nodes
+_cluster_format
+
+$COLLIE cluster shutdown
+_wait_for_sheep_stop
+
+# sheep 2 should fail to join because it was formatted at the different time
+for i in 1 2 0; do
+    _start_sheep $i
+    sleep 1
+done
+
+# sheepdog should start with sheep 0 and sheep 1
+_wait_for_sheep_stop 2
+_wait_for_sheep 2
+
+for i in 0 1; do
+    $COLLIE cluster info -p 700$i | _filter_cluster_info
+done
