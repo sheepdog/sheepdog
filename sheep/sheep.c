@@ -98,7 +98,8 @@ static const char cache_help[] =
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
 	 bind_help},
-	{'c', "cluster", true, "specify the cluster driver", cluster_help},
+	{'c', "cluster", true, "specify the cluster driver (default: corosync)",
+	 cluster_help},
 	{'d', "debug", false, "include debug messages in the log"},
 	{'D', "directio", false, "use direct IO for backend store"},
 	{'f', "foreground", false, "make the program run in the foreground"},
@@ -109,11 +110,12 @@ static struct sd_option sheep_options[] = {
 	 ioaddr_help},
 	{'j', "journal", true, "use jouranl file to log all the write "
 	 "operations", journal_help},
-	{'l', "loglevel", true, "specify the level of logging detail",
-	 loglevel_help},
+	{'l', "loglevel", true, "specify the level of logging detail "
+	 "(default: 6 [SDOG_INFO])", loglevel_help},
 	{'n', "nosync", false, "drop O_SYNC for write of backend"},
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
-	{'p', "port", true, "specify the TCP port on which to listen"},
+	{'p', "port", true, "specify the TCP port on which to listen "
+	 "(default: 7000)"},
 	{'P', "pidfile", true, "create a pid file"},
 	{'r', "http", true, "enable http service", http_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
@@ -121,7 +123,9 @@ static struct sd_option sheep_options[] = {
 	{'w', "cache", true, "enable object cache", cache_help},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
-	{'z', "zone", true, "specify the zone id", zone_help},
+	{'z', "zone", true,
+	 "specify the zone id (default: determined by listen address)",
+	 zone_help},
 	{ 0, NULL, false, NULL },
 };
 
@@ -141,7 +145,7 @@ static void usage(int status)
 		struct sd_option *opt;
 
 		printf("Sheepdog daemon (version %s)\n"
-		       "Usage: %s [OPTION]... [PATH]\n"
+		       "Usage: %s [OPTION]... [PATH] (default: /tmp)\n"
 		       "Options:\n", PACKAGE_VERSION, program_name);
 
 		sd_for_each_option(opt, sheep_options) {
