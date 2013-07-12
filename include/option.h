@@ -19,10 +19,12 @@ struct sd_option {
 	const char *name;
 	bool has_arg;
 	const char *desc;
+	const char *help;
 };
 
 char *build_short_options(const struct sd_option *opts);
 struct option *build_long_options(const struct sd_option *opts);
+const char *option_get_help(const struct sd_option *, int);
 
 #define sd_for_each_option(opt, opts)		\
 	for (opt = (opts); opt->name; opt++)

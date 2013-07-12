@@ -46,3 +46,14 @@ struct option *build_long_options(const struct sd_option *sd_opts)
 
 	return lopts;
 }
+
+const char *option_get_help(const struct sd_option *sd_opts, int ch)
+{
+	const struct sd_option *opt;
+
+	sd_for_each_option(opt, sd_opts) {
+		if (opt->ch == ch)
+			return opt->help;
+	}
+	return NULL;
+}

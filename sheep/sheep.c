@@ -24,37 +24,120 @@
 LIST_HEAD(cluster_drivers);
 static const char program_name[] = "sheep";
 
+static const char bind_help[] =
+"Example:\n\t$ sheep -b 192.168.1.1 ...\n"
+"This tries to teach sheep listen to NIC of 192.168.1.1.\n"
+"\nExample:\n\t$ sheep -b 0.0.0.0 ...\n"
+"This tries to teach sheep listen to all the NICs available. It can be useful\n"
+"when you want sheep to response collie without specified address and port.\n";
+
+static const char ioaddr_help[] =
+"Example:\n\t$ sheep -i host=192.168.1.1,port=7002 ...\n"
+"This tries to add a dedicated IO NIC of 192.168.1.1:7002 to transfer data.\n"
+"If IO NIC is down, sheep will fallback to non IO NIC to transfer data.\n";
+
+static const char journal_help[] =
+"Available arguments:\n"
+"\tsize=: size of the journal in megabyes\n"
+"\tdir=: path to the location of the journal (default: $STORE)\n"
+"\tskip: if specified, skip the recovery at startup\n"
+"\nExample:\n\t$ sheep -j dir=/journal,size=1024\n"
+"This tries to use /journal as the journal storage of the size 1024M\n";
+
+static const char loglevel_help[] =
+"Available log levels:\n"
+"  #    Level           Description\n"
+"  0    SDOG_EMERG      system has failed and is unusable\n"
+"  1    SDOG_ALERT      action must be taken immediately\n"
+"  2    SDOG_CRIT       critical conditions\n"
+"  3    SDOG_ERR        error conditions\n"
+"  4    SDOG_WARNING    warning conditions\n"
+"  5    SDOG_NOTICE     normal but significant conditions\n"
+"  6    SDOG_INFO       informational notices\n"
+"  7    SDOG_DEBUG      debugging messages\n"
+"\nExample:\n\t$ sheep -l 4 ...\n"
+"This only allows logs with level smaller than SDOG_WARNING to be logged\n";
+
+static const char http_help[] =
+"Example:\n\t$ sheep -r localhost:7001 ...\n"
+"This tries to enable sheep as http service backend and use localhost:7001 to\n"
+"communicate with http server. Not fully implemented yet.\n";
+
+static const char myaddr_help[] =
+"Example:\n\t$ sheep -y 192.168.1.1:7000 ...\n"
+"This tries to tell other nodes through what address they can talk to this\n"
+"sheep.\n";
+
+static const char zone_help[] =
+"Example:\n\t$ sheep -z 1 ...\n"
+"This tries to set the zone ID of this sheep to 1 and sheepdog won't store\n"
+"more than one copy of any object into this same zone\n";
+
+static const char cluster_help[] =
+"Available arguments:\n"
+"\tlocal: use local driver\n"
+"\tcorosync: use corosync driver (default)\n"
+"\tzookeeper: use zookeeper driver, need extra arguments\n"
+"\n\tzookeeper arguments: address-list,tiemout=value (default as 3000)\n"
+"\nExample:\n\t"
+"$ sheep -c zookeeperr:IP1:PORT1,IP2:PORT2,IP3:PORT3,timeout=1000 ...\n"
+"This tries to use 3 node zookeeper cluster, which can be reached by\n"
+"IP1:PORT1, IP2:PORT2, IP3:PORT3 to manage membership and broadcast message\n"
+"and set the timeout of node heartbeat as 1000 milliseconds\n";
+
+static const char cache_help[] =
+"Available arguments:\n"
+"\tsize=: size of the cache in megabyes\n"
+"\tdir=: path to the location of the cache (default: $STORE/cache)\n"
+"\tdirectio: use directio mode for cache IO, "
+"if not specified use buffered IO\n"
+"\nExample:\n\t$ sheep -w size=200000,dir=/my_ssd,directio ...\n"
+"This tries to use /my_ssd as the cache storage with 200G allocted to the\n"
+"cache in directio mode\n";
+
 static struct sd_option sheep_options[] = {
-	{'b', "bindaddr", true, "specify IP address of interface to listen on"},
-	{'c', "cluster", true, "specify the cluster driver"},
+	{'b', "bindaddr", true, "specify IP address of interface to listen on",
+	 bind_help},
+	{'c', "cluster", true, "specify the cluster driver", cluster_help},
 	{'d', "debug", false, "include debug messages in the log"},
 	{'D', "directio", false, "use direct IO for backend store"},
 	{'f', "foreground", false, "make the program run in the foreground"},
 	{'F', "log-format", true, "specify log format"},
 	{'g', "gateway", false, "make the progam run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
-	{'i', "ioaddr", true, "use separate network card to handle IO requests"},
-	{'j', "journal", true, "use jouranl file to log all the write operations"},
-	{'l', "loglevel", true, "specify the level of logging detail"},
+	{'i', "ioaddr", true, "use separate network card to handle IO requests",
+	 ioaddr_help},
+	{'j', "journal", true, "use jouranl file to log all the write "
+	 "operations", journal_help},
+	{'l', "loglevel", true, "specify the level of logging detail",
+	 loglevel_help},
 	{'n', "nosync", false, "drop O_SYNC for write of backend"},
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen"},
 	{'P', "pidfile", true, "create a pid file"},
-	{'r', "http", true, "enable http service"},
+	{'r', "http", true, "enable http service", http_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
-	{'w', "enable-cache", true, "enable object cache"},
-	{'y', "myaddr", true, "specify the address advertised to other sheep"},
-	{'z', "zone", true, "specify the zone id"},
+	{'w', "enable-cache", true, "enable object cache", cache_help},
+	{'y', "myaddr", true, "specify the address advertised to other sheep",
+	 myaddr_help},
+	{'z', "zone", true, "specify the zone id", zone_help},
 	{ 0, NULL, false, NULL },
 };
 
 static void usage(int status)
 {
-	if (status)
-		fprintf(stderr, "Try `%s --help' for more information.\n",
+	if (status) {
+		const char *help = option_get_help(sheep_options, optopt);
+
+		if (help) {
+			printf("%s", help);
+			goto out;
+		}
+
+		fprintf(stderr, "Try '%s --help' for more information.\n",
 			program_name);
-	else {
+	} else {
 		struct sd_option *opt;
 
 		printf("Sheepdog daemon (version %s)\n"
@@ -65,8 +148,11 @@ static void usage(int status)
 			printf("  -%c, --%-18s%s\n", opt->ch, opt->name,
 			       opt->desc);
 		}
-	}
 
+		printf("\nTry '%s <option>', e.g., '%s -w', to get more detail "
+		       "about specific option\n", program_name, program_name);
+	}
+out:
 	exit(status);
 }
 
