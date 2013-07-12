@@ -815,36 +815,6 @@ enum cluster_join_result sd_check_join_cb(const struct sd_node *joining,
 		return CJ_RES_FAIL;
 	}
 
-	if (node_is_local(joining)) {
-		struct sd_node entries[SD_MAX_NODES];
-		int nr_entries;
-		uint32_t epoch;
-
-		/*
-		 * If I'm the first sheep joins in corosync, I
-		 * becomes the master without sending JOIN.
-		 */
-
-		sd_printf(SDOG_DEBUG, "%s", node_to_str(&sys->this_node));
-
-		jm->cluster_status = sys->status;
-
-		epoch = get_latest_epoch();
-		if (!epoch)
-			return CJ_RES_SUCCESS;
-
-		nr_entries = epoch_log_read(epoch, entries, sizeof(entries));
-		if (nr_entries == -1)
-			return CJ_RES_FAIL;
-
-		sys->cinfo.epoch = epoch;
-		jm->cinfo.ctime = sys->cinfo.ctime;
-
-		if (nr_entries == 1)
-			jm->cluster_status = SD_STATUS_OK;
-		return CJ_RES_SUCCESS;
-	}
-
 	jm->cluster_status = sys->status;
 
 	switch (sys->status) {
