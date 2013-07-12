@@ -1,0 +1,15 @@
+QA output created by 069
+using backend plain store
+using backend plain store
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001]
