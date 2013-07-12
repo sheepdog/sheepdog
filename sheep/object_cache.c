@@ -875,10 +875,20 @@ static void do_push_object(struct work *work)
 	sd_dprintf("%"PRIx64, oid);
 
 	read_lock_entry(entry);
+	/*
+	 * We might happen to push readonly object in following scenario
+	 * 1. sheep pulled some read-only objects
+	 * 2. sheep crashed
+	 * 3. sheep restarted and marked all the objects in cache dirty blindly
+	 */
+	if (oid_is_readonly(idx_to_oid(oc->vid, entry_idx(entry))))
+		goto clean;
+
 	if (push_cache_object(oc->vid, entry_idx(entry), entry->bmap,
 			      !!(entry->idx & CACHE_CREATE_BIT))
 	    != SD_RES_SUCCESS)
 		panic("push failed but should never fail");
+clean:
 	if (uatomic_sub_return(&oc->push_count, 1) == 0)
 		eventfd_write(oc->push_efd, 1);
 	entry->idx &= ~CACHE_CREATE_BIT;
