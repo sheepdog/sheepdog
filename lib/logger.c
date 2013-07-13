@@ -205,8 +205,8 @@ static void notrace free_logarea(void)
 	shmdt(la);
 }
 
-static notrace int default_log_formatter(char *buff, size_t size,
-				const struct logmsg *msg)
+static notrace int server_log_formatter(char *buff, size_t size,
+					const struct logmsg *msg)
 {
 	char *p = buff;
 	struct tm tm;
@@ -248,6 +248,20 @@ static notrace int default_log_formatter(char *buff, size_t size,
 	}
 
 	return p - buff;
+}
+log_format_register("server", server_log_formatter);
+
+static notrace int default_log_formatter(char *buff, size_t size,
+					 const struct logmsg *msg)
+{
+	int len;
+
+	pstrcpy(buff, size, msg->str);
+	len = strlen(buff);
+	if (len > 0 && buff[len - 1] != '\n' && size > len)
+		buff[len++] = '\n';
+
+	return len;
 }
 log_format_register("default", default_log_formatter);
 

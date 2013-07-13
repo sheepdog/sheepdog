@@ -774,7 +774,7 @@ int main(int argc, char **argv)
 	bool daemonize = true;
 	int log_level = SDOG_INFO;
 	const char *log_file = "/var/log/shepherd.log";
-	const char *log_format = "default";
+	const char *log_format = "server";
 	struct logger_user_info shepherd_info;
 
 	int port = SHEPHERD_PORT;

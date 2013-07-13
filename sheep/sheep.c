@@ -592,7 +592,7 @@ int main(int argc, char **argv)
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
-	const char *log_format = "default", *http_address = NULL;
+	const char *log_format = "server", *http_address = NULL;
 	static struct logger_user_info sheep_info;
 
 	install_crash_handler(crash_handler);
