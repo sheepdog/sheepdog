@@ -35,7 +35,6 @@
 #include <execinfo.h>
 #include <linux/limits.h>
 
-#include "logger.h"
 #include "util.h"
 
 static bool colorize;

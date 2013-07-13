@@ -32,7 +32,6 @@
 #include "util.h"
 #include "event.h"
 #include "net.h"
-#include "logger.h"
 
 int conn_tx_off(struct connection *conn)
 {

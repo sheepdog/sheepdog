@@ -30,7 +30,6 @@
 #include "list.h"
 #include "util.h"
 #include "work.h"
-#include "logger.h"
 #include "event.h"
 
 /*

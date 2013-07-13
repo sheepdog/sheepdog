@@ -19,7 +19,6 @@
 #include "list.h"
 #include "util.h"
 #include "event.h"
-#include "logger.h"
 
 static int efd;
 static LIST_HEAD(events_list);

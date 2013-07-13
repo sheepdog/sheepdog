@@ -46,45 +46,25 @@ int __sd_dump_variable(const char *var, const void *base_sp);
 void sd_backtrace(void);
 
 /* sheep log priorities, comliant with syslog spec */
-#define	SDOG_EMERG		LOG_EMERG
-#define	SDOG_ALERT		LOG_ALERT
-#define	SDOG_CRIT		LOG_CRIT
-#define	SDOG_ERR		LOG_ERR
+#define	SDOG_EMERG	LOG_EMERG
+#define	SDOG_ALERT	LOG_ALERT
+#define	SDOG_CRIT	LOG_CRIT
+#define	SDOG_ERR	LOG_ERR
 #define	SDOG_WARNING	LOG_WARNING
-#define	SDOG_NOTICE		LOG_NOTICE
-#define	SDOG_INFO		LOG_INFO
-#define	SDOG_DEBUG		LOG_DEBUG
+#define	SDOG_NOTICE	LOG_NOTICE
+#define	SDOG_INFO	LOG_INFO
+#define	SDOG_DEBUG	LOG_DEBUG
 
-#define sd_printf(level, fmt, args...)					\
-	do {								\
-		log_write(level, __func__, __LINE__, fmt, ##args);	\
-	} while (0)
+#define sd_printf(level, fmt, args...) \
+	log_write(level, __func__, __LINE__, fmt, ##args)
+#define sd_iprintf(fmt, args...) sd_printf(SDOG_INFO, fmt, ##args)
+#define sd_eprintf(fmt, args...) sd_printf(SDOG_ERR, fmt, ##args)
+#define sd_dprintf(fmt, args...) sd_printf(SDOG_DEBUG, fmt, ##args)
 
-#define panic(fmt, args...)					\
-	({							\
-		sd_printf(SDOG_EMERG, "PANIC: " fmt, ##args);	\
-		abort();					\
-	})
-
-#define sd_iprintf(fmt, args...)					\
-	do {								\
-		log_write(SDOG_INFO, __func__, __LINE__, fmt, ##args);	\
-	} while (0)
-
-#define sd_eprintf(fmt, args...)					\
-	do {								\
-		log_write(SDOG_ERR, __func__, __LINE__, fmt, ##args);	\
-	} while (0)
-
-#define sd_dprintf(fmt, args...)					\
-	do {								\
-		log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args);	\
-	} while (0)
-
-static inline void do_assert(const char *expr, const char *func, int line)
-{
-	log_write(SDOG_EMERG, func, line, "Asserting `%s' failed.", expr);
-	abort();
-}
+#define panic(fmt, args...)				\
+({							\
+	sd_printf(SDOG_EMERG, "PANIC: " fmt, ##args);	\
+	abort();					\
+})
 
 #endif	/* LOG_H */

@@ -15,7 +15,6 @@
 
 #include "collie.h"
 #include "sheep.h"
-#include "logger.h"
 #include "strbuf.h"
 #include "sha1.h"
 

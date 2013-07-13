@@ -11,6 +11,7 @@
 #include <search.h>
 #include <urcu/uatomic.h>
 
+#include "logger.h"
 #include "bitops.h"
 #include "list.h"
 #include "compiler.h"
@@ -159,18 +160,19 @@ int atomic_create_and_write(const char *path, char *buf, size_t len,
 })
 
 #ifdef assert
-#undef assert
+#error "Don't include assert.h, use util.h for assert()"
 #endif
 
 #ifndef NDEBUG
-
-#define assert(expr) ((expr) ?				\
-			(void)0 : do_assert(#expr, __func__, __LINE__))
-
+#define assert(expr)							\
+({									\
+	if (!(expr)) {							\
+		sd_printf(SDOG_EMERG, "Asserting `%s' failed.", #expr);	\
+		abort();						\
+	}								\
+})
 #else
-
 #define assert(expr) ((void)0)
-
 #endif	/* NDEBUG */
 
 /* urcu helpers */
@@ -265,9 +267,5 @@ static inline bool is_stdout_console(void)
 
 extern mode_t sd_def_fmode;
 extern mode_t sd_def_dmode;
-
-
-/* Force a compilation error if the condition is true */
-#define BUILD_BUG_ON(condition) ((void)sizeof(struct { int: -!!(condition); }))
 
 #endif

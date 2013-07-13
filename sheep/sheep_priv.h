@@ -33,7 +33,7 @@
 
 #include "sheepdog_proto.h"
 #include "event.h"
-#include "logger.h"
+#include "util.h"
 #include "work.h"
 #include "net.h"
 #include "sheep.h"

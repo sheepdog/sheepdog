@@ -17,4 +17,7 @@
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))
 
+/* Force a compilation error if the condition is true */
+#define BUILD_BUG_ON(condition) ((void)sizeof(struct { int: -!!(condition); }))
+
 #endif	/* SD_COMPILER_H */

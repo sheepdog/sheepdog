@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "logger.h"
 #include "util.h"
 
 struct strbuf {

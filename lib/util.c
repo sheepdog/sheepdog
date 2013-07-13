@@ -18,14 +18,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <assert.h>
 #include <ctype.h>
 #include <signal.h>
 #include <sys/xattr.h>
 #include <fcntl.h>
 
 #include "util.h"
-#include "logger.h"
 
 mode_t sd_def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 mode_t sd_def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;

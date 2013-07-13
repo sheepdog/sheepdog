@@ -16,7 +16,6 @@
 #include "util.h"
 #include "list.h"
 #include "net.h"
-#include "logger.h"
 
 struct sd_vnode {
 	struct node_id  nid;
