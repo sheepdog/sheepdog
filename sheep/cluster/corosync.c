@@ -290,12 +290,12 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			return false;
 
 		if (cevent->callbacked)
-			/* sd_accept_handler() must be called only once */
+			/* sd_join_handler() must be called only once */
 			return false;
 
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_accept_handler(&cevent->sender.node, entries, nr_cpg_nodes,
-				  cevent->msg);
+		sd_join_handler(&cevent->sender.node, entries, nr_cpg_nodes,
+				cevent->msg);
 		send_message(COROSYNC_MSG_TYPE_ACCEPT, &cevent->sender,
 			     cpg_nodes, nr_cpg_nodes, cevent->msg,
 			     cevent->msg_len);
@@ -307,8 +307,8 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 		nr_cpg_nodes++;
 
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_join_handler(&cevent->sender.node, entries, nr_cpg_nodes,
-				cevent->msg);
+		sd_accept_handler(&cevent->sender.node, entries, nr_cpg_nodes,
+				  cevent->msg);
 		break;
 	case COROSYNC_EVENT_TYPE_LEAVE:
 		n = xlfind(&cevent->sender, cpg_nodes, nr_cpg_nodes,

@@ -51,12 +51,12 @@ struct cluster_driver {
 	 *
 	 * This function is used to join the cluster, and notifies a join
 	 * event to all the nodes.  The copy of 'opaque' is passed to
-	 * sd_accept_handler() and sd_join_handler().
+	 * sd_join_handler() and sd_accept_handler().
 	 *
-	 * sd_check_join_cb() is called on one of the nodes which already
+	 * sd_join_handler() is called on all of the nodes which already
 	 * paticipate in the cluster.  If the content of 'opaque' is
-	 * changed in sd_check_join_cb(), the updated 'opaque' must be
-	 * passed to sd_join_handler().
+	 * changed in sd_join_handler(), the updated 'opaque' must be
+	 * passed to sd_accept_handler().
 	 *
 	 * Returns zero on success, -1 on error
 	 */
@@ -162,18 +162,18 @@ static inline const char *get_cdrv_option(const struct cluster_driver *cdrv,
 }
 
 /* callbacks back into sheepdog from the cluster drivers */
-void sd_join_handler(const struct sd_node *joined,
-		     const struct sd_node *members, size_t nr_members,
-		     const void *opaque);
+void sd_accept_handler(const struct sd_node *joined,
+		       const struct sd_node *members, size_t nr_members,
+		       const void *opaque);
 void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 		      size_t nr_members);
 void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 int sd_reconnect_handler(void);
 void sd_update_node_handler(struct sd_node *);
-void sd_accept_handler(const struct sd_node *joining,
-		       const struct sd_node *nodes, size_t nr_nodes,
-		       void *opaque);
+void sd_join_handler(const struct sd_node *joining,
+		     const struct sd_node *nodes, size_t nr_nodes,
+		     void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 
 #endif

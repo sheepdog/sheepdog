@@ -780,9 +780,9 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
  *
  * Note that 'nodes' doesn't contain 'joining'.
  */
-void sd_accept_handler(const struct sd_node *joining,
-		       const struct sd_node *nodes, size_t nr_nodes,
-		       void *opaque)
+void sd_join_handler(const struct sd_node *joining,
+		     const struct sd_node *nodes, size_t nr_nodes,
+		     void *opaque)
 {
 	struct join_message *jm = opaque;
 	char str[MAX_NODE_STR_LEN];
@@ -918,9 +918,9 @@ static bool cluster_join_check(const struct join_message *jm)
 	return true;
 }
 
-void sd_join_handler(const struct sd_node *joined,
-		     const struct sd_node *members, size_t nr_members,
-		     const void *opaque)
+void sd_accept_handler(const struct sd_node *joined,
+		       const struct sd_node *members, size_t nr_members,
+		       const void *opaque)
 {
 	int i;
 	const struct join_message *jm = opaque;

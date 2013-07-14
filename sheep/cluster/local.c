@@ -433,7 +433,7 @@ static bool local_process_event(void)
 	case EVENT_JOIN:
 		/* nodes[nr_nodes - 1] is a sender, so don't include it */
 		assert(node_eq(&ev->sender.node, &nodes[nr_nodes - 1]));
-		sd_accept_handler(&ev->sender.node, nodes, nr_nodes - 1,
+		sd_join_handler(&ev->sender.node, nodes, nr_nodes - 1,
 				  ev->buf);
 		ev->type = EVENT_ACCEPT;
 		msync(ev, sizeof(*ev), MS_SYNC);
@@ -442,7 +442,7 @@ static bool local_process_event(void)
 
 		return false;
 	case EVENT_ACCEPT:
-		sd_join_handler(&ev->sender.node, nodes, nr_nodes, ev->buf);
+		sd_accept_handler(&ev->sender.node, nodes, nr_nodes, ev->buf);
 		break;
 	case EVENT_LEAVE:
 		if (ev->sender.gateway) {

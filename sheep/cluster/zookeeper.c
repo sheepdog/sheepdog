@@ -845,7 +845,7 @@ static void zk_handle_join(struct zk_event *ev)
 		return;
 	}
 
-	sd_accept_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
+	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
 	push_join_response(ev);
 
 	sd_dprintf("I'm the master now");
@@ -909,7 +909,7 @@ static void zk_handle_accept(struct zk_event *ev)
 	zk_tree_add(&ev->sender);
 
 	build_node_list();
-	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
+	sd_accept_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
 }
 
 static void kick_block_event(void)

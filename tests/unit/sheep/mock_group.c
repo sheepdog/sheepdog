@@ -15,7 +15,7 @@
 
 #include "cluster.h"
 
-MOCK_VOID_METHOD(sd_join_handler, const struct sd_node *joined,
+MOCK_VOID_METHOD(sd_accept_handler, const struct sd_node *joined,
 		 const struct sd_node *members, size_t nr_members,
 		 const void *opaque)
 MOCK_VOID_METHOD(sd_leave_handler, const struct sd_node *left,
