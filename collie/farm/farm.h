@@ -78,5 +78,8 @@ void object_tree_free(void);
 void object_tree_print(void);
 int for_each_object_in_tree(int (*func)(uint64_t oid, int nr_copies,
 					void *data), void *data);
+/* slice.c */
+int slice_write(void *buf, size_t len, unsigned char *outsha1);
+void *slice_read(const unsigned char *sha1, size_t *outsize);
 
 #endif
