@@ -243,7 +243,7 @@ static void do_save_object(struct work *work)
 	if (sd_read_object(sw->entry.oid, buf, size, 0, true) < 0)
 		goto error;
 
-	if (sha1_file_write(buf, size, sw->entry.sha1) < 0)
+	if (slice_write(buf, size, sw->entry.sha1) < 0)
 		goto error;
 
 	free(buf);
@@ -337,7 +337,7 @@ static void do_load_object(struct work *work)
 
 	sw = container_of(work, struct snapshot_work, work);
 
-	buffer = sha1_file_read(sw->entry.sha1, &size);
+	buffer = slice_read(sw->entry.sha1, &size);
 
 	if (!buffer)
 		goto error;
