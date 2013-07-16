@@ -52,7 +52,6 @@ char *get_object_directory(void);
 int trunk_init(void);
 int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
 		     unsigned char *trunk_sha1);
-struct trunk_file *trunk_file_read(unsigned char *sha1);
 int for_each_entry_in_trunk(unsigned char *trunk_sha1,
 			    int (*func)(struct trunk_entry *entry, void *data),
 			    void *data);

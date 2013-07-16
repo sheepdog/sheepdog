@@ -35,7 +35,7 @@ int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
 	return sha1_file_write(entries, size, trunk_sha1);
 }
 
-struct trunk_file *trunk_file_read(unsigned char *sha1)
+static struct trunk_file *trunk_file_read(unsigned char *sha1)
 {
 	size_t size;
 	struct trunk_file *trunk = NULL;
@@ -45,7 +45,7 @@ struct trunk_file *trunk_file_read(unsigned char *sha1)
 		return NULL;
 	trunk = xmalloc(sizeof(struct trunk_file));
 	trunk->nr_entries = size / sizeof(struct trunk_entry);
-	trunk->entries = (struct trunk_entry *)buf;
+	trunk->entries = buf;
 
 	return trunk;
 }
