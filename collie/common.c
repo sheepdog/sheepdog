@@ -283,3 +283,70 @@ void work_queue_wait(struct work_queue *q)
 	while (!work_queue_empty(q))
 		event_loop(-1);
 }
+
+#define DEFAULT_SCREEN_WIDTH 80
+
+static int get_screen_width(void)
+{
+	struct winsize wsz;
+
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) < 0)
+		return DEFAULT_SCREEN_WIDTH;
+
+	return wsz.ws_col;
+}
+
+/*
+ * Show prograss bar as follows.
+ *
+ *  45.0 % [===============>                  ] 180 MB / 400 MB
+ */
+void show_progress(uint64_t done, uint64_t total, bool raw)
+{
+	char done_str[256], total_str[256];
+	int screen_width = get_screen_width();
+	int bar_length = screen_width - 30;
+	char *buf;
+
+	if (!is_stdout_console())
+		return;
+	if (screen_width <= 0)
+		return;
+
+	printf("\r"); /* move to the beginning of the line */
+
+	if (raw) {
+		snprintf(done_str, sizeof(done_str), "%"PRIu64, done);
+		snprintf(total_str, sizeof(total_str), "%"PRIu64, total);
+	} else {
+		size_to_str(done, done_str, sizeof(done_str));
+		size_to_str(total, total_str, sizeof(total_str));
+	}
+
+	buf = xmalloc(screen_width + 1);
+	snprintf(buf, screen_width, "%5.1lf %% [", (double)done / total * 100);
+
+	for (int i = 0; i < bar_length; i++) {
+		if (total * (i + 1) / bar_length <= done)
+			strcat(buf, "=");
+		else if (total * i / bar_length <= done &&
+			 done < total * (i + 1) / bar_length)
+			strcat(buf, ">");
+		else
+			strcat(buf, " ");
+	}
+	snprintf(buf + strlen(buf), screen_width - strlen(buf),
+		 "] %s / %s", done_str, total_str);
+
+	/* fill the rest of buffer with blank characters */
+	memset(buf + strlen(buf), ' ', screen_width - strlen(buf));
+	buf[screen_width] = '\0';
+	printf("%s", buf);
+
+	if (done == total)
+		printf("\n");
+
+	fflush(stdout);
+
+	free(buf);
+}

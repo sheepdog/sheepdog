@@ -16,6 +16,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
@@ -83,7 +84,7 @@ void work_queue_wait(struct work_queue *q);
 int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
 		  int nr_copies);
-
+void show_progress(uint64_t done, uint64_t total, bool raw);
 
 extern struct command vdi_command;
 extern struct command node_command;

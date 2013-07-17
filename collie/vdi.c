@@ -14,7 +14,6 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
 
 #include "collie.h"
@@ -86,66 +85,9 @@ static int parse_option_size(const char *value, uint64_t *ret)
 	return 0;
 }
 
-#define DEFAULT_SCREEN_WIDTH 80
-
-static int get_screen_width(void)
+static void vdi_show_progress(uint64_t done, uint64_t total)
 {
-	struct winsize wsz;
-
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &wsz) < 0)
-		return DEFAULT_SCREEN_WIDTH;
-
-	return wsz.ws_col;
-}
-
-/*
- * Show prograss bar as follows.
- *
- *  45.0 % [===============>                  ] 180 MB / 400 MB
- */
-static void show_progress(uint64_t done, uint64_t total)
-{
-	char done_str[256], total_str[256];
-	int screen_width = get_screen_width();
-	int bar_length = screen_width - 30;
-	char *buf;
-
-	if (!is_stdout_console())
-		return;
-	if (screen_width <= 0)
-		return;
-
-	printf("\r"); /* move to the beginning of the line */
-
-	size_to_str(done, done_str, sizeof(done_str));
-	size_to_str(total, total_str, sizeof(total_str));
-
-	buf = xmalloc(screen_width + 1);
-	snprintf(buf, screen_width, "%5.1lf %% [", (double)done / total * 100);
-
-	for (int i = 0; i < bar_length; i++) {
-		if (total * (i + 1) / bar_length <= done)
-			strcat(buf, "=");
-		else if (total * i / bar_length <= done &&
-			 done < total * (i + 1) / bar_length)
-			strcat(buf, ">");
-		else
-			strcat(buf, " ");
-	}
-	snprintf(buf + strlen(buf), screen_width - strlen(buf),
-		 "] %s / %s", done_str, total_str);
-
-	/* fill the rest of buffer with blank characters */
-	memset(buf + strlen(buf), ' ', screen_width - strlen(buf));
-	buf[screen_width] = '\0';
-	printf("%s", buf);
-
-	if (done == total)
-		printf("\n");
-
-	fflush(stdout);
-
-	free(buf);
+	return show_progress(done, total, false);
 }
 
 static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
@@ -588,7 +530,7 @@ static int vdi_create(int argc, char **argv)
 	max_idx = DIV_ROUND_UP(size, SD_DATA_OBJ_SIZE);
 
 	for (idx = 0; idx < max_idx; idx++) {
-		show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 		oid = vid_to_data_oid(vid, idx);
 
 		ret = sd_write_object(oid, 0, NULL, 0, 0, 0, inode->nr_copies,
@@ -607,7 +549,7 @@ static int vdi_create(int argc, char **argv)
 			goto out;
 		}
 	}
-	show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+	vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 	ret = EXIT_SUCCESS;
 
 	if (verbose) {
@@ -700,7 +642,7 @@ static int vdi_clone(int argc, char **argv)
 	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
 
 	for (idx = 0; idx < max_idx; idx++) {
-		show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 		if (inode->data_vdi_id[idx]) {
 			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
 			ret = sd_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0, true);
@@ -727,7 +669,7 @@ static int vdi_clone(int argc, char **argv)
 			goto out;
 		}
 	}
-	show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+	vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 	ret = EXIT_SUCCESS;
 
 	if (verbose) {
@@ -1489,7 +1431,7 @@ static void free_vdi_check_info(struct vdi_check_info *info)
 {
 	if (info->done) {
 		*info->done += SD_DATA_OBJ_SIZE;
-		show_progress(*info->done, info->total);
+		vdi_show_progress(*info->done, info->total);
 	}
 	free(info);
 }
@@ -1643,7 +1585,7 @@ static int vdi_check(int argc, char **argv)
 	queue_vdi_check_work(inode, vid_to_vdi_oid(vid), NULL, wq);
 
 	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
-	show_progress(done, inode->vdi_size);
+	vdi_show_progress(done, inode->vdi_size);
 	for (int idx = 0; idx < max_idx; idx++) {
 		vid = inode->data_vdi_id[idx];
 		if (vid) {
@@ -1651,7 +1593,7 @@ static int vdi_check(int argc, char **argv)
 			queue_vdi_check_work(inode, oid, &done, wq);
 		} else {
 			done += SD_DATA_OBJ_SIZE;
-			show_progress(done, inode->vdi_size);
+			vdi_show_progress(done, inode->vdi_size);
 		}
 	}
 
