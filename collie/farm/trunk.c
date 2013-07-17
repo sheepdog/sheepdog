@@ -28,6 +28,8 @@
 #include "util.h"
 #include "sheepdog_proto.h"
 
+static uint64_t total_count;
+
 int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
 		     unsigned char *trunk_sha1)
 {
@@ -62,6 +64,7 @@ int for_each_entry_in_trunk(unsigned char *trunk_sha1,
 	if (!trunk)
 		goto out;
 
+	total_count = trunk->nr_entries;
 	entry = trunk->entries;
 	for (uint64_t i = 0; i < trunk->nr_entries; i++, entry++) {
 		if (func(entry, data) < 0)
@@ -73,4 +76,9 @@ out:
 	free(trunk->entries);
 	free(trunk);
 	return ret;
+}
+
+uint64_t trunk_get_count(void)
+{
+	return total_count;
 }

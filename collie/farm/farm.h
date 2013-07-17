@@ -55,6 +55,7 @@ int trunk_file_write(uint64_t nr_entries, struct trunk_entry *entries,
 int for_each_entry_in_trunk(unsigned char *trunk_sha1,
 			    int (*func)(struct trunk_entry *entry, void *data),
 			    void *data);
+uint64_t trunk_get_count(void);
 
 /* snap.c */
 int snap_init(const char *path);

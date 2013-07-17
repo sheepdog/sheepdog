@@ -255,15 +255,22 @@ error:
 	uatomic_set_true(&work_error);
 }
 
+static void farm_show_progress(uint64_t done, uint64_t total)
+{
+	return show_progress(done, total, true);
+}
+
 static void save_object_done(struct work *work)
 {
 	struct snapshot_work *sw = container_of(work, struct snapshot_work,
 						work);
+	static uint64_t saved;
 
 	if (uatomic_is_true(&work_error))
 		goto out;
 
 	strbuf_add(sw->trunk_buf, &sw->entry, sizeof(struct trunk_entry));
+	farm_show_progress(uatomic_add_return(&saved, 1), object_tree_size());
 out:
 	free(sw);
 }
@@ -331,6 +338,7 @@ static void do_load_object(struct work *work)
 	void *buffer = NULL;
 	size_t size;
 	struct snapshot_work *sw;
+	static uint64_t loaded;
 
 	if (uatomic_is_true(&work_error))
 		return;
@@ -356,6 +364,7 @@ static void do_load_object(struct work *work)
 		pthread_rwlock_unlock(&vdi_list_lock);
 	}
 
+	farm_show_progress(uatomic_add_return(&loaded, 1), trunk_get_count());
 	free(buffer);
 	return;
 error:
