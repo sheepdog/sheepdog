@@ -582,15 +582,15 @@ static int vdi_snapshot(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		return ret;
 
-	if (vdi_cmd_data.snapshot_tag[0]) {
-		ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
-				      SD_MAX_VDI_TAG_LEN,
-				      offsetof(struct sd_inode, tag),
-				      0, inode->nr_copies, false, true);
-	}
+	ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
+			      SD_MAX_VDI_TAG_LEN,
+			      offsetof(struct sd_inode, tag),
+			      0, inode->nr_copies, false, false);
+	if (ret != SD_RES_SUCCESS)
+		return EXIT_FAILURE;
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, vid, NULL, true,
-			     inode->nr_copies);
+			    inode->nr_copies);
 
 	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
