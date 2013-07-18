@@ -1,9 +1,5 @@
 QA output created by 058
 using backend plain store
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	25	1	0	0	0
-1	25	1	0	0	0
-2	25	1	0	0	0
 discard 104857600/104857600 bytes at offset 0
 100 MiB, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 finish check&repair test
