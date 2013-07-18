@@ -1008,6 +1008,23 @@ get_cache_entry_from(struct object_cache *cache, uint32_t idx)
 	return entry;
 }
 
+/* This helper increases the refcount */
+static struct object_cache_entry *oid_to_entry(uint64_t oid)
+{
+	uint32_t vid = oid_to_vid(oid);
+	uint32_t idx = object_cache_oid_to_idx(oid);
+	struct object_cache *cache;
+	struct object_cache_entry *entry;
+
+	cache = find_object_cache(vid, false);
+	entry = get_cache_entry_from(cache, idx);
+	if (!entry) {
+		sd_dprintf("%" PRIx64 " doesn't exist", oid);
+		return NULL;
+	}
+	return entry;
+}
+
 static int object_cache_flush_and_delete(struct object_cache *oc)
 {
 	DIR *dir;
@@ -1154,15 +1171,10 @@ err:
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, bool create)
 {
-	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = object_cache_oid_to_idx(oid);
-	struct object_cache *cache;
-	struct object_cache_entry *entry;
+	struct object_cache_entry *entry = oid_to_entry(oid);
 	int ret;
 
 	sd_dprintf("%" PRIx64, oid);
-	cache = find_object_cache(vid, false);
-	entry = get_cache_entry_from(cache, idx);
 	if (!entry) {
 		sd_dprintf("%" PRIx64 " doesn't exist", oid);
 		return SD_RES_NO_CACHE;
@@ -1176,15 +1188,10 @@ int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
 		      uint64_t offset)
 {
-	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = object_cache_oid_to_idx(oid);
-	struct object_cache *cache;
-	struct object_cache_entry *entry;
+	struct object_cache_entry *entry = oid_to_entry(oid);
 	int ret;
 
 	sd_dprintf("%" PRIx64, oid);
-	cache = find_object_cache(vid, false);
-	entry = get_cache_entry_from(cache, idx);
 	if (!entry) {
 		sd_dprintf("%" PRIx64 " doesn't exist", oid);
 		return SD_RES_NO_CACHE;
