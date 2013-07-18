@@ -436,6 +436,12 @@ int remove_object(uint64_t oid)
 	struct sd_req hdr;
 	int ret;
 
+	if (sys->enable_object_cache && object_is_cached(oid)) {
+		ret = object_cache_remove(oid);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+	}
+
 	sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 	hdr.obj.oid = oid;
 	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));

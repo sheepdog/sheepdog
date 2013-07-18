@@ -1316,6 +1316,41 @@ out:
 	return ret;
 }
 
+int object_cache_remove(uint64_t oid)
+{
+	/* Inc the entry refcount to exclude the reclaimer */
+	struct object_cache_entry *entry = oid_to_entry(oid);
+	struct object_cache *oc = entry->oc;
+	int ret;
+
+	if (!entry)
+		return SD_RES_NO_OBJ;
+
+	sd_dprintf("%" PRIx64, oid);
+	while (refcount_read(&entry->refcnt) > 1)
+		usleep(100000); /* Object might be in push */
+
+	write_lock_cache(oc);
+	/*
+	 * We assume no other thread will inc the refcount of this entry
+	 * before we call write_lock_cache(). object_cache_remove() is called
+	 * in the DISCARD context, which means nornamly no other read/write
+	 * requests.
+	 */
+	assert(refcount_read(&entry->refcnt) == 1);
+	ret = remove_cache_object(oc, entry_idx(entry));
+	if (ret != SD_RES_SUCCESS) {
+		unlock_cache(oc);
+		return ret;
+	}
+	free_cache_entry(entry);
+	unlock_cache(oc);
+
+	uatomic_sub(&gcache.capacity, CACHE_OBJECT_SIZE);
+
+	return SD_RES_SUCCESS;
+}
+
 int object_cache_init(const char *p)
 {
 	int ret = 0;
