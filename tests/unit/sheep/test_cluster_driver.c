@@ -54,8 +54,9 @@ static void do_test(const char *arg)
 	assert_ret(driver->init(option), 0);
 	assert_ret(driver->join(&node, msg, len), 0);
 
-	LOOP_WHEN(method_nr_call(sd_check_join_cb) == 0);
+	LOOP_WHEN(method_nr_call(sd_join_handler) == 0);
 	LOOP_WHEN(method_nr_call(sd_accept_handler) == 0);
+	ck_assert_int_eq(method_nr_call(sd_join_handler), 1);
 	ck_assert_int_eq(method_nr_call(sd_accept_handler), 1);
 
 	assert_ret(driver->block(), 0);
