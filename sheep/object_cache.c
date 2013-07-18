@@ -513,7 +513,8 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 
 	ret = exec_local_req(&hdr, buf);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("failed to push object %s", sd_strerror(ret));
+		sd_eprintf("failed to push object %"PRIx64", %s",
+			   oid, sd_strerror(ret));
 out:
 	free(buf);
 	return ret;
@@ -1041,8 +1042,6 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 			continue;
 		if (push_cache_object(vid, idx, all, true) !=
 		    SD_RES_SUCCESS) {
-			sd_dprintf("failed to push %"PRIx64,
-				   idx_to_oid(vid, idx));
 			ret = -1;
 			goto out_close_dir;
 		}
