@@ -84,7 +84,7 @@ void object_tree_print(void)
 
 	while (p) {
 		entry = rb_entry(p, struct object_tree_entry, node);
-		printf("Obj id: %"PRIu64"\n", entry->oid);
+		printf("Obj id: %"PRIx64"\n", entry->oid);
 		p = rb_next(p);
 	}
 }

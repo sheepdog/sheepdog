@@ -250,7 +250,7 @@ static void do_save_object(struct work *work)
 	return;
 error:
 	free(buf);
-	fprintf(stderr, "Fail to save object, oid %"PRIu64"\n",
+	fprintf(stderr, "Fail to save object, oid %"PRIx64"\n",
 		sw->entry.oid);
 	uatomic_set_true(&work_error);
 }
@@ -369,7 +369,7 @@ static void do_load_object(struct work *work)
 	return;
 error:
 	free(buffer);
-	fprintf(stderr, "Fail to load object, oid %"PRIu64"\n", sw->entry.oid);
+	fprintf(stderr, "Fail to load object, oid %"PRIx64"\n", sw->entry.oid);
 	uatomic_set_true(&work_error);
 }
 
