@@ -22,8 +22,8 @@ Architecture: any
 Pre-Depends: dpkg (>= 1.15.6~)
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Recommends: corosync
-Description: distributed storage system for KVM/QEMU
+Description: distributed storage system for QEMU
  Sheepdog provides highly available block level storage volumes that can be
- attached to KVM/QEMU virtual machines. Sheepdog scales to several hundred
+ attached to QEMU virtual machines. Sheepdog scales to several hundred
  nodes, and supports advanced volume management features such as snapshots,
  cloning, and thin provisioning.
