@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+if [ "$1" = "configure" ] ; then
+	. /usr/share/debconf/confmodule
+	mkdir -p /var/lib/sheepdog/
+	mkdir -p /etc/default
+	if [ ! -e /etc/default/sheepdog ] ; then
+		cp /usr/share/sheepdog/debian-sheepdog-default /etc/default/sheepdog
+	fi
+	if [ -r /etc/default/sheepdog ] ; then
+		db_get sheepdog/start
+		if [ "${RET}" = "true" ] ; then
+			SERVICE_START="yes"
+		else
+			SERVICE_START="no"
+		fi
+		sed -i -e "s/^[ \t]*START=.*/START=\"$SERVICE_START\"/g" /etc/default/sheepdog
+
+		db_get sheepdog/daemon_args
+		sed -i -e "s/^[ \t]*DAEMON_ARGS=.*/DAEMON_ARGS=\"$RET\"/g" /etc/default/sheepdog
+	fi
+fi
+
+#DEBHELPER#
+
+exit 0

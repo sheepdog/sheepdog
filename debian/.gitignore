@@ -1,0 +1,9 @@
+*.substvars
+*.debhelper
+*.debhelper.log
+autoreconf.after
+autoreconf.before
+files
+sheepdog
+CHANGELOG
+changelog

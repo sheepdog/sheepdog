@@ -1,0 +1,29 @@
+Source: sheepdog
+Section: admin
+Priority: optional
+Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
+Uploaders: YunQiang Su <wzssyqa@gmail.com>
+Build-Depends: debhelper (>= 9),
+ dh-autoreconf,
+ bash-completion,
+ pkg-config,
+ libcorosync-dev,
+ liburcu-dev,
+ libzookeeper-mt-dev [linux-any],
+ libfuse-dev,
+ po-debconf
+Standards-Version: 3.9.4
+Homepage: http://www.osrg.net/sheepdog/
+Vcs-Browser: http://git.debian.org/?p=openstack/sheepdog.git
+Vcs-Git: git://git.debian.org/openstack/sheepdog.git
+
+Package: sheepdog
+Architecture: any
+Pre-Depends: dpkg (>= 1.15.6~)
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: corosync
+Description: distributed storage system for KVM/QEMU
+ Sheepdog provides highly available block level storage volumes that can be
+ attached to KVM/QEMU virtual machines. Sheepdog scales to several hundred
+ nodes, and supports advanced volume management features such as snapshots,
+ cloning, and thin provisioning.
