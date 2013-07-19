@@ -355,7 +355,7 @@ int rmdir_r(char *dir_path)
 }
 
 /*
- * Trim zero blocks from the beginning and end of buffer
+ * Find zero blocks from the beginning and end of buffer
  *
  * The caller passes the offset of 'buf' with 'poffset' so that this funciton
  * can align the return values to BLOCK_SIZE.  'plen' points the length of the
@@ -365,10 +365,10 @@ int rmdir_r(char *dir_path)
  * buffer, this function also decreases the length on condition that '*plen' is
  * block-aligned.
  */
-void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
+void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen)
 {
 	const uint8_t zero[BLOCK_SIZE] = {0};
-	uint8_t *p = buf;
+	const uint8_t *p = buf;
 	uint64_t start = *poffset;
 	uint64_t offset = 0;
 	uint32_t len = *plen;
@@ -385,8 +385,6 @@ void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
 		offset += size;
 		len -= size;
 	}
-	if (offset > 0)
-		memmove(buf, p + offset, len);
 
 	/* trim zero sectors from the end of buffer */
 	while (len >= BLOCK_SIZE) {
@@ -402,6 +400,22 @@ void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
 
 	*plen = len;
 	*poffset = start + offset;
+}
+
+/*
+ * Trim zero blocks from the beginning and end of buffer
+ *
+ * This function is similar to find_zero_blocks(), but this updates 'buf' so
+ * that the zero block are removed from the beginning of buffer.
+ */
+void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
+{
+	uint8_t *p = buf;
+	uint64_t orig_offset = *poffset;
+
+	find_zero_blocks(buf, poffset, plen);
+	if (orig_offset < *poffset)
+		memmove(p, p + *poffset - orig_offset, *plen);
 }
 
 /*

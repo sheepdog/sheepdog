@@ -95,6 +95,7 @@ void reraise_crash_signal(int signo, int status);
 pid_t gettid(void);
 bool is_xattr_enabled(const char *path);
 
+void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
 void trim_zero_blocks(void *buf, uint64_t *offset, uint32_t *len);
 void untrim_zero_blocks(void *buf, uint64_t offset, uint32_t len,
 			uint32_t requested_len);
