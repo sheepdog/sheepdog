@@ -9,7 +9,7 @@
 
 Template: sheepdog/start
 Type: boolean
-Default: true
+Default: false
 _Description: Automatically start the sheepdog service?
  Please choose whether the sheepdog service should start automatically
  when the system is booted.
