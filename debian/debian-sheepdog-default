@@ -1,0 +1,20 @@
+# start sheepdog at boot [yes|no]
+START="yes"
+
+# Arguments to run the daemon with
+# Options:
+#  -p, --port              specify the TCP port on which to listen
+#  -l, --loglevel          specify the level of logging detail
+#  -d, --debug             include debug messages in the log
+#  -D, --directio          use direct IO when accessing the object store
+#  -z, --zone              specify the zone id
+#  -c, --cluster           specify the cluster driver
+DAEMON_ARGS=""
+
+# SHEEPDOG_PATH
+#       Proper LSB systems will store sheepdog files in /var/lib/sheepdog.  The init script uses this directory by default.
+#       The directory must be on a filesystem with xattr support.  In the case of ext3, user_xattr should be added  to  the
+#       mount options.
+#
+#       mount -o remount,user_xattr /var/lib/shepdog
+SHEEPDOG_PATH="/var/lib/sheepdog"

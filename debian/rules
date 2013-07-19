@@ -1,0 +1,63 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+DEBVERS         ?= $(shell dpkg-parsechangelog | sed -n -e 's/^Version: //p')
+VERSION         ?= $(shell echo '$(DEBVERS)' | sed -e 's/^[[:digit:]]*://' -e 's/[-].*//')
+DEBFLAVOR       ?= $(shell dpkg-parsechangelog | grep -E ^Distribution: | cut -d" " -f2)
+DEBPKGNAME      ?= $(shell dpkg-parsechangelog | grep -E ^Source: | cut -d" " -f2)
+UPSTREAM_GIT    ?= git://github.com/collie/sheepdog.git
+GIT_TAG         ?= $(shell echo v'$(VERSION)' | sed -e 's/~/_/')
+
+%:
+	dh $@ --with autoreconf
+
+override_dh_builddeb:
+	dh_builddeb -- -Zxz -z9
+
+UNAME := $(shell uname)
+ifeq ($(UNAME),Linux)
+	ZOOKEEPER=--enable-zookeeper
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- ${ZOOKEEPER}
+
+override_dh_install:
+	dh_install
+	rm -rf debian/sheepdog/etc/init.d/
+	dh_bash-completion
+
+get-vcs-source:
+	git remote add upstream $(UPSTREAM_GIT) || true
+	git fetch upstream
+	if [ ! -f ../$(DEBPKGNAME)_$(VERSION).orig.tar.xz ] ; then \
+		git archive --prefix=$(DEBPKGNAME)-$(GIT_TAG)/ $(GIT_TAG) | xz >../$(DEBPKGNAME)_$(VERSION).orig.tar.xz ; \
+	fi
+	if [ ! -e ../build-area ] ; then mkdir ../build-area ; fi
+	if [ ! -e ../build-area ] ; then cp ../$(DEBPKGNAME)_$(VERSION).orig.tar.xz ../build-area ; fi
+	if ! git checkout master ; then \
+		echo "No upstream branch: checking out" ; \
+		git checkout -b master upstream/master ; \
+	fi
+	git checkout debian/$(DEBFLAVOR)
+
+display-po-stats:
+	cd $(CURDIR)/debian/po; for i in *.po ;do \
+		echo -n $$i": ";\
+		msgfmt -o /dev/null --statistic $$i ; \
+	done
+
+call-for-po-trans:
+	podebconf-report-po --call --withtranslators --languageteam
+
+gen-upstream-changelog:
+	git checkout master
+	git reset --hard $(GIT_TAG)
+	git log >$(CURDIR)/../CHANGELOG
+	git checkout debian/$(DEBFLAVOR)
+	mv $(CURDIR)/../CHANGELOG $(CURDIR)/debian/CHANGELOG
+	git add $(CURDIR)/debian/CHANGELOG
+	git commit -a -m "Updated upstream changelog"
+
+override_dh_installchangelogs:
+	dh_installchangelogs $(CURDIR)/debian/CHANGELOG

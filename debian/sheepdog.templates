@@ -1,0 +1,32 @@
+# These templates have been reviewed by the debian-l10n-english
+# team
+#
+# If modifications/additions/rewording are needed, please ask
+# debian-l10n-english@lists.debian.org for advice.
+#
+# Even minor modifications require translation updates and such
+# changes should be coordinated with translators and reviewers.
+
+Template: sheepdog/start
+Type: boolean
+Default: true
+_Description: Automatically start the sheepdog service?
+ Please choose whether the sheepdog service should start automatically
+ when the system is booted.
+
+Template: sheepdog/daemon_args
+Type: string
+Default:
+_Description: Arguments for the sheepdog daemon:
+ Please choose the command line arguments that should be passed to the
+ sheepdog daemon. If no argument is given, the default behavior is to
+ start on port 7000, using the corosync driver.
+ .
+ Available options include:
+   -p, --port              specify the TCP port to listen to
+   -l, --loglevel          specify the level of logging detail
+   -d, --debug             include debug messages in the log
+   -D, --directio          use direct I/O when accessing the object store
+   -z, --zone              specify the zone ID
+   -c, --cluster           specify the cluster driver
+ More information can be found in the sheep(8) manual page.
