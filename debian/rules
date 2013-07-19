@@ -12,7 +12,7 @@ GIT_TAG         ?= $(shell echo v'$(VERSION)' | sed -e 's/~/_/')
 	dh $@ --with autoreconf
 
 override_dh_builddeb:
-	dh_builddeb -- -Zxz -z9
+	dh_builddeb --destdir=. -- -Zxz -z9
 
 UNAME := $(shell uname)
 ifeq ($(UNAME),Linux)
