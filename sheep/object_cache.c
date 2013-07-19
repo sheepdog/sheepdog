@@ -547,7 +547,14 @@ static void do_reclaim_object(struct object_cache *oc)
 			sd_dprintf("%"PRIx64" is in use, skip...", oid);
 			continue;
 		}
-		if (entry_is_dirty(entry)) {
+
+		/*
+		 * The shared snapshot objects won't be released after being
+		 * pulled and if sheep restarts, the remaining snapshot objects
+		 * will be marked as dirty. So for these kind of objects, we
+		 * can reclaim them safely.
+		 */
+		if (entry_is_dirty(entry) && !oid_is_readonly(oid)) {
 			sd_dprintf("%"PRIx64" is dirty, skip...", oid);
 			continue;
 		}
