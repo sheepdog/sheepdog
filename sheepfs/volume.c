@@ -193,7 +193,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 		hdr.flags |= SD_FLAG_CMD_CACHE;
 
 	fd = get_socket_fd(vdi, &sock_idx);
-	ret = exec_req(fd, &hdr, buf, NULL, 0);
+	ret = exec_req(fd, &hdr, buf, NULL, 0, MAX_RETRY_COUNT);
 	put_socket_fd(vdi, sock_idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
@@ -299,7 +299,7 @@ static int volume_do_sync(uint32_t vid)
 	hdr.obj.oid = vid_to_vdi_oid(vid);
 
 	fd = get_socket_fd(vdi, &idx);
-	ret = exec_req(fd, &hdr, NULL, NULL, 0);
+	ret = exec_req(fd, &hdr, NULL, NULL, 0, MAX_RETRY_COUNT);
 	put_socket_fd(vdi, idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
@@ -486,7 +486,7 @@ static int volume_sync_and_delete(uint32_t vid)
 	hdr.obj.oid = vid_to_vdi_oid(vid);
 
 	fd = get_socket_fd(vdi, &idx);
-	ret = exec_req(fd, &hdr, NULL, NULL, 0);
+	ret = exec_req(fd, &hdr, NULL, NULL, 0, MAX_RETRY_COUNT);
 	put_socket_fd(vdi, idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {

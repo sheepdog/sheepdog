@@ -208,8 +208,12 @@ int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
 		return -1;
 	}
 
-	/* Retry hard for collie because we can't get the newest epoch */
-	ret = exec_req(fd, hdr, data, NULL, 0);
+	/*
+	 * Retry forever for collie because
+	 * 1. We can't get the newest epoch
+	 * 2. Some operations might take unexpected long time
+	 */
+	ret = exec_req(fd, hdr, data, NULL, 0, UINT32_MAX);
 	close(fd);
 
 	if (ret)

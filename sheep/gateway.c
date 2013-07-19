@@ -194,7 +194,7 @@ again:
 			goto finish_write;
 		}
 		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp), sheep_need_retry,
-			    req->rq.epoch)) {
+			    req->rq.epoch, MAX_RETRY_COUNT)) {
 			sd_eprintf("remote node might have gone away");
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
@@ -285,7 +285,8 @@ static int gateway_forward_request(struct request *req)
 		}
 
 		ret = send_req(sfd->fd, &hdr, req->data, wlen,
-			       sheep_need_retry, req->rq.epoch);
+			       sheep_need_retry, req->rq.epoch,
+			       MAX_RETRY_COUNT);
 		if (ret) {
 			sheep_del_sockfd(nid, sfd);
 			err_ret = SD_RES_NETWORK_ERROR;

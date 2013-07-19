@@ -271,9 +271,9 @@ success:
 }
 
 int do_read(int sockfd, void *buf, int len, bool (*need_retry)(uint32_t epoch),
-	    uint32_t epoch)
+	    uint32_t epoch, uint32_t max_count)
 {
-	int ret, repeat = MAX_RETRY_COUNT;
+	int ret, repeat = max_count;
 reread:
 	ret = read(sockfd, buf, len);
 	if (ret == 0) {
@@ -319,9 +319,10 @@ static void forward_iov(struct msghdr *msg, int len)
 
 
 static int do_write(int sockfd, struct msghdr *msg, int len,
-		    bool (*need_retry)(uint32_t), uint32_t epoch)
+		    bool (*need_retry)(uint32_t), uint32_t epoch,
+		    uint32_t max_count)
 {
-	int ret, repeat = MAX_RETRY_COUNT;
+	int ret, repeat = max_count;
 rewrite:
 	ret = sendmsg(sockfd, msg, 0);
 	if (ret < 0) {
@@ -351,7 +352,8 @@ rewrite:
 }
 
 int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen,
-	     bool (*need_retry)(uint32_t epoch), uint32_t epoch)
+	     bool (*need_retry)(uint32_t epoch), uint32_t epoch,
+	     uint32_t max_count)
 {
 	int ret;
 	struct msghdr msg;
@@ -371,7 +373,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen,
 		iov[1].iov_len = wlen;
 	}
 
-	ret = do_write(sockfd, &msg, sizeof(*hdr) + wlen, need_retry, epoch);
+	ret = do_write(sockfd, &msg, sizeof(*hdr) + wlen, need_retry, epoch,
+		       max_count);
 	if (ret) {
 		sd_eprintf("failed to send request %x, %d: %m", hdr->opcode,
 			   wlen);
@@ -382,7 +385,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen,
 }
 
 int exec_req(int sockfd, struct sd_req *hdr, void *data,
-	     bool (*need_retry)(uint32_t epoch), uint32_t epoch)
+	     bool (*need_retry)(uint32_t epoch), uint32_t epoch,
+	     uint32_t max_count)
 {
 	int ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
@@ -396,10 +400,10 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 		rlen = hdr->data_length;
 	}
 
-	if (send_req(sockfd, hdr, data, wlen, need_retry, epoch))
+	if (send_req(sockfd, hdr, data, wlen, need_retry, epoch, max_count))
 		return 1;
 
-	ret = do_read(sockfd, rsp, sizeof(*rsp), need_retry, epoch);
+	ret = do_read(sockfd, rsp, sizeof(*rsp), need_retry, epoch, max_count);
 	if (ret) {
 		sd_eprintf("failed to read a response");
 		return 1;
@@ -409,7 +413,7 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 		rlen = rsp->data_length;
 
 	if (rlen) {
-		ret = do_read(sockfd, data, rlen, need_retry, epoch);
+		ret = do_read(sockfd, data, rlen, need_retry, epoch, max_count);
 		if (ret) {
 			sd_eprintf("failed to read the response data");
 			return 1;
