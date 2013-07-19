@@ -27,5 +27,6 @@ void sha1_init(void *ctx);
 void sha1_update(void *ctx, const uint8_t *data, unsigned int len);
 void sha1_final(void *ctx, uint8_t *out);
 const char *sha1_to_hex(const unsigned char *sha1);
+void sha1_from_buffer(const void *buf, size_t size, unsigned char *sha1);
 
 #endif

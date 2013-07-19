@@ -527,8 +527,6 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	int ret;
 	void *buf;
 	struct siocb iocb = {};
-	struct sha1_ctx c;
-	uint64_t offset = 0;
 	uint32_t length;
 	bool is_readonly_obj = oid_is_readonly(oid);
 	char path[PATH_MAX];
@@ -560,13 +558,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 		return ret;
 	}
 
-	trim_zero_blocks(buf, &offset, &length);
-
-	sha1_init(&c);
-	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));
-	sha1_update(&c, (uint8_t *)&length, sizeof(length));
-	sha1_update(&c, buf, length);
-	sha1_final(&c, sha1);
+	sha1_from_buffer(buf, length, sha1);
 	free(buf);
 
 	sd_dprintf("the message digest of %"PRIx64" at epoch %d is %s", oid,
