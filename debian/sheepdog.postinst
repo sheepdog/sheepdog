@@ -21,6 +21,7 @@ if [ "$1" = "configure" ] ; then
 		db_get sheepdog/daemon_args
 		sed -i -e "s/^[ \t]*DAEMON_ARGS=.*/DAEMON_ARGS=\"$RET\"/g" /etc/default/sheepdog
 	fi
+	db_stop || true
 fi
 
 #DEBHELPER#
