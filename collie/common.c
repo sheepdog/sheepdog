@@ -38,33 +38,6 @@ char *size_to_str(uint64_t _size, char *str, int str_size)
 	return str;
 }
 
-int sd_read_object_sha1(uint64_t oid, uint32_t epoch, int nr_copies,
-			unsigned char *sha1)
-{
-	struct sd_req req;
-	struct sd_rsp *rsp = (struct sd_rsp *)&req;
-	const struct sd_vnode *vnode = NULL;
-	char host[HOST_NAME_MAX];
-	int port, ret = -1;
-
-	sd_init_req(&req, SD_OP_GET_HASH);
-	req.obj.oid = oid;
-	req.obj.tgt_epoch = epoch;
-
-	for (int i = 0; i < nr_copies; i++) {
-		vnode = oid_to_vnode(sd_vnodes, sd_vnodes_nr, oid, i);
-		addr_to_str(host, sizeof(host), vnode->nid.addr, 0);
-		port = vnode->nid.port;
-		if (collie_exec_req(host, port, &req, NULL) == 0) {
-			memcpy(sha1, rsp->hash.digest, SHA1_DIGEST_SIZE);
-			ret = 0;
-			goto out;
-		}
-	}
-out:
-	return ret;
-}
-
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		   uint64_t offset, bool direct)
 {

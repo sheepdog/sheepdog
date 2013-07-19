@@ -68,8 +68,6 @@ typedef void (*vdi_parser_func_t)(uint32_t vid, const char *name,
 				  uint32_t flags,
 				  const struct sd_inode *i, void *data);
 int parse_vdi(vdi_parser_func_t func, size_t size, void *data);
-int sd_read_object_sha1(uint64_t oid, uint32_t epoch, int nr_copies,
-			unsigned char *sha1);
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		   uint64_t offset, bool direct);
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,

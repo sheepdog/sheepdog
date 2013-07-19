@@ -222,20 +222,11 @@ static void do_save_object(struct work *work)
 	void *buf;
 	size_t size;
 	struct snapshot_work *sw;
-	unsigned char object_sha1[SHA1_DIGEST_SIZE];
 
 	if (uatomic_is_true(&work_error))
 		return;
 
 	sw = container_of(work, struct snapshot_work, work);
-
-	/* read object sha1 and check if exists in local path */
-	if (sd_read_object_sha1(sw->entry.oid, sd_epoch, sw->entry.nr_copies,
-				object_sha1) == 0 &&
-	    sha1_file_exist(object_sha1)) {
-		memcpy(sw->entry.sha1, object_sha1, SHA1_DIGEST_SIZE);
-		return;
-	}
 
 	size = get_objsize(sw->entry.oid);
 	buf = xmalloc(size);
