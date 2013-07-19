@@ -3,6 +3,9 @@
 
 #include <stdbool.h>
 
+#include "list.h"
+#include "util.h"
+
 struct work;
 
 typedef void (*work_func_t)(struct work *);
