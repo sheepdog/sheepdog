@@ -168,6 +168,18 @@ static int recover_object_from(struct recovery_obj_work *row,
 	return ret;
 }
 
+/*
+ * A virtual node that does not match any node in current node list
+ * means the node has left the cluster, then it's an invalid virtual node.
+ */
+static bool invalid_vnode(const struct sd_vnode *v, struct vnode_info *info)
+{
+
+	if (xbsearch(v, info->nodes, info->nr_nodes, node_id_cmp))
+		return false;
+	return true;
+}
+
 static int recover_object_from_replica(struct recovery_obj_work *row,
 				       struct vnode_info *old,
 				       uint32_t tgt_epoch)
@@ -197,6 +209,9 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		int idx = (i + start) % nr_copies;
 
 		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, idx);
+
+		if (invalid_vnode(vnode, row->base.cur_vinfo))
+			continue;
 
 		ret = recover_object_from(row, vnode, tgt_epoch);
 		switch (ret) {
