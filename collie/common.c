@@ -202,11 +202,8 @@ int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 
 	fd = connect_to(host, port);
-	if (fd < 0) {
-		fprintf(stderr, "Failed to connect to %s:%d\n",
-			host, port);
+	if (fd < 0)
 		return -1;
-	}
 
 	/*
 	 * Retry forever for collie because

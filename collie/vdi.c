@@ -1371,8 +1371,8 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 		free(buf);
 		return NULL;
 	default:
-		fprintf(stderr, "FATAL: failed to read, %s\n",
-			sd_strerror(rsp->result));
+		fprintf(stderr, "FATAL: failed to read %"PRIx64", %s\n",
+			oid, sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
 	return buf;
@@ -1402,8 +1402,8 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 		exit(EXIT_SYSFAIL);
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "FATAL: failed to write, %s\n",
-			sd_strerror(rsp->result));
+		fprintf(stderr, "FATAL: failed to write %"PRIx64", %s\n",
+			oid, sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
 }
