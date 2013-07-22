@@ -142,6 +142,18 @@ static inline const struct sd_vnode *oid_to_vnode(const struct sd_vnode *entries
 	return &entries[idx];
 }
 
+static inline const struct sd_node *oid_to_node(const struct sd_vnode *entries,
+						int nr_entries, uint64_t oid,
+						int copy_idx,
+						const struct sd_node *all_nodes)
+{
+	const struct sd_vnode *vnode;
+
+	vnode = oid_to_vnode(entries, nr_entries, oid, copy_idx);
+
+	return &all_nodes[vnode->node_idx];
+}
+
 static inline void oid_to_vnodes(const struct sd_vnode *entries, int nr_entries,
 				 uint64_t oid, int nr_copies,
 				 const struct sd_vnode **vnodes)

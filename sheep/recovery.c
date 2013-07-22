@@ -105,7 +105,7 @@ static inline bool node_is_gateway_only(void)
 
 /* recover object from vnode */
 static int recover_object_from(struct recovery_obj_work *row,
-			       const struct sd_vnode *vnode, uint32_t tgt_epoch)
+			       const struct sd_node *node, uint32_t tgt_epoch)
 {
 	uint64_t oid = row->oid;
 	uint32_t local_epoch = row->local_epoch;
@@ -118,7 +118,7 @@ static int recover_object_from(struct recovery_obj_work *row,
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct siocb iocb = { 0 };
 
-	if (vnode_is_local(vnode)) {
+	if (node_is_local(node)) {
 		if (tgt_epoch < sys_epoch())
 			return sd_store->link(oid, tgt_epoch);
 
@@ -130,7 +130,7 @@ static int recover_object_from(struct recovery_obj_work *row,
 		sd_init_req(&hdr, SD_OP_GET_HASH);
 		hdr.obj.oid = oid;
 		hdr.obj.tgt_epoch = tgt_epoch;
-		ret = sheep_exec_req(&vnode->nid, &hdr, NULL);
+		ret = sheep_exec_req(&node->nid, &hdr, NULL);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 
@@ -155,7 +155,7 @@ static int recover_object_from(struct recovery_obj_work *row,
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
 
-	ret = sheep_exec_req(&vnode->nid, &hdr, buf);
+	ret = sheep_exec_req(&node->nid, &hdr, buf);
 	if (ret == SD_RES_SUCCESS) {
 		iocb.epoch = epoch;
 		iocb.length = rsp->data_length;
@@ -169,13 +169,13 @@ static int recover_object_from(struct recovery_obj_work *row,
 }
 
 /*
- * A virtual node that does not match any node in current node list
- * means the node has left the cluster, then it's an invalid virtual node.
+ * A node that does not match any node in current node list means the node has
+ * left the cluster, then it's an invalid node.
  */
-static bool invalid_vnode(const struct sd_vnode *v, struct vnode_info *info)
+static bool invalid_node(const struct sd_node *n, struct vnode_info *info)
 {
 
-	if (xbsearch(v, info->nodes, info->nr_nodes, node_id_cmp))
+	if (xbsearch(n, info->nodes, info->nr_nodes, node_cmp))
 		return false;
 	return true;
 }
@@ -205,15 +205,16 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 
 	/* Let's do a breadth-first search */
 	for (int i = 0; i < nr_copies; i++) {
-		const struct sd_vnode *vnode;
+		const struct sd_node *node;
 		int idx = (i + start) % nr_copies;
 
-		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, idx);
+		node = oid_to_node(old->vnodes, old->nr_vnodes, oid, idx,
+				   old->nodes);
 
-		if (invalid_vnode(vnode, row->base.cur_vinfo))
+		if (invalid_node(node, row->base.cur_vinfo))
 			continue;
 
-		ret = recover_object_from(row, vnode, tgt_epoch);
+		ret = recover_object_from(row, node, tgt_epoch);
 		switch (ret) {
 		case SD_RES_SUCCESS:
 			sd_dprintf("recovered oid %"PRIx64" from %d "
