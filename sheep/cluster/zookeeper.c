@@ -146,7 +146,6 @@ static struct zk_node this_node;
 	switch (rc) {							\
 	case ZNONODE:							\
 	case ZNODEEXISTS:						\
-		sd_dprintf("failed, path:%s, %s", path, zerror(rc));	\
 		break;							\
 	case ZINVALIDSTATE:						\
 	case ZSESSIONEXPIRED:						\
