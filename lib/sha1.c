@@ -20,9 +20,6 @@
 #include <arpa/inet.h>
 #include "sha1.h"
 
-#define SHA1_DIGEST_SIZE	20
-#define SHA1_HMAC_BLOCK_SIZE	64
-
 static inline uint32_t rol(uint32_t value, uint32_t bits)
 {
 	return (value << bits) | (value >> (32 - bits));
