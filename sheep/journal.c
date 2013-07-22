@@ -143,7 +143,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	char *p = (char *)jd;
 
 	snprintf(path, PATH_MAX, "%s/%016"PRIx64,
-		md_get_object_path(jd->oid), jd->oid);
+		 md_get_object_path(jd->oid), jd->oid);
 
 	if (jd->flag == JF_REMOVE_OBJ) {
 		sd_iprintf("%s (remove)", path);
@@ -153,7 +153,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	}
 
 	sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
-		path, jd->size, jd->offset, jd->create);
+		   path, jd->size, jd->offset, jd->create);
 
 	if (jd->create)
 		flags |= O_CREAT;
