@@ -478,7 +478,7 @@ _kill_zk_session()
 {
 	local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:$((7000+$1))"
 	if [[ "$DRIVER" == zoo* ]]; then
-		../../tools/zk_control "$path"
+		../../tools/zk_control kill "$path"
 		if [ $? -ne 0 ]; then
 			_die "failed to kill session"
 		fi
