@@ -3,11 +3,11 @@ MAINTAINERCLEANFILES	= Makefile.in
 sbin_PROGRAMS		=
 
 if BUILD_ZOOKEEPER
-sbin_PROGRAMS		+= kill_zk_session
+sbin_PROGRAMS		+= zk_control
 
-kill_zk_session_SOURCES = kill_zk_session.c
+zk_control_SOURCES = zk_control.c
 
-kill_zk_session_LDADD	= -lzookeeper_mt
+zk_control_LDADD	= -lzookeeper_mt
 endif
 
 noinst_PROGRAMS		= $(sbin_PROGRAMS)

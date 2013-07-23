@@ -35,7 +35,7 @@ collie/collie
 sheep/sheep
 sheepfs/sheepfs
 shepherd/shepherd
-tools/kill_zk_session
+tools/zk_control
 tests/unit/collie/test_common
 tests/unit/sheep/test_vdi
 tests/unit/sheep/test_cluster_driver
