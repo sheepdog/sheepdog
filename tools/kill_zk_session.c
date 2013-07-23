@@ -47,8 +47,14 @@ int main(int argc, char **argv)
 		;
 
 	rc = zoo_get(zh, path, 0, (char *)&cid, &len, NULL);
-	if (rc != ZOK) {
-		fprintf(stderr, "failed to get data, %s\n", zerror(rc));
+	switch (rc) {
+	case ZOK:
+		break;
+	case ZNONODE:
+		return 0;
+	default:
+		fprintf(stderr, "failed to get data for %s, %s\n", path,
+			zerror(rc));
 		exit(1);
 	}
 

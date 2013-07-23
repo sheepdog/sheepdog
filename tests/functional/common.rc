@@ -323,7 +323,7 @@ _kill_sheep()
     _wait_for_sheep_stop $1
 
     if [[ "$DRIVER" == zoo* ]];then
-        sleep 3 # wait for zookeeper ephemeral node to be deleted
+	    _kill_zk_session $1
     fi
 }
 
@@ -476,7 +476,7 @@ _random()
 
 _kill_zk_session()
 {
-	local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:700$1"
+	local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:$((7000+$1))"
 	if [[ "$DRIVER" == zoo* ]]; then
 		../../tools/kill_zk_session "$path"
 		if [ $? -ne 0 ]; then
