@@ -14,8 +14,36 @@
 #include <zookeeper/zookeeper.h>
 #include <string.h>
 
+#define FOR_EACH_ZNODE(parent, path, strs)			       \
+	for ((strs)->data += (strs)->count;			       \
+	     (strs)->count-- ?					       \
+		     snprintf(path, sizeof(path), "%s/%s", parent,     \
+			      *--(strs)->data) : (free((strs)->data), 0); \
+	     free(*(strs)->data))
+
 static const char *hosts = "127.0.0.1:2181";
 static zhandle_t *zk_handle;
+
+static inline ZOOAPI int zk_delete_node(const char *path)
+{
+	int rc;
+	do {
+		rc = zoo_delete(zk_handle, path, -1);
+	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
+
+	return rc;
+}
+
+static inline ZOOAPI int zk_get_children(const char *path,
+					 struct String_vector *strings)
+{
+	int rc;
+	do {
+		rc = zoo_get_children(zk_handle, path, 1, strings);
+	} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
+
+	return rc;
+}
 
 static int do_kill(int argc, char **argv)
 {
@@ -59,7 +87,47 @@ static int do_kill(int argc, char **argv)
 
 static int do_remove(int argc, char **argv)
 {
+	struct String_vector strs;
+	int rc;
+	char *node;
+	char path[256];
+
+	if (argc != 3) {
+		fprintf(stderr, "remove: need specify path\n");
+		return -1;
+	}
+
+	node = argv[2];
+
+	rc = zk_get_children(node, &strs);
+	switch (rc) {
+	case ZOK:
+		FOR_EACH_ZNODE(node, path, &strs) {
+			rc = zk_delete_node(path);
+			if (rc != ZOK && rc != ZNONODE) {
+				fprintf(stderr, "failed to delete child "
+					"%s, %s\n",
+					path, zerror(rc));
+				goto err;
+			}
+		}
+		break;
+	case ZNOCHILDRENFOREPHEMERALS:
+		break;
+	case ZNONODE:
+		return 0;
+	default:
+		goto err;
+	}
+
+	rc = zk_delete_node(node);
+	if (rc != ZOK && rc != ZNONODE)
+		goto err;
+
 	return 0;
+err:
+	fprintf(stderr, "failed to delete %s, %s\n", node, zerror(rc));
+	return -1;
 }
 
 static struct control_handler {

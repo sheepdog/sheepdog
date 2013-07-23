@@ -155,7 +155,10 @@ _cleanup()
     done
 
     if [[ "$DRIVER" == zoo* ]];then
-        sleep 5 # wait for zookeeper ephemeral node to be deleted
+        ../../tools/zk_control remove "/sheepdog/member"
+        if [ $? -ne 0 ]; then
+            _die "failed to remove members"
+        fi
     fi
 }
 
@@ -323,7 +326,11 @@ _kill_sheep()
     _wait_for_sheep_stop $1
 
     if [[ "$DRIVER" == zoo* ]];then
-	    _kill_zk_session $1
+        local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:$((7000+$1))"
+        ../../tools/zk_control remove "$path"
+        if [ $? -ne 0 ]; then
+            _die "failed to remove $path"
+        fi
     fi
 }
 
