@@ -41,7 +41,8 @@ done
 
 for i in 0 1 2; do
     _start_sheep $i
-    sleep 1
+    nr=$(($nr + 1))
+    _wait_for_sheep $nr 0
 done
 
 _wait_for_sheep 3

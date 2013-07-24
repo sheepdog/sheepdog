@@ -35,7 +35,8 @@ done
 # master transfer will happen once
 for i in 1 0 2; do
     _start_sheep $i
-    sleep 1
+    nr=$(($nr + 1))
+    _wait_for_sheep $nr 1
 done
 
 _wait_for_sheep 3
