@@ -932,11 +932,12 @@ static int object_cache_push(struct object_cache *oc)
 		unlock_cache(oc);
 		return SD_RES_SUCCESS;
 	}
+
+	uatomic_set(&oc->push_count, uatomic_read(&oc->dirty_count));
 	list_for_each_entry_safe(entry, t, &oc->dirty_head, dirty_list) {
 		struct push_work *pw;
 
 		get_cache_entry(entry);
-		uatomic_inc(&oc->push_count);
 		pw = xzalloc(sizeof(struct push_work));
 		pw->work.fn = do_push_object;
 		pw->work.done = push_object_done;
