@@ -26,7 +26,6 @@ _cluster_format
 
 # kill sheep 0 so that sheep 2 has larger epoch
 _kill_sheep 0
-_wait_for_sheep_stop 0
 
 $COLLIE cluster shutdown -p 7001
 _wait_for_sheep_stop

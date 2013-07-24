@@ -491,7 +491,6 @@ _kill_zk_session()
 		fi
 	else
 		_kill_sheep $1
-		_wait_for_sheep_stop $1
 		_start_sheep $1
 	fi
 }

@@ -38,7 +38,6 @@ for i in 2 1 ; do
 done
 
 _kill_sheep 0
-_wait_for_sheep_stop 0
 _wait_for_sheep 2 2
 
 sleep 1
