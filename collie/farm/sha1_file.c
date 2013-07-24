@@ -23,7 +23,6 @@
  *     by verifying that their hashes match the content of the file.
  */
 #include <sys/types.h>
-#include <sys/xattr.h>
 
 #include "farm.h"
 #include "util.h"
@@ -58,51 +57,6 @@ static char *sha1_to_path(const unsigned char *sha1)
 	return buf;
 }
 
-#define CNAME	"user.farm.count"
-#define CSIZE	sizeof(uint32_t)
-
-static void get_sha1_file(char *name)
-{
-	uint32_t count;
-	if (getxattr(name, CNAME, &count, CSIZE) < 0) {
-		if (errno == ENODATA) {
-			count = 1;
-			if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
-				panic("%m");
-			return;
-		} else
-			panic("%m");
-	}
-	count++;
-	if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
-		panic("%m");
-}
-
-static int put_sha1_file(char *name)
-{
-	uint32_t count;
-
-	if (getxattr(name, CNAME, &count, CSIZE) < 0) {
-		if (errno == ENOENT) {
-			fprintf(stderr, "sha1 file doesn't exist.\n");
-			return -1;
-		} else
-			panic("%m");
-	}
-
-	count--;
-	if (count == 0) {
-		if (unlink(name) < 0) {
-			fprintf(stderr, "%m\n");
-			return -1;
-		}
-	} else {
-		if (setxattr(name, CNAME, &count, CSIZE, 0) < 0)
-			panic("%m");
-	}
-	return 0;
-}
-
 static int sha1_buffer_write(const unsigned char *sha1,
 			     void *buf, unsigned int size)
 {
@@ -127,7 +81,6 @@ static int sha1_buffer_write(const unsigned char *sha1,
 	}
 
 	close(fd);
-	get_sha1_file(filename);
 err_open:
 	return ret;
 }
@@ -194,13 +147,6 @@ void *sha1_file_read(const unsigned char *sha1, size_t *size)
 out:
 	close(fd);
 	return buf;
-}
-
-int sha1_file_try_delete(const unsigned char *sha1)
-{
-	char *filename = sha1_to_path(sha1);
-
-	return put_sha1_file(filename);
 }
 
 static unsigned hexval(char c)
