@@ -68,7 +68,6 @@ int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1);
 /* sha1_file.c */
 int sha1_file_write(void *buf, size_t len, unsigned char *sha1);
 void *sha1_file_read(const unsigned char *sha1, size_t *size);
-int get_sha1_hex(const char *hex, unsigned char *sha1);
 
 /* object_tree.c */
 int object_tree_size(void);
