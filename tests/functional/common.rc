@@ -193,6 +193,18 @@ _wait_for_sheep_stop()
 		grep LISTEN > /dev/null 2>&1
 	fi
 	if [ $? != 0 ]; then
+	    if [[ "$DRIVER" == zoo* ]];then
+		if [ "$1" == "" ]; then
+		    ../../tools/zk_control remove "/sheepdog/member"
+		else
+		    local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:$((7000+$1))"
+		    ../../tools/zk_control remove "$path"
+		fi
+		if [ $? -ne 0 ]; then
+		    echo "failed to remove members"
+		    break;
+		fi
+	    fi
 	    return
 	fi
 	sleep 1
@@ -324,14 +336,6 @@ _kill_sheep()
     fi
 
     _wait_for_sheep_stop $1
-
-    if [[ "$DRIVER" == zoo* ]];then
-        local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:$((7000+$1))"
-        ../../tools/zk_control remove "$path"
-        if [ $? -ne 0 ]; then
-            _die "failed to remove $path"
-        fi
-    fi
 }
 
 _wait_for_sheep_recovery()
