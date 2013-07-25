@@ -408,37 +408,33 @@ static bool local_process_event(void)
 	if (ev->callbacked)
 		return false; /* wait for unblock event */
 
-	if (ev->type == EVENT_ACCEPT && lnode_eq(&this_node, &ev->sender)) {
-		sd_dprintf("join Sheepdog");
-		joined = true;
-	}
-
 	if (!joined) {
-		if (ev->type == EVENT_JOIN &&
-		    lnode_eq(&this_node, &ev->sender)) {
-			struct local_node lnodes[SD_MAX_NODES];
-
-			get_nodes(lnodes);
-
-			if (!lnode_eq(&this_node, &lnodes[0])) {
-				sd_dprintf("wait for another node"
-					   " to accept this node");
-				return false;
-			}
-		} else
+		if (!lnode_eq(&this_node, &ev->sender))
 			goto out;
+
+		switch (ev->type) {
+		case EVENT_JOIN:
+			break;
+		case EVENT_ACCEPT:
+			sd_dprintf("join Sheepdog");
+			joined = true;
+			break;
+		default:
+			goto out;
+		}
 	}
 
 	switch (ev->type) {
 	case EVENT_JOIN:
 		/* nodes[nr_nodes - 1] is a sender, so don't include it */
 		assert(node_eq(&ev->sender.node, &nodes[nr_nodes - 1]));
-		sd_join_handler(&ev->sender.node, nodes, nr_nodes - 1,
-				  ev->buf);
-		ev->type = EVENT_ACCEPT;
-		msync(ev, sizeof(*ev), MS_SYNC);
+		if (sd_join_handler(&ev->sender.node, nodes, nr_nodes - 1,
+				      ev->buf)) {
+			ev->type = EVENT_ACCEPT;
+			msync(ev, sizeof(*ev), MS_SYNC);
 
-		shm_queue_notify();
+			shm_queue_notify();
+		}
 
 		return false;
 	case EVENT_ACCEPT:

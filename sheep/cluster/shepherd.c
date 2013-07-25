@@ -30,7 +30,6 @@
 static int sph_comm_fd;
 
 static struct sd_node this_node;
-static bool is_master;
 
 static int nr_nodes;
 static struct sd_node nodes[SD_MAX_NODES];
@@ -114,11 +113,8 @@ retry:
 		 * FIXME: member change events must be ordered with nonblocked
 		 *        events
 		 */
-		sd_join_handler(&join->new_node, NULL, 0, join->opaque);
-
-		/* FIXME: join->master_elected is needed? */
-		assert(join->master_elected);
-		is_master = true;
+		if (!sd_join_handler(&join->new_node, NULL, 0, join->opaque))
+			panic("sd_accept_handler() failed");
 
 		snd.type = SPH_CLI_MSG_ACCEPT;
 		snd.body_len = join_len;
@@ -297,25 +293,11 @@ static void sph_event_handler(int fd, int events, void *data)
 		;
 }
 
-static void elected_as_master(void)
-{
-	sd_dprintf("elected_as_master() called");
-
-	is_master = true;
-	sd_iprintf("became new master");
-}
-
 static void msg_new_node(struct sph_msg *rcv)
 {
 	int ret;
 	struct sph_msg_join *join;
 	struct sph_msg snd;
-
-	if (!is_master) {
-		sd_printf(SDOG_EMERG, "I am not a master but received"
-			" SPH_MSG_NEW_NODE, shepherd is buggy");
-		exit(1);
-	}
 
 	join = xzalloc(rcv->body_len);
 	ret = xread(sph_comm_fd, join, rcv->body_len);
@@ -325,7 +307,13 @@ static void msg_new_node(struct sph_msg *rcv)
 	}
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	sd_join_handler(&join->new_node, nodes, nr_nodes, join->opaque);
+	if (!sd_join_handler(&join->new_node, join->nodes, join->nr_nodes,
+			     join->opaque))
+		/*
+		 * This should succeed always because shepherd should have sent
+		 * SPH_SRV_MSG_NEW_NODE only to the already joined node.
+		 */
+		panic("sd_join_handler() failed");
 
 	memset(&snd, 0, sizeof(snd));
 	snd.type = SPH_CLI_MSG_ACCEPT;
@@ -342,7 +330,6 @@ static void msg_new_node(struct sph_msg *rcv)
 static void msg_new_node_finish(struct sph_msg *rcv)
 {
 	int ret;
-	struct join_message *jm;
 	struct sph_msg_join_node_finish *join_node_finish;
 
 	join_node_finish = xzalloc(rcv->body_len);
@@ -352,7 +339,6 @@ static void msg_new_node_finish(struct sph_msg *rcv)
 		exit(1);
 	}
 
-	jm = (struct join_message *)join_node_finish->opaque;
 	memcpy(nodes, join_node_finish->nodes,
 	       join_node_finish->nr_nodes * sizeof(struct sd_node));
 	nr_nodes = join_node_finish->nr_nodes;
@@ -361,7 +347,8 @@ static void msg_new_node_finish(struct sph_msg *rcv)
 		   node_to_str(&join_node_finish->new_node));
 
 	/* FIXME: member change events must be ordered with nonblocked events */
-	sd_accept_handler(&join_node_finish->new_node, nodes, nr_nodes, jm);
+	sd_accept_handler(&join_node_finish->new_node, nodes, nr_nodes,
+			  join_node_finish->opaque);
 
 	free(join_node_finish);
 }
@@ -441,11 +428,6 @@ static void msg_leave_forward(struct sph_msg *rcv)
 	do_leave_sheep();
 }
 
-static void msg_master_election(struct sph_msg *rcv)
-{
-	elected_as_master();
-}
-
 static void (*msg_handlers[])(struct sph_msg *) = {
 	[SPH_SRV_MSG_NEW_NODE] = msg_new_node,
 	[SPH_SRV_MSG_NEW_NODE_FINISH] = msg_new_node_finish,
@@ -453,7 +435,6 @@ static void (*msg_handlers[])(struct sph_msg *) = {
 	[SPH_SRV_MSG_BLOCK_FORWARD] = msg_block_forward,
 	[SPH_SRV_MSG_REMOVE] = msg_remove,
 	[SPH_SRV_MSG_LEAVE_FORWARD] = msg_leave_forward,
-	[SPH_SRV_MSG_MASTER_ELECTION] = msg_master_election,
 };
 
 static void interpret_msg(struct sph_msg *rcv)
@@ -592,8 +573,6 @@ static int shepherd_leave(void)
 		sd_iprintf("xwrite() failed: %m");
 		exit(1);
 	}
-
-	is_master = false;
 
 	sd_dprintf("shepherd_leave() is completed");
 

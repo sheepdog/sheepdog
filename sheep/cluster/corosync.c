@@ -24,7 +24,6 @@
 struct cpg_node {
 	uint32_t nodeid;
 	uint32_t pid;
-	uint32_t gone;
 	struct sd_node node;
 };
 
@@ -238,28 +237,6 @@ find_event(enum corosync_event_type type, struct cpg_node *sender)
 		return find_nonblock_event(type, sender);
 }
 
-static int is_master(struct cpg_node *node)
-{
-	int i;
-	struct cpg_node *n = node;
-	if (!n)
-		n = &this_node;
-	if (nr_cpg_nodes == 0)
-		/* this node should be the first cpg node */
-		return 0;
-
-	for (i = 0; i < SD_MAX_NODES; i++) {
-		if (!cpg_nodes[i].gone)
-			goto eq_check;
-	}
-	return -1;
-
-eq_check:
-	if (cpg_node_equal(&cpg_nodes[i], n))
-		return i;
-	return -1;
-}
-
 static void build_node_list(const struct cpg_node *nodes, size_t nr_nodes,
 			    struct sd_node *entries)
 {
@@ -282,9 +259,6 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 
 	switch (cevent->type) {
 	case COROSYNC_EVENT_TYPE_JOIN:
-		if (is_master(&this_node) < 0)
-			return false;
-
 		if (!cevent->msg)
 			/* we haven't receive JOIN yet */
 			return false;
@@ -294,13 +268,14 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			return false;
 
 		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_join_handler(&cevent->sender.node, entries, nr_cpg_nodes,
-				cevent->msg);
-		send_message(COROSYNC_MSG_TYPE_ACCEPT, &cevent->sender,
-			     cpg_nodes, nr_cpg_nodes, cevent->msg,
-			     cevent->msg_len);
+		if (sd_join_handler(&cevent->sender.node, entries,
+				    nr_cpg_nodes, cevent->msg)) {
+			send_message(COROSYNC_MSG_TYPE_ACCEPT, &cevent->sender,
+				     cpg_nodes, nr_cpg_nodes, cevent->msg,
+				     cevent->msg_len);
 
-		cevent->callbacked = true;
+			cevent->callbacked = true;
+		}
 		return false;
 	case COROSYNC_EVENT_TYPE_ACCEPT:
 		add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
@@ -469,7 +444,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 {
 	struct corosync_event *cevent;
 	struct corosync_message *cmsg = msg;
-	int master;
 
 	sd_dprintf("%d", cmsg->type);
 
@@ -521,16 +495,6 @@ static void cdrv_cpg_deliver(cpg_handle_t handle,
 	case COROSYNC_MSG_TYPE_LEAVE:
 		cevent = xzalloc(sizeof(*cevent));
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
-
-		master = is_master(&cmsg->sender);
-		if (master >= 0)
-			/*
-			 * Master is down before new nodes finish joining.
-			 * We have to revoke its mastership to avoid cluster
-			 * hanging
-			 */
-			cpg_nodes[master].gone = 1;
-
 		cevent->sender = cmsg->sender;
 		cevent->msg_len = cmsg->msg_len;
 		if (cmsg->msg_len) {
@@ -614,7 +578,6 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
-		int master;
 		cevent = find_event(COROSYNC_EVENT_TYPE_JOIN, left_sheep + i);
 		if (cevent) {
 			/* the node left before joining */
@@ -633,15 +596,6 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 		}
 
 		cevent = xzalloc(sizeof(*cevent));
-		master = is_master(&left_sheep[i]);
-		if (master >= 0)
-			/*
-			 * Master is down before new nodes finish joining.
-			 * We have to revoke its mastership to avoid cluster
-			 * hanging
-			 */
-			cpg_nodes[master].gone = 1;
-
 		cevent->type = COROSYNC_EVENT_TYPE_LEAVE;
 		cevent->sender = left_sheep[i];
 

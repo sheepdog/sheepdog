@@ -62,19 +62,6 @@ struct sheep {
 };
 
 static LIST_HEAD(sheep_list_head);
-/*
- * nr_joined_sheep is a number of sheeps which is in state of
- * SHEEP_STATE_JOINED, not the length of sheep_list_head
- */
-static int nr_joined_sheep;
-
-/*
- * important invariant of shepherd: nr_joined_sheep ? !!master_sheep : true
- *
- * if there is at least one sheep which is in state of SHEEP_STATE_JOINED,
- * master sheep must be elected
- */
-static struct sheep *master_sheep;
 
 static bool running;
 static const char *progname;
@@ -122,54 +109,12 @@ static inline void remove_sheep(struct sheep *sheep)
 	sd_dprintf("remove_sheep() called, removing %s",
 		node_to_str(&sheep->node));
 
-	if (sheep->state == SHEEP_STATE_JOINED)
-		nr_joined_sheep--;
-
 	sheep->state = SHEEP_STATE_LEAVING;
 	ret = eventfd_write(remove_efd, 1);
 	if (ret < 0)
 		panic("eventfd_write() failed: %m");
 
 	event_force_refresh();
-}
-
-static int master_election(void)
-{
-	int ret, nr_failed = 0;
-	struct sheep *s;
-	struct sph_msg msg;
-
-	assert(!master_sheep);
-
-	if (!nr_joined_sheep)
-		return 0;
-
-	list_for_each_entry(s, &sheep_list_head, sheep_list) {
-		if (s->state != SHEEP_STATE_JOINED)
-			continue;
-
-		msg.type = SPH_SRV_MSG_MASTER_ELECTION;
-		msg.body_len = 0;
-
-		ret = xwrite(s->fd, &msg, sizeof(msg));
-		if (sizeof(msg) != ret) {
-			sd_eprintf("xwrite() for failed: %m");
-			goto election_failed;
-		}
-
-		master_sheep = s;
-		break;
-election_failed:
-		remove_sheep(s);
-		nr_failed++;
-	}
-
-	if (master_sheep) {
-		sd_iprintf("new master elected: %s",
-			node_to_str(&master_sheep->node));
-	}
-
-	return nr_failed;
 }
 
 static int notify_remove_sheep(struct sheep *leaving)
@@ -204,7 +149,6 @@ static void remove_handler(int fd, int events, void *data)
 	struct sheep *s;
 	int ret, failed = 0;
 	eventfd_t val;
-	bool election = false;
 
 	ret = eventfd_read(remove_efd, &val);
 	if (ret < 0)
@@ -221,13 +165,6 @@ remove:
 
 		sd_printf(SDOG_DEBUG, "removing the node: %s",
 			node_to_str(&s->node));
-
-		if (s == master_sheep) {
-			sd_printf(SDOG_DEBUG, "removing the master");
-
-			master_sheep = NULL;
-			election = true;
-		}
 
 		if (!is_sd_node_zero(&s->node))
 			/*
@@ -264,13 +201,6 @@ del:
 		goto remove;
 
 end:
-	if (election) {
-		sd_dprintf("master is removed, electing new master");
-		failed = master_election();
-
-		assert(nr_joined_sheep ? !!master_sheep : true);
-	}
-
 	sd_dprintf("nodes which failed during remove_handler(): %d", failed);
 }
 
@@ -344,27 +274,22 @@ static void sph_handle_join(struct sph_msg *msg, struct sheep *sheep)
 	}
 
 	sheep->node = join->new_node;
+	join->nr_nodes = build_node_array(join->nodes);
 
 	snd.type = SPH_SRV_MSG_NEW_NODE;
 	snd.body_len = msg->body_len;
 
-	if (!nr_joined_sheep) {
-		/* this sheep is a new master */
-		/* FIXME: is this master_elected need? */
-		join->master_elected = true;
+	/* elect one node from the already joined nodes */
+	if (join->nr_nodes > 0) {
+		struct sd_node *n = join->nodes + rand() % join->nr_nodes;
+		fd = find_sheep_by_nid(&n->nid)->fd;
 	}
 
-	assert(nr_joined_sheep ? !!master_sheep : true);
-
-	wbytes = writev2(!nr_joined_sheep ? fd : master_sheep->fd,
-			&snd, join, msg->body_len);
+	wbytes = writev2(fd, &snd, join, msg->body_len);
 	free(join);
 
 	if (sizeof(snd) + msg->body_len != wbytes) {
 		sd_eprintf("writev2() failed: %m");
-
-		if (nr_joined_sheep)
-			remove_sheep(master_sheep);
 
 		goto purge_current_sheep;
 	}
@@ -390,12 +315,6 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	struct sph_msg_join_reply *join_reply_body;
 	struct sph_msg_join_node_finish *join_node_finish;
 
-	if (nr_joined_sheep && sheep != master_sheep) {
-		sd_eprintf("sheep which is not a master replied "
-			"SPH_CLI_MSG_NEW_NODE_REPLY");
-		goto purge_current_sheep;
-	}
-
 	sd_dprintf("new node reply from %s", node_to_str(&sheep->node));
 
 	join = xzalloc(msg->body_len);
@@ -410,16 +329,7 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	sd_dprintf("joining node is %s", node_to_str(&join->new_node));
 
 	joining_sheep = find_sheep_by_nid(&join->new_node.nid);
-	if (!joining_sheep) {
-		/* master is broken */
-		sd_eprintf("invalid nid is required, %s",
-			node_to_str(&join->new_node));
-		sd_eprintf("purging master sheep: %s and joining one",
-			node_to_str(&master_sheep->node));
-
-		remove_sheep(master_sheep);
-		goto purge_current_sheep;
-	}
+	assert(joining_sheep != NULL);
 
 	opaque_len = msg->body_len - sizeof(struct sph_msg_join);
 	opaque = xzalloc(opaque_len);
@@ -449,7 +359,6 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	if (sizeof(snd) + snd.body_len != wbytes) {
 		sd_eprintf("writev2() to master failed: %m");
 
-		remove_sheep(master_sheep);
 		goto purge_current_sheep;
 	}
 
@@ -483,17 +392,7 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	free(opaque);
 
 	joining_sheep->state = SHEEP_STATE_JOINED;
-	nr_joined_sheep++;
 
-	if (nr_joined_sheep == 1) {
-		assert(!master_sheep);
-		assert(joining_sheep == sheep);
-
-		master_sheep = sheep;
-
-		sd_iprintf("new master elected: %s",
-			node_to_str(&sheep->node));
-	}
 	state = SPH_STATE_DEFAULT;
 
 	removed += release_joining_sheep();

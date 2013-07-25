@@ -53,10 +53,10 @@ struct cluster_driver {
 	 * event to all the nodes.  The copy of 'opaque' is passed to
 	 * sd_join_handler() and sd_accept_handler().
 	 *
-	 * sd_join_handler() is called on all of the nodes which already
-	 * paticipate in the cluster.  If the content of 'opaque' is
-	 * changed in sd_join_handler(), the updated 'opaque' must be
-	 * passed to sd_accept_handler().
+	 * sd_join_handler() must be called on at least one node which already
+	 * paticipates in the cluster.  If the content of 'opaque' is changed in
+	 * sd_join_handler(), the updated 'opaque' must be passed to
+	 * sd_accept_handler().
 	 *
 	 * Returns zero on success, -1 on error
 	 */
@@ -171,7 +171,7 @@ void sd_notify_handler(const struct sd_node *sender, void *msg, size_t msg_len);
 bool sd_block_handler(const struct sd_node *sender);
 int sd_reconnect_handler(void);
 void sd_update_node_handler(struct sd_node *);
-void sd_join_handler(const struct sd_node *joining,
+bool sd_join_handler(const struct sd_node *joining,
 		     const struct sd_node *nodes, size_t nr_nodes,
 		     void *opaque);
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);

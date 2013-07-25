@@ -23,7 +23,6 @@ enum sph_srv_msg_type {
 	SPH_SRV_MSG_LEAVE_FORWARD,
 
 	SPH_SRV_MSG_REMOVE,
-	SPH_SRV_MSG_MASTER_ELECTION,
 };
 
 struct sph_msg {
@@ -39,7 +38,6 @@ struct sph_msg {
 
 struct sph_msg_join {
 	struct sd_node new_node;
-	uint8_t master_elected;
 
 	struct sd_node nodes[SD_MAX_NODES];
 	uint32_t nr_nodes;
@@ -116,7 +114,6 @@ static inline const char *sph_srv_msg_to_str(enum sph_srv_msg_type msg)
 		{ SPH_SRV_MSG_NOTIFY_FORWARD, "SPH_SRV_MSG_NOTIFY_FORWARD" },
 		{ SPH_SRV_MSG_BLOCK_FORWARD, "SPH_SRV_MSG_BLOCK_FORWARD" },
 		{ SPH_SRV_MSG_REMOVE, "SPH_SRV_MSG_REMOVE" },
-		{ SPH_SRV_MSG_MASTER_ELECTION, "SPH_SRV_MSG_MASTER_ELECTION" },
 	};
 
 	for (i = 0; i < ARRAY_SIZE(msgs); i++) {
