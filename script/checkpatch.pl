@@ -1736,7 +1736,7 @@ sub process {
 				# case E
 				my $ln = $linenr;
 				while ($rawlines[$ln] !~ /^\+\s*\/\*/ && $ln >= 0) { $ln--; }
-				if ($rawlines[$ln] !~ /^\+\s*\/\*$/) {
+				if ($rawlines[$ln] =~ /^\+\s*\/\*./) {
 					WARN("BLOCK_COMMENT_STYLE",
 					     "[BCS] don't comment at first line in block comments\n" . $hereprev);
 				}
