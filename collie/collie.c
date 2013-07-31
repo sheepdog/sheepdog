@@ -17,6 +17,7 @@
 #include "sheep.h"
 #include "collie.h"
 #include "util.h"
+#include "sockfd_cache.h"
 
 #define EPOLL_SIZE 4096
 
@@ -415,6 +416,11 @@ int main(int argc, char **argv)
 
 	if (init_work_queue(get_nr_nodes, NULL, NULL) != 0) {
 		fprintf(stderr, "Failed to init work queue\n");
+		exit(EXIT_SYSFAIL);
+	}
+
+	if (sockfd_init()) {
+		fprintf(stderr, "sockfd_init() failed\n");
 		exit(EXIT_SYSFAIL);
 	}
 

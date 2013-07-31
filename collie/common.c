@@ -11,6 +11,7 @@
 
 #include "collie.h"
 #include "sha1.h"
+#include "sockfd_cache.h"
 
 char *size_to_str(uint64_t _size, char *str, int str_size)
 {
@@ -169,13 +170,18 @@ out:
 	return ret;
 }
 
-int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
+int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *buf)
 {
-	int fd, ret;
-	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
+	struct node_id nid;
+	struct sockfd *sfd;
+	int ret;
 
-	fd = connect_to(host, port);
-	if (fd < 0)
+	memset(&nid, 0, sizeof(nid));
+	str_to_addr(host, nid.addr);
+	nid.port = port;
+
+	sfd = sockfd_cache_get(&nid);
+	if (!sfd)
 		return -1;
 
 	/*
@@ -183,11 +189,9 @@ int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
 	 * 1. We can't get the newest epoch
 	 * 2. Some operations might take unexpected long time
 	 */
-	ret = exec_req(fd, hdr, data, NULL, 0, UINT32_MAX);
-	close(fd);
+	ret = exec_req(sfd->fd, hdr, buf, NULL, 0, UINT32_MAX);
 
-	if (ret)
-		return -1;
+	sockfd_cache_put(&nid, sfd);
 
 	return ret ? -1 : 0;
 }
