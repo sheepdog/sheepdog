@@ -39,10 +39,9 @@ void set_thread_name(const char *name, bool show_idx);
 void get_thread_name(char *name);
 
 #define sd_dump_variable(var) ({		\
-	register void *current_sp asm("rsp");	\
-	__sd_dump_variable(#var, current_sp);	\
+	__sd_dump_variable(#var);		\
 })
-int __sd_dump_variable(const char *var, const void *base_sp);
+int __sd_dump_variable(const char *var);
 void sd_backtrace(void);
 
 /* sheep log priorities, comliant with syslog spec */
