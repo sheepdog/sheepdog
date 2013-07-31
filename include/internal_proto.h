@@ -20,6 +20,8 @@
 #include <stdint.h>
 #include <netinet/in.h>
 
+#include "sheepdog_proto.h"
+
 #define SD_SHEEP_PROTO_VER 0x08
 
 #define SD_DEFAULT_COPIES 3

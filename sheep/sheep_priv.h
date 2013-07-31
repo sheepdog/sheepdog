@@ -42,6 +42,7 @@
 #include "strbuf.h"
 #include "sha1.h"
 #include "config.h"
+#include "sockfd_cache.h"
 
 struct client_info {
 	struct connection conn;
@@ -116,7 +117,6 @@ struct system_info {
 	struct work_queue *recovery_wqueue;
 	struct work_queue *recovery_notify_wqueue;
 	struct work_queue *block_wqueue;
-	struct work_queue *sockfd_wqueue;
 	struct work_queue *oc_reclaim_wqueue;
 	struct work_queue *oc_push_wqueue;
 	struct work_queue *md_wqueue;
@@ -398,16 +398,6 @@ int object_cache_remove(uint64_t oid);
 
 /* store layout migration */
 int sd_migrate_store(int from, int to);
-
-/* sockfd_cache */
-struct sockfd {
-	int fd;
-	int idx;
-};
-
-void sockfd_cache_del(const struct node_id *);
-void sockfd_cache_add(const struct node_id *);
-void sockfd_cache_add_group(const struct sd_node *nodes, int nr);
 
 struct sockfd *sheep_get_sockfd(const struct node_id *);
 void sheep_put_sockfd(const struct node_id *, struct sockfd *);

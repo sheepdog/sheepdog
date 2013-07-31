@@ -114,13 +114,13 @@ static inline void write_info_update(struct write_info *wi, int pos)
 
 static inline void finish_one_write(struct write_info *wi, int i)
 {
-	sheep_put_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
+	sockfd_cache_put(wi->ent[i].nid, wi->ent[i].sfd);
 	write_info_update(wi, i);
 }
 
 static inline void finish_one_write_err(struct write_info *wi, int i)
 {
-	sheep_del_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
+	sockfd_cache_del(wi->ent[i].nid, wi->ent[i].sfd);
 	write_info_update(wi, i);
 }
 
@@ -176,7 +176,7 @@ again:
 		nr_sent = wi->nr_sent;
 		/* XXX Blinedly close all the connections */
 		for (i = 0; i < nr_sent; i++)
-			sheep_del_sockfd(wi->ent[i].nid, wi->ent[i].sfd);
+			sockfd_cache_del(wi->ent[i].nid, wi->ent[i].sfd);
 
 		return SD_RES_NETWORK_ERROR;
 	}
@@ -278,7 +278,7 @@ static int gateway_forward_request(struct request *req)
 		}
 
 		nid = &target_nodes[i]->nid;
-		sfd = sheep_get_sockfd(nid);
+		sfd = sockfd_cache_get(nid);
 		if (!sfd) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			break;
@@ -288,7 +288,7 @@ static int gateway_forward_request(struct request *req)
 			       sheep_need_retry, req->rq.epoch,
 			       MAX_RETRY_COUNT);
 		if (ret) {
-			sheep_del_sockfd(nid, sfd);
+			sockfd_cache_del_node(nid);
 			err_ret = SD_RES_NETWORK_ERROR;
 			sd_dprintf("fail %d", ret);
 			break;

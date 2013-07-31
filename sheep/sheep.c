@@ -430,7 +430,6 @@ static int create_work_queues(void)
 	sys->recovery_wqueue = create_ordered_work_queue("rw");
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
-	sys->sockfd_wqueue = create_ordered_work_queue("sockfd");
 	sys->md_wqueue = create_ordered_work_queue("md");
 	if (sys->enable_object_cache) {
 		sys->oc_reclaim_wqueue =
@@ -440,9 +439,9 @@ static int create_work_queues(void)
 			return -1;
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
-	    !sys->deletion_wqueue || !sys->block_wqueue ||
-	    !sys->sockfd_wqueue || !sys->md_wqueue)
+	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue)
 			return -1;
+
 	return 0;
 }
 
@@ -832,6 +831,10 @@ int main(int argc, char **argv)
 	 * environment, for e.g, work queues below.
 	 */
 	ret = create_work_queues();
+	if (ret)
+		exit(1);
+
+	ret = sockfd_init();
 	if (ret)
 		exit(1);
 
