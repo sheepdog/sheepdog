@@ -697,11 +697,27 @@ static bool check_gdb(void)
 	return system("which gdb > /dev/null") == 0;
 }
 
+/*
+ * __builtin_frame_address() returns address in frame pointer register if any
+ * (e.g, in x86 it returns EBP). If no dedicated register, the frame address is
+ * normally the address of the first word pushed on to the stack by the function
+ *
+ * For a normal subroutine setup, above the value __builtin_frame_address
+ * returns, there are two addresses, which stores old EBP and old EIP, being
+ * pushed on to the stack. So we have to plus 2 to get the right value for the
+ * frame address, which is expected by GDB.
+ *
+ * This is tested on X86, other architetures aren't tested. But even if this
+ * formula is wrong, GDB just doesn't procude anything useful after panic.
+ */
+#define FRAME_POINTER ((unsigned long *)__builtin_frame_address(0) + 2)
+
 __attribute__ ((__noinline__))
-notrace int __sd_dump_variable(const char *var, const void *base_sp)
+notrace int __sd_dump_variable(const char *var)
 {
 	char cmd[ARG_MAX], path[PATH_MAX], info[256];
 	FILE *f = NULL;
+	void *base_sp = FRAME_POINTER;
 
 	if (!check_gdb()) {
 		sd_dprintf("cannot find gdb");
@@ -742,16 +758,12 @@ notrace int __sd_dump_variable(const char *var, const void *base_sp)
 	return 0;
 }
 
-#define dump_stack_frames() ({			\
-	register void *current_sp asm("rsp");	\
-	__dump_stack_frames(current_sp);	\
-})
-
 __attribute__ ((__noinline__))
-static notrace int __dump_stack_frames(const void *base_sp)
+static notrace int dump_stack_frames(void)
 {
 	char path[PATH_MAX];
 	int i, stack_no = 0;
+	void *base_sp = FRAME_POINTER;
 
 	if (!check_gdb()) {
 		sd_dprintf("cannot find gdb");
