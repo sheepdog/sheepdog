@@ -189,7 +189,7 @@ int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
 	if (ret)
 		return -1;
 
-	return rsp->result;
+	return ret ? -1 : 0;
 }
 
 /* Light request only contains header, without body content. */
