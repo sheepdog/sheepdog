@@ -179,6 +179,12 @@ static inline void destroy_all_slots(struct sockfd_cache_entry *entry)
 			close(entry->fds[i].fd);
 }
 
+static void free_cache_entry(struct sockfd_cache_entry *entry)
+{
+	free(entry->fds);
+	free(entry);
+}
+
 /*
  * Destroy all the Cached FDs of the node
  *
@@ -206,7 +212,7 @@ static bool sockfd_cache_destroy(const struct node_id *nid)
 	pthread_rwlock_unlock(&sockfd_cache.lock);
 
 	destroy_all_slots(entry);
-	free(entry);
+	free_cache_entry(entry);
 
 	return true;
 false_out:
@@ -225,7 +231,7 @@ static void sockfd_cache_add_nolock(const struct node_id *nid)
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
 	if (sockfd_cache_insert(new)) {
-		free(new);
+		free_cache_entry(new);
 		return;
 	}
 	sockfd_cache.count++;
@@ -260,8 +266,7 @@ void sockfd_cache_add(const struct node_id *nid)
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
 	if (sockfd_cache_insert(new)) {
-		free(new->fds);
-		free(new);
+		free_cache_entry(new);
 		pthread_rwlock_unlock(&sockfd_cache.lock);
 		return;
 	}
