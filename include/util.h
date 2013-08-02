@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <search.h>
 #include <urcu/uatomic.h>
+#include <sys/eventfd.h>
 
 #include "logger.h"
 #include "bitops.h"
@@ -85,6 +86,8 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset);
 int xmkdir(const char *pathname, mode_t mode);
 int xfallocate(int fd, int mode, off_t offset, off_t len);
 int xftruncate(int fd, off_t length);
+int eventfd_xread(int efd);
+void eventfd_xwrite(int efd, int value);
 void pstrcpy(char *buf, int buf_size, const char *str);
 int rmdir_r(char *dir_path);
 int purge_directory(char *dir_path);

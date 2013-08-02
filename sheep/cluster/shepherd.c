@@ -224,7 +224,6 @@ remove:
 static void push_sph_event(bool nonblock, struct sd_node *sender,
 			void *msg, int msg_len)
 {
-	int ret;
 	struct sph_event *ev;
 
 	sd_dprintf("push_sph_event() called, pushing %sblocking event",
@@ -249,11 +248,7 @@ static void push_sph_event(bool nonblock, struct sd_node *sender,
 	else
 		list_add_tail(&ev->event_list, &blocked_event_list);
 
-	ret = eventfd_write(sph_event_fd, 1);
-	if (ret) {
-		sd_eprintf("eventfd_write() failed: %m");
-		exit(1);
-	}
+	eventfd_xwrite(sph_event_fd, 1);
 }
 
 static void remove_one_block_event(void)
@@ -275,19 +270,14 @@ static void remove_one_block_event(void)
 	if (!removed)
 		panic("removed is not true");
 
-	eventfd_write(sph_event_fd, 1);
+	eventfd_xwrite(sph_event_fd, 1);
 
 	sd_dprintf("unblock a blocking event");
 }
 
 static void sph_event_handler(int fd, int events, void *data)
 {
-	int ret;
-	eventfd_t val;
-
-	ret = eventfd_read(fd, &val);
-	if (ret < 0)
-		panic("eventfd_read() failed: %m");
+	eventfd_xread(fd);
 
 	while (sph_process_event())
 		;

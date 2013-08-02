@@ -385,7 +385,7 @@ again:
 
 		sscanf(buf, QUEUE_ZNODE "/%"PRId32, &seq);
 		queue_pos = seq;
-		eventfd_write(efd, 1);
+		eventfd_xwrite(efd, 1);
 		first_push = false;
 	}
 
@@ -547,7 +547,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		 * do reconnect in main thread to avoid on-the-fly zookeeper
 		 * operations.
 		 */
-		eventfd_write(efd, 1);
+		eventfd_xwrite(efd, 1);
 		return;
 	}
 
@@ -558,7 +558,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		if (ret == 1)
 			zk_node_exists(path);
 		/* kick off the event handler */
-		eventfd_write(efd, 1);
+		eventfd_xwrite(efd, 1);
 	} else if (type == ZOO_DELETED_EVENT) {
 		struct zk_node *n;
 
@@ -1039,7 +1039,6 @@ static inline void handle_session_expire(void)
 
 static void zk_event_handler(int listen_fd, int events, void *data)
 {
-	eventfd_t value;
 	struct zk_event ev;
 	bool peek;
 
@@ -1051,16 +1050,13 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 		exit(1);
 	}
 
-	if (eventfd_read(efd, &value) < 0) {
-		sd_eprintf("%m");
-		return;
-	}
+	eventfd_xread(efd);
 
 	if (zoo_state(zhandle) == ZOO_EXPIRED_SESSION_STATE) {
 		sd_eprintf("detect a session timeout. reconnecting...");
 		handle_session_expire();
 		sd_iprintf("reconnected");
-		eventfd_write(efd, 1);
+		eventfd_xwrite(efd, 1);
 		return;
 	}
 
@@ -1077,7 +1073,7 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 	RETURN_VOID_IF_ERROR(zk_queue_peek(&peek), "");
 	if (peek) {
 		/* Someone has created next event, go kick event handler. */
-		eventfd_write(efd, 1);
+		eventfd_xwrite(efd, 1);
 		return;
 	}
 kick_block_event:

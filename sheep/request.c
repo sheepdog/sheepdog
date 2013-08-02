@@ -441,7 +441,6 @@ static void free_local_request(struct request *req)
 int exec_local_req(struct sd_req *rq, void *data)
 {
 	struct request *req;
-	eventfd_t value = 1;
 	int ret;
 
 	assert(is_worker_thread());
@@ -449,24 +448,19 @@ int exec_local_req(struct sd_req *rq, void *data)
 	req = alloc_local_request(data, rq->data_length);
 	req->rq = *rq;
 	req->local_req_efd = eventfd(0, 0);
+	if (req->local_req_efd < 0) {
+		/* Fake the result to ask for retry */
+		req->rp.result = SD_RES_NETWORK_ERROR;
+		goto out;
+	}
 
 	pthread_mutex_lock(&sys->local_req_lock);
 	list_add_tail(&req->request_list, &sys->local_req_queue);
 	pthread_mutex_unlock(&sys->local_req_lock);
 
-	eventfd_write(sys->local_req_efd, value);
-
-again:
-	/* In error case (for e.g, EINTR) just retry read */
-	ret = eventfd_read(req->local_req_efd, &value);
-	if (ret < 0) {
-		sd_eprintf("%m");
-		if (errno == EINTR)
-			goto again;
-		/* Fake the result to ask for retry */
-		req->rp.result = SD_RES_NETWORK_ERROR;
-	}
-
+	eventfd_xwrite(sys->local_req_efd, 1);
+	eventfd_xread(req->local_req_efd);
+out:
 	/* fill rq with response header as exec_req does */
 	memcpy(rq, &req->rp, sizeof(req->rp));
 
@@ -517,13 +511,12 @@ static void free_request(struct request *req)
 void put_request(struct request *req)
 {
 	struct client_info *ci = req->ci;
-	eventfd_t value = 1;
 
 	if (refcount_dec(&req->refcnt) > 0)
 		return;
 
 	if (req->local)
-		eventfd_write(req->local_req_efd, value);
+		eventfd_xwrite(req->local_req_efd, 1);
 	else {
 		if (conn_tx_on(&ci->conn)) {
 			clear_client_info(ci);
@@ -887,17 +880,13 @@ int init_unix_domain_socket(const char *dir)
 
 static void local_req_handler(int listen_fd, int events, void *data)
 {
-	eventfd_t value;
 	struct request *req, *t;
 	LIST_HEAD(pending_list);
-	int ret;
 
 	if (events & EPOLLERR)
 		sd_eprintf("request handler error");
 
-	ret = eventfd_read(listen_fd, &value);
-	if (ret < 0)
-		return;
+	eventfd_xread(listen_fd);
 
 	pthread_mutex_lock(&sys->local_req_lock);
 	list_splice_init(&sys->local_req_queue, &pending_list);

@@ -273,6 +273,40 @@ int xftruncate(int fd, off_t length)
 }
 
 /*
+ * Return the read value on success, or -1 if efd has been made nonblocking and
+ * errno is EAGAIN.  If efd has been marked blocking or the eventfd counter is
+ * not zero, this function doesn't return error.
+ */
+int eventfd_xread(int efd)
+{
+	int ret;
+	eventfd_t value = 0;
+
+	do {
+		ret = eventfd_read(efd, &value);
+	} while (ret < 0 && errno == EINTR);
+
+	if (ret == 0)
+		ret = value;
+	else if (errno != EAGAIN)
+		panic("eventfd_read() failed, %m");
+
+	return ret;
+}
+
+void eventfd_xwrite(int efd, int value)
+{
+	int ret;
+
+	do {
+		ret = eventfd_write(efd, (eventfd_t)value);
+	} while (ret < 0 && (errno == EINTR || errno == EAGAIN));
+
+	if (ret < 0)
+		panic("eventfd_write() failed, %m");
+}
+
+/*
  * Copy the string str to buf. If str length is bigger than buf_size -
  * 1 then it is clamped to buf_size - 1.
  * NOTE: this function does what strncpy should have done to be

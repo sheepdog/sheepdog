@@ -104,15 +104,11 @@ static int remove_efd;
 
 static inline void remove_sheep(struct sheep *sheep)
 {
-	int ret;
-
 	sd_dprintf("remove_sheep() called, removing %s",
 		node_to_str(&sheep->node));
 
 	sheep->state = SHEEP_STATE_LEAVING;
-	ret = eventfd_write(remove_efd, 1);
-	if (ret < 0)
-		panic("eventfd_write() failed: %m");
+	eventfd_xwrite(remove_efd, 1);
 
 	event_force_refresh();
 }
@@ -147,17 +143,11 @@ static int notify_remove_sheep(struct sheep *leaving)
 static void remove_handler(int fd, int events, void *data)
 {
 	struct sheep *s;
-	int ret, failed = 0;
-	eventfd_t val;
+	int nr_removed, failed = 0;
 
-	ret = eventfd_read(remove_efd, &val);
-	if (ret < 0)
-		panic("eventfd_read() failed: %m");
+	nr_removed = eventfd_xread(remove_efd);
 
-	sd_dprintf("removed sheeps: %" PRIu64, val);
-	assert(0 < val);
-
-
+	sd_dprintf("removed sheeps");
 remove:
 	list_for_each_entry(s, &sheep_list_head, sheep_list) {
 		if (s->state != SHEEP_STATE_LEAVING)
@@ -197,7 +187,7 @@ del:
 
 	event_force_refresh();
 
-	if (--val)
+	if (--nr_removed)
 		goto remove;
 
 end:

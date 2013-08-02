@@ -898,7 +898,7 @@ static void do_push_object(struct work *work)
 		panic("push failed but should never fail");
 clean:
 	if (uatomic_sub_return(&oc->push_count, 1) == 0)
-		eventfd_write(oc->push_efd, 1);
+		eventfd_xwrite(oc->push_efd, 1);
 	entry->idx &= ~CACHE_CREATE_BIT;
 	entry->bmap = 0;
 	unlock_entry(entry);
@@ -925,7 +925,6 @@ static void push_object_done(struct work *work)
 static int object_cache_push(struct object_cache *oc)
 {
 	struct object_cache_entry *entry, *t;
-	eventfd_t value;
 
 	write_lock_cache(oc);
 	if (list_empty(&oc->dirty_head)) {
@@ -946,11 +945,9 @@ static int object_cache_push(struct object_cache *oc)
 		del_from_dirty_list(entry);
 	}
 	unlock_cache(oc);
-reread:
-	if (eventfd_read(oc->push_efd, &value) < 0) {
-		sd_eprintf("eventfd read failed, %m");
-		goto reread;
-	}
+
+	eventfd_xread(oc->push_efd);
+
 	sd_dprintf("%"PRIx32" completed", oc->vid);
 	return SD_RES_SUCCESS;
 }

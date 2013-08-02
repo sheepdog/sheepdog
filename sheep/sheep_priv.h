@@ -26,7 +26,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-#include <sys/eventfd.h>
 #include <sys/time.h>
 #include <sys/epoll.h>
 #include <signal.h>

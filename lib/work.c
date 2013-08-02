@@ -170,18 +170,14 @@ void queue_work(struct work_queue *q, struct work *work)
 
 static void worker_thread_request_done(int fd, int events, void *data)
 {
-	int ret;
 	struct worker_info *wi;
 	struct work *work;
-	eventfd_t value;
 	LIST_HEAD(list);
 
 	if (wq_get_nr_nodes)
 		nr_nodes = wq_get_nr_nodes();
 
-	ret = eventfd_read(fd, &value);
-	if (ret < 0)
-		return;
+	eventfd_xread(fd);
 
 	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
 		pthread_mutex_lock(&wi->finished_lock);
@@ -202,7 +198,6 @@ static void *worker_routine(void *arg)
 {
 	struct worker_info *wi = arg;
 	struct work *work;
-	eventfd_t value = 1;
 
 	set_thread_name(wi->name, (wi->tc != WQ_ORDERED));
 
@@ -245,7 +240,7 @@ retest:
 		list_add_tail(&work->w_list, &wi->finished_list);
 		pthread_mutex_unlock(&wi->finished_lock);
 
-		eventfd_write(efd, value);
+		eventfd_xwrite(efd, 1);
 	}
 
 	pthread_exit(NULL);
