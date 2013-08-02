@@ -1159,7 +1159,7 @@ static int vdi_read(int argc, char **argv)
 	int ret, idx;
 	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
-	unsigned int len, remain;
+	unsigned int len;
 	char *buf = NULL;
 
 	if (argv[optind]) {
@@ -1205,15 +1205,12 @@ static int vdi_read(int argc, char **argv)
 		} else
 			memset(buf, 0, len);
 
-		remain = len;
-		while (remain) {
-			ret = write(STDOUT_FILENO, buf + (len - remain), len);
-			if (ret < 0) {
-				fprintf(stderr, "Failed to write to stdout: %m\n");
-				ret = EXIT_SYSFAIL;
-				goto out;
-			}
-			remain -= ret;
+		ret = xwrite(STDOUT_FILENO, buf, len);
+		if (ret < 0) {
+			fprintf(stderr, "Failed to write to stdout: %m\n");
+			abort();
+			ret = EXIT_SYSFAIL;
+			goto out;
 		}
 
 		offset = 0;
@@ -1236,7 +1233,7 @@ static int vdi_write(int argc, char **argv)
 	int ret, idx;
 	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
-	unsigned int len, remain;
+	unsigned int len;
 	char *buf = NULL;
 	bool create;
 
@@ -1283,24 +1280,15 @@ static int vdi_write(int argc, char **argv)
 		if (vdi_cmd_data.writeback)
 			flags |= SD_FLAG_CMD_CACHE;
 
-		remain = len;
-		while (remain > 0) {
-			ret = read(STDIN_FILENO, buf + (len - remain), remain);
-			if (ret == 0) {
-				if (len == remain) {
-					ret = EXIT_SUCCESS;
-					goto out;
-				}
-				/* exit after this buffer is sent */
-				memset(buf + (len - remain), 0, remain);
-				total = done + len;
-				break;
-			} else if (ret < 0) {
-				fprintf(stderr, "Failed to read from stdin: %m\n");
-				ret = EXIT_SYSFAIL;
-				goto out;
-			}
-			remain -= ret;
+		ret = xread(STDIN_FILENO, buf, len);
+		if (ret < 0) {
+			fprintf(stderr, "Failed to read from stdin: %m\n");
+			ret = EXIT_SYSFAIL;
+			goto out;
+		} else if (ret < len) {
+			/* exit after this buffer is sent */
+			memset(buf + ret, 0, len - ret);
+			total = done + len;
 		}
 
 		inode->data_vdi_id[idx] = inode->vdi_id;
