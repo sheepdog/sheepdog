@@ -192,4 +192,17 @@ static inline __attribute__((used)) void __sd_epoch_format_build_bug_ons(void)
 	BUILD_BUG_ON(sizeof(struct sd_node) != SD_NODE_SIZE);
 }
 
+enum rw_state {
+	RW_PREPARE_LIST, /* the recovery thread is preparing object list */
+	RW_RECOVER_OBJ, /* the thread is recoering objects */
+	RW_NOTIFY_COMPLETION, /* the thread is notifying recovery completion */
+};
+
+struct recovery_state {
+	uint8_t in_recovery;
+	enum rw_state state;
+	uint64_t nr_finished;
+	uint64_t nr_total;
+};
+
 #endif /* __INTERNAL_PROTO_H__ */

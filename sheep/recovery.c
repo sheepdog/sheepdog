@@ -11,12 +11,6 @@
 
 #include "sheep_priv.h"
 
-enum rw_state {
-	RW_PREPARE_LIST, /* the recovery thread is preparing object list */
-	RW_RECOVER_OBJ, /* the thread is recoering objects */
-	RW_NOTIFY_COMPLETION, /* the thread is notifying recovery completion */
-};
-
 /* base structure for the recovery thread */
 struct recovery_work {
 	uint32_t epoch;
@@ -876,4 +870,19 @@ static void queue_recovery_work(struct recovery_info *rinfo)
 	rw->old_vinfo = grab_vnode_info(rinfo->old_vinfo);
 
 	queue_work(sys->recovery_wqueue, &rw->work);
+}
+
+void get_recovery_state(struct recovery_state *state)
+{
+	struct recovery_info *rinfo = main_thread_get(current_rinfo);
+
+	if (!rinfo) {
+		state->in_recovery = 0;
+		return;
+	}
+
+	state->in_recovery = 1;
+	state->state = rinfo->state;
+	state->nr_finished = rinfo->done;
+	state->nr_total = rinfo->count;
 }

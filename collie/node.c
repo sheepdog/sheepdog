@@ -132,17 +132,19 @@ static int node_recovery(int argc, char **argv)
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char host[128];
 		struct sd_req req;
-		struct sd_rsp *rsp = (struct sd_rsp *)&req;
+		struct recovery_state state;
 
+		memset(&state, 0, sizeof(state));
 		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
 		sd_init_req(&req, SD_OP_STAT_RECOVERY);
+		req.data_length = sizeof(state);
 
-		ret = collie_exec_req(host, sd_nodes[i].nid.port, &req, NULL);
+		ret = collie_exec_req(host, sd_nodes[i].nid.port, &req, &state);
 		if (ret < 0)
 			return EXIT_SYSFAIL;
 
-		if (rsp->result == SD_RES_NODE_IN_RECOVERY) {
+		if (state.in_recovery) {
 			addr_to_str(host, sizeof(host),
 					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
 			printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s%5d%11d\n",

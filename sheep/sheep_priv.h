@@ -319,6 +319,7 @@ int objlist_cache_cleanup(uint32_t vid);
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *, bool);
 bool oid_in_recovery(uint64_t oid);
 bool node_in_recovery(void);
+void get_recovery_state(struct recovery_state *state);
 
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset);

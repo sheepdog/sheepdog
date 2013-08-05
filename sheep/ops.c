@@ -390,8 +390,8 @@ static int local_stat_sheep(struct request *req)
 static int local_stat_recovery(const struct sd_req *req, struct sd_rsp *rsp,
 					void *data)
 {
-	if (node_in_recovery())
-		return SD_RES_NODE_IN_RECOVERY;
+	get_recovery_state(data);
+	rsp->data_length = sizeof(struct recovery_state);
 
 	return SD_RES_SUCCESS;
 }
