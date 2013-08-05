@@ -13,6 +13,7 @@
 
 static struct node_cmd_data {
 	bool all_nodes;
+	bool recovery_progress;
 } node_cmd_data;
 
 static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
@@ -120,9 +121,88 @@ static int node_info(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int get_recovery_state(struct recovery_state *state)
+{
+	int ret;
+	struct sd_req req;
+
+	sd_init_req(&req, SD_OP_STAT_RECOVERY);
+	req.data_length = sizeof(*state);
+
+	ret = collie_exec_req(sdhost, sdport, &req, state);
+	if (ret < 0) {
+		fprintf(stderr, "Failed to execute request\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int node_recovery_progress(void)
+{
+	int result;
+	unsigned int prev_nr_total;
+	struct recovery_state rstate;
+
+	/*
+	 * ToDos
+	 *
+	 * 1. Calculate size of actually copied objects.
+	 *    For doing this, not so trivial changes for recovery process are
+	 *    required.
+	 *
+	 * 2. Print remaining physical time.
+	 *    Even if it is not so acculate, the information is helpful for
+	 *    administrators.
+	 */
+
+	result = get_recovery_state(&rstate);
+	if (result < 0)
+		return EXIT_SYSFAIL;
+
+	if (!rstate.in_recovery)
+		return EXIT_SUCCESS;
+
+	do {
+		prev_nr_total = rstate.nr_total;
+
+		result = get_recovery_state(&rstate);
+		if (result < 0)
+			break;
+
+		if (!rstate.in_recovery) {
+			show_progress(prev_nr_total, prev_nr_total, true);
+			break;
+		}
+
+		switch (rstate.state) {
+		case RW_PREPARE_LIST:
+			printf("\rpreparing a checked object list...");
+			break;
+		case RW_NOTIFY_COMPLETION:
+			printf("\rnotifying a completion of recovery...");
+			break;
+		case RW_RECOVER_OBJ:
+			show_progress(rstate.nr_finished, rstate.nr_total,
+				      true);
+			break;
+		default:
+			panic("unknown state of recovery: %d", rstate.state);
+			break;
+		}
+
+		sleep(1);
+	} while (true);
+
+	return result < 0 ? EXIT_SYSFAIL : EXIT_SUCCESS;
+}
+
 static int node_recovery(int argc, char **argv)
 {
 	int i, ret;
+
+	if (node_cmd_data.recovery_progress)
+		return node_recovery_progress();
 
 	if (!raw_output) {
 		printf("Nodes In Recovery:\n");
@@ -315,6 +395,9 @@ static int node_parser(int ch, char *opt)
 	case 'A':
 		node_cmd_data.all_nodes = true;
 		break;
+	case 'P':
+		node_cmd_data.recovery_progress = true;
+		break;
 	}
 
 	return 0;
@@ -322,6 +405,7 @@ static int node_parser(int ch, char *opt)
 
 static struct sd_option node_options[] = {
 	{'A', "all", false, "show md information of all the nodes"},
+	{'P', "progress", false, "show progress of recovery in the node"},
 
 	{ 0, NULL, false, NULL },
 };
@@ -333,8 +417,8 @@ static struct subcommand node_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_info},
-	{"recovery", NULL, "aprh", "show nodes in recovery", NULL,
-	 SUBCMD_FLAG_NEED_NODELIST, node_recovery},
+	{"recovery", NULL, "aphP", "show recovery information of nodes", NULL,
+	 SUBCMD_FLAG_NEED_NODELIST, node_recovery, node_options},
 	{"md", "[disks]", "apAh", "See 'collie node md' for more information",
 	 node_md_cmd, SUBCMD_FLAG_NEED_ARG, node_md, node_options},
 	{NULL,},
