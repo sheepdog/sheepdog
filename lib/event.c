@@ -178,12 +178,7 @@ static int epoll_event_cmp(const struct epoll_event *_a, struct epoll_event *_b)
 	b = (struct event_info *)_b->data.ptr;
 
 	/* we need sort event_info array in reverse order */
-	if (a->prio < b->prio)
-		return 1;
-	else if (b->prio < a->prio)
-		return -1;
-
-	return 0;
+	return intcmp(b->prio, a->prio);
 }
 
 static void do_event_loop(int timeout, bool sort_with_prio)

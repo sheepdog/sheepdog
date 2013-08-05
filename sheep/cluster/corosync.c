@@ -90,9 +90,9 @@ struct corosync_message {
 
 static int cpg_node_cmp(struct cpg_node *a, struct cpg_node *b)
 {
-	int cmp = memcmp(&a->nodeid, &b->nodeid, sizeof(a->nodeid));
+	int cmp = intcmp(a->nodeid, b->nodeid);
 	if (cmp == 0)
-		cmp = memcmp(&a->pid, &b->pid, sizeof(a->pid));
+		cmp = intcmp(a->pid, b->pid);
 	return cmp;
 }
 

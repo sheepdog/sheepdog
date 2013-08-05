@@ -91,11 +91,7 @@ static int obj_cmp(const uint64_t *oid1, const uint64_t *oid2)
 	const uint64_t hval1 = fnv_64a_buf(oid1, sizeof(*oid1), FNV1A_64_INIT);
 	const uint64_t hval2 = fnv_64a_buf(oid2, sizeof(*oid2), FNV1A_64_INIT);
 
-	if (hval1 < hval2)
-		return -1;
-	if (hval1 > hval2)
-		return 1;
-	return 0;
+	return intcmp(hval1, hval2);
 }
 
 static inline bool node_is_gateway_only(void)

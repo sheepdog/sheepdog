@@ -252,11 +252,7 @@ static inline int node_id_cmp(const struct node_id *node1,
 	if (cmp != 0)
 		return cmp;
 
-	if (node1->port < node2->port)
-		return -1;
-	if (node1->port > node2->port)
-		return 1;
-	return 0;
+	return intcmp(node1->port, node2->port);
 }
 
 static inline int node_cmp(const struct sd_node *node1,
@@ -273,11 +269,7 @@ static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 static inline int vnode_cmp(const struct sd_vnode *node1,
 			    const struct sd_vnode *node2)
 {
-	if (node1->id < node2->id)
-		return -1;
-	if (node1->id > node2->id)
-		return 1;
-	return 0;
+	return intcmp(node1->id, node2->id);
 }
 
 static inline int nodes_to_vnodes(struct sd_node *nodes, int nr,

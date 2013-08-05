@@ -71,6 +71,20 @@ static inline void *zalloc(size_t size)
 	return calloc(1, size);
 }
 
+/*
+ * Compares two integer values
+ *
+ * If the first argument is larger than the second one, intcmp() returns 1.  If
+ * two members are equal, returns 0.  Otherwise, returns -1.
+ */
+#define intcmp(x, y) \
+({					\
+	typeof(x) _x = (x);		\
+	typeof(y) _y = (y);		\
+	(void) (&_x == &_y);		\
+	_x < _y ? -1 : _x > _y ? 1 : 0;	\
+})
+
 typedef void (*try_to_free_t)(size_t);
 try_to_free_t set_try_to_free_routine(try_to_free_t);
 

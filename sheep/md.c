@@ -69,11 +69,7 @@ static struct vdisk *oid_to_vdisk_from(struct vdisk *vds, int nr, uint64_t oid)
 
 static int vdisk_cmp(const struct vdisk *d1, const struct vdisk *d2)
 {
-	if (d1->id < d2->id)
-		return -1;
-	if (d1->id > d2->id)
-		return 1;
-	return 0;
+	return intcmp(d1->id, d2->id);
 }
 
 static inline int disks_to_vdisks(struct disk *ds, int nmds, struct vdisk *vds)
