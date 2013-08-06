@@ -75,3 +75,5 @@ tests/*.out.bad
 man/sheep.8
 man/collie.8
 man/sheepfs.8
+
+*.deb
