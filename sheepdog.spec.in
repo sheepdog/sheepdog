@@ -8,13 +8,13 @@ URL: http://www.osrg.net/sheepdog
 Source0: http://downloads.sourceforge.net/project/sheepdog/%{name}/%{version}/%{name}-%{version}.tar.gz
 
 # Runtime bits
-Requires: corosync
+Requires: corosync userspace-rcu
 Requires(post): chkconfig
 Requires(preun): chkconfig
 Requires(preun): initscripts
 
 # Build bits
-BuildRequires: autoconf automake
+BuildRequires: autoconf automake userspace-rcu-devel
 BuildRequires: corosync corosynclib corosynclib-devel
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
