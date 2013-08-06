@@ -1218,12 +1218,13 @@ int object_cache_flush_vdi(uint32_t vid)
 		return SD_RES_SUCCESS;
 	}
 
-	if (!uatomic_set_true(&cache->in_push)) {
-		/* Guest expects synchronous flush, busy-wait for simplicity */
-		while (uatomic_is_true(&cache->in_push))
-			usleep(100000);
-		return SD_RES_SUCCESS;
-	}
+	/*
+	 * We have to wait for last pusher finishing and push again so
+	 * that dirty bits produced while it is waiting are guaranteed
+	 * to be pushed back
+	 */
+	while (!uatomic_set_true(&cache->in_push))
+		usleep(100000);
 
 	ret = object_cache_push(cache);
 	uatomic_set_false(&cache->in_push);
