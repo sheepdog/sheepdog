@@ -318,7 +318,7 @@ int init_disk_space(const char *base_path)
 			ret = SD_RES_EIO;
 			goto out;
 		}
-		sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bfree;
+		sys->disk_space = (uint64_t)fs.f_frsize * fs.f_bavail;
 	}
 
 	ret = set_node_space(sys->disk_space);

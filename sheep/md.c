@@ -238,7 +238,7 @@ static uint64_t get_path_free_size(char *path, uint64_t *used)
 		sd_eprintf("get disk %s space failed %m", path);
 		return 0;
 	}
-	size = (int64_t)fs.f_frsize * fs.f_bfree;
+	size = (int64_t)fs.f_frsize * fs.f_bavail;
 
 	if (!used)
 		goto out;
