@@ -409,9 +409,7 @@ void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen)
 
 	/* trim zero blocks from the beginning of buffer */
 	while (len >= BLOCK_SIZE) {
-		size_t size = (start + offset) % BLOCK_SIZE;
-		if (size == 0)
-			size = BLOCK_SIZE;
+		size_t size = BLOCK_SIZE - (start + offset) % BLOCK_SIZE;
 
 		if (memcmp(p + offset, zero, size) != 0)
 			break;
@@ -422,11 +420,11 @@ void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen)
 
 	/* trim zero sectors from the end of buffer */
 	while (len >= BLOCK_SIZE) {
-		size_t size = (start + len) % BLOCK_SIZE;
+		size_t size = (start + offset + len) % BLOCK_SIZE;
 		if (size == 0)
 			size = BLOCK_SIZE;
 
-		if (memcmp(p + len - size, zero, size) != 0)
+		if (memcmp(p + offset + len - size, zero, size) != 0)
 			break;
 
 		len -= size;
