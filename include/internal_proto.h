@@ -104,13 +104,9 @@
 #define SD_RES_STALE_OBJ        0x90 /* Object may be stale */
 #define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
 
-#define SD_FLAG_NOHALT       0x0004 /* Serve the IO rquest even lack of nodes */
-#define SD_FLAG_QUORUM       0x0008 /* Serve the IO rquest as long we are quorate */
-
 #define SD_STATUS_OK                0x00000001
 #define SD_STATUS_WAIT              0x00000004
 #define SD_STATUS_SHUTDOWN          0x00000008
-#define SD_STATUS_HALT              0x00000020
 #define SD_STATUS_KILLED            0x00000040
 
 struct node_id {

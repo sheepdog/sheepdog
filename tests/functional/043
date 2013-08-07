@@ -21,7 +21,7 @@ done
 
 _wait_for_sheep 5
 
-_cluster_format -m unsafe
+_cluster_format
 
 $COLLIE vdi create test 40M
 

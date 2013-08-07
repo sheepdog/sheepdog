@@ -470,7 +470,7 @@ _cluster_format()
     for port in $ports; do
 	local cnt
 	for cnt in `seq 10`; do # wait at most 10 seconds
-	    $COLLIE cluster info -p $port | grep -E running\|halt > /dev/null
+	    $COLLIE cluster info -p $port | grep -E running > /dev/null
 	    if [ $? == 0 ]; then
 		continue 2
 	    fi

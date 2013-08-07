@@ -269,7 +269,6 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len, uint32_t vid,
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		void *data);
 
-bool have_enough_zones(void);
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vinfo);

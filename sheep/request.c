@@ -362,12 +362,6 @@ static void queue_request(struct request *req)
 			goto done;
 		}
 		break;
-	case SD_STATUS_HALT:
-		if (!is_force_op(req->op)) {
-			rsp->result = SD_RES_HALT;
-			goto done;
-		}
-		break;
 	default:
 		break;
 	}

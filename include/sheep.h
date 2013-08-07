@@ -69,6 +69,8 @@ static inline int get_vnode_first_idx(const struct sd_vnode *entries,
 	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
 	int start, end, pos;
 
+	assert(nr_entries > 0);
+
 	start = 0;
 	end = nr_entries - 1;
 
@@ -160,6 +162,9 @@ static inline void oid_to_vnodes(const struct sd_vnode *entries, int nr_entries,
 {
 	int idx, idxs[SD_MAX_COPIES], i;
 
+	if (nr_entries == 0)
+		return;
+
 	idx = get_vnode_first_idx(entries, nr_entries, oid);
 	idxs[0] = idx;
 	vnodes[0] = &entries[idx];
@@ -213,7 +218,7 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_WAIT_FOR_FORMAT] = "Waiting for cluster to be formatted",
 		[SD_RES_WAIT_FOR_JOIN] = "Waiting for other nodes to join cluster",
 		[SD_RES_JOIN_FAILED] = "Node has failed to join cluster",
-		[SD_RES_HALT] = "IO has halted as there are too few living nodes",
+		[SD_RES_HALT] = "IO has halted as there are no living nodes",
 		[SD_RES_READONLY] = "Object is read-only",
 
 		/* from internal_proto.h */

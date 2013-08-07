@@ -32,7 +32,7 @@ done
 
 _wait_for_sheep 6
 
-_cluster_format -c 3 -m unsafe
+_cluster_format -c 3
 
 $COLLIE vdi create test 40M
 _random | $COLLIE vdi write test &

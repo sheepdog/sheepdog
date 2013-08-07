@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test cluster halt
+# Test cluster with too few living nodes
 
 seq=`basename $0`
 echo "QA output created by $seq"

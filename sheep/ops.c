@@ -264,10 +264,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret)
 		return SD_RES_EIO;
 
-	if (have_enough_zones())
-		sys->status = SD_STATUS_OK;
-	else
-		sys->status = SD_STATUS_HALT;
+	sys->status = SD_STATUS_OK;
 
 	return SD_RES_SUCCESS;
 }
@@ -448,8 +445,6 @@ out:
 			return SD_RES_WAIT_FOR_JOIN;
 	case SD_STATUS_SHUTDOWN:
 		return SD_RES_SHUTDOWN;
-	case SD_STATUS_HALT:
-		return SD_RES_HALT;
 	default:
 		return SD_RES_SYSTEM_ERROR;
 	}
@@ -544,10 +539,7 @@ static int cluster_force_recover_main(const struct sd_req *req,
 		/* initialize config file */
 		set_cluster_config(&sys->cinfo);
 
-	if (have_enough_zones())
-		sys->status = SD_STATUS_OK;
-	else
-		sys->status = SD_STATUS_HALT;
+	sys->status = SD_STATUS_OK;
 
 	vnode_info = get_vnode_info();
 	old_vnode_info = alloc_vnode_info(nodes, nr_nodes);

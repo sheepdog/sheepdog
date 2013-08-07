@@ -1,4 +1,4 @@
 QA output created by 022
 using backend plain store
 creating a VDI should fail without data nodes available
-Failed to create VDI test: IO has halted as there are too few living nodes
+Failed to create VDI test: Failed to write to requested VDI

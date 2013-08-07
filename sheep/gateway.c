@@ -42,6 +42,12 @@ int gateway_read_obj(struct request *req)
 	}
 
 	nr_copies = get_req_copy_number(req);
+
+	if (nr_copies == 0) {
+		sd_dprintf("there is no living nodes");
+		return SD_RES_HALT;
+	}
+
 	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
@@ -267,6 +273,11 @@ static int gateway_forward_request(struct request *req)
 	wlen = hdr.data_length;
 	nr_to_send = init_target_nodes(req, oid, target_nodes);
 	write_info_init(&wi, nr_to_send);
+
+	if (nr_to_send == 0) {
+		sd_dprintf("there is no living nodes");
+		return SD_RES_HALT;
+	}
 
 	for (i = 0; i < nr_to_send; i++) {
 		struct sockfd *sfd;

@@ -20,7 +20,6 @@
 static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
-	{'m', "mode", true, "mode (safe, quorum, unsafe)"},
 	{'f', "force", false, "do not prompt for confirmation"},
 
 	{ 0, NULL, false, NULL },
@@ -28,8 +27,6 @@ static struct sd_option cluster_options[] = {
 
 static struct cluster_cmd_data {
 	int copies;
-	bool nohalt;
-	bool quorum;
 	bool force;
 	char name[STORE_LEN];
 } cluster_cmd_data;
@@ -97,11 +94,6 @@ static int cluster_format(int argc, char **argv)
 
 	sd_init_req(&hdr, SD_OP_MAKE_FS);
 	hdr.cluster.copies = cluster_cmd_data.copies;
-	if (cluster_cmd_data.nohalt)
-		hdr.flags |= SD_FLAG_NOHALT;
-	if (cluster_cmd_data.quorum)
-		hdr.flags |= SD_FLAG_QUORUM;
-
 	hdr.cluster.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
@@ -483,7 +475,7 @@ static int cluster_reweight(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bcmaph", "create a Sheepdog store",
+	{"format", NULL, "bcaph", "create a Sheepdog store",
 	 NULL, 0, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
@@ -520,21 +512,6 @@ static int cluster_parser(int ch, char *opt)
 			exit(EXIT_FAILURE);
 		}
 		cluster_cmd_data.copies = copies;
-		break;
-	case 'm':
-		if (strcmp(opt, "safe") == 0) {
-			cluster_cmd_data.nohalt = false;
-			cluster_cmd_data.quorum = false;
-		} else if (strcmp(opt, "quorum") == 0) {
-			cluster_cmd_data.nohalt = false;
-			cluster_cmd_data.quorum = true;
-		} else if (strcmp(opt, "unsafe") == 0) {
-			cluster_cmd_data.nohalt = true;
-			cluster_cmd_data.quorum = false;
-		} else {
-			fprintf(stderr, "Unknown mode '%s'\n", opt);
-			exit(EXIT_FAILURE);
-		}
 		break;
 	case 'f':
 		cluster_cmd_data.force = true;

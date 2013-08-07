@@ -60,35 +60,6 @@ static int get_zones_nr_from(const struct sd_node *nodes, int nr_nodes)
 	return nr_zones;
 }
 
-bool have_enough_zones(void)
-{
-	int max_copies;
-	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
-
-	if (sys->cinfo.flags & SD_FLAG_NOHALT)
-		return true;
-
-	if (!cur_vinfo)
-		return false;
-
-	max_copies = get_max_copy_number();
-
-	sd_dprintf("flags %d, nr_zones %d, min copies %d",
-		   sys->cinfo.flags, cur_vinfo->nr_zones, max_copies);
-
-	if (!cur_vinfo->nr_zones)
-		return false;
-
-	if (sys->cinfo.flags & SD_FLAG_QUORUM) {
-		if (cur_vinfo->nr_zones > (max_copies/2))
-			return true;
-	} else {
-		if (cur_vinfo->nr_zones >= max_copies)
-			return true;
-	}
-	return false;
-}
-
 static int get_node_idx(struct vnode_info *vnode_info, struct sd_node *ent)
 {
 	ent = xbsearch(ent, vnode_info->nodes, vnode_info->nr_nodes, node_cmp);
@@ -687,16 +658,12 @@ static void update_cluster_info(const struct join_message *msg,
 
 	get_vdis(nodes, nr_nodes, joined);
 
-	switch (msg->cluster_status) {
-	case SD_STATUS_OK:
-	case SD_STATUS_HALT:
+	if (msg->cluster_status == SD_STATUS_OK) {
 		if (sys->status == SD_STATUS_WAIT) {
 			if (!is_cluster_formatted())
 				/* initialize config file */
 				set_cluster_config(&sys->cinfo);
 		}
-
-		sys->status = msg->cluster_status;
 
 		if (nr_nodes != msg->cinfo.nr_nodes) {
 			int ret = inc_and_log_epoch();
@@ -715,14 +682,9 @@ static void update_cluster_info(const struct join_message *msg,
 			start_recovery(main_thread_get(current_vnode_info),
 				       main_thread_get(current_vnode_info),
 				       false);
-
-		if (have_enough_zones())
-			sys->status = SD_STATUS_OK;
-		break;
-	default:
-		sys->status = msg->cluster_status;
-		break;
 	}
+
+	sys->status = msg->cluster_status;
 
 	put_vnode_info(old_vnode_info);
 
@@ -981,19 +943,12 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(members, nr_members));
-	switch (sys->status) {
-	case SD_STATUS_HALT:
-	case SD_STATUS_OK:
+	if (sys->status == SD_STATUS_OK) {
 		ret = inc_and_log_epoch();
 		if (ret != 0)
 			panic("cannot log current epoch %d", sys->cinfo.epoch);
 		start_recovery(main_thread_get(current_vnode_info),
 			       old_vnode_info, true);
-		if (!have_enough_zones())
-			sys->status = SD_STATUS_HALT;
-		break;
-	default:
-		break;
 	}
 
 	put_vnode_info(old_vnode_info);
