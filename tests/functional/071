@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Test partially zeroed data
+
+seq=`basename $0`
+echo "QA output created by $seq"
+
+here=`pwd`
+tmp=/tmp/$$
+status=1        # failure is the default!
+
+# get standard environment, filters and checks
+. ./common.rc
+. ./common.filter
+
+_cleanup
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$COLLIE vdi create test 4M
+
+# Create a 28 KB file.  The first 12 KB (3 blocks) is filled with zero,
+# next 4 KB is filled with one, and the rest is filled with zero.
+DATA_FILE="$STORE/data"
+rm -f $DATA_FILE
+dd if=<(_one) of=$DATA_FILE bs=4k seek=3 count=1 2> /dev/null
+truncate $DATA_FILE -s 28k
+
+for skip in 0 1 2 3; do
+    for offset in 0 512; do
+	for length in $((4 * 4096)) $((4 * 4096 - 512)); do
+	    dd if=$DATA_FILE bs=4k skip=$skip count=4 2> /dev/null \
+		| $COLLIE vdi write test $offset $length
+
+	    $COLLIE vdi read test $offset $length | hd
+	done
+    done
+done

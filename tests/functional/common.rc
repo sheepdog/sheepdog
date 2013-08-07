@@ -485,6 +485,11 @@ _random()
 	openssl enc -aes-128-cbc -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
 }
 
+_one()
+{
+    yes $'\xFF' | tr -d "\n"
+}
+
 _kill_zk_session()
 {
 	local path="/sheepdog/member/IPv4 ip:127.0.0.1 port:$((7000+$1))"
