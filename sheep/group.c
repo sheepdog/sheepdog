@@ -357,15 +357,14 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 	return 0;
 }
 
-static bool cluster_ctime_check(const struct join_message *jm)
+static bool cluster_ctime_check(const struct cluster_info *cinfo)
 {
-	if (jm->cinfo.epoch == 0 || sys->cinfo.epoch == 0)
+	if (cinfo->epoch == 0 || sys->cinfo.epoch == 0)
 		return true;
 
-	if (jm->cinfo.ctime != sys->cinfo.ctime) {
-		sd_eprintf("joining node ctime doesn't match: %"
-			   PRIu64 " vs %" PRIu64, jm->cinfo.ctime,
-			   sys->cinfo.ctime);
+	if (cinfo->ctime != sys->cinfo.ctime) {
+		sd_eprintf("joining node ctime doesn't match: %" PRIu64 " vs %"
+			   PRIu64, cinfo->ctime, sys->cinfo.ctime);
 		return false;
 	}
 
@@ -378,13 +377,13 @@ static bool cluster_ctime_check(const struct join_message *jm)
  * Sheepdog can start automatically if and only if all the members in the latest
  * epoch are gathered.
  */
-static bool enough_nodes_gathered(struct join_message *jm,
+static bool enough_nodes_gathered(struct cluster_info *cinfo,
 				  const struct sd_node *joining,
 				  const struct sd_node *nodes,
 				  size_t nr_nodes)
 {
-	for (int i = 0; i < jm->cinfo.nr_nodes; i++) {
-		const struct sd_node *key = jm->cinfo.nodes + i, *n;
+	for (int i = 0; i < cinfo->nr_nodes; i++) {
+		const struct sd_node *key = cinfo->nodes + i, *n;
 
 		n = xlfind(key, nodes, nr_nodes, node_cmp);
 		if (n == NULL && !node_eq(key, joining)) {
@@ -393,28 +392,25 @@ static bool enough_nodes_gathered(struct join_message *jm,
 		}
 	}
 
-	sd_dprintf("all the nodes are gathered, %d, %zd", jm->cinfo.nr_nodes,
+	sd_dprintf("all the nodes are gathered, %d, %zd", cinfo->nr_nodes,
 		   nr_nodes);
 	return true;
 }
 
-static int cluster_wait_check(const struct sd_node *joining,
-			      const struct sd_node *nodes, size_t nr_nodes,
-			      struct join_message *jm)
+static enum sd_status cluster_wait_check(const struct sd_node *joining,
+					 const struct sd_node *nodes,
+					 size_t nr_nodes,
+					 struct cluster_info *cinfo)
 {
-	if (!cluster_ctime_check(jm)) {
+	if (!cluster_ctime_check(cinfo)) {
 		sd_dprintf("joining node is invalid");
-		return sys->status;
+		return sys->cinfo.status;
 	}
 
-	if (jm->cinfo.epoch > sys->cinfo.epoch) {
+	if (cinfo->epoch > sys->cinfo.epoch) {
 		sd_dprintf("joining node has a larger epoch, %" PRIu32 ", %"
-			   PRIu32, jm->cinfo.epoch, sys->cinfo.epoch);
-		sys->cinfo = jm->cinfo;
-	} else if (jm->cinfo.epoch < sys->cinfo.epoch) {
-		sd_dprintf("joining node has a smaller epoch, %" PRIu32 ", %"
-			   PRIu32, jm->cinfo.epoch, sys->cinfo.epoch);
-		jm->cinfo = sys->cinfo;
+			   PRIu32, cinfo->epoch, sys->cinfo.epoch);
+		sys->cinfo = *cinfo;
 	}
 
 	/*
@@ -422,10 +418,10 @@ static int cluster_wait_check(const struct sd_node *joining,
 	 * node list, we can set the cluster live now.
 	 */
 	if (sys->cinfo.epoch > 0 &&
-	    enough_nodes_gathered(jm, joining, nodes, nr_nodes))
+	    enough_nodes_gathered(&sys->cinfo, joining, nodes, nr_nodes))
 		return SD_STATUS_OK;
 
-	return sys->status;
+	return sys->cinfo.status;
 }
 
 static int get_vdis_from(struct sd_node *node)
@@ -542,18 +538,17 @@ static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
 	return alloc_vnode_info(old_nodes, nr_nodes);
 }
 
-static void setup_backend_store(const struct join_message *jm)
+static void setup_backend_store(const struct cluster_info *cinfo)
 {
 	int ret;
 
-	if (jm->cinfo.store[0] == '\0')
+	if (cinfo->store[0] == '\0')
 		return;
 
 	if (!sd_store) {
-		sd_store = find_store_driver((char *)jm->cinfo.store);
+		sd_store = find_store_driver((char *)cinfo->store);
 		if (!sd_store)
-			panic("backend store %s not supported",
-			      jm->cinfo.store);
+			panic("backend store %s not supported", cinfo->store);
 
 		ret = sd_store->init();
 		if (ret != SD_RES_SUCCESS)
@@ -564,7 +559,7 @@ static void setup_backend_store(const struct join_message *jm)
 	 * We need to purge the stale objects for sheep joining back
 	 * after crash
 	 */
-	if (xlfind(&sys->this_node, jm->cinfo.nodes, jm->cinfo.nr_nodes,
+	if (xlfind(&sys->this_node, cinfo->nodes, cinfo->nr_nodes,
 		   node_cmp) == NULL) {
 		ret = sd_store->purge_obj();
 		if (ret != SD_RES_SUCCESS)
@@ -572,9 +567,7 @@ static void setup_backend_store(const struct join_message *jm)
 	}
 }
 
-static void finish_join(const struct join_message *msg,
-			const struct sd_node *joined,
-			const struct sd_node *nodes, size_t nr_nodes)
+static void finish_join(const struct sd_node *nodes, size_t nr_nodes)
 {
 	sockfd_cache_add_group(nodes, nr_nodes);
 }
@@ -636,21 +629,20 @@ void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
 	}
 }
 
-static void update_cluster_info(const struct join_message *msg,
+static void update_cluster_info(const struct cluster_info *cinfo,
 				const struct sd_node *joined,
 				const struct sd_node *nodes,
 				size_t nr_nodes)
 {
 	struct vnode_info *old_vnode_info;
 
-	sd_dprintf("status = %d, epoch = %d", msg->cluster_status,
-		   msg->cinfo.epoch);
+	sd_dprintf("status = %d, epoch = %d", cinfo->status, cinfo->epoch);
 
 	if (!sys->gateway_only)
-		setup_backend_store(msg);
+		setup_backend_store(cinfo);
 
 	if (node_is_local(joined))
-		finish_join(msg, joined, nodes, nr_nodes);
+		finish_join(nodes, nr_nodes);
 
 	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info,
@@ -658,14 +650,12 @@ static void update_cluster_info(const struct join_message *msg,
 
 	get_vdis(nodes, nr_nodes, joined);
 
-	if (msg->cluster_status == SD_STATUS_OK) {
-		if (sys->status == SD_STATUS_WAIT) {
-			if (!is_cluster_formatted())
-				/* initialize config file */
-				set_cluster_config(&sys->cinfo);
-		}
+	if (cinfo->status == SD_STATUS_OK) {
+		if (!is_cluster_formatted())
+			/* initialize config file */
+			set_cluster_config(&sys->cinfo);
 
-		if (nr_nodes != msg->cinfo.nr_nodes) {
+		if (nr_nodes != cinfo->nr_nodes) {
 			int ret = inc_and_log_epoch();
 			if (ret != 0)
 				panic("cannot log current epoch %d",
@@ -683,8 +673,6 @@ static void update_cluster_info(const struct join_message *msg,
 				       main_thread_get(current_vnode_info),
 				       false);
 	}
-
-	sys->status = msg->cluster_status;
 
 	put_vnode_info(old_vnode_info);
 
@@ -749,7 +737,8 @@ bool sd_join_handler(const struct sd_node *joining,
 		     const struct sd_node *nodes, size_t nr_nodes,
 		     void *opaque)
 {
-	struct join_message *jm = opaque;
+	struct cluster_info *cinfo = opaque;
+	enum sd_status status;
 	char str[MAX_NODE_STR_LEN];
 
 	/*
@@ -762,40 +751,29 @@ bool sd_join_handler(const struct sd_node *joining,
 		return false;
 	}
 
-	sd_dprintf("check %s, %d", node_to_str(joining), sys->status);
+	sd_dprintf("check %s, %d", node_to_str(joining), sys->cinfo.status);
 
-	jm->proto_ver = SD_SHEEP_PROTO_VER;
-
-	if (sys->status == SD_STATUS_WAIT)
-		jm->cluster_status = cluster_wait_check(joining, nodes,
-							nr_nodes, jm);
+	if (sys->cinfo.status == SD_STATUS_WAIT)
+		status = cluster_wait_check(joining, nodes, nr_nodes, cinfo);
 	else
-		jm->cluster_status = sys->status;
+		status = sys->cinfo.status;
+
+	*cinfo = sys->cinfo;
+	cinfo->status = status;
+	cinfo->proto_ver = SD_SHEEP_PROTO_VER;
 
 	sd_dprintf("%s: cluster_status = 0x%x",
 		   addr_to_str(str, sizeof(str), joining->nid.addr,
-			       joining->nid.port), jm->cluster_status);
-
-	jm->cinfo = sys->cinfo;
+			       joining->nid.port), cinfo->status);
 
 	return true;
 }
 
 static int send_join_request(struct sd_node *ent)
 {
-	struct join_message *msg;
-	int ret;
-
-	msg = xzalloc(sizeof(*msg));
-	msg->cinfo = sys->cinfo;
-
-	ret = sys->cdrv->join(ent, msg, sizeof(*msg));
-
 	sd_printf(SDOG_INFO, "%s", node_to_str(&sys->this_node));
 
-	free(msg);
-
-	return ret;
+	return sys->cdrv->join(ent, &sys->cinfo, sizeof(sys->cinfo));
 }
 
 static void requeue_cluster_request(void)
@@ -865,7 +843,7 @@ static void requeue_cluster_request(void)
 
 int sd_reconnect_handler(void)
 {
-	sys->status = SD_STATUS_WAIT;
+	sys->cinfo.status = SD_STATUS_WAIT;
 	if (sys->cdrv->init(sys->cdrv_option) != 0)
 		return -1;
 	if (send_join_request(&sys->this_node) != 0)
@@ -874,20 +852,20 @@ int sd_reconnect_handler(void)
 	return 0;
 }
 
-static bool cluster_join_check(const struct join_message *jm)
+static bool cluster_join_check(const struct cluster_info *cinfo)
 {
-	if (jm->proto_ver != SD_SHEEP_PROTO_VER) {
+	if (cinfo->proto_ver != SD_SHEEP_PROTO_VER) {
 		sd_eprintf("invalid protocol version: %d, %d",
-			   jm->proto_ver, SD_SHEEP_PROTO_VER);
+			   cinfo->proto_ver, SD_SHEEP_PROTO_VER);
 		return false;
 	}
 
-	if (!cluster_ctime_check(jm))
+	if (!cluster_ctime_check(cinfo))
 		return false;
 
-	if (jm->cinfo.epoch == sys->cinfo.epoch &&
-	    memcmp(jm->cinfo.nodes, sys->cinfo.nodes,
-		   sizeof(jm->cinfo.nodes[0]) * jm->cinfo.nr_nodes) != 0) {
+	if (cinfo->epoch == sys->cinfo.epoch &&
+	    memcmp(cinfo->nodes, sys->cinfo.nodes,
+		   sizeof(cinfo->nodes[0]) * cinfo->nr_nodes) != 0) {
 		sd_printf(SDOG_ALERT, "epoch log entries does not match");
 		return false;
 	}
@@ -900,23 +878,23 @@ void sd_accept_handler(const struct sd_node *joined,
 		       const void *opaque)
 {
 	int i;
-	const struct join_message *jm = opaque;
+	const struct cluster_info *cinfo = opaque;
 
-	if (!cluster_join_check(jm)) {
+	if (!cluster_join_check(cinfo)) {
 		sd_eprintf("failed to join Sheepdog");
 		exit(1);
 	}
 
-	sys->cinfo = jm->cinfo;
+	sys->cinfo = *cinfo;
 
 	sd_dprintf("join %s", node_to_str(joined));
 	for (i = 0; i < nr_members; i++)
 		sd_dprintf("[%x] %s", i, node_to_str(members + i));
 
-	if (sys->status == SD_STATUS_SHUTDOWN)
+	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
 
-	update_cluster_info(jm, joined, members, nr_members);
+	update_cluster_info(cinfo, joined, members, nr_members);
 
 	if (node_is_local(joined))
 		/* this output is used for testing */
@@ -933,7 +911,7 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	for (i = 0; i < nr_members; i++)
 		sd_dprintf("[%x] %s", i, node_to_str(members + i));
 
-	if (sys->status == SD_STATUS_SHUTDOWN)
+	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
 
 	if (node_is_local(left))
@@ -943,7 +921,7 @@ void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
 	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(members, nr_members));
-	if (sys->status == SD_STATUS_OK) {
+	if (sys->cinfo.status == SD_STATUS_OK) {
 		ret = inc_and_log_epoch();
 		if (ret != 0)
 			panic("cannot log current epoch %d", sys->cinfo.epoch);
@@ -1026,7 +1004,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		if (sys->cinfo.nr_nodes == -1)
 			return -1;
 	}
-	sys->status = SD_STATUS_WAIT;
+	sys->cinfo.status = SD_STATUS_WAIT;
 
 	main_thread_set(pending_block_list,
 			  xzalloc(sizeof(struct list_head)));

@@ -94,7 +94,6 @@ struct system_info {
 	struct sd_node this_node;
 
 	struct cluster_info cinfo;
-	uint32_t status;
 
 	uint64_t disk_space;
 

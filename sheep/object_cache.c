@@ -286,7 +286,8 @@ static void add_to_dirty_list(struct object_cache_entry *entry)
 	list_add_tail(&entry->dirty_list, &oc->dirty_head);
 	/* FIXME read sys->status atomically */
 	if (uatomic_add_return(&oc->dirty_count, 1) > MAX_DIRTY_OBJECT_COUNT
-	    && !uatomic_is_true(&oc->in_push) && sys->status == SD_STATUS_OK)
+	    && !uatomic_is_true(&oc->in_push)
+	    && sys->cinfo.status == SD_STATUS_OK)
 		kick_background_pusher(oc);
 }
 

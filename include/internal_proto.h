@@ -104,10 +104,12 @@
 #define SD_RES_STALE_OBJ        0x90 /* Object may be stale */
 #define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
 
-#define SD_STATUS_OK                0x00000001
-#define SD_STATUS_WAIT              0x00000004
-#define SD_STATUS_SHUTDOWN          0x00000008
-#define SD_STATUS_KILLED            0x00000040
+enum sd_status {
+	SD_STATUS_OK = 1,
+	SD_STATUS_WAIT,
+	SD_STATUS_SHUTDOWN,
+	SD_STATUS_KILLED,
+};
 
 struct node_id {
 	uint8_t addr[16];
@@ -126,14 +128,20 @@ struct sd_node {
 	uint64_t        space;
 };
 
+/*
+ * A joining sheep multicasts the local cluster info.  Then, the existing nodes
+ * reply the latest cluster info which is unique among all of the nodes.
+ */
 struct cluster_info {
-	uint8_t nr_copies;
+	uint8_t proto_ver; /* the version number of the internal protocol */
 	uint8_t disable_recovery;
 	int16_t nr_nodes;
 	uint32_t epoch;
 	uint64_t ctime;
 	uint16_t flags;
-	uint16_t __pad[3];
+	uint8_t nr_copies;
+	enum sd_status status : 8;
+	uint32_t __pad;
 	uint8_t store[STORE_LEN];
 
 	/* node list at cluster_info->epoch */
@@ -148,19 +156,6 @@ struct epoch_log {
 	uint8_t  disable_recovery;
 	uint8_t  __pad[3];
 	struct sd_node nodes[SD_MAX_NODES];
-};
-
-struct join_message {
-	uint8_t proto_ver;
-	uint8_t __pad[3];
-	uint32_t cluster_status;
-
-	/*
-	 * A joining sheep puts the local cluster info here.  After the master
-	 * replies it will contain the latest cluster info which is shared among
-	 * the existing nodes.
-	 */
-	struct cluster_info cinfo;
 };
 
 struct vdi_op_message {

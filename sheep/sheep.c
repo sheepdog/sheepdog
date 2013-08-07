@@ -212,7 +212,7 @@ static void signal_handler(int listen_fd, int events, void *data)
 	sd_dprintf("signal %d", siginfo.ssi_signo);
 	switch (siginfo.ssi_signo) {
 	case SIGTERM:
-		sys->status = SD_STATUS_KILLED;
+		sys->cinfo.status = SD_STATUS_KILLED;
 		break;
 	default:
 		sd_eprintf("signal %d unhandled", siginfo.ssi_signo);
@@ -874,8 +874,8 @@ int main(int argc, char **argv)
 		  PACKAGE_VERSION);
 
 	while (sys->nr_outstanding_reqs != 0 ||
-	       (sys->status != SD_STATUS_KILLED &&
-		sys->status != SD_STATUS_SHUTDOWN))
+	       (sys->cinfo.status != SD_STATUS_KILLED &&
+		sys->cinfo.status != SD_STATUS_SHUTDOWN))
 		event_loop(-1);
 
 	sd_printf(SDOG_INFO, "shutdown");

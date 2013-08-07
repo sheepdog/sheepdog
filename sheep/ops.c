@@ -264,7 +264,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret)
 		return SD_RES_EIO;
 
-	sys->status = SD_STATUS_OK;
+	sys->cinfo.status = SD_STATUS_OK;
 
 	return SD_RES_SUCCESS;
 }
@@ -272,7 +272,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 			    void *data)
 {
-	sys->status = SD_STATUS_SHUTDOWN;
+	sys->cinfo.status = SD_STATUS_SHUTDOWN;
 	return SD_RES_SUCCESS;
 }
 
@@ -435,7 +435,7 @@ static int local_stat_cluster(struct request *req)
 		epoch--;
 	}
 out:
-	switch (sys->status) {
+	switch (sys->cinfo.status) {
 	case SD_STATUS_OK:
 		return SD_RES_SUCCESS;
 	case SD_STATUS_WAIT:
@@ -488,7 +488,7 @@ static int cluster_force_recover_work(struct request *req)
 	 * 2) some nodes are physically down (same epoch condition).
 	 * In both case, the nodes(s) stat is WAIT_FOR_JOIN.
 	 */
-	if (sys->status != SD_STATUS_WAIT || req->vinfo == NULL)
+	if (sys->cinfo.status != SD_STATUS_WAIT || req->vinfo == NULL)
 		return SD_RES_FORCE_RECOVER;
 
 	old_vnode_info = get_vnode_info_epoch(epoch, req->vinfo);
@@ -539,7 +539,7 @@ static int cluster_force_recover_main(const struct sd_req *req,
 		/* initialize config file */
 		set_cluster_config(&sys->cinfo);
 
-	sys->status = SD_STATUS_OK;
+	sys->cinfo.status = SD_STATUS_OK;
 
 	vnode_info = get_vnode_info();
 	old_vnode_info = alloc_vnode_info(nodes, nr_nodes);
@@ -804,7 +804,7 @@ static int local_trace_read_buf(struct request *request)
 static int local_kill_node(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
-	sys->status = SD_STATUS_KILLED;
+	sys->cinfo.status = SD_STATUS_KILLED;
 
 	return SD_RES_SUCCESS;
 }
