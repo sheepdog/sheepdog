@@ -125,7 +125,7 @@ static inline size_t get_cache_block_size(uint64_t oid)
 static uint64_t calc_object_bmap(uint64_t oid, size_t len, off_t offset)
 {
 	int start, end, nr;
-	unsigned long bmap = 0;
+	uint64_t bmap = 0;
 	size_t bsize = get_cache_block_size(oid);
 
 	start = offset / bsize;
@@ -135,7 +135,7 @@ static uint64_t calc_object_bmap(uint64_t oid, size_t len, off_t offset)
 	while (nr--)
 		set_bit(start + nr, &bmap);
 
-	return (uint64_t)bmap;
+	return bmap;
 }
 
 static inline void get_cache_entry(struct object_cache_entry *entry)
