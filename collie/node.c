@@ -206,7 +206,8 @@ static int node_recovery(int argc, char **argv)
 
 	if (!raw_output) {
 		printf("Nodes In Recovery:\n");
-		printf("  Id   Host:Port         V-Nodes       Zone\n");
+		printf("  Id   Host:Port         V-Nodes       Zone"
+		       "       Progress\n");
 	}
 
 	for (i = 0; i < sd_nodes_nr; i++) {
@@ -227,9 +228,16 @@ static int node_recovery(int argc, char **argv)
 		if (state.in_recovery) {
 			addr_to_str(host, sizeof(host),
 					sd_nodes[i].nid.addr, sd_nodes[i].nid.port);
-			printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s%5d%11d\n",
-				   i, host, sd_nodes[i].nr_vnodes,
-				   sd_nodes[i].zone);
+			if (raw_output)
+				printf("%d %s %d %d %"PRIu64" %"PRIu64"\n", i,
+				       host, sd_nodes[i].nr_vnodes,
+				       sd_nodes[i].zone, state.nr_finished,
+				       state.nr_total);
+			else
+				printf("%4d   %-20s%5d%11d%11.1f%%\n", i, host,
+				       sd_nodes[i].nr_vnodes, sd_nodes[i].zone,
+				       100 * (float)state.nr_finished
+				       / state.nr_total);
 		}
 	}
 
