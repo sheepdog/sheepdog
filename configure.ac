@@ -323,7 +323,6 @@ WARNLIST="
 	strict-prototypes
 	pointer-arith
 	write-strings
-	cast-align
 	bad-function-cast
 	missing-format-attribute
 	format=2
@@ -334,6 +333,14 @@ WARNLIST="
 	gnu89-inline
 	no-strict-aliasing
 	"
+
+case "${host}" in
+	arm*)
+	;;
+	*)
+	WARNLIST="${WARNLIST} cast-align"
+	;;
+esac
 
 for j in $WARNLIST; do
 	if cc_supports_flag -W$j; then
