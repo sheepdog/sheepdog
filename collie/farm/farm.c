@@ -255,7 +255,7 @@ static void save_object_done(struct work *work)
 {
 	struct snapshot_work *sw = container_of(work, struct snapshot_work,
 						work);
-	static uint64_t saved;
+	static unsigned long saved;
 
 	if (uatomic_is_true(&work_error))
 		goto out;
@@ -329,7 +329,7 @@ static void do_load_object(struct work *work)
 	void *buffer = NULL;
 	size_t size;
 	struct snapshot_work *sw;
-	static uint64_t loaded;
+	static unsigned long loaded;
 
 	if (uatomic_is_true(&work_error))
 		return;
