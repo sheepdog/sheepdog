@@ -425,7 +425,7 @@ static struct subcommand node_cmd[] = {
 	 SUBCMD_FLAG_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_info},
-	{"recovery", NULL, "aphP", "show recovery information of nodes", NULL,
+	{"recovery", NULL, "aphPr", "show recovery information of nodes", NULL,
 	 SUBCMD_FLAG_NEED_NODELIST, node_recovery, node_options},
 	{"md", "[disks]", "apAh", "See 'collie node md' for more information",
 	 node_md_cmd, SUBCMD_FLAG_NEED_ARG, node_md, node_options},
