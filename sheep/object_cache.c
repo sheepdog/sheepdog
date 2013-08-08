@@ -28,8 +28,6 @@
 
 #define CACHE_INDEX_MASK      (CACHE_CREATE_BIT)
 
-#define CACHE_BLOCK_SIZE      ((UINT64_C(1) << 10) * 64) /* 64 KB */
-
 #define CACHE_OBJECT_SIZE (SD_DATA_OBJ_SIZE / 1024 / 1024) /* M */
 
 /* Kick background pusher if dirty_count greater than it */
@@ -116,13 +114,22 @@ static inline bool idx_has_vdi_bit(uint32_t idx)
 	return !!(idx & CACHE_VDI_BIT);
 }
 
-static uint64_t calc_object_bmap(size_t len, off_t offset)
+static inline size_t get_cache_block_size(uint64_t oid)
+{
+	size_t bsize = DIV_ROUND_UP(get_objsize(oid),
+				    sizeof(uint64_t) * BITS_PER_BYTE);
+
+	return round_up(bsize, BLOCK_SIZE); /* To be FS friendly */
+}
+
+static uint64_t calc_object_bmap(uint64_t oid, size_t len, off_t offset)
 {
 	int start, end, nr;
 	unsigned long bmap = 0;
+	size_t bsize = get_cache_block_size(oid);
 
-	start = offset / CACHE_BLOCK_SIZE;
-	end = DIV_ROUND_UP(len + offset, CACHE_BLOCK_SIZE);
+	start = offset / bsize;
+	end = DIV_ROUND_UP(len + offset, bsize);
 	nr = end - start;
 
 	while (nr--)
@@ -432,7 +439,7 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 	}
 	write_lock_cache(oc);
 	if (writeback) {
-		entry->bmap |= calc_object_bmap(count, offset);
+		entry->bmap |= calc_object_bmap(oid, count, offset);
 		if (list_empty(&entry->dirty_list))
 			add_to_dirty_list(entry);
 	}
@@ -470,32 +477,24 @@ static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
 	struct sd_req hdr;
 	void *buf;
 	off_t offset;
-	unsigned data_length;
-	int ret = SD_RES_NO_MEM;
 	uint64_t oid = idx_to_oid(vid, idx);
+	size_t data_length, bsize = get_cache_block_size(oid);
+	int ret = SD_RES_NO_MEM;
 	int first_bit, last_bit;
 
-	sd_dprintf("%"PRIx64", create %d", oid, create);
-
 	if (!bmap) {
-		sd_dprintf("WARN: nothing to flush");
+		sd_dprintf("WARN: nothing to flush %"PRIx64, oid);
 		return SD_RES_SUCCESS;
 	}
 
 	first_bit = ffsll(bmap) - 1;
 	last_bit = fls64(bmap) - 1;
 
-	sd_dprintf("bmap:0x%"PRIx64", first_bit:%d, last_bit:%d", bmap,
-		   first_bit, last_bit);
-	offset = first_bit * CACHE_BLOCK_SIZE;
-	data_length = (last_bit - first_bit + 1) * CACHE_BLOCK_SIZE;
-
-	/*
-	 * CACHE_BLOCK_SIZE may not be divisible by SD_INODE_SIZE,
-	 * so (offset + data_length) could larger than SD_INODE_SIZE
-	 */
-	if (is_vdi_obj(oid) && (offset + data_length) > SD_INODE_SIZE)
-		data_length = SD_INODE_SIZE - offset;
+	sd_dprintf("%"PRIx64" bmap(%zd):0x%"PRIx64", first_bit:%d, last_bit:%d",
+		   oid, bsize, bmap, first_bit, last_bit);
+	offset = first_bit * bsize;
+	data_length = min((last_bit - first_bit + 1) * bsize,
+			  get_objsize(oid) - offset);
 
 	buf = xvalloc(data_length);
 	ret = read_cache_object_noupdate(vid, idx, buf, data_length, offset);
