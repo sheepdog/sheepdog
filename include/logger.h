@@ -28,6 +28,8 @@ struct logger_user_info {
 	int port;
 };
 
+extern int sd_log_level;
+
 void early_log_init(const char *format_name,
 		struct logger_user_info *user_info);
 int log_init(const char *progname, bool to_stdout, int level, char *outfile);
@@ -68,8 +70,16 @@ void sd_backtrace(void);
 	log_write(SDOG_NOTICE, __func__, __LINE__, fmt, ##args)
 #define sd_info(fmt, args...) \
 	log_write(SDOG_INFO, __func__, __LINE__, fmt, ##args)
-#define sd_debug(fmt, args...) \
-	log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args)
+
+/*
+ * 'args' must not contain an operation/function with a side-effect.  It won't
+ * be evaluated when the log level is not SDOG_DEBUG.
+ */
+#define sd_debug(fmt, args...)						\
+({									\
+	if (unlikely(sd_log_level == SDOG_DEBUG))			\
+		log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args);	\
+})
 
 #define panic(fmt, args...)			\
 ({						\

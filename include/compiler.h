@@ -12,6 +12,9 @@
 #ifndef SD_COMPILER_H
 #define SD_COMPILER_H
 
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+
 #define __packed __attribute((packed))
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))

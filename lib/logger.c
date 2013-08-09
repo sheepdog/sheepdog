@@ -106,7 +106,7 @@ static __thread int worker_idx;
 static struct logarea *la;
 static const char *log_name;
 static char *log_nowname;
-static int log_level = SDOG_INFO;
+int sd_log_level = SDOG_INFO;
 static pid_t sheep_pid;
 static pid_t logger_pid;
 static key_t semkey;
@@ -445,7 +445,7 @@ void log_write(int prio, const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
 
-	if (prio > log_level)
+	if (prio > sd_log_level)
 		return;
 
 	va_start(ap, fmt);
@@ -610,7 +610,7 @@ int log_init(const char *program_name, bool to_stdout, int level,
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
 	int size = level == SDOG_DEBUG ? LOG_SPACE_DEBUG_SIZE : LOG_SPACE_SIZE;
 
-	log_level = level;
+	sd_log_level = level;
 
 	log_name = program_name;
 	log_nowname = outfile;
