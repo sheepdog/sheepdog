@@ -41,7 +41,7 @@ sheep_SOURCES		+= cluster/zookeeper.c
 endif
 
 if BUILD_TRACE
-sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/stabs.c trace/graph.c
+sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c
 endif
 
 sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread -lm\

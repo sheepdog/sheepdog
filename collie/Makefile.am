@@ -29,7 +29,7 @@ collie_SOURCES		= farm/object_tree.c farm/sha1_file.c farm/snap.c \
 
 if BUILD_TRACE
 collie_SOURCES          += debug.c
-override CFLAGS         := $(subst -pg -gstabs,,$(CFLAGS))
+override CFLAGS         := $(subst -pg,,$(CFLAGS))
 endif
 
 collie_LDADD		= ../lib/libsheepdog.a -lpthread

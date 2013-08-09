@@ -289,6 +289,10 @@ if test "x${enable_trace}" = xyes; then
 	if [[[ $host != *x86_64* ]]]; then
 		AC_MSG_ERROR(tracer can be used on x86_64 architectures)
 	fi
+	AC_CHECK_LIB([bfd], [bfd_openr],,
+		AC_MSG_ERROR(requires binutils-dev))
+	AC_CHECK_HEADERS([bfd.h],,
+		AC_MSG_ERROR(requires binutils-dev))
 	AC_CHECK_LIB([rt], [clock_gettime],,
 		AC_MSG_ERROR(librt not found))
 	AC_DEFINE_UNQUOTED([HAVE_TRACE], 1, [have trace])
@@ -378,11 +382,9 @@ else
 fi
 
 if test "x${enable_trace}" = xyes && \
-		cc_supports_flag -pg && \
-		cc_supports_flag -gstabs ; then
-	AC_MSG_NOTICE([Enabling trace (-pg -gstabs)])
-	TRACE_CFLAGS="-pg -gstabs"
-	TRACE_LDFLAGS="-T$(pwd)/sheep/trace/trace.ld"
+		cc_supports_flag -pg ; then
+	AC_MSG_NOTICE([Enabling trace (-pg)])
+	TRACE_CFLAGS="-pg"
 	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
 else
 	TRACE_CFLAGS=""
@@ -393,7 +395,7 @@ CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
 	$TRACE_CFLAGS $COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS \
 	-D_GNU_SOURCE -D_LGPL_SOURCE -std=gnu99"
 CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS"
-LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS $TRACE_LDFLAGS"
+LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 
 # substitute what we need:
 AC_SUBST([OS_DYFLAGS])

@@ -11,14 +11,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <bfd.h>
+
 #include "trace.h"
 
-#define TRACE_HASH_BITS       7
-#define TRACE_HASH_SIZE       (1 << TRACE_HASH_BITS)
-
-static struct hlist_head trace_hashtable[TRACE_HASH_SIZE];
-static LIST_HEAD(caller_list);
-static pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct caller *callers;
+static size_t nr_callers;
 
 static trace_func_t trace_func = trace_call;
 
@@ -33,9 +31,9 @@ union instruction {
 	} __attribute__((packed));
 };
 
-static inline int trace_hash(unsigned long ip)
+static notrace int caller_cmp(const struct caller *a, const struct caller *b)
 {
-	return hash_64(ip, TRACE_HASH_BITS);
+	return intcmp(a->mcount, b->mcount);
 }
 
 static notrace unsigned char *get_new_call(unsigned long ip, unsigned long addr)
@@ -56,13 +54,6 @@ static notrace void replace_call(unsigned long ip, unsigned long func)
 	memcpy((void *)ip, new, INSN_SIZE);
 }
 
-static inline void replace_mcount_call(unsigned long func)
-{
-	unsigned long ip = (unsigned long)mcount_call;
-
-	replace_call(ip, func);
-}
-
 static inline void replace_trace_call(unsigned long func)
 {
 	unsigned long ip = (unsigned long)trace_call;
@@ -77,66 +68,13 @@ static notrace int make_text_writable(unsigned long ip)
 	return mprotect((void *)start, getpagesize() + INSN_SIZE, PROT_READ | PROT_EXEC | PROT_WRITE);
 }
 
-notrace struct caller *trace_lookup_ip(unsigned long ip, bool create)
+notrace struct caller *trace_lookup_ip(unsigned long ip)
 {
-	int h = trace_hash(ip);
-	struct hlist_head *head = trace_hashtable + h;
-	struct hlist_node *node;
-	struct ipinfo info;
-	struct caller *new = NULL;
+	const struct caller key = {
+		.mcount = ip,
+	};
 
-	pthread_mutex_lock(&trace_lock);
-	if (hlist_empty(head))
-		goto not_found;
-
-	hlist_for_each_entry(new, node, head, hash) {
-		if (new->mcount == ip)
-			goto out;
-	}
-not_found:
-	if (get_ipinfo(ip, &info) < 0) {
-		sd_dprintf("ip: %lx not found", ip);
-		new = NULL;
-		goto out;
-	}
-	if (create) {
-		new = malloc(sizeof(*new));
-		if (!new) {
-			sd_eprintf("out of memory");
-			goto out;
-		}
-		new->mcount = ip;
-		new->namelen = info.fn_namelen;
-		new->name = info.fn_name;
-		hlist_add_head(&new->hash, head);
-		list_add(&new->list, &caller_list);
-		sd_dprintf("add %.*s", info.fn_namelen, info.fn_name);
-	} else {
-		sd_dprintf("%.*s\n not found", info.fn_namelen, info.fn_name);
-		new = NULL;
-	}
-out:
-	pthread_mutex_unlock(&trace_lock);
-	return new;
-}
-
-/*
- * Try to NOP all the mcount call sites that are supposed to be traced.
- * Later we can enable it by asking these sites to point to trace_caller,
- * where we can override trace_call() with our own trace function. We can
- * do this, because below function record the IP of 'call mcount' inside the
- * callers.
- *
- * IP points to the return address.
- */
-static notrace void do_trace_init(unsigned long ip)
-{
-
-	if (make_text_writable(ip) < 0)
-		return;
-
-	memcpy((void *)ip, NOP5, INSN_SIZE);
-	trace_lookup_ip(ip, true);
+	return xbsearch(&key, callers, nr_callers, caller_cmp);
 }
 
 notrace int register_trace_function(trace_func_t func)
@@ -151,26 +89,14 @@ notrace int register_trace_function(trace_func_t func)
 
 static notrace void patch_all_sites(unsigned long addr)
 {
-	struct caller *ca;
-	unsigned char *new;
-
-	pthread_mutex_lock(&trace_lock);
-	list_for_each_entry(ca, &caller_list, list) {
-		new = get_new_call(ca->mcount, addr);
-		memcpy((void *)ca->mcount, new, INSN_SIZE);
-	}
-	pthread_mutex_unlock(&trace_lock);
+	for (int i = 0; i < nr_callers; i++)
+		replace_call(callers[i].mcount, addr);
 }
 
 static notrace void nop_all_sites(void)
 {
-	struct caller *ca;
-
-	pthread_mutex_lock(&trace_lock);
-	list_for_each_entry(ca, &caller_list, list) {
-		memcpy((void *)ca->mcount, NOP5, INSN_SIZE);
-	}
-	pthread_mutex_unlock(&trace_lock);
+	for (int i = 0; i < nr_callers; i++)
+		memcpy((void *)callers[i].mcount, NOP5, INSN_SIZE);
 }
 
 notrace int trace_enable(void)
@@ -224,16 +150,126 @@ notrace void trace_buffer_push(int cpuid, struct trace_graph_item *item)
 	strbuf_add(&buffer[cpuid], item, sizeof(*item));
 }
 
+/* assume that mcount call exists in the first FIND_MCOUNT_RANGE bytes */
+#define FIND_MCOUNT_RANGE 32
+
+static unsigned long find_mcount_call(unsigned long entry_addr)
+{
+	unsigned long start = entry_addr;
+	unsigned long end = entry_addr + FIND_MCOUNT_RANGE;
+
+	while (start < end) {
+		union instruction *code;
+		unsigned long addr;
+
+		/* 0xe8 means a opcode of call */
+		code = memchr((void *)start, 0xe8, end - start);
+		addr = (unsigned long)code;
+
+		if (code == NULL)
+			break;
+
+		if ((int)((unsigned long)mcount - addr - INSN_SIZE) ==
+		    code->offset)
+			return addr;
+
+		start = addr + 1;
+	}
+
+	return 0;
+}
+
+static bfd *get_bfd(void)
+{
+	char fname[PATH_MAX] = {0};
+	bfd *abfd;
+
+	if (readlink("/proc/self/exe", fname, sizeof(fname)) < 0)
+		panic("failed to get a path of the program.");
+
+	abfd = bfd_openr(fname, NULL);
+	if (abfd == 0) {
+		sd_eprintf("cannot open %s", fname);
+		return NULL;
+	}
+
+	if (!bfd_check_format(abfd, bfd_object)) {
+		sd_eprintf("invalid format");
+		return NULL;
+	}
+
+	if (!(bfd_get_file_flags(abfd) & HAS_SYMS)) {
+		sd_eprintf("no symbols found");
+		return NULL;
+	}
+
+	return abfd;
+}
+
+/* Create a caller list which has a mcount call. */
+static int init_callers(void)
+{
+	int max_symtab_size;
+	asymbol **symtab;
+	int symcount;
+	bfd *abfd;
+
+	abfd = get_bfd();
+	if (abfd == NULL)
+		return -1;
+
+	max_symtab_size = bfd_get_symtab_upper_bound(abfd);
+	if (max_symtab_size < 0) {
+		sd_eprintf("failed to get symtab size");
+		return -1;
+	}
+
+	symtab = xmalloc(max_symtab_size);
+	symcount = bfd_canonicalize_symtab(abfd, symtab);
+
+	callers = xzalloc(sizeof(*callers) * symcount);
+	for (int i = 0; i < symcount; i++) {
+		asymbol *sym = symtab[i];
+		unsigned long ip, addr = bfd_asymbol_value(sym);
+		const char *name = bfd_asymbol_name(sym);
+
+		if (addr == 0 || !(sym->flags & BSF_FUNCTION))
+			/* sym is not a function */
+			continue;
+
+		ip = find_mcount_call(addr);
+		if (ip == 0) {
+			sd_dprintf("%s doesn't have mcount call", name);
+			continue;
+		}
+		if (make_text_writable(ip) < 0)
+			panic("failed to make mcount call writable");
+
+		callers[nr_callers].addr = addr;
+		callers[nr_callers].mcount = ip;
+		callers[nr_callers].name = strdup(name);
+		nr_callers++;
+	}
+	xqsort(callers, nr_callers, caller_cmp);
+
+	free(symtab);
+	bfd_close(abfd);
+
+	return 0;
+}
+
+/*
+ * Try to NOP all the mcount call sites that are supposed to be traced.  Later
+ * we can enable it by asking these sites to point to trace_caller.
+ */
 notrace int trace_init(void)
 {
 	int i;
 
-	if (make_text_writable((unsigned long)mcount_call) < 0) {
-		sd_dprintf("%m");
+	if (init_callers() < 0)
 		return -1;
-	}
 
-	replace_mcount_call((unsigned long)do_trace_init);
+	nop_all_sites();
 
 	nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
 	buffer = xzalloc(sizeof(*buffer) * nr_cpu);

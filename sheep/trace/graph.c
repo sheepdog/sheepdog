@@ -89,10 +89,8 @@ static notrace void graph_tracer(unsigned long ip, unsigned long *ret_addr)
 
 	memset(&trace, 0, sizeof(trace));
 
-	cr = trace_lookup_ip(ip, false);
-	assert(cr->namelen + 1 < TRACE_FNAME_LEN);
-	memcpy(trace.fname, cr->name, cr->namelen);
-	memset(trace.fname + cr->namelen, '\0', 1);
+	cr = trace_lookup_ip(ip);
+	pstrcpy(trace.fname, sizeof(trace.fname), cr->name);
 	get_thread_name(trace.tname);
 
 	*ret_addr = (unsigned long)trace_return_caller;
