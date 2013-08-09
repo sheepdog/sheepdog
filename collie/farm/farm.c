@@ -119,7 +119,7 @@ static int create_directory(const char *p)
 	strbuf_addstr(&buf, p);
 	if (xmkdir(buf.buf, 0755) < 0) {
 		if (errno == EEXIST)
-			fprintf(stderr, "Path is not a directory: %s\n", p);
+			sd_err("Path is not a directory: %s", p);
 		goto out;
 	}
 
@@ -144,7 +144,7 @@ static int create_directory(const char *p)
 	ret = 0;
 out:
 	if (ret)
-		fprintf(stderr, "Fail to create directory: %m\n");
+		sd_err("Fail to create directory: %m");
 	strbuf_release(&buf);
 	return ret;
 }
@@ -189,8 +189,8 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
 
 	if (ret)
-		fprintf(stderr, "Fail to notify vdi add event(%"PRIx32", %d)\n",
-			vdi_id, nr_copies);
+		sd_err("Fail to notify vdi add event(%"PRIx32", %d)", vdi_id,
+		       nr_copies);
 
 	free(buf);
 	return ret;
@@ -207,7 +207,7 @@ int farm_init(const char *path)
 	return 0;
 out:
 	if (ret)
-		fprintf(stderr, "Fail to init farm.\n");
+		sd_err("Fail to init farm.");
 	return ret;
 }
 
@@ -241,8 +241,7 @@ static void do_save_object(struct work *work)
 	return;
 error:
 	free(buf);
-	fprintf(stderr, "Fail to save object, oid %"PRIx64"\n",
-		sw->entry.oid);
+	sd_err("Fail to save object, oid %"PRIx64, sw->entry.oid);
 	uatomic_set_true(&work_error);
 }
 
@@ -360,7 +359,7 @@ static void do_load_object(struct work *work)
 	return;
 error:
 	free(buffer);
-	fprintf(stderr, "Fail to load object, oid %"PRIx64"\n", sw->entry.oid);
+	sd_err("Fail to load object, oid %"PRIx64, sw->entry.oid);
 	uatomic_set_true(&work_error);
 }
 

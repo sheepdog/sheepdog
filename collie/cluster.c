@@ -48,8 +48,7 @@ static int list_store(void)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Restore failed: %s\n",
-				sd_strerror(rsp->result));
+		sd_err("Restore failed: %s", sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -109,8 +108,7 @@ static int cluster_format(int argc, char **argv)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Format failed: %s\n",
-				sd_strerror(rsp->result));
+		sd_err("Format failed: %s", sd_strerror(rsp->result));
 		if (rsp->result == SD_RES_NO_STORE)
 			return list_store();
 		else
@@ -197,7 +195,7 @@ static int cluster_shutdown(int argc, char **argv)
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
+		sd_err("failed to execute request");
 		return EXIT_FAILURE;
 	}
 
@@ -236,7 +234,7 @@ static int list_snapshot(int argc, char **argv)
 	ret = EXIT_SUCCESS;
 out:
 	if (ret)
-		fprintf(stderr, "Fail to list snapshot.\n");
+		sd_err("Fail to list snapshot.");
 	free(buf);
 	return ret;
 }
@@ -280,12 +278,12 @@ static int save_snapshot(int argc, char **argv)
 
 	unused = strtol(tag, &p, 10);
 	if (tag != p) {
-		fprintf(stderr, "Tag should not start with number.\n");
+		sd_err("Tag should not start with number.");
 		return EXIT_USAGE;
 	}
 
 	if (!argv[optind]) {
-		fprintf(stderr, "Please specify the path to save snapshot.\n");
+		sd_err("Please specify the path to save snapshot.");
 		return EXIT_USAGE;
 	}
 	path = argv[optind];
@@ -294,8 +292,8 @@ static int save_snapshot(int argc, char **argv)
 		goto out;
 
 	if (farm_contain_snapshot(0, tag)) {
-		fprintf(stderr, "Snapshot tag has already been used for another"
-			" snapshot, please, use another one.\n");
+		sd_err("Snapshot tag has already been used for another"
+		       " snapshot, please, use another one.");
 		goto out;
 	}
 
@@ -308,7 +306,7 @@ static int save_snapshot(int argc, char **argv)
 	ret = EXIT_SUCCESS;
 out:
 	if (ret)
-		fprintf(stderr, "Fail to save snapshot to path: %s.\n", path);
+		sd_err("Fail to save snapshot to path: %s.", path);
 	object_tree_free();
 	return ret;
 }
@@ -325,7 +323,7 @@ static int load_snapshot(int argc, char **argv)
 		idx = 0;
 
 	if (!argv[optind]) {
-		fprintf(stderr, "Please specify the path to save snapshot.\n");
+		sd_err("Please specify the path to save snapshot.");
 		return EXIT_USAGE;
 	}
 	path = argv[optind];
@@ -334,7 +332,7 @@ static int load_snapshot(int argc, char **argv)
 		goto out;
 
 	if (!farm_contain_snapshot(idx, tag)) {
-		fprintf(stderr, "Snapshot index or tag does not exist.\n");
+		sd_err("Snapshot index or tag does not exist.");
 		goto out;
 	}
 
@@ -347,7 +345,7 @@ static int load_snapshot(int argc, char **argv)
 	ret = EXIT_SUCCESS;
 out:
 	if (ret)
-		fprintf(stderr, "Fail to load snapshot\n");
+		sd_err("Fail to load snapshot");
 	return ret;
 }
 
@@ -388,8 +386,8 @@ static int cluster_force_recover(int argc, char **argv)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to execute request, %s\n",
-			sd_strerror(rsp->result));
+		sd_err("failed to execute request, %s",
+		       sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -504,11 +502,11 @@ static int cluster_parser(int ch, char *opt)
 	case 'c':
 		copies = strtol(opt, &p, 10);
 		if (opt == p || copies < 1) {
-			fprintf(stderr, "There must be at least one copy of data\n");
+			sd_err("There must be at least one copy of data");
 			exit(EXIT_FAILURE);
 		} else if (copies > SD_MAX_COPIES) {
-			fprintf(stderr, "Redundancy may not exceed %d copies\n",
-				SD_MAX_COPIES);
+			sd_err("Redundancy may not exceed %d copies",
+			       SD_MAX_COPIES);
 			exit(EXIT_FAILURE);
 		}
 		cluster_cmd_data.copies = copies;

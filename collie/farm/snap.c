@@ -37,7 +37,7 @@ int snap_init(const char *farm_dir)
 	fd = open(snap_log_path, O_CREAT | O_EXCL, 0666);
 	if (fd < 0) {
 		if (errno != EEXIST) {
-			fprintf(stderr, "%m\n");
+			sd_err("%m");
 			goto out;
 		}
 	}
@@ -60,7 +60,7 @@ int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1)
 
 	fd = open(snap_log_path, O_WRONLY | O_APPEND);
 	if (fd < 0) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		goto out;
 	}
 
@@ -86,11 +86,11 @@ void *snap_log_read(int *out_nr)
 
 	fd = open(snap_log_path, O_RDONLY);
 	if (fd < 0) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		goto out;
 	}
 	if (fstat(fd, &st) < 0) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		goto out_close;
 	}
 

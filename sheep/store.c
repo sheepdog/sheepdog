@@ -169,7 +169,7 @@ out:
 int init_base_path(const char *d)
 {
 	if (xmkdir(d, sd_def_dmode) < 0) {
-		fprintf(stderr, "cannot create the directory %s (%m)\n", d);
+		sd_err("cannot create the directory %s (%m)", d);
 		return -1;
 	}
 

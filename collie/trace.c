@@ -82,7 +82,7 @@ static int trace_read_buffer(void)
 
 	tfd = open(tracefile, O_CREAT | O_RDWR | O_APPEND | O_TRUNC, 0644);
 	if (tfd < 0) {
-		fprintf(stderr, "can't create tracefile\n");
+		sd_err("can't create tracefile");
 		return EXIT_SYSFAIL;
 	}
 
@@ -98,8 +98,7 @@ read_buffer:
 		goto read_buffer;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Trace failed: %s\n",
-				sd_strerror(rsp->result));
+		sd_err("Trace failed: %s", sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -132,14 +131,13 @@ static int trace_enable(int argc, char **argv)
 	case SD_RES_SUCCESS:
 		break;
 	case SD_RES_NO_SUPPORT:
-		fprintf(stderr, "no such tracer %s\n", tracer);
+		sd_err("no such tracer %s", tracer);
 		return EXIT_FAILURE;
 	case SD_RES_INVALID_PARMS:
-		fprintf(stderr, "tracer %s is already enabled\n", tracer);
+		sd_err("tracer %s is already enabled", tracer);
 		return EXIT_FAILURE;
 	default:
-		fprintf(stderr, "unknown error (%s)\n",
-			sd_strerror(rsp->result));
+		sd_err("unknown error (%s)", sd_strerror(rsp->result));
 		return EXIT_SYSFAIL;
 	}
 
@@ -165,14 +163,13 @@ static int trace_disable(int argc, char **argv)
 	case SD_RES_SUCCESS:
 		break;
 	case SD_RES_NO_SUPPORT:
-		fprintf(stderr, "no such tracer %s\n", tracer);
+		sd_err("no such tracer %s", tracer);
 		return EXIT_FAILURE;
 	case SD_RES_INVALID_PARMS:
-		fprintf(stderr, "tracer %s is not enabled\n", tracer);
+		sd_err("tracer %s is not enabled", tracer);
 		return EXIT_FAILURE;
 	default:
-		fprintf(stderr, "unknown error (%s)\n",
-			sd_strerror(rsp->result));
+		sd_err("unknown error (%s)", sd_strerror(rsp->result));
 		return EXIT_SYSFAIL;
 	}
 
@@ -204,12 +201,12 @@ static int trace_cat(int argc, char **argv)
 	void *map;
 
 	if (fd < 0) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		return EXIT_SYSFAIL;
 	}
 
 	if (fstat(fd, &st) < 0) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		close(fd);
 		return EXIT_SYSFAIL;
 	}
@@ -220,7 +217,7 @@ static int trace_cat(int argc, char **argv)
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		return EXIT_SYSFAIL;
 	}
 	parse_trace_buffer(map, st.st_size);

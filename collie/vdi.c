@@ -76,9 +76,9 @@ static int parse_option_size(const char *value, uint64_t *ret)
 		*ret = (uint64_t) sizef;
 		break;
 	default:
-		fprintf(stderr, "Invalid size '%s'\n", value);
-		fprintf(stderr, "You may use k, M, G or T suffixes for "
-			"kilobytes, megabytes, gigabytes and terabytes.\n");
+		sd_err("Invalid size '%s'", value);
+		sd_err("You may use k, M, G or T suffixes for "
+		       "kilobytes, megabytes, gigabytes and terabytes.");
 		return -1;
 	}
 
@@ -250,11 +250,11 @@ static int do_print_obj(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 		break;
 	case SD_RES_OLD_NODE_VER:
 	case SD_RES_NEW_NODE_VER:
-		fprintf(stderr, "The node list has changed: please try again\n");
+		sd_err("The node list has changed: please try again");
 		break;
 	default:
-		fprintf(stderr, "%s: hit an unexpected error (%s)\n",
-			sheep, sd_strerror(rsp->result));
+		sd_err("%s: hit an unexpected error (%s)", sheep,
+		       sd_strerror(rsp->result));
 		break;
 	}
 
@@ -287,11 +287,11 @@ static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 		break;
 	case SD_RES_OLD_NODE_VER:
 	case SD_RES_NEW_NODE_VER:
-		fprintf(stderr, "The node list has changed: please try again\n");
+		sd_err("The node list has changed: please try again");
 		break;
 	default:
-		fprintf(stderr, "%s: hit an unexpected error (%s)\n",
-			sheep, sd_strerror(rsp->result));
+		sd_err("%s: hit an unexpected error (%s)", sheep,
+		       sd_strerror(rsp->result));
 		break;
 	}
 
@@ -408,8 +408,8 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 		return -1;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Cannot get VDI info for %s %d %s: %s\n",
-			vdiname, snapid, tag, sd_strerror(rsp->result));
+		sd_err("Cannot get VDI info for %s %d %s: %s", vdiname, snapid,
+		       tag, sd_strerror(rsp->result));
 		return -1;
 	}
 	*vid = rsp->vdi.vdi_id;
@@ -426,20 +426,19 @@ static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 
 	ret = find_vdi_name(vdiname, snapid, tag, &vid, 0);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		sd_err("Failed to open VDI %s", vdiname);
 		return EXIT_FAILURE;
 	}
 
 	ret = sd_read_object(vid_to_vdi_oid(vid), inode, size, 0, true);
 	if (ret != SD_RES_SUCCESS) {
 		if (snapid) {
-			fprintf(stderr, "Failed to read a snapshot %s:%d\n",
-				vdiname, snapid);
+			sd_err("Failed to read a snapshot %s:%d", vdiname,
+			       snapid);
 		} else if (tag && tag[0]) {
-			fprintf(stderr, "Failed to read a snapshot %s:%s\n",
-				vdiname, tag);
+			sd_err("Failed to read a snapshot %s:%s", vdiname, tag);
 		} else {
-			fprintf(stderr, "Failed to read a vdi %s\n", vdiname);
+			sd_err("Failed to read a vdi %s", vdiname);
 		}
 		return EXIT_FAILURE;
 	}
@@ -476,8 +475,8 @@ int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to create VDI %s: %s\n", vdiname,
-				sd_strerror(rsp->result));
+		sd_err("Failed to create VDI %s: %s", vdiname,
+		       sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -497,20 +496,20 @@ static int vdi_create(int argc, char **argv)
 	struct sd_inode *inode = NULL;
 
 	if (!argv[optind]) {
-		fprintf(stderr, "Please specify the VDI size\n");
+		sd_err("Please specify the VDI size");
 		return EXIT_USAGE;
 	}
 	ret = parse_option_size(argv[optind], &size);
 	if (ret < 0)
 		return EXIT_USAGE;
 	if (size > SD_MAX_VDI_SIZE) {
-		fprintf(stderr, "VDI size is too large\n");
+		sd_err("VDI size is too large");
 		return EXIT_USAGE;
 	}
 
 	if (nr_copies > sd_nodes_nr) {
-		fprintf(stderr, "There are not enough nodes(%d) to hold "
-			"the copies(%d)\n", sd_nodes_nr, nr_copies);
+		sd_err("There are not enough nodes(%d) to hold the copies(%d)",
+		       sd_nodes_nr, nr_copies);
 		return EXIT_USAGE;
 	}
 
@@ -523,7 +522,7 @@ static int vdi_create(int argc, char **argv)
 
 	ret = sd_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode), 0, true);
 	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read a newly created VDI object\n");
+		sd_err("Failed to read a newly created VDI object");
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -573,8 +572,8 @@ static int vdi_snapshot(int argc, char **argv)
 	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	if (vdi_cmd_data.snapshot_id != 0) {
-		fprintf(stderr, "Please specify a non-integer value for "
-			"a snapshot tag name\n");
+		sd_err("Please specify a non-integer value for "
+		       "a snapshot tag name");
 		return EXIT_USAGE;
 	}
 
@@ -613,14 +612,14 @@ static int vdi_clone(int argc, char **argv)
 
 	dst_vdi = argv[optind];
 	if (!dst_vdi) {
-		fprintf(stderr, "Destination VDI name must be specified\n");
+		sd_err("Destination VDI name must be specified");
 		ret = EXIT_USAGE;
 		goto out;
 	}
 
 	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
-		fprintf(stderr, "Only snapshot VDIs can be cloned\n");
-		fprintf(stderr, "Please specify the '-s' option\n");
+		sd_err("Only snapshot VDIs can be cloned");
+		sd_err("Please specify the '-s' option");
 		ret = EXIT_USAGE;
 		goto out;
 	}
@@ -694,14 +693,14 @@ static int vdi_resize(int argc, char **argv)
 	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	if (!argv[optind]) {
-		fprintf(stderr, "Please specify the new size for the VDI\n");
+		sd_err("Please specify the new size for the VDI");
 		return EXIT_USAGE;
 	}
 	ret = parse_option_size(argv[optind], &new_size);
 	if (ret < 0)
 		return EXIT_USAGE;
 	if (new_size > SD_MAX_VDI_SIZE) {
-		fprintf(stderr, "New VDI size is too large\n");
+		sd_err("New VDI size is too large");
 		return EXIT_USAGE;
 	}
 
@@ -710,7 +709,7 @@ static int vdi_resize(int argc, char **argv)
 		return ret;
 
 	if (new_size < inode->vdi_size) {
-		fprintf(stderr, "Shrinking VDIs is not implemented\n");
+		sd_err("Shrinking VDIs is not implemented");
 		return EXIT_USAGE;
 	}
 	inode->vdi_size = new_size;
@@ -718,7 +717,7 @@ static int vdi_resize(int argc, char **argv)
 	ret = sd_write_object(vid_to_vdi_oid(vid), 0, inode, SD_INODE_HEADER_SIZE, 0,
 			      0, inode->nr_copies, false, true);
 	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to update an inode header\n");
+		sd_err("Failed to update an inode header");
 		return EXIT_FAILURE;
 	}
 
@@ -735,7 +734,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 
 	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid, 0);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		sd_err("Failed to open VDI %s", vdiname);
 		return EXIT_FAILURE;
 	}
 
@@ -744,7 +743,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
+		sd_err("failed to execute request");
 		return EXIT_FAILURE;
 	}
 
@@ -762,8 +761,8 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to delete %s: %s\n", vdiname,
-				sd_strerror(rsp->result));
+		sd_err("Failed to delete %s: %s", vdiname,
+		       sd_strerror(rsp->result));
 		if (rsp->result == SD_RES_NO_VDI)
 			return EXIT_MISSING;
 		else
@@ -790,7 +789,7 @@ static int vdi_rollback(int argc, char **argv)
 	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
-		fprintf(stderr, "Please specify the '-s' option\n");
+		sd_err("Please specify the '-s' option");
 		return EXIT_USAGE;
 	}
 
@@ -806,7 +805,7 @@ static int vdi_rollback(int argc, char **argv)
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to delete the current state\n");
+		sd_err("Failed to delete the current state");
 		return EXIT_FAILURE;
 	}
 
@@ -841,7 +840,7 @@ static int vdi_object(int argc, char **argv)
 
 	vid = info.vid;
 	if (vid == 0) {
-		fprintf(stderr, "VDI not found\n");
+		sd_err("VDI not found");
 		return EXIT_MISSING;
 	}
 
@@ -873,7 +872,8 @@ static int vdi_object(int argc, char **argv)
 				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
 				       vid, idx);
 		} else
-			fprintf(stderr, "Failed to read the inode object 0x%" PRIx32 "\n", vid);
+			sd_err("Failed to read the inode object 0x%" PRIx32,
+			       vid);
 	}
 
 	return EXIT_SUCCESS;
@@ -965,7 +965,7 @@ static int vdi_track(int argc, char **argv)
 	vid = info.vid;
 	nr_copies = info.nr_copies;
 	if (vid == 0) {
-		fprintf(stderr, "VDI not found\n");
+		sd_err("VDI not found");
 		return EXIT_MISSING;
 	}
 
@@ -987,8 +987,7 @@ static int vdi_track(int argc, char **argv)
 		   &oid_info, SD_DATA_OBJ_SIZE);
 
 	if (!oid_info.success) {
-		fprintf(stderr, "Failed to read the inode object 0x%"PRIx32"\n",
-			vid);
+		sd_err("Failed to read the inode object 0x%" PRIx32, vid);
 		goto err;
 	}
 	if (!oid_info.data_oid) {
@@ -1062,7 +1061,7 @@ static int vdi_setattr(int argc, char **argv)
 
 	key = argv[optind++];
 	if (!key) {
-		fprintf(stderr, "Please specify the attribute key\n");
+		sd_err("Please specify the attribute key");
 		return EXIT_USAGE;
 	}
 
@@ -1075,7 +1074,7 @@ reread:
 		ret = read(STDIN_FILENO, value + offset,
 			   SD_MAX_VDI_ATTR_VALUE_LEN - offset);
 		if (ret < 0) {
-			fprintf(stderr, "Failed to read attribute value from stdin: %m\n");
+			sd_err("Failed to read attribute value from stdin: %m");
 			return EXIT_SYSFAIL;
 		}
 		if (ret > 0) {
@@ -1094,17 +1093,16 @@ reread:
 				vdi_cmd_data.exclusive, vdi_cmd_data.delete);
 	if (ret) {
 		if (ret == SD_RES_VDI_EXIST) {
-			fprintf(stderr, "The attribute '%s' already exists\n", key);
+			sd_err("The attribute '%s' already exists", key);
 			return EXIT_EXISTS;
 		} else if (ret == SD_RES_NO_OBJ) {
-			fprintf(stderr, "Attribute '%s' not found\n", key);
+			sd_err("Attribute '%s' not found", key);
 			return EXIT_MISSING;
 		} else if (ret == SD_RES_NO_VDI) {
-			fprintf(stderr, "VDI not found\n");
+			sd_err("VDI not found");
 			return EXIT_MISSING;
 		} else
-			fprintf(stderr, "Failed to set attribute: %s\n",
-				sd_strerror(ret));
+			sd_err("Failed to set attribute: %s", sd_strerror(ret));
 		return EXIT_FAILURE;
 	}
 
@@ -1121,7 +1119,7 @@ static int vdi_getattr(int argc, char **argv)
 
 	key = argv[optind++];
 	if (!key) {
-		fprintf(stderr, "Please specify the attribute key\n");
+		sd_err("Please specify the attribute key");
 		return EXIT_USAGE;
 	}
 
@@ -1129,14 +1127,13 @@ static int vdi_getattr(int argc, char **argv)
 				vdi_cmd_data.snapshot_id, key, NULL, 0, &vid,
 				&attr_oid, &nr_copies, false, false, false);
 	if (ret == SD_RES_NO_OBJ) {
-		fprintf(stderr, "Attribute '%s' not found\n", key);
+		sd_err("Attribute '%s' not found", key);
 		return EXIT_MISSING;
 	} else if (ret == SD_RES_NO_VDI) {
-		fprintf(stderr, "VDI not found\n");
+		sd_err("VDI not found");
 		return EXIT_MISSING;
 	} else if (ret) {
-		fprintf(stderr, "Failed to find attribute oid: %s\n",
-			sd_strerror(ret));
+		sd_err("Failed to find attribute oid: %s", sd_strerror(ret));
 		return EXIT_MISSING;
 	}
 
@@ -1144,8 +1141,7 @@ static int vdi_getattr(int argc, char **argv)
 
 	ret = sd_read_object(oid, &vattr, SD_ATTR_OBJ_SIZE, 0, true);
 	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read attribute oid: %s\n",
-			sd_strerror(ret));
+		sd_err("Failed to read attribute oid: %s", sd_strerror(ret));
 		return EXIT_SYSFAIL;
 	}
 
@@ -1183,7 +1179,7 @@ static int vdi_read(int argc, char **argv)
 		goto out;
 
 	if (inode->vdi_size < offset) {
-		fprintf(stderr, "Read offset is beyond the end of the VDI\n");
+		sd_err("Read offset is beyond the end of the VDI");
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -1198,7 +1194,7 @@ static int vdi_read(int argc, char **argv)
 			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
 			ret = sd_read_object(oid, buf, len, offset, false);
 			if (ret != SD_RES_SUCCESS) {
-				fprintf(stderr, "Failed to read VDI\n");
+				sd_err("Failed to read VDI");
 				ret = EXIT_FAILURE;
 				goto out;
 			}
@@ -1207,7 +1203,7 @@ static int vdi_read(int argc, char **argv)
 
 		ret = xwrite(STDOUT_FILENO, buf, len);
 		if (ret < 0) {
-			fprintf(stderr, "Failed to write to stdout: %m\n");
+			sd_err("Failed to write to stdout: %m");
 			abort();
 			ret = EXIT_SYSFAIL;
 			goto out;
@@ -1256,7 +1252,7 @@ static int vdi_write(int argc, char **argv)
 		goto out;
 
 	if (inode->vdi_size < offset) {
-		fprintf(stderr, "Write offset is beyond the end of the VDI\n");
+		sd_err("Write offset is beyond the end of the VDI");
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -1282,7 +1278,7 @@ static int vdi_write(int argc, char **argv)
 
 		ret = xread(STDIN_FILENO, buf, len);
 		if (ret < 0) {
-			fprintf(stderr, "Failed to read from stdin: %m\n");
+			sd_err("Failed to read from stdin: %m");
 			ret = EXIT_SYSFAIL;
 			goto out;
 		} else if (ret < len) {
@@ -1296,7 +1292,7 @@ static int vdi_write(int argc, char **argv)
 		ret = sd_write_object(oid, old_oid, buf, len, offset, flags,
 				      inode->nr_copies, create, false);
 		if (ret != SD_RES_SUCCESS) {
-			fprintf(stderr, "Failed to write VDI\n");
+			sd_err("Failed to write VDI");
 			ret = EXIT_FAILURE;
 			goto out;
 		}
@@ -1359,8 +1355,8 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 		free(buf);
 		return NULL;
 	default:
-		fprintf(stderr, "FATAL: failed to read %"PRIx64", %s\n",
-			oid, sd_strerror(rsp->result));
+		sd_err("FATAL: failed to read %"PRIx64", %s", oid,
+		       sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
 	return buf;
@@ -1390,8 +1386,8 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 		exit(EXIT_SYSFAIL);
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "FATAL: failed to write %"PRIx64", %s\n",
-			oid, sd_strerror(rsp->result));
+		sd_err("FATAL: failed to write %"PRIx64", %s", oid,
+		       sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
 }
@@ -1481,9 +1477,8 @@ static void vdi_hash_check_work(struct work *work)
 		vcw->object_found = false;
 		break;
 	default:
-		fprintf(stderr, "failed to read %"PRIx64" from %s:%d, %s\n",
-			info->oid, host, vcw->vnode->nid.port,
-			sd_strerror(ret));
+		sd_err("failed to read %" PRIx64 " from %s:%d, %s", info->oid,
+		       host, vcw->vnode->nid.port, sd_strerror(ret));
 		exit(EXIT_FAILURE);
 	}
 }
@@ -1499,7 +1494,7 @@ static void vdi_hash_check_main(struct work *work)
 		return;
 
 	if (info->base  == NULL) {
-		fprintf(stderr, "no node has %"PRIx64"\n", info->oid);
+		sd_err("no node has %" PRIx64, info->oid);
 		exit(EXIT_FAILURE);
 	}
 
@@ -1559,12 +1554,11 @@ static int vdi_check(int argc, char **argv)
 			   vdi_cmd_data.snapshot_tag, &vid, inode,
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS) {
-		fprintf(stderr, "FATAL: no inode objects\n");
+		sd_err("FATAL: no inode objects");
 		goto out;
 	}
 	if (sd_nodes_nr < inode->nr_copies) {
-		fprintf(stderr, "ABORT: Not enough active nodes for "
-			"consistency-check\n");
+		sd_err("ABORT: Not enough active nodes for consistency-check");
 		return EXIT_FAILURE;
 	}
 
@@ -1648,8 +1642,8 @@ static int get_obj_backup(int idx, uint32_t from_vid, uint32_t to_vid,
 		ret = sd_read_object(vid_to_data_oid(to_vid, idx), backup->data,
 				     SD_DATA_OBJ_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
-			fprintf(stderr, "Failed to read object %"PRIx32", %d\n",
-				to_vid, idx);
+			sd_err("Failed to read object %" PRIx32 ", %d", to_vid,
+			       idx);
 			return EXIT_FAILURE;
 		}
 	} else
@@ -1659,8 +1653,8 @@ static int get_obj_backup(int idx, uint32_t from_vid, uint32_t to_vid,
 		ret = sd_read_object(vid_to_data_oid(from_vid, idx), from_data,
 				     SD_DATA_OBJ_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
-			fprintf(stderr, "Failed to read object %"PRIx32", %d\n",
-				from_vid, idx);
+			sd_err("Failed to read object %" PRIx32 ", %d",
+			       from_vid, idx);
 			return EXIT_FAILURE;
 		}
 	}
@@ -1687,8 +1681,7 @@ static int vdi_backup(int argc, char **argv)
 	if ((!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) ||
 	    (!vdi_cmd_data.from_snapshot_id &&
 	     !vdi_cmd_data.from_snapshot_tag[0])) {
-		fprintf(stderr, "Please specify snapshots with '-F' and '-s'"
-			"options\n");
+		sd_err("Please specify snapshots with '-F' and '-s' options");
 		ret = EXIT_USAGE;
 		goto out;
 	}
@@ -1709,7 +1702,7 @@ static int vdi_backup(int argc, char **argv)
 
 	ret = xwrite(STDOUT_FILENO, &hdr, sizeof(hdr));
 	if (ret < 0) {
-		fprintf(stderr, "failed to write backup header, %m\n");
+		sd_err("failed to write backup header, %m");
 		ret = EXIT_SYSFAIL;
 		goto out;
 	}
@@ -1731,14 +1724,14 @@ static int vdi_backup(int argc, char **argv)
 		ret = xwrite(STDOUT_FILENO, backup,
 			     sizeof(*backup) - sizeof(backup->data));
 		if (ret < 0) {
-			fprintf(stderr, "failed to write backup data, %m\n");
+			sd_err("failed to write backup data, %m");
 			ret = EXIT_SYSFAIL;
 			goto out;
 		}
 		ret = xwrite(STDOUT_FILENO, backup->data + backup->offset,
 			     backup->length);
 		if (ret < 0) {
-			fprintf(stderr, "failed to write backup data, %m\n");
+			sd_err("failed to write backup data, %m");
 			ret = EXIT_SYSFAIL;
 			goto out;
 		}
@@ -1750,7 +1743,7 @@ static int vdi_backup(int argc, char **argv)
 	ret = xwrite(STDOUT_FILENO, backup,
 		     sizeof(*backup) - sizeof(backup->data));
 	if (ret < 0) {
-		fprintf(stderr, "failed to write end marker, %m\n");
+		sd_err("failed to write end marker, %m");
 		ret = EXIT_SYSFAIL;
 		goto out;
 	}
@@ -1796,11 +1789,11 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 
 	ret = xread(STDIN_FILENO, &hdr, sizeof(hdr));
 	if (ret != sizeof(hdr))
-		fprintf(stderr, "failed to read backup header, %m\n");
+		sd_err("failed to read backup header, %m");
 
 	if (hdr.version != VDI_BACKUP_FORMAT_VERSION ||
 	    hdr.magic != VDI_BACKUP_MAGIC) {
-		fprintf(stderr, "The backup file is corrupted\n");
+		sd_err("The backup file is corrupted");
 		ret = EXIT_SYSFAIL;
 		goto out;
 	}
@@ -1812,7 +1805,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid,
 			    false, inode->nr_copies);
 	if (ret != EXIT_SUCCESS) {
-		fprintf(stderr, "Failed to read VDI\n");
+		sd_err("Failed to read VDI");
 		goto out;
 	}
 
@@ -1820,7 +1813,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 		ret = xread(STDIN_FILENO, backup,
 			    sizeof(*backup) - sizeof(backup->data));
 		if (ret != sizeof(*backup) - sizeof(backup->data)) {
-			fprintf(stderr, "failed to read backup data\n");
+			sd_err("failed to read backup data");
 			ret = EXIT_SYSFAIL;
 			break;
 		}
@@ -1832,14 +1825,14 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 
 		ret = xread(STDIN_FILENO, backup->data, backup->length);
 		if (ret != backup->length) {
-			fprintf(stderr, "failed to read backup data\n");
+			sd_err("failed to read backup data");
 			ret = EXIT_SYSFAIL;
 			break;
 		}
 
 		ret = restore_obj(backup, vid, inode);
 		if (ret != SD_RES_SUCCESS) {
-			fprintf(stderr, "failed to restore backup\n");
+			sd_err("failed to restore backup");
 			do_vdi_delete(vdiname, 0, NULL);
 			ret = EXIT_FAILURE;
 			break;
@@ -1862,9 +1855,8 @@ static int vdi_restore(int argc, char **argv)
 	bool need_current_recovery = false;
 
 	if (!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) {
-		fprintf(stderr, "We can restore a backup file only to"
-			"snapshots\n");
-		fprintf(stderr, "Please specify the '-s' option\n");
+		sd_err("We can restore a backup file only to snapshots");
+		sd_err("Please specify the '-s' option");
 		ret = EXIT_USAGE;
 		goto out;
 	}
@@ -1886,14 +1878,14 @@ static int vdi_restore(int argc, char **argv)
 	}
 
 	if (is_stdin_console()) {
-		fprintf(stderr, "stdin must be pipe\n");
+		sd_err("stdin must be pipe");
 		ret = EXIT_USAGE;
 		goto out;
 	}
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
 	if (ret != EXIT_SUCCESS) {
-		fprintf(stderr, "Failed to delete the current state\n");
+		sd_err("Failed to delete the current state");
 		goto out;
 	}
 	need_current_recovery = true;
@@ -1909,7 +1901,7 @@ out:
 					     current_inode->parent_vdi_id, NULL,
 					     true, current_inode->nr_copies);
 		if (recovery_ret != EXIT_SUCCESS) {
-			fprintf(stderr, "failed to resume the current vdi\n");
+			sd_err("failed to resume the current vdi");
 			ret = recovery_ret;
 		}
 	}
@@ -1927,7 +1919,7 @@ static int vdi_cache_flush(int argc, char **argv)
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 			    vdi_cmd_data.snapshot_tag, &vid, 0);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		sd_err("Failed to open VDI %s", vdiname);
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -1937,7 +1929,7 @@ static int vdi_cache_flush(int argc, char **argv)
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
+		sd_err("failed to execute request");
 		return EXIT_FAILURE;
 	}
 out:
@@ -1954,7 +1946,7 @@ static int vdi_cache_delete(int argc, char **argv)
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 			    vdi_cmd_data.snapshot_tag, &vid, 0);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to open VDI %s\n", vdiname);
+		sd_err("Failed to open VDI %s", vdiname);
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -1964,7 +1956,7 @@ static int vdi_cache_delete(int argc, char **argv)
 
 	ret = send_light_req(&hdr, sdhost, sdport);
 	if (ret) {
-		fprintf(stderr, "failed to execute request\n");
+		sd_err("failed to execute request");
 		return EXIT_FAILURE;
 	}
 out:
@@ -2002,8 +1994,8 @@ static int vdi_cache_info(int argc, char **argv)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to get cache infomation: %s\n",
-			sd_strerror(rsp->result));
+		sd_err("failed to get cache infomation: %s",
+		       sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -2119,7 +2111,7 @@ static int vdi_parser(int ch, char *opt)
 	case 'i':
 		vdi_cmd_data.index = strtol(opt, &p, 10);
 		if (opt == p) {
-			fprintf(stderr, "The index must be an integer\n");
+			sd_err("The index must be an integer");
 			exit(EXIT_FAILURE);
 		}
 		break;
@@ -2147,8 +2139,8 @@ static int vdi_parser(int ch, char *opt)
 	case 'c':
 		nr_copies = strtol(opt, &p, 10);
 		if (opt == p || nr_copies < 0 || nr_copies > SD_MAX_COPIES) {
-			fprintf(stderr, "Invalid copies number, must be "
-				"an integer between 0 and %d\n", SD_MAX_COPIES);
+			sd_err("Invalid copies number, must be "
+			       "an integer between 0 and %d", SD_MAX_COPIES);
 			exit(EXIT_FAILURE);
 		}
 		vdi_cmd_data.nr_copies = nr_copies;

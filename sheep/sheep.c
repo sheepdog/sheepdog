@@ -140,8 +140,7 @@ static void usage(int status)
 			goto out;
 		}
 
-		fprintf(stderr, "Try '%s --help' for more information.\n",
-			program_name);
+		sd_err("Try '%s --help' for more information.", program_name);
 	} else {
 		struct sd_option *opt;
 
@@ -288,9 +287,8 @@ static void object_cache_size_set(char *s)
 	return;
 
 err:
-	fprintf(stderr, "Invalid object cache option '%s': "
-		"size must be an integer between 1 and %"PRIu32" inclusive\n",
-		s, max_cache_size);
+	sd_err("Invalid object cache option '%s': size must be an integer "
+	       "between 1 and %" PRIu32 " inclusive", s, max_cache_size);
 	exit(1);
 }
 
@@ -334,7 +332,7 @@ static void _object_cache_set(char *s)
 		}
 	}
 
-	fprintf(stderr, "invalid object cache arg: %s\n", s);
+	sd_err("invalid object cache arg: %s", s);
 	exit(1);
 }
 
@@ -346,7 +344,7 @@ static void object_cache_set(char *arg)
 	parse_arg(arg, ",", _object_cache_set);
 
 	if (sys->object_cache_size == 0) {
-		fprintf(stderr, "object cache size is not set\n");
+		sd_err("object cache size is not set");
 		exit(1);
 	}
 }
@@ -368,15 +366,15 @@ static void init_journal_arg(char *arg)
 		arg += szl;
 		jsize = strtoll(arg, NULL, 10);
 		if (jsize < MIN_JOURNAL_SIZE || jsize == LLONG_MAX) {
-			fprintf(stderr, "invalid size %s, "
-				"must be bigger than %u(M)\n", arg,
+			sd_err("invalid size %s, must be bigger than %u(M)",
+			       arg,
 				MIN_JOURNAL_SIZE);
 			exit(1);
 		}
 	} else if (!strncmp(sp, arg, spl)) {
 		jskip = true;
 	} else {
-		fprintf(stderr, "invalid paramters %s\n", arg);
+		sd_err("invalid paramters %s", arg);
 		exit(1);
 	}
 }
@@ -394,9 +392,8 @@ static void init_io_arg(char *arg)
 		arg += hl;
 		io_pt = arg;
 	} else {
-		fprintf(stderr, "invalid paramters %s. "
-			"Use '-i host=a.b.c.d,port=xxx'\n",
-			arg);
+		sd_err("invalid paramters %s. Use '-i host=a.b.c.d,port=xxx'",
+		       arg);
 		exit(1);
 	}
 }
@@ -599,8 +596,7 @@ int main(int argc, char **argv)
 			port = strtol(optarg, &p, 10);
 			if (optarg == p || port < 1 || UINT16_MAX < port
 				|| *p != '\0') {
-				fprintf(stderr, "Invalid port number '%s'\n",
-					optarg);
+				sd_err("Invalid port number '%s'", optarg);
 				exit(1);
 			}
 			break;
@@ -617,8 +613,7 @@ int main(int argc, char **argv)
 			log_level = strtol(optarg, &p, 10);
 			if (optarg == p || log_level < SDOG_EMERG ||
 			    SDOG_DEBUG < log_level || *p != '\0') {
-				fprintf(stderr, "Invalid log level '%s'\n",
-					optarg);
+				sd_err("Invalid log level '%s'", optarg);
 				sdlog_help();
 				exit(1);
 			}
@@ -628,8 +623,7 @@ int main(int argc, char **argv)
 			break;
 		case 'y':
 			if (!str_to_addr(optarg, sys->this_node.nid.addr)) {
-				fprintf(stderr, "Invalid address: '%s'\n",
-					optarg);
+				sd_err("Invalid address: '%s'", optarg);
 				exit(1);
 			}
 			explicit_addr = true;
@@ -652,9 +646,9 @@ int main(int argc, char **argv)
 			zone = strtol(optarg, &p, 10);
 			if (optarg == p || zone < 0 || UINT32_MAX < zone
 				|| *p != '\0') {
-				fprintf(stderr, "Invalid zone id '%s': "
-					"must be an integer between 0 and %u\n",
-					optarg, UINT32_MAX);
+				sd_err("Invalid zone id '%s': must be "
+				       "an integer between 0 and %u", optarg,
+				       UINT32_MAX);
 				exit(1);
 			}
 			sys->this_node.zone = zone;
@@ -665,7 +659,7 @@ int main(int argc, char **argv)
 		case 'c':
 			sys->cdrv = find_cdrv(optarg);
 			if (!sys->cdrv) {
-				fprintf(stderr, "Invalid cluster driver '%s'\n", optarg);
+				sd_err("Invalid cluster driver '%s'", optarg);
 				fprintf(stderr, "Supported drivers:");
 				FOR_EACH_CLUSTER_DRIVER(cdrv) {
 					fprintf(stderr, " %s", cdrv->name);
@@ -682,15 +676,13 @@ int main(int argc, char **argv)
 		case 'i':
 			parse_arg(optarg, ",", init_io_arg);
 			if (!str_to_addr(io_addr, sys->this_node.nid.io_addr)) {
-				fprintf(stderr, "Bad addr: '%s'\n",
-					io_addr);
+				sd_err("Bad addr: '%s'", io_addr);
 				exit(1);
 			}
 
 			if (io_pt)
 				if (sscanf(io_pt, "%u", &io_port) != 1) {
-					fprintf(stderr, "Bad port '%s'\n",
-						io_pt);
+					sd_err("Bad port '%s'", io_pt);
 					exit(1);
 				}
 			sys->this_node.nid.io_port = io_port;
@@ -699,8 +691,7 @@ int main(int argc, char **argv)
 			uatomic_set_true(&sys->use_journal);
 			parse_arg(optarg, ",", init_journal_arg);
 			if (!jsize) {
-				fprintf(stderr,
-					"you must specify size for journal\n");
+				sd_err("you must specify size for journal");
 				exit(1);
 			}
 			break;
@@ -749,7 +740,7 @@ int main(int argc, char **argv)
 
 	dir = realpath(dirp, NULL);
 	if (!dir) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		exit(1);
 	}
 
@@ -852,12 +843,12 @@ int main(int argc, char **argv)
 		exit(1);
 
 	if (pid_file && (create_pidfile(pid_file) != 0)) {
-		fprintf(stderr, "failed to pid file '%s' - %m\n", pid_file);
+		sd_err("failed to pid file '%s' - %m", pid_file);
 		exit(1);
 	}
 
 	if (chdir(dir) < 0) {
-		fprintf(stderr, "failed to chdir to %s: %m\n", dir);
+		sd_err("failed to chdir to %s: %m", dir);
 		exit(1);
 	}
 

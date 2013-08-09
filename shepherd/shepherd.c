@@ -704,12 +704,12 @@ int main(int argc, char **argv)
 		case 'p':
 			port = strtol(optarg, &p, 10);
 			if (p == optarg) {
-				fprintf(stderr, "invalid port: %s\n", optarg);
+				sd_err("invalid port: %s", optarg);
 				exit(1);
 			}
 			break;
 		default:
-			fprintf(stderr, "unknown option: %c\n", ch);
+			sd_err("unknown option: %c", ch);
 			usage();
 			exit(1);
 			break;
@@ -720,7 +720,7 @@ int main(int argc, char **argv)
 		ret = daemon(0, 0);
 
 		if (-1 == ret) {
-			fprintf(stderr, "daemon() failed: %m\n");
+			sd_err("daemon() failed: %m");
 			exit(1);
 		}
 	}

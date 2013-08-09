@@ -99,7 +99,7 @@ static int node_info(int argc, char **argv)
 	}
 
 	if (success == 0) {
-		fprintf(stderr, "Cannot get information from any nodes\n");
+		sd_err("Cannot get information from any nodes");
 		return EXIT_SYSFAIL;
 	}
 
@@ -131,7 +131,7 @@ static int get_recovery_state(struct recovery_state *state)
 
 	ret = collie_exec_req(sdhost, sdport, &req, state);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to execute request\n");
+		sd_err("Failed to execute request");
 		return -1;
 	}
 
@@ -252,14 +252,14 @@ static int node_kill(int argc, char **argv)
 	const char *p = argv[optind++];
 
 	if (!is_numeric(p)) {
-		fprintf(stderr, "Invalid node id '%s', "
-			"please specify a numeric value\n", p);
+		sd_err("Invalid node id '%s', please specify a numeric value",
+		       p);
 		exit(EXIT_USAGE);
 	}
 
 	node_id = strtol(p, NULL, 10);
 	if (node_id < 0 || node_id >= sd_nodes_nr) {
-		fprintf(stderr, "Invalid node id '%d'\n", node_id);
+		sd_err("Invalid node id '%d'", node_id);
 		exit(EXIT_USAGE);
 	}
 
@@ -269,7 +269,7 @@ static int node_kill(int argc, char **argv)
 
 	ret = send_light_req(&req, host, sd_nodes[node_id].nid.port);
 	if (ret) {
-		fprintf(stderr, "Failed to execute request\n");
+		sd_err("Failed to execute request");
 		exit(EXIT_FAILURE);
 	}
 
@@ -295,8 +295,8 @@ static int node_md_info(struct node_id *nid)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "failed to get multi-disk infomation: %s\n",
-			sd_strerror(rsp->result));
+		sd_err("failed to get multi-disk infomation: %s",
+		       sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
 
@@ -324,7 +324,7 @@ static int md_info(int argc, char **argv)
 		struct node_id nid = {.port = sdport};
 
 		if (!str_to_addr(sdhost, nid.addr)) {
-			fprintf(stderr, "Invalid address %s\n", sdhost);
+			sd_err("Invalid address %s", sdhost);
 			return EXIT_FAILURE;
 		}
 
@@ -347,7 +347,7 @@ static int do_plug_unplug(char *disks, bool plug)
 	int ret;
 
 	if (!strlen(disks)) {
-		fprintf(stderr, "Empty path isn't allowed\n");
+		sd_err("Empty path isn't allowed");
 		return EXIT_FAILURE;
 	}
 
@@ -363,8 +363,8 @@ static int do_plug_unplug(char *disks, bool plug)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to execute request, look for sheep.log"
-			" for more information\n");
+		sd_err("Failed to execute request, look for sheep.log"
+		       " for more information");
 		return EXIT_FAILURE;
 	}
 

@@ -56,13 +56,13 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 
 	ret = collie_exec_req(sdhost, sdport, &hdr, data);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to read object %" PRIx64 "\n", oid);
+		sd_err("Failed to read object %" PRIx64, oid);
 		return SD_RES_EIO;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to read object %" PRIx64 " %s\n", oid,
-			sd_strerror(rsp->result));
+		sd_err("Failed to read object %" PRIx64 " %s", oid,
+		       sd_strerror(rsp->result));
 		return rsp->result;
 	}
 
@@ -98,12 +98,12 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 
 	ret = collie_exec_req(sdhost, sdport, &hdr, data);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to write object %" PRIx64 "\n", oid);
+		sd_err("Failed to write object %" PRIx64, oid);
 		return SD_RES_EIO;
 	}
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to write object %" PRIx64 ": %s\n", oid,
-				sd_strerror(rsp->result));
+		sd_err("Failed to write object %" PRIx64 ": %s", oid,
+		       sd_strerror(rsp->result));
 		return rsp->result;
 	}
 
@@ -137,7 +137,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 		memset(&i, 0, sizeof(i));
 		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
-			fprintf(stderr, "Failed to read inode header\n");
+			sd_err("Failed to read inode header");
 			continue;
 		}
 
@@ -154,7 +154,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 					     rlen, SD_INODE_HEADER_SIZE, true);
 
 			if (ret != SD_RES_SUCCESS) {
-				fprintf(stderr, "Failed to read inode\n");
+				sd_err("Failed to read inode");
 				continue;
 			}
 		}
@@ -202,8 +202,7 @@ int send_light_req(struct sd_req *hdr, const char *host, int port)
 		return -1;
 
 	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Response's result: %s\n",
-			sd_strerror(ret));
+		sd_err("Response's result: %s", sd_strerror(ret));
 		return -1;
 	}
 
@@ -221,8 +220,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 			if (flags & SUBCMD_FLAG_NEED_NODELIST) {
 				ret = update_node_list(SD_MAX_NODES);
 				if (ret < 0) {
-					fprintf(stderr,
-						"Failed to get node list\n");
+					sd_err("Failed to get node list");
 					exit(EXIT_SYSFAIL);
 				}
 			}

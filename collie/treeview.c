@@ -175,7 +175,7 @@ void dump_tree(void)
 	width = malloc(sizeof(int) * depth);
 	more = malloc(sizeof(int) * depth);
 	if (!width || !more) {
-		fprintf(stderr, "Failed to allocate memory\n");
+		sd_err("Failed to allocate memory");
 		return;
 	}
 

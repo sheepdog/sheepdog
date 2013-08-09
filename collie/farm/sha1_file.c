@@ -66,16 +66,15 @@ static int sha1_buffer_write(const unsigned char *sha1,
 	fd = open(filename, O_WRONLY | O_CREAT | O_EXCL, 0666);
 	if (fd < 0) {
 		if (errno != EEXIST) {
-			fprintf(stderr,
-				"failed to open file %s with error: %m\n",
-				filename);
+			sd_err("failed to open file %s with error: %m",
+			       filename);
 			ret = -1;
 		}
 		goto err_open;
 	}
 	len = xwrite(fd, buf, size);
 	if (len != size) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		close(fd);
 		return -1;
 	}
@@ -104,8 +103,7 @@ static int verify_sha1_file(const unsigned char *sha1,
 
 	sha1_from_buffer(buf, len, tmp);
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_DIGEST_SIZE) != 0) {
-		fprintf(stderr, "failed, %s != %s\n", sha1_to_hex(sha1),
-			sha1_to_hex(tmp));
+		sd_err("failed, %s != %s", sha1_to_hex(sha1), sha1_to_hex(tmp));
 		return -1;
 	}
 	return 0;
@@ -123,7 +121,7 @@ void *sha1_file_read(const unsigned char *sha1, size_t *size)
 		return NULL;
 	}
 	if (fstat(fd, &st) < 0) {
-		fprintf(stderr, "%m\n");
+		sd_err("%m");
 		goto out;
 	}
 

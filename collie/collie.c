@@ -70,8 +70,8 @@ int update_node_list(int max_nodes)
 		goto out;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to update node list: %s\n",
-				sd_strerror(rsp->result));
+		sd_err("Failed to update node list: %s",
+		       sd_strerror(rsp->result));
 		ret = -1;
 		goto out;
 	}
@@ -79,7 +79,7 @@ int update_node_list(int max_nodes)
 	size = rsp->data_length;
 	sd_nodes_nr = size / sizeof(*ent);
 	if (sd_nodes_nr == 0) {
-		fprintf(stderr, "There are no active sheep daemons\n");
+		sd_err("There are no active sheep daemons");
 		exit(EXIT_FAILURE);
 	}
 
@@ -125,7 +125,7 @@ static const struct sd_option *find_opt(int ch)
 		}
 	}
 
-	fprintf(stderr, "Internal error\n");
+	sd_err("Internal error");
 	exit(EXIT_SYSFAIL);
 }
 
@@ -190,7 +190,7 @@ static unsigned long setup_commands(const struct command *commands,
 	if (!found) {
 		if (cmd && strcmp(cmd, "help") && strcmp(cmd, "--help") &&
 		    strcmp(cmd, "-h")) {
-			fprintf(stderr, "Invalid command '%s'\n", cmd);
+			sd_err("Invalid command '%s'", cmd);
 			usage(commands, EXIT_USAGE);
 		}
 		usage(commands, 0);
@@ -211,10 +211,10 @@ static unsigned long setup_commands(const struct command *commands,
 	if (!command_fn) {
 		if (subcmd && strcmp(subcmd, "help") &&
 		    strcmp(subcmd, "--help") && strcmp(subcmd, "-h"))
-			fprintf(stderr, "Invalid command '%s %s'\n", cmd, subcmd);
-		fprintf(stderr, "Available %s commands:\n", cmd);
+			sd_err("Invalid command '%s %s'", cmd, subcmd);
+		sd_err("Available %s commands:", cmd);
 		for (s = commands[i].sub; s->name; s++)
-			fprintf(stderr, "  %s %s\n", cmd, s->name);
+			sd_err("  %s %s", cmd, s->name);
 		exit(EXIT_USAGE);
 	}
 
@@ -228,7 +228,7 @@ static void usage(const struct command *commands, int status)
 	char name[64];
 
 	if (status)
-		fprintf(stderr, "Try '%s --help' for more information.\n", program_name);
+		sd_err("Try '%s --help' for more information.", program_name);
 	else {
 		printf("Sheepdog administrator utility\n");
 		printf("Usage: %s <command> <subcommand> [options]\n", program_name);
@@ -317,7 +317,7 @@ static const struct sd_option *build_sd_options(const char *opts)
 
 static void crash_handler(int signo)
 {
-	fprintf(stderr, "collie exits unexpectedly (%s).\n", strsignal(signo));
+	sd_err("collie exits unexpectedly (%s).", strsignal(signo));
 
 	sd_backtrace();
 
@@ -372,7 +372,7 @@ int main(int argc, char **argv)
 		case 'p':
 			sdport = strtol(optarg, &p, 10);
 			if (optarg == p || sdport < 1 || sdport > UINT16_MAX) {
-				fprintf(stderr, "Invalid port number '%s'\n", optarg);
+				sd_err("Invalid port number '%s'", optarg);
 				exit(EXIT_USAGE);
 			}
 			break;
@@ -403,7 +403,7 @@ int main(int argc, char **argv)
 	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
 		ret = update_node_list(SD_MAX_NODES);
 		if (ret < 0) {
-			fprintf(stderr, "Failed to get node list\n");
+			sd_err("Failed to get node list");
 			exit(EXIT_SYSFAIL);
 		}
 	}
@@ -415,12 +415,12 @@ int main(int argc, char **argv)
 		exit(EXIT_SYSFAIL);
 
 	if (init_work_queue(get_nr_nodes) != 0) {
-		fprintf(stderr, "Failed to init work queue\n");
+		sd_err("Failed to init work queue");
 		exit(EXIT_SYSFAIL);
 	}
 
 	if (sockfd_init()) {
-		fprintf(stderr, "sockfd_init() failed\n");
+		sd_err("sockfd_init() failed");
 		exit(EXIT_SYSFAIL);
 	}
 

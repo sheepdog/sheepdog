@@ -595,10 +595,10 @@ void early_log_init(const char *format_name, struct logger_user_info *user_info)
 		}
 	}
 
-	fprintf(stderr, "invalid log format: %s\n", format_name);
-	fprintf(stderr, "valid options are:\n");
+	sd_err("invalid log format: %s", format_name);
+	sd_err("valid options are:");
 	list_for_each_entry(f, &log_formats, list) {
-		fprintf(stderr, "\t%s\n", f->name);
+		sd_err("\t%s", f->name);
 	}
 
 	exit(1);
