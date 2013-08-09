@@ -30,7 +30,7 @@ struct vdisk {
 static struct disk md_disks[MD_MAX_DISK];
 static struct vdisk md_vds[MD_MAX_VDISK];
 
-static pthread_rwlock_t md_lock = PTHREAD_RWLOCK_INITIALIZER;
+static struct sd_lock md_lock = SD_LOCK_INITIALIZER;
 static int md_nr_disks; /* Protected by md_lock */
 static int md_nr_vds;
 
@@ -38,9 +38,9 @@ static inline int nr_online_disks(void)
 {
 	int nr;
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	nr = md_nr_disks;
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 
 	return nr;
 }
@@ -337,10 +337,10 @@ char *md_get_object_path(uint64_t oid)
 	struct vdisk *vd;
 	char *p;
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	vd = oid_to_vdisk(oid);
 	p = md_disks[vd->idx].path;
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 	sd_dprintf("%d, %s", vd->idx, p);
 
 	return p;
@@ -360,14 +360,14 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, uint32_t epoch,
 {
 	int i, ret = SD_RES_SUCCESS;
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		ret = for_each_object_in_path(md_disks[i].path, func,
 					      cleanup, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 	return ret;
 }
 
@@ -378,7 +378,7 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
 	int i, ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		snprintf(path, sizeof(path), "%s/.stale", md_disks[i].path);
 		sd_eprintf("%s", path);
@@ -386,7 +386,7 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 	return ret;
 }
 
@@ -395,13 +395,13 @@ int for_each_obj_path(int (*func)(char *path))
 {
 	int i, ret = SD_RES_SUCCESS;
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		ret = func(md_disks[i].path);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 	return ret;
 }
 
@@ -423,7 +423,7 @@ static void md_do_recover(struct work *work)
 	struct md_work *mw = container_of(work, struct md_work, work);
 	int idx, nr = 0;
 
-	pthread_rwlock_wrlock(&md_lock);
+	sd_write_lock(&md_lock);
 	idx = path_to_disk_idx(mw->path);
 	if (idx < 0)
 		/* Just ignore the duplicate EIO of the same path */
@@ -432,7 +432,7 @@ static void md_do_recover(struct work *work)
 	md_init_space();
 	nr = md_nr_disks;
 out:
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 
 	if (nr > 0)
 		kick_recover();
@@ -549,13 +549,13 @@ static int scan_wd(uint64_t oid, uint32_t epoch)
 {
 	int i, ret = SD_RES_EIO;
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		ret = md_check_and_move(oid, epoch, md_disks[i].path);
 		if (ret == SD_RES_SUCCESS)
 			break;
 	}
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 	return ret;
 }
 
@@ -598,7 +598,7 @@ uint32_t md_get_info(struct sd_md_info *info)
 	int i;
 
 	memset(info, 0, ret);
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		info->disk[i].idx = i;
 		pstrcpy(info->disk[i].path, PATH_MAX, md_disks[i].path);
@@ -607,7 +607,7 @@ uint32_t md_get_info(struct sd_md_info *info)
 							&info->disk[i].used);
 	}
 	info->nr = md_nr_disks;
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 	return ret;
 }
 
@@ -627,7 +627,7 @@ static int do_plug_unplug(char *disks, bool plug)
 	char *path;
 	int old_nr, cur_nr = 0, ret = SD_RES_UNKNOWN;
 
-	pthread_rwlock_wrlock(&md_lock);
+	sd_write_lock(&md_lock);
 	old_nr = md_nr_disks;
 	path = strtok(disks, ",");
 	do {
@@ -648,7 +648,7 @@ static int do_plug_unplug(char *disks, bool plug)
 
 	ret = SD_RES_SUCCESS;
 out:
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 
 	/*
 	 * We have to kick recover aggressively because there is possibility
@@ -676,10 +676,10 @@ uint64_t md_get_size(uint64_t *used)
 	uint64_t fsize = 0;
 	*used = 0;
 
-	pthread_rwlock_rdlock(&md_lock);
+	sd_read_lock(&md_lock);
 	for (int i = 0; i < md_nr_disks; i++)
 		fsize += get_path_free_size(md_disks[i].path, used);
-	pthread_rwlock_unlock(&md_lock);
+	sd_unlock(&md_lock);
 
 	return fsize + *used;
 }

@@ -37,13 +37,13 @@
 
 struct sockfd_cache {
 	struct rb_root root;
-	pthread_rwlock_t lock;
+	struct sd_lock lock;
 	int count;
 };
 
 static struct sockfd_cache sockfd_cache = {
 	.root = RB_ROOT,
-	.lock = PTHREAD_RWLOCK_INITIALIZER,
+	.lock = SD_LOCK_INITIALIZER,
 };
 
 /*
@@ -144,7 +144,7 @@ static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
 {
 	struct sockfd_cache_entry *entry;
 
-	pthread_rwlock_rdlock(&sockfd_cache.lock);
+	sd_read_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
 	if (!entry) {
 		char name[INET6_ADDRSTRLEN];
@@ -158,7 +158,7 @@ static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
 	if (*ret_idx == -1)
 		entry = NULL;
 out:
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 	return entry;
 }
 
@@ -196,7 +196,7 @@ static bool sockfd_cache_destroy(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *entry;
 
-	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	sd_write_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
 	if (!entry) {
 		sd_dprintf("It is already destroyed");
@@ -209,14 +209,14 @@ static bool sockfd_cache_destroy(const struct node_id *nid)
 	}
 
 	rb_erase(&entry->rb, &sockfd_cache.root);
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 
 	destroy_all_slots(entry);
 	free_cache_entry(entry);
 
 	return true;
 false_out:
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 	return false;
 }
 
@@ -243,12 +243,12 @@ void sockfd_cache_add_group(const struct sd_node *nodes, int nr)
 	const struct sd_node *p;
 
 	sd_dprintf("%d", nr);
-	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	sd_write_lock(&sockfd_cache.lock);
 	while (nr--) {
 		p = nodes + nr;
 		sockfd_cache_add_nolock(&p->nid);
 	}
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 }
 
 /* Add one node to the cache means we can do caching tricks on this node */
@@ -258,7 +258,7 @@ void sockfd_cache_add(const struct node_id *nid)
 	char name[INET6_ADDRSTRLEN];
 	int n, i;
 
-	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	sd_write_lock(&sockfd_cache.lock);
 	new = xmalloc(sizeof(*new));
 	new->fds = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
 	for (i = 0; i < fds_count; i++)
@@ -267,10 +267,10 @@ void sockfd_cache_add(const struct node_id *nid)
 	memcpy(&new->nid, nid, sizeof(struct node_id));
 	if (sockfd_cache_insert(new)) {
 		free_cache_entry(new);
-		pthread_rwlock_unlock(&sockfd_cache.lock);
+		sd_unlock(&sockfd_cache.lock);
 		return;
 	}
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 	n = uatomic_add_return(&sockfd_cache.count, 1);
 	addr_to_str(name, sizeof(name), nid->addr, 0);
 	sd_dprintf("%s:%d, count %d", name, nid->port, n);
@@ -288,7 +288,7 @@ static void do_grow_fds(struct work *work)
 	int old_fds_count, new_fds_count, new_size, i;
 
 	sd_dprintf("%d", fds_count);
-	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	sd_write_lock(&sockfd_cache.lock);
 	old_fds_count = fds_count;
 	new_fds_count = fds_count * 2;
 	new_size = sizeof(struct sockfd_cache_fd) * fds_count * 2;
@@ -303,7 +303,7 @@ static void do_grow_fds(struct work *work)
 
 	fds_count *= 2;
 	fds_high_watermark = FDS_WATERMARK(fds_count);
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 }
 
 static void grow_fds_done(struct work *work)
@@ -414,11 +414,11 @@ static void sockfd_cache_put_long(const struct node_id *nid, int idx)
 	addr_to_str(name, sizeof(name), addr, 0);
 	sd_dprintf("%s:%d idx %d", name, port, idx);
 
-	pthread_rwlock_rdlock(&sockfd_cache.lock);
+	sd_read_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
 	if (entry)
 		uatomic_set_false(&entry->fds[idx].in_use);
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 }
 
 static void sockfd_cache_close(const struct node_id *nid, int idx)
@@ -432,14 +432,14 @@ static void sockfd_cache_close(const struct node_id *nid, int idx)
 	addr_to_str(name, sizeof(name), addr, 0);
 	sd_dprintf("%s:%d idx %d", name, port, idx);
 
-	pthread_rwlock_wrlock(&sockfd_cache.lock);
+	sd_write_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
 	if (entry) {
 		close(entry->fds[idx].fd);
 		entry->fds[idx].fd = -1;
 		uatomic_set_false(&entry->fds[idx].in_use);
 	}
-	pthread_rwlock_unlock(&sockfd_cache.lock);
+	sd_unlock(&sockfd_cache.lock);
 }
 
 /*

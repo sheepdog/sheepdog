@@ -20,7 +20,7 @@ struct vdi_state_entry {
 
 static uint32_t max_copies;
 static struct rb_root vdi_state_root = RB_ROOT;
-static pthread_rwlock_t vdi_state_lock = PTHREAD_RWLOCK_INITIALIZER;
+static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
 
 static struct vdi_state_entry *vdi_state_search(struct rb_root *root,
 						uint32_t vid)
@@ -70,9 +70,9 @@ static bool vid_is_snapshot(uint32_t vid)
 {
 	struct vdi_state_entry *entry;
 
-	pthread_rwlock_rdlock(&vdi_state_lock);
+	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	pthread_rwlock_unlock(&vdi_state_lock);
+	sd_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_eprintf("No VDI entry for %" PRIx32 " found", vid);
@@ -95,9 +95,9 @@ int get_vdi_copy_number(uint32_t vid)
 {
 	struct vdi_state_entry *entry;
 
-	pthread_rwlock_rdlock(&vdi_state_lock);
+	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	pthread_rwlock_unlock(&vdi_state_lock);
+	sd_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_eprintf("No VDI copy entry for %" PRIx32 " found", vid);
@@ -145,7 +145,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 
 	sd_dprintf("%" PRIx32 ", %d", vid, nr_copies);
 
-	pthread_rwlock_wrlock(&vdi_state_lock);
+	sd_write_lock(&vdi_state_lock);
 	old = vdi_state_insert(&vdi_state_root, entry);
 	if (old) {
 		free(entry);
@@ -157,7 +157,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 	if (uatomic_read(&max_copies) == 0 ||
 	    nr_copies > uatomic_read(&max_copies))
 		uatomic_set(&max_copies, nr_copies);
-	pthread_rwlock_unlock(&vdi_state_lock);
+	sd_unlock(&vdi_state_lock);
 
 	return SD_RES_SUCCESS;
 }
@@ -169,7 +169,7 @@ int fill_vdi_state_list(void *data)
 	struct vdi_state *vs = data;
 	struct vdi_state_entry *entry;
 
-	pthread_rwlock_rdlock(&vdi_state_lock);
+	sd_read_lock(&vdi_state_lock);
 	for (n = rb_first(&vdi_state_root); n; n = rb_next(n)) {
 		entry = rb_entry(n, struct vdi_state_entry, node);
 		memset(vs, 0, sizeof(*vs));
@@ -179,7 +179,7 @@ int fill_vdi_state_list(void *data)
 		vs++;
 		nr++;
 	}
-	pthread_rwlock_unlock(&vdi_state_lock);
+	sd_unlock(&vdi_state_lock);
 
 	return nr * sizeof(*vs);
 }
@@ -953,7 +953,7 @@ void clean_vdi_state(void)
 	struct rb_node *current_node = rb_first(&vdi_state_root);
 	struct vdi_state_entry *entry = NULL;
 
-	pthread_rwlock_wrlock(&vdi_state_lock);
+	sd_write_lock(&vdi_state_lock);
 	while (current_node) {
 		entry = rb_entry(current_node, struct vdi_state_entry, node);
 		rb_erase(current_node, &vdi_state_root);
@@ -962,5 +962,5 @@ void clean_vdi_state(void)
 		current_node = rb_first(&vdi_state_root);
 	}
 	INIT_RB_ROOT(&vdi_state_root);
-	pthread_rwlock_unlock(&vdi_state_lock);
+	sd_unlock(&vdi_state_lock);
 }

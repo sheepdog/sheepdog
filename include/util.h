@@ -11,6 +11,8 @@
 #include <search.h>
 #include <urcu/uatomic.h>
 #include <sys/eventfd.h>
+#include <pthread.h>
+#include <errno.h>
 
 #include "logger.h"
 #include "bitops.h"
@@ -255,6 +257,62 @@ static inline int refcount_dec(refcnt_t *rc)
 {
 	assert(1 <= uatomic_read(&rc->val));
 	return uatomic_sub_return(&rc->val, 1);
+}
+
+/* wrapper for pthread_rwlock */
+
+#define SD_LOCK_INITIALIZER { .rwlock = PTHREAD_RWLOCK_INITIALIZER }
+
+struct sd_lock {
+	pthread_rwlock_t rwlock;
+};
+
+static inline void sd_init_lock(struct sd_lock *lock)
+{
+	int ret;
+
+	do {
+		ret = pthread_rwlock_init(&lock->rwlock, NULL);
+	} while (ret == EAGAIN);
+
+	if (ret != 0)
+		panic("failed to initialize a lock, %s", strerror(ret));
+}
+
+static inline void sd_destroy_lock(struct sd_lock *lock)
+{
+	int ret = pthread_rwlock_destroy(&lock->rwlock);
+
+	if (ret != 0)
+		panic("failed to destroy a lock, %s", strerror(ret));
+}
+
+static inline void sd_read_lock(struct sd_lock *lock)
+{
+	int ret;
+
+	do {
+		ret = pthread_rwlock_rdlock(&lock->rwlock);
+	} while (ret == EAGAIN);
+
+	if (ret != 0)
+		panic("failed to lock for reading, %s", strerror(ret));
+}
+
+static inline void sd_write_lock(struct sd_lock *lock)
+{
+	int ret = pthread_rwlock_wrlock(&lock->rwlock);
+
+	if (ret != 0)
+		panic("failed to lock for writing, %s", strerror(ret));
+}
+
+static inline void sd_unlock(struct sd_lock *lock)
+{
+	int ret = pthread_rwlock_unlock(&lock->rwlock);
+
+	if (ret != 0)
+		panic("failed to unlock, %s", strerror(ret));
 }
 
 /* colors */

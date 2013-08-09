@@ -71,8 +71,8 @@ struct zk_event {
 static struct sd_node sd_nodes[SD_MAX_NODES];
 static size_t nr_sd_nodes;
 static struct rb_root zk_node_root = RB_ROOT;
-static pthread_rwlock_t zk_tree_lock = PTHREAD_RWLOCK_INITIALIZER;
-static pthread_rwlock_t zk_compete_master_lock = PTHREAD_RWLOCK_INITIALIZER;
+static struct sd_lock zk_tree_lock = SD_LOCK_INITIALIZER;
+static struct sd_lock zk_compete_master_lock = SD_LOCK_INITIALIZER;
 static LIST_HEAD(zk_block_list);
 static uatomic_bool is_master;
 static uatomic_bool stop;
@@ -132,9 +132,9 @@ static inline struct zk_node *zk_tree_search(const struct node_id *nid)
 {
 	struct zk_node *n;
 
-	pthread_rwlock_rdlock(&zk_tree_lock);
+	sd_read_lock(&zk_tree_lock);
 	n = zk_tree_search_nolock(nid);
-	pthread_rwlock_unlock(&zk_tree_lock);
+	sd_unlock(&zk_tree_lock);
 	return n;
 }
 
@@ -439,7 +439,7 @@ static inline void zk_tree_add(struct zk_node *node)
 {
 	struct zk_node *zk = xzalloc(sizeof(*zk));
 	*zk = *node;
-	pthread_rwlock_wrlock(&zk_tree_lock);
+	sd_write_lock(&zk_tree_lock);
 	if (zk_tree_insert(zk)) {
 		free(zk);
 		goto out;
@@ -450,7 +450,7 @@ static inline void zk_tree_add(struct zk_node *node)
 	 */
 	sd_nodes[nr_sd_nodes++] = zk->node;
 out:
-	pthread_rwlock_unlock(&zk_tree_lock);
+	sd_unlock(&zk_tree_lock);
 }
 
 static inline void zk_tree_del_nolock(struct zk_node *node)
@@ -461,9 +461,9 @@ static inline void zk_tree_del_nolock(struct zk_node *node)
 
 static inline void zk_tree_del(struct zk_node *node)
 {
-	pthread_rwlock_wrlock(&zk_tree_lock);
+	sd_write_lock(&zk_tree_lock);
 	zk_tree_del_nolock(node);
-	pthread_rwlock_unlock(&zk_tree_lock);
+	sd_unlock(&zk_tree_lock);
 }
 
 static inline void zk_tree_destroy(void)
@@ -471,13 +471,13 @@ static inline void zk_tree_destroy(void)
 	struct zk_node *zk;
 	int i;
 
-	pthread_rwlock_wrlock(&zk_tree_lock);
+	sd_write_lock(&zk_tree_lock);
 	for (i = 0; i < nr_sd_nodes; i++) {
 		zk = zk_tree_search_nolock(&sd_nodes[i].nid);
 		if (zk)
 			zk_tree_del_nolock(zk);
 	}
-	pthread_rwlock_unlock(&zk_tree_lock);
+	sd_unlock(&zk_tree_lock);
 }
 
 static inline void build_node_list(void)
@@ -575,11 +575,11 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		p++;
 		str_to_node(p, &znode.node);
 		/* FIXME: remove redundant leave events */
-		pthread_rwlock_rdlock(&zk_tree_lock);
+		sd_read_lock(&zk_tree_lock);
 		n = zk_tree_search_nolock(&znode.node.nid);
 		if (n)
 			n->gone = true;
-		pthread_rwlock_unlock(&zk_tree_lock);
+		sd_unlock(&zk_tree_lock);
 		if (n)
 			add_event(EVENT_LEAVE, &znode, NULL, 0);
 	}
@@ -730,7 +730,7 @@ static void zk_compete_master(void)
 	 * This is to protect master_seq and my_seq because this function will
 	 * be called by both main thread and zookeeper's event thread.
 	 */
-	pthread_rwlock_wrlock(&zk_compete_master_lock);
+	sd_write_lock(&zk_compete_master_lock);
 
 	if (uatomic_is_true(&is_master) || uatomic_is_true(&stop))
 		goto out_unlock;
@@ -782,7 +782,7 @@ success:
 	uatomic_set_true(&is_master);
 	sd_dprintf("success");
 out_unlock:
-	pthread_rwlock_unlock(&zk_compete_master_lock);
+	sd_unlock(&zk_compete_master_lock);
 }
 
 static int zk_join(const struct sd_node *myself,
@@ -991,12 +991,12 @@ static void zk_handle_update_node(struct zk_event *ev)
 	if (node_eq(snode, &this_node.node))
 		this_node.node = *snode;
 
-	pthread_rwlock_rdlock(&zk_tree_lock);
+	sd_read_lock(&zk_tree_lock);
 	t = zk_tree_search_nolock(&snode->nid);
 	assert(t);
 	t->node = *snode;
 	build_node_list();
-	pthread_rwlock_unlock(&zk_tree_lock);
+	sd_unlock(&zk_tree_lock);
 	sd_update_node_handler(snode);
 }
 

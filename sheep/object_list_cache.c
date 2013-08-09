@@ -26,7 +26,7 @@ struct objlist_cache {
 	uint64_t *buf;
 	struct list_head entry_list;
 	struct rb_root root;
-	pthread_rwlock_t lock;
+	struct sd_lock lock;
 };
 
 struct objlist_deletion_work {
@@ -38,7 +38,7 @@ static struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
 	.entry_list     = LIST_HEAD_INIT(obj_list_cache.entry_list),
-	.lock		= PTHREAD_RWLOCK_INITIALIZER,
+	.lock		= SD_LOCK_INITIALIZER,
 };
 
 static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
@@ -92,12 +92,12 @@ static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 
 void objlist_cache_remove(uint64_t oid)
 {
-	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	sd_write_lock(&obj_list_cache.lock);
 	if (!objlist_cache_rb_remove(&obj_list_cache.root, oid)) {
 		obj_list_cache.cache_size--;
 		obj_list_cache.tree_version++;
 	}
-	pthread_rwlock_unlock(&obj_list_cache.lock);
+	sd_unlock(&obj_list_cache.lock);
 }
 
 int objlist_cache_insert(uint64_t oid)
@@ -108,7 +108,7 @@ int objlist_cache_insert(uint64_t oid)
 	entry->oid = oid;
 	rb_init_node(&entry->node);
 
-	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	sd_write_lock(&obj_list_cache.lock);
 	p = objlist_cache_rb_insert(&obj_list_cache.root, entry);
 	if (p)
 		free(entry);
@@ -117,7 +117,7 @@ int objlist_cache_insert(uint64_t oid)
 		obj_list_cache.cache_size++;
 		obj_list_cache.tree_version++;
 	}
-	pthread_rwlock_unlock(&obj_list_cache.lock);
+	sd_unlock(&obj_list_cache.lock);
 
 	return 0;
 }
@@ -128,13 +128,13 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 	struct objlist_cache_entry *entry;
 
 	/* first try getting the cached buffer with only a read lock held */
-	pthread_rwlock_rdlock(&obj_list_cache.lock);
+	sd_read_lock(&obj_list_cache.lock);
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
 		goto out;
 
 	/* if that fails grab a write lock for the usually nessecary update */
-	pthread_rwlock_unlock(&obj_list_cache.lock);
-	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	sd_unlock(&obj_list_cache.lock);
+	sd_write_lock(&obj_list_cache.lock);
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
 		goto out;
 
@@ -148,14 +148,14 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 
 out:
 	if (hdr->data_length < obj_list_cache.cache_size * sizeof(uint64_t)) {
-		pthread_rwlock_unlock(&obj_list_cache.lock);
+		sd_unlock(&obj_list_cache.lock);
 		sd_eprintf("GET_OBJ_LIST buffer too small");
 		return SD_RES_BUFFER_SMALL;
 	}
 
 	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
 	memcpy(data, obj_list_cache.buf, rsp->data_length);
-	pthread_rwlock_unlock(&obj_list_cache.lock);
+	sd_unlock(&obj_list_cache.lock);
 	return SD_RES_SUCCESS;
 }
 
@@ -179,7 +179,7 @@ static void objlist_deletion_work(struct work *work)
 		return;
 	}
 
-	pthread_rwlock_wrlock(&obj_list_cache.lock);
+	sd_write_lock(&obj_list_cache.lock);
 	list_for_each_entry_safe(entry, t, &obj_list_cache.entry_list, list) {
 		entry_vid = oid_to_vid(entry->oid);
 		if (entry_vid != vid)
@@ -189,7 +189,7 @@ static void objlist_deletion_work(struct work *work)
 		rb_erase(&entry->node, &obj_list_cache.root);
 		free(entry);
 	}
-	pthread_rwlock_unlock(&obj_list_cache.lock);
+	sd_unlock(&obj_list_cache.lock);
 }
 
 static void objlist_deletion_done(struct work *work)
