@@ -432,12 +432,10 @@ static void free_local_request(struct request *req)
  * This function takes advantage of gateway's retry mechanism and can be only
  * called from worker thread.
  */
-int exec_local_req(struct sd_req *rq, void *data)
+worker_fn int exec_local_req(struct sd_req *rq, void *data)
 {
 	struct request *req;
 	int ret;
-
-	assert(is_worker_thread());
 
 	req = alloc_local_request(data, rq->data_length);
 	req->rq = *rq;
@@ -502,7 +500,7 @@ static void free_request(struct request *req)
 	free(req);
 }
 
-void put_request(struct request *req)
+main_fn void put_request(struct request *req)
 {
 	struct client_info *ci = req->ci;
 
@@ -901,13 +899,12 @@ void local_req_init(void)
 	register_event(sys->local_req_efd, local_req_handler, NULL);
 }
 
-int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
+worker_fn int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr,
+			     void *buf)
 {
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 	struct sockfd *sfd;
 	int ret;
-
-	assert(is_worker_thread());
 
 	sfd = sockfd_cache_get(nid);
 	if (!sfd)

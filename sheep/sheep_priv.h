@@ -43,6 +43,25 @@
 #include "config.h"
 #include "sockfd_cache.h"
 
+ /*
+  * Functions that update global info must be called in the main
+  * thread.  Add main_fn markers to such functions.
+  *
+  * Functions that can sleep (e.g. disk I/Os or network I/Os) must be
+  * called in the worker threads.  Add worker_fn markers to such
+  * functions.
+  */
+#ifdef HAVE_TRACE
+#define MAIN_FN_SECTION ".sd_main"
+#define WORKER_FN_SECTION ".sd_worker"
+
+#define main_fn __attribute__((section(MAIN_FN_SECTION)))
+#define worker_fn __attribute__((section(WORKER_FN_SECTION)))
+#else
+#define main_fn
+#define worker_fn
+#endif
+
 struct client_info {
 	struct connection conn;
 

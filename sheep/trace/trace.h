@@ -11,6 +11,7 @@ struct caller {
 	unsigned long addr;
 	unsigned long mcount;
 	const char *name;
+	const char *section;
 };
 
 struct tracer {

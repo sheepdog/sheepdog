@@ -87,7 +87,7 @@ struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info)
  * this must only be called from the main thread.
  * This can return NULL if cluster is not started yet.
  */
-struct vnode_info *get_vnode_info(void)
+main_fn struct vnode_info *get_vnode_info(void)
 {
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
@@ -240,7 +240,7 @@ drop:
  * Must run in the main thread as it accesses unlocked state like
  * sys->pending_list.
  */
-bool sd_block_handler(const struct sd_node *sender)
+main_fn bool sd_block_handler(const struct sd_node *sender)
 {
 	struct request *req;
 
@@ -268,7 +268,7 @@ bool sd_block_handler(const struct sd_node *sender)
  * Must run in the main thread as it access unlocked state like
  * sys->pending_list.
  */
-void queue_cluster_request(struct request *req)
+main_fn void queue_cluster_request(struct request *req)
 {
 	int ret;
 	sd_dprintf("%s (%p)", op_name(req->op), req);
@@ -685,8 +685,8 @@ static void update_cluster_info(const struct cluster_info *cinfo,
  * Must run in the main thread as it accesses unlocked state like
  * sys->pending_list.
  */
-void sd_notify_handler(const struct sd_node *sender, void *data,
-		       size_t data_len)
+main_fn void sd_notify_handler(const struct sd_node *sender, void *data,
+			       size_t data_len)
 {
 	struct vdi_op_message *msg = data;
 	const struct sd_op_template *op = get_sd_op(msg->req.opcode);
@@ -733,9 +733,9 @@ void sd_notify_handler(const struct sd_node *sender, void *data,
  * Return true if the joining node is accepted.  At least one nodes in the
  * cluster must call this function and succeed in accept of the joining node.
  */
-bool sd_join_handler(const struct sd_node *joining,
-		     const struct sd_node *nodes, size_t nr_nodes,
-		     void *opaque)
+main_fn bool sd_join_handler(const struct sd_node *joining,
+			     const struct sd_node *nodes, size_t nr_nodes,
+			     void *opaque)
 {
 	struct cluster_info *cinfo = opaque;
 	enum sd_status status;
@@ -841,7 +841,7 @@ static void requeue_cluster_request(void)
 	}
 }
 
-int sd_reconnect_handler(void)
+main_fn int sd_reconnect_handler(void)
 {
 	sys->cinfo.status = SD_STATUS_WAIT;
 	if (sys->cdrv->init(sys->cdrv_option) != 0)
@@ -873,9 +873,9 @@ static bool cluster_join_check(const struct cluster_info *cinfo)
 	return true;
 }
 
-void sd_accept_handler(const struct sd_node *joined,
-		       const struct sd_node *members, size_t nr_members,
-		       const void *opaque)
+main_fn void sd_accept_handler(const struct sd_node *joined,
+			       const struct sd_node *members, size_t nr_members,
+			       const void *opaque)
 {
 	int i;
 	const struct cluster_info *cinfo = opaque;
@@ -901,8 +901,9 @@ void sd_accept_handler(const struct sd_node *joined,
 		sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
 }
 
-void sd_leave_handler(const struct sd_node *left, const struct sd_node *members,
-		      size_t nr_members)
+main_fn void sd_leave_handler(const struct sd_node *left,
+			      const struct sd_node *members,
+			      size_t nr_members)
 {
 	struct vnode_info *old_vnode_info;
 	int i, ret;
@@ -956,7 +957,7 @@ static void kick_node_recover(void)
 	put_vnode_info(old);
 }
 
-void sd_update_node_handler(struct sd_node *node)
+main_fn void sd_update_node_handler(struct sd_node *node)
 {
 	update_node_size(node);
 	kick_node_recover();
