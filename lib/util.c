@@ -345,7 +345,7 @@ int purge_directory(char *dir_path)
 	dir = opendir(dir_path);
 	if (!dir) {
 		if (errno != ENOENT)
-			sd_eprintf("failed to open %s: %m", dir_path);
+			sd_err("failed to open %s: %m", dir_path);
 		return -errno;
 	}
 
@@ -356,7 +356,7 @@ int purge_directory(char *dir_path)
 		snprintf(path, sizeof(path), "%s/%s", dir_path, d->d_name);
 		ret = stat(path, &s);
 		if (ret) {
-			sd_eprintf("failed to stat %s: %m", path);
+			sd_err("failed to stat %s: %m", path);
 			goto out;
 		}
 		if (S_ISDIR(s.st_mode))
@@ -365,9 +365,8 @@ int purge_directory(char *dir_path)
 			ret = unlink(path);
 
 		if (ret != 0) {
-			sd_eprintf("failed to remove %s %s: %m",
-				   S_ISDIR(s.st_mode) ? "directory" : "file",
-				   path);
+			sd_err("failed to remove %s %s: %m",
+			       S_ISDIR(s.st_mode) ? "directory" : "file", path);
 			goto out;
 		}
 	}
@@ -523,10 +522,10 @@ void reraise_crash_signal(int signo, int status)
 
 	/* We won't get here normally. */
 	if (ret != 0)
-		sd_printf(SDOG_EMERG, "failed to re-raise signal %d (%s).",
+		sd_emerg("failed to re-raise signal %d (%s).",
 			  signo, strsignal(signo));
 	else
-		sd_printf(SDOG_EMERG, "default handler for the re-raised "
+		sd_emerg("default handler for the re-raised "
 			  "signal %d (%s) didn't work expectedly", signo,
 			  strsignal(signo));
 
@@ -568,30 +567,29 @@ again:
 	if (fd < 0) {
 		if (errno == EEXIST) {
 			if (force_create) {
-				sd_dprintf("clean up a temporary file %s",
-					   tmp_path);
+				sd_debug("clean up a temporary file %s",
+					 tmp_path);
 				unlink(tmp_path);
 				goto again;
 			} else
-				sd_dprintf("someone else is dealing with %s",
-					   tmp_path);
+				sd_debug("someone else is dealing with %s",
+					 tmp_path);
 		} else
-			sd_eprintf("failed to open temporal file %s, %m",
-				   tmp_path);
+			sd_err("failed to open temporal file %s, %m", tmp_path);
 		ret = -1;
 		goto end;
 	}
 
 	ret = xwrite(fd, buf, len);
 	if (ret != len) {
-		sd_eprintf("failed to write %s, %m", path);
+		sd_err("failed to write %s, %m", path);
 		ret = -1;
 		goto close_fd;
 	}
 
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
-		sd_eprintf("failed to rename %s, %m", path);
+		sd_err("failed to rename %s, %m", path);
 		ret = -1;
 	}
 

@@ -44,7 +44,7 @@ void add_timer(struct timer *t, unsigned int mseconds)
 
 	tfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
 	if (tfd < 0) {
-		sd_eprintf("timerfd_create: %m");
+		sd_err("timerfd_create: %m");
 		return;
 	}
 
@@ -53,12 +53,12 @@ void add_timer(struct timer *t, unsigned int mseconds)
 	it.it_value.tv_nsec = (mseconds % 1000) * 1000000;
 
 	if (timerfd_settime(tfd, 0, &it, NULL) < 0) {
-		sd_eprintf("timerfd_settime: %m");
+		sd_err("timerfd_settime: %m");
 		return;
 	}
 
 	if (register_event(tfd, timer_handler, t) < 0)
-		sd_eprintf("failed to register timer fd");
+		sd_err("failed to register timer fd");
 }
 
 struct event_info {
@@ -79,7 +79,7 @@ int init_event(int nr)
 
 	efd = epoll_create(nr);
 	if (efd < 0) {
-		sd_eprintf("failed to create epoll fd");
+		sd_err("failed to create epoll fd");
 		return -1;
 	}
 	return 0;
@@ -114,7 +114,7 @@ int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev);
 	if (ret) {
-		sd_eprintf("failed to add epoll event: %m");
+		sd_err("failed to add epoll event: %m");
 		free(ei);
 	} else
 		list_add(&ei->ei_list, &events_list);
@@ -133,7 +133,7 @@ void unregister_event(int fd)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL);
 	if (ret)
-		sd_eprintf("failed to delete epoll event for fd %d: %m", fd);
+		sd_err("failed to delete epoll event for fd %d: %m", fd);
 
 	list_del(&ei->ei_list);
 	free(ei);
@@ -147,7 +147,7 @@ int modify_event(int fd, unsigned int new_events)
 
 	ei = lookup_event(fd);
 	if (!ei) {
-		sd_eprintf("event info for fd %d not found", fd);
+		sd_err("event info for fd %d not found", fd);
 		return 1;
 	}
 
@@ -157,7 +157,7 @@ int modify_event(int fd, unsigned int new_events)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
 	if (ret) {
-		sd_eprintf("failed to delete epoll event for fd %d: %m", fd);
+		sd_err("failed to delete epoll event for fd %d: %m", fd);
 		return 1;
 	}
 	return 0;
@@ -193,7 +193,7 @@ refresh:
 	if (nr < 0) {
 		if (errno == EINTR)
 			return;
-		sd_eprintf("epoll_wait failed: %m");
+		sd_err("epoll_wait failed: %m");
 		exit(1);
 	} else if (nr) {
 		for (i = 0; i < nr; i++) {

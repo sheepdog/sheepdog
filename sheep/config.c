@@ -35,7 +35,7 @@ static int write_config(void)
 	ret = atomic_create_and_write(config_path, (char *)&config,
 				      sizeof(config), true);
 	if (ret < 0) {
-		sd_eprintf("atomic_create_and_write() failed");
+		sd_err("atomic_create_and_write() failed");
 		return SD_RES_EIO;
 	}
 
@@ -53,7 +53,7 @@ static void check_tmp_config(void)
 	if (!ret || ret != ENOENT)
 		return;
 
-	sd_iprintf("removed temporal config file");
+	sd_info("removed temporal config file");
 }
 
 int init_config_file(void)
@@ -65,7 +65,7 @@ int init_config_file(void)
 	fd = open(config_path, O_RDONLY);
 	if (fd < 0) {
 		if (errno != ENOENT) {
-			sd_eprintf("failed to read config file, %m");
+			sd_err("failed to read config file, %m");
 			return -1;
 		}
 		goto create;
@@ -77,13 +77,13 @@ int init_config_file(void)
 		goto create;
 	}
 	if (ret < 0) {
-		sd_eprintf("failed to read config file, %m");
+		sd_err("failed to read config file, %m");
 		goto out;
 	}
 
 	if (config.version != SD_FORMAT_VERSION) {
-		sd_eprintf("This sheep version is not compatible with"
-			   " the existing data layout, %d", config.version);
+		sd_err("This sheep version is not compatible with"
+		       " the existing data layout, %d", config.version);
 		if (sys->upgrade) {
 			/* upgrade sheep store */
 			ret = sd_migrate_store(config.version, SD_FORMAT_VERSION);
@@ -91,8 +91,8 @@ int init_config_file(void)
 				/* reload config file */
 				ret = xpread(fd, &config, sizeof(config), 0);
 				if (ret != sizeof(config)) {
-					sd_eprintf("failed to reload config"
-						   " file, %m");
+					sd_err("failed to reload config file,"
+					       " %m");
 					ret = -1;
 				} else
 					ret = 0;
@@ -100,7 +100,7 @@ int init_config_file(void)
 			goto out;
 		}
 
-		sd_eprintf("use '-u' option to upgrade sheep store");
+		sd_err("use '-u' option to upgrade sheep store");
 		ret = -1;
 		goto out;
 	}

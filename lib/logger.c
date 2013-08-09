@@ -496,11 +496,10 @@ static bool is_sheep_dead(int signo)
 static void crash_handler(int signo)
 {
 	if (is_sheep_dead(signo))
-		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.",
-			  sheep_pid);
+		sd_err("sheep pid %d exited unexpectedly.", sheep_pid);
 	else {
-		sd_printf(SDOG_ERR, "logger pid %d exits unexpectedly (%s).",
-			  getpid(), strsignal(signo));
+		sd_err("logger pid %d exits unexpectedly (%s).", getpid(),
+		       strsignal(signo));
 		sd_backtrace();
 	}
 
@@ -720,7 +719,7 @@ int __sd_dump_variable(const char *var)
 	void *base_sp = FRAME_POINTER;
 
 	if (!check_gdb()) {
-		sd_dprintf("cannot find gdb");
+		sd_debug("cannot find gdb");
 		return -1;
 	}
 
@@ -732,7 +731,7 @@ int __sd_dump_variable(const char *var)
 		 path, gettid(), base_sp, var);
 	f = popen(cmd, "r");
 	if (f == NULL) {
-		sd_eprintf("failed to run gdb");
+		sd_err("failed to run gdb");
 		return -1;
 	}
 
@@ -744,15 +743,15 @@ int __sd_dump_variable(const char *var)
 	 *    <variable info>
 	 *  }
 	 */
-	sd_printf(SDOG_EMERG, "dump %s", var);
+	sd_emerg("dump %s", var);
 	while (fgets(info, sizeof(info), f) != NULL) {
 		if (info[0] == '$') {
-			sd_printf(SDOG_EMERG, "%s", info);
+			sd_emerg("%s", info);
 			break;
 		}
 	}
 	while (fgets(info, sizeof(info), f) != NULL)
-		sd_printf(SDOG_EMERG, "%s", info);
+		sd_emerg("%s", info);
 
 	pclose(f);
 	return 0;
@@ -766,7 +765,7 @@ static int dump_stack_frames(void)
 	void *base_sp = FRAME_POINTER;
 
 	if (!check_gdb()) {
-		sd_dprintf("cannot find gdb");
+		sd_debug("cannot find gdb");
 		return -1;
 	}
 
@@ -803,21 +802,21 @@ static int dump_stack_frames(void)
 				}
 				stack_no = no;
 				found = true;
-				sd_printf(SDOG_EMERG, "%s", info);
+				sd_emerg("%s", info);
 				break;
 			}
 		}
 
 		if (!found) {
-			sd_iprintf("Cannot get info from GDB");
-			sd_iprintf("Set /proc/sys/kernel/yama/ptrace_scope to"
-				   " zero if you are using Ubuntu.");
+			sd_info("Cannot get info from GDB");
+			sd_info("Set /proc/sys/kernel/yama/ptrace_scope to"
+				" zero if you are using Ubuntu.");
 			pclose(f);
 			return -1;
 		}
 
 		while (fgets(info, sizeof(info), f) != NULL)
-			sd_printf(SDOG_EMERG, "%s", info);
+			sd_emerg("%s", info);
 
 		pclose(f);
 	}
@@ -856,7 +855,7 @@ void sd_backtrace(void)
 			goto fallback_close;
 
 		if (info[0] != '?' && info[0] != '\0')
-			sd_printf(SDOG_EMERG, "%s", info);
+			sd_emerg("%s", info);
 		else
 			goto fallback_close;
 
@@ -870,7 +869,7 @@ fallback_close:
 		pclose(f);
 fallback:
 		str = backtrace_symbols(&addr, 1);
-		sd_printf(SDOG_EMERG, "%s", *str);
+		sd_emerg("%s", *str);
 		free(str);
 	}
 

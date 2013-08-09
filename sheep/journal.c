@@ -67,11 +67,11 @@ static int create_journal_file(const char *root, const char *name)
 	snprintf(path, sizeof(path), "%s/%s", root, name);
 	fd = open(path, flags, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (fd < 0) {
-		sd_eprintf("open %s %m", name);
+		sd_err("open %s %m", name);
 		return -1;
 	}
 	if (prealloc(fd, jfile_size) < 0) {
-		sd_eprintf("prealloc %s %m", name);
+		sd_err("prealloc %s %m", name);
 		return -1;
 	}
 
@@ -92,19 +92,19 @@ static int get_old_new_jfile(const char *p, int *old, int *new)
 		if (errno == ENOENT)
 			return 0;
 
-		sd_eprintf("open1 %m");
+		sd_err("open1 %m");
 		return -1;
 	}
 	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[1]);
 	fd2 = open(path, flags);
 	if (fd2 < 0) {
-		sd_eprintf("open2 %m");
+		sd_err("open2 %m");
 		close(fd1);
 		return -1;
 	}
 
 	if (fstat(fd1, &st1) < 0 || fstat(fd2, &st2) < 0) {
-		sd_eprintf("stat %m");
+		sd_err("stat %m");
 		goto out;
 	}
 
@@ -146,21 +146,21 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 		 md_get_object_path(jd->oid), jd->oid);
 
 	if (jd->flag == JF_REMOVE_OBJ) {
-		sd_iprintf("%s (remove)", path);
+		sd_info("%s (remove)", path);
 		unlink(path);
 
 		return 0;
 	}
 
-	sd_iprintf("%s, size %"PRIu64", off %"PRIu64", %d",
-		   path, jd->size, jd->offset, jd->create);
+	sd_info("%s, size %" PRIu64 ", off %" PRIu64 ", %d", path, jd->size,
+		jd->offset, jd->create);
 
 	if (jd->create)
 		flags |= O_CREAT;
 
 	fd = open(path, flags, sd_def_fmode);
 	if (fd < 0) {
-		sd_eprintf("open %m");
+		sd_err("open %m");
 		return -1;
 	}
 
@@ -174,8 +174,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	memcpy(buf, p, jd->size);
 	size = xpwrite(fd, buf, jd->size, jd->offset);
 	if (size != jd->size) {
-		sd_eprintf("write %zd, size %" PRIu64 ", errno %m", size,
-			   jd->size);
+		sd_err("write %zd, size %" PRIu64 ", errno %m", size, jd->size);
 		ret = -1;
 		goto out;
 	}
@@ -193,7 +192,7 @@ static int do_recover(int fd)
 	struct stat st;
 
 	if (fstat(fd, &st) < 0) {
-		sd_eprintf("fstat %m");
+		sd_err("fstat %m");
 		return -1;
 	}
 
@@ -210,7 +209,7 @@ static int do_recover(int fd)
 	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
-		sd_eprintf("%m");
+		sd_err("%m");
 		return -1;
 	}
 
@@ -291,12 +290,12 @@ void clean_journal_file(const char *p)
 	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[0]);
 	ret = unlink(path);
 	if (ret < 0)
-		sd_eprintf("unlink(%s): %m", path);
+		sd_err("unlink(%s): %m", path);
 
 	snprintf(path, sizeof(path), "%s/%s", p, jfile_name[1]);
 	ret = unlink(path);
 	if (ret < 0)
-		sd_eprintf("unlink(%s): %m", path);
+		sd_err("unlink(%s): %m", path);
 }
 
 static inline bool jfile_enough_space(size_t size)
@@ -340,8 +339,8 @@ static void switch_journal_file(void)
 
 retry:
 	if (!uatomic_set_true(&jfile.in_commit)) {
-		sd_eprintf("journal file in committing, "
-			   "you might need enlarge jfile size");
+		sd_err("journal file in committing, "
+		       "you might need enlarge jfile size");
 		usleep(100000); /* Wait until committing is finished */
 		goto retry;
 	}
@@ -394,7 +393,7 @@ static int journal_file_write(struct journal_descriptor *jd, const char *buf)
 	 */
 	written = xpwrite(jfile.fd, wbuffer, wsize, woff);
 	if (written != wsize) {
-		sd_eprintf("failed, written %zd, len %zd", written, wsize);
+		sd_err("failed, written %zd, len %zd", written, wsize);
 		/* FIXME: teach journal file handle EIO gracefully */
 		ret = SD_RES_EIO;
 		goto out;

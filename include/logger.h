@@ -54,16 +54,27 @@ void sd_backtrace(void);
 #define	SDOG_INFO	LOG_INFO
 #define	SDOG_DEBUG	LOG_DEBUG
 
-#define sd_printf(level, fmt, args...) \
-	log_write(level, __func__, __LINE__, fmt, ##args)
-#define sd_iprintf(fmt, args...) sd_printf(SDOG_INFO, fmt, ##args)
-#define sd_eprintf(fmt, args...) sd_printf(SDOG_ERR, fmt, ##args)
-#define sd_dprintf(fmt, args...) sd_printf(SDOG_DEBUG, fmt, ##args)
+#define sd_emerg(fmt, args...) \
+	log_write(SDOG_EMERG, __func__, __LINE__, fmt, ##args)
+#define sd_alert(fmt, args...) \
+	log_write(SDOG_ALERT, __func__, __LINE__, fmt, ##args)
+#define sd_crit(fmt, args...) \
+	log_write(SDOG_CRIT, __func__, __LINE__, fmt, ##args)
+#define sd_err(fmt, args...) \
+	log_write(SDOG_ERR, __func__, __LINE__, fmt, ##args)
+#define sd_warn(fmt, args...) \
+	log_write(SDOG_WARNING, __func__, __LINE__, fmt, ##args)
+#define sd_notice(fmt, args...) \
+	log_write(SDOG_NOTICE, __func__, __LINE__, fmt, ##args)
+#define sd_info(fmt, args...) \
+	log_write(SDOG_INFO, __func__, __LINE__, fmt, ##args)
+#define sd_debug(fmt, args...) \
+	log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args)
 
-#define panic(fmt, args...)				\
-({							\
-	sd_printf(SDOG_EMERG, "PANIC: " fmt, ##args);	\
-	abort();					\
+#define panic(fmt, args...)			\
+({						\
+	sd_emerg("PANIC: " fmt, ##args);	\
+	abort();				\
 })
 
 #endif	/* LOG_H */

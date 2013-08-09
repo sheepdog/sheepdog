@@ -209,13 +209,13 @@ static void signal_handler(int listen_fd, int events, void *data)
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));
-	sd_dprintf("signal %d", siginfo.ssi_signo);
+	sd_debug("signal %d", siginfo.ssi_signo);
 	switch (siginfo.ssi_signo) {
 	case SIGTERM:
 		sys->cinfo.status = SD_STATUS_KILLED;
 		break;
 	default:
-		sd_eprintf("signal %d unhandled", siginfo.ssi_signo);
+		sd_err("signal %d unhandled", siginfo.ssi_signo);
 		break;
 	}
 }
@@ -231,25 +231,24 @@ static int init_signal(void)
 
 	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
 	if (sigfd < 0) {
-		sd_eprintf("failed to create a signal fd: %m");
+		sd_err("failed to create a signal fd: %m");
 		return -1;
 	}
 
 	ret = register_event(sigfd, signal_handler, NULL);
 	if (ret) {
-		sd_eprintf("failed to register signal handler (%d)", ret);
+		sd_err("failed to register signal handler (%d)", ret);
 		return -1;
 	}
 
-	sd_dprintf("register signal_handler for %d", sigfd);
+	sd_debug("register signal_handler for %d", sigfd);
 
 	return 0;
 }
 
 static void crash_handler(int signo)
 {
-	sd_printf(SDOG_EMERG, "sheep exits unexpectedly (%s).",
-		  strsignal(signo));
+	sd_emerg("sheep exits unexpectedly (%s).", strsignal(signo));
 
 	sd_backtrace();
 	sd_dump_variable(__sys);
@@ -455,23 +454,23 @@ static void check_host_env(void)
 	struct rlimit r;
 
 	if (getrlimit(RLIMIT_NOFILE, &r) < 0)
-		sd_eprintf("failed to get nofile %m");
+		sd_err("failed to get nofile %m");
 	/*
 	 * 1024 is default for NOFILE on most distributions, which is very
 	 * dangerous to run Sheepdog cluster.
 	 */
 	else if (r.rlim_cur == 1024)
-		sd_eprintf("WARN: Allowed open files 1024 too small, "
-			   "suggested %u", SD_RLIM_NOFILE);
+		sd_err("WARN: Allowed open files 1024 too small, suggested %u",
+		       SD_RLIM_NOFILE);
 	else if (r.rlim_cur < SD_RLIM_NOFILE)
-		sd_iprintf("Allowed open files %lu, suggested %u", r.rlim_cur,
-			   SD_RLIM_NOFILE);
+		sd_info("Allowed open files %lu, suggested %u", r.rlim_cur,
+			SD_RLIM_NOFILE);
 
 	if (getrlimit(RLIMIT_CORE, &r) < 0)
-		sd_dprintf("failed to get core %m");
+		sd_debug("failed to get core %m");
 	else if (r.rlim_cur < RLIM_INFINITY)
-		sd_dprintf("Allowed core file size %lu, suggested unlimited",
-			   r.rlim_cur);
+		sd_debug("Allowed core file size %lu, suggested unlimited",
+			 r.rlim_cur);
 
 	/*
 	 * Disable glibc's dynamic mmap threshold and set it as 512k.
@@ -516,8 +515,7 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 		}
 
 		if (setsid() == -1) {
-			sd_eprintf("becoming a leader of a new session"
-				" failed: %m");
+			sd_err("becoming a leader of a new session failed: %m");
 			status = 1;
 			goto end;
 		}
@@ -526,7 +524,7 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 		case 0:
 			break;
 		case -1:
-			sd_eprintf("fork() failed during daemonize: %m");
+			sd_err("fork() failed during daemonize: %m");
 			status = 1;
 			goto end;
 		default:
@@ -535,14 +533,14 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 		}
 
 		if (chdir("/")) {
-			sd_eprintf("chdir to / failed: %m");
+			sd_err("chdir to / failed: %m");
 			status = 1;
 			goto end;
 		}
 
 		devnull_fd = open("/dev/null", O_RDWR);
 		if (devnull_fd < 0) {
-			sd_eprintf("opening /dev/null failed: %m");
+			sd_err("opening /dev/null failed: %m");
 			status = 1;
 			goto end;
 		}
@@ -550,7 +548,7 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 
 	ret = lock_base_dir(base_dir);
 	if (ret < 0) {
-		sd_eprintf("locking directory: %s failed", base_dir);
+		sd_err("locking directory: %s failed", base_dir);
 		status = 1;
 		goto end;
 	}
@@ -803,7 +801,7 @@ int main(int argc, char **argv)
 
 	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
 	if (ret) {
-		sd_eprintf("failed to create sheepdog cluster");
+		sd_err("failed to create sheepdog cluster");
 		exit(1);
 	}
 
@@ -812,7 +810,7 @@ int main(int argc, char **argv)
 		if (!strlen(jpath))
 			/* internal journal */
 			memcpy(jpath, dir, strlen(dir));
-		sd_dprintf("%s, %zd, %d", jpath, jsize, jskip);
+		sd_debug("%s, %zd, %d", jpath, jsize, jskip);
 		ret = journal_file_init(jpath, jsize, jskip);
 		if (ret)
 			exit(1);
@@ -865,20 +863,19 @@ int main(int argc, char **argv)
 
 	free(dir);
 	check_host_env();
-	sd_printf(SDOG_INFO, "sheepdog daemon (version %s) started",
-		  PACKAGE_VERSION);
+	sd_info("sheepdog daemon (version %s) started", PACKAGE_VERSION);
 
 	while (sys->nr_outstanding_reqs != 0 ||
 	       (sys->cinfo.status != SD_STATUS_KILLED &&
 		sys->cinfo.status != SD_STATUS_SHUTDOWN))
 		event_loop(-1);
 
-	sd_printf(SDOG_INFO, "shutdown");
+	sd_info("shutdown");
 
 	leave_cluster();
 
 	if (uatomic_is_true(&sys->use_journal)) {
-		sd_iprintf("cleaning journal file");
+		sd_info("cleaning journal file");
 		clean_journal_file(jpath);
 	}
 

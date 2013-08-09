@@ -78,10 +78,10 @@ static inline int http_request_error(struct http_request *req)
 	if (ret == 0) {
 		return OK;
 	} else if (ret < 0) {
-		sd_eprintf("failed, FCGI error %d", ret);
+		sd_err("failed, FCGI error %d", ret);
 		return INTERNAL_SERVER_ERROR;
 	} else {
-		sd_eprintf("failed, %s", strerror(ret));
+		sd_err("failed, %s", strerror(ret));
 		return INTERNAL_SERVER_ERROR;
 	}
 }
@@ -158,7 +158,7 @@ static int http_init_request(struct http_request *req)
 	int ret;
 
 	for (int i = 0; (p = req->fcgx.envp[i]); ++i)
-		sd_dprintf("%s", p);
+		sd_debug("%s", p);
 
 	ret = request_init_operation(req);
 	if (ret != OK)
@@ -268,7 +268,7 @@ static void *http_main_loop(void *ignored)
 
 		ret = FCGX_Accept_r(&req->fcgx);
 		if (ret < 0) {
-			sd_eprintf("accept failed, %d, %d", http_sockfd, ret);
+			sd_err("accept failed, %d, %d", http_sockfd, ret);
 			goto out;
 		}
 		ret = http_init_request(req);
@@ -282,7 +282,7 @@ static void *http_main_loop(void *ignored)
 out:
 	err = pthread_detach(pthread_self());
 	if (err)
-		sd_eprintf("%s", strerror(err));
+		sd_err("%s", strerror(err));
 	pthread_exit(NULL);
 }
 
@@ -300,13 +300,13 @@ int http_init(const char *address)
 #define LISTEN_QUEUE_DEPTH 1024 /* No rationale */
 	http_sockfd = FCGX_OpenSocket(address, LISTEN_QUEUE_DEPTH);
 	if (http_sockfd < 0) {
-		sd_eprintf("open socket failed, address %s", address);
+		sd_err("open socket failed, address %s", address);
 		return -1;
 	}
-	sd_iprintf("http service listen at %s", address);
+	sd_info("http service listen at %s", address);
 	err = pthread_create(&t, NULL, http_main_loop, NULL);
 	if (err) {
-		sd_eprintf("%s", strerror(err));
+		sd_err("%s", strerror(err));
 		return -1;
 	}
 	return 0;

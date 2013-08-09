@@ -65,29 +65,29 @@ static int err_to_sderr(char *path, uint64_t oid, int err)
 	struct stat s;
 	char *dir = dirname(path);
 
-	sd_dprintf("%s", dir);
+	sd_debug("%s", dir);
 	switch (err) {
 	case ENOENT:
 		if (stat(dir, &s) < 0) {
-			sd_eprintf("%s corrupted", dir);
+			sd_err("%s corrupted", dir);
 			return md_handle_eio(dir);
 		}
-		sd_dprintf("object %016" PRIx64 " not found locally", oid);
+		sd_debug("object %016" PRIx64 " not found locally", oid);
 		return SD_RES_NO_OBJ;
 	case ENOSPC:
 		/* TODO: stop automatic recovery */
-		sd_eprintf("diskfull, oid=%"PRIx64, oid);
+		sd_err("diskfull, oid=%"PRIx64, oid);
 		return SD_RES_NO_SPACE;
 	case EMFILE:
 	case ENFILE:
 	case EINTR:
 	case EAGAIN:
 	case EEXIST:
-		sd_eprintf("%m, oid=%"PRIx64, oid);
+		sd_err("%m, oid=%"PRIx64, oid);
 		/* make gateway try again */
 		return SD_RES_NETWORK_ERROR;
 	default:
-		sd_eprintf("oid=%"PRIx64", %m", oid);
+		sd_err("oid=%"PRIx64", %m", oid);
 		return md_handle_eio(dir);
 	}
 }
@@ -100,7 +100,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	ssize_t size;
 
 	if (iocb->epoch < sys_epoch()) {
-		sd_dprintf("%"PRIu32" sys %"PRIu32, iocb->epoch, sys_epoch());
+		sd_debug("%"PRIu32" sys %"PRIu32, iocb->epoch, sys_epoch());
 		return SD_RES_OLD_NODE_VER;
 	}
 
@@ -108,7 +108,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	    journal_write_store(oid, iocb->buf, iocb->length, iocb->offset,
 				false)
 	    != SD_RES_SUCCESS) {
-		sd_eprintf("turn off journaling");
+		sd_err("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
 		flags |= O_DSYNC;
 		sync();
@@ -122,9 +122,9 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
-		sd_eprintf("failed to write object %"PRIx64", path=%s, offset=%"
-			   PRId64", size=%"PRId32", result=%zd, %m", oid, path,
-			   iocb->offset, iocb->length, size);
+		sd_err("failed to write object %"PRIx64", path=%s, offset=%"
+		       PRId64", size=%"PRId32", result=%zd, %m", oid, path,
+		       iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
@@ -139,7 +139,7 @@ static int make_stale_dir(char *path)
 
 	snprintf(p, PATH_MAX, "%s/.stale", path);
 	if (xmkdir(p, sd_def_dmode) < 0) {
-		sd_eprintf("%s failed, %m", p);
+		sd_err("%s failed, %m", p);
 		return SD_RES_EIO;
 	}
 	return SD_RES_SUCCESS;
@@ -184,8 +184,8 @@ static int init_vdi_state(uint64_t oid, char *wd, uint32_t epoch)
 
 	ret = default_read(oid, &iocb);
 	if (ret != SD_RES_SUCCESS) {
-		sd_eprintf("failed to read inode header %" PRIx64 " %" PRId32,
-			   oid, epoch);
+		sd_err("failed to read inode header %" PRIx64 " %" PRId32, oid,
+		       epoch);
 		goto out;
 	}
 
@@ -205,7 +205,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, uint32_t epoch,
 	objlist_cache_insert(oid);
 
 	if (is_vdi_obj(oid)) {
-		sd_dprintf("found the VDI object %" PRIx64, oid);
+		sd_debug("found the VDI object %" PRIx64, oid);
 		set_bit(oid_to_vid(oid), sys->vdi_inuse);
 		ret = init_vdi_state(oid, wd, epoch);
 		if (ret != SD_RES_SUCCESS)
@@ -218,7 +218,7 @@ int default_init(void)
 {
 	int ret;
 
-	sd_dprintf("use plain store driver");
+	sd_debug("use plain store driver");
 	ret = for_each_obj_path(make_stale_dir);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -242,9 +242,9 @@ static int default_read_from_path(uint64_t oid, char *path,
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size != iocb->length) {
-		sd_eprintf("failed to read object %"PRIx64", path=%s, offset=%"
-			   PRId64", size=%"PRId32", result=%zd, %m", oid, path,
-			   iocb->offset, iocb->length, size);
+		sd_err("failed to read object %"PRIx64", path=%s, offset=%"
+		       PRId64", size=%"PRId32", result=%zd, %m", oid, path,
+		       iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
 	}
 	close(fd);
@@ -278,7 +278,7 @@ int prealloc(int fd, uint32_t size)
 	int ret = xfallocate(fd, 0, 0, size);
 	if (ret < 0) {
 		if (errno != ENOSYS && errno != EOPNOTSUPP) {
-			sd_eprintf("failed to preallocate space, %m");
+			sd_err("failed to preallocate space, %m");
 			return ret;
 		}
 
@@ -302,7 +302,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	    journal_write_store(oid, iocb->buf, iocb->length,
 				iocb->offset, true)
 	    != SD_RES_SUCCESS) {
-		sd_eprintf("turn off journaling");
+		sd_err("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
 		flags |= O_DSYNC;
 		sync();
@@ -318,11 +318,11 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 			 * same time.  They should try to write the same date,
 			 * so it is okay to simply return success here.
 			 */
-			sd_dprintf("%s exists", tmp_path);
+			sd_debug("%s exists", tmp_path);
 			return SD_RES_SUCCESS;
 		}
 
-		sd_eprintf("failed to open %s: %m", tmp_path);
+		sd_err("failed to open %s: %m", tmp_path);
 		return err_to_sderr(path, oid, errno);
 	}
 
@@ -336,18 +336,18 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 
 	ret = xpwrite(fd, iocb->buf, len, iocb->offset);
 	if (ret != len) {
-		sd_eprintf("failed to write object. %m");
+		sd_err("failed to write object. %m");
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
 
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
-		sd_eprintf("failed to rename %s to %s: %m", tmp_path, path);
+		sd_err("failed to rename %s to %s: %m", tmp_path, path);
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
-	sd_dprintf("%"PRIx64, oid);
+	sd_debug("%"PRIx64, oid);
 	ret = SD_RES_SUCCESS;
 out:
 	if (ret != SD_RES_SUCCESS)
@@ -360,8 +360,8 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 
-	sd_dprintf("try link %"PRIx64" from snapshot with epoch %d", oid,
-		   tgt_epoch);
+	sd_debug("try link %"PRIx64" from snapshot with epoch %d", oid,
+		 tgt_epoch);
 
 	get_obj_path(oid, path);
 	get_stale_obj_path(oid, tgt_epoch, stale_path);
@@ -374,8 +374,7 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 		if (errno == EEXIST)
 			goto out;
 
-		sd_dprintf("failed to link from %s to %s, %m", stale_path,
-			   path);
+		sd_debug("failed to link from %s to %s, %m", stale_path, path);
 		return err_to_sderr(path, oid, errno);
 	}
 out:
@@ -422,12 +421,12 @@ static int move_object_to_stale_dir(uint64_t oid, char *wd, uint32_t epoch,
 		 oid, tgt_epoch);
 
 	if (rename(path, stale_path) < 0) {
-		sd_eprintf("failed to move stale object %"PRIX64" to %s, %m",
-			   oid, path);
+		sd_err("failed to move stale object %" PRIX64 " to %s, %m", oid,
+		       path);
 		return SD_RES_EIO;
 	}
 
-	sd_dprintf("moved object %"PRIx64, oid);
+	sd_debug("moved object %"PRIx64, oid);
 	return SD_RES_SUCCESS;
 }
 
@@ -450,7 +449,7 @@ int default_format(void)
 {
 	unsigned ret;
 
-	sd_dprintf("try get a clean store");
+	sd_debug("try get a clean store");
 	ret = for_each_obj_path(purge_dir);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
@@ -474,7 +473,7 @@ int default_remove_object(uint64_t oid)
 		if (errno == ENOENT)
 			return SD_RES_NO_OBJ;
 
-		sd_eprintf("failed to remove object %"PRIx64", %m", oid);
+		sd_err("failed to remove object %"PRIx64", %m", oid);
 		return SD_RES_EIO;
 	}
 
@@ -487,7 +486,7 @@ static int get_object_sha1(char *path, uint8_t *sha1)
 {
 	if (getxattr(path, SHA1NAME, sha1, SHA1_DIGEST_SIZE)
 	    != SHA1_DIGEST_SIZE) {
-		sd_eprintf("fail to get sha1, %s", path);
+		sd_err("fail to get sha1, %s", path);
 		return -1;
 	}
 
@@ -500,7 +499,7 @@ static int set_object_sha1(char *path, const uint8_t *sha1)
 
 	ret = setxattr(path, SHA1NAME, sha1, SHA1_DIGEST_SIZE, 0);
 	if (ret < 0)
-		sd_eprintf("fail to set sha1, %s", path);
+		sd_err("fail to set sha1, %s", path);
 
 	return ret;
 }
@@ -537,8 +536,8 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 
 	if (is_readonly_obj) {
 		if (get_object_sha1(path, sha1) == 0) {
-			sd_dprintf("use cached sha1 digest %s",
-				   sha1_to_hex(sha1));
+			sd_debug("use cached sha1 digest %s",
+				 sha1_to_hex(sha1));
 			return SD_RES_SUCCESS;
 		}
 	}
@@ -561,8 +560,8 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	sha1_from_buffer(buf, length, sha1);
 	free(buf);
 
-	sd_dprintf("the message digest of %"PRIx64" at epoch %d is %s", oid,
-		   epoch, sha1_to_hex(sha1));
+	sd_debug("the message digest of %"PRIx64" at epoch %d is %s", oid,
+		 epoch, sha1_to_hex(sha1));
 
 	if (is_readonly_obj)
 		set_object_sha1(path, sha1);

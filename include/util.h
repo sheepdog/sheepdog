@@ -184,12 +184,12 @@ int atomic_create_and_write(const char *path, char *buf, size_t len,
 #endif
 
 #ifndef NDEBUG
-#define assert(expr)							\
-({									\
-	if (!(expr)) {							\
-		sd_printf(SDOG_EMERG, "Asserting `%s' failed.", #expr);	\
-		abort();						\
-	}								\
+#define assert(expr)						\
+({								\
+	if (!(expr)) {						\
+		sd_emerg("Asserting `%s' failed.", #expr);	\
+		abort();					\
+	}							\
 })
 #else
 #define assert(expr) ((void)0)

@@ -79,7 +79,7 @@ static size_t get_file_size(const char *path)
 
 	ret = stat(path, &stbuf);
 	if (ret < 0) {
-		sd_eprintf("failed to stat %s, %m", path);
+		sd_err("failed to stat %s, %m", path);
 		return -1;
 	}
 	return stbuf.st_size;
@@ -122,7 +122,7 @@ static int backup_file(char *fname, char *suffix)
 	fd = open(fname, O_RDONLY);
 	if (fd < 0) {
 		if (errno != ENOENT) {
-			sd_eprintf("failed to open %s, %m", fname);
+			sd_err("failed to open %s, %m", fname);
 			ret = -1;
 		} else
 			ret = 0;
@@ -136,7 +136,7 @@ static int backup_file(char *fname, char *suffix)
 	buf = xmalloc(len);
 	ret = xread(fd, buf, len);
 	if (ret != len) {
-		sd_eprintf("failed to read %s, %d %m", fname, ret);
+		sd_err("failed to read %s, %d %m", fname, ret);
 		ret = -1;
 		goto out;
 	}
@@ -145,14 +145,14 @@ static int backup_file(char *fname, char *suffix)
 
 	fd = open(dst_file, O_CREAT | O_WRONLY | O_DSYNC, 0644);
 	if (fd < 0) {
-		sd_eprintf("failed to create %s, %m", dst_file);
+		sd_err("failed to create %s, %m", dst_file);
 		ret = -1;
 		goto out;
 	}
 
 	ret = xwrite(fd, buf, len);
 	if (ret != len) {
-		sd_eprintf("failed to write to %s, %d %m", dst_file, ret);
+		sd_err("failed to write to %s, %d %m", dst_file, ret);
 		ret = -1;
 	}
 out:
@@ -215,13 +215,13 @@ static int update_epoch_from_v0_to_v1(uint32_t epoch)
 		if (errno == ENOENT)
 			return 0;
 
-		sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
+		sd_err("failed to open epoch %"PRIu32" log", epoch);
 		return -1;
 	}
 
 	ret = xread(fd, nodes_v0, sizeof(nodes_v0));
 	if (ret < 0) {
-		sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
+		sd_err("failed to read epoch %"PRIu32" log", epoch);
 		close(fd);
 		return ret;
 	}
@@ -238,8 +238,7 @@ static int update_epoch_from_v0_to_v1(uint32_t epoch)
 	len = sizeof(nodes_v1[0]) * nr_nodes;
 	ret = xpwrite(fd, nodes_v1, len, 0);
 	if (ret != len) {
-		sd_eprintf("failed to write epoch %"PRIu32" log",
-			   epoch);
+		sd_err("failed to write epoch %"PRIu32" log", epoch);
 		close(fd);
 		return -1;
 	}
@@ -248,8 +247,7 @@ static int update_epoch_from_v0_to_v1(uint32_t epoch)
 
 	ret = xpwrite(fd, t, sizeof(*t), len);
 	if (ret != sizeof(*t)) {
-		sd_eprintf("failed to write time to epoch %"
-			   PRIu32" log", epoch);
+		sd_err("failed to write time to epoch %" PRIu32 " log", epoch);
 		close(fd);
 		return -1;
 	}
@@ -266,14 +264,14 @@ static int migrate_from_v0_to_v1(void)
 
 	fd = open(config_path, O_RDWR);
 	if (fd < 0) {
-		sd_eprintf("failed to open config file, %m");
+		sd_err("failed to open config file, %m");
 		return -1;
 	}
 
 	memset(&config, 0, sizeof(config));
 	ret = xread(fd, &config, sizeof(config));
 	if (ret < 0) {
-		sd_eprintf("failed to read config file, %m");
+		sd_err("failed to read config file, %m");
 		close(fd);
 		return ret;
 	}
@@ -281,7 +279,7 @@ static int migrate_from_v0_to_v1(void)
 	config.version = 1;
 	ret = xpwrite(fd, &config, sizeof(config), 0);
 	if (ret != sizeof(config)) {
-		sd_eprintf("failed to write config data, %m");
+		sd_err("failed to write config data, %m");
 		close(fd);
 		return -1;
 	}
@@ -289,7 +287,7 @@ static int migrate_from_v0_to_v1(void)
 	/* 0.5.1 could wrongly extend the config file, so truncate it here */
 	ret = xftruncate(fd, sizeof(config));
 	if (ret != 0) {
-		sd_eprintf("failed to truncate config data, %m");
+		sd_err("failed to truncate config data, %m");
 		close(fd);
 		return -1;
 	}
@@ -325,7 +323,7 @@ static int update_epoch_from_v1_to_v2(uint32_t epoch)
 		if (errno == ENOENT)
 			return 0;
 
-		sd_eprintf("failed to open epoch %"PRIu32" log", epoch);
+		sd_err("failed to open epoch %"PRIu32" log", epoch);
 		return -1;
 	}
 
@@ -335,14 +333,14 @@ static int update_epoch_from_v1_to_v2(uint32_t epoch)
 	 * the value of sd_node.nid.port
 	 */
 	if ((get_file_size(path) - sizeof(time_t)) % sizeof(nodes_v1[0]) != 0) {
-		sd_dprintf("%s is not a v1 format", path);
+		sd_debug("%s is not a v1 format", path);
 		close(fd);
 		return 0;
 	}
 
 	ret = xread(fd, nodes_v1, sizeof(nodes_v1));
 	if (ret < 0) {
-		sd_eprintf("failed to read epoch %"PRIu32" log", epoch);
+		sd_err("failed to read epoch %"PRIu32" log", epoch);
 		close(fd);
 		return ret;
 	}
@@ -350,7 +348,7 @@ static int update_epoch_from_v1_to_v2(uint32_t epoch)
 	nr_nodes = ret / sizeof(nodes_v1[0]);
 	for (int i = 0; i < nr_nodes; i++) {
 		if (nodes_v1[i].nid.port == 0) {
-			sd_dprintf("%s is not a v1 format", path);
+			sd_debug("%s is not a v1 format", path);
 			return 0;
 		}
 		memset(&nodes_v2[i].nid, 0, sizeof(nodes_v2[i].nid));
@@ -365,8 +363,7 @@ static int update_epoch_from_v1_to_v2(uint32_t epoch)
 	len = sizeof(nodes_v2[0]) * nr_nodes;
 	ret = xpwrite(fd, nodes_v2, len, 0);
 	if (ret != len) {
-		sd_eprintf("failed to write epoch %"PRIu32" log",
-			   epoch);
+		sd_err("failed to write epoch %"PRIu32" log", epoch);
 		close(fd);
 		return -1;
 	}
@@ -375,8 +372,7 @@ static int update_epoch_from_v1_to_v2(uint32_t epoch)
 
 	ret = xpwrite(fd, t, sizeof(*t), len);
 	if (ret != sizeof(*t)) {
-		sd_eprintf("failed to write time to epoch %"
-			   PRIu32" log", epoch);
+		sd_err("failed to write time to epoch %" PRIu32 " log", epoch);
 		close(fd);
 		return -1;
 	}
@@ -394,14 +390,14 @@ static int migrate_from_v1_to_v2(void)
 
 	fd = open(config_path, O_WRONLY | O_DSYNC);
 	if (fd < 0) {
-		sd_eprintf("failed to open config file, %m");
+		sd_err("failed to open config file, %m");
 		return -1;
 	}
 
 	ret = xpwrite(fd, &version, sizeof(version),
 		      offsetof(struct sheepdog_config_v2, version));
 	if (ret != sizeof(version)) {
-		sd_eprintf("failed to write config data, %m");
+		sd_err("failed to write config data, %m");
 		close(fd);
 		return -1;
 	}
@@ -409,7 +405,7 @@ static int migrate_from_v1_to_v2(void)
 	ret = xpwrite(fd, store, sizeof(store),
 		      offsetof(struct sheepdog_config_v2, store));
 	if (ret != sizeof(store)) {
-		sd_eprintf("failed to write config data, %m");
+		sd_err("failed to write config data, %m");
 		close(fd);
 		return -1;
 	}
@@ -435,7 +431,7 @@ int sd_migrate_store(int from, int to)
 
 	ret = backup_store();
 	if (ret != 0) {
-		sd_eprintf("failed to backup the old store");
+		sd_err("failed to backup the old store");
 		return ret;
 	}
 

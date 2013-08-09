@@ -179,10 +179,10 @@ int trace_enable(const char *name)
 	struct tracer *tracer = find_tracer(name);
 
 	if (tracer == NULL) {
-		sd_dprintf("no such tracer, %s", name);
+		sd_debug("no such tracer, %s", name);
 		return SD_RES_NO_SUPPORT;
 	} else if (uatomic_is_true(&tracer->enabled)) {
-		sd_dprintf("tracer %s is already enabled", name);
+		sd_debug("tracer %s is already enabled", name);
 		return SD_RES_INVALID_PARMS;
 	}
 
@@ -193,7 +193,7 @@ int trace_enable(const char *name)
 		patch_all_sites((unsigned long)trace_caller);
 		resume_worker_threads();
 	}
-	sd_dprintf("tracer %s enabled", tracer->name);
+	sd_debug("tracer %s enabled", tracer->name);
 
 	return SD_RES_SUCCESS;
 }
@@ -203,10 +203,10 @@ int trace_disable(const char *name)
 	struct tracer *tracer = find_tracer(name);
 
 	if (tracer == NULL) {
-		sd_dprintf("no such tracer, %s", name);
+		sd_debug("no such tracer, %s", name);
 		return SD_RES_NO_SUPPORT;
 	} else if (!uatomic_is_true(&tracer->enabled)) {
-		sd_dprintf("tracer %s is not enabled", name);
+		sd_debug("tracer %s is not enabled", name);
 		return SD_RES_INVALID_PARMS;
 	}
 
@@ -216,7 +216,7 @@ int trace_disable(const char *name)
 		nop_all_sites();
 		resume_worker_threads();
 	}
-	sd_dprintf("tracer %s disabled", tracer->name);
+	sd_debug("tracer %s disabled", tracer->name);
 
 	return SD_RES_SUCCESS;
 }
@@ -319,17 +319,17 @@ static bfd *get_bfd(void)
 
 	abfd = bfd_openr(fname, NULL);
 	if (abfd == 0) {
-		sd_eprintf("cannot open %s", fname);
+		sd_err("cannot open %s", fname);
 		return NULL;
 	}
 
 	if (!bfd_check_format(abfd, bfd_object)) {
-		sd_eprintf("invalid format");
+		sd_err("invalid format");
 		return NULL;
 	}
 
 	if (!(bfd_get_file_flags(abfd) & HAS_SYMS)) {
-		sd_eprintf("no symbols found");
+		sd_err("no symbols found");
 		return NULL;
 	}
 
@@ -350,7 +350,7 @@ static int init_callers(void)
 
 	max_symtab_size = bfd_get_symtab_upper_bound(abfd);
 	if (max_symtab_size < 0) {
-		sd_eprintf("failed to get symtab size");
+		sd_err("failed to get symtab size");
 		return -1;
 	}
 
@@ -371,7 +371,7 @@ static int init_callers(void)
 
 		ip = find_mcount_call(addr);
 		if (ip == 0) {
-			sd_dprintf("%s doesn't have mcount call", name);
+			sd_debug("%s doesn't have mcount call", name);
 			continue;
 		}
 		if (make_text_writable(ip) < 0)
@@ -417,6 +417,6 @@ int trace_init(void)
 		pthread_mutex_init(&buffer_lock[i], NULL);
 	}
 
-	sd_iprintf("trace support enabled. cpu count %d.", nr_cpu);
+	sd_info("trace support enabled. cpu count %d.", nr_cpu);
 	return 0;
 }

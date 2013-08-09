@@ -144,12 +144,12 @@ static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
 	while (wi->nr_threads < nr_threads) {
 		ret = pthread_create(&thread, NULL, worker_routine, wi);
 		if (ret != 0) {
-			sd_eprintf("failed to create worker thread: %m");
+			sd_err("failed to create worker thread: %m");
 			pthread_mutex_unlock(&wi->startup_lock);
 			return -1;
 		}
 		wi->nr_threads++;
-		sd_dprintf("create thread %s %zu", wi->name, wi->nr_threads);
+		sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
 	}
 	pthread_mutex_unlock(&wi->startup_lock);
 
@@ -274,8 +274,8 @@ static void *worker_routine(void *arg)
 			clear_bit(tid, tid_map);
 			pthread_mutex_unlock(&wi->pending_lock);
 			pthread_detach(pthread_self());
-			sd_dprintf("destroy thread %s %d, %zu", wi->name, tid,
-				   wi->nr_threads);
+			sd_debug("destroy thread %s %d, %zu", wi->name, tid,
+				 wi->nr_threads);
 			break;
 		}
 retest:
@@ -329,19 +329,19 @@ int init_work_queue(size_t (*get_nr_nodes)(void))
 	ack_efd = eventfd(0, EFD_SEMAPHORE);
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (resume_efd < 0 || ack_efd < 0 || efd < 0) {
-		sd_eprintf("failed to create event fds: %m");
+		sd_err("failed to create event fds: %m");
 		return 1;
 	}
 
 	/* trace uses this signal to suspend the worker threads */
 	if (install_sighandler(SIGUSR2, suspend, false) < 0) {
-		sd_dprintf("%m");
+		sd_debug("%m");
 		return -1;
 	}
 
 	ret = register_event(efd, worker_thread_request_done, NULL);
 	if (ret) {
-		sd_eprintf("failed to register event fd %m");
+		sd_err("failed to register event fd %m");
 		close(efd);
 		return 1;
 	}

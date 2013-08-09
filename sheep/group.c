@@ -204,7 +204,7 @@ static void cluster_op_done(struct work *work)
 	if (req->status == REQUEST_DROPPED)
 		goto drop;
 
-	sd_dprintf("%s (%p)", op_name(req->op), req);
+	sd_debug("%s (%p)", op_name(req->op), req);
 
 	msg = prepare_cluster_msg(req, &size);
 
@@ -215,8 +215,7 @@ static void cluster_op_done(struct work *work)
 		 * unblock the event.
 		 * FIXME: handle it gracefully.
 		 */
-		sd_printf(SDOG_EMERG, "Failed to unblock, %s, exiting.",
-			  sd_strerror(ret));
+		sd_emerg("Failed to unblock, %s, exiting.", sd_strerror(ret));
 		exit(1);
 	}
 
@@ -271,13 +270,13 @@ main_fn bool sd_block_handler(const struct sd_node *sender)
 main_fn void queue_cluster_request(struct request *req)
 {
 	int ret;
-	sd_dprintf("%s (%p)", op_name(req->op), req);
+	sd_debug("%s (%p)", op_name(req->op), req);
 
 	if (has_process_work(req->op)) {
 		ret = sys->cdrv->block();
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("failed to broadcast block to cluster, %s",
-				   sd_strerror(ret));
+			sd_err("failed to broadcast block to cluster, %s",
+			       sd_strerror(ret));
 			goto error;
 		}
 		list_add_tail(&req->pending_list,
@@ -291,8 +290,8 @@ main_fn void queue_cluster_request(struct request *req)
 
 		ret = sys->cdrv->notify(msg, size);
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("failed to broadcast notify to cluster, %s",
-				   sd_strerror(ret));
+			sd_err("failed to broadcast notify to cluster, %s",
+			       sd_strerror(ret));
 			goto error;
 		}
 
@@ -363,8 +362,8 @@ static bool cluster_ctime_check(const struct cluster_info *cinfo)
 		return true;
 
 	if (cinfo->ctime != sys->cinfo.ctime) {
-		sd_eprintf("joining node ctime doesn't match: %" PRIu64 " vs %"
-			   PRIu64, cinfo->ctime, sys->cinfo.ctime);
+		sd_err("joining node ctime doesn't match: %" PRIu64 " vs %"
+		       PRIu64, cinfo->ctime, sys->cinfo.ctime);
 		return false;
 	}
 
@@ -387,13 +386,13 @@ static bool enough_nodes_gathered(struct cluster_info *cinfo,
 
 		n = xlfind(key, nodes, nr_nodes, node_cmp);
 		if (n == NULL && !node_eq(key, joining)) {
-			sd_dprintf("%s doesn't join yet", node_to_str(key));
+			sd_debug("%s doesn't join yet", node_to_str(key));
 			return false;
 		}
 	}
 
-	sd_dprintf("all the nodes are gathered, %d, %zd", cinfo->nr_nodes,
-		   nr_nodes);
+	sd_debug("all the nodes are gathered, %d, %zd", cinfo->nr_nodes,
+		 nr_nodes);
 	return true;
 }
 
@@ -403,13 +402,13 @@ static enum sd_status cluster_wait_check(const struct sd_node *joining,
 					 struct cluster_info *cinfo)
 {
 	if (!cluster_ctime_check(cinfo)) {
-		sd_dprintf("joining node is invalid");
+		sd_debug("joining node is invalid");
 		return sys->cinfo.status;
 	}
 
 	if (cinfo->epoch > sys->cinfo.epoch) {
-		sd_dprintf("joining node has a larger epoch, %" PRIu32 ", %"
-			   PRIu32, cinfo->epoch, sys->cinfo.epoch);
+		sd_debug("joining node has a larger epoch, %" PRIu32 ", %"
+			 PRIu32, cinfo->epoch, sys->cinfo.epoch);
 		sys->cinfo = *cinfo;
 	}
 
@@ -462,12 +461,12 @@ static void do_get_vdis(struct work *work)
 	int i, ret;
 
 	if (!node_is_local(&w->joined)) {
-		sd_dprintf("try to get vdi bitmap from %s",
-			   node_to_str(&w->joined));
+		sd_debug("try to get vdi bitmap from %s",
+			 node_to_str(&w->joined));
 		ret = get_vdis_from(&w->joined);
 		if (ret != SD_RES_SUCCESS)
-			sd_printf(SDOG_ALERT, "failed to get vdi bitmap from "
-				  "%s", node_to_str(&w->joined));
+			sd_alert("failed to get vdi bitmap from %s",
+				 node_to_str(&w->joined));
 		return;
 	}
 
@@ -476,13 +475,13 @@ static void do_get_vdis(struct work *work)
 		if (node_is_local(&w->members[i]))
 			continue;
 
-		sd_dprintf("try to get vdi bitmap from %s",
-			   node_to_str(&w->members[i]));
+		sd_debug("try to get vdi bitmap from %s",
+			 node_to_str(&w->members[i]));
 		ret = get_vdis_from(&w->members[i]);
 		if (ret != SD_RES_SUCCESS) {
 			/* try to read from another node */
-			sd_printf(SDOG_ALERT, "failed to get vdi bitmap from "
-				  "%s", node_to_str(&w->members[i]));
+			sd_alert("failed to get vdi bitmap from %s",
+				 node_to_str(&w->members[i]));
 			continue;
 		}
 
@@ -592,14 +591,14 @@ static void get_vdis(const struct sd_node *nodes, size_t nr_nodes,
 
 void wait_get_vdis_done(void)
 {
-	sd_dprintf("waiting for vdi list");
+	sd_debug("waiting for vdi list");
 
 	pthread_mutex_lock(&wait_vdis_lock);
 	while (!is_vdi_list_ready)
 		pthread_cond_wait(&wait_vdis_cond, &wait_vdis_lock);
 	pthread_mutex_unlock(&wait_vdis_lock);
 
-	sd_dprintf("vdi list ready");
+	sd_debug("vdi list ready");
 }
 
 void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
@@ -623,9 +622,8 @@ void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
 	for (i = 0; i < nr_nodes; i++) {
 		factor = (float)nodes[i].space / (float)avg_size;
 		nodes[i].nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
-		sd_dprintf("node %d has %d vnodes, free space %" PRIu64,
-			   nodes[i].nid.port, nodes[i].nr_vnodes,
-			   nodes[i].space);
+		sd_debug("node %d has %d vnodes, free space %" PRIu64,
+			 nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
 	}
 }
 
@@ -636,7 +634,7 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 {
 	struct vnode_info *old_vnode_info;
 
-	sd_dprintf("status = %d, epoch = %d", cinfo->status, cinfo->epoch);
+	sd_debug("status = %d, epoch = %d", cinfo->status, cinfo->epoch);
 
 	if (!sys->gateway_only)
 		setup_backend_store(cinfo);
@@ -693,8 +691,8 @@ main_fn void sd_notify_handler(const struct sd_node *sender, void *data,
 	int ret = msg->rsp.result;
 	struct request *req = NULL;
 
-	sd_dprintf("op %s, size: %zu, from: %s", op_name(op), data_len,
-		   node_to_str(sender));
+	sd_debug("op %s, size: %zu, from: %s", op_name(op), data_len,
+		 node_to_str(sender));
 
 	if (node_is_local(sender)) {
 		if (has_process_work(op))
@@ -747,11 +745,11 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 	 * not 0, the joining node has to wait for another node to accept it.
 	 */
 	if (nr_nodes > 0 && node_is_local(joining)) {
-		sd_dprintf("wait for another node to accept this node");
+		sd_debug("wait for another node to accept this node");
 		return false;
 	}
 
-	sd_dprintf("check %s, %d", node_to_str(joining), sys->cinfo.status);
+	sd_debug("check %s, %d", node_to_str(joining), sys->cinfo.status);
 
 	if (sys->cinfo.status == SD_STATUS_WAIT)
 		status = cluster_wait_check(joining, nodes, nr_nodes, cinfo);
@@ -762,16 +760,16 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 	cinfo->status = status;
 	cinfo->proto_ver = SD_SHEEP_PROTO_VER;
 
-	sd_dprintf("%s: cluster_status = 0x%x",
-		   addr_to_str(str, sizeof(str), joining->nid.addr,
-			       joining->nid.port), cinfo->status);
+	sd_debug("%s: cluster_status = 0x%x",
+		 addr_to_str(str, sizeof(str), joining->nid.addr,
+			     joining->nid.port), cinfo->status);
 
 	return true;
 }
 
 static int send_join_request(struct sd_node *ent)
 {
-	sd_printf(SDOG_INFO, "%s", node_to_str(&sys->this_node));
+	sd_info("%s", node_to_str(&sys->this_node));
 
 	return sys->cdrv->join(ent, &sys->cinfo, sizeof(sys->cinfo));
 }
@@ -791,8 +789,8 @@ static void requeue_cluster_request(void)
 		 * driver. We manually call sd_notify_handler to finish
 		 * the request.
 		 */
-		sd_dprintf("finish pending notify request, op: %s",
-			   op_name(req->op));
+		sd_debug("finish pending notify request, op: %s",
+			 op_name(req->op));
 		msg = prepare_cluster_msg(req, &size);
 		sd_notify_handler(&sys->this_node, msg, size);
 		free(msg);
@@ -803,8 +801,8 @@ static void requeue_cluster_request(void)
 		switch (req->status) {
 		case REQUEST_INIT:
 			/* this request has never been executed, re-queue it */
-			sd_dprintf("requeue a block request, op: %s",
-				   op_name(req->op));
+			sd_debug("requeue a block request, op: %s",
+				 op_name(req->op));
 			list_del(&req->pending_list);
 			queue_cluster_request(req);
 			break;
@@ -817,8 +815,8 @@ static void requeue_cluster_request(void)
 			 * timeout. Mark it as dropped to stop cluster_op_done()
 			 * from calling ->unblock.
 			 */
-			sd_dprintf("drop pending block request, op: %s",
-				   op_name(req->op));
+			sd_debug("drop pending block request, op: %s",
+				 op_name(req->op));
 			req->status = REQUEST_DROPPED;
 			break;
 		case REQUEST_DONE:
@@ -829,8 +827,8 @@ static void requeue_cluster_request(void)
 			 * driver. We manually call sd_notify_handler to finish
 			 * the request.
 			 */
-			sd_dprintf("finish pending block request, op: %s",
-				   op_name(req->op));
+			sd_debug("finish pending block request, op: %s",
+				 op_name(req->op));
 			msg = prepare_cluster_msg(req, &size);
 			sd_notify_handler(&sys->this_node, msg, size);
 			free(msg);
@@ -855,8 +853,8 @@ main_fn int sd_reconnect_handler(void)
 static bool cluster_join_check(const struct cluster_info *cinfo)
 {
 	if (cinfo->proto_ver != SD_SHEEP_PROTO_VER) {
-		sd_eprintf("invalid protocol version: %d, %d",
-			   cinfo->proto_ver, SD_SHEEP_PROTO_VER);
+		sd_err("invalid protocol version: %d, %d", cinfo->proto_ver,
+		       SD_SHEEP_PROTO_VER);
 		return false;
 	}
 
@@ -866,7 +864,7 @@ static bool cluster_join_check(const struct cluster_info *cinfo)
 	if (cinfo->epoch == sys->cinfo.epoch &&
 	    memcmp(cinfo->nodes, sys->cinfo.nodes,
 		   sizeof(cinfo->nodes[0]) * cinfo->nr_nodes) != 0) {
-		sd_printf(SDOG_ALERT, "epoch log entries does not match");
+		sd_alert("epoch log entries does not match");
 		return false;
 	}
 
@@ -881,15 +879,15 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 	const struct cluster_info *cinfo = opaque;
 
 	if (!cluster_join_check(cinfo)) {
-		sd_eprintf("failed to join Sheepdog");
+		sd_err("failed to join Sheepdog");
 		exit(1);
 	}
 
 	sys->cinfo = *cinfo;
 
-	sd_dprintf("join %s", node_to_str(joined));
+	sd_debug("join %s", node_to_str(joined));
 	for (i = 0; i < nr_members; i++)
-		sd_dprintf("[%x] %s", i, node_to_str(members + i));
+		sd_debug("[%x] %s", i, node_to_str(members + i));
 
 	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
@@ -898,7 +896,7 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 
 	if (node_is_local(joined))
 		/* this output is used for testing */
-		sd_printf(SDOG_DEBUG, "join Sheepdog cluster");
+		sd_debug("join Sheepdog cluster");
 }
 
 main_fn void sd_leave_handler(const struct sd_node *left,
@@ -908,9 +906,9 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 	struct vnode_info *old_vnode_info;
 	int i, ret;
 
-	sd_dprintf("leave %s", node_to_str(left));
+	sd_debug("leave %s", node_to_str(left));
 	for (i = 0; i < nr_members; i++)
-		sd_dprintf("[%x] %s", i, node_to_str(members + i));
+		sd_debug("[%x] %s", i, node_to_str(members + i));
 
 	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
@@ -970,8 +968,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	if (!sys->cdrv) {
 		sys->cdrv = find_cdrv(DEFAULT_CLUSTER_DRIVER);
-		sd_dprintf("use %s cluster driver as default",
-			   DEFAULT_CLUSTER_DRIVER);
+		sd_debug("use %s cluster driver as default",
+			 DEFAULT_CLUSTER_DRIVER);
 	}
 
 	ret = sys->cdrv->init(sys->cdrv_option);
@@ -993,7 +991,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 		sys->this_node.zone = b[0] | b[1] << 8 | b[2] << 16 | b[3] << 24;
 	} else
 		sys->this_node.zone = zone;
-	sd_dprintf("zone id = %u", sys->this_node.zone);
+	sd_debug("zone id = %u", sys->this_node.zone);
 
 	sys->this_node.space = sys->disk_space;
 

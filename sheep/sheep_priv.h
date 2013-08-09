@@ -448,7 +448,7 @@ int http_init(const char *address);
 #else
 static inline int http_init(const char *address)
 {
-	sd_printf(SDOG_NOTICE, "http service is not complied");
+	sd_notice("http service is not complied");
 	return 0;
 }
 #endif /* END BUILD_HTTP */

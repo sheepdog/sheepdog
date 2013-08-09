@@ -126,20 +126,19 @@ static int path_to_disk_idx(char *path)
 bool md_add_disk(char *path)
 {
 	if (path_to_disk_idx(path) != -1) {
-		sd_eprintf("duplicate path %s", path);
+		sd_err("duplicate path %s", path);
 		return false;
 	}
 
 	if (xmkdir(path, sd_def_dmode) < 0) {
-		sd_eprintf("can't mkdir for %s, %m", path);
+		sd_err("can't mkdir for %s, %m", path);
 		return false;
 	}
 
 	md_nr_disks++;
 
 	pstrcpy(md_disks[md_nr_disks - 1].path, PATH_MAX, path);
-	sd_iprintf("%s, nr %d", md_disks[md_nr_disks - 1].path,
-		   md_nr_disks);
+	sd_info("%s, nr %d", md_disks[md_nr_disks - 1].path, md_nr_disks);
 	return true;
 }
 
@@ -153,9 +152,9 @@ static inline void calculate_vdisks(struct disk *disks, int nr_disks,
 	for (i = 0; i < nr_disks; i++) {
 		factor = (float)disks[i].space / (float)avg_size;
 		md_disks[i].nr_vdisks = rintf(MD_DEFAULT_VDISKS * factor);
-		sd_dprintf("%s has %d vdisks, free space %" PRIu64,
-			   md_disks[i].path, md_disks[i].nr_vdisks,
-			   md_disks[i].space);
+		sd_debug("%s has %d vdisks, free space %" PRIu64,
+			 md_disks[i].path, md_disks[i].nr_vdisks,
+			 md_disks[i].space);
 	}
 }
 
@@ -192,7 +191,7 @@ static int for_each_object_in_path(char *path,
 
 	dir = opendir(path);
 	if (!dir) {
-		sd_eprintf("failed to open %s, %m", path);
+		sd_err("failed to open %s, %m", path);
 		return SD_RES_EIO;
 	}
 
@@ -212,7 +211,7 @@ static int for_each_object_in_path(char *path,
 			if (cleanup) {
 				snprintf(p, PATH_MAX, "%s/%016"PRIx64".tmp",
 					 path, oid);
-				sd_dprintf("remove tmp object %s", p);
+				sd_debug("remove tmp object %s", p);
 				unlink(p);
 			}
 			continue;
@@ -235,7 +234,7 @@ static uint64_t get_path_free_size(char *path, uint64_t *used)
 	uint64_t size;
 
 	if (statvfs(path, &fs) < 0) {
-		sd_eprintf("get disk %s space failed %m", path);
+		sd_err("get disk %s space failed %m", path);
 		return 0;
 	}
 	size = (int64_t)fs.f_frsize * fs.f_bavail;
@@ -260,13 +259,13 @@ static uint64_t init_path_space(char *path)
 	char stale[PATH_MAX];
 
 	if (!is_xattr_enabled(path)) {
-		sd_iprintf("multi-disk support need xattr feature");
+		sd_info("multi-disk support need xattr feature");
 		goto broken_path;
 	}
 
 	snprintf(stale, PATH_MAX, "%s/.stale", path);
 	if (xmkdir(stale, sd_def_dmode) < 0) {
-		sd_eprintf("can't mkdir for %s, %m", stale);
+		sd_err("can't mkdir for %s, %m", stale);
 		goto broken_path;
 	}
 
@@ -274,7 +273,7 @@ static uint64_t init_path_space(char *path)
 		if (errno == ENODATA) {
 			goto create;
 		} else {
-			sd_eprintf("%s, %m", path);
+			sd_err("%s, %m", path);
 			goto broken_path;
 		}
 	}
@@ -285,7 +284,7 @@ create:
 	if (!size)
 		goto broken_path;
 	if (setxattr(path, MDNAME, &size, MDSIZE, 0) < 0) {
-		sd_eprintf("%s, %m", path);
+		sd_err("%s, %m", path);
 		goto broken_path;
 	}
 	return size;
@@ -297,7 +296,7 @@ static inline void md_remove_disk(int idx)
 {
 	int i;
 
-	sd_iprintf("%s from multi-disk array", md_disks[idx].path);
+	sd_info("%s from multi-disk array", md_disks[idx].path);
 	/*
 	 * We need to keep last disk path to generate EIO when all disks are
 	 * broken
@@ -341,7 +340,7 @@ char *md_get_object_path(uint64_t oid)
 	vd = oid_to_vdisk(oid);
 	p = md_disks[vd->idx].path;
 	sd_unlock(&md_lock);
-	sd_dprintf("%d, %s", vd->idx, p);
+	sd_debug("%d, %s", vd->idx, p);
 
 	return p;
 }
@@ -381,7 +380,7 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
 	sd_read_lock(&md_lock);
 	for (i = 0; i < md_nr_disks; i++) {
 		snprintf(path, sizeof(path), "%s/.stale", md_disks[i].path);
-		sd_eprintf("%s", path);
+		sd_err("%s", path);
 		ret = for_each_object_in_path(path, func, false, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
@@ -460,7 +459,7 @@ static inline bool md_access(char *path)
 {
 	if (access(path, R_OK | W_OK) < 0) {
 		if (errno != ENOENT)
-			sd_eprintf("failed to check %s, %m", path);
+			sd_err("failed to check %s, %m", path);
 		return false;
 	}
 
@@ -495,19 +494,19 @@ static int md_move_object(uint64_t oid, char *old, char *new)
 
 	fd = open(old, O_RDONLY);
 	if (fd < 0) {
-		sd_eprintf("failed to open %s", old);
+		sd_err("failed to open %s", old);
 		goto out;
 	}
 
 	ret = strbuf_read(&buf, fd, sz);
 	if (ret != sz) {
-		sd_eprintf("failed to read %s, %d", old, ret);
+		sd_err("failed to read %s, %d", old, ret);
 		ret = -1;
 		goto out_close;
 	}
 
 	if (atomic_create_and_write(new, buf.buf, buf.len, false) < 0) {
-		sd_eprintf("failed to create %s", new);
+		sd_err("failed to create %s", new);
 		ret = -1;
 		goto out_close;
 	}
@@ -537,11 +536,11 @@ static int md_check_and_move(uint64_t oid, uint32_t epoch, char *path)
 
 	/* We can't use rename(2) accross device */
 	if (md_move_object(oid, old, new) < 0) {
-		sd_eprintf("move old %s to new %s failed", old, new);
+		sd_err("move old %s to new %s failed", old, new);
 		return SD_RES_EIO;
 	}
 
-	sd_dprintf("from %s to %s", old, new);
+	sd_debug("from %s to %s", old, new);
 	return SD_RES_SUCCESS;
 }
 
@@ -616,7 +615,7 @@ static inline void md_del_disk(char *path)
 	int idx = path_to_disk_idx(path);
 
 	if (idx < 0) {
-		sd_eprintf("invalid path %s", path);
+		sd_err("invalid path %s", path);
 		return;
 	}
 	md_remove_disk(idx);

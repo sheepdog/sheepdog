@@ -183,7 +183,7 @@ static void shm_queue_notify(void)
 	nr = get_nodes(lnodes);
 
 	for (i = 0; i < nr; i++) {
-		sd_dprintf("send signal to %s", lnode_to_str(lnodes + i));
+		sd_debug("send signal to %s", lnode_to_str(lnodes + i));
 		kill(lnodes[i].pid, SIGUSR1);
 	}
 }
@@ -281,9 +281,9 @@ static int add_event(enum local_event_type type, struct local_node *lnode,
 		abort();
 	}
 
-	sd_dprintf("type = %d, sender = %s", ev.type, lnode_to_str(&ev.sender));
+	sd_debug("type = %d, sender = %s", ev.type, lnode_to_str(&ev.sender));
 	for (int i = 0; i < ev.nr_lnodes; i++)
-		sd_dprintf("%d: %s", i, lnode_to_str(ev.lnodes + i));
+		sd_debug("%d: %s", i, lnode_to_str(ev.lnodes + i));
 
 	shm_queue_push(&ev);
 
@@ -390,14 +390,12 @@ static bool local_process_event(void)
 	if (!ev)
 		return false;
 
-	sd_dprintf("type = %d, sender = %s", ev->type,
-		   lnode_to_str(&ev->sender));
-	sd_dprintf("callbacked = %d, removed = %d", ev->callbacked,
-		   ev->removed);
+	sd_debug("type = %d, sender = %s", ev->type, lnode_to_str(&ev->sender));
+	sd_debug("callbacked = %d, removed = %d", ev->callbacked, ev->removed);
 
 	nr_nodes = 0;
 	for (i = 0; i < ev->nr_lnodes; i++) {
-		sd_dprintf("%d: %s", i, lnode_to_str(ev->lnodes + i));
+		sd_debug("%d: %s", i, lnode_to_str(ev->lnodes + i));
 		if (!ev->lnodes[i].gateway)
 			nodes[nr_nodes++] = ev->lnodes[i].node;
 	}
@@ -416,7 +414,7 @@ static bool local_process_event(void)
 		case EVENT_JOIN:
 			break;
 		case EVENT_ACCEPT:
-			sd_dprintf("join Sheepdog");
+			sd_debug("join Sheepdog");
 			joined = true;
 			break;
 		default:
@@ -442,8 +440,8 @@ static bool local_process_event(void)
 		break;
 	case EVENT_LEAVE:
 		if (ev->sender.gateway) {
-			sd_dprintf("gateway %s left sheepdog",
-				   lnode_to_str(&ev->sender));
+			sd_debug("gateway %s left sheepdog",
+				 lnode_to_str(&ev->sender));
 			break;
 		}
 		/* fall through */
@@ -476,12 +474,12 @@ static void local_handler(int listen_fd, int events, void *data)
 	int ret;
 
 	if (events & EPOLLHUP) {
-		sd_eprintf("local driver received EPOLLHUP event, exiting.");
+		sd_err("local driver received EPOLLHUP event, exiting.");
 		log_close();
 		exit(1);
 	}
 
-	sd_dprintf("read siginfo");
+	sd_debug("read siginfo");
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	if (ret != sizeof(siginfo))
@@ -524,7 +522,7 @@ static int local_init(const char *option)
 
 	sigfd = signalfd(-1, &mask, SFD_NONBLOCK);
 	if (sigfd < 0) {
-		sd_eprintf("failed to create a signal fd: %m");
+		sd_err("failed to create a signal fd: %m");
 		return -1;
 	}
 
@@ -532,7 +530,7 @@ static int local_init(const char *option)
 
 	ret = register_event(sigfd, local_handler, NULL);
 	if (ret) {
-		sd_eprintf("failed to register local event handler (%d)", ret);
+		sd_err("failed to register local event handler (%d)", ret);
 		return -1;
 	}
 

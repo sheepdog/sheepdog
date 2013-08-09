@@ -104,8 +104,8 @@ static int remove_efd;
 
 static inline void remove_sheep(struct sheep *sheep)
 {
-	sd_dprintf("remove_sheep() called, removing %s",
-		node_to_str(&sheep->node));
+	sd_debug("remove_sheep() called, removing %s",
+		 node_to_str(&sheep->node));
 
 	sheep->state = SHEEP_STATE_LEAVING;
 	eventfd_xwrite(remove_efd, 1);
@@ -130,7 +130,7 @@ static int notify_remove_sheep(struct sheep *leaving)
 			&leaving->node, sizeof(struct sd_node));
 
 		if (sizeof(snd) + sizeof(struct sd_node) != ret) {
-			sd_eprintf("writev2() failed: %m");
+			sd_err("writev2() failed: %m");
 
 			remove_sheep(s);
 			failed++;
@@ -147,14 +147,13 @@ static void remove_handler(int fd, int events, void *data)
 
 	nr_removed = eventfd_xread(remove_efd);
 
-	sd_dprintf("removed sheeps");
+	sd_debug("removed sheeps");
 remove:
 	list_for_each_entry(s, &sheep_list_head, sheep_list) {
 		if (s->state != SHEEP_STATE_LEAVING)
 			continue;
 
-		sd_printf(SDOG_DEBUG, "removing the node: %s",
-			node_to_str(&s->node));
+		sd_debug("removing the node: %s", node_to_str(&s->node));
 
 		if (!is_sd_node_zero(&s->node))
 			/*
@@ -176,7 +175,7 @@ remove:
 	goto end;
 
 del:
-	sd_iprintf("removed node: %s", node_to_str(&s->node));
+	sd_info("removed node: %s", node_to_str(&s->node));
 
 	unregister_event(s->fd);
 	close(s->fd);
@@ -191,7 +190,7 @@ del:
 		goto remove;
 
 end:
-	sd_dprintf("nodes which failed during remove_handler(): %d", failed);
+	sd_debug("nodes which failed during remove_handler(): %d", failed);
 }
 
 static LIST_HEAD(join_wait_queue);
@@ -217,10 +216,10 @@ retry:
 
 	wbytes = xwrite(waiting->fd, &snd, sizeof(snd));
 	if (sizeof(snd) != wbytes) {
-		sd_printf(SDOG_ERR, "xwrite() failed: %m");
+		sd_err("xwrite() failed: %m");
 		remove_sheep(waiting);
 
-		sd_iprintf("node %s is failed to join",
+		sd_info("node %s is failed to join",
 			node_to_str(&waiting->node));
 		nr_failed++;
 
@@ -244,21 +243,21 @@ static void sph_handle_join(struct sph_msg *msg, struct sheep *sheep)
 		buf = xzalloc(msg->body_len);
 		rbytes = xread(fd, buf, msg->body_len);
 		if (rbytes != msg->body_len) {
-			sd_eprintf("xread() failed: %m");
+			sd_err("xread() failed: %m");
 			goto purge_current_sheep;
 		}
 		free(buf);
 
 		list_add(&sheep->join_wait_list, &join_wait_queue);
 
-		sd_dprintf("there is already a joining sheep");
+		sd_debug("there is already a joining sheep");
 		return;
 	}
 
 	join = xzalloc(msg->body_len);
 	rbytes = xread(fd, join, msg->body_len);
 	if (msg->body_len != rbytes) {
-		sd_eprintf("xread() failed: %m");
+		sd_err("xread() failed: %m");
 		free(join);
 		goto purge_current_sheep;
 	}
@@ -279,7 +278,7 @@ static void sph_handle_join(struct sph_msg *msg, struct sheep *sheep)
 	free(join);
 
 	if (sizeof(snd) + msg->body_len != wbytes) {
-		sd_eprintf("writev2() failed: %m");
+		sd_err("writev2() failed: %m");
 
 		goto purge_current_sheep;
 	}
@@ -305,18 +304,18 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	struct sph_msg_join_reply *join_reply_body;
 	struct sph_msg_join_node_finish *join_node_finish;
 
-	sd_dprintf("new node reply from %s", node_to_str(&sheep->node));
+	sd_debug("new node reply from %s", node_to_str(&sheep->node));
 
 	join = xzalloc(msg->body_len);
 	rbytes = xread(fd, join, msg->body_len);
 	if (msg->body_len != rbytes) {
-		sd_eprintf("xread() failed: %m");
+		sd_err("xread() failed: %m");
 		free(join);
 
 		goto purge_current_sheep;
 	}
 
-	sd_dprintf("joining node is %s", node_to_str(&join->new_node));
+	sd_debug("joining node is %s", node_to_str(&join->new_node));
 
 	joining_sheep = find_sheep_by_nid(&join->new_node.nid);
 	assert(joining_sheep != NULL);
@@ -325,7 +324,7 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	opaque = xzalloc(opaque_len);
 	memcpy(opaque, join->opaque, opaque_len);
 
-	sd_printf(SDOG_DEBUG, "length of opaque: %d", opaque_len);
+	sd_debug("length of opaque: %d", opaque_len);
 	memset(&snd, 0, sizeof(snd));
 	snd.type = SPH_SRV_MSG_JOIN_REPLY;
 	snd.body_len = sizeof(struct sph_msg_join_reply) + opaque_len;
@@ -347,7 +346,7 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 	free(join);
 
 	if (sizeof(snd) + snd.body_len != wbytes) {
-		sd_eprintf("writev2() to master failed: %m");
+		sd_err("writev2() to master failed: %m");
 
 		goto purge_current_sheep;
 	}
@@ -372,7 +371,7 @@ static void sph_handle_accept(struct sph_msg *msg, struct sheep *sheep)
 		wbytes = writev2(s->fd, &snd, join_node_finish, snd.body_len);
 
 		if (sizeof(snd) + snd.body_len != wbytes) {
-			sd_eprintf("writev2() failed: %m");
+			sd_err("writev2() failed: %m");
 			remove_sheep(s);
 			removed++;
 		}
@@ -408,7 +407,7 @@ static void sph_handle_notify(struct sph_msg *msg, struct sheep *sheep)
 	notify = xzalloc(msg->body_len);
 	rbytes = xread(fd, notify, msg->body_len);
 	if (rbytes != msg->body_len) {
-		sd_eprintf("xread() failed: %m");
+		sd_err("xread() failed: %m");
 		goto purge_current_sheep;
 	}
 
@@ -431,7 +430,7 @@ static void sph_handle_notify(struct sph_msg *msg, struct sheep *sheep)
 
 		wbytes = writev2(s->fd, &snd, notify_forward, snd.body_len);
 		if (sizeof(snd) + snd.body_len != wbytes) {
-			sd_eprintf("writev2() failed: %m");
+			sd_err("writev2() failed: %m");
 			goto notify_failed;
 		}
 
@@ -468,7 +467,7 @@ static void sph_handle_block(struct sph_msg *msg, struct sheep *sheep)
 		wbytes = writev2(s->fd, &snd,
 				&sheep->node, sizeof(struct sd_node));
 		if (sizeof(snd) + sizeof(struct sd_node) != wbytes) {
-			sd_eprintf("writev2() failed: %m");
+			sd_err("writev2() failed: %m");
 			goto block_failed;
 		}
 
@@ -487,7 +486,7 @@ static void sph_handle_leave(struct sph_msg *msg, struct sheep *sheep)
 	struct sheep *s;
 	struct sph_msg snd;
 
-	sd_iprintf("%s is leaving", node_to_str(&sheep->node));
+	sd_info("%s is leaving", node_to_str(&sheep->node));
 
 	memset(&snd, 0, sizeof(snd));
 	snd.type = SPH_SRV_MSG_LEAVE_FORWARD;
@@ -502,7 +501,7 @@ static void sph_handle_leave(struct sph_msg *msg, struct sheep *sheep)
 		wbytes = writev2(s->fd, &snd,
 				&sheep->node, sizeof(struct sd_node));
 		if (sizeof(snd) + sizeof(struct sd_node) != wbytes) {
-			sd_eprintf("writev2() failed: %m");
+			sd_err("writev2() failed: %m");
 			goto fwd_leave_failed;
 		}
 
@@ -530,26 +529,25 @@ static void read_msg_from_sheep(struct sheep *sheep)
 	ret = xread(sheep->fd, &rcv, sizeof(rcv));
 
 	if (ret != sizeof(rcv)) {
-		sd_eprintf("xread() failed: %m, ");
+		sd_err("xread() failed: %m, ");
 		goto remove;
 	}
 
 	if (!(0 <= rcv.type && rcv.type < ARRAY_SIZE(msg_handlers))) {
-		sd_eprintf("invalid message type: %d, ", rcv.type);
-		sd_eprintf("from node: %s", node_to_str(&sheep->node));
-		sd_eprintf("from node (sockaddr): %s",
-			sockaddr_in_to_str(&sheep->addr));
-		sd_eprintf("read bytes: %d, body length: %d",
-			ret, rcv.body_len);
+		sd_err("invalid message type: %d, ", rcv.type);
+		sd_err("from node: %s", node_to_str(&sheep->node));
+		sd_err("from node (sockaddr): %s",
+		       sockaddr_in_to_str(&sheep->addr));
+		sd_err("read bytes: %d, body length: %d", ret, rcv.body_len);
 		goto remove;
 	}
 
-	sd_dprintf("received op: %s", sph_cli_msg_to_str(rcv.type));
+	sd_debug("received op: %s", sph_cli_msg_to_str(rcv.type));
 
 	return msg_handlers[rcv.type](&rcv, sheep);
 
 remove:
-	sd_eprintf("removing node: %s", node_to_str(&sheep->node));
+	sd_err("removing node: %s", node_to_str(&sheep->node));
 	remove_sheep(sheep);
 }
 
@@ -558,8 +556,8 @@ static void sheep_comm_handler(int fd, int events, void *data)
 	if (events & EPOLLIN)
 		read_msg_from_sheep(data);
 	else if (events & EPOLLHUP || events & EPOLLERR) {
-		sd_eprintf("epoll() error: %s",
-			node_to_str(&((struct sheep *)data)->node));
+		sd_err("epoll() error: %s",
+		       node_to_str(&((struct sheep *)data)->node));
 		remove_sheep(data);
 	}
 }
@@ -576,18 +574,18 @@ static void sheep_accept_handler(int fd, int events, void *data)
 	len = sizeof(struct sockaddr_in);
 	new_sheep->fd = accept(fd, (struct sockaddr *)&new_sheep->addr, &len);
 	if (new_sheep->fd < 0) {
-		sd_eprintf("accept() failed: %m");
+		sd_err("accept() failed: %m");
 		goto clean;
 	}
 
 	if (-1 == set_keepalive(new_sheep->fd)) {
-		sd_eprintf("set_keepalive() failed: %m");
+		sd_err("set_keepalive() failed: %m");
 		goto clean;
 	}
 
 	ret = register_event(new_sheep->fd, sheep_comm_handler, new_sheep);
 	if (ret < 0) {
-		sd_eprintf("register_event() failed: %m");
+		sd_err("register_event() failed: %m");
 		goto clean;
 	}
 
@@ -596,7 +594,7 @@ static void sheep_accept_handler(int fd, int events, void *data)
 
 	INIT_LIST_HEAD(&new_sheep->join_wait_list);
 
-	sd_iprintf("accepted new sheep connection");
+	sd_info("accepted new sheep connection");
 	return;
 
 clean:
@@ -632,7 +630,7 @@ static void usage(void)
 
 static void exit_handler(void)
 {
-	sd_printf(SDOG_INFO, "exiting...");
+	sd_info("exiting...");
 }
 
 static int set_listen_fd_cb(int fd, void *data)
@@ -648,8 +646,7 @@ static int set_listen_fd_cb(int fd, void *data)
 
 static void crash_handler(int signo)
 {
-	sd_printf(SDOG_EMERG, "shepherd exits unexpectedly (%s).",
-		  strsignal(signo));
+	sd_emerg("shepherd exits unexpectedly (%s).", strsignal(signo));
 
 	sd_backtrace();
 

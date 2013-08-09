@@ -75,7 +75,7 @@ static bool vid_is_snapshot(uint32_t vid)
 	sd_unlock(&vdi_state_lock);
 
 	if (!entry) {
-		sd_eprintf("No VDI entry for %" PRIx32 " found", vid);
+		sd_err("No VDI entry for %" PRIx32 " found", vid);
 		return 0;
 	}
 
@@ -100,7 +100,7 @@ int get_vdi_copy_number(uint32_t vid)
 	sd_unlock(&vdi_state_lock);
 
 	if (!entry) {
-		sd_eprintf("No VDI copy entry for %" PRIx32 " found", vid);
+		sd_err("No VDI copy entry for %" PRIx32 " found", vid);
 		return 0;
 	}
 
@@ -143,7 +143,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 	entry->nr_copies = nr_copies;
 	entry->snapshot = snapshot;
 
-	sd_dprintf("%" PRIx32 ", %d", vid, nr_copies);
+	sd_debug("%" PRIx32 ", %d", vid, nr_copies);
 
 	sd_write_lock(&vdi_state_lock);
 	old = vdi_state_insert(&vdi_state_root, entry);
@@ -198,7 +198,7 @@ int vdi_exist(uint32_t vid)
 	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
 			  sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_eprintf("fail to read vdi inode (%" PRIx32 ")", vid);
+		sd_err("fail to read vdi inode (%" PRIx32 ")", vid);
 		ret = 0;
 		goto out;
 	}
@@ -244,13 +244,13 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 
 	if (iocb->create_snapshot) {
 		if (cur_vid != iocb->base_vid) {
-			sd_printf(SDOG_INFO, "tree snapshot %s %" PRIx32 " %"
-				  PRIx32, name, cur_vid, iocb->base_vid);
+			sd_info("tree snapshot %s %" PRIx32 " %" PRIx32, name,
+				cur_vid, iocb->base_vid);
 
 			ret = read_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 					  SD_INODE_HEADER_SIZE, 0);
 			if (ret != SD_RES_SUCCESS) {
-				sd_printf(SDOG_ERR, "failed");
+				sd_err("failed");
 				ret = SD_RES_BASE_VDI_READ;
 				goto out;
 			}
@@ -292,7 +292,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 		ret = write_object(vid_to_vdi_oid(cur_vid), (char *)cur,
 				   SD_INODE_HEADER_SIZE, 0, false);
 		if (ret != 0) {
-			sd_printf(SDOG_ERR, "failed");
+			sd_err("failed");
 			ret = SD_RES_BASE_VDI_READ;
 			goto out;
 		}
@@ -302,7 +302,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 		ret = write_object(vid_to_vdi_oid(iocb->base_vid), (char *)base,
 				   SD_INODE_HEADER_SIZE, 0, false);
 		if (ret != 0) {
-			sd_printf(SDOG_ERR, "failed");
+			sd_err("failed");
 			ret = SD_RES_BASE_VDI_WRITE;
 			goto out;
 		}
@@ -378,7 +378,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		sd_eprintf("failed to allocate memory");
+		sd_err("failed to allocate memory");
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
@@ -396,8 +396,8 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 		}
 
 		if (!strncmp(inode->name, name, strlen(inode->name))) {
-			sd_dprintf("%s = %s, %u = %u", iocb->tag, inode->tag,
-				   iocb->snapid, inode->snap_id);
+			sd_debug("%s = %s, %u = %u", iocb->tag, inode->tag,
+				 iocb->snapid, inode->snap_id);
 			if (vdi_has_tag(iocb)) {
 				/* Read, delete, clone on snapshots */
 				if (!vdi_is_snapshot(inode)) {
@@ -457,7 +457,7 @@ int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info)
 
 	ret = get_vdi_bitmap_range(iocb->name, &left, &right);
 	info->free_bit = right;
-	sd_dprintf("%s left %lx right %lx, %x", iocb->name, left, right, ret);
+	sd_debug("%s left %lx right %lx, %x", iocb->name, left, right, ret);
 	switch (ret) {
 	case SD_RES_NO_VDI:
 	case SD_RES_FULL_VDI:
@@ -481,8 +481,8 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid)
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("fail to notify vdi add event(%" PRIx32 ", %d, %"
-			   PRIx32 ")", vdi_id, nr_copies, old_vid);
+		sd_err("fail to notify vdi add event(%" PRIx32 ", %d, %" PRIx32
+		       ")", vdi_id, nr_copies, old_vid);
 
 	return ret;
 }
@@ -497,8 +497,8 @@ static void vdi_flush(uint32_t vid)
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("fail to flush vdi %" PRIx32 ", %s", vid,
-			   sd_strerror(ret));
+		sd_err("fail to flush vdi %" PRIx32 ", %s", vid,
+		       sd_strerror(ret));
 }
 
 /*
@@ -529,7 +529,7 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 			return ret;
 		break;
 	default:
-		sd_eprintf("%s", sd_strerror(ret));
+		sd_err("%s", sd_strerror(ret));
 		return ret;
 	}
 	if (!iocb->snapid)
@@ -539,11 +539,11 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	sd_dprintf("%s %s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32
-		   ", cur %" PRIx32 ", copies %d, snapid %"PRIu32,
-		   iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
-		   *new_vid, iocb->base_vid, info.vid, iocb->nr_copies,
-		   iocb->snapid);
+	sd_debug("%s %s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32
+		 ", cur %" PRIx32 ", copies %d, snapid %" PRIu32,
+		 iocb->create_snapshot ? "snapshot" : "vdi", name, iocb->size,
+		 *new_vid, iocb->base_vid, info.vid, iocb->nr_copies,
+		 iocb->snapid);
 
 	return create_vdi_obj(iocb, *new_vid, info.vid);
 }
@@ -628,8 +628,8 @@ static int notify_vdi_deletion(uint32_t vdi_id)
 
 	ret = exec_local_req(&hdr, &vdi_id);
 	if (ret != SD_RES_SUCCESS)
-		sd_eprintf("fail to notify vdi deletion(%" PRIx32 "), %d",
-			   vdi_id, ret);
+		sd_err("fail to notify vdi deletion(%" PRIx32 "), %d", vdi_id,
+		       ret);
 
 	return ret;
 }
@@ -641,11 +641,11 @@ static void delete_one(struct work *work)
 	int ret, i, nr_deleted;
 	struct sd_inode *inode = NULL;
 
-	sd_dprintf("%d %d, %16x", dw->done, dw->count, vdi_id);
+	sd_debug("%d %d, %16x", dw->done, dw->count, vdi_id);
 
 	inode = malloc(sizeof(*inode));
 	if (!inode) {
-		sd_eprintf("failed to allocate memory");
+		sd_err("failed to allocate memory");
 		return;
 	}
 
@@ -653,7 +653,7 @@ static void delete_one(struct work *work)
 			  (void *)inode, sizeof(*inode), 0);
 
 	if (ret != SD_RES_SUCCESS) {
-		sd_eprintf("cannot find VDI object");
+		sd_err("cannot find VDI object");
 		goto out;
 	}
 
@@ -669,15 +669,14 @@ static void delete_one(struct work *work)
 		oid = vid_to_data_oid(inode->data_vdi_id[i], i);
 
 		if (inode->data_vdi_id[i] != inode->vdi_id) {
-			sd_dprintf("object %" PRIx64 " is base's data, would"
-				   " not be deleted.", oid);
+			sd_debug("object %" PRIx64 " is base's data, would"
+				 " not be deleted.", oid);
 			continue;
 		}
 
 		ret = remove_object(oid);
 		if (ret != SD_RES_SUCCESS)
-			sd_eprintf("remove object %" PRIx64 " fail, %d", oid,
-				   ret);
+			sd_err("remove object %" PRIx64 " fail, %d", oid, ret);
 
 		nr_deleted++;
 	}
@@ -732,7 +731,7 @@ static int fill_vdi_list(struct deletion_work *dw, uint32_t root_vid)
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		sd_eprintf("failed to allocate memory");
+		sd_err("failed to allocate memory");
 		goto err;
 	}
 
@@ -743,7 +742,7 @@ again:
 			  SD_INODE_HEADER_SIZE, 0);
 
 	if (ret != SD_RES_SUCCESS) {
-		sd_eprintf("cannot find VDI object");
+		sd_err("cannot find VDI object");
 		goto err;
 	}
 
@@ -776,7 +775,7 @@ static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
 
 	inode = malloc(SD_INODE_HEADER_SIZE);
 	if (!inode) {
-		sd_eprintf("failed to allocate memory");
+		sd_err("failed to allocate memory");
 		vid = 0;
 		goto out;
 	}
@@ -787,13 +786,13 @@ next:
 	if (vid == inode->vdi_id && inode->snap_id == 1
 			&& inode->parent_vdi_id != 0
 			&& !inode->snap_ctime) {
-		sd_dprintf("vdi %" PRIx32 " is a cloned vdi.", vid);
+		sd_debug("vdi %" PRIx32 " is a cloned vdi.", vid);
 		/* current vdi is a cloned vdi */
 		*cloned = true;
 	}
 
 	if (ret != SD_RES_SUCCESS) {
-		sd_eprintf("cannot find VDI object");
+		sd_err("cannot find VDI object");
 		vid = 0;
 		goto out;
 	}
@@ -843,15 +842,14 @@ static int start_deletion(struct request *req, uint32_t vid)
 			dw->buf[0] = vid;
 			dw->count = 1;
 		} else {
-			sd_dprintf("snapshot chain has valid vdi, "
-				   "just mark vdi %" PRIx32 " as deleted.",
-				   dw->vid);
+			sd_debug("snapshot chain has valid vdi, just mark vdi %"
+				 PRIx32 " as deleted.", dw->vid);
 			delete_inode(dw);
 			return SD_RES_SUCCESS;
 		}
 	}
 
-	sd_dprintf("%d", dw->count);
+	sd_debug("%d", dw->count);
 
 	if (dw->count == 0)
 		goto out;
@@ -942,7 +940,7 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 		(*attrid)++;
 	}
 
-	sd_dprintf("there is no space for new VDIs");
+	sd_debug("there is no space for new VDIs");
 	ret = SD_RES_FULL_VDI;
 out:
 	return ret;

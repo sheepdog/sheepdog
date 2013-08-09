@@ -40,9 +40,8 @@ static void event_handler_exit(const struct caller *this_fn, int depth)
 		unsigned quot = duration / 1000, rem = duration % 1000;
 
 		if (quot > MAX_EVENT_DURATION)
-			sd_printf(SDOG_WARNING,
-				  "%s wastes too much time in event loop: "
-				  "%u.%-3u us", this_fn->name, quot, rem);
+			sd_warn("%s wastes too much time in event loop: "
+				"%u.%-3u us", this_fn->name, quot, rem);
 	}
 }
 

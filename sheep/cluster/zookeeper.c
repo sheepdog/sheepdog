@@ -151,7 +151,7 @@ static struct zk_node this_node;
 	case ZSESSIONEXPIRED:						\
 	case ZOPERATIONTIMEOUT:						\
 	case ZCONNECTIONLOSS:						\
-		sd_eprintf("failed, path:%s, %s", path, zerror(rc));	\
+		sd_err("failed, path:%s, %s", path, zerror(rc));	\
 	case ZOK:							\
 		break;							\
 	case ZNOCHILDRENFOREPHEMERALS:					\
@@ -160,8 +160,8 @@ static struct zk_node this_node;
 		 * always non-ephemeral, this could happen only when	\
 		 * sheep joins a cluster in an incompatible version.	\
 		 */							\
-		sd_eprintf("incompatible version of sheep %s",		\
-			   PACKAGE_VERSION);				\
+		sd_err("incompatible version of sheep %s",		\
+		       PACKAGE_VERSION);				\
 	default:							\
 		panic("failed, path:%s, %s", path, zerror(rc));		\
 	}
@@ -169,8 +169,8 @@ static struct zk_node this_node;
 	do {								\
 		int __rc = stmt;					\
 		if (__rc != ZOK) {					\
-			sd_eprintf("failed, " fmt ", %s",		\
-				   ##__VA_ARGS__, zerror(__rc));	\
+			sd_err("failed, " fmt ", %s",			\
+			       ##__VA_ARGS__, zerror(__rc));		\
 			return __rc;					\
 		}							\
 	} while (0)
@@ -178,8 +178,8 @@ static struct zk_node this_node;
 	do {								\
 		int __rc = stmt;					\
 		if (__rc != ZOK) {					\
-			sd_eprintf("failed, " fmt ", %s",		\
-				   ##__VA_ARGS__, zerror(__rc));	\
+			sd_err("failed, " fmt ", %s",			\
+			       ##__VA_ARGS__, zerror(__rc));		\
 			return;						\
 		}							\
 	} while (0)
@@ -315,7 +315,7 @@ static int zk_queue_peek(bool *peek)
 		*peek = false;
 		return ZOK;
 	default:
-		sd_eprintf("failed, %s", zerror(rc));
+		sd_err("failed, %s", zerror(rc));
 		return rc;
 	}
 }
@@ -335,18 +335,18 @@ static int zk_find_seq_node(uint64_t id, char *seq_path, int seq_path_len,
 		switch (rc) {
 		case ZOK:
 			if (ev.id == id) {
-				sd_dprintf("id %"PRIx64" is found in %s", id,
-					   seq_path);
+				sd_debug("id %" PRIx64 " is found in %s", id,
+					 seq_path);
 				*found = true;
 				return ZOK;
 			}
 			break;
 		case ZNONODE:
-			sd_dprintf("id %"PRIx64" is not found", id);
+			sd_debug("id %"PRIx64" is not found", id);
 			*found = false;
 			return ZOK;
 		default:
-			sd_eprintf("failed, %s", zerror(rc));
+			sd_err("failed, %s", zerror(rc));
 			return rc;
 		}
 	}
@@ -377,7 +377,7 @@ again:
 		}
 		/* fall through */
 	default:
-		sd_eprintf("failed, path:%s, %s", path, zerror(rc));
+		sd_err("failed, path:%s, %s", path, zerror(rc));
 		return rc;
 	}
 	if (first_push) {
@@ -389,8 +389,8 @@ again:
 		first_push = false;
 	}
 
-	sd_dprintf("create path:%s, queue_pos:%010"PRId32", len:%d",
-		   buf, queue_pos, len);
+	sd_debug("create path:%s, queue_pos:%010" PRId32 ", len:%d", buf,
+		 queue_pos, len);
 	return ZOK;
 }
 
@@ -415,8 +415,8 @@ static int push_join_response(struct zk_event *ev)
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
 	RETURN_IF_ERROR(zk_set_data(path, (char *)ev, len, -1), "");
-	sd_dprintf("update path:%s, queue_pos:%010"PRId32", len:%d",
-		   path, queue_pos, len);
+	sd_debug("update path:%s, queue_pos:%010" PRId32 ", len:%d", path,
+		 queue_pos, len);
 	return ZOK;
 }
 
@@ -429,8 +429,8 @@ static int zk_queue_pop_advance(struct zk_event *ev)
 	snprintf(path, sizeof(path), QUEUE_ZNODE "/%010"PRId32, queue_pos);
 
 	RETURN_IF_ERROR(zk_get_data(path, ev, &len), "path %s", path);
-	sd_dprintf("%s, type:%d, len:%d, pos:%"PRId32, path, ev->type,
-		   len, queue_pos);
+	sd_debug("%s, type:%d, len:%d, pos:%" PRId32, path, ev->type, len,
+		 queue_pos);
 	queue_pos++;
 	return ZOK;
 }
@@ -490,7 +490,7 @@ static inline void build_node_list(void)
 		zk = rb_entry(n, struct zk_node, rb);
 		sd_nodes[nr_sd_nodes++] = zk->node;
 	}
-	sd_dprintf("nr_sd_nodes:%zu", nr_sd_nodes);
+	sd_debug("nr_sd_nodes:%zu", nr_sd_nodes);
 }
 
 static int zk_queue_init(void)
@@ -530,7 +530,7 @@ static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,
 	if (rc == ZOK)
 		return SD_RES_SUCCESS;
 	else {
-		sd_eprintf("failed, type: %d, %s", type, zerror(rc));
+		sd_err("failed, type: %d, %s", type, zerror(rc));
 		return SD_RES_CLUSTER_ERROR;
 	}
 }
@@ -552,7 +552,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 	}
 
 /* CREATED_EVENT 1, DELETED_EVENT 2, CHANGED_EVENT 3, CHILD_EVENT 4 */
-	sd_dprintf("path:%s, type:%d", path, type);
+	sd_debug("path:%s, type:%d", path, type);
 	if (type == ZOO_CREATED_EVENT || type == ZOO_CHANGED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
 		if (ret == 1)
@@ -632,7 +632,7 @@ static int zk_get_least_seq(const char *parent, char *least_seq_path,
 		case ZNONODE:
 			break;
 		default:
-			sd_eprintf("failed, %s", zerror(rc));
+			sd_err("failed, %s", zerror(rc));
 			return rc;
 		}
 	}
@@ -661,12 +661,12 @@ static int zk_find_master(int *master_seq, char *master_name)
 			case ZOK:
 				return ZOK;
 			case ZNONODE:
-				sd_iprintf("detect master leave, "
-					   "start to compete master");
+				sd_info("detect master leave, "
+					"start to compete master");
 				(*master_seq)++;
 				break;
 			default:
-				sd_eprintf("failed, %s", zerror(rc));
+				sd_err("failed, %s", zerror(rc));
 				return rc;
 			}
 		}
@@ -692,7 +692,7 @@ static int zk_verify_last_sheep_join(int seq, int *last_sheep)
 		case ZOK:
 			break;
 		default:
-			sd_eprintf("failed, %s", zerror(rc));
+			sd_err("failed, %s", zerror(rc));
 			return rc;
 		}
 
@@ -708,7 +708,7 @@ static int zk_verify_last_sheep_join(int seq, int *last_sheep)
 			(*last_sheep)++;
 			break;
 		default:
-			sd_eprintf("failed, %s", zerror(rc));
+			sd_err("failed, %s", zerror(rc));
 			return rc;
 		}
 	}
@@ -736,7 +736,7 @@ static void zk_compete_master(void)
 		goto out_unlock;
 
 	if (!joined) {
-		sd_dprintf("start to compete master for the first time");
+		sd_debug("start to compete master for the first time");
 		do {
 			if (uatomic_is_true(&stop))
 				goto out_unlock;
@@ -751,7 +751,7 @@ static void zk_compete_master(void)
 		if (rc != ZOK)
 			goto out_unlock;
 
-		sd_dprintf("my compete path: %s", my_compete_path);
+		sd_debug("my compete path: %s", my_compete_path);
 		sscanf(my_compete_path, MASTER_ZNONE "/%"PRId32,
 		       &my_seq);
 	}
@@ -762,7 +762,7 @@ static void zk_compete_master(void)
 	if (!strcmp(master_name, node_to_str(&this_node.node)))
 		goto success;
 	else if (joined) {
-		sd_dprintf("lost");
+		sd_debug("lost");
 		goto out_unlock;
 	} else {
 		if (zk_verify_last_sheep_join(my_seq,
@@ -774,13 +774,13 @@ static void zk_compete_master(void)
 			master_seq = my_seq;
 			goto success;
 		} else {
-			sd_dprintf("lost");
+			sd_debug("lost");
 			goto out_unlock;
 		}
 	}
 success:
 	uatomic_set_true(&is_master);
-	sd_dprintf("success");
+	sd_debug("success");
 out_unlock:
 	sd_unlock(&zk_compete_master_lock);
 }
@@ -796,7 +796,7 @@ static int zk_join(const struct sd_node *myself,
 	snprintf(path, sizeof(path), MEMBER_ZNODE "/%s", node_to_str(myself));
 	rc = zk_node_exists(path);
 	if (rc == ZOK) {
-		sd_eprintf("Previous zookeeper session exist, shoot myself.");
+		sd_err("Previous zookeeper session exist, shoot myself.");
 		exit(1);
 	}
 
@@ -810,7 +810,7 @@ static int zk_leave(void)
 {
 	char path[PATH_MAX];
 
-	sd_iprintf("leaving from cluster");
+	sd_info("leaving from cluster");
 	uatomic_set_true(&stop);
 
 	snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
@@ -837,7 +837,7 @@ static int zk_unblock(void *msg, size_t msg_len)
 
 static void zk_handle_join(struct zk_event *ev)
 {
-	sd_dprintf("sender: %s", node_to_str(&ev->sender.node));
+	sd_debug("sender: %s", node_to_str(&ev->sender.node));
 	if (!uatomic_is_true(&is_master)) {
 		/* Let's await master acking the join-request */
 		queue_pos--;
@@ -847,7 +847,7 @@ static void zk_handle_join(struct zk_event *ev)
 	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
 	push_join_response(ev);
 
-	sd_dprintf("I'm the master now");
+	sd_debug("I'm the master now");
 }
 
 static void watch_all_nodes(void)
@@ -868,7 +868,7 @@ static void init_node_list(struct zk_event *ev)
 	size_t node_nr = ev->nr_nodes;
 	int i;
 
-	sd_dprintf("%zu", node_nr);
+	sd_debug("%zu", node_nr);
 	for (i = 0; i < node_nr; i++) {
 		struct zk_node zk;
 		mempcpy(&zk.node, p, sizeof(struct sd_node));
@@ -884,18 +884,18 @@ static void zk_handle_accept(struct zk_event *ev)
 	char path[MAX_NODE_STR_LEN];
 	int rc;
 
-	sd_dprintf("ACCEPT");
+	sd_debug("ACCEPT");
 	if (node_eq(&ev->sender.node, &this_node.node))
 		/* newly joined node */
 		init_node_list(ev);
 
-	sd_dprintf("%s", node_to_str(&ev->sender.node));
+	sd_debug("%s", node_to_str(&ev->sender.node));
 
 	snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
 		 node_to_str(&ev->sender.node));
 	if (node_eq(&ev->sender.node, &this_node.node)) {
 		joined = true;
-		sd_dprintf("create path:%s", path);
+		sd_debug("create path:%s", path);
 		rc = zk_create_node(path,
 				    (char *)zoo_client_id(zhandle),
 				    sizeof(clientid_t),
@@ -939,8 +939,8 @@ static void zk_handle_leave(struct zk_event *ev)
 	struct zk_node *n = zk_tree_search(&ev->sender.node.nid);
 
 	if (!n) {
-		sd_dprintf("can't find this leave node:%s, ignore it.",
-			   node_to_str(&ev->sender.node));
+		sd_debug("can't find this leave node:%s, ignore it.",
+			 node_to_str(&ev->sender.node));
 		return;
 	}
 	block_event_list_del(n);
@@ -953,7 +953,7 @@ static void zk_handle_block(struct zk_event *ev)
 {
 	struct zk_node *block = xzalloc(sizeof(*block));
 
-	sd_dprintf("BLOCK");
+	sd_debug("BLOCK");
 	block->node = ev->sender.node;
 	list_add_tail(&block->list, &zk_block_list);
 	block = list_first_entry(&zk_block_list, typeof(*block), list);
@@ -965,7 +965,7 @@ static void zk_handle_unblock(struct zk_event *ev)
 {
 	struct zk_node *block;
 
-	sd_dprintf("UNBLOCK");
+	sd_debug("UNBLOCK");
 	if (list_empty(&zk_block_list))
 		return;
 	block = list_first_entry(&zk_block_list, typeof(*block), list);
@@ -977,7 +977,7 @@ static void zk_handle_unblock(struct zk_event *ev)
 
 static void zk_handle_notify(struct zk_event *ev)
 {
-	sd_dprintf("NOTIFY");
+	sd_debug("NOTIFY");
 	sd_notify_handler(&ev->sender.node, ev->buf, ev->buf_len);
 }
 
@@ -986,7 +986,7 @@ static void zk_handle_update_node(struct zk_event *ev)
 	struct zk_node *t;
 	struct sd_node *snode = &ev->sender.node;
 
-	sd_dprintf("%s", node_to_str(snode));
+	sd_debug("%s", node_to_str(snode));
 
 	if (node_eq(snode, &this_node.node))
 		this_node.node = *snode;
@@ -1032,7 +1032,7 @@ static inline void handle_session_expire(void)
 	memset(sd_nodes, 0, sizeof(struct sd_node) * SD_MAX_NODES);
 
 	while (sd_reconnect_handler()) {
-		sd_eprintf("failed to reconnect. sleep and retry...");
+		sd_err("failed to reconnect. sleep and retry...");
 		sleep(1);
 	}
 }
@@ -1042,10 +1042,9 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 	struct zk_event ev;
 	bool peek;
 
-	sd_dprintf("%d, %d", events, queue_pos);
+	sd_debug("%d, %d", events, queue_pos);
 	if (events & EPOLLHUP) {
-		sd_eprintf("zookeeper driver received EPOLLHUP event,"
-			   " exiting.");
+		sd_err("zookeeper driver received EPOLLHUP event, exiting.");
 		log_close();
 		exit(1);
 	}
@@ -1053,9 +1052,9 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 	eventfd_xread(efd);
 
 	if (zoo_state(zhandle) == ZOO_EXPIRED_SESSION_STATE) {
-		sd_eprintf("detect a session timeout. reconnecting...");
+		sd_err("detect a session timeout. reconnecting...");
 		handle_session_expire();
-		sd_iprintf("reconnected");
+		sd_info("reconnected");
 		eventfd_xwrite(efd, 1);
 		return;
 	}
@@ -1094,25 +1093,24 @@ static int zk_init(const char *option)
 	int ret, timeout = SESSION_TIMEOUT;
 
 	if (!option) {
-		sd_eprintf("You must specify zookeeper servers.");
+		sd_err("You must specify zookeeper servers.");
 		return -1;
 	}
 
 	hosts = strtok((char *)option, "=");
 	if ((to = strtok(NULL, "="))) {
 		if (sscanf(to, "%u", &timeout) != 1) {
-			sd_eprintf("Invalid paramter for timeout");
+			sd_err("Invalid paramter for timeout");
 			return -1;
 		}
 		p = strstr(hosts, "timeout");
 		*--p = '\0';
 	}
-	sd_dprintf("version %d.%d.%d, address %s, timeout %d",
-		   ZOO_MAJOR_VERSION, ZOO_MINOR_VERSION, ZOO_PATCH_VERSION,
-		   hosts, timeout);
+	sd_debug("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
+		 ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, timeout);
 	zhandle = zookeeper_init(hosts, zk_watcher, timeout, NULL, NULL, 0);
 	if (!zhandle) {
-		sd_eprintf("failed to connect to zk server %s", option);
+		sd_err("failed to connect to zk server %s", option);
 		return -1;
 	}
 
@@ -1123,14 +1121,13 @@ static int zk_init(const char *option)
 
 	efd = eventfd(0, EFD_NONBLOCK);
 	if (efd < 0) {
-		sd_eprintf("failed to create an event fd: %m");
+		sd_err("failed to create an event fd: %m");
 		return -1;
 	}
 
 	ret = register_event(efd, zk_event_handler, NULL);
 	if (ret) {
-		sd_eprintf("failed to register zookeeper event handler (%d)",
-			   ret);
+		sd_err("failed to register zookeeper event handler (%d)", ret);
 		return -1;
 	}
 

@@ -44,7 +44,7 @@ int gateway_read_obj(struct request *req)
 	nr_copies = get_req_copy_number(req);
 
 	if (nr_copies == 0) {
-		sd_dprintf("there is no living nodes");
+		sd_debug("there is no living nodes");
 		return SD_RES_HALT;
 	}
 
@@ -58,8 +58,8 @@ int gateway_read_obj(struct request *req)
 		if (ret == SD_RES_SUCCESS)
 			goto out;
 
-		sd_eprintf("local read %"PRIx64" failed, %s", oid,
-			   sd_strerror(ret));
+		sd_err("local read %"PRIx64" failed, %s", oid,
+		       sd_strerror(ret));
 		break;
 	}
 
@@ -112,7 +112,7 @@ struct write_info {
 
 static inline void write_info_update(struct write_info *wi, int pos)
 {
-	sd_dprintf("%d, %d", wi->nr_sent, pos);
+	sd_debug("%d, %d", wi->nr_sent, pos);
 	wi->nr_sent--;
 	memmove(wi->ent + pos, wi->ent + pos + 1,
 		sizeof(struct write_info_entry) * (wi->nr_sent - pos));
@@ -172,10 +172,9 @@ again:
 		 */
 		if (sheep_need_retry(req->rq.epoch) && repeat) {
 			repeat--;
-			sd_printf(SDOG_WARNING,
-				  "poll timeout %d, disks of some nodes or"
-				   " network is busy. Going to poll-wait again",
-				   wi->nr_sent);
+			sd_warn("poll timeout %d, disks of some nodes or "
+				"network is busy. Going to poll-wait again",
+				wi->nr_sent);
 			goto again;
 		}
 
@@ -193,7 +192,7 @@ again:
 			break;
 	if (i < nr_sent) {
 		int re = pi.pfds[i].revents;
-		sd_dprintf("%d, revents %x", i, re);
+		sd_debug("%d, revents %x", i, re);
 		if (re & (POLLERR | POLLHUP | POLLNVAL)) {
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
@@ -201,7 +200,7 @@ again:
 		}
 		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp), sheep_need_retry,
 			    req->rq.epoch, MAX_RETRY_COUNT)) {
-			sd_eprintf("remote node might have gone away");
+			sd_err("remote node might have gone away");
 			err_ret = SD_RES_NETWORK_ERROR;
 			finish_one_write_err(wi, i);
 			goto finish_write;
@@ -209,8 +208,8 @@ again:
 
 		ret = rsp->result;
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("fail %"PRIx64", %s", req->rq.obj.oid,
-				   sd_strerror(ret));
+			sd_err("fail %"PRIx64", %s", req->rq.obj.oid,
+			       sd_strerror(ret));
 			err_ret = ret;
 		}
 		finish_one_write(wi, i);
@@ -265,7 +264,7 @@ static int gateway_forward_request(struct request *req)
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
 
-	sd_dprintf("%"PRIx64, oid);
+	sd_debug("%"PRIx64, oid);
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
 	op = get_sd_op(hdr.opcode);
@@ -275,7 +274,7 @@ static int gateway_forward_request(struct request *req)
 	write_info_init(&wi, nr_to_send);
 
 	if (nr_to_send == 0) {
-		sd_dprintf("there is no living nodes");
+		sd_debug("there is no living nodes");
 		return SD_RES_HALT;
 	}
 
@@ -301,7 +300,7 @@ static int gateway_forward_request(struct request *req)
 		if (ret) {
 			sockfd_cache_del_node(nid);
 			err_ret = SD_RES_NETWORK_ERROR;
-			sd_dprintf("fail %d", ret);
+			sd_debug("fail %d", ret);
 			break;
 		}
 		write_info_advance(&wi, nid, sfd);
@@ -312,13 +311,13 @@ static int gateway_forward_request(struct request *req)
 		ret = sheep_do_op_work(op, req);
 
 		if (ret != SD_RES_SUCCESS) {
-			sd_eprintf("fail to write local %"PRIx64", %s", oid,
-				   sd_strerror(ret));
+			sd_err("fail to write local %"PRIx64", %s", oid,
+			       sd_strerror(ret));
 			err_ret = ret;
 		}
 	}
 
-	sd_dprintf("nr_sent %d, err %x", wi.nr_sent, err_ret);
+	sd_debug("nr_sent %d, err %x", wi.nr_sent, err_ret);
 	if (wi.nr_sent > 0) {
 		ret = wait_forward_request(&wi, req);
 		if (ret != SD_RES_SUCCESS)
