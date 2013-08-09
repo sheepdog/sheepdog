@@ -225,10 +225,6 @@ static int init_signal(void)
 	sigset_t mask;
 	int ret;
 
-	ret = trace_init_signal();
-	if (ret)
-		return ret;
-
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGTERM);
 	sigprocmask(SIG_BLOCK, &mask, NULL);
@@ -421,8 +417,7 @@ static size_t get_nr_nodes(void)
 
 static int create_work_queues(void)
 {
-	if (init_work_queue(get_nr_nodes, trace_register_thread,
-			    trace_unregister_thread))
+	if (init_work_queue(get_nr_nodes))
 		return -1;
 
 	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);

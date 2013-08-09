@@ -110,10 +110,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	return SD_RES_SUCCESS;
 }
 
-#define FOR_EACH_VDI(nr, vdis)					\
-	for (nr = find_next_bit((vdis), SD_NR_VDIS, 0);		\
-	     nr < SD_NR_VDIS;					\
-	     nr = find_next_bit((vdis), SD_NR_VDIS, nr + 1))
+#define FOR_EACH_VDI(nr, vdis) FOR_EACH_BIT(nr, vdis, SD_NR_VDIS)
 
 int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 {

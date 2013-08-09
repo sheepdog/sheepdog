@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include "internal_proto.h"
 #include "util.h"
+#include "bitops.h"
 #include "list.h"
 #include "net.h"
 

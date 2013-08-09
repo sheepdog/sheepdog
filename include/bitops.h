@@ -17,6 +17,37 @@
 
 #define BITOP_WORD(nr)		((nr) / BITS_PER_LONG)
 
+/*
+ * Iterate over a bitmap
+ *
+ * @nr: the bit number to use as a loop cursor
+ * @addr: the bitmap you iterate over
+ * @bits: the number of bits this bitmap contains
+ */
+#define FOR_EACH_BIT(nr, addr, bits)					\
+	for (nr = find_next_bit((addr), (bits), 0);			\
+	     nr < (bits);						\
+	     nr = find_next_bit((addr), (bits), nr + 1))
+
+/*
+ * Change the size of allocated bitmap
+ *
+ * This doesn't change the contents of the old bitmap pointed to by `ptr`, and
+ * initializes the newly allocated area with zeros.
+ */
+static inline unsigned long *alloc_bitmap(unsigned long *old_bmap,
+					  size_t old_bits, size_t new_bits)
+{
+	size_t old_size = BITS_TO_LONGS(old_bits) * sizeof(long);
+	size_t new_size = BITS_TO_LONGS(new_bits) * sizeof(long);
+	unsigned long *new_bmap =  xrealloc(old_bmap, new_size);
+
+	if (old_bits < new_bits)
+		memset(new_bmap + old_size, 0, new_size - old_size);
+
+	return new_bmap;
+}
+
 static inline unsigned long find_next_zero_bit(const unsigned long *addr,
 					       unsigned long size,
 					       unsigned long offset)

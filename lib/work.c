@@ -26,11 +26,20 @@
 #include <sys/eventfd.h>
 #include <sys/time.h>
 #include <linux/types.h>
+#include <signal.h>
 
 #include "list.h"
 #include "util.h"
+#include "bitops.h"
 #include "work.h"
 #include "event.h"
+
+#define TID_MAX_DEFAULT 0x8000 /* default maximum tid for most systems */
+
+static size_t tid_max;
+static unsigned long *tid_map;
+static int resume_efd;
+static int ack_efd;
 
 /*
  * The protection period from shrinking work queue.  This is necessary
@@ -68,8 +77,6 @@ static int efd;
 static LIST_HEAD(worker_info_list);
 static size_t nr_nodes = 1;
 static size_t (*wq_get_nr_nodes)(void);
-static void (*wq_create_cb)(pthread_t);
-static void (*wq_destroy_cb)(pthread_t);
 
 static void *worker_routine(void *arg);
 
@@ -141,14 +148,54 @@ static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
 			pthread_mutex_unlock(&wi->startup_lock);
 			return -1;
 		}
-		if (wq_create_cb)
-			wq_create_cb(thread);
 		wi->nr_threads++;
 		sd_dprintf("create thread %s %zu", wi->name, wi->nr_threads);
 	}
 	pthread_mutex_unlock(&wi->startup_lock);
 
 	return 0;
+}
+
+void suspend_worker_threads(void)
+{
+	struct worker_info *wi;
+	int tid;
+
+	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+		pthread_mutex_lock(&wi->pending_lock);
+	}
+
+	FOR_EACH_BIT(tid, tid_map, tid_max) {
+		if (tkill(tid, SIGUSR2) < 0)
+			panic("%m");
+	}
+
+	/*
+	 * Wait for all the worker thread to suspend.  We cannot use
+	 * wi->nr_threads here because some thread may have not called set_bit()
+	 * yet (then, the thread doesn't recieve SIGUSR2).
+	 */
+	FOR_EACH_BIT(tid, tid_map, tid_max) {
+		eventfd_xread(ack_efd);
+	}
+}
+
+void resume_worker_threads(void)
+{
+	struct worker_info *wi;
+	int nr_threads = 0, tid;
+
+	FOR_EACH_BIT(tid, tid_map, tid_max) {
+		nr_threads++;
+	}
+
+	eventfd_xwrite(resume_efd, nr_threads);
+	for (int i = 0; i < nr_threads; i++)
+		eventfd_xread(ack_efd);
+
+	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+		pthread_mutex_unlock(&wi->pending_lock);
+	}
 }
 
 void queue_work(struct work_queue *q, struct work *work)
@@ -198,6 +245,7 @@ static void *worker_routine(void *arg)
 {
 	struct worker_info *wi = arg;
 	struct work *work;
+	int tid = gettid();
 
 	set_thread_name(wi->name, (wi->tc != WQ_ORDERED));
 
@@ -206,6 +254,16 @@ static void *worker_routine(void *arg)
 	pthread_mutex_unlock(&wi->startup_lock);
 
 	pthread_mutex_lock(&wi->pending_lock);
+	if (tid > tid_max) {
+		size_t old_tid_max = tid_max;
+
+		/* enlarge bitmap size */
+		while (tid > tid_max)
+			tid_max *= 2;
+
+		tid_map = alloc_bitmap(tid_map, old_tid_max, tid_max);
+	}
+	set_bit(tid, tid_map);
 	pthread_mutex_unlock(&wi->pending_lock);
 
 	while (true) {
@@ -213,12 +271,11 @@ static void *worker_routine(void *arg)
 		pthread_mutex_lock(&wi->pending_lock);
 		if (wq_need_shrink(wi)) {
 			wi->nr_threads--;
-			if (wq_destroy_cb)
-				wq_destroy_cb(pthread_self());
+			clear_bit(tid, tid_map);
 			pthread_mutex_unlock(&wi->pending_lock);
 			pthread_detach(pthread_self());
-			sd_dprintf("destroy thread %s %d, %zu", wi->name,
-				   gettid(), wi->nr_threads);
+			sd_dprintf("destroy thread %s %d, %zu", wi->name, tid,
+				   wi->nr_threads);
 			break;
 		}
 retest:
@@ -246,22 +303,40 @@ retest:
 	pthread_exit(NULL);
 }
 
-int init_work_queue(size_t (*get_nr_nodes)(void), void (*create_cb)(pthread_t),
-		    void (*destroy_cb)(pthread_t))
+static void suspend(int num)
+{
+	int uninitialized_var(value);
+
+	eventfd_xwrite(ack_efd, 1); /* ack of suspend */
+	value = eventfd_xread(resume_efd);
+	assert(value == 1);
+	eventfd_xwrite(ack_efd, 1); /* ack of resume */
+}
+
+int init_work_queue(size_t (*get_nr_nodes)(void))
 {
 	int ret;
 
 	wq_get_nr_nodes = get_nr_nodes;
-	wq_create_cb = create_cb;
-	wq_destroy_cb = destroy_cb;
 
 	if (wq_get_nr_nodes)
 		nr_nodes = wq_get_nr_nodes();
 
+	tid_max = TID_MAX_DEFAULT;
+	tid_map = alloc_bitmap(NULL, 0, tid_max);
+
+	resume_efd = eventfd(0, EFD_SEMAPHORE);
+	ack_efd = eventfd(0, EFD_SEMAPHORE);
 	efd = eventfd(0, EFD_NONBLOCK);
-	if (efd < 0) {
-		sd_eprintf("failed to create an event fd: %m");
+	if (resume_efd < 0 || ack_efd < 0 || efd < 0) {
+		sd_eprintf("failed to create event fds: %m");
 		return 1;
+	}
+
+	/* trace uses this signal to suspend the worker threads */
+	if (install_sighandler(SIGUSR2, suspend, false) < 0) {
+		sd_dprintf("%m");
+		return -1;
 	}
 
 	ret = register_event(efd, worker_thread_request_done, NULL);

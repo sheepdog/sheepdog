@@ -22,20 +22,8 @@ static pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static trace_func_t trace_func = trace_call;
 
-static int total_nr_workers;
-
-static pthread_mutex_t suspend_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t suspend_cond = PTHREAD_COND_INITIALIZER;
-static int suspend_count;
-
 static struct strbuf *buffer;
 static int nr_cpu;
-static LIST_HEAD(worker_list);
-
-struct worker {
-	struct list_head list;
-	pthread_t id;
-};
 
 union instruction {
 	unsigned char start[INSN_SIZE];
@@ -44,14 +32,6 @@ union instruction {
 		int offset;
 	} __attribute__((packed));
 };
-
-static notrace void suspend(int num)
-{
-	pthread_mutex_lock(&suspend_lock);
-	suspend_count--;
-	pthread_cond_wait(&suspend_cond, &suspend_lock);
-	pthread_mutex_unlock(&suspend_lock);
-}
 
 static inline int trace_hash(unsigned long ip)
 {
@@ -169,36 +149,6 @@ notrace int register_trace_function(trace_func_t func)
 	return 0;
 }
 
-static notrace void suspend_worker_threads(void)
-{
-	struct worker *w;
-
-	pthread_mutex_lock(&trace_lock);
-	suspend_count = total_nr_workers;
-	list_for_each_entry(w, &worker_list, list) {
-		if (pthread_kill(w->id, SIGUSR2) != 0)
-			panic("%m");
-	}
-
-wait_for_worker_suspend:
-	/* Hold the lock, then all other worker can sleep on it */
-	pthread_mutex_lock(&suspend_lock);
-	if (suspend_count > 0) {
-		pthread_mutex_unlock(&suspend_lock);
-		pthread_yield();
-		goto wait_for_worker_suspend;
-	}
-	pthread_mutex_unlock(&suspend_lock);
-	pthread_mutex_unlock(&trace_lock);
-}
-
-static notrace void resume_worker_threads(void)
-{
-	pthread_mutex_lock(&suspend_lock);
-	pthread_cond_broadcast(&suspend_cond);
-	pthread_mutex_unlock(&suspend_lock);
-}
-
 static notrace void patch_all_sites(unsigned long addr)
 {
 	struct caller *ca;
@@ -248,16 +198,6 @@ notrace int trace_disable(void)
 	return SD_RES_SUCCESS;
 }
 
-int trace_init_signal(void)
-{
-	/* trace uses this signal to suspend the worker threads */
-	if (install_sighandler(SIGUSR2, suspend, false) < 0) {
-		sd_dprintf("%m");
-		return -1;
-	}
-	return 0;
-}
-
 notrace int trace_buffer_pop(void *buf, uint32_t len)
 {
 	int readin, count = 0, requested = len;
@@ -302,32 +242,4 @@ notrace int trace_init(void)
 
 	sd_iprintf("trace support enabled. cpu count %d.", nr_cpu);
 	return 0;
-}
-
-notrace void trace_register_thread(pthread_t id)
-{
-	struct worker *new = xmalloc(sizeof(*new));
-
-	new->id = id;
-
-	pthread_mutex_lock(&trace_lock);
-	list_add(&new->list, &worker_list);
-	total_nr_workers++;
-	pthread_mutex_unlock(&trace_lock);
-	sd_dprintf("nr %d, add pid %lx", total_nr_workers, id);
-}
-
-notrace void trace_unregister_thread(pthread_t id)
-{
-	struct worker *w, *tmp;
-
-	pthread_mutex_lock(&trace_lock);
-	list_for_each_entry_safe(w, tmp, &worker_list, list) {
-		if (w->id == id) {
-			list_del(&w->list);
-			total_nr_workers--;
-		}
-	}
-	pthread_mutex_unlock(&trace_lock);
-	sd_dprintf("nr %d, del pid %lx", total_nr_workers, id);
 }

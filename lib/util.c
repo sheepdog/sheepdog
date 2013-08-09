@@ -538,6 +538,11 @@ pid_t gettid(void)
 	return syscall(SYS_gettid);
 }
 
+int tkill(int tid, int sig)
+{
+	return syscall(SYS_tgkill, getpid(), tid, sig);
+}
+
 bool is_xattr_enabled(const char *path)
 {
 	int ret, dummy;

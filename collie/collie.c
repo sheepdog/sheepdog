@@ -414,7 +414,7 @@ int main(int argc, char **argv)
 	if (init_event(EPOLL_SIZE) < 0)
 		exit(EXIT_SYSFAIL);
 
-	if (init_work_queue(get_nr_nodes, NULL, NULL) != 0) {
+	if (init_work_queue(get_nr_nodes) != 0) {
 		fprintf(stderr, "Failed to init work queue\n");
 		exit(EXIT_SYSFAIL);
 	}

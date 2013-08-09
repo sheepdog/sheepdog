@@ -15,7 +15,6 @@
 #include <errno.h>
 
 #include "logger.h"
-#include "bitops.h"
 #include "list.h"
 #include "compiler.h"
 
@@ -112,6 +111,7 @@ int install_sighandler(int signum, void (*handler)(int), bool once);
 int install_crash_handler(void (*handler)(int));
 void reraise_crash_signal(int signo, int status);
 pid_t gettid(void);
+int tkill(int tid, int sig);
 bool is_xattr_enabled(const char *path);
 
 void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
