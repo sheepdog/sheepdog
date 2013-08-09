@@ -78,6 +78,7 @@
 #define SD_OP_MD_UNPLUG 0xB3
 #define SD_OP_GET_HASH       0xB4
 #define SD_OP_REWEIGHT       0xB5
+#define SD_OP_GET_CACHE_INFO 0xB6
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
@@ -196,6 +197,20 @@ struct recovery_state {
 	enum rw_state state;
 	uint64_t nr_finished;
 	uint64_t nr_total;
+};
+
+#define CACHE_MAX	1024
+struct cache_info {
+	uint32_t vid;
+	uint32_t dirty;
+	uint32_t total;
+};
+
+struct object_cache_info {
+	uint64_t size;
+	uint64_t used;
+	struct cache_info caches[CACHE_MAX];
+	int count;
 };
 
 #endif /* __INTERNAL_PROTO_H__ */

@@ -1971,11 +1971,76 @@ out:
 	return ret;
 }
 
+static int vid_to_name_tag(uint32_t vid, char *name, char *tag)
+{
+	struct sd_inode inode;
+	int ret;
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), &inode, SD_INODE_HEADER_SIZE,
+			     0, true);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	pstrcpy(name, SD_MAX_VDI_LEN, inode.name);
+	pstrcpy(tag, SD_MAX_VDI_TAG_LEN, inode.tag);
+
+	return SD_RES_SUCCESS;
+}
+
+static int vdi_cache_info(int argc, char **argv)
+{
+	struct object_cache_info info = {};
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	char size_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE];
+	int ret, i;
+
+	sd_init_req(&hdr, SD_OP_GET_CACHE_INFO);
+	hdr.data_length = sizeof(info);
+	ret = collie_exec_req(sdhost, sdport, &hdr, &info);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		fprintf(stderr, "failed to get cache infomation: %s\n",
+			sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	fprintf(stdout, "Name\tTag\tTotal\tDirty\tClean\n");
+	for (i = 0; i < info.count; i++) {
+		char total_str[UINT64_DECIMAL_SIZE],
+		     dirty_str[UINT64_DECIMAL_SIZE],
+		     clean_str[UINT64_DECIMAL_SIZE];
+		uint64_t total = info.caches[i].total * SD_DATA_OBJ_SIZE,
+			 dirty = info.caches[i].dirty * SD_DATA_OBJ_SIZE,
+			 clean = total - dirty;
+		char name[SD_MAX_VDI_LEN], tag[SD_MAX_VDI_TAG_LEN];
+
+		size_to_str(total, total_str, sizeof(total_str));
+		size_to_str(dirty, dirty_str, sizeof(dirty_str));
+		size_to_str(clean, clean_str, sizeof(clean_str));
+		ret = vid_to_name_tag(info.caches[i].vid, name, tag);
+		if (ret != SD_RES_SUCCESS)
+			return EXIT_FAILURE;
+		fprintf(stdout, "%s\t%s\t%s\t%s\t%s\n",
+			name, tag, total_str, dirty_str, clean_str);
+	}
+
+	size_to_str(info.size, size_str, sizeof(size_str));
+	size_to_str(info.used, used_str, sizeof(used_str));
+	fprintf(stdout, "\nCache size %s, used %s\n", size_str, used_str);
+
+	return EXIT_SUCCESS;
+}
+
 static struct subcommand vdi_cache_cmd[] = {
 	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
 	 NULL, SUBCMD_FLAG_NEED_ARG, vdi_cache_flush},
 	{"delete", NULL, NULL, "delete the cache of the vdi specified in all nodes.",
 	 NULL, SUBCMD_FLAG_NEED_ARG, vdi_cache_delete},
+	{"info", NULL, NULL, "show usage of the cache",
+	 NULL, 0, vdi_cache_info},
 	{NULL,},
 };
 

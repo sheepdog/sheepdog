@@ -54,6 +54,7 @@ struct object_cache {
 	uint32_t vid; /* The VID of this VDI */
 	uint32_t push_count; /* How many push threads queued in push phase. */
 	uint32_t dirty_count; /* How many dirty object in this cache */
+	uint32_t total_count; /* Count of objects include dirty and clean */
 	struct hlist_node hash; /* VDI is linked to the global hash lists */
 	struct rb_root lru_tree; /* For faster object search */
 	struct list_head lru_head; /* Per VDI LRU list for reclaimer */
@@ -298,6 +299,7 @@ free_cache_entry(struct object_cache_entry *entry)
 
 	rb_erase(&entry->node, &oc->lru_tree);
 	list_del_init(&entry->lru_list);
+	oc->total_count--;
 	if (!list_empty(&entry->dirty_list))
 		del_from_dirty_list(entry);
 	sd_destroy_lock(&entry->lock);
@@ -713,6 +715,7 @@ static void add_to_lru_cache(struct object_cache *oc, uint32_t idx, bool create)
 		panic("the object already exist");
 	uatomic_add(&gcache.capacity, CACHE_OBJECT_SIZE);
 	list_add_tail(&entry->lru_list, &oc->lru_head);
+	oc->total_count++;
 	if (create) {
 		/* Cache lock assure it is not raced with pusher */
 		entry->bmap = UINT64_MAX;
@@ -1398,4 +1401,32 @@ void object_cache_format(void)
 		}
 	}
 	uatomic_set(&gcache.capacity, 0);
+}
+
+int object_cache_get_info(struct object_cache_info *info)
+{
+	int j = 0;
+
+	info->used = gcache.capacity * 1024 * 1024;
+	info->size = sys->object_cache_size * 1024 * 1024;
+
+	for (int i = 0; i < HASH_SIZE; i++) {
+		struct hlist_head *head = cache_hashtable + i;
+		struct object_cache *cache;
+		struct hlist_node *node;
+
+		sd_read_lock(&hashtable_lock[i]);
+		hlist_for_each_entry(cache, node, head, hash) {
+			read_lock_cache(cache);
+			info->caches[j].vid = cache->vid;
+			info->caches[j].dirty = cache->dirty_count;
+			info->caches[j].total = cache->total_count;
+			j++;
+			unlock_cache(cache);
+		}
+		sd_unlock(&hashtable_lock[i]);
+	}
+	info->count = j;
+
+	return sizeof(*info);
 }

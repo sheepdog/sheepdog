@@ -734,6 +734,17 @@ static int local_get_hash(struct request *request)
 				  rsp->hash.digest);
 }
 
+static int local_get_cache_info(struct request *request)
+{
+	struct sd_rsp *rsp = &request->rp;
+
+	assert(request->rq.data_length == sizeof(struct object_cache_info));
+	rsp->data_length = object_cache_get_info((struct object_cache_info *)
+						 request->data);
+
+	return SD_RES_SUCCESS;
+}
+
 /* Return SD_RES_INVALID_PARMS to ask client not to send flush req again */
 static int local_flush_vdi(struct request *req)
 {
@@ -1208,6 +1219,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "GET_HASH",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_hash,
+	},
+
+	[SD_OP_GET_CACHE_INFO] = {
+		.name = "GET_CACHE_INFO",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_get_cache_info,
 	},
 
 	/* gateway I/O operations */
