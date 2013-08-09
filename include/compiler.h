@@ -12,7 +12,6 @@
 #ifndef SD_COMPILER_H
 #define SD_COMPILER_H
 
-#define notrace __attribute__((no_instrument_function))
 #define __packed __attribute((packed))
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))

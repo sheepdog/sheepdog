@@ -164,7 +164,6 @@ static inline int hlist_unhashed(const struct hlist_node *h)
 	return !h->pprev;
 }
 
-__attribute__((always_inline))
 static inline int hlist_empty(const struct hlist_head *h)
 {
 	return !h->first;

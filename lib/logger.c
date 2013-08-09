@@ -135,7 +135,7 @@ init_log_formatter(void)
 	exit(1);
 }
 
-static notrace int logarea_init(int size)
+static int logarea_init(int size)
 {
 	int shmid;
 
@@ -196,7 +196,7 @@ static notrace int logarea_init(int size)
 	return 0;
 }
 
-static void notrace free_logarea(void)
+static void free_logarea(void)
 {
 	if (log_fd >= 0)
 		close(log_fd);
@@ -205,7 +205,7 @@ static void notrace free_logarea(void)
 	shmdt(la);
 }
 
-static notrace int server_log_formatter(char *buff, size_t size,
+static int server_log_formatter(char *buff, size_t size,
 					const struct logmsg *msg)
 {
 	char *p = buff;
@@ -251,7 +251,7 @@ static notrace int server_log_formatter(char *buff, size_t size,
 }
 log_format_register("server", server_log_formatter);
 
-static notrace int default_log_formatter(char *buff, size_t size,
+static int default_log_formatter(char *buff, size_t size,
 					 const struct logmsg *msg)
 {
 	int len;
@@ -265,7 +265,7 @@ static notrace int default_log_formatter(char *buff, size_t size,
 }
 log_format_register("default", default_log_formatter);
 
-static notrace int json_log_formatter(char *buff, size_t size,
+static int json_log_formatter(char *buff, size_t size,
 				const struct logmsg *msg)
 {
 	int i, body_len;
@@ -332,7 +332,7 @@ static notrace int json_log_formatter(char *buff, size_t size,
 log_format_register("json", json_log_formatter);
 
 /* this one can block under memory pressure */
-static notrace void log_syslog(const struct logmsg *msg)
+static void log_syslog(const struct logmsg *msg)
 {
 	char str[MAX_MSG_SIZE];
 
@@ -344,7 +344,7 @@ static notrace void log_syslog(const struct logmsg *msg)
 		syslog(msg->prio, "%s", str);
 }
 
-static notrace void init_logmsg(struct logmsg *msg, struct timeval *tv,
+static void init_logmsg(struct logmsg *msg, struct timeval *tv,
 				int prio, const char *func, int line)
 {
 	msg->tv = *tv;
@@ -356,7 +356,7 @@ static notrace void init_logmsg(struct logmsg *msg, struct timeval *tv,
 	msg->worker_idx = worker_idx;
 }
 
-static notrace void dolog(int prio, const char *func, int line,
+static void dolog(int prio, const char *func, int line,
 		const char *fmt, va_list ap)
 {
 	char buf[sizeof(struct logmsg) + MAX_MSG_SIZE];
@@ -412,7 +412,7 @@ static notrace void dolog(int prio, const char *func, int line,
 	}
 }
 
-static notrace void rotate_log(void)
+static void rotate_log(void)
 {
 	int new_fd;
 
@@ -441,7 +441,7 @@ static notrace void rotate_log(void)
 	close(new_fd);
 }
 
-notrace void log_write(int prio, const char *func, int line, const char *fmt, ...)
+void log_write(int prio, const char *func, int line, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -453,7 +453,7 @@ notrace void log_write(int prio, const char *func, int line, const char *fmt, ..
 	va_end(ap);
 }
 
-static notrace void log_flush(void)
+static void log_flush(void)
 {
 	struct sembuf ops;
 	size_t size, done = 0;
@@ -493,7 +493,7 @@ static bool is_sheep_dead(int signo)
 	return signo == SIGHUP;
 }
 
-static notrace void crash_handler(int signo)
+static void crash_handler(int signo)
 {
 	if (is_sheep_dead(signo))
 		sd_printf(SDOG_ERR, "sheep pid %d exited unexpectedly.",
@@ -515,7 +515,7 @@ static notrace void crash_handler(int signo)
 	reraise_crash_signal(signo, 1);
 }
 
-static notrace void logger(char *log_dir, char *outfile)
+static void logger(char *log_dir, char *outfile)
 {
 	int fd;
 
@@ -605,7 +605,7 @@ void early_log_init(const char *format_name, struct logger_user_info *user_info)
 	exit(1);
 }
 
-notrace int log_init(const char *program_name, bool to_stdout, int level,
+int log_init(const char *program_name, bool to_stdout, int level,
 		     char *outfile)
 {
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
@@ -651,7 +651,7 @@ notrace int log_init(const char *program_name, bool to_stdout, int level,
 	return 0;
 }
 
-notrace void log_close(void)
+void log_close(void)
 {
 	if (la) {
 		la->active = false;
@@ -663,14 +663,14 @@ notrace void log_close(void)
 	}
 }
 
-notrace void set_thread_name(const char *name, bool show_idx)
+void set_thread_name(const char *name, bool show_idx)
 {
 	worker_name = name;
 	if (show_idx)
 		worker_idx = gettid();
 }
 
-notrace void get_thread_name(char *name)
+void get_thread_name(char *name)
 {
 	if (worker_name && worker_idx)
 		snprintf(name, MAX_THREAD_NAME_LEN, "%s %d",
@@ -713,7 +713,7 @@ static bool check_gdb(void)
 #define FRAME_POINTER ((unsigned long *)__builtin_frame_address(0) + 2)
 
 __attribute__ ((__noinline__))
-notrace int __sd_dump_variable(const char *var)
+int __sd_dump_variable(const char *var)
 {
 	char cmd[ARG_MAX], path[PATH_MAX], info[256];
 	FILE *f = NULL;
@@ -759,7 +759,7 @@ notrace int __sd_dump_variable(const char *var)
 }
 
 __attribute__ ((__noinline__))
-static notrace int dump_stack_frames(void)
+static int dump_stack_frames(void)
 {
 	char path[PATH_MAX];
 	int i, stack_no = 0;
@@ -826,7 +826,7 @@ static notrace int dump_stack_frames(void)
 }
 
 __attribute__ ((__noinline__))
-notrace void sd_backtrace(void)
+void sd_backtrace(void)
 {
 	void *addrs[SD_MAX_STACK_DEPTH];
 	int i, n = backtrace(addrs, ARRAY_SIZE(addrs));

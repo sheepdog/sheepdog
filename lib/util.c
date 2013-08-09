@@ -64,7 +64,7 @@ void *xzalloc(size_t size)
 	return xcalloc(1, size);
 }
 
-notrace void *xrealloc(void *ptr, size_t size)
+void *xrealloc(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
 	if (!ret && !size)
@@ -316,7 +316,7 @@ void eventfd_xwrite(int efd, int value)
  * @param buf_size size of destination buffer
  * @param str source string
  */
-void notrace pstrcpy(char *buf, int buf_size, const char *str)
+void pstrcpy(char *buf, int buf_size, const char *str)
 {
 	int c;
 	char *q = buf;

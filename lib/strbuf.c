@@ -50,7 +50,7 @@ void strbuf_attach(struct strbuf *sb, void *buf, size_t len, size_t alloc)
 	sb->buf[sb->len] = '\0';
 }
 
-notrace void strbuf_grow(struct strbuf *sb, size_t extra)
+void strbuf_grow(struct strbuf *sb, size_t extra)
 {
 	if (sb->len + extra + 1 <= sb->len)
 		panic("you want to use way too much memory");
@@ -98,7 +98,7 @@ void strbuf_remove(struct strbuf *sb, size_t pos, size_t len)
 	strbuf_splice(sb, pos, len, NULL, 0);
 }
 
-notrace void strbuf_add(struct strbuf *sb, const void *data, size_t len)
+void strbuf_add(struct strbuf *sb, const void *data, size_t len)
 {
 	strbuf_grow(sb, len);
 	memcpy(sb->buf + sb->len, data, len);

@@ -32,6 +32,8 @@ static struct strbuf *buffer;
 static pthread_mutex_t *buffer_lock;
 static int nr_cpu;
 
+static __thread bool in_trace;
+
 union instruction {
 	unsigned char start[INSN_SIZE];
 	struct {
@@ -40,12 +42,12 @@ union instruction {
 	} __attribute__((packed));
 };
 
-static notrace int caller_cmp(const struct caller *a, const struct caller *b)
+static int caller_cmp(const struct caller *a, const struct caller *b)
 {
 	return intcmp(a->mcount, b->mcount);
 }
 
-static notrace unsigned char *get_new_call(unsigned long ip, unsigned long addr)
+static unsigned char *get_new_call(unsigned long ip, unsigned long addr)
 {
 	static union instruction code;
 
@@ -55,7 +57,7 @@ static notrace unsigned char *get_new_call(unsigned long ip, unsigned long addr)
 	return code.start;
 }
 
-static notrace void replace_call(unsigned long ip, unsigned long func)
+static void replace_call(unsigned long ip, unsigned long func)
 {
 	unsigned char *new;
 
@@ -63,14 +65,14 @@ static notrace void replace_call(unsigned long ip, unsigned long func)
 	memcpy((void *)ip, new, INSN_SIZE);
 }
 
-static notrace int make_text_writable(unsigned long ip)
+static int make_text_writable(unsigned long ip)
 {
 	unsigned long start = ip & ~(getpagesize() - 1);
 
 	return mprotect((void *)start, getpagesize() + INSN_SIZE, PROT_READ | PROT_EXEC | PROT_WRITE);
 }
 
-static notrace struct caller *trace_lookup_ip(unsigned long ip)
+static struct caller *trace_lookup_ip(unsigned long ip)
 {
 	const struct caller key = {
 		.mcount = ip,
@@ -79,28 +81,34 @@ static notrace struct caller *trace_lookup_ip(unsigned long ip)
 	return xbsearch(&key, callers, nr_callers, caller_cmp);
 }
 
-notrace void regist_tracer(struct tracer *tracer)
+void regist_tracer(struct tracer *tracer)
 {
 	list_add_tail(&tracer->list, &tracers);
 }
 
-static notrace void patch_all_sites(unsigned long addr)
+static void patch_all_sites(unsigned long addr)
 {
 	for (int i = 0; i < nr_callers; i++)
 		replace_call(callers[i].mcount, addr);
 }
 
-static notrace void nop_all_sites(void)
+static void nop_all_sites(void)
 {
 	for (int i = 0; i < nr_callers; i++)
 		memcpy((void *)callers[i].mcount, NOP5, INSN_SIZE);
 }
 
 /* the entry point of the function */
-notrace void trace_function_enter(unsigned long ip, unsigned long *ret_addr)
+__attribute__((no_instrument_function))
+void trace_function_enter(unsigned long ip, unsigned long *ret_addr)
 {
 	struct tracer *tracer;
 	const struct caller *caller;
+
+	if (in_trace)
+		/* don't trace while tracing */
+		return;
+	in_trace = true;
 
 	assert(ret_stack_index < ARRAY_SIZE(trace_ret_stack));
 
@@ -115,12 +123,18 @@ notrace void trace_function_enter(unsigned long ip, unsigned long *ret_addr)
 	trace_ret_stack[ret_stack_index].ret = *ret_addr;
 	ret_stack_index++;
 	*ret_addr = (unsigned long)trace_return_caller;
+
+	in_trace = false;
 }
 
 /* the exit point of the function */
-notrace unsigned long trace_function_exit(void)
+__attribute__((no_instrument_function))
+unsigned long trace_function_exit(void)
 {
 	struct tracer *tracer;
+
+	assert(!in_trace);
+	in_trace = true;
 
 	ret_stack_index--;
 
@@ -130,10 +144,12 @@ notrace unsigned long trace_function_exit(void)
 				     ret_stack_index);
 	}
 
+	in_trace = false;
+
 	return trace_ret_stack[ret_stack_index].ret;
 }
 
-static notrace size_t count_enabled_tracers(void)
+static size_t count_enabled_tracers(void)
 {
 	size_t nr = 0;
 	struct tracer *t;
@@ -146,7 +162,7 @@ static notrace size_t count_enabled_tracers(void)
 	return nr;
 }
 
-static notrace struct tracer *find_tracer(const char *name)
+static struct tracer *find_tracer(const char *name)
 {
 	struct tracer *t;
 
@@ -158,7 +174,7 @@ static notrace struct tracer *find_tracer(const char *name)
 	return NULL;
 }
 
-notrace int trace_enable(const char *name)
+int trace_enable(const char *name)
 {
 	struct tracer *tracer = find_tracer(name);
 
@@ -182,7 +198,7 @@ notrace int trace_enable(const char *name)
 	return SD_RES_SUCCESS;
 }
 
-notrace int trace_disable(const char *name)
+int trace_disable(const char *name)
 {
 	struct tracer *tracer = find_tracer(name);
 
@@ -205,7 +221,7 @@ notrace int trace_disable(const char *name)
 	return SD_RES_SUCCESS;
 }
 
-notrace int trace_buffer_pop(void *buf, uint32_t len)
+int trace_buffer_pop(void *buf, uint32_t len)
 {
 	int readin, count = 0, requested = len;
 	char *buff = (char *)buf;
@@ -228,7 +244,7 @@ notrace int trace_buffer_pop(void *buf, uint32_t len)
 	return count;
 }
 
-notrace void trace_buffer_push(int cpuid, struct trace_graph_item *item)
+void trace_buffer_push(int cpuid, struct trace_graph_item *item)
 {
 	pthread_mutex_lock(&buffer_lock[cpuid]);
 	strbuf_add(&buffer[cpuid], item, sizeof(*item));
@@ -347,7 +363,7 @@ static int init_callers(void)
  * Try to NOP all the mcount call sites that are supposed to be traced.  Later
  * we can enable it by asking these sites to point to trace_caller.
  */
-notrace int trace_init(void)
+int trace_init(void)
 {
 	int i;
 

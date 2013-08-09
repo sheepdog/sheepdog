@@ -15,7 +15,7 @@
 
 static __thread unsigned long long entry_time[SD_MAX_STACK_DEPTH];
 
-static notrace uint64_t clock_get_time(void)
+static uint64_t clock_get_time(void)
 {
 	struct timespec ts;
 
@@ -23,7 +23,7 @@ static notrace uint64_t clock_get_time(void)
 	return (uint64_t)ts.tv_sec * 1000000000LL + (uint64_t)ts.tv_nsec;
 }
 
-static notrace void graph_tracer_exit(const struct caller *this_fn, int depth)
+static void graph_tracer_exit(const struct caller *this_fn, int depth)
 {
 	struct trace_graph_item trace = {
 		.depth = depth,
@@ -37,7 +37,7 @@ static notrace void graph_tracer_exit(const struct caller *this_fn, int depth)
 	trace_buffer_push(sched_getcpu(), &trace);
 }
 
-static notrace void graph_tracer_enter(const struct caller *this_fn, int depth)
+static void graph_tracer_enter(const struct caller *this_fn, int depth)
 {
 	struct trace_graph_item trace = {
 		.type = TRACE_GRAPH_ENTRY,
