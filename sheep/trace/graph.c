@@ -13,30 +13,7 @@
 
 #include "trace.h"
 
-static __thread int ret_stack_index;
-static __thread struct trace_ret_stack {
-	unsigned long ret;
-	unsigned long func;
-	unsigned long long entry_time;
-} trace_ret_stack[100]; /* FIXME: consider stack overrun */
-
-static void push_return_trace(unsigned long ret, unsigned long long etime,
-		unsigned long func, int *depth)
-{
-	trace_ret_stack[ret_stack_index].ret = ret;
-	trace_ret_stack[ret_stack_index].func = func;
-	trace_ret_stack[ret_stack_index].entry_time = etime;
-	*depth = ret_stack_index;
-	ret_stack_index++;
-}
-
-static void pop_return_trace(struct trace_graph_item *trace, unsigned long *ret_func)
-{
-	ret_stack_index--;
-	trace->entry_time = trace_ret_stack[ret_stack_index].entry_time;
-	*ret_func = trace_ret_stack[ret_stack_index].ret;
-	trace->depth = ret_stack_index;
-}
+static __thread unsigned long long entry_time[SD_MAX_STACK_DEPTH];
 
 static notrace uint64_t clock_get_time(void)
 {
@@ -46,59 +23,40 @@ static notrace uint64_t clock_get_time(void)
 	return (uint64_t)ts.tv_sec * 1000000000LL + (uint64_t)ts.tv_nsec;
 }
 
-static notrace void default_trace_graph_entry(struct trace_graph_item *item)
+static notrace void graph_tracer_exit(const struct caller *this_fn, int depth)
 {
-	trace_buffer_push(sched_getcpu(), item);
-}
-
-static notrace void default_trace_graph_return(struct trace_graph_item *item)
-{
-	trace_buffer_push(sched_getcpu(), item);
-}
-
-static trace_func_graph_ent_t trace_graph_entry = default_trace_graph_entry;
-static trace_func_graph_ret_t trace_graph_return = default_trace_graph_return;
-
-notrace unsigned long trace_return_call(void)
-{
-	struct trace_graph_item trace;
-	unsigned long ret;
-
-	memset(&trace, 0, sizeof(trace));
+	struct trace_graph_item trace = {
+		.depth = depth,
+		.type = TRACE_GRAPH_RETURN,
+		.entry_time = entry_time[depth],
+		.return_time = clock_get_time(),
+	};
 
 	get_thread_name(trace.tname);
-	trace.return_time = clock_get_time();
-	pop_return_trace(&trace, &ret);
-	trace.type = TRACE_GRAPH_RETURN;
-	trace_graph_return(&trace);
 
-	return ret;
+	trace_buffer_push(sched_getcpu(), &trace);
 }
 
-/* Hook the return address and push it in the trace_ret_stack.
- *
- * ip: the address of the call instruction in the code.
- * ret_addr: the address of return address in the stack frame.
- */
-static notrace void graph_tracer(unsigned long ip, unsigned long *ret_addr)
+static notrace void graph_tracer_enter(const struct caller *this_fn, int depth)
 {
-	unsigned long old_addr = *ret_addr;
-	uint64_t entry_time;
-	struct trace_graph_item trace;
-	struct caller *cr;
+	struct trace_graph_item trace = {
+		.type = TRACE_GRAPH_ENTRY,
+		.depth = depth,
+	};
 
-	memset(&trace, 0, sizeof(trace));
-
-	cr = trace_lookup_ip(ip);
-	pstrcpy(trace.fname, sizeof(trace.fname), cr->name);
+	pstrcpy(trace.fname, sizeof(trace.fname), this_fn->name);
 	get_thread_name(trace.tname);
 
-	*ret_addr = (unsigned long)trace_return_caller;
-	entry_time = clock_get_time();
-	push_return_trace(old_addr, entry_time, ip, &trace.depth);
-	trace.type = TRACE_GRAPH_ENTRY;
+	entry_time[depth] = clock_get_time();
 
-	trace_graph_entry(&trace);
+	trace_buffer_push(sched_getcpu(), &trace);
 }
 
-register_tracer(graph_tracer);
+static struct tracer graph_tracer = {
+	.name = "graph",
+
+	.enter = graph_tracer_enter,
+	.exit = graph_tracer_exit,
+};
+
+tracer_register(graph_tracer);

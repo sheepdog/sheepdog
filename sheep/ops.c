@@ -779,9 +779,9 @@ static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *d
 	int enable = req->data_length, ret;
 
 	if (enable)
-		ret = trace_enable();
+		ret = trace_enable("graph");
 	else
-		ret = trace_disable();
+		ret = trace_disable("graph");
 
 	return ret;
 }

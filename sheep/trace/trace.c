@@ -15,10 +15,15 @@
 
 #include "trace.h"
 
+static LIST_HEAD(tracers);
+static __thread int ret_stack_index;
+static __thread struct {
+	const struct caller *caller;
+	unsigned long ret;
+} trace_ret_stack[SD_MAX_STACK_DEPTH];
+
 static struct caller *callers;
 static size_t nr_callers;
-
-static trace_func_t trace_func = trace_call;
 
 static struct strbuf *buffer;
 static pthread_mutex_t *buffer_lock;
@@ -55,13 +60,6 @@ static notrace void replace_call(unsigned long ip, unsigned long func)
 	memcpy((void *)ip, new, INSN_SIZE);
 }
 
-static inline void replace_trace_call(unsigned long func)
-{
-	unsigned long ip = (unsigned long)trace_call;
-
-	replace_call(ip, func);
-}
-
 static notrace int make_text_writable(unsigned long ip)
 {
 	unsigned long start = ip & ~(getpagesize() - 1);
@@ -69,7 +67,7 @@ static notrace int make_text_writable(unsigned long ip)
 	return mprotect((void *)start, getpagesize() + INSN_SIZE, PROT_READ | PROT_EXEC | PROT_WRITE);
 }
 
-notrace struct caller *trace_lookup_ip(unsigned long ip)
+static notrace struct caller *trace_lookup_ip(unsigned long ip)
 {
 	const struct caller key = {
 		.mcount = ip,
@@ -78,14 +76,9 @@ notrace struct caller *trace_lookup_ip(unsigned long ip)
 	return xbsearch(&key, callers, nr_callers, caller_cmp);
 }
 
-notrace int register_trace_function(trace_func_t func)
+notrace void regist_tracer(struct tracer *tracer)
 {
-	if (make_text_writable((unsigned long)trace_call) < 0)
-		return -1;
-
-	replace_trace_call((unsigned long)func);
-	trace_func = func;
-	return 0;
+	list_add_tail(&tracer->list, &tracers);
 }
 
 static notrace void patch_all_sites(unsigned long addr)
@@ -100,27 +93,111 @@ static notrace void nop_all_sites(void)
 		memcpy((void *)callers[i].mcount, NOP5, INSN_SIZE);
 }
 
-notrace int trace_enable(void)
+/* the entry point of the function */
+notrace void trace_function_enter(unsigned long ip, unsigned long *ret_addr)
 {
-	if (trace_func == trace_call) {
-		sd_dprintf("no tracer available");
-		return SD_RES_NO_TAG;
+	struct tracer *tracer;
+	const struct caller *caller;
+
+	assert(ret_stack_index < ARRAY_SIZE(trace_ret_stack));
+
+	caller = trace_lookup_ip(ip);
+
+	list_for_each_entry(tracer, &tracers, list) {
+		if (tracer->enter != NULL && uatomic_is_true(&tracer->enabled))
+			tracer->enter(caller, ret_stack_index);
 	}
 
-	suspend_worker_threads();
-	patch_all_sites((unsigned long)trace_caller);
-	resume_worker_threads();
-	sd_dprintf("tracer enabled");
+	trace_ret_stack[ret_stack_index].caller = caller;
+	trace_ret_stack[ret_stack_index].ret = *ret_addr;
+	ret_stack_index++;
+	*ret_addr = (unsigned long)trace_return_caller;
+}
+
+/* the exit point of the function */
+notrace unsigned long trace_function_exit(void)
+{
+	struct tracer *tracer;
+
+	ret_stack_index--;
+
+	list_for_each_entry(tracer, &tracers, list) {
+		if (tracer->exit != NULL && uatomic_is_true(&tracer->enabled))
+			tracer->exit(trace_ret_stack[ret_stack_index].caller,
+				     ret_stack_index);
+	}
+
+	return trace_ret_stack[ret_stack_index].ret;
+}
+
+static notrace size_t count_enabled_tracers(void)
+{
+	size_t nr = 0;
+	struct tracer *t;
+
+	list_for_each_entry(t, &tracers, list) {
+		if (uatomic_is_true(&t->enabled))
+			nr++;
+	}
+
+	return nr;
+}
+
+static notrace struct tracer *find_tracer(const char *name)
+{
+	struct tracer *t;
+
+	list_for_each_entry(t, &tracers, list) {
+		if (strcmp(t->name, name) == 0)
+			return t;
+	}
+
+	return NULL;
+}
+
+notrace int trace_enable(const char *name)
+{
+	struct tracer *tracer = find_tracer(name);
+
+	if (tracer == NULL) {
+		sd_dprintf("no such tracer, %s", name);
+		return SD_RES_NO_SUPPORT;
+	} else if (uatomic_is_true(&tracer->enabled)) {
+		sd_dprintf("tracer %s is already enabled", name);
+		return SD_RES_INVALID_PARMS;
+	}
+
+	uatomic_set_true(&tracer->enabled);
+
+	if (count_enabled_tracers() == 1) {
+		suspend_worker_threads();
+		patch_all_sites((unsigned long)trace_caller);
+		resume_worker_threads();
+	}
+	sd_dprintf("tracer %s enabled", tracer->name);
 
 	return SD_RES_SUCCESS;
 }
 
-notrace int trace_disable(void)
+notrace int trace_disable(const char *name)
 {
-	suspend_worker_threads();
-	nop_all_sites();
-	resume_worker_threads();
-	sd_dprintf("tracer disabled");
+	struct tracer *tracer = find_tracer(name);
+
+	if (tracer == NULL) {
+		sd_dprintf("no such tracer, %s", name);
+		return SD_RES_NO_SUPPORT;
+	} else if (!uatomic_is_true(&tracer->enabled)) {
+		sd_dprintf("tracer %s is not enabled", name);
+		return SD_RES_INVALID_PARMS;
+	}
+
+	uatomic_set_false(&tracer->enabled);
+	if (count_enabled_tracers() == 0) {
+		suspend_worker_threads();
+		nop_all_sites();
+		resume_worker_threads();
+	}
+	sd_dprintf("tracer %s disabled", tracer->name);
 
 	return SD_RES_SUCCESS;
 }

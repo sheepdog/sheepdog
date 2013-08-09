@@ -33,9 +33,7 @@ ENTRY(trace_caller)
 	leaq 8(%rbp), %rsi
 	subq $INSN_SIZE, %rdi
 
-.globl trace_call
-trace_call:
-	call trace_stub
+	call trace_function_enter
 
 	movq 48(%rsp), %r9
 	movq 40(%rsp), %r8
@@ -45,9 +43,6 @@ trace_call:
 	movq 8(%rsp), %rcx
 	movq (%rsp), %rax
 	addq $0x38, %rsp
-
-.globl trace_stub
-trace_stub:
 	retq
 
 ENTRY(trace_return_caller)
@@ -56,7 +51,7 @@ ENTRY(trace_return_caller)
 	movq %rax, (%rsp)
 	movq %rdx, 8(%rsp)
 
-	call trace_return_call
+	call trace_function_exit
 
 	movq %rax, %rdi
 	movq 8(%rsp), %rdx
