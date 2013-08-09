@@ -21,6 +21,7 @@ static size_t nr_callers;
 static trace_func_t trace_func = trace_call;
 
 static struct strbuf *buffer;
+static pthread_mutex_t *buffer_lock;
 static int nr_cpu;
 
 union instruction {
@@ -131,7 +132,9 @@ notrace int trace_buffer_pop(void *buf, uint32_t len)
 	int i;
 
 	for (i = 0; i < nr_cpu; i++) {
+		pthread_mutex_lock(&buffer_lock[i]);
 		readin = strbuf_stripout(&buffer[i], buff, len);
+		pthread_mutex_unlock(&buffer_lock[i]);
 		count += readin;
 		if (count == requested)
 			return count;
@@ -147,7 +150,9 @@ notrace int trace_buffer_pop(void *buf, uint32_t len)
 
 notrace void trace_buffer_push(int cpuid, struct trace_graph_item *item)
 {
+	pthread_mutex_lock(&buffer_lock[cpuid]);
 	strbuf_add(&buffer[cpuid], item, sizeof(*item));
+	pthread_mutex_unlock(&buffer_lock[cpuid]);
 }
 
 /* assume that mcount call exists in the first FIND_MCOUNT_RANGE bytes */
@@ -273,8 +278,11 @@ notrace int trace_init(void)
 
 	nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
 	buffer = xzalloc(sizeof(*buffer) * nr_cpu);
-	for (i = 0; i < nr_cpu; i++)
+	buffer_lock = xzalloc(sizeof(*buffer_lock) * nr_cpu);
+	for (i = 0; i < nr_cpu; i++) {
 		strbuf_init(&buffer[i], 0);
+		pthread_mutex_init(&buffer_lock[i], NULL);
+	}
 
 	sd_iprintf("trace support enabled. cpu count %d.", nr_cpu);
 	return 0;
