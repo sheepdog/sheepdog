@@ -15,14 +15,6 @@
 
 static __thread unsigned long long entry_time[SD_MAX_STACK_DEPTH];
 
-static uint64_t clock_get_time(void)
-{
-	struct timespec ts;
-
-	clock_gettime(CLOCK_REALTIME, &ts);
-	return (uint64_t)ts.tv_sec * 1000000000LL + (uint64_t)ts.tv_nsec;
-}
-
 static void graph_tracer_exit(const struct caller *this_fn, int depth)
 {
 	struct trace_graph_item trace = {

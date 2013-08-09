@@ -377,6 +377,7 @@ int trace_init(void)
 
 #ifdef DEBUG
 	trace_enable("thread_checker");
+	trace_enable("loop_checker");
 #endif
 
 	nr_cpu = sysconf(_SC_NPROCESSORS_ONLN);
