@@ -210,7 +210,7 @@ AC_ARG_WITH([initddir],
 
 AC_ARG_ENABLE([trace],
 	[  --enable-trace           : enable trace],,
-	[ enable_trace="no" ],)
+	[ enable_trace="${enable_debug}" ],)
 AM_CONDITIONAL(BUILD_TRACE, test x$enable_trace = xyes)
 
 PKG_CHECK_MODULES([fuse],[fuse], HAVE_FUSE="yes", HAVE_FUSE="no")
@@ -282,9 +282,8 @@ if test "x${enable_zookeeper}" = xyes; then
 fi
 
 if test "x${enable_trace}" = xyes; then
-	if test "x${enable_debug}" = xyes || \
-	   test "x${enable_coverage}" = xyes; then
-		AC_MSG_ERROR(tracer cannot be used with debug options)
+	if test "x${enable_coverage}" = xyes; then
+		AC_MSG_ERROR(tracer cannot be used with coverage options)
 	fi
 	if [[[ $host != *x86_64* ]]]; then
 		AC_MSG_ERROR(tracer can be used on x86_64 architectures)
