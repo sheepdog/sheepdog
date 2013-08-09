@@ -45,7 +45,7 @@ clean-generic:
 
 cscope:
 	@echo create cscope.out
-	@find -name '*.[ch]' > cscope.files
+	@find -name '*.[chS]' > cscope.files
 	@cscope -bq
 
 $(SPEC): $(SPEC).in
