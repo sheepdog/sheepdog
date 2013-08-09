@@ -58,7 +58,3 @@ ENTRY(trace_return_caller)
 	movq (%rsp), %rax
 	addq $24, %rsp
 	jmp *%rdi
-
-.globl NOP5
-NOP5:
-	.byte 0x0f,0x1f,0x44,0x00,0x00 # Intel recommended one for 5 bytes nops

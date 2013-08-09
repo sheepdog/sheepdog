@@ -29,7 +29,6 @@ struct tracer {
 /* mcount.S */
 void mcount(void);
 void trace_caller(void);
-extern const unsigned char NOP5[];
 void trace_return_caller(void);
 void trace_function_enter(unsigned long, unsigned long *);
 unsigned long trace_function_exit(void);

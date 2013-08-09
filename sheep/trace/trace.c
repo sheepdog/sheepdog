@@ -15,6 +15,9 @@
 
 #include "trace.h"
 
+/* Intel recommended one for 5 bytes nops (nopl 0x0(%rax,%rax,1)) */
+static const unsigned char NOP5[INSN_SIZE] = {0x0f, 0x1f, 0x44, 0x00, 0x00};
+
 static LIST_HEAD(tracers);
 static __thread int ret_stack_index;
 static __thread struct {
