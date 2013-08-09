@@ -356,7 +356,7 @@ static struct sockfd *sockfd_cache_get_long(const struct node_id *nid)
 	bool use_io = nid->io_port ? true : false;
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
 	char name[INET6_ADDRSTRLEN];
-	int fd, idx, port = use_io ? nid->io_port : nid->port;
+	int fd, idx = -1, port = use_io ? nid->io_port : nid->port;
 
 	addr_to_str(name, sizeof(name), addr, 0);
 grab:
