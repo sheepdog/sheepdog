@@ -113,42 +113,88 @@ read_buffer:
 	return EXIT_SUCCESS;
 }
 
-static int trace_start(int argc, char **argv)
+static int trace_enable(int argc, char **argv)
 {
+	const char *tracer = argv[optind];
 	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
-	sd_init_req(&hdr, SD_OP_TRACE);
-	hdr.data_length = 1;
+	sd_init_req(&hdr, SD_OP_TRACE_ENABLE);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = strlen(tracer) + 1;
 
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "Trace start failed: %s\n",
-				sd_strerror(rsp->result));
+	ret = collie_exec_req(sdhost, sdport, &hdr, (void *)tracer);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	switch (rsp->result) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_NO_SUPPORT:
+		fprintf(stderr, "no such tracer %s\n", tracer);
 		return EXIT_FAILURE;
+	case SD_RES_INVALID_PARMS:
+		fprintf(stderr, "tracer %s is already enabled\n", tracer);
+		return EXIT_FAILURE;
+	default:
+		fprintf(stderr, "unknown error (%s)\n",
+			sd_strerror(rsp->result));
+		return EXIT_SYSFAIL;
 	}
 
 	return EXIT_SUCCESS;
 }
 
-static int trace_stop(int argc, char **argv)
+static int trace_disable(int argc, char **argv)
 {
+	const char *tracer = argv[optind];
 	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
-	sd_init_req(&hdr, SD_OP_TRACE);
-	hdr.data_length = 0;
+	sd_init_req(&hdr, SD_OP_TRACE_DISABLE);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = strlen(tracer) + 1;
 
-	ret = send_light_req(&hdr, sdhost, sdport);
-	if (ret) {
-		fprintf(stderr, "Trace stop failed: %s\n",
-				sd_strerror(rsp->result));
+	ret = collie_exec_req(sdhost, sdport, &hdr, (void *)tracer);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	switch (rsp->result) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_NO_SUPPORT:
+		fprintf(stderr, "no such tracer %s\n", tracer);
 		return EXIT_FAILURE;
+	case SD_RES_INVALID_PARMS:
+		fprintf(stderr, "tracer %s is not enabled\n", tracer);
+		return EXIT_FAILURE;
+	default:
+		fprintf(stderr, "unknown error (%s)\n",
+			sd_strerror(rsp->result));
+		return EXIT_SYSFAIL;
 	}
 
 	return trace_read_buffer();
+}
+
+static int trace_status(int argc, char **argv)
+{
+	char buf[4096]; /* must have enough space to store tracer list */
+	int ret;
+	struct sd_req hdr;
+
+	sd_init_req(&hdr, SD_OP_TRACE_STATUS);
+	hdr.data_length = sizeof(buf);
+
+	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	printf("%s", buf);
+
+	return EXIT_SUCCESS;
 }
 
 static int trace_cat(int argc, char **argv)
@@ -183,35 +229,26 @@ static int trace_cat(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int debug_parser(int ch, char *opt)
+static int trace_parser(int ch, char *opt)
 {
 	return 0;
 }
 
 /* Subcommand list of trace */
 static struct subcommand trace_cmd[] = {
-	{"start", NULL, NULL, "start the trace",
-	 NULL, 0, trace_start},
-	{"stop", NULL, NULL, "stop the trace",
-	 NULL, 0, trace_stop},
-	{"cat", NULL, NULL, "cat the trace",
-	 NULL, 0, trace_cat},
+	{"enable", "<tracer>", "aph", "enable tracer", NULL,
+	 SUBCMD_FLAG_NEED_ARG, trace_enable},
+	{"disable", "<tracer>", "aph", "disable tracer", NULL,
+	 SUBCMD_FLAG_NEED_ARG, trace_disable},
+	{"status", NULL, "aph", "show tracer statuses", NULL,
+	 0, trace_status},
+	{"cat", NULL, "aph", "cat the output of tracers if any", NULL,
+	 0, trace_cat},
 	{NULL},
 };
 
-static int debug_trace(int argc, char **argv)
-{
-	return do_generic_subcommand(trace_cmd, argc, argv);
-}
-
-static struct subcommand debug_cmd[] = {
-	{"trace", NULL, "aph", "trace the node",
-	 trace_cmd, SUBCMD_FLAG_NEED_ARG, debug_trace},
-	{NULL,},
-};
-
-struct command debug_command = {
-	"debug",
-	debug_cmd,
-	debug_parser
+struct command trace_command = {
+	"trace",
+	trace_cmd,
+	trace_parser
 };

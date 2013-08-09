@@ -28,7 +28,7 @@ collie_SOURCES		= farm/object_tree.c farm/sha1_file.c farm/snap.c \
 			  collie.c common.c treeview.c vdi.c node.c cluster.c
 
 if BUILD_TRACE
-collie_SOURCES          += debug.c
+collie_SOURCES          += trace.c
 override CFLAGS         := $(subst -pg,,$(CFLAGS))
 endif
 

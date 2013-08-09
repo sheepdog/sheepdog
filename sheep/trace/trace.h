@@ -40,6 +40,7 @@ unsigned long trace_function_exit(void);
   void regist_tracer(struct tracer *tracer);
   int trace_enable(const char *name);
   int trace_disable(const char *name);
+  size_t trace_status(char *buf);
   int trace_buffer_pop(void *buf, uint32_t len);
   void trace_buffer_push(int cpuid, struct trace_graph_item *item);
 
@@ -47,6 +48,7 @@ unsigned long trace_function_exit(void);
   static inline int trace_init(void) { return 0; }
   static inline int trace_enable(const char *name) { return 0; }
   static inline int trace_disable(const char *name) { return 0; }
+  static inline size_t trace_status(char *buf) { return 0; }
   static inline int trace_buffer_pop(void *buf, uint32_t len) { return 0; }
   static inline void trace_buffer_push(
 	  int cpuid, struct trace_graph_item *item) { return; }

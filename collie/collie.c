@@ -136,7 +136,7 @@ static void init_commands(const struct command **commands)
 		vdi_command,
 		node_command,
 		cluster_command,
-		debug_command,
+		trace_command,
 		{NULL,}
 	};
 

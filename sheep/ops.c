@@ -774,16 +774,24 @@ static int local_flush_and_del(struct request *req)
 	return object_cache_flush_and_del(req);
 }
 
-static int local_trace_ops(const struct sd_req *req, struct sd_rsp *rsp, void *data)
+static int local_trace_enable(const struct sd_req *req, struct sd_rsp *rsp,
+			      void *data)
 {
-	int enable = req->data_length, ret;
+	return trace_enable(data);
+}
 
-	if (enable)
-		ret = trace_enable("graph");
-	else
-		ret = trace_disable("graph");
+static int local_trace_disable(const struct sd_req *req, struct sd_rsp *rsp,
+			       void *data)
+{
+	return trace_disable(data);
+}
 
-	return ret;
+static int local_trace_status(const struct sd_req *req, struct sd_rsp *rsp,
+			      void *data)
+{
+	rsp->data_length = trace_status(data);
+
+	return SD_RES_SUCCESS;
 }
 
 static int local_trace_read_buf(struct request *request)
@@ -1143,11 +1151,25 @@ static struct sd_op_template sd_ops[] = {
 		.process_work = local_flush_and_del,
 	},
 
-	[SD_OP_TRACE] = {
-		.name = "TRACE",
+	[SD_OP_TRACE_ENABLE] = {
+		.name = "TRACE_ENABLE",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
-		.process_main = local_trace_ops,
+		.process_main = local_trace_enable,
+	},
+
+	[SD_OP_TRACE_DISABLE] = {
+		.name = "TRACE_DISABLE",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_main = local_trace_disable,
+	},
+
+	[SD_OP_TRACE_STATUS] = {
+		.name = "TRACE_STATUS",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_main = local_trace_status,
 	},
 
 	[SD_OP_TRACE_READ_BUF] = {

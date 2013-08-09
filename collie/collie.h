@@ -89,9 +89,9 @@ extern struct command node_command;
 extern struct command cluster_command;
 
 #ifdef HAVE_TRACE
-  extern struct command debug_command;
+  extern struct command trace_command;
 #else
-  #define debug_command {}
+  #define trace_command {}
 #endif /* HAVE_TRACE */
 
 #endif

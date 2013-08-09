@@ -221,6 +221,35 @@ int trace_disable(const char *name)
 	return SD_RES_SUCCESS;
 }
 
+/*
+ * Set the current tracer status to 'buf' and return the length of the
+ * data. 'buf' must have enough space to store all the tracer list.
+ */
+size_t trace_status(char *buf)
+{
+	struct tracer *t;
+	char *p = buf;
+
+	list_for_each_entry(t, &tracers, list) {
+		strcpy(p, t->name);
+		p += strlen(p);
+
+		*p++ = '\t';
+
+		if (uatomic_is_true(&t->enabled))
+			strcpy(p, "enabled");
+		else
+			strcpy(p, "disabled");
+		p += strlen(p);
+
+		*p++ = '\n';
+	}
+
+	*p++ = '\0';
+
+	return p - buf;
+}
+
 int trace_buffer_pop(void *buf, uint32_t len)
 {
 	int readin, count = 0, requested = len;
