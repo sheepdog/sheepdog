@@ -384,7 +384,6 @@ if test "x${enable_trace}" = xyes && \
 		cc_supports_flag -pg ; then
 	AC_MSG_NOTICE([Enabling trace (-pg)])
 	TRACE_CFLAGS="-pg"
-	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
 else
 	TRACE_CFLAGS=""
 fi
