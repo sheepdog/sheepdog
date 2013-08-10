@@ -23,15 +23,15 @@ _wait_for_sheep 3
 
 _cluster_format -c 1
 
-qemu-img create sheepdog:test 4G
-qemu-img snapshot -c tag1 sheepdog:test
-qemu-img snapshot -c tag2 sheepdog:test
-qemu-img snapshot -c tag3 sheepdog:test
+$QEMU_IMG create sheepdog:test 4G
+$QEMU_IMG snapshot -c tag1 sheepdog:test
+$QEMU_IMG snapshot -c tag2 sheepdog:test
+$QEMU_IMG snapshot -c tag3 sheepdog:test
 
-qemu-img create sheepdog:test2 4G
-qemu-img snapshot -c tag1 sheepdog:test2
-qemu-img snapshot -c tag2 sheepdog:test2
-qemu-io -c "write 0 512" sheepdog:test2:1 | _filter_qemu_io
-qemu-img snapshot -c tag3 sheepdog:test2
+$QEMU_IMG create sheepdog:test2 4G
+$QEMU_IMG snapshot -c tag1 sheepdog:test2
+$QEMU_IMG snapshot -c tag2 sheepdog:test2
+$QEMU_IO -c "write 0 512" sheepdog:test2:1 | _filter_qemu_io
+$QEMU_IMG snapshot -c tag3 sheepdog:test2
 
 $COLLIE vdi tree | _filter_short_date

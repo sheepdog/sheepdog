@@ -35,7 +35,7 @@ _input()
     echo quit
 }
 
-_input | qemu-io sheepdog:test > /dev/null
+_input | $QEMU_IO sheepdog:test > /dev/null
 
 $COLLIE vdi list | _filter_short_date
 $COLLIE vdi tree | _filter_short_date

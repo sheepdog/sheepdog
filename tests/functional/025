@@ -37,10 +37,10 @@ echo "creating vdi ${NAME}"
 $COLLIE vdi create ${VDI_NAME} ${VDI_SIZE}
 
 echo "filling ${VDI_NAME} with data"
-qemu-io -c "write 0 ${VDI_SIZE}" sheepdog:${VDI_NAME} | _filter_qemu_io
+$QEMU_IO -c "write 0 ${VDI_SIZE}" sheepdog:${VDI_NAME} | _filter_qemu_io
 
 echo "reading back ${VDI_NAME} from second zone"
-qemu-io -c "read 0 1m" sheepdog:localhost:7002:${VDI_NAME} | _filter_qemu_io
+$QEMU_IO -c "read 0 1m" sheepdog:localhost:7002:${VDI_NAME} | _filter_qemu_io
 
 echo "starting a sheep in the third zone"
 for i in `seq 3 3`; do
