@@ -34,14 +34,14 @@ $COLLIE vdi create ${VDI_NAME} ${VDI_SIZE}
 sleep 1
 
 echo "filling ${VDI_NAME} with data"
-qemu-io -c "write 0 ${VDI_SIZE}" sheepdog:${VDI_NAME} | _filter_qemu_io
+$QEMU_IO -c "write 0 ${VDI_SIZE}" sheepdog:${VDI_NAME} | _filter_qemu_io
 
 echo "reading back ${VDI_NAME}"
-qemu-io -c "read 0 1m" sheepdog:${VDI_NAME} | _filter_qemu_io
+$QEMU_IO -c "read 0 1m" sheepdog:${VDI_NAME} | _filter_qemu_io
 
 echo "starting second sheep"
 _start_sheep 1
 _wait_for_sheep 2
 
 echo "reading data from second sheep"
-qemu-io -c "read 0 ${VDI_SIZE}" sheepdog:localhost:7001:${VDI_NAME} | _filter_qemu_io
+$QEMU_IO -c "read 0 ${VDI_SIZE}" sheepdog:localhost:7001:${VDI_NAME} | _filter_qemu_io
