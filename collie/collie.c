@@ -400,7 +400,7 @@ int main(int argc, char **argv)
 	if (!is_stdout_console() || raw_output)
 		highlight = false;
 
-	if (flags & SUBCMD_FLAG_NEED_NODELIST) {
+	if (flags & CMD_NEED_NODELIST) {
 		ret = update_node_list(SD_MAX_NODES);
 		if (ret < 0) {
 			sd_err("Failed to get node list");
@@ -408,7 +408,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (flags & SUBCMD_FLAG_NEED_ARG && argc == optind)
+	if (flags & CMD_NEED_ARG && argc == optind)
 		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 
 	if (init_event(EPOLL_SIZE) < 0)

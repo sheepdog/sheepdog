@@ -26,8 +26,8 @@
 #include "event.h"
 #include "config.h"
 
-#define SUBCMD_FLAG_NEED_NODELIST (1 << 0)
-#define SUBCMD_FLAG_NEED_ARG (1 << 1)
+#define CMD_NEED_NODELIST (1 << 0)
+#define CMD_NEED_ARG (1 << 1)
 
 #define UINT64_DECIMAL_SIZE 21
 

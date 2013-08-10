@@ -217,7 +217,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 		if (!strcmp(sub[i].name, argv[optind])) {
 			unsigned long flags = sub[i].flags;
 
-			if (flags & SUBCMD_FLAG_NEED_NODELIST) {
+			if (flags & CMD_NEED_NODELIST) {
 				ret = update_node_list(SD_MAX_NODES);
 				if (ret < 0) {
 					sd_err("Failed to get node list");
@@ -225,8 +225,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 				}
 			}
 
-			if (flags & SUBCMD_FLAG_NEED_ARG
-			    && argc < 5)
+			if (flags & CMD_NEED_ARG && argc < 5)
 				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 			optind++;
 			ret = sub[i].fn(argc, argv);

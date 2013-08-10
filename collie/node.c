@@ -383,11 +383,11 @@ static int md_unplug(int argc, char **argv)
 
 static struct subcommand node_md_cmd[] = {
 	{"info", NULL, NULL, "show multi-disk information",
-	 NULL, SUBCMD_FLAG_NEED_NODELIST, md_info},
+	 NULL, CMD_NEED_NODELIST, md_info},
 	{"plug", NULL, NULL, "plug more disk(s) into node",
-	 NULL, SUBCMD_FLAG_NEED_ARG, md_plug},
+	 NULL, CMD_NEED_ARG, md_plug},
 	{"unplug", NULL, NULL, "unplug disk(s) from node",
-	 NULL, SUBCMD_FLAG_NEED_ARG, md_unplug},
+	 NULL, CMD_NEED_ARG, md_unplug},
 	{NULL},
 };
 
@@ -420,15 +420,15 @@ static struct sd_option node_options[] = {
 
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprh", "kill node", NULL,
-	 SUBCMD_FLAG_NEED_ARG | SUBCMD_FLAG_NEED_NODELIST, node_kill},
+	 CMD_NEED_ARG | CMD_NEED_NODELIST, node_kill},
 	{"list", NULL, "aprh", "list nodes", NULL,
-	 SUBCMD_FLAG_NEED_NODELIST, node_list},
+	 CMD_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node", NULL,
-	 SUBCMD_FLAG_NEED_NODELIST, node_info},
+	 CMD_NEED_NODELIST, node_info},
 	{"recovery", NULL, "aphPr", "show recovery information of nodes", NULL,
-	 SUBCMD_FLAG_NEED_NODELIST, node_recovery, node_options},
+	 CMD_NEED_NODELIST, node_recovery, node_options},
 	{"md", "[disks]", "apAh", "See 'collie node md' for more information",
-	 node_md_cmd, SUBCMD_FLAG_NEED_ARG, node_md, node_options},
+	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
 	{NULL,},
 };
 

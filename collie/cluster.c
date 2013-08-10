@@ -444,12 +444,12 @@ static int cluster_recover(int argc, char **argv)
 /* Subcommand list of snapshot */
 static struct subcommand cluster_snapshot_cmd[] = {
 	{"save", NULL, "h", "save snapshot to localpath",
-	 NULL, SUBCMD_FLAG_NEED_ARG|SUBCMD_FLAG_NEED_NODELIST,
+	 NULL, CMD_NEED_ARG|CMD_NEED_NODELIST,
 	 save_snapshot, NULL},
 	{"list", NULL, "h", "list snapshot of localpath",
-	 NULL, SUBCMD_FLAG_NEED_ARG, list_snapshot, NULL},
+	 NULL, CMD_NEED_ARG, list_snapshot, NULL},
 	{"load", NULL, "h", "load snapshot from localpath",
-	 NULL, SUBCMD_FLAG_NEED_ARG, load_snapshot, NULL},
+	 NULL, CMD_NEED_ARG, load_snapshot, NULL},
 	{NULL},
 };
 
@@ -472,17 +472,17 @@ static int cluster_reweight(int argc, char **argv)
 
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
-	 NULL, SUBCMD_FLAG_NEED_NODELIST, cluster_info, cluster_options},
+	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
 	{"format", NULL, "bcaph", "create a Sheepdog store",
 	 NULL, 0, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
 	{"snapshot", "<tag|idx> <path>", "aph", "snapshot/restore the cluster",
-	 cluster_snapshot_cmd, SUBCMD_FLAG_NEED_ARG,
+	 cluster_snapshot_cmd, CMD_NEED_ARG,
 	 cluster_snapshot, cluster_options},
 	{"recover", NULL, "afph",
 	 "See 'collie cluster recover' for more information\n",
-	 cluster_recover_cmd, SUBCMD_FLAG_NEED_ARG,
+	 cluster_recover_cmd, CMD_NEED_ARG,
 	 cluster_recover, cluster_options},
 	{"reweight", NULL, "aph", "reweight the cluster", NULL, 0,
 	 cluster_reweight, cluster_options},

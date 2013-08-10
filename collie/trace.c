@@ -234,9 +234,9 @@ static int trace_parser(int ch, char *opt)
 /* Subcommand list of trace */
 static struct subcommand trace_cmd[] = {
 	{"enable", "<tracer>", "aph", "enable tracer", NULL,
-	 SUBCMD_FLAG_NEED_ARG, trace_enable},
+	 CMD_NEED_ARG, trace_enable},
 	{"disable", "<tracer>", "aph", "disable tracer", NULL,
-	 SUBCMD_FLAG_NEED_ARG, trace_disable},
+	 CMD_NEED_ARG, trace_disable},
 	{"status", NULL, "aph", "show tracer statuses", NULL,
 	 0, trace_status},
 	{"cat", NULL, "aph", "cat the output of tracers if any", NULL,
