@@ -194,7 +194,7 @@ static int trace_status(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int trace_cat(int argc, char **argv)
+static int graph_cat(int argc, char **argv)
 {
 	int fd = open(tracefile, O_RDONLY);
 	struct stat st;
@@ -231,6 +231,17 @@ static int trace_parser(int ch, char *opt)
 	return 0;
 }
 
+static struct subcommand graph_cmd[] = {
+	{"cat", NULL, NULL, "cat the output of graph tracer",
+	 NULL, 0, graph_cat},
+	{NULL,},
+};
+
+static int trace_graph(int argc, char **argv)
+{
+	return do_generic_subcommand(graph_cmd, argc, argv);
+}
+
 /* Subcommand list of trace */
 static struct subcommand trace_cmd[] = {
 	{"enable", "<tracer>", "aph", "enable tracer", NULL,
@@ -239,8 +250,8 @@ static struct subcommand trace_cmd[] = {
 	 CMD_NEED_ARG, trace_disable},
 	{"status", NULL, "aph", "show tracer statuses", NULL,
 	 0, trace_status},
-	{"cat", NULL, "aph", "cat the output of tracers if any", NULL,
-	 0, trace_cat},
+	{"graph", NULL, "aph", "cat the output of tracers if any", graph_cmd,
+	 CMD_NEED_ARG, trace_graph},
 	{NULL},
 };
 
