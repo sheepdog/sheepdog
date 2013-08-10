@@ -190,7 +190,7 @@ static int for_each_object_in_path(char *path,
 	char p[PATH_MAX];
 
 	dir = opendir(path);
-	if (!dir) {
+	if (unlikely(!dir)) {
 		sd_err("failed to open %s, %m", path);
 		return SD_RES_EIO;
 	}
@@ -198,7 +198,7 @@ static int for_each_object_in_path(char *path,
 	while ((d = readdir(dir))) {
 		uint32_t epoch = 0;
 
-		if (!strncmp(d->d_name, ".", 1))
+		if (unlikely(!strncmp(d->d_name, ".", 1)))
 			continue;
 
 		oid = strtoull(d->d_name, NULL, 16);
@@ -458,7 +458,7 @@ int md_handle_eio(char *fault_path)
 static inline bool md_access(char *path)
 {
 	if (access(path, R_OK | W_OK) < 0) {
-		if (errno != ENOENT)
+		if (unlikely(errno != ENOENT))
 			sd_err("failed to check %s, %m", path);
 		return false;
 	}

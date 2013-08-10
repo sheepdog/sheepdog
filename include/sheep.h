@@ -101,7 +101,7 @@ static inline int get_vnode_next_idx(const struct sd_vnode *entries,
 	idx = prev_idxs[nr_prev_idxs - 1];
 	for (;;) {
 		idx = (idx + 1) % nr_entries;
-		if (idx == first_idx)
+		if (unlikely(idx == first_idx))
 			panic("can't find next new idx");
 
 		for (found = false, i = 0; i < nr_prev_idxs; i++) {

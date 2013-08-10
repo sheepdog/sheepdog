@@ -105,8 +105,8 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	}
 
 	if (uatomic_is_true(&sys->use_journal) &&
-	    journal_write_store(oid, iocb->buf, iocb->length, iocb->offset,
-				false)
+	    unlikely(journal_write_store(oid, iocb->buf, iocb->length,
+					 iocb->offset, false))
 	    != SD_RES_SUCCESS) {
 		sd_err("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
@@ -117,11 +117,11 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	get_obj_path(oid, path);
 
 	fd = open(path, flags, sd_def_fmode);
-	if (fd < 0)
+	if (unlikely(fd < 0))
 		return err_to_sderr(path, oid, errno);
 
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
-	if (size != iocb->length) {
+	if (unlikely(size != iocb->length)) {
 		sd_err("failed to write object %"PRIx64", path=%s, offset=%"
 		       PRId64", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
@@ -241,7 +241,7 @@ static int default_read_from_path(uint64_t oid, char *path,
 		return err_to_sderr(path, oid, errno);
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
-	if (size != iocb->length) {
+	if (unlikely(size != iocb->length)) {
 		sd_err("failed to read object %"PRIx64", path=%s, offset=%"
 		       PRId64", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
@@ -420,7 +420,7 @@ static int move_object_to_stale_dir(uint64_t oid, char *wd, uint32_t epoch,
 	snprintf(stale_path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32, wd,
 		 oid, tgt_epoch);
 
-	if (rename(path, stale_path) < 0) {
+	if (unlikely(rename(path, stale_path)) < 0) {
 		sd_err("failed to move stale object %" PRIX64 " to %s, %m", oid,
 		       path);
 		return SD_RES_EIO;

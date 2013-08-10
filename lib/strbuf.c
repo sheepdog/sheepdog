@@ -52,7 +52,7 @@ void strbuf_attach(struct strbuf *sb, void *buf, size_t len, size_t alloc)
 
 void strbuf_grow(struct strbuf *sb, size_t extra)
 {
-	if (sb->len + extra + 1 <= sb->len)
+	if (unlikely(sb->len + extra + 1 <= sb->len))
 		panic("you want to use way too much memory");
 	ALLOC_GROW(sb->buf, sb->len + extra + 1, sb->alloc);
 }
@@ -67,7 +67,7 @@ void strbuf_rtrim(struct strbuf *sb)
 void strbuf_insert(struct strbuf *sb, size_t pos, const void *data, size_t len)
 {
 	strbuf_grow(sb, len);
-	if (pos > sb->len)
+	if (unlikely(pos > sb->len))
 		panic("`pos' is too far after the end of the buffer");
 	memmove(sb->buf + pos + len, sb->buf + pos, sb->len - pos);
 	memcpy(sb->buf + pos, data, len);
@@ -77,11 +77,11 @@ void strbuf_insert(struct strbuf *sb, size_t pos, const void *data, size_t len)
 void strbuf_splice(struct strbuf *sb, size_t pos, size_t len,
 		const void *data, size_t dlen)
 {
-	if (pos + len < pos)
+	if (unlikely(pos + len < pos))
 		panic("you want to use way too much memory");
-	if (pos > sb->len)
+	if (unlikely(pos > sb->len))
 		panic("`pos' is too far after the end of the buffer");
-	if (pos + len > sb->len)
+	if (unlikely(pos + len > sb->len))
 		panic("`pos + len' is too far after the end of the buffer");
 
 	if (dlen >= len)
@@ -120,7 +120,7 @@ void strbuf_addf(struct strbuf *sb, const char *fmt, ...)
 		va_start(ap, fmt);
 		len = vsnprintf(sb->buf + sb->len, sb->alloc - sb->len, fmt, ap);
 		va_end(ap);
-		if (len > strbuf_avail(sb))
+		if (unlikely(len > strbuf_avail(sb)))
 			panic("this should not happen, your snprintf is broken");
 	}
 	strbuf_setlen(sb, sb->len + len);

@@ -317,13 +317,13 @@ static void *commit_data(void *ignored)
 
 	/* Tell runtime to release resources after termination */
 	err = pthread_detach(pthread_self());
-	if (err)
+	if (unlikely(err))
 		panic("%s", strerror(err));
 
 	sync();
-	if (xftruncate(jfile.commit_fd, 0) < 0)
+	if (unlikely(xftruncate(jfile.commit_fd, 0) < 0))
 		panic("truncate %m");
-	if (prealloc(jfile.commit_fd, jfile_size) < 0)
+	if (unlikely(prealloc(jfile.commit_fd, jfile_size) < 0))
 		panic("prealloc");
 
 	uatomic_set_false(&jfile.in_commit);
@@ -338,7 +338,7 @@ static void switch_journal_file(void)
 	pthread_t thread;
 
 retry:
-	if (!uatomic_set_true(&jfile.in_commit)) {
+	if (unlikely(!uatomic_set_true(&jfile.in_commit))) {
 		sd_err("journal file in committing, "
 		       "you might need enlarge jfile size");
 		usleep(100000); /* Wait until committing is finished */
@@ -353,7 +353,7 @@ retry:
 	jfile.pos = 0;
 
 	err = pthread_create(&thread, NULL, commit_data, NULL);
-	if (err)
+	if (unlikely(err))
 		panic("%s", strerror(err));
 }
 
@@ -392,7 +392,7 @@ static int journal_file_write(struct journal_descriptor *jd, const char *buf)
 	 * Feel free to correct me If I am wrong.
 	 */
 	written = xpwrite(jfile.fd, wbuffer, wsize, woff);
-	if (written != wsize) {
+	if (unlikely(written != wsize)) {
 		sd_err("failed, written %zd, len %zd", written, wsize);
 		/* FIXME: teach journal file handle EIO gracefully */
 		ret = SD_RES_EIO;

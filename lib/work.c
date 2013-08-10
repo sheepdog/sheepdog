@@ -166,7 +166,7 @@ void suspend_worker_threads(void)
 	}
 
 	FOR_EACH_BIT(tid, tid_map, tid_max) {
-		if (tkill(tid, SIGUSR2) < 0)
+		if (unlikely(tkill(tid, SIGUSR2) < 0))
 			panic("%m");
 	}
 

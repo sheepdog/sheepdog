@@ -46,9 +46,9 @@ try_to_free_t set_try_to_free_routine(try_to_free_t routine)
 void *xmalloc(size_t size)
 {
 	void *ret = malloc(size);
-	if (!ret && !size)
+	if (unlikely(!ret) && unlikely(!size))
 		ret = malloc(1);
-	if (!ret) {
+	if (unlikely(!ret)) {
 		try_to_free_routine(size);
 		ret = malloc(size);
 		if (!ret && !size)
@@ -67,9 +67,9 @@ void *xzalloc(size_t size)
 void *xrealloc(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
-	if (!ret && !size)
+	if (unlikely(!ret) && unlikely(!size))
 		ret = realloc(ptr, 1);
-	if (!ret) {
+	if (unlikely(!ret)) {
 		try_to_free_routine(size);
 		ret = realloc(ptr, size);
 		if (!ret && !size)
@@ -83,9 +83,9 @@ void *xrealloc(void *ptr, size_t size)
 void *xcalloc(size_t nmemb, size_t size)
 {
 	void *ret = calloc(nmemb, size);
-	if (!ret && (!nmemb || !size))
+	if (unlikely(!ret) && unlikely(!nmemb || !size))
 		ret = calloc(1, 1);
-	if (!ret) {
+	if (unlikely(!ret)) {
 		try_to_free_routine(nmemb * size);
 		ret = calloc(nmemb, size);
 		if (!ret && (!nmemb || !size))
@@ -99,7 +99,7 @@ void *xcalloc(size_t nmemb, size_t size)
 void *xvalloc(size_t size)
 {
 	void *ret = valloc(size);
-	if (!ret)
+	if (unlikely(!ret))
 		panic("Out of memory");
 	return ret;
 }
@@ -109,7 +109,7 @@ static ssize_t _read(int fd, void *buf, size_t len)
 	ssize_t nr;
 	while (true) {
 		nr = read(fd, buf, len);
-		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+		if (unlikely(nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
 		return nr;
 	}
@@ -120,7 +120,7 @@ static ssize_t _write(int fd, const void *buf, size_t len)
 	ssize_t nr;
 	while (true) {
 		nr = write(fd, buf, len);
-		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+		if (unlikely(nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
 		return nr;
 	}
@@ -133,9 +133,9 @@ ssize_t xread(int fd, void *buf, size_t count)
 
 	while (count > 0) {
 		ssize_t loaded = _read(fd, p, count);
-		if (loaded < 0)
+		if (unlikely(loaded < 0))
 			return -1;
-		if (loaded == 0)
+		if (unlikely(loaded == 0))
 			return total;
 		count -= loaded;
 		p += loaded;
@@ -152,9 +152,9 @@ ssize_t xwrite(int fd, const void *buf, size_t count)
 
 	while (count > 0) {
 		ssize_t written = _write(fd, p, count);
-		if (written < 0)
+		if (unlikely(written < 0))
 			return -1;
-		if (!written) {
+		if (unlikely(!written)) {
 			errno = ENOSPC;
 			return -1;
 		}
@@ -171,7 +171,7 @@ static ssize_t _pread(int fd, void *buf, size_t len, off_t offset)
 	ssize_t nr;
 	while (true) {
 		nr = pread(fd, buf, len, offset);
-		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+		if (unlikely(nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
 		return nr;
 	}
@@ -182,7 +182,7 @@ static ssize_t _pwrite(int fd, const void *buf, size_t len, off_t offset)
 	ssize_t nr;
 	while (true) {
 		nr = pwrite(fd, buf, len, offset);
-		if ((nr < 0) && (errno == EAGAIN || errno == EINTR))
+		if (unlikely(nr < 0) && (errno == EAGAIN || errno == EINTR))
 			continue;
 		return nr;
 	}
@@ -195,9 +195,9 @@ ssize_t xpread(int fd, void *buf, size_t count, off_t offset)
 
 	while (count > 0) {
 		ssize_t loaded = _pread(fd, p, count, offset);
-		if (loaded < 0)
+		if (unlikely(loaded < 0))
 			return -1;
-		if (loaded == 0)
+		if (unlikely(loaded == 0))
 			return total;
 		count -= loaded;
 		p += loaded;
@@ -215,9 +215,9 @@ ssize_t xpwrite(int fd, const void *buf, size_t count, off_t offset)
 
 	while (count > 0) {
 		ssize_t written = _pwrite(fd, p, count, offset);
-		if (written < 0)
+		if (unlikely(written < 0))
 			return -1;
-		if (!written) {
+		if (unlikely(!written)) {
 			errno = ENOSPC;
 			return -1;
 		}
@@ -256,7 +256,7 @@ int xfallocate(int fd, int mode, off_t offset, off_t len)
 
 	do {
 		ret = fallocate(fd, mode, offset, len);
-	} while (ret < 0 && (errno == EAGAIN || errno == EINTR));
+	} while (unlikely(ret < 0) && (errno == EAGAIN || errno == EINTR));
 
 	return ret;
 }
@@ -267,7 +267,7 @@ int xftruncate(int fd, off_t length)
 
 	do {
 		ret = ftruncate(fd, length);
-	} while (ret < 0 && (errno == EAGAIN || errno == EINTR));
+	} while (unlikely(ret < 0) && (errno == EAGAIN || errno == EINTR));
 
 	return ret;
 }
@@ -284,11 +284,11 @@ int eventfd_xread(int efd)
 
 	do {
 		ret = eventfd_read(efd, &value);
-	} while (ret < 0 && errno == EINTR);
+	} while (unlikely(ret < 0) && errno == EINTR);
 
 	if (ret == 0)
 		ret = value;
-	else if (errno != EAGAIN)
+	else if (unlikely(errno != EAGAIN))
 		panic("eventfd_read() failed, %m");
 
 	return ret;
@@ -300,9 +300,9 @@ void eventfd_xwrite(int efd, int value)
 
 	do {
 		ret = eventfd_write(efd, (eventfd_t)value);
-	} while (ret < 0 && (errno == EINTR || errno == EAGAIN));
+	} while (unlikely(ret < 0) && (errno == EINTR || errno == EAGAIN));
 
-	if (ret < 0)
+	if (unlikely(ret < 0))
 		panic("eventfd_write() failed, %m");
 }
 
@@ -581,14 +581,14 @@ again:
 	}
 
 	ret = xwrite(fd, buf, len);
-	if (ret != len) {
+	if (unlikely(ret != len)) {
 		sd_err("failed to write %s, %m", path);
 		ret = -1;
 		goto close_fd;
 	}
 
 	ret = rename(tmp_path, path);
-	if (ret < 0) {
+	if (unlikely(ret < 0)) {
 		sd_err("failed to rename %s, %m", path);
 		ret = -1;
 	}

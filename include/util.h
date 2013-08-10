@@ -275,7 +275,7 @@ static inline void sd_init_lock(struct sd_lock *lock)
 		ret = pthread_rwlock_init(&lock->rwlock, NULL);
 	} while (ret == EAGAIN);
 
-	if (ret != 0)
+	if (unlikely(ret != 0))
 		panic("failed to initialize a lock, %s", strerror(ret));
 }
 
@@ -283,7 +283,7 @@ static inline void sd_destroy_lock(struct sd_lock *lock)
 {
 	int ret = pthread_rwlock_destroy(&lock->rwlock);
 
-	if (ret != 0)
+	if (unlikely(ret != 0))
 		panic("failed to destroy a lock, %s", strerror(ret));
 }
 
@@ -295,7 +295,7 @@ static inline void sd_read_lock(struct sd_lock *lock)
 		ret = pthread_rwlock_rdlock(&lock->rwlock);
 	} while (ret == EAGAIN);
 
-	if (ret != 0)
+	if (unlikely(ret != 0))
 		panic("failed to lock for reading, %s", strerror(ret));
 }
 
@@ -303,7 +303,7 @@ static inline void sd_write_lock(struct sd_lock *lock)
 {
 	int ret = pthread_rwlock_wrlock(&lock->rwlock);
 
-	if (ret != 0)
+	if (unlikely(ret != 0))
 		panic("failed to lock for writing, %s", strerror(ret));
 }
 
@@ -311,7 +311,7 @@ static inline void sd_unlock(struct sd_lock *lock)
 {
 	int ret = pthread_rwlock_unlock(&lock->rwlock);
 
-	if (ret != 0)
+	if (unlikely(ret != 0))
 		panic("failed to unlock, %s", strerror(ret));
 }
 

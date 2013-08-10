@@ -438,7 +438,7 @@ char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port)
 		}
 	}
 	ret = inet_ntop(af, addr + addr_start_idx, str, size);
-	if (ret == NULL)
+	if (unlikely(ret == NULL))
 		panic("failed to convert addr to string, %m");
 
 	if (port) {

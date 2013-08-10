@@ -322,7 +322,7 @@ static int remove_cache_object(struct object_cache *oc, uint32_t idx)
 	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%08"PRIx32,
 		 object_cache_dir, oc->vid, idx);
 	sd_debug("%"PRIx64, idx_to_oid(oc->vid, idx));
-	if (unlink(path) < 0) {
+	if (unlikely(unlink(path) < 0)) {
 		sd_err("failed to remove cached object %m");
 		if (errno == ENOENT)
 			return SD_RES_SUCCESS;
@@ -349,7 +349,7 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	}
 
 	fd = open(p, flags, sd_def_fmode);
-	if (fd < 0) {
+	if (unlikely(fd < 0)) {
 		sd_err("%m");
 		ret = SD_RES_EIO;
 		goto out;
@@ -357,7 +357,7 @@ static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 
 	size = xpread(fd, buf, count, offset);
 
-	if (size != count) {
+	if (unlikely(size != count)) {
 		sd_err("size %zu, count:%zu, offset %jd %m", size, count,
 		       (intmax_t)offset);
 		ret = SD_RES_EIO;
@@ -385,7 +385,7 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 	}
 
 	fd = open(p, flags, sd_def_fmode);
-	if (fd < 0) {
+	if (unlikely(fd < 0)) {
 		sd_err("%m");
 		ret = SD_RES_EIO;
 		goto out;
@@ -393,7 +393,7 @@ static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
 
 	size = xpwrite(fd, buf, count, offset);
 
-	if (size != count) {
+	if (unlikely(size != count)) {
 		sd_err("size %zu, count:%zu, offset %jd %m", size, count,
 		       (intmax_t)offset);
 		ret = SD_RES_EIO;
@@ -711,7 +711,7 @@ static void add_to_lru_cache(struct object_cache *oc, uint32_t idx, bool create)
 	sd_debug("oid %"PRIx64" added", idx_to_oid(oc->vid, idx));
 
 	write_lock_cache(oc);
-	if (lru_tree_insert(&oc->lru_tree, entry))
+	if (unlikely(lru_tree_insert(&oc->lru_tree, entry)))
 		panic("the object already exist");
 	uatomic_add(&gcache.capacity, CACHE_OBJECT_SIZE);
 	list_add_tail(&entry->lru_list, &oc->lru_head);
@@ -730,7 +730,7 @@ static inline int lookup_path(char *path)
 	int ret = SD_RES_SUCCESS;
 
 	if (access(path, R_OK | W_OK) < 0) {
-		if (errno != ENOENT) {
+		if (unlikely(errno != ENOENT)) {
 			sd_debug("%m");
 			ret = SD_RES_EIO;
 		} else {
@@ -753,13 +753,13 @@ static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
 
 	flags |= O_CREAT | O_TRUNC;
 	fd = open(path, flags, sd_def_fmode);
-	if (fd < 0) {
+	if (unlikely(fd < 0)) {
 		sd_debug("%s, %m", path);
 		ret = SD_RES_EIO;
 		goto out;
 	}
 	ret = prealloc(fd, get_objsize(idx_to_oid(oc->vid, idx)));
-	if (ret < 0) {
+	if (unlikely(ret < 0)) {
 		ret = SD_RES_EIO;
 		goto out_close;
 	}
@@ -783,7 +783,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		object_cache_dir, oc->vid, idx);
 	fd = open(tmp_path, flags, sd_def_fmode);
 	if (fd < 0) {
-		if (errno == EEXIST) {
+		if (likely(errno == EEXIST)) {
 			sd_debug("%08"PRIx32" already created", idx);
 			goto out;
 		}
@@ -795,7 +795,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 	/* We need to extend it if the buffer is trimmed */
 	if (offset != 0 || buf_size != obj_size) {
 		ret = prealloc(fd, obj_size);
-		if (ret < 0) {
+		if (unlikely(ret < 0)) {
 			ret = SD_RES_EIO;
 			sd_err("%m");
 			goto out_close;
@@ -803,7 +803,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 	}
 
 	ret = xpwrite(fd, buffer, buf_size, offset);
-	if (ret != buf_size) {
+	if (unlikely(ret != buf_size)) {
 		ret = SD_RES_EIO;
 		sd_err("failed, vid %"PRIx32", idx %"PRIx32, oc->vid, idx);
 		goto out_close;
@@ -812,7 +812,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%08"PRIx32,
 		 object_cache_dir, oc->vid, idx);
 	ret = link(tmp_path, path);
-	if (ret < 0) {
+	if (unlikely(ret < 0)) {
 		if (errno == EEXIST) {
 			ret = SD_RES_OID_EXIST;
 			goto out_close;
@@ -895,9 +895,9 @@ static void do_push_object(struct work *work)
 	if (oid_is_readonly(idx_to_oid(oc->vid, entry_idx(entry))))
 		goto clean;
 
-	if (push_cache_object(oc->vid, entry_idx(entry), entry->bmap,
-			      !!(entry->idx & CACHE_CREATE_BIT))
-	    != SD_RES_SUCCESS)
+	if (unlikely(push_cache_object(oc->vid, entry_idx(entry), entry->bmap,
+				       !!(entry->idx & CACHE_CREATE_BIT))
+		     != SD_RES_SUCCESS))
 		panic("push failed but should never fail");
 clean:
 	if (uatomic_sub_return(&oc->push_count, 1) == 0)
