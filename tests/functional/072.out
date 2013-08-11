@@ -1,0 +1,9 @@
+QA output created by 072
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0  8.0 MB  8.0 MB  0.0 MB DATE   7c2b25     1              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0  8.0 MB  8.0 MB  0.0 MB DATE   7c2b25     1              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0  8.0 MB  8.0 MB  0.0 MB DATE   7c2b25     1              
+finish check&repair test
