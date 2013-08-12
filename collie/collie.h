@@ -59,7 +59,6 @@ extern uint32_t sd_epoch;
 extern struct sd_node sd_nodes[SD_MAX_NODES];
 extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 extern int sd_nodes_nr, sd_vnodes_nr;
-extern unsigned master_idx;
 
 bool is_current(const struct sd_inode *i);
 char *size_to_str(uint64_t _size, char *str, int str_size);

@@ -180,7 +180,7 @@ struct sd_rsp {
 			uint32_t	__pad;
 			uint32_t	nr_nodes;
 			uint32_t	local_idx;
-			uint32_t	master_idx;
+			uint32_t	__reserved;
 			uint64_t	store_size;
 			uint64_t	store_free;
 		} node;

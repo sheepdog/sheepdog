@@ -1,7 +1,7 @@
 QA output created by 012
 check the number of vnodes
-M   Id   Host:Port         V-Nodes       Zone
--    0   127.0.0.1:7000      	64          0
--    1   127.0.0.1:7001      	64          1
--    2   127.0.0.1:7002      	64          2
--    3   127.0.0.1:7004      	 0          4
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	64          0
+   1   127.0.0.1:7001      	64          1
+   2   127.0.0.1:7002      	64          2
+   3   127.0.0.1:7004      	 0          4

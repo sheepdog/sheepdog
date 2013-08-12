@@ -31,25 +31,15 @@ static int node_list(int argc, char **argv)
 	int i;
 
 	if (!raw_output)
-		printf("M   Id   Host:Port         V-Nodes       Zone\n");
+		printf("  Id   Host:Port         V-Nodes       Zone\n");
 	for (i = 0; i < sd_nodes_nr; i++) {
 		char data[128];
 
 		addr_to_str(data, sizeof(data), sd_nodes[i].nid.addr,
 			    sd_nodes[i].nid.port);
 
-		if (i == master_idx) {
-			if (highlight)
-				printf(TEXT_BOLD);
-			printf(raw_output ? "* %d %s %d %d\n" : "* %4d   %-20s\t%2d%11d\n",
-			       i, data, sd_nodes[i].nr_vnodes,
-			       sd_nodes[i].zone);
-			if (highlight)
-				printf(TEXT_NORMAL);
-		} else
-			printf(raw_output ? "- %d %s %d %d\n" : "- %4d   %-20s\t%2d%11d\n",
-			       i, data, sd_nodes[i].nr_vnodes,
-			       sd_nodes[i].zone);
+		printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s\t%2d%11d\n",
+		       i, data, sd_nodes[i].nr_vnodes, sd_nodes[i].zone);
 	}
 
 	return EXIT_SUCCESS;

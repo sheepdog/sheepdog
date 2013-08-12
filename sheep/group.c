@@ -161,7 +161,6 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		rsp->node.local_idx = 0;
 	}
 
-	rsp->node.master_idx = -1;
 	return SD_RES_SUCCESS;
 }
 
