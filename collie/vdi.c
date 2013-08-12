@@ -2092,7 +2092,7 @@ static struct subcommand vdi_cmd[] = {
 	{"restore", "<vdiname> <backup>", "saph", "restore snapshot images from a backup",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_restore, vdi_options},
-	{"cache", "<vdiname>", "saph", "Run 'collie vdi cache' for more information\n",
+	{"cache", "<vdiname>", "saph", "Run 'collie vdi cache' for more information",
 	 vdi_cache_cmd, CMD_NEED_ARG,
 	 vdi_cache, vdi_options},
 	{NULL,},
