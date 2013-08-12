@@ -251,4 +251,7 @@ static inline void hlist_add_after(struct hlist_node *n,
 		     ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
 	     pos = n)
 
+void list_sort(void *priv, struct list_head *head,
+	       int (*cmp)(void *priv, struct list_head *a,
+			  struct list_head *b));
 #endif	/* __LIST_H__ */
