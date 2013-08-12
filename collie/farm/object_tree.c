@@ -98,7 +98,7 @@ void object_tree_free(void)
 	free(cached_entry);
 }
 
-int object_tree_size()
+int object_tree_size(void)
 {
 	return tree.nr_objs;
 }
