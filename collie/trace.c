@@ -26,7 +26,7 @@
 
 static inline void print_thread_name(struct trace_graph_item *item)
 {
-	printf("%-20s|", item->tname);
+	printf("%-*s|", TRACE_THREAD_LEN, item->tname);
 }
 
 static inline void print_time(struct trace_graph_item *item)
