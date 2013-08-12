@@ -1204,7 +1204,6 @@ static int vdi_read(int argc, char **argv)
 		ret = xwrite(STDOUT_FILENO, buf, len);
 		if (ret < 0) {
 			sd_err("Failed to write to stdout: %m");
-			abort();
 			ret = EXIT_SYSFAIL;
 			goto out;
 		}
