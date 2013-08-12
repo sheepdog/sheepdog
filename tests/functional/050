@@ -2,20 +2,9 @@
 
 # Test IO NIC function
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
+. ./common
 
 trap "_uninit; exit \$status" 0 1 2 3 15
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-_need_to_be_root
 
 _uninit()
 {
@@ -23,7 +12,7 @@ _uninit()
 	iptables -D INPUT -p tcp --dport 8001 -j DROP
 }
 
-_cleanup
+_need_to_be_root
 
 for i in `seq 0 2`; do
 	_start_sheep $i "-i host=127.0.0.1,port=$((8000+$i))"

@@ -1,20 +1,9 @@
 #!/bin/bash
 
 # Test reweight
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
+. ./common
 
 _need_to_be_root
-
-_cleanup
 
 _make_device 0 $((100 * 1024 ** 2))
 _make_device 1 $((100 * 1024 ** 2))

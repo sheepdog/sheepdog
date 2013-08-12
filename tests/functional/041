@@ -2,18 +2,7 @@
 
 # Test vdi backup and restore
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-_cleanup
+. ./common
 
 for i in `seq 0 4`; do
     _start_sheep $i

@@ -1,20 +1,10 @@
 #!/bin/bash
 
 # Test md with single failure, multiple failure and all failure
-seq=`basename $0`
-echo "QA output created by $seq"
 
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
+. ./common
 
 MD=true
-
-_cleanup
 
 for i in 0 1 2; do
 	_start_sheep $i

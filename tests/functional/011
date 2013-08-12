@@ -2,20 +2,9 @@
 
 # Test sheep booting on existing images mounted as loop device
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
+. ./common
 
 _need_to_be_root
-
-_cleanup
 
 _make_device 0 $((2 * 1024 ** 3))
 _make_device 1 $((4 * 1024 ** 3))

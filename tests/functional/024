@@ -2,18 +2,7 @@
 
 # Make sure data written to the cluster can be read from a newly joined node
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-_cleanup
+. ./common
 
 if [[ "$DRIVER" == zoo* ]];then
 	DRIVER=${DRIVER/1000/5000}

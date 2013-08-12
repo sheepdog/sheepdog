@@ -2,21 +2,9 @@
 
 # Test sockfd connection
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
+. ./common
 
 trap "_uninit; exit \$status" 0 1 2 3 15
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-_need_to_be_root
-
 _uninit()
 {
 	for i in `seq 1 7`; do
@@ -24,7 +12,7 @@ _uninit()
 	done
 }
 
-_cleanup
+_need_to_be_root
 
 for i in `seq 0 5`; do
 	_start_sheep $i

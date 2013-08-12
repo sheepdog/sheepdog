@@ -1,24 +1,14 @@
 #!/bin/bash
 
 # Test md hot-plug and hot-unplug
-seq=`basename $0`
-echo "QA output created by $seq"
 
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
+. ./common
 
 MD=true
 
 if [ "$STORE" != "/tmp/sheepdog/057" ]; then
-    _notrun "This test cannot be run when WD is manually set"
+	_notrun "This test cannot be run when WD is manually set"
 fi
-
-_cleanup
 
 for i in 0 1 2; do
 	_start_sheep $i

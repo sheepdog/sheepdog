@@ -2,18 +2,7 @@
 
 # Test data integrity after joining a new node
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-_cleanup
+. ./common
 
 # start three sheep daemons
 for i in 0 1 2; do

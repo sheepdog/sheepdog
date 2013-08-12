@@ -2,18 +2,7 @@
 
 # Test adding nodes to the gateway only cluster
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-_cleanup
+. ./common
 
 _start_sheep 0 -g
 _start_sheep 1 -g

@@ -2,22 +2,7 @@
 
 # Test vdi snapshot functionality concurrently with object cache enabled
 
-seq=`basename $0`
-echo "QA output created by $seq"
-
-here=`pwd`
-tmp=/tmp/$$
-status=1        # failure is the default!
-
-# get standard environment, filters and checks
-. ./common.rc
-. ./common.filter
-
-if [[ "$DRIVER" == zoo* ]];then
-    DRIVER=${DRIVER/1000/5000}
-fi
-
-_cleanup
+. ./common
 
 for i in 0 1 2; do
     _start_sheep $i "-w size=1000"
