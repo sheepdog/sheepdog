@@ -49,7 +49,7 @@ static const char * const log_color[] = {
 	[SDOG_DEBUG] = TEXT_GREEN,
 };
 
-struct logger_user_info *logger_user_info;
+static struct logger_user_info *logger_user_info;
 
 static void dolog(int prio, const char *func, int line, const char *fmt,
 		  va_list ap) __printf(4, 0);

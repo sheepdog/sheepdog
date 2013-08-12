@@ -37,7 +37,7 @@ struct snapshot_work {
 	struct strbuf *trunk_buf;
 	struct work work;
 };
-struct work_queue *wq;
+static struct work_queue *wq;
 static uatomic_bool work_error;
 
 static struct vdi_entry *find_vdi(const char *name)

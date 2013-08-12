@@ -71,7 +71,7 @@ struct recovery_info {
 	struct vnode_info *cur_vinfo;
 };
 
-struct recovery_info *next_rinfo;
+static struct recovery_info *next_rinfo;
 static main_thread(struct recovery_info *) current_rinfo;
 
 static void queue_recovery_work(struct recovery_info *rinfo);
