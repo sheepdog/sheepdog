@@ -315,9 +315,9 @@ static inline int nodes_to_vnodes(struct sd_node *nodes, int nr,
 
 #define MAX_NODE_STR_LEN 256
 
-static inline char *node_to_str(const struct sd_node *id)
+static inline const char *node_to_str(const struct sd_node *id)
 {
-	static char str[MAX_NODE_STR_LEN];
+	static __thread char str[MAX_NODE_STR_LEN];
 	int af = AF_INET6;
 	const uint8_t *addr = id->nid.addr;
 

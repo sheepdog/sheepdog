@@ -40,11 +40,11 @@ struct local_node {
 	bool gateway;
 };
 
-static char *lnode_to_str(struct local_node *lnode)
+static const char *lnode_to_str(struct local_node *lnode)
 {
-	char *s = node_to_str(&lnode->node);
+	static __thread char s[MAX_NODE_STR_LEN + 32];
 
-	snprintf(s + strlen(s), MAX_NODE_STR_LEN - strlen(s), " pid:%d",
+	snprintf(s, sizeof(s), "%s pid:%d", node_to_str(&lnode->node),
 		 lnode->pid);
 
 	return s;
