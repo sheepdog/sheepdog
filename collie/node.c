@@ -38,7 +38,7 @@ static int node_list(int argc, char **argv)
 		addr_to_str(data, sizeof(data), sd_nodes[i].nid.addr,
 			    sd_nodes[i].nid.port);
 
-		printf(raw_output ? "%d %s %d %d\n" : "%4d   %-20s\t%2d%11d\n",
+		printf(raw_output ? "%d %s %d %u\n" : "%4d   %-20s\t%2d%11u\n",
 		       i, data, sd_nodes[i].nr_vnodes, sd_nodes[i].zone);
 	}
 
