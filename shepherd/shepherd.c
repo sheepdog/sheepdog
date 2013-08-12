@@ -725,10 +725,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	/*
-	 * early_log_init() must be called before any calling of
-	 * sd_printf() series
-	 */
 	shepherd_info.port = port;
 	early_log_init(log_format, &shepherd_info);
 
