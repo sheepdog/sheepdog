@@ -22,7 +22,8 @@
 #define EPOLL_SIZE 4096
 
 static const char program_name[] = "collie";
-const char *sdhost = "127.0.0.1";
+/* default sdhost is "127.0.0.1" */
+uint8_t sdhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 };
 int sdport = SD_LISTEN_PORT;
 bool highlight = true;
 bool raw_output;
@@ -365,7 +366,10 @@ int main(int argc, char **argv)
 
 		switch (ch) {
 		case 'a':
-			sdhost = optarg;
+			if (!str_to_addr(optarg, sdhost)) {
+				sd_err("Invalid ip address %s", optarg);
+				return EXIT_FAILURE;
+			}
 			break;
 		case 'p':
 			sdport = strtol(optarg, &p, 10);

@@ -15,7 +15,7 @@
 #include "mock.h"
 
 /* collie mock */
-const char *sdhost = "127.0.0.1";
+uint8_t sdhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 };
 int sdport = 7000, sd_vnodes_nr = 100;
 bool highlight = true;
 bool raw_output;

@@ -56,18 +56,16 @@ static int node_info(int argc, char **argv)
 		printf("Id\tSize\tUsed\tAvail\tUse%%\n");
 
 	for (i = 0; i < sd_nodes_nr; i++) {
-		char host[128];
 		struct sd_req req;
 		struct sd_rsp *rsp = (struct sd_rsp *)&req;
 		char store_str[UINT64_DECIMAL_SIZE],
 		     used_str[UINT64_DECIMAL_SIZE],
 		     free_str[UINT64_DECIMAL_SIZE];
 
-		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
-
 		sd_init_req(&req, SD_OP_STAT_SHEEP);
 
-		ret = send_light_req(&req, host, sd_nodes[i].nid.port);
+		ret = send_light_req(&req, sd_nodes[i].nid.addr,
+				     sd_nodes[i].nid.port);
 
 		size_to_str(rsp->node.store_size, store_str, sizeof(store_str));
 		size_to_str(rsp->node.store_free, free_str, sizeof(free_str));
@@ -206,12 +204,12 @@ static int node_recovery(int argc, char **argv)
 		struct recovery_state state;
 
 		memset(&state, 0, sizeof(state));
-		addr_to_str(host, sizeof(host), sd_nodes[i].nid.addr, 0);
 
 		sd_init_req(&req, SD_OP_STAT_RECOVERY);
 		req.data_length = sizeof(state);
 
-		ret = collie_exec_req(host, sd_nodes[i].nid.port, &req, &state);
+		ret = collie_exec_req(sd_nodes[i].nid.addr,
+				      sd_nodes[i].nid.port, &req, &state);
 		if (ret < 0)
 			return EXIT_SYSFAIL;
 
@@ -236,7 +234,6 @@ static int node_recovery(int argc, char **argv)
 
 static int node_kill(int argc, char **argv)
 {
-	char host[128];
 	int node_id, ret;
 	struct sd_req req;
 	const char *p = argv[optind++];
@@ -253,11 +250,10 @@ static int node_kill(int argc, char **argv)
 		exit(EXIT_USAGE);
 	}
 
-	addr_to_str(host, sizeof(host), sd_nodes[node_id].nid.addr, 0);
-
 	sd_init_req(&req, SD_OP_KILL_NODE);
 
-	ret = send_light_req(&req, host, sd_nodes[node_id].nid.port);
+	ret = send_light_req(&req, sd_nodes[node_id].nid.addr,
+			     sd_nodes[node_id].nid.port);
 	if (ret) {
 		sd_err("Failed to execute request");
 		exit(EXIT_FAILURE);
@@ -274,13 +270,11 @@ static int node_md_info(struct node_id *nid)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, i;
-	char host[HOST_NAME_MAX];
 
 	sd_init_req(&hdr, SD_OP_MD_INFO);
 	hdr.data_length = sizeof(info);
 
-	addr_to_str(host, sizeof(host), nid->addr, 0);
-	ret = collie_exec_req(host, nid->port, &hdr, &info);
+	ret = collie_exec_req(nid->addr, nid->port, &hdr, &info);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -313,10 +307,7 @@ static int md_info(int argc, char **argv)
 	if (!node_cmd_data.all_nodes) {
 		struct node_id nid = {.port = sdport};
 
-		if (!str_to_addr(sdhost, nid.addr)) {
-			sd_err("Invalid address %s", sdhost);
-			return EXIT_FAILURE;
-		}
+		memcpy(nid.addr, sdhost, sizeof(nid.addr));
 
 		return node_md_info(&nid);
 	}

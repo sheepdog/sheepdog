@@ -49,7 +49,7 @@ struct subcommand {
 };
 void subcommand_usage(char *cmd, char *subcmd, int status);
 
-extern const char *sdhost;
+extern uint8_t sdhost[16];
 extern int sdport;
 extern bool highlight;
 extern bool raw_output;
@@ -72,8 +72,9 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    unsigned int datalen, uint64_t offset, uint32_t flags,
 		    int copies, bool create, bool direct);
-int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data);
-int send_light_req(struct sd_req *hdr, const char *host, int port);
+int collie_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
+		    void *data);
+int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
 int update_node_list(int max_nodes);
 void confirm(const char *message);

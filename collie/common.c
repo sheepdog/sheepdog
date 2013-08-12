@@ -167,14 +167,14 @@ out:
 	return ret;
 }
 
-int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *buf)
+int collie_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
+		    void *buf)
 {
-	struct node_id nid;
+	struct node_id nid = {};
 	struct sockfd *sfd;
 	int ret;
 
-	memset(&nid, 0, sizeof(nid));
-	str_to_addr(host, nid.addr);
+	memcpy(nid.addr, addr, sizeof(nid.addr));
 	nid.port = port;
 
 	sfd = sockfd_cache_get(&nid);
@@ -194,9 +194,9 @@ int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *buf)
 }
 
 /* Light request only contains header, without body content. */
-int send_light_req(struct sd_req *hdr, const char *host, int port)
+int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port)
 {
-	int ret = collie_exec_req(host, port, hdr, NULL);
+	int ret = collie_exec_req(addr, port, hdr, NULL);
 
 	if (ret == -1)
 		return -1;

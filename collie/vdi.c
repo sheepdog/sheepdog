@@ -316,16 +316,16 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 		hdr.obj.oid = oid;
 
-		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr, 0);
-		ret = collie_exec_req(name, sd_nodes[i].nid.port, &hdr, buf);
+		ret = collie_exec_req(sd_nodes[i].nid.addr,
+				      sd_nodes[i].nid.port, &hdr, buf);
 		if (ret < 0)
 			continue;
 
-		snprintf(name + strlen(name), sizeof(name) - strlen(name),
-			 ":%d", sd_nodes[i].nid.port);
-
 		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
 				   size);
+
+		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr,
+			    sd_nodes[i].nid.port);
 		cb_ret = func(name, oid, rsp, buf, data);
 		if (cb_ret)
 			break;
@@ -1326,7 +1326,6 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
-	char name[128];
 	void *buf;
 	size_t size = get_objsize(oid);
 
@@ -1339,8 +1338,7 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 
 	hdr.obj.oid = oid;
 
-	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
-	ret = collie_exec_req(name, vnode->nid.port, &hdr, buf);
+	ret = collie_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
 
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1367,7 +1365,6 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
-	char name[128];
 
 	if (create)
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_PEER);
@@ -1378,8 +1375,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	hdr.data_length = get_objsize(oid);
 	hdr.obj.oid = oid;
 
-	addr_to_str(name, sizeof(name), vnode->nid.addr, 0);
-	ret = collie_exec_req(name, vnode->nid.port, &hdr, buf);
+	ret = collie_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
 
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1461,8 +1457,8 @@ static void vdi_hash_check_work(struct work *work)
 	hdr.obj.oid = info->oid;
 	hdr.obj.tgt_epoch = sd_epoch;
 
-	addr_to_str(host, sizeof(host), vcw->vnode->nid.addr, 0);
-	ret = collie_exec_req(host, vcw->vnode->nid.port, &hdr, NULL);
+	ret = collie_exec_req(vcw->vnode->nid.addr, vcw->vnode->nid.port, &hdr,
+			      NULL);
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
 
@@ -1476,8 +1472,9 @@ static void vdi_hash_check_work(struct work *work)
 		vcw->object_found = false;
 		break;
 	default:
-		sd_err("failed to read %" PRIx64 " from %s:%d, %s", info->oid,
-		       host, vcw->vnode->nid.port, sd_strerror(ret));
+		sd_err("failed to read %" PRIx64 " from %s, %s", info->oid,
+		       addr_to_str(host, sizeof(host), vcw->vnode->nid.addr,
+				   vcw->vnode->nid.port), sd_strerror(ret));
 		exit(EXIT_FAILURE);
 	}
 }
