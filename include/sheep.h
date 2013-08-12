@@ -47,8 +47,8 @@ struct trace_graph_item {
 	int type;
 	char fname[TRACE_FNAME_LEN];
 	int depth;
-	unsigned long long entry_time;
-	unsigned long long return_time;
+	uint64_t entry_time;
+	uint64_t return_time;
 };
 
 static inline void sd_init_req(struct sd_req *req, uint8_t opcode)

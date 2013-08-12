@@ -21,6 +21,8 @@
 #include <sys/mman.h>
 
 #include "collie.h"
+#include "rbtree.h"
+#include "list.h"
 
 static inline void print_thread_name(struct trace_graph_item *item)
 {
@@ -58,10 +60,10 @@ static void print_trace_item(struct trace_graph_item *item)
 	print_finale(item);
 }
 
-static void parse_trace_buffer(char *buf, int size)
+static void cat_trace_file(void *buf, size_t size)
 {
 	struct trace_graph_item *item = (struct trace_graph_item *)buf;
-	int sz = size / sizeof(struct trace_graph_item), i;
+	size_t sz = size / sizeof(struct trace_graph_item), i;
 
 	printf("   Thread Name      |  Time(us)  |  Function Graph\n");
 	printf("--------------------------------------------------\n");
@@ -194,35 +196,156 @@ static int trace_status(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int graph_cat(int argc, char **argv)
+static void *map_trace_file(struct stat *st)
 {
 	int fd = open(tracefile, O_RDONLY);
-	struct stat st;
 	void *map;
 
 	if (fd < 0) {
 		sd_err("%m");
-		return EXIT_SYSFAIL;
+		return NULL;
 	}
 
-	if (fstat(fd, &st) < 0) {
+	if (fstat(fd, st) < 0) {
 		sd_err("%m");
 		close(fd);
-		return EXIT_SYSFAIL;
+		return NULL;
 	}
 
-	if (st.st_size == 0)
-		return EXIT_SUCCESS;
+	if (st->st_size == 0) {
+		sd_err("trace file is empty");
+		return NULL;
+	}
 
-	map = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	map = mmap(NULL, st->st_size, PROT_READ, MAP_PRIVATE, fd, 0);
 	close(fd);
 	if (map == MAP_FAILED) {
 		sd_err("%m");
-		return EXIT_SYSFAIL;
+		return NULL;
 	}
-	parse_trace_buffer(map, st.st_size);
+
+	return map;
+}
+
+static int graph_cat(int argc, char **argv)
+{
+	struct stat st;
+	void *map = map_trace_file(&st);
+
+	if (!map)
+		return EXIT_FAILURE;
+
+	cat_trace_file(map, st.st_size);
 	munmap(map, st.st_size);
 
+	return EXIT_SUCCESS;
+}
+
+struct graph_stat_entry {
+	struct rb_node rb;
+	struct list_head list;
+	char fname[TRACE_FNAME_LEN];
+	uint64_t duration;
+	uint16_t nr_calls;
+};
+
+static struct rb_root stat_tree_root;
+
+static LIST_HEAD(stat_list);
+
+static struct graph_stat_entry *
+stat_tree_insert(struct graph_stat_entry *new)
+{
+	struct rb_node **p = &stat_tree_root.rb_node;
+	struct rb_node *parent = NULL;
+	struct graph_stat_entry *entry;
+
+	while (*p) {
+		int cmp;
+
+		parent = *p;
+		entry = rb_entry(parent, struct graph_stat_entry, rb);
+		cmp = strcmp(new->fname, entry->fname);
+
+		if (cmp < 0)
+			p = &(*p)->rb_left;
+		else if (cmp > 0)
+			p = &(*p)->rb_right;
+		else {
+			entry->duration += new->duration;
+			entry->nr_calls++;
+			return entry;
+		}
+	}
+	rb_link_node(&new->rb, parent, p);
+	rb_insert_color(&new->rb, &stat_tree_root);
+
+	return NULL; /* insert successfully */
+}
+
+static void prepare_stat_tree(struct trace_graph_item *item)
+{
+	struct graph_stat_entry *new;
+
+	if (item->type != TRACE_GRAPH_RETURN)
+		return;
+	new = xmalloc(sizeof(*new));
+	pstrcpy(new->fname, sizeof(new->fname), item->fname);
+	new->duration = item->return_time - item->entry_time;
+	new->nr_calls = 1;
+	INIT_LIST_HEAD(&new->list);
+	if (stat_tree_insert(new)) {
+		free(new);
+		return;
+	}
+	list_add(&new->list, &stat_list);
+}
+
+static void stat_list_print(void)
+{
+	struct graph_stat_entry *entry;
+
+	list_for_each_entry(entry, &stat_list, list) {
+		float total = (float)entry->duration / 1000000000;
+		float per = (float)entry->duration / entry->nr_calls / 1000000;
+
+		printf("%10.3f   %10.3f        %5"PRIu16"   %-*s\n", total, per,
+		       entry->nr_calls, TRACE_FNAME_LEN, entry->fname);
+	}
+}
+
+static int stat_list_cmp(void *priv, struct list_head *a, struct list_head *b)
+{
+	struct graph_stat_entry *ga = container_of(a, struct graph_stat_entry,
+						   list);
+	struct graph_stat_entry *gb = container_of(b, struct graph_stat_entry,
+						   list);
+	/* '-' is for reverse sort, largest first */
+	return -intcmp(ga->duration, gb->duration);
+}
+
+static void stat_trace_file(void *buf, size_t size)
+{
+	struct trace_graph_item *item = (struct trace_graph_item *)buf;
+	size_t sz = size / sizeof(struct trace_graph_item), i;
+
+	printf("   Total (s)   Per Call (ms)   Calls   Name\n");
+	for (i = 0; i < sz; i++)
+		prepare_stat_tree(item++);
+	list_sort(NULL, &stat_list, stat_list_cmp);
+	stat_list_print();
+}
+
+static int graph_stat(int argc, char **argv)
+{
+	struct stat st;
+	void *map = map_trace_file(&st);
+
+	if (!map)
+		return EXIT_FAILURE;
+
+	stat_trace_file(map, st.st_size);
+	munmap(map, st.st_size);
 	return EXIT_SUCCESS;
 }
 
@@ -234,6 +357,8 @@ static int trace_parser(int ch, char *opt)
 static struct subcommand graph_cmd[] = {
 	{"cat", NULL, NULL, "cat the output of graph tracer",
 	 NULL, 0, graph_cat},
+	{"stat", NULL, NULL, "get the stat of the graph calls",
+	 NULL, 0, graph_stat},
 	{NULL,},
 };
 
@@ -250,8 +375,8 @@ static struct subcommand trace_cmd[] = {
 	 CMD_NEED_ARG, trace_disable},
 	{"status", NULL, "aph", "show tracer statuses", NULL,
 	 0, trace_status},
-	{"graph", NULL, "aph", "cat the output of tracers if any", graph_cmd,
-	 CMD_NEED_ARG, trace_graph},
+	{"graph", NULL, "aph", "run collie trace graph for more information",
+	 graph_cmd, CMD_NEED_ARG, trace_graph},
 	{NULL},
 };
 

@@ -24,6 +24,7 @@ static void graph_tracer_exit(const struct caller *this_fn, int depth)
 		.return_time = clock_get_time(),
 	};
 
+	pstrcpy(trace.fname, sizeof(trace.fname), this_fn->name);
 	get_thread_name(trace.tname);
 
 	trace_buffer_push(sched_getcpu(), &trace);
