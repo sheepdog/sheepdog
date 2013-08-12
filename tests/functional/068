@@ -31,5 +31,5 @@ done
 
 $COLLIE vdi create test 10M
 for i in 0 1 2; do
-    _vdi_list
+    _vdi_list -p $((7000+$i))
 done
