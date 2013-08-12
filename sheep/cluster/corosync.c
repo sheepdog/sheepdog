@@ -735,9 +735,11 @@ again:
 		sd_debug("retry cpg_initialize");
 		usleep(200000);
 		goto again;
+	case CS_ERR_SECURITY:
+		sd_err("failed to initialize cpg - permission denied");
+		return -1;
 	default:
-		sd_err("failed to initialize cpg (%d) - is corosync running?",
-		       ret);
+		sd_err("failed to initialize cpg (%d)", ret);
 		return -1;
 	}
 
