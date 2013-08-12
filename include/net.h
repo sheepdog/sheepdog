@@ -62,7 +62,7 @@ int create_listen_ports(const char *bindaddr, int port,
 int create_unix_domain_socket(const char *unix_path,
 			      int (*callback)(int, void *), void *data);
 
-char *addr_to_str(char *str, int size, const uint8_t *addr, uint16_t port);
+const char *addr_to_str(const uint8_t *addr, uint16_t port);
 uint8_t *str_to_addr(const char *ipstr, uint8_t *addr);
 char *sockaddr_in_to_str(struct sockaddr_in *sockaddr);
 int set_nonblocking(int fd);
@@ -80,10 +80,7 @@ int do_writev2(int fd, void *hdr, size_t hdr_len, void *body, size_t body_len);
 
 static inline int connect_to_addr(const uint8_t *addr, int port)
 {
-	char name[INET6_ADDRSTRLEN];
-
-	addr_to_str(name, sizeof(name), addr, 0);
-	return connect_to(name, port);
+	return connect_to(addr_to_str(addr, 0), port);
 }
 
 #endif

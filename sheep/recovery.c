@@ -663,15 +663,13 @@ static void finish_object_list(struct work *work)
 static uint64_t *fetch_object_list(struct sd_node *e, uint32_t epoch,
 				   size_t *nr_oids)
 {
-	char name[128];
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	size_t buf_size = list_buffer_size;
 	uint64_t *buf = xmalloc(buf_size);
 	int ret;
 
-	addr_to_str(name, sizeof(name), e->nid.addr, 0);
-	sd_debug("%s %"PRIu32, name, e->nid.port);
+	sd_debug("%s", addr_to_str(e->nid.addr, e->nid.port));
 
 retry:
 	sd_init_req(&hdr, SD_OP_GET_OBJ_LIST);
@@ -687,8 +685,8 @@ retry:
 		buf = xrealloc(buf, buf_size);
 		goto retry;
 	default:
-		sd_alert("cannot get object list from %s:%d", name,
-			 e->nid.port);
+		sd_alert("cannot get object list from %s",
+			 addr_to_str(e->nid.addr, e->nid.port));
 		sd_alert("some objects may be not recovered at epoch %d",
 			 epoch);
 		free(buf);

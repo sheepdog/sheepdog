@@ -156,7 +156,6 @@ static int cluster_info(int argc, char **argv)
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = 0; i < nr_logs; i++) {
 		int j;
-		char name[128];
 		const struct sd_node *entry;
 
 		ti = logs[i].time;
@@ -173,8 +172,7 @@ static int cluster_info(int argc, char **argv)
 			entry = logs[i].nodes + j;
 			printf("%s%s",
 			       (j == 0) ? "" : ", ",
-			       addr_to_str(name, sizeof(name),
-					   entry->nid.addr, entry->nid.port));
+			       addr_to_str(entry->nid.addr, entry->nid.port));
 		}
 		printf("]\n");
 	}

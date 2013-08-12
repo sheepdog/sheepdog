@@ -147,10 +147,7 @@ static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
 	sd_read_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
 	if (!entry) {
-		char name[INET6_ADDRSTRLEN];
-
-		addr_to_str(name, sizeof(name), nid->addr, 0);
-		sd_debug("failed node %s:%d", name, nid->port);
+		sd_debug("failed node %s", addr_to_str(nid->addr, nid->port));
 		goto out;
 	}
 
@@ -255,7 +252,6 @@ void sockfd_cache_add_group(const struct sd_node *nodes, int nr)
 void sockfd_cache_add(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *new;
-	char name[INET6_ADDRSTRLEN];
 	int n, i;
 
 	sd_write_lock(&sockfd_cache.lock);
@@ -272,8 +268,7 @@ void sockfd_cache_add(const struct node_id *nid)
 	}
 	sd_unlock(&sockfd_cache.lock);
 	n = uatomic_add_return(&sockfd_cache.count, 1);
-	addr_to_str(name, sizeof(name), nid->addr, 0);
-	sd_debug("%s:%d, count %d", name, nid->port, n);
+	sd_debug("%s, count %d", addr_to_str(nid->addr, nid->port), n);
 }
 
 static uatomic_bool fds_in_grow;
@@ -355,10 +350,7 @@ static struct sockfd *sockfd_cache_get_long(const struct node_id *nid)
 	struct sockfd *sfd;
 	bool use_io = nid->io_port ? true : false;
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
-	char name[INET6_ADDRSTRLEN];
 	int fd, idx = -1, port = use_io ? nid->io_port : nid->port;
-
-	addr_to_str(name, sizeof(name), addr, 0);
 grab:
 	entry = sockfd_cache_grab(nid, &idx);
 	if (!entry) {
@@ -377,13 +369,14 @@ grab:
 
 	check_idx(idx);
 	if (entry->fds[idx].fd != -1) {
-		sd_debug("%s:%d, idx %d", name, port, idx);
+		sd_debug("%s, idx %d", addr_to_str(addr, port), idx);
 		goto out;
 	}
 
 	/* Create a new cached connection for this node */
-	sd_debug("create cache connection %s:%d idx %d", name, port, idx);
-	fd = connect_to(name, port);
+	sd_debug("create cache connection %s idx %d", addr_to_str(addr, port),
+		 idx);
+	fd = connect_to_addr(addr, port);
 	if (fd < 0) {
 		if (use_io) {
 			sd_err("fallback to non-io connection");
@@ -409,10 +402,8 @@ static void sockfd_cache_put_long(const struct node_id *nid, int idx)
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
 	int port = use_io ? nid->io_port : nid->port;
 	struct sockfd_cache_entry *entry;
-	char name[INET6_ADDRSTRLEN];
 
-	addr_to_str(name, sizeof(name), addr, 0);
-	sd_debug("%s:%d idx %d", name, port, idx);
+	sd_debug("%s idx %d", addr_to_str(addr, port), idx);
 
 	sd_read_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
@@ -427,10 +418,8 @@ static void sockfd_cache_close(const struct node_id *nid, int idx)
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
 	int port = use_io ? nid->io_port : nid->port;
 	struct sockfd_cache_entry *entry;
-	char name[INET6_ADDRSTRLEN];
 
-	addr_to_str(name, sizeof(name), addr, 0);
-	sd_debug("%s:%d idx %d", name, port, idx);
+	sd_debug("%s idx %d", addr_to_str(addr, port), idx);
 
 	sd_write_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
@@ -511,15 +500,13 @@ void sockfd_cache_put(const struct node_id *nid, struct sockfd *sfd)
 /* Delete all sockfd connected to the node, when node is crashed. */
 void sockfd_cache_del_node(const struct node_id *nid)
 {
-	char name[INET6_ADDRSTRLEN];
 	int n;
 
 	if (!sockfd_cache_destroy(nid))
 		return;
 
 	n = uatomic_sub_return(&sockfd_cache.count, 1);
-	addr_to_str(name, sizeof(name), nid->addr, 0);
-	sd_debug("%s:%d, count %d", name, nid->port, n);
+	sd_debug("%s, count %d", addr_to_str(nid->addr, nid->port), n);
 }
 
 /*

@@ -736,7 +736,6 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 {
 	struct cluster_info *cinfo = opaque;
 	enum sd_status status;
-	char str[MAX_NODE_STR_LEN];
 
 	/*
 	 * If nr_nodes is 0, the joining node is the first member of the cluster
@@ -760,8 +759,8 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 	cinfo->proto_ver = SD_SHEEP_PROTO_VER;
 
 	sd_debug("%s: cluster_status = 0x%x",
-		 addr_to_str(str, sizeof(str), joining->nid.addr,
-			     joining->nid.port), cinfo->status);
+		 addr_to_str(joining->nid.addr, joining->nid.port),
+		 cinfo->status);
 
 	return true;
 }

@@ -234,11 +234,11 @@ static void get_oid(uint32_t vid, const char *name, const char *tag,
 	}
 }
 
-typedef int (*obj_parser_func_t)(char *sheep, uint64_t oid,
-				  struct sd_rsp *rsp, char *buf, void *data);
+typedef int (*obj_parser_func_t)(const char *sheep, uint64_t oid,
+				 struct sd_rsp *rsp, char *buf, void *data);
 
-static int do_print_obj(char *sheep, uint64_t oid, struct sd_rsp *rsp,
-			 char *buf, void *data)
+static int do_print_obj(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
+			char *buf, void *data)
 {
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
@@ -267,8 +267,8 @@ struct get_data_oid_info {
 	unsigned idx;
 };
 
-static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
-			 char *buf, void *data)
+static int get_data_oid(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
+			char *buf, void *data)
 {
 	struct get_data_oid_info *info = data;
 	struct sd_inode *inode = (struct sd_inode *)buf;
@@ -300,7 +300,6 @@ static int get_data_oid(char *sheep, uint64_t oid, struct sd_rsp *rsp,
 
 static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigned size)
 {
-	char name[128];
 	int i, ret, cb_ret;
 	char *buf;
 
@@ -324,9 +323,9 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
 				   size);
 
-		addr_to_str(name, sizeof(name), sd_nodes[i].nid.addr,
-			    sd_nodes[i].nid.port);
-		cb_ret = func(name, oid, rsp, buf, data);
+		cb_ret = func(addr_to_str(sd_nodes[i].nid.addr,
+					  sd_nodes[i].nid.port),
+			      oid, rsp, buf, data);
 		if (cb_ret)
 			break;
 	}
@@ -888,7 +887,6 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	const struct sd_vnode *vnode_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
 	int vnodes_nr, nr_logs, log_length;
-	char host[128];
 
 	log_length = sd_epoch * sizeof(struct epoch_log);
 	logs = xmalloc(log_length);
@@ -918,10 +916,9 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 		 */
 		if (logs[i].nr_nodes < nr_copies) {
 			for (j = 0; j < logs[i].nr_nodes; j++) {
-				addr_to_str(host, sizeof(host),
-					    logs[i].nodes[j].nid.addr,
-					    logs[i].nodes[j].nid.port);
-				printf("%s\n", host);
+				const struct node_id *n = &logs[i].nodes[j].nid;
+
+				printf("%s\n", addr_to_str(n->addr, n->port));
 			}
 			continue;
 		}
@@ -929,9 +926,9 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 					    logs[i].nr_nodes, vnodes);
 		oid_to_vnodes(vnodes, vnodes_nr, oid, nr_copies, vnode_buf);
 		for (j = 0; j < nr_copies; j++) {
-			addr_to_str(host, sizeof(host), vnode_buf[j]->nid.addr,
-				    vnode_buf[j]->nid.port);
-			printf("%s\n", host);
+			const struct node_id *n = &vnode_buf[j]->nid;
+
+			printf("%s\n", addr_to_str(n->addr, n->port));
 		}
 	}
 
@@ -1448,7 +1445,6 @@ static void vdi_hash_check_work(struct work *work)
 	struct vdi_check_work *vcw = container_of(work, struct vdi_check_work,
 						  work);
 	struct vdi_check_info *info = vcw->info;
-	char host[HOST_NAME_MAX];
 	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1473,8 +1469,8 @@ static void vdi_hash_check_work(struct work *work)
 		break;
 	default:
 		sd_err("failed to read %" PRIx64 " from %s, %s", info->oid,
-		       addr_to_str(host, sizeof(host), vcw->vnode->nid.addr,
-				   vcw->vnode->nid.port), sd_strerror(ret));
+		       addr_to_str(vcw->vnode->nid.addr, vcw->vnode->nid.port),
+		       sd_strerror(ret));
 		exit(EXIT_FAILURE);
 	}
 }
