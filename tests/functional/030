@@ -34,7 +34,7 @@ $COLLIE vdi snapshot test2
 $COLLIE cluster snapshot save s2 $TMPDIR
 $COLLIE cluster snapshot list $TMPDIR | _filter_date
 
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 _cleanup
 for i in `seq 0 3`; do
@@ -44,7 +44,7 @@ _wait_for_sheep 4
 
 _cluster_format -c 3
 $COLLIE cluster snapshot load s1 $TMPDIR
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE vdi read test1 | md5sum > $STORE/csum.11.new
 $COLLIE vdi read test2 | md5sum > $STORE/csum.21.new
@@ -58,7 +58,7 @@ done
 _wait_for_sheep 4
 
 $COLLIE cluster snapshot load s2 $TMPDIR
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 _cleanup
 for i in `seq 0 3`; do
@@ -67,7 +67,7 @@ done
 _wait_for_sheep 4
 
 $COLLIE cluster snapshot load 2 $TMPDIR
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE vdi read -s 2 test1 | md5sum > $STORE/csum.12.new
 $COLLIE vdi read -s 2 test2 | md5sum > $STORE/csum.22.new

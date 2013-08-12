@@ -31,7 +31,7 @@ _wait_for_sheep_recovery 0
 
 $COLLIE vdi track test
 $COLLIE vdi track -i 1 test
-$COLLIE vdi list test | _filter_short_date
+_vdi_list test
 $COLLIE vdi list -r test | awk '{$7="MASKED";print $0}'
 
 $COLLIE vdi check test

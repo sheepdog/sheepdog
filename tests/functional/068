@@ -31,5 +31,5 @@ done
 
 $COLLIE vdi create test 10M
 for i in 0 1 2; do
-    $COLLIE vdi list | _filter_short_date
+    _vdi_list
 done

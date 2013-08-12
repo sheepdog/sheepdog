@@ -62,7 +62,7 @@ $COLLIE vdi delete -s snap10 base2 -p 7001
 $COLLIE vdi delete -s snap10 base3 -p 7002
 
 echo there should be no vdi
-$COLLIE vdi list
+_vdi_list
 
 echo there should be no object
 _node_info

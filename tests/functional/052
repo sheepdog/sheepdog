@@ -21,7 +21,7 @@ done
 _wait_for_sheep 4
 for i in 0 1 2 4; do
     $COLLIE cluster info -p 700$i | _filter_cluster_info
-    $COLLIE vdi list | _filter_short_date
+    _vdi_list
 done
 
 echo yes | $COLLIE cluster recover force
@@ -32,12 +32,12 @@ $COLLIE vdi check test | sort
 
 for i in 0 1 2 4; do
     $COLLIE cluster info -p 700$i | _filter_cluster_info
-    $COLLIE vdi list | _filter_short_date
+    _vdi_list
 done
 
 _start_sheep 3
 _wait_for_sheep 5
 for i in 0 1 2 3 4; do
     $COLLIE cluster info -p 700$i | _filter_cluster_info
-    $COLLIE vdi list | _filter_short_date
+    _vdi_list
 done

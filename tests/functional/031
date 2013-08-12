@@ -13,7 +13,7 @@ for i in 1 2 3; do
     $COLLIE vdi create test$i ${i}00MB
 done
 
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE cluster shutdown
 _wait_for_sheep_stop
@@ -21,4 +21,4 @@ _wait_for_sheep_stop
 _start_sheep 0
 _wait_for_sheep 1
 
-$COLLIE vdi list | _filter_short_date
+_vdi_list

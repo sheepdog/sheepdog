@@ -33,7 +33,7 @@ _wait_for_sheep_recovery 0
 $COLLIE vdi delete clone
 $COLLIE vdi delete -s 1 test2
 
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 for i in `seq 2 4`; do
 	$COLLIE vdi object test$i -i 1;

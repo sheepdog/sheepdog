@@ -31,7 +31,7 @@ $COLLIE vdi delete -s 1 base
 
 sleep 3
 echo there should be no vdi
-$COLLIE vdi list
+_vdi_list
 
 echo there should be no object
 _node_info

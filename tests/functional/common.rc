@@ -504,5 +504,11 @@ _kill_zk_session()
 	fi
 }
 
+_vdi_list()
+{
+	local args=$*
+	$COLLIE vdi list $args | _filter_short_date
+}
+
 # make sure this script returns success
 /bin/true

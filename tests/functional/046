@@ -15,25 +15,25 @@ _cluster_format -c 2
 echo "delete snapshot image before current one"
 $COLLIE vdi create test 4G
 $COLLIE vdi snapshot test -s snap
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE vdi delete test -s snap
 $COLLIE vdi delete test -s snap # error
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE vdi delete test
 $COLLIE vdi delete test # error
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 echo "delete current image before snapshot one"
 $COLLIE vdi create test 4G
 $COLLIE vdi snapshot test -s snap
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE vdi delete test
 $COLLIE vdi delete test # error
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 
 $COLLIE vdi delete test -s snap
 $COLLIE vdi delete test -s snap # error
-$COLLIE vdi list | _filter_short_date
+_vdi_list

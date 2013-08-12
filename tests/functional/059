@@ -26,7 +26,7 @@ _input()
 
 _input | $QEMU_IO sheepdog:test > /dev/null
 
-$COLLIE vdi list | _filter_short_date
+_vdi_list
 $COLLIE vdi tree | _filter_short_date
 
 for i in `seq 1 10`; do
