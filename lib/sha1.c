@@ -21,7 +21,7 @@
 #include "sha1.h"
 #include "util.h"
 
-static inline uint32_t rol(uint32_t value, uint32_t bits)
+static __always_inline uint32_t rol(uint32_t value, uint32_t bits)
 {
 	return (value << bits) | (value >> (32 - bits));
 }
