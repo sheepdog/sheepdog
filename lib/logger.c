@@ -49,6 +49,17 @@ static const char * const log_color[] = {
 	[SDOG_DEBUG] = TEXT_GREEN,
 };
 
+static const char * const log_prio_str[] = {
+	[SDOG_EMERG]   = "EMERG",
+	[SDOG_ALERT]   = "ALERT",
+	[SDOG_CRIT]    = "CRIT",
+	[SDOG_ERR]     = "ERROR",
+	[SDOG_WARNING] = "WARN",
+	[SDOG_NOTICE]  = "NOTICE",
+	[SDOG_INFO]    = "INFO",
+	[SDOG_DEBUG]   = "DEBUG",
+};
+
 static struct logger_user_info *logger_user_info;
 
 static void dolog(int prio, const char *func, int line, const char *fmt,
@@ -232,7 +243,9 @@ static int server_log_formatter(char *buff, size_t size,
 	p += len;
 	size -= len;
 
-	len = snprintf(p, size, "%s[%s] %s(%d) %s%s%s",
+	len = snprintf(p, size, "%s%6s %s[%s] %s(%d) %s%s%s",
+		       colorize ? log_color[msg->prio] : "",
+		       log_prio_str[msg->prio],
 		       colorize ? TEXT_YELLOW : "",
 		       format_thread_name(thread_name, sizeof(thread_name),
 					  msg->worker_name, msg->worker_idx),
