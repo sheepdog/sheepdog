@@ -36,7 +36,7 @@ static int sheepfs_debug;
 static int sheepfs_fg;
 int sheepfs_page_cache;
 int sheepfs_object_cache = true;
-char sdhost[32] = "localhost";
+char sdhost[32] = "127.0.0.1";
 int sdport = SD_LISTEN_PORT;
 
 static struct option const long_options[] = {
