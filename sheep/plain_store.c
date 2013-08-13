@@ -486,7 +486,10 @@ static int get_object_sha1(char *path, uint8_t *sha1)
 {
 	if (getxattr(path, SHA1NAME, sha1, SHA1_DIGEST_SIZE)
 	    != SHA1_DIGEST_SIZE) {
-		sd_err("fail to get sha1, %s", path);
+		if (errno == ENODATA)
+			sd_debug("sha1 is not cached yet, %s", path);
+		else
+			sd_err("fail to get xattr, %s", path);
 		return -1;
 	}
 
