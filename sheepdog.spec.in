@@ -1,5 +1,5 @@
 Name: sheepdog
-Summary: The Sheepdog Distributed Storage System for KVM/QEMU
+Summary: The Sheepdog Distributed Storage System for QEMU
 Version: @version@
 Release: 1%{?dist}
 License: GPLv2 and GPLv2+
@@ -8,27 +8,27 @@ URL: http://www.osrg.net/sheepdog
 Source0: http://downloads.sourceforge.net/project/sheepdog/%{name}/%{version}/%{name}-%{version}.tar.gz
 
 # Runtime bits
-Requires: corosync
+Requires: corosync fuse zookeeper
 Requires(post): chkconfig
 Requires(preun): chkconfig
 Requires(preun): initscripts
 
 # Build bits
 BuildRequires: autoconf automake
-BuildRequires: corosync corosynclib corosynclib-devel
+BuildRequires: corosynclib-devel userspace-rcu-devel fuse-devel zookeeper-lib-devel
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
 %description
 This package contains the Sheepdog server, and command line tool which offer
-a distributed object storage system for KVM.
+a distributed object storage system for QEMU.
 
 %prep
 %setup -q
 
 %build
 ./autogen.sh
-%{configure} --with-initddir=%{_initrddir}
+%{configure} --with-initddir=%{_initrddir} --enable-sheepfs --enalbe-zookeeper
 
 make %{_smp_mflags}
 
@@ -67,6 +67,7 @@ fi
 %{_sbindir}/sheep
 %{_sbindir}/sheepfs
 %{_sbindir}/dog
+%{_sbindir}/shepherd
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
 %{_mandir}/man8/sheep.8*
