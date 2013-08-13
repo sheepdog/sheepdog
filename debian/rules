@@ -14,6 +14,12 @@ GIT_TAG         ?= $(shell echo v'$(VERSION)' | sed -e 's/~/_/')
 override_dh_builddeb:
 	dh_builddeb --destdir=. -- -Zxz -z9
 
+override_dh_autoreconf:
+	dh_autoreconf --mode=timesize
+
+override_dh_auto_build:
+	dh_auto_build --parallel
+
 UNAME := $(shell uname)
 ifeq ($(UNAME),Linux)
 	ZOOKEEPER=--enable-zookeeper
