@@ -619,8 +619,8 @@ static void recover_object_main(struct work *work)
 	wakeup_requests_on_oid(row->oid);
 	rinfo->done++;
 
-	sd_err("done:%"PRIu64" count:%"PRIu64", oid:%"PRIx64, rinfo->done,
-	       rinfo->count, row->oid);
+	sd_info("object %"PRIx64" is recovered (%"PRIu64"/%"PRIu64")", row->oid,
+		rinfo->done, rinfo->count);
 
 	if (rinfo->done < rinfo->count) {
 		recover_next_object(rinfo);
