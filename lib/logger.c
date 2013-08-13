@@ -311,7 +311,6 @@ static void log_syslog(const struct logmsg *msg)
 	char str[MAX_MSG_SIZE];
 	int len;
 
-	memset(str, 0, MAX_MSG_SIZE);
 	len = format->formatter(str, sizeof(str) - 1, msg);
 	str[len++] = '\n';
 	if (log_fd >= 0)
@@ -329,6 +328,8 @@ static void init_logmsg(struct logmsg *msg, struct timeval *tv,
 	msg->line = line;
 	if (worker_name)
 		pstrcpy(msg->worker_name, MAX_THREAD_NAME_LEN, worker_name);
+	else
+		msg->worker_name[0] = '\0';
 	msg->worker_idx = worker_idx;
 }
 
@@ -381,8 +382,6 @@ static void dolog(int prio, const char *func, int line,
 	} else {
 		char str_final[MAX_MSG_SIZE];
 
-		memset(str_final, 0, MAX_MSG_SIZE);
-		memset(msg, 0, sizeof(struct logmsg));
 		init_logmsg(msg, &tv, prio, func, line);
 		len = format->formatter(str_final, sizeof(str_final) - 1, msg);
 		str_final[len++] = '\n';
