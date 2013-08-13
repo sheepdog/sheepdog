@@ -117,6 +117,19 @@ static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
 
 static pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static const char *format_thread_name(char *str, size_t size, const char *name,
+				      int idx)
+{
+	if (name && name[0] && idx)
+		snprintf(str, size, "%s %d", name, idx);
+	else if (name && name[0])
+		snprintf(str, size, "%s", name);
+	else
+		snprintf(str, size, "main");
+
+	return str;
+}
+
 /*
  * We need to set default log formatter because collie doesn't want to call
  * select_log_formatter().
@@ -667,13 +680,7 @@ void set_thread_name(const char *name, bool show_idx)
 
 void get_thread_name(char *name)
 {
-	if (worker_name && worker_idx)
-		snprintf(name, MAX_THREAD_NAME_LEN, "%s %d",
-			 worker_name, worker_idx);
-	else if (worker_name)
-		snprintf(name, MAX_THREAD_NAME_LEN, "%s", worker_name);
-	else
-		snprintf(name, MAX_THREAD_NAME_LEN, "%s", "main");
+	format_thread_name(name, MAX_THREAD_NAME_LEN, worker_name, worker_idx);
 }
 
 
