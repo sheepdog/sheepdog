@@ -343,7 +343,11 @@ static void dolog(int prio, const char *func, int line,
 
 	gettimeofday(&tv, NULL);
 	len = vsnprintf(str, MAX_MSG_SIZE, fmt, ap);
-	msg->str_len = len;
+	if (len < 0) {
+		syslog(LOG_ERR, "vsnprintf failed");
+		return;
+	}
+	msg->str_len = min(len, MAX_MSG_SIZE - 1);
 
 	if (la) {
 		struct sembuf ops;
