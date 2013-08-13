@@ -258,8 +258,6 @@ static int default_log_formatter(char *buff, size_t size,
 
 	pstrcpy(buff, size, msg->str);
 	len = strlen(buff);
-	if (len > 0 && buff[len - 1] != '\n' && size > len)
-		buff[len++] = '\n';
 
 	return len;
 }
@@ -316,8 +314,7 @@ static int json_log_formatter(char *buff, size_t size,
 	snprintf(p, size - strlen(buff), ", \"msg\": \"");
 	p += strlen(p);
 
-	body_len = strlen(msg->str) - 1;
-	/* this - 1 eliminates '\n', dirty... */
+	body_len = strlen(msg->str);
 	for (i = 0; i < body_len; i++) {
 		if (msg->str[i] == '"')
 			*p++ = '\\';
@@ -335,11 +332,13 @@ log_format_register("json", json_log_formatter);
 static void log_syslog(const struct logmsg *msg)
 {
 	char str[MAX_MSG_SIZE];
+	int len;
 
 	memset(str, 0, MAX_MSG_SIZE);
-	format->formatter(str, MAX_MSG_SIZE, msg);
+	len = format->formatter(str, sizeof(str) - 1, msg);
+	str[len++] = '\n';
 	if (log_fd >= 0)
-		xwrite(log_fd, str, strlen(str));
+		xwrite(log_fd, str, len);
 	else
 		syslog(msg->prio, "%s", str);
 }
@@ -367,10 +366,6 @@ static void dolog(int prio, const char *func, int line,
 
 	gettimeofday(&tv, NULL);
 	len = vsnprintf(str, MAX_MSG_SIZE, fmt, ap);
-	if (len + 1 < MAX_MSG_SIZE && str[len - 1] != '\n') {
-		str[len++] = '\n';
-		str[len] = '\0';
-	}
 
 	if (la) {
 		struct sembuf ops;
@@ -406,7 +401,8 @@ static void dolog(int prio, const char *func, int line,
 		memset(str_final, 0, MAX_MSG_SIZE);
 		memset(msg, 0, sizeof(struct logmsg));
 		init_logmsg(msg, &tv, prio, func, line);
-		len = format->formatter(str_final, MAX_MSG_SIZE, msg);
+		len = format->formatter(str_final, sizeof(str_final) - 1, msg);
+		str_final[len++] = '\n';
 		xwrite(fileno(stderr), str_final, len);
 		fflush(stderr);
 	}
