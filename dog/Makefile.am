@@ -39,6 +39,12 @@ noinst_HEADERS		= treeview.h dog.h farm/farm.h
 
 EXTRA_DIST		=
 
+install-exec-hook:
+	if [ -z "${DESTDIR}" ];then $(LN_S) -f ${sbindir}/dog ${sbindir}/collie;fi
+
+uninstall-hook:
+	rm -f ${sbindir}/collie
+
 all-local:
 	@echo Built dog
 

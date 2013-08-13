@@ -24,6 +24,8 @@ if [ "$1" = "configure" ] ; then
 	db_stop || true
 fi
 
+ln -s -f /usr/sbin/dog /usr/sbin/collie
+
 #DEBHELPER#
 
 exit 0

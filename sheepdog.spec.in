@@ -46,6 +46,7 @@ rm -rf %{buildroot}
 
 %post
 /sbin/chkconfig --add sheepdog
+ln -s -f %{_sbindir}/dog %{_sbindir}/collie
 
 %preun
 if [ $1 -eq 0 ] ; then
@@ -56,6 +57,8 @@ fi
 %postun
 if [ "$1" -ge "1" ] ; then
 	/sbin/service sheepdog condrestart >/dev/null 2>&1 || :
+else
+	rm -f /usr/sbin/collie
 fi
 
 %files

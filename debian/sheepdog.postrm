@@ -6,6 +6,8 @@ if [ "${1}" = "purge" ] ; then
 	rm -f /etc/default/sheepdog
 fi
 
+rm -f /usr/sbin/collie
+
 #DEBHELPER#
 
 exit 0
