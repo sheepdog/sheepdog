@@ -80,6 +80,7 @@ struct logmsg {
 	char worker_name[MAX_THREAD_NAME_LEN];
 	int worker_idx;
 
+	size_t str_len;
 	char str[0];
 };
 
@@ -252,12 +253,11 @@ static int server_log_formatter(char *buff, size_t size,
 log_format_register("server", server_log_formatter);
 
 static int default_log_formatter(char *buff, size_t size,
-					 const struct logmsg *msg)
+				 const struct logmsg *msg)
 {
-	int len;
+	size_t len = min(size, msg->str_len);
 
-	pstrcpy(buff, size, msg->str);
-	len = strlen(buff);
+	memcpy(buff, msg->str, len);
 
 	return len;
 }
@@ -266,7 +266,6 @@ log_format_register("default", default_log_formatter);
 static int json_log_formatter(char *buff, size_t size,
 				const struct logmsg *msg)
 {
-	int i, body_len;
 	char *p = buff;
 
 	snprintf(p, size, "{ \"user_info\": {");
@@ -314,8 +313,7 @@ static int json_log_formatter(char *buff, size_t size,
 	snprintf(p, size - strlen(buff), ", \"msg\": \"");
 	p += strlen(p);
 
-	body_len = strlen(msg->str);
-	for (i = 0; i < body_len; i++) {
+	for (int i = 0; i < msg->str_len; i++) {
 		if (msg->str[i] == '"')
 			*p++ = '\\';
 		*p++ = msg->str[i];
@@ -366,6 +364,7 @@ static void dolog(int prio, const char *func, int line,
 
 	gettimeofday(&tv, NULL);
 	len = vsnprintf(str, MAX_MSG_SIZE, fmt, ap);
+	msg->str_len = len;
 
 	if (la) {
 		struct sembuf ops;
@@ -387,6 +386,7 @@ static void dolog(int prio, const char *func, int line,
 			msg = (struct logmsg *)la->tail;
 			init_logmsg(msg, &tv, prio, func, line);
 			memcpy(msg->str, str, len + 1);
+			msg->str_len = len;
 			la->tail += sizeof(struct logmsg) + len + 1;
 		}
 
@@ -480,7 +480,7 @@ static void log_flush(void)
 	while (done < size) {
 		msg = (const struct logmsg *)(log_buff + done);
 		log_syslog(msg);
-		done += sizeof(*msg) + strlen(msg->str) + 1;
+		done += sizeof(*msg) + msg->str_len + 1;
 	}
 }
 
