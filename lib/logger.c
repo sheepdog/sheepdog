@@ -220,46 +220,28 @@ static void free_logarea(void)
 }
 
 static int server_log_formatter(char *buff, size_t size,
-					const struct logmsg *msg)
+				const struct logmsg *msg)
 {
 	char *p = buff;
 	struct tm tm;
-	int worker_name_len = strlen(msg->worker_name);
+	size_t len;
+	char thread_name[MAX_THREAD_NAME_LEN];
 
 	localtime_r(&msg->tv.tv_sec, &tm);
-	strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
-	p += strlen(p);
+	len = strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
+	p += len;
+	size -= len;
 
-	if (colorize) {
-		pstrcpy(p, size - strlen(buff), TEXT_YELLOW);
-		p += strlen(p);
-	}
-
-	if (worker_name_len && msg->worker_idx)
-		snprintf(p, size - strlen(buff), "[%s %d] ", msg->worker_name,
-			 msg->worker_idx);
-	else if (worker_name_len)
-		snprintf(p, size - strlen(buff), "[%s] ", msg->worker_name);
-	else
-		pstrcpy(p, size - strlen(buff), "[main] ");
-
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), "%s(%d) ", msg->func, msg->line);
-	p += strlen(p);
-
-	if (colorize) {
-		pstrcpy(p, size - strlen(buff), log_color[msg->prio]);
-		p += strlen(p);
-	}
-
-	snprintf(p, size - strlen(buff), "%s", (char *)msg->str);
-	p += strlen(p);
-
-	if (colorize) {
-		pstrcpy(p, size - strlen(buff), "\033[m");
-		p += strlen(p);
-	}
+	len = snprintf(p, size, "%s[%s] %s(%d) %s%s%s",
+		       colorize ? TEXT_YELLOW : "",
+		       format_thread_name(thread_name, sizeof(thread_name),
+					  msg->worker_name, msg->worker_idx),
+		       msg->func, msg->line,
+		       colorize ? log_color[msg->prio] : "",
+		       msg->str, colorize ? TEXT_NORMAL : "");
+	if (len < 0)
+		len = 0;
+	p += min(len, size - 1);
 
 	return p - buff;
 }
@@ -280,59 +262,43 @@ static int json_log_formatter(char *buff, size_t size,
 				const struct logmsg *msg)
 {
 	char *p = buff;
-
-	snprintf(p, size, "{ \"user_info\": {");
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), "\"program_name\": \"%s\", ",
-		log_name);
-	p += strlen(p);
+	size_t len;
 
 	assert(logger_user_info);
-	snprintf(p, size - strlen(buff), "\"port\": %d",
-		logger_user_info->port);
-	p += strlen(p);
 
-	snprintf(p, size - strlen(buff), "},");
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), "\"body\": {");
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), "\"second\": %lu", msg->tv.tv_sec);
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), ", \"usecond\": %lu", msg->tv.tv_usec);
-	p += strlen(p);
-
-	if (strlen(msg->worker_name))
-		snprintf(p, size - strlen(buff), ", \"worker_name\": \"%s\"",
-			msg->worker_name);
-	else
-		snprintf(p, size - strlen(buff), ", \"worker_name\": \"main\"");
-
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), ", \"worker_idx\": %d",
-		msg->worker_idx);
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), ", \"func\": \"%s\"", msg->func);
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), ", \"line\": %d", msg->line);
-	p += strlen(p);
-
-	snprintf(p, size - strlen(buff), ", \"msg\": \"");
-	p += strlen(p);
+	len = snprintf(p, size, "{ \"user_info\": "
+		       "{\"program_name\": \"%s\", \"port\": %d},"
+		       "\"body\": {"
+		       "\"second\": %lu, \"usecond\": %lu, "
+		       "\"worker_name\": \"%s\", \"worker_idx\": %d, "
+		       "\"func\": \"%s\", \"line\": %d, "
+		       "\"msg\": \"",
+		       log_name, logger_user_info->port,
+		       msg->tv.tv_sec, msg->tv.tv_usec,
+		       msg->worker_name[0] ? msg->worker_name : "main",
+		       msg->worker_idx, msg->func, msg->line);
+	if (len < 0)
+		return 0;
+	len = min(len, size - 1);
+	p += len;
+	size -= len;
 
 	for (int i = 0; i < msg->str_len; i++) {
-		if (msg->str[i] == '"')
+		if (size <= 1)
+			break;
+
+		if (msg->str[i] == '"') {
 			*p++ = '\\';
+			size--;
+		}
+
+		if (size <= 1)
+			break;
 		*p++ = msg->str[i];
+		size--;
 	}
 
-	snprintf(p, size - strlen(buff), "\"} }\n");
+	pstrcpy(p, size, "\"} }");
 	p += strlen(p);
 
 	return p - buff;
