@@ -1,6 +1,6 @@
 #!bash
 
-_collie_cluster_format()
+_dog_cluster_format()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -15,7 +15,7 @@ _collie_cluster_format()
     esac
 }
 
-_collie_cluster_recover()
+_dog_cluster_recover()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -30,7 +30,7 @@ _collie_cluster_recover()
     esac
 }
 
-_collie_vdi_create()
+_dog_vdi_create()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -45,7 +45,7 @@ _collie_vdi_create()
     esac
 }
 
-_collie_vdi_snapshot()
+_dog_vdi_snapshot()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -60,7 +60,7 @@ _collie_vdi_snapshot()
     esac
 }
 
-_collie_vdi_clone()
+_dog_vdi_clone()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -75,7 +75,7 @@ _collie_vdi_clone()
     esac
 }
 
-_collie_vdi_read()
+_dog_vdi_read()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -90,12 +90,12 @@ _collie_vdi_read()
     esac
 }
 
-_collie_vdi_delete()
+_dog_vdi_delete()
 {
-    local cur collie vdilist
+    local cur dog vdilist
     cur="${COMP_WORDS[COMP_CWORD]}"
-    collie="${COMP_WORDS[0]}"
-    vdilist="$(${collie} vdi list | tail -n+3 | grep '^  ' | awk '{print $1}')"
+    dog="${COMP_WORDS[0]}"
+    vdilist="$(${dog} vdi list | tail -n+3 | grep '^  ' | awk '{print $1}')"
 
     case "$cur" in
         -*)
@@ -110,12 +110,12 @@ _collie_vdi_delete()
     esac
 }
 
-_collie_vdi_object()
+_dog_vdi_object()
 {
-    local cur collie vdilist
+    local cur dog vdilist
     cur="${COMP_WORDS[COMP_CWORD]}"
-    collie="${COMP_WORDS[0]}"
-    vdilist="$(${collie} vdi list | tail -n+3 | grep '^  ' | awk '{print $1}')"
+    dog="${COMP_WORDS[0]}"
+    vdilist="$(${dog} vdi list | tail -n+3 | grep '^  ' | awk '{print $1}')"
 
     case "$cur" in
         -*)
@@ -130,7 +130,7 @@ _collie_vdi_object()
     esac
 }
 
-_collie_vdi_setattr()
+_dog_vdi_setattr()
 {
     local cur
     cur="${COMP_WORDS[COMP_CWORD]}"
@@ -145,7 +145,7 @@ _collie_vdi_setattr()
     esac
 }
 
-_collie_cluster()
+_dog_cluster()
 {
     local opts
     opts="info format shutdown recover snapshot"
@@ -154,12 +154,12 @@ _collie_cluster()
         info)
             ;;
         format)
-            _collie_cluster_format
+            _dog_cluster_format
             ;;
         shutdown)
             ;;
         recover)
-            _collie_cluster_recover
+            _dog_cluster_recover
             ;;
         snapshot)
             ;;
@@ -174,7 +174,7 @@ _collie_cluster()
     esac
 }
 
-_collie_node()
+_dog_node()
 {
     local opts
     opts="info list recovery kill cache"
@@ -201,7 +201,7 @@ _collie_node()
     esac
 }
 
-_collie_vdi()
+_dog_vdi()
 {
     local opts
     opts="create snapshot clone resize read write \
@@ -210,18 +210,18 @@ rollback flush backup restore"
 
     case "$1" in
 	create)
-	    _collie_vdi_create
+	    _dog_vdi_create
 	    ;;
 	snapshot)
-	    _collie_vdi_snapshot
+	    _dog_vdi_snapshot
 	    ;;
 	clone)
-	    _collie_vdi_clone
+	    _dog_vdi_clone
 	    ;;
 	resize)
 	    ;;
 	read)
-	    _collie_vdi_read
+	    _dog_vdi_read
 	    ;;
 	write)
 	    ;;
@@ -232,13 +232,13 @@ rollback flush backup restore"
         graph)
             ;;
         delete)
-            _collie_vdi_delete
+            _dog_vdi_delete
             ;;
         object)
-            _collie_vdi_object
+            _dog_vdi_object
             ;;
         setattr)
-            _collie_vdi_setattr
+            _dog_vdi_setattr
             ;;
         getattr)
             ;;
@@ -265,7 +265,7 @@ rollback flush backup restore"
     esac
 }
 
-_collie()
+_dog()
 {
     local opts cur cmd subcmd i
     opts="cluster node vdi"
@@ -283,13 +283,13 @@ _collie()
 
     case "${cmd}" in
         cluster)
-            _collie_cluster ${subcmd}
+            _dog_cluster ${subcmd}
             ;;
         node)
-            _collie_node ${subcmd}
+            _dog_node ${subcmd}
             ;;
         vdi)
-            _collie_vdi ${subcmd}
+            _dog_vdi ${subcmd}
             ;;
         "")
             COMPREPLY=($( compgen -W "${opts}" -- ${cur} ))
@@ -300,4 +300,4 @@ _collie()
     esac
 }
 
-complete -F _collie collie
+complete -F _dog dog

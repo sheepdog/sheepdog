@@ -22,8 +22,8 @@ _wait_for_sheep 6
 
 _cluster_format -c 3
 
-$COLLIE vdi create test 40M
-_random | $COLLIE vdi write test &
+$DOG vdi create test 40M
+_random | $DOG vdi write test &
 
 sleep 3
 # Test write timeout
@@ -31,14 +31,14 @@ for i in `seq 1 4`; do
 	_simulate_machine_down $i
 done
 
-# wait for collie to finish
+# wait for dog to finish
 wait
 _wait_for_sheep_recovery 0
 
-$COLLIE vdi read test | md5sum > $STORE/csum.1
+$DOG vdi read test | md5sum > $STORE/csum.1
 
 for i in `seq 0 9`; do
-	$COLLIE vdi object -i $i test
+	$DOG vdi object -i $i test
 done
 
 for i in 6 7 8; do
@@ -48,7 +48,7 @@ done
 _wait_for_sheep_recovery 0
 
 # Test read timeout
-$COLLIE vdi read test | md5sum > $STORE/csum.2 &
+$DOG vdi read test | md5sum > $STORE/csum.2 &
 for i in `seq 5 7`; do
 	_simulate_machine_down $i
 done

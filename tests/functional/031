@@ -10,12 +10,12 @@ _wait_for_sheep 1
 _cluster_format -c 1
 
 for i in 1 2 3; do
-    $COLLIE vdi create test$i ${i}00MB
+    $DOG vdi create test$i ${i}00MB
 done
 
 _vdi_list
 
-$COLLIE cluster shutdown
+$DOG cluster shutdown
 _wait_for_sheep_stop
 
 _start_sheep 0

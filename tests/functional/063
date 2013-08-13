@@ -20,17 +20,17 @@ _start_sheep 3 "-g"
 _wait_for_sheep 4
 _cluster_format -c 1
 
-$COLLIE vdi create test 200M -P
+$DOG vdi create test 200M -P
 _node_info
-$COLLIE node list
+$DOG node list
 
-$COLLIE node md plug $STORE/4
+$DOG node md plug $STORE/4
 _wait_for_sheep_recovery 0
 
-$COLLIE cluster reweight
+$DOG cluster reweight
 _start_sheep 5
 _wait_for_sheep 5
 _wait_for_sheep_recovery 0
 _node_info
-$COLLIE node list
-$COLLIE cluster info | _filter_cluster_info
+$DOG node list
+$DOG cluster info | _filter_cluster_info

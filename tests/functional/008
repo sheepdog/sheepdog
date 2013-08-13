@@ -13,11 +13,11 @@ _wait_for_sheep "8"
 _cluster_format -c 3
 
 for i in `seq 0 4`; do
-    $COLLIE vdi create test$i 100M
+    $DOG vdi create test$i 100M
 done
 
 for i in `seq 0 4`; do
-    _random | $COLLIE vdi write test$i -p 7000 &
+    _random | $DOG vdi write test$i -p 7000 &
 done
 
 sleep 3
@@ -43,7 +43,7 @@ wait
 
 for i in `seq 0 4`; do
     for port in `seq 0 7`; do
-        $COLLIE vdi read test$i -p 700$port | md5sum > $STORE/csum.$port &
+        $DOG vdi read test$i -p 700$port | md5sum > $STORE/csum.$port &
     done
     wait
     for port in `seq 1 7`; do

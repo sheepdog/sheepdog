@@ -11,46 +11,46 @@ done
 _wait_for_sheep 5
 
 _cluster_format
-$COLLIE vdi create test 4G
+$DOG vdi create test 4G
 
 $QEMU_IO -c "write 0 512 -P 1" sheepdog:test | _filter_qemu_io
-$COLLIE vdi snapshot test -s snap1
+$DOG vdi snapshot test -s snap1
 $QEMU_IO -c "write 0 512 -P 2" sheepdog:test | _filter_qemu_io
 
-echo yes | $COLLIE vdi rollback test -s snap1
+echo yes | $DOG vdi rollback test -s snap1
 $QEMU_IO -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 _vdi_list
 
 $QEMU_IO -c "write 0 512 -P 2" sheepdog:test | _filter_qemu_io
-$COLLIE vdi snapshot test -s snap2
+$DOG vdi snapshot test -s snap2
 $QEMU_IO -c "write 0 512 -P 3" sheepdog:test | _filter_qemu_io
 
-echo yes | $COLLIE vdi rollback test -s snap1
+echo yes | $DOG vdi rollback test -s snap1
 $QEMU_IO -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 _vdi_list
 
-echo yes | $COLLIE vdi rollback test -s snap2
+echo yes | $DOG vdi rollback test -s snap2
 $QEMU_IO -c "read 0 512 -P 2" sheepdog:test | _filter_qemu_io
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 _vdi_list
 
-echo yes | $COLLIE vdi rollback test -s snap1
+echo yes | $DOG vdi rollback test -s snap1
 $QEMU_IO -c "read 0 512 -P 1" sheepdog:test | _filter_qemu_io
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 _vdi_list
 
 $QEMU_IO -c "write 0 512 -P 3" sheepdog:test | _filter_qemu_io
-$COLLIE vdi snapshot test -s snap3
+$DOG vdi snapshot test -s snap3
 $QEMU_IO -c "write 0 512 -P 4" sheepdog:test | _filter_qemu_io
-$COLLIE vdi snapshot test -s snap4
+$DOG vdi snapshot test -s snap4
 
 # these fail since the snap ids don't belong to snapshots
-echo yes | $COLLIE vdi rollback test -s 0
-echo yes | $COLLIE vdi rollback test -s 5
+echo yes | $DOG vdi rollback test -s 0
+echo yes | $DOG vdi rollback test -s 5
 
-echo yes | $COLLIE vdi rollback test -s snap3
+echo yes | $DOG vdi rollback test -s snap3
 $QEMU_IO -c "read 0 512 -P 3" sheepdog:test | _filter_qemu_io
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 _vdi_list

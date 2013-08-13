@@ -13,7 +13,7 @@
 #include <sys/mman.h>
 #include <linux/limits.h>
 
-#include "collie.h"
+#include "dog.h"
 #include "sheep.h"
 #include "strbuf.h"
 #include "sha1.h"

@@ -8,8 +8,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef __COLLIE_H__
-#define __COLLIE_H__
+#ifndef __DOG_H__
+#define __DOG_H__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +72,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    unsigned int datalen, uint64_t offset, uint32_t flags,
 		    int copies, bool create, bool direct);
-int collie_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
+int dog_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
 		    void *data);
 int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);

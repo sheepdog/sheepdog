@@ -19,7 +19,7 @@ echo "formatting cluster"
 _cluster_format -c 1
 
 echo "creating vdi ${NAME}"
-$COLLIE vdi create ${VDI_NAME} ${VDI_SIZE}
+$DOG vdi create ${VDI_NAME} ${VDI_SIZE}
 sleep 1
 
 echo "filling ${VDI_NAME} with data"

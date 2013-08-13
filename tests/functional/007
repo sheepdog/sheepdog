@@ -9,7 +9,7 @@
 _start_sheep 1
 _wait_for_sheep 1 1
 _cluster_format -p 7001 -c 1
-$COLLIE cluster shutdown -p 7001
+$DOG cluster shutdown -p 7001
 _wait_for_sheep_stop
 
 # start Sheepdog with one node
@@ -23,5 +23,5 @@ _wait_for_sheep 1
 _start_sheep 2  # should succeed
 _wait_for_sheep 2
 
-$COLLIE cluster info -p 7000 | _filter_cluster_info
-$COLLIE cluster info -p 7002 | _filter_cluster_info
+$DOG cluster info -p 7000 | _filter_cluster_info
+$DOG cluster info -p 7002 | _filter_cluster_info

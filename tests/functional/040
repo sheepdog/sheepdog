@@ -10,7 +10,7 @@ _wait_for_sheep 1
 _cluster_format -c 1
 
 # create vdi in background
-$COLLIE vdi create test 4G &
+$DOG vdi create test 4G &
 
 # the created vdi object will be move from sheep 0 to sheep 1
 _start_sheep 1

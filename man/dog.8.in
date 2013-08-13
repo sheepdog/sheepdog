@@ -1,10 +1,10 @@
 .TH SHEEPDOG 8 @DATE@
 .SH NAME
-collie \- Command line utility for the sheep daemon
+dog \- Command line utility for the sheep daemon
 .SH SYNOPSIS
-.B "collie <command> <subcommand> [options]"
+.B "dog <command> <subcommand> [options]"
 .SH DESCRIPTION
-.B collie
+.B dog
 - Sheepdog is a distributed storage system for QEMU. It provides
 highly available block level storage volumes to virtual machines.
 Sheepdog supports advanced volume management features such as snapshot,
@@ -12,10 +12,10 @@ cloning, and thin provisioning. The architecture of Sheepdog is fully
 symmetric; there is no central node such as a meta-data server.
 
 The server daemon is called sheep(8).  A command line utility is available
-via collie(8).  QEMU virtual machines use the sheep daemon via a block
+via dog(8).  QEMU virtual machines use the sheep daemon via a block
 driver available in qemu(1).
 
-For more information, run 'collie <command> <subcommand> --help'.
+For more information, run 'dog <command> <subcommand> --help'.
 .SH COMMAND & SUBCOMMAND
 @OPTIONS@
 

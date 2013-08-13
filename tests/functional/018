@@ -12,14 +12,14 @@ _wait_for_sheep "3"
 
 _cluster_format -c 2
 
-$COLLIE vdi create test 4M
+$DOG vdi create test 4M
 
-_random | $COLLIE vdi write -w test
+_random | $DOG vdi write -w test
 
-$COLLIE vdi cache flush test
+$DOG vdi cache flush test
 
 for port in `seq 0 2`; do
-    $COLLIE vdi read test -p 700$port | md5sum > $STORE/csum.$port
+    $DOG vdi read test -p 700$port | md5sum > $STORE/csum.$port
 done
 
 for port in `seq 1 2`; do

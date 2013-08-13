@@ -314,7 +314,7 @@ fi
 
 if $valgrind; then
     export SHEEP=_valgrind_sheep
-    export COLLIE=_valgrind_collie
+    export DOG=_valgrind_dog
 fi
 
 # we need common.rc

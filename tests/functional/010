@@ -11,13 +11,13 @@ done
 _wait_for_sheep 5
 
 _cluster_format
-$COLLIE cluster recover disable
+$DOG cluster recover disable
 
-$COLLIE vdi create test 4G
+$DOG vdi create test 4G
 
 # create 8 objects
 for i in `seq 0 7`; do
-    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
 ls $STORE/*/obj/* | _filter_store | sort
@@ -26,43 +26,43 @@ _kill_sheep 3
 _kill_sheep 4
 
 _wait_for_sheep 3
-$COLLIE cluster info | head -6 | _filter_cluster_info
+$DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
 
 # overwrite the objects to invoke object recovery
 for i in `seq 4 7`; do
-    $COLLIE vdi read test $((i * 4 * 1024 * 1024)) 512 | md5sum
-    echo $(($i + 100)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    $DOG vdi read test $((i * 4 * 1024 * 1024)) 512 | md5sum
+    echo $(($i + 100)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$COLLIE cluster info | head -6 | _filter_cluster_info
+$DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
 
-$COLLIE cluster recover enable
+$DOG cluster recover enable
 _wait_for_sheep_recovery 0
-$COLLIE cluster info | head -6 | _filter_cluster_info
+$DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
 
-$COLLIE cluster recover disable
+$DOG cluster recover disable
 for i in `seq 3 7`; do
     _start_sheep $i
 done
 
 _wait_for_sheep 8
 
-$COLLIE cluster info | head -6 | _filter_cluster_info
+$DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
 
 # overwrite the objects to invoke object recovery
 for i in `seq 0 3`; do
-    $COLLIE vdi read test $((i * 4 * 1024 * 1024)) 512 -p 7007 | md5sum
-    echo $(($i + 200)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    $DOG vdi read test $((i * 4 * 1024 * 1024)) 512 -p 7007 | md5sum
+    echo $(($i + 200)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$COLLIE cluster info | head -6 | _filter_cluster_info
+$DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
 
-$COLLIE cluster recover enable
+$DOG cluster recover enable
 _wait_for_sheep_recovery 0
-$COLLIE cluster info | head -6 | _filter_cluster_info
+$DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort

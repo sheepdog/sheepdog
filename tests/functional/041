@@ -11,51 +11,51 @@ done
 _wait_for_sheep 5
 
 _cluster_format
-$COLLIE vdi create test 12M
+$DOG vdi create test 12M
 
 # create the first object
-echo 0 | $COLLIE vdi write test 0 512
-$COLLIE vdi snapshot test -s snap1
+echo 0 | $DOG vdi write test 0 512
+$DOG vdi snapshot test -s snap1
 
 # create the second object
-echo 1 | $COLLIE vdi write test $((4 * 1024 * 1024)) 512
-$COLLIE vdi snapshot test -s snap2
+echo 1 | $DOG vdi write test $((4 * 1024 * 1024)) 512
+$DOG vdi snapshot test -s snap2
 
 # update the first object
-echo 2 | $COLLIE vdi write test 0 512
-$COLLIE vdi snapshot test -s snap3
+echo 2 | $DOG vdi write test 0 512
+$DOG vdi snapshot test -s snap3
 
 # check vdis
 _vdi_list
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 for i in `seq 1 3`; do
-    $COLLIE vdi read test -s snap$i | md5sum
+    $DOG vdi read test -s snap$i | md5sum
 done
 
 # create backup files between snapshots
-$COLLIE vdi backup test -F snap1 -s snap2 > $STORE/backup.1.2
-$COLLIE vdi backup test -F snap1 -s snap3 > $STORE/backup.1.3
-$COLLIE vdi backup test -F snap2 -s snap3 > $STORE/backup.2.3
+$DOG vdi backup test -F snap1 -s snap2 > $STORE/backup.1.2
+$DOG vdi backup test -F snap1 -s snap3 > $STORE/backup.1.3
+$DOG vdi backup test -F snap2 -s snap3 > $STORE/backup.2.3
 
 # restore backups
-$COLLIE vdi restore test -s snap1 < $STORE/backup.1.2
+$DOG vdi restore test -s snap1 < $STORE/backup.1.2
 _vdi_list
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 
-$COLLIE vdi restore test -s 4 < $STORE/backup.2.3
+$DOG vdi restore test -s 4 < $STORE/backup.2.3
 _vdi_list
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 
-$COLLIE vdi restore test -s snap1 < $STORE/backup.1.3
+$DOG vdi restore test -s snap1 < $STORE/backup.1.3
 _vdi_list
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 
-$COLLIE vdi restore test -s snap2 < $STORE/backup.2.3
+$DOG vdi restore test -s snap2 < $STORE/backup.2.3
 _vdi_list
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 
 # check vdi contents
-$COLLIE vdi read test | md5sum
-for i in `seq 1 $($COLLIE vdi list | grep "^s " | wc -l)`; do
-    $COLLIE vdi read test -s $i | md5sum
+$DOG vdi read test | md5sum
+for i in `seq 1 $($DOG vdi list | grep "^s " | wc -l)`; do
+    $DOG vdi read test -s $i | md5sum
 done

@@ -31,12 +31,12 @@ GSYMS
 #
 # programs
 #
-collie/collie
+dog/dog
 sheep/sheep
 sheepfs/sheepfs
 shepherd/shepherd
 tools/zk_control
-tests/unit/collie/test_common
+tests/unit/dog/test_common
 tests/unit/sheep/test_vdi
 tests/unit/sheep/test_cluster_driver
 
@@ -73,7 +73,7 @@ tests/*.out.bad
 *.patch
 
 man/sheep.8
-man/collie.8
+man/dog.8
 man/sheepfs.8
 
 *.deb

@@ -25,7 +25,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 
 	sd_debug("update epoch: %d, %zu", epoch, nr_nodes);
 
-	/* Piggyback the epoch creation time for 'collie cluster info' */
+	/* Piggyback the epoch creation time for 'dog cluster info' */
 	time(&t);
 	nodes_len = nr_nodes * sizeof(struct sd_node);
 	len = nodes_len + sizeof(time_t);

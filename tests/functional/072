@@ -16,8 +16,8 @@ _cluster_format -c 1
 _start_sheep 2
 _wait_for_sheep 3
 
-$COLLIE vdi create test 8M -P
-$COLLIE cluster shutdown
+$DOG vdi create test 8M -P
+$DOG cluster shutdown
 
 mv $STORE/0/obj/007c2b2500000001 $STORE/0/obj/.stale/007c2b2500000001.1
 mv $STORE/1/obj/807c2b2500000000 $STORE/1/obj/.stale/807c2b2500000000.1
@@ -33,4 +33,4 @@ for i in 0 1 2; do
     _vdi_list -p $((7000+$i))
 done
 
-$COLLIE vdi check test
+$DOG vdi check test

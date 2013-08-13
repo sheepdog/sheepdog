@@ -12,43 +12,43 @@ _wait_for_sheep 5
 
 _cluster_format
 
-$COLLIE vdi create test 40M
+$DOG vdi create test 40M
 
 for i in `seq 0 10`; do
-    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
 for i in 0 1 2 3 4; do
-    $COLLIE vdi read test -p 700$i | md5sum
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG vdi read test -p 700$i | md5sum
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done
 
 # remove obj directory to occur EIO
 _safe_remove $STORE/4/obj
 
 for i in `seq 0 10`; do
-    echo $(($i + 100)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $(($i + 100)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
 for i in 0 1 2 3 4; do
-    $COLLIE vdi read test -p 700$i | md5sum
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG vdi read test -p 700$i | md5sum
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done
 
 # check whether sheep 4 can receive confchg event
 _kill_sheep 3
 
 for i in `seq 0 10`; do
-    echo $(($i + 200)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $(($i + 200)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
 for i in 0 1 2 4; do
-    $COLLIE vdi read test -p 700$i | md5sum
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG vdi read test -p 700$i | md5sum
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done
 
 # check whether sheep 4 can receive notify event
-$COLLIE vdi create test2 20M
+$DOG vdi create test2 20M
 
 for i in 0 1 2 4; do
     _vdi_list -p 700$i
@@ -56,4 +56,4 @@ done
 
 # check whether we can write to a gateway after EIO
 _safe_remove $STORE/0/obj
-echo hello | $COLLIE vdi write test 0 512
+echo hello | $DOG vdi write test 0 512

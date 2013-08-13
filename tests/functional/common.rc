@@ -141,7 +141,7 @@ _die()
 _cleanup()
 {
     local i
-    _kill_all_collies
+    _kill_all_dogs
     _kill_all_sheeps
 
     _cleanup_devices
@@ -225,7 +225,7 @@ _wait_for_sheep()
             _die "should have $1, but have $(_count_sheep_processes) sheep"
         fi
 
-        node_list="$($COLLIE node list -p $PORT 2> /dev/null)"
+        node_list="$($DOG node list -p $PORT 2> /dev/null)"
 
         if [ $? != 0 ]; then
             # sheep is not ready yet
@@ -270,10 +270,10 @@ _valgrind_sheep()
     done
 }
 
-_valgrind_collie()
+_valgrind_dog()
 {
     local logfile=$(mktemp)
-    valgrind --log-file=$logfile --error-exitcode=99 ${VALGRIND_OPTIONS} $COLLIE_PROG $*
+    valgrind --log-file=$logfile --error-exitcode=99 ${VALGRIND_OPTIONS} $DOG_PROG $*
     local ret=$?
     if [ $ret == 99 ]; then
         cat $logfile 1>&2
@@ -311,12 +311,12 @@ _start_sheep()
     fi
 }
 
-_kill_all_collies()
+_kill_all_dogs()
 {
-    pkill -9 -f "$COLLIE_PROG (cluster|vdi|node|debug)"
+    pkill -9 -f "$DOG_PROG (cluster|vdi|node|debug)"
 
     while [ $? == 0 ]; do
-        pgrep -f "$COLLIE_PROG (cluster|vdi|node|debug)" > /dev/null
+        pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" > /dev/null
     done
 }
 
@@ -342,7 +342,7 @@ _wait_for_sheep_recovery()
 {
     while true; do
         sleep 2
-        recovery_info="$($COLLIE node recovery -p $((7000+$1)))"
+        recovery_info="$($DOG node recovery -p $((7000+$1)))"
 
         if [ $? != 0 ]; then
             _die "failed to get recovery info"
@@ -459,18 +459,18 @@ _cluster_format()
     local args=$*
     local port_opt=$(echo $args | grep -oE '\-*p[^ ]* 7...')
 
-    $COLLIE cluster format $args
+    $DOG cluster format $args
     if [ $? != 0 ]; then
 	_die "failed to format cluster"
     fi
 
     # wait for all the sheeps to be running
-    local ports=$($COLLIE node list -r $port_opt | perl -ne 'print "$1\n" if /:(\d+)/')
+    local ports=$($DOG node list -r $port_opt | perl -ne 'print "$1\n" if /:(\d+)/')
     local port
     for port in $ports; do
 	local cnt
 	for cnt in `seq 10`; do # wait at most 10 seconds
-	    $COLLIE cluster info -p $port | grep -E running > /dev/null
+	    $DOG cluster info -p $port | grep -E running > /dev/null
 	    if [ $? == 0 ]; then
 		continue 2
 	    fi
@@ -507,7 +507,7 @@ _kill_zk_session()
 _vdi_list()
 {
 	local args=$*
-	$COLLIE vdi list $args | _filter_short_date
+	$DOG vdi list $args | _filter_short_date
 }
 
 # make sure this script returns success

@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 EXTRA_DIST		= generic.in
 
-noinst_HEADERS		= bash_completion_collie checkarch.sh vditest
+noinst_HEADERS		= bash_completion_dog checkarch.sh vditest
 
 target_INIT             = generic
 

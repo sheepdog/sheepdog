@@ -18,7 +18,7 @@ _wait_for_sheep 3
 
 echo check the number of vnodes
 for i in 0 1 2; do
-    $COLLIE node list -p 700$i
+    $DOG node list -p 700$i
 done
 
 status=0

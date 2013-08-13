@@ -13,11 +13,11 @@ _wait_for_sheep 7
 _cluster_format -c 3
 
 for i in `seq 2 4`; do
-	$COLLIE vdi create test$i 20M -c $i -P
+	$DOG vdi create test$i 20M -c $i -P
 done
 
-$COLLIE vdi snapshot -s tag test2
-$COLLIE vdi clone -s 1 test2 clone -c 3
+$DOG vdi snapshot -s tag test2
+$DOG vdi clone -s 1 test2 clone -c 3
 
 
 for i in `seq 2 3`; do
@@ -30,12 +30,12 @@ done
 
 _wait_for_sheep_recovery 0
 
-$COLLIE vdi delete clone
-$COLLIE vdi delete -s 1 test2
+$DOG vdi delete clone
+$DOG vdi delete -s 1 test2
 
 _vdi_list
 
 for i in `seq 2 4`; do
-	$COLLIE vdi object test$i -i 1;
+	$DOG vdi object test$i -i 1;
 done
 

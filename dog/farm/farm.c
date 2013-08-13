@@ -186,7 +186,7 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 	hdr.vdi_state.copies = nr_copies;
 	hdr.vdi_state.set_bitmap = true;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 
 	if (ret)
 		sd_err("Fail to notify vdi add event(%"PRIx32", %d)", vdi_id,

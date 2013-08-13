@@ -15,7 +15,7 @@ sudo ~/dynamorio/build/bin64/drrun -c libjournaling.so 1 -- \
 
 sleep 3
 
-collie cluster format -c 1
-collie vdi create test 100M
+dog cluster format -c 1
+dog vdi create test 100M
 
 sudo sheep -d -c shepherd:127.0.0.1 -p 7000 -j size=64 /tmp/sheepdog/dynamorio/0

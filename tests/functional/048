@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test some collie commands
+# Test some dog commands
 
 . ./common
 
@@ -12,14 +12,14 @@ _wait_for_sheep 3
 
 _cluster_format
 
-$COLLIE vdi create test 1G
+$DOG vdi create test 1G
 
-echo hello | $COLLIE vdi write test 4M 512
+echo hello | $DOG vdi write test 4M 512
 # kill the master gracefully
-$COLLIE node kill 0
+$DOG node kill 0
 sleep 2
 _wait_for_sheep_recovery 1
-$COLLIE node list -p 7001
+$DOG node list -p 7001
 
 nr=2
 for i in 3 4 0; do
@@ -29,12 +29,12 @@ for i in 3 4 0; do
 done
 _wait_for_sheep_recovery 0
 
-$COLLIE vdi track test
-$COLLIE vdi track -i 1 test
+$DOG vdi track test
+$DOG vdi track -i 1 test
 _vdi_list test
-$COLLIE vdi list -r test | awk '{$7="MASKED";print $0}'
+$DOG vdi list -r test | awk '{$7="MASKED";print $0}'
 
-$COLLIE vdi check test
+$DOG vdi check test
 # clear the 'first' data block
 dd if=/dev/zero of=$STORE/0/obj/007c2b2500000001 bs=1M count=4 > /dev/null 2>&1
-$COLLIE vdi check test | sort | uniq
+$DOG vdi check test | sort | uniq

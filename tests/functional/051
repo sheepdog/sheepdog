@@ -9,12 +9,12 @@ for i in 0 1; do
 done
 _wait_for_sheep 2
 _cluster_format
-$COLLIE cluster info | _filter_cluster_info
+$DOG cluster info | _filter_cluster_info
 
 _start_sheep 2
 _wait_for_sheep 3
-$COLLIE cluster info | _filter_cluster_info
+$DOG cluster info | _filter_cluster_info
 
 _kill_sheep 2
 _wait_for_sheep 2
-$COLLIE cluster info | _filter_cluster_info
+$DOG cluster info | _filter_cluster_info

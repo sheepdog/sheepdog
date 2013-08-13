@@ -11,16 +11,16 @@ done
 _wait_for_sheep 2
 _cluster_format -c 2
 
-$COLLIE vdi create t 1G -P
+$DOG vdi create t 1G -P
 
 # move objects into stale directory
 _kill_sheep 0
 _start_sheep 0 "-w size=400"
 _wait_for_sheep 2
 
-dd if=/dev/zero | $COLLIE vdi write -w t &
+dd if=/dev/zero | $DOG vdi write -w t &
 
 _wait_for_sheep_recovery 1
 wait
 
-$COLLIE cluster info | _filter_cluster_info
+$DOG cluster info | _filter_cluster_info

@@ -25,8 +25,8 @@ _wait_for_sheep 4
 _cluster_format
 
 # create two VDIs before there are enough spaces
-$COLLIE vdi create test0 100M
-$COLLIE vdi create test1 100M
+$DOG vdi create test0 100M
+$DOG vdi create test1 100M
 
 # make sheep 0 and 1 disk full
 dd if=/dev/zero of=$STORE/2/zero > /dev/null 2>&1
@@ -34,16 +34,16 @@ dd if=/dev/zero of=$STORE/3/zero > /dev/null 2>&1
 
 # test data write against disk-full cluster
 for i in `seq 0 10`; do
-    echo $i | $COLLIE vdi write test0 $((i * 4 * 1024 * 1024)) 512 -p 7000
-    echo $i | $COLLIE vdi write test1 $((i * 4 * 1024 * 1024)) 512 -p 7002
+    echo $i | $DOG vdi write test0 $((i * 4 * 1024 * 1024)) 512 -p 7000
+    echo $i | $DOG vdi write test1 $((i * 4 * 1024 * 1024)) 512 -p 7002
 done
 
 # test vdi creation against disk-full cluster
-$COLLIE vdi create test2 100M -p 7000
-$COLLIE vdi create test3 100M -p 7002
+$DOG vdi create test2 100M -p 7000
+$DOG vdi create test3 100M -p 7002
 
 for i in `seq 0 3`; do
-    $COLLIE node list -p 700$i
+    $DOG node list -p 700$i
 done
 _node_info
 ls $STORE/*/obj/* | _filter_store | sort

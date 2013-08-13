@@ -65,7 +65,7 @@ Installing from source
    $ make rpm
    $ sudo rpm -ivh x86_64/sheepdog-0.*
 
-Please read the README file, the sheep(8), collie(8) or sheepfs(8) man page for
+Please read the README file, the sheep(8), dog(8) or sheepfs(8) man page for
 further usage instructions.
 
 ===============================================================================

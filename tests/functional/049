@@ -12,10 +12,10 @@ _wait_for_sheep 3
 
 _cluster_format -c 1
 
-$COLLIE vdi create test 20M
-_random | $COLLIE vdi write -w test
+$DOG vdi create test 20M
+_random | $DOG vdi write -w test
 
-$COLLIE cluster shutdown
+$DOG cluster shutdown
 _wait_for_sheep_stop
 
 #trigger an object reclaim at startup

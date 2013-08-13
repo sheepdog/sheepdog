@@ -13,7 +13,7 @@
 
 /*
  * This file specified the sheepdog-internal protocol, which is spoken between
- * sheepdog daemons, as well as between collie and sheepdog daemon for internal
+ * sheepdog daemons, as well as between dog and sheepdog daemon for internal
  * operations.
  */
 
@@ -33,7 +33,7 @@
 
 /*
  * Operations with opcodes above 0x80 are considered part of the inter-sheep
- * include sheep-collie protocol and are versioned using SD_SHEEP_PROTO_VER
+ * include sheep-dog protocol and are versioned using SD_SHEEP_PROTO_VER
  * instead of SD_PROTO_VER.
  *
  * These same applies for the above 0x80 flags and error values below.

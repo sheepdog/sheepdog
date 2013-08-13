@@ -9,10 +9,10 @@ for i in 0 1 2 3; do
 done
 _wait_for_sheep 4
 _cluster_format
-$COLLIE vdi create test 20M -P
-$COLLIE cluster info | _filter_cluster_info
+$DOG vdi create test 20M -P
+$DOG cluster info | _filter_cluster_info
 
-$COLLIE cluster shutdown
+$DOG cluster shutdown
 _wait_for_sheep_stop
 
 for i in 0 1 2 4; do
@@ -20,24 +20,24 @@ for i in 0 1 2 4; do
 done
 _wait_for_sheep 4
 for i in 0 1 2 4; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
     _vdi_list
 done
 
-echo yes | $COLLIE cluster recover force
+echo yes | $DOG cluster recover force
 echo ""
 
 _wait_for_sheep_recovery 0
-$COLLIE vdi check test | sort
+$DOG vdi check test | sort
 
 for i in 0 1 2 4; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
     _vdi_list
 done
 
 _start_sheep 3
 _wait_for_sheep 5
 for i in 0 1 2 3 4; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
     _vdi_list
 done

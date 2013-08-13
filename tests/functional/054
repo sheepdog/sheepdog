@@ -17,15 +17,15 @@ done
 _wait_for_sheep 3
 _cluster_format
 
-$COLLIE vdi create test 100M -P
-$COLLIE cluster info | _filter_cluster_info
+$DOG vdi create test 100M -P
+$DOG cluster info | _filter_cluster_info
 
 #start recovery
 _start_sheep 3
 
 _wait_for_sheep 4
 _wait_for_sheep_recovery 0
-$COLLIE cluster info | _filter_cluster_info
+$DOG cluster info | _filter_cluster_info
 
 #test no object in .stale
 ls $STORE/*/*/.stale | grep ^- | wc -l

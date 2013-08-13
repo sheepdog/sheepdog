@@ -1,12 +1,12 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-dist_man_MANS		= sheep.8 collie.8
+dist_man_MANS		= sheep.8 dog.8
 
 if BUILD_SHEEPFS
 dist_man_MANS 		+= sheepfs.8
 endif
 
-EXTRA_DIST		= sheep.8.in collie.8.in sheepfs.8.in
+EXTRA_DIST		= sheep.8.in dog.8.in sheepfs.8.in
 
 sheep.8.options = $(shell ../sheep/sheep -h | \
 	perl -ne 'print ".TP\n.BI $$1 \"\\fR, \\fP\" $$2\n$$3\n" if /^  ([^,]+), (\S+)\s+(.+)/' | \
@@ -14,9 +14,9 @@ sheep.8.options = $(shell ../sheep/sheep -h | \
 	sed 's/"/\\"/g' | \
 	perl -pe 's/\n/\\n/g')
 
-collie.8.options = $(shell ../collie/collie -h | \
-	perl -ne 'if (/^  (.+?)  \s+(.+)/) {system "../collie/collie $$1 -h"; print "Description:\n  $$2\n"}'| \
-	sed 's/Usage: collie \(.*\)/.TP\n.BI "\1"/g' | \
+dog.8.options = $(shell ../dog/dog -h | \
+	perl -ne 'if (/^  (.+?)  \s+(.+)/) {system "../dog/dog $$1 -h"; print "Description:\n  $$2\n"}'| \
+	sed 's/Usage: dog \(.*\)/.TP\n.BI "\1"/g' | \
 	sed 's/\(^[a-zA-Z]*:\)/\n\1/g' | \
 	sed 's/\\/\\\\\\/g' | \
 	sed 's/"/\\"/g' | \

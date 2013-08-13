@@ -390,7 +390,7 @@ static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 	struct vdi_inode *inode = NULL, *dummy;
 	char command[COMMAND_LEN];
 
-	snprintf(command, sizeof(command), "collie vdi list -r %s -a %s -p %d",
+	snprintf(command, sizeof(command), "dog vdi list -r %s -a %s -p %d",
 		 entry, sdhost, sdport);
 	buf = sheepfs_run_cmd(command);
 	if (!buf)

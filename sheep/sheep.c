@@ -29,7 +29,7 @@ static const char bind_help[] =
 "This tries to teach sheep listen to NIC of 192.168.1.1.\n"
 "\nExample:\n\t$ sheep -b 0.0.0.0 ...\n"
 "This tries to teach sheep listen to all the NICs available. It can be useful\n"
-"when you want sheep to response collie without specified address and port.\n";
+"when you want sheep to response dog without specified address and port.\n";
 
 static const char ioaddr_help[] =
 "Example:\n\t$ sheep -i host=192.168.1.1,port=7002 ...\n"

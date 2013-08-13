@@ -10,13 +10,13 @@ _wait_for_sheep 2
 
 _cluster_format -c 2
 
-$COLLIE vdi create test 100M
+$DOG vdi create test 100M
 
 for i in `seq 0 24`; do
-    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$COLLIE vdi read test | md5sum
+$DOG vdi read test | md5sum
 
 for i in 2 3; do
     _start_sheep $i
@@ -27,10 +27,10 @@ done
 
 # write different content
 for i in `seq 0 24`; do
-    echo $(($i+1)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512 -p 7002
+    echo $(($i+1)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512 -p 7002
 done
 
-$COLLIE vdi read test -p 7002 | md5sum
+$DOG vdi read test -p 7002 | md5sum
 
 for i in 2 3; do
     _start_sheep $(($i-2))
@@ -39,11 +39,11 @@ for i in 2 3; do
     _wait_for_sheep_recovery $(($i-2))
 done
 
-$COLLIE vdi read test | md5sum
-$COLLIE vdi read test -p 7001 | md5sum
+$DOG vdi read test | md5sum
+$DOG vdi read test -p 7001 | md5sum
 
-$COLLIE vdi object test
+$DOG vdi object test
 
 for i in `seq 0 24`; do
-    $COLLIE vdi object -i $i test
+    $DOG vdi object -i $i test
 done

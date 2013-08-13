@@ -12,7 +12,7 @@ cloning, and thin provisioning. The architecture of Sheepdog is fully
 symmetric; there is no central node such as a meta-data server.
 
 The server daemon is called sheep(8).  A command line utility is available
-via collie(8).  QEMU virtual machines use the sheep daemon via a block
+via dog(8).  QEMU virtual machines use the sheep daemon via a block
 driver available in qemu(1).
 .SH OPTIONS
 @OPTIONS@
@@ -32,7 +32,7 @@ mount \-o remount,user_xattr /var/lib/sheepdog
 .B /var/lib/sheepdog - Directory containing block storage information
 
 .SH SEE ALSO
-.BR collie(8),
+.BR dog(8),
 .BR qemu(1),
 .BR sheepfs(8),
 .BR corosync_overview(8)

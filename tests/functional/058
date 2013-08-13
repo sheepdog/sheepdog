@@ -8,11 +8,11 @@ for i in 0 1 2; do
 done
 _wait_for_sheep 3
 _cluster_format
-$COLLIE vdi create test 100M
-dd if=/dev/zero | $COLLIE vdi write -w test
+$DOG vdi create test 100M
+dd if=/dev/zero | $DOG vdi write -w test
 $QEMU_IO -c "discard 0 100m" sheepdog:test | _filter_qemu_io
-$COLLIE vdi check test
+$DOG vdi check test
 for i in `seq 0 24`; do
-	$COLLIE vdi object test -i $i;
+	$DOG vdi object test -i $i;
 done
 _node_info

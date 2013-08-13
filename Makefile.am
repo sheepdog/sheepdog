@@ -17,7 +17,7 @@ sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
 sheepdogsysconf_DATA	= 
 
-SUBDIRS			= lib collie sheep include script shepherd tools
+SUBDIRS			= lib dog sheep include script shepherd tools
 
 if BUILD_SHEEPFS
 SUBDIRS			+= sheepfs
@@ -92,7 +92,7 @@ sparse:
 
 CHECK_STYLE=../script/checkpatch.pl -f --no-summary --terse
 check-style:
-	@for dir in lib collie sheep include sheepfs; do \
+	@for dir in lib dog sheep include sheepfs; do \
 		make -C $$dir check-style CHECK_STYLE="$(CHECK_STYLE)"; \
 	done
 
@@ -100,12 +100,12 @@ if BUILD_COVERAGE
 coverage: clean check
 	@rm -rf coverage
 
-	@for dir in collie sheep tests/unit/collie tests/unit/sheep ; do\
+	@for dir in dog sheep tests/unit/dog tests/unit/sheep ; do\
 		$(MAKE) -C $$dir coverage;				\
 	done
 
-	@lcov -a collie/collie.info -a sheep/sheep.info			\
-	-a tests/unit/collie/collie.info -a tests/unit/sheep/sheep.info	\
+	@lcov -a dog/dog.info -a sheep/sheep.info			\
+	-a tests/unit/dog/dog.info -a tests/unit/sheep/sheep.info	\
 	-o sheep.info &&						\
 	lcov -r sheep.info /usr/include/\* -o sheep.info &&		\
 	lcov -r sheep.info tests/unit/\* -o sheep.info &&		\

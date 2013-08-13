@@ -15,36 +15,36 @@ for i in 0 1 2; do
 done
 _wait_for_sheep 3
 _cluster_format
-$COLLIE vdi create test 100M -P
+$DOG vdi create test 100M -P
 
 _md_info
 
 # plug during node event
 _start_sheep 3
 _wait_for_sheep 4
-$COLLIE node md plug  $STORE/0/d3,$STORE/0/d4
+$DOG node md plug  $STORE/0/d3,$STORE/0/d4
 _wait_for_sheep_recovery 0
 _md_info
-$COLLIE vdi check test
-$COLLIE cluster info | _filter_cluster_info
+$DOG vdi check test
+$DOG cluster info | _filter_cluster_info
 
 # plug duplicate path
-$COLLIE node md plug  $STORE/0/d3
-$COLLIE node recovery
+$DOG node md plug  $STORE/0/d3
+$DOG node recovery
 _md_info
 
 # unplug
-$COLLIE node md unplug  $STORE/0/d0,$STORE/0/d1
+$DOG node md unplug  $STORE/0/d0,$STORE/0/d1
 _wait_for_sheep_recovery 0
 _md_info
-$COLLIE vdi check test
-$COLLIE cluster info | _filter_cluster_info
+$DOG vdi check test
+$DOG cluster info | _filter_cluster_info
 
 # unplug invalid path
-$COLLIE node md unplug  $STORE/0/d0
-$COLLIE node recovery
+$DOG node md unplug  $STORE/0/d0
+$DOG node recovery
 _md_info
-$COLLIE cluster info | _filter_cluster_info
+$DOG cluster info | _filter_cluster_info
 
 # check stale object purging
 find $STORE/*/d*/.stale/ -type f | _filter_store

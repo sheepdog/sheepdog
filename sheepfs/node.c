@@ -57,7 +57,7 @@ size_t node_info_get_size(const char *path)
 	size_t len;
 	char cmd[COMMAND_LEN];
 
-	snprintf(cmd, sizeof(cmd), "collie node info -a %s -p %d",
+	snprintf(cmd, sizeof(cmd), "dog node info -a %s -p %d",
 		 sdhost, sdport);
 	buf = sheepfs_run_cmd(cmd);
 	if (!buf)
@@ -80,7 +80,7 @@ size_t node_list_get_size(const char *path)
 	size_t len;
 	char cmd[COMMAND_LEN];
 
-	snprintf(cmd, sizeof(cmd), "collie node list -a %s -p %d",
+	snprintf(cmd, sizeof(cmd), "dog node list -a %s -p %d",
 		 sdhost, sdport);
 	buf = sheepfs_run_cmd(cmd);
 	if (!buf)

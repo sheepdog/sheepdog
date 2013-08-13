@@ -12,11 +12,11 @@ _wait_for_sheep 3
 
 _cluster_format -c 1
 
-$COLLIE vdi create test 40M -P
+$DOG vdi create test 40M -P
 
 _kill_sheep 2
 _wait_for_sheep_recovery 0
 _start_sheep 2
 _wait_for_sheep_recovery 0
 
-$COLLIE vdi check test
+$DOG vdi check test

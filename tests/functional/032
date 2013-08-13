@@ -12,13 +12,13 @@ _wait_for_sheep 8
 
 _cluster_format
 
-$COLLIE vdi create test 100MB
+$DOG vdi create test 100MB
 # create 25 objects
 for i in `seq 0 24`; do
-    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$COLLIE vdi read test | md5sum
+$DOG vdi read test | md5sum
 
 for i in `seq 7 -1 0`; do
     _wait_for_sheep_recovery 0
@@ -42,4 +42,4 @@ for i in `seq 0 24`; do
 done
 ls $STORE/*/obj/.stale | _filter_store | sort
 
-$COLLIE vdi read test | md5sum
+$DOG vdi read test | md5sum

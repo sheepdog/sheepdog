@@ -10,7 +10,7 @@ done
 
 _wait_for_sheep 3
 
-$COLLIE cluster format
+$DOG cluster format
 sleep 1
 
 # kill a non-master sheep
@@ -26,10 +26,10 @@ _kill_zk_session 0
 sleep 5
 
 for i in 0 1 2; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done
 
-$COLLIE vdi create test 10M
+$DOG vdi create test 10M
 for i in 0 1 2; do
     _vdi_list -p $((7000+$i))
 done

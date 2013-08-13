@@ -142,7 +142,7 @@ static const char *format_thread_name(char *str, size_t size, const char *name,
 }
 
 /*
- * We need to set default log formatter because collie doesn't want to call
+ * We need to set default log formatter because dog doesn't want to call
  * select_log_formatter().
  */
 static void __attribute__((constructor(65535)))

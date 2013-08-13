@@ -145,7 +145,7 @@ _filter_spaces()
     sed -e 's/ *$//'
 }
 
-# normalize collie cluster info output
+# normalize dog cluster info output
 _filter_cluster_info()
 {
     _filter_date | _filter_iso_date

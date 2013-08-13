@@ -13,7 +13,7 @@ _wait_for_sheep 3
 # start Sheepdog with 3 nodes
 _cluster_format
 
-$COLLIE cluster shutdown -p 7000
+$DOG cluster shutdown -p 7000
 _wait_for_sheep_stop
 
 for i in 3 4 5; do
@@ -29,5 +29,5 @@ done
 _wait_for_sheep 6
 
 for i in `seq 0 5`; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done

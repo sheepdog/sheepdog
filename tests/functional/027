@@ -12,8 +12,8 @@ _wait_for_sheep "4"
 
 _cluster_format -c 2
 
-$COLLIE vdi create test0 40M
-$COLLIE vdi create test1 40M
+$DOG vdi create test0 40M
+$DOG vdi create test1 40M
 
 _kill_sheep 3
 

@@ -16,7 +16,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "collie.h"
+#include "dog.h"
 #include "treeview.h"
 #include "sha1.h"
 
@@ -315,7 +315,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 		hdr.obj.oid = oid;
 
-		ret = collie_exec_req(sd_nodes[i].nid.addr,
+		ret = dog_exec_req(sd_nodes[i].nid.addr,
 				      sd_nodes[i].nid.port, &hdr, buf);
 		if (ret < 0)
 			continue;
@@ -402,7 +402,7 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.vdi.snapid = snapid;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 	if (ret < 0)
 		return -1;
 
@@ -469,7 +469,7 @@ int do_vdi_create(const char *vdiname, int64_t vdi_size,
 	hdr.vdi.vdi_size = vdi_size;
 	hdr.vdi.copies = nr_copies;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -755,7 +755,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	if (snap_tag)
 		pstrcpy(data + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, snap_tag);
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, data);
+	ret = dog_exec_req(sdhost, sdport, &hdr, data);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -895,7 +895,7 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, logs);
+	ret = dog_exec_req(sdhost, sdport, &hdr, logs);
 	if (ret < 0)
 		goto error;
 
@@ -1033,7 +1033,7 @@ static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snap
 	if (delete)
 		hdr.flags |= SD_FLAG_CMD_DEL;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, &vattr);
+	ret = dog_exec_req(sdhost, sdport, &hdr, &vattr);
 	if (ret < 0)
 		return SD_RES_EIO;
 
@@ -1335,7 +1335,7 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 
 	hdr.obj.oid = oid;
 
-	ret = collie_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
+	ret = dog_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
 
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1372,7 +1372,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	hdr.data_length = get_objsize(oid);
 	hdr.obj.oid = oid;
 
-	ret = collie_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
+	ret = dog_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
 
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1453,7 +1453,7 @@ static void vdi_hash_check_work(struct work *work)
 	hdr.obj.oid = info->oid;
 	hdr.obj.tgt_epoch = sd_epoch;
 
-	ret = collie_exec_req(vcw->vnode->nid.addr, vcw->vnode->nid.port, &hdr,
+	ret = dog_exec_req(vcw->vnode->nid.addr, vcw->vnode->nid.port, &hdr,
 			      NULL);
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1981,7 +1981,7 @@ static int vdi_cache_info(int argc, char **argv)
 
 	sd_init_req(&hdr, SD_OP_GET_CACHE_INFO);
 	hdr.data_length = sizeof(info);
-	ret = collie_exec_req(sdhost, sdport, &hdr, &info);
+	ret = dog_exec_req(sdhost, sdport, &hdr, &info);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -2085,7 +2085,7 @@ static struct subcommand vdi_cmd[] = {
 	{"restore", "<vdiname> <backup>", "saph", "restore snapshot images from a backup",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_restore, vdi_options},
-	{"cache", "<vdiname>", "saph", "Run 'collie vdi cache' for more information",
+	{"cache", "<vdiname>", "saph", "Run 'dog vdi cache' for more information",
 	 vdi_cache_cmd, CMD_NEED_ARG,
 	 vdi_cache, vdi_options},
 	{NULL,},

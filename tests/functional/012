@@ -16,4 +16,4 @@ _start_sheep 4 "-g"
 _wait_for_sheep 4
 
 echo check the number of vnodes
-$COLLIE node list
+$DOG node list

@@ -23,4 +23,4 @@ $QEMU_IMG snapshot -c tag2 sheepdog:test2
 $QEMU_IO -c "write 0 512" sheepdog:test2:1 | _filter_qemu_io
 $QEMU_IMG snapshot -c tag3 sheepdog:test2
 
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date

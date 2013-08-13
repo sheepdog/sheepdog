@@ -82,7 +82,7 @@ Usage
 
    2. Make fs
 
-      $ collie cluster format --copies=3
+      $ dog cluster format --copies=3
 
       --copies specifies the number of default data redundancy. In this case,
       the replicated data is stored on three machines.
@@ -91,7 +91,7 @@ Usage
 
       Following list shows that Sheepdog is running on 32 nodes.
 
-      $ collie node list
+      $ dog node list
         Idx	Node id (FNV-1a) - Host:Port
       ------------------------------------------------
         0	0308164db75cff7e - 10.68.13.15:7000
@@ -138,7 +138,7 @@ Usage
 
    3. See Sheepdog images by the following command.
 
-      $ collie vdi list
+      $ dog vdi list
         name        id    size    used  shared    creation time  object id
       --------------------------------------------------------------------
         Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
@@ -151,7 +151,7 @@ Usage
 
    2. Following command checks used images.
 
-      $ collie vm list
+      $ dog vm list
       Name            |Vdi size |Allocated| Shared  | Status
       ----------------+---------+---------+---------+------------
       Bob             |   2.0 GB|   1.6 GB|   0.0 MB| running on xx.xx.xx.xx
@@ -167,7 +167,7 @@ Usage
    2. After getting snapshot, a new virtual machine images are added as a not-
       current image.
 
-      $ collie vdi list
+      $ dog vdi list
         name        id    size    used  shared    creation time  object id
       --------------------------------------------------------------------
         Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000
@@ -185,7 +185,7 @@ Usage
 
    2. Charlie's image is added to the virtual machine list.
 
-      $ collie vdi list
+      $ dog vdi list
         name        id    size    used  shared    creation time  object id
       --------------------------------------------------------------------
         Bob          0  2.0 GB  1.6 GB  0.0 MB 2010-03-23 16:16      80000

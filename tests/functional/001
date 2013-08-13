@@ -37,5 +37,5 @@ done
 _wait_for_sheep 3
 echo check whether all nodes have the same cluster info
 for i in 0 1 2; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done

@@ -12,7 +12,7 @@ cloning, and thin provisioning. The architecture of Sheepdog is fully
 symmetric; there is no central node such as a meta-data server.
 
 The server daemon is called sheep(8).  A command line utility is available
-via collie(8). A pseudo file system is available via sheepfs(8). QEMU
+via dog(8). A pseudo file system is available via sheepfs(8). QEMU
 virtual machines use the sheep daemon via a block driver available in qemu(1).
 
 Sheepfs is a FUSE-based pseudo file system in userland to access both
@@ -47,7 +47,7 @@ none
 
 .SH SEE ALSO
 .BR sheep(8),
-.BR collie(8),
+.BR dog(8),
 .BR qemu(1),
 .BR corosync_overview(8)
 

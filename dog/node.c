@@ -9,7 +9,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "collie.h"
+#include "dog.h"
 
 static struct node_cmd_data {
 	bool all_nodes;
@@ -115,7 +115,7 @@ static int get_recovery_state(struct recovery_state *state)
 	sd_init_req(&req, SD_OP_STAT_RECOVERY);
 	req.data_length = sizeof(*state);
 
-	ret = collie_exec_req(sdhost, sdport, &req, state);
+	ret = dog_exec_req(sdhost, sdport, &req, state);
 	if (ret < 0) {
 		sd_err("Failed to execute request");
 		return -1;
@@ -205,7 +205,7 @@ static int node_recovery(int argc, char **argv)
 		sd_init_req(&req, SD_OP_STAT_RECOVERY);
 		req.data_length = sizeof(state);
 
-		ret = collie_exec_req(sd_nodes[i].nid.addr,
+		ret = dog_exec_req(sd_nodes[i].nid.addr,
 				      sd_nodes[i].nid.port, &req, &state);
 		if (ret < 0)
 			return EXIT_SYSFAIL;
@@ -271,7 +271,7 @@ static int node_md_info(struct node_id *nid)
 	sd_init_req(&hdr, SD_OP_MD_INFO);
 	hdr.data_length = sizeof(info);
 
-	ret = collie_exec_req(nid->addr, nid->port, &hdr, &info);
+	ret = dog_exec_req(nid->addr, nid->port, &hdr, &info);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -336,7 +336,7 @@ static int do_plug_unplug(char *disks, bool plug)
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = strlen(disks) + 1;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, disks);
+	ret = dog_exec_req(sdhost, sdport, &hdr, disks);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -405,7 +405,7 @@ static struct subcommand node_cmd[] = {
 	 CMD_NEED_NODELIST, node_info},
 	{"recovery", NULL, "aphPr", "show recovery information of nodes", NULL,
 	 CMD_NEED_NODELIST, node_recovery, node_options},
-	{"md", "[disks]", "apAh", "See 'collie node md' for more information",
+	{"md", "[disks]", "apAh", "See 'dog node md' for more information",
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
 	{NULL,},
 };

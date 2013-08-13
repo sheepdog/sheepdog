@@ -63,12 +63,12 @@ fi
 %doc COPYING README INSTALL
 %{_sbindir}/sheep
 %{_sbindir}/sheepfs
-%{_sbindir}/collie
+%{_sbindir}/dog
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/sheepfs.8*
-%{_mandir}/man8/collie.8*
+%{_mandir}/man8/dog.8*
 
 %changelog
 * @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@

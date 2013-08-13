@@ -28,7 +28,7 @@ AC_INIT([sheepdog], m4_default(git_version, sheepdog_version),
 	[sheepdog@lists.wpkg.org])
 AM_INIT_AUTOMAKE([-Wno-portability])
 
-AC_CONFIG_SRCDIR([collie/collie.c])
+AC_CONFIG_SRCDIR([dog/dog.c])
 AC_CONFIG_HEADER([include/config.h])
 
 AC_CANONICAL_HOST
@@ -127,7 +127,7 @@ AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		strerror strrchr strspn strstr])
 
 AC_CONFIG_FILES([Makefile
-		collie/Makefile
+		dog/Makefile
 		sheep/Makefile
 		sheepfs/Makefile
 		include/Makefile
@@ -137,7 +137,7 @@ AC_CONFIG_FILES([Makefile
 		shepherd/Makefile
 		tests/unit/Makefile
 		tests/unit/mock/Makefile
-		tests/unit/collie/Makefile
+		tests/unit/dog/Makefile
 		tests/unit/sheep/Makefile
 		tools/Makefile])
 

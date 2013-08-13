@@ -15,13 +15,13 @@
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
-#include "collie.h"
+#include "dog.h"
 #include "util.h"
 #include "sockfd_cache.h"
 
 #define EPOLL_SIZE 4096
 
-static const char program_name[] = "collie";
+static const char program_name[] = "dog";
 /* default sdhost is "127.0.0.1" */
 uint8_t sdhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 };
 int sdport = SD_LISTEN_PORT;
@@ -29,9 +29,9 @@ bool highlight = true;
 bool raw_output;
 bool verbose;
 
-static const struct sd_option collie_options[] = {
+static const struct sd_option dog_options[] = {
 
-	/* common options for all collie commands */
+	/* common options for all dog commands */
 	{'a', "address", true, "specify the daemon address (default: localhost)"},
 	{'p', "port", true, "specify the daemon port"},
 	{'r', "raw", false, "raw output mode: omit headers, separate fields with\n"
@@ -65,7 +65,7 @@ int update_node_list(int max_nodes)
 
 	hdr.data_length = size;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 	if (ret < 0)
 		goto out;
 
@@ -111,7 +111,7 @@ static const struct sd_option *find_opt(int ch)
 	const struct sd_option *opt;
 
 	/* search for common options */
-	sd_for_each_option(opt, collie_options) {
+	sd_for_each_option(opt, dog_options) {
 		if (opt->ch == ch)
 			return opt;
 	}
@@ -316,13 +316,13 @@ static const struct sd_option *build_sd_options(const char *opts)
 
 static void crash_handler(int signo)
 {
-	sd_err("collie exits unexpectedly (%s).", strsignal(signo));
+	sd_err("dog exits unexpectedly (%s).", strsignal(signo));
 
 	sd_backtrace();
 
 	/*
 	 * OOM raises SIGABRT in xmalloc but the administrator expects
-	 * that collie exits with EXIT_SYSFAIL.  We have to give up
+	 * that dog exits with EXIT_SYSFAIL.  We have to give up
 	 * dumping a core file in this case.
 	 */
 	if (signo == SIGABRT)

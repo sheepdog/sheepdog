@@ -13,7 +13,7 @@
 
 #include <check.h>
 
-#include "collie.h"
+#include "dog.h"
 
 /* test */
 START_TEST(test_common)

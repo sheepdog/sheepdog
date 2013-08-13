@@ -11,19 +11,19 @@ done
 _wait_for_sheep 2
 
 _cluster_format -c 2
-$COLLIE vdi create test 4G
+$DOG vdi create test 4G
 
 echo -n value > $STORE/tmp.dat
 
 echo "key shouldn't be found"
-$COLLIE vdi getattr test key
+$DOG vdi getattr test key
 
-$COLLIE vdi setattr test key value
-$COLLIE vdi getattr test key | diff - $STORE/tmp.dat
+$DOG vdi setattr test key value
+$DOG vdi getattr test key | diff - $STORE/tmp.dat
 
-$COLLIE vdi setattr test key value -d
+$DOG vdi setattr test key value -d
 
 echo "key shouldn't be found"
-$COLLIE vdi getattr test key
+$DOG vdi getattr test key
 
 status=0

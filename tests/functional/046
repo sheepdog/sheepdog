@@ -13,27 +13,27 @@ _wait_for_sheep 3
 _cluster_format -c 2
 
 echo "delete snapshot image before current one"
-$COLLIE vdi create test 4G
-$COLLIE vdi snapshot test -s snap
+$DOG vdi create test 4G
+$DOG vdi snapshot test -s snap
 _vdi_list
 
-$COLLIE vdi delete test -s snap
-$COLLIE vdi delete test -s snap # error
+$DOG vdi delete test -s snap
+$DOG vdi delete test -s snap # error
 _vdi_list
 
-$COLLIE vdi delete test
-$COLLIE vdi delete test # error
+$DOG vdi delete test
+$DOG vdi delete test # error
 _vdi_list
 
 echo "delete current image before snapshot one"
-$COLLIE vdi create test 4G
-$COLLIE vdi snapshot test -s snap
+$DOG vdi create test 4G
+$DOG vdi snapshot test -s snap
 _vdi_list
 
-$COLLIE vdi delete test
-$COLLIE vdi delete test # error
+$DOG vdi delete test
+$DOG vdi delete test # error
 _vdi_list
 
-$COLLIE vdi delete test -s snap
-$COLLIE vdi delete test -s snap # error
+$DOG vdi delete test -s snap
+$DOG vdi delete test -s snap # error
 _vdi_list

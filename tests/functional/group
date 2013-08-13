@@ -11,7 +11,7 @@
 # cluster:	cluster drivers tests: join/leave/etc
 # store:	basic data integrity
 # vdi:		qemu I/O, snapshots, volume creation and deletion
-# collie:	check collie commands
+# dog:	check dog commands
 # md:		multi-disk tests
 #
 001 auto quick cluster md
@@ -61,7 +61,7 @@
 045 auto quick store md
 046 auto quick vdi md
 047 auto quick vdi md
-048 auto quick collie
+048 auto quick dog
 049 auto quick cache md
 050 auto quick cluster md
 051 auto quick cluster md

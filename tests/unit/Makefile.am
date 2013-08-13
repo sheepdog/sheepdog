@@ -1,3 +1,3 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-SUBDIRS			= mock collie sheep
+SUBDIRS			= mock dog sheep

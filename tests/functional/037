@@ -10,13 +10,13 @@ done
 
 _wait_for_sheep 8
 
-$COLLIE cluster format &
+$DOG cluster format &
 
 for i in `seq 5 7`; do
     _kill_sheep $i
 done
 
-# wait for collie to finish
+# wait for dog to finish
 wait
 
 for i in `seq 5 7`; do
@@ -26,6 +26,6 @@ done
 _wait_for_sheep "8"
 
 for i in `seq 0 7`; do
-    $COLLIE cluster info -p 700$i | head -1
-    $COLLIE node list -p 700$i
+    $DOG cluster info -p 700$i | head -1
+    $DOG node list -p 700$i
 done

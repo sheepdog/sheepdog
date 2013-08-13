@@ -23,7 +23,7 @@ echo "formatting cluster"
 _cluster_format -c 2
 
 echo "creating vdi ${NAME}"
-$COLLIE vdi create ${VDI_NAME} ${VDI_SIZE}
+$DOG vdi create ${VDI_NAME} ${VDI_SIZE}
 
 echo "filling ${VDI_NAME} with data"
 $QEMU_IO -c "write 0 ${VDI_SIZE}" sheepdog:${VDI_NAME} | _filter_qemu_io
@@ -40,5 +40,5 @@ _wait_for_sheep 4
 
 echo "check that all sheep are alive"
 for i in `seq 0 3`; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done

@@ -11,55 +11,55 @@ done
 _wait_for_sheep 3
 
 _cluster_format
-$COLLIE vdi create base1 20M -p 7000
-$COLLIE vdi create base2 20M -p 7001
-$COLLIE vdi create base3 20M -p 7002
+$DOG vdi create base1 20M -p 7000
+$DOG vdi create base2 20M -p 7001
+$DOG vdi create base3 20M -p 7002
 
 for i in `seq 0 4`; do
-    echo $i | $COLLIE vdi write base1 $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write base1 $((i * 4 * 1024 * 1024)) 512
 done &
 
 for i in `seq 0 4`; do
-    echo $i | $COLLIE vdi write base2 $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write base2 $((i * 4 * 1024 * 1024)) 512
 done &
 
 for i in `seq 0 4`; do
-    echo $i | $COLLIE vdi write base3 $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write base3 $((i * 4 * 1024 * 1024)) 512
 done &
 
 wait
 
-$COLLIE vdi snapshot -s snap0 base1 -p 7000
-$COLLIE vdi snapshot -s snap0 base2 -p 7001
-$COLLIE vdi snapshot -s snap0 base3 -p 7002
+$DOG vdi snapshot -s snap0 base1 -p 7000
+$DOG vdi snapshot -s snap0 base2 -p 7001
+$DOG vdi snapshot -s snap0 base3 -p 7002
 sleep 1
 
 for i in `seq 1 10`; do
-	$COLLIE vdi snapshot -s snap$i base1 -p 7000
-	$COLLIE vdi delete -s snap$(($i - 1)) base1 -p 7000
+	$DOG vdi snapshot -s snap$i base1 -p 7000
+	$DOG vdi delete -s snap$(($i - 1)) base1 -p 7000
 	sleep 1
 done &
 
 for i in `seq 1 10`; do
-	$COLLIE vdi snapshot -s snap$i base2 -p 7001
-	$COLLIE vdi delete -s snap$(($i - 1)) base2 -p 7001
+	$DOG vdi snapshot -s snap$i base2 -p 7001
+	$DOG vdi delete -s snap$(($i - 1)) base2 -p 7001
 	sleep 1
 done &
 
 for i in `seq 1 10`; do
-	$COLLIE vdi snapshot -s snap$i base3 -p 7002
-	$COLLIE vdi delete -s snap$(($i - 1)) base3 -p 7002
+	$DOG vdi snapshot -s snap$i base3 -p 7002
+	$DOG vdi delete -s snap$(($i - 1)) base3 -p 7002
 	sleep 1
 done &
 
 wait
 
-$COLLIE vdi delete base1 -p 7000
-$COLLIE vdi delete base2 -p 7001
-$COLLIE vdi delete base3 -p 7002
-$COLLIE vdi delete -s snap10 base1 -p 7000
-$COLLIE vdi delete -s snap10 base2 -p 7001
-$COLLIE vdi delete -s snap10 base3 -p 7002
+$DOG vdi delete base1 -p 7000
+$DOG vdi delete base2 -p 7001
+$DOG vdi delete base3 -p 7002
+$DOG vdi delete -s snap10 base1 -p 7000
+$DOG vdi delete -s snap10 base2 -p 7001
+$DOG vdi delete -s snap10 base3 -p 7002
 
 echo there should be no vdi
 _vdi_list

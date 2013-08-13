@@ -10,11 +10,11 @@ _wait_for_sheep 1
 
 _cluster_format -c 1
 
-$COLLIE vdi create test 4G
+$DOG vdi create test 4G
 
 # write something to vdi 'test'
-echo "hello" | $COLLIE vdi write test 0 512
-echo "sheepdog" | $COLLIE vdi write test 4M 512
+echo "hello" | $DOG vdi write test 0 512
+echo "sheepdog" | $DOG vdi write test 4M 512
 # corrupt the vdi...
 _kill_sheep 0
 if $MD; then
@@ -32,7 +32,7 @@ _wait_for_sheep 1
 sleep 3
 
 _vdi_list
-$COLLIE vdi read test 0 512 | tr -d [:cntrl:]
+$DOG vdi read test 0 512 | tr -d [:cntrl:]
 echo -n ' '
-$COLLIE vdi read test 4M 512 | tr -d [:cntrl:]
+$DOG vdi read test 4M 512 | tr -d [:cntrl:]
 echo ''

@@ -12,7 +12,7 @@ _wait_for_sheep 3
 
 _cluster_format
 
-$COLLIE node list
+$DOG node list
 
 # make sure sheep1 and sheep2 quit simutaniously
 _kill_sheep 1 &
@@ -33,5 +33,5 @@ sleep 1
 
 echo check whether all nodes have the same cluster info
 for i in 1 2; do
-    $COLLIE node list -p 700$i
+    $DOG node list -p 700$i
 done

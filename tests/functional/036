@@ -9,7 +9,7 @@ for i in `seq 0 7`; do
 done
 
 while true; do
-    $COLLIE cluster format 2> /dev/null
+    $DOG cluster format 2> /dev/null
     if [ $? == 0 ]; then
         break
     fi
@@ -30,6 +30,6 @@ kill $pid > /dev/null 2>&1
 _wait_for_sheep 8
 
 for i in `seq 0 7`; do
-    $COLLIE cluster info -p 700$i | head -1
-    $COLLIE node list -p 700$i
+    $DOG cluster info -p 700$i | head -1
+    $DOG node list -p 700$i
 done

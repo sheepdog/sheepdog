@@ -9,7 +9,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "collie.h"
+#include "dog.h"
 #include "sha1.h"
 #include "sockfd_cache.h"
 
@@ -54,7 +54,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	if (direct)
 		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, data);
+	ret = dog_exec_req(sdhost, sdport, &hdr, data);
 	if (ret < 0) {
 		sd_err("Failed to read object %" PRIx64, oid);
 		return SD_RES_EIO;
@@ -96,7 +96,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	hdr.obj.cow_oid = cow_oid;
 	hdr.obj.offset = offset;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, data);
+	ret = dog_exec_req(sdhost, sdport, &hdr, data);
 	if (ret < 0) {
 		sd_err("Failed to write object %" PRIx64, oid);
 		return SD_RES_EIO;
@@ -124,7 +124,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
 
-	ret = collie_exec_req(sdhost, sdport, &req, &vdi_inuse);
+	ret = dog_exec_req(sdhost, sdport, &req, &vdi_inuse);
 	if (ret < 0)
 		goto out;
 
@@ -167,7 +167,7 @@ out:
 	return ret;
 }
 
-int collie_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
+int dog_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
 		    void *buf)
 {
 	struct node_id nid = {};
@@ -182,7 +182,7 @@ int collie_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
 		return -1;
 
 	/*
-	 * Retry forever for collie because
+	 * Retry forever for dog because
 	 * 1. We can't get the newest epoch
 	 * 2. Some operations might take unexpected long time
 	 */
@@ -196,7 +196,7 @@ int collie_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
 /* Light request only contains header, without body content. */
 int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port)
 {
-	int ret = collie_exec_req(addr, port, hdr, NULL);
+	int ret = dog_exec_req(addr, port, hdr, NULL);
 
 	if (ret == -1)
 		return -1;

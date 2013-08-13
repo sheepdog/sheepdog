@@ -17,10 +17,10 @@ _wait_for_sheep 8
 
 _cluster_format
 
-$COLLIE vdi create test 100MB
+$DOG vdi create test 100MB
 # create 25 objects
 for i in `seq 0 24`; do
-    echo $i | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
 # kill 5 nodes
@@ -35,10 +35,10 @@ _wait_for_sheep 3
 
 # update vdi
 for i in `seq 0 24`; do
-    echo $(($i + 100)) | $COLLIE vdi write test $((i * 4 * 1024 * 1024)) 512
+    echo $(($i + 100)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$COLLIE vdi read test | md5sum
+$DOG vdi read test | md5sum
 
 # start 5 nodes who have old objects
 for i in `seq 3 7`; do
@@ -48,5 +48,5 @@ done
 _wait_for_sheep 8
 
 for i in `seq 0 7`; do
-    $COLLIE vdi read test -p 700$i | md5sum
+    $DOG vdi read test -p 700$i | md5sum
 done

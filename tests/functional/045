@@ -11,14 +11,14 @@ done
 _wait_for_sheep 3
 
 _cluster_format -c 2
-$COLLIE vdi create test 4M
+$DOG vdi create test 4M
 
 for i in `seq 0 7`; do
-    echo $i | $COLLIE vdi write test $(($i * 1536 + 512)) 512
+    echo $i | $DOG vdi write test $(($i * 1536 + 512)) 512
 done
 
 for i in `seq 0 7`; do
-    $COLLIE vdi read test $(($i * 1536 + 512)) 512 | md5sum
+    $DOG vdi read test $(($i * 1536 + 512)) 512 | md5sum
 done
 
-$COLLIE vdi read test | md5sum
+$DOG vdi read test | md5sum

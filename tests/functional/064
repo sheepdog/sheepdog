@@ -17,25 +17,25 @@ done
 _wait_for_sheep 3
 _cluster_format -c 2
 
-$COLLIE vdi create test 100M -P
+$DOG vdi create test 100M -P
 _node_info
-$COLLIE node list
+$DOG node list
 
-$COLLIE node md plug $STORE/3
+$DOG node md plug $STORE/3
 _wait_for_sheep_recovery 0
 _node_info
-$COLLIE node list
+$DOG node list
 
-$COLLIE cluster reweight
+$DOG cluster reweight
 
 # restart sheep1 while reweighting
 _kill_sheep 2
 _wait_for_sheep_recovery 0
 _node_info | grep -v ^2 # the content of sheep 2 is non-deterministic
-$COLLIE node list
+$DOG node list
 _start_sheep 2
 
 _wait_for_sheep_recovery 0
 _node_info
-$COLLIE node list
-$COLLIE cluster info | _filter_cluster_info
+$DOG node list
+$DOG cluster info | _filter_cluster_info

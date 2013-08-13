@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test unaligned collie vdi read/write
+# Test unaligned dog vdi read/write
 
 . ./common
 
@@ -12,21 +12,21 @@ _wait_for_sheep 3
 
 _cluster_format
 
-$COLLIE vdi create test 1234
+$DOG vdi create test 1234
 sleep 1
-$COLLIE vdi list -r test | awk '{$7="MASKED";print $0}'
+$DOG vdi list -r test | awk '{$7="MASKED";print $0}'
 
-echo hello | $COLLIE vdi write test 1 6
-$COLLIE vdi read test 1 6
-echo world | $COLLIE vdi write test 1 6
-$COLLIE vdi read test 1 6
+echo hello | $DOG vdi write test 1 6
+$DOG vdi read test 1 6
+echo world | $DOG vdi write test 1 6
+$DOG vdi read test 1 6
 
-echo h*** | $COLLIE vdi write test 510 512
-echo h!!! | $COLLIE vdi write test 510 512
-$COLLIE vdi read test 510 5
-echo ^^ | $COLLIE vdi write test 511 2
-$COLLIE vdi read test 510 5
-echo xxx | $COLLIE vdi write test 1020 4
-$COLLIE vdi read test 1020 4
-$COLLIE vdi read test 510 5
-$COLLIE vdi read test 1 6
+echo h*** | $DOG vdi write test 510 512
+echo h!!! | $DOG vdi write test 510 512
+$DOG vdi read test 510 5
+echo ^^ | $DOG vdi write test 511 2
+$DOG vdi read test 510 5
+echo xxx | $DOG vdi write test 1020 4
+$DOG vdi read test 1020 4
+$DOG vdi read test 510 5
+$DOG vdi read test 1 6

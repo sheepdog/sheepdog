@@ -11,28 +11,28 @@ for i in 0 1 2; do
 done
 _wait_for_sheep 3
 _cluster_format
-$COLLIE vdi create test 200M -P
+$DOG vdi create test 200M -P
 
 # node event after disk failure
 _safe_remove $STORE/0/d0
 
-_random | $COLLIE vdi write test &
+_random | $DOG vdi write test &
 sleep 1
 _start_sheep 3
 _wait_for_sheep 4
 _wait_for_sheep_recovery 0
-wait # collie
-$COLLIE vdi check test
-$COLLIE cluster info | _filter_cluster_info
+wait # dog
+$DOG vdi check test
+$DOG cluster info | _filter_cluster_info
 
 # disk failures after node event
 _safe_remove $STORE/1/d0
-dd if=/dev/zero | $COLLIE vdi write test &
+dd if=/dev/zero | $DOG vdi write test &
 sleep 1
 _kill_sheep 2
 _wait_for_sheep 3
 _safe_remove $STORE/1/d1
 _wait_for_sheep_recovery 0
-wait # collie
-$COLLIE vdi check test
-$COLLIE cluster info | _filter_cluster_info
+wait # dog
+$DOG vdi check test
+$DOG cluster info | _filter_cluster_info

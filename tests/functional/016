@@ -11,23 +11,23 @@ done
 _wait_for_sheep 3
 
 _cluster_format -c 3
-$COLLIE vdi create base 100M -P
+$DOG vdi create base 100M -P
 
 $QEMU_IMG snapshot -c tag sheepdog:base
 
 sleep 1
 
-$COLLIE vdi clone -s 1 base test
+$DOG vdi clone -s 1 base test
 
 sleep 1
 
-$COLLIE vdi delete test
+$DOG vdi delete test
 
 sleep 1
-$COLLIE vdi delete base
+$DOG vdi delete base
 
 sleep 1
-$COLLIE vdi delete -s 1 base
+$DOG vdi delete -s 1 base
 
 sleep 3
 echo there should be no vdi

@@ -11,14 +11,14 @@ done
 _wait_for_sheep 3
 
 _cluster_format -c 3
-$COLLIE vdi create test 4M
+$DOG vdi create test 4M
 
 _input()
 {
     for i in `seq 1 10`; do
 	echo "multiwrite -P $i 0 1k ; 2k 1k ; 4k 1k ; 8k 1k"
 	sleep 1
-	$COLLIE vdi snapshot test -s snap$i
+	$DOG vdi snapshot test -s snap$i
     done
 
     echo quit
@@ -27,8 +27,8 @@ _input()
 _input | $QEMU_IO sheepdog:test > /dev/null
 
 _vdi_list
-$COLLIE vdi tree | _filter_short_date
+$DOG vdi tree | _filter_short_date
 
 for i in `seq 1 10`; do
-    $COLLIE vdi read test -s snap$i | md5sum
+    $DOG vdi read test -s snap$i | md5sum
 done

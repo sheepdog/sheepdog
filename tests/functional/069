@@ -16,7 +16,7 @@ _cluster_format
 # kill sheep 0 so that sheep 2 has larger epoch
 _kill_sheep 0
 
-$COLLIE cluster shutdown -p 7001
+$DOG cluster shutdown -p 7001
 _wait_for_sheep_stop
 
 # clean up sheep 0 and sheep 1
@@ -32,7 +32,7 @@ _wait_for_sheep 2
 # start Sheepdog with 2 nodes
 _cluster_format
 
-$COLLIE cluster shutdown
+$DOG cluster shutdown
 _wait_for_sheep_stop
 
 # sheep 2 should fail to join because it was formatted at the different time
@@ -45,5 +45,5 @@ _start_sheep 1
 _wait_for_sheep 2
 
 for i in 0 1; do
-    $COLLIE cluster info -p 700$i | _filter_cluster_info
+    $DOG cluster info -p 700$i | _filter_cluster_info
 done

@@ -14,7 +14,7 @@
 #include <ctype.h>
 #include <sys/time.h>
 
-#include "collie.h"
+#include "dog.h"
 #include "farm/farm.h"
 
 static struct sd_option cluster_options[] = {
@@ -43,7 +43,7 @@ static int list_store(void)
 	sd_init_req(&hdr, SD_OP_GET_STORE_LIST);
 	hdr.data_length = 512;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -82,7 +82,7 @@ static int cluster_format(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, &vdi_inuse);
+	ret = dog_exec_req(sdhost, sdport, &hdr, &vdi_inuse);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -103,7 +103,7 @@ static int cluster_format(int argc, char **argv)
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
 	printf("using backend %s store\n", store_name);
-	ret = collie_exec_req(sdhost, sdport, &hdr, store_name);
+	ret = dog_exec_req(sdhost, sdport, &hdr, store_name);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -135,7 +135,7 @@ static int cluster_info(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, logs);
+	ret = dog_exec_req(sdhost, sdport, &hdr, logs);
 	if (ret < 0)
 		goto error;
 
@@ -379,7 +379,7 @@ static int cluster_force_recover(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_FORCE_RECOVER);
 	hdr.data_length = sizeof(nodes);
 
-	ret = collie_exec_req(sdhost, sdport, &hdr, nodes);
+	ret = dog_exec_req(sdhost, sdport, &hdr, nodes);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -479,7 +479,7 @@ static struct subcommand cluster_cmd[] = {
 	 cluster_snapshot_cmd, CMD_NEED_ARG,
 	 cluster_snapshot, cluster_options},
 	{"recover", NULL, "afph",
-	 "See 'collie cluster recover' for more information",
+	 "See 'dog cluster recover' for more information",
 	 cluster_recover_cmd, CMD_NEED_ARG,
 	 cluster_recover, cluster_options},
 	{"reweight", NULL, "aph", "reweight the cluster", NULL, 0,
