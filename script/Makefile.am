@@ -2,7 +2,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 EXTRA_DIST		= generic.in
 
-noinst_HEADERS		= bash_completion_dog checkarch.sh vditest
+noinst_HEADERS		= bash_completion_dog checkarch.sh vditest gen_man.pl
 
 target_INIT             = generic
 

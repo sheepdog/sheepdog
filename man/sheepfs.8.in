@@ -38,7 +38,6 @@ can be used as
 This file abstraction integrates well into kernel's pagecache.
 .SH OPTIONS
 @OPTIONS@
-
 .SH DEPENDENCIES
 \fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z.
 

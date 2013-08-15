@@ -18,7 +18,6 @@ driver available in qemu(1).
 For more information, run 'dog <command> <subcommand> --help'.
 .SH COMMAND & SUBCOMMAND
 @OPTIONS@
-
 .SH DEPENDENCIES
 \fBSheepdog\fP requires QEMU 0.13.z or later and Corosync 1.y.z or 2.y.z.
 

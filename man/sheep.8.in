@@ -16,7 +16,6 @@ via dog(8).  QEMU virtual machines use the sheep daemon via a block
 driver available in qemu(1).
 .SH OPTIONS
 @OPTIONS@
-
 .SH PATH
 Proper LSB systems will store sheepdog files in /var/lib/sheepdog.  The init
 script uses this directory by default.  The directory must be on a filesystem
