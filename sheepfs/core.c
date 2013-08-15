@@ -311,10 +311,9 @@ Options:\n\
 
 int main(int argc, char **argv)
 {
-	struct strbuf path = STRBUF_INIT;
+	struct strbuf path = STRBUF_INIT, *t;
 	int ch, longindex;
 	char *dir = NULL, *cwd;
-
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				 &longindex)) >= 0) {
@@ -350,6 +349,13 @@ int main(int argc, char **argv)
 			usage(1);
 		}
 	}
+
+	t = sheepfs_run_cmd("dog");
+	if (!strlen(t->buf)) {
+		fprintf(stderr, "command dog not found\n");
+		exit(1);
+	}
+	strbuf_release(t);
 
 	if (optind != argc)
 		dir = argv[optind];
