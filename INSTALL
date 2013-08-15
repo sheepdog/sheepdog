@@ -48,7 +48,7 @@ Installing from source
 
 3. Download, build and install the Sheepdog server and command line tools:
 
-   $ git clone git://github.com/collie/sheepdog.git
+   $ git clone git://github.com/sheepdog/sheepdog.git
    $ cd sheepdog
    $ ./autogen.sh
    $ ./configure

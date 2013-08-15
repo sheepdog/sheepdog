@@ -1,2 +1,2 @@
 version=3
-https://github.com/collie/sheepdog/tags .*/v(.*).tar.gz
+https://github.com/sheepdog/sheepdog/tags .*/v(.*).tar.gz

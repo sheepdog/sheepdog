@@ -1,7 +1,7 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Contact: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>, Liu Yuan <namei.unix@gmail.com>
 Upstream-Name: sheepdog
-Source: git://github.com/collie/sheepdog.git
+Source: git://github.com/sheepdog/sheepdog.git
 
 Files: debian/*
 Copyright: 2010, Guido Günther <agx@sigxcpu.org>
