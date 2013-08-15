@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Test sheepfs
+
+. ./common
+
+trap "_uninit; exit \$status" 0 1 2 3 15
+_uninit()
+{
+	umount $STORE/sheepfs > /dev/null 2>&1
+	rm -rf $STORE/sheepfs > /dev/null 2>&1
+}
+
+_need_to_be_root
+
+# We can't pass PATH=$PATH:../../dog to sheepfs to expect it find dog
+# because fuse main loop can't inherit $PATH passed to sheepfs
+command -v dog > /dev/null 2>&1 || _notrun "Require dog but it's not installed"
+
+if [ ! -f $SHEEPFS ]; then
+    _notrun "no sheepfs binary found"
+fi
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$DOG vdi create test 4M
+
+mkdir $STORE/sheepfs
+$SHEEPFS $STORE/sheepfs
+
+cat $STORE/sheepfs/cluster/info | _filter_cluster_info
+cat $STORE/sheepfs/vdi/list | _filter_short_date
+echo test > $STORE/sheepfs/vdi/mount
+echo hello > $STORE/sheepfs/volume/test
+head -c 6 $STORE/sheepfs/volume/test
+
+status=0
