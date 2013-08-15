@@ -17,6 +17,17 @@ sub sheep {
 	my ($opt, $longopt, $desc) = ($1, $2, $3);
 	print escape(header("$opt, $longopt") . "\n");
 	print escape("$desc\n");
+
+	next if ($opt eq '-h');
+
+	# extract detailed help if available
+	my $tmpfile = `mktemp`;
+	chomp($tmpfile);
+	my $help = `$program $tmpfile $opt 2> /dev/null`;
+	unlink $tmpfile;
+
+	$help =~ s/^\s+\$.+/\n$&\n/mg;
+	print escape("\n$help");
     }
 }
 
