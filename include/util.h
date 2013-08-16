@@ -104,6 +104,7 @@ int xftruncate(int fd, off_t length);
 int eventfd_xread(int efd);
 void eventfd_xwrite(int efd, int value);
 void pstrcpy(char *buf, int buf_size, const char *str);
+char *chomp(char *str);
 int rmdir_r(char *dir_path);
 int purge_directory(char *dir_path);
 bool is_numeric(const char *p);

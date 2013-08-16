@@ -333,6 +333,16 @@ void pstrcpy(char *buf, int buf_size, const char *str)
 	*q = '\0';
 }
 
+/* remove a newline character from the end of a string */
+char *chomp(char *str)
+{
+	char *p = strchr(str, '\n');
+	if (p != NULL)
+		*p = '\0';
+
+	return str;
+}
+
 /* Purge directory recursively */
 int purge_directory(char *dir_path)
 {

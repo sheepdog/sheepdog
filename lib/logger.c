@@ -731,12 +731,12 @@ int __sd_dump_variable(const char *var)
 	sd_emerg("dump %s", var);
 	while (fgets(info, sizeof(info), f) != NULL) {
 		if (info[0] == '$') {
-			sd_emerg("%s", info);
+			sd_emerg("%s", chomp(info));
 			break;
 		}
 	}
 	while (fgets(info, sizeof(info), f) != NULL)
-		sd_emerg("%s", info);
+		sd_emerg("%s", chomp(info));
 
 	pclose(f);
 	return 0;
@@ -787,7 +787,7 @@ static int dump_stack_frames(void)
 				}
 				stack_no = no;
 				found = true;
-				sd_emerg("%s", info);
+				sd_emerg("%s", chomp(info));
 				break;
 			}
 		}
@@ -801,7 +801,7 @@ static int dump_stack_frames(void)
 		}
 
 		while (fgets(info, sizeof(info), f) != NULL)
-			sd_emerg("%s", info);
+			sd_emerg("%s", chomp(info));
 
 		pclose(f);
 	}
@@ -840,7 +840,7 @@ void sd_backtrace(void)
 			goto fallback_close;
 
 		if (info[0] != '?' && info[0] != '\0')
-			sd_emerg("%s", info);
+			sd_emerg("%s", chomp(info));
 		else
 			goto fallback_close;
 
