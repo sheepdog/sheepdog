@@ -872,6 +872,8 @@ void get_recovery_state(struct recovery_state *state)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
 
+	memset(state, 0, sizeof(*state));
+
 	if (!rinfo) {
 		state->in_recovery = 0;
 		return;
