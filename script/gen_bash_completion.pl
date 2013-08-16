@@ -32,7 +32,7 @@ foreach (@help) {
 
 	$subcmds{$cmd} = []  if (!defined($subcmds{$cmd}));
 
-	push $subcmds{$cmd}, $subcmd;
+	push @{$subcmds{$cmd}}, $subcmd;
 	$opts{"$cmd $subcmd"} = [];
 	$subsubcmds{"$cmd $subcmd"} = [];
 
@@ -41,11 +41,11 @@ foreach (@help) {
 	while (<IN>) {
 	    if (/^  (-.), (--\S+)/) {
 		# get options
-		push $opts{"$cmd $subcmd"}, $1;
-		push $opts{"$cmd $subcmd"}, $2;
+		push @{$opts{"$cmd $subcmd"}}, $1;
+		push @{$opts{"$cmd $subcmd"}}, $2;
 	    } elsif (/^  ([a-z]+)/) {
 		# get available subcommands
-		push $subsubcmds{"$cmd $subcmd"}, $1;
+		push @{$subsubcmds{"$cmd $subcmd"}}, $1;
 	    }
 	}
 	close IN;
