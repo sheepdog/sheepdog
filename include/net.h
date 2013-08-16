@@ -32,22 +32,13 @@ struct connection {
 	uint16_t port;
 	char ipstr[INET6_ADDRSTRLEN];
 
-	enum conn_state c_rx_state;
-	int rx_length;
-	void *rx_buf;
-	struct sd_req rx_hdr;
-
-	enum conn_state c_tx_state;
-	int tx_length;
-	void *tx_buf;
-	struct sd_rsp tx_hdr;
+	bool dead;
 };
 
 int conn_tx_off(struct connection *conn);
 int conn_tx_on(struct connection *conn);
 int conn_rx_off(struct connection *conn);
 int conn_rx_on(struct connection *conn);
-bool is_conn_dead(const struct connection *conn);
 int do_read(int sockfd, void *buf, int len,
 	    bool (*need_retry)(uint32_t), uint32_t, uint32_t);
 int rx(struct connection *conn, enum conn_state next_state);
@@ -65,7 +56,6 @@ int create_unix_domain_socket(const char *unix_path,
 const char *addr_to_str(const uint8_t *addr, uint16_t port);
 uint8_t *str_to_addr(const char *ipstr, uint8_t *addr);
 char *sockaddr_in_to_str(struct sockaddr_in *sockaddr);
-int set_nonblocking(int fd);
 int set_nodelay(int fd);
 int set_keepalive(int fd);
 int set_snd_timeout(int fd);
