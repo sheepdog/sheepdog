@@ -66,8 +66,10 @@ struct client_info {
 	struct connection conn;
 
 	struct request *rx_req;
+	struct work rx_work;
 
 	struct request *tx_req;
+	struct work tx_work;
 
 	struct list_head done_reqs;
 
@@ -128,6 +130,7 @@ struct system_info {
 	bool gateway_only;
 	bool nosync;
 
+	struct work_queue *net_wqueue;
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
 	struct work_queue *deletion_wqueue;

@@ -61,59 +61,6 @@ int conn_rx_on(struct connection *conn)
 	return modify_event(conn->fd, conn->events);
 }
 
-bool is_conn_dead(const struct connection *conn)
-{
-	if (conn->c_rx_state == C_IO_CLOSED || conn->c_tx_state == C_IO_CLOSED)
-		return true;
-	else
-		return false;
-}
-
-int rx(struct connection *conn, enum conn_state next_state)
-{
-	int ret;
-
-	ret = read(conn->fd, conn->rx_buf, conn->rx_length);
-	if (!ret) {
-		conn->c_rx_state = C_IO_CLOSED;
-		return 0;
-	}
-
-	if (ret < 0) {
-		if (errno != EAGAIN && errno != EINTR)
-			conn->c_rx_state = C_IO_CLOSED;
-		return 0;
-	}
-
-	conn->rx_length -= ret;
-	conn->rx_buf = (char *)conn->rx_buf + ret;
-
-	if (!conn->rx_length)
-		conn->c_rx_state = next_state;
-
-	return ret;
-}
-
-int tx(struct connection *conn, enum conn_state next_state)
-{
-	int ret;
-
-	ret = write(conn->fd, conn->tx_buf, conn->tx_length);
-	if (ret < 0) {
-		if (errno != EAGAIN && errno != EINTR)
-			conn->c_tx_state = C_IO_CLOSED;
-		return 0;
-	}
-
-	conn->tx_length -= ret;
-	conn->tx_buf = (char *)conn->tx_buf + ret;
-
-	if (!conn->tx_length)
-		conn->c_tx_state = next_state;
-
-	return ret;
-}
-
 int create_listen_ports(const char *bindaddr, int port,
 		int (*callback)(int fd, void *), void *data)
 {
@@ -166,12 +113,6 @@ int create_listen_ports(const char *bindaddr, int port,
 		ret = listen(fd, SOMAXCONN);
 		if (ret) {
 			sd_err("failed to listen on server socket: %m");
-			close(fd);
-			continue;
-		}
-
-		ret = set_nonblocking(fd);
-		if (ret < 0) {
 			close(fd);
 			continue;
 		}
@@ -483,23 +424,6 @@ uint8_t *str_to_addr(const char *ipstr, uint8_t *addr)
 	return addr;
 }
 
-int set_nonblocking(int fd)
-{
-	int ret;
-
-	ret = fcntl(fd, F_GETFL);
-	if (ret < 0) {
-		sd_err("fcntl F_GETFL failed: %m");
-		close(fd);
-	} else {
-		ret = fcntl(fd, F_SETFL, ret | O_NONBLOCK);
-		if (ret < 0)
-			sd_err("fcntl O_NONBLOCK failed: %m");
-	}
-
-	return ret;
-}
-
 int set_snd_timeout(int fd)
 {
 	struct timeval timeout;
@@ -635,10 +559,6 @@ int create_unix_domain_socket(const char *unix_path,
 		sd_err("failed to listen on socket: %m");
 		goto err;
 	}
-
-	ret = set_nonblocking(fd);
-	if (ret < 0)
-		goto err;
 
 	ret = callback(fd, data);
 	if (ret)

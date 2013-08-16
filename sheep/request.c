@@ -510,196 +510,125 @@ main_fn void put_request(struct request *req)
 	if (req->local)
 		eventfd_xwrite(req->local_req_efd, 1);
 	else {
-		if (conn_tx_on(&ci->conn)) {
+		if (ci->conn.dead) {
 			clear_client_info(ci);
 			free_request(req);
 		} else {
-			list_add(&req->request_list, &ci->done_reqs);
+			list_add_tail(&req->request_list, &ci->done_reqs);
+
+			if (ci->tx_req == NULL)
+				/* There is no request being sent. */
+				conn_tx_on(&ci->conn);
 		}
 	}
 }
 
-static void init_rx_hdr(struct client_info *ci)
+static void rx_work(struct work *work)
 {
-	ci->conn.c_rx_state = C_IO_HEADER;
-	ci->rx_req = NULL;
-	ci->conn.rx_length = sizeof(struct sd_req);
-	ci->conn.rx_buf = &ci->conn.rx_hdr;
-}
-
-static inline int begin_rx(struct client_info *ci)
-{
+	struct client_info *ci = container_of(work, struct client_info,
+					      rx_work);
 	int ret;
-	uint64_t data_len;
 	struct connection *conn = &ci->conn;
-	struct sd_req *hdr = &conn->rx_hdr;
+	struct sd_req hdr;
 	struct request *req;
 
-	switch (conn->c_rx_state) {
-	case C_IO_HEADER:
-		ret = rx(conn, C_IO_DATA_INIT);
-		if (!ret || conn->c_rx_state != C_IO_DATA_INIT)
-			break;
-	case C_IO_DATA_INIT:
-		data_len = hdr->data_length;
-
-		req = alloc_request(ci, data_len);
-		if (!req) {
-			conn->c_rx_state = C_IO_CLOSED;
-			break;
-		}
-		ci->rx_req = req;
-
-		/* use le_to_cpu */
-		memcpy(&req->rq, hdr, sizeof(req->rq));
-
-		if (data_len && hdr->flags & SD_FLAG_CMD_WRITE) {
-			conn->c_rx_state = C_IO_DATA;
-			conn->rx_length = data_len;
-			conn->rx_buf = req->data;
-		} else {
-			conn->c_rx_state = C_IO_END;
-			break;
-		}
-	case C_IO_DATA:
-		ret = rx(conn, C_IO_END);
-		break;
-	default:
-		sd_err("bug: unknown state %d", conn->c_rx_state);
+	ret = do_read(conn->fd, &hdr, sizeof(hdr), NULL, 0, UINT32_MAX);
+	if (ret) {
+		sd_err("failed to read a header");
+		conn->dead = true;
+		return;
 	}
 
-	if (is_conn_dead(conn)) {
-		clear_client_info(ci);
-		return -1;
+	req = alloc_request(ci, hdr.data_length);
+	if (!req) {
+		sd_err("failed to allocate request");
+		conn->dead = true;
+		return;
 	}
+	ci->rx_req = req;
 
-	/* Short read happens */
-	if (conn->c_rx_state != C_IO_END)
-		return -1;
+	/* use le_to_cpu */
+	memcpy(&req->rq, &hdr, sizeof(req->rq));
 
-	return 0;
+	if (hdr.data_length && hdr.flags & SD_FLAG_CMD_WRITE) {
+		ret = do_read(conn->fd, req->data, hdr.data_length, NULL, 0,
+			      UINT32_MAX);
+		if (ret) {
+			sd_err("failed to read data");
+			conn->dead = true;
+		}
+	}
 }
 
-static inline void finish_rx(struct client_info *ci)
+static void rx_main(struct work *work)
 {
-	struct request *req;
+	struct client_info *ci = container_of(work, struct client_info,
+					      rx_work);
+	struct request *req = ci->rx_req;
 
-	req = ci->rx_req;
-	init_rx_hdr(ci);
+	ci->rx_req = NULL;
+
+	refcount_dec(&ci->refcnt);
+
+	if (ci->conn.dead) {
+		if (req)
+			free_request(req);
+
+		clear_client_info(ci);
+		return;
+	}
+
+	conn_rx_on(&ci->conn);
 
 	sd_debug("%d, %s:%d", ci->conn.fd, ci->conn.ipstr, ci->conn.port);
 	queue_request(req);
 }
 
-static void do_client_rx(struct client_info *ci)
+static void tx_work(struct work *work)
 {
-	if (begin_rx(ci) < 0)
-		return;
-
-	finish_rx(ci);
-}
-
-static void init_tx_hdr(struct client_info *ci)
-{
-	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
-	struct request *req;
-
-	assert(!list_empty(&ci->done_reqs));
-
-	memset(rsp, 0, sizeof(*rsp));
-
-	req = list_first_entry(&ci->done_reqs, struct request, request_list);
-	list_del(&req->request_list);
-
-	ci->tx_req = req;
-	ci->conn.tx_length = sizeof(*rsp);
-	ci->conn.c_tx_state = C_IO_HEADER;
-	ci->conn.tx_buf = rsp;
+	struct client_info *ci = container_of(work, struct client_info,
+					      tx_work);
+	int ret;
+	struct connection *conn = &ci->conn;
+	struct sd_rsp rsp;
+	struct request *req = ci->tx_req;
+	void *data = NULL;
 
 	/* use cpu_to_le */
-	memcpy(rsp, &req->rp, sizeof(*rsp));
+	memcpy(&rsp, &req->rp, sizeof(rsp));
 
-	rsp->epoch = sys->cinfo.epoch;
-	rsp->opcode = req->rq.opcode;
-	rsp->id = req->rq.id;
+	rsp.epoch = sys->cinfo.epoch;
+	rsp.opcode = req->rq.opcode;
+	rsp.id = req->rq.id;
+
+	if (rsp.data_length)
+		data = req->data;
+
+	ret = send_req(conn->fd, (struct sd_req *)&rsp, data, rsp.data_length,
+		       NULL, 0, UINT32_MAX);
+	if (ret != 0) {
+		sd_err("failed to send a request");
+		conn->dead = true;
+	}
 }
 
-static inline int begin_tx(struct client_info *ci)
+static void tx_main(struct work *work)
 {
-	int ret, opt;
-	struct sd_rsp *rsp = (struct sd_rsp *)&ci->conn.tx_hdr;
+	struct client_info *ci = container_of(work, struct client_info,
+					      tx_work);
 
-	/* If short send happens, we don't need init hdr */
-	if (!ci->tx_req)
-		init_tx_hdr(ci);
+	refcount_dec(&ci->refcnt);
 
-	opt = 1;
-	setsockopt(ci->conn.fd, SOL_TCP, TCP_CORK, &opt, sizeof(opt));
+	free_request(ci->tx_req);
+	ci->tx_req = NULL;
 
-	switch (ci->conn.c_tx_state) {
-	case C_IO_HEADER:
-		ret = tx(&ci->conn, C_IO_DATA_INIT);
-		if (!ret)
-			break;
-
-		if (rsp->data_length) {
-			ci->conn.tx_length = rsp->data_length;
-			ci->conn.tx_buf = ci->tx_req->data;
-			ci->conn.c_tx_state = C_IO_DATA;
-		} else {
-			ci->conn.c_tx_state = C_IO_END;
-			break;
-		}
-	case C_IO_DATA:
-		ret = tx(&ci->conn, C_IO_END);
-		if (!ret)
-			break;
-	default:
-		break;
-	}
-
-	opt = 0;
-	setsockopt(ci->conn.fd, SOL_TCP, TCP_CORK, &opt, sizeof(opt));
-
-	if (is_conn_dead(&ci->conn)) {
+	if (ci->conn.dead) {
 		clear_client_info(ci);
-		return -1;
-	}
-	return 0;
-}
-
-/* Return 1 if short send happens or we have more data to send */
-static inline int finish_tx(struct client_info *ci)
-{
-	/* Finish sending one response */
-	if (ci->conn.c_tx_state == C_IO_END) {
-		sd_debug("connection from: %d, %s:%d", ci->conn.fd,
-			 ci->conn.ipstr, ci->conn.port);
-		free_request(ci->tx_req);
-		ci->tx_req = NULL;
-	}
-	if (ci->tx_req || !list_empty(&ci->done_reqs))
-		return 1;
-	return 0;
-}
-
-static void do_client_tx(struct client_info *ci)
-{
-	if (!ci->tx_req && list_empty(&ci->done_reqs)) {
-		if (conn_tx_off(&ci->conn))
-			clear_client_info(ci);
 		return;
 	}
 
-	if (begin_tx(ci) < 0)
-		return;
-
-	if (finish_tx(ci))
-		return;
-
-	/* Let's go sleep, and put_request() will wake me up */
-	if (conn_tx_off(&ci->conn))
-		clear_client_info(ci);
+	if (!list_empty(&ci->done_reqs))
+		conn_tx_on(&ci->conn);
 }
 
 static void destroy_client(struct client_info *ci)
@@ -714,16 +643,6 @@ static void clear_client_info(struct client_info *ci)
 	struct request *req, *t;
 
 	sd_debug("connection seems to be dead");
-
-	if (ci->rx_req) {
-		free_request(ci->rx_req);
-		ci->rx_req = NULL;
-	}
-
-	if (ci->tx_req) {
-		free_request(ci->tx_req);
-		ci->tx_req = NULL;
-	}
 
 	list_for_each_entry_safe(req, t, &ci->done_reqs, request_list) {
 		list_del(&req->request_list);
@@ -773,8 +692,6 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 
 	INIT_LIST_HEAD(&ci->done_reqs);
 
-	init_rx_hdr(ci);
-
 	return ci;
 }
 
@@ -782,17 +699,43 @@ static void client_handler(int fd, int events, void *data)
 {
 	struct client_info *ci = (struct client_info *)data;
 
-	sd_debug("%x, rx %d, tx %d", events, ci->conn.c_rx_state,
-		 ci->conn.c_tx_state);
+	sd_debug("%x, %d", events, ci->conn.dead);
 
-	if (events & (EPOLLERR | EPOLLHUP) || is_conn_dead(&ci->conn))
+	if (events & (EPOLLERR | EPOLLHUP) || ci->conn.dead)
 		return clear_client_info(ci);
 
-	if (events & EPOLLIN)
-		do_client_rx(ci);
+	if (events & EPOLLIN) {
+		if (conn_rx_off(&ci->conn) != 0)
+			return;
 
-	if (events & EPOLLOUT)
-		do_client_tx(ci);
+		/*
+		 * Increment refcnt so that the client_info isn't freed while
+		 * rx_work uses it.
+		 */
+		refcount_inc(&ci->refcnt);
+		ci->rx_work.fn = rx_work;
+		ci->rx_work.done = rx_main;
+		queue_work(sys->net_wqueue, &ci->rx_work);
+	}
+
+	if (events & EPOLLOUT) {
+		if (conn_tx_off(&ci->conn) != 0)
+			return;
+
+		assert(ci->tx_req == NULL);
+		ci->tx_req = list_first_entry(&ci->done_reqs, struct request,
+					      request_list);
+		list_del(&ci->tx_req->request_list);
+
+		/*
+		 * Increment refcnt so that the client_info isn't freed while
+		 * tx_work uses it.
+		 */
+		refcount_inc(&ci->refcnt);
+		ci->tx_work.fn = tx_work;
+		ci->tx_work.done = tx_main;
+		queue_work(sys->net_wqueue, &ci->tx_work);
+	}
 }
 
 static void listen_handler(int listen_fd, int events, void *data)
@@ -822,12 +765,6 @@ static void listen_handler(int listen_fd, int events, void *data)
 			close(fd);
 			return;
 		}
-	}
-
-	ret = set_nonblocking(fd);
-	if (ret) {
-		close(fd);
-		return;
 	}
 
 	ci = create_client(fd, data);

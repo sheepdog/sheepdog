@@ -416,6 +416,7 @@ static int create_work_queues(void)
 	if (init_work_queue(get_nr_nodes))
 		return -1;
 
+	sys->net_wqueue = create_work_queue("net", WQ_UNLIMITED);
 	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
 	sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
 	sys->recovery_wqueue = create_ordered_work_queue("rw");
