@@ -468,6 +468,27 @@ static int cluster_reweight(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static void cluster_check_cb(uint32_t vid, const char *name, const char *tag,
+			     uint32_t snapid, uint32_t flags,
+			     const struct sd_inode *inode, void *data)
+{
+	if (vdi_is_snapshot(inode))
+		printf("fix snapshot %s (id: %d, tag: \"%s\")\n", name,
+		       snapid, tag);
+	else
+		printf("fix vdi %s\n", name);
+
+	do_vdi_check(inode);
+}
+
+static int cluster_check(int argc, char **argv)
+{
+	if (parse_vdi(cluster_check_cb, SD_INODE_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
+
+	return EXIT_SUCCESS;
+}
+
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprh", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
@@ -484,6 +505,8 @@ static struct subcommand cluster_cmd[] = {
 	 cluster_recover, cluster_options},
 	{"reweight", NULL, "aph", "reweight the cluster", NULL, 0,
 	 cluster_reweight, cluster_options},
+	{"check", NULL, "aph", "check and repair cluster", NULL,
+	 CMD_NEED_NODELIST, cluster_check, cluster_options},
 	{NULL,},
 };
 

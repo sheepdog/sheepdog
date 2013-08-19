@@ -1508,7 +1508,7 @@ static void vdi_hash_check_main(struct work *work)
 		free_vdi_check_info(info);
 }
 
-static void queue_vdi_check_work(struct sd_inode *inode, uint64_t oid,
+static void queue_vdi_check_work(const struct sd_inode *inode, uint64_t oid,
 				 uint64_t *done, struct work_queue *wq)
 {
 	struct vdi_check_info *info;
@@ -1533,22 +1533,13 @@ static void queue_vdi_check_work(struct sd_inode *inode, uint64_t oid,
 	}
 }
 
-static int vdi_check(int argc, char **argv)
+int do_vdi_check(const struct sd_inode *inode)
 {
-	const char *vdiname = argv[optind++];
-	int ret, max_idx;
+	int max_idx;
 	uint64_t done = 0, oid;
 	uint32_t vid;
-	struct sd_inode *inode = xmalloc(sizeof(*inode));
 	struct work_queue *wq;
 
-	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
-			   vdi_cmd_data.snapshot_tag, &vid, inode,
-			   SD_INODE_SIZE);
-	if (ret != EXIT_SUCCESS) {
-		sd_err("FATAL: no inode objects");
-		goto out;
-	}
 	if (sd_nodes_nr < inode->nr_copies) {
 		sd_err("ABORT: Not enough active nodes for consistency-check");
 		return EXIT_FAILURE;
@@ -1556,14 +1547,14 @@ static int vdi_check(int argc, char **argv)
 
 	wq = create_work_queue("vdi check", WQ_DYNAMIC);
 
-	queue_vdi_check_work(inode, vid_to_vdi_oid(vid), NULL, wq);
+	queue_vdi_check_work(inode, vid_to_vdi_oid(inode->vdi_id), NULL, wq);
 
 	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
 	vdi_show_progress(done, inode->vdi_size);
 	for (int idx = 0; idx < max_idx; idx++) {
 		vid = inode->data_vdi_id[idx];
 		if (vid) {
-			oid = vid_to_data_oid(vid, idx);
+			oid = vid_to_data_oid(inode->vdi_id, idx);
 			queue_vdi_check_work(inode, oid, &done, wq);
 		} else {
 			done += SD_DATA_OBJ_SIZE;
@@ -1573,10 +1564,26 @@ static int vdi_check(int argc, char **argv)
 
 	work_queue_wait(wq);
 
-	fprintf(stdout, "finish check&repair %s\n", vdiname);
+	fprintf(stdout, "finish check&repair %s\n", inode->name);
+
 	return EXIT_SUCCESS;
-out:
-	return ret;
+}
+
+static int vdi_check(int argc, char **argv)
+{
+	const char *vdiname = argv[optind++];
+	int ret;
+	struct sd_inode *inode = xmalloc(sizeof(*inode));
+
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS) {
+		sd_err("FATAL: no inode objects");
+		return ret;
+	}
+
+	return do_vdi_check(inode);
 }
 
 /* vdi backup format */
