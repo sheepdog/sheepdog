@@ -681,9 +681,6 @@ static void delete_one(struct work *work)
 		nr_deleted++;
 	}
 
-	if (nr_deleted)
-		notify_vdi_deletion(vdi_id);
-
 	if (vdi_is_deleted(inode))
 		goto out;
 
@@ -692,6 +689,9 @@ static void delete_one(struct work *work)
 
 	write_object(vid_to_vdi_oid(vdi_id), (void *)inode,
 		     sizeof(*inode), 0, false);
+
+	if (nr_deleted)
+		notify_vdi_deletion(vdi_id);
 out:
 	free(inode);
 }
