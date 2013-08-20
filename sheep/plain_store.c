@@ -191,6 +191,7 @@ static int init_vdi_state(uint64_t oid, char *wd, uint32_t epoch)
 
 	add_vdi_state(oid_to_vid(oid), inode->nr_copies,
 		      vdi_is_snapshot(inode));
+	set_bit(oid_to_vid(oid), sys->vdi_inuse);
 
 	ret = SD_RES_SUCCESS;
 out:
@@ -206,7 +207,6 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, uint32_t epoch,
 
 	if (is_vdi_obj(oid)) {
 		sd_debug("found the VDI object %" PRIx64, oid);
-		set_bit(oid_to_vid(oid), sys->vdi_inuse);
 		ret = init_vdi_state(oid, wd, epoch);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
