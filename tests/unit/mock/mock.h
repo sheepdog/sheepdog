@@ -19,7 +19,7 @@
 struct mock_method {
 	const char *name;
 	int nr_call;
-	struct list_head list;
+	struct list_node list;
 };
 
 extern struct list_head mock_methods;

@@ -57,8 +57,8 @@ struct sheep {
 
 	enum sheep_state state;
 
-	struct list_head sheep_list;
-	struct list_head join_wait_list;
+	struct list_node sheep_list;
+	struct list_node join_wait_list;
 };
 
 static LIST_HEAD(sheep_list_head);
@@ -209,7 +209,6 @@ retry:
 	waiting = list_first_entry(&join_wait_queue,
 				struct sheep, join_wait_list);
 	list_del(&waiting->join_wait_list);
-	INIT_LIST_HEAD(&waiting->join_wait_list);
 
 	memset(&snd, 0, sizeof(snd));
 	snd.type = SPH_SRV_MSG_JOIN_RETRY;
@@ -569,7 +568,6 @@ static void sheep_accept_handler(int fd, int events, void *data)
 	socklen_t len;
 
 	new_sheep = xzalloc(sizeof(struct sheep));
-	INIT_LIST_HEAD(&new_sheep->sheep_list);
 
 	len = sizeof(struct sockaddr_in);
 	new_sheep->fd = accept(fd, (struct sockaddr *)&new_sheep->addr, &len);
@@ -591,8 +589,6 @@ static void sheep_accept_handler(int fd, int events, void *data)
 
 	list_add_tail(&new_sheep->sheep_list, &sheep_list_head);
 	new_sheep->state = SHEEP_STATE_CONNECTED;
-
-	INIT_LIST_HEAD(&new_sheep->join_wait_list);
 
 	sd_info("accepted new sheep connection");
 	return;

@@ -579,7 +579,7 @@ struct deletion_work {
 	uint32_t done;
 
 	struct work work;
-	struct list_head list;
+	struct list_node list;
 	struct request *req;
 
 	uint32_t vid;

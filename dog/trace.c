@@ -243,7 +243,7 @@ static int graph_cat(int argc, char **argv)
 
 struct graph_stat_entry {
 	struct rb_node rb;
-	struct list_head list;
+	struct list_node list;
 	char fname[TRACE_FNAME_LEN];
 	uint64_t duration;
 	uint16_t nr_calls;
@@ -293,7 +293,6 @@ static void prepare_stat_tree(struct trace_graph_item *item)
 	pstrcpy(new->fname, sizeof(new->fname), item->fname);
 	new->duration = item->return_time - item->entry_time;
 	new->nr_calls = 1;
-	INIT_LIST_HEAD(&new->list);
 	if (stat_tree_insert(new)) {
 		free(new);
 		return;
@@ -314,7 +313,7 @@ static void stat_list_print(void)
 	}
 }
 
-static int stat_list_cmp(void *priv, struct list_head *a, struct list_head *b)
+static int stat_list_cmp(void *priv, struct list_node *a, struct list_node *b)
 {
 	struct graph_stat_entry *ga = container_of(a, struct graph_stat_entry,
 						   list);

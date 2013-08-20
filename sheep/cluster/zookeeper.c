@@ -51,7 +51,7 @@ enum zk_event_type {
 };
 
 struct zk_node {
-	struct list_head list;
+	struct list_node list;
 	struct rb_node rb;
 	struct sd_node node;
 	bool callbacked;

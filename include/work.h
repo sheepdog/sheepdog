@@ -11,7 +11,7 @@ struct work;
 typedef void (*work_func_t)(struct work *);
 
 struct work {
-	struct list_head w_list;
+	struct list_node w_list;
 	work_func_t fn;
 	work_func_t done;
 };

@@ -13,7 +13,7 @@
 
 struct node {
 	struct sd_node ent;
-	struct list_head list;
+	struct list_node list;
 };
 
 struct get_vdis_work {

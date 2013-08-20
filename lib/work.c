@@ -52,7 +52,7 @@ struct worker_info {
 	const char *name;
 
 	struct list_head finished_list;
-	struct list_head worker_info_siblings;
+	struct list_node worker_info_siblings;
 
 	pthread_mutex_t finished_lock;
 	pthread_mutex_t startup_lock;

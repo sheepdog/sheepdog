@@ -15,7 +15,7 @@
 
 struct objlist_cache_entry {
 	uint64_t oid;
-	struct list_head list;
+	struct list_node list;
 	struct rb_node node;
 };
 

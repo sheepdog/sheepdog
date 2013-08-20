@@ -28,7 +28,7 @@ struct vdi_entry {
 	uint32_t vdi_id;
 	uint32_t snap_id;
 	uint8_t  nr_copies;
-	struct list_head list;
+	struct list_node list;
 };
 static LIST_HEAD(last_vdi_list);
 
@@ -62,7 +62,6 @@ static struct vdi_entry *new_vdi(const char *name, uint64_t vdi_size,
 	vdi->vdi_id = vdi_id;
 	vdi->snap_id = snap_id;
 	vdi->nr_copies = nr_copies;
-	INIT_LIST_HEAD(&vdi->list);
 	return vdi;
 }
 

@@ -44,8 +44,8 @@ struct object_cache_entry {
 	uint64_t bmap; /* Each bit represents one dirty block in object */
 	struct object_cache *oc; /* Object cache this entry belongs to */
 	struct rb_node node; /* For lru tree of object cache */
-	struct list_head dirty_list; /* For dirty list of object cache */
-	struct list_head lru_list; /* For lru list of object cache */
+	struct list_node dirty_list; /* For dirty list of object cache */
+	struct list_node lru_list; /* For lru list of object cache */
 
 	struct sd_lock lock; /* Entry lock */
 };
@@ -276,7 +276,7 @@ static void del_from_dirty_list(struct object_cache_entry *entry)
 {
 	struct object_cache *oc = entry->oc;
 
-	list_del_init(&entry->dirty_list);
+	list_del(&entry->dirty_list);
 	uatomic_dec(&oc->dirty_count);
 }
 
@@ -298,9 +298,9 @@ free_cache_entry(struct object_cache_entry *entry)
 	struct object_cache *oc = entry->oc;
 
 	rb_erase(&entry->node, &oc->lru_tree);
-	list_del_init(&entry->lru_list);
+	list_del(&entry->lru_list);
 	oc->total_count--;
-	if (!list_empty(&entry->dirty_list))
+	if (list_linked(&entry->dirty_list))
 		del_from_dirty_list(entry);
 	sd_destroy_lock(&entry->lock);
 	free(entry);
@@ -443,7 +443,7 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 	write_lock_cache(oc);
 	if (writeback) {
 		entry->bmap |= calc_object_bmap(oid, count, offset);
-		if (list_empty(&entry->dirty_list))
+		if (!list_linked(&entry->dirty_list))
 			add_to_dirty_list(entry);
 	}
 	list_move_tail(&entry->lru_list, &oc->lru_head);
@@ -698,8 +698,8 @@ alloc_cache_entry(struct object_cache *oc, uint32_t idx)
 	entry->oc = oc;
 	entry->idx = idx;
 	sd_init_lock(&entry->lock);
-	INIT_LIST_HEAD(&entry->dirty_list);
-	INIT_LIST_HEAD(&entry->lru_list);
+	INIT_LIST_NODE(&entry->dirty_list);
+	INIT_LIST_NODE(&entry->lru_list);
 
 	return entry;
 }

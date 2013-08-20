@@ -27,7 +27,7 @@ struct vdi_tree {
 	uint32_t pvid;
 	bool highlight;
 	struct list_head children;
-	struct list_head siblings;
+	struct list_node siblings;
 };
 
 static int *width, *more;
@@ -158,8 +158,8 @@ static void _dump_tree(struct vdi_tree *current, int level, bool first, bool las
 
 	list_for_each_entry(vdi, &current->children, siblings) {
 		_dump_tree(vdi, level + 1,
-			   &vdi->siblings == current->children.next,
-			   vdi->siblings.next == &current->children);
+			   &vdi->siblings == current->children.n.next,
+			   vdi->siblings.next == &current->children.n);
 	}
 }
 

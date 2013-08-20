@@ -76,7 +76,7 @@ struct corosync_event {
 
 	bool callbacked;
 
-	struct list_head list;
+	struct list_node list;
 };
 
 struct corosync_message {

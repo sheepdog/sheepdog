@@ -112,7 +112,7 @@ struct cluster_driver {
 	 */
 	int (*update_node)(struct sd_node *);
 
-	struct list_head list;
+	struct list_node list;
 };
 
 extern struct list_head cluster_drivers;

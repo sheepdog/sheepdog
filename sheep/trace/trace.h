@@ -22,7 +22,7 @@ struct tracer {
 
 	/* internal use only */
 	uatomic_bool enabled;
-	struct list_head list;
+	struct list_node list;
 };
 
 #define SD_MAX_STACK_DEPTH 1024

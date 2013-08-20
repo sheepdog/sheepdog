@@ -98,7 +98,7 @@ struct logmsg {
 struct log_format {
 	const char *name;
 	int (*formatter)(char *, size_t, const struct logmsg *);
-	struct list_head list;
+	struct list_node list;
 };
 
 #define log_format_register(n, formatter_fn)				\

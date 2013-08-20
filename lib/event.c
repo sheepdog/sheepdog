@@ -65,7 +65,7 @@ struct event_info {
 	event_handler_t handler;
 	int fd;
 	void *data;
-	struct list_head ei_list;
+	struct list_node ei_list;
 	int prio;
 };
 

@@ -172,7 +172,7 @@ struct sph_event {
 
 	bool callbacked, removed;
 
-	struct list_head event_list;
+	struct list_node event_list;
 };
 
 static LIST_HEAD(nonblocked_event_list);
@@ -240,8 +240,6 @@ static void push_sph_event(bool nonblock, struct sd_node *sender,
 
 	ev->removed = false;
 	ev->callbacked = false;
-
-	INIT_LIST_HEAD(&ev->event_list);
 
 	if (nonblock)
 		list_add_tail(&ev->event_list, &nonblocked_event_list);

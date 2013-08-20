@@ -18,7 +18,7 @@ struct object_tree_entry {
 	uint64_t oid;
 	int nr_copies;
 	struct rb_node node;
-	struct list_head list;
+	struct list_node list;
 };
 
 struct object_tree {

@@ -614,12 +614,12 @@ end:
  * to chaining of merge() calls: null-terminated, no reserved or
  * sentinel head node, "prev" links not maintained.
  */
-static struct list_head *merge(void *priv,
-			       int (*cmp)(void *priv, struct list_head *a,
-					  struct list_head *b),
-			       struct list_head *a, struct list_head *b)
+static struct list_node *merge(void *priv,
+			       int (*cmp)(void *priv, struct list_node *a,
+					  struct list_node *b),
+			       struct list_node *a, struct list_node *b)
 {
-	struct list_head head, *tail = &head;
+	struct list_node head, *tail = &head;
 
 	while (a && b) {
 		/* if equal, take 'a' -- important for sort stability */
@@ -645,12 +645,12 @@ static struct list_head *merge(void *priv,
  */
 static void
 merge_and_restore_back_links(void *priv,
-			     int (*cmp)(void *priv, struct list_head *a,
-					struct list_head *b),
+			     int (*cmp)(void *priv, struct list_node *a,
+					struct list_node *b),
 			     struct list_head *head,
-			     struct list_head *a, struct list_head *b)
+			     struct list_node *a, struct list_node *b)
 {
-	struct list_head *tail = head;
+	struct list_node *tail = &head->n;
 
 	while (a && b) {
 		/* if equal, take 'a' -- important for sort stability */
@@ -680,8 +680,8 @@ merge_and_restore_back_links(void *priv,
 		tail = tail->next;
 	} while (tail->next);
 
-	tail->next = head;
-	head->prev = tail;
+	tail->next = &head->n;
+	head->n.prev = tail;
 }
 
 /*
@@ -699,26 +699,26 @@ merge_and_restore_back_links(void *priv,
  * ordering is to be preserved, @cmp must return 0.
  */
 void list_sort(void *priv, struct list_head *head,
-	       int (*cmp)(void *priv, struct list_head *a,
-			  struct list_head *b))
+	       int (*cmp)(void *priv, struct list_node *a,
+			  struct list_node *b))
 {
 	/* sorted partial lists -- last slot is a sentinel */
 #define MAX_LIST_LENGTH_BITS 20
-	struct list_head *part[MAX_LIST_LENGTH_BITS+1];
+	struct list_node *part[MAX_LIST_LENGTH_BITS+1];
 	int lev;  /* index into part[] */
 	int max_lev = 0;
-	struct list_head *list;
+	struct list_node *list;
 
 	if (list_empty(head))
 		return;
 
 	memset(part, 0, sizeof(part));
 
-	head->prev->next = NULL;
-	list = head->next;
+	head->n.prev->next = NULL;
+	list = head->n.next;
 
 	while (list) {
-		struct list_head *cur = list;
+		struct list_node *cur = list;
 		list = list->next;
 		cur->next = NULL;
 

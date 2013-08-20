@@ -93,8 +93,8 @@ struct request {
 	unsigned int data_length;
 
 	struct client_info *ci;
-	struct list_head request_list;
-	struct list_head pending_list;
+	struct list_node request_list;
+	struct list_node pending_list;
 
 	refcnt_t refcnt;
 	bool local;
@@ -187,7 +187,7 @@ struct vdi_state {
 };
 
 struct store_driver {
-	struct list_head list;
+	struct list_node list;
 	const char *name;
 	int (*init)(void);
 	bool (*exist)(uint64_t oid);
