@@ -87,9 +87,9 @@ void add_vdi_tree(const char *name, const char *label, uint32_t vid,
 
 static void compaction(struct vdi_tree *parent)
 {
-	struct vdi_tree *vdi, *e, *new_parent;
+	struct vdi_tree *vdi, *new_parent;
 
-	list_for_each_entry_safe(vdi, e, &parent->children, siblings) {
+	list_for_each_entry(vdi, &parent->children, siblings) {
 		new_parent = find_vdi(root, vdi->pvid, vdi->name);
 		if (new_parent && parent != new_parent)
 			list_move_tail(&vdi->siblings, &new_parent->children);

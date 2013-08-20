@@ -101,8 +101,8 @@ static int create_active_vdis(void)
 
 static void free_vdi_list(void)
 {
-	struct vdi_entry *vdi, *next;
-	list_for_each_entry_safe(vdi, next, &last_vdi_list, list)
+	struct vdi_entry *vdi;
+	list_for_each_entry(vdi, &last_vdi_list, list)
 		free(vdi);
 }
 

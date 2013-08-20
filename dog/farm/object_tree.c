@@ -91,8 +91,8 @@ void object_tree_print(void)
 
 void object_tree_free(void)
 {
-	struct object_tree_entry *entry, *next;
-	list_for_each_entry_safe(entry, next, &tree.list, list)
+	struct object_tree_entry *entry;
+	list_for_each_entry(entry, &tree.list, list)
 		free(entry);
 
 	free(cached_entry);

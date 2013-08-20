@@ -538,12 +538,12 @@ out:
 #define HIGH_WATERMARK (sys->object_cache_size * 9 / 10)
 static void do_reclaim_object(struct object_cache *oc)
 {
-	struct object_cache_entry *entry, *t;
+	struct object_cache_entry *entry;
 	uint64_t oid;
 	uint32_t cap;
 
 	write_lock_cache(oc);
-	list_for_each_entry_safe(entry, t, &oc->lru_head, lru_list) {
+	list_for_each_entry(entry, &oc->lru_head, lru_list) {
 		oid = idx_to_oid(oc->vid, entry_idx(entry));
 		if (entry_in_use(entry)) {
 			sd_debug("%"PRIx64" is in use, skip...", oid);
@@ -927,7 +927,7 @@ static void push_object_done(struct work *work)
  */
 static int object_cache_push(struct object_cache *oc)
 {
-	struct object_cache_entry *entry, *t;
+	struct object_cache_entry *entry;
 
 	write_lock_cache(oc);
 	if (list_empty(&oc->dirty_head)) {
@@ -936,7 +936,7 @@ static int object_cache_push(struct object_cache *oc)
 	}
 
 	uatomic_set(&oc->push_count, uatomic_read(&oc->dirty_count));
-	list_for_each_entry_safe(entry, t, &oc->dirty_head, dirty_list) {
+	list_for_each_entry(entry, &oc->dirty_head, dirty_list) {
 		struct push_work *pw;
 
 		get_cache_entry(entry);
@@ -972,7 +972,7 @@ void object_cache_delete(uint32_t vid)
 {
 	struct object_cache *cache;
 	int h = hash(vid);
-	struct object_cache_entry *entry, *t;
+	struct object_cache_entry *entry;
 	char path[PATH_MAX];
 
 	cache = find_object_cache(vid, false);
@@ -985,7 +985,7 @@ void object_cache_delete(uint32_t vid)
 	sd_unlock(&hashtable_lock[h]);
 
 	write_lock_cache(cache);
-	list_for_each_entry_safe(entry, t, &cache->lru_head, lru_list) {
+	list_for_each_entry(entry, &cache->lru_head, lru_list) {
 		free_cache_entry(entry);
 		uatomic_sub(&gcache.capacity, CACHE_OBJECT_SIZE);
 	}
@@ -1391,12 +1391,12 @@ err:
 void object_cache_format(void)
 {
 	struct object_cache *cache;
-	struct hlist_node *node, *t;
+	struct hlist_node *node;
 	int i;
 
 	for (i = 0; i < HASH_SIZE; i++) {
 		struct hlist_head *head = cache_hashtable + i;
-		hlist_for_each_entry_safe(cache, node, t, head, hash) {
+		hlist_for_each_entry(cache, node, head, hash) {
 			object_cache_delete(cache->vid);
 		}
 	}

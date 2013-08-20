@@ -163,7 +163,7 @@ static void objlist_deletion_work(struct work *work)
 {
 	struct objlist_deletion_work *ow =
 		container_of(work, struct objlist_deletion_work, work);
-	struct objlist_cache_entry *entry, *t;
+	struct objlist_cache_entry *entry;
 	uint32_t vid = ow->vid, entry_vid;
 
 	/*
@@ -180,7 +180,7 @@ static void objlist_deletion_work(struct work *work)
 	}
 
 	sd_write_lock(&obj_list_cache.lock);
-	list_for_each_entry_safe(entry, t, &obj_list_cache.entry_list, list) {
+	list_for_each_entry(entry, &obj_list_cache.entry_list, list) {
 		entry_vid = oid_to_vid(entry->oid);
 		if (entry_vid != vid)
 			continue;

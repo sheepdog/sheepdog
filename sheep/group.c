@@ -774,12 +774,12 @@ static int send_join_request(struct sd_node *ent)
 
 static void requeue_cluster_request(void)
 {
-	struct request *req, *p;
+	struct request *req;
 	struct vdi_op_message *msg;
 	size_t size;
 
-	list_for_each_entry_safe(req, p, main_thread_get(pending_notify_list),
-				 pending_list) {
+	list_for_each_entry(req, main_thread_get(pending_notify_list),
+			    pending_list) {
 		/*
 		 * ->notify() was called and succeeded but after that
 		 * this node session-timeouted and sd_notify_handler
@@ -794,8 +794,8 @@ static void requeue_cluster_request(void)
 		free(msg);
 	}
 
-	list_for_each_entry_safe(req, p, main_thread_get(pending_block_list),
-				 pending_list) {
+	list_for_each_entry(req, main_thread_get(pending_block_list),
+			    pending_list) {
 		switch (req->status) {
 		case REQUEST_INIT:
 			/* this request has never been executed, re-queue it */

@@ -197,12 +197,12 @@ static bool request_in_recovery(struct request *req)
 /* Wakeup requests because of epoch mismatch */
 void wakeup_requests_on_epoch(void)
 {
-	struct request *req, *t;
+	struct request *req;
 	LIST_HEAD(pending_list);
 
 	list_splice_init(&sys->req_wait_queue, &pending_list);
 
-	list_for_each_entry_safe(req, t, &pending_list, request_list) {
+	list_for_each_entry(req, &pending_list, request_list) {
 		switch (req->rp.result) {
 		case SD_RES_OLD_NODE_VER:
 			/*
@@ -234,12 +234,12 @@ void wakeup_requests_on_epoch(void)
 /* Wakeup the requests on the oid that was previously being recoverred */
 void wakeup_requests_on_oid(uint64_t oid)
 {
-	struct request *req, *t;
+	struct request *req;
 	LIST_HEAD(pending_list);
 
 	list_splice_init(&sys->req_wait_queue, &pending_list);
 
-	list_for_each_entry_safe(req, t, &pending_list, request_list) {
+	list_for_each_entry(req, &pending_list, request_list) {
 		if (req->local_oid != oid)
 			continue;
 		sd_debug("retry %" PRIx64, req->local_oid);
@@ -250,12 +250,12 @@ void wakeup_requests_on_oid(uint64_t oid)
 
 void wakeup_all_requests(void)
 {
-	struct request *req, *n;
+	struct request *req;
 	LIST_HEAD(pending_list);
 
 	list_splice_init(&sys->req_wait_queue, &pending_list);
 
-	list_for_each_entry_safe(req, n, &pending_list, request_list) {
+	list_for_each_entry(req, &pending_list, request_list) {
 		sd_debug("%"PRIx64, req->rq.obj.oid);
 		del_requeue_request(req);
 	}
@@ -640,11 +640,11 @@ static void destroy_client(struct client_info *ci)
 
 static void clear_client_info(struct client_info *ci)
 {
-	struct request *req, *t;
+	struct request *req;
 
 	sd_debug("connection seems to be dead");
 
-	list_for_each_entry_safe(req, t, &ci->done_reqs, request_list) {
+	list_for_each_entry(req, &ci->done_reqs, request_list) {
 		list_del(&req->request_list);
 		free_request(req);
 	}
@@ -809,7 +809,7 @@ int init_unix_domain_socket(const char *dir)
 
 static void local_req_handler(int listen_fd, int events, void *data)
 {
-	struct request *req, *t;
+	struct request *req;
 	LIST_HEAD(pending_list);
 
 	if (events & EPOLLERR)
@@ -821,7 +821,7 @@ static void local_req_handler(int listen_fd, int events, void *data)
 	list_splice_init(&sys->local_req_queue, &pending_list);
 	pthread_mutex_unlock(&sys->local_req_lock);
 
-	list_for_each_entry_safe(req, t, &pending_list, request_list) {
+	list_for_each_entry(req, &pending_list, request_list) {
 		list_del(&req->request_list);
 		queue_request(req);
 	}

@@ -924,9 +924,9 @@ static void kick_block_event(void)
 
 static void block_event_list_del(struct zk_node *n)
 {
-	struct zk_node *ev, *t;
+	struct zk_node *ev;
 
-	list_for_each_entry_safe(ev, t, &zk_block_list, list) {
+	list_for_each_entry(ev, &zk_block_list, list) {
 		if (node_eq(&ev->node, &n->node)) {
 			list_del(&ev->list);
 			free(ev);
