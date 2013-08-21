@@ -744,6 +744,20 @@ static int local_get_cache_info(struct request *request)
 	return SD_RES_SUCCESS;
 }
 
+static int local_cache_purge(struct request *req)
+{
+	const struct sd_req *hdr = &req->rq;
+	uint32_t vid = oid_to_vid(req->rq.obj.oid);
+
+	if (hdr->flags == SD_FLAG_CMD_WRITE) {
+		object_cache_delete(vid);
+		goto out;
+	}
+	object_cache_format();
+out:
+	return SD_RES_SUCCESS;
+}
+
 /* Return SD_RES_INVALID_PARMS to ask client not to send flush req again */
 static int local_flush_vdi(struct request *req)
 {
@@ -1224,6 +1238,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "GET_CACHE_INFO",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_cache_info,
+	},
+
+	[SD_OP_CACHE_PURGE] = {
+		.name = "CACHE_PURGE",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_cache_purge,
 	},
 
 	/* gateway I/O operations */

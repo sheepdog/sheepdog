@@ -2025,6 +2025,41 @@ static int vdi_cache_info(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int vdi_cache_purge(int argc, char **argv)
+{
+	const char *vdiname;
+	struct sd_req hdr;
+	uint32_t vid;
+	int ret = EXIT_SUCCESS;
+
+	sd_init_req(&hdr, SD_OP_CACHE_PURGE);
+
+	if (argc == 5) {
+		vdiname = argv[optind++];
+		ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+				    vdi_cmd_data.snapshot_tag, &vid, 0);
+		if (ret < 0) {
+			sd_err("Failed to open VDI %s", vdiname);
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+		hdr.obj.oid = vid_to_vdi_oid(vid);
+		hdr.flags = SD_FLAG_CMD_WRITE;
+		hdr.data_length = 0;
+	} else {
+		confirm("This operation purges the cache of all the vdi"
+			". Continue? [yes/no]: ");
+	}
+
+	ret = send_light_req(&hdr, sdhost, sdport);
+	if (ret) {
+		sd_err("failed to execute request");
+		return EXIT_FAILURE;
+	}
+out:
+	return ret;
+}
+
 static struct subcommand vdi_cache_cmd[] = {
 	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
 	 NULL, CMD_NEED_ARG, vdi_cache_flush},
@@ -2032,6 +2067,8 @@ static struct subcommand vdi_cache_cmd[] = {
 	 NULL, CMD_NEED_ARG, vdi_cache_delete},
 	{"info", NULL, NULL, "show usage of the cache",
 	 NULL, 0, vdi_cache_info},
+	{"purge", NULL, NULL, "purge the cache of all vdi (no flush)",
+	 NULL, 0, vdi_cache_purge},
 	{NULL,},
 };
 
