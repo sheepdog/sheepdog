@@ -107,10 +107,10 @@ static struct sd_option sheep_options[] = {
 	{'F', "log-format", true, "specify log format"},
 	{'g', "gateway", false, "make the progam run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
-	{'i', "ioaddr", true, "use separate network card to handle IO requests",
-	 ioaddr_help},
+	{'i', "ioaddr", true, "use separate network card to handle IO requests"
+	 " (default: disabled)", ioaddr_help},
 	{'j', "journal", true, "use jouranl file to log all the write "
-	 "operations", journal_help},
+	 "operations. (default: disabled)", journal_help},
 	{'l', "loglevel", true, "specify the level of logging detail "
 	 "(default: 6 [SDOG_INFO])", loglevel_help},
 	{'n', "nosync", false, "drop O_SYNC for write of backend"},
@@ -118,7 +118,8 @@ static struct sd_option sheep_options[] = {
 	{'p', "port", true, "specify the TCP port on which to listen "
 	 "(default: 7000)"},
 	{'P', "pidfile", true, "create a pid file"},
-	{'r', "http", true, "enable http service", http_help},
+	{'r', "http", true, "enable http service. (default: disabled)",
+	 http_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "cache", true, "enable object cache", cache_help},
