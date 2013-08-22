@@ -18,19 +18,16 @@ struct object_tree_entry {
 	uint64_t oid;
 	int nr_copies;
 	struct rb_node node;
-	struct list_node list;
 };
 
 struct object_tree {
 	int nr_objs;
 	struct rb_root root;
-	struct list_head list;
 };
 
 static struct object_tree tree = {
 	.nr_objs = 0,
 	.root = RB_ROOT,
-	.list = LIST_HEAD_INIT(tree.list)
 };
 static struct object_tree_entry *cached_entry;
 
@@ -58,7 +55,6 @@ void object_tree_insert(uint64_t oid, int nr_copies)
 	rb_init_node(&cached_entry->node);
 	p = do_insert(root, cached_entry);
 	if (!p) {
-		list_add(&cached_entry->list, &tree.list);
 		tree.nr_objs++;
 		cached_entry = NULL;
 	}
@@ -76,8 +72,10 @@ void object_tree_print(void)
 void object_tree_free(void)
 {
 	struct object_tree_entry *entry;
-	list_for_each_entry(entry, &tree.list, list)
+	rb_for_each_entry(entry, &tree.root, node) {
+		rb_erase(&entry->node, &tree.root);
 		free(entry);
+	}
 
 	free(cached_entry);
 }

@@ -15,7 +15,6 @@
 
 struct objlist_cache_entry {
 	uint64_t oid;
-	struct list_node list;
 	struct rb_node node;
 };
 
@@ -24,7 +23,6 @@ struct objlist_cache {
 	int buf_version;
 	int cache_size;
 	uint64_t *buf;
-	struct list_head entry_list;
 	struct rb_root root;
 	struct sd_lock lock;
 };
@@ -37,7 +35,6 @@ struct objlist_deletion_work {
 static struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
-	.entry_list     = LIST_HEAD_INIT(obj_list_cache.entry_list),
 	.lock		= SD_LOCK_INITIALIZER,
 };
 
@@ -61,7 +58,6 @@ static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 	if (!entry)
 		return -1;
 
-	list_del(&entry->list);
 	rb_erase(&entry->node, root);
 	free(entry);
 
@@ -91,7 +87,6 @@ int objlist_cache_insert(uint64_t oid)
 	if (p)
 		free(entry);
 	else {
-		list_add(&entry->list, &obj_list_cache.entry_list);
 		obj_list_cache.cache_size++;
 		obj_list_cache.tree_version++;
 	}
@@ -120,7 +115,7 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 	obj_list_cache.buf = xrealloc(obj_list_cache.buf,
 				obj_list_cache.cache_size * sizeof(uint64_t));
 
-	list_for_each_entry(entry, &obj_list_cache.entry_list, list) {
+	rb_for_each_entry(entry, &obj_list_cache.root, node) {
 		obj_list_cache.buf[nr++] = entry->oid;
 	}
 
@@ -158,7 +153,7 @@ static void objlist_deletion_work(struct work *work)
 	}
 
 	sd_write_lock(&obj_list_cache.lock);
-	list_for_each_entry(entry, &obj_list_cache.entry_list, list) {
+	rb_for_each_entry(entry, &obj_list_cache.root, node) {
 		entry_vid = oid_to_vid(entry->oid);
 		if (entry_vid != vid)
 			continue;
@@ -168,7 +163,6 @@ static void objlist_deletion_work(struct work *work)
 			continue;
 
 		sd_debug("delete object entry %" PRIx64, entry->oid);
-		list_del(&entry->list);
 		rb_erase(&entry->node, &obj_list_cache.root);
 		free(entry);
 	}
