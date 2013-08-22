@@ -136,6 +136,12 @@ void unregister_event(int fd)
 
 	list_del(&ei->ei_list);
 	free(ei);
+
+	/*
+	 * Although ei is no longer valid pointer, ei->handler() might be about
+	 * to be called in do_event_loop().  Refreshing the event loop is safe.
+	 */
+	event_force_refresh();
 }
 
 int modify_event(int fd, unsigned int new_events)
@@ -185,6 +191,7 @@ static void do_event_loop(int timeout, bool sort_with_prio)
 	int i, nr;
 
 refresh:
+	event_loop_refresh = false;
 	nr = epoll_wait(efd, events, nr_events, timeout);
 	if (sort_with_prio)
 		xqsort(events, nr, epoll_event_cmp);
@@ -201,10 +208,8 @@ refresh:
 			ei = (struct event_info *)events[i].data.ptr;
 			ei->handler(ei->fd, events[i].events, ei->data);
 
-			if (event_loop_refresh) {
-				event_loop_refresh = false;
+			if (event_loop_refresh)
 				goto refresh;
-			}
 		}
 	}
 }
