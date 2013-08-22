@@ -11,8 +11,6 @@ MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp	\
 			  autoheader automake autoconf config.status	\
 			  config.log
 
-dist_doc_DATA		= 
-
 sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
 sheepdogsysconf_DATA	= 

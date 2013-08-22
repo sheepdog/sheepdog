@@ -157,7 +157,7 @@ static inline void clear_bit(unsigned int nr, unsigned long *addr)
  * set bit if value is nonzero. The last (most significant) bit is
  * at position 64.
  */
-#if __SIZEOF_LONG__ == 4
+#if SIZEOF_LONG == 4
 static __always_inline int fls64(uint64_t x)
 {
 	uint32_t h = x >> 32;
@@ -169,7 +169,7 @@ static __always_inline int fls64(uint64_t x)
 		return 64 - __builtin_clzl(h);
 	return 32 - __builtin_clzl(x);
 }
-#elif __SIZEOF_LONG__ == 8
+#elif SIZEOF_LONG == 8
 static __always_inline int fls64(uint64_t x)
 {
 	if (x == 0)
@@ -177,7 +177,7 @@ static __always_inline int fls64(uint64_t x)
 	return 64 - __builtin_clzl(x);
 }
 #else
-#error __SIZEOF_LONG__ not 4 or 8
+#error SIZEOF_LONG not 4 or 8
 #endif
 
 #endif /* __BITOPS_H__ */

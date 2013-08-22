@@ -16,8 +16,6 @@
 #
 
 # bootstrap / init
-AC_PREREQ([2.61])
-
 m4_define([sheepdog_version], [0.7.50])
 
 m4_define([git_version],
@@ -35,7 +33,19 @@ AC_CANONICAL_HOST
 
 AC_LANG([C])
 
-AM_SILENT_RULES([yes])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)])
+
+if make --help 2>&1 | grep -q no-print-directory; then
+	AM_MAKEFLAGS="$AM_MAKEFLAGS --no-print-directory";
+fi
+
+if make --help 2>&1 | grep -q quiet; then
+	AM_MAKEFLAGS="$AM_MAKEFLAGS --quiet"
+fi
+
+if libtool --help 2>&1 | grep -q quiet; then
+	AM_LIBTOOLFLAGS="--quiet";
+fi
 
 m4_ifndef([PKG_PROG_PKG_CONFIG], AC_MSG_ERROR([pkg-config not found]))
 
@@ -96,18 +106,27 @@ AC_CHECK_HEADERS([urcu.h urcu/uatomic.h],,
 AC_C_CONST
 AC_TYPE_UID_T
 AC_C_INLINE
-AC_TYPE_INT16_T
-AC_TYPE_INT32_T
-AC_TYPE_INT64_T
-AC_TYPE_INT8_T
 AC_TYPE_SIZE_T
-AC_TYPE_SSIZE_T
 AC_HEADER_TIME
-AC_TYPE_UINT16_T
-AC_TYPE_UINT32_T
-AC_TYPE_UINT64_T
-AC_TYPE_UINT8_T
 AC_C_VOLATILE
+
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
+SIZEOF_SHORT=$ac_cv_sizeof_short
+SIZEOF_INT=$ac_cv_sizeof_int
+SIZEOF_LONG=$ac_cv_sizeof_long
+SIZEOF_LONG_LONG=$ac_cv_sizeof_long_long
+AC_SUBST(SIZEOF_SHORT)
+AC_SUBST(SIZEOF_INT)
+AC_SUBST(SIZEOF_LONG)
+AC_SUBST(SIZEOF_LONG_LONG)
+
+# Checks for header files.
+AC_CHECK_HEADERS([sys/eventfd.h])
+AC_CHECK_HEADERS([sys/signalfd.h])
+AC_CHECK_HEADERS([sys/timerfd.h])
 
 # Checks for library functions.
 AC_FUNC_CLOSEDIR_VOID
@@ -124,7 +143,7 @@ AC_FUNC_VPRINTF
 AC_CHECK_FUNCS([alarm alphasort atexit bzero dup2 endgrent endpwent fcntl \
 		getcwd getpeerucred getpeereid gettimeofday inet_ntoa memmove \
 		memset mkdir scandir select socket strcasecmp strchr strdup \
-		strerror strrchr strspn strstr])
+		strerror strrchr strspn strstr fallocate])
 
 AC_CONFIG_FILES([Makefile
 		dog/Makefile
@@ -431,7 +450,7 @@ AC_MSG_RESULT([  Features                 =${PACKAGE_FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
-LIB_MSG_RESULT(m4_shift(local_soname_list))dnl
+AC_MSG_RESULT(m4_shift(local_soname_list))
 AC_MSG_RESULT([  Default optimization     = ${OPT_CFLAGS}])
 AC_MSG_RESULT([  Default debug options    = ${GDB_CFLAGS}])
 AC_MSG_RESULT([  Extra compiler warnings  = ${EXTRA_WARNING}])
