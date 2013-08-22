@@ -22,48 +22,24 @@ static uint32_t max_copies;
 static struct rb_root vdi_state_root = RB_ROOT;
 static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
 
+static int vdi_state_cmp(const struct vdi_state_entry *a,
+			 const struct vdi_state_entry *b)
+{
+	return intcmp(a->vid, b->vid);
+}
+
 static struct vdi_state_entry *vdi_state_search(struct rb_root *root,
 						uint32_t vid)
 {
-	struct rb_node *n = root->rb_node;
-	struct vdi_state_entry *t;
+	struct vdi_state_entry key = { .vid = vid };
 
-	while (n) {
-		t = rb_entry(n, struct vdi_state_entry, node);
-
-		if (vid < t->vid)
-			n = n->rb_left;
-		else if (vid > t->vid)
-			n = n->rb_right;
-		else
-			return t;
-	}
-
-	return NULL;
+	return rb_search(root, &key, node, vdi_state_cmp);
 }
 
 static struct vdi_state_entry *vdi_state_insert(struct rb_root *root,
 						struct vdi_state_entry *new)
 {
-	struct rb_node **p = &root->rb_node;
-	struct rb_node *parent = NULL;
-	struct vdi_state_entry *entry;
-
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct vdi_state_entry, node);
-
-		if (new->vid < entry->vid)
-			p = &(*p)->rb_left;
-		else if (new->vid > entry->vid)
-			p = &(*p)->rb_right;
-		else
-			return entry; /* already has this entry */
-	}
-	rb_link_node(&new->node, parent, p);
-	rb_insert_color(&new->node, root);
-
-	return NULL; /* insert successfully */
+	return rb_insert(root, new, node, vdi_state_cmp);
 }
 
 static bool vid_is_snapshot(uint32_t vid)
@@ -165,13 +141,11 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 int fill_vdi_state_list(void *data)
 {
 	int nr = 0;
-	struct rb_node *n;
 	struct vdi_state *vs = data;
 	struct vdi_state_entry *entry;
 
 	sd_read_lock(&vdi_state_lock);
-	for (n = rb_first(&vdi_state_root); n; n = rb_next(n)) {
-		entry = rb_entry(n, struct vdi_state_entry, node);
+	rb_for_each_entry(entry, &vdi_state_root, node) {
 		memset(vs, 0, sizeof(*vs));
 		vs->vid = entry->vid;
 		vs->nr_copies = entry->nr_copies;
@@ -948,16 +922,12 @@ out:
 
 void clean_vdi_state(void)
 {
-	struct rb_node *current_node = rb_first(&vdi_state_root);
-	struct vdi_state_entry *entry = NULL;
+	struct vdi_state_entry *entry;
 
 	sd_write_lock(&vdi_state_lock);
-	while (current_node) {
-		entry = rb_entry(current_node, struct vdi_state_entry, node);
-		rb_erase(current_node, &vdi_state_root);
+	rb_for_each_entry(entry, &vdi_state_root, node) {
+		rb_erase(&entry->node, &vdi_state_root);
 		free(entry);
-		entry = NULL;
-		current_node = rb_first(&vdi_state_root);
 	}
 	INIT_RB_ROOT(&vdi_state_root);
 	sd_unlock(&vdi_state_lock);

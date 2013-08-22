@@ -102,6 +102,12 @@ static inline uint32_t entry_idx(const struct object_cache_entry *entry)
 	return entry->idx & ~CACHE_INDEX_MASK;
 }
 
+static int object_cache_cmp(const struct object_cache_entry *a,
+			    const struct object_cache_entry *b)
+{
+	return intcmp(entry_idx(a), entry_idx(b));
+}
+
 static inline uint32_t object_cache_oid_to_idx(uint64_t oid)
 {
 	uint32_t idx = data_oid_to_idx(oid);
@@ -199,48 +205,15 @@ static inline void unlock_entry(struct object_cache_entry *entry)
 static struct object_cache_entry *
 lru_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 {
-	struct rb_node **p = &root->rb_node;
-	struct rb_node *parent = NULL;
-	struct object_cache_entry *entry;
-	uint32_t idx = entry_idx(new);
-
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct object_cache_entry, node);
-
-		if (idx < entry_idx(entry))
-			p = &(*p)->rb_left;
-		else if (idx > entry_idx(entry))
-			p = &(*p)->rb_right;
-		else {
-			/* already has this entry */
-			return entry;
-		}
-	}
-	rb_link_node(&new->node, parent, p);
-	rb_insert_color(&new->node, root);
-
-	return NULL; /* insert successfully */
+	return rb_insert(root, new, node, object_cache_cmp);
 }
 
 static struct object_cache_entry *lru_tree_search(struct rb_root *root,
 						  uint32_t idx)
 {
-	struct rb_node *n = root->rb_node;
-	struct object_cache_entry *t;
+	struct object_cache_entry key = { .idx = idx };
 
-	while (n) {
-		t = rb_entry(n, struct object_cache_entry, node);
-
-		if (idx < entry_idx(t))
-			n = n->rb_left;
-		else if (idx > entry_idx(t))
-			n = n->rb_right;
-		else
-			return t; /* found it */
-	}
-
-	return NULL;
+	return rb_search(root, &key, node, object_cache_cmp);
 }
 
 static void do_background_push(struct work *work)

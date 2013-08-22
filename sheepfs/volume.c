@@ -64,46 +64,21 @@ struct vdi_inode {
 static struct rb_root vdi_inode_tree = RB_ROOT;
 static struct sd_lock vdi_inode_tree_lock = SD_LOCK_INITIALIZER;
 
+static int vdi_inode_cmp(const struct vdi_inode *a, const struct vdi_inode *b)
+{
+	return intcmp(a->vid, b->vid);
+}
+
 static struct vdi_inode *vdi_inode_tree_insert(struct vdi_inode *new)
 {
-	struct rb_node **p = &vdi_inode_tree.rb_node;
-	struct rb_node *parent = NULL;
-	struct vdi_inode *entry;
-
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct vdi_inode, rb);
-
-		if (new->vid < entry->vid)
-			p = &(*p)->rb_left;
-		else if (new->vid > entry->vid)
-			p = &(*p)->rb_right;
-		else
-			return entry; /* already has this entry */
-	}
-	rb_link_node(&new->rb, parent, p);
-	rb_insert_color(&new->rb, &vdi_inode_tree);
-
-	return NULL; /* insert successfully */
+	return rb_insert(&vdi_inode_tree, new, rb, vdi_inode_cmp);
 }
 
 static struct vdi_inode *vdi_inode_tree_search(uint32_t vid)
 {
-	struct rb_node *n = vdi_inode_tree.rb_node;
-	struct vdi_inode *t;
+	struct vdi_inode key = { .vid = vid };
 
-	while (n) {
-		t = rb_entry(n, struct vdi_inode, rb);
-
-		if (vid < t->vid)
-			n = n->rb_left;
-		else if (vid > t->vid)
-			n = n->rb_right;
-		else
-			return t; /* found it */
-	}
-
-	return NULL;
+	return rb_search(&vdi_inode_tree, &key, rb, vdi_inode_cmp);
 }
 
 int create_volume_layout(void)
@@ -364,13 +339,11 @@ static int setup_socket_pool(int array[], int len)
 
 int reset_socket_pool(void)
 {
-	struct rb_node *node;
 	struct vdi_inode *vdi;
 	int ret = 0;
 
 	sd_read_lock(&vdi_inode_tree_lock);
-	for (node = rb_first(&vdi_inode_tree); node; node = rb_next(node)) {
-		vdi = rb_entry(node, struct vdi_inode, rb);
+	rb_for_each_entry(vdi, &vdi_inode_tree, rb) {
 		destroy_socket_pool(vdi->socket_pool, SOCKET_POOL_SIZE);
 		if (setup_socket_pool(vdi->socket_pool,
 			SOCKET_POOL_SIZE) < 0) {

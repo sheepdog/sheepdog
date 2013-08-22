@@ -72,53 +72,23 @@ struct sockfd_cache_entry {
 	struct sockfd_cache_fd *fds;
 };
 
+static int sockfd_cache_cmp(const struct sockfd_cache_entry *a,
+			    const struct sockfd_cache_entry *b)
+{
+	return node_id_cmp(&a->nid, &b->nid);
+}
+
 static struct sockfd_cache_entry *
 sockfd_cache_insert(struct sockfd_cache_entry *new)
 {
-	struct rb_node **p = &sockfd_cache.root.rb_node;
-	struct rb_node *parent = NULL;
-	struct sockfd_cache_entry *entry;
-
-	while (*p) {
-		int cmp;
-
-		parent = *p;
-		entry = rb_entry(parent, struct sockfd_cache_entry, rb);
-		cmp = node_id_cmp(&new->nid, &entry->nid);
-
-		if (cmp < 0)
-			p = &(*p)->rb_left;
-		else if (cmp > 0)
-			p = &(*p)->rb_right;
-		else
-			return entry;
-	}
-	rb_link_node(&new->rb, parent, p);
-	rb_insert_color(&new->rb, &sockfd_cache.root);
-
-	return NULL; /* insert successfully */
+	return rb_insert(&sockfd_cache.root, new, rb, sockfd_cache_cmp);
 }
 
 static struct sockfd_cache_entry *sockfd_cache_search(const struct node_id *nid)
 {
-	struct rb_node *n = sockfd_cache.root.rb_node;
-	struct sockfd_cache_entry *t;
+	struct sockfd_cache_entry key = { .nid = *nid };
 
-	while (n) {
-		int cmp;
-
-		t = rb_entry(n, struct sockfd_cache_entry, rb);
-		cmp = node_id_cmp(nid, &t->nid);
-
-		if (cmp < 0)
-			n = n->rb_left;
-		else if (cmp > 0)
-			n = n->rb_right;
-		else
-			return t; /* found it */
-	}
-
-	return NULL;
+	return rb_search(&sockfd_cache.root, &key, rb, sockfd_cache_cmp);
 }
 
 static inline int get_free_slot(struct sockfd_cache_entry *entry)
@@ -279,7 +249,6 @@ static struct work_queue *grow_wq;
 static void do_grow_fds(struct work *work)
 {
 	struct sockfd_cache_entry *entry;
-	struct rb_node *p;
 	int old_fds_count, new_fds_count, new_size, i;
 
 	sd_debug("%d", fds_count);
@@ -287,8 +256,7 @@ static void do_grow_fds(struct work *work)
 	old_fds_count = fds_count;
 	new_fds_count = fds_count * 2;
 	new_size = sizeof(struct sockfd_cache_fd) * fds_count * 2;
-	for (p = rb_first(&sockfd_cache.root); p; p = rb_next(p)) {
-		entry = rb_entry(p, struct sockfd_cache_entry, rb);
+	rb_for_each_entry(entry, &sockfd_cache.root, rb) {
 		entry->fds = xrealloc(entry->fds, new_size);
 		for (i = old_fds_count; i < new_fds_count; i++) {
 			entry->fds[i].fd = -1;

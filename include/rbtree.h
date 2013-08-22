@@ -80,4 +80,76 @@ static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
 	*rb_link = node;
 }
 
+/*
+ * Search for a value in the rbtree.  This returns NULL when the key is not
+ * found in the rbtree.
+ */
+#define rb_search(root, key, member, compar)				\
+({									\
+	struct rb_node *__n = (root)->rb_node;				\
+	typeof(key) __ret = NULL, __data;				\
+									\
+	while (__n) {							\
+		__data = rb_entry(__n, typeof(*key), member);		\
+		int __cmp = compar(key, __data);			\
+									\
+		if (__cmp < 0)						\
+			__n = __n->rb_left;				\
+		else if (__cmp > 0)					\
+			__n = __n->rb_right;				\
+		else {							\
+			__ret = __data;					\
+			break;						\
+		}							\
+	}								\
+	__ret;								\
+})
+
+/*
+ * Insert a new node into the rbtree.  This returns NULL on success, or the
+ * existing node on error.
+ */
+#define rb_insert(root, new, member, compar)				\
+({									\
+	struct rb_node **__n = &(root)->rb_node, *__parent = NULL;	\
+	typeof(new) __old = NULL, __data;				\
+									\
+	while (*__n) {							\
+		__data = rb_entry(*__n, typeof(*new), member);		\
+		int __cmp = compar(new, __data);			\
+									\
+		__parent = *__n;					\
+		if (__cmp < 0)						\
+			__n = &((*__n)->rb_left);			\
+		else if (__cmp > 0)					\
+			__n = &((*__n)->rb_right);			\
+		else {							\
+			__old = __data;					\
+			break;						\
+		}							\
+	}								\
+									\
+	if (__old == NULL) {						\
+		/* Add new node and rebalance tree. */			\
+		rb_link_node(&((new)->member), __parent, __n);		\
+		rb_insert_color(&((new)->member), root);		\
+	}								\
+									\
+	__old;							\
+})
+
+/* Iterate over a rbtree safe against removal of rbnode */
+#define rb_for_each(pos, root)					\
+	pos = rb_first(root);					\
+	for (struct rb_node *__n = rb_next(pos);		\
+	     pos && ({ __n = rb_next(pos); 1; });		\
+	     pos = __n)
+
+/* Iterate over a rbtree of given type safe against removal of rbnode */
+#define rb_for_each_entry(pos, root, member)				\
+	for (struct rb_node *__pos = rb_first(root), *__n;		\
+	     __pos && ({ __n = rb_next(__pos); 1; }) &&			\
+		     ({ pos =  rb_entry(__pos, typeof(*pos), member); 1; }); \
+	     __pos = __n)
+
 #endif /* __RBTREE_H_ */

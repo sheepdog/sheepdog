@@ -41,53 +41,31 @@ static struct objlist_cache obj_list_cache = {
 	.lock		= SD_LOCK_INITIALIZER,
 };
 
+static int objlist_cache_cmp(const struct objlist_cache_entry *a,
+			     const struct objlist_cache_entry *b)
+{
+	return intcmp(a->oid, b->oid);
+}
+
 static struct objlist_cache_entry *objlist_cache_rb_insert(struct rb_root *root,
 		struct objlist_cache_entry *new)
 {
-	struct rb_node **p = &root->rb_node;
-	struct rb_node *parent = NULL;
-	struct objlist_cache_entry *entry;
-
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct objlist_cache_entry, node);
-
-		if (new->oid < entry->oid)
-			p = &(*p)->rb_left;
-		else if (new->oid > entry->oid)
-			p = &(*p)->rb_right;
-		else
-			return entry; /* already has this entry */
-	}
-	rb_link_node(&new->node, parent, p);
-	rb_insert_color(&new->node, root);
-
-	return NULL; /* insert successfully */
+	return rb_insert(root, new, node, objlist_cache_cmp);
 }
 
 static int objlist_cache_rb_remove(struct rb_root *root, uint64_t oid)
 {
-	struct rb_node **p = &root->rb_node;
-	struct rb_node *parent = NULL;
-	struct objlist_cache_entry *entry;
+	struct objlist_cache_entry *entry,  key = { .oid = oid  };
 
-	while (*p) {
-		parent = *p;
-		entry = rb_entry(parent, struct objlist_cache_entry, node);
+	entry = rb_search(root, &key, node, objlist_cache_cmp);
+	if (!entry)
+		return -1;
 
-		if (oid < entry->oid)
-			p = &(*p)->rb_left;
-		else if (oid > entry->oid)
-			p = &(*p)->rb_right;
-		else {
-			list_del(&entry->list);
-			rb_erase(parent, root);
-			free(entry);
-			return 0;
-		}
-	}
+	list_del(&entry->list);
+	rb_erase(&entry->node, root);
+	free(entry);
 
-	return -1; /* fail to remove */
+	return 0;
 }
 
 void objlist_cache_remove(uint64_t oid)

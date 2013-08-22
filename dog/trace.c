@@ -258,34 +258,23 @@ static struct rb_root stat_tree_root;
 
 static LIST_HEAD(stat_list);
 
+static int graph_stat_cmp(const struct graph_stat_entry *a,
+			  const struct graph_stat_entry *b)
+{
+	return strcmp(a->fname, b->fname);
+}
+
 static struct graph_stat_entry *
 stat_tree_insert(struct graph_stat_entry *new)
 {
-	struct rb_node **p = &stat_tree_root.rb_node;
-	struct rb_node *parent = NULL;
 	struct graph_stat_entry *entry;
 
-	while (*p) {
-		int cmp;
-
-		parent = *p;
-		entry = rb_entry(parent, struct graph_stat_entry, rb);
-		cmp = strcmp(new->fname, entry->fname);
-
-		if (cmp < 0)
-			p = &(*p)->rb_left;
-		else if (cmp > 0)
-			p = &(*p)->rb_right;
-		else {
-			entry->duration += new->duration;
-			entry->nr_calls++;
-			return entry;
-		}
+	entry = rb_insert(&stat_tree_root, new, rb, graph_stat_cmp);
+	if (entry) {
+		entry->duration += new->duration;
+		entry->nr_calls++;
 	}
-	rb_link_node(&new->rb, parent, p);
-	rb_insert_color(&new->rb, &stat_tree_root);
-
-	return NULL; /* insert successfully */
+	return entry;
 }
 
 static void prepare_stat_tree(struct trace_graph_item *item)

@@ -80,51 +80,21 @@ static bool first_push = true;
 
 static void zk_compete_master(void);
 
+static int zk_node_cmp(const struct zk_node *a, const struct zk_node *b)
+{
+	return node_id_cmp(&a->node.nid, &b->node.nid);
+}
+
 static struct zk_node *zk_tree_insert(struct zk_node *new)
 {
-	struct rb_node **p = &zk_node_root.rb_node;
-	struct rb_node *parent = NULL;
-	struct zk_node *entry;
-
-	while (*p) {
-		int cmp;
-
-		parent = *p;
-		entry = rb_entry(parent, struct zk_node, rb);
-
-		cmp = node_cmp(&new->node, &entry->node);
-		if (cmp < 0)
-			p = &(*p)->rb_left;
-		else if (cmp > 0)
-			p = &(*p)->rb_right;
-		else
-			/* already has this entry */
-			return entry;
-	}
-	rb_link_node(&new->rb, parent, p);
-	rb_insert_color(&new->rb, &zk_node_root);
-	return NULL; /* insert successfully */
+	return rb_insert(&zk_node_root, new, rb, zk_node_cmp);
 }
 
 static struct zk_node *zk_tree_search_nolock(const struct node_id *nid)
 {
-	struct rb_node *n = zk_node_root.rb_node;
-	struct zk_node *t;
+	struct zk_node key = { .node.nid = *nid };
 
-	while (n) {
-		int cmp;
-
-		t = rb_entry(n, struct zk_node, rb);
-		cmp = node_id_cmp(nid, &t->node.nid);
-
-		if (cmp < 0)
-			n = n->rb_left;
-		else if (cmp > 0)
-			n = n->rb_right;
-		else
-			return t; /* found it */
-	}
-	return NULL;
+	return rb_search(&zk_node_root, &key, rb, zk_node_cmp);
 }
 
 static inline struct zk_node *zk_tree_search(const struct node_id *nid)
@@ -481,14 +451,12 @@ static inline void zk_tree_destroy(void)
 
 static inline void build_node_list(void)
 {
-	struct rb_node *n;
 	struct zk_node *zk;
 
 	nr_sd_nodes = 0;
-	for (n = rb_first(&zk_node_root); n; n = rb_next(n)) {
-		zk = rb_entry(n, struct zk_node, rb);
+	rb_for_each_entry(zk, &zk_node_root, rb)
 		sd_nodes[nr_sd_nodes++] = zk->node;
-	}
+
 	sd_debug("nr_sd_nodes:%zu", nr_sd_nodes);
 }
 
