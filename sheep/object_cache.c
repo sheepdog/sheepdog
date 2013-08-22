@@ -1011,7 +1011,7 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 	DIR *dir;
 	struct dirent *d;
 	uint32_t vid = oc->vid;
-	uint32_t idx;
+	unsigned long idx;
 	uint64_t all = UINT64_MAX;
 	int ret = 0;
 	char p[PATH_MAX];
@@ -1036,7 +1036,7 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 		}
 
 		idx = strtoul(d->d_name, NULL, 16);
-		if (idx == ULLONG_MAX)
+		if (idx == ULONG_MAX)
 			continue;
 		if (push_cache_object(vid, idx, all, true) !=
 		    SD_RES_SUCCESS) {
@@ -1224,7 +1224,7 @@ static int load_cache_object(struct object_cache *cache)
 {
 	DIR *dir;
 	struct dirent *d;
-	uint32_t idx;
+	unsigned long idx;
 	char path[PATH_MAX];
 	int ret = 0;
 
@@ -1249,7 +1249,7 @@ static int load_cache_object(struct object_cache *cache)
 		}
 
 		idx = strtoul(d->d_name, NULL, 16);
-		if (idx == ULLONG_MAX)
+		if (idx == ULONG_MAX)
 			continue;
 
 		/*
@@ -1271,7 +1271,7 @@ static int load_cache(void)
 {
 	DIR *dir;
 	struct dirent *d;
-	uint32_t vid;
+	unsigned long vid;
 	char path[PATH_MAX];
 	int ret = 0;
 
@@ -1287,7 +1287,7 @@ static int load_cache(void)
 		if (!strncmp(d->d_name, ".", 1))
 			continue;
 		vid = strtoul(d->d_name, NULL, 16);
-		if (vid == ULLONG_MAX)
+		if (vid == ULONG_MAX)
 			continue;
 
 		load_cache_object(find_object_cache(vid, true));
