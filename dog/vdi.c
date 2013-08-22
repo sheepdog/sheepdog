@@ -1458,7 +1458,7 @@ static void vdi_hash_check_work(struct work *work)
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
 
-	switch (ret) {
+	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		vcw->object_found = true;
 		memcpy(vcw->hash, rsp->hash.digest, sizeof(vcw->hash));
@@ -1470,7 +1470,7 @@ static void vdi_hash_check_work(struct work *work)
 	default:
 		sd_err("failed to read %" PRIx64 " from %s, %s", info->oid,
 		       addr_to_str(vcw->vnode->nid.addr, vcw->vnode->nid.port),
-		       sd_strerror(ret));
+		       sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
 }

@@ -197,12 +197,13 @@ int dog_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
 int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port)
 {
 	int ret = dog_exec_req(addr, port, hdr, NULL);
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
 	if (ret == -1)
 		return -1;
 
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("Response's result: %s", sd_strerror(ret));
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("Response's result: %s", sd_strerror(rsp->result));
 		return -1;
 	}
 
