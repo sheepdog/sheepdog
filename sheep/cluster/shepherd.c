@@ -19,7 +19,6 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/epoll.h>
-#include <sys/eventfd.h>
 
 #include "cluster.h"
 #include "event.h"

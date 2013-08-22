@@ -10,7 +10,6 @@
 #include <unistd.h>
 #include <search.h>
 #include <urcu/uatomic.h>
-#include <sys/eventfd.h>
 #include <pthread.h>
 #include <errno.h>
 

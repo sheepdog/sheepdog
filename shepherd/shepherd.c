@@ -21,7 +21,6 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/epoll.h>
-#include <sys/eventfd.h>
 
 #include <sys/un.h>
 #include <netinet/in.h>

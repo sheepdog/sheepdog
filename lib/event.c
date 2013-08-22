@@ -14,7 +14,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/epoll.h>
-#include <sys/timerfd.h>
 
 #include "list.h"
 #include "util.h"

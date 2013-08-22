@@ -13,7 +13,6 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 #include <sys/mman.h>
-#include <sys/signalfd.h>
 #include <sys/file.h>
 #include <signal.h>
 #include <fcntl.h>

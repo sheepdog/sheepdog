@@ -12,14 +12,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <sys/syscall.h>
-#include <sys/types.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <signal.h>
 #include <sys/xattr.h>
 #include <fcntl.h>
 

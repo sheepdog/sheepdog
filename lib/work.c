@@ -23,7 +23,6 @@
 #include <stdlib.h>
 #include <syscall.h>
 #include <sys/types.h>
-#include <sys/eventfd.h>
 #include <sys/time.h>
 #include <linux/types.h>
 #include <signal.h>
