@@ -242,7 +242,7 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_CLUSTER_ERROR] = "Cluster driver error",
 	};
 
-	if (descs[err] == NULL) {
+	if (!(0 <= err && err < ARRAY_SIZE(descs)) || descs[err] == NULL) {
 		static __thread char msg[32];
 		snprintf(msg, sizeof(msg), "Invalid error code %x", err);
 		return msg;
