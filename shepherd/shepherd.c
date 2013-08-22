@@ -259,8 +259,6 @@ del:
 	list_del(&s->join_wait_list);
 	free(s);
 
-	event_force_refresh();
-
 	if (--val)
 		goto remove;
 
