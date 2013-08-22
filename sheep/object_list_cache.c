@@ -184,6 +184,11 @@ static void objlist_deletion_work(struct work *work)
 		entry_vid = oid_to_vid(entry->oid);
 		if (entry_vid != vid)
 			continue;
+
+		/* VDI objects cannot be removed even after we delete images. */
+		if (is_vdi_obj(entry->oid))
+			continue;
+
 		sd_debug("delete object entry %" PRIx64, entry->oid);
 		list_del(&entry->list);
 		rb_erase(&entry->node, &obj_list_cache.root);
