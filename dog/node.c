@@ -111,6 +111,7 @@ static int get_recovery_state(struct recovery_state *state)
 {
 	int ret;
 	struct sd_req req;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req;
 
 	sd_init_req(&req, SD_OP_STAT_RECOVERY);
 	req.data_length = sizeof(*state);
@@ -118,6 +119,10 @@ static int get_recovery_state(struct recovery_state *state)
 	ret = dog_exec_req(sdhost, sdport, &req, state);
 	if (ret < 0) {
 		sd_err("Failed to execute request");
+		return -1;
+	}
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
 		return -1;
 	}
 
@@ -198,6 +203,7 @@ static int node_recovery(int argc, char **argv)
 
 	for (i = 0; i < sd_nodes_nr; i++) {
 		struct sd_req req;
+		struct sd_rsp *rsp = (struct sd_rsp *)&req;
 		struct recovery_state state;
 
 		memset(&state, 0, sizeof(state));
@@ -209,6 +215,10 @@ static int node_recovery(int argc, char **argv)
 				      sd_nodes[i].nid.port, &req, &state);
 		if (ret < 0)
 			return EXIT_SYSFAIL;
+		if (rsp->result != SD_RES_SUCCESS) {
+			sd_err("%s", sd_strerror(rsp->result));
+			return EXIT_FAILURE;
+		}
 
 		if (state.in_recovery) {
 			const char *host = addr_to_str(sd_nodes[i].nid.addr,

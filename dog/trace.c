@@ -183,6 +183,7 @@ static int trace_status(int argc, char **argv)
 	char buf[4096]; /* must have enough space to store tracer list */
 	int ret;
 	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
 	sd_init_req(&hdr, SD_OP_TRACE_STATUS);
 	hdr.data_length = sizeof(buf);
@@ -190,6 +191,10 @@ static int trace_status(int argc, char **argv)
 	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
+	switch (rsp->result) {
+		sd_err("%s", sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
 
 	printf("%s", buf);
 

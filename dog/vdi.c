@@ -319,6 +319,10 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 				      sd_nodes[i].nid.port, &hdr, buf);
 		if (ret < 0)
 			continue;
+		switch (rsp->result) {
+			sd_err("%s", sd_strerror(rsp->result));
+			continue;
+		}
 
 		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
 				   size);
