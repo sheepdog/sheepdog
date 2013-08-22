@@ -303,11 +303,17 @@ static int volume_do_sync(uint32_t vid)
 	ret = exec_req(fd, &hdr, NULL, NULL, 0);
 	put_socket_fd(vdi, idx);
 
+	/* if sheep daemon does not support FLUSH */
+	if (rsp->result == SD_RES_INVALID_PARMS) {
+		sheepfs_object_cache = false;
+		goto out;
+	}
+
 	if (ret || rsp->result != SD_RES_SUCCESS) {
 		sheepfs_pr("failed to flush vdi %"PRIx32"\n", vid);
 		return -1;
 	}
-
+out:
 	return 0;
 }
 
