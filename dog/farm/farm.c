@@ -187,7 +187,7 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 
 	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
 
-	if (ret)
+	if (ret < 0)
 		sd_err("Fail to notify vdi add event(%"PRIx32", %d)", vdi_id,
 		       nr_copies);
 
