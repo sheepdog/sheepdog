@@ -120,8 +120,6 @@ static char *log_buff;
 
 static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
 
-static pthread_mutex_t logsize_lock = PTHREAD_MUTEX_INITIALIZER;
-
 static const char *format_thread_name(char *str, size_t size, const char *name,
 				      int idx)
 {
@@ -556,7 +554,6 @@ static void logger(char *log_dir, char *outfile)
 		if (max_logsize) {
 			off_t offset;
 
-			pthread_mutex_lock(&logsize_lock);
 			offset = lseek(log_fd, 0, SEEK_END);
 			if (offset < 0) {
 				syslog(LOG_ERR, "sheep log error\n");
@@ -565,7 +562,6 @@ static void logger(char *log_dir, char *outfile)
 				if (log_size >= max_logsize)
 					rotate_log();
 			}
-			pthread_mutex_unlock(&logsize_lock);
 		}
 
 		sleep(1);
