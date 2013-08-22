@@ -95,19 +95,13 @@ struct logmsg {
 	char str[0];
 };
 
+typedef int (*formatter_fn)(char *, size_t, const struct logmsg *);
+
 struct log_format {
 	const char *name;
-	int (*formatter)(char *, size_t, const struct logmsg *);
+	formatter_fn formatter;
 	struct list_node list;
 };
-
-#define log_format_register(n, formatter_fn)				\
-	static void __attribute__((constructor(101)))			\
-	regist_ ## formatter_fn(void) {					\
-		static struct log_format f =				\
-			{ .name = n, .formatter = formatter_fn };	\
-		list_add(&f.list, &log_formats);			\
-}
 
 static LIST_HEAD(log_formats);
 static struct log_format *format;
@@ -141,14 +135,112 @@ static const char *format_thread_name(char *str, size_t size, const char *name,
 	return str;
 }
 
+static int server_log_formatter(char *buff, size_t size,
+				const struct logmsg *msg)
+{
+	char *p = buff;
+	struct tm tm;
+	size_t len;
+	char thread_name[MAX_THREAD_NAME_LEN];
+
+	localtime_r(&msg->tv.tv_sec, &tm);
+	len = strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
+	p += len;
+	size -= len;
+
+	len = snprintf(p, size, "%s%6s %s[%s] %s(%d) %s%s%s",
+		       colorize ? log_color[msg->prio] : "",
+		       log_prio_str[msg->prio],
+		       colorize ? TEXT_YELLOW : "",
+		       format_thread_name(thread_name, sizeof(thread_name),
+					  msg->worker_name, msg->worker_idx),
+		       msg->func, msg->line,
+		       colorize ? log_color[msg->prio] : "",
+		       msg->str, colorize ? TEXT_NORMAL : "");
+	if (len < 0)
+		len = 0;
+	p += min(len, size - 1);
+
+	return p - buff;
+}
+
+static int default_log_formatter(char *buff, size_t size,
+				 const struct logmsg *msg)
+{
+	size_t len = min(size, msg->str_len);
+
+	memcpy(buff, msg->str, len);
+
+	return len;
+}
+
+static int json_log_formatter(char *buff, size_t size,
+				const struct logmsg *msg)
+{
+	char *p = buff;
+	size_t len;
+
+	assert(logger_user_info);
+
+	len = snprintf(p, size, "{ \"user_info\": "
+		       "{\"program_name\": \"%s\", \"port\": %d},"
+		       "\"body\": {"
+		       "\"second\": %lu, \"usecond\": %lu, "
+		       "\"worker_name\": \"%s\", \"worker_idx\": %d, "
+		       "\"func\": \"%s\", \"line\": %d, "
+		       "\"msg\": \"",
+		       log_name, logger_user_info->port,
+		       msg->tv.tv_sec, msg->tv.tv_usec,
+		       msg->worker_name[0] ? msg->worker_name : "main",
+		       msg->worker_idx, msg->func, msg->line);
+	if (len < 0)
+		return 0;
+	len = min(len, size - 1);
+	p += len;
+	size -= len;
+
+	for (int i = 0; i < msg->str_len; i++) {
+		if (size <= 1)
+			break;
+
+		if (msg->str[i] == '"') {
+			*p++ = '\\';
+			size--;
+		}
+
+		if (size <= 1)
+			break;
+		*p++ = msg->str[i];
+		size--;
+	}
+
+	pstrcpy(p, size, "\"} }");
+	p += strlen(p);
+
+	return p - buff;
+}
+
+static void log_format_register(const char *name, formatter_fn formatter)
+{
+	struct log_format *f = xmalloc(sizeof(struct log_format));
+
+	f->name = name;
+	f->formatter = formatter;
+	list_add(&f->list, &log_formats);
+}
+
 /*
  * We need to set default log formatter because dog doesn't want to call
  * select_log_formatter().
  */
-static void __attribute__((constructor(65535)))
+static void __attribute__((constructor))
 init_log_formatter(void)
 {
 	struct log_format *f;
+
+	log_format_register("json", json_log_formatter);
+	log_format_register("server", server_log_formatter);
+	log_format_register("default", default_log_formatter);
 
 	list_for_each_entry(f, &log_formats, list) {
 		if (!strcmp(f->name, "default")) {
@@ -229,94 +321,6 @@ static void free_logarea(void)
 	shmdt(la->start);
 	shmdt(la);
 }
-
-static int server_log_formatter(char *buff, size_t size,
-				const struct logmsg *msg)
-{
-	char *p = buff;
-	struct tm tm;
-	size_t len;
-	char thread_name[MAX_THREAD_NAME_LEN];
-
-	localtime_r(&msg->tv.tv_sec, &tm);
-	len = strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
-	p += len;
-	size -= len;
-
-	len = snprintf(p, size, "%s%6s %s[%s] %s(%d) %s%s%s",
-		       colorize ? log_color[msg->prio] : "",
-		       log_prio_str[msg->prio],
-		       colorize ? TEXT_YELLOW : "",
-		       format_thread_name(thread_name, sizeof(thread_name),
-					  msg->worker_name, msg->worker_idx),
-		       msg->func, msg->line,
-		       colorize ? log_color[msg->prio] : "",
-		       msg->str, colorize ? TEXT_NORMAL : "");
-	if (len < 0)
-		len = 0;
-	p += min(len, size - 1);
-
-	return p - buff;
-}
-log_format_register("server", server_log_formatter);
-
-static int default_log_formatter(char *buff, size_t size,
-				 const struct logmsg *msg)
-{
-	size_t len = min(size, msg->str_len);
-
-	memcpy(buff, msg->str, len);
-
-	return len;
-}
-log_format_register("default", default_log_formatter);
-
-static int json_log_formatter(char *buff, size_t size,
-				const struct logmsg *msg)
-{
-	char *p = buff;
-	size_t len;
-
-	assert(logger_user_info);
-
-	len = snprintf(p, size, "{ \"user_info\": "
-		       "{\"program_name\": \"%s\", \"port\": %d},"
-		       "\"body\": {"
-		       "\"second\": %lu, \"usecond\": %lu, "
-		       "\"worker_name\": \"%s\", \"worker_idx\": %d, "
-		       "\"func\": \"%s\", \"line\": %d, "
-		       "\"msg\": \"",
-		       log_name, logger_user_info->port,
-		       msg->tv.tv_sec, msg->tv.tv_usec,
-		       msg->worker_name[0] ? msg->worker_name : "main",
-		       msg->worker_idx, msg->func, msg->line);
-	if (len < 0)
-		return 0;
-	len = min(len, size - 1);
-	p += len;
-	size -= len;
-
-	for (int i = 0; i < msg->str_len; i++) {
-		if (size <= 1)
-			break;
-
-		if (msg->str[i] == '"') {
-			*p++ = '\\';
-			size--;
-		}
-
-		if (size <= 1)
-			break;
-		*p++ = msg->str[i];
-		size--;
-	}
-
-	pstrcpy(p, size, "\"} }");
-	p += strlen(p);
-
-	return p - buff;
-}
-log_format_register("json", json_log_formatter);
 
 /* this one can block under memory pressure */
 static void log_syslog(const struct logmsg *msg)
