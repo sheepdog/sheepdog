@@ -66,6 +66,7 @@ expunge=true
 have_test_arg=false
 randomize=false
 valgrind=false
+keep_passed=false
 
 rm -f $tmp.list $tmp.tmp $tmp.sed
 
@@ -150,6 +151,7 @@ check options
     -n			show me, do not run tests
     -T			output timestamps
     -r 			randomize test order
+    -keep-passed	keep directories of passed tests
 
 testlist options
     -g group[,group...]	include tests from these groups
@@ -226,6 +228,10 @@ testlist options
 	    ;;
 	-x)	# -x group ... exclude from group file
 	    xgroup=true
+	    xpand=false
+	    ;;
+	-keep-passed)
+	    keep_passed=true
 	    xpand=false
 	    ;;
 	'[0-9][0-9][0-9] [0-9][0-9][0-9][0-9]')
@@ -510,6 +516,10 @@ do
 			:
 		    else
 			echo "$seq `expr $stop - $start`" >>$tmp.time
+			if ! $keep_passed
+			then
+			    rm -rf $STORE
+			fi
 		    fi
 		else
 		    echo " - output mismatch (see $seq.out.bad)"
