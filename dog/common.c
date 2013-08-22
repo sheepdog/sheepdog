@@ -118,6 +118,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	unsigned long nr;
 	static struct sd_inode i;
 	struct sd_req req;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req;
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	unsigned int rlen = sizeof(vdi_inuse);
 
@@ -127,6 +128,10 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	ret = dog_exec_req(sdhost, sdport, &req, &vdi_inuse);
 	if (ret < 0)
 		goto out;
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
+		goto out;
+	}
 
 	FOR_EACH_VDI(nr, vdi_inuse) {
 		uint64_t oid;

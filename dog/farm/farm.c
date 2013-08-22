@@ -179,6 +179,7 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 {
 	int ret = -1;
 	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char *buf = NULL;
 
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_ADD);
@@ -191,6 +192,10 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 	if (ret < 0)
 		sd_err("Fail to notify vdi add event(%"PRIx32", %d)", vdi_id,
 		       nr_copies);
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
+		ret = -1;
+	}
 
 	free(buf);
 	return ret;

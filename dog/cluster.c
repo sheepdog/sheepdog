@@ -85,6 +85,10 @@ static int cluster_format(int argc, char **argv)
 	ret = dog_exec_req(sdhost, sdport, &hdr, &vdi_inuse);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
 
 	if (!no_vdi(vdi_inuse))
 		confirm(FORMAT_PRINT);
