@@ -388,10 +388,15 @@ int main(int argc, char **argv)
 struct strbuf *sheepfs_run_cmd(const char *command)
 {
 	struct strbuf *buf = xmalloc(sizeof(*buf));
-	FILE *f = popen(command, "re");
+	FILE *f = popen(command, "r");
 
 	if (!f) {
 		sheepfs_pr("popen failed\n");
+		goto err;
+	}
+
+	if (fcntl(fileno(f), F_SETFD, FD_CLOEXEC) < 0) {
+		sheepfs_pr("fcntl failed\n");
 		goto err;
 	}
 
@@ -404,7 +409,8 @@ struct strbuf *sheepfs_run_cmd(const char *command)
 	return buf;
 err:
 	strbuf_release(buf);
-	pclose(f);
+	if (f)
+		pclose(f);
 	free(buf);
 	return NULL;
 }
