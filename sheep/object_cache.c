@@ -1400,6 +1400,7 @@ int object_cache_get_info(struct object_cache_info *info)
 		sd_unlock(&hashtable_lock[i]);
 	}
 	info->count = j;
+	info->directio = sys->object_cache_directio;
 
 	return sizeof(*info);
 }

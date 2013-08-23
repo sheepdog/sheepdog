@@ -2024,7 +2024,8 @@ static int vdi_cache_info(int argc, char **argv)
 
 	size_to_str(info.size, size_str, sizeof(size_str));
 	size_to_str(info.used, used_str, sizeof(used_str));
-	fprintf(stdout, "\nCache size %s, used %s\n", size_str, used_str);
+	fprintf(stdout, "\nCache size %s, used %s, %s\n", size_str, used_str,
+		info.directio ? "directio" : "non-directio");
 
 	return EXIT_SUCCESS;
 }

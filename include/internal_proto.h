@@ -212,6 +212,7 @@ struct object_cache_info {
 	uint64_t used;
 	struct cache_info caches[CACHE_MAX];
 	int count;
+	uint8_t directio;
 };
 
 #endif /* __INTERNAL_PROTO_H__ */
