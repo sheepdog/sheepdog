@@ -10,8 +10,11 @@
  */
 
 #include <string.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #include "option.h"
+#include "logger.h"
 
 char *build_short_options(const struct sd_option *sd_opts)
 {
@@ -56,4 +59,29 @@ const char *option_get_help(const struct sd_option *sd_opts, int ch)
 			return opt->help;
 	}
 	return NULL;
+}
+
+int option_parse(char *arg, const char *delim, struct option_parser *parsers)
+{
+	char *savep, *opt;
+	struct option_parser *iter = NULL;
+
+	opt = strtok_r(arg, delim, &savep);
+	do {
+		for (iter = parsers; iter->option; iter++) {
+			int len = strlen(iter->option);
+
+			if (!strncmp(iter->option, opt, len)) {
+				if (iter->parser(opt + len) < 0)
+					return -1;
+				break;
+			}
+		}
+		if (!iter->option) {
+			sd_err("invalid option %s", opt);
+			return -1;
+		}
+	} while ((opt = strtok_r(NULL, delim, &savep)));
+
+	return 0;
 }

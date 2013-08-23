@@ -258,145 +258,99 @@ static void crash_handler(int signo)
 static struct system_info __sys;
 struct system_info *sys = &__sys;
 
-static void parse_arg(char *arg, const char *delim, void (*fn)(char *))
+static int cache_size_parser(char *s)
 {
-	char *savep, *s;
-
-	s = strtok_r(arg, delim, &savep);
-	do {
-		fn(s);
-	} while ((s = strtok_r(NULL, delim, &savep)));
-}
-
-static void object_cache_size_set(char *s)
-{
-	const char *header = "size=";
-	int len = strlen(header);
-	char *size, *p;
-	uint64_t cache_size;
 	const uint32_t max_cache_size = UINT32_MAX;
+	uint64_t cache_size;
+	char *p;
 
-	assert(!strncmp(s, header, len));
-
-	size = s + len;
-	cache_size = strtoull(size, &p, 10);
-	if (size == p || max_cache_size < cache_size)
+	cache_size = strtoull(s, &p, 10);
+	if (s == p || max_cache_size < cache_size)
 		goto err;
 
 	sys->object_cache_size = cache_size;
-	return;
+	return 0;
 
 err:
 	sd_err("Invalid object cache option '%s': size must be an integer "
 	       "between 1 and %" PRIu32 " inclusive", s, max_cache_size);
-	exit(1);
+	return -1;
 }
 
-static void object_cache_directio_set(char *s)
+static int cache_directio_parser(char *s)
 {
-	assert(!strcmp(s, "directio"));
 	sys->object_cache_directio = true;
+	return 0;
 }
 
 static char ocpath[PATH_MAX];
-static void object_cache_dir_set(char *s)
-{
-	char *p = s;
 
-	p = p + strlen("dir=");
-	snprintf(ocpath, sizeof(ocpath), "%s", p);
+static int cache_dir_parser(char *s)
+{
+	snprintf(ocpath, sizeof(ocpath), "%s", s);
+	return 0;
 }
 
-static void _object_cache_set(char *s)
+static struct option_parser cache_parsers[] = {
+	{ "size=", cache_size_parser },
+	{ "directio", cache_directio_parser },
+	{ "dir=", cache_dir_parser },
+	{ NULL, NULL },
+};
+
+static char *io_addr, *io_pt;
+static int ionic_host_parser(char *s)
 {
-	int i;
-
-	struct object_cache_arg {
-		const char *name;
-		void (*set)(char *);
-	};
-
-	struct object_cache_arg object_cache_args[] = {
-		{ "size=", object_cache_size_set },
-		{ "directio", object_cache_directio_set },
-		{ "dir=", object_cache_dir_set },
-		{ NULL, NULL },
-	};
-
-	for (i = 0; object_cache_args[i].name; i++) {
-		const char *n = object_cache_args[i].name;
-
-		if (!strncmp(s, n, strlen(n))) {
-			object_cache_args[i].set(s);
-			return;
-		}
-	}
-
-	sd_err("invalid object cache arg: %s", s);
-	exit(1);
+	io_addr = s;
+	return 0;
 }
 
-static void object_cache_set(char *arg)
+static int ionic_port_parser(char *s)
 {
-	sys->enable_object_cache = true;
-	sys->object_cache_size = 0;
-
-	parse_arg(arg, ",", _object_cache_set);
-
-	if (sys->object_cache_size == 0) {
-		sd_err("object cache size is not set");
-		exit(1);
-	}
+	io_pt = s;
+	return 0;
 }
+
+static struct option_parser ionic_parsers[] = {
+	{ "host=", ionic_host_parser },
+	{ "port=", ionic_port_parser },
+	{ NULL, NULL },
+};
 
 static char jpath[PATH_MAX];
 static bool jskip;
 static ssize_t jsize;
 #define MIN_JOURNAL_SIZE (64) /* 64M */
 
-static void init_journal_arg(char *arg)
+static int journal_dir_parser(char *s)
 {
-	const char *d = "dir=", *sz = "size=", *sp = "skip";
-	int dl = strlen(d), szl = strlen(sz), spl = strlen(sp);
-
-	if (!strncmp(d, arg, dl)) {
-		arg += dl;
-		snprintf(jpath, sizeof(jpath), "%s", arg);
-	} else if (!strncmp(sz, arg, szl)) {
-		arg += szl;
-		jsize = strtoll(arg, NULL, 10);
-		if (jsize < MIN_JOURNAL_SIZE || jsize == LLONG_MAX) {
-			sd_err("invalid size %s, must be bigger than %u(M)",
-			       arg,
-				MIN_JOURNAL_SIZE);
-			exit(1);
-		}
-	} else if (!strncmp(sp, arg, spl)) {
-		jskip = true;
-	} else {
-		sd_err("invalid paramters %s", arg);
-		exit(1);
-	}
+	snprintf(jpath, sizeof(jpath), "%s", s);
+	return 0;
 }
 
-static char *io_addr, *io_pt;
-static void init_io_arg(char *arg)
+static int journal_size_parser(char *s)
 {
-	const char *host = "host=", *port = "port=";
-	int hl = strlen(host), pl = strlen(port);
-
-	if (!strncmp(host, arg, hl)) {
-		arg += hl;
-		io_addr = arg;
-	} else if (!strncmp(port, arg, pl)) {
-		arg += hl;
-		io_pt = arg;
-	} else {
-		sd_err("invalid paramters %s. Use '-i host=a.b.c.d,port=xxx'",
-		       arg);
-		exit(1);
+	jsize = strtoll(s, NULL, 10);
+	if (jsize < MIN_JOURNAL_SIZE || jsize == LLONG_MAX) {
+		sd_err("invalid size %s, must be bigger than %u(M)",
+		       s, MIN_JOURNAL_SIZE);
+		return -1;
 	}
+	return 0;
 }
+
+static int journal_skip_parser(char *s)
+{
+	jskip = true;
+	return 0;
+}
+
+static struct option_parser journal_parsers[] = {
+	{ "dir=", journal_dir_parser },
+	{ "size=", journal_size_parser },
+	{ "skip", journal_skip_parser },
+	{ NULL, NULL },
+};
 
 static size_t get_nr_nodes(void)
 {
@@ -672,10 +626,21 @@ int main(int argc, char **argv)
 			sys->cdrv_option = get_cdrv_option(sys->cdrv, optarg);
 			break;
 		case 'w':
-			object_cache_set(optarg);
+			sys->enable_object_cache = true;
+			sys->object_cache_size = 0;
+
+			if (option_parse(optarg, ",", cache_parsers) < 0)
+				exit(1);
+
+			if (sys->object_cache_size == 0) {
+				sd_err("object cache size is not set");
+				exit(1);
+			}
 			break;
 		case 'i':
-			parse_arg(optarg, ",", init_io_arg);
+			if (option_parse(optarg, ",", ionic_parsers) < 0)
+				exit(1);
+
 			if (!str_to_addr(io_addr, sys->this_node.nid.io_addr)) {
 				sd_err("Bad addr: '%s'", io_addr);
 				exit(1);
@@ -690,7 +655,8 @@ int main(int argc, char **argv)
 			break;
 		case 'j':
 			uatomic_set_true(&sys->use_journal);
-			parse_arg(optarg, ",", init_journal_arg);
+			if (option_parse(optarg, ",", journal_parsers) < 0)
+				exit(1);
 			if (!jsize) {
 				sd_err("you must specify size for journal");
 				exit(1);
