@@ -18,17 +18,15 @@
 /* test */
 START_TEST(test_common)
 {
-	char str[100];
-
 	raw_output = true;
-	ck_assert_str_eq(size_to_str(10, str, 100), "10");
-	ck_assert_str_eq(size_to_str(10000, str, 100), "10000");
-	ck_assert_str_eq(size_to_str(100000000, str, 100), "100000000");
+	ck_assert_str_eq(strnumber(10), "10");
+	ck_assert_str_eq(strnumber(10000), "10000");
+	ck_assert_str_eq(strnumber(100000000), "100000000");
 
 	raw_output = false;
-	ck_assert_str_eq(size_to_str(10, str, 100), "0.0 MB");
-	ck_assert_str_eq(size_to_str(10000, str, 100), "0.0 MB");
-	ck_assert_str_eq(size_to_str(100000000, str, 100), "95 MB");
+	ck_assert_str_eq(strnumber(10), "0.0 MB");
+	ck_assert_str_eq(strnumber(10000), "0.0 MB");
+	ck_assert_str_eq(strnumber(100000000), "95 MB");
 }
 END_TEST
 
