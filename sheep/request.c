@@ -315,6 +315,35 @@ static void queue_local_request(struct request *req)
 	queue_work(sys->io_wqueue, &req->work);
 }
 
+static main_fn inline void stat_request_begin(struct request *req)
+{
+	struct sd_req *hdr = &req->rq;
+
+	if (is_peer_op(req->op)) {
+		sys->stat.r.peer_total_nr++;
+		sys->stat.r.peer_active_nr++;
+		if (hdr->flags & SD_FLAG_CMD_WRITE)
+			sys->stat.r.peer_total_rx += hdr->data_length;
+		else
+			sys->stat.r.peer_total_tx += hdr->data_length;
+	} else if (is_gateway_op(req->op)) {
+		sys->stat.r.gway_total_nr++;
+		sys->stat.r.gway_active_nr++;
+		if (hdr->flags & SD_FLAG_CMD_WRITE)
+			sys->stat.r.gway_total_rx += hdr->data_length;
+		else
+			sys->stat.r.gway_total_tx += hdr->data_length;
+	}
+}
+
+static main_fn inline void stat_request_end(struct request *req)
+{
+	if (is_peer_op(req->op))
+		sys->stat.r.peer_active_nr--;
+	else if (is_gateway_op(req->op))
+		sys->stat.r.gway_active_nr--;
+}
+
 static void queue_request(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
@@ -384,6 +413,7 @@ static void queue_request(struct request *req)
 		rsp->result = SD_RES_SYSTEM_ERROR;
 		goto done;
 	}
+	stat_request_begin(req);
 
 	return;
 done:
@@ -396,6 +426,7 @@ static void requeue_request(struct request *req)
 		put_vnode_info(req->vinfo);
 		req->vinfo = NULL;
 	}
+	stat_request_end(req);
 	queue_request(req);
 }
 
@@ -503,6 +534,8 @@ main_fn void put_request(struct request *req)
 
 	if (refcount_dec(&req->refcnt) > 0)
 		return;
+
+	stat_request_end(req);
 
 	if (req->local)
 		eventfd_xwrite(req->local_req_efd, 1);

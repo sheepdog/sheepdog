@@ -153,6 +153,7 @@ struct system_info {
 	bool backend_dio;
 	/* upgrade data layout before starting service if necessary*/
 	bool upgrade;
+	struct sd_stat stat;
 };
 
 struct siocb {

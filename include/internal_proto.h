@@ -215,4 +215,17 @@ struct object_cache_info {
 	uint8_t directio;
 };
 
+struct sd_stat {
+	struct s_request {
+		uint64_t gway_active_nr; /* nr of running request */
+		uint64_t peer_active_nr;
+		uint64_t gway_total_nr; /* Total nr of requests received */
+		uint64_t peer_total_nr;
+		uint64_t gway_total_rx; /* Data in */
+		uint64_t gway_total_tx; /* Data out */
+		uint64_t peer_total_rx;
+		uint64_t peer_total_tx;
+	} r;
+};
+
 #endif /* __INTERNAL_PROTO_H__ */
