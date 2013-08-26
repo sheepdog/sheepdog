@@ -61,6 +61,43 @@ const char *option_get_help(const struct sd_option *sd_opts, int ch)
 	return NULL;
 }
 
+int option_parse_size(const char *value, uint64_t *ret)
+{
+	char *postfix;
+	double sizef;
+
+	sizef = strtod(value, &postfix);
+	if (postfix[0] != '\0' && postfix[1] != '\0')
+		goto err;
+
+	switch (*postfix) {
+	case 'T':
+	case 't':
+		sizef *= 1024;
+	case 'G':
+	case 'g':
+		sizef *= 1024;
+	case 'M':
+	case 'm':
+		sizef *= 1024;
+	case 'K':
+	case 'k':
+		sizef *= 1024;
+	case 'b':
+	case '\0':
+		*ret = (uint64_t) sizef;
+		break;
+	default:
+err:
+		sd_err("Invalid size '%s'", value);
+		sd_err("You may use k, M, G or T suffixes for "
+		       "kilobytes, megabytes, gigabytes and terabytes.");
+		return -1;
+	}
+
+	return 0;
+}
+
 int option_parse(char *arg, const char *delim, struct option_parser *parsers)
 {
 	char *savep, *opt;

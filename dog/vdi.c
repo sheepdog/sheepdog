@@ -55,36 +55,6 @@ struct get_vdi_info {
 	uint8_t nr_copies;
 };
 
-static int parse_option_size(const char *value, uint64_t *ret)
-{
-	char *postfix;
-	double sizef;
-
-	sizef = strtod(value, &postfix);
-	switch (*postfix) {
-	case 'T':
-		sizef *= 1024;
-	case 'G':
-		sizef *= 1024;
-	case 'M':
-		sizef *= 1024;
-	case 'K':
-	case 'k':
-		sizef *= 1024;
-	case 'b':
-	case '\0':
-		*ret = (uint64_t) sizef;
-		break;
-	default:
-		sd_err("Invalid size '%s'", value);
-		sd_err("You may use k, M, G or T suffixes for "
-		       "kilobytes, megabytes, gigabytes and terabytes.");
-		return -1;
-	}
-
-	return 0;
-}
-
 static void vdi_show_progress(uint64_t done, uint64_t total)
 {
 	return show_progress(done, total, false);
@@ -501,7 +471,7 @@ static int vdi_create(int argc, char **argv)
 		sd_err("Please specify the VDI size");
 		return EXIT_USAGE;
 	}
-	ret = parse_option_size(argv[optind], &size);
+	ret = option_parse_size(argv[optind], &size);
 	if (ret < 0)
 		return EXIT_USAGE;
 	if (size > SD_MAX_VDI_SIZE) {
@@ -698,7 +668,7 @@ static int vdi_resize(int argc, char **argv)
 		sd_err("Please specify the new size for the VDI");
 		return EXIT_USAGE;
 	}
-	ret = parse_option_size(argv[optind], &new_size);
+	ret = option_parse_size(argv[optind], &new_size);
 	if (ret < 0)
 		return EXIT_USAGE;
 	if (new_size > SD_MAX_VDI_SIZE) {
@@ -1159,11 +1129,11 @@ static int vdi_read(int argc, char **argv)
 	char *buf = NULL;
 
 	if (argv[optind]) {
-		ret = parse_option_size(argv[optind++], &offset);
+		ret = option_parse_size(argv[optind++], &offset);
 		if (ret < 0)
 			return EXIT_USAGE;
 		if (argv[optind]) {
-			ret = parse_option_size(argv[optind++], &total);
+			ret = option_parse_size(argv[optind++], &total);
 			if (ret < 0)
 				return EXIT_USAGE;
 		}
@@ -1233,11 +1203,11 @@ static int vdi_write(int argc, char **argv)
 	bool create;
 
 	if (argv[optind]) {
-		ret = parse_option_size(argv[optind++], &offset);
+		ret = option_parse_size(argv[optind++], &offset);
 		if (ret < 0)
 			return EXIT_USAGE;
 		if (argv[optind]) {
-			ret = parse_option_size(argv[optind++], &total);
+			ret = option_parse_size(argv[optind++], &total);
 			if (ret < 0)
 				return EXIT_USAGE;
 		}
