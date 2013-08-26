@@ -613,7 +613,8 @@ static void recover_object_main(struct work *work)
 		 * lifted and flush wait queue to requeue those
 		 * requests
 		 */
-		wakeup_all_requests();
+		rinfo->notify_complete = false;
+		finish_recovery(rinfo);
 		sd_dprintf("recovery is stopped");
 		goto out;
 	}
