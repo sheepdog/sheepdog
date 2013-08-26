@@ -5,7 +5,7 @@
 . ./common
 
 for i in `seq 0 1 2`; do
-    _start_sheep $i "-w size=200"
+    _start_sheep $i "-w size=200M"
 done
 
 _wait_for_sheep 3

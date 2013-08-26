@@ -40,8 +40,8 @@ static const char journal_help[] =
 "\tsize=: size of the journal in megabyes\n"
 "\tdir=: path to the location of the journal (default: $STORE)\n"
 "\tskip: if specified, skip the recovery at startup\n"
-"\nExample:\n\t$ sheep -j dir=/journal,size=1024\n"
-"This tries to use /journal as the journal storage of the size 1024M\n";
+"\nExample:\n\t$ sheep -j dir=/journal,size=1G\n"
+"This tries to use /journal as the journal storage of the size 1G\n";
 
 static const char loglevel_help[] =
 "Available log levels:\n"
@@ -90,7 +90,7 @@ static const char cache_help[] =
 "\tdir=: path to the location of the cache (default: $STORE/cache)\n"
 "\tdirectio: use directio mode for cache IO, "
 "if not specified use buffered IO\n"
-"\nExample:\n\t$ sheep -w size=200000,dir=/my_ssd,directio ...\n"
+"\nExample:\n\t$ sheep -w size=200G,dir=/my_ssd,directio ...\n"
 "This tries to use /my_ssd as the cache storage with 200G allocted to the\n"
 "cache in directio mode\n";
 
@@ -260,21 +260,21 @@ struct system_info *sys = &__sys;
 
 static int cache_size_parser(char *s)
 {
-	const uint32_t max_cache_size = UINT32_MAX;
+	const uint64_t max_cache_size = ((uint64_t)UINT32_MAX + 1)*1024*1024;
 	uint64_t cache_size;
-	char *p;
 
-	cache_size = strtoull(s, &p, 10);
-	if (s == p || max_cache_size < cache_size)
-		goto err;
+	if (option_parse_size(s, &cache_size) < 0)
+		return -1;
+#define MIN_CACHE_SIZE (10*1024*1024) /* 10M */
+	if (cache_size < MIN_CACHE_SIZE || cache_size > max_cache_size) {
+		sd_err("Invalid cache option '%s': size must be between "
+		       "between %uM and %" PRIu64 "G", s,
+		       MIN_CACHE_SIZE/1024/1024, max_cache_size/1024/1024/1024);
+		return -1;
+	}
 
-	sys->object_cache_size = cache_size;
+	sys->object_cache_size = cache_size / 1024 / 1024;
 	return 0;
-
-err:
-	sd_err("Invalid object cache option '%s': size must be an integer "
-	       "between 1 and %" PRIu32 " inclusive", s, max_cache_size);
-	return -1;
 }
 
 static int cache_directio_parser(char *s)
@@ -319,8 +319,7 @@ static struct option_parser ionic_parsers[] = {
 
 static char jpath[PATH_MAX];
 static bool jskip;
-static ssize_t jsize;
-#define MIN_JOURNAL_SIZE (64) /* 64M */
+static uint64_t jsize;
 
 static int journal_dir_parser(char *s)
 {
@@ -330,10 +329,12 @@ static int journal_dir_parser(char *s)
 
 static int journal_size_parser(char *s)
 {
-	jsize = strtoll(s, NULL, 10);
-	if (jsize < MIN_JOURNAL_SIZE || jsize == LLONG_MAX) {
+	if (option_parse_size(s, &jsize) < 0)
+		return -1;
+#define MIN_JOURNAL_SIZE (64*1024*1024) /* 64M */
+	if (jsize < MIN_JOURNAL_SIZE) {
 		sd_err("invalid size %s, must be bigger than %u(M)",
-		       s, MIN_JOURNAL_SIZE);
+		       s, MIN_JOURNAL_SIZE/1024/1024);
 		return -1;
 	}
 	return 0;

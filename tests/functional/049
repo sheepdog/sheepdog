@@ -5,7 +5,7 @@
 . ./common
 
 for i in `seq 0 2`; do
-    _start_sheep $i "-w size=30"
+    _start_sheep $i "-w size=30M"
 done
 
 _wait_for_sheep 3
@@ -20,7 +20,7 @@ _wait_for_sheep_stop
 
 #trigger an object reclaim at startup
 for i in `seq 0 2`; do
-    _start_sheep $i "-w size=10"
+    _start_sheep $i "-w size=10M"
 done
 
 _wait_for_sheep 3

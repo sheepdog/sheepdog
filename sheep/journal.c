@@ -266,7 +266,7 @@ int journal_file_init(const char *path, size_t size, bool skip)
 	if (!skip)
 		check_recover_journal_file(path);
 
-	jfile_size = (size * 1024 * 1024) / 2;
+	jfile_size = size / 2;
 
 	fd = create_journal_file(path, jfile_name[0]);
 	if (fd < 0)

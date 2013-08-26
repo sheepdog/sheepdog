@@ -4,7 +4,7 @@
 
 . ./common
 
-_start_sheep 0 "-j size=64"
+_start_sheep 0 "-j size=64M"
 
 _wait_for_sheep 1
 
@@ -26,7 +26,7 @@ else
 fi
 
 # do the journal replay
-_start_sheep 0 "-j size=64"
+_start_sheep 0 "-j size=64M"
 _wait_for_sheep 1
 
 sleep 3
