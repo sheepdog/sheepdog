@@ -97,7 +97,6 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 	int idx;
 	bool is_clone = false;
 	uint64_t my_objs, cow_objs;
-	char vdi_size_str[16], my_objs_str[16], cow_objs_str[16];
 	time_t ti;
 	struct tm tm;
 	char dbuf[128];
@@ -126,10 +125,6 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			cow_objs++;
 	}
 
-	size_to_str(i->vdi_size, vdi_size_str, sizeof(vdi_size_str));
-	size_to_str(my_objs * SD_DATA_OBJ_SIZE, my_objs_str, sizeof(my_objs_str));
-	size_to_str(cow_objs * SD_DATA_OBJ_SIZE, cow_objs_str, sizeof(cow_objs_str));
-
 	if (i->snap_id == 1 && i->parent_vdi_id != 0)
 		is_clone = true;
 
@@ -141,13 +136,18 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			putchar(*name++);
 		}
 		printf(" %d %s %s %s %s %" PRIx32 " %d %s\n", snapid,
-				vdi_size_str, my_objs_str, cow_objs_str, dbuf, vid,
-				i->nr_copies, i->tag);
+		       strnumber(i->vdi_size),
+		       strnumber(my_objs * SD_DATA_OBJ_SIZE),
+		       strnumber(cow_objs * SD_DATA_OBJ_SIZE),
+		       dbuf, vid, i->nr_copies, i->tag);
 	} else {
 		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 " %5d %13s\n",
-				vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
-				name, snapid, vdi_size_str, my_objs_str, cow_objs_str,
-				dbuf, vid, i->nr_copies, i->tag);
+		       vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
+		       name, snapid,
+		       strnumber(i->vdi_size),
+		       strnumber(my_objs * SD_DATA_OBJ_SIZE),
+		       strnumber(cow_objs * SD_DATA_OBJ_SIZE),
+		       dbuf, vid, i->nr_copies, i->tag);
 	}
 }
 
@@ -178,14 +178,13 @@ static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 {
 	time_t ti;
 	struct tm tm;
-	char dbuf[128], tbuf[128], size_str[128];
+	char dbuf[128], tbuf[128];
 
 	ti = i->create_time >> 32;
 	localtime_r(&ti, &tm);
 
 	strftime(dbuf, sizeof(dbuf), "%Y-%m-%d", &tm);
 	strftime(tbuf, sizeof(tbuf), "%H:%M:%S", &tm);
-	size_to_str(i->vdi_size, size_str, sizeof(size_str));
 
 	printf("  \"%x\" -> \"%x\";\n", i->parent_vdi_id, vid);
 	printf("  \"%x\" [\n"
@@ -197,7 +196,7 @@ static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 	       "Size: %10s\\n"
 	       "Date: %10s\\n"
 	       "Time: %10s",
-	       name, snapid, size_str, dbuf, tbuf);
+	       name, snapid, strnumber(i->vdi_size), dbuf, tbuf);
 
 	if (vdi_is_snapshot(i))
 		printf("\"\n  ];\n\n");
@@ -1987,7 +1986,6 @@ static int vdi_cache_info(int argc, char **argv)
 	struct object_cache_info info = {};
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	char size_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE];
 	int ret, i;
 
 	sd_init_req(&hdr, SD_OP_GET_CACHE_INFO);
@@ -2004,27 +2002,21 @@ static int vdi_cache_info(int argc, char **argv)
 
 	fprintf(stdout, "Name\tTag\tTotal\tDirty\tClean\n");
 	for (i = 0; i < info.count; i++) {
-		char total_str[UINT64_DECIMAL_SIZE],
-		     dirty_str[UINT64_DECIMAL_SIZE],
-		     clean_str[UINT64_DECIMAL_SIZE];
 		uint64_t total = info.caches[i].total * SD_DATA_OBJ_SIZE,
 			 dirty = info.caches[i].dirty * SD_DATA_OBJ_SIZE,
 			 clean = total - dirty;
 		char name[SD_MAX_VDI_LEN], tag[SD_MAX_VDI_TAG_LEN];
 
-		size_to_str(total, total_str, sizeof(total_str));
-		size_to_str(dirty, dirty_str, sizeof(dirty_str));
-		size_to_str(clean, clean_str, sizeof(clean_str));
 		ret = vid_to_name_tag(info.caches[i].vid, name, tag);
 		if (ret != SD_RES_SUCCESS)
 			return EXIT_FAILURE;
 		fprintf(stdout, "%s\t%s\t%s\t%s\t%s\n",
-			name, tag, total_str, dirty_str, clean_str);
+			name, tag, strnumber(total), strnumber(dirty),
+			strnumber(clean));
 	}
 
-	size_to_str(info.size, size_str, sizeof(size_str));
-	size_to_str(info.used, used_str, sizeof(used_str));
-	fprintf(stdout, "\nCache size %s, used %s, %s\n", size_str, used_str,
+	fprintf(stdout, "\nCache size %s, used %s, %s\n",
+		strnumber(info.size), strnumber(info.used),
 		info.directio ? "directio" : "non-directio");
 
 	return EXIT_SUCCESS;

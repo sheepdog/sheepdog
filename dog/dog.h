@@ -61,7 +61,8 @@ extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 extern int sd_nodes_nr, sd_vnodes_nr;
 
 bool is_current(const struct sd_inode *i);
-char *size_to_str(uint64_t _size, char *str, int str_size);
+char *strnumber(uint64_t _size);
+char *strnumber_raw(uint64_t _size, bool raw);
 typedef void (*vdi_parser_func_t)(uint32_t vid, const char *name,
 				  const char *tag, uint32_t snapid,
 				  uint32_t flags,

@@ -13,15 +13,25 @@
 #include "sha1.h"
 #include "sockfd_cache.h"
 
-char *size_to_str(uint64_t _size, char *str, int str_size)
+char *strnumber(uint64_t size)
+{
+	return strnumber_raw(size, raw_output);
+}
+
+char *strnumber_raw(uint64_t _size, bool raw)
 {
 	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
+	static __thread struct size_str {
+		char str[UINT64_DECIMAL_SIZE];
+	} s[1024]; /* Is this big enough ? */
+	static int j;
 	int i = 0;
 	double size;
+	char *ret;
 
-	if (raw_output) {
-		snprintf(str, str_size, "%" PRIu64, _size);
-		return str;
+	if (raw) {
+		snprintf(s[j].str, UINT64_DECIMAL_SIZE, "%" PRIu64, _size);
+		goto out;
 	}
 
 	size = (double)_size;
@@ -32,11 +42,16 @@ char *size_to_str(uint64_t _size, char *str, int str_size)
 	}
 
 	if (size >= 10)
-		snprintf(str, str_size, "%.0lf %s", size, units[i]);
+		snprintf(s[j].str, UINT64_DECIMAL_SIZE, "%.0lf %s",
+			 size, units[i]);
 	else
-		snprintf(str, str_size, "%.1lf %s", size, units[i]);
-
-	return str;
+		snprintf(s[j].str, UINT64_DECIMAL_SIZE, "%.1lf %s",
+			 size, units[i]);
+out:
+	ret = s[j++].str;
+	if (j == 1024)
+		j = 0;
+	return ret;
 }
 
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
@@ -281,7 +296,6 @@ static int get_screen_width(void)
  */
 void show_progress(uint64_t done, uint64_t total, bool raw)
 {
-	char done_str[256], total_str[256];
 	int screen_width = get_screen_width();
 	int bar_length = screen_width - 30;
 	char *buf;
@@ -292,14 +306,6 @@ void show_progress(uint64_t done, uint64_t total, bool raw)
 		return;
 
 	printf("\r"); /* move to the beginning of the line */
-
-	if (raw) {
-		snprintf(done_str, sizeof(done_str), "%"PRIu64, done);
-		snprintf(total_str, sizeof(total_str), "%"PRIu64, total);
-	} else {
-		size_to_str(done, done_str, sizeof(done_str));
-		size_to_str(total, total_str, sizeof(total_str));
-	}
 
 	buf = xmalloc(screen_width + 1);
 	snprintf(buf, screen_width, "%5.1lf %% [", (double)done / total * 100);
@@ -314,7 +320,8 @@ void show_progress(uint64_t done, uint64_t total, bool raw)
 			strcat(buf, " ");
 	}
 	snprintf(buf + strlen(buf), screen_width - strlen(buf),
-		 "] %s / %s", done_str, total_str);
+		 "] %s / %s", strnumber_raw(done, raw),
+		 strnumber_raw(total, raw));
 
 	/* fill the rest of buffer with blank characters */
 	memset(buf + strlen(buf), ' ', screen_width - strlen(buf));

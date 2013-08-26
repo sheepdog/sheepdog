@@ -47,8 +47,6 @@ static int node_info(int argc, char **argv)
 {
 	int i, ret, success = 0;
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
-	char total_str[UINT64_DECIMAL_SIZE], use_str[UINT64_DECIMAL_SIZE],
-	     avail_str[UINT64_DECIMAL_SIZE], vdi_size_str[UINT64_DECIMAL_SIZE];
 
 	if (!raw_output)
 		printf("Id\tSize\tUsed\tAvail\tUse%%\n");
@@ -56,26 +54,23 @@ static int node_info(int argc, char **argv)
 	for (i = 0; i < sd_nodes_nr; i++) {
 		struct sd_req req;
 		struct sd_rsp *rsp = (struct sd_rsp *)&req;
-		char store_str[UINT64_DECIMAL_SIZE],
-		     used_str[UINT64_DECIMAL_SIZE],
-		     free_str[UINT64_DECIMAL_SIZE];
 
 		sd_init_req(&req, SD_OP_STAT_SHEEP);
 
 		ret = send_light_req(&req, sd_nodes[i].nid.addr,
 				     sd_nodes[i].nid.port);
 
-		size_to_str(rsp->node.store_size, store_str, sizeof(store_str));
-		size_to_str(rsp->node.store_free, free_str, sizeof(free_str));
-		size_to_str(rsp->node.store_size - rsp->node.store_free,
-			    used_str, sizeof(used_str));
 		if (!ret) {
 			int ratio = (int)(((double)(rsp->node.store_size -
 						    rsp->node.store_free) /
 					   rsp->node.store_size) * 100);
 			printf(raw_output ? "%d %s %s %s %d%%\n" :
 					"%2d\t%s\t%s\t%s\t%3d%%\n",
-			       i, store_str, used_str, free_str,
+			       i,
+			       strnumber(rsp->node.store_size),
+			       strnumber(rsp->node.store_size -
+					   rsp->node.store_free),
+			       strnumber(rsp->node.store_free),
 			       rsp->node.store_size == 0 ? 0 : ratio);
 			success++;
 		}
@@ -93,16 +88,14 @@ static int node_info(int argc, char **argv)
 			&total_vdi_size) < 0)
 		return EXIT_SYSFAIL;
 
-	size_to_str(total_size, total_str, sizeof(total_str));
-	size_to_str(total_avail, avail_str, sizeof(avail_str));
-	size_to_str(total_size - total_avail, use_str, sizeof(use_str));
-	size_to_str(total_vdi_size, vdi_size_str, sizeof(vdi_size_str));
 	printf(raw_output ? "Total %s %s %s %d%% %s\n"
 			  : "Total\t%s\t%s\t%s\t%3d%%\n\n"
 			  "Total virtual image size\t%s\n",
-	       total_str, use_str, avail_str,
+	       strnumber(total_size),
+	       strnumber(total_size - total_avail),
+	       strnumber(total_avail),
 	       (int)(((double)(total_size - total_avail) / total_size) * 100),
-	       vdi_size_str);
+	       strnumber(total_vdi_size));
 
 	return EXIT_SUCCESS;
 }
@@ -272,8 +265,6 @@ static int node_kill(int argc, char **argv)
 static int node_md_info(struct node_id *nid)
 {
 	struct sd_md_info info = {};
-	char size_str[UINT64_DECIMAL_SIZE], used_str[UINT64_DECIMAL_SIZE],
-	     avail_str[UINT64_DECIMAL_SIZE];
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, i;
@@ -295,12 +286,11 @@ static int node_md_info(struct node_id *nid)
 		uint64_t size = info.disk[i].free + info.disk[i].used;
 		int ratio = (int)(((double)info.disk[i].used / size) * 100);
 
-		size_to_str(size, size_str, sizeof(size_str));
-		size_to_str(info.disk[i].used, used_str, sizeof(used_str));
-		size_to_str(info.disk[i].free, avail_str, sizeof(avail_str));
 		fprintf(stdout, "%2d\t%s\t%s\t%s\t%3d%%\t%s\n",
-			info.disk[i].idx, size_str, used_str, avail_str, ratio,
-			info.disk[i].path);
+			info.disk[i].idx, strnumber(size),
+			strnumber(info.disk[i].used),
+			strnumber(info.disk[i].free),
+			ratio, info.disk[i].path);
 	}
 	return EXIT_SUCCESS;
 }
