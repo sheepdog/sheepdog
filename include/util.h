@@ -331,6 +331,9 @@ static inline void sd_unlock(struct sd_lock *lock)
 #define TEXT_CYAN           "\033[0;36m"
 #define TEXT_BOLD_CYAN      "\033[1;36m"
 
+#define CLEAR_SCREEN        "\033[2J"
+#define RESET_CURSOR        "\033[1;1H"
+
 static inline bool is_stdin_console(void)
 {
 	return isatty(STDIN_FILENO);
@@ -339,6 +342,12 @@ static inline bool is_stdin_console(void)
 static inline bool is_stdout_console(void)
 {
 	return isatty(STDOUT_FILENO);
+}
+
+static inline void clear_screen(void)
+{
+	printf(CLEAR_SCREEN);
+	printf(RESET_CURSOR);
 }
 
 extern mode_t sd_def_fmode;
