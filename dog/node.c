@@ -14,6 +14,7 @@
 static struct node_cmd_data {
 	bool all_nodes;
 	bool recovery_progress;
+	bool watch;
 } node_cmd_data;
 
 static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
@@ -262,6 +263,47 @@ static int node_kill(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static int node_stat(int argc, char **argv)
+{
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct sd_stat stat;
+	int ret;
+	uint32_t i = node_cmd_data.watch ? UINT32_MAX : 0;
+
+again:
+	sd_init_req(&hdr, SD_OP_STAT);
+	hdr.data_length = sizeof(stat);
+	ret = dog_exec_req(sdhost, sdport, &hdr, &stat);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("failed to get stat information: %s",
+		       sd_strerror(rsp->result));
+		return EXIT_FAILURE;
+	}
+
+	printf("%s%"PRIu64"\t%"PRIu64"\t%s\t%s\n",
+	       raw_output ? "" :
+	       "Request\tActive\tTotal\tIn\tOut\nClient\t",
+	       stat.r.gway_active_nr, stat.r.gway_total_nr,
+	       strnumber(stat.r.gway_total_rx),
+	       strnumber(stat.r.gway_total_tx));
+	printf("%s%"PRIu64"\t%"PRIu64"\t%s\t%s\n",
+	       raw_output ? "" : "Peer\t",
+	       stat.r.peer_active_nr, stat.r.peer_total_nr,
+	       strnumber(stat.r.peer_total_rx),
+	       strnumber(stat.r.peer_total_tx));
+	if (i > 0) {
+		clear_screen();
+		sleep(1);
+		goto again;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int node_md_info(struct node_id *nid)
 {
 	struct sd_md_info info = {};
@@ -384,6 +426,8 @@ static int node_parser(int ch, char *opt)
 	case 'P':
 		node_cmd_data.recovery_progress = true;
 		break;
+	case 'w':
+		node_cmd_data.watch = true;
 	}
 
 	return 0;
@@ -392,7 +436,7 @@ static int node_parser(int ch, char *opt)
 static struct sd_option node_options[] = {
 	{'A', "all", false, "show md information of all the nodes"},
 	{'P', "progress", false, "show progress of recovery in the node"},
-
+	{'w', "watch", false, "watch the stat every second"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -407,6 +451,8 @@ static struct subcommand node_cmd[] = {
 	 CMD_NEED_NODELIST, node_recovery, node_options},
 	{"md", "[disks]", "apAh", "See 'dog node md' for more information",
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
+	{"stat", NULL, "aprwh", "show stat information about the node", NULL,
+	 0, node_stat, node_options},
 	{NULL,},
 };
 

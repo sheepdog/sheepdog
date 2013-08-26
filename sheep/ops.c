@@ -758,6 +758,14 @@ out:
 	return SD_RES_SUCCESS;
 }
 
+static int local_sd_stat(const struct sd_req *req, struct sd_rsp *rsp,
+			 void *data)
+{
+	memcpy(data, &sys->stat, sizeof(struct sd_stat));
+	rsp->data_length = sizeof(struct sd_stat);
+	return SD_RES_SUCCESS;
+}
+
 /* Return SD_RES_INVALID_PARMS to ask client not to send flush req again */
 static int local_flush_vdi(struct request *req)
 {
@@ -1244,6 +1252,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "CACHE_PURGE",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_cache_purge,
+	},
+
+	[SD_OP_STAT] = {
+		.name = "STAT",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_sd_stat,
 	},
 
 	/* gateway I/O operations */
