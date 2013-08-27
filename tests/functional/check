@@ -518,6 +518,7 @@ do
 			echo "$seq `expr $stop - $start`" >>$tmp.time
 			if ! $keep_passed
 			then
+			    _cleanup
 			    rm -rf $STORE
 			fi
 		    fi
