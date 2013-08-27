@@ -44,6 +44,8 @@ for i in 0 1 2; do
     _reboot_without_dog_shutdown
 done
 
+_wait_for_sheep_recovery 0
+
 for i in `seq 0 7`; do
     $DOG cluster info -p 700$i | _filter_cluster_info > $STORE/cinfo.$i
     _vdi_list -p 700$i
