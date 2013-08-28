@@ -715,11 +715,7 @@ static void screen_object_list(struct recovery_list_work *rlw,
 			continue;
 
 		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
-		if (!nr_objs) {
-			sd_err("ERROR: can not find copy number for object %"
-			       PRIx64, oids[i]);
-			continue;
-		}
+
 		oid_to_vnodes(rw->cur_vinfo->vnodes, rw->cur_vinfo->nr_vnodes,
 			      oids[i], nr_objs, vnodes);
 		for (j = 0; j < nr_objs; j++) {

@@ -391,10 +391,6 @@ static bool oid_stale(uint64_t oid)
 
 	vinfo = get_vnode_info();
 	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
-	if (!nr_copies) {
-		ret = false;
-		goto out;
-	}
 
 	oid_to_vnodes(vinfo->vnodes, vinfo->nr_vnodes, oid,
 		      nr_copies, obj_vnodes);
@@ -405,7 +401,7 @@ static bool oid_stale(uint64_t oid)
 			break;
 		}
 	}
-out:
+
 	put_vnode_info(vinfo);
 	return ret;
 }
