@@ -96,7 +96,7 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 
 	sd_debug("done %d %lx", ret, nr);
 	if (ret == SD_RES_SUCCESS)
-		set_bit(nr, sys->vdi_inuse);
+		atomic_set_bit(nr, sys->vdi_inuse);
 
 	return ret;
 }
@@ -579,7 +579,7 @@ static int cluster_notify_vdi_add(const struct sd_req *req, struct sd_rsp *rsp,
 			      true);
 
 	if (req->vdi_state.set_bitmap)
-		set_bit(req->vdi_state.new_vid, sys->vdi_inuse);
+		atomic_set_bit(req->vdi_state.new_vid, sys->vdi_inuse);
 
 	add_vdi_state(req->vdi_state.new_vid, req->vdi_state.copies, false);
 

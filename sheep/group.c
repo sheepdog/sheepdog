@@ -445,7 +445,7 @@ static int get_vdis_from(struct sd_node *node)
 
 	count = rsp->data_length / sizeof(*vs);
 	for (i = 0; i < count; i++) {
-		set_bit(vs[i].vid, sys->vdi_inuse);
+		atomic_set_bit(vs[i].vid, sys->vdi_inuse);
 		add_vdi_state(vs[i].vid, vs[i].nr_copies, vs[i].snapshot);
 	}
 out:
