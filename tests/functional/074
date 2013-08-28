@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Test temporary object lost
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+# start Sheepdog with 3 nodes
+_cluster_format -c 1
+
+for i in `seq 0 9`; do
+    $DOG vdi create test$i 16M -P
+done
+
+for i in 2 1 0; do
+    _wait_for_sheep_recovery 0
+    _kill_sheep $i
+done
+
+_wait_for_sheep_stop
+
+for i in 0 1 2; do
+    _start_sheep $i
+    _wait_for_sheep $(($i + 1))
+    _wait_for_sheep_recovery 0
+done
+
+for i in `seq 0 9`; do
+    $DOG vdi check test$i
+done
