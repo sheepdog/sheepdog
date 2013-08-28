@@ -303,6 +303,12 @@ static void queue_gateway_request(struct request *req)
 			return;
 
 queue_work:
+	if (req->vinfo->nr_vnodes == 0) {
+		sd_err("there is no living nodes");
+		req->rp.result = SD_RES_HALT;
+		put_request(req);
+		return;
+	}
 	req->work.fn = do_process_work;
 	req->work.done = gateway_op_done;
 	queue_work(sys->gateway_wqueue, &req->work);

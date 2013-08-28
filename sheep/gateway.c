@@ -41,11 +41,6 @@ int gateway_read_obj(struct request *req)
 		goto out;
 	}
 
-	if (req->vinfo->nr_vnodes == 0) {
-		sd_err("there is no living nodes");
-		return SD_RES_HALT;
-	}
-
 	nr_copies = get_req_copy_number(req);
 
 	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
@@ -265,11 +260,6 @@ static int gateway_forward_request(struct request *req)
 	const struct sd_node *target_nodes[SD_MAX_NODES];
 
 	sd_debug("%"PRIx64, oid);
-
-	if (req->vinfo->nr_vnodes == 0) {
-		sd_err("there is no living nodes");
-		return SD_RES_HALT;
-	}
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
 	op = get_sd_op(hdr.opcode);
