@@ -681,27 +681,11 @@ static bool check_gdb(void)
 	return system("which gdb > /dev/null") == 0;
 }
 
-/*
- * __builtin_frame_address() returns address in frame pointer register if any
- * (e.g, in x86 it returns EBP). If no dedicated register, the frame address is
- * normally the address of the first word pushed on to the stack by the function
- *
- * For a normal subroutine setup, above the value __builtin_frame_address
- * returns, there are two addresses, which stores old EBP and old EIP, being
- * pushed on to the stack. So we have to plus 2 to get the right value for the
- * frame address, which is expected by GDB.
- *
- * This is tested on X86, other architetures aren't tested. But even if this
- * formula is wrong, GDB just doesn't procude anything useful after panic.
- */
-#define FRAME_POINTER ((unsigned long *)__builtin_frame_address(0) + 2)
-
-__attribute__ ((__noinline__))
-int __sd_dump_variable(const char *var)
+static int gdb_cmd(const char *cmd)
 {
-	char cmd[ARG_MAX], path[PATH_MAX], info[256];
-	FILE *f = NULL;
-	void *base_sp = FRAME_POINTER;
+	char path[PATH_MAX], time_str[256], cmd_str[ARG_MAX];
+	time_t ti;
+	struct tm tm;
 
 	if (!check_gdb()) {
 		sd_debug("cannot find gdb");
@@ -711,102 +695,38 @@ int __sd_dump_variable(const char *var)
 	if (get_my_path(path, sizeof(path)) < 0)
 		return -1;
 
-	snprintf(cmd, sizeof(cmd), "gdb -nw %s %d -batch -ex 'set width 80'"
-		 " -ex 'select-frame %p' -ex 'up 1' -ex 'p %s' 2> /dev/null",
-		 path, gettid(), base_sp, var);
-	f = popen(cmd, "r");
-	if (f == NULL) {
-		sd_err("failed to run gdb");
-		return -1;
-	}
+	time(&ti);
+	localtime_r(&ti, &tm);
+	strftime(time_str, sizeof(time_str), "%b %2d %H:%M:%S ", &tm);
 
-	/*
-	 * The expected outputs of gdb are:
-	 *
-	 *  [some info we don't need]
-	 *  $1 = {
-	 *    <variable info>
-	 *  }
-	 */
-	sd_emerg("dump %s", var);
-	while (fgets(info, sizeof(info), f) != NULL) {
-		if (info[0] == '$') {
-			sd_emerg("%s", chomp(info));
-			break;
-		}
-	}
-	while (fgets(info, sizeof(info), f) != NULL)
-		sd_emerg("%s", chomp(info));
+	snprintf(cmd_str, sizeof(cmd_str),
+		 "gdb -nw %s %d -batch >/dev/null 2>&1"
+		 " -ex 'set logging on'"
+		 " -ex 'echo \\n'"
+		 " -ex 'echo ==\\n'"
+		 " -ex 'echo == %s\\n'"
+		 " -ex 'echo == program: %s\\n'"
+		 " -ex 'echo == command: %s\\n'"
+		 " -ex 'echo ==\\n'"
+		 " -ex '%s'"
+		 " -ex 'set logging off'",
+		 path, getpid(), time_str, path, cmd, cmd);
 
-	pclose(f);
-	return 0;
+	return system(cmd_str);
 }
 
-__attribute__ ((__noinline__))
+int __sd_dump_variable(const char *var)
+{
+	char cmd[256];
+
+	snprintf(cmd, sizeof(cmd), "p %s", var);
+
+	return gdb_cmd(cmd);
+}
+
 static int dump_stack_frames(void)
 {
-	char path[PATH_MAX];
-	int i, stack_no = 0;
-	void *base_sp = FRAME_POINTER;
-
-	if (!check_gdb()) {
-		sd_debug("cannot find gdb");
-		return -1;
-	}
-
-	if (get_my_path(path, sizeof(path)) < 0)
-		return -1;
-
-	for (i = 1; i < SD_MAX_STACK_DEPTH; i++) {
-		char cmd[ARG_MAX], info[256];
-		FILE *f = NULL;
-		bool found = false;
-
-		snprintf(cmd, sizeof(cmd), "gdb -nw %s %d -batch"
-			 " -ex 'set width 80' -ex 'select-frame %p'"
-			 " -ex 'up %d' -ex 'info locals' 2> /dev/null",
-			 path, gettid(), base_sp, i);
-		f = popen(cmd, "r");
-		if (f == NULL)
-			return -1;
-		/*
-		 * The expected outputs of gdb are:
-		 *
-		 *  [some info we don't need]
-		 *  #<stack no> <addr> in <func>(<arg>) at <file>:<line>
-		 *  <line>   <source>
-		 *  <local variables>
-		 */
-		while (fgets(info, sizeof(info), f) != NULL) {
-			int no;
-			if (sscanf(info, "#%d ", &no) == 1) {
-				if (no <= stack_no) {
-					/* reached to the end of the stacks */
-					pclose(f);
-					return 0;
-				}
-				stack_no = no;
-				found = true;
-				sd_emerg("%s", chomp(info));
-				break;
-			}
-		}
-
-		if (!found) {
-			sd_info("Cannot get info from GDB");
-			sd_info("Set /proc/sys/kernel/yama/ptrace_scope to"
-				" zero if you are using Ubuntu.");
-			pclose(f);
-			return -1;
-		}
-
-		while (fgets(info, sizeof(info), f) != NULL)
-			sd_emerg("%s", chomp(info));
-
-		pclose(f);
-	}
-
-	return 0;
+	return gdb_cmd("thread apply all where full");
 }
 
 __attribute__ ((__noinline__))
