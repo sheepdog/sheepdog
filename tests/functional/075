@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Test live snapshot under heavy workload
+
+. ./common
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format -c 3
+$DOG vdi create test 4M
+
+_input()
+{
+    for i in `seq 1024`; do
+	echo "aio_write -q 0 4m"
+    done
+    for i in `seq 5`; do
+	$DOG vdi snapshot test
+	sleep 1
+    done
+
+    echo quit
+}
+
+_input | $QEMU_IO sheepdog:test | sed 's/qemu-io> //g'
