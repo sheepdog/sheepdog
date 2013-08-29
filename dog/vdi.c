@@ -1527,7 +1527,7 @@ int do_vdi_check(const struct sd_inode *inode)
 	for (int idx = 0; idx < max_idx; idx++) {
 		vid = inode->data_vdi_id[idx];
 		if (vid) {
-			oid = vid_to_data_oid(inode->vdi_id, idx);
+			oid = vid_to_data_oid(vid, idx);
 			queue_vdi_check_work(inode, oid, &done, wq);
 		} else {
 			done += SD_DATA_OBJ_SIZE;
