@@ -323,6 +323,9 @@ if test "x${enable_sheepfs}" = xyes; then
 		[#define _FILE_OFFSET_BITS 64])
 	AC_DEFINE_UNQUOTED([HAVE_SHEEPFS], 1, [have sheepfs])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES sheepfs"
+	PKG_CHECK_EXISTS(fuse >= 2.8.0,
+		[AC_DEFINE_UNQUOTED([FUSE_SUPPORT_BIGWRITES],
+			1, [Support -obig_writes for fuse])]);
 fi
 
 if test "x${enable_http}" = xyes; then
