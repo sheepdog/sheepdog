@@ -106,6 +106,7 @@ struct request {
 
 	struct work work;
 	enum REQUST_STATUS status;
+	bool stat; /* true if this request is during stat */
 };
 
 struct system_info {

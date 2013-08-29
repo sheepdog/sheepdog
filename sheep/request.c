@@ -325,6 +325,8 @@ static main_fn inline void stat_request_begin(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 
+	req->stat = true;
+
 	if (is_peer_op(req->op)) {
 		sys->stat.r.peer_total_nr++;
 		sys->stat.r.peer_active_nr++;
@@ -344,6 +346,9 @@ static main_fn inline void stat_request_begin(struct request *req)
 
 static main_fn inline void stat_request_end(struct request *req)
 {
+	if (!req->stat)
+		return;
+
 	if (is_peer_op(req->op))
 		sys->stat.r.peer_active_nr--;
 	else if (is_gateway_op(req->op))
