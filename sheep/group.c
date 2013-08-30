@@ -565,11 +565,6 @@ static void setup_backend_store(const struct cluster_info *cinfo)
 	}
 }
 
-static void finish_join(const struct sd_node *nodes, size_t nr_nodes)
-{
-	sockfd_cache_add_group(nodes, nr_nodes);
-}
-
 static void get_vdis(const struct sd_node *nodes, size_t nr_nodes,
 		     const struct sd_node *joined)
 {
@@ -639,7 +634,7 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 		setup_backend_store(cinfo);
 
 	if (node_is_local(joined))
-		finish_join(nodes, nr_nodes);
+		sockfd_cache_add_group(nodes, nr_nodes);
 
 	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info,
