@@ -1,15 +1,15 @@
 QA output created by 048
 using backend plain store
   Id   Host:Port         V-Nodes       Zone
-   0   127.0.0.1:7001      	64          1
-   1   127.0.0.1:7002      	64          2
+   0   127.0.0.1:7001      	128          1
+   1   127.0.0.1:7002      	128          2
 Tracking the inode object 0x7c2b25 with 5 nodes
 
 obj 807c2b2500000000 locations at epoch 1, copies = 3
 ---------------------------------------------------
+127.0.0.1:7002
 127.0.0.1:7001
 127.0.0.1:7000
-127.0.0.1:7002
 
 obj 807c2b2500000000 locations at epoch 2, copies = 3
 ---------------------------------------------------
@@ -18,21 +18,21 @@ obj 807c2b2500000000 locations at epoch 2, copies = 3
 
 obj 807c2b2500000000 locations at epoch 3, copies = 3
 ---------------------------------------------------
-127.0.0.1:7001
 127.0.0.1:7002
+127.0.0.1:7001
 127.0.0.1:7003
 
 obj 807c2b2500000000 locations at epoch 4, copies = 3
 ---------------------------------------------------
-127.0.0.1:7001
 127.0.0.1:7002
-127.0.0.1:7003
+127.0.0.1:7004
+127.0.0.1:7001
 
 obj 807c2b2500000000 locations at epoch 5, copies = 3
 ---------------------------------------------------
-127.0.0.1:7001
-127.0.0.1:7000
 127.0.0.1:7002
+127.0.0.1:7004
+127.0.0.1:7001
 Tracking the object 0x7c2b2500000001 (the inode vid 0x7c2b25 idx 1) with 5 nodes
 
 obj 7c2b2500000001 locations at epoch 1, copies = 3
@@ -55,14 +55,14 @@ obj 7c2b2500000001 locations at epoch 3, copies = 3
 obj 7c2b2500000001 locations at epoch 4, copies = 3
 ---------------------------------------------------
 127.0.0.1:7001
-127.0.0.1:7004
 127.0.0.1:7003
+127.0.0.1:7002
 
 obj 7c2b2500000001 locations at epoch 5, copies = 3
 ---------------------------------------------------
 127.0.0.1:7000
 127.0.0.1:7001
-127.0.0.1:7004
+127.0.0.1:7003
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
   test         0  1.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3              
 = test 0 1073741824 4194304 0 MASKED 7c2b25 3

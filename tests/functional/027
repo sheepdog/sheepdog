@@ -15,7 +15,7 @@ _cluster_format -c 2
 $DOG vdi create test0 40M
 $DOG vdi create test1 40M
 
-_kill_sheep 3
+_kill_sheep 1
 
 _wait_for_sheep_recovery 0
 
