@@ -660,10 +660,12 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 
 			start_recovery(main_thread_get(current_vnode_info),
 				       old_vnode_info, true);
-		} else
+		} else if (!was_cluster_shutdowned()) {
 			start_recovery(main_thread_get(current_vnode_info),
 				       main_thread_get(current_vnode_info),
 				       false);
+		}
+		set_cluster_shutdown(false);
 	}
 
 	put_vnode_info(old_vnode_info);

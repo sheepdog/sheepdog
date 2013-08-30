@@ -328,6 +328,8 @@ int get_cluster_config(struct cluster_info *cinfo);
 int set_node_space(uint64_t space);
 int get_node_space(uint64_t *space);
 bool is_cluster_formatted(void);
+bool was_cluster_shutdowned(void);
+int set_cluster_shutdown(bool);
 
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);

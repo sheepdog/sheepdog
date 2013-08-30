@@ -19,7 +19,8 @@ static struct sheepdog_config {
 	uint16_t flags;
 	uint8_t copies;
 	uint8_t store[STORE_LEN];
-	uint8_t __pad[3];
+	uint8_t shutdown;
+	uint8_t __pad[2];
 	uint16_t version;
 	uint64_t space;
 } config;
@@ -169,6 +170,17 @@ bool is_cluster_formatted(void)
 	get_cluster_config(&cinfo);
 
 	return cinfo.ctime != 0;
+}
+
+int set_cluster_shutdown(bool down)
+{
+	config.shutdown = down;
+	return write_config();
+}
+
+bool was_cluster_shutdowned(void)
+{
+	return config.shutdown;
 }
 
 static inline __attribute__((used)) void __sd_config_format_build_bug_ons(void)

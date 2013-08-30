@@ -281,6 +281,12 @@ static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 			    void *data)
 {
 	sys->cinfo.status = SD_STATUS_SHUTDOWN;
+	if (!node_in_recovery() && set_cluster_shutdown(true) != SD_RES_SUCCESS)
+		/*
+		 * It's okay we failed to set 'shutdown', just start recovery
+		 * after restart blindly.
+		 */
+		sd_err("failed to set cluster as shutdown");
 	return SD_RES_SUCCESS;
 }
 
