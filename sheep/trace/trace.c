@@ -115,8 +115,10 @@ void trace_function_enter(unsigned long ip, unsigned long *ret_addr)
 	caller = trace_lookup_ip(ip);
 
 	list_for_each_entry(tracer, &tracers, list) {
-		if (tracer->enter != NULL && uatomic_is_true(&tracer->enabled))
+		if (tracer->enter && uatomic_is_true(&tracer->enabled)) {
+			tracer->stack_depth++;
 			tracer->enter(caller, ret_stack_index);
+		}
 	}
 
 	trace_ret_stack[ret_stack_index].caller = caller;
@@ -139,9 +141,17 @@ unsigned long trace_function_exit(void)
 	ret_stack_index--;
 
 	list_for_each_entry(tracer, &tracers, list) {
-		if (tracer->exit != NULL && uatomic_is_true(&tracer->enabled))
+		if (tracer->exit && uatomic_is_true(&tracer->enabled)) {
+			if (tracer->stack_depth == 0)
+				/*
+				 * The paird trace_function_enter() was not
+				 * called with this tracer.
+				 */
+				continue;
+			tracer->stack_depth--;
 			tracer->exit(trace_ret_stack[ret_stack_index].caller,
 				     ret_stack_index);
+		}
 	}
 
 	in_trace = false;

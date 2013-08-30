@@ -22,6 +22,7 @@ struct tracer {
 
 	/* internal use only */
 	uatomic_bool enabled;
+	int stack_depth;
 	struct list_node list;
 };
 
