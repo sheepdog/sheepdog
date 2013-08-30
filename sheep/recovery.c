@@ -82,8 +82,8 @@ static size_t list_buffer_size = DEFAULT_LIST_BUFFER_SIZE;
 
 static int obj_cmp(const uint64_t *oid1, const uint64_t *oid2)
 {
-	const uint64_t hval1 = fnv_64a_buf(oid1, sizeof(*oid1), FNV1A_64_INIT);
-	const uint64_t hval2 = fnv_64a_buf(oid2, sizeof(*oid2), FNV1A_64_INIT);
+	const uint64_t hval1 = sd_hash_oid(*oid1);
+	const uint64_t hval2 = sd_hash_oid(*oid2);
 
 	return intcmp(hval1, hval2);
 }

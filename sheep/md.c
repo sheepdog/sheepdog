@@ -47,7 +47,7 @@ static inline int nr_online_disks(void)
 
 static struct vdisk *oid_to_vdisk_from(struct vdisk *vds, int nr, uint64_t oid)
 {
-	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+	uint64_t id = sd_hash_oid(oid);
 	int start, end, pos;
 
 	start = 0;
@@ -72,28 +72,31 @@ static int vdisk_cmp(const struct vdisk *d1, const struct vdisk *d2)
 	return intcmp(d1->id, d2->id);
 }
 
-static inline int disks_to_vdisks(struct disk *ds, int nmds, struct vdisk *vds)
+static inline int disk_to_vdisks(const struct disk *ds, int idx, struct vdisk *vds)
 {
-	struct disk *d_iter = ds;
-	int i, j, nr_vdisks = 0;
-	uint64_t hval;
+	int nr = 0;
+	const struct disk *d = ds + idx;
+	uint64_t hval = sd_hash(d->path, strlen(d->path));
 
-	while (nmds--) {
-		hval = FNV1A_64_INIT;
+	for (int i = 0; i < d->nr_vdisks; i++) {
+		hval = sd_hash_next(hval);
 
-		for (i = 0; i < d_iter->nr_vdisks; i++) {
-			hval = fnv_64a_buf(&nmds, sizeof(nmds), hval);
-			for (j = strlen(d_iter->path) - 1; j >= 0; j--)
-				hval = fnv_64a_buf(&d_iter->path[j], 1, hval);
+		vds[nr].id = hval;
+		vds[nr].idx = idx;
 
-			vds[nr_vdisks].id = hval;
-			vds[nr_vdisks].idx = d_iter - ds;
-
-			nr_vdisks++;
-		}
-
-		d_iter++;
+		nr++;
 	}
+
+	return nr;
+}
+
+static inline int disks_to_vdisks(const struct disk *ds, int nmds, struct vdisk *vds)
+{
+	int nr_vdisks = 0;
+
+	for (int i = 0; i < nmds; i++)
+		nr_vdisks += disk_to_vdisks(ds, i, vds + nr_vdisks);
+
 	xqsort(vds, nr_vdisks, vdisk_cmp);
 
 	return nr_vdisks;

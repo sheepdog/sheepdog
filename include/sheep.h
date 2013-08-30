@@ -67,7 +67,7 @@ static inline int same_zone(const struct sd_vnode *e, int n1, int n2)
 static inline int get_vnode_first_idx(const struct sd_vnode *entries,
 				      int nr_entries, uint64_t oid)
 {
-	uint64_t id = fnv_64a_buf(&oid, sizeof(oid), FNV1A_64_INIT);
+	uint64_t id = sd_hash_oid(oid);
 	int start, end, pos;
 
 	assert(nr_entries > 0);
@@ -278,37 +278,37 @@ static inline int vnode_cmp(const struct sd_vnode *node1,
 	return intcmp(node1->id, node2->id);
 }
 
-static inline int nodes_to_vnodes(struct sd_node *nodes, int nr,
-				  struct sd_vnode *vnodes)
+static inline int node_to_vnodes(const struct sd_node *nodes, int idx,
+				 struct sd_vnode *vnodes)
 {
-	struct sd_node *n = nodes;
-	int i, j, nr_vnodes = 0;
-	uint64_t hval;
+	int nr = 0;
+	const struct sd_node *n = nodes + idx;
+	uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
 
-	while (nr--) {
-		hval = FNV1A_64_INIT;
+	for (int i = 0; i < n->nr_vnodes; i++) {
+		hval = sd_hash_next(hval);
 
-		for (i = 0; i < n->nr_vnodes; i++) {
-			if (vnodes) {
-				hval = fnv_64a_buf(&n->nid.port, sizeof(n->nid.port), hval);
-				for (j = ARRAY_SIZE(n->nid.addr) - 1; j >= 0; j--)
-					hval = fnv_64a_buf(&n->nid.addr[j], 1, hval);
+		vnodes[nr].id = hval;
+		memcpy(vnodes[nr].nid.addr, n->nid.addr, sizeof(n->nid.addr));
+		vnodes[nr].nid.port = n->nid.port;
+		vnodes[nr].node_idx = idx;
+		vnodes[nr].zone = n->zone;
 
-				vnodes[nr_vnodes].id = hval;
-				memcpy(vnodes[nr_vnodes].nid.addr, n->nid.addr, sizeof(n->nid.addr));
-				vnodes[nr_vnodes].nid.port = n->nid.port;
-				vnodes[nr_vnodes].node_idx = n - nodes;
-				vnodes[nr_vnodes].zone = n->zone;
-			}
-
-			nr_vnodes++;
-		}
-
-		n++;
+		nr++;
 	}
 
-	if (vnodes)
-		xqsort(vnodes, nr_vnodes, vnode_cmp);
+	return nr;
+}
+
+static inline int nodes_to_vnodes(const struct sd_node *nodes, int nr_nodes,
+				  struct sd_vnode *vnodes)
+{
+	int nr_vnodes = 0;
+
+	for (int i = 0; i < nr_nodes; i++)
+		nr_vnodes += node_to_vnodes(nodes, i, vnodes + nr_vnodes);
+
+	xqsort(vnodes, nr_vnodes, vnode_cmp);
 
 	return nr_vnodes;
 }

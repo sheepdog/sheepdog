@@ -445,8 +445,7 @@ out:
 static int get_vdi_bitmap_range(const char *name, unsigned long *left,
 				unsigned long *right)
 {
-	*left = fnv_64a_buf(name, strlen(name), FNV1A_64_INIT) &
-		(SD_NR_VDIS - 1);
+	*left = sd_hash_vdi(name);
 	*right = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, *left);
 	if (*left == *right)
 		return SD_RES_NO_VDI;
@@ -1018,23 +1017,32 @@ err:
 	return ret;
 }
 
+/* Calculate a vdi attribute id from sheepdog_vdi_attr. */
+static uint32_t hash_vdi_attr(const struct sheepdog_vdi_attr *attr)
+{
+	uint64_t hval;
+
+	/* We cannot use sd_hash for backward compatibility. */
+	hval = fnv_64a_buf(attr->name, sizeof(attr->name), FNV1A_64_INIT);
+	hval = fnv_64a_buf(attr->tag, sizeof(attr->tag), hval);
+	hval = fnv_64a_buf(&attr->snap_id, sizeof(attr->snap_id), hval);
+	hval = fnv_64a_buf(attr->key, sizeof(attr->key), hval);
+
+	return (uint32_t)(hval & ((UINT64_C(1) << VDI_SPACE_SHIFT) - 1));
+}
+
 int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 		 uint32_t vid, uint32_t *attrid, uint64_t create_time,
 		 bool wr, bool excl, bool delete)
 {
 	struct sheepdog_vdi_attr tmp_attr;
-	uint64_t oid, hval;
+	uint64_t oid;
 	uint32_t end;
 	int ret;
 
 	vattr->ctime = create_time;
 
-	/* we cannot include value_len for calculating the hash value */
-	hval = fnv_64a_buf(vattr->name, sizeof(vattr->name), FNV1A_64_INIT);
-	hval = fnv_64a_buf(vattr->tag, sizeof(vattr->tag), hval);
-	hval = fnv_64a_buf(&vattr->snap_id, sizeof(vattr->snap_id), hval);
-	hval = fnv_64a_buf(vattr->key, sizeof(vattr->key), hval);
-	*attrid = hval & ((UINT64_C(1) << VDI_SPACE_SHIFT) - 1);
+	*attrid = hash_vdi_attr(vattr);
 
 	end = *attrid - 1;
 	while (*attrid != end) {

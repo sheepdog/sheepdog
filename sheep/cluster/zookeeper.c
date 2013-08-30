@@ -473,12 +473,15 @@ static int zk_queue_init(void)
 static uint64_t get_uniq_id(void)
 {
 	static int seq;
-	uint64_t id, n = uatomic_add_return(&seq, 1);
+	struct {
+		uint64_t n;
+		struct zk_node node;
+	} id = {
+		.n = uatomic_add_return(&seq, 1),
+		.node = this_node,
+	};
 
-	id = fnv_64a_buf(&this_node, sizeof(this_node), FNV1A_64_INIT);
-	id = fnv_64a_buf(&n, sizeof(n), id);
-
-	return id;
+	return sd_hash(&id, sizeof(id));
 }
 
 static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,

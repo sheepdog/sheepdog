@@ -14,6 +14,7 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <linux/limits.h>
 
 #include "compiler.h"
@@ -284,11 +285,29 @@ static inline uint64_t sd_hash_next(uint64_t hval)
 	return fnv_64a_64(hval, hval);
 }
 
+/*
+ * Create a hash value from an object id.  The result is same as sd_hash(&oid,
+ * sizeof(oid)) but this function is a bit faster.
+ */
+static inline uint64_t sd_hash_oid(uint64_t oid)
+{
+	return sd_hash_64(oid);
+}
+
+/*
+ * Create a hash value from a vdi name.  We cannot use sd_hash_buf for this
+ * purpose because of backward compatibility.
+ */
+static inline uint32_t sd_hash_vdi(const char *name)
+{
+	uint64_t hval = fnv_64a_buf(name, strlen(name), FNV1A_64_INIT);
+
+	return (uint32_t)(hval & (SD_NR_VDIS - 1));
+}
+
 static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 {
-	uint64_t hash = fnv_64a_buf(&val, sizeof(uint64_t), FNV1A_64_INIT);
-
-	return hash & ((1 << bits) - 1);
+	return sd_hash_64(val) >> (64 - bits);
 }
 
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
