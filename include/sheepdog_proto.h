@@ -224,17 +224,44 @@ struct sheepdog_vdi_attr {
 
 /* 64 bit FNV-1a non-zero initial basis */
 #define FNV1A_64_INIT ((uint64_t) 0xcbf29ce484222325ULL)
+#define FNV_64_PRIME ((uint64_t) 0x100000001b3ULL)
 
 /* 64 bit Fowler/Noll/Vo FNV-1a hash code */
 static inline uint64_t fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
 {
-	unsigned char *bp = (unsigned char *) buf;
-	unsigned char *be = bp + len;
-	while (bp < be) {
-		hval ^= (uint64_t) *bp++;
-		hval += (hval << 1) + (hval << 4) + (hval << 5) +
-			(hval << 7) + (hval << 8) + (hval << 40);
+	const unsigned char *p = (const unsigned char *) buf;
+
+	for (int i = 0; i < len; i++) {
+		hval ^= (uint64_t) p[i];
+		hval *= FNV_64_PRIME;
 	}
+
+	return hval;
+}
+
+/*
+ * The result is same as fnv_64a_buf(&oid, sizeof(oid), hval) but this function
+ * is a bit faster.
+ */
+static inline uint64_t fnv_64a_64(uint64_t oid, uint64_t hval)
+{
+	hval ^= oid & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 8 & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 16 & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 24 & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 32 & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 40 & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 48 & 0xff;
+	hval *= FNV_64_PRIME;
+	hval ^= oid >> 56 & 0xff;
+	hval *= FNV_64_PRIME;
+
 	return hval;
 }
 
