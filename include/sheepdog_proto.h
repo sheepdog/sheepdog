@@ -265,6 +265,25 @@ static inline uint64_t fnv_64a_64(uint64_t oid, uint64_t hval)
 	return hval;
 }
 
+static inline uint64_t sd_hash(const void *buf, size_t len)
+{
+	uint64_t hval = fnv_64a_buf(buf, len, FNV1A_64_INIT);
+
+	return fnv_64a_64(hval, hval);
+}
+
+static inline uint64_t sd_hash_64(uint64_t oid)
+{
+	uint64_t hval = fnv_64a_64(oid, FNV1A_64_INIT);
+
+	return fnv_64a_64(hval, hval);
+}
+
+static inline uint64_t sd_hash_next(uint64_t hval)
+{
+	return fnv_64a_64(hval, hval);
+}
+
 static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 {
 	uint64_t hash = fnv_64a_buf(&val, sizeof(uint64_t), FNV1A_64_INIT);
