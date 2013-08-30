@@ -16,15 +16,23 @@ $DOG vdi create test 4M
 _input()
 {
     for i in `seq 1 10`; do
-	echo "multiwrite -P $i 0 1k ; 2k 1k ; 4k 1k ; 8k 1k"
-	sleep 1
+	echo "multiwrite -q -P $i 0 1k ; 2k 1k ; 4k 1k ; 8k 1k"
+	while true; do
+	    if grep qemu-io $STORE/qemu-io.log > /dev/null 2>&1; then
+		break
+	    fi
+	    sleep .1
+	done
+	truncate $STORE/qemu-io.log -s 0
+
 	$DOG vdi snapshot test -s snap$i
     done
 
     echo quit
 }
 
-_input | $QEMU_IO sheepdog:test > /dev/null
+_input | $QEMU_IO sheepdog:test > $STORE/qemu-io.log
+
 
 _vdi_list
 $DOG vdi tree | _filter_short_date
