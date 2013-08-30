@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-TESTS			= test_vdi test_cluster_driver
+TESTS			= test_vdi test_cluster_driver test_hash
 
 check_PROGRAMS		= ${TESTS}
 
@@ -10,7 +10,7 @@ INCLUDES		= -I$(top_srcdir)/include			\
 			  @CHECK_CFLAGS@
 
 LIBS			= $(top_srcdir)/lib/libsheepdog.a		\
-			  ../mock/libmock.a -lpthread			\
+			  ../mock/libmock.a -lpthread -lm		\
 			  @CHECK_LIBS@
 
 test_vdi_SOURCES	= test_vdi.c mock_sheep.c mock_store.c		\
@@ -27,6 +27,7 @@ test_cluster_driver_CFLAGS	+= -DBUILD_ZOOKEEPER
 LIBS += -lzookeeper_mt
 endif
 
+test_hash_SOURCES	= test_hash.c mock_sheep.c mock_group.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o
