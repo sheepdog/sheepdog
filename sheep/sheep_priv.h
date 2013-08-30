@@ -159,6 +159,7 @@ struct siocb {
 	uint64_t offset;
 };
 
+/* This structure is used to pass parameters to vdi_* functions. */
 struct vdi_iocb {
 	const char *name;
 	const char *tag;
@@ -170,8 +171,10 @@ struct vdi_iocb {
 	int nr_copies;
 };
 
+/* This structure is used to get information from sheepdog. */
 struct vdi_info {
 	uint32_t vid;
+	uint32_t snapid;
 	uint32_t free_bit;
 	uint64_t create_time;
 };
@@ -273,9 +276,9 @@ int get_max_copy_number(void);
 int get_req_copy_number(struct request *req);
 int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot);
 int vdi_exist(uint32_t vid);
-int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid);
-int vdi_delete(struct vdi_iocb *iocb, struct request *req);
-int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info);
+int vdi_create(const struct vdi_iocb *iocb, uint32_t *new_vid);
+int vdi_delete(const struct vdi_iocb *iocb, struct request *req);
+int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info);
 void clean_vdi_state(void);
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);

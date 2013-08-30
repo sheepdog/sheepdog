@@ -215,8 +215,8 @@ out:
 }
 
 /* TODO: should be performed atomically */
-static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
-			  uint32_t cur_vid)
+static int create_vdi_obj(const struct vdi_iocb *iocb, uint32_t new_snapid,
+			  uint32_t new_vid, uint32_t cur_vid)
 {
 	/* we are not called concurrently */
 	struct sd_inode *new = NULL, *base = NULL, *cur = NULL;
@@ -268,7 +268,7 @@ static int create_vdi_obj(struct vdi_iocb *iocb, uint32_t new_vid,
 	new->copy_policy = 0;
 	new->nr_copies = iocb->nr_copies;
 	new->block_size_shift = find_next_bit(&block_size, BITS_PER_LONG, 0);
-	new->snap_id = iocb->snapid;
+	new->snap_id = new_snapid;
 
 	if (iocb->base_vid) {
 		int i;
@@ -349,15 +349,15 @@ static int get_vdi_bitmap_range(const char *name, unsigned long *left,
 	return SD_RES_SUCCESS;
 }
 
-static inline bool vdi_has_tag(struct vdi_iocb *iocb)
+static inline bool vdi_has_tag(const struct vdi_iocb *iocb)
 {
 	if ((iocb->tag && iocb->tag[0]) || iocb->snapid)
 		return true;
 	return false;
 }
 
-static inline bool vdi_tag_match(struct vdi_iocb *iocb,
-			     struct sd_inode *inode)
+static inline bool vdi_tag_match(const struct vdi_iocb *iocb,
+				 const struct sd_inode *inode)
 {
 	const char *tag = iocb->tag;
 
@@ -369,7 +369,8 @@ static inline bool vdi_tag_match(struct vdi_iocb *iocb,
 }
 
 static int fill_vdi_info_range(uint32_t left, uint32_t right,
-			      struct vdi_iocb *iocb, struct vdi_info *info)
+			       const struct vdi_iocb *iocb,
+			       struct vdi_info *info)
 {
 	struct sd_inode *inode;
 	bool vdi_found = false;
@@ -412,7 +413,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 				 * Rollback & snap create, read, delete on
 				 * current working VDI
 				 */
-				iocb->snapid = inode->snap_id + 1;
+				info->snapid = inode->snap_id + 1;
 				if (vdi_is_snapshot(inode))
 					/* Current workding VDI is deleted */
 					break;
@@ -430,7 +431,7 @@ out:
 
 /* Fill the VDI information from right to left in the bitmap */
 static int fill_vdi_info(unsigned long left, unsigned long right,
-			 struct vdi_iocb *iocb, struct vdi_info *info)
+			 const struct vdi_iocb *iocb, struct vdi_info *info)
 {
 	int ret;
 
@@ -450,11 +451,10 @@ static int fill_vdi_info(unsigned long left, unsigned long right,
 }
 
 /* Return SUCCESS if we find targeted VDI specified by iocb and fill info */
-int vdi_lookup(struct vdi_iocb *iocb, struct vdi_info *info)
+int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info)
 {
 	unsigned long left, right;
 	int ret;
-
 
 	ret = get_vdi_bitmap_range(iocb->name, &left, &right);
 	info->free_bit = right;
@@ -511,7 +511,7 @@ static void vdi_flush(uint32_t vid)
  * Fresh create started with id = 1. Both rollback & snap create started with
  * current working VDI's snap_id + 1. Working VDI always has the highest snapid.
  */
-int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
+int vdi_create(const struct vdi_iocb *iocb, uint32_t *new_vid)
 {
 	const char *name = iocb->name;
 	struct vdi_info info = {};
@@ -533,8 +533,8 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 		sd_err("%s", sd_strerror(ret));
 		return ret;
 	}
-	if (!iocb->snapid)
-		iocb->snapid = 1;
+	if (info.snapid == 0)
+		info.snapid = 1;
 	*new_vid = info.free_bit;
 	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid);
 	if (ret != SD_RES_SUCCESS)
@@ -546,12 +546,12 @@ int vdi_create(struct vdi_iocb *iocb, uint32_t *new_vid)
 		 *new_vid, iocb->base_vid, info.vid, iocb->nr_copies,
 		 iocb->snapid);
 
-	return create_vdi_obj(iocb, *new_vid, info.vid);
+	return create_vdi_obj(iocb, info.snapid, *new_vid, info.vid);
 }
 
 static int start_deletion(struct request *req, uint32_t vid);
 
-int vdi_delete(struct vdi_iocb *iocb, struct request *req)
+int vdi_delete(const struct vdi_iocb *iocb, struct request *req)
 {
 	struct vdi_info info;
 	int ret;
