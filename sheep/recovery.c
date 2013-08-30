@@ -331,24 +331,11 @@ bool node_in_recovery(void)
 static inline void prepare_schedule_oid(uint64_t oid)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
-	uint64_t i;
 
-	for (i = 0; i < rinfo->nr_prio_oids; i++)
-		if (rinfo->prio_oids[i] == oid)
-			return;
-	/*
-	 * We need this check because oid might not be recovered.
-	 * Very much unlikely though, but it might happen indeed.
-	 */
-	for (i = 0; i < rinfo->done; i++)
-		if (rinfo->oids[i] == oid) {
-			sd_debug("%"PRIx64" not recovered, don't schedule it",
-				 oid);
-			return;
-		}
-	/* When recovery is not suspended, oid is currently being recovered */
-	if (!rinfo->suspended && rinfo->oids[rinfo->done] == oid)
+	if (xlfind(&oid, rinfo->prio_oids, rinfo->nr_prio_oids, oid_cmp)) {
+		sd_debug("%" PRIx64 " has been already in prio_oids", oid);
 		return;
+	}
 
 	rinfo->nr_prio_oids++;
 	rinfo->prio_oids = xrealloc(rinfo->prio_oids,
@@ -359,10 +346,9 @@ static inline void prepare_schedule_oid(uint64_t oid)
 	resume_suspended_recovery();
 }
 
-bool oid_in_recovery(uint64_t oid)
+main_fn bool oid_in_recovery(uint64_t oid)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
-	uint64_t i;
 
 	if (!node_in_recovery())
 		return false;
@@ -373,27 +359,50 @@ bool oid_in_recovery(uint64_t oid)
 	}
 
 	if (uatomic_read(&next_rinfo))
+		/*
+		 * The current recovery_info will be taken over by the next one
+		 * soon, so no need to call prepare_schedule_oid() now.
+		 */
 		return true;
 
-	/* If we are in preparation of object list, oid is not recovered yet */
-	if (rinfo->state == RW_PREPARE_LIST)
-		return true;
+	switch (rinfo->state) {
+	case RW_PREPARE_LIST:
+		/* oid is not recovered yet */
+		break;
+	case RW_RECOVER_OBJ:
+		if (xlfind(&oid, rinfo->oids, rinfo->done, oid_cmp)) {
+			sd_debug("%" PRIx64 " has been already recovered", oid);
+			return false;
+		}
 
-	/*
-	 * Check if oid is in the list that to be recovered later
-	 *
-	 * FIXME: do we need more efficient yet complex data structure?
-	 */
-	for (i = rinfo->done; i < rinfo->count; i++)
-		if (rinfo->oids[i] == oid)
+		if (rinfo->oids[rinfo->done] == oid) {
+			if (rinfo->suspended)
+				break;
+			/*
+			 * When recovery is not suspended,
+			 * rinfo->oids[rinfo->done] is currently being recovered
+			 * and no need to call prepare_schedule_oid().
+			 */
+			return true;
+		}
+
+		/*
+		 * Check if oid is in the list that to be recovered later
+		 *
+		 * FIXME: do we need more efficient yet complex data structure?
+		 */
+		if (xlfind(&oid, rinfo->oids + rinfo->done + 1, rinfo->count,
+			   oid_cmp))
 			break;
 
-	/*
-	 * Newly created object after prepare_object_list() might not be
-	 * in the list
-	 */
-	if (i == rinfo->count) {
-		sd_err("%"PRIx64" is not in the recovery list", oid);
+		/*
+		 * Newly created object after prepare_object_list() might not be
+		 * in the list
+		 */
+		sd_debug("%"PRIx64" is not in the recovery list", oid);
+		return false;
+	case RW_NOTIFY_COMPLETION:
+		sd_debug("the object %" PRIx64 " is already recoverd", oid);
 		return false;
 	}
 

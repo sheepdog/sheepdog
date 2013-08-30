@@ -251,6 +251,11 @@ static inline const char *sd_strerror(int err)
 	return descs[err];
 }
 
+static inline int oid_cmp(const uint64_t *oid1, const uint64_t *oid2)
+{
+	return intcmp(*oid1, *oid2);
+}
+
 static inline int node_id_cmp(const struct node_id *node1,
 			      const struct node_id *node2)
 {
