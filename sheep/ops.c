@@ -67,6 +67,10 @@ static int cluster_new_vdi(struct request *req)
 	struct sd_rsp *rsp = &req->rp;
 	uint32_t vid;
 	int ret;
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+
 	struct vdi_iocb iocb = {
 		.name = req->data,
 		.data_len = hdr->data_length,
@@ -75,12 +79,16 @@ static int cluster_new_vdi(struct request *req)
 		.create_snapshot = !!hdr->vdi.snapid,
 		.nr_copies = hdr->vdi.copies ? hdr->vdi.copies :
 				sys->cinfo.nr_copies,
+		.time = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000,
 	};
 
 	if (hdr->data_length != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
 
-	ret = vdi_create(&iocb, &vid);
+	if (iocb.create_snapshot)
+		ret = vdi_snapshot(&iocb, &vid);
+	else
+		ret = vdi_create(&iocb, &vid);
 
 	rsp->vdi.vdi_id = vid;
 	rsp->vdi.copies = iocb.nr_copies;

@@ -169,6 +169,7 @@ struct vdi_iocb {
 	uint32_t snapid;
 	bool create_snapshot;
 	int nr_copies;
+	uint64_t time;
 };
 
 /* This structure is used to get information from sheepdog. */
@@ -277,6 +278,7 @@ int get_req_copy_number(struct request *req);
 int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot);
 int vdi_exist(uint32_t vid);
 int vdi_create(const struct vdi_iocb *iocb, uint32_t *new_vid);
+int vdi_snapshot(const struct vdi_iocb *iocb, uint32_t *new_vid);
 int vdi_delete(const struct vdi_iocb *iocb, struct request *req);
 int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info);
 void clean_vdi_state(void);
