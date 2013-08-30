@@ -76,8 +76,9 @@ int get_vdi_copy_number(uint32_t vid)
 	sd_unlock(&vdi_state_lock);
 
 	if (!entry) {
-		sd_alert("No VDI copy entry for %" PRIx32 " found", vid);
-		return SD_DEFAULT_COPIES;
+		sd_alert("copy number for %" PRIx32 " not found, set %d", vid,
+			 sys->cinfo.nr_copies);
+		return sys->cinfo.nr_copies;
 	}
 
 	return entry->nr_copies;
