@@ -180,13 +180,20 @@ static bool request_in_recovery(struct request *req)
 	    req->rq.opcode == SD_OP_CREATE_AND_WRITE_OBJ)
 		return false;
 
-	/*
-	 * Request from recovery should go down the Farm even if
-	 * oid_in_recovery() returns true because we should also try snap
-	 * cache of the Farm and return the error code back if not found.
-	 */
-	if (oid_in_recovery(req->local_oid) &&
-	    !(req->rq.flags & SD_FLAG_CMD_RECOVERY)) {
+	if (req->rq.flags & SD_FLAG_CMD_RECOVERY)
+		/*
+		 * Recovery requests must not be linked to wait queue to avoid a
+		 * dead lock.  Here is an example scenario.
+		 *  1. Node A sends a recovery request to node B.
+		 *  2. Node B links the request to the wait queue.
+		 *  3. Node B sends a recovery request to node A to recover the
+		 *     object.
+		 *  4. Node A links the request to the wait queue, and the
+		 *     object cannot be recovered on either A or B (dead lock).
+		 */
+		return false;
+
+	if (oid_in_recovery(req->local_oid)) {
 		sd_debug("%"PRIx64" wait on oid", req->local_oid);
 		sleep_on_wait_queue(req);
 		return true;
