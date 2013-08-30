@@ -418,9 +418,17 @@ static int migrate_from_v1_to_v2(void)
 	return ret;
 }
 
+static int migrate_from_v2_to_v3(void)
+{
+	sd_err("not implemented");
+
+	return -1;
+}
+
 static int (*migrate[])(void) = {
 	migrate_from_v0_to_v1, /* from 0.4.0 or 0.5.0 to 0.5.1 */
 	migrate_from_v1_to_v2, /* from 0.5.x to 0.6.0 */
+	migrate_from_v2_to_v3, /* from 0.6.x or 0.7.x to 0.8.x */
 };
 
 int sd_migrate_store(int from, int to)
