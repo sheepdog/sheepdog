@@ -18,7 +18,6 @@ struct vdi_state_entry {
 	struct rb_node node;
 };
 
-static uint32_t max_copies;
 static struct rb_root vdi_state_root = RB_ROOT;
 static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
 
@@ -101,16 +100,6 @@ int get_req_copy_number(struct request *req)
 	return nr_copies;
 }
 
-int get_max_copy_number(void)
-{
-	int nr_copies = uatomic_read(&max_copies);
-
-	if (nr_copies == 0)
-		nr_copies = sys->cinfo.nr_copies;
-
-	return nr_copies;
-}
-
 int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 {
 	struct vdi_state_entry *entry, *old;
@@ -131,9 +120,6 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 		entry->snapshot = snapshot;
 	}
 
-	if (uatomic_read(&max_copies) == 0 ||
-	    nr_copies > uatomic_read(&max_copies))
-		uatomic_set(&max_copies, nr_copies);
 	sd_unlock(&vdi_state_lock);
 
 	return SD_RES_SUCCESS;
