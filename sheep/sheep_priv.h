@@ -323,7 +323,6 @@ int inc_and_log_epoch(void);
 
 extern char *config_path;
 int set_cluster_config(const struct cluster_info *cinfo);
-int get_cluster_config(struct cluster_info *cinfo);
 int set_node_space(uint64_t space);
 int get_node_space(uint64_t *space);
 bool is_cluster_formatted(void);
@@ -402,9 +401,6 @@ int gateway_remove_obj(struct request *req);
 
 /* backend store */
 int peer_read_obj(struct request *req);
-int peer_write_obj(struct request *req);
-int peer_create_and_write_obj(struct request *req);
-int peer_remove_obj(struct request *req);
 
 /* object_cache */
 
@@ -412,7 +408,6 @@ void object_cache_format(void);
 bool bypass_object_cache(const struct request *req);
 bool object_is_cached(uint64_t oid);
 
-void object_cache_try_to_reclaim(int);
 int object_cache_handle_request(struct request *req);
 int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset, bool create);

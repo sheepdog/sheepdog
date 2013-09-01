@@ -641,7 +641,7 @@ out:
 	return cache;
 }
 
-void object_cache_try_to_reclaim(int delay)
+static void object_cache_try_to_reclaim(int delay)
 {
 	struct reclaim_work *rw;
 

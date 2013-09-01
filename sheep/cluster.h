@@ -174,6 +174,5 @@ void sd_update_node_handler(struct sd_node *);
 bool sd_join_handler(const struct sd_node *joining,
 		     const struct sd_node *nodes, size_t nr_nodes,
 		     void *opaque);
-void recalculate_vnodes(struct sd_node *nodes, int nr_nodes);
 
 #endif

@@ -57,6 +57,16 @@ static void check_tmp_config(void)
 	sd_info("removed temporal config file");
 }
 
+static int get_cluster_config(struct cluster_info *cinfo)
+{
+	cinfo->ctime = config.ctime;
+	cinfo->nr_copies = config.copies;
+	cinfo->flags = config.flags;
+	memcpy(cinfo->store, config.store, sizeof(config.store));
+
+	return SD_RES_SUCCESS;
+}
+
 int init_config_file(void)
 {
 	int fd, ret;
@@ -137,16 +147,6 @@ int set_cluster_config(const struct cluster_info *cinfo)
 		(char *)cinfo->store);
 
 	return write_config();
-}
-
-int get_cluster_config(struct cluster_info *cinfo)
-{
-	cinfo->ctime = config.ctime;
-	cinfo->nr_copies = config.copies;
-	cinfo->flags = config.flags;
-	memcpy(cinfo->store, config.store, sizeof(config.store));
-
-	return SD_RES_SUCCESS;
 }
 
 int set_node_space(uint64_t space)

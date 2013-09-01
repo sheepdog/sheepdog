@@ -893,7 +893,7 @@ static int read_copy_from_replica(struct request *req, uint32_t epoch,
 	return ret;
 }
 
-int peer_remove_obj(struct request *req)
+static int peer_remove_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
@@ -945,7 +945,7 @@ static int do_create_and_write_obj(struct siocb *iocb, struct sd_req *hdr,
 	return sd_store->create_and_write(hdr->obj.oid, iocb);
 }
 
-int peer_write_obj(struct request *req)
+static int peer_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	struct siocb iocb = { };
@@ -959,7 +959,7 @@ int peer_write_obj(struct request *req)
 	return sd_store->write(oid, &iocb);
 }
 
-int peer_create_and_write_obj(struct request *req)
+static int peer_create_and_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	struct sd_req cow_hdr;

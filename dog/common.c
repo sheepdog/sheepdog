@@ -13,12 +13,7 @@
 #include "sha1.h"
 #include "sockfd_cache.h"
 
-char *strnumber(uint64_t size)
-{
-	return strnumber_raw(size, raw_output);
-}
-
-char *strnumber_raw(uint64_t _size, bool raw)
+static char *strnumber_raw(uint64_t _size, bool raw)
 {
 	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 	static __thread struct size_str {
@@ -52,6 +47,11 @@ out:
 	if (j == 1024)
 		j = 0;
 	return ret;
+}
+
+char *strnumber(uint64_t size)
+{
+	return strnumber_raw(size, raw_output);
 }
 
 int sd_read_object(uint64_t oid, void *data, unsigned int datalen,

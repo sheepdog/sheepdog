@@ -106,6 +106,32 @@ void put_vnode_info(struct vnode_info *vnode_info)
 	}
 }
 
+static void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
+{
+	int i, nr_non_gateway_nodes = 0;
+	uint64_t avg_size = 0;
+	float factor;
+
+	for (i = 0; i < nr_nodes; i++) {
+		if (nodes[i].space) {
+			avg_size += nodes[i].space;
+			nr_non_gateway_nodes++;
+		}
+	}
+
+	if (!nr_non_gateway_nodes)
+		return;
+
+	avg_size /= nr_non_gateway_nodes;
+
+	for (i = 0; i < nr_nodes; i++) {
+		factor = (float)nodes[i].space / (float)avg_size;
+		nodes[i].nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
+		sd_debug("node %d has %d vnodes, free space %" PRIu64,
+			 nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
+	}
+}
+
 struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
 				    size_t nr_nodes)
 {
@@ -593,32 +619,6 @@ void wait_get_vdis_done(void)
 	pthread_mutex_unlock(&wait_vdis_lock);
 
 	sd_debug("vdi list ready");
-}
-
-void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
-{
-	int i, nr_non_gateway_nodes = 0;
-	uint64_t avg_size = 0;
-	float factor;
-
-	for (i = 0; i < nr_nodes; i++) {
-		if (nodes[i].space) {
-			avg_size += nodes[i].space;
-			nr_non_gateway_nodes++;
-		}
-	}
-
-	if (!nr_non_gateway_nodes)
-		return;
-
-	avg_size /= nr_non_gateway_nodes;
-
-	for (i = 0; i < nr_nodes; i++) {
-		factor = (float)nodes[i].space / (float)avg_size;
-		nodes[i].nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
-		sd_debug("node %d has %d vnodes, free space %" PRIu64,
-			 nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
-	}
 }
 
 static void update_cluster_info(const struct cluster_info *cinfo,
