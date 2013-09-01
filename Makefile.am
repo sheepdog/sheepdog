@@ -94,6 +94,14 @@ check-style:
 		make -C $$dir check-style CHECK_STYLE="$(CHECK_STYLE)"; \
 	done
 
+check-unused:
+	@find -name '*.o' -exec nm -o {} \; | grep -v '^./lib' | grep ' U ' | \
+		awk '{print $$3;}' | sort -u > /tmp/sd_used
+	@find -name '*.o' -exec nm -o {} \; | grep -v '^./lib' | grep ' T ' | \
+		awk '{print $$3;}' > /tmp/sd_defined
+	@while read func;do if ! grep -Fq $$func /tmp/sd_used;then \
+		echo $$func; fi; done < /tmp/sd_defined
+
 if BUILD_COVERAGE
 coverage: clean check
 	@rm -rf coverage
