@@ -321,11 +321,8 @@ static unsigned long find_mcount_call(unsigned long entry_addr)
 
 static bfd *get_bfd(void)
 {
-	char fname[PATH_MAX] = {0};
+	const char *fname = my_exe_path();
 	bfd *abfd;
-
-	if (readlink("/proc/self/exe", fname, sizeof(fname)) < 0)
-		panic("failed to get a path of the program.");
 
 	abfd = bfd_openr(fname, NULL);
 	if (abfd == 0) {

@@ -668,14 +668,6 @@ void get_thread_name(char *name)
 
 #define SD_MAX_STACK_DEPTH 1024
 
-static int get_my_path(char *path, size_t size)
-{
-	/* readlink doesn't append '\0', so initialize here */
-	memset(path, 0, size);
-
-	return readlink("/proc/self/exe", path, size);
-}
-
 static bool check_gdb(void)
 {
 	return system("which gdb > /dev/null") == 0;
@@ -683,7 +675,7 @@ static bool check_gdb(void)
 
 static int gdb_cmd(const char *cmd)
 {
-	char path[PATH_MAX], time_str[256], cmd_str[ARG_MAX];
+	char time_str[256], cmd_str[ARG_MAX];
 	time_t ti;
 	struct tm tm;
 
@@ -691,9 +683,6 @@ static int gdb_cmd(const char *cmd)
 		sd_debug("cannot find gdb");
 		return -1;
 	}
-
-	if (get_my_path(path, sizeof(path)) < 0)
-		return -1;
 
 	time(&ti);
 	localtime_r(&ti, &tm);
@@ -710,7 +699,7 @@ static int gdb_cmd(const char *cmd)
 		 " -ex 'echo ==\\n'"
 		 " -ex '%s'"
 		 " -ex 'set logging off'",
-		 path, getpid(), time_str, path, cmd, cmd);
+		 my_exe_path(), getpid(), time_str, my_exe_path(), cmd, cmd);
 
 	return system(cmd_str);
 }
@@ -737,7 +726,7 @@ void sd_backtrace(void)
 
 	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
 		void *addr = addrs[i];
-		char cmd[ARG_MAX], path[PATH_MAX], info[256], **str;
+		char cmd[ARG_MAX], info[256], **str;
 		FILE *f;
 
 		/*
@@ -747,12 +736,9 @@ void sd_backtrace(void)
 		addr = (void *)((char *)addr - 1);
 
 		/* try to get a line number with addr2line if possible */
-		if (get_my_path(path, sizeof(path)) < 0)
-			goto fallback;
-
 		snprintf(cmd, sizeof(cmd), "addr2line -s -e %s -f -i %p | "
-			"perl -e '@a=<>; chomp @a; print \"$a[1]: $a[0]\"'",
-			path, addr);
+			 "perl -e '@a=<>; chomp @a; print \"$a[1]: $a[0]\"'",
+			 my_exe_path(), addr);
 		f = popen(cmd, "r");
 		if (!f)
 			goto fallback;
