@@ -171,7 +171,6 @@ out:
 int collie_exec_req(const char *host, int port, struct sd_req *hdr, void *data)
 {
 	int fd, ret;
-	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 
 	fd = connect_to(host, port);
 	if (fd < 0) {
