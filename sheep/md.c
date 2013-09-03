@@ -350,7 +350,6 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
 	sd_read_lock(&md.lock);
 	list_for_each_entry(disk, &md.disk_list, list) {
 		snprintf(path, sizeof(path), "%s/.stale", disk->path);
-		sd_err("%s", path);
 		ret = for_each_object_in_path(path, func, false, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
