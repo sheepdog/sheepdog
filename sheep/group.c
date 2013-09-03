@@ -332,16 +332,6 @@ error:
 	put_request(req);
 }
 
-static inline int get_nodes_nr_from(struct list_head *l)
-{
-	struct node *node;
-	int nr = 0;
-	list_for_each_entry(node, l, list) {
-		nr++;
-	}
-	return nr;
-}
-
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 			  time_t *timestamp, struct vnode_info *vinfo)
 {
