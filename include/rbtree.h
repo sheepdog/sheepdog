@@ -138,6 +138,37 @@ static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
 	__old;							\
 })
 
+/*
+ * Search for a value in the rbtree.  When the key is not found in the rbtree,
+ * this returns the next greater node. Note, if key > greatest node, we'll
+ * return first node.
+ *
+ * For an empty tree, we return NULL.
+ */
+#define rb_nsearch(root, key, member, compar)                           \
+({                                                                      \
+        struct rb_node *__n = (root)->rb_node;                          \
+        typeof(key) __ret = NULL, __data;                               \
+                                                                        \
+        while (__n) {                                                   \
+                __data = rb_entry(__n, typeof(*key), member);           \
+                int __cmp = compar(key, __data);                        \
+                                                                        \
+                if (__cmp < 0) {                                        \
+                        __ret = __data;                                 \
+                        __n = __n->rb_left;                             \
+                } else if (__cmp > 0)                                   \
+                        __n = __n->rb_right;                            \
+                else {                                                  \
+                        __ret = __data;                                 \
+                        break;                                          \
+                }                                                       \
+        }                                                               \
+        if (!__ret && !RB_EMPTY_ROOT(root))                             \
+                __ret = rb_entry(rb_first(root), typeof(*key), member); \
+        __ret;                                                          \
+})
+
 /* Iterate over a rbtree safe against removal of rbnode */
 #define rb_for_each(pos, root)					\
 	pos = rb_first(root);					\
