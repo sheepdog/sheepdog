@@ -60,11 +60,66 @@ static void vdi_show_progress(uint64_t done, uint64_t total)
 	return show_progress(done, total, false);
 }
 
+/*
+ * Get the number of objects.
+ *
+ * 'my_objs' means the number objects which belongs to this vdi.  'cow_objs'
+ * means the number of the other objects.
+ */
+static void stat_data_objs(const struct sd_inode *inode, uint64_t *my_objs,
+			   uint64_t *cow_objs)
+{
+	int nr;
+	uint64_t my, cow, *p;
+	uint32_t vid = inode->vdi_id;
+
+	my = 0;
+	cow = 0;
+	nr = count_data_objs(inode);
+
+	if (nr % 2 != 0) {
+		if (is_data_obj_writeable(inode, 0))
+			my++;
+		else if (inode->data_vdi_id[0] != 0)
+			cow++;
+		p = (uint64_t *)(inode->data_vdi_id + 1);
+	} else
+		p = (uint64_t *)inode->data_vdi_id;
+
+	/*
+	 * To boost performance, this function checks data_vdi_id for each 64
+	 * bit integer.
+	 */
+	nr /= 2;
+	for (int i = 0; i < nr; i++) {
+		if (p[i] == 0)
+			continue;
+		if (p[i] == (((uint64_t)vid << 32) | vid)) {
+			my += 2;
+			continue;
+		}
+
+		/* Check the higher 32 bit */
+		if (p[i] >> 32 == vid)
+			my++;
+		else if ((p[i] & 0xFFFFFFFF00000000) != 0)
+			cow++;
+
+		/* Check the lower 32 bit */
+		if ((p[i] & 0xFFFFFFFF) == vid)
+			my++;
+		else if ((p[i] & 0xFFFFFFFF) != 0)
+			cow++;
+	}
+
+	*my_objs = my;
+	*cow_objs = cow;
+}
+
 static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			   uint32_t snapid, uint32_t flags,
 			   const struct sd_inode *i, void *data)
 {
-	int idx, nr_objs;
 	bool is_clone = false;
 	uint64_t my_objs, cow_objs;
 	time_t ti;
@@ -84,17 +139,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			 "%Y-%m-%d %H:%M", &tm);
 	}
 
-	my_objs = 0;
-	cow_objs = 0;
-	nr_objs = count_data_objs(i);
-	for (idx = 0; idx < nr_objs; idx++) {
-		if (!i->data_vdi_id[idx])
-			continue;
-		if (is_data_obj_writeable(i, idx))
-			my_objs++;
-		else
-			cow_objs++;
-	}
+	stat_data_objs(i, &my_objs, &cow_objs);
 
 	if (i->snap_id == 1 && i->parent_vdi_id != 0)
 		is_clone = true;
