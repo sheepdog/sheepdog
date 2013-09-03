@@ -10,6 +10,11 @@ if [ "$STORE" != "/tmp/sheepdog/057" ]; then
 	_notrun "This test cannot be run when WD is manually set"
 fi
 
+_make_device 0 $((5 * 1024 ** 3))
+_make_device 1 $((5 * 1024 ** 3))
+_make_device 2 $((5 * 1024 ** 3))
+_make_device 3 $((5 * 1024 ** 3))
+
 for i in 0 1 2; do
 	_start_sheep $i
 done
