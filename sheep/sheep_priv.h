@@ -439,7 +439,7 @@ int journal_remove_object(uint64_t oid);
 /* md.c */
 bool md_add_disk(char *path);
 uint64_t md_init_space(void);
-char *md_get_object_path(uint64_t oid);
+const char *md_get_object_path(uint64_t oid);
 int md_handle_eio(char *);
 bool md_exist(uint64_t oid);
 int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path);
