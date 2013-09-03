@@ -99,12 +99,12 @@ out:
 	return ret;
 }
 
-static int (*command_parser)(int, char *);
+static int (*command_parser)(int, const char *);
 static int (*command_fn)(int, char **);
 static const char *command_opts;
 static const char *command_arg;
 static const char *command_desc;
-static struct sd_option *command_options;
+static const struct sd_option *command_options;
 
 static const struct sd_option *find_opt(int ch)
 {
@@ -170,11 +170,11 @@ static const struct subcommand *find_subcmd(const char *cmd, const char *subcmd)
 }
 
 static unsigned long setup_commands(const struct command *commands,
-				    char *cmd, char *subcmd)
+				    const char *cmd, const char *subcmd)
 {
 	int i;
 	bool found = false;
-	struct subcommand *s;
+	const struct subcommand *s;
 	unsigned long flags = 0;
 
 	for (i = 0; commands[i].name; i++) {
@@ -223,7 +223,7 @@ static unsigned long setup_commands(const struct command *commands,
 static void usage(const struct command *commands, int status)
 {
 	int i;
-	struct subcommand *s;
+	const struct subcommand *s;
 	char name[64];
 
 	if (status)

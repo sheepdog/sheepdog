@@ -104,8 +104,8 @@ int eventfd_xread(int efd);
 void eventfd_xwrite(int efd, int value);
 void pstrcpy(char *buf, int buf_size, const char *str);
 char *chomp(char *str);
-int rmdir_r(char *dir_path);
-int purge_directory(char *dir_path);
+int rmdir_r(const char *dir_path);
+int purge_directory(const char *dir_path);
 bool is_numeric(const char *p);
 int install_sighandler(int signum, void (*handler)(int), bool once);
 int install_crash_handler(void (*handler)(int));
@@ -119,7 +119,7 @@ void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
 void trim_zero_blocks(void *buf, uint64_t *offset, uint32_t *len);
 void untrim_zero_blocks(void *buf, uint64_t offset, uint32_t len,
 			uint32_t requested_len);
-int atomic_create_and_write(const char *path, char *buf, size_t len,
+int atomic_create_and_write(const char *path, const char *buf, size_t len,
 			    bool force_create);
 
 /* a type safe version of qsort() */

@@ -24,7 +24,7 @@ struct sd_option {
 
 struct option_parser {
 	const char *option;
-	int (*parser)(char *);
+	int (*parser)(const char *);
 };
 
 char *build_short_options(const struct sd_option *opts);

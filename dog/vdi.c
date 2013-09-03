@@ -795,7 +795,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 
 static int vdi_delete(int argc, char **argv)
 {
-	char *vdiname = argv[optind];
+	const char *vdiname = argv[optind];
 
 	return do_vdi_delete(vdiname, vdi_cmd_data.snapshot_id,
 			     vdi_cmd_data.snapshot_tag);
@@ -2151,7 +2151,7 @@ static struct subcommand vdi_cmd[] = {
 	{NULL,},
 };
 
-static int vdi_parser(int ch, char *opt)
+static int vdi_parser(int ch, const char *opt)
 {
 	char *p;
 	int nr_copies;

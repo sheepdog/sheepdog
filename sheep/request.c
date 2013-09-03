@@ -835,7 +835,7 @@ static int create_listen_port_fn(int fd, void *data)
 	return register_event(fd, listen_handler, data);
 }
 
-int create_listen_port(char *bindaddr, int port)
+int create_listen_port(const char *bindaddr, int port)
 {
 	static bool is_inet_socket = true;
 

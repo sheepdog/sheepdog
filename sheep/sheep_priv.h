@@ -224,12 +224,12 @@ int default_format(void);
 int default_remove_object(uint64_t oid);
 int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 int default_purge_obj(void);
-int for_each_object_in_wd(int (*func)(uint64_t, char *, uint32_t, void *), bool,
-			  void *);
-int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
+int for_each_object_in_wd(int (*func)(uint64_t, const char *, uint32_t, void *),
+			  bool, void *);
+int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
 					 uint32_t epoch, void *arg),
 			     void *arg);
-int for_each_obj_path(int (*func)(char *path));
+int for_each_obj_path(int (*func)(const char *path));
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)				\
@@ -265,7 +265,7 @@ static inline bool is_aligned_to_pagesize(void *p)
 	return ((uintptr_t)p & (getpagesize() - 1)) == 0;
 }
 
-int create_listen_port(char *bindaddr, int port);
+int create_listen_port(const char *bindaddr, int port);
 int init_unix_domain_socket(const char *dir);
 
 int init_store_driver(bool is_gateway);
@@ -437,12 +437,12 @@ journal_write_store(uint64_t oid, const char *buf, size_t size, off_t, bool);
 int journal_remove_object(uint64_t oid);
 
 /* md.c */
-bool md_add_disk(char *path);
+bool md_add_disk(const char *path);
 uint64_t md_init_space(void);
 const char *md_get_object_path(uint64_t oid);
-int md_handle_eio(char *);
+int md_handle_eio(const char *);
 bool md_exist(uint64_t oid);
-int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path);
+int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path, size_t size);
 uint32_t md_get_info(struct sd_md_info *info);
 int md_plug_disks(char *disks);
 int md_unplug_disks(char *disks);

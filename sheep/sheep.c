@@ -258,7 +258,7 @@ static void crash_handler(int signo)
 static struct system_info __sys;
 struct system_info *sys = &__sys;
 
-static int cache_size_parser(char *s)
+static int cache_size_parser(const char *s)
 {
 	const uint64_t max_cache_size = ((uint64_t)UINT32_MAX + 1)*1024*1024;
 	uint64_t cache_size;
@@ -277,7 +277,7 @@ static int cache_size_parser(char *s)
 	return 0;
 }
 
-static int cache_directio_parser(char *s)
+static int cache_directio_parser(const char *s)
 {
 	sys->object_cache_directio = true;
 	return 0;
@@ -285,7 +285,7 @@ static int cache_directio_parser(char *s)
 
 static char ocpath[PATH_MAX];
 
-static int cache_dir_parser(char *s)
+static int cache_dir_parser(const char *s)
 {
 	snprintf(ocpath, sizeof(ocpath), "%s", s);
 	return 0;
@@ -298,14 +298,14 @@ static struct option_parser cache_parsers[] = {
 	{ NULL, NULL },
 };
 
-static char *io_addr, *io_pt;
-static int ionic_host_parser(char *s)
+static const char *io_addr, *io_pt;
+static int ionic_host_parser(const char *s)
 {
 	io_addr = s;
 	return 0;
 }
 
-static int ionic_port_parser(char *s)
+static int ionic_port_parser(const char *s)
 {
 	io_pt = s;
 	return 0;
@@ -321,13 +321,13 @@ static char jpath[PATH_MAX];
 static bool jskip;
 static uint64_t jsize;
 
-static int journal_dir_parser(char *s)
+static int journal_dir_parser(const char *s)
 {
 	snprintf(jpath, sizeof(jpath), "%s", s);
 	return 0;
 }
 
-static int journal_size_parser(char *s)
+static int journal_size_parser(const char *s)
 {
 	if (option_parse_size(s, &jsize) < 0)
 		return -1;
@@ -340,7 +340,7 @@ static int journal_size_parser(char *s)
 	return 0;
 }
 
-static int journal_skip_parser(char *s)
+static int journal_skip_parser(const char *s)
 {
 	jskip = true;
 	return 0;

@@ -54,7 +54,7 @@ static inline int nr_online_disks(void)
 	return nr;
 }
 
-static inline int vdisk_number(struct disk *disk)
+static inline int vdisk_number(const struct disk *disk)
 {
 	return DIV_ROUND_UP(disk->space, MD_VDISK_SIZE);
 }
@@ -102,20 +102,22 @@ static inline void trim_last_slash(char *path)
 		path[strlen(path) - 1] = '\0';
 }
 
-static struct disk *path_to_disk(char *path)
+static struct disk *path_to_disk(const char *path)
 {
 	struct disk *disk;
+	char p[PATH_MAX];
 
-	trim_last_slash(path);
+	pstrcpy(p, sizeof(p), path);
+	trim_last_slash(p);
 	list_for_each_entry(disk, &md.disk_list, list) {
-		if (strcmp(disk->path, path) == 0)
+		if (strcmp(disk->path, p) == 0)
 			return disk;
 	}
 
 	return NULL;
 }
 
-static int get_total_object_size(uint64_t oid, char *wd, uint32_t epoch,
+static int get_total_object_size(uint64_t oid, const char *wd, uint32_t epoch,
 				 void *total)
 {
 	uint64_t *t = total;
@@ -132,8 +134,8 @@ static int get_total_object_size(uint64_t oid, char *wd, uint32_t epoch,
 }
 
 /* If cleanup is true, temporary objects will be removed */
-static int for_each_object_in_path(char *path,
-				   int (*func)(uint64_t, char *, uint32_t,
+static int for_each_object_in_path(const char *path,
+				   int (*func)(uint64_t, const char *, uint32_t,
 					       void *),
 				   bool cleanup, void *arg)
 {
@@ -182,7 +184,7 @@ static int for_each_object_in_path(char *path,
 	return ret;
 }
 
-static uint64_t get_path_free_size(char *path, uint64_t *used)
+static uint64_t get_path_free_size(const char *path, uint64_t *used)
 {
 	struct statvfs fs;
 	uint64_t size;
@@ -207,7 +209,7 @@ out:
  * safely use 0 to represent failure case  because 0 space path can be
  * considered as broken path.
  */
-static uint64_t init_path_space(char *path)
+static uint64_t init_path_space(const char *path)
 {
 	uint64_t size;
 	char stale[PATH_MAX];
@@ -249,7 +251,7 @@ broken_path:
 }
 
 /* We don't need lock at init stage */
-bool md_add_disk(char *path)
+bool md_add_disk(const char *path)
 {
 	struct disk *new;
 
@@ -302,7 +304,7 @@ uint64_t md_init_space(void)
 
 static const char *md_get_object_path_nolock(uint64_t oid)
 {
-	struct vdisk *vd;
+	const struct vdisk *vd;
 
 	if (unlikely(md.nr_disks == 0))
 		return NONE_EXIST_PATH; /* To generate EIO */
@@ -322,12 +324,12 @@ const char *md_get_object_path(uint64_t oid)
 	return p;
 }
 
-int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, uint32_t epoch,
-				      void *arg),
+int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
+				      uint32_t epoch, void *arg),
 			  bool cleanup, void *arg)
 {
 	int ret = SD_RES_SUCCESS;
-	struct disk *disk;
+	const struct disk *disk;
 
 	sd_read_lock(&md.lock);
 	list_for_each_entry(disk, &md.disk_list, list) {
@@ -339,13 +341,13 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, char *path, uint32_t epoch,
 	return ret;
 }
 
-int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
+int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
 					 uint32_t epoch, void *arg),
 			     void *arg)
 {
 	int ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
-	struct disk *disk;
+	const struct disk *disk;
 
 	sd_read_lock(&md.lock);
 	list_for_each_entry(disk, &md.disk_list, list) {
@@ -359,10 +361,10 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, char *path,
 }
 
 
-int for_each_obj_path(int (*func)(char *path))
+int for_each_obj_path(int (*func)(const char *path))
 {
 	int ret = SD_RES_SUCCESS;
-	struct disk *disk;
+	const struct disk *disk;
 
 	sd_read_lock(&md.lock);
 	list_for_each_entry(disk, &md.disk_list, list) {
@@ -409,7 +411,7 @@ out:
 	free(mw);
 }
 
-int md_handle_eio(char *fault_path)
+int md_handle_eio(const char *fault_path)
 {
 	struct md_work *mw;
 
@@ -425,7 +427,7 @@ int md_handle_eio(char *fault_path)
 	return SD_RES_NETWORK_ERROR;
 }
 
-static inline bool md_access(char *path)
+static inline bool md_access(const char *path)
 {
 	if (access(path, R_OK | W_OK) < 0) {
 		if (unlikely(errno != ENOENT))
@@ -436,17 +438,18 @@ static inline bool md_access(char *path)
 	return true;
 }
 
-static int get_old_new_path(uint64_t oid, uint32_t epoch, char *path,
-			    char *old, char *new)
+static int get_old_new_path(uint64_t oid, uint32_t epoch, const char *path,
+			    char *old, size_t old_size, char *new,
+			    size_t new_size)
 {
 	if (!epoch) {
-		snprintf(old, PATH_MAX, "%s/%016" PRIx64, path, oid);
-		snprintf(new, PATH_MAX, "%s/%016" PRIx64,
+		snprintf(old, old_size, "%s/%016" PRIx64, path, oid);
+		snprintf(new, new_size, "%s/%016" PRIx64,
 			 md_get_object_path_nolock(oid), oid);
 	} else {
-		snprintf(old, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32, path,
+		snprintf(old, old_size, "%s/.stale/%016"PRIx64".%"PRIu32, path,
 			 oid, epoch);
-		snprintf(new, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+		snprintf(new, new_size, "%s/.stale/%016"PRIx64".%"PRIu32,
 			 md_get_object_path_nolock(oid), oid, epoch);
 	}
 
@@ -456,7 +459,7 @@ static int get_old_new_path(uint64_t oid, uint32_t epoch, char *path,
 	return 0;
 }
 
-static int md_move_object(uint64_t oid, char *old, char *new)
+static int md_move_object(uint64_t oid, const char *old, const char *new)
 {
 	struct strbuf buf = STRBUF_INIT;
 	int fd, ret = -1;
@@ -489,11 +492,12 @@ out:
 	return ret;
 }
 
-static int md_check_and_move(uint64_t oid, uint32_t epoch, char *path)
+static int md_check_and_move(uint64_t oid, uint32_t epoch, const char *path)
 {
 	char old[PATH_MAX], new[PATH_MAX];
 
-	if (get_old_new_path(oid, epoch, path, old, new) < 0)
+	if (get_old_new_path(oid, epoch, path, old, sizeof(old), new,
+			     sizeof(new)) < 0)
 		return SD_RES_EIO;
 	/*
 	 * Recovery thread and main thread might try to recover the same object.
@@ -517,7 +521,7 @@ static int md_check_and_move(uint64_t oid, uint32_t epoch, char *path)
 static int scan_wd(uint64_t oid, uint32_t epoch)
 {
 	int ret = SD_RES_EIO;
-	struct disk *disk;
+	const struct disk *disk;
 
 	sd_read_lock(&md.lock);
 	list_for_each_entry(disk, &md.disk_list, list) {
@@ -548,9 +552,9 @@ bool md_exist(uint64_t oid)
 	return false;
 }
 
-int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path)
+int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path, size_t size)
 {
-	snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+	snprintf(path, size, "%s/.stale/%016"PRIx64".%"PRIu32,
 		 md_get_object_path(oid), oid, epoch);
 	if (md_access(path))
 		return SD_RES_SUCCESS;
@@ -565,7 +569,7 @@ int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path)
 uint32_t md_get_info(struct sd_md_info *info)
 {
 	uint32_t ret = sizeof(*info);
-	struct disk *disk;
+	const struct disk *disk;
 	int i = 0;
 
 	memset(info, 0, ret);
@@ -583,7 +587,7 @@ uint32_t md_get_info(struct sd_md_info *info)
 	return ret;
 }
 
-static inline void md_del_disk(char *path)
+static inline void md_del_disk(const char *path)
 {
 	struct disk *disk = path_to_disk(path);
 
@@ -596,7 +600,7 @@ static inline void md_del_disk(char *path)
 
 static int do_plug_unplug(char *disks, bool plug)
 {
-	char *path;
+	const char *path;
 	int old_nr, ret = SD_RES_UNKNOWN;
 
 	sd_write_lock(&md.lock);
@@ -638,7 +642,7 @@ int md_unplug_disks(char *disks)
 uint64_t md_get_size(uint64_t *used)
 {
 	uint64_t fsize = 0;
-	struct disk *disk;
+	const struct disk *disk;
 
 	*used = 0;
 	sd_read_lock(&md.lock);

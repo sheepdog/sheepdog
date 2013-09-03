@@ -341,7 +341,7 @@ char *chomp(char *str)
 }
 
 /* Purge directory recursively */
-int purge_directory(char *dir_path)
+int purge_directory(const char *dir_path)
 {
 	int ret = 0;
 	struct stat s;
@@ -383,7 +383,7 @@ out:
 }
 
 /* remove directory recursively */
-int rmdir_r(char *dir_path)
+int rmdir_r(const char *dir_path)
 {
 	int ret;
 
@@ -576,7 +576,7 @@ const char *my_exe_path(void)
  * If force_create is true, this function create the file even when the
  * temporary file exists.
  */
-int atomic_create_and_write(const char *path, char *buf, size_t len,
+int atomic_create_and_write(const char *path, const char *buf, size_t len,
 			    bool force_create)
 {
 	int fd, ret;

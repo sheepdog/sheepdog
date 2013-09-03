@@ -417,7 +417,7 @@ static int node_md(int argc, char **argv)
 }
 
 
-static int node_parser(int ch, char *opt)
+static int node_parser(int ch, const char *opt)
 {
 	switch (ch) {
 	case 'A':

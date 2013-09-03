@@ -33,8 +33,8 @@
 
 struct command {
 	const char *name;
-	struct subcommand *sub;
-	int (*parser)(int, char *);
+	const struct subcommand *sub;
+	int (*parser)(int, const char *);
 };
 
 struct subcommand {
@@ -42,10 +42,10 @@ struct subcommand {
 	const char *arg;
 	const char *opts;
 	const char *desc;
-	struct subcommand *sub;
+	const struct subcommand *sub;
 	unsigned long flags;
 	int (*fn)(int, char **);
-	struct sd_option *options;
+	const struct sd_option *options;
 };
 void subcommand_usage(char *cmd, char *subcmd, int status);
 

@@ -220,7 +220,7 @@ static void print_list(void *buf, unsigned len)
 
 static int list_snapshot(int argc, char **argv)
 {
-	char *path = argv[optind++];
+	const char *path = argv[optind++];
 	void *buf = NULL;
 	int log_nr;
 	int ret = EXIT_SYSFAIL;
@@ -275,7 +275,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 
 static int save_snapshot(int argc, char **argv)
 {
-	char *tag = argv[optind++];
+	const char *tag = argv[optind++];
 	char *path, *p;
 	int ret = EXIT_SYSFAIL, uninitialized_var(unused);
 
@@ -515,7 +515,7 @@ static struct subcommand cluster_cmd[] = {
 	{NULL,},
 };
 
-static int cluster_parser(int ch, char *opt)
+static int cluster_parser(int ch, const char *opt)
 {
 	int copies;
 	char *p;

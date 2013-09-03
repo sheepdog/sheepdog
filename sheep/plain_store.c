@@ -38,21 +38,22 @@ static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 	return flags;
 }
 
-static int get_obj_path(uint64_t oid, char *path)
+static int get_obj_path(uint64_t oid, char *path, size_t size)
 {
-	return snprintf(path, PATH_MAX, "%s/%016" PRIx64,
+	return snprintf(path, size, "%s/%016" PRIx64,
 			md_get_object_path(oid), oid);
 }
 
-static int get_tmp_obj_path(uint64_t oid, char *path)
+static int get_tmp_obj_path(uint64_t oid, char *path, size_t size)
 {
-	return snprintf(path, PATH_MAX, "%s/%016"PRIx64".tmp",
+	return snprintf(path, size, "%s/%016"PRIx64".tmp",
 			md_get_object_path(oid), oid);
 }
 
-static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path)
+static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path,
+			      size_t size)
 {
-	return md_get_stale_path(oid, epoch, path);
+	return md_get_stale_path(oid, epoch, path, size);
 }
 
 bool default_exist(uint64_t oid)
@@ -60,10 +61,14 @@ bool default_exist(uint64_t oid)
 	return md_exist(oid);
 }
 
-static int err_to_sderr(char *path, uint64_t oid, int err)
+static int err_to_sderr(const char *path, uint64_t oid, int err)
 {
 	struct stat s;
-	char *dir = dirname(path);
+	char p[PATH_MAX], *dir;
+
+	/* Use a temporary buffer since dirname() may modify its argument. */
+	pstrcpy(p, sizeof(p), path);
+	dir = dirname(p);
 
 	sd_debug("%s", dir);
 	switch (err) {
@@ -114,7 +119,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		sync();
 	}
 
-	get_obj_path(oid, path);
+	get_obj_path(oid, path, sizeof(path));
 
 	fd = open(path, flags, sd_def_fmode);
 	if (unlikely(fd < 0))
@@ -133,7 +138,7 @@ out:
 	return ret;
 }
 
-static int make_stale_dir(char *path)
+static int make_stale_dir(const char *path)
 {
 	char p[PATH_MAX];
 
@@ -145,7 +150,7 @@ static int make_stale_dir(char *path)
 	return SD_RES_SUCCESS;
 }
 
-static int purge_dir(char *path)
+static int purge_dir(const char *path)
 {
 	if (purge_directory(path) < 0)
 		return SD_RES_EIO;
@@ -153,7 +158,7 @@ static int purge_dir(char *path)
 	return SD_RES_SUCCESS;
 }
 
-static int purge_stale_dir(char *path)
+static int purge_stale_dir(const char *path)
 {
 	char p[PATH_MAX];
 
@@ -172,7 +177,7 @@ int default_cleanup(void)
 	return SD_RES_SUCCESS;
 }
 
-static int init_vdi_state(uint64_t oid, char *wd, uint32_t epoch)
+static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 {
 	int ret;
 	struct sd_inode *inode = xzalloc(SD_INODE_HEADER_SIZE);
@@ -199,8 +204,8 @@ out:
 	return SD_RES_SUCCESS;
 }
 
-static int init_objlist_and_vdi_bitmap(uint64_t oid, char *wd, uint32_t epoch,
-				       void *arg)
+static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
+				       uint32_t epoch, void *arg)
 {
 	int ret;
 	objlist_cache_insert(oid);
@@ -228,7 +233,7 @@ int default_init(void)
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 
-static int default_read_from_path(uint64_t oid, char *path,
+static int default_read_from_path(uint64_t oid, const char *path,
 				  const struct siocb *iocb)
 {
 	int flags = prepare_iocb(oid, iocb, false), fd,
@@ -256,7 +261,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	int ret;
 	char path[PATH_MAX];
 
-	get_obj_path(oid, path);
+	get_obj_path(oid, path, sizeof(path));
 	ret = default_read_from_path(oid, path, iocb);
 
 	/*
@@ -265,7 +270,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	 */
 	if (ret == SD_RES_NO_OBJ && iocb->epoch > 0 &&
 	    iocb->epoch < sys_epoch()) {
-		get_stale_obj_path(oid, iocb->epoch, path);
+		get_stale_obj_path(oid, iocb->epoch, path, sizeof(path));
 		ret = default_read_from_path(oid, path, iocb);
 	}
 
@@ -295,8 +300,8 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int ret, fd;
 	uint32_t len = iocb->length;
 
-	get_obj_path(oid, path);
-	get_tmp_obj_path(oid, tmp_path);
+	get_obj_path(oid, path, sizeof(path));
+	get_tmp_obj_path(oid, tmp_path, sizeof(tmp_path));
 
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_write_store(oid, iocb->buf, iocb->length,
@@ -363,8 +368,8 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 	sd_debug("try link %"PRIx64" from snapshot with epoch %d", oid,
 		 tgt_epoch);
 
-	get_obj_path(oid, path);
-	get_stale_obj_path(oid, tgt_epoch, stale_path);
+	get_obj_path(oid, path, sizeof(path));
+	get_stale_obj_path(oid, tgt_epoch, stale_path, sizeof(stale_path));
 
 	if (link(stale_path, path) < 0) {
 		/*
@@ -406,8 +411,8 @@ static bool oid_stale(uint64_t oid)
 	return ret;
 }
 
-static int move_object_to_stale_dir(uint64_t oid, char *wd, uint32_t epoch,
-				    void *arg)
+static int move_object_to_stale_dir(uint64_t oid, const char *wd,
+				    uint32_t epoch, void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 	uint32_t tgt_epoch = *(int *)arg;
@@ -426,7 +431,7 @@ static int move_object_to_stale_dir(uint64_t oid, char *wd, uint32_t epoch,
 	return SD_RES_SUCCESS;
 }
 
-static int check_stale_objects(uint64_t oid, char *wd, uint32_t epoch,
+static int check_stale_objects(uint64_t oid, const char *wd, uint32_t epoch,
 			       void *arg)
 {
 	if (oid_stale(oid))
@@ -463,7 +468,7 @@ int default_remove_object(uint64_t oid)
 	if (uatomic_is_true(&sys->use_journal))
 		journal_remove_object(oid);
 
-	get_obj_path(oid, path);
+	get_obj_path(oid, path, sizeof(path));
 
 	if (unlink(path) < 0) {
 		if (errno == ENOENT)
@@ -478,7 +483,7 @@ int default_remove_object(uint64_t oid)
 
 #define SHA1NAME "user.obj.sha1"
 
-static int get_object_sha1(char *path, uint8_t *sha1)
+static int get_object_sha1(const char *path, uint8_t *sha1)
 {
 	if (getxattr(path, SHA1NAME, sha1, SHA1_DIGEST_SIZE)
 	    != SHA1_DIGEST_SIZE) {
@@ -492,7 +497,7 @@ static int get_object_sha1(char *path, uint8_t *sha1)
 	return 0;
 }
 
-static int set_object_sha1(char *path, const uint8_t *sha1)
+static int set_object_sha1(const char *path, const uint8_t *sha1)
 {
 	int ret;
 
@@ -503,12 +508,13 @@ static int set_object_sha1(char *path, const uint8_t *sha1)
 	return ret;
 }
 
-static int get_object_path(uint64_t oid, uint32_t epoch, char *path)
+static int get_object_path(uint64_t oid, uint32_t epoch, char *path,
+			   size_t size)
 {
 	if (default_exist(oid)) {
-		get_obj_path(oid, path);
+		get_obj_path(oid, path, size);
 	} else {
-		get_stale_obj_path(oid, epoch, path);
+		get_stale_obj_path(oid, epoch, path, size);
 		if (access(path, F_OK) < 0) {
 			if (errno == ENOENT)
 				return SD_RES_NO_OBJ;
@@ -529,7 +535,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	bool is_readonly_obj = oid_is_readonly(oid);
 	char path[PATH_MAX];
 
-	ret = get_object_path(oid, epoch, path);
+	ret = get_object_path(oid, epoch, path, sizeof(path));
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 

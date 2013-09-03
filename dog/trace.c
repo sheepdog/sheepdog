@@ -340,7 +340,7 @@ static int graph_stat(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static int trace_parser(int ch, char *opt)
+static int trace_parser(int ch, const char *opt)
 {
 	return 0;
 }
