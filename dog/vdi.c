@@ -614,6 +614,8 @@ static int vdi_clone(int argc, char **argv)
 	max_idx = count_data_objs(inode);
 
 	for (idx = 0; idx < max_idx; idx++) {
+		size_t size;
+
 		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 		if (inode->data_vdi_id[idx]) {
 			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
@@ -622,12 +624,13 @@ static int vdi_clone(int argc, char **argv)
 				ret = EXIT_FAILURE;
 				goto out;
 			}
+			size = SD_DATA_OBJ_SIZE;
 		} else
-			memset(buf, 0, SD_DATA_OBJ_SIZE);
+			size = 0;
 
 		oid = vid_to_data_oid(new_vid, idx);
-		ret = sd_write_object(oid, 0, buf, SD_DATA_OBJ_SIZE, 0, 0,
-				      inode->nr_copies, true, true);
+		ret = sd_write_object(oid, 0, buf, size, 0, 0, inode->nr_copies,
+				      true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;

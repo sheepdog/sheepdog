@@ -154,7 +154,6 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 		oid = vid_to_vdi_oid(nr);
 
-		memset(&i, 0, sizeof(i));
 		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read inode header");

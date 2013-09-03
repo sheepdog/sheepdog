@@ -80,7 +80,7 @@ static int trace_read_buffer(void)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 #define TRACE_BUF_LEN      (1024 * 1024 * 20)
-	char *buf = xzalloc(TRACE_BUF_LEN);
+	char *buf = xmalloc(TRACE_BUF_LEN);
 
 	tfd = open(tracefile, O_CREAT | O_RDWR | O_APPEND | O_TRUNC, 0644);
 	if (tfd < 0) {
@@ -105,10 +105,8 @@ read_buffer:
 	}
 
 	xwrite(tfd, buf, rsp->data_length);
-	if (rsp->data_length == TRACE_BUF_LEN) {
-		memset(buf, 0, TRACE_BUF_LEN);
+	if (rsp->data_length == TRACE_BUF_LEN)
 		goto read_buffer;
-	}
 
 	free(buf);
 	return EXIT_SUCCESS;
