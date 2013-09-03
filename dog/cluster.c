@@ -246,7 +246,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 			  const struct sd_inode *i, void *data)
 {
 	uint64_t vdi_oid = vid_to_vdi_oid(vid), vmstate_oid;
-	int nr_vmstate_object;
+	int nr_objs, nr_vmstate_object;
 
 	/* ignore active vdi */
 	if (!vdi_is_snapshot(i))
@@ -256,7 +256,8 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	object_tree_insert(vdi_oid, i->nr_copies);
 
 	/* fill data object id */
-	for (uint64_t idx = 0; idx < MAX_DATA_OBJS; idx++) {
+	nr_objs = count_data_objs(i);
+	for (uint64_t idx = 0; idx < nr_objs; idx++) {
 		if (i->data_vdi_id[idx]) {
 			uint64_t oid = vid_to_data_oid(i->data_vdi_id[idx],
 						       idx);

@@ -784,7 +784,7 @@ static void delete_one(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
-	int ret, i, nr_deleted;
+	int ret, i, nr_deleted, nr_objs;
 	struct sd_inode *inode = NULL;
 
 	sd_debug("%d %d, %16x", dw->done, dw->count, vdi_id);
@@ -806,7 +806,8 @@ static void delete_one(struct work *work)
 	if (inode->vdi_size == 0 && vdi_is_deleted(inode))
 		goto out;
 
-	for (nr_deleted = 0, i = 0; i < MAX_DATA_OBJS; i++) {
+	nr_objs = count_data_objs(inode);
+	for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
 		uint64_t oid;
 
 		if (!inode->data_vdi_id[i])

@@ -18,6 +18,7 @@
 #include <linux/limits.h>
 
 #include "compiler.h"
+#include "bitops.h"
 
 #define SD_PROTO_VER 0x02
 
@@ -335,6 +336,11 @@ static inline bool is_data_obj(uint64_t oid)
 {
 	return !is_vdi_obj(oid) && !is_vmstate_obj(oid) &&
 		!is_vdi_attr_obj(oid);
+}
+
+static inline size_t count_data_objs(const struct sd_inode *inode)
+{
+	return DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
 }
 
 static inline size_t get_objsize(uint64_t oid)

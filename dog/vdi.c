@@ -64,7 +64,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			   uint32_t snapid, uint32_t flags,
 			   const struct sd_inode *i, void *data)
 {
-	int idx;
+	int idx, nr_objs;
 	bool is_clone = false;
 	uint64_t my_objs, cow_objs;
 	time_t ti;
@@ -86,7 +86,8 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 
 	my_objs = 0;
 	cow_objs = 0;
-	for (idx = 0; idx < MAX_DATA_OBJS; idx++) {
+	nr_objs = count_data_objs(i);
+	for (idx = 0; idx < nr_objs; idx++) {
 		if (!i->data_vdi_id[idx])
 			continue;
 		if (is_data_obj_writeable(i, idx))
@@ -610,7 +611,7 @@ static int vdi_clone(int argc, char **argv)
 		goto out;
 
 	buf = xzalloc(SD_DATA_OBJ_SIZE);
-	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
+	max_idx = count_data_objs(inode);
 
 	for (idx = 0; idx < max_idx; idx++) {
 		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
@@ -1522,7 +1523,7 @@ int do_vdi_check(const struct sd_inode *inode)
 
 	queue_vdi_check_work(inode, vid_to_vdi_oid(inode->vdi_id), NULL, wq);
 
-	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
+	max_idx = count_data_objs(inode);
 	vdi_show_progress(done, inode->vdi_size);
 	for (int idx = 0; idx < max_idx; idx++) {
 		vid = inode->data_vdi_id[idx];
@@ -1670,7 +1671,7 @@ static int vdi_backup(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		goto out;
 
-	nr_objs = DIV_ROUND_UP(to_inode->vdi_size, SD_DATA_OBJ_SIZE);
+	nr_objs = count_data_objs(to_inode);
 
 	ret = xwrite(STDOUT_FILENO, &hdr, sizeof(hdr));
 	if (ret < 0) {
