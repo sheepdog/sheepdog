@@ -283,6 +283,12 @@ bool md_add_disk(const char *path)
 	return true;
 }
 
+static inline void vdisk_free(struct vdisk *v)
+{
+	rb_erase(&v->rb, &md.vroot);
+	free(v);
+}
+
 static inline void md_remove_disk(struct disk *disk)
 {
 	struct vdisk *v;
@@ -292,7 +298,7 @@ static inline void md_remove_disk(struct disk *disk)
 	md.nr_disks--;
 	rb_for_each_entry(v, &md.vroot, rb) {
 		if (v->disk == disk)
-			rb_erase(&v->rb, &md.vroot);
+			vdisk_free(v);
 	}
 	free(disk);
 }
