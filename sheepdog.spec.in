@@ -28,7 +28,7 @@ a distributed object storage system for QEMU.
 
 %build
 ./autogen.sh
-%{configure} --with-initddir=%{_initrddir} --enable-sheepfs --enalbe-zookeeper
+%{configure} --with-initddir=%{_initrddir} --enable-sheepfs --enable-zookeeper
 
 make %{_smp_mflags}
 
