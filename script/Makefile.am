@@ -1,15 +1,16 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-EXTRA_DIST		= generic.in
+EXTRA_DIST		= sheepdog.in
 
-noinst_HEADERS		= bash_completion_dog checkarch.sh vditest gen_man.pl \
-			  gen_bash_completion.pl
+noinst_HEADERS		= checkarch.sh vditest gen_man.pl gen_bash_completion.pl
 
-target_INIT             = generic
+initscript_SCRIPTS	= sheepdog
+initscriptdir		= $(INITDDIR)
 
-target_BASH_COMPLETION  = bash_completion_dog
+completion_DATA		= dog
+completiondir		= $(sysconfdir)/bash_completion.d
 
-bash_completion_dog: $(top_srcdir)/dog/dog gen_bash_completion.pl Makefile
+dog: gen_bash_completion.pl Makefile
 	rm -f $@-t $@
 	$(top_srcdir)/script/gen_bash_completion.pl $(top_builddir)/dog/dog > $@-t
 	mv $@-t $@
@@ -25,18 +26,7 @@ bash_completion_dog: $(top_srcdir)/dog/dog gen_bash_completion.pl Makefile
 	chmod 0755 $@-t
 	mv $@-t $@
 
-all-local: $(target_INIT) $(target_BASH_COMPLETION)
+all-local: $(initscript_SCRIPTS) $(completion_DATA)
 
 clean-local:
-	rm -rf $(target_INIT)
-	rm -rf $(target_BASH_COMPLETION)
-
-install-exec-local:
-	$(INSTALL) -d $(DESTDIR)/$(INITDDIR)
-	$(INSTALL) -m 755 generic $(DESTDIR)/$(INITDDIR)/sheepdog
-	$(INSTALL) -d $(DESTDIR)/$(sysconfdir)/bash_completion.d
-	$(INSTALL) bash_completion_dog $(DESTDIR)/$(sysconfdir)/bash_completion.d/dog
-
-uninstall-local:
-	cd $(DESTDIR)/$(INITDDIR) && rm -f sheepdog
-	cd $(DESTDIR)/$(sysconfdir)/bash_completion.d && rm -f dog
+	rm -rf $(initscript_SCRIPTS) $(completion_DATA)
