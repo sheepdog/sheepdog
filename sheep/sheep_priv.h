@@ -437,7 +437,7 @@ journal_write_store(uint64_t oid, const char *buf, size_t size, off_t, bool);
 int journal_remove_object(uint64_t oid);
 
 /* md.c */
-bool md_add_disk(const char *path);
+bool md_add_disk(const char *path, bool);
 uint64_t md_init_space(void);
 const char *md_get_object_path(uint64_t oid);
 int md_handle_eio(const char *);

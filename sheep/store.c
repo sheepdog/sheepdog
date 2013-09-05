@@ -222,14 +222,14 @@ static int init_obj_path(const char *base_path, char *argp)
 		 * it. This is helpful to upgrade old sheep cluster to
 		 * the MD-enabled.
 		 */
-		md_add_disk(obj_path);
+		md_add_disk(obj_path, false);
 	} else {
 		do {
 			if (is_meta_store(p)) {
 				sd_err("%s is meta-store, abort", p);
 				return -1;
 			}
-			md_add_disk(p);
+			md_add_disk(p, false);
 		} while ((p = strtok(NULL, ",")));
 	}
 	return xmkdir(obj_path, sd_def_dmode);

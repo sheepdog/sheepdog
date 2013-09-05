@@ -209,7 +209,7 @@ out:
  * safely use 0 to represent failure case  because 0 space path can be
  * considered as broken path.
  */
-static uint64_t init_path_space(const char *path)
+static uint64_t init_path_space(const char *path, bool purge)
 {
 	uint64_t size;
 	char stale[PATH_MAX];
@@ -218,6 +218,9 @@ static uint64_t init_path_space(const char *path)
 		sd_info("multi-disk support need xattr feature");
 		goto broken_path;
 	}
+
+	if (purge && purge_directory(path) < 0)
+		sd_err("failed to purge %s", path);
 
 	snprintf(stale, PATH_MAX, "%s/.stale", path);
 	if (xmkdir(stale, sd_def_dmode) < 0) {
@@ -251,7 +254,7 @@ broken_path:
 }
 
 /* We don't need lock at init stage */
-bool md_add_disk(const char *path)
+bool md_add_disk(const char *path, bool purge)
 {
 	struct disk *new;
 
@@ -267,7 +270,7 @@ bool md_add_disk(const char *path)
 
 	new = xmalloc(sizeof(*new));
 	pstrcpy(new->path, PATH_MAX, path);
-	new->space = init_path_space(new->path);
+	new->space = init_path_space(new->path, purge);
 	if (!new->space) {
 		free(new);
 		return false;
@@ -614,8 +617,8 @@ static int do_plug_unplug(char *disks, bool plug)
 	path = strtok(disks, ",");
 	do {
 		if (plug) {
-			if (md_add_disk(path) && purge_directory(path) < 0)
-				md_del_disk(path);
+			if (!md_add_disk(path, true))
+				sd_err("failed to add %s", path);
 		} else {
 			md_del_disk(path);
 		}
