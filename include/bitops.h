@@ -43,7 +43,7 @@ static inline unsigned long *alloc_bitmap(unsigned long *old_bmap,
 	unsigned long *new_bmap =  xrealloc(old_bmap, new_size);
 
 	if (old_bits < new_bits)
-		memset(new_bmap + old_size, 0, new_size - old_size);
+		memset((char *)new_bmap + old_size, 0, new_size - old_size);
 
 	return new_bmap;
 }
