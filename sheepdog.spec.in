@@ -70,6 +70,7 @@ fi
 %{_sbindir}/shepherd
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
+%config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/sheepfs.8*
 %{_mandir}/man8/dog.8*
