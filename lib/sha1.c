@@ -11,6 +11,8 @@
  * Copyright (c) Andrew McDonald <andrew@mcdonald.org.uk>
  * Copyright (c) Jean-Francois Dive <jef@linuxbe.org>
  *
+ * Add x86 hardware acceleration by Liu Yuan <namei.unix@gmail.com>
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
  * Software Foundation; either version 2 of the License, or (at your option)
@@ -20,6 +22,16 @@
 #include <arpa/inet.h>
 #include "sha1.h"
 #include "util.h"
+
+#define SHA1_H0		0x67452301UL
+#define SHA1_H1		0xefcdab89UL
+#define SHA1_H2		0x98badcfeUL
+#define SHA1_H3		0x10325476UL
+#define SHA1_H4		0xc3d2e1f0UL
+
+sha1_init_func_t sha1_init;
+sha1_update_func_t sha1_update;
+sha1_final_func_t sha1_final;
 
 static __always_inline uint32_t rol(uint32_t value, uint32_t bits)
 {
@@ -124,19 +136,17 @@ static void sha1_transform(uint32_t *state, const uint8_t *in)
 	memset(block32, 0x00, sizeof block32);
 }
 
-void sha1_init(void *ctx)
+static void generic_sha1_init(void *ctx)
 {
 	struct sha1_ctx *sctx = ctx;
-	static const struct sha1_ctx init_state = {
-	  0,
-	  { 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0 },
-	  { 0, }
-	};
 
-	*sctx = init_state;
+	*sctx = (struct sha1_ctx){
+		.state = { SHA1_H0, SHA1_H1, SHA1_H2, SHA1_H3, SHA1_H4 },
+	};
 }
 
-void sha1_update(void *ctx, const uint8_t *data, unsigned int len)
+static void generic_sha1_update(void *ctx, const uint8_t *data,
+				unsigned int len)
 {
 	struct sha1_ctx *sctx = ctx;
 	unsigned int i, j;
@@ -157,7 +167,7 @@ void sha1_update(void *ctx, const uint8_t *data, unsigned int len)
 
 
 /* Add padding and return the message digest. */
-void sha1_final(void *ctx, uint8_t *out)
+static void generic_sha1_final(void *ctx, uint8_t *out)
 {
 	struct sha1_ctx *sctx = ctx;
 	uint32_t i, j, idx, padlen;
@@ -178,10 +188,10 @@ void sha1_final(void *ctx, uint8_t *out)
 	/* Pad out to 56 mod 64 */
 	idx = (sctx->count >> 3) & 0x3f;
 	padlen = (idx < 56) ? (56 - idx) : ((64+56) - idx);
-	sha1_update(sctx, padding, padlen);
+	generic_sha1_update(sctx, padding, padlen);
 
 	/* Append length */
-	sha1_update(sctx, bits, sizeof bits);
+	generic_sha1_update(sctx, bits, sizeof bits);
 
 	/* Store state in digest */
 	for (i = j = 0; i < 5; i++, j += 4) {
@@ -195,6 +205,119 @@ void sha1_final(void *ctx, uint8_t *out)
 	/* Wipe context */
 	memset(sctx, 0, sizeof *sctx);
 }
+
+#ifdef __x86_64__
+
+static asmlinkage void
+(*sha1_transform_asm)(uint32_t *, const uint8_t *, unsigned int);
+
+asmlinkage void sha1_transform_ssse3(uint32_t *, const uint8_t *, unsigned int);
+asmlinkage void sha1_transform_avx(uint32_t *, const uint8_t *, unsigned int);
+
+static void do_ssse3_sha1_update(struct sha1_ctx *ctx, const uint8_t *data,
+				unsigned int len, unsigned int partial)
+{
+	struct sha1_ctx *sctx = ctx;
+	unsigned int done = 0;
+
+	sctx->count += len;
+
+	if (partial) {
+		done = SHA1_BLOCK_SIZE - partial;
+		memcpy(sctx->buffer + partial, data, done);
+		sha1_transform_asm(sctx->state, sctx->buffer, 1);
+	}
+
+	if (len - done >= SHA1_BLOCK_SIZE) {
+		const unsigned int rounds = (len - done) / SHA1_BLOCK_SIZE;
+
+		sha1_transform_asm(sctx->state, data + done, rounds);
+		done += rounds * SHA1_BLOCK_SIZE;
+	}
+
+	memcpy(sctx->buffer, data + done, len - done);
+
+	return;
+}
+
+static void ssse3_sha1_update(void *ctx, const uint8_t *data,
+			     unsigned int len)
+{
+	struct sha1_ctx *sctx = ctx;
+	unsigned int partial = sctx->count % SHA1_BLOCK_SIZE;
+
+	/* Handle the fast case right here */
+	if (partial + len < SHA1_BLOCK_SIZE) {
+		sctx->count += len;
+		memcpy(sctx->buffer + partial, data, len);
+
+		return;
+	}
+
+	do_ssse3_sha1_update(ctx, data, len, partial);
+}
+
+/* Add padding and return the message digest. */
+static void ssse3_sha1_final(void *ctx, uint8_t *out)
+{
+	struct sha1_ctx *sctx = ctx;
+	unsigned int i, j, idx, padlen;
+	uint64_t t;
+	uint8_t bits[8] = { 0, };
+	static const uint8_t padding[SHA1_BLOCK_SIZE] = { 0x80, };
+
+	t = sctx->count << 3;
+	bits[7] = 0xff & t; t >>= 8;
+	bits[6] = 0xff & t; t >>= 8;
+	bits[5] = 0xff & t; t >>= 8;
+	bits[4] = 0xff & t; t >>= 8;
+	bits[3] = 0xff & t; t >>= 8;
+	bits[2] = 0xff & t; t >>= 8;
+	bits[1] = 0xff & t; t >>= 8;
+	bits[0] = 0xff & t;
+
+	/* Pad out to 56 mod 64 and append length */
+	idx = sctx->count % SHA1_BLOCK_SIZE;
+	padlen = (idx < 56) ? (56 - idx) : ((SHA1_BLOCK_SIZE+56) - idx);
+	/* We need to fill a whole block for do_ssse3_sha1_update() */
+	if (padlen <= 56) {
+		sctx->count += padlen;
+		memcpy(sctx->buffer + idx, padding, padlen);
+	} else {
+		do_ssse3_sha1_update(ctx, padding, padlen, idx);
+	}
+	do_ssse3_sha1_update(ctx, (const uint8_t *)&bits, sizeof(bits), 56);
+
+	/* Store state in digest */
+	for (i = j = 0; i < 5; i++, j += 4) {
+		uint32_t t2 = sctx->state[i];
+		out[j+3] = t2 & 0xff; t2 >>= 8;
+		out[j+2] = t2 & 0xff; t2 >>= 8;
+		out[j+1] = t2 & 0xff; t2 >>= 8;
+		out[j] = t2 & 0xff;
+	}
+
+	/* Wipe context */
+	memset(sctx, 0, sizeof(*sctx));
+
+	return;
+}
+
+static bool avx_usable(void)
+{
+	uint64_t xcr0;
+
+	if (!cpu_has_avx || !cpu_has_osxsave)
+		return false;
+
+	xcr0 = xgetbv(XCR_XFEATURE_ENABLED_MASK);
+	if ((xcr0 & (XSTATE_SSE | XSTATE_YMM)) != (XSTATE_SSE | XSTATE_YMM))
+		return false;
+
+	return true;
+}
+
+#endif
 
 const char *sha1_to_hex(const unsigned char *sha1)
 {
@@ -238,4 +361,24 @@ void sha1_from_buffer(const void *buf, size_t size, unsigned char *sha1)
 	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));
 	sha1_update(&c, buf, length);
 	sha1_final(&c, sha1);
+}
+
+static void __attribute__((constructor)) __sha1_init(void)
+{
+	sha1_init = generic_sha1_init;
+	sha1_update = generic_sha1_update;
+	sha1_final = generic_sha1_final;
+
+#ifdef __x86_64__
+	if (cpu_has_ssse3)
+		sha1_transform_asm = sha1_transform_ssse3;
+	else
+		return;
+
+	if (avx_usable())
+		sha1_transform_asm = sha1_transform_avx;
+
+	sha1_update = ssse3_sha1_update;
+	sha1_final = ssse3_sha1_final;
+#endif
 }

@@ -23,9 +23,14 @@ struct sha1_ctx {
 	uint8_t buffer[SHA1_BLOCK_SIZE];
 };
 
-void sha1_init(void *ctx);
-void sha1_update(void *ctx, const uint8_t *data, unsigned int len);
-void sha1_final(void *ctx, uint8_t *out);
+typedef void (*sha1_init_func_t)(void *);
+typedef void (*sha1_update_func_t)(void *, const uint8_t *, unsigned int);
+typedef void (*sha1_final_func_t)(void *, uint8_t *);
+
+sha1_init_func_t sha1_init;
+sha1_update_func_t sha1_update;
+sha1_final_func_t sha1_final;
+
 const char *sha1_to_hex(const unsigned char *sha1);
 void sha1_from_buffer(const void *buf, size_t size, unsigned char *sha1);
 
