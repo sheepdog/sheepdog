@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <signal.h>
+#include <stdint.h>
 
 #include "config.h"
 
@@ -23,6 +24,8 @@
 #define unlikely(x)     __builtin_expect(!!(x), 0)
 
 #define __packed __attribute((packed))
+
+#define asmlinkage  __attribute__((regparm(0)))
 
 #define __printf(a, b) __attribute__((format(printf, a, b)))
 
@@ -106,5 +109,48 @@ static inline int fallocate(int fd, int mode, __off_t offset, __off_t len)
 	return syscall(__NR_fallocate, fd, mode, offset, len);
 }
 #endif
+
+#ifdef __x86_64__
+
+#define X86_FEATURE_SSSE3	(4 * 32 + 9) /* Supplemental SSE-3 */
+#define X86_FEATURE_OSXSAVE	(4 * 32 + 27) /* "" XSAVE enabled in the OS */
+#define X86_FEATURE_AVX	(4 * 32 + 28) /* Advanced Vector Extensions */
+
+#define XSTATE_FP	0x1
+#define XSTATE_SSE	0x2
+#define XSTATE_YMM	0x4
+
+#define XCR_XFEATURE_ENABLED_MASK	0x00000000
+
+static inline int cpu_has(int flag)
+{
+	uint32_t eax, ebx, ecx, edx;
+
+	eax = (flag & 0x100) ? 7 :
+		(flag & 0x20) ? 0x80000001 : 1;
+	ecx = 0;
+
+	asm volatile("cpuid"
+		     : "+a" (eax), "=b" (ebx), "=d" (edx), "+c" (ecx));
+
+	return ((flag & 0x100 ? ebx :
+		 (flag & 0x80) ? ecx : edx) >> (flag & 31)) & 1;
+}
+
+static inline uint64_t xgetbv(uint32_t idx)
+{
+	uint32_t eax, edx;
+
+	asm volatile(".byte 0x0f,0x01,0xd0" /* xgetbv */
+		     : "=a" (eax), "=d" (edx)
+		     : "c" (idx));
+	return eax + ((uint64_t)edx << 32);
+}
+
+#define cpu_has_ssse3           cpu_has(X86_FEATURE_SSSE3)
+#define cpu_has_avx		cpu_has(X86_FEATURE_AVX)
+#define cpu_has_osxsave		cpu_has(X86_FEATURE_OSXSAVE)
+
+#endif /* __x86_64__ */
 
 #endif	/* SD_COMPILER_H */
