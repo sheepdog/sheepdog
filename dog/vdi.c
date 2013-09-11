@@ -904,14 +904,12 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	int i, j, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct sd_vnode *vnodes;
 	const struct sd_vnode *vnode_buf[SD_MAX_COPIES];
 	struct epoch_log *logs;
-	int vnodes_nr, nr_logs, log_length;
+	int nr_logs, log_length;
 
 	log_length = sd_epoch * sizeof(struct epoch_log);
 	logs = xmalloc(log_length);
-	vnodes = xmalloc(sizeof(*vnodes) * SD_MAX_VNODES);
 
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
@@ -927,6 +925,9 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = nr_logs - 1; i >= 0; i--) {
+		struct rb_root vroot = RB_ROOT;
+		struct sd_vnode *v;
+
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
 		       oid, logs[i].epoch, nr_copies);
 		printf("---------------------------------------------------\n");
@@ -943,22 +944,23 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 			}
 			continue;
 		}
-		vnodes_nr = nodes_to_vnodes(logs[i].nodes,
-					    logs[i].nr_nodes, vnodes);
-		oid_to_vnodes(vnodes, vnodes_nr, oid, nr_copies, vnode_buf);
+		nodes_to_vnodes(logs[i].nodes, logs[i].nr_nodes, &vroot);
+		oid_to_vnodes(oid, &vroot, nr_copies, vnode_buf);
 		for (j = 0; j < nr_copies; j++) {
 			const struct node_id *n = &vnode_buf[j]->node->nid;
 
 			printf("%s\n", addr_to_str(n->addr, n->port));
 		}
+		rb_for_each_entry(v, &vroot, rb) {
+			rb_erase(&v->rb, &vroot);
+			free(v);
+		}
 	}
 
 	free(logs);
-	free(vnodes);
 	return EXIT_SUCCESS;
 error:
 	free(logs);
-	free(vnodes);
 	return EXIT_SYSFAIL;
 }
 
@@ -1541,7 +1543,7 @@ static void queue_vdi_check_work(const struct sd_inode *inode, uint64_t oid,
 	info->done = done;
 	info->wq = wq;
 
-	oid_to_vnodes(sd_vnodes, sd_vnodes_nr, oid, nr_copies, tgt_vnodes);
+	oid_to_vnodes(oid, &sd_vroot, nr_copies, tgt_vnodes);
 	for (int i = 0; i < nr_copies; i++) {
 		info->vcw[i].info = info;
 		info->vcw[i].vnode = tgt_vnodes[i];

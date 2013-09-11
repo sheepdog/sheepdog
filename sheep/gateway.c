@@ -43,8 +43,7 @@ int gateway_read_obj(struct request *req)
 
 	nr_copies = get_req_copy_number(req);
 
-	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
-		      nr_copies, obj_vnodes);
+	oid_to_vnodes(oid, &req->vinfo->vroot, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
 		if (!vnode_is_local(v))
@@ -239,11 +238,10 @@ static int init_target_nodes(struct request *req, uint64_t oid,
 			     const struct sd_node **target_nodes)
 {
 	int nr_to_send;
-	const struct vnode_info *vinfo = req->vinfo;
+	struct vnode_info *vinfo = req->vinfo;
 
 	nr_to_send = get_req_copy_number(req);
-	oid_to_nodes(vinfo->vnodes, vinfo->nr_vnodes, oid, nr_to_send,
-		     target_nodes);
+	oid_to_nodes(oid, &vinfo->vroot, nr_to_send, target_nodes);
 
 	return nr_to_send;
 }

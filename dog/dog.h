@@ -56,8 +56,8 @@ extern bool verbose;
 
 extern uint32_t sd_epoch;
 extern struct sd_node sd_nodes[SD_MAX_NODES];
-extern struct sd_vnode sd_vnodes[SD_MAX_VNODES];
-extern int sd_nodes_nr, sd_vnodes_nr;
+extern struct rb_root sd_vroot;
+extern int sd_nodes_nr;
 
 bool is_current(const struct sd_inode *i);
 char *strnumber(uint64_t _size);

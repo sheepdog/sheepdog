@@ -28,9 +28,7 @@ static bool is_access_local(struct request *req, uint64_t oid)
 	int i;
 
 	nr_copies = get_req_copy_number(req);
-	oid_to_vnodes(req->vinfo->vnodes, req->vinfo->nr_vnodes, oid,
-		      nr_copies, obj_vnodes);
-
+	oid_to_vnodes(oid, &req->vinfo->vroot, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		if (vnode_is_local(obj_vnodes[i]))
 			return true;
@@ -310,7 +308,7 @@ static void queue_gateway_request(struct request *req)
 			return;
 
 queue_work:
-	if (req->vinfo->nr_vnodes == 0) {
+	if (RB_EMPTY_ROOT(&req->vinfo->vroot)) {
 		sd_err("there is no living nodes");
 		req->rp.result = SD_RES_HALT;
 		put_request(req);

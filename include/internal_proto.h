@@ -29,7 +29,6 @@
 
 #define SD_MAX_NODES 1024
 #define SD_DEFAULT_VNODES 128
-#define SD_MAX_VNODES (SD_MAX_NODES * SD_DEFAULT_VNODES)
 
 /*
  * Operations with opcodes above 0x80 are considered part of the inter-sheep

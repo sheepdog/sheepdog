@@ -184,7 +184,7 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 	for (int i = 0; i < nr_copies; i++) {
 		const struct sd_vnode *vnode;
 
-		vnode = oid_to_vnode(old->vnodes, old->nr_vnodes, oid, i);
+		vnode = oid_to_vnode(oid, &old->vroot, i);
 
 		if (vnode_is_local(vnode)) {
 			start = i;
@@ -197,7 +197,7 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		const struct sd_node *node;
 		int idx = (i + start) % nr_copies;
 
-		node = oid_to_node(old->vnodes, old->nr_vnodes, oid, idx);
+		node = oid_to_node(oid, &old->vroot, idx);
 
 		if (invalid_node(node, row->base.cur_vinfo))
 			continue;
@@ -724,8 +724,7 @@ static void screen_object_list(struct recovery_list_work *rlw,
 
 		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
 
-		oid_to_vnodes(rw->cur_vinfo->vnodes, rw->cur_vinfo->nr_vnodes,
-			      oids[i], nr_objs, vnodes);
+		oid_to_vnodes(oids[i], &rw->cur_vinfo->vroot, nr_objs, vnodes);
 		for (j = 0; j < nr_objs; j++) {
 			if (!vnode_is_local(vnodes[j]))
 				continue;

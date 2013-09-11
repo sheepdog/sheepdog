@@ -397,8 +397,7 @@ static bool oid_stale(uint64_t oid)
 	vinfo = get_vnode_info();
 	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
 
-	oid_to_vnodes(vinfo->vnodes, vinfo->nr_vnodes, oid,
-		      nr_copies, obj_vnodes);
+	oid_to_vnodes(oid, &vinfo->vroot, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {

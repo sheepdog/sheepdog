@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009-2011 Nippon Telegraph and Telephone Corporation.
+ * Copyright (C) 2012-2013 Taobao Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -17,19 +18,18 @@
 #include "bitops.h"
 #include "list.h"
 #include "net.h"
+#include "rbtree.h"
 
 struct sd_vnode {
+	struct rb_node rb;
 	const struct sd_node *node;
-	uint64_t        id;
+	uint64_t hash;
 };
 
 struct vnode_info {
-	struct sd_vnode vnodes[SD_MAX_VNODES];
-	int nr_vnodes;
-
+	struct rb_root vroot;
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
-
 	int nr_zones;
 	refcnt_t refcnt;
 };
@@ -56,133 +56,78 @@ static inline void sd_init_req(struct sd_req *req, uint8_t opcode)
 	req->proto_ver = opcode < 0x80 ? SD_PROTO_VER : SD_SHEEP_PROTO_VER;
 }
 
-static inline int same_zone(const struct sd_vnode *e, int n1, int n2)
+static inline int same_zone(const struct sd_vnode *v1,
+			    const struct sd_vnode *v2)
 {
-	return e[n1].node->zone == e[n2].node->zone;
+	return v1->node->zone == v2->node->zone;
 }
 
-/* Get the first vnode's index which is matching the OID */
-static inline int get_vnode_first_idx(const struct sd_vnode *entries,
-				      int nr_entries, uint64_t oid)
+static inline int vnode_cmp(const struct sd_vnode *node1,
+			    const struct sd_vnode *node2)
 {
-	uint64_t id = sd_hash_oid(oid);
-	int start, end, pos;
+	return intcmp(node1->hash, node2->hash);
+}
 
-	assert(nr_entries > 0);
+/* If v1_hash < oid_hash <= v2_hash, then oid is resident on v2 */
+static inline struct sd_vnode *
+oid_to_first_vnode(uint64_t oid, struct rb_root *root)
+{
+	struct sd_vnode dummy = {
+		.hash = sd_hash_oid(oid),
+	};
+	return rb_nsearch(root, &dummy, rb, vnode_cmp);
+}
 
-	start = 0;
-	end = nr_entries - 1;
+/* Replica are placed along the ring one by one with different zones */
+static inline void oid_to_vnodes(uint64_t oid, struct rb_root *root,
+				 int nr_copies,
+				 const struct sd_vnode **vnodes)
+{
+	const struct sd_vnode *next = oid_to_first_vnode(oid, root);
 
-	if (id > entries[end].id || id < entries[start].id)
-		return (end + 1) % nr_entries;
-
-	for (;;) {
-		pos = (end - start) / 2 + start;
-		if (entries[pos].id < id) {
-			if (entries[pos + 1].id >= id)
-				return (pos + 1) % nr_entries;
-			start = pos;
-		} else
-			end = pos;
+	vnodes[0] = next;
+	for (int i = 1; i < nr_copies; i++) {
+next:
+		next = rb_entry(rb_next(&next->rb), struct sd_vnode, rb);
+		if (!next) /* Wrap around */
+			next = rb_entry(rb_first(root), struct sd_vnode, rb);
+		if (unlikely(next == vnodes[0]))
+			panic("can't find a valid vnode");
+		for (int j = 0; j < i; j++)
+			if (same_zone(vnodes[j], next))
+				goto next;
+		vnodes[i] = next;
 	}
 }
 
-/* Get next vnode's index according to the PREV_IDXS */
-static inline int get_vnode_next_idx(const struct sd_vnode *entries,
-				     int nr_entries, int *prev_idxs,
-				     int nr_prev_idxs)
+static inline const struct sd_vnode *
+oid_to_vnode(uint64_t oid, struct rb_root *root, int copy_idx)
 {
-	int i, idx, first_idx;
-	bool found;
+	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 
-	first_idx = prev_idxs[0];
-	idx = prev_idxs[nr_prev_idxs - 1];
-	for (;;) {
-		idx = (idx + 1) % nr_entries;
-		if (unlikely(idx == first_idx))
-			panic("can't find next new idx");
+	oid_to_vnodes(oid, root, copy_idx + 1, vnodes);
 
-		for (found = false, i = 0; i < nr_prev_idxs; i++) {
-			if (same_zone(entries, idx, prev_idxs[i])) {
-				found = true;
-				break;
-			}
-		}
-
-		if (!found)
-			return idx;
-	}
+	return vnodes[copy_idx];
 }
 
-/* Get the n'th vnode's index which is matching the OID */
-static inline int get_vnode_nth_idx(const struct sd_vnode *entries,
-			int nr_entries, uint64_t oid, int nth)
-{
-	int nr_idxs = 0, idxs[SD_MAX_COPIES];
-
-	idxs[nr_idxs++] = get_vnode_first_idx(entries, nr_entries, oid);
-
-	if (!nth)
-		return idxs[nth];
-
-	while (nr_idxs <= nth) {
-		idxs[nr_idxs] = get_vnode_next_idx(entries, nr_entries,
-						     idxs, nr_idxs);
-		nr_idxs++;
-	}
-
-	return idxs[nth];
-}
-
-static inline const struct sd_vnode *oid_to_vnode(const struct sd_vnode *entries,
-						  int nr_entries, uint64_t oid,
-						  int copy_idx)
-{
-	int idx = get_vnode_nth_idx(entries, nr_entries, oid, copy_idx);
-
-	return &entries[idx];
-}
-
-static inline const struct sd_node *oid_to_node(const struct sd_vnode *entries,
-						int nr_entries, uint64_t oid,
-						int copy_idx)
+static inline const struct sd_node *
+oid_to_node(uint64_t oid, struct rb_root *root, int copy_idx)
 {
 	const struct sd_vnode *vnode;
 
-	vnode = oid_to_vnode(entries, nr_entries, oid, copy_idx);
+	vnode = oid_to_vnode(oid, root, copy_idx);
 
 	return vnode->node;
 }
 
-static inline void oid_to_vnodes(const struct sd_vnode *entries, int nr_entries,
-				 uint64_t oid, int nr_copies,
-				 const struct sd_vnode **vnodes)
-{
-	int idx, idxs[SD_MAX_COPIES], i;
-
-	if (nr_entries == 0)
-		return;
-
-	idx = get_vnode_first_idx(entries, nr_entries, oid);
-	idxs[0] = idx;
-	vnodes[0] = &entries[idx];
-
-	for (i = 1; i < nr_copies; i++) {
-		idx = get_vnode_next_idx(entries, nr_entries, idxs, i);
-		idxs[i] = idx;
-		vnodes[i] = &entries[idx];
-	}
-}
-
-static inline void oid_to_nodes(const struct sd_vnode *entries, int nr_entries,
-				uint64_t oid, int nr_copies,
+static inline void oid_to_nodes(uint64_t oid, struct rb_root *root,
+				int nr_copies,
 				const struct sd_node **nodes)
 {
-	int i;
 	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 
-	oid_to_vnodes(entries, nr_entries, oid, nr_copies, vnodes);
-	for (i = 0; i < nr_copies; i++)
+	oid_to_vnodes(oid, root, nr_copies, vnodes);
+	for (int i = 0; i < nr_copies; i++)
 		nodes[i] = vnodes[i]->node;
 }
 
@@ -273,39 +218,24 @@ static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 	return node_cmp(a, b) == 0;
 }
 
-static inline int vnode_cmp(const struct sd_vnode *node1,
-			    const struct sd_vnode *node2)
+static inline void
+nodes_to_vnodes(const struct sd_node *nodes, int nr_nodes, struct rb_root *root)
 {
-	return intcmp(node1->id, node2->id);
-}
+	for (int j = 0; j < nr_nodes; j++) {
+		const struct sd_node *n = nodes + j;
+		uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid),
+							  io_addr));
 
-static inline int node_to_vnodes(const struct sd_node *n,
-				 struct sd_vnode *vnodes)
-{
-	int nr = 0;
-	uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
+		for (int i = 0; i < n->nr_vnodes; i++) {
+			struct sd_vnode *v = xmalloc(sizeof(*v));
 
-	for (int i = 0; i < n->nr_vnodes; i++) {
-		hval = sd_hash_next(hval);
-		vnodes[nr].id = hval;
-		vnodes[nr].node = n;
-		nr++;
+			hval = sd_hash_next(hval);
+			v->hash = hval;
+			v->node = n;
+			if (unlikely(rb_insert(root, v, rb, vnode_cmp)))
+				panic("vdisk hash collison");
+		}
 	}
-
-	return nr;
-}
-
-static inline int nodes_to_vnodes(const struct sd_node *nodes, int nr_nodes,
-				  struct sd_vnode *vnodes)
-{
-	int nr_vnodes = 0;
-
-	for (int i = 0; i < nr_nodes; i++)
-		nr_vnodes += node_to_vnodes(nodes + i, vnodes + nr_vnodes);
-
-	xqsort(vnodes, nr_vnodes, vnode_cmp);
-
-	return nr_vnodes;
 }
 
 #define MAX_NODE_STR_LEN 256

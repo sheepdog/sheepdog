@@ -101,8 +101,14 @@ main_fn struct vnode_info *get_vnode_info(void)
 void put_vnode_info(struct vnode_info *vnode_info)
 {
 	if (vnode_info) {
-		if (refcount_dec(&vnode_info->refcnt) == 0)
+		if (refcount_dec(&vnode_info->refcnt) == 0) {
+			struct sd_vnode *v;
+			rb_for_each_entry(v, &vnode_info->vroot, rb) {
+				rb_erase(&v->rb, &vnode_info->vroot);
+				free(v);
+			}
 			free(vnode_info);
+		}
 	}
 }
 
@@ -139,14 +145,14 @@ struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
 
 	vnode_info = xzalloc(sizeof(*vnode_info));
 
+	INIT_RB_ROOT(&vnode_info->vroot);
 	vnode_info->nr_nodes = nr_nodes;
 	memcpy(vnode_info->nodes, nodes, sizeof(*nodes) * nr_nodes);
 	xqsort(vnode_info->nodes, nr_nodes, node_cmp);
 
 	recalculate_vnodes(vnode_info->nodes, nr_nodes);
 
-	vnode_info->nr_vnodes = nodes_to_vnodes(vnode_info->nodes, nr_nodes,
-						vnode_info->vnodes);
+	nodes_to_vnodes(vnode_info->nodes, nr_nodes, &vnode_info->vroot);
 	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
 	refcount_set(&vnode_info->refcnt, 1);
 	return vnode_info;
