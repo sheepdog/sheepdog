@@ -385,7 +385,7 @@ int gateway_to_peer_opcode(int opcode);
 
 static inline bool vnode_is_local(const struct sd_vnode *v)
 {
-	return node_id_cmp(&v->nid, &sys->this_node.nid) == 0;
+	return node_id_cmp(&v->node->nid, &sys->this_node.nid) == 0;
 }
 
 static inline bool node_is_local(const struct sd_node *n)

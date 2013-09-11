@@ -197,8 +197,7 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		const struct sd_node *node;
 		int idx = (i + start) % nr_copies;
 
-		node = oid_to_node(old->vnodes, old->nr_vnodes, oid, idx,
-				   old->nodes);
+		node = oid_to_node(old->vnodes, old->nr_vnodes, oid, idx);
 
 		if (invalid_node(node, row->base.cur_vinfo))
 			continue;

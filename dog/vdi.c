@@ -948,7 +948,7 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 					    logs[i].nr_nodes, vnodes);
 		oid_to_vnodes(vnodes, vnodes_nr, oid, nr_copies, vnode_buf);
 		for (j = 0; j < nr_copies; j++) {
-			const struct node_id *n = &vnode_buf[j]->nid;
+			const struct node_id *n = &vnode_buf[j]->node->nid;
 
 			printf("%s\n", addr_to_str(n->addr, n->port));
 		}
@@ -1357,7 +1357,8 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 
 	hdr.obj.oid = oid;
 
-	ret = dog_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
+	ret = dog_exec_req(vnode->node->nid.addr, vnode->node->nid.port,
+			   &hdr, buf);
 
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1394,7 +1395,8 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	hdr.data_length = get_objsize(oid);
 	hdr.obj.oid = oid;
 
-	ret = dog_exec_req(vnode->nid.addr, vnode->nid.port, &hdr, buf);
+	ret = dog_exec_req(vnode->node->nid.addr, vnode->node->nid.port,
+			   &hdr, buf);
 
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
@@ -1475,8 +1477,8 @@ static void vdi_hash_check_work(struct work *work)
 	hdr.obj.oid = info->oid;
 	hdr.obj.tgt_epoch = sd_epoch;
 
-	ret = dog_exec_req(vcw->vnode->nid.addr, vcw->vnode->nid.port, &hdr,
-			      NULL);
+	ret = dog_exec_req(vcw->vnode->node->nid.addr,
+			   vcw->vnode->node->nid.port, &hdr, NULL);
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
 
@@ -1491,7 +1493,8 @@ static void vdi_hash_check_work(struct work *work)
 		break;
 	default:
 		sd_err("failed to read %" PRIx64 " from %s, %s", info->oid,
-		       addr_to_str(vcw->vnode->nid.addr, vcw->vnode->nid.port),
+		       addr_to_str(vcw->vnode->node->nid.addr,
+				   vcw->vnode->node->nid.port),
 		       sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}

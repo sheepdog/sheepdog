@@ -74,7 +74,7 @@ int gateway_read_obj(struct request *req)
 		 * structure.
 		 */
 		gateway_init_fwd_hdr(&fwd_hdr, &req->rq);
-		ret = sheep_exec_req(&v->nid, &fwd_hdr, req->data);
+		ret = sheep_exec_req(&v->node->nid, &fwd_hdr, req->data);
 		if (ret != SD_RES_SUCCESS)
 			continue;
 
@@ -243,7 +243,7 @@ static int init_target_nodes(struct request *req, uint64_t oid,
 
 	nr_to_send = get_req_copy_number(req);
 	oid_to_nodes(vinfo->vnodes, vinfo->nr_vnodes, oid, nr_to_send,
-		     vinfo->nodes, target_nodes);
+		     target_nodes);
 
 	return nr_to_send;
 }

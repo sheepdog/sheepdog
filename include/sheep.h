@@ -19,9 +19,7 @@
 #include "net.h"
 
 struct sd_vnode {
-	struct node_id  nid;
-	uint16_t	node_idx;
-	uint32_t	zone;
+	const struct sd_node *node;
 	uint64_t        id;
 };
 
@@ -60,7 +58,7 @@ static inline void sd_init_req(struct sd_req *req, uint8_t opcode)
 
 static inline int same_zone(const struct sd_vnode *e, int n1, int n2)
 {
-	return e[n1].zone == e[n2].zone;
+	return e[n1].node->zone == e[n2].node->zone;
 }
 
 /* Get the first vnode's index which is matching the OID */
@@ -147,14 +145,13 @@ static inline const struct sd_vnode *oid_to_vnode(const struct sd_vnode *entries
 
 static inline const struct sd_node *oid_to_node(const struct sd_vnode *entries,
 						int nr_entries, uint64_t oid,
-						int copy_idx,
-						const struct sd_node *all_nodes)
+						int copy_idx)
 {
 	const struct sd_vnode *vnode;
 
 	vnode = oid_to_vnode(entries, nr_entries, oid, copy_idx);
 
-	return &all_nodes[vnode->node_idx];
+	return vnode->node;
 }
 
 static inline void oid_to_vnodes(const struct sd_vnode *entries, int nr_entries,
@@ -179,7 +176,6 @@ static inline void oid_to_vnodes(const struct sd_vnode *entries, int nr_entries,
 
 static inline void oid_to_nodes(const struct sd_vnode *entries, int nr_entries,
 				uint64_t oid, int nr_copies,
-				const struct sd_node *all_nodes,
 				const struct sd_node **nodes)
 {
 	int i;
@@ -187,7 +183,7 @@ static inline void oid_to_nodes(const struct sd_vnode *entries, int nr_entries,
 
 	oid_to_vnodes(entries, nr_entries, oid, nr_copies, vnodes);
 	for (i = 0; i < nr_copies; i++)
-		nodes[i] = &all_nodes[vnodes[i]->node_idx];
+		nodes[i] = vnodes[i]->node;
 }
 
 static inline const char *sd_strerror(int err)
@@ -283,22 +279,16 @@ static inline int vnode_cmp(const struct sd_vnode *node1,
 	return intcmp(node1->id, node2->id);
 }
 
-static inline int node_to_vnodes(const struct sd_node *nodes, int idx,
+static inline int node_to_vnodes(const struct sd_node *n,
 				 struct sd_vnode *vnodes)
 {
 	int nr = 0;
-	const struct sd_node *n = nodes + idx;
 	uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
 
 	for (int i = 0; i < n->nr_vnodes; i++) {
 		hval = sd_hash_next(hval);
-
 		vnodes[nr].id = hval;
-		memcpy(vnodes[nr].nid.addr, n->nid.addr, sizeof(n->nid.addr));
-		vnodes[nr].nid.port = n->nid.port;
-		vnodes[nr].node_idx = idx;
-		vnodes[nr].zone = n->zone;
-
+		vnodes[nr].node = n;
 		nr++;
 	}
 
@@ -311,7 +301,7 @@ static inline int nodes_to_vnodes(const struct sd_node *nodes, int nr_nodes,
 	int nr_vnodes = 0;
 
 	for (int i = 0; i < nr_nodes; i++)
-		nr_vnodes += node_to_vnodes(nodes, i, vnodes + nr_vnodes);
+		nr_vnodes += node_to_vnodes(nodes + i, vnodes + nr_vnodes);
 
 	xqsort(vnodes, nr_vnodes, vnode_cmp);
 
