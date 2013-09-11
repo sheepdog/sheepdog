@@ -58,9 +58,7 @@ static int node_info(int argc, char **argv)
 
 		sd_init_req(&req, SD_OP_STAT_SHEEP);
 
-		ret = send_light_req(&req, sd_nodes[i].nid.addr,
-				     sd_nodes[i].nid.port);
-
+		ret = send_light_req(&sd_nodes[i].nid, &req);
 		if (!ret) {
 			int ratio = (int)(((double)(rsp->node.store_size -
 						    rsp->node.store_free) /
@@ -110,7 +108,7 @@ static int get_recovery_state(struct recovery_state *state)
 	sd_init_req(&req, SD_OP_STAT_RECOVERY);
 	req.data_length = sizeof(*state);
 
-	ret = dog_exec_req(sdhost, sdport, &req, state);
+	ret = dog_exec_req(&sd_nid, &req, state);
 	if (ret < 0) {
 		sd_err("Failed to execute request");
 		return -1;
@@ -205,8 +203,7 @@ static int node_recovery(int argc, char **argv)
 		sd_init_req(&req, SD_OP_STAT_RECOVERY);
 		req.data_length = sizeof(state);
 
-		ret = dog_exec_req(sd_nodes[i].nid.addr,
-				      sd_nodes[i].nid.port, &req, &state);
+		ret = dog_exec_req(&sd_nodes[i].nid, &req, &state);
 		if (ret < 0)
 			return EXIT_SYSFAIL;
 		if (rsp->result != SD_RES_SUCCESS) {
@@ -253,8 +250,7 @@ static int node_kill(int argc, char **argv)
 
 	sd_init_req(&req, SD_OP_KILL_NODE);
 
-	ret = send_light_req(&req, sd_nodes[node_id].nid.addr,
-			     sd_nodes[node_id].nid.port);
+	ret = send_light_req(&sd_nodes[node_id].nid, &req);
 	if (ret) {
 		sd_err("Failed to execute request");
 		exit(EXIT_FAILURE);
@@ -274,7 +270,7 @@ static int node_stat(int argc, char **argv)
 again:
 	sd_init_req(&hdr, SD_OP_STAT);
 	hdr.data_length = sizeof(stat);
-	ret = dog_exec_req(sdhost, sdport, &hdr, &stat);
+	ret = dog_exec_req(&sd_nid, &hdr, &stat);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -314,7 +310,7 @@ static int node_md_info(struct node_id *nid)
 	sd_init_req(&hdr, SD_OP_MD_INFO);
 	hdr.data_length = sizeof(info);
 
-	ret = dog_exec_req(nid->addr, nid->port, &hdr, &info);
+	ret = dog_exec_req(nid, &hdr, &info);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -343,13 +339,8 @@ static int md_info(int argc, char **argv)
 
 	fprintf(stdout, "Id\tSize\tUsed\tAvail\tUse%%\tPath\n");
 
-	if (!node_cmd_data.all_nodes) {
-		struct node_id nid = {.port = sdport};
-
-		memcpy(nid.addr, sdhost, sizeof(nid.addr));
-
-		return node_md_info(&nid);
-	}
+	if (!node_cmd_data.all_nodes)
+		return node_md_info(&sd_nid);
 
 	for (i = 0; i < sd_nodes_nr; i++) {
 		fprintf(stdout, "Node %d:\n", i);
@@ -378,7 +369,7 @@ static int do_plug_unplug(char *disks, bool plug)
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = strlen(disks) + 1;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, disks);
+	ret = dog_exec_req(&sd_nid, &hdr, disks);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 

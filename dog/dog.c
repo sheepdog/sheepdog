@@ -22,9 +22,11 @@
 #define EPOLL_SIZE 4096
 
 static const char program_name[] = "dog";
-/* default sdhost is "127.0.0.1" */
-uint8_t sdhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 };
-int sdport = SD_LISTEN_PORT;
+struct node_id sd_nid = {
+	/* default sdhost is "127.0.0.1" */
+	.addr = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 },
+	.port = SD_LISTEN_PORT,
+};
 bool highlight = true;
 bool raw_output;
 bool verbose;
@@ -65,7 +67,7 @@ int update_node_list(int max_nodes)
 
 	hdr.data_length = size;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
 		goto out;
 
@@ -345,6 +347,8 @@ int main(int argc, char **argv)
 	const char *short_options;
 	char *p;
 	const struct sd_option *sd_opts;
+	uint8_t sdhost[16];
+	int sdport;
 
 	install_crash_handler(crash_handler);
 
@@ -370,6 +374,7 @@ int main(int argc, char **argv)
 				sd_err("Invalid ip address %s", optarg);
 				return EXIT_FAILURE;
 			}
+			memcpy(sd_nid.addr, sdhost, sizeof(sdhost));
 			break;
 		case 'p':
 			sdport = strtol(optarg, &p, 10);
@@ -377,6 +382,7 @@ int main(int argc, char **argv)
 				sd_err("Invalid port number '%s'", optarg);
 				exit(EXIT_USAGE);
 			}
+			sd_nid.port = sdport;
 			break;
 		case 'r':
 			raw_output = true;

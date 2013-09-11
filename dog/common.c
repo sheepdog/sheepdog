@@ -69,7 +69,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	if (direct)
 		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, data);
+	ret = dog_exec_req(&sd_nid, &hdr, data);
 	if (ret < 0) {
 		sd_err("Failed to read object %" PRIx64, oid);
 		return SD_RES_EIO;
@@ -111,7 +111,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 	hdr.obj.cow_oid = cow_oid;
 	hdr.obj.offset = offset;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, data);
+	ret = dog_exec_req(&sd_nid, &hdr, data);
 	if (ret < 0) {
 		sd_err("Failed to write object %" PRIx64, oid);
 		return SD_RES_EIO;
@@ -140,7 +140,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
 
-	ret = dog_exec_req(sdhost, sdport, &req, &vdi_inuse);
+	ret = dog_exec_req(&sd_nid, &req, &vdi_inuse);
 	if (ret < 0)
 		goto out;
 	if (rsp->result != SD_RES_SUCCESS) {
@@ -185,17 +185,12 @@ out:
 	return ret;
 }
 
-int dog_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
-		    void *buf)
+int dog_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 {
-	struct node_id nid = {};
 	struct sockfd *sfd;
 	int ret;
 
-	memcpy(nid.addr, addr, sizeof(nid.addr));
-	nid.port = port;
-
-	sfd = sockfd_cache_get(&nid);
+	sfd = sockfd_cache_get(nid);
 	if (!sfd)
 		return -1;
 
@@ -206,15 +201,15 @@ int dog_exec_req(const uint8_t *addr, int port, struct sd_req *hdr,
 	 */
 	ret = exec_req(sfd->fd, hdr, buf, NULL, 0, UINT32_MAX);
 
-	sockfd_cache_put(&nid, sfd);
+	sockfd_cache_put(nid, sfd);
 
 	return ret ? -1 : 0;
 }
 
 /* Light request only contains header, without body content. */
-int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port)
+int send_light_req(const struct node_id *nid, struct sd_req *hdr)
 {
-	int ret = dog_exec_req(addr, port, hdr, NULL);
+	int ret = dog_exec_req(nid, hdr, NULL);
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 
 	if (ret == -1)

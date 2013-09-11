@@ -92,7 +92,7 @@ read_buffer:
 	sd_init_req(&hdr, SD_OP_TRACE_READ_BUF);
 	hdr.data_length = TRACE_BUF_LEN;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -123,7 +123,7 @@ static int trace_enable(int argc, char **argv)
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = strlen(tracer) + 1;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, (void *)tracer);
+	ret = dog_exec_req(&sd_nid, &hdr, (void *)tracer);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -155,7 +155,7 @@ static int trace_disable(int argc, char **argv)
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = strlen(tracer) + 1;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, (void *)tracer);
+	ret = dog_exec_req(&sd_nid, &hdr, (void *)tracer);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -186,7 +186,7 @@ static int trace_status(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_TRACE_STATUS);
 	hdr.data_length = sizeof(buf);
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 	switch (rsp->result) {

@@ -43,7 +43,7 @@ static int list_store(void)
 	sd_init_req(&hdr, SD_OP_GET_STORE_LIST);
 	hdr.data_length = 512;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, buf);
+	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -82,7 +82,7 @@ static int cluster_format(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, &vdi_inuse);
+	ret = dog_exec_req(&sd_nid, &hdr, &vdi_inuse);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 	if (rsp->result != SD_RES_SUCCESS) {
@@ -107,7 +107,7 @@ static int cluster_format(int argc, char **argv)
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 
 	printf("using backend %s store\n", store_name);
-	ret = dog_exec_req(sdhost, sdport, &hdr, store_name);
+	ret = dog_exec_req(&sd_nid, &hdr, store_name);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -139,7 +139,7 @@ static int cluster_info(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, logs);
+	ret = dog_exec_req(&sd_nid, &hdr, logs);
 	if (ret < 0)
 		goto error;
 
@@ -195,7 +195,7 @@ static int cluster_shutdown(int argc, char **argv)
 
 	sd_init_req(&hdr, SD_OP_SHUTDOWN);
 
-	ret = send_light_req(&hdr, sdhost, sdport);
+	ret = send_light_req(&sd_nid, &hdr);
 	if (ret) {
 		sd_err("failed to execute request");
 		return EXIT_FAILURE;
@@ -384,7 +384,7 @@ static int cluster_force_recover(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_FORCE_RECOVER);
 	hdr.data_length = sizeof(nodes);
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, nodes);
+	ret = dog_exec_req(&sd_nid, &hdr, nodes);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 
@@ -404,7 +404,7 @@ static int cluster_disable_recover(int argc, char **argv)
 
 	sd_init_req(&hdr, SD_OP_DISABLE_RECOVER);
 
-	ret = send_light_req(&hdr, sdhost, sdport);
+	ret = send_light_req(&sd_nid, &hdr);
 	if (ret)
 		return EXIT_FAILURE;
 
@@ -419,7 +419,7 @@ static int cluster_enable_recover(int argc, char **argv)
 
 	sd_init_req(&hdr, SD_OP_ENABLE_RECOVER);
 
-	ret = send_light_req(&hdr, sdhost, sdport);
+	ret = send_light_req(&sd_nid, &hdr);
 	if (ret)
 		return EXIT_FAILURE;
 
@@ -467,7 +467,7 @@ static int cluster_reweight(int argc, char **argv)
 	struct sd_req hdr;
 
 	sd_init_req(&hdr, SD_OP_REWEIGHT);
-	ret = send_light_req(&hdr, sdhost, sdport);
+	ret = send_light_req(&sd_nid, &hdr);
 	if (ret)
 		return EXIT_FAILURE;
 	return EXIT_SUCCESS;
