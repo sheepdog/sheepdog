@@ -26,7 +26,7 @@ sbin_PROGRAMS		= sheepfs
 sheepfs_SOURCES		= core.c cluster.c vdi.c shadow_file.c volume.c node.c \
 			  config.c
 
-sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS)
+sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS) -lpthread
 sheepfs_DEPENDENCIES	= ../lib/libsheepdog.a
 
 noinst_HEADERS		= sheepfs.h
