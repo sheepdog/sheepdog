@@ -175,4 +175,14 @@ static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
 		     ({ pos =  rb_entry(__pos, typeof(*pos), member); 1; }); \
 	     __pos = __n)
 
+/* Destroy the tree and free the memory */
+#define rb_destroy(root, type, member)                                  \
+{                                                                       \
+        type *__dummy;                                                  \
+        rb_for_each_entry(__dummy, root, member) {                      \
+                rb_erase(&__dummy->member, root);                       \
+                free(__dummy);                                          \
+        }                                                               \
+}
+
 #endif /* __RBTREE_H_ */

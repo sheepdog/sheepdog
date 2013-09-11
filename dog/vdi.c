@@ -926,7 +926,6 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = nr_logs - 1; i >= 0; i--) {
 		struct rb_root vroot = RB_ROOT;
-		struct sd_vnode *v;
 
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
 		       oid, logs[i].epoch, nr_copies);
@@ -951,10 +950,7 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 
 			printf("%s\n", addr_to_str(n->addr, n->port));
 		}
-		rb_for_each_entry(v, &vroot, rb) {
-			rb_erase(&v->rb, &vroot);
-			free(v);
-		}
+		rb_destroy(&vroot, struct sd_vnode, rb);
 	}
 
 	free(logs);

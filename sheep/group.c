@@ -102,11 +102,7 @@ void put_vnode_info(struct vnode_info *vnode_info)
 {
 	if (vnode_info) {
 		if (refcount_dec(&vnode_info->refcnt) == 0) {
-			struct sd_vnode *v;
-			rb_for_each_entry(v, &vnode_info->vroot, rb) {
-				rb_erase(&v->rb, &vnode_info->vroot);
-				free(v);
-			}
+			rb_destroy(&vnode_info->vroot, struct sd_vnode, rb);
 			free(vnode_info);
 		}
 	}
