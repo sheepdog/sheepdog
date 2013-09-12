@@ -37,6 +37,6 @@ sleep 1
 if [ "`grep fallback $STORE/0/sheep.log`" ];then
 	echo fallback done
 fi
-$DOG vdi check test
+$DOG vdi check test 2> /dev/null
 
 status=0
