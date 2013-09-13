@@ -369,8 +369,13 @@ int main(int argc, char **argv)
 		fprintf(stderr, "%m\n");
 		exit(1);
 	}
+	if (!is_xattr_enabled(cwd)) {
+		fprintf(stderr, "%s doesn't support xattr\n", cwd);
+		exit(1);
+	}
 	strbuf_addf(&path, "%s/%s", cwd, ".sheepfs");
 	free(cwd);
+
 	memcpy(sheepfs_shadow, path.buf, path.len);
 	if (xmkdir(sheepfs_shadow, 0755) < 0) {
 		fprintf(stderr, "%m\n");
