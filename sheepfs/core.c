@@ -35,7 +35,7 @@ char sheepfs_shadow[PATH_MAX];
 static int sheepfs_debug;
 static int sheepfs_fg;
 int sheepfs_page_cache;
-int sheepfs_object_cache = true;
+int sheepfs_object_cache;
 char sdhost[32] = "127.0.0.1";
 int sdport = SD_LISTEN_PORT;
 
@@ -45,7 +45,7 @@ static struct option const long_options[] = {
 	{"help", no_argument, NULL, 'h'},
 	{"foreground", no_argument, NULL, 'f'},
 	{"pagecache", no_argument, NULL, 'k'},
-	{"noobjectcache", no_argument, NULL, 'n'},
+	{"objectcache", no_argument, NULL, 'o'},
 	{"port", required_argument, NULL, 'p'},
 	{NULL, 0, NULL, 0},
 };
@@ -300,11 +300,11 @@ static void usage(int inval)
 		printf("\
 Usage: sheepfs [OPTION]... MOUNTPOINT\n\
 Options:\n\
-  -a, --address           specify the sheep address (default: localhost)\n\
+  -a, --address           specify the sheep address (default: 127.0.0.1)\n\
   -d, --debug             enable debug output (implies -f)\n\
   -f, --foreground        sheepfs run in the foreground\n\
   -k, --pagecache         use local kernel's page cache to access volume\n\
-  -n, --noobjectcache     disable object cache of the attached volumes\n\
+  -o, --objectcache       enable object cache of the connected sheep daemon\n\
   -p, --port              specify the sheep port (default: 7000)\n\
   -h, --help              display this help and exit\n\
 ");
@@ -336,8 +336,8 @@ int main(int argc, char **argv)
 		case 'k':
 			sheepfs_page_cache = true;
 			break;
-		case 'n':
-			sheepfs_object_cache = false;
+		case 'o':
+			sheepfs_object_cache = true;
 			break;
 		case 'p':
 			sdport = strtol(optarg, NULL, 10);
