@@ -339,9 +339,6 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 			continue;
 		}
 
-		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
-				   size);
-
 		cb_ret = func(addr_to_str(n->nid.addr, n->nid.port),
 			      oid, rsp, buf, data);
 		if (cb_ret)
@@ -1363,8 +1360,6 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
-		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
-				   size);
 		break;
 	case SD_RES_NO_OBJ:
 		free(buf);

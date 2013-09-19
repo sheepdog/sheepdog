@@ -82,14 +82,6 @@ int gateway_read_obj(struct request *req)
 		break;
 	}
 out:
-	if (ret == SD_RES_SUCCESS &&
-	    req->rq.proto_ver < SD_PROTO_VER_TRIM_ZERO_SECTORS) {
-		/* the client doesn't support trimming zero bytes */
-		untrim_zero_blocks(req->data, req->rp.obj.offset,
-				   req->rp.data_length, req->rq.data_length);
-		req->rp.data_length = req->rq.data_length;
-		req->rp.obj.offset = 0;
-	}
 	return ret;
 }
 

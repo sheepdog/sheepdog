@@ -389,7 +389,6 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 			uint64_t offset)
 {
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
 
 	sd_init_req(&hdr, SD_OP_READ_OBJ);
@@ -402,9 +401,6 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 	if (ret != SD_RES_SUCCESS)
 		sd_err("failed to read object %" PRIx64 ", %s", oid,
 		       sd_strerror(ret));
-
-	untrim_zero_blocks(data, rsp->obj.offset, rsp->data_length, datalen);
-
 	return ret;
 }
 
