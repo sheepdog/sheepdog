@@ -633,6 +633,7 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 
 	if (node_is_local(joined))
 		sockfd_cache_add_group(nroot);
+	sockfd_cache_add(&joined->nid);
 
 	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info, alloc_vnode_info(nroot));
@@ -665,8 +666,6 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 	}
 
 	put_vnode_info(old_vnode_info);
-
-	sockfd_cache_add(&joined->nid);
 }
 
 /*
