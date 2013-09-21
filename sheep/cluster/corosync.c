@@ -20,6 +20,7 @@
 #include "work.h"
 
 #define CPG_INIT_RETRY_CNT 10
+#define COROSYNC_MAX_NODES 1024
 
 struct cpg_node {
 	uint32_t nodeid;
@@ -36,7 +37,7 @@ static struct cpg_node this_node;
 static LIST_HEAD(corosync_block_event_list);
 static LIST_HEAD(corosync_nonblock_event_list);
 
-static struct cpg_node cpg_nodes[SD_MAX_NODES];
+static struct cpg_node cpg_nodes[COROSYNC_MAX_NODES];
 static size_t nr_cpg_nodes;
 static bool self_elect;
 static bool join_finished;
@@ -72,7 +73,7 @@ struct corosync_event {
 	size_t msg_len;
 
 	uint32_t nr_nodes;
-	struct cpg_node nodes[SD_MAX_NODES];
+	struct cpg_node nodes[COROSYNC_MAX_NODES];
 
 	bool callbacked;
 
@@ -84,7 +85,7 @@ struct corosync_message {
 	enum corosync_message_type type:16;
 	uint16_t nr_nodes;
 	uint32_t msg_len;
-	struct cpg_node nodes[SD_MAX_NODES];
+	struct cpg_node nodes[COROSYNC_MAX_NODES];
 	uint8_t msg[0];
 };
 
@@ -543,9 +544,9 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 {
 	struct corosync_event *cevent;
 	int i;
-	struct cpg_node member_sheep[SD_MAX_NODES];
-	struct cpg_node joined_sheep[SD_MAX_NODES];
-	struct cpg_node left_sheep[SD_MAX_NODES];
+	struct cpg_node member_sheep[COROSYNC_MAX_NODES];
+	struct cpg_node joined_sheep[COROSYNC_MAX_NODES];
+	struct cpg_node left_sheep[COROSYNC_MAX_NODES];
 	bool promote = true;
 
 	sd_debug("mem:%zu, joined:%zu, left:%zu", member_list_entries,

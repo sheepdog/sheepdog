@@ -24,6 +24,7 @@
 
 #define MAX_EVENTS 500
 #define PROCESS_CHECK_INTERVAL 50 /* ms */
+#define LOCAL_MAX_NODES 1024
 
 static const char *shmfile = "/tmp/sheepdog_shm";
 static int shmfd;
@@ -80,7 +81,7 @@ struct local_event {
 	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
 
 	size_t nr_lnodes; /* the number of sheep processes */
-	struct local_node lnodes[SD_MAX_NODES];
+	struct local_node lnodes[LOCAL_MAX_NODES];
 };
 
 /* shared memory queue */
@@ -182,7 +183,7 @@ static void shm_queue_notify(void)
 {
 	int i;
 	size_t nr;
-	struct local_node lnodes[SD_MAX_NODES];
+	struct local_node lnodes[LOCAL_MAX_NODES];
 
 	nr = get_nodes(lnodes);
 
@@ -196,7 +197,7 @@ static bool is_shm_queue_valid(void)
 {
 	int i;
 	size_t nr;
-	struct local_node lnodes[SD_MAX_NODES];
+	struct local_node lnodes[LOCAL_MAX_NODES];
 
 	nr = get_nodes(lnodes);
 
@@ -311,7 +312,7 @@ static void check_pids(void *arg)
 {
 	int i;
 	size_t nr;
-	struct local_node lnodes[SD_MAX_NODES];
+	struct local_node lnodes[LOCAL_MAX_NODES];
 	struct local_event *ev;
 
 	shm_queue_lock();
