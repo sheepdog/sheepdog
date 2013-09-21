@@ -846,12 +846,17 @@ static bool cluster_join_check(const struct cluster_info *cinfo)
 	if (!cluster_ctime_check(cinfo))
 		return false;
 
-	if (cinfo->epoch == sys->cinfo.epoch &&
-	    memcmp(cinfo->nodes, sys->cinfo.nodes,
-		   sizeof(cinfo->nodes[0]) * cinfo->nr_nodes) != 0) {
-		sd_alert("epoch log entries does not match");
-		return false;
-	}
+	/*
+	 * Sheepdog's recovery code assumes every node have the same epoch
+	 * history. But we don't check epoch history of joining node because:
+	 * 1. inconsist epoch history only happens in the network partition case
+	 *    for the corosync driver, but corosync driver will panic for such
+	 *    case to prevent epoch inconsistency.
+	 * 2. checking epoch history with joining node is too expensive and is
+	 *    unneeded for zookeeper driver.
+	 *
+	 * That said, we don't check epoch history at all.
+	 */
 
 	return true;
 }
@@ -863,7 +868,7 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 	int i;
 	const struct cluster_info *cinfo = opaque;
 
-	if (!cluster_join_check(cinfo)) {
+	if (node_is_local(joined) && !cluster_join_check(cinfo)) {
 		sd_err("failed to join Sheepdog");
 		exit(1);
 	}
