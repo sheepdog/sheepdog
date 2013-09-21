@@ -185,4 +185,15 @@ static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
         }                                                               \
 }
 
+/* Copy the tree 'root' as 'outroot' */
+#define rb_copy(root, type, member, outroot, compar)                    \
+{                                                                       \
+        type *__p, *__n3;                                               \
+        rb_for_each_entry(__p, root, member) {                          \
+                __n3 = xmalloc(sizeof(*__n3));                          \
+                *__n3 = *__p;                                           \
+                rb_insert(outroot, __n3, member, compar);               \
+        }                                                               \
+}
+
 #endif /* __RBTREE_H_ */
