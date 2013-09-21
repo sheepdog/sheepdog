@@ -28,7 +28,16 @@
 #define SD_DEFAULT_COPIES 3
 #define SD_MAX_COPIES 8
 
-#define SD_MAX_NODES 1024
+/*
+ * The max number of nodes sheep daemon can support is constrained by
+ * the number of nodes in the struct cluster_info, but the actual max
+ * number is determined by the cluster driver because we have to pass
+ * sys->cinfo around the cluster to handle membership management.
+ *
+ * Currently, only zookeeper driver support SD_MAX_NODES nodes because
+ * its message buffer size is large enough to hold nodes[SD_MAX_NODES].
+ */
+#define SD_MAX_NODES 6144
 #define SD_DEFAULT_VNODES 128
 
 /*
@@ -150,7 +159,7 @@ struct cluster_info {
 	uint32_t __pad;
 	uint8_t store[STORE_LEN];
 
-	/* node list at cluster_info->epoch */
+	/* Node list at cluster_info->epoch */
 	struct sd_node nodes[SD_MAX_NODES];
 };
 

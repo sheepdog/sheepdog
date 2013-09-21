@@ -410,6 +410,18 @@ static bool enough_nodes_gathered(struct cluster_info *cinfo,
 	return true;
 }
 
+/*
+ * We have to use memcpy beause some cluster drivers like corosync can't support
+ * to send the whole cluster_info structure.
+ */
+static void cluster_info_copy(struct cluster_info *dst,
+			      const struct cluster_info *src)
+{
+	int len = offsetof(struct cluster_info, nodes) +
+		src->nr_nodes * sizeof(struct sd_node);
+	memcpy(dst, src, len);
+}
+
 static enum sd_status cluster_wait_check(const struct sd_node *joining,
 					 const struct rb_root *nroot,
 					 size_t nr_nodes,
@@ -423,7 +435,7 @@ static enum sd_status cluster_wait_check(const struct sd_node *joining,
 	if (cinfo->epoch > sys->cinfo.epoch) {
 		sd_debug("joining node has a larger epoch, %" PRIu32 ", %"
 			 PRIu32, cinfo->epoch, sys->cinfo.epoch);
-		sys->cinfo = *cinfo;
+		cluster_info_copy(&sys->cinfo, cinfo);
 	}
 
 	/*
@@ -746,7 +758,7 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 	else
 		status = sys->cinfo.status;
 
-	*cinfo = sys->cinfo;
+	cluster_info_copy(cinfo, &sys->cinfo);
 	cinfo->status = status;
 	cinfo->proto_ver = SD_SHEEP_PROTO_VER;
 
@@ -760,9 +772,11 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 static int send_join_request(void)
 {
 	struct sd_node *n = &sys->this_node;
+	int len = offsetof(struct cluster_info, nodes) +
+		sys->cinfo.nr_nodes * sizeof(struct sd_node);
 
 	sd_info("%s", node_to_str(n));
-	return sys->cdrv->join(n, &sys->cinfo, sizeof(sys->cinfo));
+	return sys->cdrv->join(n, &sys->cinfo, len);
 }
 
 static void requeue_cluster_request(void)
@@ -879,7 +893,7 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 		exit(1);
 	}
 
-	sys->cinfo = *cinfo;
+	cluster_info_copy(&sys->cinfo, cinfo);
 
 	sd_debug("join %s", node_to_str(joined));
 	rb_for_each_entry(n, nroot, rb) {

@@ -554,19 +554,25 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 /*
  * We placehold the enough space to piggyback the nodes information on join
  * response message so that every node can see the same membership view.
+ *
+ * We have to preallocate enough space and set msg_len as
+ * sizeof(struct cluster_info) because of piggyback.
  */
-static int add_join_event(void *msg, size_t msg_len)
+static int add_join_event(void *msg, size_t msglen)
 {
 	struct zk_event ev;
+	size_t msg_len = sizeof(struct cluster_info);
 	size_t len = msg_len + sizeof(struct sd_node) * SD_MAX_NODES;
 
+	if (unlikely((offsetof(struct zk_event, buf) + len) > ZK_MAX_BUF_SIZE))
+		panic("Zookeeper can't send message more than 1M");
 	ev.id = get_uniq_id();
 	ev.type = EVENT_JOIN;
 	ev.sender = this_node;
 	ev.msg_len = msg_len;
 	ev.buf_len = len;
 	if (msg)
-		memcpy(ev.buf, msg, msg_len);
+		memcpy(ev.buf, msg, msglen);
 	return zk_queue_push(&ev);
 }
 
