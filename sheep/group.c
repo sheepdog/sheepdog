@@ -183,10 +183,8 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 			sizeof(struct sd_node) * nr_nodes);
 		rsp->data_length = nr_nodes * sizeof(struct sd_node);
 		rsp->node.nr_nodes = nr_nodes;
-		rsp->node.local_idx = get_node_idx(cur_vinfo, &sys->this_node);
 	} else {
 		rsp->node.nr_nodes = 0;
-		rsp->node.local_idx = 0;
 	}
 
 	return SD_RES_SUCCESS;
