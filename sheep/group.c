@@ -757,11 +757,12 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 	return true;
 }
 
-static int send_join_request(struct sd_node *ent)
+static int send_join_request(void)
 {
-	sd_info("%s", node_to_str(&sys->this_node));
+	struct sd_node *n = &sys->this_node;
 
-	return sys->cdrv->join(ent, &sys->cinfo, sizeof(sys->cinfo));
+	sd_info("%s", node_to_str(n));
+	return sys->cdrv->join(n, &sys->cinfo, sizeof(sys->cinfo));
 }
 
 static void requeue_cluster_request(void)
@@ -834,7 +835,7 @@ main_fn int sd_reconnect_handler(void)
 	sys->cinfo.status = SD_STATUS_WAIT;
 	if (sys->cdrv->init(sys->cdrv_option) != 0)
 		return -1;
-	if (send_join_request(&sys->this_node) != 0)
+	if (send_join_request() != 0)
 		return -1;
 	requeue_cluster_request();
 	return 0;
@@ -1012,7 +1013,7 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	INIT_LIST_HEAD(&sys->local_req_queue);
 	INIT_LIST_HEAD(&sys->req_wait_queue);
 
-	ret = send_join_request(&sys->this_node);
+	ret = send_join_request();
 	if (ret != 0)
 		return -1;
 
