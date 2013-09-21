@@ -1,12 +1,13 @@
 #ifndef __RBTREE_H_
 #define __RBTREE_H_
 
+/* We have to be 64-bytes aligned to get 32/64 bits compatibility */
 struct rb_node {
-	unsigned long  rb_parent_color;
+	unsigned long  rb_parent_color __attribute__ ((aligned (8)));
 #define RB_RED          0
 #define RB_BLACK        1
-	struct rb_node *rb_right;
-	struct rb_node *rb_left;
+	struct rb_node *rb_right __attribute__ ((aligned (8)));
+	struct rb_node *rb_left __attribute__ ((aligned (8)));
 };
 
 struct rb_root {
