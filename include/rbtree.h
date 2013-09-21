@@ -164,16 +164,16 @@ static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
 /* Iterate over a rbtree safe against removal of rbnode */
 #define rb_for_each(pos, root)					\
 	pos = rb_first(root);					\
-	for (struct rb_node *__n = rb_next(pos);		\
-	     pos && ({ __n = rb_next(pos); 1; });		\
-	     pos = __n)
+	for (struct rb_node *__n1 = rb_next(pos);		\
+	     pos && ({ __n1 = rb_next(pos); 1; });		\
+	     pos = __n1)
 
 /* Iterate over a rbtree of given type safe against removal of rbnode */
 #define rb_for_each_entry(pos, root, member)				\
-	for (struct rb_node *__pos = rb_first(root), *__n;		\
-	     __pos && ({ __n = rb_next(__pos); 1; }) &&			\
+	for (struct rb_node *__pos = rb_first(root), *__n2;		\
+	     __pos && ({ __n2 = rb_next(__pos); 1; }) &&		\
 		     ({ pos =  rb_entry(__pos, typeof(*pos), member); 1; }); \
-	     __pos = __n)
+	     __pos = __n2)
 
 /* Destroy the tree and free the memory */
 #define rb_destroy(root, type, member)                                  \
