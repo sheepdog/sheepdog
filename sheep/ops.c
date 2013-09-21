@@ -512,15 +512,14 @@ static int cluster_force_recover_work(struct request *req)
 	}
 
 	if (req->rq.data_length <
-	    sizeof(*old_vnode_info->nodes) * old_vnode_info->nr_nodes) {
+	    sizeof(struct sd_node) * old_vnode_info->nr_nodes) {
 		sd_err("too small buffer size, %d", req->rq.data_length);
 		return SD_RES_INVALID_PARMS;
 	}
 
 	req->rp.epoch = epoch;
-	req->rp.data_length = sizeof(*old_vnode_info->nodes) *
-		old_vnode_info->nr_nodes;
-	memcpy(req->data, old_vnode_info->nodes, req->rp.data_length);
+	req->rp.data_length = sizeof(struct sd_node) * old_vnode_info->nr_nodes;
+	nodes_to_buffer(&old_vnode_info->nroot, req->data);
 
 	put_vnode_info(old_vnode_info);
 
@@ -535,6 +534,7 @@ static int cluster_force_recover_main(const struct sd_req *req,
 	int ret = SD_RES_SUCCESS;
 	struct sd_node *nodes = data;
 	size_t nr_nodes = rsp->data_length / sizeof(*nodes);
+	struct rb_root nroot = RB_ROOT;
 
 	if (rsp->epoch != sys->cinfo.epoch) {
 		sd_err("epoch was incremented while cluster_force_recover");
@@ -553,8 +553,11 @@ static int cluster_force_recover_main(const struct sd_req *req,
 
 	sys->cinfo.status = SD_STATUS_OK;
 
+	for (int i = 0; i < nr_nodes; i++)
+		rb_insert(&nroot, &nodes[i], rb, node_cmp);
+
 	vnode_info = get_vnode_info();
-	old_vnode_info = alloc_vnode_info(nodes, nr_nodes);
+	old_vnode_info = alloc_vnode_info(&nroot);
 	start_recovery(vnode_info, old_vnode_info, true);
 	put_vnode_info(vnode_info);
 	put_vnode_info(old_vnode_info);
@@ -654,7 +657,8 @@ static int cluster_recovery_completion(const struct sd_req *req,
 
 	if (vnode_info->nr_nodes == nr_recovereds) {
 		for (i = 0; i < nr_recovereds; ++i) {
-			if (!node_eq(vnode_info->nodes + i, recovereds + i))
+			if (!rb_search(&vnode_info->nroot, &recovereds[i],
+				       rb, node_cmp))
 				break;
 		}
 		if (i == nr_recovereds) {

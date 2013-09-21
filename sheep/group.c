@@ -20,8 +20,7 @@ struct get_vdis_work {
 	struct work work;
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	struct sd_node joined;
-	size_t nr_members;
-	struct sd_node members[];
+	struct rb_root nroot;
 };
 
 static pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -32,41 +31,33 @@ static main_thread(struct vnode_info *) current_vnode_info;
 static main_thread(struct list_head *) pending_block_list;
 static main_thread(struct list_head *) pending_notify_list;
 
-static int get_zones_nr_from(const struct sd_node *nodes, int nr_nodes)
+static int get_zones_nr_from(struct rb_root *nroot)
 {
-	int nr_zones = 0, i, j;
+	int nr_zones = 0, j;
 	uint32_t zones[SD_MAX_COPIES];
+	struct sd_node *n;
 
-	for (i = 0; i < nr_nodes; i++) {
+	rb_for_each_entry(n, nroot, rb) {
 		/*
 		 * Only count zones that actually store data, pure gateways
 		 * don't contribute to the redundancy level.
 		 */
-		if (!nodes[i].nr_vnodes)
+		if (!n->nr_vnodes)
 			continue;
 
 		for (j = 0; j < nr_zones; j++) {
-			if (nodes[i].zone == zones[j])
+			if (n->zone == zones[j])
 				break;
 		}
 
 		if (j == nr_zones) {
-			zones[nr_zones] = nodes[i].zone;
+			zones[nr_zones] = n->zone;
 			if (++nr_zones == ARRAY_SIZE(zones))
 				break;
 		}
 	}
 
 	return nr_zones;
-}
-
-static int get_node_idx(struct vnode_info *vnode_info, struct sd_node *ent)
-{
-	ent = xbsearch(ent, vnode_info->nodes, vnode_info->nr_nodes, node_cmp);
-	if (!ent)
-		return -1;
-
-	return ent - vnode_info->nodes;
 }
 
 /*
@@ -103,20 +94,22 @@ void put_vnode_info(struct vnode_info *vnode_info)
 	if (vnode_info) {
 		if (refcount_dec(&vnode_info->refcnt) == 0) {
 			rb_destroy(&vnode_info->vroot, struct sd_vnode, rb);
+			rb_destroy(&vnode_info->nroot, struct sd_node, rb);
 			free(vnode_info);
 		}
 	}
 }
 
-static void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
+static void recalculate_vnodes(struct rb_root *nroot)
 {
-	int i, nr_non_gateway_nodes = 0;
+	int nr_non_gateway_nodes = 0;
 	uint64_t avg_size = 0;
+	struct sd_node *n;
 	float factor;
 
-	for (i = 0; i < nr_nodes; i++) {
-		if (nodes[i].space) {
-			avg_size += nodes[i].space;
+	rb_for_each_entry(n, nroot, rb) {
+		if (n->space) {
+			avg_size += n->space;
 			nr_non_gateway_nodes++;
 		}
 	}
@@ -126,30 +119,35 @@ static void recalculate_vnodes(struct sd_node *nodes, int nr_nodes)
 
 	avg_size /= nr_non_gateway_nodes;
 
-	for (i = 0; i < nr_nodes; i++) {
-		factor = (float)nodes[i].space / (float)avg_size;
-		nodes[i].nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
-		sd_debug("node %d has %d vnodes, free space %" PRIu64,
-			 nodes[i].nid.port, nodes[i].nr_vnodes, nodes[i].space);
+	rb_for_each_entry(n, nroot, rb) {
+		factor = (float)n->space / (float)avg_size;
+		n->nr_vnodes = rintf(SD_DEFAULT_VNODES * factor);
+		sd_debug("node %s has %d vnodes, free space %" PRIu64,
+			 node_to_str(n), n->nr_vnodes, n->space);
 	}
 }
 
-struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
-				    size_t nr_nodes)
+struct vnode_info *alloc_vnode_info(const struct rb_root *nroot)
 {
 	struct vnode_info *vnode_info;
+	struct sd_node *n;
 
 	vnode_info = xzalloc(sizeof(*vnode_info));
 
 	INIT_RB_ROOT(&vnode_info->vroot);
-	vnode_info->nr_nodes = nr_nodes;
-	memcpy(vnode_info->nodes, nodes, sizeof(*nodes) * nr_nodes);
-	xqsort(vnode_info->nodes, nr_nodes, node_cmp);
+	INIT_RB_ROOT(&vnode_info->nroot);
+	rb_for_each_entry(n, nroot, rb) {
+		struct sd_node *new = xmalloc(sizeof(*new));
+		*new = *n;
+		if (unlikely(rb_insert(&vnode_info->nroot, new, rb, node_cmp)))
+			panic("node hash collision");
+		vnode_info->nr_nodes++;
+	}
 
-	recalculate_vnodes(vnode_info->nodes, nr_nodes);
+	recalculate_vnodes(&vnode_info->nroot);
 
-	nodes_to_vnodes(vnode_info->nodes, nr_nodes, &vnode_info->vroot);
-	vnode_info->nr_zones = get_zones_nr_from(nodes, nr_nodes);
+	nodes_to_vnodes(&vnode_info->nroot, &vnode_info->vroot);
+	vnode_info->nr_zones = get_zones_nr_from(&vnode_info->nroot);
 	refcount_set(&vnode_info->refcnt, 1);
 	return vnode_info;
 }
@@ -158,6 +156,7 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 					struct vnode_info *cur_vinfo)
 {
 	struct sd_node nodes[SD_MAX_NODES];
+	struct rb_root nroot = RB_ROOT;
 	int nr_nodes;
 
 	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
@@ -167,20 +166,21 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 		if (nr_nodes == 0)
 			return NULL;
 	}
+	for (int i = 0; i < nr_nodes; i++)
+		rb_insert(&nroot, &nodes[i], rb, node_cmp);
 
-	return alloc_vnode_info(nodes, nr_nodes);
+	return alloc_vnode_info(&nroot);
 }
 
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
-			       void *data)
+			void *data)
 {
 	int nr_nodes;
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
 
 	if (cur_vinfo) {
 		nr_nodes = cur_vinfo->nr_nodes;
-		memcpy(data, cur_vinfo->nodes,
-			sizeof(struct sd_node) * nr_nodes);
+		nodes_to_buffer(&cur_vinfo->nroot, data);
 		rsp->data_length = nr_nodes * sizeof(struct sd_node);
 		rsp->node.nr_nodes = nr_nodes;
 	} else {
@@ -335,14 +335,13 @@ error:
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 			  time_t *timestamp, struct vnode_info *vinfo)
 {
-	int i, nr, ret;
 	char buf[SD_MAX_NODES * sizeof(struct sd_node) + sizeof(time_t)];
+	const struct sd_node *node;
+	int ret;
 
-	nr = vinfo->nr_nodes;
-	for (i = 0; i < nr; i++) {
+	rb_for_each_entry(node, &vinfo->nroot, rb) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		const struct sd_node *node = vinfo->nodes + i;
 		int nodes_len;
 
 		if (node_is_local(node))
@@ -393,13 +392,13 @@ static bool cluster_ctime_check(const struct cluster_info *cinfo)
  */
 static bool enough_nodes_gathered(struct cluster_info *cinfo,
 				  const struct sd_node *joining,
-				  const struct sd_node *nodes,
+				  const struct rb_root *nroot,
 				  size_t nr_nodes)
 {
 	for (int i = 0; i < cinfo->nr_nodes; i++) {
 		const struct sd_node *key = cinfo->nodes + i, *n;
 
-		n = xlfind(key, nodes, nr_nodes, node_cmp);
+		n = rb_search(nroot, key, rb, node_cmp);
 		if (n == NULL && !node_eq(key, joining)) {
 			sd_debug("%s doesn't join yet", node_to_str(key));
 			return false;
@@ -412,7 +411,7 @@ static bool enough_nodes_gathered(struct cluster_info *cinfo,
 }
 
 static enum sd_status cluster_wait_check(const struct sd_node *joining,
-					 const struct sd_node *nodes,
+					 const struct rb_root *nroot,
 					 size_t nr_nodes,
 					 struct cluster_info *cinfo)
 {
@@ -432,7 +431,7 @@ static enum sd_status cluster_wait_check(const struct sd_node *joining,
 	 * node list, we can set the cluster live now.
 	 */
 	if (sys->cinfo.epoch > 0 &&
-	    enough_nodes_gathered(&sys->cinfo, joining, nodes, nr_nodes))
+	    enough_nodes_gathered(&sys->cinfo, joining, nroot, nr_nodes))
 		return SD_STATUS_OK;
 
 	return sys->cinfo.status;
@@ -473,7 +472,8 @@ static void do_get_vdis(struct work *work)
 {
 	struct get_vdis_work *w =
 		container_of(work, struct get_vdis_work, work);
-	int i, ret;
+	struct sd_node *n;
+	int ret;
 
 	if (!node_is_local(&w->joined)) {
 		sd_debug("try to get vdi bitmap from %s",
@@ -485,18 +485,17 @@ static void do_get_vdis(struct work *work)
 		return;
 	}
 
-	for (i = 0; i < w->nr_members; i++) {
+	rb_for_each_entry(n, &w->nroot, rb) {
 		/* We should not fetch vdi_bitmap and copy list from myself */
-		if (node_is_local(&w->members[i]))
+		if (node_is_local(n))
 			continue;
 
-		sd_debug("try to get vdi bitmap from %s",
-			 node_to_str(&w->members[i]));
-		ret = get_vdis_from(&w->members[i]);
+		sd_debug("try to get vdi bitmap from %s", node_to_str(n));
+		ret = get_vdis_from(n);
 		if (ret != SD_RES_SUCCESS) {
 			/* try to read from another node */
 			sd_alert("failed to get vdi bitmap from %s",
-				 node_to_str(&w->members[i]));
+				 node_to_str(n));
 			continue;
 		}
 
@@ -518,6 +517,7 @@ static void get_vdis_done(struct work *work)
 	pthread_cond_broadcast(&wait_vdis_cond);
 	pthread_mutex_unlock(&wait_vdis_lock);
 
+	rb_destroy(&w->nroot, struct sd_node, rb);
 	free(w);
 }
 
@@ -528,8 +528,7 @@ int inc_and_log_epoch(void)
 	if (cur_vinfo) {
 		/* update cluster info to the latest state */
 		sys->cinfo.nr_nodes = cur_vinfo->nr_nodes;
-		memcpy(sys->cinfo.nodes, cur_vinfo->nodes,
-		       sizeof(cur_vinfo->nodes[0]) * cur_vinfo->nr_nodes);
+		nodes_to_buffer(&cur_vinfo->nroot, sys->cinfo.nodes);
 	} else
 		sys->cinfo.nr_nodes = 0;
 
@@ -540,16 +539,28 @@ int inc_and_log_epoch(void)
 }
 
 static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
-					       const struct sd_node *nodes,
-					       size_t nr_nodes)
+					       const struct rb_root *nroot)
 {
-	struct sd_node old_nodes[SD_MAX_NODES];
+	struct rb_root old_root = RB_ROOT;
+	struct sd_node *n;
+	struct vnode_info *old;
 
 	/* exclude the newly added one */
-	memcpy(old_nodes, nodes, sizeof(*nodes) * nr_nodes);
-	xlremove(joined, old_nodes, &nr_nodes, node_cmp);
+	rb_for_each_entry(n, nroot, rb) {
+		struct sd_node *new = xmalloc(sizeof(*new));
 
-	return alloc_vnode_info(old_nodes, nr_nodes);
+		*new = *n;
+		if (node_eq(joined, new)) {
+			free(new);
+			continue;
+		}
+		if (rb_insert(&old_root, new, rb, node_cmp))
+			panic("node hash collision");
+	}
+
+	old = alloc_vnode_info(&old_root);
+	rb_destroy(&old_root, struct sd_node, rb);
+	return old;
 }
 
 static void setup_backend_store(const struct cluster_info *cinfo)
@@ -581,17 +592,14 @@ static void setup_backend_store(const struct cluster_info *cinfo)
 	}
 }
 
-static void get_vdis(const struct sd_node *nodes, size_t nr_nodes,
-		     const struct sd_node *joined)
+static void get_vdis(const struct rb_root *nroot, const struct sd_node *joined)
 {
-	int array_len = nr_nodes * sizeof(struct sd_node);
 	struct get_vdis_work *w;
 
-	w = xmalloc(sizeof(*w) + array_len);
+	w = xmalloc(sizeof(*w));
 	w->joined = *joined;
-	w->nr_members = nr_nodes;
-	memcpy(w->members, nodes, array_len);
-
+	INIT_RB_ROOT(&w->nroot);
+	rb_copy(nroot, struct sd_node, rb, &w->nroot, node_cmp);
 	refcount_inc(&nr_get_vdis_works);
 
 	w->work.fn = do_get_vdis;
@@ -613,7 +621,7 @@ void wait_get_vdis_done(void)
 
 static void update_cluster_info(const struct cluster_info *cinfo,
 				const struct sd_node *joined,
-				const struct sd_node *nodes,
+				const struct rb_root *nroot,
 				size_t nr_nodes)
 {
 	struct vnode_info *old_vnode_info;
@@ -624,13 +632,12 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 		setup_backend_store(cinfo);
 
 	if (node_is_local(joined))
-		sockfd_cache_add_group(nodes, nr_nodes);
+		sockfd_cache_add_group(nroot);
 
 	old_vnode_info = main_thread_get(current_vnode_info);
-	main_thread_set(current_vnode_info,
-			  alloc_vnode_info(nodes, nr_nodes));
+	main_thread_set(current_vnode_info, alloc_vnode_info(nroot));
 
-	get_vdis(nodes, nr_nodes, joined);
+	get_vdis(nroot, joined);
 
 	if (cinfo->status == SD_STATUS_OK) {
 		if (!is_cluster_formatted())
@@ -643,10 +650,9 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 				panic("cannot log current epoch %d",
 				      sys->cinfo.epoch);
 
-			if (!old_vnode_info) {
+			if (!old_vnode_info)
 				old_vnode_info = alloc_old_vnode_info(joined,
-						nodes, nr_nodes);
-			}
+								      nroot);
 
 			start_recovery(main_thread_get(current_vnode_info),
 				       old_vnode_info, true);
@@ -718,7 +724,7 @@ main_fn void sd_notify_handler(const struct sd_node *sender, void *data,
  * cluster must call this function and succeed in accept of the joining node.
  */
 main_fn bool sd_join_handler(const struct sd_node *joining,
-			     const struct sd_node *nodes, size_t nr_nodes,
+			     const struct rb_root *nroot, size_t nr_nodes,
 			     void *opaque)
 {
 	struct cluster_info *cinfo = opaque;
@@ -737,7 +743,7 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 	sd_debug("check %s, %d", node_to_str(joining), sys->cinfo.status);
 
 	if (sys->cinfo.status == SD_STATUS_WAIT)
-		status = cluster_wait_check(joining, nodes, nr_nodes, cinfo);
+		status = cluster_wait_check(joining, nroot, nr_nodes, cinfo);
 	else
 		status = sys->cinfo.status;
 
@@ -862,11 +868,11 @@ static bool cluster_join_check(const struct cluster_info *cinfo)
 }
 
 main_fn void sd_accept_handler(const struct sd_node *joined,
-			       const struct sd_node *members, size_t nr_members,
+			       const struct rb_root *nroot, size_t nr_nodes,
 			       const void *opaque)
 {
-	int i;
 	const struct cluster_info *cinfo = opaque;
+	struct sd_node *n;
 
 	if (node_is_local(joined) && !cluster_join_check(cinfo)) {
 		sd_err("failed to join Sheepdog");
@@ -876,13 +882,14 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 	sys->cinfo = *cinfo;
 
 	sd_debug("join %s", node_to_str(joined));
-	for (i = 0; i < nr_members; i++)
-		sd_debug("[%x] %s", i, node_to_str(members + i));
+	rb_for_each_entry(n, nroot, rb) {
+		sd_debug("%s", node_to_str(n));
+	}
 
 	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
 
-	update_cluster_info(cinfo, joined, members, nr_members);
+	update_cluster_info(cinfo, joined, nroot, nr_nodes);
 
 	if (node_is_local(joined))
 		/* this output is used for testing */
@@ -890,15 +897,16 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 }
 
 main_fn void sd_leave_handler(const struct sd_node *left,
-			      const struct sd_node *members,
-			      size_t nr_members)
+			      const struct rb_root *nroot, size_t nr_nodes)
 {
 	struct vnode_info *old_vnode_info;
-	int i, ret;
+	struct sd_node *n;
+	int ret;
 
 	sd_debug("leave %s", node_to_str(left));
-	for (i = 0; i < nr_members; i++)
-		sd_debug("[%x] %s", i, node_to_str(members + i));
+	rb_for_each_entry(n, nroot, rb) {
+		sd_debug("%s", node_to_str(n));
+	}
 
 	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
@@ -908,8 +916,7 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 		sys->this_node.nr_vnodes = 0;
 
 	old_vnode_info = main_thread_get(current_vnode_info);
-	main_thread_set(current_vnode_info,
-			  alloc_vnode_info(members, nr_members));
+	main_thread_set(current_vnode_info, alloc_vnode_info(nroot));
 	if (sys->cinfo.status == SD_STATUS_OK) {
 		ret = inc_and_log_epoch();
 		if (ret != 0)
@@ -926,9 +933,11 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 static void update_node_size(struct sd_node *node)
 {
 	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
-	int idx = get_node_idx(cur_vinfo, node);
-	assert(idx != -1);
-	cur_vinfo->nodes[idx].space = node->space;
+	struct sd_node *n = rb_search(&cur_vinfo->nroot, node, rb, node_cmp);
+
+	if (unlikely(!n))
+		panic("can't find %s", node_to_str(node));
+	n->space = node->space;
 }
 
 static void kick_node_recover(void)
@@ -936,8 +945,7 @@ static void kick_node_recover(void)
 	struct vnode_info *old = main_thread_get(current_vnode_info);
 	int ret;
 
-	main_thread_set(current_vnode_info,
-			alloc_vnode_info(old->nodes, old->nr_nodes));
+	main_thread_set(current_vnode_info, alloc_vnode_info(&old->nroot));
 	ret = inc_and_log_epoch();
 	if (ret != 0)
 		panic("cannot log current epoch %d", sys->cinfo.epoch);

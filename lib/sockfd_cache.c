@@ -205,15 +205,13 @@ static void sockfd_cache_add_nolock(const struct node_id *nid)
 }
 
 /* Add group of nodes to the cache */
-void sockfd_cache_add_group(const struct sd_node *nodes, int nr)
+void sockfd_cache_add_group(const struct rb_root *nroot)
 {
-	const struct sd_node *p;
+	struct sd_node *n;
 
-	sd_debug("%d", nr);
 	sd_write_lock(&sockfd_cache.lock);
-	while (nr--) {
-		p = nodes + nr;
-		sockfd_cache_add_nolock(&p->nid);
+	rb_for_each_entry(n, nroot, rb) {
+		sockfd_cache_add_nolock(&n->nid);
 	}
 	sd_unlock(&sockfd_cache.lock);
 }

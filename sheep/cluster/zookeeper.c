@@ -57,6 +57,8 @@ struct zk_node {
 	bool gone;
 };
 
+#define ZK_MAX_BUF_SIZE (1*1024*1024) /* 1M */
+
 struct zk_event {
 	uint64_t id;
 	enum zk_event_type type;
@@ -64,10 +66,10 @@ struct zk_event {
 	size_t msg_len;
 	size_t nr_nodes;
 	size_t buf_len;
-	uint8_t buf[SD_MAX_EVENT_BUF_SIZE];
+	uint8_t buf[ZK_MAX_BUF_SIZE];
 };
 
-static struct sd_node sd_nodes[SD_MAX_NODES];
+static struct rb_root sd_node_root = RB_ROOT;
 static size_t nr_sd_nodes;
 static struct rb_root zk_node_root = RB_ROOT;
 static struct sd_lock zk_tree_lock = SD_LOCK_INITIALIZER;
@@ -372,12 +374,14 @@ static inline void *zk_event_sd_nodes(struct zk_event *ev)
 static int push_join_response(struct zk_event *ev)
 {
 	char path[MAX_NODE_STR_LEN];
+	struct sd_node *n, *np = zk_event_sd_nodes(ev);
 	int len;
 
 	ev->type = EVENT_ACCEPT;
 	ev->nr_nodes = nr_sd_nodes;
-	memcpy(zk_event_sd_nodes(ev), sd_nodes,
-	       nr_sd_nodes * sizeof(struct sd_node));
+	rb_for_each_entry(n, &sd_node_root, rb) {
+		memcpy(np++, n, sizeof(struct sd_node));
+	}
 	queue_pos--;
 
 	len = offsetof(typeof(*ev), buf) + ev->buf_len;
@@ -417,35 +421,24 @@ static inline void zk_tree_add(struct zk_node *node)
 	 * Even node list will be built later, we need this because in master
 	 * transfer case, we need this information to destroy the tree.
 	 */
-	sd_nodes[nr_sd_nodes++] = zk->node;
+	rb_insert(&sd_node_root, &zk->node, rb, node_cmp);
+	nr_sd_nodes++;
 out:
 	sd_unlock(&zk_tree_lock);
-}
-
-static inline void zk_tree_del_nolock(struct zk_node *node)
-{
-	rb_erase(&node->rb, &zk_node_root);
-	free(node);
 }
 
 static inline void zk_tree_del(struct zk_node *node)
 {
 	sd_write_lock(&zk_tree_lock);
-	zk_tree_del_nolock(node);
+	rb_erase(&node->rb, &zk_node_root);
+	free(node);
 	sd_unlock(&zk_tree_lock);
 }
 
 static inline void zk_tree_destroy(void)
 {
-	struct zk_node *zk;
-	int i;
-
 	sd_write_lock(&zk_tree_lock);
-	for (i = 0; i < nr_sd_nodes; i++) {
-		zk = zk_tree_search_nolock(&sd_nodes[i].nid);
-		if (zk)
-			zk_tree_del_nolock(zk);
-	}
+	rb_destroy(&zk_node_root, struct zk_node, rb);
 	sd_unlock(&zk_tree_lock);
 }
 
@@ -454,8 +447,11 @@ static inline void build_node_list(void)
 	struct zk_node *zk;
 
 	nr_sd_nodes = 0;
-	rb_for_each_entry(zk, &zk_node_root, rb)
-		sd_nodes[nr_sd_nodes++] = zk->node;
+	INIT_RB_ROOT(&sd_node_root);
+	rb_for_each_entry(zk, &zk_node_root, rb) {
+		rb_insert(&sd_node_root, &zk->node, rb, node_cmp);
+		nr_sd_nodes++;
+	}
 
 	sd_debug("nr_sd_nodes:%zu", nr_sd_nodes);
 }
@@ -564,7 +560,6 @@ static int add_join_event(void *msg, size_t msg_len)
 	struct zk_event ev;
 	size_t len = msg_len + sizeof(struct sd_node) * SD_MAX_NODES;
 
-	assert(len <= SD_MAX_EVENT_BUF_SIZE);
 	ev.id = get_uniq_id();
 	ev.type = EVENT_JOIN;
 	ev.sender = this_node;
@@ -814,7 +809,7 @@ static void zk_handle_join(struct zk_event *ev)
 		return;
 	}
 
-	sd_join_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
+	sd_join_handler(&ev->sender.node, &sd_node_root, nr_sd_nodes, ev->buf);
 	push_join_response(ev);
 
 	sd_debug("I'm the master now");
@@ -878,7 +873,8 @@ static void zk_handle_accept(struct zk_event *ev)
 	zk_tree_add(&ev->sender);
 
 	build_node_list();
-	sd_accept_handler(&ev->sender.node, sd_nodes, nr_sd_nodes, ev->buf);
+	sd_accept_handler(&ev->sender.node, &sd_node_root, nr_sd_nodes,
+			  ev->buf);
 }
 
 static void kick_block_event(void)
@@ -916,7 +912,7 @@ static void zk_handle_leave(struct zk_event *ev)
 	block_event_list_del(n);
 	zk_tree_del(n);
 	build_node_list();
-	sd_leave_handler(&ev->sender.node, sd_nodes, nr_sd_nodes);
+	sd_leave_handler(&ev->sender.node, &sd_node_root, nr_sd_nodes);
 }
 
 static void zk_handle_block(struct zk_event *ev)
@@ -997,9 +993,9 @@ static inline void handle_session_expire(void)
 	INIT_RB_ROOT(&zk_node_root);
 	INIT_LIST_HEAD(&zk_block_list);
 	nr_sd_nodes = 0;
+	INIT_RB_ROOT(&sd_node_root);
 	first_push = true;
 	joined = false;
-	memset(sd_nodes, 0, sizeof(struct sd_node) * SD_MAX_NODES);
 
 	while (sd_reconnect_handler()) {
 		sd_err("failed to reconnect. sleep and retry...");

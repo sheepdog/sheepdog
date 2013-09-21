@@ -237,13 +237,11 @@ find_event(enum corosync_event_type type, struct cpg_node *sender)
 		return find_nonblock_event(type, sender);
 }
 
-static void build_node_list(const struct cpg_node *nodes, size_t nr_nodes,
-			    struct sd_node *entries)
+static void build_node_list(struct cpg_node *nodes, size_t nr_nodes,
+			    struct rb_root *nroot)
 {
-	int i;
-
-	for (i = 0; i < nr_nodes; i++)
-		entries[i] = nodes[i].node;
+	for (int i = 0; i < nr_nodes; i++)
+		rb_insert(nroot, &nodes[i].node, rb, node_cmp);
 }
 
 /*
@@ -253,8 +251,9 @@ static void build_node_list(const struct cpg_node *nodes, size_t nr_nodes,
  */
 static bool __corosync_dispatch_one(struct corosync_event *cevent)
 {
-	struct sd_node entries[SD_MAX_NODES], *node;
+	struct sd_node *node;
 	struct cpg_node *n;
+	struct rb_root nroot = RB_ROOT;
 	int idx;
 
 	switch (cevent->type) {
@@ -267,8 +266,8 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			/* sd_join_handler() must be called only once */
 			return false;
 
-		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		if (sd_join_handler(&cevent->sender.node, entries,
+		build_node_list(cpg_nodes, nr_cpg_nodes, &nroot);
+		if (sd_join_handler(&cevent->sender.node, &nroot,
 				    nr_cpg_nodes, cevent->msg)) {
 			send_message(COROSYNC_MSG_TYPE_ACCEPT, &cevent->sender,
 				     cpg_nodes, nr_cpg_nodes, cevent->msg,
@@ -281,8 +280,8 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 		add_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 		nr_cpg_nodes++;
 
-		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_accept_handler(&cevent->sender.node, entries, nr_cpg_nodes,
+		build_node_list(cpg_nodes, nr_cpg_nodes, &nroot);
+		sd_accept_handler(&cevent->sender.node, &nroot, nr_cpg_nodes,
 				  cevent->msg);
 		break;
 	case COROSYNC_EVENT_TYPE_LEAVE:
@@ -294,8 +293,8 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 
 		del_cpg_node(cpg_nodes, nr_cpg_nodes, &cevent->sender);
 		nr_cpg_nodes--;
-		build_node_list(cpg_nodes, nr_cpg_nodes, entries);
-		sd_leave_handler(&cevent->sender.node, entries, nr_cpg_nodes);
+		build_node_list(cpg_nodes, nr_cpg_nodes, &nroot);
+		sd_leave_handler(&cevent->sender.node, &nroot, nr_cpg_nodes);
 		break;
 	case COROSYNC_EVENT_TYPE_BLOCK:
 		if (cevent->callbacked)

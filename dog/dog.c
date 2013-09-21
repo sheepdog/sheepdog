@@ -48,15 +48,15 @@ static void usage(const struct command *commands, int status);
 
 uint32_t sd_epoch;
 
-struct sd_node sd_nodes[SD_MAX_NODES];
 int sd_nodes_nr;
 struct rb_root sd_vroot = RB_ROOT;
+struct rb_root sd_nroot = RB_ROOT;
 
 int update_node_list(int max_nodes)
 {
 	int ret;
 	unsigned int size;
-	char *buf = NULL;
+	struct sd_node *buf = NULL;
 	struct sd_node *ent;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -91,8 +91,14 @@ int update_node_list(int max_nodes)
 		goto out;
 	}
 
-	memcpy(sd_nodes, buf, size);
-	nodes_to_vnodes(sd_nodes, sd_nodes_nr, &sd_vroot);
+	for (int i = 0; i < sd_nodes_nr; i++) {
+		struct sd_node *n = xmalloc(sizeof(*n));
+
+		*n = buf[i];
+		rb_insert(&sd_nroot, n, rb, node_cmp);
+	}
+
+	nodes_to_vnodes(&sd_nroot, &sd_vroot);
 	sd_epoch = hdr.epoch;
 out:
 	if (buf)

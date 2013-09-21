@@ -29,16 +29,16 @@ static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
 
 static int node_list(int argc, char **argv)
 {
-	int i;
+	struct sd_node *n;
+	int i = 0;
 
 	if (!raw_output)
 		printf("  Id   Host:Port         V-Nodes       Zone\n");
-	for (i = 0; i < sd_nodes_nr; i++) {
-		const char *host = addr_to_str(sd_nodes[i].nid.addr,
-					       sd_nodes[i].nid.port);
+	rb_for_each_entry(n, &sd_nroot, rb) {
+		const char *host = addr_to_str(n->nid.addr, n->nid.port);
 
 		printf(raw_output ? "%d %s %d %u\n" : "%4d   %-20s\t%2d%11u\n",
-		       i, host, sd_nodes[i].nr_vnodes, sd_nodes[i].zone);
+		       i++, host, n->nr_vnodes, n->zone);
 	}
 
 	return EXIT_SUCCESS;
@@ -46,26 +46,27 @@ static int node_list(int argc, char **argv)
 
 static int node_info(int argc, char **argv)
 {
-	int i, ret, success = 0;
+	int ret, success = 0, i = 0;
 	uint64_t total_size = 0, total_avail = 0, total_vdi_size = 0;
+	struct sd_node *n;
 
 	if (!raw_output)
 		printf("Id\tSize\tUsed\tAvail\tUse%%\n");
 
-	for (i = 0; i < sd_nodes_nr; i++) {
+	rb_for_each_entry(n, &sd_nroot, rb) {
 		struct sd_req req;
 		struct sd_rsp *rsp = (struct sd_rsp *)&req;
 
 		sd_init_req(&req, SD_OP_STAT_SHEEP);
 
-		ret = send_light_req(&sd_nodes[i].nid, &req);
+		ret = send_light_req(&n->nid, &req);
 		if (!ret) {
 			int ratio = (int)(((double)(rsp->node.store_size -
 						    rsp->node.store_free) /
 					   rsp->node.store_size) * 100);
 			printf(raw_output ? "%d %s %s %s %d%%\n" :
 					"%2d\t%s\t%s\t%s\t%3d%%\n",
-			       i,
+			       i++,
 			       strnumber(rsp->node.store_size),
 			       strnumber(rsp->node.store_size -
 					   rsp->node.store_free),
@@ -182,7 +183,8 @@ static int node_recovery_progress(void)
 
 static int node_recovery(int argc, char **argv)
 {
-	int i, ret;
+	struct sd_node *n;
+	int ret, i = 0;
 
 	if (node_cmd_data.recovery_progress)
 		return node_recovery_progress();
@@ -193,7 +195,7 @@ static int node_recovery(int argc, char **argv)
 		       "       Progress\n");
 	}
 
-	for (i = 0; i < sd_nodes_nr; i++) {
+	rb_for_each_entry(n, &sd_nroot, rb) {
 		struct sd_req req;
 		struct sd_rsp *rsp = (struct sd_rsp *)&req;
 		struct recovery_state state;
@@ -203,7 +205,7 @@ static int node_recovery(int argc, char **argv)
 		sd_init_req(&req, SD_OP_STAT_RECOVERY);
 		req.data_length = sizeof(state);
 
-		ret = dog_exec_req(&sd_nodes[i].nid, &req, &state);
+		ret = dog_exec_req(&n->nid, &req, &state);
 		if (ret < 0)
 			return EXIT_SYSFAIL;
 		if (rsp->result != SD_RES_SUCCESS) {
@@ -212,22 +214,33 @@ static int node_recovery(int argc, char **argv)
 		}
 
 		if (state.in_recovery) {
-			const char *host = addr_to_str(sd_nodes[i].nid.addr,
-						       sd_nodes[i].nid.port);
+			const char *host = addr_to_str(n->nid.addr,
+						       n->nid.port);
 			if (raw_output)
 				printf("%d %s %d %d %"PRIu64" %"PRIu64"\n", i,
-				       host, sd_nodes[i].nr_vnodes,
-				       sd_nodes[i].zone, state.nr_finished,
+				       host, n->nr_vnodes,
+				       n->zone, state.nr_finished,
 				       state.nr_total);
 			else
 				printf("%4d   %-20s%5d%11d%11.1f%%\n", i, host,
-				       sd_nodes[i].nr_vnodes, sd_nodes[i].zone,
+				       n->nr_vnodes, n->zone,
 				       100 * (float)state.nr_finished
 				       / state.nr_total);
 		}
+		i++;
 	}
 
 	return EXIT_SUCCESS;
+}
+
+static struct sd_node *idx_to_node(struct rb_root *nroot, int idx)
+{
+	struct sd_node *n = rb_entry(rb_first(nroot), struct sd_node, rb);
+
+	while (idx--)
+		n = rb_entry(rb_next(&n->rb), struct sd_node, rb);
+
+	return n;
 }
 
 static int node_kill(int argc, char **argv)
@@ -249,8 +262,7 @@ static int node_kill(int argc, char **argv)
 	}
 
 	sd_init_req(&req, SD_OP_KILL_NODE);
-
-	ret = send_light_req(&sd_nodes[node_id].nid, &req);
+	ret = send_light_req(&idx_to_node(&sd_nroot, node_id)->nid, &req);
 	if (ret) {
 		sd_err("Failed to execute request");
 		exit(EXIT_FAILURE);
@@ -335,16 +347,17 @@ static int node_md_info(struct node_id *nid)
 
 static int md_info(int argc, char **argv)
 {
-	int i, ret;
+	struct sd_node *n;
+	int ret, i = 0;
 
 	fprintf(stdout, "Id\tSize\tUsed\tAvail\tUse%%\tPath\n");
 
 	if (!node_cmd_data.all_nodes)
 		return node_md_info(&sd_nid);
 
-	for (i = 0; i < sd_nodes_nr; i++) {
-		fprintf(stdout, "Node %d:\n", i);
-		ret = node_md_info(&sd_nodes[i].nid);
+	rb_for_each_entry(n, &sd_nroot, rb) {
+		fprintf(stdout, "Node %d:\n", i++);
+		ret = node_md_info(&n->nid);
 		if (ret != EXIT_SUCCESS)
 			return EXIT_FAILURE;
 	}

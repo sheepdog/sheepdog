@@ -55,8 +55,8 @@ extern bool raw_output;
 extern bool verbose;
 
 extern uint32_t sd_epoch;
-extern struct sd_node sd_nodes[SD_MAX_NODES];
 extern struct rb_root sd_vroot;
+extern struct rb_root sd_nroot;
 extern int sd_nodes_nr;
 
 bool is_current(const struct sd_inode *i);

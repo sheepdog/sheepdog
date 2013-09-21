@@ -28,7 +28,7 @@ struct sd_vnode {
 
 struct vnode_info {
 	struct rb_root vroot;
-	struct sd_node nodes[SD_MAX_NODES];
+	struct rb_root nroot;
 	int nr_nodes;
 	int nr_zones;
 	refcnt_t refcnt;
@@ -219,10 +219,11 @@ static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 }
 
 static inline void
-nodes_to_vnodes(const struct sd_node *nodes, int nr_nodes, struct rb_root *root)
+nodes_to_vnodes(struct rb_root *nroot, struct rb_root *vroot)
 {
-	for (int j = 0; j < nr_nodes; j++) {
-		const struct sd_node *n = nodes + j;
+	struct sd_node *n;
+
+	rb_for_each_entry(n, nroot, rb) {
 		uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid),
 							  io_addr));
 
@@ -232,9 +233,18 @@ nodes_to_vnodes(const struct sd_node *nodes, int nr_nodes, struct rb_root *root)
 			hval = sd_hash_next(hval);
 			v->hash = hval;
 			v->node = n;
-			if (unlikely(rb_insert(root, v, rb, vnode_cmp)))
+			if (unlikely(rb_insert(vroot, v, rb, vnode_cmp)))
 				panic("vdisk hash collison");
 		}
+	}
+}
+
+static inline void nodes_to_buffer(struct rb_root *nroot, void *buffer)
+{
+	struct sd_node *n, *buf = buffer;
+
+	rb_for_each_entry(n, nroot, rb) {
+		memcpy(buf++, n, sizeof(*n));
 	}
 }
 

@@ -315,11 +315,12 @@ static int get_data_oid(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
 
 static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigned size)
 {
-	int i, ret, cb_ret;
+	int ret, cb_ret;
+	struct sd_node *n;
 	char *buf;
 
 	buf = xzalloc(size);
-	for (i = 0; i < sd_nodes_nr; i++) {
+	rb_for_each_entry(n, &sd_nroot, rb) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
@@ -330,7 +331,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 
 		hdr.obj.oid = oid;
 
-		ret = dog_exec_req(&sd_nodes[i].nid, &hdr, buf);
+		ret = dog_exec_req(&n->nid, &hdr, buf);
 		if (ret < 0)
 			continue;
 		switch (rsp->result) {
@@ -341,8 +342,7 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		untrim_zero_blocks(buf, rsp->obj.offset, rsp->data_length,
 				   size);
 
-		cb_ret = func(addr_to_str(sd_nodes[i].nid.addr,
-					  sd_nodes[i].nid.port),
+		cb_ret = func(addr_to_str(n->nid.addr, n->nid.port),
 			      oid, rsp, buf, data);
 		if (cb_ret)
 			break;
@@ -926,6 +926,7 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = nr_logs - 1; i >= 0; i--) {
 		struct rb_root vroot = RB_ROOT;
+		struct rb_root nroot = RB_ROOT;
 
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
 		       oid, logs[i].epoch, nr_copies);
@@ -943,7 +944,9 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 			}
 			continue;
 		}
-		nodes_to_vnodes(logs[i].nodes, logs[i].nr_nodes, &vroot);
+		for (int k = 0; k < logs[i].nr_nodes; k++)
+			rb_insert(&nroot, &logs[i].nodes[k], rb, node_cmp);
+		nodes_to_vnodes(&nroot, &vroot);
 		oid_to_vnodes(oid, &vroot, nr_copies, vnode_buf);
 		for (j = 0; j < nr_copies; j++) {
 			const struct node_id *n = &vnode_buf[j]->node->nid;

@@ -164,7 +164,7 @@ static int recover_object_from(struct recovery_obj_work *row,
 static bool invalid_node(const struct sd_node *n, struct vnode_info *info)
 {
 
-	if (xbsearch(n, info->nodes, info->nr_nodes, node_cmp))
+	if (rb_search(&info->nroot, n, rb, node_cmp))
 		return false;
 	return true;
 }
@@ -751,25 +751,28 @@ static void prepare_object_list(struct work *work)
 	struct recovery_list_work *rlw = container_of(rw,
 						      struct recovery_list_work,
 						      base);
-	struct sd_node *cur = rw->cur_vinfo->nodes;
-	int cur_nr = rw->cur_vinfo->nr_nodes;
-	int start = random() % cur_nr, i, end = cur_nr;
+	int nr_nodes = rw->cur_vinfo->nr_nodes;
+	int start = random() % nr_nodes, i, end = nr_nodes;
 	uint64_t *oids;
+	struct sd_node *nodes;
 
 	if (node_is_gateway_only())
 		return;
 
 	sd_debug("%u", rw->epoch);
 	wait_get_vdis_done();
+
+	nodes = xmalloc(sizeof(struct sd_node) * nr_nodes);
+	nodes_to_buffer(&rw->cur_vinfo->nroot, nodes);
 again:
 	/* We need to start at random node for better load balance */
 	for (i = start; i < end; i++) {
 		size_t nr_oids;
-		struct sd_node *node = cur + i;
+		struct sd_node *node = nodes + i;
 
 		if (uatomic_read(&next_rinfo)) {
 			sd_debug("go to the next recovery");
-			return;
+			goto out;
 		}
 
 		oids = fetch_object_list(node, rw->epoch, &nr_oids);
@@ -786,6 +789,8 @@ again:
 	}
 
 	sd_debug("%"PRIu64, rlw->count);
+out:
+	free(nodes);
 }
 
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,

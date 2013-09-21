@@ -299,8 +299,7 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
 void put_vnode_info(struct vnode_info *vinfo);
-struct vnode_info *alloc_vnode_info(const struct sd_node *nodes,
-				    size_t nr_nodes);
+struct vnode_info *alloc_vnode_info(const struct rb_root *);
 struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 					struct vnode_info *cur_vinfo);
 void wait_get_vdis_done(void);

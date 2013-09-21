@@ -21,6 +21,7 @@
 #include <netinet/in.h>
 
 #include "sheepdog_proto.h"
+#include "rbtree.h"
 
 #define SD_SHEEP_PROTO_VER 0x08
 
@@ -123,9 +124,10 @@ struct node_id {
 	uint8_t pad[4];
 };
 
-#define SD_NODE_SIZE 56
+#define SD_NODE_SIZE 80
 
 struct sd_node {
+	struct rb_node  rb;
 	struct node_id  nid;
 	uint16_t	nr_vnodes;
 	uint32_t	zone;

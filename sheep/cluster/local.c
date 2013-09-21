@@ -83,7 +83,6 @@ struct local_event {
 	struct local_node lnodes[SD_MAX_NODES];
 };
 
-
 /* shared memory queue */
 
 static struct shm_queue {
@@ -92,6 +91,12 @@ static struct shm_queue {
 	int nonblock_event_pos;
 	struct local_event nonblock_events[MAX_EVENTS];
 } *shm_queue;
+
+static inline void node_insert(struct sd_node *new, struct rb_root *root)
+{
+	if (rb_insert(root, new, rb, node_cmp))
+		panic("insert duplicate %s", node_to_str(new));
+}
 
 static void shm_queue_lock(void)
 {
@@ -382,8 +387,8 @@ static bool local_process_event(void)
 {
 	struct local_event *ev;
 	int i;
-	struct sd_node nodes[SD_MAX_NODES];
-	size_t nr_nodes;
+	struct rb_root root = RB_ROOT;
+	size_t nr_nodes = 0;
 
 	ev = shm_queue_peek();
 	if (!ev)
@@ -391,13 +396,6 @@ static bool local_process_event(void)
 
 	sd_debug("type = %d, sender = %s", ev->type, lnode_to_str(&ev->sender));
 	sd_debug("callbacked = %d, removed = %d", ev->callbacked, ev->removed);
-
-	nr_nodes = 0;
-	for (i = 0; i < ev->nr_lnodes; i++) {
-		sd_debug("%d: %s", i, lnode_to_str(ev->lnodes + i));
-		if (!ev->lnodes[i].gateway)
-			nodes[nr_nodes++] = ev->lnodes[i].node;
-	}
 
 	if (ev->removed)
 		goto out;
@@ -421,12 +419,23 @@ static bool local_process_event(void)
 		}
 	}
 
+	for (i = 0; i < ev->nr_lnodes; i++) {
+		sd_debug("%d: %s", i, lnode_to_str(ev->lnodes + i));
+		if (!ev->lnodes[i].gateway) {
+			node_insert(&ev->lnodes[i].node, &root);
+			nr_nodes++;
+		}
+	}
+
 	switch (ev->type) {
 	case EVENT_JOIN:
-		/* nodes[nr_nodes - 1] is a sender, so don't include it */
-		assert(node_eq(&ev->sender.node, &nodes[nr_nodes - 1]));
-		if (sd_join_handler(&ev->sender.node, nodes, nr_nodes - 1,
-				      ev->buf)) {
+		for (i = 0; i < ev->nr_lnodes; i++)
+			if (node_eq(&ev->sender.node, &ev->lnodes[i].node)) {
+				rb_erase(&ev->lnodes[i].node.rb, &root);
+				nr_nodes--;
+			}
+		if (sd_join_handler(&ev->sender.node, &root, nr_nodes,
+				    ev->buf)) {
 			ev->type = EVENT_ACCEPT;
 			msync(ev, sizeof(*ev), MS_SYNC);
 
@@ -435,7 +444,7 @@ static bool local_process_event(void)
 
 		return false;
 	case EVENT_ACCEPT:
-		sd_accept_handler(&ev->sender.node, nodes, nr_nodes, ev->buf);
+		sd_accept_handler(&ev->sender.node, &root, nr_nodes, ev->buf);
 		break;
 	case EVENT_LEAVE:
 		if (ev->sender.gateway) {
@@ -445,7 +454,7 @@ static bool local_process_event(void)
 		}
 		/* fall through */
 	case EVENT_GATEWAY:
-		sd_leave_handler(&ev->sender.node, nodes, nr_nodes);
+		sd_leave_handler(&ev->sender.node, &root, nr_nodes);
 		break;
 	case EVENT_BLOCK:
 		ev->callbacked = sd_block_handler(&ev->sender.node);
