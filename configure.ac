@@ -224,6 +224,11 @@ AC_ARG_ENABLE([zookeeper],
 	[ enable_zookeeper="no" ],)
 AM_CONDITIONAL(BUILD_ZOOKEEPER, test x$enable_zookeeper = xyes)
 
+AC_ARG_ENABLE([shepherd],
+	[  --enable-shepherd       : build shepherd cluster driver ],,
+	[ enable_shepherd="no" ],)
+AM_CONDITIONAL(BUILD_SHEPHERD, test x$enable_shepherd = xyes)
+
 AC_ARG_WITH([initddir],
 	[  --with-initddir=DIR     : path to init script directory. ],
 	[ INITDDIR="$withval" ],
@@ -300,6 +305,11 @@ if test "x${enable_zookeeper}" = xyes; then
 		AC_MSG_ERROR(zookeeper.h header missing))
 	AC_DEFINE_UNQUOTED([HAVE_ZOOKEEPER], 1, [have zookeeper])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES zookeeper"
+fi
+
+if test "x${enable_shepherd}" = xyes; then
+	AC_DEFINE_UNQUOTED([HAVE_SHEPHERD], 1, [have shepherd])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES shepherd"
 fi
 
 if test "x${enable_trace}" = xyes; then

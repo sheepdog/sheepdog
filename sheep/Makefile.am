@@ -27,8 +27,7 @@ sbin_PROGRAMS		= sheep
 sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c \
 			  journal.c ops.c recovery.c cluster/local.c \
 			  object_cache.c object_list_cache.c \
-			  plain_store.c config.c migrate.c md.c \
-			  cluster/shepherd.c
+			  plain_store.c config.c migrate.c md.c
 
 if BUILD_HTTP
 sheep_SOURCES		+= http.c
@@ -38,6 +37,9 @@ sheep_SOURCES		+= cluster/corosync.c
 endif
 if BUILD_ZOOKEEPER
 sheep_SOURCES		+= cluster/zookeeper.c
+endif
+if BUILD_SHEPHERD
+sheep_SOURCES		+= cluster/shepherd.c
 endif
 
 if BUILD_TRACE
