@@ -355,10 +355,10 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 		if (ret != SD_RES_SUCCESS)
 			continue;
 
-		nodes_len = rsp->data_length - sizeof(timestamp);
+		nodes_len = rsp->data_length - sizeof(*timestamp);
 		memcpy((void *)nodes, buf, nodes_len);
 		if (timestamp)
-			memcpy(timestamp, buf + nodes_len, sizeof(timestamp));
+			memcpy(timestamp, buf + nodes_len, sizeof(*timestamp));
 
 		return nodes_len / sizeof(struct sd_node);
 	}
