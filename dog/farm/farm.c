@@ -16,7 +16,7 @@
 #include <pthread.h>
 
 #include "farm.h"
-#include "list.h"
+#include "rbtree.h"
 
 static char farm_object_dir[PATH_MAX];
 static char farm_dir[PATH_MAX];
@@ -28,9 +28,9 @@ struct vdi_entry {
 	uint32_t vdi_id;
 	uint32_t snap_id;
 	uint8_t  nr_copies;
-	struct list_node list;
+	struct rb_node rb;
 };
-static LIST_HEAD(last_vdi_list);
+static struct rb_root last_vdi_tree = RB_ROOT;
 
 struct snapshot_work {
 	struct trunk_entry entry;
@@ -40,15 +40,18 @@ struct snapshot_work {
 static struct work_queue *wq;
 static uatomic_bool work_error;
 
+static int vdi_cmp(const struct vdi_entry *e1, const struct vdi_entry *e2)
+{
+	return strcmp(e1->name, e2->name);
+}
+
 static struct vdi_entry *find_vdi(const char *name)
 {
-	struct vdi_entry *vdi;
+	struct vdi_entry key = {};
 
-	list_for_each_entry(vdi, &last_vdi_list, list) {
-		if (!strcmp(vdi->name, name))
-			return vdi;
-	}
-	return NULL;
+	pstrcpy(key.name, sizeof(key.name), name);
+
+	return rb_search(&last_vdi_tree, &key, rb, vdi_cmp);
 }
 
 static struct vdi_entry *new_vdi(const char *name, uint64_t vdi_size,
@@ -75,7 +78,7 @@ static void insert_vdi(struct sd_inode *new)
 			      new->vdi_id,
 			      new->snap_id,
 			      new->nr_copies);
-		list_add(&vdi->list, &last_vdi_list);
+		rb_insert(&last_vdi_tree, vdi, rb, vdi_cmp);
 	} else if (vdi->snap_id < new->snap_id) {
 		vdi->vdi_size = new->vdi_size;
 		vdi->vdi_id = new->vdi_id;
@@ -88,7 +91,7 @@ static int create_active_vdis(void)
 {
 	struct vdi_entry *vdi;
 	uint32_t new_vid;
-	list_for_each_entry(vdi, &last_vdi_list, list) {
+	rb_for_each_entry(vdi, &last_vdi_tree, rb) {
 		if (do_vdi_create(vdi->name,
 				  vdi->vdi_size,
 				  vdi->vdi_id, &new_vid,
@@ -101,8 +104,10 @@ static int create_active_vdis(void)
 static void free_vdi_list(void)
 {
 	struct vdi_entry *vdi;
-	list_for_each_entry(vdi, &last_vdi_list, list)
+	rb_for_each_entry(vdi, &last_vdi_tree, rb) {
+		rb_erase(&vdi->rb, &last_vdi_tree);
 		free(vdi);
+	}
 }
 
 char *get_object_directory(void)
