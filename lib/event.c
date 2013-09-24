@@ -15,12 +15,12 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 
-#include "list.h"
+#include "rbtree.h"
 #include "util.h"
 #include "event.h"
 
 static int efd;
-static LIST_HEAD(events_list);
+static struct rb_root events_tree = RB_ROOT;
 
 static void timer_handler(int fd, int events, void *data)
 {
@@ -64,12 +64,17 @@ struct event_info {
 	event_handler_t handler;
 	int fd;
 	void *data;
-	struct list_node ei_list;
+	struct rb_node rb;
 	int prio;
 };
 
 static struct epoll_event *events;
 static int nr_events;
+
+static int event_cmp(const struct event_info *e1, const struct event_info *e2)
+{
+	return intcmp(e1->fd, e2->fd);
+}
 
 int init_event(int nr)
 {
@@ -86,13 +91,9 @@ int init_event(int nr)
 
 static struct event_info *lookup_event(int fd)
 {
-	struct event_info *ei;
+	struct event_info key = { .fd = fd };
 
-	list_for_each_entry(ei, &events_list, ei_list) {
-		if (ei->fd == fd)
-			return ei;
-	}
-	return NULL;
+	return rb_search(&events_tree, &key, rb, event_cmp);
 }
 
 int register_event_prio(int fd, event_handler_t h, void *data, int prio)
@@ -116,7 +117,7 @@ int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 		sd_err("failed to add epoll event: %m");
 		free(ei);
 	} else
-		list_add(&ei->ei_list, &events_list);
+		rb_insert(&events_tree, ei, rb, event_cmp);
 
 	return ret;
 }
@@ -134,7 +135,7 @@ void unregister_event(int fd)
 	if (ret)
 		sd_err("failed to delete epoll event for fd %d: %m", fd);
 
-	list_del(&ei->ei_list);
+	rb_erase(&ei->rb, &events_tree);
 	free(ei);
 
 	/*
