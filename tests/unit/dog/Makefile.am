@@ -4,7 +4,7 @@ TESTS			= test_common
 
 check_PROGRAMS		= ${TESTS}
 
-INCLUDES		= -I$(top_srcdir)/include			\
+AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  -I$(top_srcdir)/dog				\
 			  -I$(top_srcdir)/dog/farm			\
 			  -I../mock					\

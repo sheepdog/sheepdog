@@ -19,7 +19,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 
 AM_CFLAGS		= $(fuse_CFLAGS) -DFUSE_USE_VERSION=26
 
-INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
+AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= sheepfs
 
