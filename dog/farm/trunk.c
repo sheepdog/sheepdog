@@ -61,8 +61,10 @@ int for_each_entry_in_trunk(unsigned char *trunk_sha1,
 	int ret = -1;
 
 	trunk = trunk_file_read(trunk_sha1);
-	if (!trunk)
-		goto out;
+	if (!trunk) {
+		sd_err("failed to read trunk");
+		return ret;
+	}
 
 	total_count = trunk->nr_entries;
 	entry = trunk->entries;
