@@ -165,38 +165,37 @@ static inline void rb_link_node(struct rb_node *node, struct rb_node *parent,
 })
 
 /* Iterate over a rbtree safe against removal of rbnode */
-#define rb_for_each(pos, root)					\
-	pos = rb_first(root);					\
-	for (struct rb_node *__n1 = rb_next(pos);		\
-	     pos && ({ __n1 = rb_next(pos); 1; });		\
-	     pos = __n1)
+#define rb_for_each(pos, root)						\
+	for (struct rb_node *LOCAL(n) = (pos = rb_first(root), NULL);	\
+	     pos && (LOCAL(n) = rb_next(pos), 1);			\
+	     pos = LOCAL(n))
 
 /* Iterate over a rbtree of given type safe against removal of rbnode */
 #define rb_for_each_entry(pos, root, member)				\
-	for (struct rb_node *__pos = rb_first(root), *__n2;		\
-	     __pos && ({ __n2 = rb_next(__pos); 1; }) &&		\
-		     ({ pos =  rb_entry(__pos, typeof(*pos), member); 1; }); \
-	     __pos = __n2)
+	for (struct rb_node *LOCAL(p) = rb_first(root), *LOCAL(n);	\
+	     LOCAL(p) && (LOCAL(n) = rb_next(LOCAL(p)), 1) &&		\
+		     (pos = rb_entry(LOCAL(p), typeof(*pos), member), 1); \
+	     LOCAL(p) = LOCAL(n))
 
 /* Destroy the tree and free the memory */
-#define rb_destroy(root, type, member)                                  \
-{                                                                       \
-        type *__dummy;                                                  \
-        rb_for_each_entry(__dummy, root, member) {                      \
-                rb_erase(&__dummy->member, root);                       \
-                free(__dummy);                                          \
-        }                                                               \
-}
+#define rb_destroy(root, type, member)					\
+({									\
+	type *__dummy;							\
+	rb_for_each_entry(__dummy, root, member) {			\
+		rb_erase(&__dummy->member, root);			\
+		free(__dummy);						\
+	}								\
+})
 
 /* Copy the tree 'root' as 'outroot' */
-#define rb_copy(root, type, member, outroot, compar)                    \
-{                                                                       \
-        type *__p, *__n3;                                               \
-        rb_for_each_entry(__p, root, member) {                          \
-                __n3 = xmalloc(sizeof(*__n3));                          \
-                *__n3 = *__p;                                           \
-                rb_insert(outroot, __n3, member, compar);               \
-        }                                                               \
-}
+#define rb_copy(root, type, member, outroot, compar)			\
+({									\
+	type *__src, *__dst;						\
+	rb_for_each_entry(__src, root, member) {			\
+		__dst = xmalloc(sizeof(*__dst));			\
+		*__dst = *__src;					\
+		rb_insert(outroot, __dst, member, compar);		\
+	}								\
+})
 
 #endif /* __RBTREE_H_ */

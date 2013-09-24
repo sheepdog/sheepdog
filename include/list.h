@@ -52,18 +52,22 @@ static inline bool list_linked(const struct list_node *node)
 #define list_entry(ptr, type, member) \
 	container_of(ptr, type, member)
 
-#define list_for_each(pos, head) \
-	pos = (head)->n.next;					\
-	for (typeof(pos) __n = pos->next; pos != &(head)->n;	\
-	     pos = __n, __n = pos->next)
+#define list_for_each(pos, head)					\
+	for (typeof(pos) LOCAL(n) = (pos = (head)->n.next, pos->next);	\
+	     pos != &(head)->n;						\
+	     pos = LOCAL(n), LOCAL(n) = pos->next)
 
 #define list_for_each_entry(pos, head, member)				\
-	pos = list_entry((head)->n.next, typeof(*pos), member);		\
-	for (typeof(pos) __n = list_entry(pos->member.next, typeof(*pos), \
-					  member);			\
+	for (typeof(pos) LOCAL(n) = (pos = list_entry((head)->n.next,	\
+						      typeof(*pos),	\
+						      member),		\
+				     list_entry(pos->member.next,	\
+						typeof(*pos),		\
+						member));		\
 	     &pos->member != &(head)->n;				\
-	     pos = __n, __n = list_entry(__n->member.next, typeof(*__n), \
-					 member))
+	     pos = LOCAL(n), LOCAL(n) = list_entry(LOCAL(n)->member.next, \
+						   typeof(*LOCAL(n)),	\
+						   member))
 
 static inline void __list_add(struct list_node *new,
 			      struct list_node *prev,
@@ -228,10 +232,10 @@ static inline void hlist_add_after(struct hlist_node *n,
 
 #define hlist_entry(ptr, type, member) container_of(ptr, type, member)
 
-#define hlist_for_each(pos, head)				\
-	pos = (head)->first;					\
-	for (typeof(pos) __n; pos && ({ __n = pos->next; 1; });	\
-	     pos = __n)						\
+#define hlist_for_each(pos, head)					\
+	for (typeof(pos) LOCAL(n) = (pos = (head)->first, NULL);	\
+	     pos && (LOCAL(n) = pos->next, 1);				\
+	     pos = LOCAL(n))						\
 
 /*
  * hlist_for_each_entry - iterate over list of given type
@@ -241,11 +245,10 @@ static inline void hlist_add_after(struct hlist_node *n,
  * @member:     the name of the hlist_node within the struct.
  */
 #define hlist_for_each_entry(tpos, pos, head, member)			\
-	pos = (head)->first;						\
-	for (typeof(pos) __n;						\
-	     pos && ({ __n = pos->next; 1; }) &&			\
-		     ({ tpos = hlist_entry(pos, typeof(*tpos), member); 1; }); \
-	     pos = __n)
+	for (typeof(pos) LOCAL(n) = (pos = (head)->first, NULL);	\
+	     pos && (LOCAL(n) = pos->next, 1) &&			\
+		     (tpos = hlist_entry(pos, typeof(*tpos), member), 1); \
+	     pos = LOCAL(n))
 
 void list_sort(void *priv, struct list_head *head,
 	       int (*cmp)(void *priv, struct list_node *a,

@@ -21,6 +21,10 @@
 
 #include "config.h"
 
+#define __LOCAL(var, line) __ ## var ## line
+#define _LOCAL(var, line) __LOCAL(var, line)
+#define LOCAL(var) _LOCAL(var, __LINE__)
+
 #define container_of(ptr, type, member) ({			\
 	const typeof(((type *)0)->member) *__mptr = (ptr);	\
 	(type *)((char *)__mptr - offsetof(type, member)); })
