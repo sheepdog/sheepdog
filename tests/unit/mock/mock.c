@@ -15,21 +15,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "list.h"
 #include "mock.h"
 
-LIST_HEAD(mock_methods);
+struct rb_root mock_methods = RB_ROOT;
 
 static struct mock_method *find_method(const char *name)
 {
-	struct mock_method *method;
-	int len;
-	list_for_each_entry(method, &mock_methods, list) {
-		len = strlen(method->name);
-		if (strncmp(method->name, name, len) == 0)
-			return method;
-	}
-	return NULL;
+	struct mock_method key = { .name = name };
+
+	return rb_search(&mock_methods, &key, rb, mock_cmp);
 }
 
 int __method_nr_call(const char *name)
@@ -46,6 +40,6 @@ int __method_nr_call(const char *name)
 void __method_reset_all(void)
 {
 	struct mock_method *method;
-	list_for_each_entry(method, &mock_methods, list)
+	rb_for_each_entry(method, &mock_methods, rb)
 		method->nr_call = 0;
 }

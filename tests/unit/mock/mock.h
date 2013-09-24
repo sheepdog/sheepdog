@@ -14,19 +14,27 @@
 #ifndef __MOCK_H__
 #define __MOCK_H__
 
-#include "list.h"
+#include <string.h>
+
+#include "rbtree.h"
 
 struct mock_method {
 	const char *name;
 	int nr_call;
-	struct list_node list;
+	struct rb_node rb;
 };
 
-extern struct list_head mock_methods;
+static inline int mock_cmp(const struct mock_method *m1,
+			   const struct mock_method *m2)
+{
+	return strcmp(m1->name, m2->name);
+}
+
+extern struct rb_root mock_methods;
 #define method_register(m)						\
 	static void __attribute__((constructor)) regist_##m(void)	\
 	{								\
-		list_add(&m.list, &mock_methods);			\
+		rb_insert(&mock_methods, &m, rb, mock_cmp);		\
 	}
 
 #define MOCK_VOID_METHOD(m, ...)			\
