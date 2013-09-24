@@ -4,7 +4,7 @@ Upstream-Name: sheepdog
 Source: git://github.com/sheepdog/sheepdog.git
 
 Files: debian/*
-Copyright: 2010, Guido Günther <agx@sigxcpu.org>
+Copyright: 2010, Guido GÃ¼nther <agx@sigxcpu.org>
 	2012, YunQiang Su <wzssyqa@gmail.com>
 	2012, Thomas Goirand <zigo@debian.org>
 License: GPL-2
