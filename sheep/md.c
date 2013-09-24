@@ -74,14 +74,17 @@ static struct vdisk *vdisk_insert(struct vdisk *new)
 	return rb_insert(&md.vroot, new, rb, vdisk_cmp);
 }
 
-/* If v1_hash < oid <= v2_hash, then oid is resident in v2 */
-static struct vdisk *oid_to_vdisk(uint64_t oid)
+/* If v1_hash < hval <= v2_hash, then oid is resident in v2 */
+static struct vdisk *hval_to_vdisk(uint64_t hval)
 {
-	struct vdisk dummy = {
-		.hash = sd_hash_oid(oid),
-	};
+	struct vdisk dummy = { .hash = hval };
 
 	return rb_nsearch(&md.vroot, &dummy, rb, vdisk_cmp);
+}
+
+static struct vdisk *oid_to_vdisk(uint64_t oid)
+{
+	return hval_to_vdisk(sd_hash_oid(oid));
 }
 
 static void create_vdisks(struct disk *disk)
@@ -97,6 +100,28 @@ static void create_vdisks(struct disk *disk)
 		v->disk = disk;
 		if (unlikely(vdisk_insert(v)))
 			panic("vdisk hash collison");
+	}
+}
+
+static inline void vdisk_free(struct vdisk *v)
+{
+	rb_erase(&v->rb, &md.vroot);
+	free(v);
+}
+
+static void remove_vdisks(const struct disk *disk)
+{
+	uint64_t hval = sd_hash(disk->path, strlen(disk->path));
+	int nr = vdisk_number(disk);
+
+	for (int i = 0; i < nr; i++) {
+		struct vdisk *v;
+
+		hval = sd_hash_next(hval);
+		v = hval_to_vdisk(hval);
+		assert(v->hash == hval);
+
+		vdisk_free(v);
 	}
 }
 
@@ -286,23 +311,12 @@ bool md_add_disk(const char *path, bool purge)
 	return true;
 }
 
-static inline void vdisk_free(struct vdisk *v)
-{
-	rb_erase(&v->rb, &md.vroot);
-	free(v);
-}
-
 static inline void md_remove_disk(struct disk *disk)
 {
-	struct vdisk *v;
-
 	sd_info("%s from multi-disk array", disk->path);
 	rb_erase(&disk->rb, &md.root);
 	md.nr_disks--;
-	rb_for_each_entry(v, &md.vroot, rb) {
-		if (v->disk == disk)
-			vdisk_free(v);
-	}
+	remove_vdisks(disk);
 	free(disk);
 }
 
