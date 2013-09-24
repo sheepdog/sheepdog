@@ -12,6 +12,7 @@
 #ifndef SD_COMPILER_H
 #define SD_COMPILER_H
 
+#include <stddef.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <time.h>
@@ -19,6 +20,10 @@
 #include <stdint.h>
 
 #include "config.h"
+
+#define container_of(ptr, type, member) ({			\
+	const typeof(((type *)0)->member) *__mptr = (ptr);	\
+	(type *)((char *)__mptr - offsetof(type, member)); })
 
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
