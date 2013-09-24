@@ -1104,13 +1104,8 @@ out:
 
 void clean_vdi_state(void)
 {
-	struct vdi_state_entry *entry;
-
 	sd_write_lock(&vdi_state_lock);
-	rb_for_each_entry(entry, &vdi_state_root, node) {
-		rb_erase(&entry->node, &vdi_state_root);
-		free(entry);
-	}
+	rb_destroy(&vdi_state_root, struct vdi_state_entry, node);
 	INIT_RB_ROOT(&vdi_state_root);
 	sd_unlock(&vdi_state_lock);
 }

@@ -71,12 +71,7 @@ void object_tree_print(void)
 
 void object_tree_free(void)
 {
-	struct object_tree_entry *entry;
-	rb_for_each_entry(entry, &tree.root, node) {
-		rb_erase(&entry->node, &tree.root);
-		free(entry);
-	}
-
+	rb_destroy(&tree.root, struct object_tree_entry, node);
 	free(cached_entry);
 }
 
