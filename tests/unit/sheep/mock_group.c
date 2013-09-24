@@ -17,13 +17,13 @@
 #include "cluster.h"
 
 MOCK_VOID_METHOD(sd_accept_handler, const struct sd_node *joined,
-		 const struct sd_node *members, size_t nr_members,
+		 const struct rb_root *nroot, size_t nr_nodes,
 		 const void *opaque)
 MOCK_METHOD(sd_join_handler, bool, true, const struct sd_node *joining,
-	    const struct sd_node *nodes, size_t nr_nodes,
+	    const struct rb_root *nroot, size_t nr_nodes,
 	    void *opaque)
 MOCK_VOID_METHOD(sd_leave_handler, const struct sd_node *left,
-		 const struct sd_node *members, size_t nr_members)
+		 const struct rb_root *nroot, size_t nr_nodes)
 MOCK_VOID_METHOD(sd_notify_handler, const struct sd_node *sender, void *msg,
 		 size_t msg_len)
 MOCK_METHOD(sd_block_handler, bool, true, const struct sd_node *sender)

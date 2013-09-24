@@ -219,24 +219,29 @@ static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 }
 
 static inline void
+node_to_vnodes(const struct sd_node *n, struct rb_root *vroot)
+{
+	uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid),
+						  io_addr));
+
+	for (int i = 0; i < n->nr_vnodes; i++) {
+		struct sd_vnode *v = xmalloc(sizeof(*v));
+
+		hval = sd_hash_next(hval);
+		v->hash = hval;
+		v->node = n;
+		if (unlikely(rb_insert(vroot, v, rb, vnode_cmp)))
+			panic("vdisk hash collison");
+	}
+}
+
+static inline void
 nodes_to_vnodes(struct rb_root *nroot, struct rb_root *vroot)
 {
 	struct sd_node *n;
 
-	rb_for_each_entry(n, nroot, rb) {
-		uint64_t hval = sd_hash(&n->nid, offsetof(typeof(n->nid),
-							  io_addr));
-
-		for (int i = 0; i < n->nr_vnodes; i++) {
-			struct sd_vnode *v = xmalloc(sizeof(*v));
-
-			hval = sd_hash_next(hval);
-			v->hash = hval;
-			v->node = n;
-			if (unlikely(rb_insert(vroot, v, rb, vnode_cmp)))
-				panic("vdisk hash collison");
-		}
-	}
+	rb_for_each_entry(n, nroot, rb)
+		node_to_vnodes(n, vroot);
 }
 
 static inline void nodes_to_buffer(struct rb_root *nroot, void *buffer)

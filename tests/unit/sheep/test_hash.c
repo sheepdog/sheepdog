@@ -230,46 +230,83 @@ static void node5_setup(void)
 	gen_nodes = gen_many_nodes_some_vnodes;
 }
 
+static size_t get_vnodes_array(struct rb_root *vroot, struct sd_vnode *vnodes)
+{
+	struct sd_vnode *vnode;
+	size_t nr = 0;
+
+	rb_for_each_entry(vnode, vroot, rb) {
+		nr++;
+		*vnodes++ = *vnode;
+	}
+
+	return nr;
+}
+
 /* check the existing vnodes don't change */
 START_TEST(test_nodes_update)
 {
 	size_t nr_vnodes;
 	size_t nr_vnodes_after;
 	struct sd_node nodes[DATA_SIZE];
-	struct sd_vnode vnodes[SD_MAX_VNODES];
-	struct sd_vnode vnodes_after[SD_MAX_VNODES];
+	struct sd_vnode vnodes[DATA_SIZE];
+	struct sd_vnode vnodes_after[DATA_SIZE];
+	struct rb_root vroot;
 
 	gen_nodes(nodes, 0);
 
-	nr_vnodes = nodes_to_vnodes(nodes, 1, vnodes);
+	INIT_RB_ROOT(&vroot);
+	node_to_vnodes(nodes, &vroot);
+	nr_vnodes = get_vnodes_array(&vroot, vnodes);
 	/* 1 node join */
-	nr_vnodes_after = nodes_to_vnodes(nodes, 2, vnodes_after);
+	node_to_vnodes(nodes + 1, &vroot);
+	nr_vnodes_after = get_vnodes_array(&vroot, vnodes_after);
 	ck_assert(is_subset(vnodes_after, nr_vnodes_after, vnodes,
 			    nr_vnodes, vnode_cmp));
 
-	nr_vnodes = nodes_to_vnodes(nodes, 100, vnodes);
+	INIT_RB_ROOT(&vroot);
+	for (int i = 0; i < 100; i++)
+		node_to_vnodes(nodes + i, &vroot);
+	nr_vnodes = get_vnodes_array(&vroot, vnodes);
 	/* 1 node join */
-	nr_vnodes_after = nodes_to_vnodes(nodes, 101, vnodes_after);
+	node_to_vnodes(nodes + 100, &vroot);
+	nr_vnodes_after = get_vnodes_array(&vroot, vnodes_after);
 	ck_assert(is_subset(vnodes_after, nr_vnodes_after, vnodes,
 			    nr_vnodes, vnode_cmp));
 	/* 100 nodes join */
-	nr_vnodes_after = nodes_to_vnodes(nodes, 200, vnodes_after);
+	for (int i = 101; i < 200; i++)
+		node_to_vnodes(nodes + i, &vroot);
+	nr_vnodes_after = get_vnodes_array(&vroot, vnodes_after);
 	ck_assert(is_subset(vnodes_after, nr_vnodes_after, vnodes,
 			    nr_vnodes, vnode_cmp));
 
-	nr_vnodes = nodes_to_vnodes(nodes, 2, vnodes);
+	INIT_RB_ROOT(&vroot);
+	node_to_vnodes(nodes, &vroot);
+	node_to_vnodes(nodes + 1, &vroot);
+	nr_vnodes = get_vnodes_array(&vroot, vnodes);
 	/* 1 node leave */
-	nr_vnodes_after = nodes_to_vnodes(nodes + 1, 1, vnodes_after);
+	INIT_RB_ROOT(&vroot);
+	node_to_vnodes(nodes, &vroot);
+	nr_vnodes_after = get_vnodes_array(&vroot, vnodes_after);
 	ck_assert(is_subset(vnodes, nr_vnodes, vnodes_after,
 			    nr_vnodes_after, vnode_cmp));
 
-	nr_vnodes = nodes_to_vnodes(nodes, 200, vnodes);
+	INIT_RB_ROOT(&vroot);
+	for (int i = 0; i < 200; i++)
+		node_to_vnodes(nodes + i, &vroot);
+	nr_vnodes = get_vnodes_array(&vroot, vnodes);
 	/* 1 node leave */
-	nr_vnodes_after = nodes_to_vnodes(nodes + 1, 199, vnodes_after);
+	INIT_RB_ROOT(&vroot);
+	for (int i = 0; i < 199; i++)
+		node_to_vnodes(nodes + i, &vroot);
+	nr_vnodes_after = get_vnodes_array(&vroot, vnodes_after);
 	ck_assert(is_subset(vnodes, nr_vnodes, vnodes_after,
 			    nr_vnodes_after, vnode_cmp));
 	/* 100 nodes leave */
-	nr_vnodes_after = nodes_to_vnodes(nodes + 50, 100, vnodes_after);
+	INIT_RB_ROOT(&vroot);
+	for (int i = 50; i < 150; i++)
+		node_to_vnodes(nodes + i, &vroot);
+	nr_vnodes_after = get_vnodes_array(&vroot, vnodes_after);
 	ck_assert(is_subset(vnodes, nr_vnodes, vnodes_after,
 			    nr_vnodes_after, vnode_cmp));
 }
@@ -278,16 +315,20 @@ END_TEST
 static void gen_data_from_nodes(double *data, int idx)
 {
 	struct sd_node nodes[DATA_SIZE];
-	struct sd_vnode vnodes[DATA_SIZE];
+	struct sd_vnode *vnode;
+	struct rb_root vroot;
 	int nr_nodes;
-	int nr_vnodes;
+	double *p = data;
 
 	nr_nodes = gen_nodes(nodes, idx);
-	nr_vnodes = nodes_to_vnodes(nodes, nr_nodes, vnodes);
-	ck_assert_int_eq(nr_vnodes, DATA_SIZE);
+	INIT_RB_ROOT(&vroot);
+	for (int i = 0; i < nr_nodes; i++)
+		node_to_vnodes(nodes + i, &vroot);
 
-	for (int i = 0; i < DATA_SIZE; i++)
-		data[i] = vnodes[i].id;
+	rb_for_each_entry(vnode, &vroot, rb)
+		*p++ = vnode->hash;
+
+	ck_assert_int_eq(p - data, DATA_SIZE);
 }
 
 START_TEST(test_nodes_dispersion)
@@ -304,7 +345,7 @@ static size_t gen_many_vdisks(struct disk *disks, int idx)
 	memset(disks, 0, sizeof(*disks));
 
 	snprintf(disks[0].path, sizeof(disks[0].path), "/%x", idx);
-	disks[0].nr_vdisks = DATA_SIZE;
+	disks[0].space = MD_VDISK_SIZE * DATA_SIZE;
 
 	return 1;
 }
@@ -322,7 +363,7 @@ static size_t gen_many_disks_one_vdisk(struct disk *disks, int idx)
 	for (int i = 0; i < DATA_SIZE; i++) {
 		snprintf(disks[i].path, sizeof(disks[i].path),
 			 "/%x/%x", idx, i);
-		disks[i].nr_vdisks = 1;
+		disks[i].space = MD_VDISK_SIZE;
 	}
 
 	return DATA_SIZE;
@@ -341,7 +382,7 @@ static size_t gen_many_disks_some_vdisks(struct disk *disks, int idx)
 	for (int i = 0; i < DATA_SIZE / 4; i++) {
 		snprintf(disks[i].path, sizeof(disks[i].path),
 			 "/%x/%x", idx, i);
-		disks[i].nr_vdisks = 4;
+		disks[i].space = MD_VDISK_SIZE * 4;
 	}
 
 	return DATA_SIZE / 4;
@@ -352,45 +393,79 @@ static void disk3_setup(void)
 	gen_disks = gen_many_disks_some_vdisks;
 }
 
+static size_t get_vdisks_array(struct vdisk *vdisks)
+{
+	struct vdisk *vdisk;
+	size_t nr = 0;
+
+	rb_for_each_entry(vdisk, &md.vroot, rb) {
+		nr++;
+		*vdisks++ = *vdisk;
+	}
+
+	return nr;
+}
+
 START_TEST(test_disks_update)
 {
 	size_t nr_vdisks;
 	size_t nr_vdisks_after;
 	struct disk disks[DATA_SIZE];
-	struct vdisk vdisks[MD_MAX_VDISK];
-	struct vdisk vdisks_after[MD_MAX_VDISK];
+	struct vdisk vdisks[DATA_SIZE];
+	struct vdisk vdisks_after[DATA_SIZE];
 
 	gen_disks(disks, 0);
 
-	nr_vdisks = disks_to_vdisks(disks, 1, vdisks);
+	INIT_RB_ROOT(&md.vroot);
+	create_vdisks(disks);
+	nr_vdisks = get_vdisks_array(vdisks);
 	/* add 1 disk */
-	nr_vdisks_after = disks_to_vdisks(disks, 2, vdisks_after);
+	create_vdisks(disks + 1);
+	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks_after, nr_vdisks_after, vdisks,
 			    nr_vdisks, vdisk_cmp));
 
-	nr_vdisks = disks_to_vdisks(disks, 30, vdisks);
+	INIT_RB_ROOT(&md.vroot);
+	for (int i = 0; i < 30; i++)
+		create_vdisks(disks + i);
+	nr_vdisks = get_vdisks_array(vdisks);
 	/* add 1 disk */
-	nr_vdisks_after = disks_to_vdisks(disks, 31, vdisks_after);
+	create_vdisks(disks + 30);
+	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks_after, nr_vdisks_after, vdisks,
 			    nr_vdisks, vdisk_cmp));
 	/* add 20 disks */
-	nr_vdisks_after = disks_to_vdisks(disks, 50, vdisks_after);
+	for (int i = 31; i < 50; i++)
+		create_vdisks(disks + i);
+	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks_after, nr_vdisks_after, vdisks,
 			    nr_vdisks, vdisk_cmp));
 
-	nr_vdisks = disks_to_vdisks(disks, 2, vdisks);
+	INIT_RB_ROOT(&md.vroot);
+	create_vdisks(disks);
+	create_vdisks(disks + 1);
+	nr_vdisks = get_vdisks_array(vdisks);
 	/* remove 1 disk */
-	nr_vdisks_after = disks_to_vdisks(disks + 1, 1, vdisks_after);
+	remove_vdisks(disks);
+	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks, nr_vdisks, vdisks_after,
 			    nr_vdisks_after, vdisk_cmp));
 
-	nr_vdisks = disks_to_vdisks(disks, 50, vdisks);
+	INIT_RB_ROOT(&md.vroot);
+	for (int i = 0; i < 50; i++)
+		create_vdisks(disks + i);
+	nr_vdisks = get_vdisks_array(vdisks);
 	/* remove 1 disk */
-	nr_vdisks_after = disks_to_vdisks(disks + 1, 49, vdisks_after);
+	remove_vdisks(disks);
+	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks, nr_vdisks, vdisks_after,
 			    nr_vdisks_after, vdisk_cmp));
 	/* remove 20 disks */
-	nr_vdisks_after = disks_to_vdisks(disks + 10, 30, vdisks_after);
+	for (int i = 1; i < 10; i++)
+		remove_vdisks(disks + i);
+	for (int i = 40; i < 50; i++)
+		remove_vdisks(disks + i);
+	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks, nr_vdisks, vdisks_after,
 			    nr_vdisks_after, vdisk_cmp));
 }
@@ -399,16 +474,19 @@ END_TEST
 static void gen_data_from_disks(double *data, int idx)
 {
 	struct disk disks[DATA_SIZE];
-	struct vdisk vdisks[DATA_SIZE];
+	struct vdisk *vdisk;
 	int nr_disks;
-	int nr_vdisks;
+	double *p = data;
 
 	nr_disks = gen_disks(disks, idx);
-	nr_vdisks = disks_to_vdisks(disks, nr_disks, vdisks);
-	ck_assert_int_eq(nr_vdisks, DATA_SIZE);
+	INIT_RB_ROOT(&md.vroot);
+	for (int i = 0; i < nr_disks; i++)
+		create_vdisks(disks + i);
 
-	for (int i = 0; i < DATA_SIZE; i++)
-		data[i] = vdisks[i].id;
+	rb_for_each_entry(vdisk, &md.vroot, rb)
+		*p++ = vdisk->hash;
+
+	ck_assert_int_eq(p - data, DATA_SIZE);
 }
 
 START_TEST(test_disks_dispersion)
@@ -475,8 +553,8 @@ static Suite *test_suite(void)
 	TCase *tc_nodes4 = tcase_create("many nodes with one vnode");
 	TCase *tc_nodes5 = tcase_create("many nodes with some vnodes");
 	TCase *tc_disks1 = tcase_create("many vdisks on one disk");
-	TCase *tc_disks2 = tcase_create("many disks with one vnode");
-	TCase *tc_disks3 = tcase_create("many disks with some vnodes");
+	TCase *tc_disks2 = tcase_create("many disks with one vdisk");
+	TCase *tc_disks3 = tcase_create("many disks with some vdisks");
 	TCase *tc_objects1 = tcase_create("many data objects");
 	TCase *tc_objects2 = tcase_create("many vdi objects");
 

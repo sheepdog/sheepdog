@@ -15,11 +15,15 @@
 #include "mock.h"
 
 /* dog mock */
-uint8_t sdhost[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 };
-int sdport = 7000, sd_vnodes_nr = 100;
+struct node_id sd_nid = {
+	/* default sdhost is "127.0.0.1" */
+	.addr = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 1 },
+	.port = SD_LISTEN_PORT,
+};
 bool highlight = true;
 bool raw_output;
-struct sd_vnode sd_vnodes[SD_MAX_VNODES];
+struct rb_root sd_vroot = RB_ROOT;
+struct rb_root sd_nroot = RB_ROOT;
 
 MOCK_METHOD(update_node_list, int, 0, int max_nodes)
 MOCK_VOID_METHOD(subcommand_usage, char *cmd, char *subcmd, int status)
