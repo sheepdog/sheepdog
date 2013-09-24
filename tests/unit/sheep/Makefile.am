@@ -4,7 +4,7 @@ TESTS			= test_vdi test_cluster_driver
 
 check_PROGRAMS		= ${TESTS}
 
-INCLUDES		= -I$(top_srcdir)/include			\
+AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  -I$(top_srcdir)/sheep				\
 			  -I../mock					\
 			  @CHECK_CFLAGS@

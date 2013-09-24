@@ -19,7 +19,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 
 AM_CFLAGS		=
 
-INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include \
+AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 			  $(libcpg_CFLAGS) $(libcfg_CFLAGS) $(libacrd_CFLAGS)
 
 sbin_PROGRAMS		= sheep

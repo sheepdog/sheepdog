@@ -19,7 +19,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 
 AM_CFLAGS		=
 
-INCLUDES		= -I$(top_builddir)/include -I$(top_srcdir)/include
+AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include
 
 sbin_PROGRAMS		= shepherd
 
@@ -31,7 +31,7 @@ shepherd_DEPENDENCIES	= ../lib/libsheepdog.a
 EXTRA_DIST		=
 
 lint:
-	-splint $(INCLUDES) $(LINT_FLAGS) $(CFLAGS) *.c
+	-splint $(AM_CPPFLAGS) $(LINT_FLAGS) $(CFLAGS) *.c
 
 all-local:
 	@echo Built shepherd
