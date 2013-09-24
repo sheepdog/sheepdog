@@ -13,9 +13,9 @@ Build-Depends: debhelper (>= 9),
  libfuse-dev,
  po-debconf
 Standards-Version: 3.9.4
-Homepage: http://www.osrg.net/sheepdog/
-Vcs-Browser: http://git.debian.org/?p=openstack/sheepdog.git
-Vcs-Git: git://git.debian.org/openstack/sheepdog.git
+Homepage: http://sheepdog.github.io/sheepdog
+Vcs-Browser: http://anonscm.debian.org/?p=openstack/sheepdog.git
+Vcs-Git: git://anonscm.debian.org/openstack/sheepdog.git
 
 Package: sheepdog
 Architecture: any
