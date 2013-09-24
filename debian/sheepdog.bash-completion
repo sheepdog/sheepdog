@@ -1,1 +1,2 @@
 script/bash_completion_dog dog
+script/bash_completion_dog collie
