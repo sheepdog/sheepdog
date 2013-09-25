@@ -96,6 +96,7 @@ void *slice_read(const unsigned char *sha1, size_t *outsize)
 		if (!sbuf)
 			goto err;
 		strbuf_add(&buf, sbuf, size);
+		free(sbuf);
 		*outsize += size;
 	}
 
