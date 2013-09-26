@@ -89,6 +89,7 @@ struct forward_info_entry {
 	struct pollfd pfd;
 	const struct node_id *nid;
 	struct sockfd *sfd;
+	void *buf;
 };
 
 struct forward_info {
@@ -114,6 +115,17 @@ static inline void finish_one_entry_err(struct forward_info *fi, int i)
 {
 	sockfd_cache_del(fi->ent[i].nid, fi->ent[i].sfd);
 	forward_info_update(fi, i);
+}
+
+static inline struct forward_info_entry *
+forward_info_find(struct forward_info *fi, int fd)
+{
+	for (int i = 0; i < fi->nr_sent; i++)
+		if (fi->ent[i].pfd.fd == fd)
+			return &fi->ent[i];
+
+	panic("can't find entry for %d", fd);
+	return NULL;
 }
 
 struct pfd_info {
@@ -192,6 +204,19 @@ again:
 			goto out;
 		}
 
+		if (rsp->data_length) {
+			struct forward_info_entry *ent;
+
+			ent = forward_info_find(fi, pi.pfds[i].fd);
+			if (do_read(pi.pfds[i].fd, ent->buf, rsp->data_length,
+				    sheep_need_retry, req->rq.epoch,
+				    MAX_RETRY_COUNT)) {
+				sd_err("remote node might have gone away");
+				err_ret = SD_RES_NETWORK_ERROR;
+				finish_one_entry_err(fi, i);
+				goto out;
+			}
+		}
 		ret = rsp->result;
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("fail %"PRIx64", %s", req->rq.obj.oid,
