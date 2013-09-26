@@ -279,13 +279,15 @@ out:
 	free(sw);
 }
 
-static int queue_save_snapshot_work(uint64_t oid, int nr_copies, void *data)
+static int queue_save_snapshot_work(uint64_t oid, uint32_t nr_copies,
+				    uint8_t copy_policy, void *data)
 {
 	struct snapshot_work *sw = xzalloc(sizeof(struct snapshot_work));
 	struct strbuf *trunk_buf = data;
 
 	sw->entry.oid = oid;
 	sw->entry.nr_copies = nr_copies;
+	sw->entry.copy_policy = copy_policy;
 	sw->trunk_buf = trunk_buf;
 	sw->work.fn = do_save_object;
 	sw->work.done = save_object_done;
@@ -355,7 +357,8 @@ static void do_load_object(struct work *work)
 		goto error;
 
 	if (sd_write_object(sw->entry.oid, 0, buffer, size, 0, 0,
-			    sw->entry.nr_copies, true, true) != 0)
+			    sw->entry.nr_copies, sw->entry.copy_policy,
+			    true, true) != 0)
 		goto error;
 
 	if (is_vdi_obj(sw->entry.oid)) {

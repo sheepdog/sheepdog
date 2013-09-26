@@ -70,7 +70,7 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 		   uint64_t offset, bool direct);
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    unsigned int datalen, uint64_t offset, uint32_t flags,
-		    int copies, bool create, bool direct);
+		    uint8_t copies, uint8_t, bool create, bool direct);
 int dog_exec_req(const struct node_id *, struct sd_req *hdr, void *data);
 int send_light_req(const struct node_id *, struct sd_req *hdr);
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv);
@@ -79,7 +79,7 @@ void confirm(const char *message);
 void work_queue_wait(struct work_queue *q);
 int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
-		  int nr_copies, uint8_t copy_policy);
+		  uint8_t nr_copies, uint8_t copy_policy);
 int do_vdi_check(const struct sd_inode *inode);
 void show_progress(uint64_t done, uint64_t total, bool raw);
 

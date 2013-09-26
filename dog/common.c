@@ -86,7 +86,8 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 
 int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		    unsigned int datalen, uint64_t offset, uint32_t flags,
-		    int copies, bool create, bool direct)
+		    uint8_t copies, uint8_t copy_policy, bool create,
+		    bool direct)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -105,6 +106,7 @@ int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 		hdr.flags |= SD_FLAG_CMD_DIRECT;
 
 	hdr.obj.copies = copies;
+	hdr.obj.copy_policy = copy_policy;
 	hdr.obj.oid = oid;
 	hdr.obj.cow_oid = cow_oid;
 	hdr.obj.offset = offset;

@@ -242,8 +242,8 @@ out:
 }
 
 static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
-			  uint32_t snapid, uint32_t flags,
-			  const struct sd_inode *i, void *data)
+			     uint32_t snapid, uint32_t flags,
+			     const struct sd_inode *i, void *data)
 {
 	uint64_t vdi_oid = vid_to_vdi_oid(vid), vmstate_oid;
 	int nr_objs, nr_vmstate_object;
@@ -253,7 +253,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 		return;
 
 	/* fill vdi object id */
-	object_tree_insert(vdi_oid, i->nr_copies);
+	object_tree_insert(vdi_oid, i->nr_copies, 0);
 
 	/* fill data object id */
 	nr_objs = count_data_objs(i);
@@ -261,7 +261,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 		if (i->data_vdi_id[idx]) {
 			uint64_t oid = vid_to_data_oid(i->data_vdi_id[idx],
 						       idx);
-			object_tree_insert(oid, i->nr_copies);
+			object_tree_insert(oid, i->nr_copies, i->copy_policy);
 		}
 	}
 
@@ -269,7 +269,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	nr_vmstate_object = DIV_ROUND_UP(i->vm_state_size, SD_DATA_OBJ_SIZE);
 	for (int idx = 0; idx < nr_vmstate_object; idx++) {
 		vmstate_oid = vid_to_vmstate_oid(vid, idx);
-		object_tree_insert(vmstate_oid, i->nr_copies);
+		object_tree_insert(vmstate_oid, i->nr_copies, i->copy_policy);
 	}
 }
 

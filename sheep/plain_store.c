@@ -295,7 +295,7 @@ int prealloc(int fd, uint32_t size)
 
 static size_t get_store_objsize(uint64_t oid)
 {
-	if (is_erasure_object(oid))
+	if (is_erasure_oid(oid))
 		return SD_EC_OBJECT_SIZE;
 	return get_objsize(oid);
 }

@@ -170,17 +170,23 @@ out:
 	return reqs;
 }
 
-bool is_erasure_object(uint64_t oid)
+/* Requests from dog might not have vdi registered yet in the vdi state */
+static bool is_erasure_req(struct request *req)
 {
-	return !is_vdi_obj(oid) && get_vdi_copy_policy(oid_to_vid(oid)) != 0;
+	if (req->rq.obj.copy_policy > 0)
+		return true;
+	return is_erasure_oid(req->rq.obj.oid);
+}
+
+bool is_erasure_oid(uint64_t oid)
+{
+	return !is_vdi_obj(oid) && get_vdi_copy_policy(oid_to_vid(oid)) > 0;
 }
 
 /* Prepare request iterator and buffer for each replica */
 static struct req_iter *prepare_requests(struct request *req, int *nr)
 {
-	uint64_t oid = req->rq.obj.oid;
-
-	if (is_erasure_object(oid))
+	if (is_erasure_req(req))
 		return prepare_erasure_requests(req, nr);
 	else
 		return prepare_replication_requests(req, nr);
@@ -197,7 +203,7 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 	int end = DIV_ROUND_UP(off + len, SD_EC_D_SIZE), i, j;
 	int nr_stripe = end - start;
 
-	if (!is_erasure_object(oid))
+	if (!is_erasure_oid(oid))
 		goto out;
 
 	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
@@ -516,7 +522,7 @@ int gateway_read_obj(struct request *req)
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	if (is_erasure_object(oid))
+	if (is_erasure_oid(oid))
 		return gateway_forward_request(req);
 	else
 		return gateway_replication_read(req);

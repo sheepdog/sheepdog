@@ -467,7 +467,7 @@ static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 
 int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
-		  int nr_copies, uint8_t copy_policy)
+		  uint8_t nr_copies, uint8_t copy_policy)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -550,7 +550,7 @@ static int vdi_create(int argc, char **argv)
 		oid = vid_to_data_oid(vid, idx);
 
 		ret = sd_write_object(oid, 0, NULL, 0, 0, 0, inode->nr_copies,
-				      true, true);
+				      inode->copy_policy, true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -558,8 +558,9 @@ static int vdi_create(int argc, char **argv)
 
 		inode->data_vdi_id[idx] = vid;
 		ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
-				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx, 0,
-				      inode->nr_copies, false, true);
+				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
+				      0, inode->nr_copies, inode->copy_policy,
+				      false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -601,7 +602,8 @@ static int vdi_snapshot(int argc, char **argv)
 	ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
 			      SD_MAX_VDI_TAG_LEN,
 			      offsetof(struct sd_inode, tag),
-			      0, inode->nr_copies, false, false);
+			      0, inode->nr_copies, inode->copy_policy,
+			      false, false);
 	if (ret != SD_RES_SUCCESS)
 		return EXIT_FAILURE;
 
@@ -674,15 +676,17 @@ static int vdi_clone(int argc, char **argv)
 
 		oid = vid_to_data_oid(new_vid, idx);
 		ret = sd_write_object(oid, 0, buf, size, 0, 0, inode->nr_copies,
-				      true, true);
+				      inode->copy_policy, true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
 		}
 
-		ret = sd_write_object(vid_to_vdi_oid(new_vid), 0, &new_vid, sizeof(new_vid),
-				      SD_INODE_HEADER_SIZE + sizeof(new_vid) * idx, 0,
-				      inode->nr_copies, false, true);
+		ret = sd_write_object(vid_to_vdi_oid(new_vid), 0, &new_vid,
+				      sizeof(new_vid),
+				SD_INODE_HEADER_SIZE + sizeof(new_vid) * idx, 0,
+				      inode->nr_copies, inode->copy_policy,
+				      false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -734,8 +738,10 @@ static int vdi_resize(int argc, char **argv)
 	}
 	inode->vdi_size = new_size;
 
-	ret = sd_write_object(vid_to_vdi_oid(vid), 0, inode, SD_INODE_HEADER_SIZE, 0,
-			      0, inode->nr_copies, false, true);
+	ret = sd_write_object(vid_to_vdi_oid(vid), 0,
+			      inode, SD_INODE_HEADER_SIZE, 0,
+			      0, inode->nr_copies, inode->copy_policy,
+			      false, true);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to update an inode header");
 		return EXIT_FAILURE;
@@ -1308,7 +1314,8 @@ static int vdi_write(int argc, char **argv)
 		inode->data_vdi_id[idx] = inode->vdi_id;
 		oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
 		ret = sd_write_object(oid, old_oid, buf, len, offset, flags,
-				      inode->nr_copies, create, false);
+				      inode->nr_copies, inode->copy_policy,
+				      create, false);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write VDI");
 			ret = EXIT_FAILURE;
@@ -1316,9 +1323,11 @@ static int vdi_write(int argc, char **argv)
 		}
 
 		if (create) {
-			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
-					      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
-					      flags, inode->nr_copies, false, false);
+			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid,
+					      sizeof(vid),
+				SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
+					      flags, inode->nr_copies,
+					      inode->copy_policy, false, false);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;
@@ -1787,13 +1796,15 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 	/* send a copy-on-write request */
 	ret = sd_write_object(vid_to_data_oid(vid, backup->idx), parent_oid,
 			      backup->data, backup->length, backup->offset,
-			      0, parent_inode->nr_copies, true, true);
+			      0, parent_inode->nr_copies,
+			      parent_inode->copy_policy, true, true);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	return sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 			       SD_INODE_HEADER_SIZE + sizeof(vid) * backup->idx,
-			       0, parent_inode->nr_copies, false, true);
+			       0, parent_inode->nr_copies,
+			       parent_inode->copy_policy, false, true);
 }
 
 static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)

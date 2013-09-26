@@ -20,7 +20,9 @@
 
 struct trunk_entry {
 	uint64_t oid;
-	int nr_copies;
+	uint8_t nr_copies;
+	uint8_t copy_policy;
+	uint8_t reserved[2];
 	unsigned char sha1[SHA1_DIGEST_SIZE];
 };
 
@@ -71,11 +73,11 @@ void *sha1_file_read(const unsigned char *sha1, size_t *size);
 
 /* object_tree.c */
 int object_tree_size(void);
-void object_tree_insert(uint64_t oid, int nr_copies);
+void object_tree_insert(uint64_t oid, uint32_t nr_copies, uint8_t);
 void object_tree_free(void);
 void object_tree_print(void);
-int for_each_object_in_tree(int (*func)(uint64_t oid, int nr_copies,
-					void *data), void *data);
+int for_each_object_in_tree(int (*func)(uint64_t oid, uint32_t nr_copies,
+					uint8_t, void *data), void *data);
 /* slice.c */
 int slice_write(void *buf, size_t len, unsigned char *outsha1);
 void *slice_read(const unsigned char *sha1, size_t *outsize);
