@@ -293,6 +293,13 @@ int prealloc(int fd, uint32_t size)
 	return 0;
 }
 
+static size_t get_store_objsize(uint64_t oid)
+{
+	if (is_erasure_object(oid))
+		return SD_EC_OBJECT_SIZE;
+	return get_objsize(oid);
+}
+
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
@@ -331,8 +338,8 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		return err_to_sderr(path, oid, errno);
 	}
 
-	if (iocb->offset != 0 || iocb->length != get_objsize(oid)) {
-		ret = prealloc(fd, get_objsize(oid));
+	if (iocb->offset != 0 || iocb->length != get_store_objsize(oid)) {
+		ret = prealloc(fd, get_store_objsize(oid));
 		if (ret < 0) {
 			ret = err_to_sderr(path, oid, errno);
 			goto out;

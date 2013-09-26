@@ -401,6 +401,7 @@ int gateway_read_obj(struct request *req);
 int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
 int gateway_remove_obj(struct request *req);
+bool is_erasure_object(uint64_t oid);
 
 /* backend store */
 int peer_read_obj(struct request *req);

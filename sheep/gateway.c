@@ -47,13 +47,124 @@ static struct req_iter *prepare_replication_requests(struct request *req,
 	return reqs;
 }
 
-static struct req_iter *prepare_requests(struct request *req, int *nr)
+/*
+ * We spread data strips of req along with its parity strips onto replica for
+ * write opertaion. For read we only need to prepare data strip buffers.
+ */
+static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 {
-	return prepare_replication_requests(req, nr);
+	void *data = req->data;
+	uint32_t len = req->rq.data_length;
+	uint64_t off = req->rq.obj.offset;
+	int opcode = req->rq.opcode;
+	int start = off / SD_EC_D_SIZE;
+	int end = DIV_ROUND_UP(off + len, SD_EC_D_SIZE), i, j;
+	int nr_stripe = end - start;
+	struct fec *ctx = ec_init();
+	int nr_to_send = (opcode == SD_OP_READ_OBJ) ? SD_EC_D : SD_EC_DP;
+	struct req_iter *reqs = xzalloc(sizeof(*reqs) * nr_to_send);
+	char *p, *buf = NULL;
+
+	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
+		 start, end, nr_to_send, off, len);
+
+	*nr = nr_to_send;
+	for (i = 0; i < nr_to_send; i++) {
+		int l = SD_EC_STRIP_SIZE * nr_stripe;
+
+		reqs[i].buf = xmalloc(l);
+		reqs[i].dlen = l;
+		reqs[i].off = start * SD_EC_STRIP_SIZE;
+		switch (opcode) {
+		case SD_OP_CREATE_AND_WRITE_OBJ:
+		case SD_OP_WRITE_OBJ:
+			reqs[i].wlen = l;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (opcode != SD_OP_WRITE_OBJ && opcode != SD_OP_CREATE_AND_WRITE_OBJ)
+		goto out; /* Read and remove operation */
+
+	p = buf = xzalloc(SD_EC_D_SIZE * nr_stripe);
+	memcpy(buf + off % SD_EC_D_SIZE, data, len);
+	for (i = 0; i < nr_stripe; i++) {
+		const uint8_t *ds[SD_EC_D];
+		uint8_t *ps[SD_EC_P];
+
+		for (j = 0; j < SD_EC_D; j++)
+			ds[j] = reqs[j].buf + SD_EC_STRIP_SIZE * i;
+
+		for (j = 0; j < SD_EC_P; j++)
+			ps[j] = reqs[SD_EC_D + j].buf + SD_EC_STRIP_SIZE * i;
+
+		for (j = 0; j < SD_EC_D; j++)
+			memcpy((uint8_t *)ds[j], p + j * SD_EC_STRIP_SIZE,
+			       SD_EC_STRIP_SIZE);
+		ec_encode(ctx, ds, ps);
+		p += SD_EC_D_SIZE;
+	}
+out:
+	ec_destroy(ctx);
+	free(buf);
+
+	return reqs;
 }
 
-static void finish_requests(struct req_iter *reqs)
+bool is_erasure_object(uint64_t oid)
 {
+	return !is_vdi_obj(oid) && get_vdi_copy_policy(oid_to_vid(oid)) != 0;
+}
+
+/* Prepare request iterator and buffer for each replica */
+static struct req_iter *prepare_requests(struct request *req, int *nr)
+{
+	uint64_t oid = req->rq.obj.oid;
+
+	if (is_erasure_object(oid))
+		return prepare_erasure_requests(req, nr);
+	else
+		return prepare_replication_requests(req, nr);
+}
+
+static void finish_requests(struct request *req, struct req_iter *reqs,
+			    int nr_to_send)
+{
+	uint64_t oid = req->rq.obj.oid;
+	uint32_t len = req->rq.data_length;
+	uint64_t off = req->rq.obj.offset;
+	int opcode = req->rq.opcode;
+	int start = off / SD_EC_D_SIZE;
+	int end = DIV_ROUND_UP(off + len, SD_EC_D_SIZE), i, j;
+	int nr_stripe = end - start;
+
+	if (!is_erasure_object(oid))
+		goto out;
+
+	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
+		 start, end, nr_to_send, off, len);
+
+	/* We need to assemble the data strips into the req buffer for read */
+	if (opcode == SD_OP_READ_OBJ) {
+		char *p, *buf = xmalloc(SD_EC_D_SIZE * nr_stripe);
+
+		p = buf;
+		for (i = 0; i < nr_stripe; i++) {
+			for (j = 0; j < nr_to_send; j++) {
+				memcpy(p, reqs[j].buf + SD_EC_STRIP_SIZE * i,
+				       SD_EC_STRIP_SIZE);
+				p += SD_EC_STRIP_SIZE;
+			}
+		}
+		memcpy(req->data, buf + off % SD_EC_D_SIZE, len);
+		req->rp.data_length = req->rq.data_length;
+		free(buf);
+	}
+	for (i = 0; i < nr_to_send; i++)
+		free(reqs[i].buf);
+out:
 	free(reqs);
 }
 
@@ -335,16 +446,21 @@ static int gateway_forward_request(struct request *req)
 			err_ret = ret;
 	}
 
-	finish_requests(reqs);
+	finish_requests(req, reqs, nr_to_send);
 	return err_ret;
 }
 
 int gateway_read_obj(struct request *req)
 {
+	uint64_t oid = req->rq.obj.oid;
+
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	return gateway_replication_read(req);
+	if (is_erasure_object(oid))
+		return gateway_forward_request(req);
+	else
+		return gateway_replication_read(req);
 }
 
 int gateway_write_obj(struct request *req)
