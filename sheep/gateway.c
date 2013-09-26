@@ -48,12 +48,63 @@ static struct req_iter *prepare_replication_requests(struct request *req,
 }
 
 /*
+ * Make sure we don't overwrite the existing data for unaligned write
+ *
+ * If either offset or length of request isn't aligned to SD_EC_D_SIZE, we have
+ * to read the unaligned blocks before write. This kind of write amplification
+ * indeed slow down the write operation with extra read overhead.
+ */
+static void *init_erasure_buffer(struct request *req, int buf_len)
+{
+	char *buf = xzalloc(buf_len);
+	uint32_t len = req->rq.data_length;
+	uint64_t off = req->rq.obj.offset;
+	uint64_t oid = req->rq.obj.oid;
+	int opcode = req->rq.opcode;
+	struct sd_req hdr;
+	uint64_t head = round_down(off, SD_EC_D_SIZE);
+	uint64_t tail = round_down(off + len, SD_EC_D_SIZE);
+	int ret;
+
+	if (opcode != SD_OP_WRITE_OBJ)
+		goto out;
+
+	if (off % SD_EC_D_SIZE) {
+		/* Read head */
+		sd_init_req(&hdr, SD_OP_READ_OBJ);
+		hdr.obj.oid = oid;
+		hdr.data_length = SD_EC_D_SIZE;
+		hdr.obj.offset = head;
+		ret = exec_local_req(&hdr, buf);
+		if (ret != SD_RES_SUCCESS) {
+			free(buf);
+			return NULL;
+		}
+	}
+
+	if ((len + off) % SD_EC_D_SIZE && tail - head > 0) {
+		/* Read tail */
+		sd_init_req(&hdr, SD_OP_READ_OBJ);
+		hdr.obj.oid = oid;
+		hdr.data_length = SD_EC_D_SIZE;
+		hdr.obj.offset = tail;
+		ret = exec_local_req(&hdr, buf + tail - head);
+		if (ret != SD_RES_SUCCESS) {
+			free(buf);
+			return NULL;
+		}
+	}
+out:
+	memcpy(buf + off % SD_EC_D_SIZE, req->data, len);
+	return buf;
+}
+
+/*
  * We spread data strips of req along with its parity strips onto replica for
  * write opertaion. For read we only need to prepare data strip buffers.
  */
 static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 {
-	void *data = req->data;
 	uint32_t len = req->rq.data_length;
 	uint64_t off = req->rq.obj.offset;
 	int opcode = req->rq.opcode;
@@ -88,8 +139,14 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	if (opcode != SD_OP_WRITE_OBJ && opcode != SD_OP_CREATE_AND_WRITE_OBJ)
 		goto out; /* Read and remove operation */
 
-	p = buf = xzalloc(SD_EC_D_SIZE * nr_stripe);
-	memcpy(buf + off % SD_EC_D_SIZE, data, len);
+	p = buf = init_erasure_buffer(req, SD_EC_D_SIZE * nr_stripe);
+	if (!buf) {
+		sd_err("failed to init erasure buffer %"PRIx64,
+		       req->rq.obj.oid);
+		free(reqs);
+		reqs = NULL;
+		goto out;
+	}
 	for (i = 0; i < nr_stripe; i++) {
 		const uint8_t *ds[SD_EC_D];
 		uint8_t *ps[SD_EC_P];
@@ -412,6 +469,8 @@ static int gateway_forward_request(struct request *req)
 	oid_to_nodes(oid, &req->vinfo->vroot, nr_copies, target_nodes);
 	forward_info_init(&fi, nr_copies);
 	reqs = prepare_requests(req, &nr_to_send);
+	if (!reqs)
+		return SD_RES_NETWORK_ERROR;
 
 	for (i = 0; i < nr_to_send; i++) {
 		struct sockfd *sfd;
