@@ -125,29 +125,34 @@ struct sd_req {
 		struct {
 			uint64_t	oid;
 			uint64_t	cow_oid;
-			uint32_t	copies;
+			uint8_t		copies;
+			uint8_t		copy_policy;
+			uint8_t		reserved[2];
 			uint32_t	tgt_epoch;
 			uint64_t	offset;
 		} obj;
 		struct {
 			uint64_t	vdi_size;
 			uint32_t	base_vdi_id;
-			uint32_t	copies;
-			uint32_t	snapid;
+			uint8_t		copies;
 			uint8_t		copy_policy;
+			uint8_t		reserved[2];
+			uint32_t	snapid;
 		} vdi;
 
 		/* sheepdog-internal */
 		struct {
 			uint64_t	oid;
 			uint64_t	ctime;
-			uint32_t	copies;
+			uint8_t		copies;
+			uint8_t		copy_policy;
+			uint8_t		reserved[2];
 			uint32_t	tag;
 		} cluster;
 		struct {
 			uint32_t	old_vid;
 			uint32_t	new_vid;
-			uint32_t	copies;
+			uint8_t		copies;
 			uint8_t		set_bitmap; /* 0 means false */
 						    /* others mean true */
 			uint8_t		copy_policy;
@@ -168,7 +173,8 @@ struct sd_rsp {
 		uint32_t        result;
 		struct {
 			uint32_t	__pad;
-			uint32_t	copies;
+			uint8_t		copies;
+			uint8_t		reserved[3];
 			uint64_t	offset;
 		} obj;
 		struct {
@@ -176,7 +182,8 @@ struct sd_rsp {
 			uint32_t	rsvd;
 			uint32_t	vdi_id;
 			uint32_t	attr_id;
-			uint32_t	copies;
+			uint8_t		copies;
+			uint8_t		reserved[3];
 		} vdi;
 
 		/* sheepdog-internal */
