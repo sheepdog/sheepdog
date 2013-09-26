@@ -85,35 +85,35 @@ out:
 	return ret;
 }
 
-struct write_info_entry {
+struct forward_info_entry {
 	struct pollfd pfd;
 	const struct node_id *nid;
 	struct sockfd *sfd;
 };
 
-struct write_info {
-	struct write_info_entry ent[SD_MAX_NODES];
+struct forward_info {
+	struct forward_info_entry ent[SD_MAX_NODES];
 	int nr_sent;
 };
 
-static inline void write_info_update(struct write_info *wi, int pos)
+static inline void forward_info_update(struct forward_info *fi, int pos)
 {
-	sd_debug("%d, %d", wi->nr_sent, pos);
-	wi->nr_sent--;
-	memmove(wi->ent + pos, wi->ent + pos + 1,
-		sizeof(struct write_info_entry) * (wi->nr_sent - pos));
+	sd_debug("%d, %d", fi->nr_sent, pos);
+	fi->nr_sent--;
+	memmove(fi->ent + pos, fi->ent + pos + 1,
+		sizeof(struct forward_info_entry) * (fi->nr_sent - pos));
 }
 
-static inline void finish_one_write(struct write_info *wi, int i)
+static inline void finish_one_entry(struct forward_info *fi, int i)
 {
-	sockfd_cache_put(wi->ent[i].nid, wi->ent[i].sfd);
-	write_info_update(wi, i);
+	sockfd_cache_put(fi->ent[i].nid, fi->ent[i].sfd);
+	forward_info_update(fi, i);
 }
 
-static inline void finish_one_write_err(struct write_info *wi, int i)
+static inline void finish_one_entry_err(struct forward_info *fi, int i)
 {
-	sockfd_cache_del(wi->ent[i].nid, wi->ent[i].sfd);
-	write_info_update(wi, i);
+	sockfd_cache_del(fi->ent[i].nid, fi->ent[i].sfd);
+	forward_info_update(fi, i);
 }
 
 struct pfd_info {
@@ -121,12 +121,12 @@ struct pfd_info {
 	int nr;
 };
 
-static inline void pfd_info_init(struct write_info *wi, struct pfd_info *pi)
+static inline void pfd_info_init(struct forward_info *fi, struct pfd_info *pi)
 {
 	int i;
-	for (i = 0; i < wi->nr_sent; i++)
-		pi->pfds[i] = wi->ent[i].pfd;
-	pi->nr = wi->nr_sent;
+	for (i = 0; i < fi->nr_sent; i++)
+		pi->pfds[i] = fi->ent[i].pfd;
+	pi->nr = fi->nr_sent;
 }
 
 /*
@@ -137,14 +137,14 @@ static inline void pfd_info_init(struct write_info *wi, struct pfd_info *pi)
  *
  * Return error code if any one request fails.
  */
-static int wait_forward_request(struct write_info *wi, struct request *req)
+static int wait_forward_request(struct forward_info *fi, struct request *req)
 {
 	int nr_sent, err_ret = SD_RES_SUCCESS, ret, pollret, i,
 	    repeat = MAX_RETRY_COUNT;
 	struct pfd_info pi;
 	struct sd_rsp *rsp = &req->rp;
 again:
-	pfd_info_init(wi, &pi);
+	pfd_info_init(fi, &pi);
 	pollret = poll(pi.pfds, pi.nr, 1000 * POLL_TIMEOUT);
 	if (pollret < 0) {
 		if (errno == EINTR)
@@ -160,19 +160,19 @@ again:
 			repeat--;
 			sd_warn("poll timeout %d, disks of some nodes or "
 				"network is busy. Going to poll-wait again",
-				wi->nr_sent);
+				fi->nr_sent);
 			goto again;
 		}
 
-		nr_sent = wi->nr_sent;
+		nr_sent = fi->nr_sent;
 		/* XXX Blinedly close all the connections */
 		for (i = 0; i < nr_sent; i++)
-			sockfd_cache_del(wi->ent[i].nid, wi->ent[i].sfd);
+			sockfd_cache_del(fi->ent[i].nid, fi->ent[i].sfd);
 
 		return SD_RES_NETWORK_ERROR;
 	}
 
-	nr_sent = wi->nr_sent;
+	nr_sent = fi->nr_sent;
 	for (i = 0; i < nr_sent; i++)
 		if (pi.pfds[i].revents & POLLIN)
 			break;
@@ -181,15 +181,15 @@ again:
 		sd_debug("%d, revents %x", i, re);
 		if (re & (POLLERR | POLLHUP | POLLNVAL)) {
 			err_ret = SD_RES_NETWORK_ERROR;
-			finish_one_write_err(wi, i);
-			goto finish_write;
+			finish_one_entry_err(fi, i);
+			goto out;
 		}
 		if (do_read(pi.pfds[i].fd, rsp, sizeof(*rsp), sheep_need_retry,
 			    req->rq.epoch, MAX_RETRY_COUNT)) {
 			sd_err("remote node might have gone away");
 			err_ret = SD_RES_NETWORK_ERROR;
-			finish_one_write_err(wi, i);
-			goto finish_write;
+			finish_one_entry_err(fi, i);
+			goto out;
 		}
 
 		ret = rsp->result;
@@ -198,32 +198,32 @@ again:
 			       sd_strerror(ret));
 			err_ret = ret;
 		}
-		finish_one_write(wi, i);
+		finish_one_entry(fi, i);
 	}
-finish_write:
-	if (wi->nr_sent > 0)
+out:
+	if (fi->nr_sent > 0)
 		goto again;
 
 	return err_ret;
 }
 
-static inline void write_info_init(struct write_info *wi, size_t nr_to_send)
+static inline void forward_info_init(struct forward_info *fi, size_t nr_to_send)
 {
 	int i;
 	for (i = 0; i < nr_to_send; i++)
-		wi->ent[i].pfd.fd = -1;
-	wi->nr_sent = 0;
+		fi->ent[i].pfd.fd = -1;
+	fi->nr_sent = 0;
 }
 
 static inline void
-write_info_advance(struct write_info *wi, const struct node_id *nid,
+forward_info_advance(struct forward_info *fi, const struct node_id *nid,
 		   struct sockfd *sfd)
 {
-	wi->ent[wi->nr_sent].nid = nid;
-	wi->ent[wi->nr_sent].pfd.fd = sfd->fd;
-	wi->ent[wi->nr_sent].pfd.events = POLLIN;
-	wi->ent[wi->nr_sent].sfd = sfd;
-	wi->nr_sent++;
+	fi->ent[fi->nr_sent].nid = nid;
+	fi->ent[fi->nr_sent].pfd.fd = sfd->fd;
+	fi->ent[fi->nr_sent].pfd.events = POLLIN;
+	fi->ent[fi->nr_sent].sfd = sfd;
+	fi->nr_sent++;
 }
 
 static int gateway_forward_request(struct request *req)
@@ -231,7 +231,7 @@ static int gateway_forward_request(struct request *req)
 	int i, err_ret = SD_RES_SUCCESS, ret;
 	unsigned wlen;
 	uint64_t oid = req->rq.obj.oid;
-	struct write_info wi;
+	struct forward_info fi;
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
 	int nr_copies = get_req_copy_number(req);
@@ -242,7 +242,7 @@ static int gateway_forward_request(struct request *req)
 
 	wlen = hdr.data_length;
 	oid_to_nodes(oid, &req->vinfo->vroot, nr_copies, target_nodes);
-	write_info_init(&wi, nr_copies);
+	forward_info_init(&fi, nr_copies);
 
 	for (i = 0; i < nr_copies; i++) {
 		struct sockfd *sfd;
@@ -264,12 +264,12 @@ static int gateway_forward_request(struct request *req)
 			sd_debug("fail %d", ret);
 			break;
 		}
-		write_info_advance(&wi, nid, sfd);
+		forward_info_advance(&fi, nid, sfd);
 	}
 
-	sd_debug("nr_sent %d, err %x", wi.nr_sent, err_ret);
-	if (wi.nr_sent > 0) {
-		ret = wait_forward_request(&wi, req);
+	sd_debug("nr_sent %d, err %x", fi.nr_sent, err_ret);
+	if (fi.nr_sent > 0) {
+		ret = wait_forward_request(&fi, req);
 		if (ret != SD_RES_SUCCESS)
 			err_ret = ret;
 	}
