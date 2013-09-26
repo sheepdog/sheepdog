@@ -228,11 +228,10 @@ write_info_advance(struct write_info *wi, const struct node_id *nid,
 
 static int gateway_forward_request(struct request *req)
 {
-	int i, err_ret = SD_RES_SUCCESS, ret, local = -1;
+	int i, err_ret = SD_RES_SUCCESS, ret;
 	unsigned wlen;
 	uint64_t oid = req->rq.obj.oid;
 	struct write_info wi;
-	const struct sd_op_template *op;
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
 	int nr_copies = get_req_copy_number(req);
@@ -240,7 +239,6 @@ static int gateway_forward_request(struct request *req)
 	sd_debug("%"PRIx64, oid);
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
-	op = get_sd_op(hdr.opcode);
 
 	wlen = hdr.data_length;
 	oid_to_nodes(oid, &req->vinfo->vroot, nr_copies, target_nodes);
@@ -249,11 +247,6 @@ static int gateway_forward_request(struct request *req)
 	for (i = 0; i < nr_copies; i++) {
 		struct sockfd *sfd;
 		const struct node_id *nid;
-
-		if (node_is_local(target_nodes[i])) {
-			local = i;
-			continue;
-		}
 
 		nid = &target_nodes[i]->nid;
 		sfd = sockfd_cache_get(nid);
@@ -272,17 +265,6 @@ static int gateway_forward_request(struct request *req)
 			break;
 		}
 		write_info_advance(&wi, nid, sfd);
-	}
-
-	if (local != -1 && err_ret == SD_RES_SUCCESS) {
-		assert(op);
-		ret = sheep_do_op_work(op, req);
-
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("fail to write local %"PRIx64", %s", oid,
-			       sd_strerror(ret));
-			err_ret = ret;
-		}
 	}
 
 	sd_debug("nr_sent %d, err %x", wi.nr_sent, err_ret);
