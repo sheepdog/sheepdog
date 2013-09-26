@@ -35,6 +35,8 @@ static struct req_iter *prepare_replication_requests(struct request *req,
 	uint64_t off = req->rq.obj.offset;
 	struct req_iter *reqs = xzalloc(sizeof(*reqs) * nr_copies);
 
+	sd_debug("%"PRIx64, req->rq.obj.oid);
+
 	*nr = nr_copies;
 	for (int i = 0; i < nr_copies; i++) {
 		reqs[i].buf = data;

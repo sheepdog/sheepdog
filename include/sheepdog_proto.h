@@ -134,6 +134,7 @@ struct sd_req {
 			uint32_t	base_vdi_id;
 			uint32_t	copies;
 			uint32_t	snapid;
+			uint8_t		copy_policy;
 		} vdi;
 
 		/* sheepdog-internal */
@@ -149,6 +150,7 @@ struct sd_req {
 			uint32_t	copies;
 			uint8_t		set_bitmap; /* 0 means false */
 						    /* others mean true */
+			uint8_t		copy_policy;
 		} vdi_state;
 
 		uint32_t		__pad[8];
@@ -203,7 +205,8 @@ struct sd_inode {
 	uint64_t vm_clock_nsec;
 	uint64_t vdi_size;
 	uint64_t vm_state_size;
-	uint16_t copy_policy;
+	uint8_t  copy_policy;
+	uint8_t  reserved;
 	uint8_t  nr_copies;
 	uint8_t  block_size_shift;
 	uint32_t snap_id;

@@ -28,6 +28,7 @@ struct vdi_entry {
 	uint32_t vdi_id;
 	uint32_t snap_id;
 	uint8_t  nr_copies;
+	uint8_t copy_policy;
 	struct rb_node rb;
 };
 static struct rb_root last_vdi_tree = RB_ROOT;
@@ -56,7 +57,7 @@ static struct vdi_entry *find_vdi(const char *name)
 
 static struct vdi_entry *new_vdi(const char *name, uint64_t vdi_size,
 				 uint32_t vdi_id, uint32_t snap_id,
-				 uint8_t nr_copies)
+				 uint8_t nr_copies, uint8_t copy_policy)
 {
 	struct vdi_entry *vdi;
 	vdi = xmalloc(sizeof(struct vdi_entry));
@@ -65,6 +66,7 @@ static struct vdi_entry *new_vdi(const char *name, uint64_t vdi_size,
 	vdi->vdi_id = vdi_id;
 	vdi->snap_id = snap_id;
 	vdi->nr_copies = nr_copies;
+	vdi->copy_policy = copy_policy;
 	return vdi;
 }
 
@@ -77,13 +79,15 @@ static void insert_vdi(struct sd_inode *new)
 			      new->vdi_size,
 			      new->vdi_id,
 			      new->snap_id,
-			      new->nr_copies);
+			      new->nr_copies,
+			      new->copy_policy);
 		rb_insert(&last_vdi_tree, vdi, rb, vdi_cmp);
 	} else if (vdi->snap_id < new->snap_id) {
 		vdi->vdi_size = new->vdi_size;
 		vdi->vdi_id = new->vdi_id;
 		vdi->snap_id = new->snap_id;
 		vdi->nr_copies = new->nr_copies;
+		vdi->copy_policy = new->copy_policy;
 	}
 }
 
@@ -95,7 +99,8 @@ static int create_active_vdis(void)
 		if (do_vdi_create(vdi->name,
 				  vdi->vdi_size,
 				  vdi->vdi_id, &new_vid,
-				  false, vdi->nr_copies) < 0)
+				  false, vdi->nr_copies,
+				  vdi->copy_policy) < 0)
 			return -1;
 	}
 	return 0;

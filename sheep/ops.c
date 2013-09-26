@@ -77,10 +77,14 @@ static int cluster_new_vdi(struct request *req)
 		.size = hdr->vdi.vdi_size,
 		.base_vid = hdr->vdi.base_vdi_id,
 		.create_snapshot = !!hdr->vdi.snapid,
+		.copy_policy = hdr->vdi.copy_policy,
 		.nr_copies = hdr->vdi.copies ? hdr->vdi.copies :
 				sys->cinfo.nr_copies,
 		.time = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000,
 	};
+
+	if (iocb.copy_policy)
+		iocb.nr_copies = SD_EC_DP;
 
 	if (hdr->data_length != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;
@@ -592,12 +596,13 @@ static int cluster_notify_vdi_add(const struct sd_req *req, struct sd_rsp *rsp,
 		/* make the previous working vdi a snapshot */
 		add_vdi_state(req->vdi_state.old_vid,
 			      get_vdi_copy_number(req->vdi_state.old_vid),
-			      true);
+			      true, 0);
 
 	if (req->vdi_state.set_bitmap)
 		atomic_set_bit(req->vdi_state.new_vid, sys->vdi_inuse);
 
-	add_vdi_state(req->vdi_state.new_vid, req->vdi_state.copies, false);
+	add_vdi_state(req->vdi_state.new_vid, req->vdi_state.copies, false,
+		      req->vdi_state.copy_policy);
 
 	return SD_RES_SUCCESS;
 }

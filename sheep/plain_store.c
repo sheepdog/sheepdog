@@ -195,7 +195,7 @@ static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 	}
 
 	add_vdi_state(oid_to_vid(oid), inode->nr_copies,
-		      vdi_is_snapshot(inode));
+		      vdi_is_snapshot(inode), inode->copy_policy);
 	atomic_set_bit(oid_to_vid(oid), sys->vdi_inuse);
 
 	ret = SD_RES_SUCCESS;
