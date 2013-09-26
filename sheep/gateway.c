@@ -19,13 +19,49 @@ static inline void gateway_init_fwd_hdr(struct sd_req *fwd, struct sd_req *hdr)
 	fwd->proto_ver = SD_SHEEP_PROTO_VER;
 }
 
+struct req_iter {
+	uint8_t *buf;
+	uint32_t wlen;
+	uint32_t dlen;
+	uint64_t off;
+};
+
+static struct req_iter *prepare_replication_requests(struct request *req,
+						     int *nr)
+{
+	int nr_copies = get_req_copy_number(req);
+	void *data = req->data;
+	uint32_t len = req->rq.data_length;
+	uint64_t off = req->rq.obj.offset;
+	struct req_iter *reqs = xzalloc(sizeof(*reqs) * nr_copies);
+
+	*nr = nr_copies;
+	for (int i = 0; i < nr_copies; i++) {
+		reqs[i].buf = data;
+		reqs[i].dlen = len;
+		reqs[i].off = off;
+		reqs[i].wlen = len;
+	}
+	return reqs;
+}
+
+static struct req_iter *prepare_requests(struct request *req, int *nr)
+{
+	return prepare_replication_requests(req, nr);
+}
+
+static void finish_requests(struct req_iter *reqs)
+{
+	free(reqs);
+}
+
 /*
  * Try our best to read one copy and read local first.
  *
  * Return success if any read succeed. We don't call gateway_forward_request()
  * because we only read once.
  */
-int gateway_read_obj(struct request *req)
+static int gateway_replication_read(struct request *req)
 {
 	int i, ret = SD_RES_SUCCESS;
 	struct sd_req fwd_hdr;
@@ -34,12 +70,6 @@ int gateway_read_obj(struct request *req)
 	const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 	uint64_t oid = req->rq.obj.oid;
 	int nr_copies, j;
-
-	if (sys->enable_object_cache && !req->local &&
-	    !bypass_object_cache(req)) {
-		ret = object_cache_handle_request(req);
-		goto out;
-	}
 
 	nr_copies = get_req_copy_number(req);
 
@@ -242,12 +272,13 @@ static inline void forward_info_init(struct forward_info *fi, size_t nr_to_send)
 
 static inline void
 forward_info_advance(struct forward_info *fi, const struct node_id *nid,
-		   struct sockfd *sfd)
+		     struct sockfd *sfd, void *buf)
 {
 	fi->ent[fi->nr_sent].nid = nid;
 	fi->ent[fi->nr_sent].pfd.fd = sfd->fd;
 	fi->ent[fi->nr_sent].pfd.events = POLLIN;
 	fi->ent[fi->nr_sent].sfd = sfd;
+	fi->ent[fi->nr_sent].buf = buf;
 	fi->nr_sent++;
 }
 
@@ -259,17 +290,17 @@ static int gateway_forward_request(struct request *req)
 	struct forward_info fi;
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
-	int nr_copies = get_req_copy_number(req);
+	int nr_copies = get_req_copy_number(req), nr_to_send = 0;
+	struct req_iter *reqs = NULL;
 
 	sd_debug("%"PRIx64, oid);
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
-
-	wlen = hdr.data_length;
 	oid_to_nodes(oid, &req->vinfo->vroot, nr_copies, target_nodes);
 	forward_info_init(&fi, nr_copies);
+	reqs = prepare_requests(req, &nr_to_send);
 
-	for (i = 0; i < nr_copies; i++) {
+	for (i = 0; i < nr_to_send; i++) {
 		struct sockfd *sfd;
 		const struct node_id *nid;
 
@@ -280,7 +311,10 @@ static int gateway_forward_request(struct request *req)
 			break;
 		}
 
-		ret = send_req(sfd->fd, &hdr, req->data, wlen,
+		hdr.data_length = reqs[i].dlen;
+		wlen = reqs[i].wlen;
+		hdr.obj.offset = reqs[i].off;
+		ret = send_req(sfd->fd, &hdr, reqs[i].buf, wlen,
 			       sheep_need_retry, req->rq.epoch,
 			       MAX_RETRY_COUNT);
 		if (ret) {
@@ -289,7 +323,7 @@ static int gateway_forward_request(struct request *req)
 			sd_debug("fail %d", ret);
 			break;
 		}
-		forward_info_advance(&fi, nid, sfd);
+		forward_info_advance(&fi, nid, sfd, reqs[i].buf);
 	}
 
 	sd_debug("nr_sent %d, err %x", fi.nr_sent, err_ret);
@@ -299,7 +333,16 @@ static int gateway_forward_request(struct request *req)
 			err_ret = ret;
 	}
 
+	finish_requests(reqs);
 	return err_ret;
+}
+
+int gateway_read_obj(struct request *req)
+{
+	if (!bypass_object_cache(req))
+		return object_cache_handle_request(req);
+
+	return gateway_replication_read(req);
 }
 
 int gateway_write_obj(struct request *req)
