@@ -771,6 +771,8 @@ int main(int argc, char **argv)
 			exit(1);
 	}
 
+	init_fec();
+
 	/*
 	 * After this function, we are multi-threaded.
 	 *

@@ -196,6 +196,8 @@ int atomic_create_and_write(const char *path, const char *buf, size_t len,
 #define assert(expr) ((void)0)
 #endif	/* NDEBUG */
 
+#define SWAP(a, b) { typeof(a) tmp; tmp = a; a = b; b = tmp; }
+
 /* urcu helpers */
 
 /* Boolean data type which can be accessed by multiple threads */
