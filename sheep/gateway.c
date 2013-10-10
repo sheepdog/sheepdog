@@ -173,9 +173,15 @@ out:
 /* Requests from dog might not have vdi registered yet in the vdi state */
 static bool is_erasure_req(struct request *req)
 {
+	uint64_t oid = req->rq.obj.oid;
+
+	if (is_vdi_obj(oid))
+		return false;
+
 	if (req->rq.obj.copy_policy > 0)
 		return true;
-	return is_erasure_oid(req->rq.obj.oid);
+
+	return get_vdi_copy_policy(oid_to_vid(oid)) > 0;
 }
 
 bool is_erasure_oid(uint64_t oid)
