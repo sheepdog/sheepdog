@@ -991,9 +991,6 @@ static int peer_create_and_write_obj(struct request *req)
 		ret = do_create_and_write_obj(&iocb, &cow_hdr, epoch, buf);
 	} else
 		ret = do_create_and_write_obj(&iocb, hdr, epoch, req->data);
-
-	if (SD_RES_SUCCESS == ret)
-		objlist_cache_insert(oid);
 out:
 	if (buf)
 		free(buf);

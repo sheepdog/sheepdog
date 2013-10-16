@@ -401,6 +401,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		goto out;
 	}
 	ret = SD_RES_SUCCESS;
+	objlist_cache_insert(oid);
 out:
 	if (ret != SD_RES_SUCCESS)
 		unlink(tmp_path);

@@ -240,7 +240,6 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		case SD_RES_SUCCESS:
 			sd_debug("recovered oid %"PRIx64" from %d to epoch %d",
 				 oid, tgt_epoch, epoch);
-			objlist_cache_insert(oid);
 			return ret;
 		case SD_RES_OLD_NODE_VER:
 			/* move to the next epoch recovery */
