@@ -941,6 +941,7 @@ static int peer_create_and_write_obj(struct request *req)
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
 	iocb.ec_index = hdr->obj.ec_index;
+	iocb.copy_policy = hdr->obj.copy_policy;
 	return sd_store->create_and_write(hdr->obj.oid, &iocb);
 }
 

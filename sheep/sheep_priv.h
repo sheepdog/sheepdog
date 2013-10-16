@@ -164,6 +164,7 @@ struct siocb {
 	uint32_t length;
 	uint32_t offset;
 	uint8_t ec_index;
+	uint8_t copy_policy;
 };
 
 /* This structure is used to pass parameters to vdi_* functions. */
@@ -409,6 +410,7 @@ int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
 int gateway_remove_obj(struct request *req);
 bool is_erasure_oid(uint64_t oid);
+bool is_erasure_obj(uint64_t oid, uint8_t copy_policy);
 
 /* object_cache */
 

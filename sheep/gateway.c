@@ -170,15 +170,22 @@ out:
 	return reqs;
 }
 
-/* Requests from dog might not have vdi registered yet in the vdi state */
-static bool is_erasure_req(struct request *req)
+/*
+ * We have two kinds of requests that might go for erasured object:
+ *  1. requests without setting copy_policy but expect vdi's copy policy is
+ *     registered in vdi states, e.g, normal requests from QEMU
+ *  2. requests with copy_policy explicitly set because vdi's copy policy is
+ *     not registered, e.g, requests from 'cluster snapshot load'.
+ *
+ * So we have to firstly check copy_policy directly from iocb and then call
+ * get_vdi_copy_policy(oid).
+ */
+bool is_erasure_obj(uint64_t oid, uint8_t copy_policy)
 {
-	uint64_t oid = req->rq.obj.oid;
-
 	if (is_vdi_obj(oid))
 		return false;
 
-	if (req->rq.obj.copy_policy > 0)
+	if (copy_policy > 0)
 		return true;
 
 	return get_vdi_copy_policy(oid_to_vid(oid)) > 0;
@@ -192,7 +199,7 @@ bool is_erasure_oid(uint64_t oid)
 /* Prepare request iterator and buffer for each replica */
 static struct req_iter *prepare_requests(struct request *req, int *nr)
 {
-	if (is_erasure_req(req))
+	if (is_erasure_obj(req->rq.obj.oid, req->rq.obj.copy_policy))
 		return prepare_erasure_requests(req, nr);
 	else
 		return prepare_replication_requests(req, nr);
@@ -499,6 +506,7 @@ static int gateway_forward_request(struct request *req)
 		wlen = reqs[i].wlen;
 		hdr.obj.offset = reqs[i].off;
 		hdr.obj.ec_index = i;
+		hdr.obj.copy_policy = req->rq.obj.copy_policy;
 		ret = send_req(sfd->fd, &hdr, reqs[i].buf, wlen,
 			       sheep_need_retry, req->rq.epoch,
 			       MAX_RETRY_COUNT);

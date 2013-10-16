@@ -341,6 +341,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
+	bool ec = is_erasure_obj(oid, iocb->copy_policy);
 
 	sd_debug("%"PRIx64, oid);
 	get_obj_path(oid, path, sizeof(path));
@@ -374,7 +375,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		return err_to_sderr(path, oid, errno);
 	}
 
-	ret = prealloc(fd, get_store_objsize(oid));
+	ret = prealloc(fd, ec ? SD_EC_OBJECT_SIZE : get_objsize(oid));
 	if (ret < 0) {
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
@@ -393,8 +394,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
-	if (is_erasure_oid(oid) &&
-	    set_erasure_index(path, iocb->ec_index) < 0) {
+	if (ec && set_erasure_index(path, iocb->ec_index) < 0) {
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
