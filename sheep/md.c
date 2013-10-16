@@ -153,7 +153,7 @@ static int get_total_object_size(uint64_t oid, const char *wd, uint32_t epoch,
 	if (stat(path, &s) == 0)
 		*t += s.st_blocks * SECTOR_SIZE;
 	else
-		*t += get_objsize(oid);
+		*t += get_store_objsize(oid);
 
 	return SD_RES_SUCCESS;
 }
@@ -486,7 +486,7 @@ static int md_move_object(uint64_t oid, const char *old, const char *new)
 {
 	struct strbuf buf = STRBUF_INIT;
 	int fd, ret = -1;
-	size_t sz = get_objsize(oid);
+	size_t sz = get_store_objsize(oid);
 
 	fd = open(old, O_RDONLY);
 	if (fd < 0) {

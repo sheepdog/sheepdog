@@ -12,6 +12,7 @@
 #include "dog.h"
 #include "sha1.h"
 #include "sockfd_cache.h"
+#include "fec.h"
 
 static char *strnumber_raw(uint64_t _size, bool raw)
 {
@@ -327,4 +328,13 @@ void show_progress(uint64_t done, uint64_t total, bool raw)
 	fflush(stdout);
 
 	free(buf);
+}
+
+size_t get_store_objsize(uint8_t copy_policy, uint64_t oid)
+{
+	if (is_vdi_obj(oid))
+		return SD_INODE_SIZE;
+	if (copy_policy != 0)
+		return SD_EC_OBJECT_SIZE;
+	return get_objsize(oid);
 }

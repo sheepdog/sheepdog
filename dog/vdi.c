@@ -877,11 +877,11 @@ static int vdi_object(int argc, char **argv)
 		return EXIT_MISSING;
 	}
 
-	size = info.copy_policy ? SD_EC_OBJECT_SIZE : SD_DATA_OBJ_SIZE;
 	if (idx == ~0) {
 		printf("Looking for the inode object 0x%" PRIx32 " with %d nodes\n\n",
 		       vid, sd_nodes_nr);
-		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL, size);
+		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL,
+			   SD_INODE_SIZE);
 	} else {
 		struct obj_info_filler_info oid_info = {0};
 
@@ -893,6 +893,7 @@ static int vdi_object(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
+		size = info.copy_policy ? SD_EC_OBJECT_SIZE : SD_DATA_OBJ_SIZE;
 		parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
 			   size);
 

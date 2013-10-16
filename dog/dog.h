@@ -82,6 +82,7 @@ int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint8_t nr_copies, uint8_t copy_policy);
 int do_vdi_check(const struct sd_inode *inode);
 void show_progress(uint64_t done, uint64_t total, bool raw);
+size_t get_store_objsize(uint8_t copy_policy, uint64_t oid);
 
 extern struct command vdi_command;
 extern struct command node_command;
