@@ -878,28 +878,6 @@ static int local_kill_node(const struct sd_req *req, struct sd_rsp *rsp,
 	return SD_RES_SUCCESS;
 }
 
-static int read_copy_from_replica(struct request *req, uint32_t epoch,
-				  uint64_t oid, char *buf)
-{
-	struct request read_req = { };
-	struct sd_req *hdr = &read_req.rq;
-
-	/* Create a fake gateway read request */
-	sd_init_req(hdr, SD_OP_READ_OBJ);
-	hdr->data_length = SD_DATA_OBJ_SIZE;
-	hdr->epoch = epoch;
-
-	hdr->obj.oid = oid;
-	hdr->obj.offset = 0;
-	hdr->obj.copies = get_req_copy_number(req);
-
-	read_req.data = buf;
-	read_req.op = get_sd_op(hdr->opcode);
-	read_req.vinfo = req->vinfo;
-
-	return gateway_read_obj(&read_req);
-}
-
 static int peer_remove_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
@@ -940,16 +918,6 @@ out:
 	return ret;
 }
 
-static int do_create_and_write_obj(struct siocb *iocb, struct sd_req *hdr,
-				   uint32_t epoch, void *data)
-{
-	iocb->buf = data;
-	iocb->length = hdr->data_length;
-	iocb->offset = hdr->obj.offset;
-
-	return sd_store->create_and_write(hdr->obj.oid, iocb);
-}
-
 static int peer_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
@@ -967,41 +935,13 @@ static int peer_write_obj(struct request *req)
 static int peer_create_and_write_obj(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
-	struct sd_req cow_hdr;
-	uint32_t epoch = hdr->epoch;
-	uint64_t oid = hdr->obj.oid;
-	char *buf = NULL;
-	struct siocb iocb;
-	int ret = SD_RES_SUCCESS;
+	struct siocb iocb = { };
 
-	memset(&iocb, 0, sizeof(iocb));
-	iocb.epoch = epoch;
-	iocb.length = get_store_objsize(oid);
+	iocb.epoch = hdr->epoch;
+	iocb.buf = req->data;
+	iocb.length = hdr->data_length;
 	iocb.ec_index = hdr->obj.ec_index;
-	if (hdr->flags & SD_FLAG_CMD_COW) {
-		sd_debug("%" PRIx64 ", %" PRIx64, oid, hdr->obj.cow_oid);
-
-		buf = xvalloc(SD_DATA_OBJ_SIZE);
-		if (hdr->data_length != SD_DATA_OBJ_SIZE) {
-			ret = read_copy_from_replica(req, hdr->epoch,
-						     hdr->obj.cow_oid, buf);
-			if (ret != SD_RES_SUCCESS) {
-				sd_err("failed to read cow object");
-				goto out;
-			}
-		}
-
-		memcpy(buf + hdr->obj.offset, req->data, hdr->data_length);
-		memcpy(&cow_hdr, hdr, sizeof(cow_hdr));
-		cow_hdr.data_length = SD_DATA_OBJ_SIZE;
-		cow_hdr.obj.offset = 0;
-		ret = do_create_and_write_obj(&iocb, &cow_hdr, epoch, buf);
-	} else
-		ret = do_create_and_write_obj(&iocb, hdr, epoch, req->data);
-out:
-	if (buf)
-		free(buf);
-	return ret;
+	return sd_store->create_and_write(hdr->obj.oid, &iocb);
 }
 
 static struct sd_op_template sd_ops[] = {

@@ -548,12 +548,46 @@ int gateway_write_obj(struct request *req)
 	return gateway_forward_request(req);
 }
 
+static int gateway_handle_cow(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+	size_t len = get_objsize(oid);
+	struct sd_req hdr, *req_hdr = &req->rq;
+	char *buf = xmalloc(len);
+	int ret;
+
+	if (req->rq.data_length != len) {
+		/* Partial write, need read the copy first */
+		sd_init_req(&hdr, SD_OP_READ_OBJ);
+		hdr.obj.oid = req_hdr->obj.cow_oid;
+		hdr.data_length = len;
+		hdr.obj.offset = 0;
+		ret = exec_local_req(&hdr, buf);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+	}
+
+	memcpy(buf + req_hdr->obj.offset, req->data, req_hdr->data_length);
+	sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.obj.oid = oid;
+	hdr.data_length = len;
+	hdr.obj.offset = 0;
+	ret = exec_local_req(&hdr, buf);
+out:
+	free(buf);
+	return ret;
+}
+
 int gateway_create_and_write_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
 	if (oid_is_readonly(oid))
 		return SD_RES_READONLY;
+
+	if (req->rq.flags & SD_FLAG_CMD_COW)
+		return gateway_handle_cow(req);
 
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
