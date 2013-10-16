@@ -602,7 +602,7 @@ static int cluster_notify_vdi_add(const struct sd_req *req, struct sd_rsp *rsp,
 		/* make the previous working vdi a snapshot */
 		add_vdi_state(req->vdi_state.old_vid,
 			      get_vdi_copy_number(req->vdi_state.old_vid),
-			      true, 0);
+			      true, req->vdi_state.copy_policy);
 
 	if (req->vdi_state.set_bitmap)
 		atomic_set_bit(req->vdi_state.new_vid, sys->vdi_inuse);
