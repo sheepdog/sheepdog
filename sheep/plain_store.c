@@ -128,7 +128,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	size = xpwrite(fd, iocb->buf, iocb->length, iocb->offset);
 	if (unlikely(size != iocb->length)) {
 		sd_err("failed to write object %"PRIx64", path=%s, offset=%"
-		       PRId64", size=%"PRId32", result=%zd, %m", oid, path,
+		       PRId32", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
@@ -248,7 +248,7 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (unlikely(size != iocb->length)) {
 		sd_err("failed to read object %"PRIx64", path=%s, offset=%"
-		       PRId64", size=%"PRId32", result=%zd, %m", oid, path,
+		       PRId32", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
 	}
@@ -300,6 +300,17 @@ static size_t get_store_objsize(uint64_t oid)
 	return get_objsize(oid);
 }
 
+#define ECNAME "user.ec.index"
+#define ECSIZE sizeof(uint8_t)
+static int set_erasure_index(const char *path, uint8_t idx)
+{
+	if (setxattr(path, ECNAME, &idx, ECSIZE, 0) < 0) {
+		sd_err("failed to setxattr %s, %m", path);
+		return -1;
+	}
+	return 0;
+}
+
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
@@ -307,6 +318,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int ret, fd;
 	uint32_t len = iocb->length;
 
+	sd_debug("%"PRIx64, oid);
 	get_obj_path(oid, path, sizeof(path));
 	get_tmp_obj_path(oid, tmp_path, sizeof(tmp_path));
 
@@ -359,7 +371,11 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
-	sd_debug("%"PRIx64, oid);
+	if (is_erasure_oid(oid) &&
+	    set_erasure_index(path, iocb->ec_index) < 0) {
+		ret = err_to_sderr(path, oid, errno);
+		goto out;
+	}
 	ret = SD_RES_SUCCESS;
 out:
 	if (ret != SD_RES_SUCCESS)

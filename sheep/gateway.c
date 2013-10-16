@@ -498,6 +498,7 @@ static int gateway_forward_request(struct request *req)
 		hdr.data_length = reqs[i].dlen;
 		wlen = reqs[i].wlen;
 		hdr.obj.offset = reqs[i].off;
+		hdr.obj.ec_index = i;
 		ret = send_req(sfd->fd, &hdr, reqs[i].buf, wlen,
 			       sheep_need_retry, req->rq.epoch,
 			       MAX_RETRY_COUNT);

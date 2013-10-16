@@ -1099,7 +1099,7 @@ int object_cache_handle_request(struct request *req)
 	int ret;
 	bool create = false;
 
-	sd_debug("%08" PRIx32 ", len %" PRIu32 ", off %" PRIu64, idx,
+	sd_debug("%08" PRIx32 ", len %" PRIu32 ", off %" PRIu32, idx,
 		 hdr->data_length, hdr->obj.offset);
 
 	cache = find_object_cache(vid, true);

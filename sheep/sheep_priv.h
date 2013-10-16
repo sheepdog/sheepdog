@@ -162,7 +162,8 @@ struct siocb {
 	uint32_t epoch;
 	void *buf;
 	uint32_t length;
-	uint64_t offset;
+	uint32_t offset;
+	uint8_t ec_index;
 };
 
 /* This structure is used to pass parameters to vdi_* functions. */

@@ -969,6 +969,7 @@ static int peer_create_and_write_obj(struct request *req)
 	memset(&iocb, 0, sizeof(iocb));
 	iocb.epoch = epoch;
 	iocb.length = get_objsize(oid);
+	iocb.ec_index = hdr->obj.ec_index;
 	if (hdr->flags & SD_FLAG_CMD_COW) {
 		sd_debug("%" PRIx64 ", %" PRIx64, oid, hdr->obj.cow_oid);
 
