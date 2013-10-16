@@ -19,6 +19,7 @@
 #include "dog.h"
 #include "treeview.h"
 #include "sha1.h"
+#include "fec.h"
 
 static struct sd_option vdi_options[] = {
 	{'P', "prealloc", false, "preallocate all the data objects"},
@@ -55,6 +56,7 @@ struct get_vdi_info {
 	uint32_t vid;
 	uint32_t snapid;
 	uint8_t nr_copies;
+	uint8_t copy_policy;
 };
 
 static void vdi_show_progress(uint64_t done, uint64_t total)
@@ -223,9 +225,9 @@ static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 
 }
 
-static void get_oid(uint32_t vid, const char *name, const char *tag,
-		    uint32_t snapid, uint32_t flags,
-		    const struct sd_inode *i, void *data)
+static void vdi_info_filler(uint32_t vid, const char *name, const char *tag,
+			    uint32_t snapid, uint32_t flags,
+			    const struct sd_inode *i, void *data)
 {
 	struct get_vdi_info *info = data;
 
@@ -235,17 +237,20 @@ static void get_oid(uint32_t vid, const char *name, const char *tag,
 			    !strcmp(tag, info->tag)) {
 				info->vid = vid;
 			info->nr_copies = i->nr_copies;
+			info->copy_policy = i->copy_policy;
 			}
 		} else if (info->snapid) {
 			if (!strcmp(name, info->name) &&
 			    snapid == info->snapid) {
 				info->vid = vid;
 				info->nr_copies = i->nr_copies;
+				info->copy_policy = i->copy_policy;
 			}
 		} else {
 			if (!strcmp(name, info->name)) {
 				info->vid = vid;
 				info->nr_copies = i->nr_copies;
+				info->copy_policy = i->copy_policy;
 			}
 		}
 	}
@@ -278,16 +283,16 @@ static int do_print_obj(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
 	return 0;
 }
 
-struct get_data_oid_info {
+struct obj_info_filler_info {
 	bool success;
 	uint64_t data_oid;
 	unsigned idx;
 };
 
-static int get_data_oid(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
-			char *buf, void *data)
+static int obj_info_filler(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
+			   char *buf, void *data)
 {
-	struct get_data_oid_info *info = data;
+	struct obj_info_filler_info *info = data;
 	struct sd_inode *inode = (struct sd_inode *)buf;
 
 	switch (rsp->result) {
@@ -315,7 +320,8 @@ static int get_data_oid(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
 	return 0;
 }
 
-static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigned size)
+static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data,
+		       size_t size)
 {
 	int ret, cb_ret;
 	struct sd_node *n;
@@ -330,8 +336,8 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data, unsigne
 		hdr.data_length = size;
 		hdr.flags = 0;
 		hdr.epoch = sd_epoch;
-
 		hdr.obj.oid = oid;
+		hdr.obj.ec_index = SD_MAX_COPIES + 1; /* Ignore index */
 
 		ret = dog_exec_req(&n->nid, &hdr, buf);
 		if (ret < 0)
@@ -854,6 +860,7 @@ static int vdi_object(int argc, char **argv)
 	unsigned idx = vdi_cmd_data.index;
 	struct get_vdi_info info;
 	uint32_t vid;
+	size_t size;
 
 	memset(&info, 0, sizeof(info));
 	info.name = vdiname;
@@ -861,7 +868,7 @@ static int vdi_object(int argc, char **argv)
 	info.vid = 0;
 	info.snapid = vdi_cmd_data.snapshot_id;
 
-	if (parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info) < 0)
+	if (parse_vdi(vdi_info_filler, SD_INODE_HEADER_SIZE, &info) < 0)
 		return EXIT_SYSFAIL;
 
 	vid = info.vid;
@@ -870,12 +877,13 @@ static int vdi_object(int argc, char **argv)
 		return EXIT_MISSING;
 	}
 
+	size = info.copy_policy ? SD_EC_OBJECT_SIZE : SD_DATA_OBJ_SIZE;
 	if (idx == ~0) {
 		printf("Looking for the inode object 0x%" PRIx32 " with %d nodes\n\n",
 		       vid, sd_nodes_nr);
-		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL, SD_INODE_SIZE);
+		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL, size);
 	} else {
-		struct get_data_oid_info oid_info = {0};
+		struct obj_info_filler_info oid_info = {0};
 
 		oid_info.success = false;
 		oid_info.idx = idx;
@@ -885,7 +893,8 @@ static int vdi_object(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
-		parse_objs(vid_to_vdi_oid(vid), get_data_oid, &oid_info, SD_DATA_OBJ_SIZE);
+		parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
+			   size);
 
 		if (oid_info.success) {
 			if (oid_info.data_oid) {
@@ -893,7 +902,8 @@ static int vdi_object(int argc, char **argv)
 				       " (the inode vid 0x%" PRIx32 " idx %u) with %d nodes\n\n",
 				       oid_info.data_oid, vid, idx, sd_nodes_nr);
 
-				parse_objs(oid_info.data_oid, do_print_obj, NULL, SD_DATA_OBJ_SIZE);
+				parse_objs(oid_info.data_oid, do_print_obj,
+					   NULL, size);
 			} else
 				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
 				       vid, idx);
@@ -974,7 +984,7 @@ static int vdi_track(int argc, char **argv)
 	const char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
 	struct get_vdi_info info;
-	struct get_data_oid_info oid_info = {0};
+	struct obj_info_filler_info oid_info = {0};
 	uint32_t vid;
 	uint8_t nr_copies;
 
@@ -984,7 +994,7 @@ static int vdi_track(int argc, char **argv)
 	info.vid = 0;
 	info.snapid = vdi_cmd_data.snapshot_id;
 
-	if (parse_vdi(get_oid, SD_INODE_HEADER_SIZE, &info) < 0)
+	if (parse_vdi(vdi_info_filler, SD_INODE_HEADER_SIZE, &info) < 0)
 		return EXIT_SYSFAIL;
 
 	vid = info.vid;
@@ -1008,8 +1018,8 @@ static int vdi_track(int argc, char **argv)
 		goto err;
 	}
 
-	parse_objs(vid_to_vdi_oid(vid), get_data_oid,
-		   &oid_info, SD_DATA_OBJ_SIZE);
+	parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
+		   info.copy_policy ? SD_EC_OBJECT_SIZE : SD_DATA_OBJ_SIZE);
 
 	if (!oid_info.success) {
 		sd_err("Failed to read the inode object 0x%" PRIx32, vid);

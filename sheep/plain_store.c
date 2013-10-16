@@ -265,7 +265,7 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	if (fd < 0)
 		return err_to_sderr(path, oid, errno);
 
-	if (is_erasure_oid(oid)) {
+	if (is_erasure_oid(oid) && iocb->ec_index <= SD_MAX_COPIES) {
 		uint8_t idx;
 
 		if (get_erasure_index(path, &idx) < 0) {
