@@ -374,12 +374,10 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		return err_to_sderr(path, oid, errno);
 	}
 
-	if (iocb->offset != 0 || iocb->length != get_store_objsize(oid)) {
-		ret = prealloc(fd, get_store_objsize(oid));
-		if (ret < 0) {
-			ret = err_to_sderr(path, oid, errno);
-			goto out;
-		}
+	ret = prealloc(fd, get_store_objsize(oid));
+	if (ret < 0) {
+		ret = err_to_sderr(path, oid, errno);
+		goto out;
 	}
 
 	ret = xpwrite(fd, iocb->buf, len, iocb->offset);

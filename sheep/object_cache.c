@@ -745,8 +745,7 @@ out:
 }
 
 static int create_cache_object(struct object_cache *oc, uint32_t idx,
-			       void *buffer, size_t buf_size, off_t offset,
-			       size_t obj_size)
+			       void *buffer, size_t buf_size)
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd;
 	int ret = SD_RES_OID_EXIST;
@@ -765,17 +764,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out;
 	}
 
-	/* We need to extend it if the buffer is trimmed */
-	if (offset != 0 || buf_size != obj_size) {
-		ret = prealloc(fd, obj_size);
-		if (unlikely(ret < 0)) {
-			ret = SD_RES_EIO;
-			sd_err("%m");
-			goto out_close;
-		}
-	}
-
-	ret = xpwrite(fd, buffer, buf_size, offset);
+	ret = xwrite(fd, buffer, buf_size);
 	if (unlikely(ret != buf_size)) {
 		ret = SD_RES_EIO;
 		sd_err("failed, vid %"PRIx32", idx %"PRIx32, oc->vid, idx);
@@ -796,7 +785,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out_close;
 	}
 	ret = SD_RES_SUCCESS;
-	sd_debug("%08"PRIx32" size %zu", idx, obj_size);
+	sd_debug("%08"PRIx32" size %zu", idx, buf_size);
 out_close:
 	close(fd);
 	unlink(tmp_path);
@@ -808,7 +797,6 @@ out:
 static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 {
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret = SD_RES_NO_MEM;
 	uint64_t oid = idx_to_oid(oc->vid, idx);
 	uint32_t data_length = get_objsize(oid);
@@ -824,8 +812,7 @@ static int object_cache_pull(struct object_cache *oc, uint32_t idx)
 		goto err;
 
 	sd_debug("oid %"PRIx64" pulled successfully", oid);
-	ret = create_cache_object(oc, idx, buf, rsp->data_length,
-				  rsp->obj.offset, data_length);
+	ret = create_cache_object(oc, idx, buf, data_length);
 	/*
 	 * We try to delay reclaim objects to avoid object ping-pong
 	 * because the pulled object is clean and likely to be reclaimed
