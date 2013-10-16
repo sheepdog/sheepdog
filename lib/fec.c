@@ -460,8 +460,6 @@ struct fec *fec_new(unsigned short k, unsigned short n)
 
 	struct fec *retval;
 
-		init_fec();
-
 	retval = (struct fec *)xmalloc(sizeof(struct fec));
 	retval->k = k;
 	retval->n = n;
