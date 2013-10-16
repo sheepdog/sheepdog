@@ -4,30 +4,26 @@
 
 . ./common
 
-for i in `seq 0 4`; do
+for i in `seq 0 7`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 5
+_wait_for_sheep 8
 
-_cluster_format
+_cluster_format -c 6
 $DOG cluster recover disable
 
-$DOG vdi create test 4G
+_vdi_create test 4G
 
 # create 8 objects
 for i in `seq 0 7`; do
     echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-ls $STORE/*/obj/* | _filter_store | sort
-
 _kill_sheep 3
 _kill_sheep 4
 
-_wait_for_sheep 3
-$DOG cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | _filter_store | sort
+_wait_for_sheep 6
 
 # overwrite the objects to invoke object recovery
 for i in `seq 4 7`; do
@@ -35,23 +31,17 @@ for i in `seq 4 7`; do
     echo $(($i + 100)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$DOG cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | _filter_store | sort
-
 $DOG cluster recover enable
 _wait_for_sheep_recovery 0
 $DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
 
 $DOG cluster recover disable
-for i in `seq 3 7`; do
+for i in 3 4; do
     _start_sheep $i
 done
 
 _wait_for_sheep 8
-
-$DOG cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | _filter_store | sort
 
 # overwrite the objects to invoke object recovery
 for i in `seq 0 3`; do
@@ -59,10 +49,8 @@ for i in `seq 0 3`; do
     echo $(($i + 200)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-$DOG cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | _filter_store | sort
-
 $DOG cluster recover enable
 _wait_for_sheep_recovery 0
 $DOG cluster info | head -6 | _filter_cluster_info
 ls $STORE/*/obj/* | _filter_store | sort
+$DOG vdi read test 0 32m | md5sum

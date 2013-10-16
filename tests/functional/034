@@ -9,29 +9,29 @@ if [[ "$DRIVER" == zoo* ]];then
 fi
 
 # start 8 nodes
-for i in `seq 0 7`; do
+for i in `seq 0 15`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 8
+_wait_for_sheep 16
 
-_cluster_format
+_cluster_format -c 6
 
-$DOG vdi create test 100M
+_vdi_create test 100M
 # create 25 objects
 for i in `seq 0 24`; do
     echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
 # kill 5 nodes
-nr=8
+nr=16
 for i in `seq 3 7`; do
     _wait_for_sheep $nr
     _wait_for_sheep_recovery 0
     _kill_sheep $i
     nr=$(($nr - 1))
 done
-_wait_for_sheep 3
+_wait_for_sheep 11
 
 # update vdi
 for i in `seq 0 24`; do
@@ -45,8 +45,8 @@ for i in `seq 3 7`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 8
+_wait_for_sheep 16
 
-for i in `seq 0 7`; do
-    $DOG vdi read test -p 700$i | md5sum
+for i in `seq 0 15`; do
+    $DOG vdi read test -p $((7000+$i)) | md5sum
 done

@@ -4,14 +4,14 @@
 
 . ./common
 
-for i in 0 2; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 2
+_wait_for_sheep 6
 
 _cluster_format -c 2
-$DOG vdi create test 4G
+_vdi_create test 4G
 
 echo -n value > $STORE/tmp.dat
 

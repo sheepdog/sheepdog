@@ -1,10 +1,12 @@
 QA output created by 031
 using backend plain store
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test4        0  400 MB  0.0 MB  0.0 MB DATE   fd2de3     6              
   test1        0  100 MB  0.0 MB  0.0 MB DATE   fd32fc     1              
-  test3        0  300 MB  0.0 MB  0.0 MB DATE   fd3662     1              
-  test2        0  200 MB  0.0 MB  0.0 MB DATE   fd3815     1              
+  test3        0  300 MB  0.0 MB  0.0 MB DATE   fd3662     3              
+  test2        0  200 MB  0.0 MB  0.0 MB DATE   fd3815     2              
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test4        0  400 MB  0.0 MB  0.0 MB DATE   fd2de3     6              
   test1        0  100 MB  0.0 MB  0.0 MB DATE   fd32fc     1              
-  test3        0  300 MB  0.0 MB  0.0 MB DATE   fd3662     1              
-  test2        0  200 MB  0.0 MB  0.0 MB DATE   fd3815     1              
+  test3        0  300 MB  0.0 MB  0.0 MB DATE   fd3662     3              
+  test2        0  200 MB  0.0 MB  0.0 MB DATE   fd3815     2              

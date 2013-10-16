@@ -9,21 +9,24 @@ _make_device 0 $((1024 ** 3))
 _make_device 1 $((2 * 1024 ** 3))
 _make_device 2 $((3 * 1024 ** 3))
 _make_device 3 $((3 * 1024 ** 3))
+_make_device 4 $((4 * 1024 ** 3))
+_make_device 5 $((5 * 1024 ** 3))
+_make_device 6 $((6 * 1024 ** 3))
 
 #start three in different size
-for i in 0 1 2; do
+for i in `seq 0 5`; do
 	_start_sheep $i
 done
-_wait_for_sheep 3
-_cluster_format
+_wait_for_sheep 6
+_cluster_format -c 6
 
-$DOG vdi create test 100M -P
+_vdi_create test 100M -P
 $DOG cluster info | _filter_cluster_info
 
 #start recovery
-_start_sheep 3
+_start_sheep 6
 
-_wait_for_sheep 4
+_wait_for_sheep 7
 _wait_for_sheep_recovery 0
 $DOG cluster info | _filter_cluster_info
 

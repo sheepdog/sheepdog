@@ -8,33 +8,33 @@ if [[ "$DRIVER" == zoo* ]];then
     DRIVER=${DRIVER/1000/5000}
 fi
 
-for i in `seq 0 7`; do
+for i in `seq 0 15`; do
     _start_sheep $i
 done
 
-_wait_for_sheep "8"
+_wait_for_sheep 16
 
 _cluster_format
 
 # create new vdis
 (
 for i in `seq 0 40`;do
-    $DOG vdi create test$i 4M
+    _vdi_create test$i 4M
 done
 ) &
 
 # kill nodes and join them back
 for i in 1 2; do _kill_sheep $i;done
-_wait_for_sheep 6
+_wait_for_sheep 14
 _wait_for_sheep_recovery 0
 for i in 3 4; do _kill_sheep $i;done
-_wait_for_sheep 4
+_wait_for_sheep 12
 _wait_for_sheep_recovery 0
 for i in 5; do _kill_sheep $i;done
-_wait_for_sheep 3
+_wait_for_sheep 11
 _wait_for_sheep_recovery 0
 for i in `seq 1 5`; do _start_sheep $i;done
-_wait_for_sheep 8
+_wait_for_sheep 16
 
 # wait for dog to finish
 wait

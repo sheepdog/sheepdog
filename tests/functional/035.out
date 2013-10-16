@@ -1,42 +1,82 @@
 QA output created by 035
 using backend plain store
-Looking for the object 0x7c2b2500000000 (the inode vid 0x7c2b25 idx 0) with 2 nodes
+Looking for the object 0x7c2b2500000000 (the inode vid 0x7c2b25 idx 0) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000001 (the inode vid 0x7c2b25 idx 1) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000001 (the inode vid 0x7c2b25 idx 1) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000002 (the inode vid 0x7c2b25 idx 2) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000002 (the inode vid 0x7c2b25 idx 2) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000003 (the inode vid 0x7c2b25 idx 3) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000003 (the inode vid 0x7c2b25 idx 3) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000004 (the inode vid 0x7c2b25 idx 4) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000004 (the inode vid 0x7c2b25 idx 4) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000005 (the inode vid 0x7c2b25 idx 5) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000005 (the inode vid 0x7c2b25 idx 5) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000006 (the inode vid 0x7c2b25 idx 6) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000006 (the inode vid 0x7c2b25 idx 6) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000007 (the inode vid 0x7c2b25 idx 7) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000007 (the inode vid 0x7c2b25 idx 7) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000008 (the inode vid 0x7c2b25 idx 8) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000008 (the inode vid 0x7c2b25 idx 8) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000009 (the inode vid 0x7c2b25 idx 9) with 2 nodes
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)
+Looking for the object 0x7c2b2500000009 (the inode vid 0x7c2b25 idx 9) with 6 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7005 has the object (should be 2 copies)
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7005 has the object (should be 6 copies)
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 has the object (should be 6 copies)
+127.0.0.1:7009 has the object (should be 6 copies)

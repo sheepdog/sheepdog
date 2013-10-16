@@ -5,16 +5,16 @@
 . ./common
 
 # start three sheep daemons
-for i in 0 1 2; do
+for i in `seq 0 6`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 7
 
-_cluster_format -c 2
+_cluster_format
 
 # create a pre-allocated vdi
-$DOG vdi create test 80M -P
+_vdi_create test 80M -P
 
 # stop the 3rd node
 _kill_sheep 2
@@ -28,9 +28,10 @@ _start_sheep 2
 _wait_for_sheep_recovery 0
 
 # show md5sum of the vdi on each node
-for i in 0 1 2; do
+for i in `seq 0 6`; do
     $DOG vdi read test -p 700$i | md5sum > $STORE/csum.$i
 done
 
-diff -u $STORE/csum.0 $STORE/csum.1
-diff -u $STORE/csum.0 $STORE/csum.2
+for i in `seq 1 6`; do
+    diff -u $STORE/csum.0 $STORE/csum.$i
+done

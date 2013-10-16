@@ -14,13 +14,13 @@ _uninit()
 
 _need_to_be_root
 
-for i in `seq 0 2`; do
+for i in `seq 0 5`; do
 	_start_sheep $i "-i host=127.0.0.1,port=$((8000+$i))"
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
-_cluster_format
+_cluster_format -c 6
 
 $DOG vdi create test 100M
 dd if=/dev/zero | $DOG vdi write test &

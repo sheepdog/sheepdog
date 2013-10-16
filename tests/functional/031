@@ -4,21 +4,23 @@
 
 . ./common
 
-_start_sheep 0
-_wait_for_sheep 1
+for i in `seq 0 5`;do _start_sheep $i;done
+_wait_for_sheep 6
 
 _cluster_format -c 1
 
 for i in 1 2 3; do
-    $DOG vdi create test$i ${i}00M
+    $DOG vdi create test$i ${i}00M -c $i
 done
+
+$DOG vdi create -e test4 400M
 
 _vdi_list
 
 $DOG cluster shutdown
 _wait_for_sheep_stop
 
-_start_sheep 0
-_wait_for_sheep 1
+for i in `seq 0 5`;do _start_sheep $i;done
+_wait_for_sheep 6
 
 _vdi_list

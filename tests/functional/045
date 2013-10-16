@@ -4,14 +4,14 @@
 
 . ./common
 
-for i in 0 1 2; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
-_cluster_format -c 2
-$DOG vdi create test 4M
+_cluster_format -c 6
+_vdi_create test 4M
 
 for i in `seq 0 7`; do
     echo $i | $DOG vdi write test $(($i * 1536 + 512)) 512

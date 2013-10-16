@@ -9,10 +9,10 @@ done
 
 _wait_for_sheep 8
 
-_cluster_format
+_cluster_format -c 6
 
 for i in `seq 0 3`; do
-    $DOG vdi create test$i 100M
+    _vdi_create test$i 100M
 
     for j in `seq 0 24`; do
 	echo "$i $j" | $DOG vdi write test$i $(($j * 4 * 1024 ** 2)) 512

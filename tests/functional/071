@@ -4,15 +4,15 @@
 
 . ./common
 
-for i in 0 1 2; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
-_cluster_format
+_cluster_format -c 6
 
-$DOG vdi create test 4M
+_vdi_create test 4M
 
 # Create a 28 KB file.  The first 12 KB (3 blocks) is filled with zero,
 # next 4 KB is filled with one, and the rest is filled with zero.

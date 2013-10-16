@@ -13,6 +13,6 @@ _wait_for_sheep "3"
 _cluster_format -c 3
 
 echo "creating a VDI should fail without data nodes available"
-$DOG vdi create test 100M
+_vdi_create test 100M
 
 status=0

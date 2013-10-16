@@ -4,15 +4,15 @@
 
 . ./common
 
-for i in `seq 0 4`; do
+for i in `seq 0 9`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 5
+_wait_for_sheep 10
 
-_cluster_format
+_cluster_format -c 6
 
-$DOG vdi create test 40M
+_vdi_create test 40M
 
 for i in `seq 0 10`; do
     echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
@@ -48,7 +48,7 @@ for i in 0 1 2 4; do
 done
 
 # check whether sheep 4 can receive notify event
-$DOG vdi create test2 20M
+_vdi_create test2 20M
 
 for i in 0 1 2 4; do
     _vdi_list -p 700$i

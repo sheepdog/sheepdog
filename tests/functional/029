@@ -4,11 +4,11 @@
 
 . ./common
 
-for i in `seq 0 6`; do
+for i in `seq 0 7`; do
 	_start_sheep $i;
 done
 
-_wait_for_sheep 7
+_wait_for_sheep 8
 
 _cluster_format -c 3
 
@@ -16,6 +16,7 @@ for i in `seq 2 4`; do
 	$DOG vdi create test$i 20M -c $i -P
 done
 
+$DOG vdi create -e test5 20M -P
 $DOG vdi snapshot -s tag test2
 $DOG vdi clone -s 1 test2 clone -c 3
 
@@ -24,7 +25,7 @@ for i in `seq 2 3`; do
 	_kill_sheep $i;
 done
 
-for i in `seq 7 8`; do
+for i in `seq 8 9`; do
 	_start_sheep $i;
 done
 
@@ -35,7 +36,7 @@ $DOG vdi delete -s 1 test2
 
 _vdi_list
 
-for i in `seq 2 4`; do
+for i in `seq 2 5`; do
 	$DOG vdi object test$i -i 1;
 done
 

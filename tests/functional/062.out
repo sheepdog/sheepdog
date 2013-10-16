@@ -1,6 +1,6 @@
 QA output created by 062
 using backend plain store
-= test 0 1234 0 0 MASKED 7c2b25 3
+= test 0 4095 0 0 MASKED 7c2b25 6
 hello
 world
 h!!!
@@ -8,3 +8,4 @@ h^^!
 xxx
 h^^!
 world
+erxxxxxxcode

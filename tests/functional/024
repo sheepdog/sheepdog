@@ -12,14 +12,14 @@ VDI_NAME="test"
 VDI_SIZE="300M"
 
 echo "starting first sheep"
-_start_sheep 0
-_wait_for_sheep 1
+for i in `seq 0 5`; do _start_sheep $i; done
+_wait_for_sheep 6
 
 echo "formatting cluster"
 _cluster_format -c 1
 
 echo "creating vdi ${NAME}"
-$DOG vdi create ${VDI_NAME} ${VDI_SIZE}
+_vdi_create ${VDI_NAME} ${VDI_SIZE}
 sleep 1
 
 echo "filling ${VDI_NAME} with data"
@@ -29,8 +29,8 @@ echo "reading back ${VDI_NAME}"
 $QEMU_IO -c "read 0 1m" sheepdog:${VDI_NAME} | _filter_qemu_io
 
 echo "starting second sheep"
-_start_sheep 1
-_wait_for_sheep 2
+_start_sheep 6
+_wait_for_sheep 7
 
 echo "reading data from second sheep"
 $QEMU_IO -c "read 0 ${VDI_SIZE}" sheepdog:localhost:7001:${VDI_NAME} | _filter_qemu_io

@@ -176,6 +176,10 @@ testlist options
 	    MD=true
 	    xpand=false
 	    ;;
+	-ec)
+	    EC=true
+	    xpand=false
+	    ;;
 
 	-valgrind)
 	    valgrind=true

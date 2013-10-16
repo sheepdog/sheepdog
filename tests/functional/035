@@ -14,18 +14,18 @@ _uninit()
 
 _need_to_be_root
 
-for i in `seq 0 5`; do
+for i in `seq 0 9`; do
 	_start_sheep $i
 done
 
-_wait_for_sheep 6
+_wait_for_sheep 10
 
-_cluster_format -c 3
+_cluster_format -c 6
 
-$DOG vdi create test 40M
+_vdi_create test 40M
 _random | $DOG vdi write test &
 
-sleep 3
+sleep 2
 # Test write timeout
 for i in `seq 1 4`; do
 	_simulate_machine_down $i
@@ -41,7 +41,7 @@ for i in `seq 0 9`; do
 	$DOG vdi object -i $i test
 done
 
-for i in 6 7 8; do
+for i in 10 11 12; do
 	_start_sheep $i
 done
 

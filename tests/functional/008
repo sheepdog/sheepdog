@@ -4,23 +4,23 @@
 
 . ./common
 
-for i in `seq 0 7`; do
+for i in `seq 0 15`; do
     _start_sheep $i
 done
 
-_wait_for_sheep "8"
+_wait_for_sheep 16
 
 _cluster_format -c 3
 
 for i in `seq 0 4`; do
-    $DOG vdi create test$i 100M
+    _vdi_create test$i 100M
 done
 
 for i in `seq 0 4`; do
     _random | $DOG vdi write test$i -p 7000 &
 done
 
-sleep 3
+sleep 1
 
 echo begin kill
 

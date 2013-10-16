@@ -1,19 +1,21 @@
 QA output created by 029
 using backend plain store
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test5        0   20 MB   20 MB  0.0 MB DATE   fd2c30     6              
   test4        0   20 MB   20 MB  0.0 MB DATE   fd2de3     4              
   test3        0   20 MB   20 MB  0.0 MB DATE   fd3662     3              
   test2        0   20 MB  0.0 MB   20 MB DATE   fd3816     2              
-Looking for the object 0xfd381500000001 (the inode vid 0xfd3816 idx 1) with 7 nodes
+Looking for the object 0xfd381500000001 (the inode vid 0xfd3816 idx 1) with 8 nodes
 
 127.0.0.1:7000 has the object (should be 2 copies)
 127.0.0.1:7001 doesn't have the object
 127.0.0.1:7004 doesn't have the object
 127.0.0.1:7005 doesn't have the object
-127.0.0.1:7006 has the object (should be 2 copies)
+127.0.0.1:7006 doesn't have the object
 127.0.0.1:7007 doesn't have the object
 127.0.0.1:7008 doesn't have the object
-Looking for the object 0xfd366200000001 (the inode vid 0xfd3662 idx 1) with 7 nodes
+127.0.0.1:7009 has the object (should be 2 copies)
+Looking for the object 0xfd366200000001 (the inode vid 0xfd3662 idx 1) with 8 nodes
 
 127.0.0.1:7000 doesn't have the object
 127.0.0.1:7001 has the object (should be 3 copies)
@@ -22,7 +24,8 @@ Looking for the object 0xfd366200000001 (the inode vid 0xfd3662 idx 1) with 7 no
 127.0.0.1:7006 doesn't have the object
 127.0.0.1:7007 has the object (should be 3 copies)
 127.0.0.1:7008 doesn't have the object
-Looking for the object 0xfd2de300000001 (the inode vid 0xfd2de3 idx 1) with 7 nodes
+127.0.0.1:7009 doesn't have the object
+Looking for the object 0xfd2de300000001 (the inode vid 0xfd2de3 idx 1) with 8 nodes
 
 127.0.0.1:7000 doesn't have the object
 127.0.0.1:7001 has the object (should be 4 copies)
@@ -31,3 +34,14 @@ Looking for the object 0xfd2de300000001 (the inode vid 0xfd2de3 idx 1) with 7 no
 127.0.0.1:7006 doesn't have the object
 127.0.0.1:7007 has the object (should be 4 copies)
 127.0.0.1:7008 has the object (should be 4 copies)
+127.0.0.1:7009 doesn't have the object
+Looking for the object 0xfd2c3000000001 (the inode vid 0xfd2c30 idx 1) with 8 nodes
+
+127.0.0.1:7000 has the object (should be 6 copies)
+127.0.0.1:7001 has the object (should be 6 copies)
+127.0.0.1:7004 has the object (should be 6 copies)
+127.0.0.1:7005 doesn't have the object
+127.0.0.1:7006 has the object (should be 6 copies)
+127.0.0.1:7007 has the object (should be 6 copies)
+127.0.0.1:7008 doesn't have the object
+127.0.0.1:7009 has the object (should be 6 copies)

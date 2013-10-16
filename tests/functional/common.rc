@@ -510,5 +510,14 @@ _vdi_list()
 	$DOG vdi list $args | _filter_short_date
 }
 
+_vdi_create()
+{
+	if $EC; then
+		$DOG vdi create -e $*
+	else
+		$DOG vdi create $*
+	fi
+}
+
 # make sure this script returns success
 /bin/true
