@@ -576,3 +576,88 @@ void fec_decode(const struct fec *code,
 		}
 	}
 }
+
+/*
+ * fec_decode need primary(data) strips in the numeric place, e,g, we have
+ * indexes passed as { 0, 2, 4, 5 } and 4, 5 are parity strip, we need to pass
+ * { 0, 4, 2, 5 } (we choose this form) or { 0, 5, 2, 4} to it.
+ *
+ * Return out and outidx as fec_decode requested.
+ */
+static inline void decode_prepare(const uint8_t *dp[], const uint8_t *out[],
+				  int outidx[])
+{
+	int i, p = 0;
+
+	for (i = SD_EC_D; i < SD_EC_DP; i++) {
+		if (dp[i]) {
+			p = i;
+			break;
+		}
+	}
+
+	for (i = 0; i < SD_EC_D; i++) {
+		if (dp[i]) {
+			out[i] = dp[i];
+			outidx[i] = i;
+		} else {
+			out[i] = dp[p];
+			outidx[i] = p;
+			p++;
+		}
+	}
+}
+
+static inline bool data_is_missing(const uint8_t *dp[])
+{
+	for (int i = 0; i < SD_EC_D; i++)
+		if (!dp[i])
+			return true;
+	return false;
+}
+
+/*
+ * This function takes input strips and return the lost strip
+ *
+ * @input: strips (either ds or ps) that are used to generate lost strips
+ * @inidx: indexes of each input strip in the whole stripe, must be in numeric
+ *         order such as { 0, 2, 4, 5 }
+ * @output: the lost ds or ps to return
+ * @idx: index of output which is lost
+ */
+void ec_decode(struct fec *ctx, const uint8_t *input[SD_EC_D],
+	       const int inidx[SD_EC_D],
+	       uint8_t output[], int idx)
+{
+	const uint8_t *dp[SD_EC_DP] = { NULL };
+	const uint8_t *oin[SD_EC_D] = { NULL };
+	int oidx[SD_EC_D] = { 0 }, i;
+	uint8_t m0[SD_EC_STRIP_SIZE], m1[SD_EC_STRIP_SIZE],
+		p0[SD_EC_STRIP_SIZE], p1[SD_EC_STRIP_SIZE];
+	uint8_t *missing[SD_EC_P] = { m0, m1 };
+	uint8_t *p[SD_EC_P] = { p0, p1 };
+
+	for (i = 0; i < SD_EC_D; i++)
+		dp[inidx[i]] = input[i];
+
+	decode_prepare(dp, oin, oidx);
+
+	/* Fill the data strip if missing */
+	if (data_is_missing(dp)) {
+		int m = 0;
+		fec_decode(ctx, oin, missing, oidx, SD_EC_STRIP_SIZE);
+		for (i = 0; i < SD_EC_D; i++)
+			if (!dp[i])
+				dp[i] = missing[m++];
+	}
+
+	if (idx < SD_EC_D)
+		goto out;
+
+	/* Fill the parity strip */
+	ec_encode(ctx, dp, p);
+	for (i = 0; i < SD_EC_P; i++)
+		dp[SD_EC_D + i] = p[i];
+out:
+	memcpy(output, dp[idx], SD_EC_STRIP_SIZE);
+}

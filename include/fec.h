@@ -118,7 +118,7 @@ void fec_decode(const struct fec *code,
 #define SD_EC_D_SIZE (SD_EC_STRIP_SIZE * SD_EC_D)
 #define SD_EC_OBJECT_SIZE (SD_DATA_OBJ_SIZE / SD_EC_D)
 #define SD_EC_STRIPE (SD_EC_STRIP_SIZE * SD_EC_DP)
-#define STRIP_PER_OBJECT (SD_DATA_OBJ_SIZE / SD_EC_STRIP_SIZE)
+#define SD_EC_NR_STRIPE_PER_OBJECT (SD_EC_OBJECT_SIZE / SD_EC_STRIP_SIZE)
 
 /*
  * Stripe: data strips + parity strips, spread on all replica
@@ -158,18 +158,17 @@ static inline void ec_encode(struct fec *ctx, const uint8_t *ds[SD_EC_D],
 }
 
 /*
- * This function takes input strips and return the lost strips
+ * This function takes input strips and return the lost strip
  *
  * @input: strips (either ds or ps) that are used to generate lost strips
+ * @inidx: indexes of each input strip in the whole stripe, must be in numeric
+ *         order such as { 0, 2, 4, 5 }
  * @output: the lost ds or ps to return
- * @idx: indexes of each input strip in the whole stripe
+ * @idx: index of output which is lost
  */
-static inline void ec_decode(struct fec *ctx, const uint8_t *input[SD_EC_D],
-			     uint8_t *output[],
-			     const int idx[])
-{
-	fec_decode(ctx, input, output, idx, SD_EC_STRIP_SIZE);
-}
+void ec_decode(struct fec *ctx, const uint8_t *input[SD_EC_D],
+	       const int inidx[SD_EC_D],
+	       uint8_t output[], int idx);
 
 /* Destroy the erasure code context */
 static inline void ec_destroy(struct fec *ctx)
