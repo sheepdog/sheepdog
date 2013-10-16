@@ -1621,6 +1621,11 @@ static int vdi_check(int argc, char **argv)
 		return ret;
 	}
 
+	if (inode->copy_policy > 0) {
+		sd_err("not implemented for erasure coded vdi");
+		return EXIT_FAILURE;
+	}
+
 	return do_vdi_check(inode);
 }
 
