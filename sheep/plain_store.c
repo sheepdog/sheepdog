@@ -451,8 +451,16 @@ static bool oid_stale(uint64_t oid)
 	const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
 
 	vinfo = get_vnode_info();
-	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
 
+	/*
+	 * If vinfo->nr_zones < SD_EC_DP, we might not get the idx, so we don't
+	 * know it is stale or not. In this case, we keep it stay in the working
+	 * directory in order to recover it when we get enough zones
+	 */
+	if (unlikely(vinfo->nr_zones < SD_EC_DP) && is_erasure_oid(oid))
+		return false;
+
+	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
 	oid_to_vnodes(oid, &vinfo->vroot, nr_copies, obj_vnodes);
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];

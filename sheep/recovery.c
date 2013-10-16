@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009-2011 Nippon Telegraph and Telephone Corporation.
+ * Copyright (C) 2012-2013 Taobao Inc.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -93,15 +94,90 @@ static inline bool node_is_gateway_only(void)
 	return sys->this_node.nr_vnodes == 0;
 }
 
-static void *read_erasure_object(const struct sd_node *node, uint64_t oid,
-				 uint32_t epoch, uint32_t tgt_epoch,
-				 uint8_t idx)
+static struct vnode_info *rollback_vnode_info(uint32_t *epoch,
+					      struct vnode_info *cur)
+{
+	struct vnode_info *vinfo;
+rollback:
+	*epoch -= 1;
+	if (*epoch < last_gathered_epoch)
+		return NULL;
+
+	vinfo = get_vnode_info_epoch(*epoch, cur);
+	if (!vinfo) {
+		/* We rollback in case we don't get a valid epoch */
+		sd_alert("cannot get epoch %d", *epoch);
+		sd_alert("clients may see old data");
+		goto rollback;
+	}
+	return vinfo;
+}
+
+/*
+ * A node that does not match any node in current node list means the node has
+ * left the cluster, then it's an invalid node.
+ */
+static bool invalid_node(const struct sd_node *n, struct vnode_info *info)
+{
+
+	if (rb_search(&info->nroot, n, rb, node_cmp))
+		return false;
+	return true;
+}
+
+static int search_erasure_object(uint64_t oid, uint8_t idx,
+				 struct rb_root *nroot,
+				 struct recovery_work *rw,
+				 uint32_t tgt_epoch,
+				 void *buf)
+{
+	struct sd_req hdr;
+	unsigned rlen = get_store_objsize(oid);
+	struct sd_node *n;
+	uint32_t epoch = rw->epoch;
+
+	rb_for_each_entry(n, nroot, rb) {
+		if (invalid_node(n, rw->cur_vinfo))
+			continue;
+		sd_init_req(&hdr, SD_OP_READ_PEER);
+		hdr.epoch = epoch;
+		hdr.flags = SD_FLAG_CMD_RECOVERY;
+		hdr.data_length = rlen;
+		hdr.obj.oid = oid;
+		hdr.obj.tgt_epoch = tgt_epoch;
+		hdr.obj.ec_index = idx;
+
+		sd_debug("%"PRIx64" epoch %"PRIu32" tgt %"PRIu32" idx %d, %s",
+			 oid, epoch, tgt_epoch, idx, node_to_str(n));
+		if (sheep_exec_req(&n->nid, &hdr, buf) == SD_RES_SUCCESS)
+			return SD_RES_SUCCESS;
+	}
+	return SD_RES_NO_OBJ;
+}
+
+static void *read_erasure_object(uint64_t oid, uint8_t idx,
+				 struct recovery_work *rw)
 {
 	struct sd_req hdr;
 	unsigned rlen = get_store_objsize(oid);
 	void *buf = xvalloc(rlen);
-	int ret;
-
+	struct vnode_info *old = grab_vnode_info(rw->old_vinfo), *new_old;
+	uint32_t epoch = rw->epoch, tgt_epoch = rw->tgt_epoch;
+	const struct sd_node *node;
+again:
+	if (old->nr_zones < SD_EC_DP) {
+		if (search_erasure_object(oid, idx, &old->nroot, rw,
+					  tgt_epoch, buf)
+		    == SD_RES_SUCCESS)
+			goto done;
+		else
+			goto rollback;
+	}
+	node = oid_to_node(oid, &old->vroot, idx);
+	sd_debug("%"PRIx64" epoch %"PRIu32" tgt %"PRIu32" idx %d, %s",
+		 oid, epoch, tgt_epoch, idx, node_to_str(node));
+	if (invalid_node(node, rw->cur_vinfo))
+		goto rollback;
 	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY;
@@ -110,13 +186,21 @@ static void *read_erasure_object(const struct sd_node *node, uint64_t oid,
 	hdr.obj.tgt_epoch = tgt_epoch;
 	hdr.obj.ec_index = idx;
 
-	sd_debug("%s, epoch %"PRIu32" tgt %"PRIu32" idx %d", node_to_str(node),
-		 epoch, tgt_epoch, idx);
-	ret = sheep_exec_req(&node->nid, &hdr, buf);
-	if (ret != SD_RES_SUCCESS) {
-		free(buf);
-		return NULL;
+	if (sheep_exec_req(&node->nid, &hdr, buf) != SD_RES_SUCCESS) {
+rollback:
+		new_old = rollback_vnode_info(&tgt_epoch, rw->cur_vinfo);
+		if (!new_old) {
+			sd_err("can not read %"PRIx64" idx %d", oid, idx);
+			free(buf);
+			buf = NULL;
+			goto done;
+		}
+		put_vnode_info(old);
+		old = new_old;
+		goto again;
 	}
+done:
+	put_vnode_info(old);
 	return buf;
 }
 
@@ -188,18 +272,6 @@ static int recover_object_from(struct recovery_obj_work *row,
 
 	free(buf);
 	return ret;
-}
-
-/*
- * A node that does not match any node in current node list means the node has
- * left the cluster, then it's an invalid node.
- */
-static bool invalid_node(const struct sd_node *n, struct vnode_info *info)
-{
-
-	if (rb_search(&info->nroot, n, rb, node_cmp))
-		return false;
-	return true;
 }
 
 static int recover_object_from_replica(struct recovery_obj_work *row,
@@ -299,51 +371,36 @@ again:
 		/* fall through */
 	default:
 		/* No luck, roll back to an older configuration and try again */
-rollback:
-		tgt_epoch--;
-		if (tgt_epoch < 1) {
+		new_old = rollback_vnode_info(&tgt_epoch, rw->cur_vinfo);
+		if (!new_old) {
 			sd_err("can not recover oid %"PRIx64, oid);
 			ret = -1;
-			break;
-		}
-
-		new_old = get_vnode_info_epoch(tgt_epoch, rw->cur_vinfo);
-		if (!new_old) {
-			/* We rollback in case we don't get a valid epoch */
-			sd_alert("cannot get epoch %d", tgt_epoch);
-			sd_alert("clients may see old data");
-			goto rollback;
+			goto out;
 		}
 
 		put_vnode_info(old);
 		old = new_old;
 		goto again;
 	}
-
+out:
 	put_vnode_info(old);
 	return ret;
 }
 
-static void *rebuild_erasure_object(struct recovery_obj_work *row,
-				    uint32_t tgt_epoch, const uint8_t idx)
+static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
+				    struct recovery_work *rw)
 {
-	struct vnode_info *old = grab_vnode_info(row->base.old_vinfo);
-	const struct sd_node *target_nodes[SD_MAX_NODES];
 	uint8_t *bufs[SD_EC_D] = { 0 };
-	uint64_t oid = row->oid;
-	uint32_t epoch = row->base.epoch;
 	int idxs[SD_EC_D], len = get_store_objsize(oid);
 	struct fec *ctx = ec_init();
 	char *lost = xvalloc(len);
 	int i, j;
 
 	/* Prepare replica */
-	oid_to_nodes(oid, &old->vroot, SD_EC_DP, target_nodes);
 	for (i = 0, j = 0; i < SD_EC_DP && j < SD_EC_D; i++) {
 		if (i == idx)
 			continue;
-		bufs[j] = read_erasure_object(target_nodes[i], oid,
-					      epoch, tgt_epoch, i);
+		bufs[j] = read_erasure_object(oid, i, rw);
 		if (!bufs[j])
 			continue;
 		idxs[j++] = i;
@@ -366,7 +423,6 @@ static void *rebuild_erasure_object(struct recovery_obj_work *row,
 	}
 out:
 	ec_destroy(ctx);
-	put_vnode_info(old);
 	for (i = 0; i < SD_EC_D; i++)
 		free(bufs[i]);
 	return lost;
@@ -384,34 +440,45 @@ static uint8_t local_node_copy_index(struct rb_root *vroot, uint64_t oid)
 	panic("can't get valid index for %"PRIx64, oid);
 }
 
+/*
+ * Erasure object recovery algorithm
+ *
+ * 1. read the lost object from its track in epoch history vertically because
+ *    every copy that holds partial data of the object is unique
+ * 2. if not found in 1, then tries to rebuild it with RS algorithm
+ *    2.1 read enough other copies from their tracks in epoch history
+ *    2.2 rebuild the lost object from the content of copies read at 2.1
+ *
+ * The subtle case is number for available zones is less than SD_EC_DP or the
+ * requested index of lost object:
+ *    1 we need to make sure nr_zones >= SD_EC_DP to avoid panic of
+ *      oid_to_node(s) helpers.
+ *    2 we have to search all the available zones when we can't get idx. Its
+ *      okay to do a mad search when number of available zones is small
+ */
 static int recover_erasure_object(struct recovery_obj_work *row)
 {
 	struct recovery_work *rw = &row->base;
-	struct vnode_info *old, *cur;
+	struct vnode_info *cur = rw->cur_vinfo;
 	uint64_t oid = row->oid;
-	uint32_t tgt_epoch = rw->tgt_epoch, epoch = rw->epoch;
-	const struct sd_node *node;
 	struct siocb iocb = { 0 };
-	void *buf;
+	void *buf = NULL;
 	uint8_t idx;
 	int ret = -1;
 
-	cur = grab_vnode_info(rw->cur_vinfo);
-	old = grab_vnode_info(rw->old_vinfo);
+	if (cur->nr_zones < SD_EC_DP)
+		return -1;
 
 	idx = local_node_copy_index(&cur->vroot, oid);
-	node = oid_to_node(oid, &old->vroot, idx);
-
-	sd_debug("%"PRIx64" idx %d, from epoch %"PRIu32, oid, idx, tgt_epoch);
-
-	if (invalid_node(node, cur))
-		buf = rebuild_erasure_object(row, tgt_epoch, idx);
-	else
-		buf = read_erasure_object(node, oid, epoch, tgt_epoch, idx);
+	buf = read_erasure_object(oid, idx, rw);
 	if (!buf)
+		buf = rebuild_erasure_object(oid, idx, rw);
+	if (!buf) {
+		sd_err("can not recover %"PRIx64" idx %d", oid, idx);
 		goto out;
+	}
 
-	iocb.epoch = epoch;
+	iocb.epoch = rw->epoch;
 	iocb.length = get_store_objsize(oid);
 	iocb.offset = 0;
 	iocb.buf = buf;
@@ -419,8 +486,6 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	ret = sd_store->create_and_write(oid, &iocb);
 	free(buf);
 out:
-	put_vnode_info(cur);
-	put_vnode_info(old);
 	return ret;
 }
 
