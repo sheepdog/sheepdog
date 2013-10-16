@@ -375,7 +375,6 @@ forward_write:
 
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -395,7 +394,6 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 	hdr.data_length = datalen;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
-	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -440,7 +438,6 @@ int remove_object(uint64_t oid)
 
 	sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 	hdr.obj.oid = oid;
-	hdr.obj.copies = get_vdi_copy_number(oid_to_vid(oid));
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
