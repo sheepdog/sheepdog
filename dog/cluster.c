@@ -253,7 +253,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 		return;
 
 	/* fill vdi object id */
-	object_tree_insert(vdi_oid, i->nr_copies, 0);
+	object_tree_insert(vdi_oid, i->nr_copies, i->copy_policy);
 
 	/* fill data object id */
 	nr_objs = count_data_objs(i);

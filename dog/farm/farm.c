@@ -184,7 +184,8 @@ out:
 	return ret;
 }
 
-static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
+static int notify_vdi_add(uint32_t vdi_id, uint8_t nr_copies,
+			  uint8_t copy_policy)
 {
 	int ret = -1;
 	struct sd_req hdr;
@@ -194,6 +195,7 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies)
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_ADD);
 	hdr.vdi_state.new_vid = vdi_id;
 	hdr.vdi_state.copies = nr_copies;
+	hdr.vdi_state.copy_policy = copy_policy;
 	hdr.vdi_state.set_bitmap = true;
 
 	ret = dog_exec_req(&sd_nid, &hdr, buf);
@@ -363,7 +365,8 @@ static void do_load_object(struct work *work)
 
 	if (is_vdi_obj(sw->entry.oid)) {
 		if (notify_vdi_add(oid_to_vid(sw->entry.oid),
-				   sw->entry.nr_copies) < 0)
+				   sw->entry.nr_copies,
+				   sw->entry.copy_policy) < 0)
 			goto error;
 
 		sd_write_lock(&vdi_list_lock);
