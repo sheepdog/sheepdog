@@ -93,8 +93,9 @@ static inline bool node_is_gateway_only(void)
 	return sys->this_node.nr_vnodes == 0;
 }
 
-static void *read_object_from(const struct sd_node *node, uint64_t oid,
-			      uint32_t epoch, uint32_t tgt_epoch, uint8_t idx)
+static void *read_erasure_object(const struct sd_node *node, uint64_t oid,
+				 uint32_t epoch, uint32_t tgt_epoch,
+				 uint8_t idx)
 {
 	struct sd_req hdr;
 	unsigned rlen = get_store_objsize(oid);
@@ -127,8 +128,7 @@ static void *read_object_from(const struct sd_node *node, uint64_t oid,
  */
 static int recover_object_from(struct recovery_obj_work *row,
 			       const struct sd_node *node,
-			       uint32_t tgt_epoch,
-			       uint8_t idx)
+			       uint32_t tgt_epoch)
 {
 	uint64_t oid = row->oid;
 	uint32_t local_epoch = row->local_epoch;
@@ -149,7 +149,7 @@ static int recover_object_from(struct recovery_obj_work *row,
 	}
 
 	/* compare sha1 hash value first */
-	if (!is_erasure_oid(oid) && local_epoch > 0) {
+	if (local_epoch > 0) {
 		sd_init_req(&hdr, SD_OP_GET_HASH);
 		hdr.obj.oid = oid;
 		hdr.obj.tgt_epoch = tgt_epoch;
@@ -176,7 +176,6 @@ static int recover_object_from(struct recovery_obj_work *row,
 	hdr.data_length = rlen;
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
-	hdr.obj.ec_index = idx;
 
 	ret = sheep_exec_req(&node->nid, &hdr, buf);
 	if (ret == SD_RES_SUCCESS) {
@@ -184,7 +183,6 @@ static int recover_object_from(struct recovery_obj_work *row,
 		iocb.length = rsp->data_length;
 		iocb.offset = rsp->obj.offset;
 		iocb.buf = buf;
-		iocb.ec_index = idx;
 		ret = sd_store->create_and_write(oid, &iocb);
 	}
 
@@ -237,7 +235,7 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		if (invalid_node(node, row->base.cur_vinfo))
 			continue;
 
-		ret = recover_object_from(row, node, tgt_epoch, 0);
+		ret = recover_object_from(row, node, tgt_epoch);
 		switch (ret) {
 		case SD_RES_SUCCESS:
 			sd_debug("recovered oid %"PRIx64" from %d to epoch %d",
@@ -327,9 +325,8 @@ rollback:
 	return ret;
 }
 
-static int rebuild_object_from_replica(struct recovery_obj_work *row,
-				       uint32_t tgt_epoch,
-				       const uint8_t idx)
+static void *rebuild_erasure_object(struct recovery_obj_work *row,
+				    uint32_t tgt_epoch, const uint8_t idx)
 {
 	struct vnode_info *old = grab_vnode_info(row->base.old_vinfo);
 	const struct sd_node *target_nodes[SD_MAX_NODES];
@@ -339,22 +336,24 @@ static int rebuild_object_from_replica(struct recovery_obj_work *row,
 	int idxs[SD_EC_D], len = get_store_objsize(oid);
 	struct fec *ctx = ec_init();
 	char *lost = xvalloc(len);
-	struct siocb iocb = { 0 };
-	int i, j, ret = -1;
+	int i, j;
 
 	/* Prepare replica */
 	oid_to_nodes(oid, &old->vroot, SD_EC_DP, target_nodes);
 	for (i = 0, j = 0; i < SD_EC_DP && j < SD_EC_D; i++) {
 		if (i == idx)
 			continue;
-		bufs[j] = read_object_from(target_nodes[i], oid,
-					   epoch, tgt_epoch, i);
+		bufs[j] = read_erasure_object(target_nodes[i], oid,
+					      epoch, tgt_epoch, i);
 		if (!bufs[j])
 			continue;
 		idxs[j++] = i;
 	}
-	if (j != SD_EC_D)
+	if (j != SD_EC_D) {
+		free(lost);
+		lost = NULL;
 		goto out;
+	}
 
 	/* Rebuild the lost replica */
 	for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
@@ -366,20 +365,12 @@ static int rebuild_object_from_replica(struct recovery_obj_work *row,
 		ec_decode(ctx, in, idxs, out, idx);
 		memcpy(lost + SD_EC_STRIP_SIZE * i, out, SD_EC_STRIP_SIZE);
 	}
-
-	iocb.epoch = epoch;
-	iocb.length = len;
-	iocb.offset = 0;
-	iocb.buf = lost;
-	iocb.ec_index = idx;
-	ret = sd_store->create_and_write(oid, &iocb);
 out:
 	ec_destroy(ctx);
 	put_vnode_info(old);
 	for (i = 0; i < SD_EC_D; i++)
 		free(bufs[i]);
-	free(lost);
-	return ret;
+	return lost;
 }
 
 static uint8_t local_node_copy_index(struct rb_root *vroot, uint64_t oid)
@@ -399,10 +390,12 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	struct recovery_work *rw = &row->base;
 	struct vnode_info *old, *cur;
 	uint64_t oid = row->oid;
-	uint32_t tgt_epoch = rw->tgt_epoch;
-	uint8_t idx;
+	uint32_t tgt_epoch = rw->tgt_epoch, epoch = rw->epoch;
 	const struct sd_node *node;
-	int ret;
+	struct siocb iocb = { 0 };
+	void *buf;
+	uint8_t idx;
+	int ret = -1;
 
 	cur = grab_vnode_info(rw->cur_vinfo);
 	old = grab_vnode_info(rw->old_vinfo);
@@ -413,10 +406,20 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	sd_debug("%"PRIx64" idx %d, from epoch %"PRIu32, oid, idx, tgt_epoch);
 
 	if (invalid_node(node, cur))
-		ret = rebuild_object_from_replica(row, tgt_epoch, idx);
+		buf = rebuild_erasure_object(row, tgt_epoch, idx);
 	else
-		ret = recover_object_from(row, node, tgt_epoch, idx);
+		buf = read_erasure_object(node, oid, epoch, tgt_epoch, idx);
+	if (!buf)
+		goto out;
 
+	iocb.epoch = epoch;
+	iocb.length = get_store_objsize(oid);
+	iocb.offset = 0;
+	iocb.buf = buf;
+	iocb.ec_index = idx;
+	ret = sd_store->create_and_write(oid, &iocb);
+	free(buf);
+out:
 	put_vnode_info(cur);
 	put_vnode_info(old);
 	return ret;
