@@ -177,7 +177,7 @@ _wait_for_sheep_stop()
 	if [ "$1" == "" ]; then
 	    pgrep -f "$SHEEP_PROG $WD" > /dev/null
 	else
-	    pgrep -f "$SHEEP_PROG $STORE/$1" > /dev/null
+	    pgrep -f "$SHEEP_PROG $STORE/$1 " > /dev/null
 	fi
 	if [ $? == 0 ]; then
 	    sleep 1
@@ -288,7 +288,7 @@ _start_sheep()
     local running=true
     local cnt
     for cnt in `seq 1 10`; do  # wait at most 10 seconds
-        pgrep -f "$SHEEP_PROG $STORE/$1" > /dev/null
+        pgrep -f "$SHEEP_PROG $STORE/$1 " > /dev/null
         if [ $? != 0 ]; then
             running=false
             break
@@ -329,7 +329,7 @@ _kill_all_sheeps()
 
 _kill_sheep()
 {
-    pkill -9 -f "$SHEEP_PROG $STORE/$1"
+    pkill -9 -f "$SHEEP_PROG $STORE/$1 "
 
     if [ $? != 0 ]; then
         _die "cannot kill sheep $1"
