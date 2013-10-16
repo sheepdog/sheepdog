@@ -918,6 +918,7 @@ int peer_read_obj(struct request *req)
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
+	iocb.ec_index = hdr->obj.ec_index;
 	ret = sd_store->read(hdr->obj.oid, &iocb);
 	if (ret != SD_RES_SUCCESS)
 		goto out;

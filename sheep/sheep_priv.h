@@ -216,6 +216,9 @@ struct store_driver {
 	int (*cleanup)(void);
 };
 
+/* backend store */
+int peer_read_obj(struct request *req);
+
 int default_init(void);
 bool default_exist(uint64_t oid);
 int default_create_and_write(uint64_t oid, const struct siocb *iocb);
@@ -234,6 +237,7 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
 					 uint32_t epoch, void *arg),
 			     void *arg);
 int for_each_obj_path(int (*func)(const char *path));
+size_t get_store_objsize(uint64_t oid);
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)				\
@@ -403,9 +407,6 @@ int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
 int gateway_remove_obj(struct request *req);
 bool is_erasure_oid(uint64_t oid);
-
-/* backend store */
-int peer_read_obj(struct request *req);
 
 /* object_cache */
 

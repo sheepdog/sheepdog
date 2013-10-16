@@ -15,6 +15,26 @@
 
 #define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
 
+#define ECNAME "user.ec.index"
+#define ECSIZE sizeof(uint8_t)
+static int set_erasure_index(const char *path, uint8_t idx)
+{
+	if (setxattr(path, ECNAME, &idx, ECSIZE, 0) < 0) {
+		sd_err("failed to setxattr %s, %m", path);
+		return -1;
+	}
+	return 0;
+}
+
+static int get_erasure_index(const char *path, uint8_t *idx)
+{
+	if (getxattr(path, ECNAME, idx, ECSIZE) < 0) {
+		sd_err("failed to getxattr %s, %m", path);
+		return -1;
+	}
+	return 0;
+}
+
 static inline bool iocb_is_aligned(const struct siocb *iocb)
 {
 	return  sector_algined(iocb->offset) && sector_algined(iocb->length);
@@ -245,6 +265,21 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	if (fd < 0)
 		return err_to_sderr(path, oid, errno);
 
+	if (is_erasure_oid(oid)) {
+		uint8_t idx;
+
+		if (get_erasure_index(path, &idx) < 0) {
+			close(fd);
+			return err_to_sderr(path, oid, errno);
+		}
+		/* We pretend NO-OBJ to read old object in the stale dir */
+		if (idx != iocb->ec_index) {
+			sd_debug("ec_index %d != %d", iocb->ec_index, idx);
+			close(fd);
+			return SD_RES_NO_OBJ;
+		}
+	}
+
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (unlikely(size != iocb->length)) {
 		sd_err("failed to read object %"PRIx64", path=%s, offset=%"
@@ -293,31 +328,11 @@ int prealloc(int fd, uint32_t size)
 	return 0;
 }
 
-static size_t get_store_objsize(uint64_t oid)
+size_t get_store_objsize(uint64_t oid)
 {
 	if (is_erasure_oid(oid))
 		return SD_EC_OBJECT_SIZE;
 	return get_objsize(oid);
-}
-
-#define ECNAME "user.ec.index"
-#define ECSIZE sizeof(uint8_t)
-static int set_erasure_index(const char *path, uint8_t idx)
-{
-	if (setxattr(path, ECNAME, &idx, ECSIZE, 0) < 0) {
-		sd_err("failed to setxattr %s, %m", path);
-		return -1;
-	}
-	return 0;
-}
-
-static int get_erasure_index(const char *path, uint8_t *idx)
-{
-	if (getxattr(path, ECNAME, idx, ECSIZE) < 0) {
-		sd_err("failed to getxattr %s, %m", path);
-		return -1;
-	}
-	return 0;
 }
 
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
