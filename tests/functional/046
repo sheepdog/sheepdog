@@ -4,16 +4,16 @@
 
 . ./common
 
-for i in 0 1 2; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
-_cluster_format -c 2
+_cluster_format -c 6
 
 echo "delete snapshot image before current one"
-$DOG vdi create test 4G
+_vdi_create test 4G
 $DOG vdi snapshot test -s snap
 _vdi_list
 
@@ -26,7 +26,7 @@ $DOG vdi delete test # error
 _vdi_list
 
 echo "delete current image before snapshot one"
-$DOG vdi create test 4G
+_vdi_create test 4G
 $DOG vdi snapshot test -s snap
 _vdi_list
 

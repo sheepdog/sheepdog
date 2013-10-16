@@ -1,6 +1,5 @@
 QA output created by 013
 using backend plain store
-Formatting 'sheepdog:test', fmt=raw size=4294967296 
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 wrote 512/512 bytes at offset 0

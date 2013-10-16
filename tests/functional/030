@@ -3,18 +3,18 @@
 # Test cluster snapshot
 
 . ./common
-for i in `seq 0 3`; do
+for i in `seq 0 5`; do
 	_start_sheep $i;
 done
-_wait_for_sheep 4
+_wait_for_sheep 6
 
 TMPDIR="$STORE/tmp"
 rm -rf $TMPDIR
 
-_cluster_format -c 3
+_cluster_format -c 6
 
-$DOG vdi create test1 10M
-$DOG vdi create test2 10M
+_vdi_create test1 10M
+_vdi_create test2 10M
 
 _random | $DOG vdi write test1
 _random | $DOG vdi write test2
@@ -37,12 +37,12 @@ $DOG cluster snapshot list $TMPDIR | _filter_date
 _vdi_list
 
 _cleanup
-for i in `seq 0 3`; do
+for i in `seq 0 5`; do
 	_start_sheep $i;
 done
-_wait_for_sheep 4
+_wait_for_sheep 6
 
-_cluster_format -c 3
+_cluster_format -c 6
 $DOG cluster snapshot load s1 $TMPDIR
 _vdi_list
 
@@ -52,19 +52,19 @@ diff -u $STORE/csum.11.org $STORE/csum.11.new
 diff -u $STORE/csum.21.org $STORE/csum.21.new
 
 _cleanup
-for i in `seq 0 3`; do
+for i in `seq 0 5`; do
 	_start_sheep $i;
 done
-_wait_for_sheep 4
+_wait_for_sheep 6
 
 $DOG cluster snapshot load s2 $TMPDIR
 _vdi_list
 
 _cleanup
-for i in `seq 0 3`; do
+for i in `seq 0 5`; do
 	_start_sheep $i;
 done
-_wait_for_sheep 4
+_wait_for_sheep 6
 
 $DOG cluster snapshot load 2 $TMPDIR
 _vdi_list

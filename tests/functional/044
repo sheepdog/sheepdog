@@ -4,16 +4,16 @@
 
 . ./common
 
-for i in 0 1 2; do
+for i in `seq 0 5`; do
     _start_sheep $i "-w size=1000M"
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
-_cluster_format
-$DOG vdi create base1 20M -p 7000
-$DOG vdi create base2 20M -p 7001
-$DOG vdi create base3 20M -p 7002
+_cluster_format -c 6
+_vdi_create base1 20M -p 7000
+_vdi_create base2 20M -p 7001
+_vdi_create base3 20M -p 7002
 
 for i in `seq 0 4`; do
     echo $i | $DOG vdi write base1 $((i * 4 * 1024 * 1024)) 512

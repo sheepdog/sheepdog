@@ -4,14 +4,14 @@
 
 . ./common
 
-for i in 0 1 2; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
-_cluster_format -c 3
-$DOG vdi create base 100M -P
+_cluster_format -c 6
+_vdi_create base 100M -P
 
 $QEMU_IMG snapshot -c tag sheepdog:base
 

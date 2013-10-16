@@ -2,23 +2,23 @@ QA output created by 046
 using backend plain store
 delete snapshot image before current one
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25     2          snap
-  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b26     2              
+s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25     6          snap
+  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b26     6              
 Cannot get VDI info for test 0 snap: Failed to find requested tag
 Failed to open VDI test
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b26     2              
+  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b26     6              
 Cannot get VDI info for test 0 : No VDI found
 Failed to open VDI test
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 delete current image before snapshot one
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25     2          snap
-  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b27     2              
+s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25     6          snap
+  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b27     6              
 Cannot get VDI info for test 0 : No VDI found
 Failed to open VDI test
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25     2          snap
+s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25     6          snap
 Cannot get VDI info for test 0 snap: No VDI found
 Failed to open VDI test
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag

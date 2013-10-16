@@ -4,14 +4,14 @@
 
 . ./common
 
-for i in `seq 0 4`; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 5
+_wait_for_sheep 6
 
-_cluster_format
-$DOG vdi create test 4G
+_cluster_format -c 6
+_vdi_create test 4G
 
 $QEMU_IO -c "write 0 512 -P 1" sheepdog:test | _filter_qemu_io
 $DOG vdi snapshot test -s snap1

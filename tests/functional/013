@@ -4,15 +4,15 @@
 
 . ./common
 
-for i in 0 1 2; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
 
-_wait_for_sheep 3
+_wait_for_sheep 6
 
 _cluster_format -c 1
 
-$QEMU_IMG create sheepdog:test 4G
+_vdi_create test 4G
 for i in `seq 1 9`; do
     $QEMU_IO -c "write 0 512 -P $i" sheepdog:test | _filter_qemu_io
     $QEMU_IMG snapshot -c tag$i sheepdog:test

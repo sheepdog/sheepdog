@@ -177,7 +177,7 @@ out:
  *  2. requests with copy_policy explicitly set because vdi's copy policy is
  *     not registered, e.g, requests from 'cluster snapshot load'.
  *
- * So we have to firstly check copy_policy directly from iocb and then call
+ * So we have to firstly check copy_policy from heaher directly and then call
  * get_vdi_copy_policy(oid).
  */
 bool is_erasure_obj(uint64_t oid, uint8_t copy_policy)
