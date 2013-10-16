@@ -168,9 +168,11 @@ static int send_message(enum corosync_message_type type,
 {
 	struct iovec iov[2];
 	int ret, iov_cnt = 1;
+	size_t mlen = MIN(msg_len, SD_MAX_EVENT_BUF_SIZE);
+
 	struct corosync_message cmsg = {
 		.type = type,
-		.msg_len = msg_len,
+		.msg_len = mlen,
 		.sender = *sender,
 		.nr_nodes = nr_nodes,
 	};
@@ -182,7 +184,7 @@ static int send_message(enum corosync_message_type type,
 	iov[0].iov_len = sizeof(cmsg);
 	if (msg) {
 		iov[1].iov_base = msg;
-		iov[1].iov_len = msg_len;
+		iov[1].iov_len = mlen;
 		iov_cnt++;
 	}
 retry:
@@ -640,7 +642,6 @@ static int corosync_join(const struct sd_node *myself,
 			 void *opaque, size_t opaque_len)
 {
 	int ret;
-
 retry:
 	ret = cpg_join(cpg_handle, &cpg_group);
 	switch (ret) {

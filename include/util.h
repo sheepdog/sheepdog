@@ -54,6 +54,9 @@ static inline int after(uint32_t seq1, uint32_t seq2)
 	return (int32_t)(seq2 - seq1) < 0;
 }
 
+#define MIN(x, y) ((x) > (y) ? (y) : (x))
+#define MAX(x, y) ((x) > (y) ? (x) : (y))
+
 #define min(x, y) ({ \
 	typeof(x) _x = (x);	\
 	typeof(y) _y = (y);	\

@@ -23,7 +23,10 @@
 #include "sheep.h"
 #include "config.h"
 
-/* maximum payload size sent in ->notify and ->unblock */
+/*
+ * maximum payload size sent in ->notify and ->unblock, it should be large
+ * enough to support COROSYNC_MAX_NODES * struct sd_node
+ */
 #define SD_MAX_EVENT_BUF_SIZE (128 * 1024) /* 128k */
 
 struct cluster_driver {

@@ -773,11 +773,9 @@ main_fn bool sd_join_handler(const struct sd_node *joining,
 static int send_join_request(void)
 {
 	struct sd_node *n = &sys->this_node;
-	int len = offsetof(struct cluster_info, nodes) +
-		sys->cinfo.nr_nodes * sizeof(struct sd_node);
 
 	sd_info("%s", node_to_str(n));
-	return sys->cdrv->join(n, &sys->cinfo, len);
+	return sys->cdrv->join(n, &sys->cinfo, sizeof(sys->cinfo));
 }
 
 static void requeue_cluster_request(void)

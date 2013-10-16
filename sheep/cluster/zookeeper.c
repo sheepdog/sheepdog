@@ -561,15 +561,14 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 static int add_join_event(void *msg, size_t msglen)
 {
 	struct zk_event ev;
-	size_t msg_len = sizeof(struct cluster_info);
-	size_t len = msg_len + sizeof(struct sd_node) * SD_MAX_NODES;
+	size_t len = msglen + sizeof(struct sd_node) * SD_MAX_NODES;
 
 	if (unlikely((offsetof(struct zk_event, buf) + len) > ZK_MAX_BUF_SIZE))
 		panic("Zookeeper can't send message more than 1M");
 	ev.id = get_uniq_id();
 	ev.type = EVENT_JOIN;
 	ev.sender = this_node;
-	ev.msg_len = msg_len;
+	ev.msg_len = msglen;
 	ev.buf_len = len;
 	if (msg)
 		memcpy(ev.buf, msg, msglen);
