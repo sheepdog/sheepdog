@@ -604,7 +604,8 @@ static inline void decode_prepare(struct fec *ctx, const uint8_t *dp[],
 		} else {
 			out[i] = dp[p];
 			outidx[i] = p;
-			p++;
+			while (!dp[++p])
+				;
 		}
 	}
 }
