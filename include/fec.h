@@ -196,4 +196,6 @@ static inline void ec_destroy(struct fec *ctx)
 	fec_free(ctx);
 }
 
+void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
+		      char *buf, int idx, size_t strip_size, int nr_stripe);
 #endif

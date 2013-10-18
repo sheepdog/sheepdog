@@ -1581,16 +1581,11 @@ static void check_erasure_object(struct vdi_check_info *info)
 			idx[i] = i;
 
 		for (k = 0; k < p; k++) {
-			for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
-				const uint8_t *ds[d];
-				uint8_t out[strip_size];
-
-				for (j = 0; j < d; j++)
-					ds[j] = info->vcw[j].buf + strip_size
-						* i;
-				ec_decode(ctx, ds, idx, out, d + k);
-				memcpy(obj + strip_size * i, out, strip_size);
-			}
+			uint8_t *ds[d];
+			for (j = 0; j < d; j++)
+				ds[j] = info->vcw[j].buf;
+			ec_decode_buffer(ctx, ds, idx, obj, d + k, strip_size,
+					 SD_EC_NR_STRIPE_PER_OBJECT);
 			if (memcmp(obj, info->vcw[d + k].buf, len) != 0) {
 				/* TODO repair the inconsistency */
 				sd_err("object %"PRIx64" is inconsistent", oid);
@@ -1603,17 +1598,13 @@ static void check_erasure_object(struct vdi_check_info *info)
 		goto out;
 	} else {
 		for (k = 0; k < j; k++) {
-			int m = miss_idx[k], n;
+			int m = miss_idx[k];
+			uint8_t *ds[d];
 
-			for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
-				const uint8_t *ds[d];
-				uint8_t out[strip_size];
-
-				for (n = 0; n < d; n++)
-					ds[n] = input[n] + strip_size * i;
-				ec_decode(ctx, ds, input_idx, out, m);
-				memcpy(obj + strip_size * i, out, strip_size);
-			}
+			for (i = 0; i < d; i++)
+				ds[i] = input[i];
+			ec_decode_buffer(ctx, ds, input_idx, obj, m, strip_size,
+					 SD_EC_NR_STRIPE_PER_OBJECT);
 			write_object_to(info->vcw[m].vnode, oid, obj, true,
 					info->vcw[m].ec_index);
 			fprintf(stdout, "fixed missing %"PRIx64", "

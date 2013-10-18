@@ -681,3 +681,19 @@ void ec_decode(struct fec *ctx, const uint8_t *input[], const int inidx[],
 out:
 	memcpy(output, dp[idx], strip_size);
 }
+
+void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
+		      char *buf, int idx, size_t strip_size, int nr_stripe)
+{
+	int i, j, d = ctx->d;
+
+	for (i = 0; i < nr_stripe; i++) {
+		const uint8_t *in[d];
+		uint8_t out[strip_size];
+
+		for (j = 0; j < d; j++)
+			in[j] = input[j] + strip_size * i;
+		ec_decode(ctx, in, in_idx, out, idx);
+		memcpy(buf + strip_size * i, out, strip_size);
+	}
+}
