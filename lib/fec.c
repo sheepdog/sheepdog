@@ -251,18 +251,18 @@ static void _addmul1(register uint8_t *dst,
 		GF_ADDMULC(*dst, *src);
 }
 
-/* computes C = AB where A is n*k, B is k*m, C is n*m */
-static void _matmul(uint8_t *a, uint8_t *b, uint8_t *c, unsigned n, unsigned k,
+/* computes C = AB where A is dp*d, B is d*m, C is dp*m */
+static void _matmul(uint8_t *a, uint8_t *b, uint8_t *c, unsigned dp, unsigned d,
 		    unsigned m)
 {
 	unsigned row, col, i;
 
-	for (row = 0; row < n; row++) {
+	for (row = 0; row < dp; row++) {
 		for (col = 0; col < m; col++) {
-			uint8_t *pa = &a[row * k];
+			uint8_t *pa = &a[row * d];
 			uint8_t *pb = &b[col];
 			uint8_t acc = 0;
-			for (i = 0; i < k; i++, pa++, pb += m)
+			for (i = 0; i < d; i++, pa++, pb += m)
 				acc ^= gf_mul(*pa, *pb);
 			c[row * m + col] = acc;
 		}
@@ -271,43 +271,43 @@ static void _matmul(uint8_t *a, uint8_t *b, uint8_t *c, unsigned n, unsigned k,
 
 /*
  * _invert_mat() takes a matrix and produces its inverse
- * k is the size of the matrix.
+ * d is the size of the matrix.
  * (Gauss-Jordan, adapted from Numerical Recipes in C)
  * Return non-zero if singular.
  */
-static void _invert_mat(uint8_t *src, unsigned k)
+static void _invert_mat(uint8_t *src, unsigned d)
 {
 	uint8_t c, *p;
 	unsigned irow = 0;
 	unsigned icol = 0;
 	unsigned row, col, i, ix;
 
-	unsigned *indxc = (unsigned *)xmalloc(k * sizeof(unsigned));
-	unsigned *indxr = (unsigned *)xmalloc(k * sizeof(unsigned));
-	unsigned *ipiv = (unsigned *)xmalloc(k * sizeof(unsigned));
-	uint8_t *id_row = NEW_GF_MATRIX(1, k);
+	unsigned *indxc = (unsigned *)xmalloc(d * sizeof(unsigned));
+	unsigned *indxr = (unsigned *)xmalloc(d * sizeof(unsigned));
+	unsigned *ipiv = (unsigned *)xmalloc(d * sizeof(unsigned));
+	uint8_t *id_row = NEW_GF_MATRIX(1, d);
 
-	memset(id_row, '\0', k * sizeof(uint8_t));
+	memset(id_row, '\0', d * sizeof(uint8_t));
 	/* ipiv marks elements already used as pivots. */
-	for (i = 0; i < k; i++)
+	for (i = 0; i < d; i++)
 		ipiv[i] = 0;
 
-	for (col = 0; col < k; col++) {
+	for (col = 0; col < d; col++) {
 		uint8_t *pivot_row;
 		/*
 		 * Zeroing column 'col', look for a non-zero element.
 		 * First try on the diagonal, if it fails, look elsewhere.
 		 */
-		if (ipiv[col] != 1 && src[col * k + col] != 0) {
+		if (ipiv[col] != 1 && src[col * d + col] != 0) {
 			irow = col;
 			icol = col;
 			goto found_piv;
 		}
-		for (row = 0; row < k; row++) {
+		for (row = 0; row < d; row++) {
 			if (ipiv[row] != 1) {
-				for (ix = 0; ix < k; ix++) {
+				for (ix = 0; ix < d; ix++) {
 					if (ipiv[ix] == 0) {
-						if (src[row * k + ix] != 0) {
+						if (src[row * d + ix] != 0) {
 							irow = row;
 							icol = ix;
 							goto found_piv;
@@ -325,11 +325,11 @@ found_piv:
 		 * optimizing.
 		 */
 		if (irow != icol)
-			for (ix = 0; ix < k; ix++)
-				SWAP(src[irow*k + ix], src[icol*k + ix]);
+			for (ix = 0; ix < d; ix++)
+				SWAP(src[irow*d + ix], src[icol*d + ix]);
 		indxr[col] = irow;
 		indxc[col] = icol;
-		pivot_row = &src[icol * k];
+		pivot_row = &src[icol * d];
 		c = pivot_row[icol];
 		assert(c != 0);
 		if (c != 1) {   /* otherwhise this is a NOP */
@@ -339,7 +339,7 @@ found_piv:
 			 */
 			c = inverse[c];
 			pivot_row[icol] = 1;
-			for (ix = 0; ix < k; ix++)
+			for (ix = 0; ix < d; ix++)
 				pivot_row[ix] = gf_mul(c, pivot_row[ix]);
 		}
 		/*
@@ -350,22 +350,22 @@ found_piv:
 		 * we can optimize the addmul).
 		 */
 		id_row[icol] = 1;
-		if (memcmp(pivot_row, id_row, k * sizeof(uint8_t)) != 0) {
-			for (p = src, ix = 0; ix < k; ix++, p += k) {
+		if (memcmp(pivot_row, id_row, d * sizeof(uint8_t)) != 0) {
+			for (p = src, ix = 0; ix < d; ix++, p += d) {
 				if (ix != icol) {
 					c = p[icol];
 					p[icol] = 0;
-					addmul(p, pivot_row, c, k);
+					addmul(p, pivot_row, c, d);
 				}
 			}
 		}
 		id_row[icol] = 0;
 	}                           /* done all columns */
-	for (col = k; col > 0; col--)
+	for (col = d; col > 0; col--)
 		if (indxr[col-1] != indxc[col-1])
-			for (row = 0; row < k; row++)
-				SWAP(src[row * k + indxr[col-1]],
-				     src[row * k + indxc[col-1]]);
+			for (row = 0; row < d; row++)
+				SWAP(src[row * d + indxr[col-1]],
+				     src[row * d + indxc[col-1]]);
 }
 
 /*
@@ -379,51 +379,51 @@ found_piv:
  * p = coefficients of the matrix (p_i)
  * q = values of the polynomial (known)
  */
-static void _invert_vdm(uint8_t *src, unsigned k)
+static void _invert_vdm(uint8_t *src, unsigned d)
 {
 	unsigned i, j, row, col;
 	uint8_t *b, *c, *p;
 	uint8_t t, xx;
 
-	if (k == 1)     /* degenerate case, matrix must be p^0 = 1 */
+	if (d == 1)     /* degenerate case, matrix must be p^0 = 1 */
 		return;
 	/*
-	 * c holds the coefficient of P(x) = Prod (x - p_i), i=0..k-1
+	 * c holds the coefficient of P(x) = Prod (x - p_i), i=0..d-1
 	 * b holds the coefficient for the matrix inversion
 	 */
-	c = NEW_GF_MATRIX(1, k);
-	b = NEW_GF_MATRIX(1, k);
-	p = NEW_GF_MATRIX(1, k);
+	c = NEW_GF_MATRIX(1, d);
+	b = NEW_GF_MATRIX(1, d);
+	p = NEW_GF_MATRIX(1, d);
 
-	for (j = 1, i = 0; i < k; i++, j += k) {
+	for (j = 1, i = 0; i < d; i++, j += d) {
 		c[i] = 0;
 		p[i] = src[j];            /* p[i] */
 	}
 	/*
-	 * construct coeffs. recursively. We know c[k] = 1 (implicit)
+	 * construct coeffs. recursively. We know c[d] = 1 (implicit)
 	 * and start P_0 = x - p_0, then at each stage multiply by
 	 * x - p_i generating P_i = x P_{i-1} - p_i P_{i-1}
-	 * After k steps we are done.
+	 * After d steps we are done.
 	 */
-	c[k - 1] = p[0];              /* really -p(0), but x = -x in GF(2^m) */
-	for (i = 1; i < k; i++) {
+	c[d - 1] = p[0];              /* really -p(0), but x = -x in GF(2^m) */
+	for (i = 1; i < d; i++) {
 		uint8_t p_i = p[i];            /* see above comment */
-		for (j = k - 1 - (i - 1); j < k - 1; j++)
+		for (j = d - 1 - (i - 1); j < d - 1; j++)
 			c[j] ^= gf_mul(p_i, c[j + 1]);
-		c[k - 1] ^= p_i;
+		c[d - 1] ^= p_i;
 	}
 
-	for (row = 0; row < k; row++) {
+	for (row = 0; row < d; row++) {
 		/* synthetic division etc. */
 		xx = p[row];
 		t = 1;
-		b[k - 1] = 1;             /* this is in fact c[k] */
-		for (i = k - 1; i > 0; i--) {
+		b[d - 1] = 1;             /* this is in fact c[d] */
+		for (i = d - 1; i > 0; i--) {
 			b[i-1] = c[i] ^ gf_mul(xx, b[i]);
 			t = gf_mul(xx, t) ^ b[i-1];
 		}
-		for (col = 0; col < k; col++)
-			src[col * k + row] = gf_mul(inverse[t], b[col]);
+		for (col = 0; col < d; col++)
+			src[col * d + row] = gf_mul(inverse[t], b[col]);
 	}
 	free(c);
 	free(b);
@@ -447,13 +447,13 @@ void init_fec(void)
 
 void fec_free(struct fec *p)
 {
-	assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->k) ^ p->n) ^
+	assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->d) ^ p->dp) ^
 					 (unsigned long) (p->enc_matrix)));
 	free(p->enc_matrix);
 	free(p);
 }
 
-struct fec *fec_new(unsigned short k, unsigned short n)
+struct fec *fec_new(unsigned short d, unsigned short dp)
 {
 	unsigned row, col;
 	uint8_t *p, *tmp_m;
@@ -461,32 +461,32 @@ struct fec *fec_new(unsigned short k, unsigned short n)
 	struct fec *retval;
 
 	retval = (struct fec *)xmalloc(sizeof(struct fec));
-	retval->k = k;
-	retval->n = n;
-	retval->enc_matrix = NEW_GF_MATRIX(n, k);
-	retval->magic = ((FEC_MAGIC^k)^n)^(unsigned long)(retval->enc_matrix);
-	tmp_m = NEW_GF_MATRIX(n, k);
+	retval->d = d;
+	retval->dp = dp;
+	retval->enc_matrix = NEW_GF_MATRIX(dp, d);
+	retval->magic = ((FEC_MAGIC^d)^dp)^(unsigned long)(retval->enc_matrix);
+	tmp_m = NEW_GF_MATRIX(dp, d);
 	/*
 	 * fill the matrix with powers of field elements, starting from 0.
 	 * The first row is special, cannot be computed with exp. table.
 	 */
 	tmp_m[0] = 1;
-	for (col = 1; col < k; col++)
+	for (col = 1; col < d; col++)
 		tmp_m[col] = 0;
-	for (p = tmp_m + k, row = 0; row < n - 1; row++, p += k)
-		for (col = 0; col < k; col++)
+	for (p = tmp_m + d, row = 0; row < dp - 1; row++, p += d)
+		for (col = 0; col < d; col++)
 			p[col] = gf_exp[modnn(row * col)];
 
 	/*
 	 * quick code to build systematic matrix: invert the top
-	 * k*k vandermonde matrix, multiply right the bottom n-k rows
+	 * d*d vandermonde matrix, multiply right the bottom dp-d rows
 	 * by the inverse, and construct the identity matrix at the top.
 	 */
-	_invert_vdm(tmp_m, k);        /* much faster than _invert_mat */
-	_matmul(tmp_m + k * k, tmp_m, retval->enc_matrix + k * k, n - k, k, k);
+	_invert_vdm(tmp_m, d);        /* much faster than _invert_mat */
+	_matmul(tmp_m + d * d, tmp_m, retval->enc_matrix + d * d, dp - d, d, d);
 	/* the upper matrix is I so do not bother with a slow multiply */
-	memset(retval->enc_matrix, '\0', k * k * sizeof(uint8_t));
-	for (p = retval->enc_matrix, col = 0; col < k; col++, p += k + 1)
+	memset(retval->enc_matrix, '\0', d * d * sizeof(uint8_t));
+	for (p = retval->enc_matrix, col = 0; col < d; col++, p += d + 1)
 		*p = 1;
 	free(tmp_m);
 
@@ -508,19 +508,19 @@ void fec_encode(const struct fec *code,
 		size_t num_block_nums, size_t sz)
 {
 	unsigned char i, j;
-	size_t k;
+	size_t d;
 	unsigned fecnum;
 	const uint8_t *p;
 
-	for (k = 0; k < sz; k += STRIDE) {
-		size_t stride = ((sz-k) < STRIDE) ? (sz-k) : STRIDE;
+	for (d = 0; d < sz; d += STRIDE) {
+		size_t stride = ((sz-d) < STRIDE) ? (sz-d) : STRIDE;
 		for (i = 0; i < num_block_nums; i++) {
 			fecnum = block_nums[i];
-			assert(fecnum >= code->k);
-			memset(fecs[i]+k, 0, stride);
-			p = &(code->enc_matrix[fecnum * code->k]);
-			for (j = 0; j < code->k; j++)
-				addmul(fecs[i]+k, src[j]+k, p[j], stride);
+			assert(fecnum >= code->d);
+			memset(fecs[i]+d, 0, stride);
+			p = &(code->enc_matrix[fecnum * code->d]);
+			for (j = 0; j < code->d; j++)
+				addmul(fecs[i]+d, src[j]+d, p[j], stride);
 		}
 	}
 }
@@ -528,24 +528,24 @@ void fec_encode(const struct fec *code,
 /*
  * Build decode matrix into some memory space.
  *
- * @param matrix a space allocated for a k by k matrix
+ * @param matrix a space allocated for a d by d matrix
  */
 static void
 build_decode_matrix_into_space(const struct fec *const code,
 			       const int *const idx,
-			       const unsigned k, uint8_t *const matrix)
+			       const unsigned d, uint8_t *const matrix)
 {
 	unsigned char i;
 	uint8_t *p;
-	for (i = 0, p = matrix; i < k; i++, p += k) {
-		if (idx[i] < k) {
-			memset(p, 0, k);
+	for (i = 0, p = matrix; i < d; i++, p += d) {
+		if (idx[i] < d) {
+			memset(p, 0, d);
 			p[i] = 1;
 		} else {
-			memcpy(p, &(code->enc_matrix[idx[i] * code->k]), k);
+			memcpy(p, &(code->enc_matrix[idx[i] * code->d]), d);
 		}
 	}
-	_invert_mat(matrix, k);
+	_invert_mat(matrix, d);
 }
 
 void fec_decode(const struct fec *code,
@@ -553,25 +553,25 @@ void fec_decode(const struct fec *code,
 		uint8_t *const *const outpkts,
 		const int *const idx, size_t sz)
 {
-	uint8_t m_dec[code->k * code->k];
+	uint8_t m_dec[code->d * code->d];
 	unsigned char outix = 0;
 	unsigned char row = 0;
 	unsigned char col = 0;
 
-	assert(code->k * code->k < 8 * 1024 * 1024);
-	build_decode_matrix_into_space(code, idx, code->k, m_dec);
+	assert(code->d * code->d < 8 * 1024 * 1024);
+	build_decode_matrix_into_space(code, idx, code->d, m_dec);
 
-	for (row = 0; row < code->k; row++) {
+	for (row = 0; row < code->d; row++) {
 		/*
 		 * If the block whose number is i is present, then it is
 		 * required to be in the i'th element.
 		 */
-		assert((idx[row] >= code->k) || (idx[row] == row));
-		if (idx[row] >= code->k) {
+		assert((idx[row] >= code->d) || (idx[row] == row));
+		if (idx[row] >= code->d) {
 			memset(outpkts[outix], 0, sz);
-			for (col = 0; col < code->k; col++)
+			for (col = 0; col < code->d; col++)
 				addmul(outpkts[outix], inpkts[col],
-				       m_dec[row * code->k + col], sz);
+				       m_dec[row * code->d + col], sz);
 			outix++;
 		}
 	}
@@ -584,19 +584,20 @@ void fec_decode(const struct fec *code,
  *
  * Return out and outidx as fec_decode requested.
  */
-static inline void decode_prepare(const uint8_t *dp[], const uint8_t *out[],
+static inline void decode_prepare(struct fec *ctx, const uint8_t *dp[],
+				  const uint8_t *out[],
 				  int outidx[])
 {
 	int i, p = 0;
 
-	for (i = SD_EC_D; i < SD_EC_DP; i++) {
+	for (i = ctx->d; i < ctx->dp; i++) {
 		if (dp[i]) {
 			p = i;
 			break;
 		}
 	}
 
-	for (i = 0; i < SD_EC_D; i++) {
+	for (i = 0; i < ctx->d; i++) {
 		if (dp[i]) {
 			out[i] = dp[i];
 			outidx[i] = i;
@@ -608,9 +609,9 @@ static inline void decode_prepare(const uint8_t *dp[], const uint8_t *out[],
 	}
 }
 
-static inline bool data_is_missing(const uint8_t *dp[])
+static inline bool data_is_missing(const uint8_t *dp[], int d)
 {
-	for (int i = 0; i < SD_EC_D; i++)
+	for (int i = 0; i < d; i++)
 		if (!dp[i])
 			return true;
 	return false;
@@ -625,39 +626,50 @@ static inline bool data_is_missing(const uint8_t *dp[])
  * @output: the lost ds or ps to return
  * @idx: index of output which is lost
  */
-void ec_decode(struct fec *ctx, const uint8_t *input[SD_EC_D],
-	       const int inidx[SD_EC_D],
+void ec_decode(struct fec *ctx, const uint8_t *input[], const int inidx[],
 	       uint8_t output[], int idx)
 {
-	const uint8_t *dp[SD_EC_DP] = { NULL };
-	const uint8_t *oin[SD_EC_D] = { NULL };
-	int oidx[SD_EC_D] = { 0 }, i;
-	uint8_t m0[SD_EC_STRIP_SIZE], m1[SD_EC_STRIP_SIZE],
-		p0[SD_EC_STRIP_SIZE], p1[SD_EC_STRIP_SIZE];
-	uint8_t *missing[SD_EC_P] = { m0, m1 };
-	uint8_t *p[SD_EC_P] = { p0, p1 };
+	int edp = ctx->dp, ep = ctx->dp - ctx->d, ed = ctx->d;
+	const uint8_t *dp[edp];
+	const uint8_t *oin[ed];
+	int oidx[ed], i;
+	int strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
+	uint8_t m0[strip_size], m1[strip_size], m2[strip_size], m3[strip_size],
+		m4[strip_size], m5[strip_size], m6[strip_size], m7[strip_size],
+		p0[strip_size], p1[strip_size], p2[strip_size], p3[strip_size],
+		p4[strip_size], p5[strip_size], p6[strip_size], p7[strip_size];
+#define SD_EC_MAX_PARITY 8
+	uint8_t *missing[SD_EC_MAX_PARITY] = { m0, m1, m2, m3, m4, m5, m6, m7 };
+	uint8_t *p[SD_EC_MAX_PARITY] = { p0, p1, p2, p3, p4, p5, p6, p7 };
 
-	for (i = 0; i < SD_EC_D; i++)
+	for (i = 0; i < edp; i++)
+		dp[i] = NULL;
+	for (i = 0; i < ed; i++)
+		oin[i] = NULL;
+	for (i = 0; i < ed; i++)
+		oidx[i] = 0;
+
+	for (i = 0; i < ed; i++)
 		dp[inidx[i]] = input[i];
 
-	decode_prepare(dp, oin, oidx);
+	decode_prepare(ctx, dp, oin, oidx);
 
 	/* Fill the data strip if missing */
-	if (data_is_missing(dp)) {
+	if (data_is_missing(dp, ed)) {
 		int m = 0;
-		fec_decode(ctx, oin, missing, oidx, SD_EC_STRIP_SIZE);
-		for (i = 0; i < SD_EC_D; i++)
+		fec_decode(ctx, oin, missing, oidx, strip_size);
+		for (i = 0; i < ed; i++)
 			if (!dp[i])
 				dp[i] = missing[m++];
 	}
 
-	if (idx < SD_EC_D)
+	if (idx < ed)
 		goto out;
 
 	/* Fill the parity strip */
 	ec_encode(ctx, dp, p);
-	for (i = 0; i < SD_EC_P; i++)
-		dp[SD_EC_D + i] = p[i];
+	for (i = 0; i < ep; i++)
+		dp[ed + i] = p[i];
 out:
-	memcpy(output, dp[idx], SD_EC_STRIP_SIZE);
+	memcpy(output, dp[idx], strip_size);
 }

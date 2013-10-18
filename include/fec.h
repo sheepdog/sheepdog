@@ -61,16 +61,16 @@
 
 struct fec {
 	unsigned long magic;
-	unsigned short k, n;                     /* parameters of the code */
+	unsigned short d, dp;                     /* parameters of the code */
 	uint8_t *enc_matrix;
 };
 
 void init_fec(void);
 /*
- * param k the number of blocks required to reconstruct
- * param m the total number of blocks created
+ * param d the number of blocks required to reconstruct
+ * param dp the total number of blocks created
  */
-struct fec *fec_new(unsigned short k, unsigned short m);
+struct fec *fec_new(unsigned short d, unsigned short dp);
 void fec_free(struct fec *p);
 
 /*
@@ -104,7 +104,6 @@ void fec_decode(const struct fec *code,
 #define SD_EC_D	4 /* No. of data strips */
 #define SD_EC_P 2 /* No. of parity strips */
 #define SD_EC_DP (SD_EC_D + SD_EC_P)
-#define SD_EC_STRIP_SIZE (256)
 
 /*
  * SD_EC_D_SIZE <= 1K is the safe value to run VM after some experimentations.
@@ -115,10 +114,9 @@ void fec_decode(const struct fec *code,
  * failed (grub got screwed) and 1K is probably the biggest value if we want
  * VM to run on erasure coded volume.
  */
-#define SD_EC_D_SIZE (SD_EC_STRIP_SIZE * SD_EC_D)
+#define SD_EC_DATA_STRIPE_SIZE (1024) /* 1K */
 #define SD_EC_OBJECT_SIZE (SD_DATA_OBJ_SIZE / SD_EC_D)
-#define SD_EC_STRIPE (SD_EC_STRIP_SIZE * SD_EC_DP)
-#define SD_EC_NR_STRIPE_PER_OBJECT (SD_EC_OBJECT_SIZE / SD_EC_STRIP_SIZE)
+#define SD_EC_NR_STRIPE_PER_OBJECT (SD_DATA_OBJ_SIZE / SD_EC_DATA_STRIPE_SIZE)
 
 /*
  * Stripe: data strips + parity strips, spread on all replica
@@ -127,19 +125,19 @@ void fec_decode(const struct fec *code,
  * R: Replica
  *
  *  +--------------------stripe ----------------------+
- *  v                                                 v
- * +----+----------------------------------------------+
+ *  v   data stripe                   parity stripe   v
+ * +----+----+----+----+----+-----+----+----+-----+----+
  * | ds | ds | ds | ds | ds | ... | ps | ps | ... | ps |
- * +----+----------------------------------------------+
+ * +----+----+----+----+----+-----+----+----+-----+----+
  * | .. | .. | .. | .. | .. | ... | .. | .. | ... | .. |
  * +----+----+----+----+----+ ... +----+----+-----+----+
  *  R1    R2   R3   R4   R5   ...   Rn  Rn+1  Rn+2  Rn+3
  */
 
 /* Return the erasure code context to encode|decode */
-static inline struct fec *ec_init(void)
+static inline struct fec *ec_init(int d, int dp)
 {
-	return fec_new(SD_EC_D, SD_EC_DP);
+	return fec_new(d, dp);
 }
 
 /*
@@ -148,13 +146,16 @@ static inline struct fec *ec_init(void)
  * @ds: data strips to generate parity strips
  * @ps: parity strips to return
  */
-static inline void ec_encode(struct fec *ctx, const uint8_t *ds[SD_EC_D],
-			     uint8_t *ps[SD_EC_P])
+static inline void ec_encode(struct fec *ctx, const uint8_t *ds[],
+			     uint8_t *ps[])
 {
-	int total = SD_EC_D + SD_EC_P;
-	const int pidx[SD_EC_P] = { total - 2, total - 1 };
+	int p = ctx->dp - ctx->d;
+	int pidx[p];
 
-	fec_encode(ctx, ds, ps, pidx, SD_EC_P, SD_EC_STRIP_SIZE);
+	for (int i = 0; i < p; i++)
+		pidx[i] = ctx->d + i;
+
+	fec_encode(ctx, ds, ps, pidx, p, SD_EC_DATA_STRIPE_SIZE / ctx->d);
 }
 
 /*
@@ -166,8 +167,8 @@ static inline void ec_encode(struct fec *ctx, const uint8_t *ds[SD_EC_D],
  * @output: the lost ds or ps to return
  * @idx: index of output which is lost
  */
-void ec_decode(struct fec *ctx, const uint8_t *input[SD_EC_D],
-	       const int inidx[SD_EC_D],
+void ec_decode(struct fec *ctx, const uint8_t *input[],
+	       const int inidx[],
 	       uint8_t output[], int idx);
 
 /* Destroy the erasure code context */

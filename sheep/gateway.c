@@ -48,11 +48,12 @@ static struct req_iter *prepare_replication_requests(struct request *req,
 }
 
 /*
- * Make sure we don't overwrite the existing data for unaligned write
+ * Make sure we don't overwrite the existing data for misaligned write
  *
- * If either offset or length of request isn't aligned to SD_EC_D_SIZE, we have
- * to read the unaligned blocks before write. This kind of write amplification
- * indeed slow down the write operation with extra read overhead.
+ * If either offset or length of request isn't aligned to
+ * SD_EC_DATA_STRIPE_SIZE, we have to read the unaligned blocks before write.
+ * This kind of write amplification indeed slow down the write operation with
+ * extra read overhead.
  */
 static void *init_erasure_buffer(struct request *req, int buf_len)
 {
@@ -62,18 +63,18 @@ static void *init_erasure_buffer(struct request *req, int buf_len)
 	uint64_t oid = req->rq.obj.oid;
 	int opcode = req->rq.opcode;
 	struct sd_req hdr;
-	uint64_t head = round_down(off, SD_EC_D_SIZE);
-	uint64_t tail = round_down(off + len, SD_EC_D_SIZE);
+	uint64_t head = round_down(off, SD_EC_DATA_STRIPE_SIZE);
+	uint64_t tail = round_down(off + len, SD_EC_DATA_STRIPE_SIZE);
 	int ret;
 
 	if (opcode != SD_OP_WRITE_OBJ)
 		goto out;
 
-	if (off % SD_EC_D_SIZE) {
+	if (off % SD_EC_DATA_STRIPE_SIZE) {
 		/* Read head */
 		sd_init_req(&hdr, SD_OP_READ_OBJ);
 		hdr.obj.oid = oid;
-		hdr.data_length = SD_EC_D_SIZE;
+		hdr.data_length = SD_EC_DATA_STRIPE_SIZE;
 		hdr.obj.offset = head;
 		ret = exec_local_req(&hdr, buf);
 		if (ret != SD_RES_SUCCESS) {
@@ -82,11 +83,11 @@ static void *init_erasure_buffer(struct request *req, int buf_len)
 		}
 	}
 
-	if ((len + off) % SD_EC_D_SIZE && tail - head > 0) {
+	if ((len + off) % SD_EC_DATA_STRIPE_SIZE && tail - head > 0) {
 		/* Read tail */
 		sd_init_req(&hdr, SD_OP_READ_OBJ);
 		hdr.obj.oid = oid;
-		hdr.data_length = SD_EC_D_SIZE;
+		hdr.data_length = SD_EC_DATA_STRIPE_SIZE;
 		hdr.obj.offset = tail;
 		ret = exec_local_req(&hdr, buf + tail - head);
 		if (ret != SD_RES_SUCCESS) {
@@ -95,7 +96,7 @@ static void *init_erasure_buffer(struct request *req, int buf_len)
 		}
 	}
 out:
-	memcpy(buf + off % SD_EC_D_SIZE, req->data, len);
+	memcpy(buf + off % SD_EC_DATA_STRIPE_SIZE, req->data, len);
 	return buf;
 }
 
@@ -108,11 +109,12 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	uint32_t len = req->rq.data_length;
 	uint64_t off = req->rq.obj.offset;
 	int opcode = req->rq.opcode;
-	int start = off / SD_EC_D_SIZE;
-	int end = DIV_ROUND_UP(off + len, SD_EC_D_SIZE), i, j;
+	int start = off / SD_EC_DATA_STRIPE_SIZE;
+	int end = DIV_ROUND_UP(off + len, SD_EC_DATA_STRIPE_SIZE), i, j;
 	int nr_stripe = end - start;
-	struct fec *ctx = ec_init();
+	struct fec *ctx = ec_init(SD_EC_D, SD_EC_DP);
 	int nr_to_send = (opcode == SD_OP_READ_OBJ) ? SD_EC_D : SD_EC_DP;
+	int strip_size = SD_EC_DATA_STRIPE_SIZE / SD_EC_D;
 	struct req_iter *reqs = xzalloc(sizeof(*reqs) * nr_to_send);
 	char *p, *buf = NULL;
 
@@ -121,11 +123,11 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 
 	*nr = nr_to_send;
 	for (i = 0; i < nr_to_send; i++) {
-		int l = SD_EC_STRIP_SIZE * nr_stripe;
+		int l = strip_size * nr_stripe;
 
 		reqs[i].buf = xmalloc(l);
 		reqs[i].dlen = l;
-		reqs[i].off = start * SD_EC_STRIP_SIZE;
+		reqs[i].off = start * strip_size;
 		switch (opcode) {
 		case SD_OP_CREATE_AND_WRITE_OBJ:
 		case SD_OP_WRITE_OBJ:
@@ -139,7 +141,7 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	if (opcode != SD_OP_WRITE_OBJ && opcode != SD_OP_CREATE_AND_WRITE_OBJ)
 		goto out; /* Read and remove operation */
 
-	p = buf = init_erasure_buffer(req, SD_EC_D_SIZE * nr_stripe);
+	p = buf = init_erasure_buffer(req, SD_EC_DATA_STRIPE_SIZE * nr_stripe);
 	if (!buf) {
 		sd_err("failed to init erasure buffer %"PRIx64,
 		       req->rq.obj.oid);
@@ -152,16 +154,16 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 		uint8_t *ps[SD_EC_P];
 
 		for (j = 0; j < SD_EC_D; j++)
-			ds[j] = reqs[j].buf + SD_EC_STRIP_SIZE * i;
+			ds[j] = reqs[j].buf + strip_size * i;
 
 		for (j = 0; j < SD_EC_P; j++)
-			ps[j] = reqs[SD_EC_D + j].buf + SD_EC_STRIP_SIZE * i;
+			ps[j] = reqs[SD_EC_D + j].buf + strip_size * i;
 
 		for (j = 0; j < SD_EC_D; j++)
-			memcpy((uint8_t *)ds[j], p + j * SD_EC_STRIP_SIZE,
-			       SD_EC_STRIP_SIZE);
+			memcpy((uint8_t *)ds[j], p + j * strip_size,
+			       strip_size);
 		ec_encode(ctx, ds, ps);
-		p += SD_EC_D_SIZE;
+		p += SD_EC_DATA_STRIPE_SIZE;
 	}
 out:
 	ec_destroy(ctx);
@@ -212,8 +214,8 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 	uint32_t len = req->rq.data_length;
 	uint64_t off = req->rq.obj.offset;
 	int opcode = req->rq.opcode;
-	int start = off / SD_EC_D_SIZE;
-	int end = DIV_ROUND_UP(off + len, SD_EC_D_SIZE), i, j;
+	int start = off / SD_EC_DATA_STRIPE_SIZE;
+	int end = DIV_ROUND_UP(off + len, SD_EC_DATA_STRIPE_SIZE), i, j;
 	int nr_stripe = end - start;
 
 	if (!is_erasure_oid(oid))
@@ -224,17 +226,18 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 
 	/* We need to assemble the data strips into the req buffer for read */
 	if (opcode == SD_OP_READ_OBJ) {
-		char *p, *buf = xmalloc(SD_EC_D_SIZE * nr_stripe);
+		char *p, *buf = xmalloc(SD_EC_DATA_STRIPE_SIZE * nr_stripe);
+		int strip_size = SD_EC_DATA_STRIPE_SIZE / SD_EC_D;
 
 		p = buf;
 		for (i = 0; i < nr_stripe; i++) {
 			for (j = 0; j < nr_to_send; j++) {
-				memcpy(p, reqs[j].buf + SD_EC_STRIP_SIZE * i,
-				       SD_EC_STRIP_SIZE);
-				p += SD_EC_STRIP_SIZE;
+				memcpy(p, reqs[j].buf + strip_size * i,
+				       strip_size);
+				p += strip_size;
 			}
 		}
-		memcpy(req->data, buf + off % SD_EC_D_SIZE, len);
+		memcpy(req->data, buf + off % SD_EC_DATA_STRIPE_SIZE, len);
 		req->rp.data_length = req->rq.data_length;
 		free(buf);
 	}

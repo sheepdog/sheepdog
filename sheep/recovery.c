@@ -392,7 +392,7 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 {
 	uint8_t *bufs[SD_EC_D] = { 0 };
 	int idxs[SD_EC_D], len = get_store_objsize(oid);
-	struct fec *ctx = ec_init();
+	struct fec *ctx = ec_init(SD_EC_D, SD_EC_DP);
 	char *lost = xvalloc(len);
 	int i, j;
 
@@ -414,12 +414,13 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 	/* Rebuild the lost replica */
 	for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
 		const uint8_t *in[SD_EC_D];
-		uint8_t out[SD_EC_STRIP_SIZE];
+		int strip_size = SD_EC_DATA_STRIPE_SIZE / SD_EC_D;
+		uint8_t out[strip_size];
 
 		for (j = 0; j < SD_EC_D; j++)
-			in[j] = bufs[j] + SD_EC_STRIP_SIZE * i;
+			in[j] = bufs[j] + strip_size * i;
 		ec_decode(ctx, in, idxs, out, idx);
-		memcpy(lost + SD_EC_STRIP_SIZE * i, out, SD_EC_STRIP_SIZE);
+		memcpy(lost + strip_size * i, out, strip_size);
 	}
 out:
 	ec_destroy(ctx);
