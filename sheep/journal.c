@@ -31,10 +31,7 @@ struct journal_descriptor {
 	uint32_t magic;
 	uint16_t flag;
 	uint16_t reserved;
-	union {
-		uint32_t epoch;
-		uint64_t oid;
-	};
+	uint64_t oid;
 	uint64_t offset;
 	uint64_t size;
 	uint8_t create;
@@ -412,9 +409,9 @@ int journal_write_store(uint64_t oid, const char *buf, size_t size,
 		.offset = offset,
 		.size = size,
 		.create = create,
+		.oid = oid,
 	};
-	/* We have to explicitly do assignment to get all GCC compatible */
-	jd.oid = oid;
+
 	return journal_file_write(&jd, buf);
 }
 
@@ -424,8 +421,9 @@ int journal_remove_object(uint64_t oid)
 		.magic = JOURNAL_DESC_MAGIC,
 		.flag = JF_REMOVE_OBJ,
 		.size = 0,
+		.oid = oid,
 	};
-	jd.oid = oid;
+
 	return journal_file_write(&jd, NULL);
 }
 
