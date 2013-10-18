@@ -22,11 +22,16 @@
 
 #include "sheepdog_proto.h"
 #include "rbtree.h"
+#include "fec.h"
 
 #define SD_SHEEP_PROTO_VER 0x08
 
 #define SD_DEFAULT_COPIES 3
-#define SD_MAX_COPIES 8
+/*
+ * For erasure coding, we use at most SD_EC_MAX_STRIP for data strips and
+ * (SD_EC_MAX_STRIP - 1) for parity strips
+ */
+#define SD_MAX_COPIES (SD_EC_MAX_STRIP * 2 - 1)
 
 /*
  * The max number of nodes sheep daemon can support is constrained by

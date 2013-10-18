@@ -636,11 +636,18 @@ void ec_decode(struct fec *ctx, const uint8_t *input[], const int inidx[],
 	int strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
 	uint8_t m0[strip_size], m1[strip_size], m2[strip_size], m3[strip_size],
 		m4[strip_size], m5[strip_size], m6[strip_size], m7[strip_size],
+		m8[strip_size], m9[strip_size], m10[strip_size],
+		m11[strip_size], m12[strip_size], m13[strip_size],
+		m14[strip_size], m15[strip_size],
 		p0[strip_size], p1[strip_size], p2[strip_size], p3[strip_size],
-		p4[strip_size], p5[strip_size], p6[strip_size], p7[strip_size];
-#define SD_EC_MAX_PARITY 8
-	uint8_t *missing[SD_EC_MAX_PARITY] = { m0, m1, m2, m3, m4, m5, m6, m7 };
-	uint8_t *p[SD_EC_MAX_PARITY] = { p0, p1, p2, p3, p4, p5, p6, p7 };
+		p4[strip_size], p5[strip_size], p6[strip_size], p7[strip_size],
+		p8[strip_size], p9[strip_size], p10[strip_size],
+		p11[strip_size], p12[strip_size], p13[strip_size],
+		p14[strip_size];
+	uint8_t *missing[SD_EC_MAX_STRIP] = { m0, m1, m2, m3, m4, m5, m6, m7,
+		m8, m9, m10, m11, m12, m13, m14, m15 };
+	uint8_t *p[SD_EC_MAX_STRIP - 1] = { p0, p1, p2, p3, p4, p5, p6, p7, p8,
+		p9, p10, p11, p12, p13, p14 };
 
 	for (i = 0; i < edp; i++)
 		dp[i] = NULL;

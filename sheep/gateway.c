@@ -112,16 +112,23 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	int start = off / SD_EC_DATA_STRIPE_SIZE;
 	int end = DIV_ROUND_UP(off + len, SD_EC_DATA_STRIPE_SIZE), i, j;
 	int nr_stripe = end - start;
-	struct fec *ctx = ec_init(SD_EC_D, SD_EC_DP);
-	int nr_to_send = (opcode == SD_OP_READ_OBJ) ? SD_EC_D : SD_EC_DP;
-	int strip_size = SD_EC_DATA_STRIPE_SIZE / SD_EC_D;
-	struct req_iter *reqs = xzalloc(sizeof(*reqs) * nr_to_send);
+	struct fec *ctx;
+	int strip_size, nr_to_send;
+	struct req_iter *reqs;
 	char *p, *buf = NULL;
+	uint8_t policy = req->rq.obj.copy_policy ?:
+		get_vdi_copy_policy(oid_to_vid(req->rq.obj.oid));
+	int ed = 0, ep = 0, edp;
+
+	edp = ec_policy_to_dp(policy, &ed, &ep);
+	ctx = ec_init(ed, edp);
+	*nr = nr_to_send = (opcode == SD_OP_READ_OBJ) ? ed : edp;
+	strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
+	reqs = xzalloc(sizeof(*reqs) * nr_to_send);
 
 	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
 		 start, end, nr_to_send, off, len);
 
-	*nr = nr_to_send;
 	for (i = 0; i < nr_to_send; i++) {
 		int l = strip_size * nr_stripe;
 
@@ -150,16 +157,16 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 		goto out;
 	}
 	for (i = 0; i < nr_stripe; i++) {
-		const uint8_t *ds[SD_EC_D];
-		uint8_t *ps[SD_EC_P];
+		const uint8_t *ds[ed];
+		uint8_t *ps[ep];
 
-		for (j = 0; j < SD_EC_D; j++)
+		for (j = 0; j < ed; j++)
 			ds[j] = reqs[j].buf + strip_size * i;
 
-		for (j = 0; j < SD_EC_P; j++)
-			ps[j] = reqs[SD_EC_D + j].buf + strip_size * i;
+		for (j = 0; j < ep; j++)
+			ps[j] = reqs[ed + j].buf + strip_size * i;
 
-		for (j = 0; j < SD_EC_D; j++)
+		for (j = 0; j < ed; j++)
 			memcpy((uint8_t *)ds[j], p + j * strip_size,
 			       strip_size);
 		ec_encode(ctx, ds, ps);
@@ -218,7 +225,7 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 	int end = DIV_ROUND_UP(off + len, SD_EC_DATA_STRIPE_SIZE), i, j;
 	int nr_stripe = end - start;
 
-	if (!is_erasure_oid(oid))
+	if (!is_erasure_obj(oid, req->rq.obj.copy_policy))
 		goto out;
 
 	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
@@ -227,7 +234,12 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 	/* We need to assemble the data strips into the req buffer for read */
 	if (opcode == SD_OP_READ_OBJ) {
 		char *p, *buf = xmalloc(SD_EC_DATA_STRIPE_SIZE * nr_stripe);
-		int strip_size = SD_EC_DATA_STRIPE_SIZE / SD_EC_D;
+		uint8_t policy = req->rq.obj.copy_policy ?:
+			get_vdi_copy_policy(oid_to_vid(req->rq.obj.oid));
+		int ed = 0, strip_size;
+
+		ec_policy_to_dp(policy, &ed, NULL);
+		strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
 
 		p = buf;
 		for (i = 0; i < nr_stripe; i++) {

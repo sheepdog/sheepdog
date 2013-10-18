@@ -164,8 +164,10 @@ static void *read_erasure_object(uint64_t oid, uint8_t idx,
 	struct vnode_info *old = grab_vnode_info(rw->old_vinfo), *new_old;
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->tgt_epoch;
 	const struct sd_node *node;
+	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+	int edp = ec_policy_to_dp(policy, NULL, NULL);
 again:
-	if (old->nr_zones < SD_EC_DP) {
+	if (unlikely(old->nr_zones < edp)) {
 		if (search_erasure_object(oid, idx, &old->nroot, rw,
 					  tgt_epoch, buf)
 		    == SD_RES_SUCCESS)
@@ -390,14 +392,23 @@ out:
 static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 				    struct recovery_work *rw)
 {
-	uint8_t *bufs[SD_EC_D] = { 0 };
-	int idxs[SD_EC_D], len = get_store_objsize(oid);
-	struct fec *ctx = ec_init(SD_EC_D, SD_EC_DP);
+	int len = get_store_objsize(oid);
 	char *lost = xvalloc(len);
 	int i, j;
+	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+	int ed = 0, edp;
+	edp = ec_policy_to_dp(policy, &ed, NULL);
+	struct fec *ctx = ec_init(ed, edp);
+	uint8_t *bufs[ed];
+	int idxs[ed];
+
+	for (i = 0; i < ed; i++)
+		bufs[i] = NULL;
+	for (i = 0; i < ed; i++)
+		idxs[i] = 0;
 
 	/* Prepare replica */
-	for (i = 0, j = 0; i < SD_EC_DP && j < SD_EC_D; i++) {
+	for (i = 0, j = 0; i < edp && j < ed; i++) {
 		if (i == idx)
 			continue;
 		bufs[j] = read_erasure_object(oid, i, rw);
@@ -405,7 +416,7 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 			continue;
 		idxs[j++] = i;
 	}
-	if (j != SD_EC_D) {
+	if (j != ed) {
 		free(lost);
 		lost = NULL;
 		goto out;
@@ -413,18 +424,18 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 
 	/* Rebuild the lost replica */
 	for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
-		const uint8_t *in[SD_EC_D];
-		int strip_size = SD_EC_DATA_STRIPE_SIZE / SD_EC_D;
+		const uint8_t *in[ed];
+		int strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
 		uint8_t out[strip_size];
 
-		for (j = 0; j < SD_EC_D; j++)
+		for (j = 0; j < ed; j++)
 			in[j] = bufs[j] + strip_size * i;
 		ec_decode(ctx, in, idxs, out, idx);
 		memcpy(lost + strip_size * i, out, strip_size);
 	}
 out:
 	ec_destroy(ctx);
-	for (i = 0; i < SD_EC_D; i++)
+	for (i = 0; i < ed; i++)
 		free(bufs[i]);
 	return lost;
 }
@@ -432,10 +443,12 @@ out:
 static uint8_t local_node_copy_index(struct rb_root *vroot, uint64_t oid)
 {
 	const struct sd_node *target_nodes[SD_MAX_NODES];
+	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
 	uint8_t idx;
+	int edp = ec_policy_to_dp(policy, NULL, NULL);
 
-	oid_to_nodes(oid, vroot, SD_EC_DP, target_nodes);
-	for (idx = 0; idx < SD_EC_DP; idx++)
+	oid_to_nodes(oid, vroot, edp, target_nodes);
+	for (idx = 0; idx < edp; idx++)
 		if (node_is_local(target_nodes[idx]))
 			return idx;
 	panic("can't get valid index for %"PRIx64, oid);
@@ -450,9 +463,9 @@ static uint8_t local_node_copy_index(struct rb_root *vroot, uint64_t oid)
  *    2.1 read enough other copies from their tracks in epoch history
  *    2.2 rebuild the lost object from the content of copies read at 2.1
  *
- * The subtle case is number for available zones is less than SD_EC_DP or the
- * requested index of lost object:
- *    1 we need to make sure nr_zones >= SD_EC_DP to avoid panic of
+ * The subtle case is number for available zones is less than total copy number
+ * or the requested index of lost object:
+ *    1 we need to make sure nr_zones >= total_copy_nr to avoid panic of
  *      oid_to_node(s) helpers.
  *    2 we have to search all the available zones when we can't get idx. Its
  *      okay to do a mad search when number of available zones is small
@@ -466,8 +479,10 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	void *buf = NULL;
 	uint8_t idx;
 	int ret = -1;
+	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+	int edp = ec_policy_to_dp(policy, NULL, NULL);
 
-	if (cur->nr_zones < SD_EC_DP)
+	if (cur->nr_zones < edp)
 		return -1;
 
 	idx = local_node_copy_index(&cur->vroot, oid);

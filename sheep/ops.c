@@ -90,7 +90,7 @@ static int cluster_new_vdi(struct request *req)
 	};
 
 	if (iocb.copy_policy)
-		iocb.nr_copies = SD_EC_DP;
+		iocb.nr_copies = ec_policy_to_dp(iocb.copy_policy, NULL, NULL);
 
 	if (hdr->data_length != SD_MAX_VDI_LEN)
 		return SD_RES_INVALID_PARMS;

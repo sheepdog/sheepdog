@@ -330,8 +330,12 @@ int prealloc(int fd, uint32_t size)
 
 size_t get_store_objsize(uint64_t oid)
 {
-	if (is_erasure_oid(oid))
-		return SD_EC_OBJECT_SIZE;
+	if (is_erasure_oid(oid)) {
+		uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+		int d;
+		ec_policy_to_dp(policy, &d, NULL);
+		return SD_DATA_OBJ_SIZE / d;
+	}
 	return get_objsize(oid);
 }
 
@@ -342,6 +346,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int ret, fd;
 	uint32_t len = iocb->length;
 	bool ec = is_erasure_obj(oid, iocb->copy_policy);
+	size_t obj_size;
 
 	sd_debug("%"PRIx64, oid);
 	get_obj_path(oid, path, sizeof(path));
@@ -375,7 +380,16 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		return err_to_sderr(path, oid, errno);
 	}
 
-	ret = prealloc(fd, ec ? SD_EC_OBJECT_SIZE : get_objsize(oid));
+	if (ec) {
+		uint8_t policy = iocb->copy_policy ?:
+			get_vdi_copy_policy(oid_to_vid(oid));
+		int d;
+		ec_policy_to_dp(policy, &d, NULL);
+		obj_size = SD_DATA_OBJ_SIZE / d;
+	} else
+		obj_size = get_objsize(oid);
+
+	ret = prealloc(fd, obj_size);
 	if (ret < 0) {
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
@@ -447,7 +461,6 @@ static bool oid_stale(uint64_t oid)
 	const struct sd_vnode *v;
 	bool ret = true;
 	const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
-
 	vinfo = get_vnode_info();
 
 	/*
@@ -455,8 +468,13 @@ static bool oid_stale(uint64_t oid)
 	 * know it is stale or not. In this case, we keep it stay in the working
 	 * directory in order to recover it when we get enough zones
 	 */
-	if (unlikely(vinfo->nr_zones < SD_EC_DP) && is_erasure_oid(oid))
-		return false;
+	if (is_erasure_oid(oid)) {
+		uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+		int edp = ec_policy_to_dp(policy, NULL, NULL);
+
+		if (unlikely(vinfo->nr_zones < edp))
+			return false;
+	}
 
 	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
 	oid_to_vnodes(oid, &vinfo->vroot, nr_copies, obj_vnodes);

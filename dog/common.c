@@ -334,7 +334,11 @@ size_t get_store_objsize(uint8_t copy_policy, uint64_t oid)
 {
 	if (is_vdi_obj(oid))
 		return SD_INODE_SIZE;
-	if (copy_policy != 0)
-		return SD_EC_OBJECT_SIZE;
+	if (copy_policy != 0) {
+		int d;
+
+		ec_policy_to_dp(copy_policy, &d, NULL);
+		return SD_DATA_OBJ_SIZE / d;
+	}
 	return get_objsize(oid);
 }

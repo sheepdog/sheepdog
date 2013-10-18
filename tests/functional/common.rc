@@ -513,7 +513,7 @@ _vdi_list()
 _vdi_create()
 {
 	if $EC; then
-		$DOG vdi create -e $*
+		$DOG vdi create -c 4:2 $*
 	else
 		$DOG vdi create $*
 	fi

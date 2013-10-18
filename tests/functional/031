@@ -13,7 +13,7 @@ for i in 1 2 3; do
     $DOG vdi create test$i ${i}00M -c $i
 done
 
-$DOG vdi create -e test4 400M
+$DOG vdi create -c 4:2 test4 400M
 
 _vdi_list
 

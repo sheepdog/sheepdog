@@ -28,10 +28,9 @@ static struct sd_option vdi_options[] = {
 	{'x', "exclusive", false, "write in an exclusive mode"},
 	{'d', "delete", false, "delete a key"},
 	{'w', "writeback", false, "use writeback mode"},
-	{'c', "copies", true, "specify the data redundancy (number of copies)"},
+	{'c', "copies", true, "specify the data redundancy level"},
 	{'F', "from", true, "create a differential backup from the snapshot"},
 	{'f', "force", false, "do operation forcibly"},
-	{'e', "erasure", false, "create erasure coded vdi"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -893,7 +892,8 @@ static int vdi_object(int argc, char **argv)
 			exit(EXIT_FAILURE);
 		}
 
-		size = info.copy_policy ? SD_EC_OBJECT_SIZE : SD_DATA_OBJ_SIZE;
+		size = get_store_objsize(info.copy_policy,
+					 vid_to_data_oid(vid, 0));
 		parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
 			   size);
 
@@ -1020,7 +1020,8 @@ static int vdi_track(int argc, char **argv)
 	}
 
 	parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
-		   info.copy_policy ? SD_EC_OBJECT_SIZE : SD_DATA_OBJ_SIZE);
+		   get_store_objsize(info.copy_policy,
+				     vid_to_data_oid(vid, 0)));
 
 	if (!oid_info.success) {
 		sd_err("Failed to read the inode object 0x%" PRIx32, vid);
@@ -2121,7 +2122,7 @@ static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "saph", "check and repair image's consistency",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_check, vdi_options},
-	{"create", "<vdiname> <size>", "Pcapherv", "create an image",
+	{"create", "<vdiname> <size>", "Pcaphrv", "create an image",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_create, vdi_options},
 	{"snapshot", "<vdiname>", "saphrv", "create a snapshot",
@@ -2175,10 +2176,47 @@ static struct subcommand vdi_cmd[] = {
 	{NULL,},
 };
 
+/* Return 0 to indicate ill str */
+static uint8_t parse_copy(const char *str, uint8_t *copy_policy)
+{
+	char *n1, *n2;
+	uint8_t copy, parity;
+	char p[10];
+
+	strcpy(p, str);
+	n1 = strtok(p, ":");
+	n2 = strtok(NULL, ":");
+
+	if ((n1 && !is_numeric(n1)) || (n2 && !is_numeric(n2)))
+		return 0;
+
+	copy = strtol(n1, NULL, 10);
+	if (copy > SD_MAX_COPIES)
+		return 0;
+	if (!n2) {
+		*copy_policy = 0;
+		return copy;
+	}
+
+	if (copy != 2 && copy != 4 && copy != 8 && copy != 16)
+		return 0;
+
+	parity = strtol(n2, NULL, 10);
+	if (parity >= SD_EC_MAX_STRIP || parity >= copy || parity == 0)
+		return 0;
+
+	/*
+	 * 4 bits for parity and 4 bits for data.
+	 * We have to compress upper data bits because it can't represent 16
+	 */
+	*copy_policy = ((copy / 2) << 4) + parity;
+	copy = copy + parity;
+	return copy;
+}
+
 static int vdi_parser(int ch, const char *opt)
 {
 	char *p;
-	int nr_copies;
 
 	switch (ch) {
 	case 'P':
@@ -2213,13 +2251,19 @@ static int vdi_parser(int ch, const char *opt)
 		vdi_cmd_data.writeback = true;
 		break;
 	case 'c':
-		nr_copies = strtol(opt, &p, 10);
-		if (opt == p || nr_copies < 0 || nr_copies > SD_MAX_COPIES) {
-			sd_err("Invalid copies number, must be "
-			       "an integer between 0 and %d", SD_MAX_COPIES);
+		vdi_cmd_data.nr_copies = parse_copy(opt,
+						    &vdi_cmd_data.copy_policy);
+		if (!vdi_cmd_data.nr_copies) {
+			sd_err("Invalid parameter %s\n"
+			       "To create replicated vdi, set -c x\n"
+			       "  x(1 to %d)   - number of replicated copies\n"
+			       "To create erasure coded vdi, set -c x:y\n"
+			       "  x(2,4,8,16)  - number of data strips\n"
+			       "  y(1 to 15)   - number of parity strips\n"
+			       "and meet the condition x > y",
+			       opt, SD_MAX_COPIES);
 			exit(EXIT_FAILURE);
 		}
-		vdi_cmd_data.nr_copies = nr_copies;
 		break;
 	case 'F':
 		vdi_cmd_data.from_snapshot_id = strtol(opt, &p, 10);
@@ -2232,8 +2276,6 @@ static int vdi_parser(int ch, const char *opt)
 	case 'f':
 		vdi_cmd_data.force = true;
 		break;
-	case 'e':
-		vdi_cmd_data.copy_policy = 1;
 	}
 
 	return 0;

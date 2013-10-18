@@ -4,11 +4,11 @@
 
 . ./common
 
-for i in `seq 0 2`; do
+for i in `seq 0 5`; do
     _start_sheep $i "-g"
 done
 
-_wait_for_sheep "3"
+_wait_for_sheep 6
 
 _cluster_format -c 3
 

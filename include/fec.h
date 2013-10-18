@@ -1,3 +1,6 @@
+#ifndef __FEC_H__
+#define __FEC_H__
+
 /*
  * zfec -- fast forward error correction library
  *
@@ -59,6 +62,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "util.h"
+
 struct fec {
 	unsigned long magic;
 	unsigned short d, dp;                     /* parameters of the code */
@@ -101,12 +106,8 @@ void fec_decode(const struct fec *code,
 		uint8_t *const *const outpkts,
 		const int *const index, size_t sz);
 
-#define SD_EC_D	4 /* No. of data strips */
-#define SD_EC_P 2 /* No. of parity strips */
-#define SD_EC_DP (SD_EC_D + SD_EC_P)
-
 /*
- * SD_EC_D_SIZE <= 1K is the safe value to run VM after some experimentations.
+ * data stripe <= 1K is the safe value to run VM after some experimentations.
  *
  * Though most OS's file system will operate on 4K block, some softwares like
  * grub will operate on 512 bytes and Linux kernel itself will sometimes
@@ -115,8 +116,26 @@ void fec_decode(const struct fec *code,
  * VM to run on erasure coded volume.
  */
 #define SD_EC_DATA_STRIPE_SIZE (1024) /* 1K */
-#define SD_EC_OBJECT_SIZE (SD_DATA_OBJ_SIZE / SD_EC_D)
 #define SD_EC_NR_STRIPE_PER_OBJECT (SD_DATA_OBJ_SIZE / SD_EC_DATA_STRIPE_SIZE)
+#define SD_EC_MAX_STRIP (16)
+
+static inline int ec_policy_to_dp(uint8_t policy, int *d, int *p)
+{
+	int ed = 0, ep = 0;
+
+	ep = policy & 0b1111;
+	ed = policy >> 4;
+
+	if (unlikely(!ep))
+		panic("invalid policy %d", policy);
+
+	if (d)
+		*d = ed * 2;
+	if (p)
+		*p = ep;
+
+	return ed * 2 + ep;
+}
 
 /*
  * Stripe: data strips + parity strips, spread on all replica
@@ -176,3 +195,5 @@ static inline void ec_destroy(struct fec *ctx)
 {
 	fec_free(ctx);
 }
+
+#endif
