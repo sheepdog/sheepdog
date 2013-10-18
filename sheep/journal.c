@@ -149,6 +149,10 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 		return 0;
 	}
 
+	if (jd->flag != JF_STORE)
+		panic("flag is not JF_STORE, the journaling file is broken."
+		      " please remove the journaling file and restart sheep daemon");
+
 	sd_info("%s, size %" PRIu64 ", off %" PRIu64 ", %d", path, jd->size,
 		jd->offset, jd->create);
 
