@@ -4,22 +4,22 @@
 
 . ./common
 
-for i in 0 1 2 3; do
+for i in `seq 0 5`; do
     _start_sheep $i
 done
-_wait_for_sheep 4
-_cluster_format
-$DOG vdi create test 20M -P
+_wait_for_sheep 6
+_cluster_format -c 6
+_vdi_create test 20M -P
 $DOG cluster info | _filter_cluster_info
 
 $DOG cluster shutdown
 _wait_for_sheep_stop
 
-for i in 0 1 2 4; do
+for i in 0 1 2 3 4 6; do
     _start_sheep $i
 done
-_wait_for_sheep 4
-for i in 0 1 2 4; do
+_wait_for_sheep 6
+for i in 0 1 2 3 4 6; do
     $DOG cluster info -p 700$i | _filter_cluster_info
     _vdi_list
 done
@@ -30,14 +30,14 @@ echo ""
 _wait_for_sheep_recovery 0
 $DOG vdi check test | sort
 
-for i in 0 1 2 4; do
+for i in 0 1 2 3 4 6; do
     $DOG cluster info -p 700$i | _filter_cluster_info
     _vdi_list
 done
 
-_start_sheep 3
-_wait_for_sheep 5
-for i in 0 1 2 3 4; do
+_start_sheep 5
+_wait_for_sheep 7
+for i in 0 1 2 3 4 5 6; do
     $DOG cluster info -p 700$i | _filter_cluster_info
     _vdi_list
 done

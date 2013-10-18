@@ -342,3 +342,12 @@ size_t get_store_objsize(uint8_t copy_policy, uint64_t oid)
 	}
 	return get_objsize(oid);
 }
+
+bool is_erasure_oid(uint64_t oid, uint8_t policy)
+{
+	if (is_vdi_obj(oid))
+		return false;
+	if (policy == 0)
+		return false;
+	return true;
+}

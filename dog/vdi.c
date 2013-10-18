@@ -1397,7 +1397,7 @@ static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
 }
 
 static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
-			    void *buf, bool create)
+			    void *buf, bool create, uint8_t ec_index)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1411,6 +1411,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.data_length = get_objsize(oid);
 	hdr.obj.oid = oid;
+	hdr.obj.ec_index = ec_index;
 
 	ret = dog_exec_req(&vnode->node->nid, &hdr, buf);
 	if (ret < 0)
@@ -1427,13 +1428,16 @@ struct vdi_check_work {
 	struct vdi_check_info *info;
 	const struct sd_vnode *vnode;
 	uint8_t hash[SHA1_DIGEST_SIZE];
+	uint8_t ec_index;
+	uint8_t *buf;
 	bool object_found;
 	struct work work;
 };
 
 struct vdi_check_info {
 	uint64_t oid;
-	int nr_copies;
+	uint8_t nr_copies;
+	uint8_t copy_policy;
 	uint64_t total;
 	uint64_t *done;
 	int refcnt;
@@ -1459,7 +1463,7 @@ static void vdi_repair_work(struct work *work)
 	void *buf;
 
 	buf = read_object_from(info->base->vnode, info->oid);
-	write_object_to(vcw->vnode, info->oid, buf, !vcw->object_found);
+	write_object_to(vcw->vnode, info->oid, buf, !vcw->object_found, 0);
 	free(buf);
 }
 
@@ -1479,7 +1483,7 @@ static void vdi_repair_main(struct work *work)
 		free_vdi_check_info(info);
 }
 
-static void vdi_hash_check_work(struct work *work)
+static void vdi_check_object_work(struct work *work)
 {
 	struct vdi_check_work *vcw = container_of(work, struct vdi_check_work,
 						  work);
@@ -1488,19 +1492,29 @@ static void vdi_hash_check_work(struct work *work)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
-	sd_init_req(&hdr, SD_OP_GET_HASH);
+	if (is_erasure_oid(info->oid, info->copy_policy)) {
+		sd_init_req(&hdr, SD_OP_READ_PEER);
+		hdr.data_length = get_store_objsize(info->copy_policy,
+						    info->oid);
+		hdr.obj.ec_index = vcw->ec_index;
+		hdr.epoch = sd_epoch;
+		vcw->buf = xmalloc(hdr.data_length);
+	} else
+		sd_init_req(&hdr, SD_OP_GET_HASH);
 	hdr.obj.oid = info->oid;
 	hdr.obj.tgt_epoch = sd_epoch;
 
-	ret = dog_exec_req(&vcw->vnode->node->nid, &hdr, NULL);
+	ret = dog_exec_req(&vcw->vnode->node->nid, &hdr, vcw->buf);
 	if (ret < 0)
 		exit(EXIT_SYSFAIL);
 
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		vcw->object_found = true;
-		memcpy(vcw->hash, rsp->hash.digest, sizeof(vcw->hash));
-		uatomic_set(&info->base, vcw);
+		if (!is_erasure_oid(info->oid, info->copy_policy)) {
+			memcpy(vcw->hash, rsp->hash.digest, sizeof(vcw->hash));
+			uatomic_set(&info->base, vcw);
+		}
 		break;
 	case SD_RES_NO_OBJ:
 		vcw->object_found = false;
@@ -1514,17 +1528,9 @@ static void vdi_hash_check_work(struct work *work)
 	}
 }
 
-static void vdi_hash_check_main(struct work *work)
+static void check_replicatoin_object(struct vdi_check_info *info)
 {
-	struct vdi_check_work *vcw = container_of(work, struct vdi_check_work,
-						  work);
-	struct vdi_check_info *info = vcw->info;
-
-	info->refcnt--;
-	if (info->refcnt > 0)
-		return;
-
-	if (info->base  == NULL) {
+	if (info->base == NULL) {
 		sd_err("no node has %" PRIx64, info->oid);
 		exit(EXIT_FAILURE);
 	}
@@ -1542,6 +1548,99 @@ static void vdi_hash_check_main(struct work *work)
 			queue_work(info->wq, &info->vcw[i].work);
 		}
 	}
+}
+
+static void check_erasure_object(struct vdi_check_info *info)
+{
+	int d = 0, p = 0, i, j, k;
+	int dp = ec_policy_to_dp(info->copy_policy, &d, &p);
+	struct fec *ctx = ec_init(d, dp);
+	int miss_idx[dp], input_idx[dp];
+	size_t strip_size = SD_EC_DATA_STRIPE_SIZE / d;
+	uint64_t oid = info->oid;
+	size_t len = get_store_objsize(info->copy_policy, oid);
+	char *obj = xmalloc(len);
+	uint8_t *input[dp];
+
+	for (i = 0; i < dp; i++)
+		miss_idx[i] = -1;
+
+	for (i = 0, j = 0, k = 0; i < info->nr_copies; i++)
+		if (!info->vcw[i].object_found) {
+			miss_idx[j++] = i;
+		} else {
+			input_idx[k] = i;
+			input[k] = info->vcw[i].buf;
+			k++;
+		}
+
+	if (!j) { /* No object missing */
+		int idx[d];
+
+		for (i = 0; i < d; i++)
+			idx[i] = i;
+
+		for (k = 0; k < p; k++) {
+			for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
+				const uint8_t *ds[d];
+				uint8_t out[strip_size];
+
+				for (j = 0; j < d; j++)
+					ds[j] = info->vcw[j].buf + strip_size
+						* i;
+				ec_decode(ctx, ds, idx, out, d + k);
+				memcpy(obj + strip_size * i, out, strip_size);
+			}
+			if (memcmp(obj, info->vcw[d + k].buf, len) != 0) {
+				/* TODO repair the inconsistency */
+				sd_err("object %"PRIx64" is inconsistent", oid);
+				goto out;
+			}
+		}
+	} else if (j > p) {
+		sd_err("failed to rebuild object %"PRIx64". %d copies get "
+		       "lost, more than %d", oid, j, p);
+		goto out;
+	} else {
+		for (k = 0; k < j; k++) {
+			int m = miss_idx[k], n;
+
+			for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
+				const uint8_t *ds[d];
+				uint8_t out[strip_size];
+
+				for (n = 0; n < d; n++)
+					ds[n] = input[n] + strip_size * i;
+				ec_decode(ctx, ds, input_idx, out, m);
+				memcpy(obj + strip_size * i, out, strip_size);
+			}
+			write_object_to(info->vcw[m].vnode, oid, obj, true,
+					info->vcw[m].ec_index);
+			fprintf(stdout, "fixed missing %"PRIx64", "
+				"copy index %d\n", info->oid, m);
+		}
+	}
+out:
+	for (i = 0; i < dp; i++)
+		free(info->vcw[i].buf);
+	free(obj);
+	ec_destroy(ctx);
+}
+
+static void vdi_check_object_main(struct work *work)
+{
+	struct vdi_check_work *vcw = container_of(work, struct vdi_check_work,
+						  work);
+	struct vdi_check_info *info = vcw->info;
+
+	info->refcnt--;
+	if (info->refcnt > 0)
+		return;
+
+	if (is_erasure_oid(info->oid, info->copy_policy))
+		check_erasure_object(info);
+	else
+		check_replicatoin_object(info);
 
 	if (info->refcnt == 0)
 		free_vdi_check_info(info);
@@ -1560,13 +1659,15 @@ static void queue_vdi_check_work(const struct sd_inode *inode, uint64_t oid,
 	info->total = inode->vdi_size;
 	info->done = done;
 	info->wq = wq;
+	info->copy_policy = inode->copy_policy;
 
 	oid_to_vnodes(oid, &sd_vroot, nr_copies, tgt_vnodes);
 	for (int i = 0; i < nr_copies; i++) {
 		info->vcw[i].info = info;
+		info->vcw[i].ec_index = i;
 		info->vcw[i].vnode = tgt_vnodes[i];
-		info->vcw[i].work.fn = vdi_hash_check_work;
-		info->vcw[i].work.done = vdi_hash_check_main;
+		info->vcw[i].work.fn = vdi_check_object_work;
+		info->vcw[i].work.done = vdi_check_object_main;
 		info->refcnt++;
 		queue_work(info->wq, &info->vcw[i].work);
 	}
@@ -1585,6 +1686,8 @@ int do_vdi_check(const struct sd_inode *inode)
 	}
 
 	wq = create_work_queue("vdi check", WQ_DYNAMIC);
+
+	init_fec();
 
 	queue_vdi_check_work(inode, vid_to_vdi_oid(inode->vdi_id), NULL, wq);
 
@@ -1620,11 +1723,6 @@ static int vdi_check(int argc, char **argv)
 	if (ret != EXIT_SUCCESS) {
 		sd_err("FATAL: no inode objects");
 		return ret;
-	}
-
-	if (inode->copy_policy > 0) {
-		sd_err("not implemented for erasure coded vdi");
-		return EXIT_FAILURE;
 	}
 
 	return do_vdi_check(inode);

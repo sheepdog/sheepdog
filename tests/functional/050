@@ -22,7 +22,7 @@ _wait_for_sheep 6
 
 _cluster_format -c 6
 
-$DOG vdi create test 100M
+_vdi_create test 100M
 dd if=/dev/zero | $DOG vdi write test &
 
 # simulate IO NIC down of sheep 1

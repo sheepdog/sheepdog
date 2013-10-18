@@ -6,12 +6,12 @@
 
 MD=true
 
-for i in 0 1 2; do
+for i in `seq 0 6`; do
 	_start_sheep $i
 done
-_wait_for_sheep 3
-_cluster_format -c 2
-$DOG vdi create test 200M -P
+_wait_for_sheep 7
+_cluster_format -c 6
+_vdi_create test 120M -P
 
 # simulate one disk failure
 _safe_remove $STORE/0/d0
