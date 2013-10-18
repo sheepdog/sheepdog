@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# Test sheep recovery logic for erasure coding
+
+. ./common
+
+for i in `seq 0 45`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 46
+
+_cluster_format
+
+$DOG vdi create -c 16:15 test 40M
+_vdi_list
+_random | $DOG vdi write test
+$DOG vdi read test | md5sum > $STORE/csum1
+
+for i in `seq 1 15`;do _kill_sheep $i;done
+$DOG vdi read test | md5sum > $STORE/csum2
+
+diff -u $STORE/csum1 $STORE/csum2
