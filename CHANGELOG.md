@@ -14,3 +14,4 @@ DOG COMMAND INTERFACE:
 SHEEP COMMAND INTERFACE:
  - improvements of help messages
  - change format of the size format in -j (journaling) and -w (object cache) options. The new format is: n[TtGgMmKkb]. e.g. "-j size=1024M".
+ - rotate log when sheep process catches SIGHUP signal

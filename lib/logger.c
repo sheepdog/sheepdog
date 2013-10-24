@@ -114,11 +114,42 @@ static const char *log_name;
 static char *log_nowname;
 int sd_log_level = SDOG_INFO;
 static pid_t sheep_pid;
-static pid_t logger_pid;
+pid_t logger_pid = -1;
 static key_t semkey;
 static char *log_buff;
 
 static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
+
+/*
+ * block_sighup()
+ *
+ * used for protecting log_fd from SIGHUP rotation
+ */
+static void block_sighup(void)
+{
+	int ret;
+	sigset_t new, old;
+
+	sigemptyset(&new);
+	sigemptyset(&old);
+	sigaddset(&new, SIGHUP);
+	ret = sigprocmask(SIG_BLOCK, &new, &old);
+	if (ret < 0)
+		syslog(LOG_ERR, "blocking SIGHUP failed\n");
+}
+
+static void unblock_sighup(void)
+{
+	int ret;
+	sigset_t new, old;
+
+	sigemptyset(&new);
+	sigemptyset(&old);
+	sigaddset(&new, SIGHUP);
+	ret = sigprocmask(SIG_UNBLOCK, &new, &old);
+	if (ret < 0)
+		syslog(LOG_ERR, "unblock SIGHUP failed\n");
+}
 
 static const char *format_thread_name(char *str, size_t size, const char *name,
 				      int idx)
@@ -328,10 +359,15 @@ static void log_syslog(const struct logmsg *msg)
 
 	len = format->formatter(str, sizeof(str) - 1, msg);
 	str[len++] = '\n';
+
+	block_sighup();
+
 	if (log_fd >= 0)
 		xwrite(log_fd, str, len);
 	else
 		syslog(msg->prio, "%s", str);
+
+	unblock_sighup();
 }
 
 static void init_logmsg(struct logmsg *msg, struct timeval *tv,
@@ -507,6 +543,22 @@ static void crash_handler(int signo)
 	reraise_crash_signal(signo, 1);
 }
 
+static void sighup_handler(int signo)
+{
+	if (getppid() == 1)
+		/*
+		 * My parent (sheep process) is dead. This SIGHUP is sent
+		 * because of prctl(PR_SET_PDEATHSIG, SIGHUP)
+		 */
+		return crash_handler(signo);
+
+	/*
+	 * My parent sheep process is still alive, this SIGHUP is a request
+	 * for log rotation.
+	*/
+	rotate_log();
+}
+
 static void logger(char *log_dir, char *outfile)
 {
 	int fd;
@@ -537,7 +589,7 @@ static void logger(char *log_dir, char *outfile)
 
 	/* flush when either the logger or its parent dies */
 	install_crash_handler(crash_handler);
-	install_sighandler(SIGHUP, crash_handler, false);
+	install_sighandler(SIGHUP, sighup_handler, false);
 
 	prctl(PR_SET_PDEATHSIG, SIGHUP);
 
@@ -551,6 +603,8 @@ static void logger(char *log_dir, char *outfile)
 	while (la->active) {
 		log_flush();
 
+		block_sighup();
+
 		if (max_logsize) {
 			off_t offset;
 
@@ -563,6 +617,8 @@ static void logger(char *log_dir, char *outfile)
 					rotate_log();
 			}
 		}
+
+		unblock_sighup();
 
 		sleep(1);
 	}

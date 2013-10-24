@@ -90,4 +90,6 @@ void sd_backtrace(void);
 void set_loglevel(int new_loglevel);
 int get_loglevel(void);
 
+extern pid_t logger_pid;
+
 #endif	/* LOG_H */
