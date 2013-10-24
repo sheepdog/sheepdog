@@ -968,6 +968,35 @@ out:
 	return ret;
 }
 
+static int local_get_loglevel(struct request *req)
+{
+	int32_t current_level;
+
+	current_level = get_loglevel();
+	memcpy(req->data, &current_level, sizeof(current_level));
+	req->rp.data_length = sizeof(current_level);
+
+	sd_info("returning log level: %u", current_level);
+
+	return SD_RES_SUCCESS;
+}
+
+static int local_set_loglevel(struct request *req)
+{
+	int32_t new_level = 0;
+
+	memcpy(&new_level, req->data, sizeof(int32_t));
+	if (!(LOG_EMERG <= new_level && new_level <= LOG_DEBUG)) {
+		sd_err("invalid log level: %d", new_level);
+		return SD_RES_INVALID_PARMS;
+	}
+
+	set_loglevel(new_level);
+
+	return SD_RES_SUCCESS;
+
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1224,6 +1253,20 @@ static struct sd_op_template sd_ops[] = {
 		.name = "GET_CACHE_INFO",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_cache_info,
+	},
+
+	[SD_OP_GET_LOGLEVEL] = {
+		.name = "GET_LOGLEVEL",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_work = local_get_loglevel,
+	},
+
+	[SD_OP_SET_LOGLEVEL] = {
+		.name = "SET_LOGLEVEL",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_work = local_set_loglevel,
 	},
 
 	/* gateway I/O operations */

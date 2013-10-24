@@ -328,3 +328,87 @@ void show_progress(uint64_t done, uint64_t total, bool raw)
 
 	free(buf);
 }
+
+static const char * const loglevel_table[] = {
+	"emerg",
+	"alert",
+	"crit",
+	"err",
+	"warning",
+	"notice",
+	"info",
+	"debug",
+};				/* index is log level */
+
+int do_loglevel_set(const struct node_id *nid, const char *loglevel_str)
+{
+	int32_t loglevel = -1;
+	int ret;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+
+	for (int i = 0; i < ARRAY_SIZE(loglevel_table); i++) {
+		if (!strcmp(loglevel_table[i], loglevel_str)) {
+			loglevel = i;
+			break;
+		}
+	}
+
+	if (loglevel == -1)
+		return EXIT_USAGE;
+
+	sd_init_req(&hdr, SD_OP_SET_LOGLEVEL);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = sizeof(loglevel);
+
+	ret = dog_exec_req(nid->addr, nid->port, &hdr, &loglevel);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	if (rsp->result != SD_RES_SUCCESS)
+		return EXIT_FAILURE;
+
+	return EXIT_SUCCESS;
+}
+
+int do_loglevel_get(const struct node_id *nid, int32_t *ret_loglevel)
+{
+	int32_t loglevel = -1;
+	int ret;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+
+	sd_init_req(&hdr, SD_OP_GET_LOGLEVEL);
+	hdr.data_length = sizeof(loglevel);
+
+	ret = dog_exec_req(nid->addr, nid->port, &hdr, &loglevel);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	if (rsp->result != SD_RES_SUCCESS)
+		return EXIT_FAILURE;
+
+	*ret_loglevel = loglevel;
+
+	return EXIT_SUCCESS;
+}
+
+const char *loglevel_to_str(int loglevel)
+{
+	for (int i = 0; i < ARRAY_SIZE(loglevel_table); i++) {
+		if (i == loglevel)
+			return loglevel_table[i];
+	}
+
+	return "unknown loglevel";
+}
+
+void dump_loglevels(bool err)
+{
+	for (int i = 0; i < ARRAY_SIZE(loglevel_table); i++) {
+		if (err)
+			sd_err("%s\t(%d)", loglevel_table[i], i);
+		else
+			sd_info("%s\t(%d)", loglevel_table[i], i);
+	}
+}

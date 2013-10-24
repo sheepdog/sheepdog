@@ -857,3 +857,14 @@ fallback:
 	/* dump the stack frames if possible*/
 	dump_stack_frames();
 }
+
+void set_loglevel(int new_loglevel)
+{
+	assert(SDOG_EMERG <= new_loglevel && new_loglevel <= SDOG_DEBUG);
+	sd_log_level = new_loglevel;
+}
+
+int get_loglevel(void)
+{
+	return sd_log_level;
+}
