@@ -570,6 +570,15 @@ end:
 	return status;
 }
 
+static void sighup_handler(int signum)
+{
+	if (unlikely(logger_pid == -1))
+		return;
+
+	/* forward SIGHUP for log rotating */
+	kill(logger_pid, SIGHUP);
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
@@ -586,6 +595,8 @@ int main(int argc, char **argv)
 
 	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
+
+	install_sighandler(SIGHUP, sighup_handler, false);
 
 	long_options = build_long_options(sheep_options);
 	short_options = build_short_options(sheep_options);
