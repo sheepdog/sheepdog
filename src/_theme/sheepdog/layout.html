@@ -1,0 +1,185 @@
+{%- block doctype -%}
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+{%- endblock %}
+{%- set reldelim0 = reldelim0 is not defined and ' &laquo; ' or reldelim0 %}
+{%- set reldelim1 = reldelim1 is not defined and ' &raquo; ' or reldelim1 %}
+{%- set reldelim2 = reldelim2 is not defined and '&nbsp;|&nbsp;' or reldelim2 %}
+
+{%- macro relbar() %}
+    <div class="related">
+      <ul>
+	<li><a href="{{ pathto(master_doc) }}">Top</a>
+	</li>
+      </ul>
+      {{ toctree() }}
+    </div>
+{%- endmacro %}
+
+{%- macro sidebar() %}
+      <div class="sidebar">&nbsp;
+          {%- block sidebarlogo %}
+          {%- if logo %}
+            <p class="logo"><a href="{{ pathto(master_doc) }}">
+              <img class="logo" src="{{ pathto('_static/' + logo, 1) }}" alt="Logo"/>
+            </a></p>
+          {%- endif %}
+          {%- endblock %}
+          {%- block sidebartoc %}
+          {%- if display_toc %}
+            <h3>{{ _('Table Of Contents') }}</h3>
+            {{ toc }}
+          {%- endif %}
+          {%- endblock %}
+          {%- block sidebarrel %}
+          {%- if next %}
+            <h4>{{ _('Next topic') }}</h4>
+            <p class="topless"><a href="{{ next.link|e }}"
+                                  title="{{ _('next chapter') }}">{{ next.title }}</a></p>
+          {%- endif %}
+          {%- if prev %}
+            <h4>{{ _('Previous topic') }}</h4>
+            <p class="topless"><a href="{{ prev.link|e }}"
+                                  title="{{ _('previous chapter') }}">{{ prev.title }}</a></p>
+          {%- endif %}
+          {%- endblock %}
+          {%- block sidebarsourcelink %}
+          {%- if show_source and has_source and sourcename %}
+            <h3>{{ _('This Page') }}</h3>
+            <ul class="this-page-menu">
+              <li><a href="{{ pathto('_sources/' + sourcename, true)|e }}"
+                     rel="nofollow">{{ _('Show Source') }}</a></li>
+            </ul>
+          {%- endif %}
+          {%- endblock %}
+          {%- if customsidebar %}
+          {% include customsidebar %}
+          {%- endif %}
+          {%- block sidebarsearch %}
+          {%- if pagename != "search" %}
+          <div id="searchbox">
+            <h3>{{ _('Quick search') }}</h3>
+              <form class="search" action="{{ pathto('search') }}" method="get">
+                <input type="text" name="q" size="18" />
+                <input type="submit" value="{{ _('Go') }}" />
+                <input type="hidden" name="check_keywords" value="yes" />
+                <input type="hidden" name="area" value="default" />
+              </form>
+              <p class="searchtip" style="font-size: 80%; white-space: normal;">
+              {{ _('Enter search terms or a module, class or function name.') }}
+              </p>
+          </div>
+          <script type="text/javascript">$('#searchbox').show(0);</script>
+          {%- endif %}
+          {%- endblock %}
+      </div>
+{%- endmacro %}
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    {{ metatags }}
+    {%- if not embedded and docstitle %}
+      {%- set titlesuffix = " &mdash; "|safe + docstitle|e %}
+    {%- else %}
+      {%- set titlesuffix = "" %}
+    {%- endif %}
+    <title>{{ title|striptags }}{{ titlesuffix }}</title>
+    <link rel="stylesheet" href="{{ pathto('_static/' + style, 1) }}" type="text/css" />
+    {%- if not embedded %}
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '{{ pathto("", 1) }}',
+        VERSION:     '{{ release|e }}',
+        COLLAPSE_MODINDEX: false,
+        FILE_SUFFIX: '{{ file_suffix }}',
+        HAS_SOURCE:  {{ has_source|lower }}
+      };
+    </script>
+    {%- for scriptfile in script_files %}
+    <script type="text/javascript" src="{{ pathto(scriptfile, 1) }}"></script>
+    {%- endfor %}
+    {%- if use_opensearch %}
+    <link rel="search" type="application/opensearchdescription+xml"
+          title="{% trans docstitle=docstitle|e %}Search within {{ docstitle }}{% endtrans %}"
+          href="{{ pathto('_static/opensearch.xml', 1) }}"/>
+    {%- endif %}
+    {%- if favicon %}
+    <link rel="shortcut icon" href="{{ pathto('_static/' + favicon, 1) }}"/>
+    {%- endif %}
+    {%- endif %}
+{%- block linktags %}
+    {%- if hasdoc('about') %}
+    <link rel="author" title="{{ _('About these documents') }}" href="{{ pathto('about') }}" />
+    {%- endif %}
+    {%- if hasdoc('genindex') %}
+    <link rel="index" title="{{ _('Index') }}" href="{{ pathto('genindex') }}" />
+    {%- endif %}
+    {%- if hasdoc('search') %}
+    <link rel="search" title="{{ _('Search') }}" href="{{ pathto('search') }}" />
+    {%- endif %}
+    {%- if hasdoc('copyright') %}
+    <link rel="copyright" title="{{ _('Copyright') }}" href="{{ pathto('copyright') }}" />
+    {%- endif %}
+    <link rel="top" title="{{ docstitle|e }}" href="{{ pathto('index') }}" />
+    {%- if parents %}
+    <link rel="up" title="{{ parents[-1].title|striptags }}" href="{{ parents[-1].link|e }}" />
+    {%- endif %}
+    {%- if next %}
+    <link rel="next" title="{{ next.title|striptags }}" href="{{ next.link|e }}" />
+    {%- endif %}
+    {%- if prev %}
+    <link rel="prev" title="{{ prev.title|striptags }}" href="{{ prev.link|e }}" />
+    {%- endif %}
+{%- endblock %}
+{%- block extrahead %} {% endblock %}
+  </head>
+  <body>
+    <div id="wrapper">
+{%- block header %}
+    <div class="header">
+      <div class="title"><a href="{{ pathto(master_doc) }}">Sheepdog</a></div></div>
+{% endblock %}
+
+{%- block relbar1 %}{{ relbar() }}{% endblock %}
+
+    <div class="document">
+{%- block sidebar1 %}{{ sidebar() }}{% endblock %}
+
+{%- block document %}
+      <div class="documentwrapper">
+      {%- if not embedded %}{% if not theme_nosidebar|tobool %}
+        <div class="bodywrapper">
+      {%- endif %}{% endif %}
+          <div class="body">
+            {% block body %} {% endblock %}
+          </div>
+      {%- if not embedded %}{% if not theme_nosidebar|tobool %}
+        </div>
+      {%- endif %}{% endif %}
+      </div>
+{%- endblock %}
+
+      <div class="clearer"></div>
+    </div>
+
+{%- block footer %}
+    <div class="footer">
+    <div class="copyright">
+    {%- if hasdoc('copyright') %}
+      {% trans path=pathto('copyright'), copyright=copyright|e %}&copy; <a href="{{ path }}">Copyright</a> {{ copyright }}.{% endtrans %}
+    {%- else %}
+      {% trans copyright=copyright|e %}&copy; Copyright {{ copyright }}.{% endtrans %}
+    {%- endif %}
+    {%- if last_updated %}
+      {% trans last_updated=last_updated|e %}Last updated on {{ last_updated }}.{% endtrans %}
+    {%- endif %}
+    {%- if show_sphinx %}
+      {% trans sphinx_version=sphinx_version|e %}Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> {{ sphinx_version }}.{% endtrans %}
+    {%- endif %}
+    </div>
+    </div>
+{%- endblock %}
+    </div>
+  </body>
+</html>
