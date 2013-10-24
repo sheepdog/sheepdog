@@ -1,12 +1,21 @@
 Sheepdog Project
 ================
 
-Sheepdog is a distributed storage system for `QEMU <http://www.qemu.org/>`__.
-It provides highly available block level storage volumes
-that can be attached to QEMU virtual machines. Sheepdog scales to several
-hundreds nodes, and supports
-advanced volume management features such as snapshot, cloning, and
-thin provisioning.
+Sheepdog is a distributed object storage system for volume and container
+services and manages the disks and nodes intelligently. Sheepdog features
+ease of use, simplicity of code and can scale out to thousands of nodes.
+
+- The block level volume abstraction can be attached to
+  `QEMU <http://www.qemu.org/>`__ virtual machines and
+  `Linux SCSI Target <http://stgt.sourceforge.net/>`__ and supports
+  advanced volume management features such as snapshot, cloning, and
+  thin provisioning.
+
+- The object level container abstraction is designed to be
+  `Openstack Swift <https://wiki.openstack.org/wiki/Swift>`__ and
+  `Amazon S3 <http://aws.amazon.com/s3/>`__ API compatible and can be used to
+  store and retrieve any amount of data with a simple web services
+  interface.
 
 .. figure:: overview.png
    :alt: figure of sheepdog overview

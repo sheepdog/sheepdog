@@ -71,12 +71,21 @@
             
   <div class="section" id="sheepdog-project">
 <h1>Sheepdog Project<a class="headerlink" href="#sheepdog-project" title="Permalink to this headline">¶</a></h1>
-<p>Sheepdog is a distributed storage system for <a class="reference external" href="http://www.qemu.org/">QEMU</a>.
-It provides highly available block level storage volumes
-that can be attached to QEMU virtual machines. Sheepdog scales to several
-hundreds nodes, and supports
+<p>Sheepdog is a distributed object storage system for volume and container
+services and manages the disks and nodes intelligently. Sheepdog features
+ease of use, simplicity of code and can scale out to thousands of nodes.</p>
+<ul class="simple">
+<li>The block level volume abstraction can be attached to
+<a class="reference external" href="http://www.qemu.org/">QEMU</a> virtual machines and
+<a class="reference external" href="http://stgt.sourceforge.net/">Linux SCSI Target</a> and supports
 advanced volume management features such as snapshot, cloning, and
-thin provisioning.</p>
+thin provisioning.</li>
+<li>The object level container abstraction is designed to be
+<a class="reference external" href="https://wiki.openstack.org/wiki/Swift">Openstack Swift</a> and
+<a class="reference external" href="http://aws.amazon.com/s3/">Amazon S3</a> API compatible and can be used to
+store and retrieve any amount of data with a simple web services
+interface.</li>
+</ul>
 <div class="figure align-center">
 <a class="reference internal image-reference" href="_images/overview.png"><img alt="figure of sheepdog overview" src="_images/overview.png" style="width: 592.8px; height: 356.8px;" /></a>
 </div>
