@@ -87,4 +87,7 @@ void sd_backtrace(void);
 	abort();				\
 })
 
+void set_loglevel(int new_loglevel);
+int get_loglevel(void);
+
 #endif	/* LOG_H */

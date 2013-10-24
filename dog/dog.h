@@ -95,4 +95,9 @@ extern struct command cluster_command;
   #define trace_command {}
 #endif /* HAVE_TRACE */
 
+int do_loglevel_set(const struct node_id *nid, const char *loglevel_str);
+int do_loglevel_get(const struct node_id *nid, int32_t *ret_loglevel);
+const char *loglevel_to_str(int loglevel);
+void dump_loglevels(bool err);
+
 #endif

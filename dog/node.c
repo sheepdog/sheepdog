@@ -420,7 +420,6 @@ static int node_md(int argc, char **argv)
 	return do_generic_subcommand(node_md_cmd, argc, argv);
 }
 
-
 static int node_parser(int ch, const char *opt)
 {
 	switch (ch) {
@@ -444,6 +443,93 @@ static struct sd_option node_options[] = {
 	{ 0, NULL, false, NULL },
 };
 
+static int node_log_level_set(int argc, char **argv)
+{
+	int ret = 0;
+	char *loglevel_str = argv[optind];
+
+	ret = do_loglevel_set(&sd_nid, loglevel_str);
+	switch (ret) {
+	case EXIT_USAGE:
+		sd_err("invalid loglevel: %s", loglevel_str);
+		sd_err("available loglevels:");
+		dump_loglevels(true);
+
+		ret = -1;
+		break;
+	case EXIT_FAILURE:
+	case EXIT_SYSFAIL:
+		sd_err("Failed to execute request");
+		ret = -1;
+		break;
+	case EXIT_SUCCESS:
+		/* do nothing */
+		break;
+	default:
+		sd_err("unknown return code of do_loglevel_set(): %d", ret);
+		ret = -1;
+		break;
+	}
+
+	return ret;
+}
+
+static int node_log_level_get(int argc, char **argv)
+{
+	int ret = 0, loglevel = -1;
+
+	ret = do_loglevel_get(&sd_nid, &loglevel);
+	switch (ret) {
+	case EXIT_FAILURE:
+	case EXIT_SYSFAIL:
+		sd_err("Failed to execute request");
+		ret = -1;
+		break;
+	case EXIT_SUCCESS:
+		sd_info("%s (%d)", loglevel_to_str(loglevel), loglevel);
+		break;
+	default:
+		sd_err("unknown return code of do_loglevel_get(): %d", ret);
+		ret = -1;
+		break;
+	}
+
+	return ret;
+}
+
+static int node_log_level_list(int argc, char **argv)
+{
+	dump_loglevels(false);
+
+	return EXIT_SUCCESS;
+}
+
+static struct subcommand node_log_level_cmd[] = {
+	{"set", "<log level>", NULL, "set new loglevel",
+	 NULL, CMD_NEED_ARG, node_log_level_set},
+	{"get", NULL, NULL, "get current loglevel",
+	 NULL, 0, node_log_level_get},
+	{"list", NULL, NULL, "list available loglevels",
+	 NULL, 0, node_log_level_list},
+	{NULL},
+};
+
+static int node_log_level(int argc, char **argv)
+{
+	return do_generic_subcommand(node_log_level_cmd, argc, argv);
+}
+
+static struct subcommand node_log_cmd[] = {
+	{"level", "<subcommand>", NULL, "manipulate loglevel",
+	 node_log_level_cmd, CMD_NEED_ARG, node_log_level},
+	{NULL},
+};
+
+static int node_log(int argc, char **argv)
+{
+	return do_generic_subcommand(node_log_cmd, argc, argv);
+}
+
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprh", "kill node", NULL,
 	 CMD_NEED_ARG | CMD_NEED_NODELIST, node_kill},
@@ -457,6 +543,8 @@ static struct subcommand node_cmd[] = {
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
 	{"stat", NULL, "aprwh", "show stat information about the node", NULL,
 	 0, node_stat, node_options},
+	{"log", NULL, "aph", "show or set log level of the node", node_log_cmd,
+	 CMD_NEED_ARG, node_log},
 	{NULL,},
 };
 

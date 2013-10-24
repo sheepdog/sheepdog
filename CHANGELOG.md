@@ -3,9 +3,13 @@
 
 DOG COMMAND INTERFACE:
  - new subcommand "vdi cache purge" for cleaning stale object cache
- -- "vdi cache purge" cleans stale cache of all images
- -- "vdi cache purge <image>" cleans stale cache of the specified image
+  - "vdi cache purge" cleans stale cache of all images
+  - "vdi cache purge <image>" cleans stale cache of the specified image
  - new subcommand "node stat" for showing I/O status of the node
+ - new subcommand "node loglevel" for changing log level at runtime
+  - "node log level set" sets loglevel of running sheep process
+  - "node log level get" gets loglevel from running sheep process
+  - "node log level list" lists avialable loglevels
 
 SHEEP COMMAND INTERFACE:
  - improvements of help messages

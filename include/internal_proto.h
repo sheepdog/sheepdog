@@ -95,6 +95,8 @@
 #define SD_OP_GET_CACHE_INFO 0xB6
 #define SD_OP_CACHE_PURGE    0xB7
 #define SD_OP_STAT	0xB8
+#define SD_OP_GET_LOGLEVEL	0xB9
+#define SD_OP_SET_LOGLEVEL	0xBA
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
