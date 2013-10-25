@@ -389,7 +389,6 @@ bool has_process_main(const struct sd_op_template *op);
 void do_process_work(struct work *work);
 int do_process_main(const struct sd_op_template *op, const struct sd_req *req,
 		    struct sd_rsp *rsp, void *data);
-int sheep_do_op_work(const struct sd_op_template *op, struct request *req);
 int gateway_to_peer_opcode(int opcode);
 
 extern uint32_t last_gathered_epoch;

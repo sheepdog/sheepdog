@@ -1384,11 +1384,6 @@ int do_process_main(const struct sd_op_template *op, const struct sd_req *req,
 	return op->process_main(req, rsp, data);
 }
 
-int sheep_do_op_work(const struct sd_op_template *op, struct request *req)
-{
-	return op->process_work(req);
-}
-
 static int map_table[] = {
 	[SD_OP_CREATE_AND_WRITE_OBJ] = SD_OP_CREATE_AND_WRITE_PEER,
 	[SD_OP_READ_OBJ] = SD_OP_READ_PEER,
