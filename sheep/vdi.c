@@ -22,6 +22,13 @@ struct vdi_state_entry {
 static struct rb_root vdi_state_root = RB_ROOT;
 static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
 
+/*
+ * ec_max_data_strip represent max number of data strips in the cluster. When
+ * nr_zones < it, we don't purge the stale objects because for erasure coding,
+ * there is only one copy of data.
+ */
+int ec_max_data_strip;
+
 static int vdi_state_cmp(const struct vdi_state_entry *a,
 			 const struct vdi_state_entry *b)
 {
@@ -125,6 +132,13 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 	entry->nr_copies = nr_copies;
 	entry->snapshot = snapshot;
 	entry->copy_policy = cp;
+
+	if (cp) {
+		int d;
+
+		ec_policy_to_dp(cp, &d, NULL);
+		ec_max_data_strip = max(d, ec_max_data_strip);
+	}
 
 	sd_debug("%" PRIx32 ", %d, %d", vid, nr_copies, cp);
 

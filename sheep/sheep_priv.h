@@ -296,6 +296,7 @@ int vdi_snapshot(const struct vdi_iocb *iocb, uint32_t *new_vid);
 int vdi_delete(const struct vdi_iocb *iocb, struct request *req);
 int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info);
 void clean_vdi_state(void);
+extern int ec_max_data_strip;
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
 
