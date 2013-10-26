@@ -2288,7 +2288,7 @@ static uint8_t parse_copy(const char *str, uint8_t *copy_policy)
 		return 0;
 
 	parity = strtol(n2, NULL, 10);
-	if (parity >= SD_EC_MAX_STRIP || parity >= copy || parity == 0)
+	if (parity >= SD_EC_MAX_STRIP || parity == 0)
 		return 0;
 
 	/*
@@ -2345,8 +2345,7 @@ static int vdi_parser(int ch, const char *opt)
 			       "  x(1 to %d)   - number of replicated copies\n"
 			       "To create erasure coded vdi, set -c x:y\n"
 			       "  x(2,4,8,16)  - number of data strips\n"
-			       "  y(1 to 15)   - number of parity strips\n"
-			       "and meet the condition x > y",
+			       "  y(1 to 15)   - number of parity strips",
 			       opt, SD_MAX_COPIES);
 			exit(EXIT_FAILURE);
 		}
