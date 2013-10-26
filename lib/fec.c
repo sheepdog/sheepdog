@@ -683,11 +683,12 @@ out:
 }
 
 void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		      char *buf, int idx, size_t strip_size, int nr_stripe)
+		      char *buf, int idx)
 {
 	int i, j, d = ctx->d;
+	size_t strip_size = SD_EC_DATA_STRIPE_SIZE / d;
 
-	for (i = 0; i < nr_stripe; i++) {
+	for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
 		const uint8_t *in[d];
 		uint8_t out[strip_size];
 

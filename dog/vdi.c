@@ -1556,7 +1556,6 @@ static void check_erasure_object(struct vdi_check_info *info)
 	int dp = ec_policy_to_dp(info->copy_policy, &d, &p);
 	struct fec *ctx = ec_init(d, dp);
 	int miss_idx[dp], input_idx[dp];
-	size_t strip_size = SD_EC_DATA_STRIPE_SIZE / d;
 	uint64_t oid = info->oid;
 	size_t len = get_store_objsize(info->copy_policy, oid);
 	char *obj = xmalloc(len);
@@ -1584,8 +1583,7 @@ static void check_erasure_object(struct vdi_check_info *info)
 			uint8_t *ds[d];
 			for (j = 0; j < d; j++)
 				ds[j] = info->vcw[j].buf;
-			ec_decode_buffer(ctx, ds, idx, obj, d + k, strip_size,
-					 SD_EC_NR_STRIPE_PER_OBJECT);
+			ec_decode_buffer(ctx, ds, idx, obj, d + k);
 			if (memcmp(obj, info->vcw[d + k].buf, len) != 0) {
 				/* TODO repair the inconsistency */
 				sd_err("object %"PRIx64" is inconsistent", oid);
@@ -1603,8 +1601,7 @@ static void check_erasure_object(struct vdi_check_info *info)
 
 			for (i = 0; i < d; i++)
 				ds[i] = input[i];
-			ec_decode_buffer(ctx, ds, input_idx, obj, m, strip_size,
-					 SD_EC_NR_STRIPE_PER_OBJECT);
+			ec_decode_buffer(ctx, ds, input_idx, obj, m);
 			write_object_to(info->vcw[m].vnode, oid, obj, true,
 					info->vcw[m].ec_index);
 			fprintf(stdout, "fixed missing %"PRIx64", "

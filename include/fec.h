@@ -63,6 +63,7 @@
 #include <stdint.h>
 
 #include "util.h"
+#include "sheepdog_proto.h"
 
 struct fec {
 	unsigned long magic;
@@ -197,5 +198,5 @@ static inline void ec_destroy(struct fec *ctx)
 }
 
 void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		      char *buf, int idx, size_t strip_size, int nr_stripe);
+		      char *buf, int idx);
 #endif
