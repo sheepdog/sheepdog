@@ -21,3 +21,23 @@ for i in `seq 1 15`;do _kill_sheep $i;done
 $DOG vdi read test | md5sum > $STORE/csum2
 
 diff -u $STORE/csum1 $STORE/csum2
+
+_cleanup
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$DOG vdi create -c 2:1 test 40M
+_vdi_list
+_random | $DOG vdi write test
+$DOG vdi read test | md5sum > $STORE/csum1
+
+_kill_sheep 1;
+$DOG vdi read test | md5sum > $STORE/csum2
+
+diff -u $STORE/csum1 $STORE/csum2
