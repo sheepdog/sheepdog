@@ -431,17 +431,15 @@ out:
 	return lost;
 }
 
-static uint8_t local_node_copy_index(struct rb_root *vroot, uint64_t oid)
+static uint8_t local_node_copy_index(struct vnode_info *vinfo, uint64_t oid)
 {
-	const struct sd_node *target_nodes[SD_MAX_NODES];
-	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
-	uint8_t idx;
-	int edp = ec_policy_to_dp(policy, NULL, NULL);
+	int idx;
 
-	oid_to_nodes(oid, vroot, edp, target_nodes);
-	for (idx = 0; idx < edp; idx++)
-		if (node_is_local(target_nodes[idx]))
+	for (idx = 0; idx < vinfo->nr_zones; idx++) {
+		const struct sd_node *n = oid_to_node(oid, &vinfo->vroot, idx);
+		if (node_is_local(n))
 			return idx;
+	}
 	panic("can't get valid index for %"PRIx64, oid);
 }
 
@@ -470,13 +468,8 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	void *buf = NULL;
 	uint8_t idx;
 	int ret = -1;
-	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
-	int edp = ec_policy_to_dp(policy, NULL, NULL);
 
-	if (cur->nr_zones < edp)
-		return -1;
-
-	idx = local_node_copy_index(&cur->vroot, oid);
+	idx = local_node_copy_index(cur, oid);
 	buf = read_erasure_object(oid, idx, rw);
 	if (!buf)
 		buf = rebuild_erasure_object(oid, idx, rw);
