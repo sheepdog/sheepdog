@@ -1878,6 +1878,7 @@ static int vdi_backup(int argc, char **argv)
 	}
 
 	fsync(STDOUT_FILENO);
+	ret = EXIT_SUCCESS;
 out:
 	free(from_inode);
 	free(to_inode);
