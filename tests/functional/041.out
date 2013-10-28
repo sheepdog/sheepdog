@@ -58,3 +58,6 @@ d210baf5c55b42b5e0edf04a8535ad6d  -
 d210baf5c55b42b5e0edf04a8535ad6d  -
 d210baf5c55b42b5e0edf04a8535ad6d  -
 d210baf5c55b42b5e0edf04a8535ad6d  -
+Cannot get VDI info for test 0 non-existence-tag: Failed to find requested tag
+Failed to open VDI test
+Snapshot ID 0 or tag non-existence-tag doesn't exist

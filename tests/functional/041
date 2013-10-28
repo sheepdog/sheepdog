@@ -59,3 +59,8 @@ $DOG vdi read test | md5sum
 for i in `seq 1 $($DOG vdi list | grep "^s " | wc -l)`; do
     $DOG vdi read test -s $i | md5sum
 done
+
+# restore to non-existence snapshot, this must be error
+$DOG vdi restore test -s non-existence-tag < $STORE/backup.2.3
+
+true
