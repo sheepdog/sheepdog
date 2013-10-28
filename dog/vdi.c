@@ -1981,6 +1981,7 @@ static int vdi_restore(int argc, char **argv)
 	const char *vdiname = argv[optind++];
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE] = {0};
+	struct sd_inode *inode_for_check = xzalloc(sizeof(*inode_for_check));
 	struct sd_inode *current_inode = xzalloc(sizeof(*current_inode));
 	struct sd_inode *parent_inode = (struct sd_inode *)buf;
 	bool need_current_recovery = false;
@@ -1989,6 +1990,16 @@ static int vdi_restore(int argc, char **argv)
 		sd_err("We can restore a backup file only to snapshots");
 		sd_err("Please specify the '-s' option");
 		ret = EXIT_USAGE;
+		goto out;
+	}
+
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode_for_check,
+			   SD_INODE_SIZE);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Snapshot ID %d or tag %s doesn't exist",
+		       vdi_cmd_data.snapshot_id, vdi_cmd_data.snapshot_tag);
+
 		goto out;
 	}
 
@@ -2038,6 +2049,7 @@ out:
 		}
 	}
 	free(current_inode);
+	free(inode_for_check);
 	return ret;
 }
 
