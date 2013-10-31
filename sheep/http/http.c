@@ -13,51 +13,46 @@
 
 /* This files implement RESTful interface to sheepdog storage via fastcgi */
 
-#include <fcgiapp.h>
-
+#include "http.h"
 #include "sheep_priv.h"
 
-enum http_opcode {
-	HTTP_GET = 1,
-	HTTP_PUT,
-	HTTP_POST,
-	HTTP_DELETE,
-	HTTP_HEAD,
-};
+static inline const char *stropcode(enum http_opcode opcode)
+{
+	static const char *const descs[] = {
+		[HTTP_GET] = "GET",
+		[HTTP_PUT] = "PUT",
+		[HTTP_POST] = "POST",
+		[HTTP_DELETE] = "DELETE",
+		[HTTP_HEAD] = "HEAD",
+	};
 
-enum http_status {
-	UNKNOWN = 0,
-	OK,                             /* 200 */
-	CREATED,                        /* 201 */
-	PARTIAL_CONTENT,                /* 206 */
-	BAD_REQUEST,                    /* 400 */
-	NOT_FOUND,                      /* 404 */
-	REQUEST_RANGE_NOT_SATISFIABLE,  /* 416 */
-	INTERNAL_SERVER_ERROR,          /* 500 */
-	NOT_IMPLEMENTED,                /* 501 */
-};
+	if (descs[opcode] == NULL) {
+		static __thread char msg[32];
+		snprintf(msg, sizeof(msg), "Invalid opcode %d", opcode);
+		return msg;
+	}
 
-struct http_request {
-	FCGX_Request fcgx;
-	char *uri;
-	enum http_opcode opcode;
-	enum http_status status;
-	size_t data_length;
-};
+	return descs[opcode];
+}
 
-static inline const char *strstatus(int status)
+static inline const char *strstatus(enum http_status status)
 {
 	static const char *const descs[] = {
 		[UNKNOWN] = "Unknown",
 		[OK] = "200 OK",
-		[CREATED] = "201 CREATED",
+		[CREATED] = "201 Created",
+		[ACCEPTED] = "202 Accepted",
+		[NO_CONTENT] = "204 No Content",
 		[PARTIAL_CONTENT] = "206 Partial Content",
 		[BAD_REQUEST] = "400 Bad Request",
 		[NOT_FOUND] = "404 Not Found",
+		[METHOD_NOT_ALLOWED] = "405 Method Not Allowed",
+		[CONFLICT] = "409 Conflict",
 		[REQUEST_RANGE_NOT_SATISFIABLE] =
 			"416 Requested Range Not Satisfiable",
 		[INTERNAL_SERVER_ERROR] = "500 Internal Server Error",
 		[NOT_IMPLEMENTED] = "501 Not Implemented",
+		[SERVICE_UNAVAILABLE] = "503 Service_Unavailable",
 	};
 
 	if (descs[status] == NULL) {
@@ -67,6 +62,17 @@ static inline const char *strstatus(int status)
 	}
 
 	return descs[status];
+}
+
+const char *str_http_req(const struct http_request *req)
+{
+	static __thread char msg[1024];
+
+	snprintf(msg, sizeof(msg), "%s %s, status = %s, data_length = %zd",
+		 req->uri, stropcode(req->opcode), strstatus(req->status),
+		 req->data_length);
+
+	return msg;
 }
 
 struct http_work {
@@ -86,8 +92,7 @@ static inline void http_request_error(struct http_request *req)
 		sd_err("failed, %s", strerror(ret));
 }
 
-static inline int http_request_write(struct http_request *req,
-				     const char *buf, int len)
+int http_request_write(struct http_request *req, const void *buf, int len)
 {
 	int ret = FCGX_PutStr(buf, len, req->fcgx.out);
 	if (ret < 0)
@@ -95,8 +100,7 @@ static inline int http_request_write(struct http_request *req,
 	return ret;
 }
 
-static inline int http_request_read(struct http_request *req,
-				    char *buf, int len)
+int http_request_read(struct http_request *req, void *buf, int len)
 {
 	int ret = FCGX_GetStr(buf, len, req->fcgx.in);
 	if (ret < 0)
@@ -104,7 +108,7 @@ static inline int http_request_read(struct http_request *req,
 	return ret;
 }
 
-static inline int http_request_writes(struct http_request *req, const char *str)
+int http_request_writes(struct http_request *req, const char *str)
 {
 	int ret = FCGX_PutS(str, req->fcgx.out);
 	if (ret < 0)
@@ -113,7 +117,7 @@ static inline int http_request_writes(struct http_request *req, const char *str)
 }
 
 __printf(2, 3)
-static int http_request_writef(struct http_request *req, const char *fmt, ...)
+int http_request_writef(struct http_request *req, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
@@ -173,7 +177,7 @@ static int http_init_request(struct http_request *req)
 }
 
 /* This function does nothing if we have already printed a status code. */
-static void http_response_header(struct http_request *req, int status)
+void http_response_header(struct http_request *req, enum http_status status)
 {
 	if (req->status != UNKNOWN)
 		return;
