@@ -20,7 +20,6 @@
 struct http_request {
 	FCGX_Request fcgx;
 	int opcode;
-	char *data;
 	size_t data_length;
 };
 
@@ -71,19 +70,16 @@ struct http_work {
 	struct http_request *request;
 };
 
-static inline int http_request_error(struct http_request *req)
+static inline void http_request_error(struct http_request *req)
 {
 	int ret = FCGX_GetError(req->fcgx.out);
 
-	if (ret == 0) {
-		return OK;
-	} else if (ret < 0) {
+	if (ret == 0)
+		return;
+	else if (ret < 0)
 		sd_err("failed, FCGI error %d", ret);
-		return INTERNAL_SERVER_ERROR;
-	} else {
+	else
 		sd_err("failed, %s", strerror(ret));
-		return INTERNAL_SERVER_ERROR;
-	}
 }
 
 static inline int http_request_write(struct http_request *req,
@@ -91,8 +87,8 @@ static inline int http_request_write(struct http_request *req,
 {
 	int ret = FCGX_PutStr(buf, len, req->fcgx.out);
 	if (ret < 0)
-		return http_request_error(req);
-	return OK;
+		http_request_error(req);
+	return ret;
 }
 
 static inline int http_request_read(struct http_request *req,
@@ -100,16 +96,16 @@ static inline int http_request_read(struct http_request *req,
 {
 	int ret = FCGX_GetStr(buf, len, req->fcgx.in);
 	if (ret < 0)
-		return http_request_error(req);
-	return OK;
+		http_request_error(req);
+	return ret;
 }
 
 static inline int http_request_writes(struct http_request *req, const char *str)
 {
 	int ret = FCGX_PutS(str, req->fcgx.out);
 	if (ret < 0)
-		return http_request_error(req);
-	return OK;
+		http_request_error(req);
+	return ret;
 }
 
 __printf(2, 3)
@@ -122,22 +118,18 @@ static int http_request_writef(struct http_request *req, const char *fmt, ...)
 	ret = FCGX_VFPrintF(req->fcgx.out, fmt, ap);
 	va_end(ap);
 	if (ret < 0)
-		return http_request_error(req);
-	return OK;
+		http_request_error(req);
+	return ret;
 }
 
 static int request_init_operation(struct http_request *req)
 {
 	char **env = req->fcgx.envp;
-	char *p;
+	char *p, *endp;
 
 	p = FCGX_GetParam("REQUEST_METHOD", env);
 	if (!strcmp(p, "PUT")) {
 		req->opcode = HTTP_PUT;
-		p = FCGX_GetParam("CONTENT_LENGTH", env);
-		req->data_length = strtoll(p, NULL, 10);
-		req->data = xmalloc(req->data_length);
-		http_request_read(req, req->data, req->data_length);
 	} else if (!strcmp(p, "GET")) {
 		req->opcode = HTTP_GET;
 	} else if (!strcmp(p, "POST")) {
@@ -149,6 +141,14 @@ static int request_init_operation(struct http_request *req)
 	} else {
 		return BAD_REQUEST;
 	}
+
+	p = FCGX_GetParam("CONTENT_LENGTH", env);
+	req->data_length = strtoll(p, &endp, 10);
+	if (p == endp) {
+		sd_err("invalid content_length %s", p);
+		return BAD_REQUEST;
+	}
+
 	return OK;
 }
 
@@ -215,7 +215,6 @@ static const int http_max_request_handlers = ARRAY_SIZE(http_request_handlers);
 static void http_end_request(struct http_request *req)
 {
 	FCGX_Finish_r(&req->fcgx);
-	free(req->data);
 	free(req);
 }
 
