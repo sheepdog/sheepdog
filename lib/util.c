@@ -573,6 +573,59 @@ const char *my_exe_path(void)
 }
 
 /*
+ * Split the given path and sets the splitted parts to 'segs'.
+ *
+ * This returns the number of splitted segments.
+ *
+ * For example:
+ *   split_path("/a/b/c", 3, segs);
+ *     -> Returns 3 and segs will be { "a", "b", "c" }.
+ *   split_path("/a//b//c", 3, segs);
+ *     -> Returns 3 and segs will be { "a", "b", "c" }.
+ *   split_path("/a/b/c", 2, segs);
+ *     -> Returns 2 and segs will be { "a", "b/c" }.
+ *   split_path("/a/b/c", 4, segs);
+ *     -> Returns 3 and segs will be { "a", "b", "c", undefined }.
+ */
+int split_path(const char *path, size_t nr_segs, char **segs)
+{
+	for (int i = 0; i < nr_segs; i++) {
+		while (*path == '/')
+			path++;
+
+		if (*path == '\0')
+			return i;
+
+		if (i == nr_segs - 1) {
+			segs[i] = strdup(path);
+			if (segs[i] == NULL)
+				panic("OOM");
+		} else {
+			char *p = strchrnul(path, '/');
+			int len = p - path;
+
+			segs[i] = xmalloc(len + 1);
+			memcpy(segs[i], path, len);
+			segs[i][len] = '\0';
+
+			path = p;
+		}
+	}
+
+	return nr_segs;
+}
+
+/* Concatenate 'segs' with '/' separators. */
+void make_path(char *path, size_t size, size_t nr_segs, const char **segs)
+{
+	for (int i = 0; i < nr_segs; i++) {
+		int len = snprintf(path, size, "/%s", segs[i]);
+		path += len;
+		size -= len;
+	}
+}
+
+/*
  * If force_create is true, this function create the file even when the
  * temporary file exists.
  */
