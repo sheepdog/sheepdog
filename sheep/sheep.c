@@ -58,9 +58,13 @@ static const char loglevel_help[] =
 "This only allows logs with level smaller than SDOG_WARNING to be logged\n";
 
 static const char http_help[] =
-"Example:\n\t$ sheep -r localhost:7001 ...\n"
-"This tries to enable sheep as http service backend and use localhost:7001 to\n"
-"communicate with http server. Not fully implemented yet.\n";
+"Available arguments:\n"
+"\thost=: specify a host to communicate with http server (default: localhost)\n"
+"\tport=: specify a port to communicate with http server (default: 8000)\n"
+"\tswift: enable swift API\n"
+"Example:\n\t$ sheep -r host=localhost,port=7001,swift ...\n"
+"This tries to enable Swift API and use localhost:7001 to\n"
+"communicate with http server.\n";
 
 static const char myaddr_help[] =
 "Example:\n\t$ sheep -y 192.168.1.1:7000 ...\n"
@@ -546,7 +550,7 @@ int main(int argc, char **argv)
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
-	const char *log_format = "server", *http_address = NULL;
+	const char *log_format = "server", *http_options = NULL;
 	static struct logger_user_info sheep_info;
 
 	install_crash_handler(crash_handler);
@@ -571,7 +575,7 @@ int main(int argc, char **argv)
 			pid_file = optarg;
 			break;
 		case 'r':
-			http_address = optarg;
+			http_options = optarg;
 			break;
 		case 'f':
 			is_daemon = false;
@@ -816,7 +820,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	if (http_address && http_init(http_address) != 0)
+	if (http_options && http_init(http_options) != 0)
 		exit(1);
 
 	if (pid_file && (create_pidfile(pid_file) != 0)) {

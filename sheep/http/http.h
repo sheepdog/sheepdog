@@ -49,6 +49,57 @@ struct http_request {
 	size_t data_length;
 };
 
+struct http_driver {
+	const char *name;
+
+	/* Returns zero on success, -1 on error. */
+	int (*init)(const char *option);
+
+	void (*head)(struct http_request *req);
+	void (*get)(struct http_request *req);
+	void (*put)(struct http_request *req);
+	void (*post)(struct http_request *req);
+	void (*delete)(struct http_request *req);
+
+	struct list_node list;
+};
+
+extern struct list_head http_drivers;
+
+#define hdrv_register(driver)						\
+static void __attribute__((constructor)) register_ ## driver(void)	\
+{									\
+	list_add(&driver.list, &http_drivers);				\
+}
+
+static inline struct http_driver *find_hdrv(struct list_head *drivers,
+					    const char *name)
+{
+	struct http_driver *hdrv;
+	int len;
+
+	list_for_each_entry(hdrv, drivers, list) {
+		len = strlen(hdrv->name);
+
+		if (strncmp(hdrv->name, name, len) == 0 &&
+		    (name[len] == ':' || name[len] == '\0'))
+			return hdrv;
+	}
+
+	return NULL;
+}
+
+static inline const char *get_hdrv_option(const struct http_driver *hdrv,
+					  const char *arg)
+{
+	int len = strlen(hdrv->name);
+
+	if (arg[len] == ':')
+		return strdup(arg + len + 1);
+	else
+		return NULL;
+}
+
 const char *str_http_req(const struct http_request *req);
 void http_response_header(struct http_request *req, enum http_status status);
 int http_request_read(struct http_request *req, void *buf, int len);

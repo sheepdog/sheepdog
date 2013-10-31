@@ -460,9 +460,9 @@ uint64_t md_get_size(uint64_t *used);
 
 /* http.c */
 #ifdef HAVE_HTTP
-int http_init(const char *address);
+int http_init(const char *options);
 #else
-static inline int http_init(const char *address)
+static inline int http_init(const char *options)
 {
 	sd_notice("http service is not complied");
 	return 0;

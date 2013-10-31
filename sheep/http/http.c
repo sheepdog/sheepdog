@@ -15,6 +15,13 @@
 
 #include "http.h"
 #include "sheep_priv.h"
+#include "option.h"
+
+static const char *http_host = "localhost";
+static const char *http_port = "8000";
+
+LIST_HEAD(http_drivers);
+static LIST_HEAD(http_enabled_drivers);
 
 static inline const char *stropcode(enum http_opcode opcode)
 {
@@ -187,46 +194,6 @@ void http_response_header(struct http_request *req, enum http_status status)
 	http_request_writes(req, "Content-type: text/plain;\r\n\r\n");
 }
 
-static void http_handle_get(struct http_request *req)
-{
-	http_response_header(req, NOT_IMPLEMENTED);
-	http_request_writes(req, "not implemented\n");
-}
-
-static void http_handle_put(struct http_request *req)
-{
-	http_response_header(req, NOT_IMPLEMENTED);
-	http_request_writes(req, "not implemented\n");
-}
-
-static void http_handle_post(struct http_request *req)
-{
-	http_response_header(req, NOT_IMPLEMENTED);
-	http_request_writes(req, "not implemented\n");
-}
-
-static void http_handle_delete(struct http_request *req)
-{
-	http_response_header(req, NOT_IMPLEMENTED);
-	http_request_writes(req, "not implemented\n");
-}
-
-static void http_handle_head(struct http_request *req)
-{
-	http_response_header(req, NOT_IMPLEMENTED);
-	http_request_writes(req, "not implemented\n");
-}
-
-static void (*const http_request_handlers[])(struct http_request *req) = {
-	[HTTP_GET] = http_handle_get,
-	[HTTP_PUT] = http_handle_put,
-	[HTTP_POST] = http_handle_post,
-	[HTTP_DELETE] = http_handle_delete,
-	[HTTP_HEAD] = http_handle_head,
-};
-
-static const int http_max_request_handlers = ARRAY_SIZE(http_request_handlers);
-
 static void http_end_request(struct http_request *req)
 {
 	FCGX_Finish_r(&req->fcgx);
@@ -238,11 +205,40 @@ static void http_run_request(struct work *work)
 	struct http_work *hw = container_of(work, struct http_work, work);
 	struct http_request *req = hw->request;
 	int op = req->opcode;
+	struct http_driver *hdrv;
 
-	if (op < http_max_request_handlers && http_request_handlers[op])
-		http_request_handlers[op](req);
-	else
-		panic("unhandled opcode %d", op);
+	list_for_each_entry(hdrv, &http_enabled_drivers, list) {
+		void (*method)(struct http_request *req) = NULL;
+
+		switch (op) {
+		case HTTP_HEAD:
+			method = hdrv->head;
+			break;
+		case HTTP_GET:
+			method = hdrv->get;
+			break;
+		case HTTP_PUT:
+			method = hdrv->put;
+			break;
+		case HTTP_POST:
+			method = hdrv->post;
+			break;
+		case HTTP_DELETE:
+			method = hdrv->delete;
+			break;
+		default:
+			break;
+		}
+
+		if (method != NULL) {
+			method(req);
+			if (req->status != UNKNOWN)
+				goto out;
+		}
+	}
+
+	http_response_header(req, METHOD_NOT_ALLOWED);
+out:
 	http_end_request(req);
 }
 
@@ -300,10 +296,65 @@ out:
 	pthread_exit(NULL);
 }
 
-int http_init(const char *address)
+static int http_opt_host_parser(const char *s)
+{
+	http_host = s;
+	return 0;
+}
+
+static int http_opt_port_parser(const char *s)
+{
+	http_port = s;
+	return 0;
+}
+
+static int http_opt_default_parser(const char *s)
+{
+	struct http_driver *hdrv;
+
+	hdrv = find_hdrv(&http_enabled_drivers, s);
+	if (hdrv != NULL) {
+		sd_err("%s driver is already enabled", hdrv->name);
+		return -1;
+	}
+
+	hdrv = find_hdrv(&http_drivers, s);
+	if (hdrv == NULL) {
+		sd_err("'%s' is not a valid driver name", s);
+		return -1;
+	}
+
+	if (hdrv->init(get_hdrv_option(hdrv, s)) < 0) {
+		sd_err("failed to initialize %s driver", hdrv->name);
+		return -1;
+	}
+
+	list_move_tail(&hdrv->list, &http_enabled_drivers);
+
+	return 0;
+}
+
+static struct option_parser http_opt_parsers[] = {
+	{ "host=", http_opt_host_parser },
+	{ "port=", http_opt_port_parser },
+	{ "", http_opt_default_parser },
+	{ NULL, NULL },
+};
+
+int http_init(const char *options)
 {
 	pthread_t t;
 	int err;
+	char *s, address[HOST_NAME_MAX + 8];
+
+	s = strdup(options);
+	if (s == NULL) {
+		sd_emerg("OOM");
+		return -1;
+	}
+
+	if (option_parse(s, ",", http_opt_parsers) < 0)
+		return -1;
 
 	sys->http_wqueue = create_work_queue("http", WQ_DYNAMIC);
 	if (!sys->http_wqueue)
@@ -312,6 +363,7 @@ int http_init(const char *address)
 	FCGX_Init();
 
 #define LISTEN_QUEUE_DEPTH 1024 /* No rationale */
+	snprintf(address, sizeof(address), "%s:%s", http_host, http_port);
 	http_sockfd = FCGX_OpenSocket(address, LISTEN_QUEUE_DEPTH);
 	if (http_sockfd < 0) {
 		sd_err("open socket failed, address %s", address);
