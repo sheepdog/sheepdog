@@ -17,12 +17,6 @@
 
 #include "sheep_priv.h"
 
-struct http_request {
-	FCGX_Request fcgx;
-	int opcode;
-	size_t data_length;
-};
-
 enum http_opcode {
 	HTTP_GET = 1,
 	HTTP_PUT,
@@ -32,7 +26,8 @@ enum http_opcode {
 };
 
 enum http_status {
-	OK = 1,                         /* 200 */
+	UNKNOWN = 0,
+	OK,                             /* 200 */
 	CREATED,                        /* 201 */
 	PARTIAL_CONTENT,                /* 206 */
 	BAD_REQUEST,                    /* 400 */
@@ -42,9 +37,18 @@ enum http_status {
 	NOT_IMPLEMENTED,                /* 501 */
 };
 
+struct http_request {
+	FCGX_Request fcgx;
+	char *uri;
+	enum http_opcode opcode;
+	enum http_status status;
+	size_t data_length;
+};
+
 static inline const char *strstatus(int status)
 {
 	static const char *const descs[] = {
+		[UNKNOWN] = "Unknown",
 		[OK] = "200 OK",
 		[CREATED] = "201 CREATED",
 		[PARTIAL_CONTENT] = "206 Partial Content",
@@ -148,6 +152,8 @@ static int request_init_operation(struct http_request *req)
 		sd_err("invalid content_length %s", p);
 		return BAD_REQUEST;
 	}
+	req->uri = FCGX_GetParam("DOCUMENT_URI", env);
+	req->status = UNKNOWN;
 
 	return OK;
 }
@@ -166,8 +172,13 @@ static int http_init_request(struct http_request *req)
 	return OK;
 }
 
+/* This function does nothing if we have already printed a status code. */
 static void http_response_header(struct http_request *req, int status)
 {
+	if (req->status != UNKNOWN)
+		return;
+
+	req->status = status;
 	http_request_writef(req, "Status: %s\n", strstatus(status));
 	http_request_writes(req, "Content-type: text/plain;\r\n\r\n");
 }
