@@ -30,7 +30,7 @@ sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c \
 			  plain_store.c config.c migrate.c md.c
 
 if BUILD_HTTP
-sheep_SOURCES		+= http/http.c
+sheep_SOURCES		+= http/http.c http/kv.c
 endif
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c
@@ -51,7 +51,7 @@ sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread -lm\
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h
+noinst_HEADERS		= sheep_priv.h cluster.h http/http.h http/kv.h trace/trace.h
 
 EXTRA_DIST		= 
 
