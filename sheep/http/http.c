@@ -179,7 +179,7 @@ static void http_response_header(struct http_request *req, int status)
 		return;
 
 	req->status = status;
-	http_request_writef(req, "Status: %s\n", strstatus(status));
+	http_request_writef(req, "Status: %s\r\n", strstatus(status));
 	http_request_writes(req, "Content-type: text/plain;\r\n\r\n");
 }
 
