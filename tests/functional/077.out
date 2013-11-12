@@ -1,0 +1,16 @@
+QA output created by 077
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB  0.0 MB  0.0 MB DATE   7c2b25     3              
+fixed missing 7c2b2500000000
+finish check&repair test
+original data
+fixed replica 7c2b2500000000
+finish check&repair test
+original data
+fixed missing 7c2b2500000000
+fixed missing 7c2b2500000000
+finish check&repair test
+original data
+no majority of 7c2b2500000000
+finish check&repair test
