@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Test vdi repair functionality
+
+. ./common
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$DOG vdi create test 12M
+_vdi_list
+
+echo "original data" | $DOG vdi write test
+
+$DOG cluster shutdown
+
+# single object lost
+
+rm $STORE/0/obj/007c2b2500000000
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$DOG vdi check test
+
+$DOG vdi read test 0 14
+
+$DOG cluster shutdown
+
+# single broken object
+
+_random | dd of=$STORE/1/obj/007c2b2500000000 bs=4096 count=1024 &> /dev/null
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$DOG vdi check test
+
+$DOG vdi read test 0 14
+
+$DOG cluster shutdown
+
+# two object lost
+
+rm $STORE/0/obj/007c2b2500000000
+rm $STORE/1/obj/007c2b2500000000
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$DOG vdi check test
+
+$DOG vdi read test 0 14
+
+$DOG cluster shutdown
+
+# single object lost, single broken object. no majority
+
+rm $STORE/0/obj/007c2b2500000000
+_random | dd of=$STORE/1/obj/007c2b2500000000 bs=4096 count=1024 &> /dev/null
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+$DOG vdi check test
+
+$DOG cluster shutdown
