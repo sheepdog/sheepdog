@@ -1396,6 +1396,12 @@ struct vdi_check_work {
 	struct work work;
 };
 
+enum vdi_check_result {
+	VDI_CHECK_NO_OBJ_FOUND,
+	VDI_CHECK_NO_MAJORITY_FOUND,
+	VDI_CHECK_SUCCESS,
+};
+
 struct vdi_check_info {
 	uint64_t oid;
 	int nr_copies;
@@ -1403,7 +1409,8 @@ struct vdi_check_info {
 	uint64_t *done;
 	int refcnt;
 	struct work_queue *wq;
-	struct vdi_check_work *base;
+	enum vdi_check_result result;
+	struct vdi_check_work *majority;
 	struct vdi_check_work vcw[0];
 };
 
@@ -1423,7 +1430,7 @@ static void vdi_repair_work(struct work *work)
 	struct vdi_check_info *info = vcw->info;
 	void *buf;
 
-	buf = read_object_from(info->base->vnode, info->oid);
+	buf = read_object_from(info->majority->vnode, info->oid);
 	write_object_to(vcw->vnode, info->oid, buf, !vcw->object_found);
 	free(buf);
 }
@@ -1466,7 +1473,6 @@ static void vdi_hash_check_work(struct work *work)
 	case SD_RES_SUCCESS:
 		vcw->object_found = true;
 		memcpy(vcw->hash, rsp->hash.digest, sizeof(vcw->hash));
-		uatomic_set(&info->base, vcw);
 		break;
 	case SD_RES_NO_OBJ:
 		vcw->object_found = false;
@@ -1479,6 +1485,46 @@ static void vdi_hash_check_work(struct work *work)
 	}
 }
 
+static void vote_majority_object(struct vdi_check_info *info)
+{
+	/*
+	 * Voting majority object from existing ones.
+	 *
+	 * The linear majority vote algorithm by Boyer and Moore is used:
+	 * http://www.cs.utexas.edu/~moore/best-ideas/mjrty/
+	 */
+
+	int count = 0, nr_live_copies = 0;
+	struct vdi_check_work *majority = NULL;
+
+	for (int i = 0; i < info->nr_copies; i++) {
+		struct vdi_check_work *vcw = &info->vcw[i];
+
+		if (!vcw->object_found)
+			continue;
+		nr_live_copies++;
+
+		if (!count)
+			majority = vcw;
+
+		if (!memcmp(majority->hash, vcw->hash, sizeof(vcw->hash)))
+			count++;
+		else
+			count--;
+	}
+
+	if (!majority)
+		info->result = VDI_CHECK_NO_OBJ_FOUND;
+	else if (count < nr_live_copies / 2) {
+		/* no majority found */
+		majority = NULL;
+		info->result = VDI_CHECK_NO_MAJORITY_FOUND;
+	} else
+		info->result = VDI_CHECK_SUCCESS;
+
+	info->majority = majority;
+}
+
 static void vdi_hash_check_main(struct work *work)
 {
 	struct vdi_check_work *vcw = container_of(work, struct vdi_check_work,
@@ -1489,27 +1535,39 @@ static void vdi_hash_check_main(struct work *work)
 	if (info->refcnt > 0)
 		return;
 
-	if (info->base  == NULL) {
-		sd_err("no node has %" PRIx64, info->oid);
-		exit(EXIT_FAILURE);
+	vote_majority_object(info);
+
+	if (info->majority == NULL) {
+		switch (info->result) {
+		case VDI_CHECK_NO_OBJ_FOUND:
+			sd_err("no node has %" PRIx64, info->oid);
+			break;
+		case VDI_CHECK_NO_MAJORITY_FOUND:
+			sd_err("no majority of %" PRIx64, info->oid);
+			break;
+		default:
+			sd_err("unknown result of vdi check: %d", info->result);
+			exit(EXIT_FAILURE);
+			break;
+		}
+
+		/* do nothing */
+		return;
 	}
 
 	for (int i = 0; i < info->nr_copies; i++) {
-		if (&info->vcw[i] == info->base)
+		if (&info->vcw[i] == info->majority)
 			continue;
 		/* need repair when object not found or consistency broken */
 		if (!info->vcw[i].object_found ||
-		    memcmp(info->base->hash, info->vcw[i].hash,
-			   sizeof(info->base->hash)) != 0) {
+		    memcmp(info->majority->hash, info->vcw[i].hash,
+			   sizeof(info->majority->hash)) != 0) {
 			info->vcw[i].work.fn = vdi_repair_work;
 			info->vcw[i].work.done = vdi_repair_main;
 			info->refcnt++;
 			queue_work(info->wq, &info->vcw[i].work);
 		}
 	}
-
-	if (info->refcnt == 0)
-		free_vdi_check_info(info);
 }
 
 static void queue_vdi_check_work(struct sd_inode *inode, uint64_t oid,
