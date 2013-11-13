@@ -218,7 +218,9 @@ int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port)
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 {
 	int i, ret;
+	static int depth = -1;
 
+	depth++;
 	for (i = 0; sub[i].name; i++) {
 		if (!strcmp(sub[i].name, argv[optind])) {
 			unsigned long flags = sub[i].flags;
@@ -231,7 +233,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 				}
 			}
 
-			if (flags & CMD_NEED_ARG && argc < 5)
+			if (flags & CMD_NEED_ARG && argc < 5 + depth)
 				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 			optind++;
 			ret = sub[i].fn(argc, argv);
@@ -241,6 +243,7 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 		}
 	}
 
+	depth--;
 	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
 	return EXIT_FAILURE;
 }
