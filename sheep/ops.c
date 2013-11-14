@@ -84,10 +84,15 @@ static int cluster_new_vdi(struct request *req)
 		.base_vid = hdr->vdi.base_vdi_id,
 		.create_snapshot = !!hdr->vdi.snapid,
 		.copy_policy = hdr->vdi.copy_policy,
-		.nr_copies = hdr->vdi.copies ? hdr->vdi.copies :
-				sys->cinfo.nr_copies,
+		.nr_copies = hdr->vdi.copies,
 		.time = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000,
 	};
+
+	/* Client doesn't specify redundancy scheme (copy = 0) */
+	if (!hdr->vdi.copies) {
+		iocb.nr_copies = sys->cinfo.nr_copies;
+		iocb.copy_policy = sys->cinfo.copy_policy;
+	}
 
 	if (iocb.copy_policy)
 		iocb.nr_copies = ec_policy_to_dp(iocb.copy_policy, NULL, NULL);
@@ -264,6 +269,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 		return ret;
 
 	sys->cinfo.nr_copies = req->cluster.copies;
+	sys->cinfo.copy_policy = req->cluster.copy_policy;
 	sys->cinfo.flags = req->flags;
 	if (!sys->cinfo.nr_copies)
 		sys->cinfo.nr_copies = SD_DEFAULT_COPIES;

@@ -26,7 +26,8 @@ static struct sd_option cluster_options[] = {
 };
 
 static struct cluster_cmd_data {
-	int copies;
+	uint8_t copies;
+	uint8_t copy_policy;
 	bool force;
 	char name[STORE_LEN];
 } cluster_cmd_data;
@@ -97,6 +98,7 @@ static int cluster_format(int argc, char **argv)
 
 	sd_init_req(&hdr, SD_OP_MAKE_FS);
 	hdr.cluster.copies = cluster_cmd_data.copies;
+	hdr.cluster.copy_policy = cluster_cmd_data.copy_policy;
 	hdr.cluster.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
@@ -517,25 +519,24 @@ static struct subcommand cluster_cmd[] = {
 
 static int cluster_parser(int ch, const char *opt)
 {
-	int copies;
-	char *p;
-
 	switch (ch) {
 	case 'b':
 		pstrcpy(cluster_cmd_data.name, sizeof(cluster_cmd_data.name),
 			opt);
 		break;
 	case 'c':
-		copies = strtol(opt, &p, 10);
-		if (opt == p || copies < 1) {
-			sd_err("There must be at least one copy of data");
-			exit(EXIT_FAILURE);
-		} else if (copies > SD_MAX_COPIES) {
-			sd_err("Redundancy may not exceed %d copies",
-			       SD_MAX_COPIES);
+		cluster_cmd_data.copies =
+			parse_copy(opt, &cluster_cmd_data.copy_policy);
+		if (!cluster_cmd_data.copies) {
+			sd_err("Invalid parameter %s\n"
+			       "To create replicated vdi, set -c x\n"
+			       "  x(1 to %d)   - number of replicated copies\n"
+			       "To create erasure coded vdi, set -c x:y\n"
+			       "  x(2,4,8,16)  - number of data strips\n"
+			       "  y(1 to 15)   - number of parity strips",
+			       opt, SD_MAX_COPIES);
 			exit(EXIT_FAILURE);
 		}
-		cluster_cmd_data.copies = copies;
 		break;
 	case 'f':
 		cluster_cmd_data.force = true;

@@ -438,3 +438,41 @@ void dump_loglevels(bool err)
 			sd_info("%s\t(%d)", loglevel_table[i], i);
 	}
 }
+
+/* Return 0 to indicate ill str */
+uint8_t parse_copy(const char *str, uint8_t *copy_policy)
+{
+	char *n1, *n2;
+	uint8_t copy, parity;
+	char p[10];
+
+	strcpy(p, str);
+	n1 = strtok(p, ":");
+	n2 = strtok(NULL, ":");
+
+	if ((!n1 || !is_numeric(n1)) || (n2 && !is_numeric(n2)))
+		return 0;
+
+	copy = strtol(n1, NULL, 10);
+	if (copy > SD_MAX_COPIES)
+		return 0;
+	if (!n2) {
+		*copy_policy = 0;
+		return copy;
+	}
+
+	if (copy != 2 && copy != 4 && copy != 8 && copy != 16)
+		return 0;
+
+	parity = strtol(n2, NULL, 10);
+	if (parity >= SD_EC_MAX_STRIP || parity == 0)
+		return 0;
+
+	/*
+	 * 4 bits for parity and 4 bits for data.
+	 * We have to compress upper data bits because it can't represent 16
+	 */
+	*copy_policy = ((copy / 2) << 4) + parity;
+	copy = copy + parity;
+	return copy;
+}

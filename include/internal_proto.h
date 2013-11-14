@@ -162,6 +162,7 @@ struct cluster_info {
 	uint64_t ctime;
 	uint16_t flags;
 	uint8_t nr_copies;
+	uint8_t copy_policy;
 	enum sd_status status : 8;
 	uint32_t __pad;
 	uint8_t store[STORE_LEN];
