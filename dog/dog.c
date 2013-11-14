@@ -255,9 +255,16 @@ void subcommand_usage(char *cmd, char *subcmd, int status)
 
 	printf("Usage: %s %s %s", program_name, cmd, subcmd);
 
-	/* Show subcmd's subcommands if necessary */
-	sub = find_subcmd(cmd, subcmd);
-	subsub = sub->sub;
+	if (0 <= subcmd_depth) {
+		for (i = 0; i < subcmd_depth + 1; i++)
+			printf(" %s", subcmd_stack[i]->name);
+
+		subsub = subcmd_stack[i - 1]->sub;
+	} else {
+		sub = find_subcmd(cmd, subcmd);
+		subsub = sub->sub;
+	}
+
 	if (subsub) {
 		n = 0;
 		while (subsub[n].name)

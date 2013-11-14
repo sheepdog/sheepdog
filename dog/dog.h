@@ -51,6 +51,11 @@ void subcommand_usage(char *cmd, char *subcmd, int status);
 
 extern uint8_t sdhost[16];
 extern int sdport;
+#define MAX_SUBCMD_DEPTH 8
+
+extern int subcmd_depth;
+extern struct subcommand *subcmd_stack[MAX_SUBCMD_DEPTH];
+
 extern bool highlight;
 extern bool raw_output;
 extern bool verbose;

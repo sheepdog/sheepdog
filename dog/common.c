@@ -215,36 +215,49 @@ int send_light_req(struct sd_req *hdr, const uint8_t *addr, int port)
 	return 0;
 }
 
+int subcmd_depth = -1;
+struct subcommand *subcmd_stack[MAX_SUBCMD_DEPTH];
+
 int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 {
 	int i, ret;
-	static int depth = -1;
 
-	depth++;
-	for (i = 0; sub[i].name; i++) {
-		if (!strcmp(sub[i].name, argv[optind])) {
-			unsigned long flags = sub[i].flags;
-
-			if (flags & CMD_NEED_NODELIST) {
-				ret = update_node_list(SD_MAX_NODES);
-				if (ret < 0) {
-					sd_err("Failed to get node list");
-					exit(EXIT_SYSFAIL);
-				}
-			}
-
-			if (flags & CMD_NEED_ARG && argc < 5 + depth)
-				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
-			optind++;
-			ret = sub[i].fn(argc, argv);
-			if (ret == EXIT_USAGE)
-				subcommand_usage(argv[1], argv[2], EXIT_USAGE);
-			return ret;
-		}
+	if (subcmd_depth + 1 == MAX_SUBCMD_DEPTH) {
+		sd_err("Too deep netsted subcommands, "
+		       "please expand MAX_SUBCMD_DEPTH");
+		exit(EXIT_USAGE);
 	}
 
-	depth--;
+	subcmd_stack[++subcmd_depth] = sub;
+
+	for (i = 0; sub[i].name; i++) {
+		unsigned long flags;
+
+		if (strcmp(sub[i].name, argv[optind]))
+			continue;
+
+		flags = sub[i].flags;
+
+		if (flags & CMD_NEED_NODELIST) {
+			ret = update_node_list(SD_MAX_NODES);
+			if (ret < 0) {
+				sd_err("Failed to get node list");
+				exit(EXIT_SYSFAIL);
+			}
+		}
+
+		if (flags & CMD_NEED_ARG && argc < 5 + subcmd_depth)
+			subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+		optind++;
+		ret = sub[i].fn(argc, argv);
+		if (ret == EXIT_USAGE)
+			subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+		return ret;
+	}
+
 	subcommand_usage(argv[1], argv[2], EXIT_FAILURE);
+	subcmd_depth--;
+
 	return EXIT_FAILURE;
 }
 
