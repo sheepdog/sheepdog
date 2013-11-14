@@ -49,6 +49,11 @@ struct subcommand {
 };
 void subcommand_usage(char *cmd, char *subcmd, int status);
 
+#define MAX_SUBCMD_DEPTH 8
+
+extern int subcmd_depth;
+extern struct subcommand *subcmd_stack[MAX_SUBCMD_DEPTH];
+
 extern struct node_id sd_nid;
 extern bool highlight;
 extern bool raw_output;
