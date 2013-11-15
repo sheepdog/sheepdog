@@ -172,15 +172,11 @@ static int request_init_operation(struct http_request *req)
 static int http_init_request(struct http_request *req)
 {
 	char *p;
-	int ret;
 
 	for (int i = 0; (p = req->fcgx.envp[i]); ++i)
 		sd_debug("%s", p);
 
-	ret = request_init_operation(req);
-	if (ret != OK)
-		return ret;
-	return OK;
+	return request_init_operation(req);
 }
 
 /* This function does nothing if we have already printed a status code. */
