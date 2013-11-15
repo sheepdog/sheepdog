@@ -164,6 +164,9 @@ static int request_init_operation(struct http_request *req)
 		return BAD_REQUEST;
 	}
 	req->uri = FCGX_GetParam("DOCUMENT_URI", env);
+	if (!req->uri)
+		return BAD_REQUEST;
+
 	req->status = UNKNOWN;
 
 	return OK;
