@@ -158,10 +158,12 @@ static int request_init_operation(struct http_request *req)
 	}
 
 	p = FCGX_GetParam("CONTENT_LENGTH", env);
-	req->data_length = strtoll(p, &endp, 10);
-	if (p == endp) {
-		sd_err("invalid content_length %s", p);
-		return BAD_REQUEST;
+	if (p[0] != '\0') {
+		req->data_length = strtoll(p, &endp, 10);
+		if (p == endp) {
+			sd_err("invalid content_length %s", p);
+			return BAD_REQUEST;
+		}
 	}
 	req->uri = FCGX_GetParam("DOCUMENT_URI", env);
 	if (!req->uri)
