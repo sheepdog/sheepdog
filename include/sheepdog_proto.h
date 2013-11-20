@@ -109,8 +109,7 @@
 
 #define SD_INODE_SIZE (sizeof(struct sd_inode))
 #define SD_INODE_INDEX_SIZE (sizeof(uint32_t) * MAX_DATA_OBJS)
-#define SD_INODE_HEADER_SIZE ((unsigned long) \
-			      (&((struct sd_inode *)0)->data_vdi_id))
+#define SD_INODE_HEADER_SIZE offsetof(struct sd_inode, data_vdi_id)
 #define SD_ATTR_OBJ_SIZE (sizeof(struct sheepdog_vdi_attr))
 #define CURRENT_VDI_ID 0
 
@@ -250,8 +249,10 @@ struct sd_extent_header {
 };
 
 typedef int (*write_node_fn)(uint64_t id, void *mem, unsigned int len,
-				int copies, int copy_policy, int create);
-typedef int (*read_node_fn)(uint64_t id, void **mem, unsigned int len);
+				uint64_t offset, uint32_t flags, int copies,
+				int copy_policy, bool create, bool direct);
+typedef int (*read_node_fn)(uint64_t id, void **mem, unsigned int len,
+				uint64_t offset);
 
 struct sheepdog_vdi_attr {
 	char name[SD_MAX_VDI_LEN];
@@ -268,6 +269,10 @@ extern uint32_t sd_inode_get_vid(read_node_fn reader,
 extern void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 			     struct sd_inode *inode, uint32_t idx,
 			     uint32_t vdi_id);
+extern int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
+			      uint32_t idx, uint32_t vid, uint32_t value,
+			      int flags, bool create, bool direct);
+extern uint32_t sd_inode_get_meta_size(struct sd_inode *inode, size_t size);
 extern void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi);
 
 /* 64 bit FNV-1a non-zero initial basis */

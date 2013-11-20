@@ -159,7 +159,7 @@ static void dump_btree(read_node_fn reader, struct sd_inode *inode)
 		tmp = (void *)leaf_node;
 
 		while (iter_idx != last_idx) {
-			reader(iter_idx->oid, &tmp, SD_INODE_INDEX_SIZE);
+			reader(iter_idx->oid, &tmp, SD_INODE_INDEX_SIZE, 0);
 
 			sd_info("btree> %p idx: %d, %lu, %u",
 					iter_idx, iter_idx->idx, iter_idx->oid,
@@ -335,10 +335,10 @@ static void transfer_to_idx_root(write_node_fn writer, struct sd_inode *inode)
 	left_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
 	right_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
 
-	writer(left_oid, left, SD_INODE_INDEX_SIZE, inode->nr_copies,
-			inode->copy_policy, 1);
-	writer(right_oid, right, SD_INODE_INDEX_SIZE, inode->nr_copies,
-			inode->copy_policy, 1);
+	writer(left_oid, left, SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
+			inode->copy_policy, true, false);
+	writer(right_oid, right, SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
+			inode->copy_policy, true, false);
 
 	/* change root from ext-node to idx-node */
 	root->entries = 0;
@@ -373,7 +373,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 
 		if (idx_in_range(header, path->p_idx)) {
 			oid = path->p_idx->oid;
-			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE);
+			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE, 0);
 			if (ret != SD_RES_SUCCESS)
 				goto out;
 			path->p_ext = search_ext_entry(leaf_node, idx);
@@ -384,7 +384,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 		} else {
 			/* check if last idx-node has space */
 			oid = (path->p_idx - 1)->oid;
-			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE);
+			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE, 0);
 			if (ret != SD_RES_SUCCESS)
 				goto out;
 			if (leaf_node->entries < EXT_MAX_ENTRIES) {
@@ -445,10 +445,10 @@ static void split_ext_node(write_node_fn writer, struct sd_inode *inode,
 	split_to_nodes(old, new_ext, old, num);
 
 	new_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
-	writer(new_oid, new_ext, SD_INODE_INDEX_SIZE, inode->nr_copies,
-			inode->copy_policy, 1);
-	writer(path->p_idx->oid, old, SD_INODE_INDEX_SIZE, inode->nr_copies,
-			inode->copy_policy, 0);
+	writer(new_oid, new_ext, SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
+			inode->copy_policy, true, false);
+	writer(path->p_idx->oid, old, SD_INODE_INDEX_SIZE, 0, 0,
+	       inode->nr_copies, inode->copy_policy, false, false);
 
 	/* write new index */
 	insert_idx_entry(EXT_HEADER(inode->data_vdi_id),
@@ -492,8 +492,8 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 			insert_ext_entry_nosearch(path->p_ext_header,
 					path->p_ext, idx, vdi_id);
 			writer(path->p_idx->oid, path->p_ext_header,
-				SD_INODE_INDEX_SIZE, inode->nr_copies,
-				inode->copy_policy, 1);
+				SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
+				inode->copy_policy, true, false);
 		} else if (path->p_ext_header) {
 			/* the last idx-node */
 			insert_ext_entry_nosearch(path->p_ext_header,
@@ -502,8 +502,8 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 			path->p_idx->idx =
 				(LAST_EXT(path->p_ext_header) - 1)->idx;
 			writer(path->p_idx->oid, path->p_ext_header,
-				SD_INODE_INDEX_SIZE, inode->nr_copies,
-				inode->copy_policy, 1);
+				SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
+				inode->copy_policy, true, false);
 		} else {
 			/* create a new ext-node */
 			leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
@@ -513,8 +513,8 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 			insert_ext_entry_nosearch(leaf_node,
 					FIRST_EXT(leaf_node), idx, vdi_id);
 			writer(oid, leaf_node, SD_INODE_INDEX_SIZE,
-					inode->nr_copies,
-					inode->copy_policy, 1);
+					0, 0, inode->nr_copies,
+					inode->copy_policy, true, false);
 			insert_idx_entry_nosearch(header, path->p_idx,
 					idx, oid);
 		}
@@ -564,6 +564,63 @@ out:
 	if (path.p_ext_header)
 		free(path.p_ext_header);
 	dump_btree(reader, inode);
+}
+
+/*
+ * Return the size of meta-data in inode->data_vdi_id. When leaf-node of B-tree
+ * is not full, we don't need to read out all sizeof(sd_inode).
+ * The argument of 'size' is just for compatibility of parse_vdi().
+ */
+uint32_t sd_inode_get_meta_size(struct sd_inode *inode, size_t size)
+{
+	struct sd_extent_header *header;
+	uint32_t len;
+
+	if (inode->store_policy == 0) {
+		len = count_data_objs(inode) * sizeof(inode->data_vdi_id[0]);
+		if (len > size - SD_INODE_HEADER_SIZE - sizeof(uint32_t))
+			len = size - SD_INODE_HEADER_SIZE - sizeof(uint32_t);
+	} else {
+		header = EXT_HEADER(inode->data_vdi_id);
+		len = sizeof(struct sd_extent_header);
+		if (header->depth == 1)
+			len += sizeof(struct sd_extent) * header->entries;
+		else if (header->depth == 2)
+			len += sizeof(struct sd_extent_idx) * header->entries;
+		else
+			panic("Depth of B-tree is out of range(depth: %u)",
+			      header->depth);
+	}
+	return len;
+}
+
+/* Write the meta-data of inode out */
+int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
+		       uint32_t idx, uint32_t vid, uint32_t value,
+		       int flags, bool create, bool direct)
+{
+	uint32_t len;
+	int ret = SD_RES_SUCCESS;
+
+	if (inode->store_policy == 0)
+		ret = writer(vid_to_vdi_oid(vid), &value, sizeof(value),
+			     SD_INODE_HEADER_SIZE + sizeof(value) * idx,
+			     flags, inode->nr_copies, inode->copy_policy,
+			     create, direct);
+	else {
+		len = SD_INODE_HEADER_SIZE + sd_inode_get_meta_size(inode, 0);
+		ret = writer(vid_to_vdi_oid(vid), inode, len, 0, flags,
+			     inode->nr_copies, inode->copy_policy,
+			     create, false);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		ret = writer(vid_to_vdi_oid(vid), inode, sizeof(uint32_t),
+			     offsetof(struct sd_inode, btree_counter),
+			     flags, inode->nr_copies, inode->copy_policy,
+			     create, false);
+	}
+out:
+	return ret;
 }
 
 void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi)

@@ -66,8 +66,10 @@ static struct sd_lock vdi_inode_tree_lock = SD_LOCK_INITIALIZER;
 
 
 static int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
-				int copies, int copy_policy, int create);
-static int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len);
+				uint64_t offset, uint32_t flags, int copies,
+				int copy_policy, bool create, bool direct);
+static int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
+				uint64_t offset);
 
 #define INODE_GET_VID(inode, idx) (sd_inode_get_vid(\
 					sheepfs_bnode_reader, inode, idx))
@@ -196,10 +198,8 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	if (create) {
 		INODE_SET_VID(vdi->inode, idx, vid);
 		/* writeback inode update */
-		if (volume_rw_object((char *)&vid, vid_to_vdi_oid(vid),
-				     sizeof(vid),
-				     SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
-				     VOLUME_WRITE) < 0)
+		if (sd_inode_write_vid(sheepfs_bnode_writer, vdi->inode, idx,
+					vid, vid, 0, false, false) < 0)
 			return -1;
 	}
 done:
@@ -250,19 +250,21 @@ static int volume_do_rw(const char *path, char *buf, size_t size,
 }
 
 int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
-			 int copies, int copy_policy, int create)
+			 uint64_t offset, uint32_t flags, int copies,
+			 int copy_policy, bool create, bool direct)
 {
 	int ret;
-	ret = volume_rw_object(mem, oid, len, 0, VOLUME_WRITE);
+	ret = volume_rw_object(mem, oid, len, offset, VOLUME_WRITE);
 	if (ret == len)
 		return SD_RES_SUCCESS;
 	return ret;
 }
 
-int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len)
+int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
+			 uint64_t offset)
 {
 	int ret;
-	ret = volume_rw_object(*mem, oid, len, 0, VOLUME_READ);
+	ret = volume_rw_object(*mem, oid, len, offset, VOLUME_READ);
 	if (ret == len)
 		return SD_RES_SUCCESS;
 	return ret;

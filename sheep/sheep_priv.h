@@ -377,8 +377,10 @@ void objlist_cache_remove(uint64_t oid);
 void put_request(struct request *req);
 
 int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
-		       int copies, int copy_policy, int create);
-int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len);
+		       uint64_t offset, uint32_t flags, int copies,
+		       int copy_policy, bool create, bool direct);
+int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len,
+		       uint64_t offset);
 
 #define INODE_GET_VID(inode, idx) (sd_inode_get_vid(sheep_bnode_reader, \
 					inode, idx))

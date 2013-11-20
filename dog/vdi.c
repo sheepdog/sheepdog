@@ -58,16 +58,18 @@ struct get_vdi_info {
 	uint8_t copy_policy;
 };
 
-int dog_bnode_writer(uint64_t oid, void *mem, unsigned int len,
-		     int copies, int copy_policy, int create)
+int dog_bnode_writer(uint64_t oid, void *mem, unsigned int len, uint64_t offset,
+		     uint32_t flags, int copies, int copy_policy, bool create,
+		     bool direct)
 {
-	return sd_write_object(oid, 0, mem, len, 0, 0, copies, copy_policy,
-			true, true);
+	return sd_write_object(oid, 0, mem, len, offset, flags, copies,
+			       copy_policy, create, direct);
 }
 
-int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len)
+int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len,
+		     uint64_t offset)
 {
-	return sd_read_object(oid, *mem, len, 0, true);
+	return sd_read_object(oid, *mem, len, offset, true);
 }
 
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
@@ -582,10 +584,8 @@ static int vdi_create(int argc, char **argv)
 		}
 
 		INODE_SET_VID(inode, idx, vid);
-		ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
-				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
-				      0, inode->nr_copies, inode->copy_policy,
-				      false, true);
+		ret = sd_inode_write_vid(dog_bnode_writer, inode, idx, vid, vid,
+					 0, false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -651,7 +651,7 @@ static int vdi_clone(int argc, char **argv)
 	uint32_t base_vid, new_vid, vdi_id;
 	uint64_t oid;
 	uint32_t idx, max_idx, ret;
-	struct sd_inode *inode = NULL;
+	struct sd_inode *inode = NULL, *new_inode = NULL;
 	char *buf = NULL;
 
 	dst_vdi = argv[optind];
@@ -681,6 +681,12 @@ static int vdi_clone(int argc, char **argv)
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
+	new_inode = xmalloc(sizeof(*inode));
+	ret = read_vdi_obj(dst_vdi, 0, "", NULL, new_inode,
+			SD_INODE_HEADER_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
+
 	buf = xzalloc(SD_DATA_OBJ_SIZE);
 	max_idx = count_data_objs(inode);
 
@@ -708,11 +714,9 @@ static int vdi_clone(int argc, char **argv)
 			goto out;
 		}
 
-		ret = sd_write_object(vid_to_vdi_oid(new_vid), 0, &new_vid,
-				      sizeof(new_vid),
-				SD_INODE_HEADER_SIZE + sizeof(new_vid) * idx, 0,
-				      inode->nr_copies, inode->copy_policy,
-				      false, true);
+		INODE_SET_VID(new_inode, idx, new_vid);
+		ret = sd_inode_write_vid(dog_bnode_writer, new_inode, idx,
+					 new_vid, new_vid, 0, false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -729,6 +733,8 @@ static int vdi_clone(int argc, char **argv)
 	}
 out:
 	free(inode);
+	if (new_inode)
+		free(new_inode);
 	free(buf);
 	return ret;
 }
@@ -1358,11 +1364,8 @@ static int vdi_write(int argc, char **argv)
 		}
 
 		if (create) {
-			ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid,
-					      sizeof(vid),
-				SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
-					      flags, inode->nr_copies,
-					      inode->copy_policy, false, false);
+			ret = sd_inode_write_vid(dog_bnode_writer, inode, idx,
+						 vid, vid, flags, false, false);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;

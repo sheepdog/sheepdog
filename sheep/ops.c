@@ -818,20 +818,33 @@ static int local_flush_vdi(struct request *req)
 static int local_discard_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
-	uint32_t vid = oid_to_vid(oid), zero = 0;
-	int ret, idx = data_oid_to_idx(oid);
+	uint32_t vid = oid_to_vid(oid), zero = 0, tmp_vid;
+	int ret = SD_RES_SUCCESS, idx = data_oid_to_idx(oid);
+	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 
 	sd_debug("%"PRIx64, oid);
-	ret = write_object(vid_to_vdi_oid(vid), (char *)&zero, sizeof(zero),
-			   SD_INODE_HEADER_SIZE + sizeof(vid) * idx, false);
+	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+			sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS)
-		return ret;
-	if (remove_object(oid) != SD_RES_SUCCESS)
-		sd_err("failed to remove %"PRIx64, oid);
+		goto out;
+
+	tmp_vid = INODE_GET_VID(inode, idx);
+	/* if vid in idx is not exist, we don't need to remove it */
+	if (tmp_vid) {
+		INODE_SET_VID(inode, idx, vid);
+		ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx, vid,
+					 zero, 0, false, false);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		if (remove_object(oid) != SD_RES_SUCCESS)
+			sd_err("failed to remove %"PRIx64, oid);
+	}
 	/*
 	 * Return success even if remove_object fails because we have updated
 	 * inode successfully.
 	 */
+out:
+	free(inode);
 	return SD_RES_SUCCESS;
 }
 

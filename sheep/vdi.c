@@ -30,14 +30,16 @@ static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
 int ec_max_data_strip;
 
 int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
-		       int copies, int copy_policy, int create)
+		       uint64_t offset, uint32_t flags, int copies,
+		       int copy_policy, bool create, bool direct)
 {
-	return write_object(oid, mem, len, 0, create == 1);
+	return write_object(oid, mem, len, offset, create);
 }
 
-int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len)
+int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len,
+		       uint64_t offset)
 {
-	return read_object(oid, *mem, len, 0);
+	return read_object(oid, *mem, len, offset);
 }
 
 static int vdi_state_cmp(const struct vdi_state_entry *a,
