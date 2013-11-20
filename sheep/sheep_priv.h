@@ -177,6 +177,7 @@ struct vdi_iocb {
 	uint32_t snapid;
 	bool create_snapshot;
 	uint8_t copy_policy;
+	uint8_t store_policy;
 	uint8_t nr_copies;
 	uint64_t time;
 };

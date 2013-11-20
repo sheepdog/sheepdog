@@ -83,8 +83,7 @@
 /*
  * Object ID rules
  *
- *  0 - 19 (20 bits): data object space
- * 20 - 31 (12 bits): reserved data object space
+ *  0 - 31 (32 bits): data object space
  * 32 - 55 (24 bits): VDI object space
  * 56 - 59 ( 4 bits): reserved VDI object space
  * 60 - 63 ( 4 bits): object type indentifier space
@@ -96,7 +95,8 @@
 #define VMSTATE_BIT (UINT64_C(1) << 62)
 #define VDI_ATTR_BIT (UINT64_C(1) << 61)
 #define VDI_BTREE_BIT (UINT64_C(1) << 60)
-#define MAX_DATA_OBJS (1ULL << 20)
+#define OLD_MAX_DATA_OBJS (1ULL << 20)
+#define MAX_DATA_OBJS (1ULL << 32)
 #define MAX_CHILDREN 1024U
 #define SD_MAX_VDI_LEN 256U
 #define SD_MAX_VDI_TAG_LEN 256U
@@ -105,10 +105,13 @@
 #define SD_MAX_SNAPSHOT_TAG_LEN 256U
 #define SD_NR_VDIS   (1U << 24)
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
+#define SD_OLD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * OLD_MAX_DATA_OBJS)
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
 
 #define SD_INODE_SIZE (sizeof(struct sd_inode))
 #define SD_INODE_INDEX_SIZE (sizeof(uint32_t) * MAX_DATA_OBJS)
+#define SD_INODE_DATA_INDEX (1ULL << 20)
+#define SD_INODE_DATA_INDEX_SIZE (sizeof(uint32_t) * SD_INODE_DATA_INDEX)
 #define SD_INODE_HEADER_SIZE offsetof(struct sd_inode, data_vdi_id)
 #define SD_ATTR_OBJ_SIZE (sizeof(struct sheepdog_vdi_attr))
 #define CURRENT_VDI_ID 0
@@ -142,7 +145,8 @@ struct sd_req {
 			uint32_t	base_vdi_id;
 			uint8_t		copies;
 			uint8_t		copy_policy;
-			uint8_t		reserved[2];
+			uint8_t		store_policy;
+			uint8_t		reserved;
 			uint32_t	snapid;
 		} vdi;
 
@@ -226,7 +230,7 @@ struct sd_inode {
 	uint32_t vdi_id;
 	uint32_t parent_vdi_id;
 	uint32_t child_vdi_id[MAX_CHILDREN];
-	uint32_t data_vdi_id[MAX_DATA_OBJS];
+	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
 	uint32_t btree_counter;
 };
 
@@ -264,6 +268,7 @@ struct sheepdog_vdi_attr {
 	char value[SD_MAX_VDI_ATTR_VALUE_LEN];
 };
 
+extern void sd_inode_init(void *data, int depth);
 extern uint32_t sd_inode_get_vid(read_node_fn reader,
 				 const struct sd_inode *inode, uint32_t idx);
 extern void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,

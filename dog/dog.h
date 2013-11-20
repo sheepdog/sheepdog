@@ -84,7 +84,7 @@ void confirm(const char *message);
 void work_queue_wait(struct work_queue *q);
 int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
-		  uint8_t nr_copies, uint8_t copy_policy);
+		  uint8_t nr_copies, uint8_t copy_policy, uint8_t store_policy);
 int do_vdi_check(const struct sd_inode *inode);
 void show_progress(uint64_t done, uint64_t total, bool raw);
 size_t get_store_objsize(uint8_t copy_policy, uint64_t oid);

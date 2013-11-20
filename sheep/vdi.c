@@ -232,12 +232,15 @@ static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 	new->create_time = iocb->time;
 	new->vdi_size = iocb->size;
 	new->copy_policy = iocb->copy_policy;
+	new->store_policy = iocb->store_policy;
 	new->nr_copies = iocb->nr_copies;
 	new->block_size_shift = find_next_bit(&block_size, BITS_PER_LONG, 0);
 	new->snap_id = new_snapid;
 	new->parent_vdi_id = iocb->base_vid;
 	if (data_vdi_id)
 		memcpy(new->data_vdi_id, data_vdi_id, sizeof(new->data_vdi_id));
+	else if (new->store_policy)
+		sd_inode_init(new->data_vdi_id, 1);
 
 	return new;
 }
@@ -261,9 +264,9 @@ static int create_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	int ret;
 
 	sd_debug("%s: size %" PRIu64 ", new_vid %" PRIx32 ", copies %d, "
-		 "snapid %" PRIu32 " copy policy %"PRIu8, iocb->name,
-		 iocb->size, new_vid, iocb->nr_copies, new_snapid,
-		 new->copy_policy);
+		 "snapid %" PRIu32 " copy policy %"PRIu8 "store policy %"PRIu8,
+		 iocb->name, iocb->size, new_vid, iocb->nr_copies, new_snapid,
+		 new->copy_policy, new->store_policy);
 
 	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
 			   0, true);

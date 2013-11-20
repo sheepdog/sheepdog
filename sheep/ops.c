@@ -84,6 +84,7 @@ static int cluster_new_vdi(struct request *req)
 		.base_vid = hdr->vdi.base_vdi_id,
 		.create_snapshot = !!hdr->vdi.snapid,
 		.copy_policy = hdr->vdi.copy_policy,
+		.store_policy = hdr->vdi.store_policy,
 		.nr_copies = hdr->vdi.copies,
 		.time = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000,
 	};

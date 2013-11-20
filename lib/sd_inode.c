@@ -76,7 +76,8 @@
 #include "util.h"
 #include "sheepdog_proto.h"
 
-#define EXT_MAX_SPACE (SD_INODE_INDEX_SIZE - sizeof(struct sd_extent_header))
+#define EXT_MAX_SPACE (SD_INODE_DATA_INDEX_SIZE - \
+		sizeof(struct sd_extent_header))
 #define EXT_MAX_ENTRIES (EXT_MAX_SPACE / sizeof(struct sd_extent))
 #define EXT_IDX_MAX_ENTRIES (EXT_MAX_SPACE / sizeof(struct sd_extent_idx))
 
@@ -155,11 +156,12 @@ static void dump_btree(read_node_fn reader, struct sd_inode *inode)
 	} else if (header->depth == 2) {
 		last_idx = LAST_IDX(inode->data_vdi_id);
 		iter_idx = FIRST_IDX(inode->data_vdi_id);
-		leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
+		leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
 		tmp = (void *)leaf_node;
 
 		while (iter_idx != last_idx) {
-			reader(iter_idx->oid, &tmp, SD_INODE_INDEX_SIZE, 0);
+			reader(iter_idx->oid, &tmp,
+					SD_INODE_DATA_INDEX_SIZE, 0);
 
 			sd_info("btree> %p idx: %d, %lu, %u",
 					iter_idx, iter_idx->idx, iter_idx->oid,
@@ -205,7 +207,7 @@ static void *binary_search(void *first, void *last, void *key,
 	return (void *)l;
 }
 
-static void sd_inode_init(void *data, int depth)
+void sd_inode_init(void *data, int depth)
 {
 	struct sd_extent_header *header = EXT_HEADER(data);
 	header->magic = INODE_BTREE_MAGIC;
@@ -326,8 +328,8 @@ static void transfer_to_idx_root(write_node_fn writer, struct sd_inode *inode)
 	uint32_t num = root->entries / 2;
 
 	/* create two leaf-node and copy the entries from root-node */
-	left = xmalloc(SD_INODE_INDEX_SIZE);
-	right = xmalloc(SD_INODE_INDEX_SIZE);
+	left = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+	right = xmalloc(SD_INODE_DATA_INDEX_SIZE);
 
 	split_to_nodes(root, left, right, num);
 
@@ -335,10 +337,10 @@ static void transfer_to_idx_root(write_node_fn writer, struct sd_inode *inode)
 	left_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
 	right_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
 
-	writer(left_oid, left, SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
-			inode->copy_policy, true, false);
-	writer(right_oid, right, SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
-			inode->copy_policy, true, false);
+	writer(left_oid, left, SD_INODE_DATA_INDEX_SIZE, 0, 0,
+	       inode->nr_copies, inode->copy_policy, true, false);
+	writer(right_oid, right, SD_INODE_DATA_INDEX_SIZE, 0, 0,
+	       inode->nr_copies, inode->copy_policy, true, false);
 
 	/* change root from ext-node to idx-node */
 	root->entries = 0;
@@ -368,12 +370,12 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 	if (header->depth == 2) {
 		path->depth = 2;
 		path->p_idx = search_idx_entry(header, idx);
-		leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
+		leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
 		tmp = (void *)leaf_node;
 
 		if (idx_in_range(header, path->p_idx)) {
 			oid = path->p_idx->oid;
-			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE, 0);
+			ret = reader(oid, &tmp, SD_INODE_DATA_INDEX_SIZE, 0);
 			if (ret != SD_RES_SUCCESS)
 				goto out;
 			path->p_ext = search_ext_entry(leaf_node, idx);
@@ -384,7 +386,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 		} else {
 			/* check if last idx-node has space */
 			oid = (path->p_idx - 1)->oid;
-			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE, 0);
+			ret = reader(oid, &tmp, SD_INODE_DATA_INDEX_SIZE, 0);
 			if (ret != SD_RES_SUCCESS)
 				goto out;
 			if (leaf_node->entries < EXT_MAX_ENTRIES) {
@@ -440,14 +442,14 @@ static void split_ext_node(write_node_fn writer, struct sd_inode *inode,
 	uint32_t num = old->entries / 2;
 	uint64_t new_oid;
 
-	new_ext = xmalloc(SD_INODE_INDEX_SIZE);
+	new_ext = xmalloc(SD_INODE_DATA_INDEX_SIZE);
 
 	split_to_nodes(old, new_ext, old, num);
 
 	new_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
-	writer(new_oid, new_ext, SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
-			inode->copy_policy, true, false);
-	writer(path->p_idx->oid, old, SD_INODE_INDEX_SIZE, 0, 0,
+	writer(new_oid, new_ext, SD_INODE_DATA_INDEX_SIZE, 0, 0,
+	       inode->nr_copies, inode->copy_policy, true, false);
+	writer(path->p_idx->oid, old, SD_INODE_DATA_INDEX_SIZE, 0, 0,
 	       inode->nr_copies, inode->copy_policy, false, false);
 
 	/* write new index */
@@ -492,8 +494,8 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 			insert_ext_entry_nosearch(path->p_ext_header,
 					path->p_ext, idx, vdi_id);
 			writer(path->p_idx->oid, path->p_ext_header,
-				SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
-				inode->copy_policy, true, false);
+			       SD_INODE_DATA_INDEX_SIZE, 0, 0, inode->nr_copies,
+			       inode->copy_policy, true, false);
 		} else if (path->p_ext_header) {
 			/* the last idx-node */
 			insert_ext_entry_nosearch(path->p_ext_header,
@@ -502,17 +504,17 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 			path->p_idx->idx =
 				(LAST_EXT(path->p_ext_header) - 1)->idx;
 			writer(path->p_idx->oid, path->p_ext_header,
-				SD_INODE_INDEX_SIZE, 0, 0, inode->nr_copies,
-				inode->copy_policy, true, false);
+			       SD_INODE_DATA_INDEX_SIZE, 0, 0, inode->nr_copies,
+			       inode->copy_policy, true, false);
 		} else {
 			/* create a new ext-node */
-			leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
+			leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
 			sd_inode_init(leaf_node, 2);
 			oid = vid_to_btree_oid(inode->vdi_id,
 					inode->btree_counter++);
 			insert_ext_entry_nosearch(leaf_node,
 					FIRST_EXT(leaf_node), idx, vdi_id);
-			writer(oid, leaf_node, SD_INODE_INDEX_SIZE,
+			writer(oid, leaf_node, SD_INODE_DATA_INDEX_SIZE,
 					0, 0, inode->nr_copies,
 					inode->copy_policy, true, false);
 			insert_idx_entry_nosearch(header, path->p_idx,
