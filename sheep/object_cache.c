@@ -16,15 +16,16 @@
 /*
  * Object Cache ID
  *
- *  0 - 19 (20 bits): data object space
- *  20 - 27 (8 bits): object flag space
- *  28 - 31 (4 bits): object type indentifier space
+ *  0 - 31 (32 bits): data object space
+ *  32 - 51 (20 bits): reserved
+ *  52 - 59 (8 bits): object flag space
+ *  60 - 63 (4 bits): object type indentifier space
  */
-#define CACHE_VDI_SHIFT       31 /* if the entry is identified as VDI object */
-#define CACHE_CREATE_SHIFT    27 /* If the entry should be created at backend */
+#define CACHE_VDI_SHIFT       63 /* if the entry is identified as VDI object */
+#define CACHE_CREATE_SHIFT    59 /* If the entry should be created at backend */
 
-#define CACHE_VDI_BIT         (UINT32_C(1) << CACHE_VDI_SHIFT)
-#define CACHE_CREATE_BIT      (UINT32_C(1) << CACHE_CREATE_SHIFT)
+#define CACHE_VDI_BIT         (UINT64_C(1) << CACHE_VDI_SHIFT)
+#define CACHE_CREATE_BIT      (UINT64_C(1) << CACHE_CREATE_SHIFT)
 
 #define CACHE_INDEX_MASK      (CACHE_CREATE_BIT)
 
@@ -39,7 +40,7 @@ struct global_cache {
 };
 
 struct object_cache_entry {
-	uint32_t idx; /* Index of this entry */
+	uint64_t idx; /* Index of this entry */
 	refcnt_t refcnt; /* Reference count of this entry */
 	uint64_t bmap; /* Each bit represents one dirty block in object */
 	struct object_cache *oc; /* Object cache this entry belongs to */
@@ -97,7 +98,7 @@ static inline int hash(uint64_t vid)
 }
 
 /* We should always use this helper to get entry idx */
-static inline uint32_t entry_idx(const struct object_cache_entry *entry)
+static inline uint64_t entry_idx(const struct object_cache_entry *entry)
 {
 	return entry->idx & ~CACHE_INDEX_MASK;
 }
@@ -108,15 +109,17 @@ static int object_cache_cmp(const struct object_cache_entry *a,
 	return intcmp(entry_idx(a), entry_idx(b));
 }
 
-static inline uint32_t object_cache_oid_to_idx(uint64_t oid)
+static inline uint64_t object_cache_oid_to_idx(uint64_t oid)
 {
-	uint32_t idx = data_oid_to_idx(oid);
+	uint64_t idx = data_oid_to_idx(oid);
 	if (is_vdi_obj(oid))
-		idx |= 1 << CACHE_VDI_SHIFT;
+		idx |= 1ULL << CACHE_VDI_SHIFT;
+	else if (is_vdi_btree_obj(oid))
+		idx |= VDI_BTREE_BIT;
 	return idx;
 }
 
-static inline bool idx_has_vdi_bit(uint32_t idx)
+static inline bool idx_has_vdi_bit(uint64_t idx)
 {
 	return !!(idx & CACHE_VDI_BIT);
 }
@@ -209,7 +212,7 @@ lru_tree_insert(struct rb_root *root, struct object_cache_entry *new)
 }
 
 static struct object_cache_entry *lru_tree_search(struct rb_root *root,
-						  uint32_t idx)
+						  uint64_t idx)
 {
 	struct object_cache_entry key = { .idx = idx };
 
@@ -279,7 +282,7 @@ free_cache_entry(struct object_cache_entry *entry)
 	free(entry);
 }
 
-static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
+static uint64_t idx_to_oid(uint32_t vid, uint64_t idx)
 {
 	if (idx_has_vdi_bit(idx))
 		return vid_to_vdi_oid(vid);
@@ -287,12 +290,12 @@ static uint64_t idx_to_oid(uint32_t vid, uint32_t idx)
 		return vid_to_data_oid(vid, idx);
 }
 
-static int remove_cache_object(struct object_cache *oc, uint32_t idx)
+static int remove_cache_object(struct object_cache *oc, uint64_t idx)
 {
 	int ret = SD_RES_SUCCESS;
 	char path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%08"PRIx32,
+	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%016"PRIx64,
 		 object_cache_dir, oc->vid, idx);
 	sd_debug("%"PRIx64, idx_to_oid(oc->vid, idx));
 	if (unlikely(unlink(path) < 0)) {
@@ -306,14 +309,14 @@ out:
 	return ret;
 }
 
-static int read_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
+static int read_cache_object_noupdate(uint32_t vid, uint64_t idx, void *buf,
 				      size_t count, off_t offset)
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	char p[PATH_MAX];
 
-	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
+	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%016"PRIx64, object_cache_dir,
 		 vid, idx);
 
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx)) {
@@ -343,14 +346,14 @@ out:
 	return ret;
 }
 
-static int write_cache_object_noupdate(uint32_t vid, uint32_t idx, void *buf,
+static int write_cache_object_noupdate(uint32_t vid, uint64_t idx, void *buf,
 				       size_t count, off_t offset)
 {
 	size_t size;
 	int fd, flags = def_open_flags, ret = SD_RES_SUCCESS;
 	char p[PATH_MAX];
 
-	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%08"PRIx32, object_cache_dir,
+	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%016"PRIx64, object_cache_dir,
 		 vid, idx);
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx)) {
 		assert(is_aligned_to_pagesize(buf));
@@ -382,7 +385,8 @@ out:
 static int read_cache_object(struct object_cache_entry *entry, void *buf,
 			     size_t count, off_t offset)
 {
-	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
+	uint32_t vid = entry->oc->vid;
+	uint64_t idx = entry_idx(entry);
 	struct object_cache *oc = entry->oc;
 	int ret;
 
@@ -400,7 +404,8 @@ static int write_cache_object(struct object_cache_entry *entry, void *buf,
 			      size_t count, off_t offset, bool create,
 			      bool writeback)
 {
-	uint32_t vid = entry->oc->vid, idx = entry_idx(entry);
+	uint32_t vid = entry->oc->vid;
+	uint64_t idx = entry_idx(entry);
 	uint64_t oid = idx_to_oid(vid, idx);
 	struct object_cache *oc = entry->oc;
 	struct sd_req hdr;
@@ -447,7 +452,7 @@ out:
 	return ret;
 }
 
-static int push_cache_object(uint32_t vid, uint32_t idx, uint64_t bmap,
+static int push_cache_object(uint32_t vid, uint64_t idx, uint64_t bmap,
 			     bool create)
 {
 	struct sd_req hdr;
@@ -663,7 +668,7 @@ static void object_cache_try_to_reclaim(int delay)
 }
 
 static inline struct object_cache_entry *
-alloc_cache_entry(struct object_cache *oc, uint32_t idx)
+alloc_cache_entry(struct object_cache *oc, uint64_t idx)
 {
 	struct object_cache_entry *entry;
 
@@ -677,7 +682,7 @@ alloc_cache_entry(struct object_cache *oc, uint32_t idx)
 	return entry;
 }
 
-static void add_to_lru_cache(struct object_cache *oc, uint32_t idx, bool create)
+static void add_to_lru_cache(struct object_cache *oc, uint64_t idx, bool create)
 {
 	struct object_cache_entry *entry = alloc_cache_entry(oc, idx);
 
@@ -713,13 +718,13 @@ static inline int lookup_path(char *path)
 	return ret;
 }
 
-static int object_cache_lookup(struct object_cache *oc, uint32_t idx,
+static int object_cache_lookup(struct object_cache *oc, uint64_t idx,
 			       bool create, bool writeback)
 {
 	int fd, ret, flags = def_open_flags;
 	char path[PATH_MAX];
 
-	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%08"PRIx32,
+	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%016"PRIx64,
 		 object_cache_dir, oc->vid, idx);
 	if (!create)
 		return lookup_path(path);
@@ -744,19 +749,19 @@ out:
 	return ret;
 }
 
-static int create_cache_object(struct object_cache *oc, uint32_t idx,
+static int create_cache_object(struct object_cache *oc, uint64_t idx,
 			       void *buffer, size_t buf_size)
 {
 	int flags = def_open_flags | O_CREAT | O_EXCL, fd;
 	int ret = SD_RES_OID_EXIST;
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 
-	snprintf(tmp_path, sizeof(tmp_path), "%s/%06"PRIx32"/%08"PRIx32".tmp",
+	snprintf(tmp_path, sizeof(tmp_path), "%s/%06"PRIx32"/%016"PRIx64".tmp",
 		object_cache_dir, oc->vid, idx);
 	fd = open(tmp_path, flags, sd_def_fmode);
 	if (fd < 0) {
 		if (likely(errno == EEXIST)) {
-			sd_debug("%08"PRIx32" already created", idx);
+			sd_debug("%016"PRIx64" already created", idx);
 			goto out;
 		}
 		sd_debug("%m");
@@ -767,11 +772,11 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 	ret = xwrite(fd, buffer, buf_size);
 	if (unlikely(ret != buf_size)) {
 		ret = SD_RES_EIO;
-		sd_err("failed, vid %"PRIx32", idx %"PRIx32, oc->vid, idx);
+		sd_err("failed, vid %"PRIx32", idx %"PRIx64, oc->vid, idx);
 		goto out_close;
 	}
 	/* This is intended to take care of partial write due to crash */
-	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%08"PRIx32,
+	snprintf(path, sizeof(path), "%s/%06"PRIx32"/%016"PRIx64,
 		 object_cache_dir, oc->vid, idx);
 	ret = link(tmp_path, path);
 	if (unlikely(ret < 0)) {
@@ -785,7 +790,7 @@ static int create_cache_object(struct object_cache *oc, uint32_t idx,
 		goto out_close;
 	}
 	ret = SD_RES_SUCCESS;
-	sd_debug("%08"PRIx32" size %zu", idx, buf_size);
+	sd_debug("%016"PRIx64" size %zu", idx, buf_size);
 out_close:
 	close(fd);
 	unlink(tmp_path);
@@ -794,7 +799,7 @@ out:
 }
 
 /* Fetch the object, cache it in the clean state */
-static int object_cache_pull(struct object_cache *oc, uint32_t idx)
+static int object_cache_pull(struct object_cache *oc, uint64_t idx)
 {
 	struct sd_req hdr;
 	int ret = SD_RES_NO_MEM;
@@ -918,7 +923,7 @@ static int object_cache_push(struct object_cache *oc)
 bool object_is_cached(uint64_t oid)
 {
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = object_cache_oid_to_idx(oid);
+	uint64_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
 
 	cache = find_object_cache(vid, false);
@@ -960,7 +965,7 @@ void object_cache_delete(uint32_t vid)
 }
 
 static struct object_cache_entry *
-get_cache_entry_from(struct object_cache *cache, uint32_t idx)
+get_cache_entry_from(struct object_cache *cache, uint64_t idx)
 {
 	struct object_cache_entry *entry;
 
@@ -980,7 +985,7 @@ get_cache_entry_from(struct object_cache *cache, uint32_t idx)
 static struct object_cache_entry *oid_to_entry(uint64_t oid)
 {
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = object_cache_oid_to_idx(oid);
+	uint64_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
 	struct object_cache_entry *entry;
 
@@ -998,7 +1003,7 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 	DIR *dir;
 	struct dirent *d;
 	uint32_t vid = oc->vid;
-	unsigned long idx;
+	uint64_t idx;
 	uint64_t all = UINT64_MAX;
 	int ret = 0;
 	char p[PATH_MAX];
@@ -1022,8 +1027,8 @@ static int object_cache_flush_and_delete(struct object_cache *oc)
 			continue;
 		}
 
-		idx = strtoul(d->d_name, NULL, 16);
-		if (idx == ULONG_MAX)
+		idx = strtoull(d->d_name, NULL, 16);
+		if (idx == ULLONG_MAX)
 			continue;
 		if (push_cache_object(vid, idx, all, true) !=
 		    SD_RES_SUCCESS) {
@@ -1063,7 +1068,7 @@ bool bypass_object_cache(const struct request *req)
 			return true;
 		} else  {
 			/* For read requet, we can read cache if any */
-			uint32_t idx = object_cache_oid_to_idx(oid);
+			uint64_t idx = object_cache_oid_to_idx(oid);
 
 			if (object_cache_lookup(cache, idx, false, false) == 0)
 				return false;
@@ -1080,13 +1085,13 @@ int object_cache_handle_request(struct request *req)
 	struct sd_req *hdr = &req->rq;
 	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid);
-	uint32_t idx = object_cache_oid_to_idx(oid);
+	uint64_t idx = object_cache_oid_to_idx(oid);
 	struct object_cache *cache;
 	struct object_cache_entry *entry;
 	int ret;
 	bool create = false;
 
-	sd_debug("%08" PRIx32 ", len %" PRIu32 ", off %" PRIu32, idx,
+	sd_debug("%08" PRIx64 ", len %" PRIu32 ", off %" PRIu32, idx,
 		 hdr->data_length, hdr->obj.offset);
 
 	cache = find_object_cache(vid, true);
@@ -1211,7 +1216,7 @@ static int load_cache_object(struct object_cache *cache)
 {
 	DIR *dir;
 	struct dirent *d;
-	unsigned long idx;
+	uint64_t idx;
 	char path[PATH_MAX];
 	int ret = 0;
 
@@ -1235,8 +1240,8 @@ static int load_cache_object(struct object_cache *cache)
 			continue;
 		}
 
-		idx = strtoul(d->d_name, NULL, 16);
-		if (idx == ULONG_MAX)
+		idx = strtoull(d->d_name, NULL, 16);
+		if (idx == ULLONG_MAX)
 			continue;
 
 		/*

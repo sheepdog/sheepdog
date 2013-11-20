@@ -495,7 +495,7 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 					path->p_ext, idx, vdi_id);
 			writer(path->p_idx->oid, path->p_ext_header,
 			       SD_INODE_DATA_INDEX_SIZE, 0, 0, inode->nr_copies,
-			       inode->copy_policy, true, false);
+			       inode->copy_policy, false, false);
 		} else if (path->p_ext_header) {
 			/* the last idx-node */
 			insert_ext_entry_nosearch(path->p_ext_header,
@@ -505,8 +505,11 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 				(LAST_EXT(path->p_ext_header) - 1)->idx;
 			writer(path->p_idx->oid, path->p_ext_header,
 			       SD_INODE_DATA_INDEX_SIZE, 0, 0, inode->nr_copies,
-			       inode->copy_policy, true, false);
+			       inode->copy_policy, false, false);
 		} else {
+			/* if btree is full, then panic */
+			if (header->entries >= EXT_IDX_MAX_ENTRIES)
+				panic("%s() B-tree is full!", __func__);
 			/* create a new ext-node */
 			leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
 			sd_inode_init(leaf_node, 2);

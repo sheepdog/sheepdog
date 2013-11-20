@@ -419,7 +419,7 @@ static inline uint64_t vid_to_vdi_oid(uint32_t vid)
 	return VDI_BIT | ((uint64_t)vid << VDI_SPACE_SHIFT);
 }
 
-static inline uint64_t vid_to_data_oid(uint32_t vid, uint32_t idx)
+static inline uint64_t vid_to_data_oid(uint32_t vid, uint64_t idx)
 {
 	return ((uint64_t)vid << VDI_SPACE_SHIFT) | idx;
 }
