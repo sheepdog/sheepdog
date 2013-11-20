@@ -27,7 +27,7 @@ for skip in 0 1 2 3; do
 	    dd if=$DATA_FILE bs=4k skip=$skip count=4 2> /dev/null \
 		| $DOG vdi write test $offset $length
 
-	    $DOG vdi read test $offset $length | hd
+	    $DOG vdi read test $offset $length | hexdump -C
 	done
     done
 done
