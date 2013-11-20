@@ -29,6 +29,17 @@ static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
  */
 int ec_max_data_strip;
 
+int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
+		       int copies, int copy_policy, int create)
+{
+	return write_object(oid, mem, len, 0, create == 1);
+}
+
+int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len)
+{
+	return read_object(oid, *mem, len, 0);
+}
+
 static int vdi_state_cmp(const struct vdi_state_entry *a,
 			 const struct vdi_state_entry *b)
 {
@@ -847,7 +858,7 @@ static void delete_one(struct work *work)
 	nr_objs = count_data_objs(inode);
 	for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
 		uint64_t oid;
-		uint32_t vid = sd_inode_get_vid(inode, i);
+		uint32_t vid = INODE_GET_VID(inode, i);
 
 		if (!vid)
 			continue;

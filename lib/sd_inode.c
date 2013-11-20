@@ -1,13 +1,572 @@
+/*
+ * B-tree is a tree data structure that keeps data sorted and allows searches,
+ * sequential access, insertions, and deletions in logarithmic time.
+ * The B-tree is a generalization of a binary search tree in that a node can
+ * have more than two children. (Comer 1979, p. 123) Unlike self-balancing
+ * binary search trees, the B-tree is optimized for systems that read and
+ * write large blocks of data. (ref: http://en.wikipedia.org/wiki/B-tree)
+ *
+ * In sheepdog, we use space in inode->data_vdi_id[] to store leaf-node at
+ * beginning and store root-node of B-tree when it reach depths of two.
+ *
+ * At beginning, the inode->data_vdi_id[] is storing leaf-node which point
+ * to data-obj directly:
+ *
+ *     +------------------+-----------+-----------+--------+
+ *     | sd_extent_header | sd_extent | sd_extent | ...... |
+ *     +------------------+-----------+-----------+--------+
+ *                              |          |
+ *                             /            \
+ *                            /              \
+ *                           /                \
+ *     +------------+ <------                  ----> +------------+
+ *     | data-obj 1 |                                | data-obj 2 |
+ *     +------------+                                +------------+
+ *
+ * After adding more oid into it, the leaf-node will be full of struct sd_extent
+ * and should be splited to two leaf-nodes, after it, the inode->data_vdi_id[]
+ * should become root-node which store sd_extent_idx and point to the two
+ * leaf-nodes:
+ *
+ *     +------------------+-----------------+-----------------+
+ *     | sd_extent_header |  sd_extent_idx  |  sd_extent_idx  |
+ *     +------------------+-----------------+-----------------+
+ *                              |                   |
+ *                             /                    \
+ *                            /                      -------------
+ *                           /                                    \
+ *                          /                                      \
+ *                         /                                        \
+ *     +------------------+-----------+-----------+--------+      +------------------+-----------+-----------+--------+
+ *     | sd_extent_header | sd_extent | sd_extent | ...... |      | sd_extent_header | sd_extent | sd_extent | ...... |
+ *     +------------------+-----------+-----------+--------+      +------------------+-----------+-----------+--------+
+ *                           /                \                                             /           \
+ *     +------------+ <------                  ---> +------------+      +--------------+ <--             --> +--------------+
+ *     | data-obj 1 |                               | data-obj 2 |      | data-obj 511 |                     | data-obj 512 |
+ *     +------------+                               +------------+      +--------------+                     +--------------+
+ *
+ * When a leaf-node is full, we could add a new leaf-node and add a
+ * new sd_extent_idx in root-node to point to it:
+ *
+ *     +------------------+-----------------+-----------------+---------------+
+ *     | sd_extent_header |  sd_extent_idx  |  sd_extent_idx  | sd_extent_idx |
+ *     +------------------+-----------------+-----------------+---------------+
+ *                              |                   |                 \
+ *                             /                    \                  \     (new leaf-node)
+ *                            /                      ---------          ------ +------------------+-----------+--------+
+ *                           /                                \                | sd_extent_header | sd_extent | ...... |
+ *                          /                                  \               +------------------+-----------+--------+
+ *                         /                                    \
+ *     +------------------+-----------+--------+      +------------------+-----------+--------+
+ *     | sd_extent_header | sd_extent | ...... |      | sd_extent_header | sd_extent | ...... |
+ *     +------------------+-----------+--------+      +------------------+-----------+--------+
+ *
+ *
+ * As above, the root-node point to leaf-node which point to data-obj
+ * (the implemention of B-tree in sd_inode only support two depth), so it could
+ * store:
+ *
+ *   (number of sd_extent_idx in root-node) * (number of sd_extent in leaf-node)
+ *
+ * which is 349524 * 524287 = 183250889388 data-objects (about 680 PB with 4MB data-objs).
+ *
+ */
 #include <string.h>
 
+#include "util.h"
 #include "sheepdog_proto.h"
 
-uint32_t sd_inode_get_vid(const struct sd_inode *inode, int idx)
+#define EXT_MAX_SPACE (SD_INODE_INDEX_SIZE - sizeof(struct sd_extent_header))
+#define EXT_MAX_ENTRIES (EXT_MAX_SPACE / sizeof(struct sd_extent))
+#define EXT_IDX_MAX_ENTRIES (EXT_MAX_SPACE / sizeof(struct sd_extent_idx))
+
+#define EXT_HEADER(data) ((struct sd_extent_header *)(data))
+#define FIRST_EXT(data)  ((struct sd_extent *)((char *)(data) + \
+			sizeof(struct sd_extent_header)))
+#define LAST_EXT(data)   (FIRST_EXT(data) + EXT_HEADER(data)->entries)
+#define OFFSET_EXT(data, n) ((char *)(data) + sizeof(struct sd_extent_header) \
+			+ n * sizeof(struct sd_extent))
+
+#define EXT_MAX_IDXS (EXT_MAX_SPACE / sizeof(struct sd_extent_idx))
+#define FIRST_IDX(data)  ((struct sd_extent_idx *)((char *)(data) + \
+			sizeof(struct sd_extent_header)))
+#define LAST_IDX(data)   (FIRST_IDX(data) + EXT_HEADER(data)->entries)
+#define OFFSET_IDX(data, n) ((char *)(data) + sizeof(struct sd_extent_header) \
+			+ n * sizeof(struct sd_extent_idx))
+
+struct find_path {
+	struct sd_extent_idx *p_idx;
+	struct sd_extent *p_ext;
+	struct sd_extent_header *p_ext_header;
+	int depth;
+};
+
+typedef int (*comp)(void *a, void *b);
+
+/* compare function for sd_extent */
+static int extent_comp(void *a, void *b)
 {
-	return inode->data_vdi_id[idx];
+	struct sd_extent *ea = (struct sd_extent *)a;
+	struct sd_extent *eb = (struct sd_extent *)b;
+
+	if (ea->idx > eb->idx)
+		return 1;
+	else if (ea->idx < eb->idx)
+		return -1;
+	else
+		return 0;
 }
 
-void sd_inode_set_vid(struct sd_inode *inode, int idx, uint32_t vdi_id)
+/* compare function for sd_extent_idx */
+static int index_comp(void *a, void *b)
 {
-	inode->data_vdi_id[idx] = vdi_id;
+	struct sd_extent_idx *ia = (struct sd_extent_idx *)a;
+	struct sd_extent_idx *ib = (struct sd_extent_idx *)b;
+
+	if (ia->idx > ib->idx)
+		return 1;
+	else if (ia->idx < ib->idx)
+		return -1;
+	else
+		return 0;
+}
+
+/* dump the information of B-tree */
+static void dump_btree(read_node_fn reader, struct sd_inode *inode)
+{
+#ifdef DEBUG
+	struct sd_extent_header *header = EXT_HEADER(inode->data_vdi_id);
+	struct sd_extent_header *leaf_node = NULL;
+	struct sd_extent *last, *iter;
+	struct sd_extent_idx *last_idx, *iter_idx;
+	void *tmp;
+
+	sd_info("btree> header: %u %u %u", header->magic,
+			header->entries, header->depth);
+
+	if (header->depth == 1) {
+		last = LAST_EXT(inode->data_vdi_id);
+		iter = FIRST_EXT(inode->data_vdi_id);
+
+		while (iter != last) {
+			sd_info("btree> ext: %d, %u", iter->idx, iter->vdi_id);
+			iter++;
+		}
+	} else if (header->depth == 2) {
+		last_idx = LAST_IDX(inode->data_vdi_id);
+		iter_idx = FIRST_IDX(inode->data_vdi_id);
+		leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
+		tmp = (void *)leaf_node;
+
+		while (iter_idx != last_idx) {
+			reader(iter_idx->oid, &tmp, SD_INODE_INDEX_SIZE);
+
+			sd_info("btree> %p idx: %d, %lu, %u",
+					iter_idx, iter_idx->idx, iter_idx->oid,
+					leaf_node->entries);
+			last = LAST_EXT(leaf_node);
+			iter = FIRST_EXT(leaf_node);
+			while (iter != last) {
+				sd_info("btree> ext in: %d, %u",
+						iter->idx, iter->vdi_id);
+				iter++;
+			}
+			iter_idx++;
+		}
+
+		free(leaf_node);
+	} else
+		panic("This B-tree not support depth %u", header->depth);
+#endif
+}
+
+/*
+ * Search for the key in a B-tree node. If can't find it, return the position
+ * for insert operation. So we can't just use xbsearch().
+ */
+static void *binary_search(void *first, void *last, void *key,
+			   size_t obj_size, comp cmp)
+{
+	const char *l, *r, *m;
+	int ret;
+
+	l = (const char *)first;
+	r = (const char *)last - obj_size;
+	while (l <= r) {
+		m = l + ((r - l) / obj_size / 2) * obj_size;
+		ret = cmp((void *)key, (void *)m);
+		if (ret < 0)
+			r = m - obj_size;
+		else if (ret > 0)
+			l = m + obj_size;
+		else
+			return (void *)m;
+	}
+	return (void *)l;
+}
+
+static void sd_inode_init(void *data, int depth)
+{
+	struct sd_extent_header *header = EXT_HEADER(data);
+	header->magic = INODE_BTREE_MAGIC;
+	header->depth = depth;
+	header->entries = 0;
+}
+
+/* check whether ext is in this node */
+static bool ext_in_range(struct sd_extent_header *header, struct sd_extent *ext)
+{
+	struct sd_extent *last = LAST_EXT(header);
+	if (last - ext > 0)
+		return true;
+	return false;
+}
+
+/* check whether idx is in this node */
+static bool idx_in_range(struct sd_extent_header *header,
+				struct sd_extent_idx *idx)
+{
+	struct sd_extent_idx *last = LAST_IDX(header);
+	if (last - idx > 0)
+		return true;
+	return false;
+}
+
+/* search idx in leaf-node */
+static struct sd_extent *search_ext_entry(struct sd_extent_header *header,
+					  uint32_t idx)
+{
+	struct sd_extent tmp;
+	tmp.idx = idx;
+	return binary_search(FIRST_EXT(header), LAST_EXT(header), &tmp,
+			sizeof(struct sd_extent), extent_comp);
+}
+
+/* search idx in middle-node */
+static struct sd_extent_idx *search_idx_entry(struct sd_extent_header *header,
+					      uint32_t idx)
+{
+	struct sd_extent_idx tmp;
+	tmp.idx = idx;
+	return binary_search(FIRST_IDX(header), LAST_IDX(header), &tmp,
+			sizeof(struct sd_extent_idx), index_comp);
+}
+
+static void insert_ext_entry_nosearch(struct sd_extent_header *header,
+				      struct sd_extent *ext, uint32_t idx,
+				      uint32_t vdi_id)
+{
+	struct sd_extent *last = LAST_EXT(header);
+
+	memmove(ext + 1, ext, (last - ext) * sizeof(struct sd_extent));
+	ext->idx = idx;
+	ext->vdi_id = vdi_id;
+	header->entries++;
+}
+
+static void insert_idx_entry_nosearch(struct sd_extent_header *header,
+				      struct sd_extent_idx *idx_ext,
+				      uint32_t idx, uint64_t oid)
+{
+	struct sd_extent_idx *last = LAST_IDX(header);
+	memmove(idx_ext + 1, idx_ext,
+			(last - idx_ext) * sizeof(struct sd_extent_idx));
+	idx_ext->idx = idx;
+	idx_ext->oid = oid;
+	header->entries++;
+}
+
+static void insert_idx_entry(struct sd_extent_header *header,
+			     uint32_t idx, uint64_t oid)
+{
+	struct sd_extent_idx *found;
+
+	if (header->entries >= EXT_MAX_IDXS)
+		goto out;
+
+	if (!header->entries) {
+		FIRST_IDX(header)->idx = idx;
+		FIRST_IDX(header)->oid = oid;
+		header->entries++;
+		goto out;
+	}
+
+	found = search_idx_entry(header, idx);
+	insert_idx_entry_nosearch(header, found, idx, oid);
+out:
+	return;
+}
+
+static void split_to_nodes(struct sd_extent_header *src,
+			   struct sd_extent_header *left,
+			   struct sd_extent_header *right, int num)
+{
+	memcpy(left, src, sizeof(struct sd_extent_header) +
+			num * sizeof(struct sd_extent));
+	left->entries = num;
+
+	mempcpy(right, src, sizeof(struct sd_extent_header));
+	mempcpy(FIRST_EXT(right), OFFSET_EXT(src, num),
+			(src->entries - num) * sizeof(struct sd_extent));
+	right->entries = src->entries - num;
+}
+
+/*
+ * The meta-data in inode is leaf-node at beginning, but after inserting too
+ * much sd_extent it will be full. When sd_extents is full, we need to create
+ * two new nodes, move sd_extents from inode to them and finally, let inode
+ * point to them.
+ */
+static void transfer_to_idx_root(write_node_fn writer, struct sd_inode *inode)
+{
+	struct sd_extent_header *left;
+	struct sd_extent_header *right;
+	struct sd_extent_header *root = EXT_HEADER(inode->data_vdi_id);
+	uint64_t left_oid, right_oid;
+	uint32_t num = root->entries / 2;
+
+	/* create two leaf-node and copy the entries from root-node */
+	left = xmalloc(SD_INODE_INDEX_SIZE);
+	right = xmalloc(SD_INODE_INDEX_SIZE);
+
+	split_to_nodes(root, left, right, num);
+
+	/* write two nodes back */
+	left_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
+	right_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
+
+	writer(left_oid, left, SD_INODE_INDEX_SIZE, inode->nr_copies,
+			inode->copy_policy, 1);
+	writer(right_oid, right, SD_INODE_INDEX_SIZE, inode->nr_copies,
+			inode->copy_policy, 1);
+
+	/* change root from ext-node to idx-node */
+	root->entries = 0;
+	root->depth = 2;
+	insert_idx_entry(root, (LAST_EXT(left) - 1)->idx, left_oid);
+	insert_idx_entry(root, (LAST_EXT(right) - 1)->idx, right_oid);
+
+	free(left);
+	free(right);
+}
+
+/*
+ * Search whole btree for 'idx'.
+ * Return available position (could insert new sd_extent) if can't find 'idx'.
+ */
+static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
+			      uint32_t idx, struct find_path *path)
+{
+	struct sd_extent_header *header, *leaf_node;
+	void *tmp;
+	uint64_t oid;
+	int ret = SD_RES_BTREE_NOT_FOUND;
+
+	header = EXT_HEADER(inode->data_vdi_id);
+
+	/* root is idx-node */
+	if (header->depth == 2) {
+		path->depth = 2;
+		path->p_idx = search_idx_entry(header, idx);
+		leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
+		tmp = (void *)leaf_node;
+
+		if (idx_in_range(header, path->p_idx)) {
+			oid = path->p_idx->oid;
+			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE);
+			if (ret != SD_RES_SUCCESS)
+				goto out;
+			path->p_ext = search_ext_entry(leaf_node, idx);
+			path->p_ext_header = leaf_node;
+			if (ext_in_range(leaf_node, path->p_ext) &&
+					path->p_ext->idx == idx)
+				ret = SD_RES_BTREE_FOUND;
+		} else {
+			/* check if last idx-node has space */
+			oid = (path->p_idx - 1)->oid;
+			ret = reader(oid, &tmp, SD_INODE_INDEX_SIZE);
+			if (ret != SD_RES_SUCCESS)
+				goto out;
+			if (leaf_node->entries < EXT_MAX_ENTRIES) {
+				path->p_ext = search_ext_entry(leaf_node, idx);
+				path->p_ext_header = leaf_node;
+			}
+		}
+	} else if (header->depth == 1) {
+		path->depth = 1;
+		path->p_ext = search_ext_entry(header, idx);
+		if (ext_in_range(header, path->p_ext) &&
+				path->p_ext->idx == idx)
+			ret = SD_RES_BTREE_FOUND;
+		else
+			ret = SD_RES_BTREE_NOT_FOUND;
+	}
+out:
+	return ret;
+}
+
+uint32_t sd_inode_get_vid(read_node_fn reader, const struct sd_inode *inode,
+			  uint32_t idx)
+{
+	struct find_path path;
+	int ret;
+
+	if (inode->store_policy == 0)
+		return inode->data_vdi_id[idx];
+	else {
+		/* btree is not init, so vdi is 0 */
+		if (inode->data_vdi_id[0] == 0)
+			return 0;
+
+		memset(&path, 0, sizeof(path));
+		ret = search_whole_btree(reader, inode, idx, &path);
+		if (ret == SD_RES_BTREE_FOUND)
+			return path.p_ext->vdi_id;
+		if (path.p_ext_header)
+			free(path.p_ext_header);
+	}
+
+	return 0;
+}
+
+/*
+ * When the leaf-node is full, we need to create a new node and
+ * move half of the data into new one.
+ */
+static void split_ext_node(write_node_fn writer, struct sd_inode *inode,
+			   struct find_path *path)
+{
+	struct sd_extent_header *old = path->p_ext_header, *new_ext;
+	uint32_t num = old->entries / 2;
+	uint64_t new_oid;
+
+	new_ext = xmalloc(SD_INODE_INDEX_SIZE);
+
+	split_to_nodes(old, new_ext, old, num);
+
+	new_oid = vid_to_btree_oid(inode->vdi_id, inode->btree_counter++);
+	writer(new_oid, new_ext, SD_INODE_INDEX_SIZE, inode->nr_copies,
+			inode->copy_policy, 1);
+	writer(path->p_idx->oid, old, SD_INODE_INDEX_SIZE, inode->nr_copies,
+			inode->copy_policy, 0);
+
+	/* write new index */
+	insert_idx_entry(EXT_HEADER(inode->data_vdi_id),
+			LAST_EXT(new_ext)->idx, new_oid);
+
+	free(new_ext);
+}
+
+/*
+ * Add new 'idx' and 'vdi_id' pair into leaf-node if depth equal 1 and
+ * add new leaf-node if there is no room for new 'idx' and 'vdi_id' pair.
+ */
+static int insert_new_node(write_node_fn writer, read_node_fn reader,
+			   struct sd_inode *inode, struct find_path *path,
+			   uint32_t idx, uint32_t vdi_id)
+{
+	struct sd_extent_header *header = EXT_HEADER(inode->data_vdi_id);
+	struct sd_extent_header *leaf_node = NULL;
+	uint64_t oid;
+	int ret = SD_RES_SUCCESS;
+
+	if (path->depth == 1) {
+		if (header->entries >= EXT_MAX_ENTRIES) {
+			transfer_to_idx_root(writer, inode);
+			ret = SD_RES_BTREE_REPEAT;
+			goto out;
+		}
+		insert_ext_entry_nosearch(header,
+				path->p_ext, idx, vdi_id);
+	} else if (path->depth == 2) {
+		if (idx_in_range(header, path->p_idx)) {
+			if (!path->p_ext_header) {
+				ret = SD_RES_BTREE_NOT_FOUND;
+				goto out;
+			}
+			if (path->p_ext_header->entries >= EXT_MAX_ENTRIES) {
+				split_ext_node(writer, inode, path);
+				ret = SD_RES_BTREE_REPEAT;
+				goto out;
+			}
+			insert_ext_entry_nosearch(path->p_ext_header,
+					path->p_ext, idx, vdi_id);
+			writer(path->p_idx->oid, path->p_ext_header,
+				SD_INODE_INDEX_SIZE, inode->nr_copies,
+				inode->copy_policy, 1);
+		} else if (path->p_ext_header) {
+			/* the last idx-node */
+			insert_ext_entry_nosearch(path->p_ext_header,
+					path->p_ext, idx, vdi_id);
+			path->p_idx--;
+			path->p_idx->idx =
+				(LAST_EXT(path->p_ext_header) - 1)->idx;
+			writer(path->p_idx->oid, path->p_ext_header,
+				SD_INODE_INDEX_SIZE, inode->nr_copies,
+				inode->copy_policy, 1);
+		} else {
+			/* create a new ext-node */
+			leaf_node = xmalloc(SD_INODE_INDEX_SIZE);
+			sd_inode_init(leaf_node, 2);
+			oid = vid_to_btree_oid(inode->vdi_id,
+					inode->btree_counter++);
+			insert_ext_entry_nosearch(leaf_node,
+					FIRST_EXT(leaf_node), idx, vdi_id);
+			writer(oid, leaf_node, SD_INODE_INDEX_SIZE,
+					inode->nr_copies,
+					inode->copy_policy, 1);
+			insert_idx_entry_nosearch(header, path->p_idx,
+					idx, oid);
+		}
+	}
+out:
+	if (leaf_node)
+		free(leaf_node);
+	return ret;
+}
+
+void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
+		      struct sd_inode *inode, uint32_t idx, uint32_t vdi_id)
+{
+	struct sd_extent_header *header;
+	struct find_path path;
+	int ret;
+
+	path.p_ext_header = NULL;
+
+	if (inode->store_policy == 0)
+		inode->data_vdi_id[idx] = vdi_id;
+	else {
+		if (inode->data_vdi_id[0] == 0)
+			sd_inode_init(inode->data_vdi_id, 1);
+		header = EXT_HEADER(inode->data_vdi_id);
+		if (header->magic != INODE_BTREE_MAGIC)
+			panic("%s() B-tree in inode is corrupt!", __func__);
+		while (1) {
+			memset(&path, 0, sizeof(path));
+			ret = search_whole_btree(reader, inode, idx, &path);
+			if (ret == SD_RES_BTREE_FOUND) {
+				path.p_ext->vdi_id = vdi_id;
+				goto out;
+			} else {
+				ret = insert_new_node(writer, reader, inode,
+						&path, idx, vdi_id);
+				if (SD_RES_BTREE_REPEAT == ret) {
+					if (path.p_ext_header)
+						free(path.p_ext_header);
+					continue;
+				} else
+					goto out;
+			}
+		}
+	}
+out:
+	if (path.p_ext_header)
+		free(path.p_ext_header);
+	dump_btree(reader, inode);
+}
+
+void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi)
+{
+	memcpy(newi->data_vdi_id, oldi->data_vdi_id, sizeof(newi->data_vdi_id));
 }

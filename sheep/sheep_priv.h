@@ -376,6 +376,15 @@ void objlist_cache_remove(uint64_t oid);
 
 void put_request(struct request *req);
 
+int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
+		       int copies, int copy_policy, int create);
+int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len);
+
+#define INODE_GET_VID(inode, idx) (sd_inode_get_vid(sheep_bnode_reader, \
+					inode, idx))
+#define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid(sheep_bnode_writer,\
+					sheep_bnode_reader, inode, idx, vdi_id))
+
 /* Operations */
 
 const struct sd_op_template *get_sd_op(uint8_t opcode);

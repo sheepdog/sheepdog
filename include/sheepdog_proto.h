@@ -74,6 +74,9 @@
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 #define SD_RES_HALT          0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_READONLY      0x1A /* Object is read-only */
+#define SD_RES_BTREE_NOT_FOUND	0x1B /* Cannot found node in btree */
+#define SD_RES_BTREE_FOUND   0x1C /* Found node in btree */
+#define SD_RES_BTREE_REPEAT  0x1D /* Should repeat op in btree */
 
 /* errors above 0x80 are sheepdog-internal */
 
@@ -92,6 +95,7 @@
 #define VDI_BIT (UINT64_C(1) << 63)
 #define VMSTATE_BIT (UINT64_C(1) << 62)
 #define VDI_ATTR_BIT (UINT64_C(1) << 61)
+#define VDI_BTREE_BIT (UINT64_C(1) << 60)
 #define MAX_DATA_OBJS (1ULL << 20)
 #define MAX_CHILDREN 1024U
 #define SD_MAX_VDI_LEN 256U
@@ -104,8 +108,9 @@
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
 
 #define SD_INODE_SIZE (sizeof(struct sd_inode))
-#define SD_INODE_HEADER_SIZE (sizeof(struct sd_inode) - \
-			      sizeof(uint32_t) * MAX_DATA_OBJS)
+#define SD_INODE_INDEX_SIZE (sizeof(uint32_t) * MAX_DATA_OBJS)
+#define SD_INODE_HEADER_SIZE ((unsigned long) \
+			      (&((struct sd_inode *)0)->data_vdi_id))
 #define SD_ATTR_OBJ_SIZE (sizeof(struct sheepdog_vdi_attr))
 #define CURRENT_VDI_ID 0
 
@@ -215,7 +220,7 @@ struct sd_inode {
 	uint64_t vdi_size;
 	uint64_t vm_state_size;
 	uint8_t  copy_policy;
-	uint8_t  reserved;
+	uint8_t  store_policy;
 	uint8_t  nr_copies;
 	uint8_t  block_size_shift;
 	uint32_t snap_id;
@@ -223,7 +228,30 @@ struct sd_inode {
 	uint32_t parent_vdi_id;
 	uint32_t child_vdi_id[MAX_CHILDREN];
 	uint32_t data_vdi_id[MAX_DATA_OBJS];
+	uint32_t btree_counter;
 };
+
+struct sd_extent {
+	uint32_t idx;
+	uint32_t vdi_id;
+};
+
+struct sd_extent_idx {
+	uint32_t idx;
+	uint64_t oid;
+};
+
+#define INODE_BTREE_MAGIC	0x6274
+
+struct sd_extent_header {
+	uint16_t magic;
+	uint16_t depth;	/* 1 -- ext node; 2 -- idx node */
+	uint32_t entries;
+};
+
+typedef int (*write_node_fn)(uint64_t id, void *mem, unsigned int len,
+				int copies, int copy_policy, int create);
+typedef int (*read_node_fn)(uint64_t id, void **mem, unsigned int len);
 
 struct sheepdog_vdi_attr {
 	char name[SD_MAX_VDI_LEN];
@@ -235,9 +263,12 @@ struct sheepdog_vdi_attr {
 	char value[SD_MAX_VDI_ATTR_VALUE_LEN];
 };
 
-uint32_t sd_inode_get_vid(const struct sd_inode *inode, int idx);
-void sd_inode_set_vid(struct sd_inode *inode, int idx, uint32_t vdi_id);
-void sd_inode_copy_vids(struct sd_inode *oldi, struct sd_inode *newi);
+extern uint32_t sd_inode_get_vid(read_node_fn reader,
+				 const struct sd_inode *inode, uint32_t idx);
+extern void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
+			     struct sd_inode *inode, uint32_t idx,
+			     uint32_t vdi_id);
+extern void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi);
 
 /* 64 bit FNV-1a non-zero initial basis */
 #define FNV1A_64_INIT ((uint64_t) 0xcbf29ce484222325ULL)
@@ -326,12 +357,6 @@ static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 	return sd_hash_64(val) >> (64 - bits);
 }
 
-static inline bool is_data_obj_writeable(const struct sd_inode *inode,
-					 int idx)
-{
-	return inode->vdi_id == sd_inode_get_vid(inode, idx);
-}
-
 static inline bool is_vdi_obj(uint64_t oid)
 {
 	return !!(oid & VDI_BIT);
@@ -347,10 +372,15 @@ static inline bool is_vdi_attr_obj(uint64_t oid)
 	return !!(oid & VDI_ATTR_BIT);
 }
 
+static inline bool is_vdi_btree_obj(uint64_t oid)
+{
+	return !!(oid & VDI_BTREE_BIT);
+}
+
 static inline bool is_data_obj(uint64_t oid)
 {
 	return !is_vdi_obj(oid) && !is_vmstate_obj(oid) &&
-		!is_vdi_attr_obj(oid);
+		!is_vdi_attr_obj(oid) && !is_vdi_btree_obj(oid);
 }
 
 static inline size_t count_data_objs(const struct sd_inode *inode)
@@ -392,6 +422,11 @@ static inline uint32_t oid_to_vid(uint64_t oid)
 static inline uint64_t vid_to_attr_oid(uint32_t vid, uint32_t attrid)
 {
 	return ((uint64_t)vid << VDI_SPACE_SHIFT) | VDI_ATTR_BIT | attrid;
+}
+
+static inline uint64_t vid_to_btree_oid(uint32_t vid, uint32_t btreeid)
+{
+	return ((uint64_t)vid << VDI_SPACE_SHIFT) | VDI_BTREE_BIT | btreeid;
 }
 
 static inline uint64_t vid_to_vmstate_oid(uint32_t vid, uint32_t idx)

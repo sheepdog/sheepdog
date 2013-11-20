@@ -64,6 +64,24 @@ struct vdi_inode {
 static struct rb_root vdi_inode_tree = RB_ROOT;
 static struct sd_lock vdi_inode_tree_lock = SD_LOCK_INITIALIZER;
 
+
+static int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
+				int copies, int copy_policy, int create);
+static int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len);
+
+#define INODE_GET_VID(inode, idx) (sd_inode_get_vid(\
+					sheepfs_bnode_reader, inode, idx))
+#define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid( \
+					sheepfs_bnode_writer, \
+					sheepfs_bnode_reader, \
+					inode, idx, vdi_id))
+
+static inline bool is_data_obj_writeable(const struct sd_inode *inode,
+					 uint32_t idx)
+{
+	return inode->vdi_id == INODE_GET_VID(inode, idx);
+}
+
 static int vdi_inode_cmp(const struct vdi_inode *a, const struct vdi_inode *b)
 {
 	return intcmp(a->vid, b->vid);
@@ -129,7 +147,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	if (is_data_obj(oid)) {
 		idx = data_oid_to_idx(oid);
 		assert(vdi);
-		vdi_id = sd_inode_get_vid(vdi->inode, idx);
+		vdi_id = INODE_GET_VID(vdi->inode, idx);
 		if (!vdi_id) {
 			/* if object doesn't exist, we'er done */
 			if (rw == VOLUME_READ) {
@@ -152,7 +170,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	if (rw == VOLUME_READ)
 		hdr.opcode = SD_OP_READ_OBJ;
 	else {
-		hdr.opcode = create ?
+		hdr.opcode = (create || is_vdi_btree_obj(oid)) ?
 			SD_OP_CREATE_AND_WRITE_OBJ : SD_OP_WRITE_OBJ;
 		hdr.flags |= SD_FLAG_CMD_WRITE;
 	}
@@ -176,7 +194,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	}
 
 	if (create) {
-		sd_inode_set_vid(vdi->inode, idx, vid);
+		INODE_SET_VID(vdi->inode, idx, vid);
 		/* writeback inode update */
 		if (volume_rw_object((char *)&vid, vid_to_vdi_oid(vid),
 				     sizeof(vid),
@@ -229,6 +247,25 @@ static int volume_do_rw(const char *path, char *buf, size_t size,
 	} while (size > 0);
 
 	return 0;
+}
+
+int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
+			 int copies, int copy_policy, int create)
+{
+	int ret;
+	ret = volume_rw_object(mem, oid, len, 0, VOLUME_WRITE);
+	if (ret == len)
+		return SD_RES_SUCCESS;
+	return ret;
+}
+
+int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len)
+{
+	int ret;
+	ret = volume_rw_object(*mem, oid, len, 0, VOLUME_READ);
+	if (ret == len)
+		return SD_RES_SUCCESS;
+	return ret;
 }
 
 int volume_read(const char *path, char *buf, size_t size, off_t offset)
