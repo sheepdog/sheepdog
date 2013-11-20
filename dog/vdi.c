@@ -293,14 +293,16 @@ static int obj_info_filler(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
 {
 	struct obj_info_filler_info *info = data;
 	struct sd_inode *inode = (struct sd_inode *)buf;
+	uint32_t vdi_id;
 
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
 		if (info->success)
 			break;
 		info->success = true;
-		if (inode->data_vdi_id[info->idx]) {
-			info->data_oid = vid_to_data_oid(inode->data_vdi_id[info->idx], info->idx);
+		vdi_id = sd_inode_get_vid(inode, info->idx);
+		if (vdi_id) {
+			info->data_oid = vid_to_data_oid(vdi_id, info->idx);
 			return 1;
 		}
 		break;
@@ -561,7 +563,7 @@ static int vdi_create(int argc, char **argv)
 			goto out;
 		}
 
-		inode->data_vdi_id[idx] = vid;
+		sd_inode_set_vid(inode, idx, vid);
 		ret = sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
 				      SD_INODE_HEADER_SIZE + sizeof(vid) * idx,
 				      0, inode->nr_copies, inode->copy_policy,
@@ -628,7 +630,7 @@ static int vdi_snapshot(int argc, char **argv)
 static int vdi_clone(int argc, char **argv)
 {
 	const char *src_vdi = argv[optind++], *dst_vdi;
-	uint32_t base_vid, new_vid;
+	uint32_t base_vid, new_vid, vdi_id;
 	uint64_t oid;
 	int idx, max_idx, ret;
 	struct sd_inode *inode = NULL;
@@ -668,8 +670,9 @@ static int vdi_clone(int argc, char **argv)
 		size_t size;
 
 		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
-		if (inode->data_vdi_id[idx]) {
-			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+		vdi_id = sd_inode_get_vid(inode, idx);
+		if (vdi_id) {
+			oid = vid_to_data_oid(vdi_id, idx);
 			ret = sd_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0, true);
 			if (ret) {
 				ret = EXIT_FAILURE;
@@ -1192,6 +1195,7 @@ static int vdi_read(int argc, char **argv)
 	int ret, idx;
 	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
+	uint32_t vdi_id;
 	unsigned int len;
 	char *buf = NULL;
 
@@ -1226,9 +1230,9 @@ static int vdi_read(int argc, char **argv)
 	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
-
-		if (inode->data_vdi_id[idx]) {
-			oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+		vdi_id = sd_inode_get_vid(inode, idx);
+		if (vdi_id) {
+			oid = vid_to_data_oid(vdi_id, idx);
 			ret = sd_read_object(oid, buf, len, offset, false);
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("Failed to read VDI");
@@ -1261,7 +1265,7 @@ out:
 static int vdi_write(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
-	uint32_t vid, flags;
+	uint32_t vid, flags, vdi_id;
 	int ret, idx;
 	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
@@ -1302,11 +1306,12 @@ static int vdi_write(int argc, char **argv)
 		flags = 0;
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
 
-		if (!inode->data_vdi_id[idx])
+		vdi_id = sd_inode_get_vid(inode, idx);
+		if (!vdi_id)
 			create = true;
 		else if (!is_data_obj_writeable(inode, idx)) {
 			create = true;
-			old_oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+			old_oid = vid_to_data_oid(vdi_id, idx);
 		}
 
 		if (vdi_cmd_data.writeback)
@@ -1323,8 +1328,8 @@ static int vdi_write(int argc, char **argv)
 			total = done + len;
 		}
 
-		inode->data_vdi_id[idx] = inode->vdi_id;
-		oid = vid_to_data_oid(inode->data_vdi_id[idx], idx);
+		sd_inode_set_vid(inode, idx, inode->vdi_id);
+		oid = vid_to_data_oid(inode->vdi_id, idx);
 		ret = sd_write_object(oid, old_oid, buf, len, offset, flags,
 				      inode->nr_copies, inode->copy_policy,
 				      create, false);
@@ -1742,7 +1747,7 @@ int do_vdi_check(const struct sd_inode *inode)
 	max_idx = count_data_objs(inode);
 	vdi_show_progress(done, inode->vdi_size);
 	for (int idx = 0; idx < max_idx; idx++) {
-		vid = inode->data_vdi_id[idx];
+		vid = sd_inode_get_vid(inode, idx);
 		if (vid) {
 			oid = vid_to_data_oid(vid, idx);
 			queue_vdi_check_work(inode, oid, &done, wq);
@@ -1897,8 +1902,8 @@ static int vdi_backup(int argc, char **argv)
 	}
 
 	for (idx = 0; idx < nr_objs; idx++) {
-		uint32_t from_vid = from_inode->data_vdi_id[idx];
-		uint32_t to_vid = to_inode->data_vdi_id[idx];
+		uint32_t from_vid = sd_inode_get_vid(from_inode, idx);
+		uint32_t to_vid = sd_inode_get_vid(to_inode, idx);
 
 		if (to_vid == 0 && from_vid == 0)
 			continue;
@@ -1951,7 +1956,7 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 		       struct sd_inode *parent_inode)
 {
 	int ret;
-	uint32_t parent_vid = parent_inode->data_vdi_id[backup->idx];
+	uint32_t parent_vid = sd_inode_get_vid(parent_inode, backup->idx);
 	uint64_t parent_oid = 0;
 
 	if (parent_vid)

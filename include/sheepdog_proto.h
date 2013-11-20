@@ -235,6 +235,10 @@ struct sheepdog_vdi_attr {
 	char value[SD_MAX_VDI_ATTR_VALUE_LEN];
 };
 
+uint32_t sd_inode_get_vid(const struct sd_inode *inode, int idx);
+void sd_inode_set_vid(struct sd_inode *inode, int idx, uint32_t vdi_id);
+void sd_inode_copy_vids(struct sd_inode *oldi, struct sd_inode *newi);
+
 /* 64 bit FNV-1a non-zero initial basis */
 #define FNV1A_64_INIT ((uint64_t) 0xcbf29ce484222325ULL)
 #define FNV_64_PRIME ((uint64_t) 0x100000001b3ULL)
@@ -325,7 +329,7 @@ static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
 					 int idx)
 {
-	return inode->vdi_id == inode->data_vdi_id[idx];
+	return inode->vdi_id == sd_inode_get_vid(inode, idx);
 }
 
 static inline bool is_vdi_obj(uint64_t oid)

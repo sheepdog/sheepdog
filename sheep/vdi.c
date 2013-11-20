@@ -847,13 +847,14 @@ static void delete_one(struct work *work)
 	nr_objs = count_data_objs(inode);
 	for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
 		uint64_t oid;
+		uint32_t vid = sd_inode_get_vid(inode, i);
 
-		if (!inode->data_vdi_id[i])
+		if (!vid)
 			continue;
 
-		oid = vid_to_data_oid(inode->data_vdi_id[i], i);
+		oid = vid_to_data_oid(vid, i);
 
-		if (inode->data_vdi_id[i] != inode->vdi_id) {
+		if (vid != inode->vdi_id) {
 			sd_debug("object %" PRIx64 " is base's data, would"
 				 " not be deleted.", oid);
 			continue;

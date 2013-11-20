@@ -117,7 +117,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret, fd, sock_idx;
 	bool create = false;
-	uint32_t vid = oid_to_vid(oid);
+	uint32_t vid = oid_to_vid(oid), vdi_id;
 	struct vdi_inode *vdi;
 	unsigned long idx = 0;
 	uint64_t cow_oid = 0;
@@ -129,7 +129,8 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	if (is_data_obj(oid)) {
 		idx = data_oid_to_idx(oid);
 		assert(vdi);
-		if (!vdi->inode->data_vdi_id[idx]) {
+		vdi_id = sd_inode_get_vid(vdi->inode, idx);
+		if (!vdi_id) {
 			/* if object doesn't exist, we'er done */
 			if (rw == VOLUME_READ) {
 				memset(buf, 0, size);
@@ -138,14 +139,10 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 			create = true;
 		} else {
 			if (rw == VOLUME_READ) {
-				oid = vid_to_data_oid(
-					vdi->inode->data_vdi_id[idx],
-					idx);
+				oid = vid_to_data_oid(vdi_id, idx);
 			/* in case we are writing a COW object */
 			} else if (!is_data_obj_writeable(vdi->inode, idx)) {
-				cow_oid = vid_to_data_oid(
-						vdi->inode->data_vdi_id[idx],
-						idx);
+				cow_oid = vid_to_data_oid(vdi_id, idx);
 				hdr.flags |= SD_FLAG_CMD_COW;
 				create = true;
 			}
@@ -179,7 +176,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	}
 
 	if (create) {
-		vdi->inode->data_vdi_id[idx] = vid;
+		sd_inode_set_vid(vdi->inode, idx, vid);
 		/* writeback inode update */
 		if (volume_rw_object((char *)&vid, vid_to_vdi_oid(vid),
 				     sizeof(vid),
