@@ -284,7 +284,10 @@ extern int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
 			      uint32_t idx, uint32_t vid, uint32_t value,
 			      int flags, bool create, bool direct);
 extern uint32_t sd_inode_get_meta_size(struct sd_inode *inode, size_t size);
-extern void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi);
+extern void sd_inode_copy_vdis(write_node_fn writer, read_node_fn reader,
+			       uint32_t *data_vdi_id, uint8_t store_policy,
+			       uint8_t nr_copies, uint8_t copy_policy,
+			       struct sd_inode *newi);
 
 typedef void (*btree_cb_fn)(void *data, enum btree_node_type type, void *arg);
 extern void traverse_btree(read_node_fn reader, const struct sd_inode *inode,

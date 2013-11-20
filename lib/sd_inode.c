@@ -661,8 +661,37 @@ out:
 	return ret;
 }
 
-void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi)
+void sd_inode_copy_vdis(write_node_fn writer, read_node_fn reader,
+			uint32_t *data_vdi_id, uint8_t store_policy,
+			uint8_t nr_copies, uint8_t copy_policy,
+			struct sd_inode *newi)
 {
-	memcpy(newi->data_vdi_id, oldi->data_vdi_id, sizeof(newi->data_vdi_id));
-}
+	struct sd_extent_header *header = EXT_HEADER(data_vdi_id);
+	struct sd_extent_header *leaf_node;
+	struct sd_extent_idx *last_idx, *old_iter_idx, *new_iter_idx;
+	uint64_t oid;
+	void *tmp;
 
+	memcpy(newi->data_vdi_id, data_vdi_id, sizeof(newi->data_vdi_id));
+
+	if (store_policy == 1 && header->depth > 1) {
+		/* for B-tree (> 1 level), it needs to copy all leaf-node */
+		last_idx = LAST_IDX(data_vdi_id);
+		old_iter_idx = FIRST_IDX(data_vdi_id);
+		new_iter_idx = FIRST_IDX(newi->data_vdi_id);
+		leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+		tmp = (void *)leaf_node;
+		while (old_iter_idx != last_idx) {
+			reader(old_iter_idx->oid, &tmp,
+			       SD_INODE_DATA_INDEX_SIZE, 0);
+			oid = vid_to_btree_oid(newi->vdi_id,
+					       newi->btree_counter++);
+			writer(oid, leaf_node, SD_INODE_DATA_INDEX_SIZE, 0, 0,
+			       nr_copies, copy_policy, true, false);
+			new_iter_idx->oid = oid;
+			old_iter_idx++;
+			new_iter_idx++;
+		}
+		free(leaf_node);
+	}
+}

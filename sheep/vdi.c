@@ -238,7 +238,9 @@ static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 	new->snap_id = new_snapid;
 	new->parent_vdi_id = iocb->base_vid;
 	if (data_vdi_id)
-		memcpy(new->data_vdi_id, data_vdi_id, sizeof(new->data_vdi_id));
+		sd_inode_copy_vdis(sheep_bnode_writer, sheep_bnode_reader,
+				   data_vdi_id, iocb->store_policy,
+				   iocb->nr_copies, iocb->copy_policy, new);
 	else if (new->store_policy)
 		sd_inode_init(new->data_vdi_id, 1);
 
