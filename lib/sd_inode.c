@@ -132,25 +132,26 @@ static int index_comp(void *a, void *b)
 		return 0;
 }
 
-/* dump the information of B-tree */
-static void dump_btree(read_node_fn reader, struct sd_inode *inode)
+/*
+ * traverse the whole btree that include all the inode->data_vdi_id, bnode,
+ * data objects and call btree_cb_fn()
+ */
+void traverse_btree(read_node_fn reader, const struct sd_inode *inode,
+		    btree_cb_fn fn, void *arg)
 {
-#ifdef DEBUG
 	struct sd_extent_header *header = EXT_HEADER(inode->data_vdi_id);
 	struct sd_extent_header *leaf_node = NULL;
 	struct sd_extent *last, *iter;
 	struct sd_extent_idx *last_idx, *iter_idx;
 	void *tmp;
 
-	sd_info("btree> header: %u %u %u", header->magic,
-			header->entries, header->depth);
-
+	fn(header, BTREE_HEAD, arg);
 	if (header->depth == 1) {
 		last = LAST_EXT(inode->data_vdi_id);
 		iter = FIRST_EXT(inode->data_vdi_id);
 
 		while (iter != last) {
-			sd_info("btree> ext: %d, %u", iter->idx, iter->vdi_id);
+			fn(iter, BTREE_EXT, arg);
 			iter++;
 		}
 	} else if (header->depth == 2) {
@@ -163,14 +164,12 @@ static void dump_btree(read_node_fn reader, struct sd_inode *inode)
 			reader(iter_idx->oid, &tmp,
 					SD_INODE_DATA_INDEX_SIZE, 0);
 
-			sd_info("btree> %p idx: %d, %lu, %u",
-					iter_idx, iter_idx->idx, iter_idx->oid,
-					leaf_node->entries);
+			fn(iter_idx, BTREE_IDX, arg);
+			fn(leaf_node, BTREE_HEAD, arg);
 			last = LAST_EXT(leaf_node);
 			iter = FIRST_EXT(leaf_node);
 			while (iter != last) {
-				sd_info("btree> ext in: %d, %u",
-						iter->idx, iter->vdi_id);
+				fn(iter, BTREE_EXT, arg);
 				iter++;
 			}
 			iter_idx++;
@@ -179,6 +178,40 @@ static void dump_btree(read_node_fn reader, struct sd_inode *inode)
 		free(leaf_node);
 	} else
 		panic("This B-tree not support depth %u", header->depth);
+}
+
+#ifdef DEBUG
+static void dump_cb(void *data, enum btree_node_type type, void *arg)
+{
+	struct sd_extent_header *header;
+	struct sd_extent *ext;
+	struct sd_extent_idx *idx;
+
+	switch (type) {
+	case BTREE_HEAD:
+		header = (struct sd_extent_header *)data;
+		sd_info("btree> HEAD: magic %u entries %u depth %u",
+			header->magic, header->entries, header->depth);
+		break;
+	case BTREE_EXT:
+		ext = (struct sd_extent *)data;
+		sd_info("btree> EXT: idx %u vdi_id %u", ext->idx, ext->vdi_id);
+		break;
+	case BTREE_IDX:
+		idx = (struct sd_extent_idx *)data;
+		sd_info("btree> IDX: idx %u oid %lu", idx->idx, idx->oid);
+		break;
+	}
+}
+#endif
+
+/* dump the information of B-tree */
+static void dump_btree(read_node_fn reader, struct sd_inode *inode)
+{
+#ifdef DEBUG
+	sd_info("btree> BEGIN");
+	traverse_btree(reader, inode, dump_cb, NULL);
+	sd_info("btree> END");
 #endif
 }
 
@@ -632,3 +665,4 @@ void sd_inode_copy_vdis(struct sd_inode *oldi, struct sd_inode *newi)
 {
 	memcpy(newi->data_vdi_id, oldi->data_vdi_id, sizeof(newi->data_vdi_id));
 }
+

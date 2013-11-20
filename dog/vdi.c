@@ -85,14 +85,37 @@ static void vdi_show_progress(uint64_t done, uint64_t total)
 	return show_progress(done, total, false);
 }
 
-/*
- * Get the number of objects.
- *
- * 'my_objs' means the number objects which belongs to this vdi.  'cow_objs'
- * means the number of the other objects.
- */
-static void stat_data_objs(const struct sd_inode *inode, uint64_t *my_objs,
-			   uint64_t *cow_objs)
+struct stat_arg {
+	uint64_t *my;
+	uint64_t *cow;
+	uint32_t vid;
+};
+
+static void stat_cb(void *data, enum btree_node_type type, void *arg)
+{
+	struct sd_extent *ext;
+	struct stat_arg *sarg = arg;
+	uint64_t *my = sarg->my;
+	uint64_t *cow = sarg->cow;
+
+	if (type == BTREE_EXT) {
+		ext = (struct sd_extent *)data;
+		if (ext->vdi_id == sarg->vid)
+			(*my)++;
+		else if (ext->vdi_id != 0)
+			(*cow)++;
+	}
+}
+
+static void stat_data_objs_btree(const struct sd_inode *inode,
+				 uint64_t *my_objs, uint64_t *cow_objs)
+{
+	struct stat_arg arg = {my_objs, cow_objs, inode->vdi_id};
+	traverse_btree(dog_bnode_reader, inode, stat_cb, &arg);
+}
+
+static void stat_data_objs_array(const struct sd_inode *inode,
+				 uint64_t *my_objs, uint64_t *cow_objs)
 {
 	int nr;
 	uint64_t my, cow, *p;
@@ -141,12 +164,27 @@ static void stat_data_objs(const struct sd_inode *inode, uint64_t *my_objs,
 	*cow_objs = cow;
 }
 
+/*
+ * Get the number of objects.
+ *
+ * 'my_objs' means the number objects which belongs to this vdi.  'cow_objs'
+ * means the number of the other objects.
+ */
+static void stat_data_objs(const struct sd_inode *inode, uint64_t *my_objs,
+			   uint64_t *cow_objs)
+{
+	if (inode->store_policy == 0)
+		stat_data_objs_array(inode, my_objs, cow_objs);
+	else
+		stat_data_objs_btree(inode, my_objs, cow_objs);
+}
+
 static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			   uint32_t snapid, uint32_t flags,
 			   const struct sd_inode *i, void *data)
 {
 	bool is_clone = false;
-	uint64_t my_objs, cow_objs;
+	uint64_t my_objs = 0, cow_objs = 0;
 	time_t ti;
 	struct tm tm;
 	char dbuf[128];
@@ -1769,6 +1807,29 @@ static void queue_vdi_check_work(const struct sd_inode *inode, uint64_t oid,
 	}
 }
 
+struct check_arg {
+	const struct sd_inode *inode;
+	uint64_t *done;
+	struct work_queue *wq;
+};
+
+static void check_cb(void *data, enum btree_node_type type, void *arg)
+{
+	struct sd_extent *ext;
+	struct check_arg *carg = arg;
+	uint64_t oid;
+
+	if (type == BTREE_EXT) {
+		ext = (struct sd_extent *)data;
+		if (ext->vdi_id) {
+			oid = vid_to_data_oid(ext->vdi_id, ext->idx);
+			*(carg->done) = (uint64_t)ext->idx * SD_DATA_OBJ_SIZE;
+			vdi_show_progress(*(carg->done), carg->inode->vdi_size);
+			queue_vdi_check_work(carg->inode, oid, NULL, carg->wq);
+		}
+	}
+}
+
 int do_vdi_check(const struct sd_inode *inode)
 {
 	uint32_t max_idx;
@@ -1787,17 +1848,23 @@ int do_vdi_check(const struct sd_inode *inode)
 
 	queue_vdi_check_work(inode, vid_to_vdi_oid(inode->vdi_id), NULL, wq);
 
-	max_idx = count_data_objs(inode);
-	vdi_show_progress(done, inode->vdi_size);
-	for (uint32_t idx = 0; idx < max_idx; idx++) {
-		vid = INODE_GET_VID(inode, idx);
-		if (vid) {
-			oid = vid_to_data_oid(vid, idx);
-			queue_vdi_check_work(inode, oid, &done, wq);
-		} else {
-			done += SD_DATA_OBJ_SIZE;
-			vdi_show_progress(done, inode->vdi_size);
+	if (inode->store_policy == 0) {
+		max_idx = count_data_objs(inode);
+		vdi_show_progress(done, inode->vdi_size);
+		for (uint32_t idx = 0; idx < max_idx; idx++) {
+			vid = INODE_GET_VID(inode, idx);
+			if (vid) {
+				oid = vid_to_data_oid(vid, idx);
+				queue_vdi_check_work(inode, oid, &done, wq);
+			} else {
+				done += SD_DATA_OBJ_SIZE;
+				vdi_show_progress(done, inode->vdi_size);
+			}
 		}
+	} else {
+		struct check_arg arg = {inode, &done, wq};
+		traverse_btree(dog_bnode_reader, inode, check_cb, &arg);
+		vdi_show_progress(inode->vdi_size, inode->vdi_size);
 	}
 
 	work_queue_wait(wq);
