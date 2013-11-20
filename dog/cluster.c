@@ -243,13 +243,29 @@ out:
 	return ret;
 }
 
+static void fill_cb(void *data, enum btree_node_type type, void *arg)
+{
+	struct sd_extent *ext;
+	struct sd_inode *inode = (struct sd_inode *)arg;
+	uint64_t oid;
+
+	if (type == BTREE_EXT) {
+		ext = (struct sd_extent *)data;
+		if (ext->vdi_id) {
+			oid = vid_to_data_oid(ext->vdi_id, ext->idx);
+			object_tree_insert(oid, inode->nr_copies,
+					   inode->copy_policy);
+		}
+	}
+}
+
 static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 			     uint32_t snapid, uint32_t flags,
 			     const struct sd_inode *i, void *data)
 {
 	uint64_t vdi_oid = vid_to_vdi_oid(vid), vmstate_oid;
 	uint32_t vdi_id;
-	int nr_objs, nr_vmstate_object;
+	uint32_t nr_objs, nr_vmstate_object;
 
 	/* ignore active vdi */
 	if (!vdi_is_snapshot(i))
@@ -259,18 +275,21 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	object_tree_insert(vdi_oid, i->nr_copies, i->copy_policy);
 
 	/* fill data object id */
-	nr_objs = count_data_objs(i);
-	for (uint64_t idx = 0; idx < nr_objs; idx++) {
-		vdi_id = INODE_GET_VID(i, idx);
-		if (vdi_id) {
+	if (i->store_policy == 0) {
+		nr_objs = count_data_objs(i);
+		for (uint32_t idx = 0; idx < nr_objs; idx++) {
+			vdi_id = INODE_GET_VID(i, idx);
+			if (!vdi_id)
+				continue;
 			uint64_t oid = vid_to_data_oid(vdi_id, idx);
 			object_tree_insert(oid, i->nr_copies, i->copy_policy);
 		}
-	}
+	} else
+		traverse_btree(dog_bnode_reader, i, fill_cb, &i);
 
 	/* fill vmstate object id */
 	nr_vmstate_object = DIV_ROUND_UP(i->vm_state_size, SD_DATA_OBJ_SIZE);
-	for (int idx = 0; idx < nr_vmstate_object; idx++) {
+	for (uint32_t idx = 0; idx < nr_vmstate_object; idx++) {
 		vmstate_oid = vid_to_vmstate_oid(vid, idx);
 		object_tree_insert(vmstate_oid, i->nr_copies, i->copy_policy);
 	}

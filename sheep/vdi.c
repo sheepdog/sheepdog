@@ -834,11 +834,43 @@ static int notify_vdi_deletion(uint32_t vdi_id)
 	return ret;
 }
 
+struct delete_arg {
+	const struct sd_inode *inode;
+	uint32_t *nr_deleted;
+};
+
+static void delete_cb(void *data, enum btree_node_type type, void *arg)
+{
+	struct sd_extent *ext;
+	struct delete_arg *darg = (struct delete_arg *)arg;
+	uint64_t oid;
+	int ret;
+
+	if (type != BTREE_EXT)
+		return;
+
+	ext = (struct sd_extent *)data;
+	if (ext->vdi_id) {
+		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
+		if (ext->vdi_id != darg->inode->vdi_id)
+			sd_debug("object %" PRIx64 " is base's data, would"
+				 " not be deleted.", oid);
+		else {
+			ret = remove_object(oid);
+			if (ret != SD_RES_SUCCESS)
+				sd_err("remove object %" PRIx64 " fail, %d",
+				       oid, ret);
+			(*(darg->nr_deleted))++;
+		}
+	}
+}
+
 static void delete_one(struct work *work)
 {
 	struct deletion_work *dw = container_of(work, struct deletion_work, work);
 	uint32_t vdi_id = *(dw->buf + dw->count - dw->done - 1);
-	int ret, i, nr_deleted, nr_objs;
+	int ret;
+	uint32_t i, nr_deleted, nr_objs;
 	struct sd_inode *inode = NULL;
 
 	sd_debug("%d %d, %16x", dw->done, dw->count, vdi_id);
@@ -860,27 +892,33 @@ static void delete_one(struct work *work)
 	if (inode->vdi_size == 0 && vdi_is_deleted(inode))
 		goto out;
 
-	nr_objs = count_data_objs(inode);
-	for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
-		uint64_t oid;
-		uint32_t vid = INODE_GET_VID(inode, i);
+	if (inode->store_policy == 0) {
+		nr_objs = count_data_objs(inode);
+		for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
+			uint64_t oid;
+			uint32_t vid = INODE_GET_VID(inode, i);
 
-		if (!vid)
-			continue;
+			if (!vid)
+				continue;
 
-		oid = vid_to_data_oid(vid, i);
+			oid = vid_to_data_oid(vid, i);
 
-		if (vid != inode->vdi_id) {
-			sd_debug("object %" PRIx64 " is base's data, would"
-				 " not be deleted.", oid);
-			continue;
+			if (vid != inode->vdi_id) {
+				sd_debug("object %" PRIx64 " is base's data, "
+					 "would not be deleted.", oid);
+				continue;
+			}
+
+			ret = remove_object(oid);
+			if (ret != SD_RES_SUCCESS)
+				sd_err("remove object %" PRIx64 " fail, %d",
+				       oid, ret);
+
+			nr_deleted++;
 		}
-
-		ret = remove_object(oid);
-		if (ret != SD_RES_SUCCESS)
-			sd_err("remove object %" PRIx64 " fail, %d", oid, ret);
-
-		nr_deleted++;
+	} else {
+		struct delete_arg arg = {inode, &nr_deleted};
+		traverse_btree(sheep_bnode_reader, inode, delete_cb, &arg);
 	}
 
 	if (vdi_is_deleted(inode))
