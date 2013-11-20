@@ -60,6 +60,8 @@ int kv_create_bucket(struct http_request *req, const char *bucket)
 
 	hdr.vdi.vdi_size = SD_MAX_VDI_SIZE;
 	hdr.vdi.copies = sys->cinfo.nr_copies;
+	hdr.vdi.copy_policy = sys->cinfo.copy_policy;
+	hdr.vdi.store_policy = 1;
 
 	ret = exec_local_req(&hdr, buf);
 	switch (ret) {
@@ -221,10 +223,20 @@ static int do_kv_create_object(struct http_request *req, const char *obj_name,
 
 	if (memcmp(&hdr, &obj->hdr, sizeof(hdr)) == 0) {
 		/* update inode object */
-		uint64_t offset = offsetof(struct sd_inode, data_vdi_id)
-			+ idx * sizeof(vid);
-		ret = write_object(vid_to_vdi_oid(vid), (char *)&vid,
-				   sizeof(vid), offset, false);
+		struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
+
+		ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+				  sizeof(*inode), 0);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("failed to read inode, %" PRIx64,
+			       vid_to_vdi_oid(vid));
+			free(inode);
+			goto err;
+		}
+		INODE_SET_VID(inode, idx, vid);
+		ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
+					 vid, vid, 0, false, false);
+		free(inode);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("failed to update inode, %" PRIx64,
 			       vid_to_vdi_oid(vid));
