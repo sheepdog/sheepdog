@@ -1,0 +1,55 @@
+#!/bin/bash
+
+# Test sheep write/read/recovery logic for hyper volume
+
+. ./common
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$DOG vdi create test 16P -y
+_vdi_list
+
+# write many 2MB data from different offset of vdi
+for i in `seq 0 15`; do
+	_random | head -c 2M > $STORE/b$i
+	cat $STORE/b$i | md5sum > $STORE/cs$i
+	dd if=$STORE/b$i 2>/dev/null | $DOG vdi write test ${i}P 2M
+done
+
+# read these data out and check
+for i in `seq 0 15`; do
+	$DOG vdi read test ${i}P 2M > $STORE/c$i
+	cat $STORE/c$i | md5sum > $STORE/csum$i
+	diff -u -a $STORE/cs$i $STORE/csum$i
+done
+
+_vdi_list
+
+_cleanup
+
+# test sheep recovery logic for hyper volume (B-tree)
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format
+
+$DOG vdi create test 16P -y
+_vdi_list
+_random | $DOG vdi write test 15P 2M
+$DOG vdi read test 15P 2M | md5sum > $STORE/csum1
+
+_kill_sheep 2;
+$DOG vdi read test 15P 2M | md5sum > $STORE/csum2
+
+diff -u $STORE/csum1 $STORE/csum2
+
+_vdi_list
