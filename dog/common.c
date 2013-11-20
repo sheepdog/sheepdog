@@ -349,6 +349,8 @@ size_t get_store_objsize(uint8_t copy_policy, uint64_t oid)
 {
 	if (is_vdi_obj(oid))
 		return SD_INODE_SIZE;
+	if (is_vdi_btree_obj(oid))
+		return SD_INODE_DATA_INDEX_SIZE;
 	if (copy_policy != 0) {
 		int d;
 
@@ -361,6 +363,8 @@ size_t get_store_objsize(uint8_t copy_policy, uint64_t oid)
 bool is_erasure_oid(uint64_t oid, uint8_t policy)
 {
 	if (is_vdi_obj(oid))
+		return false;
+	if (is_vdi_btree_obj(oid))
 		return false;
 	if (policy == 0)
 		return false;

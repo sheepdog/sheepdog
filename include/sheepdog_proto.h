@@ -419,6 +419,9 @@ static inline size_t get_objsize(uint64_t oid)
 	if (is_vdi_attr_obj(oid))
 		return SD_ATTR_OBJ_SIZE;
 
+	if (is_vdi_btree_obj(oid))
+		return SD_INODE_DATA_INDEX_SIZE;
+
 	return SD_DATA_OBJ_SIZE;
 }
 

@@ -194,6 +194,9 @@ bool is_erasure_obj(uint64_t oid, uint8_t copy_policy)
 	if (is_vdi_obj(oid))
 		return false;
 
+	if (is_vdi_btree_obj(oid))
+		return false;
+
 	if (copy_policy > 0)
 		return true;
 
@@ -202,7 +205,8 @@ bool is_erasure_obj(uint64_t oid, uint8_t copy_policy)
 
 bool is_erasure_oid(uint64_t oid)
 {
-	return !is_vdi_obj(oid) && get_vdi_copy_policy(oid_to_vid(oid)) > 0;
+	return !is_vdi_obj(oid) && !is_vdi_btree_obj(oid) &&
+		get_vdi_copy_policy(oid_to_vid(oid)) > 0;
 }
 
 /* Prepare request iterator and buffer for each replica */
