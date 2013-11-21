@@ -1,0 +1,57 @@
+Sheepdog Maintainers
+====================
+
+The intention of this file is not to establish who owns what portions of the
+code base, but to provide a set of names that developers can consult when they
+have a question about a particular subset and also to provide a set of names
+to be CC'd when submitting a patch to obtain appropriate review.
+
+In general, if you have a question about inclusion of a patch, you should
+consult sheepdog development list and not any specific individual privately.
+
+Descriptions of section entries:
+
+	M: Mail patches to: FullName <address@domain>
+	L: Mailing list that is relevant to this area
+	B: Branches with wildcard patterns
+	F: Files and directories with wildcard patterns
+
+Sheepdog Overall
+------------------------------
+M: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+M: Liu Yuan <namei.unix@gmail.com>
+B: sheeepdog/*
+L: sheepdog@lists.wpkg.org
+
+Sheepdog Stable Branches
+------------------------------
+M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+B: sheepdog/stable-*
+L: sheepdog@lists.wpkg.org
+
+QEMU Driver
+------------------------------
+M: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+M: Liu Yuan <namei.unix@gmail.com>
+F: qemu/block/sheedog.c
+L: qemu-devel@nongnu.org
+
+iSCSI Target Driver
+------------------------------
+M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+F: tgt/usr/bs_sheepdog.c
+L: stgt@vger.kernel.org
+
+Libvirt Driver
+------------------------------
+M: Sebastian Wiedenroth <sebastian.wiedenroth@skylime.net>
+F: libvirt/storage/storage_backend_sheepdog.c
+L: libvir-list@redhat.com
+
+Openstack Drivers
+------------------------------
+M: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+M: Liu Yuan <namei.unix@gmail.com>
+F: openstack/glance/store/sheepdog.py
+F: openstack/cinder/volume/drivers/sheepdog.py
+L: openstack-dev@lists.openstack.org
