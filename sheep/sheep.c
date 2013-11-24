@@ -83,7 +83,7 @@ static const char cluster_help[] =
 "\tzookeeper: use zookeeper driver, need extra arguments\n"
 "\n\tzookeeper arguments: address-list,tiemout=value (default as 3000)\n"
 "\nExample:\n\t"
-"$ sheep -c zookeeperr:IP1:PORT1,IP2:PORT2,IP3:PORT3,timeout=1000 ...\n"
+"$ sheep -c zookeeper:IP1:PORT1,IP2:PORT2,IP3:PORT3,timeout=1000 ...\n"
 "This tries to use 3 node zookeeper cluster, which can be reached by\n"
 "IP1:PORT1, IP2:PORT2, IP3:PORT3 to manage membership and broadcast message\n"
 "and set the timeout of node heartbeat as 1000 milliseconds\n";
