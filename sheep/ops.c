@@ -819,7 +819,7 @@ static int local_flush_vdi(struct request *req)
 static int local_discard_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
-	uint32_t vid = oid_to_vid(oid), zero = 0, tmp_vid;
+	uint32_t vid = oid_to_vid(oid), tmp_vid;
 	int ret = SD_RES_SUCCESS, idx = data_oid_to_idx(oid);
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 
@@ -832,9 +832,9 @@ static int local_discard_obj(struct request *req)
 	tmp_vid = INODE_GET_VID(inode, idx);
 	/* if vid in idx is not exist, we don't need to remove it */
 	if (tmp_vid) {
-		INODE_SET_VID(inode, idx, vid);
+		INODE_SET_VID(inode, idx, 0);
 		ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx, vid,
-					 zero, 0, false, false);
+					 0, 0, false, false);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		if (sd_remove_object(oid) != SD_RES_SUCCESS)
@@ -846,7 +846,7 @@ static int local_discard_obj(struct request *req)
 	 */
 out:
 	free(inode);
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 static int local_flush_and_del(struct request *req)
