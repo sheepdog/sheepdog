@@ -124,6 +124,7 @@
 #define SD_RES_AGAIN            0x8F /* Ask to try again */
 #define SD_RES_STALE_OBJ        0x90 /* Object may be stale */
 #define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
+#define SD_RES_OBJ_TAKEN        0x92 /* Object ID is taken up */
 
 enum sd_status {
 	SD_STATUS_OK = 1,
