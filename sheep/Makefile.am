@@ -30,7 +30,8 @@ sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c \
 			  plain_store.c config.c migrate.c md.c
 
 if BUILD_HTTP
-sheep_SOURCES		+= http/http.c http/kv.c http/s3.c http/swift.c
+sheep_SOURCES		+= http/http.c http/kv.c http/s3.c http/swift.c \
+			   http/oalloc.c
 endif
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c

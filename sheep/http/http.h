@@ -108,4 +108,10 @@ int http_request_writes(struct http_request *req, const char *str);
 __printf(2, 3)
 int http_request_writef(struct http_request *req, const char *fmt, ...);
 
+/* object_allocator.c */
+int oalloc_new_prepare(uint32_t vid, uint64_t *start, uint64_t count);
+int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count);
+int oalloc_free(uint32_t vid, uint64_t start, uint64_t count);
+int oalloc_init(uint32_t vid);
+
 #endif /* __SHEEP_HTTP_H__ */
