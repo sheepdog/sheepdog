@@ -14,12 +14,12 @@
 #include "mock.h"
 #include "sheep_priv.h"
 
-MOCK_METHOD(read_object, int, 0,
+MOCK_METHOD(sd_read_object, int, 0,
 	    uint64_t oid, char *data, unsigned int datalen, uint64_t offset)
-MOCK_METHOD(write_object, int, 0,
+MOCK_METHOD(sd_write_object, int, 0,
 	    uint64_t oid, char *data, unsigned int datalen, uint64_t offset,
 	    bool create)
 MOCK_METHOD(read_backend_object, int, 0,
 	    uint64_t oid, char *data, unsigned int datalen, uint64_t offset)
-MOCK_METHOD(remove_object, int, 0,
+MOCK_METHOD(sd_remove_object, int, 0,
 	    uint64_t oid)

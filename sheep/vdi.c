@@ -33,13 +33,13 @@ int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
 		       uint64_t offset, uint32_t flags, int copies,
 		       int copy_policy, bool create, bool direct)
 {
-	return write_object(oid, mem, len, offset, create);
+	return sd_write_object(oid, mem, len, offset, create);
 }
 
 int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 		       uint64_t offset)
 {
-	return read_object(oid, *mem, len, offset);
+	return sd_read_object(oid, *mem, len, offset);
 }
 
 static int vdi_state_cmp(const struct vdi_state_entry *a,
@@ -202,8 +202,8 @@ int vdi_exist(uint32_t vid)
 	int ret = 1;
 
 	inode = xzalloc(sizeof(*inode));
-	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
-			  sizeof(*inode), 0);
+	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
+			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("fail to read vdi inode (%" PRIx32 ")", vid);
 		ret = 0;
@@ -270,8 +270,8 @@ static int create_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		 iocb->name, iocb->size, new_vid, iocb->nr_copies, new_snapid,
 		 new->copy_policy, new->store_policy);
 
-	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, true);
+	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
+			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
 		ret = SD_RES_VDI_WRITE;
 
@@ -306,8 +306,8 @@ static int clone_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		 "copies %d, snapid %" PRIu32, iocb->name, iocb->size, new_vid,
 		 base_vid, iocb->nr_copies, new_snapid);
 
-	ret = read_object(vid_to_vdi_oid(base_vid), (char *)base, sizeof(*base),
-			  0);
+	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
+			     sizeof(*base), 0);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_READ;
 		goto out;
@@ -319,12 +319,13 @@ static int clone_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	/* TODO: multiple write_object should be performed atomically */
+	/* TODO: multiple sd_write_object should be performed atomically */
 
 	/* update a base vdi */
-	ret = write_object(vid_to_vdi_oid(base_vid), (char *)&new_vid,
-			   sizeof(new_vid),
-			   offsetof(struct sd_inode, child_vdi_id[idx]), false);
+	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)&new_vid,
+			      sizeof(new_vid),
+			      offsetof(struct sd_inode, child_vdi_id[idx]),
+			      false);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_WRITE;
 		goto out;
@@ -332,8 +333,8 @@ static int clone_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 
 	/* create a new vdi */
 	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id);
-	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, true);
+	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
+			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
 		ret = SD_RES_VDI_WRITE;
 
@@ -369,8 +370,8 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		 "copies %d, snapid %" PRIu32, iocb->name, iocb->size, new_vid,
 		 base_vid, iocb->nr_copies, new_snapid);
 
-	ret = read_object(vid_to_vdi_oid(base_vid), (char *)base, sizeof(*base),
-			  0);
+	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
+			     sizeof(*base), 0);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_READ;
 		goto out;
@@ -382,13 +383,13 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	/* TODO: multiple write_object should be performed atomically */
+	/* TODO: multiple sd_write_object should be performed atomically */
 
 	/* update a base vdi */
 	base->snap_ctime = iocb->time;
 	base->child_vdi_id[idx] = new_vid;
-	ret = write_object(vid_to_vdi_oid(base_vid), (char *)base,
-			   SD_INODE_HEADER_SIZE, 0, false);
+	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base,
+			      SD_INODE_HEADER_SIZE, 0, false);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_WRITE;
 		goto out;
@@ -396,8 +397,8 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 
 	/* create a new vdi */
 	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id);
-	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, true);
+	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
+			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
 		ret = SD_RES_VDI_WRITE;
 
@@ -438,8 +439,8 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		 iocb->size, new_vid, base_vid, cur_vid, iocb->nr_copies,
 		 new_snapid);
 
-	ret = read_object(vid_to_vdi_oid(base_vid), (char *)base, sizeof(*base),
-			  0);
+	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
+			     sizeof(*base), 0);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_READ;
 		goto out;
@@ -451,21 +452,22 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	/* TODO: multiple write_object should be performed atomically */
+	/* TODO: multiple sd_write_object should be performed atomically */
 
 	/* update current working vdi */
-	ret = write_object(vid_to_vdi_oid(cur_vid), (char *)&iocb->time,
-			   sizeof(iocb->time),
-			   offsetof(struct sd_inode, snap_ctime), false);
+	ret = sd_write_object(vid_to_vdi_oid(cur_vid), (char *)&iocb->time,
+			      sizeof(iocb->time),
+			      offsetof(struct sd_inode, snap_ctime), false);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_READ;
 		goto out;
 	}
 
 	/* update base vdi */
-	ret = write_object(vid_to_vdi_oid(base_vid), (char *)&new_vid,
-			   sizeof(new_vid),
-			   offsetof(struct sd_inode, child_vdi_id[idx]), false);
+	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)&new_vid,
+			      sizeof(new_vid),
+			      offsetof(struct sd_inode, child_vdi_id[idx]),
+			      false);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_WRITE;
 		goto out;
@@ -473,8 +475,8 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 
 	/* create a new vdi */
 	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id);
-	ret = write_object(vid_to_vdi_oid(new_vid), (char *)new, sizeof(*new),
-			   0, true);
+	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
+			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
 		ret = SD_RES_VDI_WRITE;
 
@@ -547,8 +549,8 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 		goto out;
 	}
 	for (i = right - 1; i >= left; i--) {
-		ret = read_object(vid_to_vdi_oid(i), (char *)inode,
-				  SD_INODE_HEADER_SIZE, 0);
+		ret = sd_read_object(vid_to_vdi_oid(i), (char *)inode,
+				     SD_INODE_HEADER_SIZE, 0);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 
@@ -798,8 +800,8 @@ static int delete_inode(struct deletion_work *dw)
 	int ret = SD_RES_SUCCESS;
 
 	inode = xzalloc(sizeof(*inode));
-	ret = read_object(vid_to_vdi_oid(dw->vid), (char *)inode,
-			  SD_INODE_HEADER_SIZE, 0);
+	ret = sd_read_object(vid_to_vdi_oid(dw->vid), (char *)inode,
+			     SD_INODE_HEADER_SIZE, 0);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -807,8 +809,8 @@ static int delete_inode(struct deletion_work *dw)
 
 	memset(inode->name, 0, sizeof(inode->name));
 
-	ret = write_object(vid_to_vdi_oid(dw->vid), (char *)inode,
-			   SD_INODE_HEADER_SIZE, 0, false);
+	ret = sd_write_object(vid_to_vdi_oid(dw->vid), (char *)inode,
+			      SD_INODE_HEADER_SIZE, 0, false);
 	if (ret != 0) {
 		ret = SD_RES_EIO;
 		goto out;
@@ -858,7 +860,7 @@ static void delete_cb(void *data, enum btree_node_type type, void *arg)
 			sd_debug("object %" PRIx64 " is base's data, would"
 				 " not be deleted.", oid);
 		else {
-			ret = remove_object(oid);
+			ret = sd_remove_object(oid);
 			if (ret != SD_RES_SUCCESS)
 				sd_err("remove object %" PRIx64 " fail, %d",
 				       oid, ret);
@@ -884,7 +886,7 @@ static void delete_one(struct work *work)
 	}
 
 	ret = read_backend_object(vid_to_vdi_oid(vdi_id),
-			  (void *)inode, sizeof(*inode), 0);
+				  (void *)inode, sizeof(*inode), 0);
 
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("cannot find VDI object");
@@ -911,7 +913,7 @@ static void delete_one(struct work *work)
 				continue;
 			}
 
-			ret = remove_object(oid);
+			ret = sd_remove_object(oid);
 			if (ret != SD_RES_SUCCESS)
 				sd_err("remove object %" PRIx64 " fail, %d",
 				       oid, ret);
@@ -929,8 +931,8 @@ static void delete_one(struct work *work)
 	inode->vdi_size = 0;
 	memset(inode->name, 0, sizeof(inode->name));
 
-	write_object(vid_to_vdi_oid(vdi_id), (void *)inode,
-		     sizeof(*inode), 0, false);
+	sd_write_object(vid_to_vdi_oid(vdi_id), (void *)inode,
+			sizeof(*inode), 0, false);
 
 	if (nr_deleted)
 		notify_vdi_deletion(vdi_id);
@@ -981,7 +983,7 @@ static int fill_vdi_list(struct deletion_work *dw, uint32_t root_vid)
 again:
 	vid = dw->buf[done++];
 	ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
-			  SD_INODE_HEADER_SIZE, 0);
+				  SD_INODE_HEADER_SIZE, 0);
 
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("cannot find VDI object");
@@ -1023,11 +1025,11 @@ static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
 	}
 next:
 	ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
-			  SD_INODE_HEADER_SIZE, 0);
+				  SD_INODE_HEADER_SIZE, 0);
 
 	if (vid == inode->vdi_id && inode->snap_id == 1
-			&& inode->parent_vdi_id != 0
-			&& !inode->snap_ctime) {
+	    && inode->parent_vdi_id != 0
+	    && !inode->snap_ctime) {
 		sd_debug("vdi %" PRIx32 " is a cloned vdi.", vid);
 		/* current vdi is a cloned vdi */
 		*cloned = true;
@@ -1143,12 +1145,12 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 	end = *attrid - 1;
 	while (*attrid != end) {
 		oid = vid_to_attr_oid(vid, *attrid);
-		ret = read_object(oid, (char *)&tmp_attr,
-				  sizeof(tmp_attr), 0);
+		ret = sd_read_object(oid, (char *)&tmp_attr,
+				     sizeof(tmp_attr), 0);
 
 		if (ret == SD_RES_NO_OBJ && wr) {
-			ret = write_object(oid, (char *)vattr, data_len, 0,
-					   true);
+			ret = sd_write_object(oid, (char *)vattr, data_len, 0,
+					      true);
 			if (ret)
 				ret = SD_RES_EIO;
 			else
@@ -1167,17 +1169,17 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 			if (excl)
 				ret = SD_RES_VDI_EXIST;
 			else if (delete) {
-				ret = write_object(oid, (char *)"", 1,
-						   offsetof(struct sheepdog_vdi_attr, name),
-						   false);
+				ret = sd_write_object(oid, (char *)"", 1,
+				offsetof(struct sheepdog_vdi_attr, name),
+						      false);
 				if (ret)
 					ret = SD_RES_EIO;
 				else
 					ret = SD_RES_SUCCESS;
 			} else if (wr) {
-				ret = write_object(oid, (char *)vattr,
-						   SD_ATTR_OBJ_SIZE, 0,
-						   false);
+				ret = sd_write_object(oid, (char *)vattr,
+						      SD_ATTR_OBJ_SIZE, 0,
+						      false);
 
 				if (ret)
 					ret = SD_RES_EIO;

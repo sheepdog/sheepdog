@@ -824,8 +824,8 @@ static int local_discard_obj(struct request *req)
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 
 	sd_debug("%"PRIx64, oid);
-	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
-			sizeof(struct sd_inode), 0);
+	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
+			     sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
@@ -837,11 +837,11 @@ static int local_discard_obj(struct request *req)
 					 zero, 0, false, false);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		if (remove_object(oid) != SD_RES_SUCCESS)
+		if (sd_remove_object(oid) != SD_RES_SUCCESS)
 			sd_err("failed to remove %"PRIx64, oid);
 	}
 	/*
-	 * Return success even if remove_object fails because we have updated
+	 * Return success even if sd_remove_object fails because we have updated
 	 * inode successfully.
 	 */
 out:

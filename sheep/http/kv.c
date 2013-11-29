@@ -147,7 +147,8 @@ int kv_list_buckets(struct http_request *req,
 
 		oid = vid_to_vdi_oid(nr);
 
-		ret = read_object(oid, (char *)inode, SD_INODE_HEADER_SIZE, 0);
+		ret = sd_read_object(oid, (char *)inode, SD_INODE_HEADER_SIZE,
+				     0);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read inode header");
 			continue;
@@ -212,17 +213,17 @@ static int kv_create_inlined_object(struct sd_inode *inode,
 
 	if (overwrite) {
 		sd_info("overwrite object %s", onode->hdr.name);
-		ret = write_object(oid, (char *)onode,
-				   sizeof(onode->hdr) + onode->hdr.size,
-				   0, false);
+		ret = sd_write_object(oid, (char *)onode,
+				      sizeof(onode->hdr) + onode->hdr.size,
+				      0, false);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("failed to write object, %" PRIx64, oid);
 			goto out;
 		}
 	} else {
-		ret = write_object(oid, (char *)onode,
-				   sizeof(onode->hdr) + onode->hdr.size,
-				   0, true);
+		ret = sd_write_object(oid, (char *)onode,
+				      sizeof(onode->hdr) + onode->hdr.size,
+				      0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("failed to create object, %" PRIx64, oid);
 			goto out;
@@ -261,8 +262,8 @@ static int do_kv_create_object(struct http_request *req,
 	uint32_t tmp_vid;
 	int ret;
 
-	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
-			  sizeof(*inode), 0);
+	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
+			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read inode, %" PRIx64,
 		       vid_to_vdi_oid(vid));
@@ -270,7 +271,7 @@ static int do_kv_create_object(struct http_request *req,
 	}
 	tmp_vid = INODE_GET_VID(inode, idx);
 	if (tmp_vid) {
-		ret = read_object(oid, (char *)&hdr, sizeof(hdr), 0);
+		ret = sd_read_object(oid, (char *)&hdr, sizeof(hdr), 0);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("failed to read object, %" PRIx64, oid);
 			goto out;
@@ -356,7 +357,7 @@ static int do_kv_read_object(struct http_request *req, const char *obj_name,
 	uint64_t oid = vid_to_data_oid(vid, idx);
 	int ret;
 
-	ret = read_object(oid, (char *)obj, sizeof(*obj), 0);
+	ret = sd_read_object(oid, (char *)obj, sizeof(*obj), 0);
 	switch (ret) {
 	case SD_RES_SUCCESS:
 		break;
@@ -418,7 +419,7 @@ static int do_kv_update_object(struct http_request *req, const char *obj_name,
 	uint64_t oid = vid_to_data_oid(vid, idx);
 	int ret;
 
-	ret = read_object(oid, (char *)&obj->hdr, sizeof(obj->hdr), 0);
+	ret = sd_read_object(oid, (char *)&obj->hdr, sizeof(obj->hdr), 0);
 	switch (ret) {
 	case SD_RES_SUCCESS:
 		break;
@@ -439,8 +440,9 @@ static int do_kv_update_object(struct http_request *req, const char *obj_name,
 		obj->hdr.mtime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 		obj->hdr.size = size;
 
-		ret = write_object(oid, (char *)obj,
-				   sizeof(obj->hdr) + obj->hdr.size, 0, false);
+		ret = sd_write_object(oid, (char *)obj,
+				      sizeof(obj->hdr) + obj->hdr.size,
+				      0, false);
 		if (ret == SD_RES_SUCCESS)
 			http_response_header(req, ACCEPTED);
 		else {
@@ -501,7 +503,7 @@ static int do_kv_delete_object(struct http_request *req, const char *obj_name,
 	char name[SD_MAX_OBJECT_NAME];
 	int ret;
 
-	ret = read_object(oid, name, sizeof(name), 0);
+	ret = sd_read_object(oid, name, sizeof(name), 0);
 	switch (ret) {
 	case SD_RES_SUCCESS:
 		break;
@@ -517,7 +519,7 @@ static int do_kv_delete_object(struct http_request *req, const char *obj_name,
 
 	if (strcmp(name, obj_name) == 0) {
 		memset(name, 0, sizeof(name));
-		ret = write_object(oid, name, sizeof(name), 0, false);
+		ret = sd_write_object(oid, name, sizeof(name), 0, false);
 		if (ret == SD_RES_SUCCESS)
 			http_response_header(req, NO_CONTENT);
 		else {
@@ -569,9 +571,9 @@ int kv_list_objects(struct http_request *req, const char *bucket,
 		return ret;
 
 	inode = xzalloc(sizeof(*inode));
-	ret = read_object(vid_to_vdi_oid(vid), (char *)inode->data_vdi_id,
-			  sizeof(inode->data_vdi_id),
-			  offsetof(typeof(*inode), data_vdi_id));
+	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode->data_vdi_id,
+			     sizeof(inode->data_vdi_id),
+			     offsetof(typeof(*inode), data_vdi_id));
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("%s: bucket %s", sd_strerror(ret), bucket);
 		http_response_header(req, INTERNAL_SERVER_ERROR);
@@ -589,7 +591,7 @@ int kv_list_objects(struct http_request *req, const char *bucket,
 
 		oid = vid_to_data_oid(vid, idx);
 
-		ret = read_object(oid, name, sizeof(name), 0);
+		ret = sd_read_object(oid, name, sizeof(name), 0);
 		switch (ret) {
 		case SD_RES_SUCCESS:
 			if (name[0] != '\0')

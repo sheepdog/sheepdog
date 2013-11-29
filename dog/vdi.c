@@ -64,14 +64,14 @@ int dog_bnode_writer(uint64_t oid, void *mem, unsigned int len, uint64_t offset,
 		     uint32_t flags, int copies, int copy_policy, bool create,
 		     bool direct)
 {
-	return sd_write_object(oid, 0, mem, len, offset, flags, copies,
+	return dog_write_object(oid, 0, mem, len, offset, flags, copies,
 			       copy_policy, create, direct);
 }
 
 int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 		     uint64_t offset)
 {
-	return sd_read_object(oid, *mem, len, offset, true);
+	return dog_read_object(oid, *mem, len, offset, true);
 }
 
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
@@ -513,7 +513,7 @@ static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 		return EXIT_FAILURE;
 	}
 
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, size, 0, true);
+	ret = dog_read_object(vid_to_vdi_oid(vid), inode, size, 0, true);
 	if (ret != SD_RES_SUCCESS) {
 		if (snapid) {
 			sd_err("Failed to read a snapshot %s:%d", vdiname,
@@ -615,7 +615,8 @@ static int vdi_create(int argc, char **argv)
 
 	inode = xmalloc(sizeof(*inode));
 
-	ret = sd_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode), 0, true);
+	ret = dog_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode), 0,
+			      true);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to read a newly created VDI object");
 		ret = EXIT_FAILURE;
@@ -627,7 +628,7 @@ static int vdi_create(int argc, char **argv)
 		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 		oid = vid_to_data_oid(vid, idx);
 
-		ret = sd_write_object(oid, 0, NULL, 0, 0, 0, inode->nr_copies,
+		ret = dog_write_object(oid, 0, NULL, 0, 0, 0, inode->nr_copies,
 				      inode->copy_policy, true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
@@ -675,11 +676,12 @@ static int vdi_snapshot(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		return ret;
 
-	ret = sd_write_object(vid_to_vdi_oid(vid), 0, vdi_cmd_data.snapshot_tag,
-			      SD_MAX_VDI_TAG_LEN,
-			      offsetof(struct sd_inode, tag),
-			      0, inode->nr_copies, inode->copy_policy,
-			      false, false);
+	ret = dog_write_object(vid_to_vdi_oid(vid), 0,
+			       vdi_cmd_data.snapshot_tag,
+			       SD_MAX_VDI_TAG_LEN,
+			       offsetof(struct sd_inode, tag),
+			       0, inode->nr_copies, inode->copy_policy,
+			       false, false);
 	if (ret != SD_RES_SUCCESS)
 		return EXIT_FAILURE;
 
@@ -750,7 +752,8 @@ static int vdi_clone(int argc, char **argv)
 		vdi_id = INODE_GET_VID(inode, idx);
 		if (vdi_id) {
 			oid = vid_to_data_oid(vdi_id, idx);
-			ret = sd_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0, true);
+			ret = dog_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0,
+					      true);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;
@@ -760,8 +763,9 @@ static int vdi_clone(int argc, char **argv)
 			size = 0;
 
 		oid = vid_to_data_oid(new_vid, idx);
-		ret = sd_write_object(oid, 0, buf, size, 0, 0, inode->nr_copies,
-				      inode->copy_policy, true, true);
+		ret = dog_write_object(oid, 0, buf, size, 0, 0,
+				       inode->nr_copies,
+				       inode->copy_policy, true, true);
 		if (ret != SD_RES_SUCCESS) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -829,7 +833,7 @@ static int vdi_resize(int argc, char **argv)
 	}
 	inode->vdi_size = new_size;
 
-	ret = sd_write_object(vid_to_vdi_oid(vid), 0,
+	ret = dog_write_object(vid_to_vdi_oid(vid), 0,
 			      inode, SD_INODE_HEADER_SIZE, 0,
 			      0, inode->nr_copies, inode->copy_policy,
 			      false, true);
@@ -1263,7 +1267,7 @@ static int vdi_getattr(int argc, char **argv)
 
 	oid = attr_oid;
 
-	ret = sd_read_object(oid, &vattr, SD_ATTR_OBJ_SIZE, 0, true);
+	ret = dog_read_object(oid, &vattr, SD_ATTR_OBJ_SIZE, 0, true);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to read attribute oid: %s", sd_strerror(ret));
 		return EXIT_SYSFAIL;
@@ -1317,7 +1321,7 @@ static int vdi_read(int argc, char **argv)
 		vdi_id = INODE_GET_VID(inode, idx);
 		if (vdi_id) {
 			oid = vid_to_data_oid(vdi_id, idx);
-			ret = sd_read_object(oid, buf, len, offset, false);
+			ret = dog_read_object(oid, buf, len, offset, false);
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("Failed to read VDI");
 				ret = EXIT_FAILURE;
@@ -1414,7 +1418,7 @@ static int vdi_write(int argc, char **argv)
 
 		INODE_SET_VID(inode, idx, inode->vdi_id);
 		oid = vid_to_data_oid(inode->vdi_id, idx);
-		ret = sd_write_object(oid, old_oid, buf, len, offset, flags,
+		ret = dog_write_object(oid, old_oid, buf, len, offset, flags,
 				      inode->nr_copies, inode->copy_policy,
 				      create, false);
 		if (ret != SD_RES_SUCCESS) {
@@ -1943,8 +1947,8 @@ static int get_obj_backup(uint32_t idx, uint32_t from_vid, uint32_t to_vid,
 	backup->length = SD_DATA_OBJ_SIZE;
 
 	if (to_vid) {
-		ret = sd_read_object(vid_to_data_oid(to_vid, idx), backup->data,
-				     SD_DATA_OBJ_SIZE, 0, true);
+		ret = dog_read_object(vid_to_data_oid(to_vid, idx),
+				      backup->data, SD_DATA_OBJ_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read object %" PRIx32 ", %d", to_vid,
 			       idx);
@@ -1954,8 +1958,8 @@ static int get_obj_backup(uint32_t idx, uint32_t from_vid, uint32_t to_vid,
 		memset(backup->data, 0, SD_DATA_OBJ_SIZE);
 
 	if (from_vid) {
-		ret = sd_read_object(vid_to_data_oid(from_vid, idx), from_data,
-				     SD_DATA_OBJ_SIZE, 0, true);
+		ret = dog_read_object(vid_to_data_oid(from_vid, idx), from_data,
+				      SD_DATA_OBJ_SIZE, 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read object %" PRIx32 ", %d",
 			       from_vid, idx);
@@ -2074,17 +2078,17 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 		parent_oid = vid_to_data_oid(parent_vid, backup->idx);
 
 	/* send a copy-on-write request */
-	ret = sd_write_object(vid_to_data_oid(vid, backup->idx), parent_oid,
-			      backup->data, backup->length, backup->offset,
-			      0, parent_inode->nr_copies,
-			      parent_inode->copy_policy, true, true);
+	ret = dog_write_object(vid_to_data_oid(vid, backup->idx), parent_oid,
+			       backup->data, backup->length, backup->offset,
+			       0, parent_inode->nr_copies,
+			       parent_inode->copy_policy, true, true);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	return sd_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
-			       SD_INODE_HEADER_SIZE + sizeof(vid) * backup->idx,
-			       0, parent_inode->nr_copies,
-			       parent_inode->copy_policy, false, true);
+	return dog_write_object(vid_to_vdi_oid(vid), 0, &vid, sizeof(vid),
+			SD_INODE_HEADER_SIZE + sizeof(vid) * backup->idx,
+				0, parent_inode->nr_copies,
+				parent_inode->copy_policy, false, true);
 }
 
 static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
@@ -2190,7 +2194,7 @@ static int vdi_restore(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		goto out;
 
-	ret = sd_read_object(vid_to_vdi_oid(current_inode->parent_vdi_id),
+	ret = dog_read_object(vid_to_vdi_oid(current_inode->parent_vdi_id),
 			     parent_inode, SD_INODE_HEADER_SIZE, 0, true);
 	if (ret != SD_RES_SUCCESS) {
 		printf("error\n");
@@ -2291,7 +2295,7 @@ static int vid_to_name_tag(uint32_t vid, char *name, char *tag)
 	struct sd_inode inode;
 	int ret;
 
-	ret = sd_read_object(vid_to_vdi_oid(vid), &inode, SD_INODE_HEADER_SIZE,
+	ret = dog_read_object(vid_to_vdi_oid(vid), &inode, SD_INODE_HEADER_SIZE,
 			     0, true);
 	if (ret != SD_RES_SUCCESS)
 		return ret;

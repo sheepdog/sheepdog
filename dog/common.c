@@ -55,8 +55,8 @@ char *strnumber(uint64_t size)
 	return strnumber_raw(size, raw_output);
 }
 
-int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
-		   uint64_t offset, bool direct)
+int dog_read_object(uint64_t oid, void *data, unsigned int datalen,
+		    uint64_t offset, bool direct)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -85,10 +85,10 @@ int sd_read_object(uint64_t oid, void *data, unsigned int datalen,
 	return SD_RES_SUCCESS;
 }
 
-int sd_write_object(uint64_t oid, uint64_t cow_oid, void *data,
-		    unsigned int datalen, uint64_t offset, uint32_t flags,
-		    uint8_t copies, uint8_t copy_policy, bool create,
-		    bool direct)
+int dog_write_object(uint64_t oid, uint64_t cow_oid, void *data,
+		     unsigned int datalen, uint64_t offset, uint32_t flags,
+		     uint8_t copies, uint8_t copy_policy, bool create,
+		     bool direct)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -156,8 +156,8 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 		oid = vid_to_vdi_oid(nr);
 
 		/* for B-tree inode, we also need sd_extent_header */
-		ret = sd_read_object(oid, &i, SD_INODE_HEADER_SIZE +
-				     sizeof(struct sd_extent_header), 0, true);
+		ret = dog_read_object(oid, &i, SD_INODE_HEADER_SIZE +
+				      sizeof(struct sd_extent_header), 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read inode header");
 			continue;
@@ -168,8 +168,9 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 		if (size > SD_INODE_HEADER_SIZE) {
 			rlen = sd_inode_get_meta_size(&i, size);
-			ret = sd_read_object(oid, ((char *)&i) + SD_INODE_HEADER_SIZE,
-					     rlen, SD_INODE_HEADER_SIZE, true);
+			ret = dog_read_object(oid,
+					((char *)&i) + SD_INODE_HEADER_SIZE,
+					      rlen, SD_INODE_HEADER_SIZE, true);
 
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("Failed to read inode");

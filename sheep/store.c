@@ -346,8 +346,8 @@ int init_global_pathnames(const char *d, char *argp)
 }
 
 /* Write data to both local object cache (if enabled) and backends */
-int write_object(uint64_t oid, char *data, unsigned int datalen,
-		 uint64_t offset, bool create)
+int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
+		    uint64_t offset, bool create)
 {
 	struct sd_req hdr;
 	int ret;
@@ -406,8 +406,8 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
  * Read data firstly from local object cache(if enabled), if fail,
  * try read backends
  */
-int read_object(uint64_t oid, char *data, unsigned int datalen,
-		uint64_t offset)
+int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
+		   uint64_t offset)
 {
 	int ret;
 
@@ -425,7 +425,7 @@ forward_read:
 	return read_backend_object(oid, data, datalen, offset);
 }
 
-int remove_object(uint64_t oid)
+int sd_remove_object(uint64_t oid)
 {
 	struct sd_req hdr;
 	int ret;

@@ -253,7 +253,7 @@ static void do_save_object(struct work *work)
 	size = get_objsize(sw->entry.oid);
 	buf = xmalloc(size);
 
-	if (sd_read_object(sw->entry.oid, buf, size, 0, true) < 0)
+	if (dog_read_object(sw->entry.oid, buf, size, 0, true) < 0)
 		goto error;
 
 	if (slice_write(buf, size, sw->entry.sha1) < 0)
@@ -364,7 +364,7 @@ static void do_load_object(struct work *work)
 	if (!buffer)
 		goto error;
 
-	if (sd_write_object(sw->entry.oid, 0, buffer, size, 0, 0,
+	if (dog_write_object(sw->entry.oid, 0, buffer, size, 0, 0,
 			    sw->entry.nr_copies, sw->entry.copy_policy,
 			    true, true) != 0)
 		goto error;
