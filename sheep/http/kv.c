@@ -190,74 +190,72 @@ struct kv_object {
 	uint8_t data[SD_DATA_OBJ_SIZE - sizeof(struct kv_object_hdr)];
 };
 
+/*
+ * Create the object if the index isn't taken. Overwrite the object if it exists
+ * Return 0 if the index is taken by other object.
+ */
 static int do_kv_create_object(struct http_request *req, const char *obj_name,
 			       struct kv_object *obj, uint32_t vid,
 			       uint32_t idx)
 {
 	uint64_t oid = vid_to_data_oid(vid, idx);
+	uint32_t tmp_vid;
 	struct kv_object_hdr hdr;
+	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 	int ret;
 
-	ret = write_object(oid, (char *)obj, sizeof(obj->hdr) + obj->hdr.size,
-			   0, true);
+	ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
+			  sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to create object, %" PRIx64, oid);
+		sd_err("failed to read inode, %" PRIx64,
+		       vid_to_vdi_oid(vid));
 		goto err;
 	}
-
-	/*
-	 * XXX: SD_OP_CREATE_AND_WRITE_OBJ returns success even if the object
-	 * alreay exists.  We need to confirm that the stored object is actually
-	 * what we wrote.
-	 */
-	ret = read_object(oid, (char *)&hdr, sizeof(hdr), 0);
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read object, %" PRIx64, oid);
-		goto err;
-	}
-
-	if (hdr.name[0] != '\0' && strcmp(hdr.name, obj->hdr.name) != 0) {
-		sd_debug("index %d is already used", idx);
-		return 0;
-	}
-
-	if (memcmp(&hdr, &obj->hdr, sizeof(hdr)) == 0) {
-		/* update inode object */
-		struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
-
-		ret = read_object(vid_to_vdi_oid(vid), (char *)inode,
-				  sizeof(*inode), 0);
+	tmp_vid = INODE_GET_VID(inode, idx);
+	if (tmp_vid) {
+		ret = read_object(oid, (char *)&hdr, sizeof(hdr), 0);
 		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to read inode, %" PRIx64,
-			       vid_to_vdi_oid(vid));
-			free(inode);
+			sd_err("failed to read object, %" PRIx64, oid);
+			goto err;
+		}
+
+		if (hdr.name[0] != '\0' &&
+		    strcmp(hdr.name, obj->hdr.name) != 0){
+			sd_debug("index %d is already used", idx);
+			goto out;
+		}
+		sd_info("overwrite object %s", obj_name);
+		ret = write_object(oid, (char *)obj,
+				   sizeof(obj->hdr) + obj->hdr.size,
+				   0, false);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("failed to write object, %" PRIx64, oid);
+			goto err;
+		}
+	} else {
+		ret = write_object(oid, (char *)obj,
+				   sizeof(obj->hdr) + obj->hdr.size,
+				   0, true);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("failed to create object, %" PRIx64, oid);
 			goto err;
 		}
 		INODE_SET_VID(inode, idx, vid);
 		ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
 					 vid, vid, 0, false, false);
-		free(inode);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("failed to update inode, %" PRIx64,
 			       vid_to_vdi_oid(vid));
 			goto err;
 		}
-	} else {
-		sd_info("object %s already exists", obj_name);
-
-		/* write again without a create option */
-		ret = write_object(oid, (char *)obj,
-				   sizeof(obj->hdr) + obj->hdr.size, 0, false);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to update object, %"PRIx64, oid);
-			goto err;
-		}
 	}
-
 	http_response_header(req, CREATED);
+out:
+	free(inode);
 	return 0;
 err:
 	http_response_header(req, INTERNAL_SERVER_ERROR);
+	free(inode);
 	return -1;
 }
 
