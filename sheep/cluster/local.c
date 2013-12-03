@@ -547,6 +547,19 @@ static int local_init(const char *option)
 	return 0;
 }
 
+static int local_init_lock(struct cluster_lock *cluster_lock, uint64_t id)
+{
+	return -1;
+}
+
+static void local_lock(struct cluster_lock *cluster_lock)
+{
+}
+
+static void local_unlock(struct cluster_lock *cluster_lock)
+{
+}
+
 static int local_update_node(struct sd_node *node)
 {
 	struct local_node lnode = this_node;
@@ -566,6 +579,9 @@ static struct cluster_driver cdrv_local = {
 	.notify		= local_notify,
 	.block		= local_block,
 	.unblock	= local_unblock,
+	.init_lock	= local_init_lock,
+	.lock		= local_lock,
+	.unlock		= local_unlock,
 	.update_node    = local_update_node,
 };
 

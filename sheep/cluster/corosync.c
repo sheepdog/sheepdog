@@ -774,6 +774,19 @@ again:
 	return 0;
 }
 
+static int corosync_init_lock(struct cluster_lock *cluster_lock, uint64_t id)
+{
+	return -1;
+}
+
+static void corosync_lock(struct cluster_lock *cluster_lock)
+{
+}
+
+static void corosync_unlock(struct cluster_lock *cluster_lock)
+{
+}
+
 static int corosync_update_node(struct sd_node *node)
 {
 	struct cpg_node cnode = this_node;
@@ -794,6 +807,9 @@ static struct cluster_driver cdrv_corosync = {
 	.notify		= corosync_notify,
 	.block		= corosync_block,
 	.unblock	= corosync_unblock,
+	.init_lock	= corosync_init_lock,
+	.lock		= corosync_lock,
+	.unlock		= corosync_unlock,
 	.update_node	= corosync_update_node,
 };
 

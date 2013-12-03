@@ -30,6 +30,72 @@
 #define QUEUE_ZNODE BASE_ZNODE "/queue"
 #define MEMBER_ZNODE BASE_ZNODE "/member"
 #define MASTER_ZNONE BASE_ZNODE "/master"
+#define LOCK_ZNODE BASE_ZNODE "/lock"
+
+#define WAIT_TIME	1		/* second */
+
+#define HASH_BUCKET_NR	1021
+static struct hlist_head *cluster_locks_table;
+static pthread_mutex_t table_locks[HASH_BUCKET_NR];
+
+/*
+ * All the operations of the lock table is protected by
+ * cluster_lock->id_lock so we don't need to add lock here
+ */
+
+static void lock_table_del(uint64_t lock_id)
+{
+	uint64_t hval = sd_hash_64(lock_id) % HASH_BUCKET_NR;
+	struct hlist_node *iter;
+	struct cluster_lock *lock;
+
+	pthread_mutex_lock(table_locks + hval);
+	hlist_for_each_entry(lock, iter, cluster_locks_table + hval, hnode) {
+		if (lock->id == lock_id) {
+			hlist_del(iter);
+			break;
+		}
+	}
+	pthread_mutex_unlock(table_locks + hval);
+}
+
+static void lock_table_add(uint64_t lock_id,
+			   struct cluster_lock *cluster_lock)
+{
+	uint64_t hval = sd_hash_64(lock_id) % HASH_BUCKET_NR;
+
+	pthread_mutex_lock(table_locks + hval);
+	hlist_add_head(&(cluster_lock->hnode), cluster_locks_table + hval);
+	pthread_mutex_unlock(table_locks + hval);
+}
+
+static int lock_table_lookup_release(uint64_t lock_id)
+{
+	uint64_t hval = sd_hash_64(lock_id) % HASH_BUCKET_NR;
+	int res = -1;
+	struct hlist_node *iter;
+	struct cluster_lock *lock;
+
+	pthread_mutex_lock(table_locks + hval);
+	hlist_for_each_entry(lock, iter, cluster_locks_table + hval, hnode) {
+		if (lock->id == lock_id) {
+			pthread_mutex_unlock(&lock->wait_release);
+			res = 0;
+			break;
+		}
+	}
+	pthread_mutex_unlock(table_locks + hval);
+	return res;
+}
+
+/*
+ * Wait a while when create, delete or get_children fail on
+ * zookeeper lock so it will not print too much loop log
+ */
+static void zk_wait(void)
+{
+	sleep(WAIT_TIME);
+}
 
 /* iterate child znodes */
 #define FOR_EACH_ZNODE(parent, path, strs)			       \
@@ -506,6 +572,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 {
 	struct zk_node znode;
 	char str[MAX_NODE_STR_LEN], *p;
+	uint64_t lock_id;
 	int ret;
 
 	if (type == ZOO_SESSION_EVENT && state == ZOO_EXPIRED_SESSION_STATE) {
@@ -527,6 +594,15 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		eventfd_xwrite(efd, 1);
 	} else if (type == ZOO_DELETED_EVENT) {
 		struct zk_node *n;
+
+		/* process distributed lock */
+		ret = sscanf(path, LOCK_ZNODE "/%lu/%s", &lock_id, str);
+		if (ret == 2) {
+			ret = lock_table_lookup_release(lock_id);
+			if (ret)
+				sd_debug("release lock %lu %s", lock_id, str);
+			return;
+		}
 
 		ret = sscanf(path, MASTER_ZNONE "/%s", str);
 		if (ret == 1) {
@@ -580,9 +656,17 @@ static int zk_get_least_seq(const char *parent, char *least_seq_path,
 {
 	char path[MAX_NODE_STR_LEN], *p, *tmp;
 	struct String_vector strs;
-	int rc, least_seq = INT_MAX , seq;
+	int rc, least_seq, seq;
 
 	while (true) {
+		/*
+		 * If first loop fail, the least_seq may be a very small number
+		 * which had been deleted in zookeeper, the new create file will
+		 * be all larger than it and it will cause dead loop.
+		 * Therefore we need to set least_seq to INT_MAX in every loop.
+		 */
+		least_seq = INT_MAX;
+
 		RETURN_IF_ERROR(zk_get_children(parent, &strs), "");
 
 		FOR_EACH_ZNODE(parent, path, &strs) {
@@ -1058,6 +1142,109 @@ kick_block_event:
 	kick_block_event();
 }
 
+static int zk_init_lock(struct cluster_lock *cluster_lock, uint64_t lock_id)
+{
+	int rc = 0;
+	char path[MAX_NODE_STR_LEN];
+
+	cluster_lock->id = lock_id;
+	snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu", cluster_lock->id);
+	rc = zk_init_node(path);
+	if (rc)
+		goto out;
+
+	rc = pthread_mutex_init(&cluster_lock->wait_release, NULL);
+	if (rc) {
+		sd_err("failed to init cluster_lock->wait_release");
+		goto out;
+	}
+
+	rc = pthread_mutex_init(&cluster_lock->id_lock, NULL);
+	if (rc) {
+		sd_err("failed to init cluster_lock->id_lock");
+		goto out;
+	}
+out:
+	return rc;
+}
+
+/*
+ * This operation will create a seq-ephemeral znode in lock directory
+ * of zookeeper (use lock-id as dir name). The smallest file path in
+ * this directory wil be the owner of the lock; the other threads will
+ * wait on a pthread_mutex_t (cluster_lock->wait_release)
+ */
+static void zk_lock(struct cluster_lock *cluster_lock)
+{
+	int flags = ZOO_SEQUENCE | ZOO_EPHEMERAL;
+	int rc, len = MAX_NODE_STR_LEN;
+	char *my_path;
+	char parent[MAX_NODE_STR_LEN];
+	char lowest_seq_path[MAX_NODE_STR_LEN];
+	char owner_name[MAX_NODE_STR_LEN];
+
+	/*
+	 * if many threads use locks with same id, we should use
+	 * ->id_lock to avoid the only zookeeper handler to
+	 * create many seq-ephemeral files.
+	 */
+	pthread_mutex_lock(&cluster_lock->id_lock);
+
+	lock_table_add(cluster_lock->id, cluster_lock);
+
+	my_path = cluster_lock->lock_path;
+
+	/* compete owner of lock is just like zk_compete_master() */
+	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu/",
+		 cluster_lock->id);
+	while (true) {
+		rc = zoo_create(zhandle, parent, "", 0, &ZOO_OPEN_ACL_UNSAFE,
+				flags, my_path, MAX_NODE_STR_LEN);
+		if (rc == ZOK)
+			break;
+		sd_err("failed to create path:%s, %s", my_path, zerror(rc));
+		zk_wait();
+	}
+	sd_debug("create path %s success", my_path);
+
+	/* create node ok now */
+	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu", cluster_lock->id);
+	while (true) {
+		zk_get_least_seq(parent, lowest_seq_path, MAX_NODE_STR_LEN,
+				 owner_name, &len);
+
+		/* I got the lock */
+		if (!strncmp(lowest_seq_path, my_path, strlen(my_path))) {
+			sd_debug("I am master now. %s", lowest_seq_path);
+			return;
+		}
+
+		/* I failed to get the lock */
+		rc = zoo_exists(zhandle, lowest_seq_path, 1, NULL);
+		if (rc == ZOK) {
+			sd_debug("call zoo_exits success %s", lowest_seq_path);
+			pthread_mutex_lock(&cluster_lock->wait_release);
+		} else {
+			sd_err("failed to call zoo_exists %s", zerror(rc));
+			if (rc != ZNONODE)
+				zk_wait();
+		}
+	}
+}
+
+static void zk_unlock(struct cluster_lock *cluster_lock)
+{
+	int rc;
+	rc = zk_delete_node(cluster_lock->lock_path, -1);
+	if (rc != ZOK)
+		sd_err("Failed to delete path: %s %s",
+		       cluster_lock->lock_path, zerror(rc));
+
+	lock_table_del(cluster_lock->id);
+	pthread_mutex_unlock(&cluster_lock->id_lock);
+}
+
+
 static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
@@ -1102,6 +1289,21 @@ static int zk_init(const char *option)
 		return -1;
 	}
 
+	/* init distributed lock structures */
+
+	cluster_locks_table = xzalloc(sizeof(struct list_head) *
+				      HASH_BUCKET_NR);
+	for (uint64_t i = 0; i < HASH_BUCKET_NR; i++) {
+		INIT_HLIST_HEAD(cluster_locks_table + i);
+		pthread_mutex_init(table_locks + i, NULL);
+	}
+
+	ret = zk_init_node(LOCK_ZNODE);
+	if (ret != ZOK) {
+		sd_err("Failed to create %s %s", LOCK_ZNODE, zerror(ret));
+		free(cluster_locks_table);
+		return -1;
+	}
 	return 0;
 }
 
@@ -1122,7 +1324,10 @@ static struct cluster_driver cdrv_zookeeper = {
 	.notify     = zk_notify,
 	.block      = zk_block,
 	.unblock    = zk_unblock,
-	.update_node = zk_update_node,
+	.init_lock  = zk_init_lock,
+	.lock       = zk_lock,
+	.unlock     = zk_unlock,
+	.update_node  = zk_update_node,
 	.get_local_addr = get_local_addr,
 };
 
