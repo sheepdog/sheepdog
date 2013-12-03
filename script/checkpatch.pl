@@ -1734,8 +1734,8 @@ sub process {
 				     "[BCS] don't use block comments for one liner comment\n" . $hereprev);
 			} else {
 				# case E
-				my $ln = $linenr;
-				while ($rawlines[$ln] !~ /^\+\s*\/\*/ && $ln >= 0) { $ln--; }
+				my $ln = $linenr - 1;
+				while ($rawlines[$ln] =~ /^\+/ && $rawlines[$ln] !~ /^\+\s*\/\*/ && $ln >= 0) { $ln--; }
 				if ($rawlines[$ln] =~ /^\+\s*\/\*./) {
 					WARN("BLOCK_COMMENT_STYLE",
 					     "[BCS] don't comment at first line in block comments\n" . $hereprev);
