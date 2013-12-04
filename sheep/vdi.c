@@ -112,9 +112,11 @@ int get_vdi_copy_policy(uint32_t vid)
 	entry = vdi_state_search(&vdi_state_root, vid);
 	sd_unlock(&vdi_state_lock);
 
-	if (!entry)
-		/* If not found, it must be non-erasure object */
-		return 0;
+	if (!entry) {
+		sd_alert("copy policy for %" PRIx32 " not found, set %d", vid,
+			 sys->cinfo.copy_policy);
+		return sys->cinfo.copy_policy;
+	}
 
 	return entry->copy_policy;
 }
