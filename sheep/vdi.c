@@ -561,7 +561,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 			continue;
 		}
 
-		if (!strncmp(inode->name, name, strlen(inode->name))) {
+		if (!strncmp(inode->name, name, sizeof(inode->name))) {
 			sd_debug("%s = %s, %u = %u", iocb->tag, inode->tag,
 				 iocb->snapid, inode->snap_id);
 			if (vdi_has_tag(iocb)) {
