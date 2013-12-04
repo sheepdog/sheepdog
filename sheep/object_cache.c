@@ -1372,8 +1372,8 @@ int object_cache_get_info(struct object_cache_info *info)
 {
 	int j = 0;
 
-	info->used = gcache.capacity * 1024 * 1024;
-	info->size = sys->object_cache_size * 1024 * 1024;
+	info->used = (uint64_t)gcache.capacity * 1024 * 1024;
+	info->size = (uint64_t)sys->object_cache_size * 1024 * 1024;
 
 	for (int i = 0; i < HASH_SIZE; i++) {
 		struct hlist_head *head = cache_hashtable + i;
