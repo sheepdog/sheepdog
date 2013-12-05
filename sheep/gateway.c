@@ -510,6 +510,13 @@ static int gateway_forward_request(struct request *req)
 	if (!reqs)
 		return SD_RES_NETWORK_ERROR;
 
+	/* avoid out range of target_nodes[] */
+	if (nr_to_send > nr_copies) {
+		sd_err("There isn't enough copies(%d) to send out (%d)",
+		       nr_copies, nr_to_send);
+		return SD_RES_SYSTEM_ERROR;
+	}
+
 	for (i = 0; i < nr_to_send; i++) {
 		struct sockfd *sfd;
 		const struct node_id *nid;
