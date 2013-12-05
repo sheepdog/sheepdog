@@ -178,7 +178,10 @@ struct epoch_log {
 	uint32_t epoch;
 	uint32_t nr_nodes;
 	uint8_t  disable_recovery;
-	uint8_t  __pad[3];
+	uint8_t  nr_copies;
+	uint8_t  copy_policy;
+	uint8_t  __pad[1];
+	char drv_name[STORE_LEN];
 	struct sd_node nodes[SD_MAX_NODES];
 };
 

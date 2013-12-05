@@ -21,7 +21,7 @@ static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
 	{'f', "force", false, "do not prompt for confirmation"},
-
+	{'s', "backend", false, "show backend store information"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -29,6 +29,7 @@ static struct cluster_cmd_data {
 	uint8_t copies;
 	uint8_t copy_policy;
 	bool force;
+	bool show_store;
 	char name[STORE_LEN];
 } cluster_cmd_data;
 
@@ -145,6 +146,7 @@ static int cluster_info(int argc, char **argv)
 	if (ret < 0)
 		goto error;
 
+	/* show cluster status */
 	if (!raw_output)
 		printf("Cluster status: ");
 	if (rsp->result == SD_RES_SUCCESS)
@@ -152,6 +154,28 @@ static int cluster_info(int argc, char **argv)
 		       "disabled" : "enabled");
 	else
 		printf("%s\n", sd_strerror(rsp->result));
+
+	/* show cluster backend store */
+	if (cluster_cmd_data.show_store) {
+		if (!raw_output)
+			printf("Cluster store: ");
+		if (rsp->result == SD_RES_SUCCESS) {
+			char copy[10];
+			int data, parity;
+			if (!logs->copy_policy)
+				snprintf(copy, sizeof(copy), "%d",
+					 logs->nr_copies);
+			else {
+				ec_policy_to_dp(logs->copy_policy,
+						&data, &parity);
+				snprintf(copy, sizeof(copy), "%d:%d",
+					 data, parity);
+			}
+			printf("%s with %s redundancy policy\n",
+			       logs->drv_name, copy);
+		} else
+			printf("%s\n", sd_strerror(rsp->result));
+	}
 
 	if (!raw_output && rsp->data_length > 0) {
 		ct = logs[0].ctime >> 32;
@@ -517,7 +541,7 @@ static int cluster_check(int argc, char **argv)
 }
 
 static struct subcommand cluster_cmd[] = {
-	{"info", NULL, "aprh", "show cluster information",
+	{"info", NULL, "aprhs", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
 	{"format", NULL, "bcaph", "create a Sheepdog store",
 	 NULL, 0, cluster_format, cluster_options},
@@ -560,6 +584,9 @@ static int cluster_parser(int ch, const char *opt)
 		break;
 	case 'f':
 		cluster_cmd_data.force = true;
+		break;
+	case 's':
+		cluster_cmd_data.show_store = true;
 		break;
 	}
 

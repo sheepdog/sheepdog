@@ -445,8 +445,18 @@ static int local_stat_cluster(struct request *req)
 
 		elog = (struct epoch_log *)req->data + i;
 		memset(elog, 0, sizeof(*elog));
+
+		/* some filed only need to store in first elog */
+		if (i == 0) {
+			elog->ctime = sys->cinfo.ctime;
+			elog->disable_recovery = sys->cinfo.disable_recovery;
+			elog->nr_copies = sys->cinfo.nr_copies;
+			elog->copy_policy = sys->cinfo.copy_policy;
+			strncpy(elog->drv_name, (char *)sys->cinfo.store,
+				STORE_LEN);
+		}
+
 		elog->epoch = epoch;
-		elog->ctime = sys->cinfo.ctime;
 		nr_nodes = epoch_log_read_with_timestamp(epoch, elog->nodes,
 							 sizeof(elog->nodes),
 							 (time_t *)&elog->time);
@@ -459,7 +469,6 @@ static int local_stat_cluster(struct request *req)
 		assert(nr_nodes <= SD_MAX_NODES);
 		elog->nr_nodes = nr_nodes;
 
-		elog->disable_recovery = sys->cinfo.disable_recovery;
 
 		rsp->data_length += sizeof(*elog);
 		epoch--;
