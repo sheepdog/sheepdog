@@ -81,6 +81,15 @@ static int cluster_format(int argc, char **argv)
 	char store_name[STORE_LEN];
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
+	if (cluster_cmd_data.copies > sd_nodes_nr) {
+		char info[1024];
+		snprintf(info, sizeof(info), "Number of copies (%d) is larger "
+			 "than number of nodes (%d).\n"
+			 "Are you sure you want to continue? [yes/no]: ",
+			 cluster_cmd_data.copies, sd_nodes_nr);
+		confirm(info);
+	}
+
 	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
@@ -544,7 +553,7 @@ static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhs", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
 	{"format", NULL, "bcaph", "create a Sheepdog store",
-	 NULL, 0, cluster_format, cluster_options},
+	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
 	{"snapshot", "<tag|idx> <path>", "aph", "snapshot/restore the cluster",
