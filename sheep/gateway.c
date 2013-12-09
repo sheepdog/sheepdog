@@ -498,7 +498,7 @@ static int gateway_forward_request(struct request *req)
 	struct forward_info fi;
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
-	int nr_copies = get_req_copy_number(req), nr_to_send = 0;
+	int nr_copies = get_req_copy_number(req), nr_reqs, nr_to_send = 0;
 	struct req_iter *reqs = NULL;
 
 	sd_debug("%"PRIx64, oid);
@@ -510,11 +510,24 @@ static int gateway_forward_request(struct request *req)
 	if (!reqs)
 		return SD_RES_NETWORK_ERROR;
 
-	/* avoid out range of target_nodes[] */
+	/*
+	 * For replication, we send number of available zones copies.
+	 *
+	 * For erasure, we need at least number of data strips to send to avoid
+	 * overflow of target_nodes.
+	 */
+	nr_reqs = nr_to_send;
 	if (nr_to_send > nr_copies) {
-		sd_err("There isn't enough copies(%d) to send out (%d)",
-		       nr_copies, nr_to_send);
-		return SD_RES_SYSTEM_ERROR;
+		int ds;
+		/* Only for erasure code, nr_to_send might > nr_copies */
+		ec_policy_to_dp(req->rq.obj.copy_policy, &ds, NULL);
+		if (nr_copies < ds) {
+			sd_err("There isn't enough copies(%d) to send out (%d)",
+			       nr_copies, nr_to_send);
+			err_ret = SD_RES_SYSTEM_ERROR;
+			goto out;
+		}
+		nr_to_send = ds;
 	}
 
 	for (i = 0; i < nr_to_send; i++) {
@@ -551,8 +564,8 @@ static int gateway_forward_request(struct request *req)
 		if (ret != SD_RES_SUCCESS)
 			err_ret = ret;
 	}
-
-	finish_requests(req, reqs, nr_to_send);
+out:
+	finish_requests(req, reqs, nr_reqs);
 	return err_ret;
 }
 
