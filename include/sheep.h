@@ -255,18 +255,6 @@ static inline void nodes_to_buffer(struct rb_root *nroot, void *buffer)
 
 #define MAX_NODE_STR_LEN 256
 
-/* structure for distributed lock */
-struct cluster_lock {
-	struct hlist_node hnode;
-	/* id is passed by users to represent a lock handle */
-	uint64_t id;
-	/* wait for the release of id by other lock owner */
-	pthread_mutex_t wait_release;
-	/* lock for different threads of the same node on the same id */
-	pthread_mutex_t id_lock;
-	char lock_path[MAX_NODE_STR_LEN];
-};
-
 static inline const char *node_to_str(const struct sd_node *id)
 {
 	static __thread char str[MAX_NODE_STR_LEN];

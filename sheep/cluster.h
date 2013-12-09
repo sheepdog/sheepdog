@@ -109,33 +109,32 @@ struct cluster_driver {
 	int (*unblock)(void *msg, size_t msg_len);
 
 	/*
-	 * Init a distributed mutually exclusive lock to avoid race condition
-	 * when the whole sheepdog cluster process one exclusive resource.
-	 *
-	 * This function use 'lock_id' as the id of this distributed lock.
-	 * A thread can create many locks in one sheep daemon.
-	 *
-	 * Returns SD_RES_XXX
-	 */
-	int (*init_lock)(struct cluster_lock *lock, uint64_t lock_id);
-
-	/*
 	 * Acquire the distributed lock.
 	 *
-	 * The cluster_lock referenced by 'lock' shall be locked by calling
-	 * cluster->lock(). If the cluster_lock is already locked, the calling
-	 * thread shall block until the cluster_lock becomes available.
+	 * Create a distributed mutually exclusive lock to avoid race condition
+	 * and try to acquire the lock.
+	 *
+	 * This function use 'lock_id' as the id of this distributed lock.
+	 * A thread can acquire many locks with different lock_id in one
+	 * sheep daemon.
+	 *
+	 * The cluster lock referenced by 'lock' shall be locked by calling
+	 * cluster->lock(). If the cluster lock is already locked, the calling
+	 * thread shall block until the cluster lock becomes available.
 	 */
-	void (*lock)(struct cluster_lock *lock);
+	void (*lock)(uint64_t lock_id);
 
 	/*
 	 * Release the distributed lock.
 	 *
-	 * If the owner of the cluster_lock release it (or the owner is
+	 * If the owner of the cluster lock release it (or the owner is
 	 * killed by accident), zookeeper will trigger zk_watch() which will
 	 * wake up all waiting threads to compete new owner of the lock
+	 *
+	 * After all thread unlock, all the resource of this distributed lock
+	 * will be released.
 	 */
-	void (*unlock)(struct cluster_lock *lock);
+	void (*unlock)(uint64_t lock_id);
 
 	/*
 	 * Update the specific node in the driver's private copy of nodes
