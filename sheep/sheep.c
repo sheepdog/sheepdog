@@ -43,20 +43,6 @@ static const char journal_help[] =
 "\nExample:\n\t$ sheep -j dir=/journal,size=1G\n"
 "This tries to use /journal as the journal storage of the size 1G\n";
 
-static const char loglevel_help[] =
-"Available log levels:\n"
-"  #    Level           Description\n"
-"  0    SDOG_EMERG      system has failed and is unusable\n"
-"  1    SDOG_ALERT      action must be taken immediately\n"
-"  2    SDOG_CRIT       critical conditions\n"
-"  3    SDOG_ERR        error conditions\n"
-"  4    SDOG_WARNING    warning conditions\n"
-"  5    SDOG_NOTICE     normal but significant conditions\n"
-"  6    SDOG_INFO       informational notices\n"
-"  7    SDOG_DEBUG      debugging messages\n"
-"\nExample:\n\t$ sheep -l 4 ...\n"
-"This only allows logs with level smaller than SDOG_WARNING to be logged\n";
-
 static const char http_help[] =
 "Available arguments:\n"
 "\thost=: specify a host to communicate with http server (default: localhost)\n"
@@ -98,11 +84,30 @@ static const char cache_help[] =
 "This tries to use /my_ssd as the cache storage with 200G allocted to the\n"
 "cache in directio mode\n";
 
-static const char logdir_help[] =
-"Example:\n\t$ sheep -L dir=/var/log/ ...\n"
+static const char log_help[] =
+"Example:\n\t$ sheep -l dir=/var/log/,level=0,format=server ...\n"
 "Available arguments:\n"
 "\tdir=: path to the location of sheep.log\n"
-"if not specified use metastore directory\n";
+"\tlevel=: log level of sheep.log\n"
+"\tformat=: log format type\n\n"
+"if dir is not specified, use metastore directory\n\n"
+"Available log levels:\n"
+"  #    Level           Description\n"
+"  0    SDOG_EMERG      system has failed and is unusable\n"
+"  1    SDOG_ALERT      action must be taken immediately\n"
+"  2    SDOG_CRIT       critical conditions\n"
+"  3    SDOG_ERR        error conditions\n"
+"  4    SDOG_WARNING    warning conditions\n"
+"  5    SDOG_NOTICE     normal but significant conditions\n"
+"  6    SDOG_INFO       informational notices\n"
+"  7    SDOG_DEBUG      debugging messages\n"
+"default log level is SDOG_INFO\n\n"
+"Available log format:\n"
+"  FormatType      Description\n"
+"  default         raw format\n"
+"  server          raw format with timestamp\n"
+"  json            json format\n"
+"default log format is server\n";
 
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
@@ -110,19 +115,17 @@ static struct sd_option sheep_options[] = {
 	{'c', "cluster", true,
 	 "specify the cluster driver (default: "DEFAULT_CLUSTER_DRIVER")",
 	 cluster_help},
-	{'d', "debug", false, "include debug messages in the log"},
 	{'D', "directio", false, "use direct IO for backend store"},
 	{'f', "foreground", false, "make the program run in the foreground"},
-	{'F', "log-format", true, "specify log format"},
 	{'g', "gateway", false, "make the progam run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
 	{'i', "ioaddr", true, "use separate network card to handle IO requests"
 	 " (default: disabled)", ioaddr_help},
 	{'j', "journal", true, "use jouranl file to log all the write "
 	 "operations. (default: disabled)", journal_help},
-	{'l', "loglevel", true, "specify the level of logging detail "
-	 "(default: 6 [SDOG_INFO])", loglevel_help},
-	{'L', "logdir", true, "output directory of sheep.log", logdir_help},
+	{'l', "log", true,
+	 "specify the log level, the log directory and the log format"
+	 "(log level default: 6 [SDOG_INFO])", log_help},
 	{'n', "nosync", false, "drop O_SYNC for write of backend"},
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen "
@@ -309,16 +312,45 @@ static struct option_parser cache_parsers[] = {
 	{ NULL, NULL },
 };
 
-static char ologpath[PATH_MAX];
+static int log_level = SDOG_INFO;
+
+static int log_level_parser(const char *s)
+{
+	char *p;
+	log_level = strtol(s, &p, 10);
+	if (s == p || log_level < SDOG_EMERG ||
+		SDOG_DEBUG < log_level || *p != '\0') {
+		sd_err("Invalid log level '%s'", s);
+		sdlog_help();
+		return -1;
+	}
+	return 0;
+}
+
+static char *logdir;
 
 static int log_dir_parser(const char *s)
 {
-	snprintf(ologpath, sizeof(ologpath), "%s", s);
+	logdir = realpath(s, NULL);
+	if (!logdir) {
+		sd_err("%m");
+		exit(1);
+	}
+	return 0;
+}
+
+static const char *log_format = "server";
+
+static int log_format_parser(const char *s)
+{
+	log_format = s;
 	return 0;
 }
 
 static struct option_parser log_parsers[] = {
+	{ "level=", log_level_parser },
 	{ "dir=", log_dir_parser },
+	{ "format=", log_format_parser },
 	{ NULL, NULL },
 };
 
@@ -563,15 +595,15 @@ static void sighup_handler(int signum)
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
-	int log_level = SDOG_INFO, nr_vnodes = SD_DEFAULT_VNODES;
+	int nr_vnodes = SD_DEFAULT_VNODES;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX],
-	     *argp = NULL, *logdir = NULL;
+	     *argp = NULL;
 	bool is_daemon = true, to_stdout = false, explicit_addr = false;
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
-	const char *log_format = "server", *http_options = NULL;
+	const char *http_options = NULL;
 	static struct logger_user_info sheep_info;
 
 	install_crash_handler(crash_handler);
@@ -602,22 +634,8 @@ int main(int argc, char **argv)
 			is_daemon = false;
 			break;
 		case 'l':
-			log_level = strtol(optarg, &p, 10);
-			if (optarg == p || log_level < SDOG_EMERG ||
-			    SDOG_DEBUG < log_level || *p != '\0') {
-				sd_err("Invalid log level '%s'", optarg);
-				sdlog_help();
-				exit(1);
-			}
-			break;
-		case 'L':
 			if (option_parse(optarg, ",", log_parsers) < 0)
 				exit(1);
-			logdir = realpath(ologpath, NULL);
-			if (!logdir) {
-				sd_err("%m");
-				exit(1);
-			}
 			break;
 		case 'n':
 			sys->nosync = true;
@@ -628,10 +646,6 @@ int main(int argc, char **argv)
 				exit(1);
 			}
 			explicit_addr = true;
-			break;
-		case 'd':
-			/* removed soon. use loglevel instead */
-			log_level = SDOG_DEBUG;
 			break;
 		case 'D':
 			sys->backend_dio = true;
@@ -720,9 +734,6 @@ int main(int argc, char **argv)
 			fprintf(stdout, "Sheepdog daemon version %s\n",
 				PACKAGE_VERSION);
 			exit(0);
-			break;
-		case 'F':
-			log_format = optarg;
 			break;
 		default:
 			usage(1);
