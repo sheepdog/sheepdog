@@ -6,105 +6,105 @@ a6c5d562057d0b8e7c90df17e5ea9450  -
 a6c5d562057d0b8e7c90df17e5ea9450  -
 Looking for the inode object 0x7c2b25 with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000000 (the inode vid 0x7c2b25 idx 0) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000000 (vid 0x7c2b25 idx 0, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000001 (the inode vid 0x7c2b25 idx 1) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000001 (vid 0x7c2b25 idx 1, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000002 (the inode vid 0x7c2b25 idx 2) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000002 (vid 0x7c2b25 idx 2, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000003 (the inode vid 0x7c2b25 idx 3) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000003 (vid 0x7c2b25 idx 3, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000004 (the inode vid 0x7c2b25 idx 4) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000004 (vid 0x7c2b25 idx 4, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000005 (the inode vid 0x7c2b25 idx 5) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000005 (vid 0x7c2b25 idx 5, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000006 (the inode vid 0x7c2b25 idx 6) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000006 (vid 0x7c2b25 idx 6, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000007 (the inode vid 0x7c2b25 idx 7) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000007 (vid 0x7c2b25 idx 7, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000008 (the inode vid 0x7c2b25 idx 8) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000008 (vid 0x7c2b25 idx 8, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000009 (the inode vid 0x7c2b25 idx 9) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000009 (vid 0x7c2b25 idx 9, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b250000000a (the inode vid 0x7c2b25 idx 10) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b250000000a (vid 0x7c2b25 idx 10, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b250000000b (the inode vid 0x7c2b25 idx 11) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b250000000b (vid 0x7c2b25 idx 11, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b250000000c (the inode vid 0x7c2b25 idx 12) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b250000000c (vid 0x7c2b25 idx 12, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b250000000d (the inode vid 0x7c2b25 idx 13) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b250000000d (vid 0x7c2b25 idx 13, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b250000000e (the inode vid 0x7c2b25 idx 14) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b250000000e (vid 0x7c2b25 idx 14, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b250000000f (the inode vid 0x7c2b25 idx 15) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b250000000f (vid 0x7c2b25 idx 15, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000010 (the inode vid 0x7c2b25 idx 16) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000010 (vid 0x7c2b25 idx 16, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000011 (the inode vid 0x7c2b25 idx 17) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000011 (vid 0x7c2b25 idx 17, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000012 (the inode vid 0x7c2b25 idx 18) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000012 (vid 0x7c2b25 idx 18, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000013 (the inode vid 0x7c2b25 idx 19) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000013 (vid 0x7c2b25 idx 19, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000014 (the inode vid 0x7c2b25 idx 20) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000014 (vid 0x7c2b25 idx 20, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000015 (the inode vid 0x7c2b25 idx 21) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000015 (vid 0x7c2b25 idx 21, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000016 (the inode vid 0x7c2b25 idx 22) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000016 (vid 0x7c2b25 idx 22, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000017 (the inode vid 0x7c2b25 idx 23) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000017 (vid 0x7c2b25 idx 23, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
-Looking for the object 0x7c2b2500000018 (the inode vid 0x7c2b25 idx 24) with 2 nodes
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object
+Looking for the object 0x7c2b2500000018 (vid 0x7c2b25 idx 24, 2 copies) with 2 nodes
 
-127.0.0.1:7000 has the object (should be 2 copies)
-127.0.0.1:7001 has the object (should be 2 copies)
+127.0.0.1:7000 has the object
+127.0.0.1:7001 has the object

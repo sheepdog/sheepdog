@@ -323,8 +323,7 @@ static int do_print_obj(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
 {
 	switch (rsp->result) {
 	case SD_RES_SUCCESS:
-		printf("%s has the object (should be %d copies)\n",
-		       sheep, rsp->obj.copies);
+		printf("%s has the object\n", sheep);
 		break;
 	case SD_RES_NO_OBJ:
 		printf("%s doesn't have the object\n", sheep);
@@ -991,8 +990,10 @@ static int vdi_object(int argc, char **argv)
 		if (oid_info.success) {
 			if (oid_info.data_oid) {
 				printf("Looking for the object 0x%" PRIx64
-				       " (the inode vid 0x%" PRIx32 " idx %u) with %d nodes\n\n",
-				       oid_info.data_oid, vid, idx, sd_nodes_nr);
+				       " (vid 0x%" PRIx32 " idx %u, %u copies) "
+				       "with %d nodes\n\n",
+				       oid_info.data_oid, vid, idx,
+				       info.nr_copies, sd_nodes_nr);
 
 				parse_objs(oid_info.data_oid, do_print_obj,
 					   NULL, size);
