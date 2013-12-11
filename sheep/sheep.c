@@ -95,6 +95,12 @@ static const char cache_help[] =
 "This tries to use /my_ssd as the cache storage with 200G allocted to the\n"
 "cache in directio mode\n";
 
+static const char logdir_help[] =
+"Example:\n\t$ sheep -L dir=/var/log/ ...\n"
+"Available arguments:\n"
+"\tdir=: path to the location of sheep.log\n"
+"if not specified use metastore directory\n";
+
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
 	 bind_help},
@@ -113,6 +119,7 @@ static struct sd_option sheep_options[] = {
 	 "operations", journal_help},
 	{'l', "loglevel", true, "specify the level of logging detail "
 	 "(default: 6 [SDOG_INFO])", loglevel_help},
+	{'L', "logdir", true, "output directory of sheep.log", logdir_help},
 	{'n', "nosync", false, "drop O_SYNC for write of backend"},
 	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen "
@@ -585,7 +592,7 @@ int main(int argc, char **argv)
 	int log_level = SDOG_INFO, nr_vnodes = SD_DEFAULT_VNODES;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX],
-	     *argp = NULL;
+	     *argp = NULL, *logdir = NULL;
 	bool is_daemon = true, to_stdout = false, explicit_addr = false;
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
@@ -626,6 +633,13 @@ int main(int argc, char **argv)
 			    SDOG_DEBUG < log_level || *p != '\0') {
 				sd_err("Invalid log level '%s'", optarg);
 				sdlog_help();
+				exit(1);
+			}
+			break;
+		case 'L':
+			logdir = realpath(optarg, NULL);
+			if (!logdir) {
+				sd_err("%m");
 				exit(1);
 			}
 			break;
@@ -751,7 +765,9 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	snprintf(path, sizeof(path), "%s/" LOG_FILE_NAME, dir);
+	snprintf(path, sizeof(path), "%s/" LOG_FILE_NAME, logdir ?: dir);
+
+	free(logdir);
 
 	srandom(port);
 
