@@ -271,7 +271,7 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	sys->cinfo.nr_copies = req->cluster.copies;
 	sys->cinfo.copy_policy = req->cluster.copy_policy;
-	sys->cinfo.flags = req->flags;
+	sys->cinfo.flags = req->cluster.flags;
 	if (!sys->cinfo.nr_copies)
 		sys->cinfo.nr_copies = SD_DEFAULT_COPIES;
 	sys->cinfo.ctime = req->cluster.ctime;

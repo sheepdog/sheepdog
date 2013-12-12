@@ -21,6 +21,8 @@ static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
 	{'f', "force", false, "do not prompt for confirmation"},
+	{'t', "strict", false,
+	 "do not serve write request if number of nodes is not sufficient"},
 	{'s', "backend", false, "show backend store information"},
 	{ 0, NULL, false, NULL },
 };
@@ -30,6 +32,7 @@ static struct cluster_cmd_data {
 	uint8_t copy_policy;
 	bool force;
 	bool show_store;
+	bool strict;
 	char name[STORE_LEN];
 } cluster_cmd_data;
 
@@ -117,6 +120,8 @@ static int cluster_format(int argc, char **argv)
 		pstrcpy(store_name, STORE_LEN, DEFAULT_STORE);
 	hdr.data_length = strlen(store_name) + 1;
 	hdr.flags |= SD_FLAG_CMD_WRITE;
+	if (cluster_cmd_data.strict)
+		hdr.cluster.flags |= SD_CLUSTER_FLAG_STRICT;
 
 	printf("using backend %s store\n", store_name);
 	ret = dog_exec_req(&sd_nid, &hdr, store_name);
@@ -552,7 +557,7 @@ static int cluster_check(int argc, char **argv)
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhs", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bcaph", "create a Sheepdog store",
+	{"format", NULL, "bctaph", "create a Sheepdog store",
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aph", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
@@ -596,6 +601,9 @@ static int cluster_parser(int ch, const char *opt)
 		break;
 	case 's':
 		cluster_cmd_data.show_store = true;
+		break;
+	case 't':
+		cluster_cmd_data.strict = true;
 		break;
 	}
 

@@ -126,6 +126,8 @@
 #define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
 #define SD_RES_OBJ_TAKEN        0x92 /* Object ID is taken up */
 
+#define SD_CLUSTER_FLAG_STRICT  0x0001 /* Strict mode for write */
+
 enum sd_status {
 	SD_STATUS_OK = 1,
 	SD_STATUS_WAIT,

@@ -156,7 +156,7 @@ struct sd_req {
 			uint64_t	ctime;
 			uint8_t		copies;
 			uint8_t		copy_policy;
-			uint8_t		reserved[2];
+			uint16_t	flags;
 			uint32_t	tag;
 		} cluster;
 		struct {

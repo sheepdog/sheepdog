@@ -284,6 +284,22 @@ static void queue_peer_request(struct request *req)
 	queue_work(sys->io_wqueue, &req->work);
 }
 
+/*
+ * We make sure we write the exact number of copies to honor the promise of the
+ * redundancy for strict mode. This means that after writing of targeted data,
+ * they are redundant as promised and can withstand the random node failures.
+ *
+ * For example, with a 4:2 policy, we need at least write to 6 nodes with data
+ * strip and parity strips. For non-strict mode, we allow to write successfully
+ * only if the data are written fully with 4 nodes alive.
+ */
+static bool has_enough_zones(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+
+	return req->vinfo->nr_zones >= get_vdi_copy_number(oid_to_vid(oid));
+}
+
 static void queue_gateway_request(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
@@ -310,13 +326,25 @@ static void queue_gateway_request(struct request *req)
 queue_work:
 	if (RB_EMPTY_ROOT(&req->vinfo->vroot)) {
 		sd_err("there is no living nodes");
-		req->rp.result = SD_RES_HALT;
-		put_request(req);
-		return;
+		goto end_request;
 	}
+	if (sys->cinfo.flags & SD_CLUSTER_FLAG_STRICT &&
+	    (hdr->opcode == SD_OP_CREATE_AND_WRITE_OBJ ||
+	     hdr->opcode == SD_OP_WRITE_OBJ) &&
+	    !has_enough_zones(req)) {
+		sd_err("not enough zones available");
+		goto end_request;
+	}
+
 	req->work.fn = do_process_work;
 	req->work.done = gateway_op_done;
 	queue_work(sys->gateway_wqueue, &req->work);
+	return;
+
+end_request:
+	req->rp.result = SD_RES_HALT;
+	put_request(req);
+	return;
 }
 
 static void queue_local_request(struct request *req)

@@ -160,7 +160,8 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_WAIT_FOR_FORMAT] = "Waiting for cluster to be formatted",
 		[SD_RES_WAIT_FOR_JOIN] = "Waiting for other nodes to join cluster",
 		[SD_RES_JOIN_FAILED] = "Node has failed to join cluster",
-		[SD_RES_HALT] = "IO has halted as there are no living nodes",
+		[SD_RES_HALT] =
+			"IO has halted as there are not enough living nodes",
 		[SD_RES_READONLY] = "Object is read-only",
 
 		/* from internal_proto.h */
