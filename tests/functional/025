@@ -9,12 +9,12 @@ VDI_SIZE="20M"
 
 echo "starting two sheep in the first zone"
 for i in `seq 0 1`; do
-    $SHEEP $STORE/$i -d -z 0 -p 700$i -c $DRIVER -y 127.0.0.1
+    $SHEEP $STORE/$i -l level=7 -z 0 -p 700$i -c $DRIVER -y 127.0.0.1
 done
 
 echo "starting a sheep in the second zone"
 for i in `seq 2 2`; do
-    $SHEEP $STORE/$i -d -z 1 -p 700$i -c $DRIVER -y 127.0.0.1
+    $SHEEP $STORE/$i -l level=7 -z 1 -p 700$i -c $DRIVER -y 127.0.0.1
 done
 
 _wait_for_sheep "3"
@@ -33,7 +33,7 @@ $QEMU_IO -c "read 0 1m" sheepdog:localhost:7002:${VDI_NAME} | _filter_qemu_io
 
 echo "starting a sheep in the third zone"
 for i in `seq 3 3`; do
-    $SHEEP $STORE/$i -d -z 2 -p 700$i -c $DRIVER -y 127.0.0.1
+    $SHEEP $STORE/$i -l level=7 -z 2 -p 700$i -c $DRIVER -y 127.0.0.1
 done
 
 _wait_for_sheep 4
