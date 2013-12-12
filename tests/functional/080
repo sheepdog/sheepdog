@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Test sheep strict mode for write
+
+. ./common
+
+for i in `seq 0 5`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 4:2 -t
+
+$DOG vdi create test 10M
+$DOG node kill 3
+echo hello | $DOG vdi write test 0 512
+_vdi_list
+
+# Should fail
+$DOG vdi create test1 10M
+echo world | $DOG vdi write test 0 512
+
+$DOG cluster shutdown
+sleep 1
+
+for i in 0 1 2 4 5; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 5
+
+# Should fail
+$DOG vdi create test1 10M
+echo world | $DOG vdi write test 0 512
+
+_vdi_list
