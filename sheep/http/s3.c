@@ -108,7 +108,7 @@ static void s3_get_bucket(struct http_request *req, const char *bucket)
 {
 	bool print_header = true;
 
-	kv_list_objects(req, bucket, s3_get_bucket_cb, &print_header);
+	kv_list_objects(req, "s3", bucket, s3_get_bucket_cb, &print_header);
 
 	switch (req->status) {
 	case OK:
@@ -166,7 +166,7 @@ static void s3_head_object(struct http_request *req, const char *bucket,
 static void s3_get_object(struct http_request *req, const char *bucket,
 			  const char *object)
 {
-	kv_read_object(req, bucket, object);
+	kv_read_object(req, "s3", bucket, object);
 
 	if (req->status == NOT_FOUND)
 		s3_write_err_response(req, "NoSuchKey",
@@ -176,7 +176,7 @@ static void s3_get_object(struct http_request *req, const char *bucket,
 static void s3_put_object(struct http_request *req, const char *bucket,
 			  const char *object)
 {
-	kv_create_object(req, bucket, object);
+	kv_create_object(req, "s3", bucket, object);
 
 	if (req->status == NOT_FOUND)
 		s3_write_err_response(req, "NoSuchBucket",
@@ -192,7 +192,7 @@ static void s3_post_object(struct http_request *req, const char *bucket,
 static void s3_delete_object(struct http_request *req, const char *bucket,
 			     const char *object)
 {
-	kv_delete_object(req, bucket, object);
+	kv_delete_object(req, "s3", bucket, object);
 
 	if (req->status == NOT_FOUND)
 		s3_write_err_response(req, "NoSuchKey",

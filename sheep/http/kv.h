@@ -38,15 +38,16 @@ int kv_list_buckets(struct http_request *req, const char *account,
 		    void *opaque);
 
 /* Object operations */
-int kv_create_object(struct http_request *req, const char *bucket,
-		     const char *object);
-int kv_read_object(struct http_request *req, const char *bucket,
-		   const char *object);
+int kv_create_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *object);
+int kv_read_object(struct http_request *req, const char *account,
+		   const char *bucket, const char *object);
 int kv_update_object(struct http_request *req, const char *bucket,
 		     const char *object);
-int kv_delete_object(struct http_request *req, const char *bucket,
-		     const char *object);
-int kv_list_objects(struct http_request *req, const char *bucket,
+int kv_delete_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *object);
+int kv_list_objects(struct http_request *req, const char *account,
+		    const char *bucket,
 		    void (*cb)(struct http_request *req, const char *bucket,
 			       const char *object, void *opaque),
 		    void *opaque);

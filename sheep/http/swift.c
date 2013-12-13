@@ -17,14 +17,6 @@
 
 static void swift_delete_account(struct http_request *req, const char *account);
 
-static void make_bucket_path(char *bucket, size_t size, const char *account,
-			     const char *container)
-{
-	const char *args[] = { account, container };
-
-	make_path(bucket, size, ARRAY_SIZE(args), args);
-}
-
 /* Operations on Accounts */
 
 static void swift_head_account(struct http_request *req, const char *account)
@@ -126,17 +118,23 @@ static void swift_head_container(struct http_request *req, const char *account,
 static void swift_get_container_cb(struct http_request *req, const char *bucket,
 				   const char *object, void *opaque)
 {
-	http_request_writes(req, object);
-	http_request_writes(req, "\n");
+	struct strbuf *buf = (struct strbuf *)opaque;
+
+	if (bucket && object)
+		strbuf_addf(buf, "%s\n", object);
 }
 
 static void swift_get_container(struct http_request *req, const char *account,
 				const char *container)
 {
-	char bucket[SD_MAX_BUCKET_NAME];
+	struct strbuf buf = STRBUF_INIT;
 
-	make_bucket_path(bucket, sizeof(bucket), account, container);
-	kv_list_objects(req, bucket, swift_get_container_cb, NULL);
+	kv_list_objects(req, account, container, swift_get_container_cb,
+			(void *)&buf);
+	req->data_length = buf.len;
+	http_response_header(req, OK);
+	http_request_write(req, buf.buf, buf.len);
+	strbuf_release(&buf);
 }
 
 static void swift_put_container(struct http_request *req, const char *account,
@@ -180,19 +178,13 @@ static void swift_head_object(struct http_request *req, const char *account,
 static void swift_get_object(struct http_request *req, const char *account,
 			     const char *container, const char *object)
 {
-	char bucket[SD_MAX_BUCKET_NAME];
-
-	make_bucket_path(bucket, sizeof(bucket), account, container);
-	kv_read_object(req, bucket, object);
+	kv_read_object(req, account, container, object);
 }
 
 static void swift_put_object(struct http_request *req, const char *account,
 			     const char *container, const char *object)
 {
-	char bucket[SD_MAX_BUCKET_NAME];
-
-	make_bucket_path(bucket, sizeof(bucket), account, container);
-	kv_create_object(req, bucket, object);
+	kv_create_object(req, account, container, object);
 }
 
 static void swift_post_object(struct http_request *req, const char *account,
@@ -204,10 +196,7 @@ static void swift_post_object(struct http_request *req, const char *account,
 static void swift_delete_object(struct http_request *req, const char *account,
 				const char *container, const char *object)
 {
-	char bucket[SD_MAX_BUCKET_NAME];
-
-	make_bucket_path(bucket, sizeof(bucket), account, container);
-	kv_delete_object(req, bucket, object);
+	kv_delete_object(req, account, container, object);
 }
 
 /* Swift driver interfaces */
