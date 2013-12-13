@@ -58,7 +58,7 @@ static void s3_get_service(struct http_request *req)
 {
 	bool print_header = true;
 
-	kv_list_buckets(req, s3_get_service_cb, &print_header);
+	kv_list_buckets(req, "s3", s3_get_service_cb, &print_header);
 
 	http_request_writes(req, "</Buckets></ListAllMyBucketsResult>\r\n");
 }
@@ -125,7 +125,7 @@ static void s3_get_bucket(struct http_request *req, const char *bucket)
 
 static void s3_put_bucket(struct http_request *req, const char *bucket)
 {
-	kv_create_bucket(req, bucket);
+	kv_create_bucket("s3", bucket);
 
 	if (req->status == ACCEPTED)
 		s3_write_err_response(req, "BucketAlreadyExists",
@@ -139,7 +139,7 @@ static void s3_post_bucket(struct http_request *req, const char *bucket)
 
 static void s3_delete_bucket(struct http_request *req, const char *bucket)
 {
-	kv_delete_bucket(req, bucket);
+	kv_delete_bucket("s3", bucket);
 
 	switch (req->status) {
 	case NOT_FOUND:

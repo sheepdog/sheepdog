@@ -9,8 +9,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "strbuf.h"
 #include "http.h"
 #include "kv.h"
+
+#define HTTP_REMOVE_ACCOUNT "HTTP_X_REMOVE_ACCOUNT_META_BOOK"
+
+static void swift_delete_account(struct http_request *req, const char *account);
 
 static void make_bucket_path(char *bucket, size_t size, const char *account,
 			     const char *container)
@@ -24,26 +29,37 @@ static void make_bucket_path(char *bucket, size_t size, const char *account,
 
 static void swift_head_account(struct http_request *req, const char *account)
 {
-	http_response_header(req, NOT_IMPLEMENTED);
+	uint32_t nr_buckets;
+	int ret;
+
+	ret = kv_read_account(account, &nr_buckets);
+	if (ret)
+		http_response_header(req, UNAUTHORIZED);
+	else {
+		http_request_writef(req, "X-Account-Container-Count: %u\n",
+				    nr_buckets);
+		http_response_header(req, NO_CONTENT);
+	}
 }
 
 static void swift_get_account_cb(struct http_request *req, const char *bucket,
 				 void *opaque)
 {
-	const char *account = opaque;
-	char *args[2] = {};
+	struct strbuf *buf = (struct strbuf *)opaque;
 
-	split_path(bucket, ARRAY_SIZE(args), args);
-
-	if (args[1] != NULL && strcmp(args[0], account) == 0) {
-		http_request_writes(req, args[1]);
-		http_request_writes(req, "\n");
-	}
+	if (bucket)
+		strbuf_addf(buf, "%s\n", bucket);
 }
 
 static void swift_get_account(struct http_request *req, const char *account)
 {
-	kv_list_buckets(req, swift_get_account_cb, (void *)account);
+	struct strbuf buf = STRBUF_INIT;
+
+	kv_list_buckets(req, account, swift_get_account_cb, (void *)&buf);
+	req->data_length = buf.len;
+	http_response_header(req, OK);
+	http_request_write(req, buf.buf, buf.len);
+	strbuf_release(&buf);
 }
 
 static void swift_put_account(struct http_request *req, const char *account)
@@ -53,24 +69,50 @@ static void swift_put_account(struct http_request *req, const char *account)
 
 static void swift_post_account(struct http_request *req, const char *account)
 {
-	http_response_header(req, NOT_IMPLEMENTED);
-}
+	char *p;
+	int ret;
 
-static void swift_delete_account_cb(struct http_request *req,
-				    const char *bucket, void *opaque)
-{
-	const char *account = opaque;
-	char *args[2] = {};
-
-	split_path(bucket, ARRAY_SIZE(args), args);
-
-	if (args[1] != NULL && strcmp(args[0], account) == 0)
-		kv_delete_bucket(req, bucket);
+	for (int i = 0; (p = req->fcgx.envp[i]); ++i) {
+		/* delete account */
+		if (!strncmp(p, HTTP_REMOVE_ACCOUNT,
+			     strlen(HTTP_REMOVE_ACCOUNT))) {
+			swift_delete_account(req, account);
+			return;
+		}
+	}
+	/* create account */
+	ret = kv_create_account(account);
+	if (ret == SD_RES_SUCCESS)
+		http_response_header(req, CREATED);
+	else if (ret == SD_RES_VDI_EXIST)
+		http_response_header(req, ACCEPTED);
+	else
+		http_response_header(req, INTERNAL_SERVER_ERROR);
 }
 
 static void swift_delete_account(struct http_request *req, const char *account)
 {
-	kv_list_buckets(req, swift_delete_account_cb, (void *)account);
+	uint32_t nr_buckets;
+	int ret;
+
+	ret = kv_read_account(account, &nr_buckets);
+	if (ret) {
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		return;
+	}
+
+	if (nr_buckets) {
+		/* return HTTP_CONFLICT when the account is not empty */
+		http_response_header(req, CONFLICT);
+		return;
+	}
+
+	ret = kv_delete_account(account);
+	if (ret) {
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		return;
+	}
+	http_response_header(req, OK);
 }
 
 /* Operations on Containers */
@@ -100,10 +142,14 @@ static void swift_get_container(struct http_request *req, const char *account,
 static void swift_put_container(struct http_request *req, const char *account,
 				const char *container)
 {
-	char bucket[SD_MAX_BUCKET_NAME];
-
-	make_bucket_path(bucket, sizeof(bucket), account, container);
-	kv_create_bucket(req, bucket);
+	int ret;
+	ret = kv_create_bucket(account, container);
+	if (ret == SD_RES_SUCCESS)
+		http_response_header(req, CREATED);
+	else if (ret == SD_RES_VDI_EXIST)
+		http_response_header(req, ACCEPTED);
+	else
+		http_response_header(req, INTERNAL_SERVER_ERROR);
 }
 
 static void swift_post_container(struct http_request *req, const char *account,
@@ -115,10 +161,12 @@ static void swift_post_container(struct http_request *req, const char *account,
 static void swift_delete_container(struct http_request *req,
 				   const char *account, const char *container)
 {
-	char bucket[SD_MAX_BUCKET_NAME];
-
-	make_bucket_path(bucket, sizeof(bucket), account, container);
-	kv_delete_bucket(req, bucket);
+	int ret;
+	ret = kv_delete_bucket(account, container);
+	if (ret == SD_RES_NO_VDI)
+		http_response_header(req, NOT_FOUND);
+	else
+		http_response_header(req, NO_CONTENT);
 }
 
 /* Operations on Objects */

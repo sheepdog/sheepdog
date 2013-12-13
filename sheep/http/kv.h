@@ -14,15 +14,25 @@
 
 #include "http.h"
 
-#define SD_MAX_BUCKET_NAME 1024
+#define SD_MAX_BUCKET_NAME 64
 #define SD_MAX_OBJECT_NAME 1024
 
+/* Account operations */
+int kv_create_account(const char *account);
+int kv_read_account(const char *account, uint32_t *nr_buckets);
+int kv_update_account(const char *account);
+int kv_delete_account(const char *account);
+int kv_list_accounts(struct http_request *req,
+		    void (*cb)(struct http_request *req, const char *account,
+			       void *opaque),
+		    void *opaque);
+
 /* Bucket operations */
-int kv_create_bucket(struct http_request *req, const char *bucket);
-int kv_read_bucket(struct http_request *req, const char *bucket);
-int kv_update_bucket(struct http_request *req, const char *bucket);
-int kv_delete_bucket(struct http_request *req, const char *bucket);
-int kv_list_buckets(struct http_request *req,
+int kv_create_bucket(const char *account, const char *bucket);
+int kv_read_bucket(const char *account, const char *bucket);
+int kv_update_bucket(const char *account, const char *bucket);
+int kv_delete_bucket(const char *account, const char *bucket);
+int kv_list_buckets(struct http_request *req, const char *account,
 		    void (*cb)(struct http_request *req, const char *bucket,
 			       void *opaque),
 		    void *opaque);

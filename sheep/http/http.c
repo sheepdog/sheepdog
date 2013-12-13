@@ -52,6 +52,7 @@ static inline const char *strstatus(enum http_status status)
 		[NO_CONTENT] = "204 No Content",
 		[PARTIAL_CONTENT] = "206 Partial Content",
 		[BAD_REQUEST] = "400 Bad Request",
+		[UNAUTHORIZED] = "401 Unauthorized",
 		[NOT_FOUND] = "404 Not Found",
 		[METHOD_NOT_ALLOWED] = "405 Method Not Allowed",
 		[CONFLICT] = "409 Conflict",
@@ -192,6 +193,9 @@ void http_response_header(struct http_request *req, enum http_status status)
 
 	req->status = status;
 	http_request_writef(req, "Status: %s\r\n", strstatus(status));
+	if (req->opcode == HTTP_GET && req->data_length > 0)
+		http_request_writef(req, "Content-Length: %lu\r\n",
+				    req->data_length);
 	http_request_writes(req, "Content-type: text/plain;\r\n\r\n");
 }
 
@@ -233,6 +237,7 @@ static void http_run_request(struct work *work)
 
 		if (method != NULL) {
 			method(req);
+			sd_debug("req->status %d", req->status);
 			if (req->status != UNKNOWN)
 				goto out;
 		}
