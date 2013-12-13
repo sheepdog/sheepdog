@@ -178,7 +178,10 @@ static void swift_head_object(struct http_request *req, const char *account,
 static void swift_get_object(struct http_request *req, const char *account,
 			     const char *container, const char *object)
 {
-	kv_read_object(req, account, container, object);
+	int ret;
+	ret = kv_read_object(req, account, container, object);
+	if (ret)
+		http_response_header(req, NOT_FOUND);
 }
 
 static void swift_put_object(struct http_request *req, const char *account,
@@ -196,7 +199,10 @@ static void swift_post_object(struct http_request *req, const char *account,
 static void swift_delete_object(struct http_request *req, const char *account,
 				const char *container, const char *object)
 {
-	kv_delete_object(req, account, container, object);
+	int ret;
+	ret = kv_delete_object(req, account, container, object);
+	if (ret)
+		http_response_header(req, NOT_FOUND);
 }
 
 /* Swift driver interfaces */
