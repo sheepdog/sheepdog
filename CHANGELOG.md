@@ -10,6 +10,7 @@ DOG COMMAND INTERFACE:
   - "node log level set" sets loglevel of running sheep process
   - "node log level get" gets loglevel from running sheep process
   - "node log level list" lists avialable loglevels
+ - new option "-o" of "vdi track", for tracking objects with their oids
 
 SHEEP COMMAND INTERFACE:
  - improvements of help messages

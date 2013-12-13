@@ -32,6 +32,7 @@ static struct sd_option vdi_options[] = {
 	{'F', "from", true, "create a differential backup from the snapshot"},
 	{'f', "force", false, "do operation forcibly"},
 	{'y', "hyper", false, "create a hyper volume"},
+	{'o', "oid", true, "specify the object id of the tracking object"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -49,6 +50,7 @@ static struct vdi_cmd_data {
 	bool force;
 	uint8_t copy_policy;
 	uint8_t store_policy;
+	uint64_t oid;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -1080,6 +1082,7 @@ static int vdi_track(int argc, char **argv)
 	struct obj_info_filler_info oid_info = {0};
 	uint32_t vid;
 	uint8_t nr_copies;
+	uint64_t oid = vdi_cmd_data.oid;
 
 	memset(&info, 0, sizeof(info));
 	info.name = vdiname;
@@ -1097,38 +1100,48 @@ static int vdi_track(int argc, char **argv)
 		return EXIT_MISSING;
 	}
 
-	if (idx == ~0) {
-		printf("Tracking the inode object 0x%" PRIx32 " with %d nodes\n",
-		       vid, sd_nodes_nr);
-		return do_track_object(vid_to_vdi_oid(vid), nr_copies);
-	}
+	if (!oid) {
+		if (idx == ~0) {
+			printf("Tracking the inode object 0x%" PRIx32
+			       " with %d nodes\n", vid, sd_nodes_nr);
+			return do_track_object(vid_to_vdi_oid(vid), nr_copies);
+		}
 
-	oid_info.success = false;
-	oid_info.idx = idx;
+		oid_info.success = false;
+		oid_info.idx = idx;
 
-	if (idx >= MAX_DATA_OBJS) {
-		printf("The offset is too large!\n");
-		goto err;
-	}
+		if (idx >= MAX_DATA_OBJS) {
+			printf("The offset is too large!\n");
+			goto err;
+		}
 
-	parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
-		   get_store_objsize(info.copy_policy,
-				     vid_to_data_oid(vid, 0)));
+		parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
+			   get_store_objsize(info.copy_policy,
+					     vid_to_data_oid(vid, 0)));
 
-	if (!oid_info.success) {
-		sd_err("Failed to read the inode object 0x%" PRIx32, vid);
-		goto err;
-	}
-	if (!oid_info.data_oid) {
-		printf("The inode object 0x%"PRIx32" idx %u is not allocated\n",
-		       vid, idx);
-		goto err;
-	}
-	printf("Tracking the object 0x%" PRIx64
-	       " (the inode vid 0x%" PRIx32 " idx %u)"
-	       " with %d nodes\n",
-	       oid_info.data_oid, vid, idx, sd_nodes_nr);
-	return do_track_object(oid_info.data_oid, nr_copies);
+		if (!oid_info.success) {
+			sd_err("Failed to read the inode object 0x%" PRIx32,
+			       vid);
+			goto err;
+		}
+		if (!oid_info.data_oid) {
+			printf("The inode object 0x%"PRIx32
+			       " idx %u is not allocated\n", vid, idx);
+			goto err;
+		}
+
+		oid = oid_info.data_oid;
+
+		printf("Tracking the object 0x%" PRIx64
+		       " (the inode vid 0x%" PRIx32 " idx %u)"
+		       " with %d nodes\n", oid, vid, idx, sd_nodes_nr);
+	} else
+		printf("Tracking the object 0x%" PRIx64
+		       " (the inode vid 0x%" PRIx32 ")"
+		       " with %d nodes\n", oid, vid, sd_nodes_nr);
+
+	return do_track_object(oid, nr_copies);
+
 err:
 	return EXIT_FAILURE;
 }
@@ -2428,7 +2441,8 @@ static struct subcommand vdi_cmd[] = {
 	{"object", "<vdiname>", "isaph", "show object information in the image",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_object, vdi_options},
-	{"track", "<vdiname>", "isaph", "show the object epoch trace in the image",
+	{"track", "<vdiname>", "isapho",
+	 "show the object epoch trace in the image",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_track, vdi_options},
 	{"setattr", "<vdiname> <key> [value]", "dxaph", "set a VDI attribute",
@@ -2521,6 +2535,14 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 'y':
 		vdi_cmd_data.store_policy = 1;
+		break;
+	case 'o':
+		vdi_cmd_data.oid = strtoll(opt, &p, 16);
+		if (opt == p) {
+			sd_err("object id must be a hex integer");
+			exit(EXIT_FAILURE);
+		}
+		break;
 	}
 
 	return 0;
