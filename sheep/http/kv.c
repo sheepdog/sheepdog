@@ -395,7 +395,7 @@ static int delete_bucket(struct sd_inode *account_inode, uint64_t idx,
 			 oid, vdi_id);
 	} else {
 		ret = sd_write_object(oid, buf, sizeof(struct bucket_inode),
-				   i * sizeof(struct bucket_inode), false);
+				      i * sizeof(struct bucket_inode), false);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write object %lx", oid);
 			ret = -1;
@@ -496,7 +496,7 @@ static int add_bucket(struct sd_inode *account_inode, uint64_t idx,
 		ret = sd_write_object(oid, buf, SD_DATA_OBJ_SIZE, 0, create);
 	else
 		ret = sd_write_object(oid, buf, sizeof(struct bucket_inode),
-				   i * sizeof(struct bucket_inode), create);
+				      i * sizeof(struct bucket_inode), create);
 
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to write object %lx", oid);
@@ -540,7 +540,7 @@ static int kv_get_lock_bucket(struct sd_inode *account_inode,
 	/* read account vdi out */
 	oid = vid_to_vdi_oid(account_vid);
 	ret = sd_read_object(oid, (char *)account_inode,
-			  sizeof(struct sd_inode), 0);
+			     sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
@@ -688,7 +688,7 @@ int kv_list_buckets(struct http_request *req, const char *account,
 	oid = vid_to_vdi_oid(account_vid);
 	sys->cdrv->lock(account_vid);
 	ret = sd_read_object(oid, (char *)&account_inode,
-			  sizeof(struct sd_inode), 0);
+			     sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to read account inode header %lx", oid);
 		goto out;
@@ -807,6 +807,28 @@ static void list_objects_cb(void *data, enum btree_node_type type, void *arg)
 	}
 out:
 	free(onode);
+}
+
+struct find_object_arg {
+	bool found;
+	const char *object_name;
+};
+
+static void find_object_cb(struct http_request *req, const char *bucket,
+			   const char *object, void *opaque)
+{
+	struct find_object_arg *foarg = (struct find_object_arg *)opaque;
+
+	if (!strncmp(foarg->object_name, object, SD_MAX_OBJECT_NAME))
+		foarg->found = true;
+}
+
+static bool kv_find_object(struct http_request *req, const char *account,
+			   const char *bucket, const char *object)
+{
+	struct find_object_arg arg = {false, object};
+	kv_list_objects(req, account, bucket, find_object_cb, &arg);
+	return arg.found;
 }
 
 #define KV_ONODE_INLINE_SIZE (SD_DATA_OBJ_SIZE - sizeof(struct kv_onode_hdr))
@@ -977,6 +999,15 @@ int kv_create_object(struct http_request *req, const char *account,
 	if (ret < 0)
 		return ret;
 
+	if (kv_find_object(req, account, bucket, name)) {
+		/* delete old object if it exists */
+		ret = kv_delete_object(req, account, bucket, name);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to delete exists object %s", name);
+			return ret;
+		}
+	}
+
 	onode = xzalloc(sizeof(*onode));
 
 	/* for inlined onode */
@@ -1130,6 +1161,9 @@ int kv_read_object(struct http_request *req, const char *account,
 	ret = lookup_bucket(req, vdi_name, &vid);
 	if (ret < 0)
 		goto out;
+
+	if (!kv_find_object(req, account, bucket, object))
+		return SD_RES_NO_OBJ;
 
 	onode = xzalloc(sizeof(*onode));
 
@@ -1293,6 +1327,12 @@ static int do_kv_delete_object(struct http_request *req, const char *obj_name,
 			sd_err("failed to read onode extent %" PRIx64, oid);
 			goto out;
 		}
+		/* discard the data object which stores onode */
+		ret = discard_data_obj(oid);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("failed to discard oid %lu", oid);
+			goto out;
+		}
 		for (i = 0; i < onode->hdr.nr_extent; i++) {
 			ret = oalloc_free(onode->hdr.data_vid, ext[i].start,
 					  ext[i].count);
@@ -1320,6 +1360,9 @@ int kv_delete_object(struct http_request *req, const char *account,
 	ret = lookup_bucket(req, vdi_name, &vid);
 	if (ret < 0)
 		return ret;
+
+	if (!kv_find_object(req, account, bucket, object))
+		return SD_RES_NO_OBJ;
 
 	sys->cdrv->lock(vid);
 	hval = sd_hash(object, strlen(object));
@@ -1360,7 +1403,7 @@ int kv_list_objects(struct http_request *req, const char *account,
 
 	inode = xmalloc(sizeof(*inode));
 	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
-			  sizeof(struct sd_inode), 0);
+			     sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("%s: bucket %s", sd_strerror(ret), bucket);
 		http_response_header(req, INTERNAL_SERVER_ERROR);
