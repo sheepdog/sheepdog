@@ -221,7 +221,7 @@ static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 	ret = SD_RES_SUCCESS;
 out:
 	free(inode);
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
