@@ -402,6 +402,10 @@ _cleanup_devices()
         umount -l $d
         rm -f $d.img
     done
+
+    for d in `find /dev/ -name "loop*"`; do
+        losetup -d $d &> /dev/null
+    done
 }
 
 _list_data_obj()
