@@ -632,12 +632,40 @@ uint32_t sd_inode_get_meta_size(struct sd_inode *inode, size_t size)
 	return len;
 }
 
+/* Write the whole meta-data of inode out */
+int sd_inode_write(write_node_fn writer, struct sd_inode *inode, int flags,
+		   bool create, bool direct)
+{
+	uint32_t len;
+	int ret;
+
+	if (inode->store_policy == 0)
+		ret = writer(vid_to_vdi_oid(inode->vdi_id), inode,
+			     SD_INODE_HEADER_SIZE, 0,
+			     flags, inode->nr_copies, inode->copy_policy,
+			     create, direct);
+	else {
+		len = SD_INODE_HEADER_SIZE + sd_inode_get_meta_size(inode, 0);
+		ret = writer(vid_to_vdi_oid(inode->vdi_id), inode, len, 0,
+			     flags, inode->nr_copies, inode->copy_policy,
+			     create, false);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		ret = writer(vid_to_vdi_oid(inode->vdi_id), inode,
+			     sizeof(uint32_t),
+			     offsetof(struct sd_inode, btree_counter), flags,
+			     inode->nr_copies, inode->copy_policy,
+			     create, false);
+	}
+out:
+	return ret;
+}
+
 /* Write the meta-data of inode out */
 int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
 		       uint32_t idx, uint32_t vid, uint32_t value,
 		       int flags, bool create, bool direct)
 {
-	uint32_t len;
 	int ret = SD_RES_SUCCESS;
 
 	if (inode->store_policy == 0)
@@ -646,18 +674,12 @@ int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
 			     flags, inode->nr_copies, inode->copy_policy,
 			     create, direct);
 	else {
-		len = SD_INODE_HEADER_SIZE + sd_inode_get_meta_size(inode, 0);
-		ret = writer(vid_to_vdi_oid(vid), inode, len, 0, flags,
-			     inode->nr_copies, inode->copy_policy,
-			     create, false);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
-		ret = writer(vid_to_vdi_oid(vid), inode, sizeof(uint32_t),
-			     offsetof(struct sd_inode, btree_counter),
-			     flags, inode->nr_copies, inode->copy_policy,
-			     create, false);
+		/*
+		 * For btree type sd_inode, we only have to write all
+		 * meta-data of sd_inode out.
+		 */
+		ret = sd_inode_write(writer, inode, flags, create, direct);
 	}
-out:
 	return ret;
 }
 

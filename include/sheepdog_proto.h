@@ -280,6 +280,8 @@ extern uint32_t sd_inode_get_vid(read_node_fn reader,
 extern void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 			     struct sd_inode *inode, uint32_t idx,
 			     uint32_t vdi_id);
+extern int sd_inode_write(write_node_fn writer, struct sd_inode *inode,
+			  int flags, bool create, bool direct);
 extern int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
 			      uint32_t idx, uint32_t vid, uint32_t value,
 			      int flags, bool create, bool direct);

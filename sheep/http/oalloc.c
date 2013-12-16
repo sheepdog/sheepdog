@@ -178,17 +178,14 @@ int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count)
 		goto out;
 	}
 
-	/* TODO: add range support for inode update */
-	for (uint64_t i = 0; i < count; i++) {
+	for (uint64_t i = 0; i < count; i++)
 		INODE_SET_VID(inode, start + i, vid);
 
-		ret = sd_inode_write_vid(sheep_bnode_writer, inode, start + i,
-					 vid, vid, 0, false, false);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to update inode, %" PRIx64", %s",
-			       vid_to_vdi_oid(vid), sd_strerror(ret));
-			goto out;
-		}
+	ret = sd_inode_write(sheep_bnode_writer, inode, 0, false, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update inode, %" PRIx64", %s",
+		       vid_to_vdi_oid(vid), sd_strerror(ret));
+		goto out;
 	}
 out:
 	free(inode);
