@@ -1075,7 +1075,7 @@ static int start_deletion(struct request *req, uint32_t vid)
 	root_vid = get_vdi_root(dw->vid, &cloned);
 	if (!root_vid) {
 		ret = SD_RES_EIO;
-		goto err;
+		goto out;
 	}
 
 	ret = fill_vdi_list(dw, root_vid);
@@ -1091,12 +1091,14 @@ static int start_deletion(struct request *req, uint32_t vid)
 			sd_debug("snapshot chain has valid vdi, just mark vdi %"
 				 PRIx32 " as deleted.", dw->vid);
 			delete_inode(dw);
-			return SD_RES_SUCCESS;
+			ret = SD_RES_SUCCESS;
+			goto out;
 		}
 	}
 
 	sd_debug("%d", dw->count);
 
+	ret = SD_RES_SUCCESS;
 	if (dw->count == 0)
 		goto out;
 
@@ -1107,9 +1109,9 @@ static int start_deletion(struct request *req, uint32_t vid)
 		queue_work(sys->deletion_wqueue, &dw->work);
 	} else
 		list_add_tail(&dw->list, &deletion_work_list);
+
+	return ret;
 out:
-	return SD_RES_SUCCESS;
-err:
 	if (dw)
 		free(dw->buf);
 	free(dw);
