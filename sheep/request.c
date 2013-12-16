@@ -744,8 +744,10 @@ static struct client_info *create_client(int fd, struct cluster_info *cluster)
 	if (!ci)
 		return NULL;
 
-	if (getpeername(fd, (struct sockaddr *)&from, &namesize))
+	if (getpeername(fd, (struct sockaddr *)&from, &namesize)) {
+		free(ci);
 		return NULL;
+	}
 
 	switch (from.ss_family) {
 	case AF_INET:
