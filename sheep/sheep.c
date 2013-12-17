@@ -801,7 +801,7 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	local_req_init();
+	local_request_init();
 
 	ret = init_signal();
 	if (ret)

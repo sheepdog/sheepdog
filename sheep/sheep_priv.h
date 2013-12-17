@@ -84,6 +84,12 @@ enum REQUST_STATUS {
 	REQUEST_DROPPED
 };
 
+struct request_iocb {
+	uint32_t count;
+	int efd;
+	int result;
+};
+
 struct request {
 	struct sd_req rq;
 	struct sd_rsp rp;
@@ -100,6 +106,7 @@ struct request {
 	refcnt_t refcnt;
 	bool local;
 	int local_req_efd;
+	struct request_iocb *iocb;
 
 	uint64_t local_oid;
 
@@ -367,8 +374,12 @@ int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
 		   uint64_t offset);
 int sd_remove_object(uint64_t oid);
 
+struct request_iocb *local_req_init(void);
 int exec_local_req(struct sd_req *rq, void *data);
-void local_req_init(void);
+int exec_local_req_async(struct sd_req *rq, void *, struct request_iocb *);
+int local_req_wait(struct request_iocb *iocb);
+
+void local_request_init(void);
 
 int prealloc(int fd, uint32_t size);
 

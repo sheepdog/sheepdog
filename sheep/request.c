@@ -499,6 +499,15 @@ static void free_local_request(struct request *req)
 	free(req);
 }
 
+static void submit_local_request(struct request *req)
+{
+	pthread_mutex_lock(&sys->local_req_lock);
+	list_add_tail(&req->request_list, &sys->local_req_queue);
+	pthread_mutex_unlock(&sys->local_req_lock);
+
+	eventfd_xwrite(sys->local_req_efd, 1);
+}
+
 /*
  * Exec the request locally and synchronously.
  *
@@ -514,16 +523,13 @@ worker_fn int exec_local_req(struct sd_req *rq, void *data)
 	req->rq = *rq;
 	req->local_req_efd = eventfd(0, 0);
 	if (req->local_req_efd < 0) {
+		sd_err("eventfd failed, %m");
 		/* Fake the result to ask for retry */
 		req->rp.result = SD_RES_NETWORK_ERROR;
 		goto out;
 	}
 
-	pthread_mutex_lock(&sys->local_req_lock);
-	list_add_tail(&req->request_list, &sys->local_req_queue);
-	pthread_mutex_unlock(&sys->local_req_lock);
-
-	eventfd_xwrite(sys->local_req_efd, 1);
+	submit_local_request(req);
 	eventfd_xread(req->local_req_efd);
 out:
 	/* fill rq with response header as exec_req does */
@@ -534,6 +540,73 @@ out:
 	free_local_request(req);
 
 	return ret;
+}
+
+static void local_req_async_handler(int fd, int events, void *data)
+{
+	struct request *req = data;
+	struct request_iocb *iocb = req->iocb;
+
+	if (events & EPOLLERR)
+		sd_err("request handler error");
+	eventfd_xread(fd);
+
+	if (unlikely(req->rp.result != SD_RES_SUCCESS))
+		iocb->result = req->rp.result;
+
+	if (uatomic_sub_return(&iocb->count, 1) == 0)
+		eventfd_xwrite(iocb->efd, 1);
+
+	unregister_event(req->local_req_efd);
+	close(req->local_req_efd);
+	free_local_request(req);
+}
+
+worker_fn struct request_iocb *local_req_init(void)
+{
+	struct request_iocb *iocb = xzalloc(sizeof(*iocb));
+
+	iocb->efd = eventfd(0, 0);
+	if (iocb->efd < 0) {
+		sd_err("eventfd failed, %m");
+		free(iocb);
+		return NULL;
+	}
+	iocb->result = SD_RES_SUCCESS;
+	return iocb;
+}
+
+worker_fn int local_req_wait(struct request_iocb *iocb)
+{
+	int ret;
+
+	eventfd_xread(iocb->efd);
+
+	ret = iocb->result;
+	close(iocb->efd);
+	free(iocb);
+	return ret;
+}
+
+worker_fn int exec_local_req_async(struct sd_req *rq, void *data,
+				   struct request_iocb *iocb)
+{
+	struct request *req;
+
+	req = alloc_local_request(data, rq->data_length);
+	req->rq = *rq;
+	req->local_req_efd = eventfd(0, EFD_NONBLOCK);
+	if (req->local_req_efd < 0) {
+		sd_err("eventfd failed, %m");
+		return SD_RES_SYSTEM_ERROR;
+	}
+
+	uatomic_inc(&iocb->count);
+	req->iocb = iocb;
+	register_event(req->local_req_efd, local_req_async_handler, req);
+	submit_local_request(req);
+
+	return SD_RES_SUCCESS;
 }
 
 static struct request *alloc_request(struct client_info *ci, int data_length)
@@ -903,7 +976,7 @@ static void local_req_handler(int listen_fd, int events, void *data)
 	}
 }
 
-void local_req_init(void)
+void local_request_init(void)
 {
 	pthread_mutex_init(&sys->local_req_lock, NULL);
 	sys->local_req_efd = eventfd(0, EFD_NONBLOCK);
