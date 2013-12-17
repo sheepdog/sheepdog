@@ -281,7 +281,11 @@ static inline void sd_init_lock(struct sd_lock *lock)
 
 static inline void sd_destroy_lock(struct sd_lock *lock)
 {
-	int ret = pthread_rwlock_destroy(&lock->rwlock);
+	int ret;
+
+	do {
+		ret = pthread_rwlock_destroy(&lock->rwlock);
+	} while (ret == EAGAIN);
 
 	if (unlikely(ret != 0))
 		panic("failed to destroy a lock, %s", strerror(ret));
@@ -299,9 +303,17 @@ static inline void sd_read_lock(struct sd_lock *lock)
 		panic("failed to lock for reading, %s", strerror(ret));
 }
 
+/*
+ * Even though POSIX manual it doesn't return EAGAIN, we indeed have met the
+ * case that it returned EAGAIN
+ */
 static inline void sd_write_lock(struct sd_lock *lock)
 {
-	int ret = pthread_rwlock_wrlock(&lock->rwlock);
+	int ret;
+
+	do {
+		ret = pthread_rwlock_wrlock(&lock->rwlock);
+	} while (ret == EAGAIN);
 
 	if (unlikely(ret != 0))
 		panic("failed to lock for writing, %s", strerror(ret));
@@ -309,7 +321,11 @@ static inline void sd_write_lock(struct sd_lock *lock)
 
 static inline void sd_unlock(struct sd_lock *lock)
 {
-	int ret = pthread_rwlock_unlock(&lock->rwlock);
+	int ret;
+
+	do {
+		ret = pthread_rwlock_unlock(&lock->rwlock);
+	} while (ret == EAGAIN);
 
 	if (unlikely(ret != 0))
 		panic("failed to unlock, %s", strerror(ret));
