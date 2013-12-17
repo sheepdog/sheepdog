@@ -217,7 +217,7 @@ int do_read(int sockfd, void *buf, int len, bool (*need_retry)(uint32_t epoch),
 reread:
 	ret = read(sockfd, buf, len);
 	if (ret == 0) {
-		sd_err("connection is closed (%d bytes left)", len);
+		sd_debug("connection is closed (%d bytes left)", len);
 		return 1;
 	}
 	if (ret < 0) {
