@@ -10,7 +10,6 @@
  */
 
 #include "http.h"
-#include "kv.h"
 
 #define MAX_BUCKET_LISTING 1000
 

@@ -11,7 +11,6 @@
 
 #include "strbuf.h"
 #include "http.h"
-#include "kv.h"
 
 #define HTTP_REMOVE_ACCOUNT "HTTP_X_REMOVE_ACCOUNT_META_BOOK"
 

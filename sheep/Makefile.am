@@ -52,7 +52,7 @@ sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread -lm\
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= sheep_priv.h cluster.h http/http.h http/kv.h trace/trace.h
+noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h
 
 EXTRA_DIST		= 
 

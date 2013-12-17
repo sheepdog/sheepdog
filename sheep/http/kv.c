@@ -12,7 +12,7 @@
 /* This file implements backend kv functions for object storage. */
 
 #include "sheep_priv.h"
-#include "kv.h"
+#include "http.h"
 
 #define FOR_EACH_VDI(nr, vdis) FOR_EACH_BIT(nr, vdis, SD_NR_VDIS)
 

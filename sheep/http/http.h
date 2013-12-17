@@ -109,6 +109,46 @@ int http_request_writes(struct http_request *req, const char *str);
 __printf(2, 3)
 int http_request_writef(struct http_request *req, const char *fmt, ...);
 
+/* For kv.c */
+
+#define SD_MAX_BUCKET_NAME 64
+#define SD_MAX_OBJECT_NAME 1024
+
+/* Account operations */
+int kv_create_account(const char *account);
+int kv_read_account(const char *account, uint32_t *nr_buckets);
+int kv_update_account(const char *account);
+int kv_delete_account(const char *account);
+int kv_list_accounts(struct http_request *req,
+		    void (*cb)(struct http_request *req, const char *account,
+			       void *opaque),
+		    void *opaque);
+
+/* Bucket operations */
+int kv_create_bucket(const char *account, const char *bucket);
+int kv_read_bucket(const char *account, const char *bucket);
+int kv_update_bucket(const char *account, const char *bucket);
+int kv_delete_bucket(const char *account, const char *bucket);
+int kv_list_buckets(struct http_request *req, const char *account,
+		    void (*cb)(struct http_request *req, const char *bucket,
+			       void *opaque),
+		    void *opaque);
+
+/* Object operations */
+int kv_create_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *object);
+int kv_read_object(struct http_request *req, const char *account,
+		   const char *bucket, const char *object);
+int kv_update_object(struct http_request *req, const char *bucket,
+		     const char *object);
+int kv_delete_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *object);
+int kv_list_objects(struct http_request *req, const char *account,
+		    const char *bucket,
+		    void (*cb)(struct http_request *req, const char *bucket,
+			       const char *object, void *opaque),
+		    void *opaque);
+
 /* object_allocator.c */
 int oalloc_new_prepare(uint32_t vid, uint64_t *start, uint64_t count);
 int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count);
