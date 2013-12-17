@@ -1,5 +1,7 @@
 /*
  * Copyright (C) 2013 MORITA Kazutaka <morita.kazutaka@gmail.com>
+ * Copyright (C) 2013 Robin Dong <sanbai@taobao.com>
+ * Copyright (C) 2013 Liu Yuan <namei.unix@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -919,11 +921,57 @@ out:
 	return ret;
 }
 
+static int vdi_read_write(uint32_t vid, char *data, size_t length,
+			  off_t offset, bool read)
+{
+	struct sd_req hdr;
+	uint32_t idx = offset / SD_DATA_OBJ_SIZE;
+	uint64_t done = 0;
+	struct request_iocb *iocb;
+	int ret;
+
+	iocb = local_req_init();
+	if (!iocb)
+		return SD_RES_SYSTEM_ERROR;
+
+	offset %= SD_DATA_OBJ_SIZE;
+	while (done < length) {
+		size_t len = min(length - done, SD_DATA_OBJ_SIZE - offset);
+
+		if (read) {
+			sd_init_req(&hdr, SD_OP_READ_OBJ);
+		} else {
+			sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+			hdr.flags = SD_FLAG_CMD_WRITE;
+		}
+		hdr.data_length = len;
+		hdr.obj.oid = vid_to_data_oid(vid, idx);
+		hdr.obj.offset = offset;
+
+		ret = exec_local_req_async(&hdr, data, iocb);
+		if (ret != SD_RES_SUCCESS)
+			sd_err("failed to write object %" PRIx64 ", %s",
+			       hdr.obj.oid, sd_strerror(ret));
+
+		offset += len;
+		if (offset == SD_DATA_OBJ_SIZE) {
+			offset = 0;
+			idx++;
+		}
+		done += len;
+		data += len;
+	}
+
+	return local_req_wait(iocb);
+}
+
+#define READ_WRITE_BUFFER (SD_DATA_OBJ_SIZE * 25) /* no rationale */
+
 static int kv_create_extent_onode(struct http_request *req, uint32_t data_vid,
 				  struct kv_onode *onode, ssize_t *total_size)
 {
 	ssize_t size;
-	uint64_t start = 0, count, limit, block;
+	uint64_t start = 0, count, done = 0, total, offset;
 	int ret;
 	char *data_buf = NULL;
 
@@ -931,6 +979,7 @@ static int kv_create_extent_onode(struct http_request *req, uint32_t data_vid,
 	sys->cdrv->lock(data_vid);
 	ret = oalloc_new_prepare(data_vid, &start, count);
 	sys->cdrv->unlock(data_vid);
+	sd_debug("start: %lu, count: %lu", start, count);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to prepare allocation of %lu bytes!",
 		       req->data_length);
@@ -939,23 +988,22 @@ static int kv_create_extent_onode(struct http_request *req, uint32_t data_vid,
 	}
 
 	/* receive and write data at first, then write onode */
-	data_buf = xmalloc(SD_DATA_OBJ_SIZE);
-
-	sd_debug("start: %lu, count: %lu", start, count);
-	for (block = start, limit = start + count; block < limit; block++) {
-		sd_debug("block: %lu, limit: %lu", block, limit);
-		size = http_request_read(req, data_buf, SD_DATA_OBJ_SIZE);
-		*total_size += size;
-		ret = sd_write_object(vid_to_data_oid(data_vid, block),
-				      data_buf, size, 0, true);
+	data_buf = xmalloc(READ_WRITE_BUFFER);
+	offset = start * SD_DATA_OBJ_SIZE;
+	total = req->data_length;
+	while (done < total) {
+		size = http_request_read(req, data_buf, READ_WRITE_BUFFER);
+		ret = vdi_read_write(data_vid, data_buf, size, offset, false);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write data object for %" PRIx32" %s",
 			       data_vid, sd_strerror(ret));
 			goto out;
 		}
-		if (size < SD_DATA_OBJ_SIZE)
-			break;
+		done += size;
+		offset += size;
 	}
+
+	*total_size = done;
 
 	sd_debug("DATA_LENGTH: %lu, total size: %lu, last blocks: %lu",
 		 req->data_length, *total_size, start);
@@ -975,6 +1023,7 @@ static int kv_create_extent_onode(struct http_request *req, uint32_t data_vid,
 	onode->o_extent[0].count = count;
 	onode->hdr.nr_extent = 1;
 out:
+	free(data_buf);
 	return ret;
 }
 
@@ -1075,32 +1124,30 @@ static int kv_read_extent_onode(struct http_request *req,
 				struct kv_onode *onode)
 {
 	struct onode_extent *ext;
-	uint64_t oid, block, size, total_size, limit;
+	uint64_t size, total, total_size, offset, done = 0;
 	uint32_t i;
 	int ret;
 	char *data_buf = NULL;
 
-	data_buf = xmalloc(SD_DATA_OBJ_SIZE);
-
+	data_buf = xmalloc(READ_WRITE_BUFFER);
 	total_size = onode->hdr.size;
-	ext = onode->o_extent;
 	for (i = 0; i < onode->hdr.nr_extent; i++) {
-		limit = ext->count + ext->start;
-		for (block = ext->start; block < limit; block++) {
-			oid = vid_to_data_oid(onode->hdr.data_vid, block);
-			if (total_size < SD_DATA_OBJ_SIZE)
-				size = total_size;
-			else
-				size = SD_DATA_OBJ_SIZE;
-			ret = sd_read_object(oid, data_buf, size, 0);
+		ext = onode->o_extent + i;
+		total = min(ext->count * SD_DATA_OBJ_SIZE, total_size);
+		offset = ext->start * SD_DATA_OBJ_SIZE;
+		while (done < total) {
+			size = MIN(total - done, READ_WRITE_BUFFER);
+			ret = vdi_read_write(onode->hdr.data_vid, data_buf,
+					     size, offset, true);
 			if (ret != SD_RES_SUCCESS) {
-				sd_err("Failed to read oid %lx", oid);
+				sd_err("Failed to read for vid %"PRIx32,
+				       onode->hdr.data_vid);
 				goto out;
 			}
 			http_request_write(req, data_buf, size);
+			done += size;
+			offset += size;
 			total_size -= size;
-			sd_debug("read extented block %lu, size %lu",
-				 block, size);
 		}
 	}
 out:
