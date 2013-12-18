@@ -11,6 +11,10 @@ if BUILD_SHA1_HW
 libsheepdog_a_SOURCES	+= sha1_ssse3.S
 endif
 
+if BUILD_TRACE
+AM_CPPFLAGS		+= -DENABLE_TRACE
+endif
+
 # support for GNU Flymake
 check-syntax:
 	$(COMPILE) -fsyntax-only $(CHK_SOURCES)

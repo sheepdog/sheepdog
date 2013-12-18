@@ -44,6 +44,7 @@ sheep_SOURCES		+= cluster/shepherd.c
 endif
 
 if BUILD_TRACE
+AM_CPPFLAGS		+= -DENABLE_TRACE
 sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c trace/checker.c
 endif
 
