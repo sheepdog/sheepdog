@@ -211,31 +211,11 @@ const char *sha1_to_hex(const unsigned char *sha1)
 	return buffer;
 }
 
-/*
- * Calculate a sha1 message digest based on the content of 'buf'
- *
- * We can uniquely generate the original buffer from
- * - the trimmed buffer
- * - the orignal buffer length
- * - the trimmed buffer length
- * - the trimmed buffer offset
- *
- * This calculates a unique sha1 digest faster than the naive calculation when
- * the content of 'buf' is sparse.  The result will be set in 'sha1'.
- */
-void sha1_from_buffer(const void *buf, size_t size, unsigned char *sha1)
+void get_buffer_sha1(unsigned char *buf, unsigned len, unsigned char *sha1)
 {
 	struct sha1_ctx c;
-	uint64_t offset = 0;
-	uint32_t length = size;
 
 	sha1_init(&c);
-	sha1_update(&c, (uint8_t *)&length, sizeof(length));
-
-	find_zero_blocks(buf, &offset, &length);
-
-	sha1_update(&c, (uint8_t *)&length, sizeof(length));
-	sha1_update(&c, (uint8_t *)&offset, sizeof(offset));
-	sha1_update(&c, buf, length);
+	sha1_update(&c, buf, len);
 	sha1_final(&c, sha1);
 }
