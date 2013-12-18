@@ -57,7 +57,7 @@ static struct req_iter *prepare_replication_requests(struct request *req,
  */
 static void *init_erasure_buffer(struct request *req, int buf_len)
 {
-	char *buf = xzalloc(buf_len);
+	char *buf = xvalloc(buf_len);
 	uint32_t len = req->rq.data_length;
 	uint64_t off = req->rq.obj.offset;
 	uint64_t oid = req->rq.obj.oid;
@@ -600,7 +600,7 @@ static int gateway_handle_cow(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	size_t len = get_objsize(oid);
 	struct sd_req hdr, *req_hdr = &req->rq;
-	char *buf = xmalloc(len);
+	char *buf = xvalloc(len);
 	int ret;
 
 	if (req->rq.data_length != len) {
