@@ -639,7 +639,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 		return ret;
 	}
 
-	sha1_from_buffer(buf, length, sha1);
+	get_buffer_sha1(buf, length, sha1);
 	free(buf);
 
 	sd_debug("the message digest of %"PRIx64" at epoch %d is %s", oid,

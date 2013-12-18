@@ -88,7 +88,7 @@ int sha1_file_write(void *buf, size_t len, unsigned char *outsha1)
 {
 	unsigned char sha1[SHA1_DIGEST_SIZE];
 
-	sha1_from_buffer(buf, len, sha1);
+	get_buffer_sha1(buf, len, sha1);
 	if (sha1_buffer_write(sha1, buf, len) < 0)
 		return -1;
 	if (outsha1)
@@ -101,7 +101,7 @@ static int verify_sha1_file(const unsigned char *sha1,
 {
 	unsigned char tmp[SHA1_DIGEST_SIZE];
 
-	sha1_from_buffer(buf, len, tmp);
+	get_buffer_sha1(buf, len, tmp);
 	if (memcmp((char *)tmp, (char *)sha1, SHA1_DIGEST_SIZE) != 0) {
 		sd_err("failed, %s != %s", sha1_to_hex(sha1), sha1_to_hex(tmp));
 		return -1;

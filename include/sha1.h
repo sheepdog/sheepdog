@@ -32,6 +32,6 @@ sha1_update_func_t sha1_update;
 sha1_final_func_t sha1_final;
 
 const char *sha1_to_hex(const unsigned char *sha1);
-void sha1_from_buffer(const void *buf, size_t size, unsigned char *sha1);
+void get_buffer_sha1(unsigned char *buf, unsigned len, unsigned char *sha1);
 
 #endif
