@@ -7,6 +7,10 @@ noinst_LIBRARIES	= libsheepdog.a
 libsheepdog_a_SOURCES	= event.c logger.c net.c util.c rbtree.c strbuf.c \
 			  sha1.c option.c work.c sockfd_cache.c
 
+if BUILD_TRACE
+AM_CPPFLAGS		+= -DENABLE_TRACE
+endif
+
 # support for GNU Flymake
 check-syntax:
 	$(COMPILE) -fsyntax-only $(CHK_SOURCES)
