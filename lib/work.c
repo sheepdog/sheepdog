@@ -41,25 +41,25 @@
  */
 #define WQ_PROTECTION_PERIOD 1000 /* ms */
 
-struct worker_info {
+struct wq_info {
 	const char *name;
 
 	struct list_head finished_list;
-	struct list_head worker_info_siblings;
+	struct list_head list;
 
 	pthread_mutex_t finished_lock;
 	pthread_mutex_t startup_lock;
 
-	/* wokers sleep on this and signaled by tgtd */
+	/* wokers sleep on this and signaled by work producer */
 	pthread_cond_t pending_cond;
-	/* locked by tgtd and workers */
+	/* locked by work producer and workers */
 	pthread_mutex_t pending_lock;
 	/* protected by pending_lock */
 	struct work_queue q;
 	size_t nr_threads;
 
 	/* protected by uatomic primitives */
-	size_t nr_workers;
+	size_t nr_queued_work;
 
 	/* we cannot shrink work queue till this time */
 	uint64_t tm_end_of_protection;
@@ -67,7 +67,7 @@ struct worker_info {
 };
 
 static int efd;
-static LIST_HEAD(worker_info_list);
+static LIST_HEAD(wq_info_list);
 static size_t nr_nodes = 1;
 static size_t (*wq_get_nr_nodes)(void);
 
@@ -86,10 +86,10 @@ static int ack_efd;
 
 void suspend_worker_threads(void)
 {
-	struct worker_info *wi;
+	struct wq_info *wi;
 	int tid;
 
-	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+	list_for_each_entry(wi, &wq_info_list, list) {
 		pthread_mutex_lock(&wi->pending_lock);
 	}
 
@@ -110,7 +110,7 @@ void suspend_worker_threads(void)
 
 void resume_worker_threads(void)
 {
-	struct worker_info *wi;
+	struct wq_info *wi;
 	int nr_threads = 0, tid;
 
 	FOR_EACH_BIT(tid, tid_map, tid_max) {
@@ -121,7 +121,7 @@ void resume_worker_threads(void)
 	for (int i = 0; i < nr_threads; i++)
 		eventfd_xread(ack_efd);
 
-	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+	list_for_each_entry(wi, &wq_info_list, list) {
 		pthread_mutex_unlock(&wi->pending_lock);
 	}
 }
@@ -196,7 +196,7 @@ static uint64_t get_msec_time(void)
 	return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-static inline uint64_t wq_get_roof(struct worker_info *wi)
+static inline uint64_t wq_get_roof(struct wq_info *wi)
 {
 	uint64_t nr = 1;
 
@@ -216,9 +216,9 @@ static inline uint64_t wq_get_roof(struct worker_info *wi)
 	return nr;
 }
 
-static bool wq_need_grow(struct worker_info *wi)
+static bool wq_need_grow(struct wq_info *wi)
 {
-	if (wi->nr_threads < uatomic_read(&wi->nr_workers) &&
+	if (wi->nr_threads < uatomic_read(&wi->nr_queued_work) &&
 	    wi->nr_threads * 2 <= wq_get_roof(wi)) {
 		wi->tm_end_of_protection = get_msec_time() +
 			WQ_PROTECTION_PERIOD;
@@ -232,9 +232,9 @@ static bool wq_need_grow(struct worker_info *wi)
  * Return true if more than half of threads are not used more than
  * WQ_PROTECTION_PERIOD seconds
  */
-static bool wq_need_shrink(struct worker_info *wi)
+static bool wq_need_shrink(struct wq_info *wi)
 {
-	if (uatomic_read(&wi->nr_workers) < wi->nr_threads / 2)
+	if (uatomic_read(&wi->nr_queued_work) < wi->nr_threads / 2)
 		/* we cannot shrink work queue during protection period. */
 		return wi->tm_end_of_protection <= get_msec_time();
 
@@ -243,7 +243,7 @@ static bool wq_need_shrink(struct worker_info *wi)
 	return false;
 }
 
-static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
+static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 {
 	pthread_t thread;
 	int ret;
@@ -266,9 +266,9 @@ static int create_worker_threads(struct worker_info *wi, size_t nr_threads)
 
 void queue_work(struct work_queue *q, struct work *work)
 {
-	struct worker_info *wi = container_of(q, struct worker_info, q);
+	struct wq_info *wi = container_of(q, struct wq_info, q);
 
-	uatomic_inc(&wi->nr_workers);
+	uatomic_inc(&wi->nr_queued_work);
 	pthread_mutex_lock(&wi->pending_lock);
 
 	if (wq_need_grow(wi))
@@ -283,7 +283,7 @@ void queue_work(struct work_queue *q, struct work *work)
 
 static void worker_thread_request_done(int fd, int events, void *data)
 {
-	struct worker_info *wi;
+	struct wq_info *wi;
 	struct work *work;
 	LIST_HEAD(list);
 
@@ -292,7 +292,7 @@ static void worker_thread_request_done(int fd, int events, void *data)
 
 	eventfd_xread(fd);
 
-	list_for_each_entry(wi, &worker_info_list, worker_info_siblings) {
+	list_for_each_entry(wi, &wq_info_list, list) {
 		pthread_mutex_lock(&wi->finished_lock);
 		list_splice_init(&wi->finished_list, &list);
 		pthread_mutex_unlock(&wi->finished_lock);
@@ -302,14 +302,14 @@ static void worker_thread_request_done(int fd, int events, void *data)
 			list_del(&work->w_list);
 
 			work->done(work);
-			uatomic_dec(&wi->nr_workers);
+			uatomic_dec(&wi->nr_queued_work);
 		}
 	}
 }
 
 static void *worker_routine(void *arg)
 {
-	struct worker_info *wi = arg;
+	struct wq_info *wi = arg;
 	struct work *work;
 	int tid = gettid();
 
@@ -402,7 +402,7 @@ struct work_queue *create_work_queue(const char *name,
 				     enum wq_thread_control tc)
 {
 	int ret;
-	struct worker_info *wi;
+	struct wq_info *wi;
 
 	wi = xzalloc(sizeof(*wi));
 	wi->name = name;
@@ -421,7 +421,7 @@ struct work_queue *create_work_queue(const char *name,
 	if (ret < 0)
 		goto destroy_threads;
 
-	list_add(&wi->worker_info_siblings, &worker_info_list);
+	list_add(&wi->list, &wq_info_list);
 
 	return &wi->q;
 destroy_threads:
@@ -441,7 +441,7 @@ struct work_queue *create_ordered_work_queue(const char *name)
 
 bool work_queue_empty(struct work_queue *q)
 {
-	struct worker_info *wi = container_of(q, struct worker_info, q);
+	struct wq_info *wi = container_of(q, struct wq_info, q);
 
-	return uatomic_read(&wi->nr_workers) == 0;
+	return uatomic_read(&wi->nr_queued_work) == 0;
 }
