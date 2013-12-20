@@ -1991,10 +1991,18 @@ out:
 
 static int vdi_cache_flush(int argc, char **argv)
 {
-	const char *vdiname = argv[optind++];
+	const char *vdiname;
 	struct sd_req hdr;
 	uint32_t vid;
 	int ret = EXIT_SUCCESS;
+
+	if (optind < argc)
+		vdiname = argv[optind++];
+	else {
+		sd_err("please specify VDI name");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
 
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 			    vdi_cmd_data.snapshot_tag, &vid, 0);
@@ -2018,10 +2026,18 @@ out:
 
 static int vdi_cache_delete(int argc, char **argv)
 {
-	const char *vdiname = argv[optind++];
+	const char *vdiname;
 	struct sd_req hdr;
 	uint32_t vid;
 	int ret = EXIT_SUCCESS;
+
+	if (optind < argc)
+		vdiname = argv[optind++];
+	else {
+		sd_err("please specify VDI name");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
 
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 			    vdi_cmd_data.snapshot_tag, &vid, 0);
