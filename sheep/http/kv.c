@@ -29,7 +29,7 @@ struct bucket_inode_hdr {
 struct bucket_inode {
 	union {
 		struct bucket_inode_hdr hdr;
-		uint8_t data[SD_MAX_BUCKET_NAME << 1];
+		uint8_t data[BLOCK_SIZE];
 	};
 };
 
@@ -814,18 +814,18 @@ struct find_object_arg {
 };
 
 static void find_object_cb(struct http_request *req, const char *bucket,
-			   const char *object, void *opaque)
+			   const char *name, void *opaque)
 {
 	struct find_object_arg *foarg = (struct find_object_arg *)opaque;
 
-	if (!strncmp(foarg->object_name, object, SD_MAX_OBJECT_NAME))
+	if (!strncmp(foarg->object_name, name, SD_MAX_OBJECT_NAME))
 		foarg->found = true;
 }
 
 static bool kv_find_object(struct http_request *req, const char *account,
-			   const char *bucket, const char *object)
+			   const char *bucket, const char *name)
 {
-	struct find_object_arg arg = {false, object};
+	struct find_object_arg arg = {false, name};
 	kv_list_objects(req, account, bucket, find_object_cb, &arg);
 	return arg.found;
 }
@@ -1010,7 +1010,6 @@ out:
 
 static int onode_create(struct kv_onode *onode, uint32_t onode_vid)
 {
-
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 	uint32_t tmp_vid, idx, i;
 	uint64_t hval;
@@ -1059,6 +1058,81 @@ static int onode_free_data(struct kv_onode *onode)
 	return ret;
 }
 
+static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
+{
+	struct onode_extent *ext;
+	uint64_t size, total, total_size, offset, done = 0;
+	uint32_t i;
+	int ret;
+	char *data_buf = NULL;
+
+	data_buf = xmalloc(READ_WRITE_BUFFER);
+	total_size = onode->hdr.size;
+	for (i = 0; i < onode->hdr.nr_extent; i++) {
+		ext = onode->o_extent + i;
+		total = min(ext->count * SD_DATA_OBJ_SIZE, total_size);
+		offset = ext->start * SD_DATA_OBJ_SIZE;
+		while (done < total) {
+			size = MIN(total - done, READ_WRITE_BUFFER);
+			ret = vdi_read_write(onode->hdr.data_vid, data_buf,
+					     size, offset, true);
+			if (ret != SD_RES_SUCCESS) {
+				sd_err("Failed to read for vid %"PRIx32,
+				       onode->hdr.data_vid);
+				goto out;
+			}
+			http_request_write(req, data_buf, size);
+			done += size;
+			offset += size;
+			total_size -= size;
+		}
+	}
+out:
+	free(data_buf);
+	return ret;
+}
+
+static int onode_lookup(struct kv_onode *onode, uint32_t onode_vid,
+			const char *name)
+{
+	uint64_t hval;
+	uint32_t i;
+	int ret;
+
+	sys->cdrv->lock(onode_vid);
+	hval = sd_hash(name, strlen(name));
+	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		uint32_t idx = (hval + i) % MAX_DATA_OBJS;
+		uint64_t oid = vid_to_data_oid(onode_vid, idx);
+
+		ret = sd_read_object(oid, (char *)onode, sizeof(*onode), 0);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		if (strcmp(onode->hdr.name, name) == 0)
+			break;
+	}
+
+	if (i == MAX_DATA_OBJS)
+		ret = SD_RES_NO_OBJ;
+out:
+	sys->cdrv->unlock(onode_vid);
+	return ret;
+}
+
+static int onode_read_data(struct kv_onode *onode, struct http_request *req)
+{
+	int ret;
+
+	if (!onode->hdr.inlined)
+		return onode_read_extents(onode, req);
+
+	ret = http_request_write(req, onode->data, onode->hdr.size);
+	if (ret != onode->hdr.size)
+		return SD_RES_SYSTEM_ERROR;
+
+	return SD_RES_SUCCESS;
+}
+
 /*
  * user object name -> struct kv_onode -> sheepdog objects -> user data
  *
@@ -1105,121 +1179,33 @@ out:
 	return ret;
 }
 
-static int kv_read_extent_onode(struct http_request *req,
-				struct kv_onode *onode)
-{
-	struct onode_extent *ext;
-	uint64_t size, total, total_size, offset, done = 0;
-	uint32_t i;
-	int ret;
-	char *data_buf = NULL;
-
-	data_buf = xmalloc(READ_WRITE_BUFFER);
-	total_size = onode->hdr.size;
-	for (i = 0; i < onode->hdr.nr_extent; i++) {
-		ext = onode->o_extent + i;
-		total = min(ext->count * SD_DATA_OBJ_SIZE, total_size);
-		offset = ext->start * SD_DATA_OBJ_SIZE;
-		while (done < total) {
-			size = MIN(total - done, READ_WRITE_BUFFER);
-			ret = vdi_read_write(onode->hdr.data_vid, data_buf,
-					     size, offset, true);
-			if (ret != SD_RES_SUCCESS) {
-				sd_err("Failed to read for vid %"PRIx32,
-				       onode->hdr.data_vid);
-				goto out;
-			}
-			http_request_write(req, data_buf, size);
-			done += size;
-			offset += size;
-			total_size -= size;
-		}
-	}
-out:
-	free(data_buf);
-	return ret;
-}
-
-static int do_kv_read_object(struct http_request *req, const char *obj_name,
-			     struct kv_onode *onode, uint32_t vid, uint32_t idx)
-{
-	uint64_t oid = vid_to_data_oid(vid, idx);
-	int ret;
-
-	ret = sd_read_object(oid, (char *)onode, sizeof(*onode), 0);
-	switch (ret) {
-	case SD_RES_SUCCESS:
-		break;
-	case SD_RES_NO_OBJ:
-		sd_info("object %s doesn't exist", obj_name);
-		http_response_header(req, NOT_FOUND);
-		goto out;
-	default:
-		sd_err("failed to read %s, %s", req->uri, sd_strerror(ret));
-		http_response_header(req, INTERNAL_SERVER_ERROR);
-		goto out;
-	}
-
-	if (strcmp(onode->hdr.name, obj_name) == 0) {
-		http_response_header(req, OK);
-		/* for inlined onode */
-		if (onode->hdr.inlined)
-			http_request_write(req, onode->data, onode->hdr.size);
-		else {
-			sys->cdrv->unlock(vid);
-			ret = kv_read_extent_onode(req, onode);
-			sys->cdrv->lock(vid);
-			if (ret != SD_RES_SUCCESS) {
-				sd_err("Failed to read extent onode");
-				goto out;
-			}
-		}
-	} else
-		ret = SD_RES_OBJ_TAKEN;
-out:
-	return ret;
-}
-
 int kv_read_object(struct http_request *req, const char *account,
-		   const char *bucket, const char *object)
+		   const char *bucket, const char *name)
 {
 	struct kv_onode *onode = NULL;
-	int ret, i;
-	uint64_t hval;
-	uint32_t vid;
 	char vdi_name[SD_MAX_VDI_LEN];
+	uint32_t onode_vid;
+	int ret;
 
-	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, &vid);
-	if (ret < 0)
-		goto out;
-
-	if (!kv_find_object(req, account, bucket, object))
+	if (!kv_find_object(req, account, bucket, name))
 		return SD_RES_NO_OBJ;
 
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
+	ret = kv_lookup_vdi(vdi_name, &onode_vid);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
 	onode = xzalloc(sizeof(*onode));
+	ret = onode_lookup(onode, onode_vid, name);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
-	sys->cdrv->lock(vid);
-	hval = sd_hash(object, strlen(object));
-	for (i = 0; i < MAX_DATA_OBJS; i++) {
-		uint32_t idx = (hval + i) % MAX_DATA_OBJS;
-
-		ret = do_kv_read_object(req, object, onode, vid, idx);
-		switch (ret) {
-		case SD_RES_SUCCESS:
-			goto out;
-		case SD_RES_OBJ_TAKEN:
-			break;
-		default:
-			ret = -1;
-			goto out;
-		}
-	}
-
-	if (i >= MAX_DATA_OBJS)
-		ret = -1;
+	req->data_length = onode->hdr.size;
+	http_response_header(req, OK);
+	ret = onode_read_data(onode, req);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("failed to read data for %s", name);
 out:
-	sys->cdrv->unlock(vid);
 	free(onode);
 	return ret;
 }
@@ -1346,7 +1332,7 @@ int kv_list_objects(struct http_request *req, const char *account,
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
 	ret = kv_lookup_vdi(vdi_name, &vid);
-	if (ret < 0)
+	if (ret != SD_RES_SUCCESS)
 		goto out;
 
 	inode = xmalloc(sizeof(*inode));
