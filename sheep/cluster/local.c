@@ -16,17 +16,33 @@
 #include <sys/file.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <limits.h>
 
 #include "cluster.h"
 #include "event.h"
 #include "work.h"
 #include "util.h"
+#include "rbtree.h"
 
 #define MAX_EVENTS 500
 #define PROCESS_CHECK_INTERVAL 50 /* ms */
 #define LOCAL_MAX_NODES 1024
 
 static const char *shmfile = "/tmp/sheepdog_shm";
+static const char *lockdir = "/tmp/sheepdog_locks/";
+/*
+ * we have to use sd_lock because flock isn't thread exclusive
+ * and it also serves to project lock_tree
+ */
+static struct sd_lock lock_tree_lock = SD_LOCK_INITIALIZER;
+static struct rb_root lock_tree_root = RB_ROOT;
+
+struct lock_entry {
+	struct rb_node rb;
+	int fd;
+	uint64_t lock_id;
+};
+
 static int shmfd;
 static int sigfd;
 static int block_event_pos;
@@ -99,14 +115,25 @@ static inline void node_insert(struct sd_node *new, struct rb_root *root)
 		panic("insert duplicate %s", node_to_str(new));
 }
 
+static int xflock(int fd, int operation)
+{
+	int ret;
+
+	do {
+		ret = flock(fd, operation);
+	} while (ret < 0 && (errno == EAGAIN || errno == EINTR));
+
+	return ret;
+}
+
 static void shm_queue_lock(void)
 {
-	flock(shmfd, LOCK_EX);
+	xflock(shmfd, LOCK_EX);
 }
 
 static void shm_queue_unlock(void)
 {
-	flock(shmfd, LOCK_UN);
+	xflock(shmfd, LOCK_UN);
 }
 
 static size_t get_nodes(struct local_node *n)
@@ -544,15 +571,79 @@ static int local_init(const char *option)
 		return -1;
 	}
 
+	ret = xmkdir(lockdir, sd_def_dmode);
+	if (ret < 0) {
+		sd_err("failed to create lockdir %s, %m", lockdir);
+		return -1;
+	}
+
+	ret = purge_directory(lockdir);
+	if (ret < 0) {
+		sd_err("failed to purge lockdir %s, %m", lockdir);
+		return -1;
+	}
+
 	return 0;
+}
+
+static int lock_cmp(struct lock_entry *a, struct lock_entry *b)
+{
+	return intcmp(a->lock_id, b->lock_id);
+}
+
+static struct lock_entry *lock_tree_lookup(uint64_t lock_id)
+{
+	struct lock_entry entry = {
+		.lock_id = lock_id,
+	};
+
+	return rb_search(&lock_tree_root, &entry, rb, lock_cmp);
+}
+
+static struct lock_entry *lock_tree_add(struct lock_entry *new)
+{
+	return rb_insert(&lock_tree_root, new, rb, lock_cmp);
 }
 
 static void local_lock(uint64_t lock_id)
 {
+	struct lock_entry *entry;
+
+	sd_write_lock(&lock_tree_lock);
+	entry = lock_tree_lookup(lock_id);
+	if (!entry) {
+		char path[PATH_MAX];
+		int fd;
+
+		snprintf(path, sizeof(path), "%s%016"PRIx64, lockdir, lock_id);
+		fd = open(path, O_RDONLY | O_CREAT, sd_def_fmode);
+		if (fd < 0)
+			panic("failed to open %s, %m", path);
+		entry = xmalloc(sizeof(*entry));
+		entry->lock_id = lock_id;
+		entry->fd = fd;
+		lock_tree_add(entry);
+	}
+
+	if (xflock(entry->fd, LOCK_EX) < 0)
+		panic("lock failed %"PRIx64", %m", lock_id);
 }
 
 static void local_unlock(uint64_t lock_id)
 {
+	struct lock_entry *entry;
+
+	entry = lock_tree_lookup(lock_id);
+	if (!entry)
+		panic("can't find fd for lock %"PRIx64, lock_id);
+
+	if (xflock(entry->fd, LOCK_UN) < 0)
+		panic("unlock failed %"PRIx64", %m", lock_id);
+
+	close(entry->fd);
+	rb_erase(&entry->rb, &lock_tree_root);
+	free(entry);
+	sd_unlock(&lock_tree_lock);
 }
 
 static int local_update_node(struct sd_node *node)
