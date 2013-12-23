@@ -446,3 +446,19 @@ int sd_remove_object(uint64_t oid)
 
 	return ret;
 }
+
+int sd_discard_object(uint64_t oid)
+{
+	int ret;
+	struct sd_req hdr;
+
+	sd_init_req(&hdr, SD_OP_DISCARD_OBJ);
+	hdr.obj.oid = oid;
+
+	ret = exec_local_req(&hdr, NULL);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("Failed to discard data obj %lu %s", oid,
+		       sd_strerror(ret));
+
+	return ret;
+}

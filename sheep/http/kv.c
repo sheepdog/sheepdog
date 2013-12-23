@@ -52,63 +52,6 @@ static int kv_create_hyper_volume(const char *name, uint32_t *vdi_id)
 	return ret;
 }
 
-static int discard_data_obj(uint64_t oid)
-{
-	int ret;
-	struct sd_req hdr;
-
-	sd_init_req(&hdr, SD_OP_DISCARD_OBJ);
-	hdr.obj.oid = oid;
-
-	ret = exec_local_req(&hdr, NULL);
-	if (ret != SD_RES_SUCCESS)
-		sd_err("Failed to discard data obj %lu %s", oid,
-		       sd_strerror(ret));
-
-	return ret;
-}
-
-static int kv_lookup_vdi(const char *name, uint32_t *vid)
-{
-	int ret;
-	struct vdi_info info = {};
-	struct vdi_iocb iocb = {
-		.name = name,
-		.data_len = strlen(name),
-	};
-
-	ret = vdi_lookup(&iocb, &info);
-	switch (ret) {
-	case SD_RES_SUCCESS:
-		*vid = info.vid;
-		break;
-	case SD_RES_NO_VDI:
-		break;
-	default:
-		sd_err("Failed to lookup name %s, %s", name, sd_strerror(ret));
-	}
-
-	return ret;
-}
-
-static int kv_delete_vdi(const char *name)
-{
-	struct sd_req hdr;
-	char data[SD_MAX_VDI_LEN] = {0};
-	int ret;
-
-	sd_init_req(&hdr, SD_OP_DEL_VDI);
-	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = sizeof(data);
-	pstrcpy(data, SD_MAX_VDI_LEN, name);
-
-	ret = exec_local_req(&hdr, data);
-	if (ret != SD_RES_SUCCESS)
-		sd_err("Failed to delete vdi %s %s", name, sd_strerror(ret));
-
-	return ret;
-}
-
 /*
  * Find an free object index by hash of name in the vid and create an object
  * that holds the kv node{kv_bnode, kv_onode}.
@@ -247,7 +190,7 @@ static int kv_get_account(const char *account, uint32_t *nr_buckets)
 	struct list_buckets_arg arg = {NULL, NULL, NULL, 0};
 	int ret;
 
-	ret = kv_lookup_vdi(account, &account_vid);
+	ret = sd_lookup_vdi(account, &account_vid);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
@@ -286,7 +229,7 @@ int kv_delete_account(const char *account)
 {
 	int ret;
 
-	ret = kv_delete_vdi(account);
+	ret = sd_delete_vdi(account);
 	if (ret != SD_RES_SUCCESS)
 		sd_err("Failed to delete vdi %s", account);
 
@@ -374,7 +317,7 @@ static int bucket_create(const char *account, uint32_t account_vid,
 	ret = kv_create_hyper_volume(alloc_name, &vid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to create bucket %s data vid", bucket);
-		kv_delete_vdi(onode_name);
+		sd_delete_vdi(onode_name);
 		return ret;
 	}
 	ret = oalloc_init(vid);
@@ -392,8 +335,8 @@ static int bucket_create(const char *account, uint32_t account_vid,
 
 	return SD_RES_SUCCESS;
 err:
-	kv_delete_vdi(onode_name);
-	kv_delete_vdi(alloc_name);
+	sd_delete_vdi(onode_name);
+	sd_delete_vdi(alloc_name);
 	return ret;
 }
 
@@ -417,13 +360,13 @@ static int bucket_delete(const char *account, uint32_t avid, const char *bucket)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	ret = discard_data_obj(bnode.oid);
+	ret = sd_discard_object(bnode.oid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to discard bnode for %s", bucket);
 		return ret;
 	}
-	kv_delete_vdi(onode_name);
-	kv_delete_vdi(alloc_name);
+	sd_delete_vdi(onode_name);
+	sd_delete_vdi(alloc_name);
 
 	return SD_RES_SUCCESS;
 }
@@ -434,7 +377,7 @@ int kv_create_bucket(const char *account, const char *bucket)
 	char vdi_name[SD_MAX_VDI_LEN];
 	int ret;
 
-	ret = kv_lookup_vdi(account, &account_vid);
+	ret = sd_lookup_vdi(account, &account_vid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to find account %s", account);
 		return ret;
@@ -442,7 +385,7 @@ int kv_create_bucket(const char *account, const char *bucket)
 
 	sys->cdrv->lock(account_vid);
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, &vid);
+	ret = sd_lookup_vdi(vdi_name, &vid);
 	if (ret == SD_RES_SUCCESS) {
 		sd_err("bucket %s is exists.", bucket);
 		ret = SD_RES_VDI_EXIST;
@@ -476,7 +419,7 @@ int kv_delete_bucket(const char *account, const char *bucket)
 	char vdi_name[SD_MAX_VDI_LEN];
 	int ret;
 
-	ret = kv_lookup_vdi(account, &account_vid);
+	ret = sd_lookup_vdi(account, &account_vid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to find account %s", account);
 		return ret;
@@ -485,7 +428,7 @@ int kv_delete_bucket(const char *account, const char *bucket)
 	sys->cdrv->lock(account_vid);
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
 
-	ret = kv_lookup_vdi(vdi_name, &vid);
+	ret = sd_lookup_vdi(vdi_name, &vid);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 	ret = bucket_delete(account, account_vid, bucket);
@@ -503,7 +446,7 @@ int kv_list_buckets(struct http_request *req, const char *account,
 	uint64_t oid;
 	int ret;
 
-	ret = kv_lookup_vdi(account, &account_vid);
+	ret = sd_lookup_vdi(account, &account_vid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to find account %s", account);
 		return ret;
@@ -757,12 +700,12 @@ static int get_onode_data_vid(const char *account, const char *bucket,
 	int ret;
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, onode_vid);
+	ret = sd_lookup_vdi(vdi_name, onode_vid);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, data_vid);
+	ret = sd_lookup_vdi(vdi_name, data_vid);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -898,7 +841,7 @@ static int onode_delete(struct kv_onode *onode)
 {
 	int ret;
 
-	ret = discard_data_obj(onode->oid);
+	ret = sd_discard_object(onode->oid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to discard onode for %s", onode->name);
 		return ret;
@@ -969,7 +912,7 @@ int kv_read_object(struct http_request *req, const char *account,
 		return SD_RES_NO_OBJ;
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, &onode_vid);
+	ret = sd_lookup_vdi(vdi_name, &onode_vid);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -1000,7 +943,7 @@ int kv_delete_object(struct http_request *req, const char *account,
 		return SD_RES_NO_OBJ;
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, &onode_vid);
+	ret = sd_lookup_vdi(vdi_name, &onode_vid);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -1024,7 +967,7 @@ int kv_list_objects(struct http_request *req, const char *account,
 	char vdi_name[SD_MAX_VDI_LEN];
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, &vid);
+	ret = sd_lookup_vdi(vdi_name, &vid);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 

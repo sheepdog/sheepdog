@@ -1210,3 +1210,44 @@ void clean_vdi_state(void)
 	INIT_RB_ROOT(&vdi_state_root);
 	sd_unlock(&vdi_state_lock);
 }
+
+int sd_delete_vdi(const char *name)
+{
+	struct sd_req hdr;
+	char data[SD_MAX_VDI_LEN] = {0};
+	int ret;
+
+	sd_init_req(&hdr, SD_OP_DEL_VDI);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = sizeof(data);
+	pstrcpy(data, SD_MAX_VDI_LEN, name);
+
+	ret = exec_local_req(&hdr, data);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("Failed to delete vdi %s %s", name, sd_strerror(ret));
+
+	return ret;
+}
+
+int sd_lookup_vdi(const char *name, uint32_t *vid)
+{
+	int ret;
+	struct vdi_info info = {};
+	struct vdi_iocb iocb = {
+		.name = name,
+		.data_len = strlen(name),
+	};
+
+	ret = vdi_lookup(&iocb, &info);
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		*vid = info.vid;
+		break;
+	case SD_RES_NO_VDI:
+		break;
+	default:
+		sd_err("Failed to lookup name %s, %s", name, sd_strerror(ret));
+	}
+
+	return ret;
+}
