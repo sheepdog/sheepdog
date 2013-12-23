@@ -16,8 +16,6 @@
 #include "sheep_priv.h"
 #include "http.h"
 
-#define FOR_EACH_VDI(nr, vdis) FOR_EACH_BIT(nr, vdis, SD_NR_VDIS)
-
 struct bucket_inode_hdr {
 	char bucket_name[SD_MAX_BUCKET_NAME];
 	uint64_t obj_count;
@@ -743,8 +741,8 @@ struct kv_onode_hdr {
 			uint64_t mtime;
 			uint32_t data_vid;
 			uint32_t nr_extent;
+			uint64_t oid;
 			uint8_t inlined;
-			uint8_t pad[5];
 		};
 
 		uint8_t __pad[BLOCK_SIZE];
@@ -897,7 +895,6 @@ static int onode_populate_extents(struct kv_onode *onode,
 		goto out;
 	}
 
-	/* receive and write data at first, then write onode */
 	data_buf = xmalloc(READ_WRITE_BUFFER);
 	offset = start * SD_DATA_OBJ_SIZE;
 	total = req->data_length;
@@ -985,6 +982,7 @@ static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
 	uint64_t oid = vid_to_data_oid(vid, idx), len;
 	int ret;
 
+	onode->hdr.oid = oid;
 	if (onode->hdr.inlined)
 		len = onode->hdr.size;
 	else
@@ -1134,6 +1132,34 @@ static int onode_read_data(struct kv_onode *onode, struct http_request *req)
 }
 
 /*
+ * We free the data and meta data in following sequence:
+ *
+ * 1. discard onode
+ * 2. discard data
+ *
+ * If (1) success, we consdier it a successful deletion of user object. If (2)
+ * fails, data objects become orphan(s).
+ *
+ * XXX: GC the orphans
+ */
+static int onode_delete(struct kv_onode *onode)
+{
+	int ret;
+
+	ret = discard_data_obj(onode->hdr.oid);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to discard onode for %s", onode->hdr.name);
+		return ret;
+	}
+
+	ret = onode_free_data(onode);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("failed to free data for %s", onode->hdr.name);
+
+	return SD_RES_SUCCESS;
+}
+
+/*
  * user object name -> struct kv_onode -> sheepdog objects -> user data
  *
  * onode is a index node that maps name to sheepdog objects which hold the user
@@ -1210,115 +1236,30 @@ out:
 	return ret;
 }
 
-static int do_kv_delete_object(struct http_request *req, const char *obj_name,
-			       uint32_t vid, uint32_t idx)
-{
-	struct kv_onode *onode = NULL;
-	struct onode_extent *ext = NULL;
-	uint64_t oid = vid_to_data_oid(vid, idx);
-	char name[SD_MAX_OBJECT_NAME];
-	int ret = 0, len, i;
-
-	ret = sd_read_object(oid, name, sizeof(name), 0);
-	switch (ret) {
-	case SD_RES_SUCCESS:
-		break;
-	case SD_RES_NO_OBJ:
-		sd_info("object %s doesn't exist", obj_name);
-		http_response_header(req, NOT_FOUND);
-		goto out;
-	default:
-		sd_err("failed to read %s, %s", req->uri, sd_strerror(ret));
-		http_response_header(req, INTERNAL_SERVER_ERROR);
-		goto out;
-	}
-
-	if (strcmp(name, obj_name) == 0) {
-		/* delete onode at first */
-		memset(name, 0, sizeof(name));
-		ret = sd_write_object(oid, name, sizeof(name), 0, false);
-		if (ret == SD_RES_SUCCESS)
-			http_response_header(req, NO_CONTENT);
-		else {
-			sd_err("failed to update object, %" PRIx64,
-			       oid);
-			http_response_header(req, INTERNAL_SERVER_ERROR);
-			goto out;
-		}
-		/* then free data space */
-		onode = xmalloc(sizeof(struct kv_onode_hdr));
-		ret = sd_read_object(oid, (char *)onode,
-				     sizeof(struct kv_onode_hdr), 0);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to read onode hdr %" PRIx64, oid);
-			goto out;
-		}
-		len = sizeof(struct onode_extent) * onode->hdr.nr_extent;
-		ext = xmalloc(len);
-		ret = sd_read_object(oid, (char *)ext, len,
-				     sizeof(struct kv_onode_hdr));
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to read onode extent %" PRIx64, oid);
-			goto out;
-		}
-		/* discard the data object which stores onode */
-		ret = discard_data_obj(oid);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to discard oid %lu", oid);
-			goto out;
-		}
-		for (i = 0; i < onode->hdr.nr_extent; i++) {
-			ret = oalloc_free(onode->hdr.data_vid, ext[i].start,
-					  ext[i].count);
-			if (ret != SD_RES_SUCCESS)
-				sd_err("failed to free start %lu count %lu",
-				       ext[i].start, ext[i].count);
-		}
-	} else
-		ret = SD_RES_NO_OBJ;
-out:
-	free(ext);
-	free(onode);
-	return ret;
-}
-
 int kv_delete_object(struct http_request *req, const char *account,
-		     const char *bucket, const char *object)
+		     const char *bucket, const char *name)
 {
-	int ret, i;
-	uint64_t hval;
-	uint32_t vid;
 	char vdi_name[SD_MAX_VDI_LEN];
+	uint32_t onode_vid;
+	struct kv_onode *onode = NULL;
+	int ret;
 
-	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_lookup_vdi(vdi_name, &vid);
-	if (ret < 0)
-		return ret;
-
-	if (!kv_find_object(req, account, bucket, object))
+	if (!kv_find_object(req, account, bucket, name))
 		return SD_RES_NO_OBJ;
 
-	sys->cdrv->lock(vid);
-	hval = sd_hash(object, strlen(object));
-	for (i = 0; i < MAX_DATA_OBJS; i++) {
-		uint32_t idx = (hval + i) % MAX_DATA_OBJS;
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
+	ret = kv_lookup_vdi(vdi_name, &onode_vid);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
 
-		ret = do_kv_delete_object(req, object, vid, idx);
-		switch (ret) {
-		case SD_RES_SUCCESS:
-			goto out;
-		case SD_RES_NO_OBJ:
-			break;
-		default:
-			ret = -1;
-			goto out;
-		}
-	}
+	onode = xzalloc(sizeof(*onode));
+	ret = onode_lookup(onode, onode_vid, name);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
 
-	if (i >= MAX_DATA_OBJS)
-		ret = -1;
+	ret = onode_delete(onode);
 out:
-	sys->cdrv->unlock(vid);
+	free(onode);
 	return ret;
 }
 

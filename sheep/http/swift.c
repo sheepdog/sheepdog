@@ -224,9 +224,20 @@ static void swift_delete_object(struct http_request *req, const char *account,
 				const char *container, const char *object)
 {
 	int ret;
+
 	ret = kv_delete_object(req, account, container, object);
-	if (ret)
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		http_response_header(req, NO_CONTENT);
+		break;
+	case SD_RES_NO_VDI:
+	case SD_RES_NO_OBJ:
 		http_response_header(req, NOT_FOUND);
+		break;
+	default:
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		break;
+	}
 }
 
 /* Swift driver interfaces */
