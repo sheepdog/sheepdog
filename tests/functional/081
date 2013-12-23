@@ -18,7 +18,7 @@ _wait_for_sheep 6
 
 _cluster_format -c 4:2
 
-curl -s -X POST http://localhost/v1/sd
+curl -s -X PUT http://localhost/v1/sd
 curl -s -X PUT http://localhost/v1/sd/sheep
 curl -s -X PUT http://localhost/v1/sd/dog
 
@@ -48,7 +48,7 @@ done
 wait
 
 # list the container and objects
-curl -s -X GET http://localhost/v1/sd
+curl -s -X GET http://localhost/v1/sd | sort
 curl -s -X GET http://localhost/v1/sd/sheep | sort
 curl -s -X GET http://localhost/v1/sd/dog | sort
 

@@ -12,10 +12,6 @@
 #include "strbuf.h"
 #include "http.h"
 
-#define HTTP_REMOVE_ACCOUNT "HTTP_X_REMOVE_ACCOUNT_META_BOOK"
-
-static void swift_delete_account(struct http_request *req, const char *account);
-
 /* Operations on Accounts */
 
 static void swift_head_account(struct http_request *req, const char *account)
@@ -55,23 +51,8 @@ static void swift_get_account(struct http_request *req, const char *account)
 
 static void swift_put_account(struct http_request *req, const char *account)
 {
-	http_response_header(req, NOT_IMPLEMENTED);
-}
-
-static void swift_post_account(struct http_request *req, const char *account)
-{
-	char *p;
 	int ret;
 
-	for (int i = 0; (p = req->fcgx.envp[i]); ++i) {
-		/* delete account */
-		if (!strncmp(p, HTTP_REMOVE_ACCOUNT,
-			     strlen(HTTP_REMOVE_ACCOUNT))) {
-			swift_delete_account(req, account);
-			return;
-		}
-	}
-	/* create account */
 	ret = kv_create_account(account);
 	if (ret == SD_RES_SUCCESS)
 		http_response_header(req, CREATED);
@@ -79,6 +60,11 @@ static void swift_post_account(struct http_request *req, const char *account)
 		http_response_header(req, ACCEPTED);
 	else
 		http_response_header(req, INTERNAL_SERVER_ERROR);
+}
+
+static void swift_post_account(struct http_request *req, const char *account)
+{
+	http_response_header(req, NOT_IMPLEMENTED);
 }
 
 static void swift_delete_account(struct http_request *req, const char *account)
@@ -141,12 +127,17 @@ static void swift_put_container(struct http_request *req, const char *account,
 {
 	int ret;
 	ret = kv_create_bucket(account, container);
-	if (ret == SD_RES_SUCCESS)
+	switch (ret) {
+	case SD_RES_SUCCESS:
 		http_response_header(req, CREATED);
-	else if (ret == SD_RES_VDI_EXIST)
+		break;
+	case SD_RES_VDI_EXIST:
 		http_response_header(req, ACCEPTED);
-	else
+		break;
+	default:
 		http_response_header(req, INTERNAL_SERVER_ERROR);
+		break;
+	}
 }
 
 static void swift_post_container(struct http_request *req, const char *account,

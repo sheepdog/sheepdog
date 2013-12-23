@@ -111,7 +111,7 @@ int http_request_writef(struct http_request *req, const char *fmt, ...);
 
 /* For kv.c */
 
-#define SD_MAX_BUCKET_NAME 64
+#define SD_MAX_BUCKET_NAME 256
 #define SD_MAX_OBJECT_NAME 1024
 
 /* Account operations */

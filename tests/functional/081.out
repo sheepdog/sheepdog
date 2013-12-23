@@ -1,7 +1,7 @@
 QA output created by 081
 using backend plain store
-sheep
 dog
+sheep
 checker.c
 config.c
 corosync.c
