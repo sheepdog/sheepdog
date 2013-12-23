@@ -836,7 +836,7 @@ static bool kv_find_object(struct http_request *req, const char *account,
 #define KV_ONODE_INLINE_SIZE (SD_DATA_OBJ_SIZE - sizeof(struct kv_onode_hdr))
 
 static int kv_write_onode(struct sd_inode *inode, struct kv_onode *onode,
-			  uint32_t vid, uint32_t idx, bool overwrite)
+			  uint32_t vid, uint32_t idx)
 {
 	uint64_t oid = vid_to_data_oid(vid, idx), len;
 	int ret;
@@ -846,31 +846,19 @@ static int kv_write_onode(struct sd_inode *inode, struct kv_onode *onode,
 	else
 		len = sizeof(struct onode_extent) * onode->hdr.nr_extent;
 
-	if (overwrite) {
-		sd_info("overwrite object %s", onode->hdr.name);
-		ret = sd_write_object(oid, (char *)onode,
-				      sizeof(onode->hdr) + len,
-				      0, false);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to write object, %" PRIx64, oid);
-			goto out;
-		}
-	} else {
-		ret = sd_write_object(oid, (char *)onode,
-				      sizeof(onode->hdr) + len,
-				      0, true);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to create object, %" PRIx64, oid);
-			goto out;
-		}
-		INODE_SET_VID(inode, idx, vid);
-		ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
-					 vid, vid, 0, false, false);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to update inode, %" PRIx64,
-			       vid_to_vdi_oid(vid));
-			goto out;
-		}
+	ret = sd_write_object(oid, (char *)onode, sizeof(onode->hdr) + len,
+			      0, true);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to create object, %" PRIx64, oid);
+		goto out;
+	}
+	INODE_SET_VID(inode, idx, vid);
+	ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
+				 vid, vid, 0, false, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update inode, %" PRIx64,
+		       vid_to_vdi_oid(vid));
+		goto out;
 	}
 out:
 	return ret;
@@ -880,14 +868,10 @@ out:
  * Create the object if the index isn't taken. Overwrite the object if it exists
  * Return SD_RES_OBJ_TAKEN if the index is taken by other object.
  */
-static int do_kv_create_object(struct http_request *req,
-			       struct kv_onode *onode,
+static int do_kv_create_object(struct http_request *req, struct kv_onode *onode,
 			       uint32_t vid, uint32_t idx)
 {
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
-	uint64_t oid = vid_to_data_oid(vid, idx);
-	struct kv_onode_hdr hdr;
-	uint32_t tmp_vid;
 	int ret;
 
 	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
@@ -897,23 +881,7 @@ static int do_kv_create_object(struct http_request *req,
 		       vid_to_vdi_oid(vid));
 		goto out;
 	}
-	tmp_vid = INODE_GET_VID(inode, idx);
-	if (tmp_vid) {
-		ret = sd_read_object(oid, (char *)&hdr, sizeof(hdr), 0);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to read object, %" PRIx64, oid);
-			goto out;
-		}
-
-		if (hdr.name[0] != '\0' &&
-		    strcmp(hdr.name, onode->hdr.name) != 0) {
-			sd_debug("index %d is already used", idx);
-			ret = SD_RES_OBJ_TAKEN;
-			goto out;
-		}
-	}
-
-	ret = kv_write_onode(inode, onode, vid, idx, !!tmp_vid);
+	ret = kv_write_onode(inode, onode, vid, idx);
 	if (ret != SD_RES_SUCCESS)
 		sd_err("Failed to write onode");
 out:
