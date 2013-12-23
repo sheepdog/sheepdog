@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# Test http service with a single server
+
+. ./common
+
+_need_to_be_root
+
+which nginx > /dev/null || _notrun "Require nginx but it's not running"
+pkill nginx > /dev/null
+nginx -c `pwd`/nginx.conf
+
+for i in `seq 0 5`; do
+	_start_sheep $i "-r swift,port=800$i"
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 4:2
+
+curl -s -X POST http://localhost/v1/sd
+curl -s -X PUT http://localhost/v1/sd/sheep
+curl -s -X PUT http://localhost/v1/sd/dog
+
+for i in 4 19 97 137; do
+    _random | dd iflag=fullblock of=$STORE/data$i bs=1M count=$i &> /dev/null
+    dd if=$STORE/data$i 2> /dev/null | md5sum > $STORE/data$i.1
+done
+sheep_files=`find $SOURCE/sheep -name '*.c'`
+dog_files=`find $SOURCE/dog -name '*.c'`
+
+# upload the objects
+for file in $sheep_files; do
+	f=`basename $file`
+	cat $file | md5sum > $STORE/sheep.$f.1
+	cat $file | curl -s -T "-" -X PUT http://localhost/v1/sd/sheep/$f &
+done
+
+for file in $dog_files; do
+	f=`basename $file`
+	cat $file | md5sum > $STORE/dog.$f.1
+	cat $file | curl -s -T "-" -X PUT http://localhost/v1/sd/dog/$f &
+done
+
+for i in 4 19 97 137; do
+	curl -s -T $STORE/data$i -X PUT http://localhost/v1/sd/sheep/data$i &
+done
+wait
+
+# list the container and objects
+curl -s -X GET http://localhost/v1/sd
+curl -s -X GET http://localhost/v1/sd/sheep | sort
+curl -s -X GET http://localhost/v1/sd/dog | sort
+
+# download the objects
+for file in $sheep_files; do
+	f=`basename $file`
+	curl -s -X GET http://localhost/v1/sd/sheep/$f | md5sum > $STORE/sheep.$f.2 &
+done
+for file in $dog_files; do
+	f=`basename $file`
+	curl -s -X GET http://localhost/v1/sd/dog/$f | md5sum > $STORE/dog.$f.2 &
+done
+for i in 4 19 97 137; do
+	curl -s -X GET http://localhost/v1/sd/sheep/data$i | md5sum > $STORE/data$i.2 &
+done
+wait
+
+# check the objects
+for file in $sheep_files; do
+	f=`basename $file`
+	diff -u $STORE/sheep.$f.1 $STORE/sheep.$f.2
+done
+for file in $dog_files; do
+	f=`basename $file`
+	diff -u $STORE/dog.$f.1 $STORE/dog.$f.2
+done
+for i in 4 19 97 137; do
+	diff -u $STORE/data$i.1 $STORE/data$i.2
+done
+
+_vdi_list
+
+#delete the objects
+for file in $sheep_files; do
+	f=`basename $file`
+	curl -s -X DELETE http://localhost/v1/sd/sheep/$f &
+done
+wait
+curl -s -X GET http://localhost/v1/sd/sheep | sort
+
+_vdi_list
+
+for i in 4 19 97 137; do
+	curl -s -X DELETE http://localhost/v1/sd/sheep/data$i &
+done
+wait
+
+curl -s -X DELETE http://localhost/v1/sd/dog
+
+curl -s -X GET http://localhost/v1/sd
+curl -s -X GET http://localhost/v1/sd/sheep
+
+_vdi_list
