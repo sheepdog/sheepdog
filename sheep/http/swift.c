@@ -186,7 +186,22 @@ static void swift_get_object(struct http_request *req, const char *account,
 static void swift_put_object(struct http_request *req, const char *account,
 			     const char *container, const char *object)
 {
-	kv_create_object(req, account, container, object);
+	int ret;
+
+	ret = kv_create_object(req, account, container, object);
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		http_response_header(req, CREATED);
+		break;
+	case SD_RES_NO_VDI:
+		http_response_header(req, NOT_FOUND);
+		break;
+	case SD_RES_NO_SPACE:
+		http_response_header(req, SERVICE_UNAVAILABLE);
+	default:
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		break;
+	}
 }
 
 static void swift_post_object(struct http_request *req, const char *account,
