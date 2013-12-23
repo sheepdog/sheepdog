@@ -1,0 +1,85 @@
+QA output created by 082
+using backend plain store
+sheep
+dog
+checker.c
+config.c
+corosync.c
+data1
+data10
+data11
+data12
+data2
+data3
+data4
+data5
+data6
+data7
+data8
+data9
+gateway.c
+graph.c
+group.c
+http.c
+journal.c
+kv.c
+local.c
+md.c
+migrate.c
+oalloc.c
+object_cache.c
+object_list_cache.c
+ops.c
+plain_store.c
+recovery.c
+request.c
+s3.c
+sheep.c
+shepherd.c
+store.c
+swift.c
+trace.c
+vdi.c
+zookeeper.c
+cluster.c
+common.c
+dog.c
+farm.c
+node.c
+object_tree.c
+sha1_file.c
+slice.c
+snap.c
+trace.c
+treeview.c
+trunk.c
+vdi.c
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd/dog       0   16 PB   52 MB  0.0 MB DATE   5a5cbf     6              
+  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2     6              
+  sd/sheep     0   16 PB  156 MB  0.0 MB DATE   8ad11e     6              
+  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95     6              
+  sd/sheep/allocator     0   16 PB  316 MB  0.0 MB DATE   fd57fc     6              
+data1
+data10
+data11
+data12
+data2
+data3
+data4
+data5
+data6
+data7
+data8
+data9
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd/dog       0   16 PB   52 MB  0.0 MB DATE   5a5cbf     6              
+  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2     6              
+  sd/sheep     0   16 PB   48 MB  0.0 MB DATE   8ad11e     6              
+  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95     6              
+  sd/sheep/allocator     0   16 PB  316 MB  0.0 MB DATE   fd57fc     6              
+sheep
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2     6              
+  sd/sheep     0   16 PB  0.0 MB  0.0 MB DATE   8ad11e     6              
+  sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc     6              
