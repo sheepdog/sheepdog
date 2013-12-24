@@ -129,23 +129,19 @@ int kv_create_bucket(const char *account, const char *bucket);
 int kv_read_bucket(const char *account, const char *bucket);
 int kv_update_bucket(const char *account, const char *bucket);
 int kv_delete_bucket(const char *account, const char *bucket);
-int kv_list_buckets(struct http_request *req, const char *account,
-		    void (*cb)(struct http_request *req, const char *bucket,
-			       void *opaque),
-		    void *opaque);
+int kv_iterate_bucket(const char *account,
+		      void (*cb)(const char *bucket, void *opaque),
+		      void *opaque);
 
 /* Object operations */
 int kv_create_object(struct http_request *req, const char *account,
 		     const char *bucket, const char *object);
 int kv_read_object(struct http_request *req, const char *account,
 		   const char *bucket, const char *object);
-int kv_delete_object(struct http_request *req, const char *account,
-		     const char *bucket, const char *object);
-int kv_list_objects(struct http_request *req, const char *account,
-		    const char *bucket,
-		    void (*cb)(struct http_request *req, const char *bucket,
-			       const char *object, void *opaque),
-		    void *opaque);
+int kv_delete_object(const char *account, const char *bucket, const char *);
+int kv_iterate_object(const char *account, const char *bucket,
+		      void (*cb)(const char *object, void *opaque),
+		      void *opaque);
 
 /* object_allocator.c */
 int oalloc_new_prepare(uint32_t vid, uint64_t *start, uint64_t count);

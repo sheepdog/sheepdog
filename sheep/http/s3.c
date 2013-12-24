@@ -13,13 +13,6 @@
 
 #define MAX_BUCKET_LISTING 1000
 
-/* Escape 'str' for use in XML. */
-static const char *xml_escape(const char *str)
-{
-	/* FIXME: implement this function */
-	return str;
-}
-
 static void s3_write_err_response(struct http_request *req, const char *code,
 				  const char *desc)
 {
@@ -32,32 +25,15 @@ static void s3_write_err_response(struct http_request *req, const char *code,
 
 /* Operations on the Service */
 
-static void s3_get_service_cb(struct http_request *req, const char *bucket,
-			      void *opaque)
+static void s3_get_service_cb(const char *bucket, void *opaque)
 {
-	bool *print_header = opaque;
-
-	if (*print_header) {
-		*print_header = false;
-
-		http_request_writes(req,
-			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-			"<ListAllMyBucketsResult "
-			"xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\">"
-			"<Buckets>");
-	}
-
-	/* FIXME: set the correct creation date */
-	http_request_writef(req, "<Bucket><Name>%s</Name><CreationDate>"
-			    "2009-02-03T16:45:09.000Z</CreationDate></Bucket>",
-			    xml_escape(bucket));
 }
 
 static void s3_get_service(struct http_request *req)
 {
 	bool print_header = true;
 
-	kv_list_buckets(req, "s3", s3_get_service_cb, &print_header);
+	kv_iterate_bucket("s3", s3_get_service_cb, &print_header);
 
 	http_request_writes(req, "</Buckets></ListAllMyBucketsResult>\r\n");
 }
@@ -69,45 +45,15 @@ static void s3_head_bucket(struct http_request *req, const char *bucket)
 	http_response_header(req, NOT_IMPLEMENTED);
 }
 
-static void s3_get_bucket_cb(struct http_request *req, const char *bucket,
-			     const char *object, void *opaque)
+static void s3_get_bucket_cb(const char *object, void *opaque)
 {
-	bool *print_header = opaque;
-
-	if (*print_header) {
-		*print_header = false;
-
-		http_request_writef(req,
-			"<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-			"<ListBucketResult "
-			"xmlns=\"http://s3.amazonaws.com/doc/2006-03-01\">"
-			"<Prefix></Prefix>"
-			"<Marker></Marker>"
-			"<Delimiter></Delimiter>"
-			"<IsTruncated>false</IsTruncated>"
-			"<MaxKeys>%d</MaxKeys>"
-			"<Name>%s</Name>", MAX_BUCKET_LISTING,
-			xml_escape(bucket));
-	}
-
-	/* FIXME: set the correct metadata info */
-	http_request_writef(req, "<Contents>"
-		"<Key>%s</Key>"
-		"<LastModified>2006-01-01T12:00:00.000Z</LastModified>"
-		"<ETag>&quot;828ef3fdfa96f00ad9f27c383fc9ac7f&quot;</ETag>"
-		"<Size>4</Size>"
-		"<StorageClass>STANDARD</StorageClass>"
-		"<Owner>"
-		"<ID>bcaf1ffd86a5fb16fd081034f</ID>"
-		"<DisplayName>webfile</DisplayName>"
-		"</Owner></Contents>", xml_escape(object));
 }
 
 static void s3_get_bucket(struct http_request *req, const char *bucket)
 {
 	bool print_header = true;
 
-	kv_list_objects(req, "s3", bucket, s3_get_bucket_cb, &print_header);
+	kv_iterate_object("s3", bucket, s3_get_bucket_cb, &print_header);
 
 	switch (req->status) {
 	case OK:
@@ -191,7 +137,7 @@ static void s3_post_object(struct http_request *req, const char *bucket,
 static void s3_delete_object(struct http_request *req, const char *bucket,
 			     const char *object)
 {
-	kv_delete_object(req, "s3", bucket, object);
+	kv_delete_object("s3", bucket, object);
 
 	if (req->status == NOT_FOUND)
 		s3_write_err_response(req, "NoSuchKey",

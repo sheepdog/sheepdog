@@ -29,20 +29,18 @@ static void swift_head_account(struct http_request *req, const char *account)
 	}
 }
 
-static void swift_get_account_cb(struct http_request *req, const char *bucket,
-				 void *opaque)
+static void swift_get_account_cb(const char *bucket, void *opaque)
 {
 	struct strbuf *buf = (struct strbuf *)opaque;
 
-	if (bucket)
-		strbuf_addf(buf, "%s\n", bucket);
+	strbuf_addf(buf, "%s\n", bucket);
 }
 
 static void swift_get_account(struct http_request *req, const char *account)
 {
 	struct strbuf buf = STRBUF_INIT;
 
-	kv_list_buckets(req, account, swift_get_account_cb, (void *)&buf);
+	kv_iterate_bucket(account, swift_get_account_cb, &buf);
 	req->data_length = buf.len;
 	http_response_header(req, OK);
 	http_request_write(req, buf.buf, buf.len);
@@ -100,13 +98,11 @@ static void swift_head_container(struct http_request *req, const char *account,
 	http_response_header(req, NOT_IMPLEMENTED);
 }
 
-static void swift_get_container_cb(struct http_request *req, const char *bucket,
-				   const char *object, void *opaque)
+static void swift_get_container_cb(const char *object, void *opaque)
 {
 	struct strbuf *buf = (struct strbuf *)opaque;
 
-	if (bucket && object)
-		strbuf_addf(buf, "%s\n", object);
+	strbuf_addf(buf, "%s\n", object);
 }
 
 static void swift_get_container(struct http_request *req, const char *account,
@@ -114,8 +110,7 @@ static void swift_get_container(struct http_request *req, const char *account,
 {
 	struct strbuf buf = STRBUF_INIT;
 
-	kv_list_objects(req, account, container, swift_get_container_cb,
-			(void *)&buf);
+	kv_iterate_object(account, container, swift_get_container_cb, &buf);
 	req->data_length = buf.len;
 	http_response_header(req, OK);
 	http_request_write(req, buf.buf, buf.len);
@@ -216,7 +211,7 @@ static void swift_delete_object(struct http_request *req, const char *account,
 {
 	int ret;
 
-	ret = kv_delete_object(req, account, container, object);
+	ret = kv_delete_object(account, container, object);
 	switch (ret) {
 	case SD_RES_SUCCESS:
 		http_response_header(req, NO_CONTENT);
