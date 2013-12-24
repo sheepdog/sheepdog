@@ -464,8 +464,8 @@ static void check_host_env(void)
 	 * dangerous to run Sheepdog cluster.
 	 */
 	else if (r.rlim_cur == 1024)
-		sd_err("WARN: Allowed open files 1024 too small, suggested %u",
-		       SD_RLIM_NOFILE);
+		sd_warn("Allowed open files 1024 too small, suggested %u",
+			SD_RLIM_NOFILE);
 	else if (r.rlim_cur < SD_RLIM_NOFILE)
 		sd_info("Allowed open files %lu, suggested %u", r.rlim_cur,
 			SD_RLIM_NOFILE);
