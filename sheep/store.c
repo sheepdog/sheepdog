@@ -203,7 +203,8 @@ static int is_meta_store(const char *path)
 static int init_obj_path(const char *base_path, char *argp)
 {
 	char *p;
-	int len;
+	int len, ret;
+	struct sd_md_info mdi;
 
 	if (check_path_len(base_path) < 0)
 		return -1;
@@ -232,6 +233,18 @@ static int init_obj_path(const char *base_path, char *argp)
 			md_add_disk(p, false);
 		} while ((p = strtok(NULL, ",")));
 	}
+
+	ret = md_get_info(&mdi);
+	if (ret != sizeof(mdi)) {
+		sd_err("Can't get md info");
+		return -1;
+	}
+
+	if (mdi.nr <= 0) {
+		sd_err("There isn't any available disk!");
+		return -1;
+	}
+
 	return xmkdir(obj_path, sd_def_dmode);
 }
 

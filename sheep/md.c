@@ -240,7 +240,8 @@ static uint64_t init_path_space(const char *path, bool purge)
 	char stale[PATH_MAX];
 
 	if (!is_xattr_enabled(path)) {
-		sd_info("multi-disk support need xattr feature");
+		sd_warn("multi-disk support need xattr feature for path: %s",
+			path);
 		goto broken_path;
 	}
 

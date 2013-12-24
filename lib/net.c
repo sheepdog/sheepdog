@@ -516,12 +516,12 @@ int get_local_addr(uint8_t *bytes)
 			memset(bytes, 0, 12);
 			memcpy(bytes + 12, &sin->sin_addr, 4);
 			memcpy(bytes + 12, &sin->sin_addr, 4);
-			sd_err("found IPv4 address");
+			sd_notice("found IPv4 address");
 			goto out;
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 			memcpy(bytes, &sin6->sin6_addr, 16);
-			sd_err("found IPv6 address");
+			sd_notice("found IPv6 address");
 			goto out;
 		}
 	}
