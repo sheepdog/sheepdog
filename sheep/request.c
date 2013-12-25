@@ -501,9 +501,9 @@ static void free_local_request(struct request *req)
 
 static void submit_local_request(struct request *req)
 {
-	pthread_mutex_lock(&sys->local_req_lock);
+	sd_mutex_lock(&sys->local_req_lock);
 	list_add_tail(&req->request_list, &sys->local_req_queue);
-	pthread_mutex_unlock(&sys->local_req_lock);
+	sd_mutex_unlock(&sys->local_req_lock);
 
 	eventfd_xwrite(sys->local_req_efd, 1);
 }
@@ -966,9 +966,9 @@ static void local_req_handler(int listen_fd, int events, void *data)
 
 	eventfd_xread(listen_fd);
 
-	pthread_mutex_lock(&sys->local_req_lock);
+	sd_mutex_lock(&sys->local_req_lock);
 	list_splice_init(&sys->local_req_queue, &pending_list);
-	pthread_mutex_unlock(&sys->local_req_lock);
+	sd_mutex_unlock(&sys->local_req_lock);
 
 	list_for_each_entry(req, &pending_list, request_list) {
 		list_del(&req->request_list);
@@ -978,7 +978,7 @@ static void local_req_handler(int listen_fd, int events, void *data)
 
 void local_request_init(void)
 {
-	pthread_mutex_init(&sys->local_req_lock, NULL);
+	sd_init_mutex(&sys->local_req_lock);
 	sys->local_req_efd = eventfd(0, EFD_NONBLOCK);
 	if (sys->local_req_efd < 0)
 		panic("failed to init local req efd");
