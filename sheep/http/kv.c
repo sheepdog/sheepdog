@@ -43,7 +43,7 @@ struct kv_onode {
 			uint8_t inlined;
 		};
 
-		uint8_t __pad[BLOCK_SIZE];
+		uint8_t pad[BLOCK_SIZE];
 	};
 	union {
 		uint8_t data[SD_DATA_OBJ_SIZE - BLOCK_SIZE];
@@ -87,69 +87,6 @@ static int kv_create_hyper_volume(const char *name, uint32_t *vdi_id)
 
 	return ret;
 }
-
-/*
- * Find an free object index by hash of name in the vid and create an object
- * that holds the kv node{kv_bnode, kv_onode}.
- */
-#define kv_generic_object_create(node, vid, node_do_create)		\
-({									\
-	struct sd_inode *__inode = xmalloc(sizeof(struct sd_inode));	\
-	uint32_t __tmp_vid, __idx, __i;					\
-	uint64_t __hval;						\
-	int __ret;							\
-									\
-	__ret = sd_read_object(vid_to_vdi_oid(vid), (char *)__inode,	\
-			       sizeof(*__inode), 0);			\
-	if (__ret != SD_RES_SUCCESS) {					\
-		sd_err("failed to read %" PRIx32 " %s", vid,		\
-		       sd_strerror(__ret));				\
-		goto out;						\
-	}								\
-									\
-	__hval = sd_hash(node->name, strlen(node->name));		\
-	for (__i = 0; __i < MAX_DATA_OBJS; __i++) {			\
-		__idx = (__hval + __i) % MAX_DATA_OBJS;			\
-		__tmp_vid = INODE_GET_VID(__inode, __idx);		\
-		if (__tmp_vid)						\
-			continue;					\
-		else							\
-			break;						\
-	}								\
-	if (__i == MAX_DATA_OBJS) {					\
-		__ret = SD_RES_NO_SPACE;				\
-		goto out;						\
-	}								\
-	__ret = node_do_create(node, __inode, __idx);			\
-out:									\
-	free(__inode);							\
-	__ret;								\
-})
-
-/* Find the object in the vid which holds the 'node' that matches 'name' */
-#define kv_generic_object_lookup(node, vid, name)			\
-({									\
-	uint64_t __hval;						\
-	uint32_t __i;							\
-	int __ret;							\
-									\
-	__hval = sd_hash(name, strlen(name));				\
-	for (__i = 0; __i < MAX_DATA_OBJS; __i++) {			\
-		uint32_t __idx = (__hval + __i) % MAX_DATA_OBJS;	\
-		uint64_t __oid = vid_to_data_oid(vid, __idx);		\
-									\
-		__ret = sd_read_object(__oid, (char *)node, sizeof(*node), 0); \
-		if (__ret != SD_RES_SUCCESS)				\
-			goto out;					\
-		if (strcmp(node->name, name) == 0)			\
-			break;						\
-	}								\
-									\
-	if (__i == MAX_DATA_OBJS)					\
-		__ret = SD_RES_NO_OBJ;					\
-out:									\
-	__ret;								\
-})
 
 /* Account operations */
 
@@ -320,7 +257,36 @@ out:
 
 static int bnode_create(struct kv_bnode *bnode, uint32_t account_vid)
 {
-	return kv_generic_object_create(bnode, account_vid, bnode_do_create);
+	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
+	uint32_t tmp_vid, idx;
+	uint64_t hval, i;
+	int ret;
+
+	ret = sd_read_object(vid_to_vdi_oid(account_vid), (char *)inode,
+			       sizeof(*inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read %" PRIx32 " %s", account_vid,
+		       sd_strerror(ret));
+		goto out;
+	}
+
+	hval = sd_hash(bnode->name, strlen(bnode->name));
+	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		idx = (hval + i) % MAX_DATA_OBJS;
+		tmp_vid = INODE_GET_VID(inode, idx);
+		if (tmp_vid)
+			continue;
+		else
+			break;
+	}
+	if (i == MAX_DATA_OBJS) {
+		ret = SD_RES_NO_SPACE;
+		goto out;
+	}
+	ret = bnode_do_create(bnode, inode, idx);
+out:
+	free(inode);
+	return ret;
 }
 
 static int bucket_create(const char *account, uint32_t account_vid,
@@ -366,9 +332,27 @@ err:
 	return ret;
 }
 
-static int bucket_lookup(struct kv_bnode *bnode, uint32_t vid, const char *name)
+static int bnode_lookup(struct kv_bnode *bnode, uint32_t vid, const char *name)
 {
-	return kv_generic_object_lookup(bnode, vid, name);
+	uint64_t hval, i;
+	int ret;
+
+	hval = sd_hash(name, strlen(name));
+	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		uint32_t idx = (hval + i) % MAX_DATA_OBJS;
+		uint64_t oid = vid_to_data_oid(vid, idx);
+
+		ret = sd_read_object(oid, (char *)bnode, sizeof(*bnode), 0);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+		if (strcmp(bnode->name, name) == 0)
+			break;
+	}
+
+	if (i == MAX_DATA_OBJS)
+		ret = SD_RES_NO_OBJ;
+out:
+	return ret;
 }
 
 static int bucket_delete(const char *account, uint32_t avid, const char *bucket)
@@ -382,7 +366,7 @@ static int bucket_delete(const char *account, uint32_t avid, const char *bucket)
 	snprintf(alloc_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account,
 		 bucket);
 
-	ret = bucket_lookup(&bnode, avid, bucket);
+	ret = bnode_lookup(&bnode, avid, bucket);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -684,7 +668,7 @@ out:
 }
 
 static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
-			   uint32_t idx)
+			   uint32_t idx, bool create)
 {
 	uint32_t vid = inode->vdi_id;
 	uint64_t oid = vid_to_data_oid(vid, idx), len;
@@ -697,11 +681,14 @@ static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
 		len = sizeof(struct onode_extent) * onode->nr_extent;
 
 	ret = sd_write_object(oid, (char *)onode, BLOCK_SIZE + len,
-			      0, true);
+			      0, create);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to create object, %" PRIx64, oid);
 		goto out;
 	}
+	if (!create)
+		goto out;
+
 	INODE_SET_VID(inode, idx, vid);
 	ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
 				 vid, vid, 0, false, false);
@@ -716,12 +703,48 @@ out:
 
 static int onode_create(struct kv_onode *onode, uint32_t bucket_vid)
 {
+	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
+	uint32_t tmp_vid, idx;
+	uint64_t hval, i;
 	int ret;
+	bool create = true;
 
 	sys->cdrv->lock(bucket_vid);
-	ret = kv_generic_object_create(onode, bucket_vid, onode_do_create);
-	sys->cdrv->unlock(bucket_vid);
+	ret = sd_read_object(vid_to_vdi_oid(bucket_vid), (char *)inode,
+			       sizeof(*inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read %" PRIx32 " %s", bucket_vid,
+		       sd_strerror(ret));
+		goto out;
+	}
 
+	hval = sd_hash(onode->name, strlen(onode->name));
+	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		idx = (hval + i) % MAX_DATA_OBJS;
+		tmp_vid = INODE_GET_VID(inode, idx);
+		if (tmp_vid) {
+			uint64_t oid = vid_to_data_oid(bucket_vid, idx);
+			char name[SD_MAX_OBJECT_NAME] = { };
+
+			ret = sd_read_object(oid, name, sizeof(name), 0);
+			if (ret != SD_RES_SUCCESS)
+				goto out;
+			if (name[0] == 0) {
+				create = false;
+				goto create;
+			}
+		} else
+			break;
+	}
+	if (i == MAX_DATA_OBJS) {
+		ret = SD_RES_NO_SPACE;
+		goto out;
+	}
+create:
+	ret = onode_do_create(onode, inode, idx, create);
+out:
+	free(inode);
+	sys->cdrv->unlock(bucket_vid);
 	return ret;
 }
 
@@ -742,8 +765,7 @@ static int onode_free_data(struct kv_onode *onode)
 static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 {
 	struct onode_extent *ext;
-	uint64_t size, total, total_size, offset, done = 0;
-	uint32_t i;
+	uint64_t size, total, total_size, offset, done = 0, i;
 	int ret;
 	char *data_buf = NULL;
 
@@ -773,12 +795,60 @@ out:
 	return ret;
 }
 
+/*
+ * Check if object by name exists in a bucket and init 'onode' if it exists.
+ *
+ * Return SD_RES_SUCCESS if found, SD_RES_NO_OBJ if not found.
+ *
+ * We check adjacent objects one by one once we get a start index by hashing
+ * name. Unallocated slot marks the end of the check window.
+ *
+ * For e.g, if we are going to check if fish in the following bucket, assume
+ * fish hashes to 'sheep', so we compare the name one by one from 'sheep' to
+ * 'fish'. '\0' indicates that object was deleted before checking.
+ *
+ * [ sheep, dog, wolve, '\0', fish, {unallocated}, tiger, ]
+ */
 static int onode_lookup(struct kv_onode *onode, uint32_t ovid, const char *name)
 {
+	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
+	uint32_t tmp_vid, idx;
+	uint64_t hval, i;
 	int ret;
 
 	sys->cdrv->lock(ovid);
-	ret = kv_generic_object_lookup(onode, ovid, name);
+	ret = sd_read_object(vid_to_vdi_oid(ovid), (char *)inode,
+			     sizeof(*inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read %" PRIx32 " %s", ovid,
+		       sd_strerror(ret));
+		goto out;
+	}
+
+	hval = sd_hash(name, strlen(name));
+	for (i = 0; i < MAX_DATA_OBJS; i++) {
+		idx = (hval + i) % MAX_DATA_OBJS;
+		tmp_vid = INODE_GET_VID(inode, idx);
+		if (tmp_vid) {
+			uint64_t oid = vid_to_data_oid(ovid, idx);
+
+			ret = sd_read_object(oid, (char *)onode,
+					     sizeof(*onode), 0);
+			if (ret != SD_RES_SUCCESS)
+				goto out;
+			if (strcmp(onode->name, name) == 0)
+				break;
+		} else {
+			ret = SD_RES_NO_OBJ;
+			break;
+		}
+	}
+	if (i == MAX_DATA_OBJS) {
+		ret = SD_RES_NO_OBJ;
+		goto out;
+	}
+out:
+	free(inode);
 	sys->cdrv->unlock(ovid);
 	return ret;
 }
@@ -800,7 +870,9 @@ static int onode_read_data(struct kv_onode *onode, struct http_request *req)
 /*
  * We free the data and meta data in following sequence:
  *
- * 1. discard onode
+ * 1. zero onode
+ *  - we can't discard it because onode_lookup() need it to find if some object
+ *    exists or not by checking adjacent objects
  * 2. discard data
  *
  * If (1) success, we consdier it a successful deletion of user object. If (2)
@@ -810,11 +882,12 @@ static int onode_read_data(struct kv_onode *onode, struct http_request *req)
  */
 static int onode_delete(struct kv_onode *onode)
 {
+	char name[SD_MAX_OBJECT_NAME] = {};
 	int ret;
 
-	ret = sd_discard_object(onode->oid);
+	ret = sd_write_object(onode->oid, name, sizeof(name), 0, 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to discard onode for %s", onode->name);
+		sd_err("failed to zero onode for %s", onode->name);
 		return ret;
 	}
 
@@ -823,36 +896,6 @@ static int onode_delete(struct kv_onode *onode)
 		sd_err("failed to free data for %s", onode->name);
 
 	return SD_RES_SUCCESS;
-}
-
-struct find_object_arg {
-	const char *object_name;
-	int ret;
-};
-
-static void find_object_cb(const char *name, void *opaque)
-{
-	struct find_object_arg *foarg = (struct find_object_arg *)opaque;
-
-	if (!strncmp(foarg->object_name, name, SD_MAX_OBJECT_NAME))
-		foarg->ret = SD_RES_SUCCESS;
-}
-
-/*
- * If we don't know if object exists in the bucket, we should use onode_find,
- * which iterate effeciently the bucket, instead of onode_lookup(), that assumes
- * object alrady exists and tries to look it up.
- */
-static int onode_find(uint32_t ovid, const char *name)
-{
-	struct find_object_arg arg = {name, SD_RES_NO_OBJ};
-	int ret;
-
-	ret = bucket_iterate_object(ovid, find_object_cb, &arg);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
-	return arg.ret;
 }
 
 /*
@@ -874,23 +917,24 @@ int kv_create_object(struct http_request *req, const char *account,
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	ret = onode_find(bucket_vid, name);
+	onode = xzalloc(sizeof(*onode));
+	ret = onode_lookup(onode, bucket_vid, name);
 	if (ret == SD_RES_SUCCESS) {
 		/* For overwrite, we delete old object and then create */
 		ret = kv_delete_object(account, bucket, name);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to delete exists object %s", name);
-			return ret;
+			goto out;
 		}
 	} else if (ret != SD_RES_NO_OBJ)
-		return ret;
+		goto out;
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account, bucket);
 	ret = sd_lookup_vdi(vdi_name, &data_vid);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	onode = xzalloc(sizeof(*onode));
+	memset(onode, 0, sizeof(*onode));
 	pstrcpy(onode->name, sizeof(onode->name), name);
 	onode->data_vid = data_vid;
 
@@ -923,10 +967,6 @@ int kv_read_object(struct http_request *req, const char *account,
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	ret = onode_find(bucket_vid, name);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
 	onode = xzalloc(sizeof(*onode));
 	ret = onode_lookup(onode, bucket_vid, name);
 	if (ret != SD_RES_SUCCESS)
@@ -951,10 +991,6 @@ int kv_delete_object(const char *account, const char *bucket, const char *name)
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
 	ret = sd_lookup_vdi(vdi_name, &bucket_vid);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
-	ret = onode_find(bucket_vid, name);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
