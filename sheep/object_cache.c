@@ -47,7 +47,7 @@ struct object_cache_entry {
 	struct list_head dirty_list; /* For dirty list of object cache */
 	struct list_head lru_list; /* For lru list of object cache */
 
-	struct sd_lock lock; /* Entry lock */
+	struct sd_rw_lock lock; /* Entry lock */
 };
 
 struct object_cache {
@@ -62,7 +62,7 @@ struct object_cache {
 	int push_efd; /* Used to synchronize between pusher and push threads */
 	uatomic_bool in_push; /* Whether if pusher is running */
 
-	struct sd_lock lock; /* Cache lock */
+	struct sd_rw_lock lock; /* Cache lock */
 };
 
 struct push_work {
@@ -78,8 +78,8 @@ static int def_open_flags = O_RDWR;
 #define HASH_BITS	5
 #define HASH_SIZE	(1 << HASH_BITS)
 
-static struct sd_lock hashtable_lock[HASH_SIZE] = {
-	[0 ... HASH_SIZE - 1] = SD_LOCK_INITIALIZER
+static struct sd_rw_lock hashtable_lock[HASH_SIZE] = {
+	[0 ... HASH_SIZE - 1] = SD_RW_LOCK_INITIALIZER
 };
 
 static struct hlist_head cache_hashtable[HASH_SIZE];
@@ -178,7 +178,7 @@ static inline void write_lock_cache(struct object_cache *oc)
 
 static inline void unlock_cache(struct object_cache *oc)
 {
-	sd_unlock(&oc->lock);
+	sd_rw_unlock(&oc->lock);
 }
 
 static inline void read_lock_entry(struct object_cache_entry *entry)
@@ -193,7 +193,7 @@ static inline void write_lock_entry(struct object_cache_entry *entry)
 
 static inline void unlock_entry(struct object_cache_entry *entry)
 {
-	sd_unlock(&entry->lock);
+	sd_rw_unlock(&entry->lock);
 }
 
 static struct object_cache_entry *
@@ -302,7 +302,7 @@ free_cache_entry(struct object_cache_entry *entry)
 	oc->total_count--;
 	if (!list_empty(&entry->dirty_list))
 		del_from_dirty_list(entry);
-	sd_destroy_lock(&entry->lock);
+	sd_destroy_rw_lock(&entry->lock);
 	free(entry);
 }
 
@@ -598,12 +598,12 @@ static void do_reclaim(struct work *work)
 			do_reclaim_object(cache);
 			cap = uatomic_read(&gcache.capacity);
 			if (cap <= HIGH_WATERMARK) {
-				sd_unlock(&hashtable_lock[idx]);
+				sd_rw_unlock(&hashtable_lock[idx]);
 				sd_debug("complete, capacity %"PRIu32, cap);
 				return;
 			}
 		}
-		sd_unlock(&hashtable_lock[idx]);
+		sd_rw_unlock(&hashtable_lock[idx]);
 	}
 	sd_debug("finished");
 }
@@ -658,13 +658,13 @@ not_found:
 		INIT_LIST_HEAD(&cache->dirty_head);
 		INIT_LIST_HEAD(&cache->lru_head);
 
-		sd_init_lock(&cache->lock);
+		sd_init_rw_lock(&cache->lock);
 		hlist_add_head(&cache->hash, head);
 	} else {
 		cache = NULL;
 	}
 out:
-	sd_unlock(&hashtable_lock[h]);
+	sd_rw_unlock(&hashtable_lock[h]);
 	return cache;
 }
 
@@ -697,7 +697,7 @@ alloc_cache_entry(struct object_cache *oc, uint32_t idx)
 	entry = xzalloc(sizeof(*entry));
 	entry->oc = oc;
 	entry->idx = idx;
-	sd_init_lock(&entry->lock);
+	sd_init_rw_lock(&entry->lock);
 	INIT_LIST_HEAD(&entry->dirty_list);
 	INIT_LIST_HEAD(&entry->lru_list);
 
@@ -982,7 +982,7 @@ void object_cache_delete(uint32_t vid)
 	/* Firstly we free memeory */
 	sd_write_lock(&hashtable_lock[h]);
 	hlist_del(&cache->hash);
-	sd_unlock(&hashtable_lock[h]);
+	sd_rw_unlock(&hashtable_lock[h]);
 
 	write_lock_cache(cache);
 	list_for_each_entry_safe(entry, t, &cache->lru_head, lru_list) {
@@ -990,7 +990,7 @@ void object_cache_delete(uint32_t vid)
 		uatomic_sub(&gcache.capacity, CACHE_OBJECT_SIZE);
 	}
 	unlock_cache(cache);
-	sd_destroy_lock(&cache->lock);
+	sd_destroy_rw_lock(&cache->lock);
 	close(cache->push_efd);
 	free(cache);
 
@@ -1424,7 +1424,7 @@ int object_cache_get_info(struct object_cache_info *info)
 			j++;
 			unlock_cache(cache);
 		}
-		sd_unlock(&hashtable_lock[i]);
+		sd_rw_unlock(&hashtable_lock[i]);
 	}
 	info->count = j;
 

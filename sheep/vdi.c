@@ -20,7 +20,7 @@ struct vdi_state_entry {
 
 static uint32_t max_copies;
 static struct rb_root vdi_state_root = RB_ROOT;
-static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock vdi_state_lock = SD_RW_LOCK_INITIALIZER;
 
 static struct vdi_state_entry *vdi_state_search(struct rb_root *root,
 						uint32_t vid)
@@ -72,7 +72,7 @@ static bool vid_is_snapshot(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_err("No VDI entry for %" PRIx32 " found", vid);
@@ -97,7 +97,7 @@ int get_vdi_copy_number(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("copy number for %" PRIx32 " not found, set %d", vid,
@@ -158,7 +158,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot)
 	if (uatomic_read(&max_copies) == 0 ||
 	    nr_copies > uatomic_read(&max_copies))
 		uatomic_set(&max_copies, nr_copies);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	return SD_RES_SUCCESS;
 }
@@ -180,7 +180,7 @@ int fill_vdi_state_list(void *data)
 		vs++;
 		nr++;
 	}
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	return nr * sizeof(*vs);
 }
@@ -963,5 +963,5 @@ void clean_vdi_state(void)
 		current_node = rb_first(&vdi_state_root);
 	}
 	INIT_RB_ROOT(&vdi_state_root);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 }

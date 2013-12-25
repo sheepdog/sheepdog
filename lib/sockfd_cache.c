@@ -37,13 +37,13 @@
 
 struct sockfd_cache {
 	struct rb_root root;
-	struct sd_lock lock;
+	struct sd_rw_lock lock;
 	int count;
 };
 
 static struct sockfd_cache sockfd_cache = {
 	.root = RB_ROOT,
-	.lock = SD_LOCK_INITIALIZER,
+	.lock = SD_RW_LOCK_INITIALIZER,
 };
 
 /*
@@ -155,7 +155,7 @@ static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
 	if (*ret_idx == -1)
 		entry = NULL;
 out:
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 	return entry;
 }
 
@@ -206,14 +206,14 @@ static bool sockfd_cache_destroy(const struct node_id *nid)
 	}
 
 	rb_erase(&entry->rb, &sockfd_cache.root);
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 
 	destroy_all_slots(entry);
 	free_cache_entry(entry);
 
 	return true;
 false_out:
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 	return false;
 }
 
@@ -245,7 +245,7 @@ void sockfd_cache_add_group(const struct sd_node *nodes, int nr)
 		p = nodes + nr;
 		sockfd_cache_add_nolock(&p->nid);
 	}
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 }
 
 /* Add one node to the cache means we can do caching tricks on this node */
@@ -263,10 +263,10 @@ void sockfd_cache_add(const struct node_id *nid)
 	memcpy(&new->nid, nid, sizeof(struct node_id));
 	if (sockfd_cache_insert(new)) {
 		free_cache_entry(new);
-		sd_unlock(&sockfd_cache.lock);
+		sd_rw_unlock(&sockfd_cache.lock);
 		return;
 	}
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 	n = uatomic_add_return(&sockfd_cache.count, 1);
 	sd_debug("%s, count %d", addr_to_str(nid->addr, nid->port), n);
 }
@@ -298,7 +298,7 @@ static void do_grow_fds(struct work *work)
 
 	fds_count *= 2;
 	fds_high_watermark = FDS_WATERMARK(fds_count);
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 }
 
 static void grow_fds_done(struct work *work)
@@ -409,7 +409,7 @@ static void sockfd_cache_put_long(const struct node_id *nid, int idx)
 	entry = sockfd_cache_search(nid);
 	if (entry)
 		uatomic_set_false(&entry->fds[idx].in_use);
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 }
 
 static void sockfd_cache_close(const struct node_id *nid, int idx)
@@ -428,7 +428,7 @@ static void sockfd_cache_close(const struct node_id *nid, int idx)
 		entry->fds[idx].fd = -1;
 		uatomic_set_false(&entry->fds[idx].in_use);
 	}
-	sd_unlock(&sockfd_cache.lock);
+	sd_rw_unlock(&sockfd_cache.lock);
 }
 
 /*

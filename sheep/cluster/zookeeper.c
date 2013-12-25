@@ -71,8 +71,8 @@ struct zk_event {
 static struct sd_node sd_nodes[SD_MAX_NODES];
 static size_t nr_sd_nodes;
 static struct rb_root zk_node_root = RB_ROOT;
-static struct sd_lock zk_tree_lock = SD_LOCK_INITIALIZER;
-static struct sd_lock zk_compete_master_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock zk_tree_lock = SD_RW_LOCK_INITIALIZER;
+static struct sd_rw_lock zk_compete_master_lock = SD_RW_LOCK_INITIALIZER;
 static LIST_HEAD(zk_block_list);
 static uatomic_bool is_master;
 static uatomic_bool stop;
@@ -134,7 +134,7 @@ static inline struct zk_node *zk_tree_search(const struct node_id *nid)
 
 	sd_read_lock(&zk_tree_lock);
 	n = zk_tree_search_nolock(nid);
-	sd_unlock(&zk_tree_lock);
+	sd_rw_unlock(&zk_tree_lock);
 	return n;
 }
 
@@ -450,7 +450,7 @@ static inline void zk_tree_add(struct zk_node *node)
 	 */
 	sd_nodes[nr_sd_nodes++] = zk->node;
 out:
-	sd_unlock(&zk_tree_lock);
+	sd_rw_unlock(&zk_tree_lock);
 }
 
 static inline void zk_tree_del_nolock(struct zk_node *node)
@@ -463,7 +463,7 @@ static inline void zk_tree_del(struct zk_node *node)
 {
 	sd_write_lock(&zk_tree_lock);
 	zk_tree_del_nolock(node);
-	sd_unlock(&zk_tree_lock);
+	sd_rw_unlock(&zk_tree_lock);
 }
 
 static inline void zk_tree_destroy(void)
@@ -477,7 +477,8 @@ static inline void zk_tree_destroy(void)
 		if (zk)
 			zk_tree_del_nolock(zk);
 	}
-	sd_unlock(&zk_tree_lock);
+	rb_destroy(&zk_node_root, struct zk_node, rb);
+	sd_rw_unlock(&zk_tree_lock);
 }
 
 static inline void build_node_list(void)
@@ -579,7 +580,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		n = zk_tree_search_nolock(&znode.node.nid);
 		if (n)
 			n->gone = true;
-		sd_unlock(&zk_tree_lock);
+		sd_rw_unlock(&zk_tree_lock);
 		if (n)
 			add_event(EVENT_LEAVE, &znode, NULL, 0);
 	}
@@ -782,7 +783,7 @@ success:
 	uatomic_set_true(&is_master);
 	sd_debug("success");
 out_unlock:
-	sd_unlock(&zk_compete_master_lock);
+	sd_rw_unlock(&zk_compete_master_lock);
 }
 
 static int zk_join(const struct sd_node *myself,
@@ -996,7 +997,7 @@ static void zk_handle_update_node(struct zk_event *ev)
 	assert(t);
 	t->node = *snode;
 	build_node_list();
-	sd_unlock(&zk_tree_lock);
+	sd_rw_unlock(&zk_tree_lock);
 	sd_update_node_handler(snode);
 }
 

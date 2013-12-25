@@ -21,7 +21,7 @@
 static char farm_object_dir[PATH_MAX];
 static char farm_dir[PATH_MAX];
 
-static struct sd_lock vdi_list_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock vdi_list_lock = SD_RW_LOCK_INITIALIZER;
 struct vdi_entry {
 	char name[SD_MAX_VDI_LEN];
 	uint64_t vdi_size;
@@ -356,7 +356,7 @@ static void do_load_object(struct work *work)
 
 		sd_write_lock(&vdi_list_lock);
 		insert_vdi(buffer);
-		sd_unlock(&vdi_list_lock);
+		sd_rw_unlock(&vdi_list_lock);
 	}
 
 	farm_show_progress(uatomic_add_return(&loaded, 1), trunk_get_count());
