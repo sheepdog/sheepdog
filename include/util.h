@@ -259,6 +259,110 @@ static inline int refcount_dec(refcnt_t *rc)
 	return uatomic_sub_return(&rc->val, 1);
 }
 
+/* wrapper for pthread_mutex */
+
+#define SD_MUTEX_INITIALIZER { .mutex = PTHREAD_MUTEX_INITIALIZER }
+
+struct sd_mutex {
+	pthread_mutex_t mutex;
+};
+
+static inline void sd_init_mutex(struct sd_mutex *mutex)
+{
+	int ret;
+
+	do {
+		ret = pthread_mutex_init(&mutex->mutex, NULL);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to initialize a lock, %s", strerror(ret));
+}
+
+static inline void sd_destroy_mutex(struct sd_mutex *mutex)
+{
+	int ret;
+
+	do {
+		ret = pthread_mutex_destroy(&mutex->mutex);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to destroy a lock, %s", strerror(ret));
+}
+
+static inline void sd_mutex_lock(struct sd_mutex *mutex)
+{
+	int ret;
+
+	do {
+		ret = pthread_mutex_lock(&mutex->mutex);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to lock for reading, %s", strerror(ret));
+}
+
+static inline void sd_mutex_unlock(struct sd_mutex *mutex)
+{
+	int ret;
+
+	do {
+		ret = pthread_mutex_unlock(&mutex->mutex);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to unlock, %s", strerror(ret));
+}
+
+/* wrapper for pthread_cond */
+
+#define SD_COND_INITIALIZER { .cond = PTHREAD_COND_INITIALIZER }
+
+struct sd_cond {
+	pthread_cond_t cond;
+};
+
+static inline void sd_cond_init(struct sd_cond *cond)
+{
+	int ret;
+
+	do {
+		ret = pthread_cond_init(&cond->cond, NULL);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to initialize a lock, %s", strerror(ret));
+
+}
+
+static inline void sd_destroy_cond(struct sd_cond *cond)
+{
+	int ret;
+
+	do {
+		ret = pthread_cond_destroy(&cond->cond);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to destroy a lock, %s", strerror(ret));
+}
+
+static inline int sd_cond_signal(struct sd_cond *cond)
+{
+	return pthread_cond_signal(&cond->cond);
+}
+
+static inline int sd_cond_wait(struct sd_cond *cond, struct sd_mutex *mutex)
+{
+	return pthread_cond_wait(&cond->cond, &mutex->mutex);
+}
+
+static inline int sd_cond_broadcast(struct sd_cond *cond)
+{
+	return pthread_cond_broadcast(&cond->cond);
+}
+
 /* wrapper for pthread_rwlock */
 
 #define SD_RW_LOCK_INITIALIZER { .rwlock = PTHREAD_RWLOCK_INITIALIZER }

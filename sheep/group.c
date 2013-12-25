@@ -24,8 +24,8 @@ struct get_vdis_work {
 	struct sd_node members[];
 };
 
-static pthread_mutex_t wait_vdis_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_cond_t wait_vdis_cond = PTHREAD_COND_INITIALIZER;
+static struct sd_mutex wait_vdis_lock = SD_MUTEX_INITIALIZER;
+static struct sd_cond wait_vdis_cond = SD_COND_INITIALIZER;
 static refcnt_t nr_get_vdis_works;
 
 static main_thread(struct vnode_info *) current_vnode_info;
@@ -499,10 +499,10 @@ static void get_vdis_done(struct work *work)
 	struct get_vdis_work *w =
 		container_of(work, struct get_vdis_work, work);
 
-	pthread_mutex_lock(&wait_vdis_lock);
+	sd_mutex_lock(&wait_vdis_lock);
 	refcount_dec(&nr_get_vdis_works);
-	pthread_cond_broadcast(&wait_vdis_cond);
-	pthread_mutex_unlock(&wait_vdis_lock);
+	sd_cond_broadcast(&wait_vdis_cond);
+	sd_mutex_unlock(&wait_vdis_lock);
 
 	free(w);
 }
@@ -596,10 +596,10 @@ void wait_get_vdis_done(void)
 {
 	sd_debug("waiting for vdi list");
 
-	pthread_mutex_lock(&wait_vdis_lock);
+	sd_mutex_lock(&wait_vdis_lock);
 	while (refcount_read(&nr_get_vdis_works) > 0)
-		pthread_cond_wait(&wait_vdis_cond, &wait_vdis_lock);
-	pthread_mutex_unlock(&wait_vdis_lock);
+		sd_cond_wait(&wait_vdis_cond, &wait_vdis_lock);
+	sd_mutex_unlock(&wait_vdis_lock);
 
 	sd_debug("vdi list ready");
 }

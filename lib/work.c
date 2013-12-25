@@ -47,13 +47,13 @@ struct wq_info {
 	struct list_head finished_list;
 	struct list_head list;
 
-	pthread_mutex_t finished_lock;
-	pthread_mutex_t startup_lock;
+	struct sd_mutex finished_lock;
+	struct sd_mutex startup_lock;
 
 	/* wokers sleep on this and signaled by work producer */
-	pthread_cond_t pending_cond;
+	struct sd_cond pending_cond;
 	/* locked by work producer and workers */
-	pthread_mutex_t pending_lock;
+	struct sd_mutex pending_lock;
 	/* protected by pending_lock */
 	struct work_queue q;
 	size_t nr_threads;
@@ -79,7 +79,7 @@ static void *worker_routine(void *arg);
 
 static size_t tid_max;
 static unsigned long *tid_map;
-static pthread_mutex_t tid_map_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct sd_mutex tid_map_lock = SD_MUTEX_INITIALIZER;
 
 static int resume_efd;
 static int ack_efd;
@@ -90,7 +90,7 @@ void suspend_worker_threads(void)
 	int tid;
 
 	list_for_each_entry(wi, &wq_info_list, list) {
-		pthread_mutex_lock(&wi->pending_lock);
+		sd_mutex_lock(&wi->pending_lock);
 	}
 
 	FOR_EACH_BIT(tid, tid_map, tid_max) {
@@ -122,7 +122,7 @@ void resume_worker_threads(void)
 		eventfd_xread(ack_efd);
 
 	list_for_each_entry(wi, &wq_info_list, list) {
-		pthread_mutex_unlock(&wi->pending_lock);
+		sd_mutex_unlock(&wi->pending_lock);
 	}
 }
 
@@ -159,7 +159,7 @@ static int wq_trace_init(void)
 
 static void trace_set_tid_map(int tid)
 {
-	pthread_mutex_lock(&tid_map_lock);
+	sd_mutex_lock(&tid_map_lock);
 	if (tid > tid_max) {
 		size_t old_tid_max = tid_max;
 
@@ -170,14 +170,14 @@ static void trace_set_tid_map(int tid)
 		tid_map = alloc_bitmap(tid_map, old_tid_max, tid_max);
 	}
 	set_bit(tid, tid_map);
-	pthread_mutex_unlock(&tid_map_lock);
+	sd_mutex_unlock(&tid_map_lock);
 }
 
 static void trace_clear_tid_map(int tid)
 {
-	pthread_mutex_lock(&tid_map_lock);
+	sd_mutex_lock(&tid_map_lock);
 	clear_bit(tid, tid_map);
-	pthread_mutex_unlock(&tid_map_lock);
+	sd_mutex_unlock(&tid_map_lock);
 }
 
 #else
@@ -248,18 +248,18 @@ static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 	pthread_t thread;
 	int ret;
 
-	pthread_mutex_lock(&wi->startup_lock);
+	sd_mutex_lock(&wi->startup_lock);
 	while (wi->nr_threads < nr_threads) {
 		ret = pthread_create(&thread, NULL, worker_routine, wi);
 		if (ret != 0) {
 			sd_err("failed to create worker thread: %m");
-			pthread_mutex_unlock(&wi->startup_lock);
+			sd_mutex_unlock(&wi->startup_lock);
 			return -1;
 		}
 		wi->nr_threads++;
 		sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
 	}
-	pthread_mutex_unlock(&wi->startup_lock);
+	sd_mutex_unlock(&wi->startup_lock);
 
 	return 0;
 }
@@ -269,16 +269,16 @@ void queue_work(struct work_queue *q, struct work *work)
 	struct wq_info *wi = container_of(q, struct wq_info, q);
 
 	uatomic_inc(&wi->nr_queued_work);
-	pthread_mutex_lock(&wi->pending_lock);
+	sd_mutex_lock(&wi->pending_lock);
 
 	if (wq_need_grow(wi))
 		/* double the thread pool size */
 		create_worker_threads(wi, wi->nr_threads * 2);
 
 	list_add_tail(&work->w_list, &wi->q.pending_list);
-	pthread_mutex_unlock(&wi->pending_lock);
+	sd_mutex_unlock(&wi->pending_lock);
 
-	pthread_cond_signal(&wi->pending_cond);
+	sd_cond_signal(&wi->pending_cond);
 }
 
 static void worker_thread_request_done(int fd, int events, void *data)
@@ -293,9 +293,9 @@ static void worker_thread_request_done(int fd, int events, void *data)
 	eventfd_xread(fd);
 
 	list_for_each_entry(wi, &wq_info_list, list) {
-		pthread_mutex_lock(&wi->finished_lock);
+		sd_mutex_lock(&wi->finished_lock);
 		list_splice_init(&wi->finished_list, &list);
-		pthread_mutex_unlock(&wi->finished_lock);
+		sd_mutex_unlock(&wi->finished_lock);
 
 		while (!list_empty(&list)) {
 			work = list_first_entry(&list, struct work, w_list);
@@ -315,19 +315,19 @@ static void *worker_routine(void *arg)
 
 	set_thread_name(wi->name, (wi->tc != WQ_ORDERED));
 
-	pthread_mutex_lock(&wi->startup_lock);
+	sd_mutex_lock(&wi->startup_lock);
 	/* started this thread */
-	pthread_mutex_unlock(&wi->startup_lock);
+	sd_mutex_unlock(&wi->startup_lock);
 
 	trace_set_tid_map(tid);
 	while (true) {
 
-		pthread_mutex_lock(&wi->pending_lock);
+		sd_mutex_lock(&wi->pending_lock);
 		if (wq_need_shrink(wi)) {
 			wi->nr_threads--;
 
 			trace_clear_tid_map(tid);
-			pthread_mutex_unlock(&wi->pending_lock);
+			sd_mutex_unlock(&wi->pending_lock);
 			pthread_detach(pthread_self());
 			sd_debug("destroy thread %s %d, %zu", wi->name, tid,
 				 wi->nr_threads);
@@ -335,7 +335,7 @@ static void *worker_routine(void *arg)
 		}
 retest:
 		if (list_empty(&wi->q.pending_list)) {
-			pthread_cond_wait(&wi->pending_cond, &wi->pending_lock);
+			sd_cond_wait(&wi->pending_cond, &wi->pending_lock);
 			goto retest;
 		}
 
@@ -343,14 +343,14 @@ retest:
 				       struct work, w_list);
 
 		list_del(&work->w_list);
-		pthread_mutex_unlock(&wi->pending_lock);
+		sd_mutex_unlock(&wi->pending_lock);
 
 		if (work->fn)
 			work->fn(work);
 
-		pthread_mutex_lock(&wi->finished_lock);
+		sd_mutex_lock(&wi->finished_lock);
 		list_add_tail(&work->w_list, &wi->finished_list);
-		pthread_mutex_unlock(&wi->finished_lock);
+		sd_mutex_unlock(&wi->finished_lock);
 
 		eventfd_xwrite(efd, 1);
 	}
@@ -411,11 +411,11 @@ struct work_queue *create_work_queue(const char *name,
 	INIT_LIST_HEAD(&wi->q.pending_list);
 	INIT_LIST_HEAD(&wi->finished_list);
 
-	pthread_cond_init(&wi->pending_cond, NULL);
+	sd_cond_init(&wi->pending_cond);
 
-	pthread_mutex_init(&wi->finished_lock, NULL);
-	pthread_mutex_init(&wi->pending_lock, NULL);
-	pthread_mutex_init(&wi->startup_lock, NULL);
+	sd_init_mutex(&wi->finished_lock);
+	sd_init_mutex(&wi->pending_lock);
+	sd_init_mutex(&wi->startup_lock);
 
 	ret = create_worker_threads(wi, 1);
 	if (ret < 0)
@@ -425,11 +425,10 @@ struct work_queue *create_work_queue(const char *name,
 
 	return &wi->q;
 destroy_threads:
-	pthread_mutex_unlock(&wi->startup_lock);
-	pthread_cond_destroy(&wi->pending_cond);
-	pthread_mutex_destroy(&wi->pending_lock);
-	pthread_mutex_destroy(&wi->startup_lock);
-	pthread_mutex_destroy(&wi->finished_lock);
+	sd_mutex_unlock(&wi->startup_lock);
+	sd_destroy_cond(&wi->pending_cond);
+	sd_destroy_mutex(&wi->pending_lock);
+	sd_destroy_mutex(&wi->finished_lock);
 
 	return NULL;
 }

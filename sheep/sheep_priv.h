@@ -120,7 +120,7 @@ struct system_info {
 
 	int local_req_efd;
 
-	pthread_mutex_t local_req_lock;
+	struct sd_mutex local_req_lock;
 	struct list_head local_req_queue;
 	struct list_head req_wait_queue;
 	int nr_outstanding_reqs;

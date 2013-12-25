@@ -30,7 +30,7 @@ static struct caller *callers;
 static size_t nr_callers;
 
 static struct strbuf *buffer;
-static pthread_mutex_t *buffer_lock;
+static struct sd_mutex *buffer_lock;
 static int nr_cpu;
 
 static __thread bool in_trace;
@@ -258,9 +258,9 @@ int trace_buffer_pop(void *buf, uint32_t len)
 	int i;
 
 	for (i = 0; i < nr_cpu; i++) {
-		pthread_mutex_lock(&buffer_lock[i]);
+		sd_mutex_lock(&buffer_lock[i]);
 		readin = strbuf_stripout(&buffer[i], buff, len);
-		pthread_mutex_unlock(&buffer_lock[i]);
+		sd_mutex_unlock(&buffer_lock[i]);
 		count += readin;
 		if (count == requested)
 			return count;
@@ -276,9 +276,9 @@ int trace_buffer_pop(void *buf, uint32_t len)
 
 void trace_buffer_push(int cpuid, struct trace_graph_item *item)
 {
-	pthread_mutex_lock(&buffer_lock[cpuid]);
+	sd_mutex_lock(&buffer_lock[cpuid]);
 	strbuf_add(&buffer[cpuid], item, sizeof(*item));
-	pthread_mutex_unlock(&buffer_lock[cpuid]);
+	sd_mutex_unlock(&buffer_lock[cpuid]);
 }
 
 /* assume that mcount call exists in the first FIND_MCOUNT_RANGE bytes */
@@ -415,7 +415,7 @@ int trace_init(void)
 	buffer_lock = xzalloc(sizeof(*buffer_lock) * nr_cpu);
 	for (i = 0; i < nr_cpu; i++) {
 		strbuf_init(&buffer[i], 0);
-		pthread_mutex_init(&buffer_lock[i], NULL);
+		sd_init_mutex(&buffer_lock[i]);
 	}
 
 	sd_info("trace support enabled. cpu count %d.", nr_cpu);
