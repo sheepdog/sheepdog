@@ -32,7 +32,7 @@ struct vdisk {
 struct md {
 	struct rb_root vroot;
 	struct rb_root root;
-	struct sd_lock lock;
+	struct sd_rw_lock lock;
 	uint64_t space;
 	uint32_t nr_disks;
 };
@@ -40,7 +40,7 @@ struct md {
 static struct md md = {
 	.vroot = RB_ROOT,
 	.root = RB_ROOT,
-	.lock = SD_LOCK_INITIALIZER,
+	.lock = SD_RW_LOCK_INITIALIZER,
 };
 
 static inline int nr_online_disks(void)
@@ -49,7 +49,7 @@ static inline int nr_online_disks(void)
 
 	sd_read_lock(&md.lock);
 	nr = md.nr_disks;
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 
 	return nr;
 }
@@ -343,7 +343,7 @@ const char *md_get_object_path(uint64_t oid)
 
 	sd_read_lock(&md.lock);
 	p = md_get_object_path_nolock(oid);
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 
 	return p;
 }
@@ -361,7 +361,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 	return ret;
 }
 
@@ -380,7 +380,7 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 	return ret;
 }
 
@@ -396,7 +396,7 @@ int for_each_obj_path(int (*func)(const char *path))
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 	return ret;
 }
 
@@ -427,7 +427,7 @@ static void md_do_recover(struct work *work)
 	md_remove_disk(disk);
 	nr = md.nr_disks;
 out:
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 
 	if (nr > 0)
 		kick_recover();
@@ -553,7 +553,7 @@ static int scan_wd(uint64_t oid, uint32_t epoch)
 		if (ret == SD_RES_SUCCESS)
 			break;
 	}
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 	return ret;
 }
 
@@ -607,7 +607,7 @@ uint32_t md_get_info(struct sd_md_info *info)
 		i++;
 	}
 	info->nr = md.nr_disks;
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 	return ret;
 }
 
@@ -645,7 +645,7 @@ static int do_plug_unplug(char *disks, bool plug)
 
 	ret = SD_RES_SUCCESS;
 out:
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 
 	if (ret == SD_RES_SUCCESS)
 		kick_recover();
@@ -673,7 +673,7 @@ uint64_t md_get_size(uint64_t *used)
 	rb_for_each_entry(disk, &md.root, rb) {
 		fsize += get_path_free_size(disk->path, used);
 	}
-	sd_unlock(&md.lock);
+	sd_rw_unlock(&md.lock);
 
 	return fsize + *used;
 }

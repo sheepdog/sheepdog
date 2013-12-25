@@ -24,7 +24,7 @@ struct objlist_cache {
 	int cache_size;
 	uint64_t *buf;
 	struct rb_root root;
-	struct sd_lock lock;
+	struct sd_rw_lock lock;
 };
 
 struct objlist_deletion_work {
@@ -35,7 +35,7 @@ struct objlist_deletion_work {
 static struct objlist_cache obj_list_cache = {
 	.tree_version	= 1,
 	.root		= RB_ROOT,
-	.lock		= SD_LOCK_INITIALIZER,
+	.lock		= SD_RW_LOCK_INITIALIZER,
 };
 
 static int objlist_cache_cmp(const struct objlist_cache_entry *a,
@@ -71,7 +71,7 @@ void objlist_cache_remove(uint64_t oid)
 		obj_list_cache.cache_size--;
 		obj_list_cache.tree_version++;
 	}
-	sd_unlock(&obj_list_cache.lock);
+	sd_rw_unlock(&obj_list_cache.lock);
 }
 
 int objlist_cache_insert(uint64_t oid)
@@ -90,7 +90,7 @@ int objlist_cache_insert(uint64_t oid)
 		obj_list_cache.cache_size++;
 		obj_list_cache.tree_version++;
 	}
-	sd_unlock(&obj_list_cache.lock);
+	sd_rw_unlock(&obj_list_cache.lock);
 
 	return 0;
 }
@@ -106,7 +106,7 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 		goto out;
 
 	/* if that fails grab a write lock for the usually nessecary update */
-	sd_unlock(&obj_list_cache.lock);
+	sd_rw_unlock(&obj_list_cache.lock);
 	sd_write_lock(&obj_list_cache.lock);
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
 		goto out;
@@ -121,14 +121,14 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 
 out:
 	if (hdr->data_length < obj_list_cache.cache_size * sizeof(uint64_t)) {
-		sd_unlock(&obj_list_cache.lock);
+		sd_rw_unlock(&obj_list_cache.lock);
 		sd_err("GET_OBJ_LIST buffer too small");
 		return SD_RES_BUFFER_SMALL;
 	}
 
 	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
 	memcpy(data, obj_list_cache.buf, rsp->data_length);
-	sd_unlock(&obj_list_cache.lock);
+	sd_rw_unlock(&obj_list_cache.lock);
 	return SD_RES_SUCCESS;
 }
 
@@ -166,7 +166,7 @@ static void objlist_deletion_work(struct work *work)
 		rb_erase(&entry->node, &obj_list_cache.root);
 		free(entry);
 	}
-	sd_unlock(&obj_list_cache.lock);
+	sd_rw_unlock(&obj_list_cache.lock);
 }
 
 static void objlist_deletion_done(struct work *work)

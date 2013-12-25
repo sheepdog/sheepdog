@@ -62,7 +62,7 @@ struct vdi_inode {
 };
 
 static struct rb_root vdi_inode_tree = RB_ROOT;
-static struct sd_lock vdi_inode_tree_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock vdi_inode_tree_lock = SD_RW_LOCK_INITIALIZER;
 
 
 static int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
@@ -144,7 +144,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 
 	sd_read_lock(&vdi_inode_tree_lock);
 	vdi = vdi_inode_tree_search(vid);
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 
 	if (is_data_obj(oid)) {
 		idx = data_oid_to_idx(oid);
@@ -304,7 +304,7 @@ static int volume_do_sync(uint32_t vid)
 
 	sd_read_lock(&vdi_inode_tree_lock);
 	vdi = vdi_inode_tree_search(vid);
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 
 	hdr.opcode = SD_OP_FLUSH_VDI;
 	hdr.obj.oid = vid_to_vdi_oid(vid);
@@ -394,7 +394,7 @@ int reset_socket_pool(void)
 		}
 	}
 out:
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 	return ret;
 }
 
@@ -431,7 +431,7 @@ static int init_vdi_info(const char *entry, uint32_t *vid, size_t *size)
 	/* we need insert inode before calling volume_rw_object */
 	sd_write_lock(&vdi_inode_tree_lock);
 	dummy = vdi_inode_tree_insert(inode);
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 	if (dummy)
 		goto err;
 	if (volume_rw_object(inode_buf, vid_to_vdi_oid(*vid), SD_INODE_SIZE,
@@ -495,7 +495,7 @@ static int volume_sync_and_delete(uint32_t vid)
 
 	sd_read_lock(&vdi_inode_tree_lock);
 	vdi = vdi_inode_tree_search(vid);
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 
 	hdr.opcode = SD_OP_FLUSH_DEL_CACHE;
 	hdr.obj.oid = vid_to_vdi_oid(vid);
@@ -534,12 +534,12 @@ int volume_remove_entry(const char *entry)
 
 	sd_read_lock(&vdi_inode_tree_lock);
 	vdi = vdi_inode_tree_search(vid);
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 	destroy_socket_pool(vdi->socket_pool, SOCKET_POOL_SIZE);
 
 	sd_write_lock(&vdi_inode_tree_lock);
 	rb_erase(&vdi->rb, &vdi_inode_tree);
-	sd_unlock(&vdi_inode_tree_lock);
+	sd_rw_unlock(&vdi_inode_tree_lock);
 
 	free(vdi->inode);
 	free(vdi);

@@ -270,13 +270,13 @@ static inline int refcount_dec(refcnt_t *rc)
 
 /* wrapper for pthread_rwlock */
 
-#define SD_LOCK_INITIALIZER { .rwlock = PTHREAD_RWLOCK_INITIALIZER }
+#define SD_RW_LOCK_INITIALIZER { .rwlock = PTHREAD_RWLOCK_INITIALIZER }
 
-struct sd_lock {
+struct sd_rw_lock {
 	pthread_rwlock_t rwlock;
 };
 
-static inline void sd_init_lock(struct sd_lock *lock)
+static inline void sd_init_rw_lock(struct sd_rw_lock *lock)
 {
 	int ret;
 
@@ -288,7 +288,7 @@ static inline void sd_init_lock(struct sd_lock *lock)
 		panic("failed to initialize a lock, %s", strerror(ret));
 }
 
-static inline void sd_destroy_lock(struct sd_lock *lock)
+static inline void sd_destroy_rw_lock(struct sd_rw_lock *lock)
 {
 	int ret;
 
@@ -300,7 +300,7 @@ static inline void sd_destroy_lock(struct sd_lock *lock)
 		panic("failed to destroy a lock, %s", strerror(ret));
 }
 
-static inline void sd_read_lock(struct sd_lock *lock)
+static inline void sd_read_lock(struct sd_rw_lock *lock)
 {
 	int ret;
 
@@ -316,7 +316,7 @@ static inline void sd_read_lock(struct sd_lock *lock)
  * Even though POSIX manual it doesn't return EAGAIN, we indeed have met the
  * case that it returned EAGAIN
  */
-static inline void sd_write_lock(struct sd_lock *lock)
+static inline void sd_write_lock(struct sd_rw_lock *lock)
 {
 	int ret;
 
@@ -328,7 +328,7 @@ static inline void sd_write_lock(struct sd_lock *lock)
 		panic("failed to lock for writing, %s", strerror(ret));
 }
 
-static inline void sd_unlock(struct sd_lock *lock)
+static inline void sd_rw_unlock(struct sd_rw_lock *lock)
 {
 	int ret;
 

@@ -21,7 +21,7 @@
 
 static int efd;
 static struct rb_root events_tree = RB_ROOT;
-static struct sd_lock events_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock events_lock = SD_RW_LOCK_INITIALIZER;
 
 static void timer_handler(int fd, int events, void *data)
 {
@@ -97,7 +97,7 @@ static struct event_info *lookup_event(int fd)
 
 	sd_read_lock(&events_lock);
 	ret = rb_search(&events_tree, &key, rb, event_cmp);
-	sd_unlock(&events_lock);
+	sd_rw_unlock(&events_lock);
 	return ret;
 }
 
@@ -124,7 +124,7 @@ int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 	} else {
 		sd_write_lock(&events_lock);
 		rb_insert(&events_tree, ei, rb, event_cmp);
-		sd_unlock(&events_lock);
+		sd_rw_unlock(&events_lock);
 	}
 
 	return ret;
@@ -145,7 +145,7 @@ void unregister_event(int fd)
 
 	sd_write_lock(&events_lock);
 	rb_erase(&ei->rb, &events_tree);
-	sd_unlock(&events_lock);
+	sd_rw_unlock(&events_lock);
 	free(ei);
 
 	/*

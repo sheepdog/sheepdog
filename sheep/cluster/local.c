@@ -31,10 +31,10 @@
 static const char *shmfile = "/tmp/sheepdog_shm";
 static const char *lockdir = "/tmp/sheepdog_locks/";
 /*
- * we have to use sd_lock because flock isn't thread exclusive
+ * we have to use sd_rw_lock because flock isn't thread exclusive
  * and it also serves to project lock_tree
  */
-static struct sd_lock lock_tree_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock lock_tree_lock = SD_RW_LOCK_INITIALIZER;
 static struct rb_root lock_tree_root = RB_ROOT;
 
 struct lock_entry {
@@ -643,7 +643,7 @@ static void local_unlock(uint64_t lock_id)
 	close(entry->fd);
 	rb_erase(&entry->rb, &lock_tree_root);
 	free(entry);
-	sd_unlock(&lock_tree_lock);
+	sd_rw_unlock(&lock_tree_lock);
 }
 
 static int local_update_node(struct sd_node *node)

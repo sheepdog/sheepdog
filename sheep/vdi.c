@@ -20,7 +20,7 @@ struct vdi_state_entry {
 };
 
 static struct rb_root vdi_state_root = RB_ROOT;
-static struct sd_lock vdi_state_lock = SD_LOCK_INITIALIZER;
+static struct sd_rw_lock vdi_state_lock = SD_RW_LOCK_INITIALIZER;
 
 /*
  * ec_max_data_strip represent max number of data strips in the cluster. When
@@ -68,7 +68,7 @@ static bool vid_is_snapshot(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_err("No VDI entry for %" PRIx32 " found", vid);
@@ -93,7 +93,7 @@ int get_vdi_copy_number(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("copy number for %" PRIx32 " not found, set %d", vid,
@@ -110,7 +110,7 @@ int get_vdi_copy_policy(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("copy policy for %" PRIx32 " not found, set %d", vid,
@@ -167,7 +167,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 		entry->copy_policy = cp;
 	}
 
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	return SD_RES_SUCCESS;
 }
@@ -188,7 +188,7 @@ int fill_vdi_state_list(void *data)
 		vs++;
 		nr++;
 	}
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 
 	return nr * sizeof(*vs);
 }
@@ -1208,7 +1208,7 @@ void clean_vdi_state(void)
 	sd_write_lock(&vdi_state_lock);
 	rb_destroy(&vdi_state_root, struct vdi_state_entry, node);
 	INIT_RB_ROOT(&vdi_state_root);
-	sd_unlock(&vdi_state_lock);
+	sd_rw_unlock(&vdi_state_lock);
 }
 
 int sd_delete_vdi(const char *name)
