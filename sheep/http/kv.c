@@ -18,7 +18,7 @@
 
 struct kv_bnode {
 	char name[SD_MAX_BUCKET_NAME];
-	uint64_t obj_count;
+	uint64_t object_count;
 	uint64_t bytes_used;
 	uint64_t oid;
 };
@@ -320,7 +320,7 @@ static int bucket_create(const char *account, uint32_t account_vid,
 
 	pstrcpy(bnode.name, sizeof(bnode.name), bucket);
 	bnode.bytes_used = 0;
-	bnode.obj_count = 0;
+	bnode.object_count = 0;
 	ret = bnode_create(&bnode, account_vid);
 	if (ret != SD_RES_SUCCESS)
 		goto err;
@@ -353,6 +353,39 @@ static int bnode_lookup(struct kv_bnode *bnode, uint32_t vid, const char *name)
 		ret = SD_RES_NO_OBJ;
 out:
 	return ret;
+}
+
+static int bnode_update(const char *account, const char *bucket, uint64_t used,
+			bool create)
+{
+	uint32_t account_vid;
+	struct kv_bnode bnode;
+	int ret;
+
+	ret = sd_lookup_vdi(account, &account_vid);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to find account %s", account);
+		return ret;
+	}
+
+	ret = bnode_lookup(&bnode, account_vid, bucket);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	if (create) {
+		bnode.object_count++;
+		bnode.bytes_used += used;
+	} else {
+		bnode.object_count--;
+		bnode.bytes_used -= used;
+	}
+
+	ret = sd_write_object(bnode.oid, (char *)&bnode, sizeof(bnode), 0, 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update bnode for %s", bucket);
+		return ret;
+	}
+	return SD_RES_SUCCESS;
 }
 
 static int bucket_delete(const char *account, uint32_t avid, const char *bucket)
@@ -470,10 +503,29 @@ out:
 	return ret;
 }
 
-int kv_read_bucket(const char *account, const char *bucket)
+int kv_read_bucket(struct http_request *req, const char *account,
+		   const char *bucket)
 {
-	/* TODO: read metadata of the bucket */
-	return -1;
+	uint32_t account_vid;
+	struct kv_bnode bnode;
+	int ret;
+
+	ret = sd_lookup_vdi(account, &account_vid);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to find account %s", account);
+		return ret;
+	}
+
+	ret = bnode_lookup(&bnode, account_vid, bucket);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+	http_request_writef(req, "X-Container-Object-Count: %"PRIu64"\n",
+			    bnode.object_count);
+
+	http_request_writef(req, "X-Container-Bytes-Used: %"PRIu64"\n",
+			    bnode.bytes_used);
+out:
+	return ret;
 }
 
 int kv_update_bucket(const char *account, const char *bucket)
@@ -948,6 +1000,13 @@ int kv_create_object(struct http_request *req, const char *account,
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to create onode for %s", name);
 		onode_free_data(onode);
+		goto out;
+	}
+
+	ret = bnode_update(account, bucket, req->data_length, true);
+	if (ret != SD_RES_SUCCESS) {
+		ret = onode_delete(onode);
+		goto out;
 	}
 out:
 	free(onode);
@@ -1000,6 +1059,17 @@ int kv_delete_object(const char *account, const char *bucket, const char *name)
 		goto out;
 
 	ret = onode_delete(onode);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	/*
+	 * If bnode is deleted successfully, we consider it successful deletion
+	 * even if bnode_update() fails.
+	 *
+	 * FIXME: make bnode metadata consistent
+	 */
+	if (bnode_update(account, bucket, onode->size, false) != SD_RES_SUCCESS)
+		sd_err("failed to update bnode for %s/%s", account, bucket);
 out:
 	free(onode);
 	return ret;

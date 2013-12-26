@@ -126,7 +126,8 @@ int kv_list_accounts(struct http_request *req,
 
 /* Bucket operations */
 int kv_create_bucket(const char *account, const char *bucket);
-int kv_read_bucket(const char *account, const char *bucket);
+int kv_read_bucket(struct http_request *req, const char *account,
+		   const char *bucket);
 int kv_update_bucket(const char *account, const char *bucket);
 int kv_delete_bucket(const char *account, const char *bucket);
 int kv_iterate_bucket(const char *account,
