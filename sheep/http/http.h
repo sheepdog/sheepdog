@@ -116,9 +116,9 @@ int http_request_writef(struct http_request *req, const char *fmt, ...);
 
 /* Account operations */
 int kv_create_account(const char *account);
-int kv_read_account(const char *account, uint32_t *nr_buckets);
+int kv_read_account_meta(struct http_request *req, const char *account);
 int kv_update_account(const char *account);
-int kv_delete_account(const char *account);
+int kv_delete_account(struct http_request *req, const char *account);
 int kv_list_accounts(struct http_request *req,
 		    void (*cb)(struct http_request *req, const char *account,
 			       void *opaque),

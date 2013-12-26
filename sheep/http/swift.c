@@ -16,17 +16,13 @@
 
 static void swift_head_account(struct http_request *req, const char *account)
 {
-	uint32_t nr_buckets;
 	int ret;
 
-	ret = kv_read_account(account, &nr_buckets);
-	if (ret)
-		http_response_header(req, UNAUTHORIZED);
-	else {
-		http_request_writef(req, "X-Account-Container-Count: %u\n",
-				    nr_buckets);
+	ret = kv_read_account_meta(req, account);
+	if (ret == SD_RES_SUCCESS)
 		http_response_header(req, NO_CONTENT);
-	}
+	else
+		http_response_header(req, UNAUTHORIZED);
 }
 
 static void swift_get_account_cb(const char *bucket, void *opaque)
@@ -39,11 +35,22 @@ static void swift_get_account_cb(const char *bucket, void *opaque)
 static void swift_get_account(struct http_request *req, const char *account)
 {
 	struct strbuf buf = STRBUF_INIT;
+	int ret;
 
-	kv_iterate_bucket(account, swift_get_account_cb, &buf);
-	req->data_length = buf.len;
-	http_response_header(req, OK);
-	http_request_write(req, buf.buf, buf.len);
+	ret = kv_iterate_bucket(account, swift_get_account_cb, &buf);
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		req->data_length = buf.len;
+		http_response_header(req, OK);
+		http_request_write(req, buf.buf, buf.len);
+		break;
+	case SD_RES_NO_VDI:
+		http_response_header(req, NOT_FOUND);
+		break;
+	default:
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		break;
+	}
 	strbuf_release(&buf);
 }
 
@@ -67,27 +74,24 @@ static void swift_post_account(struct http_request *req, const char *account)
 
 static void swift_delete_account(struct http_request *req, const char *account)
 {
-	uint32_t nr_buckets;
 	int ret;
 
-	ret = kv_read_account(account, &nr_buckets);
-	if (ret) {
-		http_response_header(req, INTERNAL_SERVER_ERROR);
-		return;
-	}
-
-	if (nr_buckets) {
-		/* return HTTP_CONFLICT when the account is not empty */
+	ret = kv_delete_account(req, account);
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		http_response_header(req, NO_CONTENT);
+		break;
+	case SD_RES_NO_VDI:
+	case SD_RES_NO_OBJ:
+		http_response_header(req, NOT_FOUND);
+		break;
+	case SD_RES_VDI_NOT_EMPTY:
 		http_response_header(req, CONFLICT);
-		return;
-	}
-
-	ret = kv_delete_account(account);
-	if (ret) {
+		break;
+	default:
 		http_response_header(req, INTERNAL_SERVER_ERROR);
-		return;
+		break;
 	}
-	http_response_header(req, OK);
 }
 
 /* Operations on Containers */
@@ -123,11 +127,23 @@ static void swift_get_container(struct http_request *req, const char *account,
 				const char *container)
 {
 	struct strbuf buf = STRBUF_INIT;
+	int ret;
 
-	kv_iterate_object(account, container, swift_get_container_cb, &buf);
-	req->data_length = buf.len;
-	http_response_header(req, OK);
-	http_request_write(req, buf.buf, buf.len);
+	ret = kv_iterate_object(account, container, swift_get_container_cb,
+				&buf);
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		req->data_length = buf.len;
+		http_response_header(req, OK);
+		http_request_write(req, buf.buf, buf.len);
+		break;
+	case SD_RES_NO_VDI:
+		http_response_header(req, NOT_FOUND);
+		break;
+	default:
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		break;
+	}
 	strbuf_release(&buf);
 }
 
@@ -159,11 +175,23 @@ static void swift_delete_container(struct http_request *req,
 				   const char *account, const char *container)
 {
 	int ret;
+
 	ret = kv_delete_bucket(account, container);
-	if (ret == SD_RES_NO_VDI)
-		http_response_header(req, NOT_FOUND);
-	else
+	switch (ret) {
+	case SD_RES_SUCCESS:
 		http_response_header(req, NO_CONTENT);
+		break;
+	case SD_RES_NO_VDI:
+	case SD_RES_NO_OBJ:
+		http_response_header(req, NOT_FOUND);
+		break;
+	case SD_RES_VDI_NOT_EMPTY:
+		http_response_header(req, CONFLICT);
+		break;
+	default:
+		http_response_header(req, INTERNAL_SERVER_ERROR);
+		break;
+	}
 }
 
 /* Operations on Objects */

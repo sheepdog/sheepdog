@@ -55,7 +55,9 @@ typedef void (*bucket_iter_cb)(const char *bucket, void *opaque);
 struct bucket_iterater_arg {
 	void *opaque;
 	bucket_iter_cb cb;
-	uint32_t count;
+	uint64_t bucket_count;
+	uint64_t object_count;
+	uint64_t bytes_used;
 };
 
 static int kv_create_hyper_volume(const char *name, uint32_t *vdi_id)
@@ -139,45 +141,55 @@ static void bucket_iterater(void *data, enum btree_node_type type, void *arg)
 			return;
 		if (biarg->cb)
 			biarg->cb(bnode.name, biarg->opaque);
-		biarg->count++;
+		biarg->bucket_count++;
+		biarg->object_count += bnode.object_count;
+		biarg->bytes_used += bnode.bytes_used;
 	}
 }
 
-/* get number of buckets in this account */
-static int kv_get_account(const char *account, uint32_t *nr_buckets)
+static int read_account_meta(const char *account, uint64_t *bucket_count,
+			     uint64_t *object_count, uint64_t *used)
 {
-	struct sd_inode inode;
-	uint64_t oid;
+	struct sd_inode *inode = NULL;
+	struct bucket_iterater_arg arg = {};
 	uint32_t account_vid;
-	struct bucket_iterater_arg arg = {NULL, NULL, 0};
+	uint64_t oid;
 	int ret;
 
 	ret = sd_lookup_vdi(account, &account_vid);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	/* read account vdi out */
 	oid = vid_to_vdi_oid(account_vid);
-	ret = sd_read_object(oid, (char *)&inode, sizeof(struct sd_inode), 0);
+	inode = xmalloc(sizeof(*inode));
+	ret = sd_read_object(oid, (char *)inode, sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to read inode header %lx", oid);
 		goto out;
 	}
 
-	traverse_btree(sheep_bnode_reader, &inode, bucket_iterater, &arg);
-	if (nr_buckets)
-		*nr_buckets = arg.count;
+	traverse_btree(sheep_bnode_reader, inode, bucket_iterater, &arg);
+	*object_count = arg.object_count;
+	*bucket_count = arg.bucket_count;
+	*used = arg.bytes_used;
 out:
+	free(inode);
 	return ret;
 }
 
-int kv_read_account(const char *account, uint32_t *nr_buckets)
+int kv_read_account_meta(struct http_request *req, const char *account)
 {
+	uint64_t bcount, ocount, used;
 	int ret;
 
-	ret = kv_get_account(account, nr_buckets);
+	ret = read_account_meta(account, &bcount, &ocount, &used);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("Failed to get number of buckets in %s", account);
+		return ret;
+
+	http_request_writef(req, "X-Account-Container-Count: %"PRIu64"\n",
+			    bcount);
+	http_request_writef(req, "X-Account-Object-Count: %"PRIu64"\n", ocount);
+	http_request_writef(req, "X-Account-Bytes-Used: %"PRIu64"\n", used);
 	return ret;
 }
 
@@ -187,14 +199,21 @@ int kv_update_account(const char *account)
 	return -1;
 }
 
-int kv_delete_account(const char *account)
+int kv_delete_account(struct http_request *req, const char *account)
 {
+	uint64_t bcount, ocount, used;
 	int ret;
+
+	ret = read_account_meta(account, &bcount, &ocount, &used);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	if (bcount)
+		return SD_RES_VDI_NOT_EMPTY;
 
 	ret = sd_delete_vdi(account);
 	if (ret != SD_RES_SUCCESS)
 		sd_err("Failed to delete vdi %s", account);
-
 	return ret;
 }
 
@@ -402,6 +421,9 @@ static int bucket_delete(const char *account, uint32_t avid, const char *bucket)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
+	if (bnode.object_count > 0)
+		return SD_RES_VDI_NOT_EMPTY;
+
 	ret = sd_discard_object(bnode.oid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to discard bnode for %s", bucket);
@@ -561,7 +583,7 @@ out:
 int kv_iterate_bucket(const char *account, bucket_iter_cb cb, void *opaque)
 {
 	struct sd_inode account_inode;
-	struct bucket_iterater_arg arg = {opaque, cb, 0};
+	struct bucket_iterater_arg arg = {opaque, cb, 0, 0, 0};
 	uint32_t account_vid;
 	uint64_t oid;
 	int ret;
