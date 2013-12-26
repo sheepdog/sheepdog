@@ -35,7 +35,6 @@ struct kv_onode {
 			/* a hash value for etag */
 			uint8_t sha1[round_up(SHA1_DIGEST_SIZE, 8)];
 			uint64_t size;
-			uint64_t ctime;
 			uint64_t mtime;
 			uint32_t data_vid;
 			uint32_t nr_extent;
@@ -690,10 +689,19 @@ out:
 	return ret;
 }
 
+static uint64_t get_seconds(void)
+{
+	struct timeval tv;
+	uint64_t seconds;
+
+	gettimeofday(&tv, NULL);
+	seconds = (uint64_t)tv.tv_sec;
+	return seconds;
+}
+
 static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 {
 	ssize_t size;
-	struct timeval tv;
 	int ret;
 
 	if (req->data_length <= KV_ONODE_INLINE_SIZE) {
@@ -711,9 +719,7 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 			goto out;
 	}
 
-	gettimeofday(&tv, NULL);
-	onode->ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
-	onode->mtime = onode->ctime;
+	onode->mtime = get_seconds();
 	onode->size = req->data_length;
 out:
 	return ret;
@@ -1091,5 +1097,40 @@ int kv_iterate_object(const char *account, const char *bucket,
 	ret = bucket_iterate_object(bucket_vid, cb, opaque);
 	sys->cdrv->unlock(bucket_vid);
 
+	return ret;
+}
+
+static char *http_time(uint64_t time)
+{
+	static __thread char time_str[128];
+
+	strftime(time_str, sizeof(time_str), "%a, %d %b %Y %H:%M:%S GMT",
+		 gmtime((time_t *)&time));
+	return time_str;
+}
+
+int kv_read_object_meta(struct http_request *req, const char *account,
+			const char *bucket, const char *name)
+{
+	struct kv_onode *onode = NULL;
+	char vdi_name[SD_MAX_VDI_LEN];
+	uint32_t bucket_vid;
+	int ret;
+
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
+	ret = sd_lookup_vdi(vdi_name, &bucket_vid);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	onode = xzalloc(sizeof(*onode));
+	ret = onode_lookup(onode, bucket_vid, name);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	req->data_length = onode->size;
+	http_request_writef(req, "Last-Modified: %s\n",
+			    http_time(onode->mtime));
+out:
+	free(onode);
 	return ret;
 }

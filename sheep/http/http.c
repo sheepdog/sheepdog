@@ -193,7 +193,7 @@ void http_response_header(struct http_request *req, enum http_status status)
 
 	req->status = status;
 	http_request_writef(req, "Status: %s\r\n", strstatus(status));
-	if (req->opcode == HTTP_GET && req->data_length > 0)
+	if (req->opcode == HTTP_GET || req->opcode == HTTP_HEAD)
 		http_request_writef(req, "Content-Length: %lu\r\n",
 				    req->data_length);
 	http_request_writes(req, "Content-type: text/plain;\r\n\r\n");

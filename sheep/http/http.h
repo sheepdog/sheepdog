@@ -139,6 +139,8 @@ int kv_create_object(struct http_request *req, const char *account,
 		     const char *bucket, const char *object);
 int kv_read_object(struct http_request *req, const char *account,
 		   const char *bucket, const char *object);
+int kv_read_object_meta(struct http_request *req, const char *account,
+			const char *bucket, const char *object);
 int kv_delete_object(const char *account, const char *bucket, const char *);
 int kv_iterate_object(const char *account, const char *bucket,
 		      void (*cb)(const char *object, void *opaque),
