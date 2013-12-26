@@ -61,7 +61,7 @@ struct object_cache {
 	struct list_head lru_head; /* Per VDI LRU list for reclaimer */
 	struct list_head dirty_head; /* Dirty objects linked to this list */
 	int push_efd; /* Used to synchronize between pusher and push threads */
-	uatomic_bool in_push; /* Whether if pusher is running */
+	struct sd_mutex push_mutex; /* mutex for pushing cache */
 
 	struct sd_rw_lock lock; /* Cache lock */
 };
@@ -224,11 +224,11 @@ static void do_background_push(struct work *work)
 	struct push_work *pw = container_of(work, struct push_work, work);
 	struct object_cache *oc = pw->oc;
 
-	if (!uatomic_set_true(&oc->in_push))
+	if (sd_mutex_trylock(&oc->push_mutex) == EBUSY)
 		return;
 
 	object_cache_push(oc);
-	uatomic_set_false(&oc->in_push);
+	sd_mutex_unlock(&oc->push_mutex);
 }
 
 static void background_push_done(struct work *work)
@@ -263,13 +263,11 @@ static void add_to_dirty_list(struct object_cache_entry *entry)
 	list_add_tail(&entry->dirty_list, &oc->dirty_head);
 	/* FIXME read sys->status atomically */
 	if (uatomic_add_return(&oc->dirty_count, 1) > MAX_DIRTY_OBJECT_COUNT
-	    && !uatomic_is_true(&oc->in_push)
 	    && sys->cinfo.status == SD_STATUS_OK)
 		kick_background_pusher(oc);
 }
 
-static inline void
-free_cache_entry(struct object_cache_entry *entry)
+static inline void free_cache_entry(struct object_cache_entry *entry)
 {
 	struct object_cache *oc = entry->oc;
 
@@ -638,6 +636,8 @@ not_found:
 
 		sd_init_rw_lock(&cache->lock);
 		hlist_add_head(&cache->hash, head);
+
+		sd_init_mutex(&cache->push_mutex);
 	} else {
 		cache = NULL;
 	}
@@ -1191,11 +1191,10 @@ int object_cache_flush_vdi(uint32_t vid)
 	 * that dirty bits produced while it is waiting are guaranteed
 	 * to be pushed back
 	 */
-	while (!uatomic_set_true(&cache->in_push))
-		usleep(100000);
-
+	sd_mutex_lock(&cache->push_mutex);
 	ret = object_cache_push(cache);
-	uatomic_set_false(&cache->in_push);
+	sd_mutex_unlock(&cache->push_mutex);
+
 	return ret;
 }
 
