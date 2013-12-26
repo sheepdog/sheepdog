@@ -303,6 +303,11 @@ static inline void sd_mutex_lock(struct sd_mutex *mutex)
 		panic("failed to lock for reading, %s", strerror(ret));
 }
 
+static inline int sd_mutex_trylock(struct sd_mutex *mutex)
+{
+	return pthread_mutex_trylock(&mutex->mutex);
+}
+
 static inline void sd_mutex_unlock(struct sd_mutex *mutex)
 {
 	int ret;
