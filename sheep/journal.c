@@ -54,7 +54,9 @@ static int jfile_fds[2];
 static size_t jfile_size;
 
 static struct journal_file jfile;
-static pthread_spinlock_t jfile_lock;
+static struct sd_mutex jfile_lock = SD_MUTEX_INITIALIZER;
+
+static struct work_queue *commit_wq;
 
 static int create_journal_file(const char *root, const char *name)
 {
@@ -277,7 +279,12 @@ int journal_file_init(const char *path, size_t size, bool skip)
 	fd = create_journal_file(path, jfile_name[1]);
 	jfile_fds[1] = fd;
 
-	pthread_spin_init(&jfile_lock, PTHREAD_PROCESS_PRIVATE);
+	commit_wq = create_ordered_work_queue("journal commit");
+	if (!commit_wq) {
+		sd_err("error at creating a workqueue for journal data commit");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -301,10 +308,10 @@ void clean_journal_file(const char *p)
 
 static inline bool jfile_enough_space(size_t size)
 {
-	if (jfile.pos + size > jfile_size)
-		return false;
-	return true;
+	return (jfile.pos + size) < jfile_size;
 }
+
+static struct sd_mutex journal_commit_mutex = SD_MUTEX_INITIALIZER;
 
 /*
  * We rely on the kernel's page cache to cache data objects to 1) boost read
@@ -312,38 +319,32 @@ static inline bool jfile_enough_space(size_t size)
  * sync() operation and We do it in a dedicated thread to avoid blocking
  * the writer by switch back and forth between two journal files.
  */
-static void *commit_data(void *ignored)
+static void journal_commit_data_work(struct work *work)
 {
-	int err;
-
-	/* Tell runtime to release resources after termination */
-	err = pthread_detach(pthread_self());
-	if (unlikely(err))
-		panic("%s", strerror(err));
-
 	sync();
+
 	if (unlikely(xftruncate(jfile.commit_fd, 0) < 0))
 		panic("truncate %m");
 	if (unlikely(prealloc(jfile.commit_fd, jfile_size) < 0))
-		panic("prealloc");
+		panic("prealloc %m");
 
-	uatomic_set_false(&jfile.in_commit);
-
-	pthread_exit(NULL);
+	sd_mutex_unlock(&journal_commit_mutex);
 }
 
-/* FIXME: Try not sleep inside lock */
+static void journal_commit_data_done(struct work *work)
+{
+	free(work);
+}
+
 static void switch_journal_file(void)
 {
-	int old = jfile.fd, err;
-	pthread_t thread;
+	int old = jfile.fd;
+	struct work *w;
 
-retry:
-	if (unlikely(!uatomic_set_true(&jfile.in_commit))) {
-		sd_err("journal file in committing, "
-		       "you might need enlarge jfile size");
-		usleep(100000); /* Wait until committing is finished */
-		goto retry;
+	if (sd_mutex_trylock(&journal_commit_mutex) == EBUSY) {
+		sd_err("journal file in commiting, you might need"
+		       " enlarge jfile size");
+		sd_mutex_lock(&journal_commit_mutex);
 	}
 
 	if (old == jfile_fds[0])
@@ -353,9 +354,10 @@ retry:
 	jfile.commit_fd = old;
 	jfile.pos = 0;
 
-	err = pthread_create(&thread, NULL, commit_data, NULL);
-	if (unlikely(err))
-		panic("%s", strerror(err));
+	w = xzalloc(sizeof(*w));
+	w->fn = journal_commit_data_work;
+	w->done = journal_commit_data_done;
+	queue_work(commit_wq, w);
 }
 
 static int journal_file_write(struct journal_descriptor *jd, const char *buf)
@@ -368,12 +370,12 @@ static int journal_file_write(struct journal_descriptor *jd, const char *buf)
 	off_t woff;
 	char *wbuffer, *p;
 
-	pthread_spin_lock(&jfile_lock);
+	sd_mutex_lock(&jfile_lock);
 	if (!jfile_enough_space(wsize))
 		switch_journal_file();
 	woff = jfile.pos;
 	jfile.pos += wsize;
-	pthread_spin_unlock(&jfile_lock);
+	sd_mutex_unlock(&jfile_lock);
 
 	p = wbuffer = xvalloc(wsize);
 	memcpy(p, jd, JOURNAL_DESC_SIZE);
