@@ -76,7 +76,7 @@ const char *str_http_req(const struct http_request *req)
 {
 	static __thread char msg[1024];
 
-	snprintf(msg, sizeof(msg), "%s %s, status = %s, data_length = %zd",
+	snprintf(msg, sizeof(msg), "%s %s, status = %s, data_length = %"PRIu64,
 		 req->uri, stropcode(req->opcode), strstatus(req->status),
 		 req->data_length);
 
@@ -194,7 +194,7 @@ void http_response_header(struct http_request *req, enum http_status status)
 	req->status = status;
 	http_request_writef(req, "Status: %s\r\n", strstatus(status));
 	if (req->opcode == HTTP_GET || req->opcode == HTTP_HEAD)
-		http_request_writef(req, "Content-Length: %lu\r\n",
+		http_request_writef(req, "Content-Length: %"PRIu64"\r\n",
 				    req->data_length);
 	http_request_writes(req, "Content-type: text/plain;\r\n\r\n");
 }

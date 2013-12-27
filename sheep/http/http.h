@@ -47,7 +47,7 @@ struct http_request {
 	char *uri;
 	enum http_opcode opcode;
 	enum http_status status;
-	size_t data_length;
+	uint64_t data_length;
 };
 
 struct http_driver {
