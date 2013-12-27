@@ -823,7 +823,7 @@ int main(int argc, char **argv)
 		if (!strlen(jpath))
 			/* internal journal */
 			memcpy(jpath, dir, strlen(dir));
-		sd_debug("%s, %zd, %d", jpath, jsize, jskip);
+		sd_debug("%s, %"PRIu64", %d", jpath, jsize, jskip);
 		ret = journal_file_init(jpath, jsize, jskip);
 		if (ret)
 			exit(1);

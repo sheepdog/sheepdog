@@ -343,7 +343,7 @@ static struct cluster_lock *lock_table_lookup_acquire(uint64_t lock_id)
 		ret_lock = xzalloc(sizeof(*ret_lock));
 		ret_lock->id = lock_id;
 		ret_lock->ref = 1;
-		snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu",
+		snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
 			 ret_lock->id);
 		rc = zk_init_node(path);
 		if (rc)
@@ -393,7 +393,7 @@ static void lock_table_lookup_release(uint64_t lock_id)
 			/* free all resource used by this lock */
 			sd_destroy_mutex(&lock->id_lock);
 			sd_destroy_mutex(&lock->wait_wakeup);
-			snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu",
+			snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
 				 lock->id);
 			/*
 			 * If deletion of directory 'lock_id' fail, we only get
@@ -675,11 +675,12 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		struct zk_node *n;
 
 		/* process distributed lock */
-		ret = sscanf(path, LOCK_ZNODE "/%lu/%s", &lock_id, str);
+		ret = sscanf(path, LOCK_ZNODE "/%"PRIu64"/%s", &lock_id, str);
 		if (ret == 2) {
 			ret = lock_table_lookup_wakeup(lock_id);
 			if (ret)
-				sd_debug("release lock %lu %s", lock_id, str);
+				sd_debug("release lock %"PRIu64" %s",
+					 lock_id, str);
 			return;
 		}
 
@@ -1242,7 +1243,7 @@ static void zk_lock(uint64_t lock_id)
 	my_path = cluster_lock->lock_path;
 
 	/* compete owner of lock is just like zk_compete_master() */
-	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu/",
+	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64"/",
 		 cluster_lock->id);
 	while (true) {
 		rc = zoo_create(zhandle, parent, "", 0, &ZOO_OPEN_ACL_UNSAFE,
@@ -1255,7 +1256,8 @@ static void zk_lock(uint64_t lock_id)
 	sd_debug("create path %s success", my_path);
 
 	/* create node ok now */
-	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%lu", cluster_lock->id);
+	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64"",
+		 cluster_lock->id);
 	while (true) {
 		zk_get_least_seq(parent, lowest_seq_path, MAX_NODE_STR_LEN,
 				 owner_name, &len);

@@ -133,7 +133,7 @@ static void bucket_iterater(void *data, enum btree_node_type type, void *arg)
 		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
 		ret = sd_read_object(oid, (char *)&bnode, sizeof(bnode), 0);
 		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to read data object %lx", oid);
+			sd_err("Failed to read data object %"PRIx64, oid);
 			return;
 		}
 
@@ -164,7 +164,7 @@ static int read_account_meta(const char *account, uint64_t *bucket_count,
 	inode = xmalloc(sizeof(*inode));
 	ret = sd_read_object(oid, (char *)inode, sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("Failed to read inode header %lx", oid);
+		sd_err("Failed to read inode header %"PRIx64, oid);
 		goto out;
 	}
 
@@ -475,7 +475,7 @@ static void object_iterater(void *data, enum btree_node_type type, void *arg)
 		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
 		ret = sd_read_object(oid, (char *)onode, SD_DATA_OBJ_SIZE, 0);
 		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to read data object %lx", oid);
+			sd_err("Failed to read data object %"PRIx64, oid);
 			goto out;
 		}
 
