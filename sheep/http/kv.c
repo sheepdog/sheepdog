@@ -373,6 +373,21 @@ out:
 	return ret;
 }
 
+/*
+ * For object create/delete, we can't easily maintain the bnode consistent by
+ * playing around the operations order.
+ *
+ * We should inform the user the deletion failure if bnode_update() fails even
+ * though we might delete the onode successfully. Then subsequent 'delete' for
+ * the same object won't skew up the bnode metadata.
+ * The true fix for the inconsistency (for whatever reaons it happens), is a
+ * check request that does a server side consistency check. This is left for a
+ * future patch.
+ *
+ * Alternative fix is that we drop the redundant data about bytes_used,
+ * object_counts from bnode, and so for "HEAD" operation, we just iterate all
+ * the objects. This can't scale if we have huge objects.
+ */
 static int bnode_update(const char *account, const char *bucket, uint64_t used,
 			bool create)
 {
@@ -1033,7 +1048,8 @@ int kv_create_object(struct http_request *req, const char *account,
 
 	ret = bnode_update(account, bucket, req->data_length, true);
 	if (ret != SD_RES_SUCCESS) {
-		ret = onode_delete(onode);
+		sd_err("failed to update bucket for %s", name);
+		onode_delete(onode);
 		goto out;
 	}
 out:
@@ -1087,17 +1103,15 @@ int kv_delete_object(const char *account, const char *bucket, const char *name)
 		goto out;
 
 	ret = onode_delete(onode);
-	if (ret != SD_RES_SUCCESS)
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to delete bnode for %s", name);
 		goto out;
-
-	/*
-	 * If bnode is deleted successfully, we consider it successful deletion
-	 * even if bnode_update() fails.
-	 *
-	 * FIXME: make bnode metadata consistent
-	 */
-	if (bnode_update(account, bucket, onode->size, false) != SD_RES_SUCCESS)
-		sd_err("failed to update bnode for %s/%s", account, bucket);
+	}
+	ret = bnode_update(account, bucket, onode->size, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update bnode for %s", name);
+		goto out;
+	}
 out:
 	free(onode);
 	return ret;
