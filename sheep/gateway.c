@@ -518,9 +518,11 @@ static int gateway_forward_request(struct request *req)
 	 */
 	nr_reqs = nr_to_send;
 	if (nr_to_send > nr_copies) {
+		uint8_t policy = req->rq.obj.copy_policy ?:
+			get_vdi_copy_policy(oid_to_vid(req->rq.obj.oid));
 		int ds;
 		/* Only for erasure code, nr_to_send might > nr_copies */
-		ec_policy_to_dp(req->rq.obj.copy_policy, &ds, NULL);
+		ec_policy_to_dp(policy, &ds, NULL);
 		if (nr_copies < ds) {
 			sd_err("There isn't enough copies(%d) to send out (%d)",
 			       nr_copies, nr_to_send);
