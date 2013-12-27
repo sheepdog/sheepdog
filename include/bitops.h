@@ -11,6 +11,7 @@
 #define DECLARE_BITMAP(name, bits) \
 	unsigned long name[BITS_TO_LONGS(bits)]
 #define BITS_PER_LONG (BITS_PER_BYTE * sizeof(long))
+#define BITS_PER_UINT64 (BITS_PER_BYTE * sizeof(uint64_t))
 
 #define __ffs(x)  (x ? __builtin_ffsl(x) - 1 : 0)
 #define ffz(x)  __ffs(~(x))
@@ -133,6 +134,11 @@ found_middle:
 static inline void set_bit(int nr, unsigned long *addr)
 {
 	addr[nr / BITS_PER_LONG] |= 1UL << (nr % BITS_PER_LONG);
+}
+
+static inline void set_bit_64(int nr, uint64_t *addr)
+{
+	addr[nr / BITS_PER_UINT64] |= 1ULL << (nr % BITS_PER_UINT64);
 }
 
 static inline void atomic_set_bit(int nr, unsigned long *addr)

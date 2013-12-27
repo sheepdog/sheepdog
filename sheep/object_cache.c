@@ -143,7 +143,7 @@ static uint64_t calc_object_bmap(uint64_t oid, size_t len, off_t offset)
 	nr = end - start;
 
 	while (nr--)
-		set_bit(start + nr, &bmap);
+		set_bit_64(start + nr, &bmap);
 
 	return bmap;
 }
@@ -473,7 +473,7 @@ static int push_cache_object(uint32_t vid, uint64_t idx, uint64_t bmap,
 		 oid, bsize, bmap, first_bit, last_bit);
 	offset = first_bit * bsize;
 	data_length = min((last_bit - first_bit + 1) * bsize,
-			  get_objsize(oid) - offset);
+			  get_objsize(oid) - (size_t)offset);
 
 	buf = xvalloc(data_length);
 	ret = read_cache_object_noupdate(vid, idx, buf, data_length, offset);
