@@ -630,7 +630,7 @@ out:
 #define KV_ONODE_INLINE_SIZE (SD_DATA_OBJ_SIZE - BLOCK_SIZE)
 
 static int vdi_read_write(uint32_t vid, char *data, size_t length,
-			  off_t offset, bool read)
+			  off_t offset, bool is_read)
 {
 	struct sd_req hdr;
 	uint32_t idx = offset / SD_DATA_OBJ_SIZE;
@@ -646,7 +646,7 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 	while (done < length) {
 		size_t len = min(length - done, SD_DATA_OBJ_SIZE - offset);
 
-		if (read) {
+		if (is_read) {
 			sd_init_req(&hdr, SD_OP_READ_OBJ);
 		} else {
 			sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
@@ -1136,12 +1136,12 @@ int kv_iterate_object(const char *account, const char *bucket,
 	return ret;
 }
 
-static char *http_time(uint64_t time)
+static char *http_time(uint64_t time_sec)
 {
 	static __thread char time_str[128];
 
 	strftime(time_str, sizeof(time_str), "%a, %d %b %Y %H:%M:%S GMT",
-		 gmtime((time_t *)&time));
+		 gmtime((time_t *)&time_sec));
 	return time_str;
 }
 
