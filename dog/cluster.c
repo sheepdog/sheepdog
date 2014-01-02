@@ -82,7 +82,7 @@ static int cluster_format(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_READ_VDIS);
 	hdr.data_length = sizeof(vdi_inuse);
 
-	ret = dog_exec_req(sdhost, sdport, &hdr, &vdi_inuse);
+	ret = dog_exec_req(sdhost, sdport, &hdr, vdi_inuse);
 	if (ret < 0)
 		return EXIT_SYSFAIL;
 	if (rsp->result != SD_RES_SUCCESS) {
