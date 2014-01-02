@@ -1027,7 +1027,7 @@ int kv_create_object(struct http_request *req, const char *account,
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account, bucket);
 	ret = sd_lookup_vdi(vdi_name, &data_vid);
 	if (ret != SD_RES_SUCCESS)
-		return ret;
+		goto out;
 
 	memset(onode, 0, sizeof(*onode));
 	pstrcpy(onode->name, sizeof(onode->name), name);
