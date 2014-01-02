@@ -141,7 +141,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
 
-	ret = dog_exec_req(&sd_nid, &req, &vdi_inuse);
+	ret = dog_exec_req(&sd_nid, &req, vdi_inuse);
 	if (ret < 0)
 		goto out;
 	if (rsp->result != SD_RES_SUCCESS) {
