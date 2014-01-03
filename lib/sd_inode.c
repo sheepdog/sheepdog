@@ -568,6 +568,7 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 {
 	struct sd_extent_header *header;
 	struct find_path path;
+	uint64_t offset;
 	int ret;
 
 	path.p_ext_header = NULL;
@@ -585,6 +586,18 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 			ret = search_whole_btree(reader, inode, idx, &path);
 			if (ret == SD_RES_BTREE_FOUND) {
 				path.p_ext->vdi_id = vdi_id;
+				/*
+				 * Only write the vdi_id in sd_extent for
+				 * second level leaf-node.
+				 */
+				if (!path.p_ext_header)
+					goto out;
+				offset = (unsigned char *)(path.p_ext) -
+					 (unsigned char *)(path.p_ext_header) +
+					 offsetof(struct sd_extent, vdi_id);
+				writer(path.p_idx->oid, &vdi_id, sizeof(vdi_id),
+				       offset, 0, inode->nr_copies,
+				       inode->copy_policy, false, false);
 				goto out;
 			} else {
 				ret = insert_new_node(writer, reader, inode,
