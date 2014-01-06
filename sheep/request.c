@@ -367,6 +367,19 @@ static main_fn inline void stat_request_begin(struct request *req)
 			sys->stat.r.peer_total_rx += hdr->data_length;
 		else
 			sys->stat.r.peer_total_tx += hdr->data_length;
+
+		switch (hdr->opcode) {
+		case SD_OP_READ_PEER:
+			sys->stat.r.peer_total_read_nr++;
+			break;
+		case SD_OP_WRITE_PEER:
+		case SD_OP_CREATE_AND_WRITE_PEER:
+			sys->stat.r.peer_total_write_nr++;
+			break;
+		case SD_OP_REMOVE_PEER:
+			sys->stat.r.peer_total_remove_nr++;
+			break;
+		}
 	} else if (is_gateway_op(req->op)) {
 		sys->stat.r.gway_total_nr++;
 		sys->stat.r.gway_active_nr++;
@@ -374,17 +387,38 @@ static main_fn inline void stat_request_begin(struct request *req)
 			sys->stat.r.gway_total_rx += hdr->data_length;
 		else
 			sys->stat.r.gway_total_tx += hdr->data_length;
+
+		switch (hdr->opcode) {
+		case SD_OP_READ_OBJ:
+			sys->stat.r.gway_total_read_nr++;
+			break;
+		case SD_OP_WRITE_OBJ:
+		case SD_OP_CREATE_AND_WRITE_OBJ:
+			sys->stat.r.gway_total_write_nr++;
+			break;
+		case SD_OP_DISCARD_OBJ:
+			sys->stat.r.gway_total_remove_nr++;
+			break;
+		}
+	} else if (hdr->opcode == SD_OP_FLUSH_VDI) {
+		sys->stat.r.gway_total_nr++;
+		sys->stat.r.gway_active_nr++;
+		sys->stat.r.gway_total_flush_nr++;
 	}
 }
 
 static main_fn inline void stat_request_end(struct request *req)
 {
+	struct sd_req *hdr = &req->rq;
+
 	if (!req->stat)
 		return;
 
 	if (is_peer_op(req->op))
 		sys->stat.r.peer_active_nr--;
 	else if (is_gateway_op(req->op))
+		sys->stat.r.gway_active_nr--;
+	else if (hdr->opcode == SD_OP_FLUSH_VDI)
 		sys->stat.r.gway_active_nr--;
 }
 

@@ -250,6 +250,13 @@ struct sd_stat {
 		uint64_t gway_total_tx; /* Data out */
 		uint64_t peer_total_rx;
 		uint64_t peer_total_tx;
+		uint64_t gway_total_remove_nr;
+		uint64_t gway_total_read_nr;
+		uint64_t gway_total_write_nr;
+		uint64_t gway_total_flush_nr;
+		uint64_t peer_total_remove_nr;
+		uint64_t peer_total_read_nr;
+		uint64_t peer_total_write_nr;
 	} r;
 };
 

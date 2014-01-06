@@ -275,9 +275,9 @@ static int node_stat(int argc, char **argv)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct sd_stat stat;
+	struct sd_stat stat, last;
 	int ret;
-	uint32_t i = node_cmd_data.watch ? UINT32_MAX : 0;
+	bool watch = node_cmd_data.watch ? true : false, first = true;
 
 again:
 	sd_init_req(&hdr, SD_OP_STAT);
@@ -292,21 +292,55 @@ again:
 		return EXIT_FAILURE;
 	}
 
-	printf("%s%"PRIu64"\t%"PRIu64"\t%s\t%s\n",
-	       raw_output ? "" :
-	       "Request\tActive\tTotal\tIn\tOut\nClient\t",
-	       stat.r.gway_active_nr, stat.r.gway_total_nr,
-	       strnumber(stat.r.gway_total_rx),
-	       strnumber(stat.r.gway_total_tx));
-	printf("%s%"PRIu64"\t%"PRIu64"\t%s\t%s\n",
-	       raw_output ? "" : "Peer\t",
-	       stat.r.peer_active_nr, stat.r.peer_total_nr,
-	       strnumber(stat.r.peer_total_rx),
-	       strnumber(stat.r.peer_total_tx));
-	if (i > 0) {
-		clear_screen();
+	if (watch) {
+		if (first) {
+			last = stat;
+			first = false;
+		}
+		printf("%s%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t"
+		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\t%s\t%s\n",
+		       raw_output ? "" :
+		       "Request\tActive\tTotal\tWrite\tRead\tRemove\tFlush\t"
+		       "All WR\tAll RD\tWRBW\tRDBW\nClient\t",
+		       stat.r.gway_active_nr, stat.r.gway_total_nr,
+		       stat.r.gway_total_read_nr, stat.r.gway_total_write_nr,
+		       stat.r.gway_total_remove_nr, stat.r.gway_total_flush_nr,
+		       strnumber(stat.r.gway_total_rx),
+		       strnumber(stat.r.gway_total_tx),
+		       strnumber(stat.r.gway_total_rx - last.r.gway_total_rx),
+		       strnumber(stat.r.gway_total_tx - last.r.gway_total_tx));
+		printf("%s%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t"
+		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\t%s\t%s\n",
+		       raw_output ? "" : "Peer\t",
+		       stat.r.peer_active_nr, stat.r.peer_total_nr,
+		       stat.r.peer_total_read_nr, stat.r.peer_total_write_nr,
+		       stat.r.peer_total_remove_nr, 0UL,
+		       strnumber(stat.r.peer_total_rx),
+		       strnumber(stat.r.peer_total_tx),
+		       strnumber(stat.r.peer_total_rx - last.r.peer_total_rx),
+		       strnumber(stat.r.peer_total_tx - last.r.peer_total_tx));
+		last = stat;
 		sleep(1);
 		goto again;
+	} else {
+		printf("%s%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t"
+		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\n",
+		       raw_output ? "" :
+		       "Request\tActive\tTotal\tWrite\tRead\tRemove\tFlush\t"
+		       "All WR\tAll RD\nClient\t",
+		       stat.r.gway_active_nr, stat.r.gway_total_nr,
+		       stat.r.gway_total_read_nr, stat.r.gway_total_write_nr,
+		       stat.r.gway_total_remove_nr, stat.r.gway_total_flush_nr,
+		       strnumber(stat.r.gway_total_rx),
+		       strnumber(stat.r.gway_total_tx));
+		printf("%s%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t"
+		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\n",
+		       raw_output ? "" : "Peer\t",
+		       stat.r.peer_active_nr, stat.r.peer_total_nr,
+		       stat.r.peer_total_read_nr, stat.r.peer_total_write_nr,
+		       stat.r.peer_total_remove_nr, 0UL,
+		       strnumber(stat.r.peer_total_rx),
+		       strnumber(stat.r.peer_total_tx));
 	}
 
 	return EXIT_SUCCESS;
