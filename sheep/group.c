@@ -147,7 +147,7 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 			       void *data)
 {
 	int nr_nodes;
-	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = get_vnode_info();
 
 	if (cur_vinfo) {
 		nr_nodes = cur_vinfo->nr_nodes;
@@ -156,6 +156,8 @@ int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 		rsp->data_length = nr_nodes * sizeof(struct sd_node);
 		rsp->node.nr_nodes = nr_nodes;
 		rsp->node.local_idx = get_node_idx(cur_vinfo, &sys->this_node);
+
+		put_vnode_info(cur_vinfo);
 	} else {
 		rsp->node.nr_nodes = 0;
 		rsp->node.local_idx = 0;
@@ -507,13 +509,15 @@ static void get_vdis_done(struct work *work)
 
 int inc_and_log_epoch(void)
 {
-	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = get_vnode_info();
 
 	if (cur_vinfo) {
 		/* update cluster info to the latest state */
 		sys->cinfo.nr_nodes = cur_vinfo->nr_nodes;
 		memcpy(sys->cinfo.nodes, cur_vinfo->nodes,
 		       sizeof(cur_vinfo->nodes[0]) * cur_vinfo->nr_nodes);
+
+		put_vnode_info(cur_vinfo);
 	} else
 		sys->cinfo.nr_nodes = 0;
 
@@ -933,10 +937,12 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 
 static void update_node_size(struct sd_node *node)
 {
-	struct vnode_info *cur_vinfo = main_thread_get(current_vnode_info);
+	struct vnode_info *cur_vinfo = get_vnode_info();
 	int idx = get_node_idx(cur_vinfo, node);
+
 	assert(idx != -1);
 	cur_vinfo->nodes[idx].space = node->space;
+	put_vnode_info(cur_vinfo);
 }
 
 static void kick_node_recover(void)
