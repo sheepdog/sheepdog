@@ -2235,7 +2235,12 @@ static int vdi_parser(int ch, char *opt)
 		break;
 	case 'c':
 		nr_copies = strtol(opt, &p, 10);
-		if (opt == p || nr_copies < 0 || nr_copies > SD_MAX_COPIES) {
+		if (*p != '\0') {
+			sd_err("copy number %s is invalid", opt);
+			sd_err("If you want to use the erasure coding feature,"
+			       " please use sheepdog 0.8 or later");
+			exit(EXIT_FAILURE);
+		} if (opt == p || nr_copies < 0 || nr_copies > SD_MAX_COPIES) {
 			sd_err("Invalid copies number, must be "
 			       "an integer between 0 and %d", SD_MAX_COPIES);
 			exit(EXIT_FAILURE);

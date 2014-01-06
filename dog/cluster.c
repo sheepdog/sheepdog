@@ -503,7 +503,12 @@ static int cluster_parser(int ch, char *opt)
 		break;
 	case 'c':
 		copies = strtol(opt, &p, 10);
-		if (opt == p || copies < 1) {
+		if (*p != '\0') {
+			sd_err("copy number %s is invalid", opt);
+			sd_err("If you want to use the erasure coding feature,"
+			       " please use sheepdog 0.8 or later");
+			exit(EXIT_FAILURE);
+		} else if (opt == p || copies < 1) {
 			sd_err("There must be at least one copy of data");
 			exit(EXIT_FAILURE);
 		} else if (copies > SD_MAX_COPIES) {
