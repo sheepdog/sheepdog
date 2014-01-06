@@ -385,17 +385,10 @@ static const char * const loglevel_table[] = {
 
 int do_loglevel_set(const struct node_id *nid, const char *loglevel_str)
 {
-	int32_t loglevel = -1;
+	int32_t loglevel = loglevel_str2num(loglevel_str);
 	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-
-	for (int i = 0; i < ARRAY_SIZE(loglevel_table); i++) {
-		if (!strcmp(loglevel_table[i], loglevel_str)) {
-			loglevel = i;
-			break;
-		}
-	}
 
 	if (loglevel == -1)
 		return EXIT_USAGE;

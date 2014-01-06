@@ -87,6 +87,29 @@ void sd_backtrace(void);
 	abort();				\
 })
 
+
+static inline int loglevel_str2num(const char *str)
+{
+	static const char * const loglevel_table[] = {
+		"emerg",
+		"alert",
+		"crit",
+		"err",
+		"warning",
+		"notice",
+		"info",
+		"debug",
+	};
+	int i, max = ARRAY_SIZE(loglevel_table);
+
+	for (i = 0; i < max; i++) {
+		if (!strcmp(loglevel_table[i], str))
+			break;
+	}
+
+	return i == max ? -1 : i;
+}
+
 void set_loglevel(int new_loglevel);
 int get_loglevel(void);
 

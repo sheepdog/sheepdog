@@ -20,7 +20,6 @@
 #define SECTOR_SIZE (1U << 9)
 #define BLOCK_SIZE (1U << 12)
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define round_up(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
 #define round_down(x, y) (((x) / (y)) * (y))
 

@@ -21,6 +21,8 @@
 
 #include "config.h"
 
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
 #define __LOCAL(var, line) __ ## var ## line
 #define _LOCAL(var, line) __LOCAL(var, line)
 #define LOCAL(var) _LOCAL(var, __LINE__)

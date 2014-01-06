@@ -85,7 +85,7 @@ static const char cache_help[] =
 "cache in directio mode\n";
 
 static const char log_help[] =
-"Example:\n\t$ sheep -l dir=/var/log/,level=0,format=server ...\n"
+"Example:\n\t$ sheep -l dir=/var/log/,level=debug,format=server ...\n"
 "Available arguments:\n"
 "\tdir=: path to the location of sheep.log\n"
 "\tlevel=: log level of sheep.log\n"
@@ -93,15 +93,15 @@ static const char log_help[] =
 "if dir is not specified, use metastore directory\n\n"
 "Available log levels:\n"
 "  #    Level           Description\n"
-"  0    SDOG_EMERG      system has failed and is unusable\n"
-"  1    SDOG_ALERT      action must be taken immediately\n"
-"  2    SDOG_CRIT       critical conditions\n"
-"  3    SDOG_ERR        error conditions\n"
-"  4    SDOG_WARNING    warning conditions\n"
-"  5    SDOG_NOTICE     normal but significant conditions\n"
-"  6    SDOG_INFO       informational notices\n"
-"  7    SDOG_DEBUG      debugging messages\n"
-"default log level is SDOG_INFO\n\n"
+"  0    emerg      system has failed and is unusable\n"
+"  1    alert      action must be taken immediately\n"
+"  2    crit       critical conditions\n"
+"  3    err        error conditions\n"
+"  4    warning    warning conditions\n"
+"  5    notice     normal but significant conditions\n"
+"  6    info       informational notices\n"
+"  7    debug      debugging messages\n"
+"default log level is info\n\n"
 "Available log format:\n"
 "  FormatType      Description\n"
 "  default         raw format\n"
@@ -316,14 +316,15 @@ static int log_level = SDOG_INFO;
 
 static int log_level_parser(const char *s)
 {
-	char *p;
-	log_level = strtol(s, &p, 10);
-	if (s == p || log_level < SDOG_EMERG ||
-		SDOG_DEBUG < log_level || *p != '\0') {
+	int level = loglevel_str2num(s);
+
+	if (level < 0) {
 		sd_err("Invalid log level '%s'", s);
 		sdlog_help();
 		return -1;
 	}
+
+	log_level = level;
 	return 0;
 }
 
