@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <sys/time.h>
+#include <fcntl.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
@@ -351,6 +353,60 @@ static size_t get_nr_nodes(void)
 	return sd_nodes_nr;
 }
 
+static void log_dog_operation(int argc, char **argv)
+{
+	int length = 0, printed = 0;
+	char *msg;
+	const char *custom_log_path;
+
+	if (!getenv("SHEEPDOG_DOG_LOG"))
+		/* don't log operation of dog */
+		return;
+
+	for (int i = 0; i < argc; i++)
+		length += 1 + strlen(argv[i]); /* 1 is for space */
+
+	length++; /* 1 is for '\0' */
+	msg = xcalloc(length, sizeof(char));
+
+	for (int i = 0; i < argc; i++)
+		printed += snprintf(msg + printed, length - printed,
+				    " %s", argv[i]);
+
+	custom_log_path = getenv("SHEEPDOG_DOG_LOG_PATH");
+	if (custom_log_path) {
+		struct timeval tv;
+		struct tm tm;
+		char time_str[256];
+		int fd;
+
+		fd = open(custom_log_path, O_WRONLY | O_APPEND | O_CREAT,
+			  S_IRUSR | S_IWUSR);
+		if (fd < 0) {
+			fprintf(stderr, "error at opening log file of dog"
+				"(%s): %m\n", custom_log_path);
+			goto out;
+		}
+
+		gettimeofday(&tv, NULL);
+		localtime_r(&tv.tv_sec, &tm);
+		strftime(time_str, sizeof(time_str),
+			 "%Y %b %2d %H:%M:%S ", &tm);
+
+		dprintf(fd, "%s: %s\n", time_str, msg);
+		close(fd);
+	} else {
+		/* if the path is not specified, we use standard syslog */
+
+		openlog("sheepdog admin operation", LOG_PID, LOG_USER);
+		syslog(LOG_INFO, "%s\n", msg);
+		closelog();
+	}
+
+out:
+	free(msg);
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret;
@@ -362,6 +418,8 @@ int main(int argc, char **argv)
 	const struct sd_option *sd_opts;
 	uint8_t sdhost[16];
 	int sdport;
+
+	log_dog_operation(argc, argv);
 
 	install_crash_handler(crash_handler);
 
