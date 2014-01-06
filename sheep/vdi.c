@@ -1053,6 +1053,8 @@ static int start_deletion(struct request *req, uint32_t vid)
 		 * if the VDI is a cloned VDI, delete its objects
 		 * no matter whether the VDI tree is clear.
 		 */
+		ret = SD_RES_SUCCESS;
+
 		if (cloned) {
 			di->delete_vid_array[0] = vid;
 			di->delete_vid_count = 1;
@@ -1060,7 +1062,6 @@ static int start_deletion(struct request *req, uint32_t vid)
 			sd_debug("snapshot chain has valid vdi, just mark vdi %"
 				 PRIx32 " as deleted.", di->target_vid);
 			delete_inode(di->target_vid);
-			ret = SD_RES_SUCCESS;
 			goto out;
 		}
 	}
