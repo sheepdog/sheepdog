@@ -65,7 +65,7 @@ static const char zone_help[] =
 static const char cluster_help[] =
 "Available arguments:\n"
 "\tlocal: use local driver\n"
-"\tcorosync: use corosync driver (default)\n"
+"\tcorosync: use corosync driver\n"
 "\tzookeeper: use zookeeper driver, need extra arguments\n"
 "\n\tzookeeper arguments: address-list,tiemout=value (default as 3000)\n"
 "\nExample:\n\t"
