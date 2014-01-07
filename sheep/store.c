@@ -51,7 +51,7 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	fd = open(path, O_RDONLY);
 	if (fd < 0) {
-		sd_err("failed to open epoch %"PRIu32" log, %m", epoch);
+		sd_debug("failed to open epoch %"PRIu32" log, %m", epoch);
 		goto err;
 	}
 

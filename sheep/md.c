@@ -497,7 +497,7 @@ static int md_move_object(uint64_t oid, const char *old, const char *new)
 
 	ret = strbuf_read(&buf, fd, sz);
 	if (ret != sz) {
-		sd_err("failed to read %s, %d", old, ret);
+		sd_err("failed to read %s, size %zu, %d, %m", old, sz, ret);
 		ret = -1;
 		goto out_close;
 	}
