@@ -647,14 +647,14 @@ static int vdi_create(int argc, char **argv)
 	vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 	ret = EXIT_SUCCESS;
 
-	if (verbose) {
+out:
+	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
 			printf("%x\n", vid);
 		else
 			printf("VDI ID of newly created VDI: %x\n", vid);
 	}
 
-out:
 	free(inode);
 	return ret;
 }
@@ -783,13 +783,14 @@ static int vdi_clone(int argc, char **argv)
 	vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
 	ret = EXIT_SUCCESS;
 
-	if (verbose) {
+out:
+	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
 			printf("%x\n", new_vid);
 		else
 			printf("VDI ID of newly created clone: %x\n", new_vid);
 	}
-out:
+
 	free(inode);
 	if (new_inode)
 		free(new_inode);
