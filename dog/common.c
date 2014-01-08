@@ -14,7 +14,7 @@
 #include "sockfd_cache.h"
 #include "fec.h"
 
-static char *strnumber_raw(uint64_t _size, bool raw)
+char *strnumber_raw(uint64_t _size, bool raw)
 {
 	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
 	static __thread struct size_str {

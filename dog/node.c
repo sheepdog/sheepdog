@@ -298,27 +298,31 @@ again:
 			first = false;
 		}
 		printf("%s%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t"
-		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\t%s\t%s\n",
+		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\t%s\t%s\t%s\n",
 		       raw_output ? "" :
 		       "Request\tActive\tTotal\tWrite\tRead\tRemove\tFlush\t"
-		       "All WR\tAll RD\tWRBW\tRDBW\nClient\t",
+		       "All WR\tAll RD\tWRBW\tRDBW\tRPS\nClient\t",
 		       stat.r.gway_active_nr, stat.r.gway_total_nr,
-		       stat.r.gway_total_read_nr, stat.r.gway_total_write_nr,
+		       stat.r.gway_total_write_nr, stat.r.gway_total_read_nr,
 		       stat.r.gway_total_remove_nr, stat.r.gway_total_flush_nr,
 		       strnumber(stat.r.gway_total_rx),
 		       strnumber(stat.r.gway_total_tx),
 		       strnumber(stat.r.gway_total_rx - last.r.gway_total_rx),
-		       strnumber(stat.r.gway_total_tx - last.r.gway_total_tx));
+		       strnumber(stat.r.gway_total_tx - last.r.gway_total_tx),
+		       strnumber_raw(stat.r.gway_total_nr -
+				     last.r.gway_total_nr, true));
 		printf("%s%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t%"PRIu64"\t"
-		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\t%s\t%s\n",
+		       "%"PRIu64"\t%"PRIu64"\t%s\t%s\t%s\t%s\t%s\n",
 		       raw_output ? "" : "Peer\t",
 		       stat.r.peer_active_nr, stat.r.peer_total_nr,
-		       stat.r.peer_total_read_nr, stat.r.peer_total_write_nr,
+		       stat.r.peer_total_write_nr, stat.r.peer_total_read_nr,
 		       stat.r.peer_total_remove_nr, 0UL,
 		       strnumber(stat.r.peer_total_rx),
 		       strnumber(stat.r.peer_total_tx),
 		       strnumber(stat.r.peer_total_rx - last.r.peer_total_rx),
-		       strnumber(stat.r.peer_total_tx - last.r.peer_total_tx));
+		       strnumber(stat.r.peer_total_tx - last.r.peer_total_tx),
+		       strnumber_raw(stat.r.peer_total_nr -
+				     last.r.peer_total_nr, true));
 		last = stat;
 		sleep(1);
 		goto again;
