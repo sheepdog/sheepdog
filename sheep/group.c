@@ -652,7 +652,13 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 		sockfd_cache_add_group(nroot);
 	sockfd_cache_add(&joined->nid);
 
-	old_vnode_info = get_vnode_info();
+	/*
+	 * We need use main_thread_get() to obtain current_vnode_info. The
+	 * reference count of old_vnode_info is decremented at the last of this
+	 * function in order to release old_vnode_info. The counter part
+	 * of this dereference is alloc_vnode_info().
+	 */
+	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info, alloc_vnode_info(nroot));
 
 	get_vdis(nroot, joined);
@@ -932,7 +938,11 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 		/* Mark leave node as gateway only node */
 		sys->this_node.nr_vnodes = 0;
 
-	old_vnode_info = get_vnode_info();
+	/*
+	 * Using main_thread_get() instead of get_vnode_info() is allowed
+	 * because of the same reason of update_cluster_info()
+	 */
+	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info, alloc_vnode_info(nroot));
 	if (sys->cinfo.status == SD_STATUS_OK) {
 		ret = inc_and_log_epoch();
@@ -961,7 +971,11 @@ static void update_node_size(struct sd_node *node)
 
 static void kick_node_recover(void)
 {
-	struct vnode_info *old = get_vnode_info();
+	/*
+	 * Using main_thread_get() instead of get_vnode_info() is allowed
+	 * because of the same reason of update_cluster_info()
+	 */
+	struct vnode_info *old = main_thread_get(current_vnode_info);
 	int ret;
 
 	main_thread_set(current_vnode_info, alloc_vnode_info(&old->nroot));
