@@ -474,7 +474,7 @@ static void queue_request(struct request *req)
 	}
 
 	req->vinfo = get_vnode_info();
-
+	stat_request_begin(req);
 	if (is_peer_op(req->op)) {
 		queue_peer_request(req);
 	} else if (is_gateway_op(req->op)) {
@@ -491,7 +491,6 @@ static void queue_request(struct request *req)
 		rsp->result = SD_RES_SYSTEM_ERROR;
 		goto done;
 	}
-	stat_request_begin(req);
 
 	return;
 done:
