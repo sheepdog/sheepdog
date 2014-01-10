@@ -207,18 +207,29 @@ done:
 }
 
 /* Do sync read/write */
-static int volume_do_rw(const char *path, char *buf, size_t size,
-			 off_t offset, int rw)
+static ssize_t volume_do_rw(const char *path, char *buf, size_t size,
+			    off_t offset, int rw)
 {
 	uint32_t vid;
 	uint64_t oid;
 	unsigned long idx;
 	off_t start;
-	size_t len, ret;
+	size_t len, ret, vdi_size, sz;
 
 	if (shadow_file_getxattr(path, SH_VID_NAME, &vid, SH_VID_SIZE) < 0)
 		return -1;
 
+	if (shadow_file_getxattr(path, SH_SIZE_NAME, &vdi_size, SH_SIZE_SIZE)
+	    < 0)
+		return -1;
+
+	if (offset >= vdi_size)
+		return 0;
+
+	if (offset + size > vdi_size)
+		size = vdi_size - offset;
+
+	sz = size;
 	idx = offset / SD_DATA_OBJ_SIZE;
 	oid = vid_to_data_oid(vid, idx);
 	start = offset % SD_DATA_OBJ_SIZE;
@@ -246,7 +257,7 @@ static int volume_do_rw(const char *path, char *buf, size_t size,
 		len = size > SD_DATA_OBJ_SIZE ? SD_DATA_OBJ_SIZE : size;
 	} while (size > 0);
 
-	return 0;
+	return sz - size;
 }
 
 int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
@@ -272,19 +283,24 @@ int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 
 int volume_read(const char *path, char *buf, size_t size, off_t offset)
 {
+	ssize_t done;
 
-	if (volume_do_rw(path, buf, size, offset, VOLUME_READ) < 0)
+	done = volume_do_rw(path, buf, size, offset, VOLUME_READ);
+	if (done < 0)
 		return -EIO;
 
-	return size;
+	return done;
 }
 
 int volume_write(const char *path, const char *buf, size_t size, off_t offset)
 {
-	if (volume_do_rw(path, (char *)buf, size, offset, VOLUME_WRITE) < 0)
+	ssize_t done;
+
+	done = volume_do_rw(path, (char *)buf, size, offset, VOLUME_WRITE);
+	if (done < 0)
 		return -EIO;
 
-	return size;
+	return done;
 }
 
 size_t volume_get_size(const char *path)
