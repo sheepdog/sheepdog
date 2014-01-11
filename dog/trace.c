@@ -23,6 +23,7 @@
 #include "dog.h"
 #include "rbtree.h"
 #include "list.h"
+#include "internal_proto.h"
 
 static inline void print_thread_name(struct trace_graph_item *item)
 {
