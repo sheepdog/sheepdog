@@ -36,21 +36,6 @@ struct vnode_info {
 	refcnt_t refcnt;
 };
 
-#define TRACE_GRAPH_ENTRY  0x01
-#define TRACE_GRAPH_RETURN 0x02
-
-#define TRACE_FNAME_LEN    36
-#define TRACE_THREAD_LEN   MAX_THREAD_NAME_LEN
-
-struct trace_graph_item {
-	char tname[TRACE_THREAD_LEN];
-	int type;
-	char fname[TRACE_FNAME_LEN];
-	int depth;
-	uint64_t entry_time;
-	uint64_t return_time;
-};
-
 static inline void sd_init_req(struct sd_req *req, uint8_t opcode)
 {
 	memset(req, 0, sizeof(*req));

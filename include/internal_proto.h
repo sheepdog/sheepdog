@@ -215,4 +215,32 @@ struct object_cache_info {
 	int count;
 };
 
+#ifdef HAVE_TRACE
+
+#define TRACE_GRAPH_ENTRY  0x01
+#define TRACE_GRAPH_RETURN 0x02
+
+#define TRACE_FNAME_LEN    36
+#define TRACE_THREAD_LEN   MAX_THREAD_NAME_LEN
+
+struct trace_graph_item {
+	char tname[TRACE_THREAD_LEN];
+	int type;
+	char fname[TRACE_FNAME_LEN];
+	int depth;
+	uint64_t entry_time;
+	uint64_t return_time;
+};
+
+#else
+
+/*
+ * Some functions e.g. trace_buffer_push() can declare a pointer of struct
+ * trace_graph_item in its parameters, so we need the below empty
+ * declaration.
+ */
+struct trace_graph_item;
+
+#endif	/* HAVE_TRACE */
+
 #endif /* __INTERNAL_PROTO_H__ */
