@@ -72,7 +72,7 @@ static size_t (*wq_get_nr_nodes)(void);
 
 static void *worker_routine(void *arg);
 
-#ifdef ENABLE_TRACE
+#ifdef HAVE_TRACE
 
 #define TID_MAX_DEFAULT 0x8000 /* default maximum tid for most systems */
 
@@ -185,7 +185,7 @@ static inline int wq_trace_init(void) { return 0; }
 static inline void trace_set_tid_map(int tid) {}
 static inline void trace_clear_tid_map(int tid) {}
 
-#endif	/* ENABLE_TRACE */
+#endif	/* HAVE_TRACE */
 
 static uint64_t get_msec_time(void)
 {

@@ -64,9 +64,9 @@ struct work_queue *create_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);
 bool work_queue_empty(struct work_queue *q);
 
-#ifdef ENABLE_TRACE
+#ifdef HAVE_TRACE
 void suspend_worker_threads(void);
 void resume_worker_threads(void);
-#endif	/* BUILD_TRACE */
+#endif	/* HAVE_TRACE */
 
 #endif
