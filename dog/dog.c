@@ -52,6 +52,10 @@ struct sd_node sd_nodes[SD_MAX_NODES];
 struct sd_vnode sd_vnodes[SD_MAX_VNODES];
 int sd_nodes_nr, sd_vnodes_nr;
 
+/* a number of zones never exceeds a number of nodes */
+static uint32_t sd_zones[SD_MAX_NODES];
+int sd_zones_nr;
+
 int update_node_list(int max_nodes)
 {
 	int ret;
@@ -94,6 +98,19 @@ int update_node_list(int max_nodes)
 	memcpy(sd_nodes, buf, size);
 	sd_vnodes_nr = nodes_to_vnodes(sd_nodes, sd_nodes_nr, sd_vnodes);
 	sd_epoch = hdr.epoch;
+
+	for (int i = 0; i < sd_nodes_nr; i++) {
+		int j;
+
+		for (j = 0; j < i; j++) {
+			if (sd_zones[j] == sd_nodes[i].zone)
+				break;
+		}
+
+		if (j == i)
+			sd_zones[sd_zones_nr++] = sd_nodes[i].zone;
+	}
+
 out:
 	if (buf)
 		free(buf);
