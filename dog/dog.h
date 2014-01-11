@@ -63,6 +63,7 @@ extern uint32_t sd_epoch;
 extern struct rb_root sd_vroot;
 extern struct rb_root sd_nroot;
 extern int sd_nodes_nr;
+extern int sd_zones_nr;
 
 bool is_current(const struct sd_inode *i);
 char *strnumber(uint64_t _size);

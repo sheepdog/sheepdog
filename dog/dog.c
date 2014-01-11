@@ -53,6 +53,9 @@ uint32_t sd_epoch;
 int sd_nodes_nr;
 struct rb_root sd_vroot = RB_ROOT;
 struct rb_root sd_nroot = RB_ROOT;
+int sd_zones_nr;
+/* a number of zones never exceeds a number of nodes */
+static uint32_t sd_zones[SD_MAX_NODES];
 
 int update_node_list(int max_nodes)
 {
@@ -95,9 +98,18 @@ int update_node_list(int max_nodes)
 
 	for (int i = 0; i < sd_nodes_nr; i++) {
 		struct sd_node *n = xmalloc(sizeof(*n));
+		int j;
 
 		*n = buf[i];
 		rb_insert(&sd_nroot, n, rb, node_cmp);
+
+		for (j = 0; j < sd_zones_nr; j++) {
+			if (sd_zones[j] == n->zone)
+				break;
+		}
+
+		if (j == sd_zones_nr)
+			sd_zones[sd_zones_nr++] = n->zone;
 	}
 
 	nodes_to_vnodes(&sd_nroot, &sd_vroot);
