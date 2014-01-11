@@ -32,6 +32,8 @@
 #define MASTER_ZNONE BASE_ZNODE "/master"
 #define LOCK_ZNODE BASE_ZNODE "/lock"
 
+static int zk_timeout = SESSION_TIMEOUT;
+
 /* structure for distributed lock */
 struct cluster_lock {
 	struct hlist_node hnode;
@@ -930,7 +932,8 @@ static int zk_join(const struct sd_node *myself,
 	snprintf(path, sizeof(path), MEMBER_ZNODE "/%s", node_to_str(myself));
 	rc = zk_node_exists(path);
 	if (rc == ZOK) {
-		sd_err("Previous zookeeper session exist, shoot myself.");
+		sd_err("Previous zookeeper session exist, shoot myself. Please "
+		       "wait for %d seconds to join me again.", zk_timeout);
 		exit(1);
 	}
 
@@ -1289,7 +1292,7 @@ static void zk_unlock(uint64_t lock_id)
 static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
-	int ret, timeout = SESSION_TIMEOUT;
+	int ret;
 
 	if (!option) {
 		sd_err("You must specify zookeeper servers.");
@@ -1298,7 +1301,7 @@ static int zk_init(const char *option)
 
 	hosts = strtok((char *)option, "=");
 	if ((to = strtok(NULL, "="))) {
-		if (sscanf(to, "%u", &timeout) != 1) {
+		if (sscanf(to, "%u", &zk_timeout) != 1) {
 			sd_err("Invalid paramter for timeout");
 			return -1;
 		}
@@ -1306,8 +1309,8 @@ static int zk_init(const char *option)
 		*--p = '\0';
 	}
 	sd_debug("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
-		 ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, timeout);
-	zhandle = zookeeper_init(hosts, zk_watcher, timeout, NULL, NULL, 0);
+		 ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
+	zhandle = zookeeper_init(hosts, zk_watcher, zk_timeout, NULL, NULL, 0);
 	if (!zhandle) {
 		sd_err("failed to connect to zk server %s", option);
 		return -1;
