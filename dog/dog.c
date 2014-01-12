@@ -231,7 +231,8 @@ static void usage(const struct command *commands, int status)
 	if (status)
 		sd_err("Try '%s --help' for more information.", program_name);
 	else {
-		printf("Sheepdog administrator utility\n");
+		printf("Sheepdog administrator utility (version %s)\n",
+		       PACKAGE_VERSION);
 		printf("Usage: %s <command> <subcommand> [options]\n", program_name);
 		printf("\nAvailable commands:\n");
 		for (i = 0; commands[i].name; i++) {
