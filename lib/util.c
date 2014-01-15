@@ -93,11 +93,13 @@ void *xcalloc(size_t nmemb, size_t size)
 	return ret;
 }
 
+/* zeroed memory version of valloc() */
 void *xvalloc(size_t size)
 {
 	void *ret = valloc(size);
 	if (unlikely(!ret))
 		panic("Out of memory");
+	memset(ret, 0, size);
 	return ret;
 }
 
