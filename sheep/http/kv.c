@@ -673,7 +673,7 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 	return local_req_wait(iocb);
 }
 
-#define READ_WRITE_BUFFER (SD_DATA_OBJ_SIZE * 25) /* no rationale */
+#define MAX_RW_BUFFER (SD_DATA_OBJ_SIZE * 25) /* No rationale yet */
 
 static int onode_populate_extents(struct kv_onode *onode,
 				  struct http_request *req)
@@ -683,6 +683,7 @@ static int onode_populate_extents(struct kv_onode *onode,
 	int ret;
 	char *data_buf = NULL;
 	uint32_t data_vid = onode->data_vid;
+	uint64_t write_buffer_size = MIN(MAX_RW_BUFFER, req->data_length);
 
 	count = DIV_ROUND_UP(req->data_length, SD_DATA_OBJ_SIZE);
 	sys->cdrv->lock(data_vid);
@@ -694,11 +695,11 @@ static int onode_populate_extents(struct kv_onode *onode,
 		goto out;
 	}
 
-	data_buf = xmalloc(READ_WRITE_BUFFER);
+	data_buf = xmalloc(write_buffer_size);
 	offset = start * SD_DATA_OBJ_SIZE;
 	total = req->data_length;
 	while (done < total) {
-		size = http_request_read(req, data_buf, READ_WRITE_BUFFER);
+		size = http_request_read(req, data_buf, write_buffer_size);
 		ret = vdi_read_write(data_vid, data_buf, size, offset, false);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write data object for %s, %s",
@@ -863,15 +864,16 @@ static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 	uint64_t size, total, total_size, offset, done = 0, i;
 	int ret;
 	char *data_buf = NULL;
+	uint64_t read_buffer_size = MIN(MAX_RW_BUFFER, onode->size);
 
-	data_buf = xmalloc(READ_WRITE_BUFFER);
+	data_buf = xmalloc(read_buffer_size);
 	total_size = onode->size;
 	for (i = 0; i < onode->nr_extent; i++) {
 		ext = onode->o_extent + i;
 		total = min(ext->count * SD_DATA_OBJ_SIZE, total_size);
 		offset = ext->start * SD_DATA_OBJ_SIZE;
 		while (done < total) {
-			size = MIN(total - done, READ_WRITE_BUFFER);
+			size = MIN(total - done, read_buffer_size);
 			ret = vdi_read_write(onode->data_vid, data_buf,
 					     size, offset, true);
 			if (ret != SD_RES_SUCCESS) {
