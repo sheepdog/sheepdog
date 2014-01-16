@@ -156,16 +156,18 @@ static int search_erasure_object(uint64_t oid, uint8_t idx,
 }
 
 static void *read_erasure_object(uint64_t oid, uint8_t idx,
-				 struct recovery_work *rw)
+				 struct recovery_obj_work *row)
 {
 	struct sd_req hdr;
 	unsigned rlen = get_store_objsize(oid);
 	void *buf = xvalloc(rlen);
+	struct recovery_work *rw = &row->base;
 	struct vnode_info *old = grab_vnode_info(rw->old_vinfo), *new_old;
 	uint32_t epoch = rw->epoch, tgt_epoch = rw->tgt_epoch;
 	const struct sd_node *node;
 	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
 	int edp = ec_policy_to_dp(policy, NULL, NULL);
+	int ret;
 again:
 	if (unlikely(old->nr_zones < edp)) {
 		if (search_erasure_object(oid, idx, &old->nroot, rw,
@@ -188,7 +190,16 @@ again:
 	hdr.obj.tgt_epoch = tgt_epoch;
 	hdr.obj.ec_index = idx;
 
-	if (sheep_exec_req(&node->nid, &hdr, buf) != SD_RES_SUCCESS) {
+	ret = sheep_exec_req(&node->nid, &hdr, buf);
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		goto done;
+	case SD_RES_OLD_NODE_VER:
+		free(buf);
+		buf = NULL;
+		row->stop = true;
+		break;
+	default:
 rollback:
 		new_old = rollback_vnode_info(&tgt_epoch, rw->cur_vinfo);
 		if (!new_old) {
@@ -390,7 +401,7 @@ out:
 }
 
 static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
-				    struct recovery_work *rw)
+				    struct recovery_obj_work *row)
 {
 	int len = get_store_objsize(oid);
 	char *lost = xvalloc(len);
@@ -411,7 +422,9 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 	for (i = 0, j = 0; i < edp && j < ed; i++) {
 		if (i == idx)
 			continue;
-		bufs[j] = read_erasure_object(oid, i, rw);
+		bufs[j] = read_erasure_object(oid, i, row);
+		if (row->stop)
+			break;
 		if (!bufs[j])
 			continue;
 		idxs[j++] = i;
@@ -470,11 +483,12 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	int ret = -1;
 
 	idx = local_node_copy_index(cur, oid);
-	buf = read_erasure_object(oid, idx, rw);
-	if (!buf)
-		buf = rebuild_erasure_object(oid, idx, rw);
+	buf = read_erasure_object(oid, idx, row);
+	if (!buf && !row->stop)
+		buf = rebuild_erasure_object(oid, idx, row);
 	if (!buf) {
-		sd_err("can not recover %"PRIx64" idx %d", oid, idx);
+		if (!row->stop)
+			sd_err("failed to recover %"PRIx64" idx %d", oid, idx);
 		goto out;
 	}
 
