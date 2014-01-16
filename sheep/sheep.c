@@ -591,14 +591,15 @@ int main(int argc, char **argv)
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
 	int log_level = SDOG_INFO, nr_vnodes = SD_DEFAULT_VNODES;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
-	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, path[PATH_MAX],
-	     *argp = NULL, *logdir = NULL;
+	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
+		*argp = NULL, *logdir = NULL;
 	bool is_daemon = true, to_stdout = false, explicit_addr = false;
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
 	const char *log_format = "server", *http_address = NULL;
 	static struct logger_user_info sheep_info;
+	struct stat logdir_st;
 
 	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
@@ -765,7 +766,22 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	snprintf(path, sizeof(path), "%s/" LOG_FILE_NAME, logdir ?: dir);
+	if (logdir) {
+		memset(&logdir_st, 0, sizeof(logdir_st));
+		ret = stat(logdir, &logdir_st);
+		if (ret < 0) {
+			sd_err("stat() failed on %s, %m", logdir);
+			exit(1);
+		}
+
+		if (!S_ISDIR(logdir_st.st_mode)) {
+			sd_err("log dir: %s is not a directory", logdir);
+			exit(1);
+		}
+	}
+
+	snprintf(log_path, sizeof(log_path), "%s/" LOG_FILE_NAME,
+		 logdir ?: dir);
 
 	free(logdir);
 
@@ -774,7 +790,7 @@ int main(int argc, char **argv)
 	if (lock_and_daemon(is_daemon, dir))
 		exit(1);
 
-	ret = log_init(program_name, to_stdout, log_level, path);
+	ret = log_init(program_name, to_stdout, log_level, log_path);
 	if (ret)
 		exit(1);
 
