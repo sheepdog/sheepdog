@@ -740,7 +740,7 @@ static uint64_t get_seconds(void)
 static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 {
 	ssize_t size;
-	int ret;
+	int ret = SD_RES_SUCCESS;
 
 	if (req->data_length <= KV_ONODE_INLINE_SIZE) {
 		onode->inlined = 1;
