@@ -575,31 +575,11 @@ out:
 	return ret;
 }
 
-static void local_req_async_handler(int fd, int events, void *data)
-{
-	struct request *req = data;
-	struct request_iocb *iocb = req->iocb;
-
-	if (events & EPOLLERR)
-		sd_err("request handler error");
-	eventfd_xread(fd);
-
-	if (unlikely(req->rp.result != SD_RES_SUCCESS))
-		iocb->result = req->rp.result;
-
-	if (uatomic_sub_return(&iocb->count, 1) == 0)
-		eventfd_xwrite(iocb->efd, 1);
-
-	unregister_event(req->local_req_efd);
-	close(req->local_req_efd);
-	free_local_request(req);
-}
-
 worker_fn struct request_iocb *local_req_init(void)
 {
 	struct request_iocb *iocb = xzalloc(sizeof(*iocb));
 
-	iocb->efd = eventfd(0, 0);
+	iocb->efd = eventfd(0, EFD_SEMAPHORE);
 	if (iocb->efd < 0) {
 		sd_err("eventfd failed, %m");
 		free(iocb);
@@ -613,7 +593,8 @@ worker_fn int local_req_wait(struct request_iocb *iocb)
 {
 	int ret;
 
-	eventfd_xread(iocb->efd);
+	for (uint32_t i = 0; i < iocb->count; i++)
+		eventfd_xread(iocb->efd);
 
 	ret = iocb->result;
 	close(iocb->efd);
@@ -621,23 +602,47 @@ worker_fn int local_req_wait(struct request_iocb *iocb)
 	return ret;
 }
 
+struct areq_work {
+	struct sd_req rq;
+	void *data;
+	struct request_iocb *iocb;
+	int result;
+
+	struct work work;
+};
+
+static void local_req_async_work(struct work *work)
+{
+	struct areq_work *areq = container_of(work, struct areq_work, work);
+
+	areq->result = exec_local_req(&areq->rq, areq->data);
+}
+
+static void local_req_async_main(struct work *work)
+{
+	struct areq_work *areq = container_of(work, struct areq_work, work);
+
+	if (unlikely(areq->result != SD_RES_SUCCESS))
+		areq->iocb->result = areq->result;
+
+	eventfd_xwrite(areq->iocb->efd, 1);
+}
+
 worker_fn int exec_local_req_async(struct sd_req *rq, void *data,
 				   struct request_iocb *iocb)
 {
-	struct request *req;
+	struct areq_work *areq;
 
-	req = alloc_local_request(data, rq->data_length);
-	req->rq = *rq;
-	req->local_req_efd = eventfd(0, EFD_NONBLOCK);
-	if (req->local_req_efd < 0) {
-		sd_err("eventfd failed, %m");
-		return SD_RES_SYSTEM_ERROR;
-	}
+	areq = xzalloc(sizeof(*areq));
+	areq->rq = *rq;
+	areq->data = data;
+	areq->iocb = iocb;
+	areq->work.fn = local_req_async_work;
+	areq->work.done = local_req_async_main;
 
-	uatomic_inc(&iocb->count);
-	req->iocb = iocb;
-	register_event(req->local_req_efd, local_req_async_handler, req);
-	submit_local_request(req);
+	queue_work(sys->areq_wqueue, &areq->work);
+
+	iocb->count++;
 
 	return SD_RES_SUCCESS;
 }

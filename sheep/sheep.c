@@ -436,6 +436,7 @@ static int create_work_queues(void)
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
 	sys->md_wqueue = create_ordered_work_queue("md");
+	sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
 	if (sys->enable_object_cache) {
 		sys->oc_reclaim_wqueue =
 			create_ordered_work_queue("oc_reclaim");
@@ -444,7 +445,8 @@ static int create_work_queues(void)
 			return -1;
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
-	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue)
+	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
+	    !sys->areq_wqueue)
 			return -1;
 
 	return 0;

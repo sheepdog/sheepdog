@@ -106,7 +106,6 @@ struct request {
 	refcnt_t refcnt;
 	bool local;
 	int local_req_efd;
-	struct request_iocb *iocb;
 
 	uint64_t local_oid;
 
@@ -149,6 +148,7 @@ struct system_info {
 	struct work_queue *oc_reclaim_wqueue;
 	struct work_queue *oc_push_wqueue;
 	struct work_queue *md_wqueue;
+	struct work_queue *areq_wqueue;
 #ifdef HAVE_HTTP
 	struct work_queue *http_wqueue;
 #endif
