@@ -21,7 +21,6 @@
 
 static int efd;
 static struct rb_root events_tree = RB_ROOT;
-static struct sd_rw_lock events_lock = SD_RW_LOCK_INITIALIZER;
 
 static void timer_handler(int fd, int events, void *data)
 {
@@ -93,12 +92,8 @@ int init_event(int nr)
 static struct event_info *lookup_event(int fd)
 {
 	struct event_info key = { .fd = fd };
-	struct event_info *ret;
 
-	sd_read_lock(&events_lock);
-	ret = rb_search(&events_tree, &key, rb, event_cmp);
-	sd_rw_unlock(&events_lock);
-	return ret;
+	return rb_search(&events_tree, &key, rb, event_cmp);
 }
 
 int register_event_prio(int fd, event_handler_t h, void *data, int prio)
@@ -121,11 +116,8 @@ int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 	if (ret) {
 		sd_err("failed to add epoll event: %m");
 		free(ei);
-	} else {
-		sd_write_lock(&events_lock);
+	} else
 		rb_insert(&events_tree, ei, rb, event_cmp);
-		sd_rw_unlock(&events_lock);
-	}
 
 	return ret;
 }
@@ -143,9 +135,7 @@ void unregister_event(int fd)
 	if (ret)
 		sd_err("failed to delete epoll event for fd %d: %m", fd);
 
-	sd_write_lock(&events_lock);
 	rb_erase(&ei->rb, &events_tree);
-	sd_rw_unlock(&events_lock);
 	free(ei);
 
 	/*
