@@ -1240,6 +1240,7 @@ static void zk_lock(uint64_t lock_id)
 	int rc, len = MAX_NODE_STR_LEN;
 	char *my_path;
 	char parent[MAX_NODE_STR_LEN];
+	char parent_node[MAX_NODE_STR_LEN];
 	char lowest_seq_path[MAX_NODE_STR_LEN];
 	char owner_name[MAX_NODE_STR_LEN];
 	struct cluster_lock *cluster_lock;
@@ -1248,24 +1249,38 @@ static void zk_lock(uint64_t lock_id)
 
 	my_path = cluster_lock->lock_path;
 
-	/* compete owner of lock is just like zk_compete_master() */
 	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64"/",
 		 cluster_lock->id);
+	/*
+	 * It need using path without end of '/' to create node of lock_id in
+	 * zookeeper's API, so we use 'parent_node'.
+	 */
+	snprintf(parent_node, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
+		 cluster_lock->id);
+	/* compete owner of lock is just like zk_compete_master() */
 	while (true) {
 		rc = zk_create_node(parent, "", 0, &ZOO_OPEN_ACL_UNSAFE,
 				     flags, my_path, MAX_NODE_STR_LEN);
 		if (rc == ZOK)
 			break;
+		if (rc == ZNONODE) {
+			zk_init_node(parent_node);
+			/*
+			 * We don't need to check the return code of
+			 * zk_init_node() because the routine must stay in loop
+			 * if it doesn't take the lock, no matter what kind of
+			 * error happed.
+			 */
+			continue;
+		}
 		sd_err("failed to create path:%s, %s", my_path, zerror(rc));
 		zk_wait();
 	}
 	sd_debug("create path %s success", my_path);
 
 	/* create node ok now */
-	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
-		 cluster_lock->id);
 	while (true) {
-		zk_get_least_seq(parent, lowest_seq_path, MAX_NODE_STR_LEN,
+		zk_get_least_seq(parent_node, lowest_seq_path, MAX_NODE_STR_LEN,
 				 owner_name, &len);
 
 		/* I got the lock */
