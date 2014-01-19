@@ -42,7 +42,8 @@ struct cluster_lock {
 	/* referenced by different threads in one sheepdog daemon */
 	uint64_t ref;
 	/* wait for the release of id by other lock owner */
-	struct sd_mutex wait_wakeup;
+	struct sd_cond wait_wakeup;
+	struct sd_mutex wait_mutex;
 	/* lock for different threads of the same node on the same id */
 	struct sd_mutex id_lock;
 	char lock_path[MAX_NODE_STR_LEN];
@@ -314,7 +315,7 @@ static int lock_table_lookup_wakeup(uint64_t lock_id)
 	sd_mutex_lock(table_locks + hval);
 	hlist_for_each_entry(lock, iter, cluster_locks_table + hval, hnode) {
 		if (lock->id == lock_id) {
-			sd_mutex_unlock(&lock->wait_wakeup);
+			sd_cond_signal(&lock->wait_wakeup);
 			res = 0;
 			break;
 		}
@@ -351,7 +352,8 @@ static struct cluster_lock *lock_table_lookup_acquire(uint64_t lock_id)
 		if (rc)
 			panic("Failed to init node %s", path);
 
-		sd_init_mutex(&ret_lock->wait_wakeup);
+		sd_cond_init(&ret_lock->wait_wakeup);
+		sd_init_mutex(&ret_lock->wait_mutex);
 		sd_init_mutex(&ret_lock->id_lock);
 
 		hlist_add_head(&(ret_lock->hnode), cluster_locks_table + hval);
@@ -394,7 +396,8 @@ static void lock_table_lookup_release(uint64_t lock_id)
 			hlist_del(iter);
 			/* free all resource used by this lock */
 			sd_destroy_mutex(&lock->id_lock);
-			sd_destroy_mutex(&lock->wait_wakeup);
+			sd_destroy_mutex(&lock->wait_mutex);
+			sd_destroy_cond(&lock->wait_wakeup);
 			snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
 				 lock->id);
 			/*
@@ -1229,7 +1232,7 @@ kick_block_event:
  * This operation will create a seq-ephemeral znode in lock directory
  * of zookeeper (use lock-id as dir name). The smallest file path in
  * this directory wil be the owner of the lock; the other threads will
- * wait on a struct sd_mutex (cluster_lock->wait_wakeup)
+ * wait on a struct sd_cond (cluster_lock->wait_wakeup)
  */
 static void zk_lock(uint64_t lock_id)
 {
@@ -1249,8 +1252,8 @@ static void zk_lock(uint64_t lock_id)
 	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64"/",
 		 cluster_lock->id);
 	while (true) {
-		rc = zoo_create(zhandle, parent, "", 0, &ZOO_OPEN_ACL_UNSAFE,
-				flags, my_path, MAX_NODE_STR_LEN);
+		rc = zk_create_node(parent, "", 0, &ZOO_OPEN_ACL_UNSAFE,
+				     flags, my_path, MAX_NODE_STR_LEN);
 		if (rc == ZOK)
 			break;
 		sd_err("failed to create path:%s, %s", my_path, zerror(rc));
@@ -1259,7 +1262,7 @@ static void zk_lock(uint64_t lock_id)
 	sd_debug("create path %s success", my_path);
 
 	/* create node ok now */
-	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64"",
+	snprintf(parent, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
 		 cluster_lock->id);
 	while (true) {
 		zk_get_least_seq(parent, lowest_seq_path, MAX_NODE_STR_LEN,
@@ -1272,10 +1275,13 @@ static void zk_lock(uint64_t lock_id)
 		}
 
 		/* I failed to get the lock */
-		rc = zoo_exists(zhandle, lowest_seq_path, 1, NULL);
+		rc = zk_node_exists(lowest_seq_path);
 		if (rc == ZOK) {
 			sd_debug("call zoo_exits success %s", lowest_seq_path);
-			sd_mutex_lock(&cluster_lock->wait_wakeup);
+			/* Use wait_timeout to avoid missing wakeup signal */
+			sd_cond_wait_timeout(&cluster_lock->wait_wakeup,
+					     &cluster_lock->wait_mutex,
+					     WAIT_TIME * 2);
 		} else {
 			sd_debug("failed to call zoo_exists %s", zerror(rc));
 			if (rc != ZNONODE)
