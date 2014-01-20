@@ -16,3 +16,10 @@ SHEEP COMMAND INTERFACE:
  - improvements of help messages
  - change format of the size format in -j (journaling) and -w (object cache) options. The new format is: n[TtGgMmKkb]. e.g. "-j size=1024M".
  - rotate log when sheep process catches SIGHUP signal
+ - remove "-o" option for choosing stdout as an output of log
+ - remove "-f" option for executing sheep as a foreground process
+  - "-o" and "-f" is a same thing to "-l dst=stdout"
+ - unified "-l" option
+  - "-l format=..." for log format
+  - "-l level=..." for log level
+  - "-l dst=..." for log destination

@@ -89,7 +89,8 @@ static const char log_help[] =
 "Available arguments:\n"
 "\tdir=: path to the location of sheep.log\n"
 "\tlevel=: log level of sheep.log\n"
-"\tformat=: log format type\n\n"
+"\tformat=: log format type\n"
+"\tdst=: log destination type\n\n"
 "if dir is not specified, use metastore directory\n\n"
 "Available log levels:\n"
 "  Level      Description\n"
@@ -106,8 +107,12 @@ static const char log_help[] =
 "  FormatType      Description\n"
 "  default         raw format\n"
 "  server          raw format with timestamp\n"
-"  json            json format\n"
-"default log format is server\n";
+"  json            json format\n\n"
+"Available log destination:\n"
+"  DestinationType    Description\n"
+"  default            dedicated file in a directory used by sheep\n"
+"  syslog             syslog of the system\n"
+"  stdout             standard output\n";
 
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
@@ -116,7 +121,6 @@ static struct sd_option sheep_options[] = {
 	 "specify the cluster driver (default: "DEFAULT_CLUSTER_DRIVER")",
 	 cluster_help},
 	{'D', "directio", false, "use direct IO for backend store"},
-	{'f', "foreground", false, "make the program run in the foreground"},
 	{'g', "gateway", false, "make the progam run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
 	{'i', "ioaddr", true, "use separate network card to handle IO requests"
@@ -127,7 +131,6 @@ static struct sd_option sheep_options[] = {
 	 "specify the log level, the log directory and the log format"
 	 "(log level default: 6 [SDOG_INFO])", log_help},
 	{'n', "nosync", false, "drop O_SYNC for write of backend"},
-	{'o', "stdout", false, "log to stdout instead of shared logger"},
 	{'p', "port", true, "specify the TCP port on which to listen "
 	 "(default: 7000)"},
 	{'P', "pidfile", true, "create a pid file"},
@@ -348,10 +351,19 @@ static int log_format_parser(const char *s)
 	return 0;
 }
 
+static const char *log_dst = "default"; /* default: dedicated file */
+
+static int log_dst_parser(const char *s)
+{
+	log_dst = s;
+	return 0;
+}
+
 static struct option_parser log_parsers[] = {
 	{ "level=", log_level_parser },
 	{ "dir=", log_dir_parser },
 	{ "format=", log_format_parser },
+	{ "dst=", log_dst_parser },
 	{ NULL, NULL },
 };
 
@@ -602,13 +614,14 @@ int main(int argc, char **argv)
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
-	bool is_daemon = true, to_stdout = false, explicit_addr = false;
+	bool explicit_addr = false;
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
 	const char *http_options = NULL;
 	static struct logger_user_info sheep_info;
 	struct stat logdir_st;
+	enum log_dst_type log_dst_type;
 
 	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
@@ -634,9 +647,6 @@ int main(int argc, char **argv)
 		case 'r':
 			http_options = optarg;
 			break;
-		case 'f':
-			is_daemon = false;
-			break;
 		case 'l':
 			if (option_parse(optarg, ",", log_parsers) < 0)
 				exit(1);
@@ -657,9 +667,6 @@ int main(int argc, char **argv)
 		case 'g':
 			/* same as '-v 0' */
 			nr_vnodes = 0;
-			break;
-		case 'o':
-			to_stdout = true;
 			break;
 		case 'z':
 			zone = strtol(optarg, &p, 10);
@@ -768,7 +775,26 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	if (!strcmp(log_dst, "default"))
+		log_dst_type = LOG_DST_DEFAULT;
+	else if (!strcmp(log_dst, "stdout"))
+		log_dst_type = LOG_DST_STDOUT;
+	else if (!strcmp(log_dst, "syslog"))
+		log_dst_type = LOG_DST_SYSLOG;
+	else {
+		sd_err("invalid type of log destination: %s", log_dst);
+		exit(1);
+	}
+
 	if (logdir) {
+		if (log_dst_type != LOG_DST_DEFAULT) {
+			sd_err("logdir (%s) is specified but logging"
+			       " destination is %s", logdir,
+			       log_dst_type == LOG_DST_STDOUT
+			       ? "stdout" : "syslog");
+			exit(1);
+		}
+
 		memset(&logdir_st, 0, sizeof(logdir_st));
 		ret = stat(logdir, &logdir_st);
 		if (ret < 0) {
@@ -789,10 +815,10 @@ int main(int argc, char **argv)
 
 	srandom(port);
 
-	if (lock_and_daemon(is_daemon, dir))
+	if (lock_and_daemon(log_dst_type != LOG_DST_STDOUT, dir))
 		exit(1);
 
-	ret = log_init(program_name, to_stdout, log_level, log_path);
+	ret = log_init(program_name, log_dst_type, log_level, log_path);
 	if (ret)
 		exit(1);
 

@@ -30,9 +30,16 @@ struct logger_user_info {
 
 extern int sd_log_level;
 
+enum log_dst_type {
+	LOG_DST_DEFAULT,
+	LOG_DST_STDOUT,
+	LOG_DST_SYSLOG,
+};
+
 void early_log_init(const char *format_name,
 		struct logger_user_info *user_info);
-int log_init(const char *progname, bool to_stdout, int level, char *outfile);
+int log_init(const char *progname, enum log_dst_type type, int level,
+	     char *outfile);
 void log_close(void);
 void dump_logmsg(void *);
 void log_write(int prio, const char *func, int line, const char *fmt, ...)
