@@ -614,7 +614,8 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 out:
 	if (path.p_ext_header)
 		free(path.p_ext_header);
-	dump_btree(reader, inode);
+	if (inode->store_policy != 0)
+		dump_btree(reader, inode);
 }
 
 /*
