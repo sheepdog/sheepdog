@@ -1,6 +1,9 @@
 
 ## 0.8.0 (not released yet)
 
+NEW FEATURE:
+ - hyper volume: use B-tree structure to replace index-array in sd_inode so the max size of vdi could extent from 4TB to 16PB.
+
 DOG COMMAND INTERFACE:
  - new subcommand "vdi cache purge" for cleaning stale object cache
   - "vdi cache purge" cleans stale cache of all images
@@ -11,6 +14,7 @@ DOG COMMAND INTERFACE:
   - "node log level get" gets loglevel from running sheep process
   - "node log level list" lists avialable loglevels
  - new option "-o" of "vdi track", for tracking objects with their oids
+ - new option "-y" of "vdi create", for create hyper-volume vdi
 
 SHEEP COMMAND INTERFACE:
  - improvements of help messages
