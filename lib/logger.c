@@ -95,9 +95,11 @@ struct logmsg {
 	char str[0];
 };
 
+typedef int (*formatter_fn)(char *, size_t, const struct logmsg *, bool);
+
 struct log_format {
 	const char *name;
-	int (*formatter)(char *, size_t, const struct logmsg *);
+	int (*formatter)(char *, size_t, const struct logmsg *, bool);
 	struct list_head list;
 };
 
@@ -125,6 +127,8 @@ static key_t semkey;
 static char *log_buff;
 
 static int64_t max_logsize = 500 * 1024 * 1024;  /*500MB*/
+
+static enum log_dst_type dst_type = LOG_DST_STDOUT;
 
 /*
  * block_sighup()
@@ -260,17 +264,20 @@ static void free_logarea(void)
 }
 
 static int server_log_formatter(char *buff, size_t size,
-				const struct logmsg *msg)
+				const struct logmsg *msg, bool print_time)
 {
 	char *p = buff;
 	struct tm tm;
 	size_t len;
 	char thread_name[MAX_THREAD_NAME_LEN];
 
-	localtime_r(&msg->tv.tv_sec, &tm);
-	len = strftime(p, size, "%b %2d %H:%M:%S ", (const struct tm *)&tm);
-	p += len;
-	size -= len;
+	if (print_time) {
+		localtime_r(&msg->tv.tv_sec, &tm);
+		len = strftime(p, size, "%b %2d %H:%M:%S ",
+			       (const struct tm *)&tm);
+		p += len;
+		size -= len;
+	}
 
 	len = snprintf(p, size, "%s%6s %s[%s] %s(%d) %s%s%s",
 		       colorize ? log_color[msg->prio] : "",
@@ -290,7 +297,7 @@ static int server_log_formatter(char *buff, size_t size,
 log_format_register("server", server_log_formatter);
 
 static int default_log_formatter(char *buff, size_t size,
-				 const struct logmsg *msg)
+				 const struct logmsg *msg, bool print_time)
 {
 	size_t len = min(size, msg->str_len);
 
@@ -301,7 +308,7 @@ static int default_log_formatter(char *buff, size_t size,
 log_format_register("default", default_log_formatter);
 
 static int json_log_formatter(char *buff, size_t size,
-				const struct logmsg *msg)
+			      const struct logmsg *msg, bool print_time)
 {
 	char *p = buff;
 	size_t len;
@@ -353,8 +360,11 @@ static void log_syslog(const struct logmsg *msg)
 	char str[MAX_MSG_SIZE];
 	int len;
 
-	len = format->formatter(str, sizeof(str) - 1, msg);
-	str[len++] = '\n';
+	len = format->formatter(str, sizeof(str) - 1, msg, log_fd >= 0);
+	if (dst_type == LOG_DST_DEFAULT)
+		str[len++] = '\n';
+	else	/* LOG_DST_SYSLOG */
+		str[len++] = '\0';
 
 	block_sighup();
 
@@ -430,7 +440,8 @@ static void dolog(int prio, const char *func, int line,
 		char str_final[MAX_MSG_SIZE];
 
 		init_logmsg(msg, &tv, prio, func, line);
-		len = format->formatter(str_final, sizeof(str_final) - 1, msg);
+		len = format->formatter(str_final, sizeof(str_final) - 1, msg,
+					true);
 		str_final[len++] = '\n';
 		xwrite(fileno(stderr), str_final, len);
 		fflush(stderr);
@@ -550,10 +561,12 @@ static void logger(char *log_dir, char *outfile)
 
 	log_buff = xzalloc(la->end - la->start);
 
-	log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
-	if (log_fd < 0) {
-		syslog(LOG_ERR, "failed to open %s\n", outfile);
-		exit(1);
+	if (dst_type == LOG_DST_DEFAULT) {
+		log_fd = open(outfile, O_CREAT | O_RDWR | O_APPEND, 0644);
+		if (log_fd < 0) {
+			syslog(LOG_ERR, "failed to open %s\n", outfile);
+			exit(1);
+		}
 	}
 	la->active = true;
 
@@ -588,7 +601,7 @@ static void logger(char *log_dir, char *outfile)
 
 		block_sighup();
 
-		if (max_logsize) {
+		if (dst_type == LOG_DST_DEFAULT && max_logsize) {
 			off_t offset;
 
 			offset = lseek(log_fd, 0, SEEK_END);
@@ -638,12 +651,13 @@ void early_log_init(const char *format_name, struct logger_user_info *user_info)
 	exit(1);
 }
 
-int log_init(const char *program_name, bool to_stdout, int level,
+int log_init(const char *program_name, enum log_dst_type type, int level,
 		     char *outfile)
 {
 	char log_dir[PATH_MAX], tmp[PATH_MAX];
 	int size = level == SDOG_DEBUG ? LOG_SPACE_DEBUG_SIZE : LOG_SPACE_SIZE;
 
+	dst_type = type;
 	sd_log_level = level;
 
 	log_name = program_name;
@@ -653,10 +667,15 @@ int log_init(const char *program_name, bool to_stdout, int level,
 
 	semkey = random();
 
-	if (to_stdout) {
+	switch (type) {
+	case LOG_DST_STDOUT:
 		if (is_stdout_console())
 			colorize = true;
-	} else {
+		break;
+	case LOG_DST_SYSLOG:
+		openlog(program_name, LOG_PID, LOG_DAEMON);
+		/* fall through */
+	case LOG_DST_DEFAULT:
 		if (logarea_init(size)) {
 			syslog(LOG_ERR, "failed to initialize the logger\n");
 			return 1;
@@ -679,6 +698,10 @@ int log_init(const char *program_name, bool to_stdout, int level,
 			syslog(LOG_WARNING, "logger pid %d starting\n", logger_pid);
 		else
 			logger(log_dir, outfile);
+		break;
+	default:
+		sd_err("unknown type of log destination type: %d", type);
+		return -1;
 	}
 
 	return 0;

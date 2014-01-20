@@ -126,6 +126,7 @@ static struct sd_option sheep_options[] = {
 	 "(default: 7000)"},
 	{'P', "pidfile", true, "create a pid file"},
 	{'r', "http", true, "enable http service", http_help},
+	{'s', "syslog", false, "use syslog as an output of log"},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "cache", true, "enable object cache", cache_help},
@@ -600,6 +601,7 @@ int main(int argc, char **argv)
 	const char *log_format = "server", *http_address = NULL;
 	static struct logger_user_info sheep_info;
 	struct stat logdir_st;
+	enum log_dst_type log_dst = LOG_DST_DEFAULT;
 
 	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
@@ -643,6 +645,9 @@ int main(int argc, char **argv)
 				sd_err("%m");
 				exit(1);
 			}
+			break;
+		case 's':
+			log_dst = LOG_DST_SYSLOG;
 			break;
 		case 'n':
 			sys->nosync = true;
@@ -766,7 +771,9 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (logdir) {
+	if (to_stdout)
+		log_dst = LOG_DST_STDOUT;
+	else if (logdir) {
 		memset(&logdir_st, 0, sizeof(logdir_st));
 		ret = stat(logdir, &logdir_st);
 		if (ret < 0) {
@@ -790,7 +797,7 @@ int main(int argc, char **argv)
 	if (lock_and_daemon(is_daemon, dir))
 		exit(1);
 
-	ret = log_init(program_name, to_stdout, log_level, log_path);
+	ret = log_init(program_name, log_dst, log_level, log_path);
 	if (ret)
 		exit(1);
 
