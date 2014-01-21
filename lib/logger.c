@@ -541,17 +541,6 @@ static void crash_handler(int signo)
 
 static void sighup_handler(int signo)
 {
-	if (getppid() == 1)
-		/*
-		 * My parent (sheep process) is dead. This SIGHUP is sent
-		 * because of prctl(PR_SET_PDEATHSIG, SIGHUP)
-		 */
-		return crash_handler(signo);
-
-	/*
-	 * My parent sheep process is still alive, this SIGHUP is a request
-	 * for log rotation.
-	*/
 	rotate_log();
 }
 
@@ -587,8 +576,6 @@ static void logger(char *log_dir, char *outfile)
 	install_crash_handler(crash_handler);
 	install_sighandler(SIGHUP, sighup_handler, false);
 
-	prctl(PR_SET_PDEATHSIG, SIGHUP);
-
 	/*
 	 * we need to check the aliveness of the sheep process since
 	 * it could die before the logger call prctl.
@@ -615,6 +602,10 @@ static void logger(char *log_dir, char *outfile)
 		}
 
 		unblock_sighup();
+
+		if (getppid() == 1)
+			/* My parent (sheep process) is dead. */
+			break;
 
 		sleep(1);
 	}
