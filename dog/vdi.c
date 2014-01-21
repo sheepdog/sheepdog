@@ -1584,12 +1584,12 @@ static void vdi_hash_check_main(struct work *work)
 	}
 }
 
-static void queue_vdi_check_work(struct sd_inode *inode, uint64_t oid,
-				 uint64_t *done, struct work_queue *wq)
+static void queue_vdi_check_work(const struct sd_inode *inode, uint64_t oid,
+				 uint64_t *done, struct work_queue *wq,
+				 int nr_copies)
 {
 	struct vdi_check_info *info;
 	const struct sd_vnode *tgt_vnodes[SD_MAX_COPIES];
-	int nr_copies = inode->nr_copies;
 
 	info = xzalloc(sizeof(*info) + sizeof(info->vcw[0]) * nr_copies);
 	info->oid = oid;
@@ -1617,6 +1617,7 @@ static int vdi_check(int argc, char **argv)
 	uint32_t vid;
 	struct sd_inode *inode = xmalloc(sizeof(*inode));
 	struct work_queue *wq;
+	int nr_copies;
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, &vid, inode,
@@ -1625,14 +1626,12 @@ static int vdi_check(int argc, char **argv)
 		sd_err("FATAL: no inode objects");
 		goto out;
 	}
-	if (sd_nodes_nr < inode->nr_copies) {
-		sd_err("ABORT: Not enough active nodes for consistency-check");
-		return EXIT_FAILURE;
-	}
+
+	nr_copies = min((int)inode->nr_copies, sd_zones_nr);
 
 	wq = create_work_queue("vdi check", WQ_DYNAMIC);
 
-	queue_vdi_check_work(inode, vid_to_vdi_oid(vid), NULL, wq);
+	queue_vdi_check_work(inode, vid_to_vdi_oid(vid), NULL, wq, nr_copies);
 
 	max_idx = DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
 	vdi_show_progress(done, inode->vdi_size);
@@ -1640,7 +1639,7 @@ static int vdi_check(int argc, char **argv)
 		vid = inode->data_vdi_id[idx];
 		if (vid) {
 			oid = vid_to_data_oid(vid, idx);
-			queue_vdi_check_work(inode, oid, &done, wq);
+			queue_vdi_check_work(inode, oid, &done, wq, nr_copies);
 		} else {
 			done += SD_DATA_OBJ_SIZE;
 			vdi_show_progress(done, inode->vdi_size);
