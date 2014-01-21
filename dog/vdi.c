@@ -181,6 +181,20 @@ static void stat_data_objs(const struct sd_inode *inode, uint64_t *my_objs,
 		stat_data_objs_btree(inode, my_objs, cow_objs);
 }
 
+static char *redundancy_scheme(uint8_t copy_nr, uint8_t policy)
+{
+	static char str[10];
+
+	if (policy > 0) {
+		int d, p;
+		ec_policy_to_dp(policy, &d, &p);
+		snprintf(str, sizeof(str), "%d:%d", d, p);
+	} else {
+		snprintf(str, sizeof(str), "%d", copy_nr);
+	}
+	return str;
+}
+
 static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			   uint32_t snapid, uint32_t flags,
 			   const struct sd_inode *i, void *data)
@@ -216,19 +230,23 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 				putchar('\\');
 			putchar(*name++);
 		}
-		printf(" %d %s %s %s %s %" PRIx32 " %d %s\n", snapid,
+		printf(" %d %s %s %s %s %" PRIx32 " %s %s\n", snapid,
 		       strnumber(i->vdi_size),
 		       strnumber(my_objs * SD_DATA_OBJ_SIZE),
 		       strnumber(cow_objs * SD_DATA_OBJ_SIZE),
-		       dbuf, vid, i->nr_copies, i->tag);
+		       dbuf, vid,
+		       redundancy_scheme(i->nr_copies, i->copy_policy),
+		       i->tag);
 	} else {
-		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 " %5d %13s\n",
+		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 " %6s %13s\n",
 		       vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
 		       name, snapid,
 		       strnumber(i->vdi_size),
 		       strnumber(my_objs * SD_DATA_OBJ_SIZE),
 		       strnumber(cow_objs * SD_DATA_OBJ_SIZE),
-		       dbuf, vid, i->nr_copies, i->tag);
+		       dbuf, vid,
+		       redundancy_scheme(i->nr_copies, i->copy_policy),
+		       i->tag);
 	}
 }
 
