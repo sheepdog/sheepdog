@@ -79,9 +79,65 @@ for i in 4 19 97 137; do
 	diff -u $STORE/data$i.1 $STORE/data$i.2
 done
 
+# get object range and check
+for i in 4 19 97 137; do
+	j=`expr $i \* $i`
+	curl -s --header "Range: bytes=${i}-${j}" -X GET http://localhost/v1/sd/sheep/data$i > $STORE/data$i.3 &
+done
+wait
+
+for i in 4 19 97 137; do
+	j=`expr $i \* $i`
+	cnt=`expr $j - $i + 1`
+	dd if=$STORE/data$i bs=1 skip=$i count=$cnt of=$STORE/data$i.4 2> /dev/null &
+done
+wait
+
+for i in 4 19 97 137; do
+	diff -u $STORE/data$i.3 $STORE/data$i.4
+done
+## check range 0 to $i
+for i in 1 7 19 97 137; do
+	curl -s --header "Range: bytes=0-${i}" -X GET http://localhost/v1/sd/sheep/data4 > $STORE/data$i.5 &
+done
+wait
+
+for i in 1 7 19 97 137; do
+	cnt=`expr $i + 1`
+	dd if=$STORE/data4 bs=1 count=$cnt of=$STORE/data$i.6 2> /dev/null &
+done
+wait
+
+for i in 1 7 19 97 137; do
+	diff -u $STORE/data$i.5 $STORE/data$i.6
+done
+## check range $i to 'end of file'
+for i in 1 7 19 97 137; do
+	j=`expr $i + 4 \* 1048576`
+	curl -s --header "Range: bytes=${i}-${j}" -X GET http://localhost/v1/sd/sheep/data4 > $STORE/data$i.7 &
+done
+wait
+
+for i in 1 7 19 97 137; do
+	cnt=`expr 4 \* 1048576`
+	dd if=$STORE/data4 bs=1 skip=$i count=$cnt of=$STORE/data$i.8 2> /dev/null &
+done
+wait
+
+for i in 1 7 19 97 137; do
+	diff -u $STORE/data$i.7 $STORE/data$i.8
+done
+## check range which offset is already out of file
+for i in 7 19 97; do
+	j=`expr $i \* 1048576`
+	k=`expr 137 \* 1048576`
+	curl -s --header "Range: bytes=${j}-${k}" -X GET http://localhost/v1/sd/sheep/data4 -v 2>&1 |grep "< HTTP"
+done
+wait
+
 _vdi_list
 
-#delete the objects
+# delete the objects
 for file in $sheep_files; do
 	f=`basename $file`
 	curl -s -X DELETE http://localhost/v1/sd/sheep/$f &
