@@ -861,21 +861,31 @@ static int onode_free_data(struct kv_onode *onode)
 static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 {
 	struct onode_extent *ext;
-	uint64_t size, total, total_size, offset, done = 0, i;
+	uint64_t size, total, total_size, offset, done = 0, i, ext_len;
+	uint64_t off = req->offset, len = req->data_length;
 	int ret;
 	char *data_buf = NULL;
 	uint64_t read_buffer_size = MIN(MAX_RW_BUFFER, onode->size);
 
 	data_buf = xmalloc(read_buffer_size);
-	total_size = onode->size;
+	total_size = len;
 	for (i = 0; i < onode->nr_extent; i++) {
 		ext = onode->o_extent + i;
-		total = min(ext->count * SD_DATA_OBJ_SIZE, total_size);
-		offset = ext->start * SD_DATA_OBJ_SIZE;
+		ext_len = ext->count * SD_DATA_OBJ_SIZE;
+		if (off >= ext_len) {
+			off -= ext_len;
+			continue;
+		}
+		total = min(ext_len - off, total_size);
+		offset = ext->start * SD_DATA_OBJ_SIZE + off;
+		off = 0;
+		done = 0;
 		while (done < total) {
 			size = MIN(total - done, read_buffer_size);
 			ret = vdi_read_write(onode->data_vid, data_buf,
 					     size, offset, true);
+			sd_debug("vdi_read_write size: %"PRIx64", offset: %"
+				 PRIx64, size, offset);
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("Failed to read for vid %"PRIx32,
 				       onode->data_vid);
@@ -953,12 +963,30 @@ out:
 static int onode_read_data(struct kv_onode *onode, struct http_request *req)
 {
 	int ret;
+	uint64_t off = 0, len = onode->size;
+
+	if (req->offset || req->data_length) {
+		off = req->offset;
+		len = req->data_length;
+		if ((off + len - 1) > onode->size) {
+			if (onode->size > off)
+				len = onode->size - off;
+			else
+				len = 0;
+		}
+	}
+
+	req->data_length = len;
+	if (!len)
+		return SD_RES_INVALID_PARMS;
+
+	http_response_header(req, OK);
 
 	if (!onode->inlined)
 		return onode_read_extents(onode, req);
 
-	ret = http_request_write(req, onode->data, onode->size);
-	if (ret != onode->size)
+	ret = http_request_write(req, onode->data + off, len);
+	if (ret != len)
 		return SD_RES_SYSTEM_ERROR;
 
 	return SD_RES_SUCCESS;
@@ -1077,8 +1105,6 @@ int kv_read_object(struct http_request *req, const char *account,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	req->data_length = onode->size;
-	http_response_header(req, OK);
 	ret = onode_read_data(onode, req);
 	if (ret != SD_RES_SUCCESS)
 		sd_err("failed to read data for %s", name);

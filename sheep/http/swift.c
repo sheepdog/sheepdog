@@ -229,6 +229,9 @@ static void swift_get_object(struct http_request *req, const char *account,
 	case SD_RES_NO_OBJ:
 		http_response_header(req, NOT_FOUND);
 		break;
+	case SD_RES_INVALID_PARMS:
+		http_response_header(req, REQUEST_RANGE_NOT_SATISFIABLE);
+		break;
 	default:
 		http_response_header(req, INTERNAL_SERVER_ERROR);
 		break;

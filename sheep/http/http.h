@@ -48,6 +48,7 @@ struct http_request {
 	enum http_opcode opcode;
 	enum http_status status;
 	uint64_t data_length;
+	uint64_t offset;
 };
 
 struct http_driver {

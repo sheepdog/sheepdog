@@ -169,10 +169,42 @@ static int request_init_operation(struct http_request *req)
 	req->uri = FCGX_GetParam("DOCUMENT_URI", env);
 	if (!req->uri)
 		return BAD_REQUEST;
+	p = FCGX_GetParam("HTTP_RANGE", env);
+	if (p && p[0] != '\0') {
+		const char prefix[] = "bytes=";
+		char *left, *right, num[64];
+		uint64_t max;
+		left = strstr(p, prefix);
+		if (!p)
+			goto invalid_range;
+		right = strchr(left, '-');
+		strncpy(num, left + sizeof(prefix) - 1, right - left);
+		req->offset = strtoll(num, &endp, 10);
+		if (num == endp)
+			goto invalid_range;
+		strcpy(num, right + 1);
+		/*
+		 * In swift spec, the second number of RANGE should be included
+		 * which means [num1, num2], but our common means for read and
+		 * write data by 'offset' and 'len' is [num1, num2), so we
+		 * should add 1 to num2.
+		 */
+		max = strtoll(num, &endp, 10) + 1;
+		if (num == endp)
+			goto invalid_range;
+		if (max <= req->offset)
+			goto invalid_range;
+		req->data_length = max - req->offset;
+		sd_debug("HTTP_RANGE: %"PRIu64" %"PRIu64, req->offset, max);
+	}
 
 	req->status = UNKNOWN;
 
 	return OK;
+
+invalid_range:
+	sd_err("invalid range %s", p);
+	return REQUEST_RANGE_NOT_SATISFIABLE;
 }
 
 static int http_init_request(struct http_request *req)
