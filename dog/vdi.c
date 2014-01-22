@@ -596,7 +596,7 @@ static int vdi_create(int argc, char **argv)
 	uint64_t size;
 	uint32_t vid;
 	uint64_t oid;
-	uint32_t idx, max_idx, nr_copies = vdi_cmd_data.nr_copies;
+	uint32_t idx, max_idx;
 	struct sd_inode *inode = NULL;
 	int ret;
 
@@ -618,12 +618,6 @@ static int vdi_create(int argc, char **argv)
 
 	if (size > SD_MAX_VDI_SIZE) {
 		sd_err("VDI size is too large");
-		return EXIT_USAGE;
-	}
-
-	if (nr_copies > sd_nodes_nr) {
-		sd_err("There are not enough nodes(%d) to hold the copies(%d)",
-		       sd_nodes_nr, nr_copies);
 		return EXIT_USAGE;
 	}
 
