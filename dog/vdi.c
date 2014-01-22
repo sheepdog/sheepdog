@@ -497,8 +497,9 @@ static int vdi_create(int argc, char **argv)
 	uint64_t size;
 	uint32_t vid;
 	uint64_t oid;
-	int idx, max_idx, ret, nr_copies = vdi_cmd_data.nr_copies;
+	uint32_t idx, max_idx, nr_copies = vdi_cmd_data.nr_copies;
 	struct sd_inode *inode = NULL;
+	int ret;
 
 	if (!argv[optind]) {
 		sd_err("Please specify the VDI size");
