@@ -1,5 +1,5 @@
 
-## 0.8.0 (not released yet)
+## 0.8.0
 
 NEW FEATURE:
  - hyper volume: use B-tree structure to replace index-array in sd_inode so the max size of vdi could extent from 4TB to 16PB.
