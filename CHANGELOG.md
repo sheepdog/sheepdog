@@ -20,6 +20,8 @@ DOG COMMAND INTERFACE:
  - new option "-s" of "cluster info", show backend store information
  - new option "-t" of "cluster format", choose not serve write request if number of nodes is not sufficient
  - modify option "-c" of "vdi create", we can specify "x:y" for erasure code
+ - new subcommand "node stat" for node request satistics
+  - "node stat -w" set watch mode for this command
 
 SHEEP COMMAND INTERFACE:
  - improvements of help messages
