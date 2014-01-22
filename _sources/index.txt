@@ -43,7 +43,8 @@ Source Code
 Sheepdog is an Open Source software, released under the terms of the
 `GPL2 <./_static/LICENSE.txt>`__.
 
-+ The latest version is `0.7.6 <https://github.com/sheepdog/sheepdog/tarball/v0.7.6>`__
++ The latest 0.8.x release is `0.8.0 <https://github.com/sheepdog/sheepdog/tarball/v0.8.0>`__
++ The latest 0.7.x release is `0.7.6 <https://github.com/sheepdog/sheepdog/tarball/v0.7.6>`__
 + The latest developent code is available on the git tree
 
   + server: git://github.com/sheepdog/sheepdog.git
