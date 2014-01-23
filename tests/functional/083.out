@@ -5,7 +5,7 @@ QA output created by 083
    2   127.0.0.1:7002      	128          1
 using backend plain store
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   12 MB  0.0 MB  0.0 MB DATE   7c2b25     3              
+  test         0   12 MB  0.0 MB  0.0 MB DATE   7c2b25      3              
 fixed missing 7c2b2500000000
 finish check&repair test
 original data

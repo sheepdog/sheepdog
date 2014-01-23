@@ -7,14 +7,14 @@ To create erasure coded vdi, set -c x:y
   x(2,4,8,16)  - number of data strips
   y(1 to 15)   - number of parity strips
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test5        0   20 MB   20 MB  0.0 MB DATE   fd2c30     6              
-  test4        0   20 MB   20 MB  0.0 MB DATE   fd2de3     4              
-  test7        0   20 MB   20 MB  0.0 MB DATE   fd2f96     8              
-  test6        0   20 MB   20 MB  0.0 MB DATE   fd3149     7              
-  test3        0   20 MB   20 MB  0.0 MB DATE   fd3662     3              
-  test2        0   20 MB  0.0 MB   20 MB DATE   fd3816     2              
-  test9        0   20 MB   20 MB  0.0 MB DATE   fd4094    23              
-  test8        0   20 MB   20 MB  0.0 MB DATE   fd4247     9              
+  test5        0   20 MB   20 MB  0.0 MB DATE   fd2c30    4:2              
+  test4        0   20 MB   20 MB  0.0 MB DATE   fd2de3      4              
+  test7        0   20 MB   20 MB  0.0 MB DATE   fd2f96    4:4              
+  test6        0   20 MB   20 MB  0.0 MB DATE   fd3149    4:3              
+  test3        0   20 MB   20 MB  0.0 MB DATE   fd3662      3              
+  test2        0   20 MB  0.0 MB   20 MB DATE   fd3816      2              
+  test9        0   20 MB   20 MB  0.0 MB DATE   fd4094   16:7              
+  test8        0   20 MB   20 MB  0.0 MB DATE   fd4247    4:5              
 Looking for the object 0xfd381500000001 (vid 0xfd3816 idx 1, 2 copies) with 23 nodes
 
 127.0.0.1:7000 doesn't have the object
