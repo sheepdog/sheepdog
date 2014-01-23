@@ -43,7 +43,7 @@ int shadow_file_read(const char *path, char *buf, size_t size, off_t offset)
 	return len;
 }
 
-size_t shadow_file_write(const char *path, char *buf, size_t size)
+size_t shadow_file_write(const char *path, const char *buf, size_t size)
 {
 	char p[PATH_MAX];
 	int fd;
@@ -138,6 +138,20 @@ bool shadow_file_exsit(const char *path)
 
 	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
 	if (access(p, R_OK | W_OK) < 0) {
+		if (errno != ENOENT)
+			sheepfs_pr("%m\n");
+		return false;
+	}
+
+	return true;
+}
+
+bool shadow_file_stat(const char *path, struct stat *st)
+{
+	char p[PATH_MAX];
+
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
+	if (stat(p, st) < 0) {
 		if (errno != ENOENT)
 			sheepfs_pr("%m\n");
 		return false;

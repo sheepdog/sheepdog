@@ -76,6 +76,9 @@ static struct sheepfs_file_operation {
 				config_sheep_info_get_size },
 	[OP_VOLUME]         = { volume_read, volume_write, volume_get_size,
 				volume_sync, volume_open },
+	[OP_HTTP_ADDRESS]   = { http_address_read, http_address_write,
+				http_address_get_size },
+	[OP_HTTP_OBJECT]    = { NULL, http_object_write },
 };
 
 __printf(3, 4)
@@ -288,7 +291,8 @@ static int create_sheepfs_layout(void)
 		return -1;
 	if (create_config_layout() < 0)
 		return -1;
-
+	if (create_http_layout() < 0)
+		return -1;
 	return 0;
 }
 
