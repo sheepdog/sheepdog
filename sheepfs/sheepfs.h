@@ -17,6 +17,7 @@ enum sheepfs_opcode {
 	OP_VOLUME,
 	OP_HTTP_ADDRESS,
 	OP_HTTP_OBJECT,
+	OP_OBJECT,
 };
 
 #define COMMAND_LEN  512
@@ -107,4 +108,8 @@ int http_address_write(const char *path, const char *buf, size_t size,
 size_t http_address_get_size(const char *path);
 int http_object_write(const char *path, const char *buf, size_t size,
 		      off_t ignore);
+
+int object_read(const char *path, char *buf, size_t size, off_t ignore);
+size_t object_get_size(const char *path);
+int object_open(const char *path, struct fuse_file_info *);
 #endif

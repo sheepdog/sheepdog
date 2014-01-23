@@ -79,6 +79,7 @@ static struct sheepfs_file_operation {
 	[OP_HTTP_ADDRESS]   = { http_address_read, http_address_write,
 				http_address_get_size },
 	[OP_HTTP_OBJECT]    = { NULL, http_object_write },
+	[OP_OBJECT]         = { object_read, NULL, object_get_size },
 };
 
 __printf(3, 4)
