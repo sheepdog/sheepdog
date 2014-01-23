@@ -482,7 +482,7 @@ _cluster_format()
 
 _random()
 {
-	openssl enc -rc4 -pass pass:"$(date)" -nosalt < /dev/zero 2>/dev/null
+	openssl enc -rc4 -pass pass:"$(date)" < /dev/zero 2>/dev/null
 }
 
 _one()
