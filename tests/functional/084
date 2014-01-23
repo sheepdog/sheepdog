@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Test http interface of sheepfs
+
+. ./common
+
+_need_to_be_root
+
+which nginx > /dev/null || _notrun "Require nginx but it's not running"
+pkill nginx > /dev/null
+nginx -c `pwd`/nginx.conf
+
+for i in `seq 0 5`; do
+	_start_sheep $i "-r swift,port=800$i"
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 4:2
+
+curl -s -X PUT http://localhost/v1/sd
+curl -s -X PUT http://localhost/v1/sd/sheep
+
+for i in 3 7 19 37 57 97; do
+    _random | dd iflag=fullblock of=$STORE/data$i bs=1M count=$i &> /dev/null
+    dd if=$STORE/data$i 2> /dev/null | md5sum > $STORE/data$i.1
+done
+
+# upload the objects
+for i in 3 7 19 37 57 97; do
+	curl -s -T $STORE/data$i -X PUT http://localhost/v1/sd/sheep/data$i &
+done
+wait
+
+# mount sheepfs and check the objects
+mkdir $STORE/sheepfs 2> /dev/null
+$SHEEPFS $STORE/sheepfs
+
+echo "localhost" > $STORE/sheepfs/http/address
+
+for i in 3 7 19 37 57 97; do
+	echo "/sd/sheep/data$i" > $STORE/sheepfs/http/object
+done
+wait
+
+for i in 3 7 19 37 57 97; do
+	diff -u $STORE/data$i $STORE/sheepfs/http/sd/sheep/data$i
+done
+
+umount $STORE/sheepfs
