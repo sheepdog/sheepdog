@@ -15,6 +15,8 @@ enum sheepfs_opcode {
 	OP_CONFIG_OCACHE,
 	OP_CONFIG_SHEEP,
 	OP_VOLUME,
+	OP_HTTP_ADDRESS,
+	OP_HTTP_OBJECT,
 };
 
 #define COMMAND_LEN  512
@@ -39,7 +41,7 @@ extern printf_fn fs_printf;
 })
 
 /* shadow_file.c */
-size_t shadow_file_write(const char *path, char *buf, size_t size);
+size_t shadow_file_write(const char *path, const char *buf, size_t size);
 int shadow_file_read(const char *, char *buf, size_t size, off_t);
 int shadow_dir_create(const char *path);
 int shadow_file_create(const char *path);
@@ -49,6 +51,7 @@ int shadow_file_getxattr(const char *path, const char *name,
 				void *value, size_t size);
 int shadow_file_delete(const char *path);
 bool shadow_file_exsit(const char *path);
+bool shadow_file_stat(const char *path, struct stat *st);
 
 /* volume.c */
 int create_volume_layout(void);
@@ -96,4 +99,12 @@ int config_sheep_info_read(const char *path, char *, size_t size, off_t);
 int config_sheep_info_write(const char *, const char *, size_t, off_t);
 size_t config_sheep_info_get_size(const char *path);
 
+/* http.c */
+int create_http_layout(void);
+int http_address_read(const char *path, char *buf, size_t size, off_t ignore);
+int http_address_write(const char *path, const char *buf, size_t size,
+		       off_t ignore);
+size_t http_address_get_size(const char *path);
+int http_object_write(const char *path, const char *buf, size_t size,
+		      off_t ignore);
 #endif
