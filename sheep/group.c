@@ -645,7 +645,7 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 	if (node_is_local(joined))
 		finish_join(nodes, nr_nodes);
 
-	old_vnode_info = get_vnode_info();
+	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(nodes, nr_nodes));
 
@@ -919,7 +919,7 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 		/* Mark leave node as gateway only node */
 		sys->this_node.nr_vnodes = 0;
 
-	old_vnode_info = get_vnode_info();
+	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info,
 			  alloc_vnode_info(members, nr_members));
 	if (sys->cinfo.status == SD_STATUS_OK) {
@@ -947,7 +947,7 @@ static void update_node_size(struct sd_node *node)
 
 static void kick_node_recover(void)
 {
-	struct vnode_info *old = get_vnode_info();
+	struct vnode_info *old = main_thread_get(current_vnode_info);
 	int ret;
 
 	main_thread_set(current_vnode_info,
