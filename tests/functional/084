@@ -47,4 +47,8 @@ for i in 3 7 19 37 57 97; do
 	diff -u $STORE/data$i $STORE/sheepfs/http/sd/sheep/data$i
 done
 
+# remove local entries
+rm -rf $STORE/sheepfs/http/sd/
+find $STORE/sheepfs/http/ | sort
+
 umount $STORE/sheepfs
