@@ -18,6 +18,7 @@ enum sheepfs_opcode {
 	OP_HTTP_ADDRESS,
 	OP_HTTP_OBJECT,
 	OP_OBJECT,
+	OP_CONTAINER,
 };
 
 #define COMMAND_LEN  512
@@ -45,6 +46,7 @@ extern printf_fn fs_printf;
 size_t shadow_file_write(const char *path, const char *buf, size_t size);
 int shadow_file_read(const char *, char *buf, size_t size, off_t);
 int shadow_dir_create(const char *path);
+int shadow_dir_delete(const char *path);
 int shadow_file_create(const char *path);
 int shadow_file_setxattr(const char *path, const char *name,
 				const void *value, size_t size);
@@ -111,5 +113,6 @@ int http_object_write(const char *path, const char *buf, size_t size,
 
 int object_read(const char *path, char *buf, size_t size, off_t ignore);
 size_t object_get_size(const char *path);
-int object_open(const char *path, struct fuse_file_info *);
+int object_unlink(const char *path);
+int container_rmdir(const char *path);
 #endif

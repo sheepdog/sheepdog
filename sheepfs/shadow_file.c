@@ -92,6 +92,18 @@ int shadow_dir_create(const char *path)
 	return 0;
 }
 
+int shadow_dir_delete(const char *path)
+{
+	char p[PATH_MAX];
+
+	snprintf(p, sizeof(p), "%s%s", sheepfs_shadow, path);
+	if (rmdir(p) < 0) {
+		sheepfs_pr("%m\n");
+		return -1;
+	}
+	return 0;
+}
+
 int shadow_file_setxattr(const char *path, const char *name,
 			 const void *value, size_t size)
 {
