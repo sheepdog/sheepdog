@@ -263,6 +263,16 @@ size_t object_get_size(const char *path)
 	return object_size;
 }
 
+int object_unlink(const char *path)
+{
+	return shadow_file_delete(path);
+}
+
+int container_rmdir(const char *path)
+{
+	return shadow_dir_delete(path);
+}
+
 static int object_create_entry(const char *entry, const char *url)
 {
 	struct strbuf buf = STRBUF_INIT;
@@ -306,6 +316,11 @@ static int object_create_entry(const char *entry, const char *url)
 		} else {
 			if (shadow_dir_create(path) < 0) {
 				sheepfs_pr("Create dir %s fail", path);
+				goto out;
+			}
+			if (sheepfs_set_op(path, OP_CONTAINER) < 0) {
+				sheepfs_pr("Set_op %s fail", path);
+				shadow_dir_delete(path);
 				goto out;
 			}
 		}

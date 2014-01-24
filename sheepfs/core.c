@@ -57,7 +57,9 @@ static struct sheepfs_file_operation {
 	int (*write)(const char *path, const char *buf, size_t size, off_t);
 	size_t (*get_size)(const char *path);
 	int (*sync)(const char *path);
-	int (*open)(const char *paht, struct fuse_file_info *);
+	int (*open)(const char *path, struct fuse_file_info *);
+	int (*unlink)(const char *path);
+	int (*rmdir)(const char *path);
 } sheepfs_file_ops[] = {
 	[OP_NULL]           = { NULL, NULL, NULL },
 	[OP_CLUSTER_INFO]   = { cluster_info_read, NULL,
@@ -79,7 +81,10 @@ static struct sheepfs_file_operation {
 	[OP_HTTP_ADDRESS]   = { http_address_read, http_address_write,
 				http_address_get_size },
 	[OP_HTTP_OBJECT]    = { NULL, http_object_write },
-	[OP_OBJECT]         = { object_read, NULL, object_get_size },
+	[OP_OBJECT]         = { object_read, NULL, object_get_size, NULL, NULL,
+				object_unlink },
+	[OP_CONTAINER]      = { NULL, NULL, NULL, NULL, NULL, NULL,
+				container_rmdir },
 };
 
 __printf(3, 4)
@@ -150,6 +155,28 @@ static int sheepfs_getattr(const char *path, struct stat *st)
 		st->st_size = sheepfs_get_size(path);
 out:
 	strbuf_release(&p);
+	return ret;
+}
+
+static int sheepfs_unlink(const char *path)
+{
+	int ret = 0;
+	unsigned op = sheepfs_get_op(path);
+
+	if (sheepfs_file_ops[op].unlink)
+		ret = sheepfs_file_ops[op].unlink(path);
+
+	return ret;
+}
+
+static int sheepfs_rmdir(const char *path)
+{
+	int ret = 0;
+	unsigned op = sheepfs_get_op(path);
+
+	if (sheepfs_file_ops[op].rmdir)
+		ret = sheepfs_file_ops[op].rmdir(path);
+
 	return ret;
 }
 
@@ -247,6 +274,8 @@ static int sheepfs_open(const char *path, struct fuse_file_info *fi)
 
 static struct fuse_operations sheepfs_ops =  {
 	.getattr  = sheepfs_getattr,
+	.unlink   = sheepfs_unlink,
+	.rmdir    = sheepfs_rmdir,
 	.readdir  = sheepfs_readdir,
 	.truncate = sheepfs_truncate,
 	.read     = sheepfs_read,
