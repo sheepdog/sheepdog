@@ -275,7 +275,7 @@ static int node_stat(int argc, char **argv)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct sd_stat stat, last;
+	struct sd_stat stat, last = { { 0 } };
 	int ret;
 	bool watch = node_cmd_data.watch ? true : false, first = true;
 
