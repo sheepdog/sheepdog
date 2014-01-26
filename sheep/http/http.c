@@ -394,6 +394,11 @@ int http_init(const char *options)
 	if (option_parse(s, ",", http_opt_parsers) < 0)
 		return -1;
 
+	if (list_empty(&http_enabled_drivers)) {
+		http_opt_default_parser("swift");
+		sd_debug("Use swift as default http driver");
+	}
+
 	sys->http_wqueue = create_work_queue("http", WQ_DYNAMIC);
 	if (!sys->http_wqueue)
 		return -1;
