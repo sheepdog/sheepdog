@@ -103,7 +103,12 @@ int config_sheep_info_write(const char *, const char *, size_t, off_t);
 size_t config_sheep_info_get_size(const char *path);
 
 /* http.c */
+#ifdef HAVE_HTTP
 int create_http_layout(void);
+#else
+static inline int create_http_layout(void) { return 0; }
+#endif
+
 int http_address_read(const char *path, char *buf, size_t size, off_t ignore);
 int http_address_write(const char *path, const char *buf, size_t size,
 		       off_t ignore);

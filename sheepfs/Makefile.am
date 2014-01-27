@@ -24,9 +24,18 @@ AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include
 sbin_PROGRAMS		= sheepfs
 
 sheepfs_SOURCES		= core.c cluster.c vdi.c shadow_file.c volume.c node.c \
-			  config.c http.c
+			  config.c
+
+if BUILD_HTTP
+sheepfs_SOURCES		+= http.c
+endif
 
 sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS) -lpthread -lcurl
+
+if BUILD_HTTP
+sheepfs_LDADD		+= -lcurl
+endif
+
 sheepfs_DEPENDENCIES	= ../lib/libsheepdog.a
 
 noinst_HEADERS		= sheepfs.h

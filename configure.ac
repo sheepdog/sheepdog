@@ -333,10 +333,12 @@ if test "x${enable_sheepfs}" = xyes; then
 	AC_CHECK_HEADERS([fuse.h],,
 		AC_MSG_ERROR(fuse.h header missing),
 		[#define _FILE_OFFSET_BITS 64])
-	AC_CHECK_LIB([curl], [curl_easy_init],,
-		AC_MSG_ERROR(libcurl not found))
-	AC_CHECK_HEADERS([curl/curl.h],,
+	if test "x${enable_http}" = xyes; then
+		AC_CHECK_LIB([curl], [curl_easy_init],,
+			     AC_MSG_ERROR(libcurl not found))
+		AC_CHECK_HEADERS([curl/curl.h],,
 		AC_MSG_ERROR(curl.h header missing))
+	fi
 	AC_DEFINE_UNQUOTED([HAVE_SHEEPFS], 1, [have sheepfs])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES sheepfs"
 	PKG_CHECK_EXISTS(fuse >= 2.8.0,
