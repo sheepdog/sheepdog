@@ -41,6 +41,6 @@ $DOG vdi delete -s 1 test2
 _vdi_list
 
 for i in `seq 2 9`; do
-	$DOG vdi object test$i -i 1;
+	$DOG vdi object location test$i -i 1;
 done
 

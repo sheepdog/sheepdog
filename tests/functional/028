@@ -42,8 +42,8 @@ done
 $DOG vdi read test | md5sum
 $DOG vdi read test -p 7001 | md5sum
 
-$DOG vdi object test
+$DOG vdi object location test
 
 for i in `seq 0 24`; do
-    $DOG vdi object -i $i test
+    $DOG vdi object location -i $i test
 done

@@ -37,7 +37,7 @@ static struct sd_option vdi_options[] = {
 };
 
 static struct vdi_cmd_data {
-	unsigned int index;
+	uint64_t index;
 	int snapshot_id;
 	char snapshot_tag[SD_MAX_VDI_TAG_LEN];
 	bool exclusive;
@@ -959,10 +959,43 @@ static int vdi_rollback(int argc, char **argv)
 	return ret;
 }
 
-static int vdi_object(int argc, char **argv)
+
+static int vdi_object_map(int argc, char **argv)
 {
 	const char *vdiname = argv[optind];
-	unsigned idx = vdi_cmd_data.index;
+	uint64_t idx = vdi_cmd_data.index;
+	struct sd_inode *inode = xmalloc(sizeof(*inode));
+	uint32_t vid;
+	int ret;
+
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS) {
+		sd_err("FATAL: %s not found", vdiname);
+		return ret;
+	}
+
+	printf("Index       VID\n");
+	if (idx != ~0) {
+		vid = INODE_GET_VID(inode, idx);
+		printf("%08"PRIu64" %8"PRIx32"\n", idx, vid);
+	} else {
+		uint32_t max_idx = count_data_objs(inode);
+
+		for (idx = 0; idx < max_idx; idx++) {
+			vid = INODE_GET_VID(inode, idx);
+			if (vid)
+				printf("%08"PRIu64" %8"PRIx32"\n", idx, vid);
+		}
+	}
+	return EXIT_SUCCESS;
+}
+
+static int vdi_object_location(int argc, char **argv)
+{
+	const char *vdiname = argv[optind];
+	uint64_t idx = vdi_cmd_data.index;
 	struct get_vdi_info info;
 	uint32_t vid;
 	size_t size;
@@ -1006,15 +1039,16 @@ static int vdi_object(int argc, char **argv)
 		if (oid_info.success) {
 			if (oid_info.data_oid) {
 				printf("Looking for the object 0x%" PRIx64
-				       " (vid 0x%" PRIx32 " idx %u, %u copies) "
-				       "with %d nodes\n\n",
+				       " (vid 0x%" PRIx32 " idx %"PRIu64
+				       ", %u copies) with %d nodes\n\n",
 				       oid_info.data_oid, vid, idx,
 				       info.nr_copies, sd_nodes_nr);
 
 				parse_objs(oid_info.data_oid, do_print_obj,
 					   NULL, size);
 			} else
-				printf("The inode object 0x%" PRIx32 " idx %u is not allocated\n",
+				printf("The inode object 0x%" PRIx32 " idx"
+				       "%"PRIu64" is not allocated\n",
 				       vid, idx);
 		} else
 			sd_err("Failed to read the inode object 0x%" PRIx32,
@@ -2432,6 +2466,20 @@ out:
 	return ret;
 }
 
+static struct subcommand vdi_object_cmd[] = {
+	{"location", NULL, NULL, "show object location information",
+	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG, vdi_object_location},
+	{"map", NULL, NULL, "show object map information",
+	 NULL, CMD_NEED_ARG, vdi_object_map},
+	{NULL},
+};
+
+static int vdi_object(int argc, char **argv)
+{
+	return do_generic_subcommand(vdi_object_cmd, argc, argv);
+}
+
+
 static struct subcommand vdi_cache_cmd[] = {
 	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
 	 NULL, CMD_NEED_ARG, vdi_cache_flush},
@@ -2475,7 +2523,7 @@ static struct subcommand vdi_cmd[] = {
 	{"graph", NULL, "aph", "show images in Graphviz dot format",
 	 NULL, 0, vdi_graph, vdi_options},
 	{"object", "<vdiname>", "isaph", "show object information in the image",
-	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
+	 vdi_object_cmd, CMD_NEED_ARG,
 	 vdi_object, vdi_options},
 	{"track", "<vdiname>", "isapho",
 	 "show the object epoch trace in the image",

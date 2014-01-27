@@ -13,6 +13,6 @@ dd if=/dev/zero | $DOG vdi write -w test
 $QEMU_IO -c "discard 0 100m" sheepdog:test | _filter_qemu_io
 $DOG vdi check test
 for i in `seq 0 24`; do
-	$DOG vdi object test -i $i;
+	$DOG vdi object location test -i $i;
 done
 _node_info

@@ -38,7 +38,7 @@ _wait_for_sheep_recovery 0
 $DOG vdi read test | md5sum > $STORE/csum.1
 
 for i in `seq 0 9`; do
-	$DOG vdi object -i $i test
+	$DOG vdi object location -i $i test
 done
 
 for i in 10 11 12; do
