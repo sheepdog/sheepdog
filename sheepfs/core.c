@@ -78,6 +78,7 @@ static struct sheepfs_file_operation {
 				config_sheep_info_get_size },
 	[OP_VOLUME]         = { volume_read, volume_write, volume_get_size,
 				volume_sync, volume_open },
+#ifdef HAVE_HTTP
 	[OP_HTTP_ADDRESS]   = { http_address_read, http_address_write,
 				http_address_get_size },
 	[OP_HTTP_OBJECT]    = { NULL, http_object_write },
@@ -85,6 +86,7 @@ static struct sheepfs_file_operation {
 				object_unlink },
 	[OP_CONTAINER]      = { NULL, NULL, NULL, NULL, NULL, NULL,
 				container_rmdir },
+#endif
 };
 
 __printf(3, 4)
