@@ -35,7 +35,7 @@ sheep_SOURCES		+= http/http.c http/kv.c http/s3.c http/swift.c \
 endif
 
 if BUILD_NFS
-sheep_SOURCES		+= nfs/nfsd.c nfs/nfs.c nfs/xdr.c
+sheep_SOURCES		+= nfs/nfsd.c nfs/nfs.c nfs/xdr.c nfs/mount.c
 endif
 
 if BUILD_COROSYNC

@@ -22,6 +22,7 @@ struct svc_handler {
 	xdrproc_t    decoder; /* XDR decode args */
 	xdrproc_t    encoder; /* XDR encode result */
 	unsigned int count;	 /* call count */
+	const char *name;       /* handler name */
 };
 
 #define NFS_HANDLER(name)			\
@@ -30,6 +31,7 @@ struct svc_handler {
 	(xdrproc_t) xdr_##name##_args,		\
 	(xdrproc_t) xdr_##name##_res,		\
 	0,					\
+	"nfs3."#name,				\
 }
 
 static struct svc_handler nfs3_handlers[] = {
@@ -57,28 +59,57 @@ static struct svc_handler nfs3_handlers[] = {
 	NFS_HANDLER(commit),
 };
 
-static void nfs3_dispatcher(struct svc_req *reg, SVCXPRT *transp)
+#define MOUNT_HANDLER(name, arg, res)		\
+{						\
+	(svc_func)  mount3_##name,		\
+	(xdrproc_t) xdr_##arg,			\
+	(xdrproc_t) xdr_##res,			\
+	0,					\
+	"mount3."#name,				\
+}
+
+static struct svc_handler mount3_handlers[] = {
+	MOUNT_HANDLER(null, null_args, null_res),
+	MOUNT_HANDLER(mnt, dirpath, mountres3),
+	MOUNT_HANDLER(dump, null_args, mountlist),
+	MOUNT_HANDLER(umnt, dirpath, null_res),
+	MOUNT_HANDLER(umntall, null_args, null_res),
+	MOUNT_HANDLER(export, null_args, exports),
+};
+
+static void svc_dispatcher(struct svc_req *reg, SVCXPRT *transp)
 {
 	struct nfs_arg arg = {};
-	int proc = reg->rq_proc;
+	int prog = reg->rq_prog, vers = reg->rq_vers, proc = reg->rq_proc;
+	struct svc_handler *handlers;
 	void *result;
 
-	sd_debug("%d", proc);
+	if (prog == NFS_PROGRAM && vers == NFS_V3)
+		handlers = nfs3_handlers;
+	else if (prog == MOUNT_PROGRAM && vers == MOUNT_V3)
+		handlers = mount3_handlers;
+	else {
+		sd_err("invalid protocol %d, version %d", prog, vers);
+		return;
+	}
 
-	if (!svc_getargs(transp, nfs3_handlers[proc].decoder, (caddr_t)&arg)) {
+	sd_debug("%s", handlers[proc].name);
+
+	if (!svc_getargs(transp, handlers[proc].decoder, (caddr_t)&arg)) {
 		sd_err("svc_getargs failed");
 		svcerr_decode(transp);
 		return;
 	}
 
-	result = nfs3_handlers[proc].func(reg, &arg);
-	if (result && !svc_sendreply(transp, nfs3_handlers[proc].encoder,
+	handlers[proc].count++;
+	result = handlers[proc].func(reg, &arg);
+	if (result && !svc_sendreply(transp, handlers[proc].encoder,
 				     result)) {
 		sd_err("svc_sendreply failed");
 		svcerr_systemerr(transp);
 	}
 
-	if (!svc_freeargs(transp, nfs3_handlers[proc].decoder, (caddr_t)&arg))
+	if (!svc_freeargs(transp, handlers[proc].decoder, (caddr_t)&arg))
 		panic("unable to free arguments");
 
 	return;
@@ -89,6 +120,7 @@ static int nfs_init_transport(void)
 	SVCXPRT *nfs_trans = NULL;
 
 	pmap_unset(NFS_PROGRAM, NFS_V3);
+	pmap_unset(MOUNT_PROGRAM, MOUNT_V3);
 
 	nfs_trans = svcudp_create(RPC_ANYSOCK);
 	if (!nfs_trans) {
@@ -96,7 +128,7 @@ static int nfs_init_transport(void)
 		return -1;
 	}
 
-	if (!svc_register(nfs_trans, NFS_PROGRAM, NFS_V3, nfs3_dispatcher,
+	if (!svc_register(nfs_trans, NFS_PROGRAM, NFS_V3, svc_dispatcher,
 			  IPPROTO_UDP)) {
 		sd_err("svc_register udp, failed");
 		return -1;
@@ -109,13 +141,38 @@ static int nfs_init_transport(void)
 		return -1;
 	}
 
-	if (!svc_register(nfs_trans, NFS_PROGRAM, NFS_V3, nfs3_dispatcher,
+	if (!svc_register(nfs_trans, NFS_PROGRAM, NFS_V3, svc_dispatcher,
 			  IPPROTO_TCP)) {
 		sd_err("svc_register tcp, failed");
 		return -1;
 	}
 	sd_info("nfs service listen at %d, proto tcp", nfs_trans->xp_port);
 
+	nfs_trans = svcudp_create(RPC_ANYSOCK);
+	if (!nfs_trans) {
+		sd_err("svcudp_create for mount failed");
+		return -1;
+	}
+
+	if (!svc_register(nfs_trans, MOUNT_PROGRAM, MOUNT_V3, svc_dispatcher,
+			  IPPROTO_UDP)) {
+		sd_err("svc_register udp for mount failed");
+		return -1;
+	}
+	sd_info("mount service listen at %d, proto udp", nfs_trans->xp_port);
+
+	nfs_trans = svctcp_create(RPC_ANYSOCK, 0, 0);
+	if (!nfs_trans) {
+		sd_err("svctcp_create for mount failed");
+		return -1;
+	}
+
+	if (!svc_register(nfs_trans, MOUNT_PROGRAM, MOUNT_V3, svc_dispatcher,
+			  IPPROTO_TCP)) {
+		sd_err("svc_register tcp for mount failed");
+		return -1;
+	}
+	sd_info("mount service listen at %d, proto tcp", nfs_trans->xp_port);
 	return 0;
 }
 

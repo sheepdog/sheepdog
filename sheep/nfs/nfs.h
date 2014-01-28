@@ -946,6 +946,8 @@ typedef struct COMMIT3res COMMIT3res;
 #define NFSPROC3_PATHCONF 20
 #define NFSPROC3_COMMIT 21
 
+typedef char *dirpath;
+
 struct nfs_arg {
 	union {
 		GETATTR3args getattr;
@@ -969,6 +971,9 @@ struct nfs_arg {
 		FSINFO3args fsinfo;
 		PATHCONF3args pathconf;
 		COMMIT3args commit;
+		/* mount */
+		dirpath mnt;
+		dirpath umnt;
 	};
 };
 
@@ -1130,5 +1135,99 @@ extern bool_t xdr_commit_resfail(XDR *, COMMIT3resfail*);
 extern bool_t xdr_commit_res(XDR *, COMMIT3res*);
 extern bool_t xdr_null_args(XDR *xdrs, void *);
 extern bool_t xdr_null_res(XDR *xdrs, void *);
+
+/* Mount Protocol */
+
+#define MNTPATHLEN 1024
+#define MNTNAMLEN 255
+#define FHSIZE 32
+#define FHSIZE3 64
+
+typedef struct {
+	u_int fhandle3_len;
+	char *fhandle3_val;
+} fhandle3;
+
+enum mountstat3 {
+	MNT3_OK = 0,
+	MNT3ERR_PERM = 1,
+	MNT3ERR_NOENT = 2,
+	MNT3ERR_IO = 5,
+	MNT3ERR_ACCES = 13,
+	MNT3ERR_NOTDIR = 20,
+	MNT3ERR_INVAL = 22,
+	MNT3ERR_NAMETOOLONG = 63,
+	MNT3ERR_NOTSUPP = 10004,
+	MNT3ERR_SERVERFAULT = 10006,
+};
+typedef enum mountstat3 mountstat3;
+
+struct mountres3_ok {
+	fhandle3 fhandle;
+	struct {
+		u_int auth_flavors_len;
+		int *auth_flavors_val;
+	} auth_flavors;
+};
+typedef struct mountres3_ok mountres3_ok;
+
+struct mountres3 {
+	mountstat3 fhs_status;
+	union {
+		mountres3_ok mountinfo;
+	} mountres3_u;
+};
+typedef struct mountres3 mountres3;
+
+typedef struct mountbody *mountlist;
+
+struct mountbody {
+	char *ml_hostname;
+	dirpath ml_directory;
+	mountlist ml_next;
+};
+typedef struct mountbody mountbody;
+
+typedef struct groupnode *groups;
+
+struct groupnode {
+	char *gr_name;
+	groups gr_next;
+};
+typedef struct groupnode groupnode;
+
+typedef struct exportnode *exports;
+
+struct exportnode {
+	dirpath ex_dir;
+	groups ex_groups;
+	exports ex_next;
+};
+typedef struct exportnode exportnode;
+
+#define MOUNT_PROGRAM 100005
+#define MOUNT_V3 3
+
+extern void *mount3_null(struct svc_req *, struct nfs_arg *);
+extern void *mount3_mnt(struct svc_req *, struct nfs_arg *);
+extern void *mount3_dump(struct svc_req *, struct nfs_arg *);
+extern void *mount3_umnt(struct svc_req *, struct nfs_arg *);
+extern void *mount3_umntall(struct svc_req *, struct nfs_arg *);
+extern void *mount3_export(struct svc_req *, struct nfs_arg *);
+
+/* the xdr functions */
+
+extern bool_t xdr_fhandle3(XDR *, fhandle3*);
+extern bool_t xdr_mountstat3(XDR *, mountstat3*);
+extern bool_t xdr_mountres3_ok(XDR *, mountres3_ok*);
+extern bool_t xdr_mountres3(XDR *, mountres3*);
+extern bool_t xdr_dirpath(XDR *, dirpath*);
+extern bool_t xdr_name(XDR *, char **);
+extern bool_t xdr_mountlist(XDR *, mountlist*);
+extern bool_t xdr_mountbody(XDR *, mountbody*);
+extern bool_t xdr_groups(XDR *, groups*);
+extern bool_t xdr_groupnode(XDR *, groupnode*);
+extern bool_t xdr_exports(XDR *, exports*);
+extern bool_t xdr_exportnode(XDR *, exportnode*);
 
 #endif /* !_NFS_H */
