@@ -13,6 +13,7 @@
 #include <sys/eventfd.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/param.h>
 
 #include "logger.h"
 #include "list.h"
@@ -22,7 +23,7 @@
 #define BLOCK_SIZE (1U << 12)
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#define round_up(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
+#define round_up(x, y) roundup(x, y)
 #define round_down(x, y) (((x) / (y)) * (y))
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
