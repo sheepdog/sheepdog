@@ -30,7 +30,7 @@ if BUILD_HTTP
 sheepfs_SOURCES		+= http.c
 endif
 
-sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS) -lpthread -lcurl
+sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS) -lpthread
 
 if BUILD_HTTP
 sheepfs_LDADD		+= -lcurl
