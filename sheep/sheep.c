@@ -911,6 +911,10 @@ int main(int argc, char **argv)
 	if (http_options && http_init(http_options) != 0)
 		exit(1);
 
+	ret = nfs_init(NULL);
+	if (ret)
+		exit(1);
+
 	if (pid_file && (create_pidfile(pid_file) != 0)) {
 		sd_err("failed to pid file '%s' - %m", pid_file);
 		exit(1);

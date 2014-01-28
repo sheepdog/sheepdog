@@ -152,7 +152,6 @@ struct system_info {
 #ifdef HAVE_HTTP
 	struct work_queue *http_wqueue;
 #endif
-
 	bool enable_object_cache;
 
 	uint32_t object_cache_size;
@@ -495,5 +494,15 @@ static inline int http_init(const char *options)
 	return 0;
 }
 #endif /* END BUILD_HTTP */
+
+#ifdef HAVE_NFS
+int nfs_init(const char *options);
+#else
+static inline int nfs_init(const char *options)
+{
+	sd_notice("nfs server service is not complied");
+	return 0;
+}
+#endif
 
 #endif

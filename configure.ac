@@ -250,6 +250,11 @@ AC_ARG_ENABLE([http],
 	[ enable_http="no" ],)
 AM_CONDITIONAL(BUILD_HTTP, test x$enable_http = xyes)
 
+AC_ARG_ENABLE([nfs],
+	[ --enable-nfs : enable nfs server service (default no) ],,
+	[ enable_nfs="no" ],)
+AM_CONDITIONAL(BUILD_NFS, test x$enable_nfs = xyes)
+
 CP=cp
 OS_LDL="-ldl"
 case "$host_os" in
@@ -353,6 +358,13 @@ if test "x${enable_http}" = xyes; then
 		AC_MSG_ERROR(libfcgi not found))
 	AC_DEFINE_UNQUOTED(HAVE_HTTP, 1, [have http])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES http"
+fi
+
+if test "x${enable_nfs}" = xyes; then
+	AC_CHECK_HEADERS([rpc/rpc.h],,
+		AC_MSG_ERROR(rpc.h header not found))
+	AC_DEFINE_UNQUOTED(HAVE_NFS, 1, [have nfs])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES nfs"
 fi
 
 # extra warnings

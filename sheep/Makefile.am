@@ -33,6 +33,11 @@ if BUILD_HTTP
 sheep_SOURCES		+= http/http.c http/kv.c http/s3.c http/swift.c \
 			   http/oalloc.c
 endif
+
+if BUILD_NFS
+sheep_SOURCES		+= nfs/nfsd.c nfs/nfs.c nfs/xdr.c
+endif
+
 if BUILD_COROSYNC
 sheep_SOURCES		+= cluster/corosync.c
 endif
@@ -53,7 +58,7 @@ sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread -lm\
 sheep_DEPENDENCIES	= ../lib/libsheepdog.a
 
 
-noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h
+noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h nfs/nfs.h
 
 EXTRA_DIST		= 
 
