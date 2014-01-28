@@ -12,6 +12,7 @@
 #include <urcu/uatomic.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/param.h>
 
 #include "logger.h"
 #include "list.h"
@@ -20,7 +21,7 @@
 #define SECTOR_SIZE (1U << 9)
 #define BLOCK_SIZE (1U << 12)
 
-#define round_up(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
+#define round_up(x, y) roundup(x, y)
 #define round_down(x, y) (((x) / (y)) * (y))
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
@@ -52,9 +53,6 @@ static inline int after(uint32_t seq1, uint32_t seq2)
 {
 	return (int32_t)(seq2 - seq1) < 0;
 }
-
-#define MIN(x, y) ((x) > (y) ? (y) : (x))
-#define MAX(x, y) ((x) > (y) ? (x) : (y))
 
 #define min(x, y) ({ \
 	typeof(x) _x = (x);	\
