@@ -1087,6 +1087,7 @@ static int start_deletion(struct request *req, uint32_t vid)
 	 * deletion_info are deleted
 	 */
 	eventfd_xread(di->finish_fd);
+	close(di->finish_fd);
 
 	return ret;
 out:
