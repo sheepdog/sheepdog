@@ -18,7 +18,7 @@
 #define NFS_PORT 2049
 #define NFS_MAXDATA 8192
 #define NFS_MAXPATHLEN 1024
-#define NFS_MAXNAMLEN 255
+#define NFS_MAXNAMLEN 63
 #define NFS_FHSIZE 32
 #define NFS_COOKIESIZE 4
 #define NFS_FIFO_DEV -1
@@ -197,49 +197,37 @@ typedef enum time_how time_how;
 
 struct set_mode3 {
 	bool_t set_it;
-	union {
-		mode3 mode;
-	} set_mode3_u;
+	mode3 mode;
 };
 typedef struct set_mode3 set_mode3;
 
 struct set_uid3 {
 	bool_t set_it;
-	union {
-		uid3 uid;
-	} set_uid3_u;
+	uid3 uid;
 };
 typedef struct set_uid3 set_uid3;
 
 struct set_gid3 {
 	bool_t set_it;
-	union {
-		gid3 gid;
-	} set_gid3_u;
+	gid3 gid;
 };
 typedef struct set_gid3 set_gid3;
 
 struct set_size3 {
 	bool_t set_it;
-	union {
-		size3 size;
-	} set_size3_u;
+	size3 size;
 };
 typedef struct set_size3 set_size3;
 
 struct set_atime {
 	time_how set_it;
-	union {
-		nfstime3 atime;
-	} set_atime_u;
+	nfstime3 atime;
 };
 typedef struct set_atime set_atime;
 
 struct set_mtime {
 	time_how set_it;
-	union {
-		nfstime3 mtime;
-	} set_mtime_u;
+	nfstime3 mtime;
 };
 typedef struct set_mtime set_mtime;
 

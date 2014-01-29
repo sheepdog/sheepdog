@@ -316,7 +316,7 @@ xdr_set_mode3(XDR *xdrs, set_mode3 *objp)
 		return FALSE;
 	switch (objp->set_it) {
 	case TRUE:
-		if (!xdr_mode3(xdrs, &objp->set_mode3_u.mode))
+		if (!xdr_mode3(xdrs, &objp->mode))
 			return FALSE;
 		break;
 	default:
@@ -332,7 +332,7 @@ xdr_set_uid3(XDR *xdrs, set_uid3 *objp)
 		return FALSE;
 	switch (objp->set_it) {
 	case TRUE:
-		if (!xdr_uid3(xdrs, &objp->set_uid3_u.uid))
+		if (!xdr_uid3(xdrs, &objp->uid))
 			return FALSE;
 		break;
 	default:
@@ -348,7 +348,7 @@ xdr_set_gid3(XDR *xdrs, set_gid3 *objp)
 		return FALSE;
 	switch (objp->set_it) {
 	case TRUE:
-		if (!xdr_gid3(xdrs, &objp->set_gid3_u.gid))
+		if (!xdr_gid3(xdrs, &objp->gid))
 			return FALSE;
 		break;
 	default:
@@ -364,7 +364,7 @@ xdr_set_size3(XDR *xdrs, set_size3 *objp)
 		return FALSE;
 	switch (objp->set_it) {
 	case TRUE:
-		if (!xdr_size3(xdrs, &objp->set_size3_u.size))
+		if (!xdr_size3(xdrs, &objp->size))
 			return FALSE;
 		break;
 	default:
@@ -380,7 +380,7 @@ xdr_set_atime(XDR *xdrs, set_atime *objp)
 		return FALSE;
 	switch (objp->set_it) {
 	case SET_TO_CLIENT_TIME:
-		if (!xdr_nfstime3(xdrs, &objp->set_atime_u.atime))
+		if (!xdr_nfstime3(xdrs, &objp->atime))
 			return FALSE;
 		break;
 	default:
@@ -396,7 +396,7 @@ xdr_set_mtime(XDR *xdrs, set_mtime *objp)
 		return FALSE;
 	switch (objp->set_it) {
 	case SET_TO_CLIENT_TIME:
-		if (!xdr_nfstime3(xdrs, &objp->set_mtime_u.mtime))
+		if (!xdr_nfstime3(xdrs, &objp->mtime))
 			return FALSE;
 		break;
 	default:

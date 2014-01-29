@@ -41,7 +41,7 @@
 #define RPCSVC_MAXPAYLOAD_TCP	RPCSVC_MAXPAYLOAD
 #define RPCSVC_MAXPAYLOAD_UDP	(32*1024u)
 
-static struct svc_fh *get_svc_fh(struct nfs_arg *argp)
+static inline struct svc_fh *get_svc_fh(struct nfs_arg *argp)
 {
 	struct nfs_fh3 *nfh = (struct nfs_fh3 *)argp;
 
@@ -49,6 +49,12 @@ static struct svc_fh *get_svc_fh(struct nfs_arg *argp)
 		panic("invalid nfs file handle len %u", nfh->data.data_len);
 
 	return (struct svc_fh *)(nfh->data.data_val);
+}
+
+static inline void set_svc_fh(struct nfs_fh3 *nfh, struct svc_fh *sfh)
+{
+	nfh->data.data_len = sizeof(struct svc_fh);
+	nfh->data.data_val = (char *)sfh;
 }
 
 static void update_post_attr(struct inode *inode, fattr3 *post)
@@ -101,14 +107,102 @@ out:
 	return &result;
 }
 
+/* FIXME: Add nanotime support */
 void *nfs3_setattr(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static SETATTR3res result;
+	SETATTR3args *arg = &argp->setattr;
+	struct svc_fh *fh = get_svc_fh(argp);
+	struct sattr3 *sattr = &arg->new_attributes;
+	struct post_op_attr *poa = &result.SETATTR3res_u.resok.obj_wcc.after;
+	struct fattr3 *post = &poa->post_op_attr_u.attributes;
+	struct inode *inode;
+	int ret;
+
+	sd_debug("%"PRIx64, fh->ino);
+
+	inode = fs_read_inode_hdr(fh->ino);
+	if (IS_ERR(inode)) {
+		switch (PTR_ERR(inode)) {
+		case SD_RES_NO_OBJ:
+			result.status = NFS3ERR_NOENT;
+			goto out;
+		default:
+			result.status = NFS3ERR_IO;
+			goto out;
+		}
+	}
+
+	if (sattr->mode.set_it)
+		inode->mode = sattr->mode.mode;
+	if (sattr->uid.set_it)
+		inode->uid = sattr->uid.uid;
+	if (sattr->gid.set_it)
+		inode->gid = sattr->gid.gid;
+	if (sattr->size.set_it)
+		inode->size = sattr->size.size;
+
+	ret = fs_write_inode_hdr(inode);
+	if (ret != SD_RES_SUCCESS)
+		result.status = NFS3ERR_IO;
+	else
+		result.status = NFS3_OK;
+
+	poa->attributes_follow = true;
+	update_post_attr(inode, post);
+	free(inode);
+out:
+	return &result;
 }
 
 void *nfs3_lookup(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static LOOKUP3res result;
+	static struct svc_fh den_fh;
+	LOOKUP3args *arg = &argp->lookup;
+	struct svc_fh *fh = get_svc_fh(argp);
+	struct inode *inode;
+	struct dentry *dentry;
+	char *name = arg->what.name;
+
+	sd_debug("%"PRIx64" %s", fh->ino, name);
+
+	inode = fs_read_inode_full(fh->ino);
+	if (IS_ERR(inode)) {
+		switch (PTR_ERR(inode)) {
+		case SD_RES_NO_OBJ:
+			result.status = NFS3ERR_NOENT;
+			goto out;
+		default:
+			result.status = NFS3ERR_IO;
+			goto out;
+		}
+	}
+
+	if (!S_ISDIR(inode->mode)) {
+		result.status = NFS3ERR_NOTDIR;
+		goto out_free;
+	}
+
+	dentry = fs_lookup_dir(inode, name);
+	if (IS_ERR(dentry)) {
+		switch (PTR_ERR(dentry)) {
+		case SD_RES_NOT_FOUND:
+			result.status = NFS3ERR_NOENT;
+			goto out_free;
+		default:
+			result.status = NFS3ERR_IO;
+			goto out_free;
+		}
+	}
+
+	result.status = NFS3_OK;
+	den_fh.ino = dentry->ino;
+	set_svc_fh(&result.LOOKUP3res_u.resok.object, &den_fh);
+out_free:
+	free(inode);
+out:
+	return &result;
 }
 
 /* FIXME: implement UNIX ACL */
@@ -166,9 +260,47 @@ void *nfs3_write(struct svc_req *req, struct nfs_arg *argp)
 	return NULL;
 }
 
+/* FIXME: support GUARDED and EXCLUSIVE */
 void *nfs3_create(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static CREATE3res result;
+	static struct svc_fh file_fh;
+	CREATE3args *arg = &argp->create;
+	struct svc_fh *fh = get_svc_fh(argp);
+	struct sattr3 *sattr = &arg->how.createhow3_u.obj_attributes;
+	struct post_op_attr *poa =
+		&result.CREATE3res_u.resok.obj_attributes;
+	struct fattr3 *post = &poa->post_op_attr_u.attributes;
+	struct inode *new = xzalloc(sizeof(*new));
+	char *name = arg->where.name;
+	int mode = arg->how.mode, ret;
+
+	sd_debug("%"PRIx64" %s, mode %d, size %"PRIu64, fh->ino, name, mode,
+		 sattr->size.size);
+
+	new->mode = S_IFREG | sd_def_fmode;
+	new->uid = 0;
+	new->gid = 0;
+	new->size = 0;
+	new->used = INODE_DATA_SIZE;
+	new->ctime = new->atime = new->mtime = time(NULL);
+
+	ret = fs_create_file(fh->ino, new, name);
+	if (ret != SD_RES_SUCCESS) {
+		result.status = NFS3ERR_IO;
+		goto out;
+	}
+
+	file_fh.ino = new->ino;
+
+	result.status = NFS3_OK;
+	result.CREATE3res_u.resok.obj.handle_follows = true;
+	set_svc_fh(&result.CREATE3res_u.resok.obj.post_op_fh3_u.handle,
+		   &file_fh);
+	poa->attributes_follow = true;
+	update_post_attr(new, post);
+out:
+	return &result;
 }
 
 void *nfs3_mkdir(struct svc_req *req, struct nfs_arg *argp)

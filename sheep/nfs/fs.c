@@ -286,3 +286,54 @@ int fs_read_dir(struct inode *inode, uint64_t offset,
 	}
 	return ret;
 }
+
+static int dentry_compare(struct dentry *a, struct dentry *b)
+{
+	return strcmp(a->name, b->name);
+}
+
+struct dentry *fs_lookup_dir(struct inode *inode, const char *name)
+{
+	struct dentry *tmp, *base = (struct dentry *)inode->data;
+	struct dentry *key = xmalloc(sizeof(*key));
+	uint64_t dentry_count = inode->size / sizeof(struct dentry);
+
+	sd_debug("%"PRIx64", %s", inode->ino, name);
+
+	pstrcpy(key->name, NFS_MAXNAMLEN, name);
+
+	tmp = xlfind(key, base, dentry_count, dentry_compare);
+	if (tmp)
+		*key = *tmp;
+	else {
+		free(key);
+		key = (struct dentry *)-SD_RES_NOT_FOUND;
+	}
+
+	return key;
+}
+
+int fs_create_file(uint64_t pino, struct inode *new, const char *name)
+{
+	uint32_t vid = oid_to_vid(pino);
+	struct inode *inode;
+	struct dentry *dentry;
+	int ret;
+
+	ret = inode_create(new, vid, name);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	inode = fs_read_inode_full(pino);
+	if (IS_ERR(inode))
+		return PTR_ERR(inode);
+
+	dentry = (struct dentry *)(inode->data + inode->size);
+	pstrcpy(dentry->name, NFS_MAXNAMLEN, name);
+	dentry->ino = new->ino;
+	inode->size += sizeof(*dentry);
+
+	ret = fs_write_inode_full(inode);
+	free(inode);
+	return ret;
+}

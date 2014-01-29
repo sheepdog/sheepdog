@@ -64,5 +64,7 @@ int fs_write_inode_full(struct inode *inode);
 int fs_read_dir(struct inode *inode, uint64_t offset,
 		int (*dentry_reader)(struct inode *, struct dentry *, void *),
 		void *data);
+struct dentry *fs_lookup_dir(struct inode *inode, const char *name);
+int fs_create_file(uint64_t pino, struct inode *new, const char *name);
 
 #endif
