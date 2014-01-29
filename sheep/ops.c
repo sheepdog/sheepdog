@@ -998,8 +998,33 @@ static int local_set_loglevel(struct request *req)
 	set_loglevel(new_level);
 
 	return SD_RES_SUCCESS;
-
 }
+
+#ifdef HAVE_NFS
+
+static int local_nfs_create(struct request *req)
+{
+	return nfs_create(req->data);
+}
+
+static int local_nfs_delete(struct request *req)
+{
+	return nfs_delete(req->data);
+}
+
+#else
+
+static inline int local_nfs_create(struct request *req)
+{
+	return 0;
+}
+
+static inline int local_nfs_delete(struct request *req)
+{
+	return 0;
+}
+
+#endif
 
 static struct sd_op_template sd_ops[] = {
 
@@ -1284,6 +1309,22 @@ static struct sd_op_template sd_ops[] = {
 		.force = true,
 		.process_work = local_set_loglevel,
 	},
+
+#ifdef HAVE_NFS
+	[SD_OP_NFS_CREATE] = {
+		.name = "NFS_CREATE",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = false,
+		.process_work = local_nfs_create,
+	},
+
+	[SD_OP_NFS_DELETE] = {
+		.name = "NFS_DELETE",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = false,
+		.process_work = local_nfs_delete,
+	},
+#endif
 
 	/* gateway I/O operations */
 	[SD_OP_CREATE_AND_WRITE_OBJ] = {

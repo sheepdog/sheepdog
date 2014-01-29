@@ -60,35 +60,6 @@ struct bucket_iterater_arg {
 	uint64_t bytes_used;
 };
 
-static int kv_create_hyper_volume(const char *name, uint32_t *vdi_id)
-{
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int ret;
-	char buf[SD_MAX_VDI_LEN] = {0};
-
-	pstrcpy(buf, SD_MAX_VDI_LEN, name);
-
-	sd_init_req(&hdr, SD_OP_NEW_VDI);
-	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = SD_MAX_VDI_LEN;
-
-	hdr.vdi.vdi_size = SD_MAX_VDI_SIZE;
-	hdr.vdi.copies = sys->cinfo.nr_copies;
-	hdr.vdi.copy_policy = sys->cinfo.copy_policy;
-	hdr.vdi.store_policy = 1;
-
-	ret = exec_local_req(&hdr, buf);
-	if (rsp->result != SD_RES_SUCCESS)
-		sd_err("Failed to create VDI %s: %s", name,
-		       sd_strerror(rsp->result));
-
-	if (vdi_id)
-		*vdi_id = rsp->vdi.vdi_id;
-
-	return ret;
-}
-
 /* Account operations */
 
 /*
@@ -114,7 +85,7 @@ static int kv_create_hyper_volume(const char *name, uint32_t *vdi_id)
 int kv_create_account(const char *account)
 {
 	uint32_t vdi_id;
-	return kv_create_hyper_volume(account, &vdi_id);
+	return sd_create_hyper_volume(account, &vdi_id);
 }
 
 static void bucket_iterater(void *data, enum btree_node_type type, void *arg)
@@ -317,14 +288,14 @@ static int bucket_create(const char *account, uint32_t account_vid,
 	int ret;
 
 	snprintf(onode_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = kv_create_hyper_volume(onode_name, &vid);
+	ret = sd_create_hyper_volume(onode_name, &vid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to create bucket %s onode vid", bucket);
 		return ret;
 	}
 	snprintf(alloc_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account,
 		 bucket);
-	ret = kv_create_hyper_volume(alloc_name, &vid);
+	ret = sd_create_hyper_volume(alloc_name, &vid);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to create bucket %s data vid", bucket);
 		sd_delete_vdi(onode_name);

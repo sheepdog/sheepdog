@@ -32,6 +32,10 @@ dog_SOURCES		+= trace.c
 override CFLAGS         := $(subst -pg,,$(CFLAGS))
 endif
 
+if BUILD_NFS
+dog_SOURCES		+= nfs.c
+endif
+
 dog_LDADD		= ../lib/libsheepdog.a -lpthread
 dog_DEPENDENCIES	= ../lib/libsheepdog.a
 

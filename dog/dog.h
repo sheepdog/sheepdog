@@ -109,10 +109,12 @@ extern struct command node_command;
 extern struct command cluster_command;
 
 #ifdef HAVE_TRACE
-  extern struct command trace_command;
-#else
-  #define trace_command {}
+extern struct command trace_command;
 #endif /* HAVE_TRACE */
+
+#ifdef HAVE_NFS
+extern struct command nfs_command;
+#endif /* HAVE_NFS */
 
 int do_loglevel_set(const struct node_id *nid, const char *loglevel_str);
 int do_loglevel_get(const struct node_id *nid, int32_t *ret_loglevel);

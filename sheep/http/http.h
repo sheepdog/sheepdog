@@ -147,7 +147,7 @@ int kv_iterate_object(const char *account, const char *bucket,
 		      void (*cb)(const char *object, void *opaque),
 		      void *opaque);
 
-/* object_allocator.c */
+/* http/oalloc.c */
 int oalloc_new_prepare(uint32_t vid, uint64_t *start, uint64_t count);
 int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count);
 int oalloc_free(uint32_t vid, uint64_t start, uint64_t count);

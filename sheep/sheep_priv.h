@@ -305,6 +305,7 @@ int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info);
 void clean_vdi_state(void);
 int sd_delete_vdi(const char *name);
 int sd_lookup_vdi(const char *name, uint32_t *vid);
+int sd_create_hyper_volume(const char *name, uint32_t *vdi_id);
 
 extern int ec_max_data_strip;
 
@@ -497,6 +498,8 @@ static inline int http_init(const char *options)
 
 #ifdef HAVE_NFS
 int nfs_init(const char *options);
+int nfs_create(const char *name);
+int nfs_delete(const char *name);
 #else
 static inline int nfs_init(const char *options)
 {

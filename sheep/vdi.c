@@ -1246,3 +1246,33 @@ int sd_lookup_vdi(const char *name, uint32_t *vid)
 
 	return ret;
 }
+
+int sd_create_hyper_volume(const char *name, uint32_t *vdi_id)
+{
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	char buf[SD_MAX_VDI_LEN] = {};
+	int ret;
+
+	pstrcpy(buf, SD_MAX_VDI_LEN, name);
+
+	sd_init_req(&hdr, SD_OP_NEW_VDI);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = SD_MAX_VDI_LEN;
+
+	hdr.vdi.vdi_size = SD_MAX_VDI_SIZE;
+	hdr.vdi.copies = sys->cinfo.nr_copies;
+	hdr.vdi.copy_policy = sys->cinfo.copy_policy;
+	hdr.vdi.store_policy = 1;
+
+	ret = exec_local_req(&hdr, buf);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to create VDI %s: %s", name, sd_strerror(ret));
+		goto out;
+	}
+
+	if (vdi_id)
+		*vdi_id = rsp->vdi.vdi_id;
+out:
+	return ret;
+}

@@ -157,7 +157,12 @@ static void init_commands(const struct command **commands)
 		vdi_command,
 		node_command,
 		cluster_command,
+#ifdef HAVE_TRACE
 		trace_command,
+#endif
+#ifdef HAVE_NFS
+		nfs_command,
+#endif
 		{NULL,}
 	};
 

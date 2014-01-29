@@ -207,3 +207,32 @@ int nfs_init(const char *options)
 
 	return 0;
 }
+
+int nfs_create(const char *name)
+{
+	uint32_t vdi;
+	int ret;
+
+	ret = sd_create_hyper_volume(name, &vdi);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	return SD_RES_SUCCESS;
+}
+
+int nfs_delete(const char *name)
+{
+	char data_name[SD_MAX_VDI_LEN];
+	int ret;
+
+	ret = sd_delete_vdi(name);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	snprintf(data_name, SD_MAX_VDI_LEN, "%s_nfs", name);
+	ret = sd_delete_vdi(data_name);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	return SD_RES_SUCCESS;
+}
