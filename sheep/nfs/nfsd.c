@@ -217,7 +217,11 @@ int nfs_create(const char *name)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	return SD_RES_SUCCESS;
+	ret = fs_make_root(vdi);
+	if (ret != SD_RES_SUCCESS)
+		sd_delete_vdi(name);
+
+	return ret;
 }
 
 int nfs_delete(const char *name)

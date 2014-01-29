@@ -1,3 +1,15 @@
+/*
+ * Copyright (C) 2014 Taobao Inc.
+ *
+ * Liu Yuan <namei.unix@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License version
+ * 2 as published by the Free Software Foundation.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <nfs://www.gnu.org/licenses/>.
+ */
 #ifndef _NFS_H
 #define _NFS_H
 
@@ -1229,5 +1241,11 @@ extern bool_t xdr_groups(XDR *, groups*);
 extern bool_t xdr_groupnode(XDR *, groupnode*);
 extern bool_t xdr_exports(XDR *, exports*);
 extern bool_t xdr_exportnode(XDR *, exportnode*);
+
+struct svc_fh {
+	uint64_t ino;
+};
+
+#include "fs.h"
 
 #endif /* !_NFS_H */
