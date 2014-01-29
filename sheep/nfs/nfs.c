@@ -481,7 +481,11 @@ void *nfs3_rmdir(struct svc_req *req, struct nfs_arg *argp)
 
 void *nfs3_rename(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static RENAME3res result;
+
+	result.status = NFS3ERR_NOTSUPP;
+
+	return &result;
 }
 
 void *nfs3_link(struct svc_req *req, struct nfs_arg *argp)
@@ -619,7 +623,38 @@ void *nfs3_readdirplus(struct svc_req *req, struct nfs_arg *argp)
 
 void *nfs3_fsstat(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static FSSTAT3res result;
+	struct svc_fh *fh = get_svc_fh(argp);
+	struct sd_inode *sd_inode = xmalloc(sizeof(*sd_inode));
+	uint32_t vid = oid_to_vid(fh->ino);
+	uint64_t my = 0 , cow = 0;
+	int ret;
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)sd_inode,
+			     sizeof(*sd_inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read %" PRIx32 " %s", vid,
+		       sd_strerror(ret));
+		result.status = NFS3ERR_IO;
+		goto out;
+	}
+
+	sd_inode_stat(sd_inode, &my, &cow, sheep_bnode_reader);
+
+	sd_debug("%"PRIx32" contains %lu objects", vid, my);
+
+	result.status = NFS3_OK;
+	result.FSSTAT3res_u.resok.tbytes = SD_MAX_VDI_SIZE;
+	result.FSSTAT3res_u.resok.fbytes = SD_MAX_VDI_SIZE -
+					my * SD_DATA_OBJ_SIZE;
+	result.FSSTAT3res_u.resok.abytes = SD_MAX_VDI_SIZE -
+					my * SD_DATA_OBJ_SIZE;
+	result.FSSTAT3res_u.resok.tfiles = MAX_DATA_OBJS;
+	result.FSSTAT3res_u.resok.ffiles = MAX_DATA_OBJS - my;
+	result.FSSTAT3res_u.resok.afiles = MAX_DATA_OBJS - my;
+out:
+	free(sd_inode);
+	return &result;
 }
 
 static uint32_t get_max_size(struct svc_req *req)
