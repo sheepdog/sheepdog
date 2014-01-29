@@ -581,7 +581,7 @@ out:
 static int vdi_snapshot(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
-	uint32_t vid;
+	uint32_t vid, new_vid;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
@@ -605,15 +605,16 @@ static int vdi_snapshot(int argc, char **argv)
 	if (ret != SD_RES_SUCCESS)
 		return EXIT_FAILURE;
 
-	ret = do_vdi_create(vdiname, inode->vdi_size, vid, NULL, true,
+	ret = do_vdi_create(vdiname, inode->vdi_size, vid, &new_vid, true,
 			    inode->nr_copies, inode->copy_policy,
 			    inode->store_policy);
 
 	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
-			printf("%x\n", vid);
+			printf("%x %x\n", new_vid, vid);
 		else
-			printf("VDI ID of newly created snapshot: %x\n", vid);
+			printf("new VID of original VDI: %x,"
+			       " VDI ID of newly created snapshot: %x\n", new_vid, vid);
 	}
 
 	return ret;
