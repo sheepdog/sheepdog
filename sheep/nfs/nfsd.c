@@ -194,6 +194,8 @@ out:
 	pthread_exit(NULL);
 }
 
+uint64_t nfs_boot_time;
+
 int nfs_init(const char *options)
 {
 	pthread_t t;
@@ -205,6 +207,7 @@ int nfs_init(const char *options)
 		return -1;
 	}
 
+	nfs_boot_time = clock_get_time();
 	return 0;
 }
 

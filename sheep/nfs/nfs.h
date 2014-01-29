@@ -1234,6 +1234,8 @@ struct svc_fh {
 	uint64_t ino;
 };
 
+uint64_t nfs_boot_time;
+
 #include "fs.h"
 
 #endif /* !_NFS_H */

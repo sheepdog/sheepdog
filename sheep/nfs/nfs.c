@@ -250,14 +250,97 @@ void *nfs3_readlink(struct svc_req *req, struct nfs_arg *argp)
 	return NULL;
 }
 
+static char nfs_read_buffer[RPCSVC_MAXPAYLOAD];
+
 void *nfs3_read(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static READ3res result;
+	READ3args *arg = &argp->read;
+	struct svc_fh *fh = get_svc_fh(argp);
+	uint64_t offset = arg->offset, count = arg->count;
+	struct post_op_attr *poa =
+		&result.READ3res_u.resok.file_attributes;
+	struct fattr3 *post = &poa->post_op_attr_u.attributes;
+	struct inode *inode;
+	int ret;
+
+	sd_debug("%"PRIx64"count %"PRIu64" offset %"PRIu64, fh->ino,
+		 count, offset);
+
+	inode = fs_read_inode_full(fh->ino);
+	if (IS_ERR(inode)) {
+		switch (PTR_ERR(inode)) {
+		case SD_RES_NO_OBJ:
+			result.status = NFS3ERR_NOENT;
+			goto out;
+		default:
+			result.status = NFS3ERR_IO;
+			goto out;
+		}
+	}
+
+	ret = fs_read(inode, nfs_read_buffer, count, offset);
+	if (ret < 0) {
+		result.status = NFS3ERR_IO;
+		goto out_free;
+	}
+	result.status = NFS3_OK;
+	result.READ3res_u.resok.count = ret;
+	result.READ3res_u.resok.eof = ret < count;
+	result.READ3res_u.resok.data.data_val = nfs_read_buffer;
+	result.READ3res_u.resok.data.data_len = ret;
+	poa->attributes_follow = true;
+	update_post_attr(inode, post);
+out_free:
+	free(inode);
+out:
+	return &result;
 }
 
 void *nfs3_write(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static WRITE3res result;
+	WRITE3args *arg = &argp->write;
+	struct svc_fh *fh = get_svc_fh(argp);
+	uint64_t offset = arg->offset, count = arg->count;
+	struct post_op_attr *poa =
+		&result.WRITE3res_u.resok.file_wcc.after;
+	struct fattr3 *post = &poa->post_op_attr_u.attributes;
+	struct inode *inode;
+	int64_t done;
+	void *buffer = arg->data.data_val;
+
+	sd_debug("%"PRIx64" count %"PRIu64" offset %"PRIu64" stable %d",
+		 fh->ino, count, offset, arg->stable);
+
+	inode = fs_read_inode_full(fh->ino);
+	if (IS_ERR(inode)) {
+		switch (PTR_ERR(inode)) {
+		case SD_RES_NO_OBJ:
+			result.status = NFS3ERR_NOENT;
+			goto out;
+		default:
+			result.status = NFS3ERR_IO;
+			goto out;
+		}
+	}
+
+	done = fs_write(inode, buffer, count, offset);
+	if (done < 0) {
+		result.status = NFS3ERR_IO;
+		goto out_free;
+	}
+	result.status = NFS3_OK;
+	result.WRITE3res_u.resok.count = done;
+	result.WRITE3res_u.resok.committed = FILE_SYNC;
+	memcpy(&result.WRITE3res_u.resok.verf, &nfs_boot_time,
+	       sizeof(nfs_boot_time));
+	poa->attributes_follow = true;
+	update_post_attr(inode, post);
+out_free:
+	free(inode);
+out:
+	return &result;
 }
 
 /* FIXME: support GUARDED and EXCLUSIVE */

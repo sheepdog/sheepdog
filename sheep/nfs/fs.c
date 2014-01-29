@@ -337,3 +337,44 @@ int fs_create_file(uint64_t pino, struct inode *new, const char *name)
 	free(inode);
 	return ret;
 }
+
+/* TODO: support extent */
+int64_t fs_read(struct inode *inode, void *buffer, uint64_t count,
+		uint64_t offset)
+{
+	uint8_t *start = inode->data + offset;
+	int64_t done = count;
+
+	if (offset >= inode->size || count == 0)
+		return 0;
+
+	if (offset + count > inode->size)
+		done = inode->size - offset;
+
+	memcpy(buffer, start, done);
+
+	return done;
+}
+
+int64_t fs_write(struct inode *inode, void *buffer, uint64_t count,
+		 uint64_t offset)
+{
+	uint8_t *start = inode->data + offset;
+	int64_t done = count;
+	int ret;
+
+	if (count == 0)
+		return 0;
+
+	memcpy(start, buffer, done);
+
+	/* TODO: lock inode */
+	if ((offset + done) > inode->size)
+		inode->size = offset + done;
+
+	inode->mtime = time(NULL);
+	ret = fs_write_inode_full(inode);
+	if (ret != SD_RES_SUCCESS)
+		done = -1;
+	return done;
+}

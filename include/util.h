@@ -523,4 +523,12 @@ static inline long __must_check IS_ERR_OR_NULL(const void *ptr)
 	return !ptr || IS_ERR_VALUE((unsigned long)ptr);
 }
 
+static inline uint64_t clock_get_time(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_REALTIME, &ts);
+	return (uint64_t)ts.tv_sec * 1000000000LL + (uint64_t)ts.tv_nsec;
+}
+
 #endif
