@@ -48,7 +48,8 @@ static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 		flags &= ~O_DSYNC;
 
 	if (sys->backend_dio && iocb_is_aligned(iocb)) {
-		assert(is_aligned_to_pagesize(iocb->buf));
+		if (!is_aligned_to_pagesize(iocb->buf))
+			panic("Memory isn't aligned to pagesize %p", iocb->buf);
 		flags |= O_DIRECT;
 	}
 
