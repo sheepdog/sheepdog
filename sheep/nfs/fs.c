@@ -140,27 +140,21 @@ static inline int inode_create(struct inode *inode, uint32_t vid,
 	return ret;
 }
 
-static int nlink_inc(uint64_t ino)
+static void dentry_add(struct inode *parent, struct dentry *dentry)
 {
-	struct inode *inode = fs_read_inode_hdr(ino);
-	int ret;
+	uint8_t *tail = parent->data + parent->size;
 
-	if (IS_ERR(inode))
-		return PTR_ERR(inode);
-
-	inode->nlink++;
-
-	ret = fs_write_inode_hdr(inode);
-	free(inode);
-	return ret;
+	parent->nlink++;
+	memcpy(tail, dentry, sizeof(*dentry));
+	parent->size += sizeof(*dentry);
 }
 
-static int dir_create(struct inode *inode, uint32_t vid, const char *name,
-		      uint64_t pino)
+int fs_create_dir(struct inode *inode, const char *name, struct inode *parent)
 {
+	uint64_t myino, pino = parent->ino;
+	uint32_t vid = oid_to_vid(pino);
 	struct inode_data *id = prepare_inode_data(inode, vid, name);
 	struct dentry *entry;
-	uint64_t myino;
 	int ret;
 
 	sys->cdrv->lock(vid);
@@ -185,17 +179,21 @@ static int dir_create(struct inode *inode, uint32_t vid, const char *name,
 	entry->name[0] = '.';
 	entry->name[1] = '.';
 
-	if (unlikely(myino == pino))
+	if (unlikely(inode == parent))
 		inode->nlink++; /* I'm root */
 	else {
-		ret = nlink_inc(pino);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("failed to inc nlink %"PRIx64, pino);
-			goto out;
-		}
+		struct dentry new = {
+			.ino = myino,
+			.nlen = strlen(name),
+		};
+		pstrcpy(new.name, NFS_MAXNAMLEN, name);
+		dentry_add(parent, &new);
 	}
 
 	ret = inode_do_create(id);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+	ret = fs_write_inode_full(parent);
 out:
 	sys->cdrv->unlock(vid);
 	finish_inode_data(id);
@@ -211,8 +209,9 @@ int fs_make_root(uint32_t vid)
 	root->uid = 0;
 	root->gid = 0;
 	root->atime = root->mtime = root->ctime = time(NULL);
+	root->ino = fs_root_ino(vid);
 
-	ret = dir_create(root, vid, "/", fs_root_ino(vid));
+	ret = fs_create_dir(root, "/", root);
 	free(root);
 	return ret;
 }

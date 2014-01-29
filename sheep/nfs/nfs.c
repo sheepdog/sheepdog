@@ -388,7 +388,62 @@ out:
 
 void *nfs3_mkdir(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static MKDIR3res result;
+	static struct svc_fh file_fh;
+	MKDIR3args *arg = &argp->mkdir;
+	struct svc_fh *fh = get_svc_fh(argp);
+	struct post_op_attr *poa =
+		&result.MKDIR3res_u.resok.obj_attributes;
+	struct fattr3 *post = &poa->post_op_attr_u.attributes;
+	struct inode *new = xzalloc(sizeof(*new)), *parent;
+	char *name = arg->where.name;
+	int ret;
+
+	sd_debug("%"PRIx64" %s", fh->ino, name);
+
+	parent = fs_read_inode_full(fh->ino);
+	if (IS_ERR(parent)) {
+		switch (PTR_ERR(parent)) {
+		case SD_RES_NO_OBJ:
+			result.status = NFS3ERR_NOENT;
+			goto out;
+		default:
+			result.status = NFS3ERR_IO;
+			goto out;
+		}
+	}
+
+	if (!S_ISDIR(parent->mode)) {
+		result.status = NFS3ERR_NOTDIR;
+		goto out_free_parent;
+	}
+
+	new->mode = S_IFDIR | sd_def_dmode;
+	new->uid = 0;
+	new->gid = 0;
+	new->size = 0;
+	new->used = INODE_DATA_SIZE;
+	new->ctime = new->atime = new->mtime = time(NULL);
+
+	ret = fs_create_dir(new, name, parent);
+	if (ret != SD_RES_SUCCESS) {
+		result.status = NFS3ERR_IO;
+		goto out_free_parent;
+	}
+
+	file_fh.ino = new->ino;
+	result.status = NFS3_OK;
+	result.MKDIR3res_u.resok.obj.handle_follows = true;
+	set_svc_fh(&result.MKDIR3res_u.resok.obj.post_op_fh3_u.handle,
+		   &file_fh);
+	poa->attributes_follow = true;
+	update_post_attr(new, post);
+
+out_free_parent:
+	free(parent);
+out:
+	free(new);
+	return &result;
 }
 
 void *nfs3_symlink(struct svc_req *req, struct nfs_arg *argp)
@@ -398,17 +453,30 @@ void *nfs3_symlink(struct svc_req *req, struct nfs_arg *argp)
 
 void *nfs3_mknod(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static MKNOD3res result;
+
+	result.status = NFS3ERR_NOTSUPP;
+
+	return &result;
 }
 
+/* TODO: implement btree or hash based kv store to manage dentries */
 void *nfs3_remove(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static REMOVE3res result;
+
+	result.status = NFS3ERR_NOTSUPP;
+
+	return &result;
 }
 
 void *nfs3_rmdir(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static RMDIR3res result;
+
+	result.status = NFS3ERR_NOTSUPP;
+
+	return &result;
 }
 
 void *nfs3_rename(struct svc_req *req, struct nfs_arg *argp)
@@ -612,5 +680,9 @@ void *nfs3_pathconf(struct svc_req *req, struct nfs_arg *argp)
 
 void *nfs3_commit(struct svc_req *req, struct nfs_arg *argp)
 {
-	return NULL;
+	static COMMIT3res result;
+
+	result.status = NFS3ERR_NOTSUPP;
+
+	return &result;
 }
