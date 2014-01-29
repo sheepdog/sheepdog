@@ -1048,7 +1048,7 @@ static int vdi_object_location(int argc, char **argv)
 					   NULL, size);
 			} else
 				printf("The inode object 0x%" PRIx32 " idx"
-				       "%"PRIu64" is not allocated\n",
+				       " %"PRIu64" is not allocated\n",
 				       vid, idx);
 		} else
 			sd_err("Failed to read the inode object 0x%" PRIx32,
