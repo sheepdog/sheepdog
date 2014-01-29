@@ -157,7 +157,7 @@ void traverse_btree(read_node_fn reader, const struct sd_inode *inode,
 	} else if (header->depth == 2) {
 		last_idx = LAST_IDX(inode->data_vdi_id);
 		iter_idx = FIRST_IDX(inode->data_vdi_id);
-		leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+		leaf_node = xvalloc(SD_INODE_DATA_INDEX_SIZE);
 		tmp = (void *)leaf_node;
 
 		while (iter_idx != last_idx) {
@@ -361,8 +361,8 @@ static void transfer_to_idx_root(write_node_fn writer, struct sd_inode *inode)
 	uint32_t num = root->entries / 2;
 
 	/* create two leaf-node and copy the entries from root-node */
-	left = xmalloc(SD_INODE_DATA_INDEX_SIZE);
-	right = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+	left = xvalloc(SD_INODE_DATA_INDEX_SIZE);
+	right = xvalloc(SD_INODE_DATA_INDEX_SIZE);
 
 	split_to_nodes(root, left, right, num);
 
@@ -403,7 +403,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 	if (header->depth == 2) {
 		path->depth = 2;
 		path->p_idx = search_idx_entry(header, idx);
-		leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+		leaf_node = xvalloc(SD_INODE_DATA_INDEX_SIZE);
 		tmp = (void *)leaf_node;
 
 		if (idx_in_range(header, path->p_idx)) {
@@ -475,7 +475,7 @@ static void split_ext_node(write_node_fn writer, struct sd_inode *inode,
 	uint32_t num = old->entries / 2;
 	uint64_t new_oid;
 
-	new_ext = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+	new_ext = xvalloc(SD_INODE_DATA_INDEX_SIZE);
 
 	split_to_nodes(old, new_ext, old, num);
 
@@ -544,7 +544,7 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 			if (header->entries >= EXT_IDX_MAX_ENTRIES)
 				panic("%s() B-tree is full!", __func__);
 			/* create a new ext-node */
-			leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+			leaf_node = xvalloc(SD_INODE_DATA_INDEX_SIZE);
 			sd_inode_init(leaf_node, 2);
 			oid = vid_to_btree_oid(inode->vdi_id,
 					inode->btree_counter++);
@@ -715,7 +715,7 @@ void sd_inode_copy_vdis(write_node_fn writer, read_node_fn reader,
 		last_idx = LAST_IDX(data_vdi_id);
 		old_iter_idx = FIRST_IDX(data_vdi_id);
 		new_iter_idx = FIRST_IDX(newi->data_vdi_id);
-		leaf_node = xmalloc(SD_INODE_DATA_INDEX_SIZE);
+		leaf_node = xvalloc(SD_INODE_DATA_INDEX_SIZE);
 		tmp = (void *)leaf_node;
 		while (old_iter_idx != last_idx) {
 			reader(old_iter_idx->oid, &tmp,
