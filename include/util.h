@@ -493,4 +493,34 @@ static inline void clear_screen(void)
 extern mode_t sd_def_fmode;
 extern mode_t sd_def_dmode;
 
+#define MAX_ERRNO	4095
+
+#define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-MAX_ERRNO)
+
+/*
+ * For SD, we should pass a '-SD_RES_SOME_ERROR' to ERR_PTR at first, then we
+ * use PTR_ERR() to get the actual error code, because we use positive integer
+ * for error code.
+ */
+static inline void * __must_check ERR_PTR(long error)
+{
+	assert(error < 0);
+	return (void *)error;
+}
+
+static inline long __must_check PTR_ERR(const void *ptr)
+{
+	return -(long)ptr;
+}
+
+static inline long __must_check IS_ERR(const void *ptr)
+{
+	return IS_ERR_VALUE((unsigned long)ptr);
+}
+
+static inline long __must_check IS_ERR_OR_NULL(const void *ptr)
+{
+	return !ptr || IS_ERR_VALUE((unsigned long)ptr);
+}
+
 #endif

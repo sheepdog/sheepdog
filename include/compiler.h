@@ -43,6 +43,8 @@
 /* Force a compilation error if the condition is true */
 #define BUILD_BUG_ON(condition) ((void)sizeof(struct { int: -!!(condition); }))
 
+#define __must_check            __attribute__((warn_unused_result))
+
 #ifdef HAVE_SYS_SIGNALFD_H
 #include <sys/signalfd.h>
 #else
