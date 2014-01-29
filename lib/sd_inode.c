@@ -74,7 +74,7 @@
 #include <string.h>
 
 #include "util.h"
-#include "sheepdog_proto.h"
+#include "internal_proto.h"
 
 #define EXT_MAX_SPACE (SD_INODE_DATA_INDEX_SIZE - \
 		sizeof(struct sd_extent_header))
@@ -395,7 +395,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 	struct sd_extent_header *header, *leaf_node;
 	void *tmp;
 	uint64_t oid;
-	int ret = SD_RES_BTREE_NOT_FOUND;
+	int ret = SD_RES_NOT_FOUND;
 
 	header = EXT_HEADER(inode->data_vdi_id);
 
@@ -415,7 +415,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 			path->p_ext_header = leaf_node;
 			if (ext_in_range(leaf_node, path->p_ext) &&
 					path->p_ext->idx == idx)
-				ret = SD_RES_BTREE_FOUND;
+				ret = SD_RES_SUCCESS;
 		} else {
 			/* check if last idx-node has space */
 			oid = (path->p_idx - 1)->oid;
@@ -432,9 +432,9 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 		path->p_ext = search_ext_entry(header, idx);
 		if (ext_in_range(header, path->p_ext) &&
 				path->p_ext->idx == idx)
-			ret = SD_RES_BTREE_FOUND;
+			ret = SD_RES_SUCCESS;
 		else
-			ret = SD_RES_BTREE_NOT_FOUND;
+			ret = SD_RES_NOT_FOUND;
 	}
 out:
 	return ret;
@@ -455,7 +455,7 @@ uint32_t sd_inode_get_vid(read_node_fn reader, const struct sd_inode *inode,
 
 		memset(&path, 0, sizeof(path));
 		ret = search_whole_btree(reader, inode, idx, &path);
-		if (ret == SD_RES_BTREE_FOUND)
+		if (ret == SD_RES_SUCCESS)
 			return path.p_ext->vdi_id;
 		if (path.p_ext_header)
 			free(path.p_ext_header);
@@ -508,7 +508,7 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 	if (path->depth == 1) {
 		if (header->entries >= EXT_MAX_ENTRIES) {
 			transfer_to_idx_root(writer, inode);
-			ret = SD_RES_BTREE_REPEAT;
+			ret = SD_RES_AGAIN;
 			goto out;
 		}
 		insert_ext_entry_nosearch(header,
@@ -516,12 +516,12 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 	} else if (path->depth == 2) {
 		if (idx_in_range(header, path->p_idx)) {
 			if (!path->p_ext_header) {
-				ret = SD_RES_BTREE_NOT_FOUND;
+				ret = SD_RES_NOT_FOUND;
 				goto out;
 			}
 			if (path->p_ext_header->entries >= EXT_MAX_ENTRIES) {
 				split_ext_node(writer, inode, path);
-				ret = SD_RES_BTREE_REPEAT;
+				ret = SD_RES_AGAIN;
 				goto out;
 			}
 			insert_ext_entry_nosearch(path->p_ext_header,
@@ -584,7 +584,7 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 		while (1) {
 			memset(&path, 0, sizeof(path));
 			ret = search_whole_btree(reader, inode, idx, &path);
-			if (ret == SD_RES_BTREE_FOUND) {
+			if (ret == SD_RES_SUCCESS) {
 				path.p_ext->vdi_id = vdi_id;
 				/*
 				 * Only write the vdi_id in sd_extent for
@@ -602,7 +602,7 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 			} else {
 				ret = insert_new_node(writer, reader, inode,
 						&path, idx, vdi_id);
-				if (SD_RES_BTREE_REPEAT == ret) {
+				if (SD_RES_AGAIN == ret) {
 					if (path.p_ext_header)
 						free(path.p_ext_header);
 					continue;

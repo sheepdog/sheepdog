@@ -127,6 +127,7 @@
 #define SD_RES_STALE_OBJ        0x90 /* Object may be stale */
 #define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
 #define SD_RES_VDI_NOT_EMPTY    0x92 /* VDI is not empty */
+#define SD_RES_NOT_FOUND	0x93 /* Cannot found target */
 
 #define SD_CLUSTER_FLAG_STRICT  0x0001 /* Strict mode for write */
 

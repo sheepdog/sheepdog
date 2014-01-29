@@ -74,9 +74,6 @@
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 #define SD_RES_HALT          0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_READONLY      0x1A /* Object is read-only */
-#define SD_RES_BTREE_NOT_FOUND	0x1B /* Cannot found node in btree */
-#define SD_RES_BTREE_FOUND   0x1C /* Found node in btree */
-#define SD_RES_BTREE_REPEAT  0x1D /* Should repeat op in btree */
 
 /* errors above 0x80 are sheepdog-internal */
 
