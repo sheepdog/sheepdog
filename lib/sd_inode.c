@@ -731,3 +731,98 @@ void sd_inode_copy_vdis(write_node_fn writer, read_node_fn reader,
 		free(leaf_node);
 	}
 }
+
+struct stat_arg {
+	uint64_t *my;
+	uint64_t *cow;
+	uint32_t vid;
+};
+
+static void stat_cb(void *data, enum btree_node_type type, void *arg)
+{
+	struct sd_extent *ext;
+	struct stat_arg *sarg = arg;
+	uint64_t *my = sarg->my;
+	uint64_t *cow = sarg->cow;
+
+	if (type == BTREE_EXT) {
+		ext = (struct sd_extent *)data;
+		if (ext->vdi_id == sarg->vid)
+			(*my)++;
+		else if (ext->vdi_id != 0)
+			(*cow)++;
+	}
+}
+
+static void hypver_volume_stat(const struct sd_inode *inode,
+			       uint64_t *my_objs, uint64_t *cow_objs,
+			       read_node_fn reader)
+{
+	struct stat_arg arg = {my_objs, cow_objs, inode->vdi_id};
+	traverse_btree(reader, inode, stat_cb, &arg);
+}
+
+static void volume_stat(const struct sd_inode *inode, uint64_t *my_objs,
+			uint64_t *cow_objs)
+{
+	int nr;
+	uint64_t my, cow, *p;
+	uint32_t vid = inode->vdi_id;
+
+	my = 0;
+	cow = 0;
+	nr = count_data_objs(inode);
+
+	if (nr % 2 != 0) {
+		if (inode->data_vdi_id[0] == inode->vdi_id)
+			my++;
+		else if (inode->data_vdi_id[0] != 0)
+			cow++;
+		p = (uint64_t *)(inode->data_vdi_id + 1);
+	} else
+		p = (uint64_t *)inode->data_vdi_id;
+
+	/*
+	 * To boost performance, this function checks data_vdi_id for each 64
+	 * bit integer.
+	 */
+	nr /= 2;
+	for (int i = 0; i < nr; i++) {
+		if (p[i] == 0)
+			continue;
+		if (p[i] == (((uint64_t)vid << 32) | vid)) {
+			my += 2;
+			continue;
+		}
+
+		/* Check the higher 32 bit */
+		if (p[i] >> 32 == vid)
+			my++;
+		else if ((p[i] & 0xFFFFFFFF00000000) != 0)
+			cow++;
+
+		/* Check the lower 32 bit */
+		if ((p[i] & 0xFFFFFFFF) == vid)
+			my++;
+		else if ((p[i] & 0xFFFFFFFF) != 0)
+			cow++;
+	}
+
+	*my_objs = my;
+	*cow_objs = cow;
+}
+
+/*
+ * Get the number of objects.
+ *
+ * 'my_objs' means the number objects which belongs to this vdi.  'cow_objs'
+ * means the number of the other objects.
+ */
+void sd_inode_stat(const struct sd_inode *inode, uint64_t *my_objs,
+		   uint64_t *cow_objs, read_node_fn reader)
+{
+	if (inode->store_policy == 0)
+		volume_stat(inode, my_objs, cow_objs);
+	else
+		hypver_volume_stat(inode, my_objs, cow_objs, reader);
+}

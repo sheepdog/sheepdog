@@ -87,100 +87,6 @@ static void vdi_show_progress(uint64_t done, uint64_t total)
 	return show_progress(done, total, false);
 }
 
-struct stat_arg {
-	uint64_t *my;
-	uint64_t *cow;
-	uint32_t vid;
-};
-
-static void stat_cb(void *data, enum btree_node_type type, void *arg)
-{
-	struct sd_extent *ext;
-	struct stat_arg *sarg = arg;
-	uint64_t *my = sarg->my;
-	uint64_t *cow = sarg->cow;
-
-	if (type == BTREE_EXT) {
-		ext = (struct sd_extent *)data;
-		if (ext->vdi_id == sarg->vid)
-			(*my)++;
-		else if (ext->vdi_id != 0)
-			(*cow)++;
-	}
-}
-
-static void stat_data_objs_btree(const struct sd_inode *inode,
-				 uint64_t *my_objs, uint64_t *cow_objs)
-{
-	struct stat_arg arg = {my_objs, cow_objs, inode->vdi_id};
-	traverse_btree(dog_bnode_reader, inode, stat_cb, &arg);
-}
-
-static void stat_data_objs_array(const struct sd_inode *inode,
-				 uint64_t *my_objs, uint64_t *cow_objs)
-{
-	int nr;
-	uint64_t my, cow, *p;
-	uint32_t vid = inode->vdi_id;
-
-	my = 0;
-	cow = 0;
-	nr = count_data_objs(inode);
-
-	if (nr % 2 != 0) {
-		if (is_data_obj_writeable(inode, 0))
-			my++;
-		else if (inode->data_vdi_id[0] != 0)
-			cow++;
-		p = (uint64_t *)(inode->data_vdi_id + 1);
-	} else
-		p = (uint64_t *)inode->data_vdi_id;
-
-	/*
-	 * To boost performance, this function checks data_vdi_id for each 64
-	 * bit integer.
-	 */
-	nr /= 2;
-	for (int i = 0; i < nr; i++) {
-		if (p[i] == 0)
-			continue;
-		if (p[i] == (((uint64_t)vid << 32) | vid)) {
-			my += 2;
-			continue;
-		}
-
-		/* Check the higher 32 bit */
-		if (p[i] >> 32 == vid)
-			my++;
-		else if ((p[i] & 0xFFFFFFFF00000000) != 0)
-			cow++;
-
-		/* Check the lower 32 bit */
-		if ((p[i] & 0xFFFFFFFF) == vid)
-			my++;
-		else if ((p[i] & 0xFFFFFFFF) != 0)
-			cow++;
-	}
-
-	*my_objs = my;
-	*cow_objs = cow;
-}
-
-/*
- * Get the number of objects.
- *
- * 'my_objs' means the number objects which belongs to this vdi.  'cow_objs'
- * means the number of the other objects.
- */
-static void stat_data_objs(const struct sd_inode *inode, uint64_t *my_objs,
-			   uint64_t *cow_objs)
-{
-	if (inode->store_policy == 0)
-		stat_data_objs_array(inode, my_objs, cow_objs);
-	else
-		stat_data_objs_btree(inode, my_objs, cow_objs);
-}
-
 static char *redundancy_scheme(uint8_t copy_nr, uint8_t policy)
 {
 	static char str[10];
@@ -218,7 +124,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			 "%Y-%m-%d %H:%M", &tm);
 	}
 
-	stat_data_objs(i, &my_objs, &cow_objs);
+	sd_inode_stat(i, &my_objs, &cow_objs, dog_bnode_reader);
 
 	if (i->snap_id == 1 && i->parent_vdi_id != 0)
 		is_clone = true;

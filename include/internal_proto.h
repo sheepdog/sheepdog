@@ -263,6 +263,9 @@ struct sd_stat {
 	} r;
 };
 
+void sd_inode_stat(const struct sd_inode *inode, uint64_t *, uint64_t *,
+		   read_node_fn reader);
+
 #ifdef HAVE_TRACE
 
 #define TRACE_GRAPH_ENTRY  0x01
