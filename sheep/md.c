@@ -198,8 +198,14 @@ static int for_each_object_in_path(const char *path,
 			continue;
 		}
 
-		if (strlen(d->d_name) > 17 && d->d_name[16] == '.')
+		if (strlen(d->d_name) > 17 && d->d_name[16] == '.') {
 			epoch = strtoul(d->d_name + 17, NULL, 10);
+			if (epoch == 0 || epoch == ULONG_MAX) {
+				sd_info("%s ignored, strtoul failed %m",
+					d->d_name);
+				continue;
+			}
+		}
 
 		ret = func(oid, path, epoch, arg);
 		if (ret != SD_RES_SUCCESS)
