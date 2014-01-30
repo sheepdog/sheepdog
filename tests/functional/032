@@ -34,6 +34,7 @@ for i in `seq 1 7`; do
     _start_sheep $i
 done
 
+_wait_for_sheep 8
 _wait_for_sheep_recovery 0
 
 ls $STORE/*/obj/807c2b2500000000 | _filter_store | sort
