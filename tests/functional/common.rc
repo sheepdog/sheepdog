@@ -300,7 +300,7 @@ _start_sheep()
         _die "sheep $1 is still running"
     fi
 
-    if $MD; then
+    if $MD && [ -z "$MD_STORE" ]; then
 	MD_STORE=",$STORE/$1/d0,$STORE/$1/d1,$STORE/$1/d2"
     fi
 
@@ -309,6 +309,7 @@ _start_sheep()
     if [ $? != 0 ]; then
         _die "cannot start sheep $1"
     fi
+    unset MD_STORE
 }
 
 _kill_all_dogs()

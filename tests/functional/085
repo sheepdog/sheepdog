@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# Restart sheep with less disks in MD setup
+
+. ./common
+
+MD=true
+
+for i in `seq 0 5`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 6
+
+_vdi_create test 100M
+# create 25 objects
+for i in `seq 0 24`; do
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+$DOG vdi read test | md5sum
+
+$DOG cluster shutdown
+_wait_for_sheep_stop
+
+for i in `seq 0 4`; do
+    _start_sheep $i
+done
+
+# start sheep with different number of disks than that before shutdown
+MD_STORE=",$STORE/5/d0,$STORE/5/d1,$STORE/5/d2,$STORE/5/d3"
+_start_sheep 5
+
+_wait_for_sheep 6
+
+for i in `seq 0 24`; do
+    echo $(($i+1)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+$DOG vdi read test | md5sum
+$DOG cluster info | _filter_cluster_info
