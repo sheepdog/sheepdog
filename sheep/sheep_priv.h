@@ -412,6 +412,7 @@ bool is_local_op(const struct sd_op_template *op);
 bool is_peer_op(const struct sd_op_template *op);
 bool is_gateway_op(const struct sd_op_template *op);
 bool is_force_op(const struct sd_op_template *op);
+bool is_logging_op(const struct sd_op_template *op);
 bool has_process_work(const struct sd_op_template *op);
 bool has_process_main(const struct sd_op_template *op);
 void do_process_work(struct work *work);
