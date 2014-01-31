@@ -27,6 +27,12 @@ struct sd_op_template {
 	bool force;
 
 	/*
+	 * Indicates administrative operation to trace.
+	 * If true is set, rx_main and tx_main log operations at info level.
+	 */
+	bool is_admin_op;
+
+	/*
 	 * process_work() will be called in a worker thread, and process_main()
 	 * will be called in the main thread.
 	 *
@@ -1032,6 +1038,7 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_NEW_VDI] = {
 		.name = "NEW_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
 		.process_work = cluster_new_vdi,
 		.process_main = post_cluster_new_vdi,
 	},
@@ -1039,6 +1046,7 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_DEL_VDI] = {
 		.name = "DEL_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
 		.process_work = cluster_del_vdi,
 		.process_main = post_cluster_del_vdi,
 	},
@@ -1047,6 +1055,7 @@ static struct sd_op_template sd_ops[] = {
 		.name = "MAKE_FS",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = true,
+		.is_admin_op = true,
 		.process_main = cluster_make_fs,
 	},
 
@@ -1054,6 +1063,7 @@ static struct sd_op_template sd_ops[] = {
 		.name = "SHUTDOWN",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = true,
+		.is_admin_op = true,
 		.process_main = cluster_shutdown,
 	},
 
@@ -1067,6 +1077,7 @@ static struct sd_op_template sd_ops[] = {
 		.name = "FORCE_RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
 		.force = true,
+		.is_admin_op = true,
 		.process_work = cluster_force_recover_work,
 		.process_main = cluster_force_recover_main,
 	},
@@ -1120,18 +1131,21 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_REWEIGHT] = {
 		.name = "REWEIGHT",
 		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
 		.process_main = cluster_reweight,
 	},
 
 	[SD_OP_ENABLE_RECOVER] = {
 		.name = "ENABLE_RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
 		.process_main = cluster_enable_recover,
 	},
 
 	[SD_OP_DISABLE_RECOVER] = {
 		.name = "DISABLE_RECOVER",
 		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
 		.process_main = cluster_disable_recover,
 	},
 
@@ -1251,6 +1265,7 @@ static struct sd_op_template sd_ops[] = {
 		.name = "KILL_NODE",
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
+		.is_admin_op = true,
 		.process_main = local_kill_node,
 	},
 
@@ -1263,12 +1278,14 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_MD_PLUG] = {
 		.name = "MD_PLUG_DISKS",
 		.type = SD_OP_TYPE_LOCAL,
+		.is_admin_op = true,
 		.process_main = local_md_plug,
 	},
 
 	[SD_OP_MD_UNPLUG] = {
 		.name = "MD_UNPLUG_DISKS",
 		.type = SD_OP_TYPE_LOCAL,
+		.is_admin_op = true,
 		.process_main = local_md_unplug,
 	},
 
@@ -1413,6 +1430,11 @@ bool is_gateway_op(const struct sd_op_template *op)
 bool is_force_op(const struct sd_op_template *op)
 {
 	return !!op->force;
+}
+
+bool is_logging_op(const struct sd_op_template *op)
+{
+	return !!op->is_admin_op;
 }
 
 bool has_process_work(const struct sd_op_template *op)
