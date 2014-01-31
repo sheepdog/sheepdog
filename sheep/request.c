@@ -580,7 +580,19 @@ static void rx_main(struct work *work)
 
 	conn_rx_on(&ci->conn);
 
-	sd_debug("%d, %s:%d", ci->conn.fd, ci->conn.ipstr, ci->conn.port);
+	if (is_logging_op(get_sd_op(req->rq.opcode))) {
+		sd_info("req=%p, fd=%d, client=%s:%d, op=%s, data=%s",
+			req,
+			ci->conn.fd,
+			ci->conn.ipstr, ci->conn.port,
+			op_name(get_sd_op(req->rq.opcode)),
+			(char *)req->data);
+	} else {
+		sd_debug("%d, %s:%d",
+			 ci->conn.fd,
+			 ci->conn.ipstr,
+			 ci->conn.port);
+	}
 	queue_request(req);
 }
 
@@ -619,6 +631,20 @@ static void tx_main(struct work *work)
 
 	refcount_dec(&ci->refcnt);
 
+	if (is_logging_op(ci->tx_req->op)) {
+		sd_info("req=%p, fd=%d, client=%s:%d, op=%s, result=%02X",
+			ci->tx_req,
+			ci->conn.fd,
+			ci->conn.ipstr,
+			ci->conn.port,
+			op_name(ci->tx_req->op),
+			ci->tx_req->rp.result);
+	} else {
+		sd_debug("%d, %s:%d",
+			 ci->conn.fd,
+			 ci->conn.ipstr,
+			 ci->conn.port);
+	}
 	free_request(ci->tx_req);
 	ci->tx_req = NULL;
 
