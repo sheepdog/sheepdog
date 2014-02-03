@@ -613,8 +613,8 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		 *
 		 * FIXME: do we need more efficient yet complex data structure?
 		 */
-		if (xlfind(&oid, rinfo->oids + rinfo->done + 1, rinfo->count,
-			   oid_cmp))
+		if (xlfind(&oid, rinfo->oids + rinfo->done + 1,
+			   rinfo->count - (rinfo->done + 1), oid_cmp))
 			break;
 
 		/*
