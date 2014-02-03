@@ -973,7 +973,7 @@ static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
 static int start_deletion(struct request *req, uint32_t vid)
 {
 	struct deletion_work *dw = NULL;
-	int ret = SD_RES_SUCCESS;
+	int ret = SD_RES_SUCCESS, finish_fd;
 	bool cloned;
 	uint32_t root_vid;
 
@@ -981,7 +981,7 @@ static int start_deletion(struct request *req, uint32_t vid)
 	dw->delete_vid_array = xzalloc(SD_INODE_SIZE - SD_INODE_HEADER_SIZE);
 	dw->delete_vid_count = 0;
 	dw->target_vid = vid;
-	dw->finish_fd = eventfd(0, 0);
+	finish_fd = dw->finish_fd = eventfd(0, 0);
 	if (dw->finish_fd < 0) {
 		sd_err("cannot create an eventfd for notifying finish of"
 		       " deletion info: %m");
@@ -1030,8 +1030,8 @@ static int start_deletion(struct request *req, uint32_t vid)
 	 * the event fd is written by delete_one_vdi_done(), when all vdis of
 	 * deletion_work are deleted
 	 */
-	eventfd_xread(dw->finish_fd);
-	close(dw->finish_fd);
+	eventfd_xread(finish_fd);
+	close(finish_fd);
 
 	return ret;
 out:
