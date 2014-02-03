@@ -255,7 +255,7 @@ _valgrind_sheep()
             --suppressions=valgrind.supp ${VALGRIND_OPTIONS}"
 
     rm -f ${dir}/lock
-    sh -c "echo y | valgrind ${opts} $SHEEP_PROG $* -f -o 2>> ${dir}/sheep.log &"
+    sh -c "echo y | valgrind ${opts} $SHEEP_PROG $* -l dst=stdout 2>> ${dir}/sheep.log &"
 
     # wait for sheep to start up
     while true; do
