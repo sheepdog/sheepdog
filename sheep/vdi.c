@@ -446,7 +446,7 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 			   sizeof(iocb->time),
 			   offsetof(struct sd_inode, snap_ctime), false);
 	if (ret != SD_RES_SUCCESS) {
-		ret = SD_RES_BASE_VDI_READ;
+		ret = SD_RES_VDI_WRITE;
 		goto out;
 	}
 
