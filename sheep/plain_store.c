@@ -77,6 +77,10 @@ static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path,
 	return md_get_stale_path(oid, epoch, path, size);
 }
 
+/*
+ * Check if oid is in this nodes (if oid is in the wrong place, it will be moved
+ * to the correct one after this call in a MD setup.
+ */
 bool default_exist(uint64_t oid)
 {
 	return md_exist(oid);
@@ -141,6 +145,14 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	}
 
 	get_obj_path(oid, path, sizeof(path));
+
+	/*
+	 * Make sure oid is in the right place because oid might be misplaced
+	 * in a wrong place, due to 'shutdown/restart with less/more disks' or
+	 * any bugs. We need call err_to_sderr() to return EIO if disk is broken
+	 */
+	if (!default_exist(oid))
+		return err_to_sderr(path, oid, ENOENT);
 
 	fd = open(path, flags, sd_def_fmode);
 	if (unlikely(fd < 0))
@@ -210,8 +222,8 @@ static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 
 	ret = default_read(oid, &iocb);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read inode header %" PRIx64 " %" PRId32, oid,
-		       epoch);
+		sd_err("failed to read inode header %" PRIx64 " %" PRId32
+		       "wat %s", oid, epoch, wd);
 		goto out;
 	}
 
@@ -232,7 +244,8 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
 	objlist_cache_insert(oid);
 
 	if (is_vdi_obj(oid)) {
-		sd_debug("found the VDI object %" PRIx64, oid);
+		sd_debug("found the VDI object %" PRIx64" epoch %"PRIu32
+			 " at %s", oid, epoch, wd);
 		ret = init_vdi_state(oid, wd, epoch);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
@@ -254,12 +267,27 @@ int default_init(void)
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 
+static inline bool is_stale_path(const char *path)
+{
+	return !!strstr(path, "stale");
+}
+
 static int default_read_from_path(uint64_t oid, const char *path,
 				  const struct siocb *iocb)
 {
 	int flags = prepare_iocb(oid, iocb, false), fd,
 	    ret = SD_RES_SUCCESS;
 	ssize_t size;
+
+	/*
+	 * Make sure oid is in the right place because oid might be misplaced
+	 * in a wrong place, due to 'shutdown/restart with less disks' or any
+	 * bugs. We need call err_to_sderr() to return EIO if disk is broken.
+	 *
+	 * For stale path, get_stale_obj_path() already does default_exist job.
+	 */
+	if (!is_stale_path(path) && !default_exist(oid))
+		return err_to_sderr(path, oid, ENOENT);
 
 	fd = open(path, flags);
 
