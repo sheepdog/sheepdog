@@ -495,6 +495,22 @@ bool is_numeric(const char *s)
 }
 
 /*
+ * We regard 'data' as string when it contains '\0' in the first 256 characters.
+ */
+const char *data_to_str(void *data, size_t data_length)
+{
+	data_length = MIN(data_length, 256);
+
+	if (data == NULL)
+		return "(null)";
+
+	if (memchr(data, '\0', data_length) != NULL)
+		return data;
+
+	return "(not string)";
+}
+
+/*
  * If 'once' is true, the signal will be restored to the default state
  * after 'handler' is called.
  */

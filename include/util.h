@@ -107,6 +107,7 @@ char *chomp(char *str);
 int rmdir_r(const char *dir_path);
 int purge_directory(const char *dir_path);
 bool is_numeric(const char *p);
+const char *data_to_str(void *data, size_t data_length);
 int install_sighandler(int signum, void (*handler)(int), bool once);
 int install_crash_handler(void (*handler)(int));
 void reraise_crash_signal(int signo, int status);
