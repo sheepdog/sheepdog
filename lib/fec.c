@@ -602,9 +602,10 @@ static inline void decode_prepare(struct fec *ctx, const uint8_t *dp[],
 			out[i] = dp[i];
 			outidx[i] = i;
 		} else {
+			assert(p < ctx->dp);
 			out[i] = dp[p];
 			outidx[i] = p;
-			while (!dp[++p])
+			while (++p < ctx->dp && !dp[p])
 				;
 		}
 	}
