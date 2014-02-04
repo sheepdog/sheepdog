@@ -1407,6 +1407,7 @@ int object_cache_get_info(struct object_cache_info *info)
 {
 	int j = 0;
 
+	memset(info, 0, sizeof(*info));
 	info->used = (uint64_t)gcache.capacity * 1024 * 1024;
 	info->size = (uint64_t)sys->object_cache_size * 1024 * 1024;
 
