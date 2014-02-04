@@ -477,7 +477,6 @@ static inline void zk_tree_destroy(void)
 		if (zk)
 			zk_tree_del_nolock(zk);
 	}
-	rb_destroy(&zk_node_root, struct zk_node, rb);
 	sd_rw_unlock(&zk_tree_lock);
 }
 
