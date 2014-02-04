@@ -1404,47 +1404,50 @@ const struct sd_op_template *get_sd_op(uint8_t opcode)
 
 const char *op_name(const struct sd_op_template *op)
 {
+	if (op == NULL)
+		return "(invalid opcode)";
+
 	return op->name;
 }
 
 bool is_cluster_op(const struct sd_op_template *op)
 {
-	return op->type == SD_OP_TYPE_CLUSTER;
+	return op != NULL && op->type == SD_OP_TYPE_CLUSTER;
 }
 
 bool is_local_op(const struct sd_op_template *op)
 {
-	return op->type == SD_OP_TYPE_LOCAL;
+	return op != NULL && op->type == SD_OP_TYPE_LOCAL;
 }
 
 bool is_peer_op(const struct sd_op_template *op)
 {
-	return op->type == SD_OP_TYPE_PEER;
+	return op != NULL && op->type == SD_OP_TYPE_PEER;
 }
 
 bool is_gateway_op(const struct sd_op_template *op)
 {
-	return op->type == SD_OP_TYPE_GATEWAY;
+	return op != NULL && op->type == SD_OP_TYPE_GATEWAY;
 }
 
 bool is_force_op(const struct sd_op_template *op)
 {
-	return !!op->force;
+	return op != NULL && op->force;
 }
 
 bool is_logging_op(const struct sd_op_template *op)
 {
-	return !!op->is_admin_op;
+	return op != NULL && op->is_admin_op;
 }
 
 bool has_process_work(const struct sd_op_template *op)
 {
-	return !!op->process_work;
+	return op != NULL && !!op->process_work;
 }
 
 bool has_process_main(const struct sd_op_template *op)
 {
-	return !!op->process_main;
+	return op != NULL && !!op->process_main;
 }
 
 void do_process_work(struct work *work)
