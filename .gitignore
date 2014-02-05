@@ -19,6 +19,7 @@ cscope.*
 *.gcda
 *.gcno
 *.info
+*~
 
 #
 # for GLOBAL
@@ -64,6 +65,8 @@ ltmain.sh
 config.h
 config.h.in
 script/generic
+script/dog
+script/sheepdog
 
 tests/check.log
 tests/check.time
