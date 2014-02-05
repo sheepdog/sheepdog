@@ -119,10 +119,6 @@ const char *my_exe_path(void);
 int split_path(const char *path, size_t nr_segs, char **segs);
 void make_path(char *path, size_t size, size_t nr_segs, const char **segs);
 
-void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
-void trim_zero_blocks(void *buf, uint64_t *offset, uint32_t *len);
-void untrim_zero_blocks(void *buf, uint64_t offset, uint32_t len,
-			uint32_t requested_len);
 int atomic_create_and_write(const char *path, const char *buf, size_t len,
 			    bool force_create);
 
