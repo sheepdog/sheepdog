@@ -315,9 +315,9 @@ static int clone_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	idx = find_free_idx(base->child_vdi_id, sizeof(base->child_vdi_id));
+	idx = find_free_idx(base->child_vdi_id, ARRAY_SIZE(base->child_vdi_id));
 	if (idx < 0) {
-		ret = SD_RES_NO_BASE_VDI;
+		ret = SD_RES_FULL_VDI;
 		goto out;
 	}
 
@@ -379,9 +379,9 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	idx = find_free_idx(base->child_vdi_id, sizeof(base->child_vdi_id));
+	idx = find_free_idx(base->child_vdi_id, ARRAY_SIZE(base->child_vdi_id));
 	if (idx < 0) {
-		ret = SD_RES_NO_BASE_VDI;
+		ret = SD_RES_FULL_VDI;
 		goto out;
 	}
 
@@ -448,9 +448,9 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	idx = find_free_idx(base->child_vdi_id, sizeof(base->child_vdi_id));
+	idx = find_free_idx(base->child_vdi_id, ARRAY_SIZE(base->child_vdi_id));
 	if (idx < 0) {
-		ret = SD_RES_NO_BASE_VDI;
+		ret = SD_RES_FULL_VDI;
 		goto out;
 	}
 
