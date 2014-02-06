@@ -695,7 +695,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 				break;
 		}
 		if (i == nr_recovereds) {
-			sd_debug("all nodes are recovered, epoch %d", epoch);
+			sd_notice("all nodes are recovered, epoch %d", epoch);
 			last_gathered_epoch = epoch;
 			/* sd_store can be NULL if this node is a gateway */
 			if (vnode_info->nr_zones >= ec_max_data_strip &&
