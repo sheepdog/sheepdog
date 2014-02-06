@@ -62,6 +62,26 @@ RPMBUILDOPTS = --define "_sourcedir $(abs_builddir)" \
 		--define "_srcrpmdir $(abs_builddir)" \
 		--define "_rpmdir $(abs_builddir)"
 
+RPMBUILD_CONFIG_OPTS =
+RPMBUILD_REQ_OPTS =
+RPMBUILD_BUILD_REQ_OPTS =
+
+if BUILD_ZOOKEEPER
+RPMBUILD_CONFIG_OPTS += --enable-zookeeper
+RPMBUILD_REQ_OPTS += zookeeper
+RPMBUILD_BUILD_REQ_OPTS += zookeeper-lib-devel
+endif
+
+if BUILD_SHEEPFS
+RPMBUILD_CONFIG_OPTS += --enable-sheepfs
+RPMBUILD_REQ_OPTS += fuse
+RPMBUILD_BUILD_REQ_OPTS += fuse-devel
+endif
+
+RPMBUILDOPTS += --define "_configopts $(RPMBUILD_CONFIG_OPTS)"
+RPMBUILDOPTS += --define "_requires $(RPMBUILD_REQ_OPTS)"
+RPMBUILDOPTS += --define "_buildrequires $(RPMBUILD_BUILD_REQ_OPTS)"
+
 $(TARFILE):
 	$(MAKE) dist
 
