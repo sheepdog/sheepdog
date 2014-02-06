@@ -659,7 +659,7 @@ static int cluster_recovery_completion(const struct sd_req *req,
 				break;
 		}
 		if (i == nr_recovereds) {
-			sd_debug("all nodes are recovered, epoch %d", epoch);
+			sd_notice("all nodes are recovered, epoch %d", epoch);
 			/* sd_store can be NULL if this node is a gateway */
 			if (sd_store && sd_store->cleanup)
 				sd_store->cleanup();
