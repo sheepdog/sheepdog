@@ -95,7 +95,11 @@ rpm: clean
 
 deb:
 	fakeroot ./debian/rules clean
-	git log > debian/CHANGELOG
+	@if [ -d .git ]; then \
+		git log > debian/CHANGELOG; \
+	else \
+		echo "This package doesn't contain CHANGELOG because it is build from raw source archive." > debian/CHANGELOG; \
+	fi
 	rm -f debian/changelog
 	dch -v $(shell echo $(PACKAGE_VERSION) | sed s/_/+/ | sed s/_/./g)-1 \
 		--package sheepdog --create 'Local build'
