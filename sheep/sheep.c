@@ -444,7 +444,7 @@ static int create_work_queues(void)
 	sys->net_wqueue = create_work_queue("net", WQ_UNLIMITED);
 	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
 	sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
-	sys->recovery_wqueue = create_ordered_work_queue("rw");
+	sys->recovery_wqueue = create_work_queue("rw", WQ_UNLIMITED);
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
 	sys->md_wqueue = create_ordered_work_queue("md");

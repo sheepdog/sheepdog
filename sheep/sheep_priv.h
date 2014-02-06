@@ -485,6 +485,7 @@ uint32_t md_get_info(struct sd_md_info *info);
 int md_plug_disks(char *disks);
 int md_unplug_disks(char *disks);
 uint64_t md_get_size(uint64_t *used);
+uint32_t md_nr_disks(void);
 
 /* http.c */
 #ifdef HAVE_HTTP

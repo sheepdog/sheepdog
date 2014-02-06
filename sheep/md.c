@@ -43,9 +43,9 @@ static struct md md = {
 	.lock = SD_RW_LOCK_INITIALIZER,
 };
 
-static inline int nr_online_disks(void)
+static inline uint32_t nr_online_disks(void)
 {
-	int nr;
+	uint32_t nr;
 
 	sd_read_lock(&md.lock);
 	nr = md.nr_disks;
@@ -682,4 +682,9 @@ uint64_t md_get_size(uint64_t *used)
 	sd_rw_unlock(&md.lock);
 
 	return fsize + *used;
+}
+
+uint32_t md_nr_disks(void)
+{
+	return nr_online_disks();
 }

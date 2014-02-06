@@ -54,6 +54,7 @@ struct recovery_info {
 	uint32_t epoch;
 	uint32_t tgt_epoch;
 	uint64_t done;
+	uint64_t next;
 
 	/*
 	 * true when automatic recovery is disabled
@@ -507,6 +508,8 @@ static int do_recover_object(struct recovery_obj_work *row)
 {
 	uint64_t oid = row->oid;
 
+	sd_debug("try recover object %"PRIx64, oid);
+
 	if (is_erasure_oid(oid))
 		return recover_erasure_object(row);
 	else
@@ -597,13 +600,15 @@ main_fn bool oid_in_recovery(uint64_t oid)
 			return false;
 		}
 
-		if (rinfo->oids[rinfo->done] == oid) {
+		if (xlfind(&oid, rinfo->oids + rinfo->done,
+			   rinfo->next - rinfo->done, oid_cmp)) {
 			if (rinfo->suspended)
 				break;
 			/*
 			 * When recovery is not suspended,
-			 * rinfo->oids[rinfo->done] is currently being recovered
-			 * and no need to call prepare_schedule_oid().
+			 * rinfo->oids[rinfo->done .. rinfo->next) is currently
+			 * being recovered and no need to call
+			 * prepare_schedule_oid().
 			 */
 			return true;
 		}
@@ -613,8 +618,8 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		 *
 		 * FIXME: do we need more efficient yet complex data structure?
 		 */
-		if (xlfind(&oid, rinfo->oids + rinfo->done + 1,
-			   rinfo->count - (rinfo->done + 1), oid_cmp))
+		if (xlfind(&oid, rinfo->oids + rinfo->next,
+			   rinfo->count - rinfo->next + 1, oid_cmp))
 			break;
 
 		/*
@@ -666,12 +671,19 @@ static void free_recovery_info(struct recovery_info *rinfo)
 /* Return true if next recovery work is queued. */
 static inline bool run_next_rw(void)
 {
-	struct recovery_info *nrinfo = uatomic_xchg_ptr(&next_rinfo, NULL);
+	struct recovery_info *nrinfo = uatomic_read(&next_rinfo);
 	struct recovery_info *cur = main_thread_get(current_rinfo);
 
 	if (nrinfo == NULL)
 		return false;
 
+	/* Some objects are still in recovery. */
+	if (cur->done < cur->next) {
+		sd_debug("some threads still running, wait for completion");
+		return true;
+	}
+
+	nrinfo = uatomic_xchg_ptr(&next_rinfo, NULL);
 	/*
 	 * When md recovery supersed the reweight or node recovery, we need to
 	 * notify completion.
@@ -743,14 +755,14 @@ static inline bool oid_in_prio_oids(struct recovery_info *rinfo, uint64_t oid)
 /*
  * Schedule prio_oids to be recovered first in FIFO order
  *
- * rw->done is index of the original next object to be recovered and also the
- * number of objects already recovered.
+ * rw->next is index of the original next object to be recovered and also the
+ * number of objects already recovered and being recovered.
  * we just move rw->prio_oids in between:
- *   new_oids = [0..rw->done - 1] + [rw->prio_oids] + [rw->done]
+ *   new_oids = [0..rw->next - 1] + [rw->prio_oids] + [rw->next]
  */
 static inline void finish_schedule_oids(struct recovery_info *rinfo)
 {
-	uint64_t i, nr_recovered = rinfo->done, new_idx;
+	uint64_t i, nr_recovered = rinfo->next, new_idx;
 	uint64_t *new_oids;
 
 	/* If I am the last oid, done */
@@ -763,7 +775,7 @@ static inline void finish_schedule_oids(struct recovery_info *rinfo)
 	       rinfo->nr_prio_oids * sizeof(uint64_t));
 	new_idx = nr_recovered + rinfo->nr_prio_oids;
 
-	for (i = rinfo->done; i < rinfo->count; i++) {
+	for (i = rinfo->next; i < rinfo->count; i++) {
 		if (oid_in_prio_oids(rinfo, rinfo->oids[i]))
 			continue;
 		new_oids[new_idx++] = rinfo->oids[i];
@@ -810,8 +822,13 @@ static void recover_next_object(struct recovery_info *rinfo)
 		return;
 	}
 
+	/* no more objects to be recovered */
+	if (rinfo->next >= rinfo->count)
+		return;
+
 	/* Try recover next object */
 	queue_recovery_work(rinfo);
+	rinfo->next++;
 }
 
 void resume_suspended_recovery(void)
@@ -833,8 +850,20 @@ static void recover_object_main(struct work *work)
 						     base);
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
 
-	if (run_next_rw())
-		goto out;
+	/* ->oids[done, next] is out of order since finish order is random */
+	if (rinfo->oids[rinfo->done] != row->oid) {
+		uint64_t *p = xlfind(&row->oid, rinfo->oids + rinfo->done,
+				     rinfo->next - rinfo->done, oid_cmp);
+
+		*p = rinfo->oids[rinfo->done];
+		rinfo->oids[rinfo->done] = row->oid;
+	}
+	rinfo->done++;
+
+	if (run_next_rw()) {
+		free_recovery_obj_work(row);
+		return;
+	}
 
 	if (row->stop) {
 		/*
@@ -843,24 +872,23 @@ static void recover_object_main(struct work *work)
 		 * requests
 		 */
 		rinfo->notify_complete = false;
-		finish_recovery(rinfo);
 		sd_debug("recovery is stopped");
-		goto out;
+		goto finish_recovery;
 	}
 
 	wakeup_requests_on_oid(row->oid);
-	rinfo->done++;
 
 	sd_info("object %"PRIx64" is recovered (%"PRIu64"/%"PRIu64")", row->oid,
 		rinfo->done, rinfo->count);
 
-	if (rinfo->done < rinfo->count) {
-		recover_next_object(rinfo);
-		goto out;
-	}
+	if (rinfo->done >= rinfo->count)
+		goto finish_recovery;
 
+	recover_next_object(rinfo);
+	free_recovery_obj_work(row);
+	return;
+finish_recovery:
 	finish_recovery(rinfo);
-out:
 	free_recovery_obj_work(row);
 }
 
@@ -872,6 +900,22 @@ static void finish_object_list(struct work *work)
 						      struct recovery_list_work,
 						      base);
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
+	/*
+	 * Rationale for multi-threaded recovery:
+	 * 1. If one node is added, we find that all the VMs on other nodes will
+	 *    get noticeably affected until 50% data is transferred to the new
+	 *    node.
+	 * 2. For node failure, we might not have problems of running VM but the
+	 *    recovery process boost will benefit IO operation of VM with less
+	 *    chances to be blocked for write and also improve reliability.
+	 * 3. For disk failure in node, this is similar to adding a node. All
+	 *    the data on the broken disk will be recovered on other disks in
+	 *    this node. Speedy recoery not only improve data reliability but
+	 *    also cause less writing blocking on the lost data.
+	 *
+	 * We choose md_nr_disks() * 2 threads for recovery, no rationale.
+	 */
+	uint32_t nr_threads = md_nr_disks() * 2;
 
 	rinfo->state = RW_RECOVER_OBJ;
 	rinfo->count = rlw->count;
@@ -887,7 +931,8 @@ static void finish_object_list(struct work *work)
 		return;
 	}
 
-	recover_next_object(rinfo);
+	for (uint32_t i = 0; i < nr_threads; i++)
+		recover_next_object(rinfo);
 	return;
 }
 
@@ -1076,7 +1121,7 @@ static void queue_recovery_work(struct recovery_info *rinfo)
 		break;
 	case RW_RECOVER_OBJ:
 		row = xzalloc(sizeof(*row));
-		row->oid = rinfo->oids[rinfo->done];
+		row->oid = rinfo->oids[rinfo->next];
 
 		rw = &row->base;
 		rw->work.fn = recover_object_work;
