@@ -562,3 +562,7 @@ W_PRECALC_AVX
  *                                     unsigned int rounds);
  */
 SHA1_VECTOR_ASM     sha1_transform_avx
+
+#if defined(__linux__) && defined(__ELF__)
+.section .note.GNU-stack,"",%progbits
+#endif
