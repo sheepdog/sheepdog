@@ -671,10 +671,21 @@ static int onode_populate_extents(struct kv_onode *onode,
 	total = req->data_length;
 	while (done < total) {
 		size = http_request_read(req, data_buf, write_buffer_size);
+		if (size <= 0) {
+			sd_err("Failed to read http request: %ld", size);
+			sys->cdrv->lock(data_vid);
+			oalloc_free(data_vid, start, count);
+			sys->cdrv->unlock(data_vid);
+			ret = SD_RES_EIO;
+			goto out;
+		}
 		ret = vdi_read_write(data_vid, data_buf, size, offset, false);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write data object for %s, %s",
 			       onode->name, sd_strerror(ret));
+			sys->cdrv->lock(data_vid);
+			oalloc_free(data_vid, start, count);
+			sys->cdrv->unlock(data_vid);
 			goto out;
 		}
 		done += size;
