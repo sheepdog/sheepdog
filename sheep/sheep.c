@@ -47,10 +47,11 @@ static const char http_help[] =
 "Available arguments:\n"
 "\thost=: specify a host to communicate with http server (default: localhost)\n"
 "\tport=: specify a port to communicate with http server (default: 8000)\n"
+"\tbuffer=: specify buffer size for http request (default: 32M)\n"
 "\tswift: enable swift API\n"
-"Example:\n\t$ sheep -r host=localhost,port=7001,swift ...\n"
+"Example:\n\t$ sheep -r host=localhost,port=7001,buffer=64M,swift ...\n"
 "This tries to enable Swift API and use localhost:7001 to\n"
-"communicate with http server.\n";
+"communicate with http server, using 64MB buffer.\n";
 
 static const char myaddr_help[] =
 "Example:\n\t$ sheep -y 192.168.1.1:7000 ...\n"

@@ -346,6 +346,26 @@ static int http_opt_port_parser(const char *s)
 	return 0;
 }
 
+static int http_opt_buffer_parser(const char *s)
+{
+	const uint64_t max_buffer_size = SD_DATA_OBJ_SIZE * 256;
+	const uint64_t min_buffer_size = SD_DATA_OBJ_SIZE;
+	uint64_t buffer_size;
+
+	if (option_parse_size(s, &buffer_size) < 0)
+		return -1;
+	if (buffer_size < min_buffer_size || buffer_size > max_buffer_size) {
+		sd_err("Invalid buffer option '%s': size must be "
+		       "between %"PRIu64"M and %"PRIu64"M", s,
+		       min_buffer_size / 1024 / 1024,
+		       max_buffer_size / 1024 / 1024);
+		       return -1;
+	}
+	kv_rw_buffer = round_up(buffer_size, SD_DATA_OBJ_SIZE);
+	sd_info("kv_rw_buffer: %"PRIu64, kv_rw_buffer);
+	return 0;
+}
+
 static int http_opt_default_parser(const char *s)
 {
 	struct http_driver *hdrv;
@@ -375,6 +395,7 @@ static int http_opt_default_parser(const char *s)
 static struct option_parser http_opt_parsers[] = {
 	{ "host=", http_opt_host_parser },
 	{ "port=", http_opt_port_parser },
+	{ "buffer=", http_opt_buffer_parser },
 	{ "", http_opt_default_parser },
 	{ NULL, NULL },
 };

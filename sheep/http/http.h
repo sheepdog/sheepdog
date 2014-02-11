@@ -115,6 +115,10 @@ int http_request_writef(struct http_request *req, const char *fmt, ...);
 #define SD_MAX_BUCKET_NAME 256
 #define SD_MAX_OBJECT_NAME 1024
 
+/* This default value shows best performance in test */
+#define DEFAULT_KV_RW_BUFFER (SD_DATA_OBJ_SIZE * 8)
+extern uint64_t kv_rw_buffer;
+
 /* Account operations */
 int kv_create_account(const char *account);
 int kv_read_account_meta(struct http_request *req, const char *account);

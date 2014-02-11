@@ -16,6 +16,8 @@
 #include "sheep_priv.h"
 #include "http.h"
 
+uint64_t kv_rw_buffer = DEFAULT_KV_RW_BUFFER;
+
 struct kv_bnode {
 	char name[SD_MAX_BUCKET_NAME];
 	uint64_t object_count;
@@ -644,8 +646,6 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 	return local_req_wait(iocb);
 }
 
-#define MAX_RW_BUFFER (SD_DATA_OBJ_SIZE * 25) /* No rationale yet */
-
 static int onode_populate_extents(struct kv_onode *onode,
 				  struct http_request *req)
 {
@@ -654,7 +654,7 @@ static int onode_populate_extents(struct kv_onode *onode,
 	int ret;
 	char *data_buf = NULL;
 	uint32_t data_vid = onode->data_vid;
-	uint64_t write_buffer_size = MIN(MAX_RW_BUFFER, req->data_length);
+	uint64_t write_buffer_size = MIN(kv_rw_buffer, req->data_length);
 
 	count = DIV_ROUND_UP(req->data_length, SD_DATA_OBJ_SIZE);
 	sys->cdrv->lock(data_vid);
@@ -836,7 +836,7 @@ static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 	uint64_t off = req->offset, len = req->data_length;
 	int ret;
 	char *data_buf = NULL;
-	uint64_t read_buffer_size = MIN(MAX_RW_BUFFER, onode->size);
+	uint64_t read_buffer_size = MIN(kv_rw_buffer, onode->size);
 
 	data_buf = xmalloc(read_buffer_size);
 	total_size = len;
