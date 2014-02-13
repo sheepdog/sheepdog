@@ -18,7 +18,7 @@
 # bootstrap / init
 AC_PREREQ([2.61])
 
-m4_define([sheepdog_version], [0.7.7_rc1])
+m4_define([sheepdog_version], [0.7.7])
 
 m4_define([git_version],
 	m4_esyscmd([git describe --tags --dirty 2> /dev/null | sed 's/^v//' \
