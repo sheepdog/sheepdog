@@ -366,6 +366,10 @@ found_piv:
 			for (row = 0; row < d; row++)
 				SWAP(src[row * d + indxr[col-1]],
 				     src[row * d + indxc[col-1]]);
+	free(indxc);
+	free(indxr);
+	free(ipiv);
+	free(id_row);
 }
 
 /*
