@@ -626,6 +626,7 @@ static void local_req_async_main(struct work *work)
 		areq->iocb->result = areq->result;
 
 	eventfd_xwrite(areq->iocb->efd, 1);
+	free(areq);
 }
 
 worker_fn int exec_local_req_async(struct sd_req *rq, void *data,
