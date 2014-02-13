@@ -747,6 +747,8 @@ static bool check_gdb(void)
 	return system("which gdb > /dev/null") == 0;
 }
 
+#define SD_ARG_MAX (sysconf(_SC_ARG_MAX))
+
 /*
  * __builtin_frame_address() returns address in frame pointer register if any
  * (e.g, in x86 it returns EBP). If no dedicated register, the frame address is
@@ -765,7 +767,7 @@ static bool check_gdb(void)
 __attribute__ ((__noinline__))
 int __sd_dump_variable(const char *var)
 {
-	char cmd[ARG_MAX], path[PATH_MAX], info[256];
+	char cmd[SD_ARG_MAX], path[PATH_MAX], info[256];
 	FILE *f = NULL;
 	void *base_sp = FRAME_POINTER;
 
@@ -824,7 +826,7 @@ static int dump_stack_frames(void)
 		return -1;
 
 	for (i = 1; i < SD_MAX_STACK_DEPTH; i++) {
-		char cmd[ARG_MAX], info[256];
+		char cmd[SD_ARG_MAX], info[256];
 		FILE *f = NULL;
 		bool found = false;
 
@@ -883,7 +885,7 @@ void sd_backtrace(void)
 
 	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
 		void *addr = addrs[i];
-		char cmd[ARG_MAX], path[PATH_MAX], info[256], **str;
+		char cmd[SD_ARG_MAX], path[PATH_MAX], info[256], **str;
 		FILE *f;
 
 		/*
