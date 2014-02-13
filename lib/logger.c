@@ -741,9 +741,11 @@ static bool check_gdb(void)
 	return system("which gdb > /dev/null") == 0;
 }
 
+#define SD_ARG_MAX (sysconf(_SC_ARG_MAX))
+
 static int gdb_cmd(const char *cmd)
 {
-	char time_str[256], cmd_str[ARG_MAX];
+	char time_str[256], cmd_str[SD_ARG_MAX];
 	time_t ti;
 	struct tm tm;
 
@@ -794,7 +796,7 @@ void sd_backtrace(void)
 
 	for (i = 1; i < n; i++) { /* addrs[0] is here, so skip it */
 		void *addr = addrs[i];
-		char cmd[ARG_MAX], info[256], **str;
+		char cmd[SD_ARG_MAX], info[256], **str;
 		FILE *f;
 
 		/*
