@@ -403,16 +403,18 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		goto out;
 	}
 
+	if (ec && set_erasure_index(tmp_path, iocb->ec_index) < 0) {
+		ret = err_to_sderr(tmp_path, oid, errno);
+		goto out;
+	}
+
 	ret = rename(tmp_path, path);
 	if (ret < 0) {
 		sd_err("failed to rename %s to %s: %m", tmp_path, path);
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
 	}
-	if (ec && set_erasure_index(path, iocb->ec_index) < 0) {
-		ret = err_to_sderr(path, oid, errno);
-		goto out;
-	}
+
 	ret = SD_RES_SUCCESS;
 	objlist_cache_insert(oid);
 out:
