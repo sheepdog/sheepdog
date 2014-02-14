@@ -677,7 +677,8 @@ int sd_inode_write(write_node_fn writer, struct sd_inode *inode, int flags,
 			     create, false);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		ret = writer(vid_to_vdi_oid(inode->vdi_id), inode,
+		ret = writer(vid_to_vdi_oid(inode->vdi_id),
+			     &(inode->btree_counter),
 			     sizeof(uint32_t),
 			     offsetof(struct sd_inode, btree_counter), flags,
 			     inode->nr_copies, inode->copy_policy,
