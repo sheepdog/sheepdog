@@ -556,7 +556,7 @@ static int insert_new_node(write_node_fn writer, read_node_fn reader,
 				panic("%s() B-tree is full!", __func__);
 			/* create a new ext-node */
 			leaf_node = xvalloc(SD_INODE_DATA_INDEX_SIZE);
-			sd_inode_init(leaf_node, 2);
+			sd_inode_init(leaf_node, 1);
 			oid = vid_to_btree_oid(inode->vdi_id,
 					inode->btree_counter++);
 			insert_ext_entry_nosearch(leaf_node,
