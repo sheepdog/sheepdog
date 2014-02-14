@@ -409,23 +409,34 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 		if (idx_in_range(header, path->p_idx)) {
 			oid = path->p_idx->oid;
 			ret = reader(oid, &tmp, SD_INODE_DATA_INDEX_SIZE, 0);
-			if (ret != SD_RES_SUCCESS)
+			if (ret != SD_RES_SUCCESS) {
+				sd_err("read oid %"PRIu64" fail", oid);
 				goto out;
+			}
 			path->p_ext = search_ext_entry(leaf_node, idx);
 			path->p_ext_header = leaf_node;
 			if (ext_in_range(leaf_node, path->p_ext) &&
 					path->p_ext->idx == idx)
 				ret = SD_RES_SUCCESS;
+			else
+				ret = SD_RES_NOT_FOUND;
 		} else {
-			/* check if last idx-node has space */
+			/* check if last ext-node has space */
 			oid = (path->p_idx - 1)->oid;
 			ret = reader(oid, &tmp, SD_INODE_DATA_INDEX_SIZE, 0);
-			if (ret != SD_RES_SUCCESS)
+			if (ret != SD_RES_SUCCESS) {
+				sd_err("read oid %"PRIu64" fail", oid);
 				goto out;
+			}
 			if (leaf_node->entries < EXT_MAX_ENTRIES) {
 				path->p_ext = search_ext_entry(leaf_node, idx);
 				path->p_ext_header = leaf_node;
+			} else {
+				sd_info("last ext-node is full (oid: %"
+					PRIx64")", oid);
+				free(leaf_node);
 			}
+			ret = SD_RES_NOT_FOUND;
 		}
 	} else if (header->depth == 1) {
 		path->depth = 1;
@@ -599,7 +610,7 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 				       offset, 0, inode->nr_copies,
 				       inode->copy_policy, false, false);
 				goto out;
-			} else {
+			} else if (ret == SD_RES_NOT_FOUND) {
 				ret = insert_new_node(writer, reader, inode,
 						&path, idx, vdi_id);
 				if (SD_RES_AGAIN == ret) {
@@ -608,7 +619,8 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 					continue;
 				} else
 					goto out;
-			}
+			} else
+				panic("ret: %d", ret);
 		}
 	}
 out:
