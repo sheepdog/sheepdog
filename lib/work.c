@@ -428,6 +428,7 @@ destroy_threads:
 	sd_destroy_cond(&wi->pending_cond);
 	sd_destroy_mutex(&wi->pending_lock);
 	sd_destroy_mutex(&wi->finished_lock);
+	free(wi);
 
 	return NULL;
 }
