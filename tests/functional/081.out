@@ -9,6 +9,7 @@ data137
 data19
 data4
 data97
+fs.c
 gateway.c
 graph.c
 group.c
@@ -18,6 +19,9 @@ kv.c
 local.c
 md.c
 migrate.c
+mount.c
+nfs.c
+nfsd.c
 oalloc.c
 object_cache.c
 object_list_cache.c
@@ -32,11 +36,13 @@ store.c
 swift.c
 trace.c
 vdi.c
+xdr.c
 zookeeper.c
 cluster.c
 common.c
 dog.c
 farm.c
+nfs.c
 node.c
 object_tree.c
 sha1_file.c
@@ -50,9 +56,9 @@ vdi.c
 < HTTP/1.1 416 Requested Range Not Satisfiable
 < HTTP/1.1 416 Requested Range Not Satisfiable
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  sd/dog       0   16 PB   52 MB  0.0 MB DATE   5a5cbf    4:2              
+  sd/dog       0   16 PB   56 MB  0.0 MB DATE   5a5cbf    4:2              
   sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2              
-  sd/sheep     0   16 PB  124 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep     0   16 PB  144 MB  0.0 MB DATE   8ad11e    4:2              
   sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2              
   sd/sheep/allocator     0   16 PB  268 MB  0.0 MB DATE   fd57fc    4:2              
 data137
@@ -60,16 +66,16 @@ data19
 data4
 data97
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  sd/dog       0   16 PB   52 MB  0.0 MB DATE   5a5cbf    4:2              
+  sd/dog       0   16 PB   56 MB  0.0 MB DATE   5a5cbf    4:2              
   sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2              
-  sd/sheep     0   16 PB  124 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep     0   16 PB  144 MB  0.0 MB DATE   8ad11e    4:2              
   sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2              
   sd/sheep/allocator     0   16 PB  268 MB  0.0 MB DATE   fd57fc    4:2              
 dog
 sheep
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  sd/dog       0   16 PB   52 MB  0.0 MB DATE   5a5cbf    4:2              
+  sd/dog       0   16 PB   56 MB  0.0 MB DATE   5a5cbf    4:2              
   sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2              
-  sd/sheep     0   16 PB  124 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep     0   16 PB  144 MB  0.0 MB DATE   8ad11e    4:2              
   sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2              
   sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc    4:2              
