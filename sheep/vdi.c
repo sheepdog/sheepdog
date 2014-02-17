@@ -1028,6 +1028,51 @@ static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
 	return vid;
 }
 
+static void clear_parent_child_vdi(uint32_t vid)
+{
+	struct sd_inode * inode = xmalloc(SD_INODE_HEADER_SIZE);
+	uint32_t pvid, i;
+	int ret;
+
+	ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
+				  SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read inode %"PRIx32, vid);
+		goto out;
+	}
+
+	pvid = inode->parent_vdi_id;
+	if (!pvid)
+		goto out;
+	ret = read_backend_object(vid_to_vdi_oid(pvid), (char *)inode,
+				  SD_INODE_HEADER_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read parent inode %"PRIx32, pvid);
+		goto out;
+	}
+
+	for (i = 0; i < MAX_CHILDREN; i++)
+		if (inode->child_vdi_id[i] == vid) {
+			inode->child_vdi_id[i] = 0;
+			break;
+		}
+
+	if (i == MAX_CHILDREN) {
+		sd_info("failed to find child %"PRIx32, vid);
+		goto out;
+	}
+
+	ret = sd_write_object(vid_to_vdi_oid(pvid), (char *)inode,
+			      SD_INODE_HEADER_SIZE, 0, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update parent %"PRIx32, pvid);
+		goto out;
+	}
+	sd_debug("parent %"PRIx32, pvid);
+out:
+	free(inode);
+}
+
 static int start_deletion(struct request *req, uint32_t vid)
 {
 	struct deletion_work *dw = NULL;
@@ -1051,6 +1096,8 @@ static int start_deletion(struct request *req, uint32_t vid)
 		ret = SD_RES_EIO;
 		goto out;
 	}
+
+	clear_parent_child_vdi(vid);
 
 	ret = fill_delete_vid_array(dw, root_vid);
 	if (ret < 0) {
