@@ -87,14 +87,16 @@ int option_parse_size(const char *value, uint64_t *ret)
 	case 'k':
 		sizef *= 1024;
 	case 'b':
+	case 'B':
 	case '\0':
 		*ret = (uint64_t) sizef;
 		break;
 	default:
 err:
 		sd_err("Invalid size '%s'", value);
-		sd_err("You may use k, M, G, T or P suffixes for "
-		       "kilobytes, megabytes, gigabytes, terabytes and petabytes.");
+		sd_err("You may use B, K, M, G, T or P suffixes for "
+		       "bytes, kilobytes, megabytes, gigabytes, terabytes and"
+		       " petabytes.");
 		return -1;
 	}
 
