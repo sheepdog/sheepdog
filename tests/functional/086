@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Test vdi clone
+
+. ./common
+
+for i in `seq 0 2`; do
+    _start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format -c 3
+
+$DOG vdi create test 100M
+$DOG vdi snapshot -s base test
+
+for i in `seq 0 1023`; do
+	$DOG vdi clone test -s base clone$i
+done;
+
+for i in `seq 0 1022`; do
+	$DOG vdi delete clone$i
+done;
+
+for i in `seq 0 1023`; do
+	$DOG vdi clone test -s base clone$i
+done;
+
+_vdi_list
