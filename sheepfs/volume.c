@@ -76,7 +76,11 @@ static int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 #define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid( \
 					sheepfs_bnode_writer, \
 					sheepfs_bnode_reader, \
-					inode, idx, vdi_id))
+					inode, idx, idx, vdi_id))
+#define INODE_SET_VID_RANGE(inode, idx_start, idx_end, vdi_id) \
+				(sd_inode_set_vid(sheepfs_bnode_writer, \
+				sheepfs_bnode_reader, inode, idx_start, \
+				idx_end, vdi_id))
 
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
 					 uint32_t idx)

@@ -620,19 +620,24 @@ out:
 }
 
 void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
-		      struct sd_inode *inode, uint32_t idx, uint32_t vdi_id)
+		      struct sd_inode *inode, uint32_t idx_start,
+		      uint32_t idx_end, uint32_t vdi_id)
 {
 	struct sd_extent_header *header;
+	int idx;
 
-	if (inode->store_policy == 0)
-		inode->data_vdi_id[idx] = vdi_id;
-	else {
-		if (inode->data_vdi_id[0] == 0)
-			sd_inode_init(inode->data_vdi_id, 1);
-		header = EXT_HEADER(inode->data_vdi_id);
-		if (header->magic != INODE_BTREE_MAGIC)
-			panic("%s() B-tree in inode is corrupt!", __func__);
-		set_vid_for_btree(writer, reader, inode, idx, vdi_id);
+	for (idx = idx_start; idx <= idx_end; idx++) {
+		if (inode->store_policy == 0)
+			inode->data_vdi_id[idx] = vdi_id;
+		else {
+			if (inode->data_vdi_id[0] == 0)
+				sd_inode_init(inode->data_vdi_id, 1);
+			header = EXT_HEADER(inode->data_vdi_id);
+			if (header->magic != INODE_BTREE_MAGIC)
+				panic("%s() B-tree in inode is corrupt!",
+				      __func__);
+			set_vid_for_btree(writer, reader, inode, idx, vdi_id);
+		}
 	}
 	if (inode->store_policy != 0)
 		dump_btree(reader, inode);

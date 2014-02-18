@@ -401,7 +401,12 @@ int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 #define INODE_GET_VID(inode, idx) (sd_inode_get_vid(sheep_bnode_reader, \
 					inode, idx))
 #define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid(sheep_bnode_writer,\
-					sheep_bnode_reader, inode, idx, vdi_id))
+					   sheep_bnode_reader, inode, idx, idx,\
+					   vdi_id))
+#define INODE_SET_VID_RANGE(inode, idx_start, idx_end, vdi_id) \
+				(sd_inode_set_vid(sheep_bnode_writer,\
+				sheep_bnode_reader, inode, idx_start, \
+				idx_end, vdi_id))
 
 /* Operations */
 
