@@ -574,15 +574,55 @@ out:
 	return ret;
 }
 
-void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
-		      struct sd_inode *inode, uint32_t idx, uint32_t vdi_id)
+static void set_vid_for_btree(write_node_fn writer, read_node_fn reader,
+			      struct sd_inode *inode, uint32_t idx,
+			      uint32_t vdi_id)
 {
-	struct sd_extent_header *header;
 	struct find_path path;
 	uint64_t offset;
 	int ret;
 
 	path.p_ext_header = NULL;
+
+	while (1) {
+		memset(&path, 0, sizeof(path));
+		ret = search_whole_btree(reader, inode, idx, &path);
+		if (ret == SD_RES_SUCCESS) {
+			path.p_ext->vdi_id = vdi_id;
+			/*
+			 * Only write the vdi_id in sd_extent for
+			 * second level leaf-node.
+			 */
+			if (!path.p_ext_header)
+				goto out;
+			offset = (unsigned char *)(path.p_ext) -
+				 (unsigned char *)(path.p_ext_header) +
+				 offsetof(struct sd_extent, vdi_id);
+			writer(path.p_idx->oid, &vdi_id, sizeof(vdi_id),
+			       offset, 0, inode->nr_copies,
+			       inode->copy_policy, false, false);
+			goto out;
+		} else if (ret == SD_RES_NOT_FOUND) {
+			ret = insert_new_node(writer, reader, inode,
+					&path, idx, vdi_id);
+			if (SD_RES_AGAIN == ret) {
+				if (path.p_ext_header)
+					free(path.p_ext_header);
+				continue;
+			} else
+				goto out;
+		} else
+			panic("ret: %d", ret);
+	}
+out:
+	if (path.p_ext_header)
+		free(path.p_ext_header);
+}
+
+void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
+		      struct sd_inode *inode, uint32_t idx, uint32_t vdi_id)
+{
+	struct sd_extent_header *header;
 
 	if (inode->store_policy == 0)
 		inode->data_vdi_id[idx] = vdi_id;
@@ -592,40 +632,8 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 		header = EXT_HEADER(inode->data_vdi_id);
 		if (header->magic != INODE_BTREE_MAGIC)
 			panic("%s() B-tree in inode is corrupt!", __func__);
-		while (1) {
-			memset(&path, 0, sizeof(path));
-			ret = search_whole_btree(reader, inode, idx, &path);
-			if (ret == SD_RES_SUCCESS) {
-				path.p_ext->vdi_id = vdi_id;
-				/*
-				 * Only write the vdi_id in sd_extent for
-				 * second level leaf-node.
-				 */
-				if (!path.p_ext_header)
-					goto out;
-				offset = (unsigned char *)(path.p_ext) -
-					 (unsigned char *)(path.p_ext_header) +
-					 offsetof(struct sd_extent, vdi_id);
-				writer(path.p_idx->oid, &vdi_id, sizeof(vdi_id),
-				       offset, 0, inode->nr_copies,
-				       inode->copy_policy, false, false);
-				goto out;
-			} else if (ret == SD_RES_NOT_FOUND) {
-				ret = insert_new_node(writer, reader, inode,
-						&path, idx, vdi_id);
-				if (SD_RES_AGAIN == ret) {
-					if (path.p_ext_header)
-						free(path.p_ext_header);
-					continue;
-				} else
-					goto out;
-			} else
-				panic("ret: %d", ret);
-		}
+		set_vid_for_btree(writer, reader, inode, idx, vdi_id);
 	}
-out:
-	if (path.p_ext_header)
-		free(path.p_ext_header);
 	if (inode->store_policy != 0)
 		dump_btree(reader, inode);
 }
