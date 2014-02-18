@@ -178,8 +178,8 @@ int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count)
 		goto out;
 	}
 
-	for (uint64_t i = 0; i < count; i++)
-		INODE_SET_VID(inode, start + i, vid);
+	sd_debug("start %"PRIu64" end %"PRIu64, start, start + count - 1);
+	INODE_SET_VID_RANGE(inode, start, (start + count - 1), vid);
 
 	ret = sd_inode_write(sheep_bnode_writer, inode, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {

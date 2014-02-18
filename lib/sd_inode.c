@@ -216,6 +216,106 @@ static void dump_btree(read_node_fn reader, struct sd_inode *inode)
 }
 
 /*
+ * This is the cache for inode and ext-node (B-tree), so we name it 'icache'.
+ * Cache of the same inode and ext-node dose not support concurrent operations
+ * so it could only be used in sd_inode_set_vid() which will be protected by
+ * distributed lock and should be released in the end of sd_inode_set_vid().
+ */
+static write_node_fn caller_writer;
+static read_node_fn caller_reader;
+
+/* no rationale */
+#define NUMBER_OF_CACHE	4
+
+struct inode_cache {
+	uint64_t oid;
+	unsigned char mem[SD_INODE_DATA_INDEX_SIZE];
+} cache_array[NUMBER_OF_CACHE];
+static int cache_idx;
+
+static void icache_init(void)
+{
+	cache_idx = 0;
+}
+
+static void icache_writeout(write_node_fn writer, int copies, int policy)
+{
+	int i;
+	for (i = 0; i < cache_idx; i++) {
+		writer(cache_array[i].oid, cache_array[i].mem,
+		       SD_INODE_DATA_INDEX_SIZE, 0, 0, copies, policy,
+		       false, false);
+	}
+}
+
+static void icache_release(write_node_fn writer, int copies, int policy)
+{
+	icache_writeout(writer, copies, policy);
+	icache_init();
+}
+
+static void icache_insert(write_node_fn writer, int copies, int policy,
+			 uint64_t oid, void *mem)
+{
+	int i;
+	for (i = 0; i < cache_idx; i++) {
+		if (oid == cache_array[i].oid) {
+			memcpy(cache_array[i].mem, mem,
+			       SD_INODE_DATA_INDEX_SIZE);
+			return;
+		}
+	}
+
+	if (cache_idx == (NUMBER_OF_CACHE - 1)) {
+		sd_debug("cache for B-tree is full, so write all out");
+		icache_release(writer, copies, policy);
+	}
+
+	/* insert new cache */
+	cache_array[cache_idx].oid = oid;
+	memcpy(cache_array[cache_idx].mem, mem, SD_INODE_DATA_INDEX_SIZE);
+	cache_idx++;
+}
+
+static void *icache_find(uint64_t oid)
+{
+	int i;
+	for (i = 0; i < cache_idx; i++) {
+		if (cache_array[i].oid == oid)
+			return cache_array[i].mem;
+	}
+	return NULL;
+}
+
+static int icache_writer(uint64_t id, void *mem, unsigned int len,
+			 uint64_t offset, uint32_t flags, int copies,
+			 int copy_policy, bool create, bool direct)
+{
+	/* Only try to cache entire ext-node */
+	if (!offset && !create && !direct && len == SD_INODE_DATA_INDEX_SIZE) {
+		icache_insert(caller_writer, copies, copy_policy, id, mem);
+		return SD_RES_SUCCESS;
+	}
+	return caller_writer(id, mem, len, offset, flags, copies, copy_policy,
+			  create, direct);
+}
+
+static int icache_reader(uint64_t id, void **mem, unsigned int len,
+			 uint64_t offset)
+{
+	void *data;
+
+	if (!offset && len == SD_INODE_DATA_INDEX_SIZE) {
+		data = icache_find(id);
+		if (data) {
+			memcpy(*mem, data, len);
+			return SD_RES_SUCCESS;
+		}
+	}
+	return caller_reader(id, mem, len, offset);
+}
+
+/*
  * Search for the key in a B-tree node. If can't find it, return the position
  * for insert operation. So we can't just use xbsearch().
  */
@@ -432,8 +532,8 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 				path->p_ext = search_ext_entry(leaf_node, idx);
 				path->p_ext_header = leaf_node;
 			} else {
-				sd_info("last ext-node is full (oid: %"
-					PRIx64")", oid);
+				sd_debug("last ext-node is full (oid: %"
+					 PRIx64")", oid);
 				free(leaf_node);
 			}
 			ret = SD_RES_NOT_FOUND;
@@ -626,6 +726,10 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 	struct sd_extent_header *header;
 	int idx;
 
+	/* save default writer and reader */
+	caller_writer = writer;
+	caller_reader = reader;
+
 	for (idx = idx_start; idx <= idx_end; idx++) {
 		if (inode->store_policy == 0)
 			inode->data_vdi_id[idx] = vdi_id;
@@ -636,11 +740,15 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 			if (header->magic != INODE_BTREE_MAGIC)
 				panic("%s() B-tree in inode is corrupt!",
 				      __func__);
-			set_vid_for_btree(writer, reader, inode, idx, vdi_id);
+			/* use cache version of writer and reader */
+			set_vid_for_btree(icache_writer, icache_reader, inode,
+					  idx, vdi_id);
 		}
 	}
 	if (inode->store_policy != 0)
 		dump_btree(reader, inode);
+
+	icache_release(caller_writer, inode->nr_copies, inode->copy_policy);
 }
 
 /*
