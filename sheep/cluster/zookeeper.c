@@ -383,8 +383,10 @@ static void lock_table_lookup_release(uint64_t lock_id)
 			continue;
 		while (true) {
 			rc = zk_delete_node(lock->lock_path, -1);
-			if (rc == ZOK || rc == ZNONODE)
+			if (rc == ZOK || rc == ZNONODE) {
+				sd_debug("delete path: %s ok", lock->lock_path);
 				break;
+			}
 			sd_err("Failed to delete path: %s %s", lock->lock_path,
 			       zerror(rc));
 			zk_wait();
@@ -1259,8 +1261,9 @@ static void zk_lock(uint64_t lock_id)
 		 cluster_lock->id);
 	/* compete owner of lock is just like zk_compete_master() */
 	while (true) {
-		rc = zk_create_node(parent, "", 0, &ZOO_OPEN_ACL_UNSAFE,
-				     flags, my_path, MAX_NODE_STR_LEN);
+		rc = zk_create_node(parent, node_to_str(&this_node.node),
+				    MAX_NODE_STR_LEN, &ZOO_OPEN_ACL_UNSAFE,
+				    flags, my_path, MAX_NODE_STR_LEN);
 		if (rc == ZOK)
 			break;
 		if (rc == ZNONODE) {
@@ -1292,7 +1295,7 @@ static void zk_lock(uint64_t lock_id)
 		/* I failed to get the lock */
 		rc = zk_node_exists(lowest_seq_path);
 		if (rc == ZOK) {
-			sd_debug("call zoo_exits success %s", lowest_seq_path);
+			sd_debug("call zoo_exists success %s", lowest_seq_path);
 			/* Use wait_timeout to avoid missing wakeup signal */
 			sd_cond_wait_timeout(&cluster_lock->wait_wakeup,
 					     &cluster_lock->wait_mutex,
@@ -1308,6 +1311,7 @@ static void zk_lock(uint64_t lock_id)
 static void zk_unlock(uint64_t lock_id)
 {
 	lock_table_lookup_release(lock_id);
+	sd_debug("unlock %"PRIx64, lock_id);
 }
 
 static int zk_init(const char *option)
