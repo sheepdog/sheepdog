@@ -888,7 +888,7 @@ static int vdi_object_map(int argc, char **argv)
 		vid = INODE_GET_VID(inode, idx);
 		printf("%08"PRIu64" %8"PRIx32"\n", idx, vid);
 	} else {
-		uint32_t max_idx = count_data_objs(inode);
+		uint64_t max_idx = count_data_objs(inode);
 
 		for (idx = 0; idx < max_idx; idx++) {
 			vid = INODE_GET_VID(inode, idx);
