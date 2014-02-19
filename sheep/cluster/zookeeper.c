@@ -1259,6 +1259,7 @@ static void zk_lock(uint64_t lock_id)
 	 */
 	snprintf(parent_node, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
 		 cluster_lock->id);
+create_seq_node:
 	/* compete owner of lock is just like zk_compete_master() */
 	while (true) {
 		rc = zk_create_node(parent, node_to_str(&this_node.node),
@@ -1283,9 +1284,13 @@ static void zk_lock(uint64_t lock_id)
 
 	/* create node ok now */
 	while (true) {
-		zk_get_least_seq(parent_node, lowest_seq_path, MAX_NODE_STR_LEN,
-				 owner_name, &len);
-
+		rc = zk_get_least_seq(parent_node, lowest_seq_path,
+				      MAX_NODE_STR_LEN, owner_name, &len);
+		/* may be expired */
+		if (rc == ZNONODE) {
+			sd_debug("Recreate seq node");
+			goto create_seq_node;
+		}
 		/* I got the lock */
 		if (!strncmp(lowest_seq_path, my_path, strlen(my_path))) {
 			sd_debug("I am master now. %s", lowest_seq_path);
