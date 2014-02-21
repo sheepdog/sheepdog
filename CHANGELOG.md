@@ -1,6 +1,12 @@
 
 ## 0.9.0 (not released yet)
 
+DOG COMMAND INTERFACE:
+ - output format of "dog vdi snapshot" with -v option is changed
+ - remove "dog vdi object"
+  - instead, "dog vdi object location" is the new name of the previous "dog vdi object"
+ - new subcommand "dog vdi object map" for printing map of inode objects
+
 ## 0.8.0
 
 NEW FEATURE:
@@ -13,7 +19,7 @@ DOG COMMAND INTERFACE:
   - "vdi cache purge" cleans stale cache of all images
   - "vdi cache purge <image>" cleans stale cache of the specified image
  - new subcommand "node stat" for showing I/O status of the node
- - new subcommand "node loglevel" for changing log level at runtime
+ - new subcommand "node logl evel" for changing log level at runtime
   - "node log level set" sets loglevel of running sheep process
   - "node log level get" gets loglevel from running sheep process
   - "node log level list" lists avialable loglevels
