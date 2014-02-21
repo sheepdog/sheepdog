@@ -15,6 +15,7 @@ static struct node_cmd_data {
 	bool all_nodes;
 	bool recovery_progress;
 	bool watch;
+	bool local;
 } node_cmd_data;
 
 static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
@@ -247,22 +248,43 @@ static int node_kill(int argc, char **argv)
 {
 	int node_id, ret;
 	struct sd_req req;
-	const char *p = argv[optind++];
+	const char *p;
+	struct node_id *nid = NULL;
 
-	if (!is_numeric(p)) {
-		sd_err("Invalid node id '%s', please specify a numeric value",
-		       p);
-		exit(EXIT_USAGE);
+	if (node_cmd_data.local)
+		nid = &sd_nid;	/* issue kill request to local node */
+
+	if (optind < argc) {
+		if (nid) {
+			sd_err("don't use -l option and specify node id at the"
+			       " same time");
+			exit(EXIT_USAGE);
+		}
+
+		p = argv[optind++];
+
+		if (!is_numeric(p)) {
+			sd_err("Invalid node id '%s', please specify a numeric"
+			       " value", p);
+			exit(EXIT_USAGE);
+		}
+
+		node_id = strtol(p, NULL, 10);
+		if (node_id < 0 || node_id >= sd_nodes_nr) {
+			sd_err("Invalid node id '%d'", node_id);
+			exit(EXIT_USAGE);
+		}
+
+		nid = &idx_to_node(&sd_nroot, node_id)->nid;
 	}
 
-	node_id = strtol(p, NULL, 10);
-	if (node_id < 0 || node_id >= sd_nodes_nr) {
-		sd_err("Invalid node id '%d'", node_id);
+	if (!nid) {
+		sd_err("please specify -l option or node id");
 		exit(EXIT_USAGE);
 	}
 
 	sd_init_req(&req, SD_OP_KILL_NODE);
-	ret = send_light_req(&idx_to_node(&sd_nroot, node_id)->nid, &req);
+	ret = send_light_req(nid, &req);
 	if (ret) {
 		sd_err("Failed to execute request");
 		exit(EXIT_FAILURE);
@@ -469,6 +491,10 @@ static int node_parser(int ch, const char *opt)
 		break;
 	case 'w':
 		node_cmd_data.watch = true;
+		break;
+	case 'l':
+		node_cmd_data.local = true;
+		break;
 	}
 
 	return 0;
@@ -478,6 +504,7 @@ static struct sd_option node_options[] = {
 	{'A', "all", false, "show md information of all the nodes"},
 	{'P', "progress", false, "show progress of recovery in the node"},
 	{'w', "watch", false, "watch the stat every second"},
+	{'l', "local", false, "issue request to local node"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -569,8 +596,8 @@ static int node_log(int argc, char **argv)
 }
 
 static struct subcommand node_cmd[] = {
-	{"kill", "<node id>", "aprh", "kill node", NULL,
-	 CMD_NEED_ARG | CMD_NEED_NODELIST, node_kill},
+	{"kill", "<node id>", "aprhl", "kill node", NULL,
+	 CMD_NEED_NODELIST, node_kill, node_options},
 	{"list", NULL, "aprh", "list nodes", NULL,
 	 CMD_NEED_NODELIST, node_list},
 	{"info", NULL, "aprh", "show information about each node", NULL,
