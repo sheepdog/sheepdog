@@ -265,7 +265,27 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 	char *meta = xvalloc(SD_DATA_OBJ_SIZE);
 	struct header *hd;
 	uint64_t oid = vid_to_data_oid(vid, 0), i;
+	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 	int ret;
+
+	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
+			     sizeof(*inode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read inode, %" PRIx64 ", %s",
+		       vid_to_vdi_oid(vid), sd_strerror(ret));
+		goto out;
+	}
+
+	sd_debug("discard start %"PRIu64" end %"PRIu64, start,
+		 start + count - 1);
+	INODE_SET_VID_RANGE(inode, start, (start + count - 1), 0);
+
+	ret = sd_inode_write(sheep_bnode_writer, inode, 0, false, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update inode, %" PRIx64", %s",
+		       vid_to_vdi_oid(vid), sd_strerror(ret));
+		goto out;
+	}
 
 	ret = sd_read_object(oid, meta, SD_DATA_OBJ_SIZE, 0);
 	if (ret != SD_RES_SUCCESS) {
@@ -278,15 +298,20 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	/* XXX use aio to speed up discard of objects */
+	/* XXX use aio to speed up remove of objects */
 	for (i = 0; i < count; i++) {
 		struct sd_req hdr;
+		int res;
 
-		sd_init_req(&hdr, SD_OP_DISCARD_OBJ);
+		sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 		hdr.obj.oid = vid_to_data_oid(vid, start + i);
-		ret = exec_local_req(&hdr, NULL);
-		if (ret != SD_RES_SUCCESS)
-			goto out;
+		res = exec_local_req(&hdr, NULL);
+		/*
+		 * return the error code if it doesnot
+		 * success or can't find obj.
+		 */
+		if (res != SD_RES_SUCCESS && res != SD_RES_NO_OBJ)
+			ret = res;
 	}
 
 	hd = (struct header *)meta;
@@ -299,5 +324,6 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 	sd_debug("used %"PRIu64", nr_free %"PRIu64, hd->used, hd->nr_free);
 out:
 	free(meta);
+	free(inode);
 	return ret;
 }
