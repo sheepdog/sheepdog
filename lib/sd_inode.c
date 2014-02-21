@@ -224,11 +224,6 @@ struct inode_cache {
 } cache_array[NUMBER_OF_CACHE];
 static int cache_idx;
 
-static void icache_init(void)
-{
-	cache_idx = 0;
-}
-
 static void icache_writeout(int copies, int policy)
 {
 	int i;
@@ -242,7 +237,7 @@ static void icache_writeout(int copies, int policy)
 static void icache_release(int copies, int policy)
 {
 	icache_writeout(copies, policy);
-	icache_init();
+	cache_idx = 0; /* reset icache */
 }
 
 static void icache_insert(int copies, int policy,
