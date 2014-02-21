@@ -249,11 +249,9 @@ struct sd_index_header {
 	uint32_t entries;
 };
 
-enum btree_node_type {
-	BTREE_HEAD = 1,
-	BTREE_INDEX,
-	BTREE_INDIRECT_IDX,
-};
+#define	BTREE_HEAD         1
+#define	BTREE_INDEX        2
+#define BTREE_INDIRECT_IDX 4
 
 typedef int (*write_node_fn)(uint64_t id, void *mem, unsigned int len,
 				uint64_t offset, uint32_t flags, int copies,
@@ -287,9 +285,8 @@ extern void sd_inode_copy_vdis(write_node_fn writer, read_node_fn reader,
 			       uint8_t nr_copies, uint8_t copy_policy,
 			       struct sd_inode *newi);
 
-typedef void (*btree_cb_fn)(void *data, enum btree_node_type type, void *arg);
-extern void traverse_btree(const struct sd_inode *inode,
-			   btree_cb_fn fn, void *arg);
+typedef void (*index_cb_fn)(struct sd_index *, void *arg, int type);
+void sd_inode_index_walk(const struct sd_inode *inode, index_cb_fn, void *);
 
 /* 64 bit FNV-1a non-zero initial basis */
 #define FNV1A_64_INIT ((uint64_t) 0xcbf29ce484222325ULL)

@@ -1786,21 +1786,17 @@ struct check_arg {
 	int nr_copies;
 };
 
-static void check_cb(void *data, enum btree_node_type type, void *arg)
+static void check_cb(struct sd_index *idx, void *arg, int ignore)
 {
-	struct sd_index *ext;
 	struct check_arg *carg = arg;
 	uint64_t oid;
 
-	if (type == BTREE_INDEX) {
-		ext = (struct sd_index *)data;
-		if (ext->vdi_id) {
-			oid = vid_to_data_oid(ext->vdi_id, ext->idx);
-			*(carg->done) = (uint64_t)ext->idx * SD_DATA_OBJ_SIZE;
-			vdi_show_progress(*(carg->done), carg->inode->vdi_size);
-			queue_vdi_check_work(carg->inode, oid, NULL, carg->wq,
-					     carg->nr_copies);
-		}
+	if (idx->vdi_id) {
+		oid = vid_to_data_oid(idx->vdi_id, idx->idx);
+		*(carg->done) = (uint64_t)idx->idx * SD_DATA_OBJ_SIZE;
+		vdi_show_progress(*(carg->done), carg->inode->vdi_size);
+		queue_vdi_check_work(carg->inode, oid, NULL, carg->wq,
+				     carg->nr_copies);
 	}
 }
 
@@ -1841,7 +1837,7 @@ int do_vdi_check(const struct sd_inode *inode)
 		}
 	} else {
 		struct check_arg arg = {inode, &done, wq, nr_copies};
-		traverse_btree(inode, check_cb, &arg);
+		sd_inode_index_walk(inode, check_cb, &arg);
 		vdi_show_progress(inode->vdi_size, inode->vdi_size);
 	}
 

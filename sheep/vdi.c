@@ -824,20 +824,15 @@ struct delete_arg {
 	uint32_t *nr_deleted;
 };
 
-static void delete_cb(void *data, enum btree_node_type type, void *arg)
+static void delete_cb(struct sd_index *idx, void *arg, int ignore)
 {
-	struct sd_index *ext;
 	struct delete_arg *darg = (struct delete_arg *)arg;
 	uint64_t oid;
 	int ret;
 
-	if (type != BTREE_INDEX)
-		return;
-
-	ext = (struct sd_index *)data;
-	if (ext->vdi_id) {
-		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
-		if (ext->vdi_id != darg->inode->vdi_id)
+	if (idx->vdi_id) {
+		oid = vid_to_data_oid(idx->vdi_id, idx->idx);
+		if (idx->vdi_id != darg->inode->vdi_id)
 			sd_debug("object %" PRIx64 " is base's data, would"
 				 " not be deleted.", oid);
 		else {
@@ -900,7 +895,7 @@ static int delete_one_vdi(uint32_t vdi_id)
 		}
 	} else {
 		struct delete_arg arg = {inode, &nr_deleted};
-		traverse_btree(inode, delete_cb, &arg);
+		sd_inode_index_walk(inode, delete_cb, &arg);
 	}
 
 	if (vdi_is_deleted(inode))

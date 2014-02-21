@@ -126,27 +126,36 @@ static int indirect_idx_compare(struct sd_indirect_idx *a,
 	return intcmp(a->idx, b->idx);
 }
 
+typedef void (*btree_cb_fn)(void *data, void *arg, int type);
+
 /*
- * traverse the whole btree that include all the inode->data_vdi_id, bnode,
- * data objects and call btree_cb_fn()
+ * Traverse the whole btree that include all header, indirect_idx and index.
+ * @interest specify which objects user wants to run @fn against.
+ *
+ * If error happens when reading btree internal nodes, we simply continue to
+ * process next candidate.
  */
-void traverse_btree(const struct sd_inode *inode, btree_cb_fn fn, void *arg)
+static void traverse_btree(const struct sd_inode *inode, btree_cb_fn fn,
+			   void *arg, int interest)
 {
 	struct sd_index_header *header = INDEX_HEADER(inode->data_vdi_id);
 	struct sd_index_header *leaf_node = NULL;
 	struct sd_index *last, *iter;
 	struct sd_indirect_idx *last_idx, *iter_idx;
 	void *tmp;
+	int ret;
 
-	fn(header, BTREE_HEAD, arg);
+	if (interest & BTREE_HEAD)
+		fn(header, arg, BTREE_HEAD);
 	if (header->depth == 1) {
 		last = LAST_INDEX(inode->data_vdi_id);
 		iter = FIRST_INDEX(inode->data_vdi_id);
 
-		while (iter != last) {
-			fn(iter, BTREE_INDEX, arg);
-			iter++;
-		}
+		if (interest & BTREE_INDEX)
+			while (iter != last) {
+				fn(iter, arg, BTREE_INDEX);
+				iter++;
+			}
 	} else if (header->depth == 2) {
 		last_idx = LAST_INDRECT_IDX(inode->data_vdi_id);
 		iter_idx = FIRST_INDIRECT_IDX(inode->data_vdi_id);
@@ -154,17 +163,25 @@ void traverse_btree(const struct sd_inode *inode, btree_cb_fn fn, void *arg)
 		tmp = (void *)leaf_node;
 
 		while (iter_idx != last_idx) {
-			inode_actor.reader(iter_idx->oid, &tmp,
-					   SD_INODE_DATA_INDEX_SIZE, 0);
+			ret = inode_actor.reader(iter_idx->oid, &tmp,
+						 SD_INODE_DATA_INDEX_SIZE, 0);
+			if (ret != SD_RES_SUCCESS) {
+				sd_err("failed to read %"PRIx64, iter_idx->oid);
+				iter_idx++;
+				continue;
+			}
 
-			fn(iter_idx, BTREE_INDIRECT_IDX, arg);
-			fn(leaf_node, BTREE_HEAD, arg);
+			if (interest & BTREE_INDIRECT_IDX)
+				fn(iter_idx, arg, BTREE_INDIRECT_IDX);
+			if (interest & BTREE_HEAD)
+				fn(leaf_node, arg, BTREE_HEAD);
 			last = LAST_INDEX(leaf_node);
 			iter = FIRST_INDEX(leaf_node);
-			while (iter != last) {
-				fn(iter, BTREE_INDEX, arg);
-				iter++;
-			}
+			if (interest & BTREE_INDEX)
+				while (iter != last) {
+					fn(iter, arg, BTREE_INDEX);
+					iter++;
+				}
 			iter_idx++;
 		}
 
@@ -173,8 +190,15 @@ void traverse_btree(const struct sd_inode *inode, btree_cb_fn fn, void *arg)
 		panic("This B-tree not support depth %u", header->depth);
 }
 
+/* Walk the sd_inode's vdi index array and call func against each sd_index */
+void sd_inode_index_walk(const struct sd_inode *inode, index_cb_fn func,
+			 void *arg)
+{
+	traverse_btree(inode, (btree_cb_fn)func, arg, BTREE_INDEX);
+}
+
 #ifdef DEBUG
-static void dump_cb(void *data, enum btree_node_type type, void *arg)
+static void dump_cb(void *data, void *arg, int type)
 {
 	struct sd_index_header *header;
 	struct sd_index *ext;
@@ -203,7 +227,8 @@ static void dump_btree(struct sd_inode *inode)
 {
 #ifdef DEBUG
 	sd_info("btree> BEGIN");
-	traverse_btree(inode, dump_cb, NULL);
+	traverse_btree(inode, dump_cb, NULL,
+		       BTREE_INDEX | BTREE_HEAD | BTREE_INDIRECT_IDX);
 	sd_info("btree> END");
 #endif
 }
@@ -840,27 +865,24 @@ struct stat_arg {
 	uint32_t vid;
 };
 
-static void stat_cb(void *data, enum btree_node_type type, void *arg)
+static void stat_cb(struct sd_index *idx, void *arg,
+		    int ignore)
 {
-	struct sd_index *ext;
 	struct stat_arg *sarg = arg;
 	uint64_t *my = sarg->my;
 	uint64_t *cow = sarg->cow;
 
-	if (type == BTREE_INDEX) {
-		ext = (struct sd_index *)data;
-		if (ext->vdi_id == sarg->vid)
-			(*my)++;
-		else if (ext->vdi_id != 0)
-			(*cow)++;
-	}
+	if (idx->vdi_id == sarg->vid)
+		(*my)++;
+	else if (idx->vdi_id != 0)
+		(*cow)++;
 }
 
 static void hypver_volume_stat(const struct sd_inode *inode,
 			       uint64_t *my_objs, uint64_t *cow_objs)
 {
 	struct stat_arg arg = {my_objs, cow_objs, inode->vdi_id};
-	traverse_btree(inode, stat_cb, &arg);
+	sd_inode_index_walk(inode, stat_cb, &arg);
 }
 
 static void volume_stat(const struct sd_inode *inode, uint64_t *my_objs,

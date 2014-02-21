@@ -90,34 +90,30 @@ int kv_create_account(const char *account)
 	return sd_create_hyper_volume(account, &vdi_id);
 }
 
-static void bucket_iterater(void *data, enum btree_node_type type, void *arg)
+static void bucket_iterater(struct sd_index *idx, void *arg, int ignore)
 {
-	struct sd_index *ext;
 	struct bucket_iterater_arg *biarg = arg;
 	struct kv_bnode bnode;
 	uint64_t oid;
 	int ret;
 
-	if (type == BTREE_INDEX) {
-		ext = (struct sd_index *)data;
-		if (!ext->vdi_id)
-			return;
+	if (!idx->vdi_id)
+		return;
 
-		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
-		ret = sd_read_object(oid, (char *)&bnode, sizeof(bnode), 0);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to read data object %"PRIx64, oid);
-			return;
-		}
-
-		if (bnode.name[0] == 0)
-			return;
-		if (biarg->cb)
-			biarg->cb(bnode.name, biarg->opaque);
-		biarg->bucket_count++;
-		biarg->object_count += bnode.object_count;
-		biarg->bytes_used += bnode.bytes_used;
+	oid = vid_to_data_oid(idx->vdi_id, idx->idx);
+	ret = sd_read_object(oid, (char *)&bnode, sizeof(bnode), 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to read data object %"PRIx64, oid);
+		return;
 	}
+
+	if (bnode.name[0] == 0)
+		return;
+	if (biarg->cb)
+		biarg->cb(bnode.name, biarg->opaque);
+	biarg->bucket_count++;
+	biarg->object_count += bnode.object_count;
+	biarg->bytes_used += bnode.bytes_used;
 }
 
 static int read_account_meta(const char *account, uint64_t *bucket_count,
@@ -141,7 +137,7 @@ static int read_account_meta(const char *account, uint64_t *bucket_count,
 		goto out;
 	}
 
-	traverse_btree(inode, bucket_iterater, &arg);
+	sd_inode_index_walk(inode, bucket_iterater, &arg);
 	*object_count = arg.object_count;
 	*bucket_count = arg.bucket_count;
 	*used = arg.bytes_used;
@@ -253,7 +249,7 @@ static int bnode_create(struct kv_bnode *bnode, uint32_t account_vid)
 	int ret;
 
 	ret = sd_read_object(vid_to_vdi_oid(account_vid), (char *)inode,
-			       sizeof(*inode), 0);
+			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read %" PRIx32 " %s", account_vid,
 		       sd_strerror(ret));
@@ -430,33 +426,29 @@ struct object_iterater_arg {
 	uint32_t count;
 };
 
-static void object_iterater(void *data, enum btree_node_type type, void *arg)
+static void object_iterater(struct sd_index *idx, void *arg, int ignore)
 {
-	struct sd_index *ext;
 	struct object_iterater_arg *oiarg = arg;
 	struct kv_onode *onode = NULL;
 	uint64_t oid;
 	int ret;
 
-	if (type == BTREE_INDEX) {
-		ext = (struct sd_index *)data;
-		if (!ext->vdi_id)
-			goto out;
+	if (!idx->vdi_id)
+		goto out;
 
-		onode = xmalloc(SD_DATA_OBJ_SIZE);
-		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
-		ret = sd_read_object(oid, (char *)onode, SD_DATA_OBJ_SIZE, 0);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to read data object %"PRIx64, oid);
-			goto out;
-		}
-
-		if (onode->name[0] == '\0')
-			goto out;
-		if (oiarg->cb)
-			oiarg->cb(onode->name, oiarg->opaque);
-		oiarg->count++;
+	onode = xmalloc(SD_DATA_OBJ_SIZE);
+	oid = vid_to_data_oid(idx->vdi_id, idx->idx);
+	ret = sd_read_object(oid, (char *)onode, SD_DATA_OBJ_SIZE, 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to read data object %"PRIx64, oid);
+		goto out;
 	}
+
+	if (onode->name[0] == '\0')
+		goto out;
+	if (oiarg->cb)
+		oiarg->cb(onode->name, oiarg->opaque);
+	oiarg->count++;
 out:
 	free(onode);
 }
@@ -476,7 +468,7 @@ static int bucket_iterate_object(uint32_t bucket_vid, object_iter_cb cb,
 		goto out;
 	}
 
-	traverse_btree(inode, object_iterater, &arg);
+	sd_inode_index_walk(inode, object_iterater, &arg);
 out:
 	free(inode);
 	return ret;
@@ -590,7 +582,7 @@ int kv_iterate_bucket(const char *account, bucket_iter_cb cb, void *opaque)
 		goto out;
 	}
 
-	traverse_btree(&account_inode, bucket_iterater, &arg);
+	sd_inode_index_walk(&account_inode, bucket_iterater, &arg);
 out:
 	sys->cdrv->unlock(account_vid);
 	return ret;
