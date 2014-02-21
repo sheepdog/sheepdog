@@ -304,12 +304,17 @@ static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 			    void *data)
 {
 	sys->cinfo.status = SD_STATUS_SHUTDOWN;
-	if (!node_in_recovery() && set_cluster_shutdown(true) != SD_RES_SUCCESS)
-		/*
-		 * It's okay we failed to set 'shutdown', just start recovery
-		 * after restart blindly.
-		 */
-		sd_err("failed to set cluster as shutdown");
+	if (!node_in_recovery()) {
+		unregister_listening_fds();
+
+		if (set_cluster_shutdown(true) != SD_RES_SUCCESS)
+			/*
+			 * It's okay we failed to set 'shutdown', just start
+			 * recovery after restart blindly.
+			 */
+			sd_err("failed to set cluster as shutdown");
+	}
+
 	return SD_RES_SUCCESS;
 }
 
@@ -910,6 +915,7 @@ static int local_kill_node(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
 	sys->cinfo.status = SD_STATUS_KILLED;
+	unregister_listening_fds();
 
 	return SD_RES_SUCCESS;
 }

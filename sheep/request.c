@@ -996,9 +996,32 @@ static void listen_handler(int listen_fd, int events, void *data)
 	sd_debug("accepted a new connection: %d", fd);
 }
 
+static LIST_HEAD(listening_fd_list);
+
+struct listening_fd {
+	int fd;
+	struct list_node list;
+};
+
 static int create_listen_port_fn(int fd, void *data)
 {
+	struct listening_fd *new_fd;
+
+	new_fd = xzalloc(sizeof(*new_fd));
+	new_fd->fd = fd;
+	list_add_tail(&new_fd->list, &listening_fd_list);
+
 	return register_event(fd, listen_handler, data);
+}
+
+void unregister_listening_fds(void)
+{
+	struct listening_fd *fd;
+
+	list_for_each_entry(fd, &listening_fd_list, list) {
+		sd_debug("unregistering fd: %d", fd->fd);
+		unregister_event(fd->fd);
+	}
 }
 
 int create_listen_port(const char *bindaddr, int port)
