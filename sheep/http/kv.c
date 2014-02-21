@@ -829,14 +829,17 @@ out:
 static int onode_free_data(struct kv_onode *onode)
 {
 	uint32_t data_vid = onode->data_vid;
-	int ret;
+	int ret = SD_RES_SUCCESS;
 
-	sys->cdrv->lock(data_vid);
-	ret = oalloc_free(data_vid, onode->o_extent[0].start,
-			  onode->o_extent[0].count);
-	sys->cdrv->unlock(data_vid);
-	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to free %s", onode->name);
+	/* it don't need to free data for inlined onode */
+	if (!onode->inlined) {
+		sys->cdrv->lock(data_vid);
+		ret = oalloc_free(data_vid, onode->o_extent[0].start,
+				  onode->o_extent[0].count);
+		sys->cdrv->unlock(data_vid);
+		if (ret != SD_RES_SUCCESS)
+			sd_err("failed to free %s", onode->name);
+	}
 	return ret;
 }
 
