@@ -1,4 +1,3 @@
-
 ## 0.9.0 (not released yet)
 
 DOG COMMAND INTERFACE:
@@ -19,7 +18,7 @@ DOG COMMAND INTERFACE:
   - "vdi cache purge" cleans stale cache of all images
   - "vdi cache purge <image>" cleans stale cache of the specified image
  - new subcommand "node stat" for showing I/O status of the node
- - new subcommand "node logl evel" for changing log level at runtime
+ - new subcommand "node log level" for changing log level at runtime
   - "node log level set" sets loglevel of running sheep process
   - "node log level get" gets loglevel from running sheep process
   - "node log level list" lists avialable loglevels
