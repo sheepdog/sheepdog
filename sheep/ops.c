@@ -287,6 +287,8 @@ static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
 			    void *data)
 {
 	sys->cinfo.status = SD_STATUS_SHUTDOWN;
+	unregister_listening_fds();
+
 	return SD_RES_SUCCESS;
 }
 
@@ -837,6 +839,7 @@ static int local_kill_node(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
 	sys->cinfo.status = SD_STATUS_KILLED;
+	unregister_listening_fds();
 
 	return SD_RES_SUCCESS;
 }
