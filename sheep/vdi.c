@@ -878,7 +878,7 @@ static int delete_one_vdi(uint32_t vdi_id)
 		nr_objs = count_data_objs(inode);
 		for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
 			uint64_t oid;
-			uint32_t vid = INODE_GET_VID(inode, i);
+			uint32_t vid = sd_inode_get_vid(inode, i);
 
 			if (!vid)
 				continue;
@@ -900,7 +900,7 @@ static int delete_one_vdi(uint32_t vdi_id)
 		}
 	} else {
 		struct delete_arg arg = {inode, &nr_deleted};
-		traverse_btree(sheep_bnode_reader, inode, delete_cb, &arg);
+		traverse_btree(inode, delete_cb, &arg);
 	}
 
 	if (vdi_is_deleted(inode))

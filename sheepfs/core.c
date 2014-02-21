@@ -388,6 +388,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (sd_inode_actor_init(sheepfs_bnode_writer, sheepfs_bnode_reader) < 0)
+		exit(1);
+
 	t = sheepfs_run_cmd("dog");
 	if (!strlen(t->buf)) {
 		fprintf(stderr, "command dog not found\n");

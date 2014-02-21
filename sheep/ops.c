@@ -849,12 +849,11 @@ static int local_discard_obj(struct request *req)
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	tmp_vid = INODE_GET_VID(inode, idx);
+	tmp_vid = sd_inode_get_vid(inode, idx);
 	/* if vid in idx is not exist, we don't need to remove it */
 	if (tmp_vid) {
-		INODE_SET_VID(inode, idx, 0);
-		ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx, vid,
-					 0, 0, false, false);
+		sd_inode_set_vid(inode, idx, 0);
+		ret = sd_inode_write_vid(inode, idx, vid, 0, 0, false, false);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		if (sd_remove_object(oid) != SD_RES_SUCCESS)

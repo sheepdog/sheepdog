@@ -272,14 +272,13 @@ struct sheepdog_vdi_attr {
 };
 
 extern void sd_inode_init(void *data, int depth);
-extern uint32_t sd_inode_get_vid(read_node_fn reader,
-				 const struct sd_inode *inode, uint32_t idx);
-extern void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
-			     struct sd_inode *inode, uint32_t idx_start,
-			     uint32_t idx_end, uint32_t vdi_id);
-extern int sd_inode_write(write_node_fn writer, struct sd_inode *inode,
-			  int flags, bool create, bool direct);
-extern int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
+extern int sd_inode_actor_init(write_node_fn writer, read_node_fn reader);
+extern uint32_t sd_inode_get_vid(const struct sd_inode *inode, uint32_t idx);
+extern int sd_inode_set_vid(struct sd_inode *inode, uint32_t idx, uint32_t);
+extern int sd_inode_set_vid_range(struct sd_inode *inode, uint32_t idx_start,
+				  uint32_t idx_end, uint32_t vdi_id);
+extern int sd_inode_write(struct sd_inode *inode, int flags, bool create, bool);
+extern int sd_inode_write_vid(struct sd_inode *inode,
 			      uint32_t idx, uint32_t vid, uint32_t value,
 			      int flags, bool create, bool direct);
 extern uint32_t sd_inode_get_meta_size(struct sd_inode *inode, size_t size);
@@ -289,7 +288,7 @@ extern void sd_inode_copy_vdis(write_node_fn writer, read_node_fn reader,
 			       struct sd_inode *newi);
 
 typedef void (*btree_cb_fn)(void *data, enum btree_node_type type, void *arg);
-extern void traverse_btree(read_node_fn reader, const struct sd_inode *inode,
+extern void traverse_btree(const struct sd_inode *inode,
 			   btree_cb_fn fn, void *arg);
 
 /* 64 bit FNV-1a non-zero initial basis */

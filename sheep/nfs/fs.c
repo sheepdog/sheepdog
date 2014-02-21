@@ -63,9 +63,8 @@ static int inode_do_create(struct inode_data *id)
 	if (!create)
 		goto out;
 
-	INODE_SET_VID(sd_inode, idx, vid);
-	ret = sd_inode_write_vid(sheep_bnode_writer, sd_inode, idx,
-				 vid, vid, 0, false, false);
+	sd_inode_set_vid(sd_inode, idx, vid);
+	ret = sd_inode_write_vid(sd_inode, idx, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update sd inode, %" PRIx64,
 		       vid_to_vdi_oid(vid));
@@ -95,7 +94,7 @@ static int inode_lookup(struct inode_data *idata)
 	hval = sd_hash(name, strlen(name));
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
 		idx = (hval + i) % MAX_DATA_OBJS;
-		tmp_vid = INODE_GET_VID(sd_inode, idx);
+		tmp_vid = sd_inode_get_vid(sd_inode, idx);
 		if (tmp_vid) {
 			uint64_t oid = vid_to_data_oid(vid, idx);
 			uint64_t block;

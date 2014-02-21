@@ -79,7 +79,7 @@ int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
 					 uint32_t idx)
 {
-	return inode->vdi_id == INODE_GET_VID(inode, idx);
+	return inode->vdi_id == sd_inode_get_vid(inode, idx);
 }
 
 static void vdi_show_progress(uint64_t done, uint64_t total)
@@ -124,7 +124,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 			 "%Y-%m-%d %H:%M", &tm);
 	}
 
-	sd_inode_stat(i, &my_objs, &cow_objs, dog_bnode_reader);
+	sd_inode_stat(i, &my_objs, &cow_objs);
 
 	if (i->snap_id == 1 && i->parent_vdi_id != 0)
 		is_clone = true;
@@ -285,7 +285,7 @@ static int obj_info_filler(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
 		if (info->success)
 			break;
 		info->success = true;
-		vdi_id = INODE_GET_VID(inode, info->idx);
+		vdi_id = sd_inode_get_vid(inode, info->idx);
 		if (vdi_id) {
 			info->data_oid = vid_to_data_oid(vdi_id, info->idx);
 			return 1;
@@ -555,9 +555,8 @@ static int vdi_create(int argc, char **argv)
 			goto out;
 		}
 
-		INODE_SET_VID(inode, idx, vid);
-		ret = sd_inode_write_vid(dog_bnode_writer, inode, idx, vid, vid,
-					 0, false, true);
+		sd_inode_set_vid(inode, idx, vid);
+		ret = sd_inode_write_vid(inode, idx, vid, vid, 0, false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -670,7 +669,7 @@ static int vdi_clone(int argc, char **argv)
 		size_t size;
 
 		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
-		vdi_id = INODE_GET_VID(inode, idx);
+		vdi_id = sd_inode_get_vid(inode, idx);
 		if (vdi_id) {
 			oid = vid_to_data_oid(vdi_id, idx);
 			ret = dog_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0,
@@ -692,9 +691,9 @@ static int vdi_clone(int argc, char **argv)
 			goto out;
 		}
 
-		INODE_SET_VID(new_inode, idx, new_vid);
-		ret = sd_inode_write_vid(dog_bnode_writer, new_inode, idx,
-					 new_vid, new_vid, 0, false, true);
+		sd_inode_set_vid(new_inode, idx, new_vid);
+		ret = sd_inode_write_vid(new_inode, idx, new_vid, new_vid, 0,
+					 false, true);
 		if (ret) {
 			ret = EXIT_FAILURE;
 			goto out;
@@ -885,13 +884,13 @@ static int vdi_object_map(int argc, char **argv)
 
 	printf("Index       VID\n");
 	if (idx != ~0) {
-		vid = INODE_GET_VID(inode, idx);
+		vid = sd_inode_get_vid(inode, idx);
 		printf("%08"PRIu64" %8"PRIx32"\n", idx, vid);
 	} else {
 		uint64_t max_idx = count_data_objs(inode);
 
 		for (idx = 0; idx < max_idx; idx++) {
-			vid = INODE_GET_VID(inode, idx);
+			vid = sd_inode_get_vid(inode, idx);
 			if (vid)
 				printf("%08"PRIu64" %8"PRIx32"\n", idx, vid);
 		}
@@ -1287,7 +1286,7 @@ static int vdi_read(int argc, char **argv)
 	offset %= SD_DATA_OBJ_SIZE;
 	while (done < total) {
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
-		vdi_id = INODE_GET_VID(inode, idx);
+		vdi_id = sd_inode_get_vid(inode, idx);
 		if (vdi_id) {
 			oid = vid_to_data_oid(vdi_id, idx);
 			ret = dog_read_object(oid, buf, len, offset, false);
@@ -1363,7 +1362,7 @@ static int vdi_write(int argc, char **argv)
 		flags = 0;
 		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
 
-		vdi_id = INODE_GET_VID(inode, idx);
+		vdi_id = sd_inode_get_vid(inode, idx);
 		if (!vdi_id)
 			create = true;
 		else if (!is_data_obj_writeable(inode, idx)) {
@@ -1385,7 +1384,7 @@ static int vdi_write(int argc, char **argv)
 			total = done + len;
 		}
 
-		INODE_SET_VID(inode, idx, inode->vdi_id);
+		sd_inode_set_vid(inode, idx, inode->vdi_id);
 		oid = vid_to_data_oid(inode->vdi_id, idx);
 		ret = dog_write_object(oid, old_oid, buf, len, offset, flags,
 				      inode->nr_copies, inode->copy_policy,
@@ -1397,8 +1396,8 @@ static int vdi_write(int argc, char **argv)
 		}
 
 		if (create) {
-			ret = sd_inode_write_vid(dog_bnode_writer, inode, idx,
-						 vid, vid, flags, false, false);
+			ret = sd_inode_write_vid(inode, idx, vid, vid, flags,
+						 false, false);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;
@@ -1830,7 +1829,7 @@ int do_vdi_check(const struct sd_inode *inode)
 		max_idx = count_data_objs(inode);
 		vdi_show_progress(done, inode->vdi_size);
 		for (uint32_t idx = 0; idx < max_idx; idx++) {
-			vid = INODE_GET_VID(inode, idx);
+			vid = sd_inode_get_vid(inode, idx);
 			if (vid) {
 				oid = vid_to_data_oid(vid, idx);
 				queue_vdi_check_work(inode, oid, &done, wq,
@@ -1842,7 +1841,7 @@ int do_vdi_check(const struct sd_inode *inode)
 		}
 	} else {
 		struct check_arg arg = {inode, &done, wq, nr_copies};
-		traverse_btree(dog_bnode_reader, inode, check_cb, &arg);
+		traverse_btree(inode, check_cb, &arg);
 		vdi_show_progress(inode->vdi_size, inode->vdi_size);
 	}
 
@@ -1992,8 +1991,8 @@ static int vdi_backup(int argc, char **argv)
 	}
 
 	for (idx = 0; idx < nr_objs; idx++) {
-		uint32_t from_vid = INODE_GET_VID(from_inode, idx);
-		uint32_t to_vid = INODE_GET_VID(to_inode, idx);
+		uint32_t from_vid = sd_inode_get_vid(from_inode, idx);
+		uint32_t to_vid = sd_inode_get_vid(to_inode, idx);
 
 		if (to_vid == 0 && from_vid == 0)
 			continue;
@@ -2046,7 +2045,7 @@ static int restore_obj(struct obj_backup *backup, uint32_t vid,
 		       struct sd_inode *parent_inode)
 {
 	int ret;
-	uint32_t parent_vid = INODE_GET_VID(parent_inode, backup->idx);
+	uint32_t parent_vid = sd_inode_get_vid(parent_inode, backup->idx);
 	uint64_t parent_oid = 0;
 
 	if (parent_vid)

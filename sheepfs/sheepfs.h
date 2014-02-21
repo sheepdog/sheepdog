@@ -66,6 +66,11 @@ int volume_remove_entry(const char *entry);
 int volume_sync(const char *path);
 int volume_open(const char *path, struct fuse_file_info *);
 int reset_socket_pool(void);
+int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
+			 uint64_t offset, uint32_t flags, int copies,
+			 int copy_policy, bool create, bool direct);
+int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
+			 uint64_t offset);
 
 /* cluster.c */
 int cluster_info_read(const char *path, char *buf, size_t size, off_t);

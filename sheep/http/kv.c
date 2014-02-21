@@ -141,7 +141,7 @@ static int read_account_meta(const char *account, uint64_t *bucket_count,
 		goto out;
 	}
 
-	traverse_btree(sheep_bnode_reader, inode, bucket_iterater, &arg);
+	traverse_btree(inode, bucket_iterater, &arg);
 	*object_count = arg.object_count;
 	*bucket_count = arg.bucket_count;
 	*used = arg.bytes_used;
@@ -234,9 +234,8 @@ static int bnode_do_create(struct kv_bnode *bnode, struct sd_inode *inode,
 		sd_err("failed to create object, %" PRIx64, oid);
 		goto out;
 	}
-	INODE_SET_VID(inode, idx, vid);
-	ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
-				 vid, vid, 0, false, false);
+	sd_inode_set_vid(inode, idx, vid);
+	ret = sd_inode_write_vid(inode, idx, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update inode, %" PRIx64,
 		       vid_to_vdi_oid(vid));
@@ -264,7 +263,7 @@ static int bnode_create(struct kv_bnode *bnode, uint32_t account_vid)
 	hval = sd_hash(bnode->name, strlen(bnode->name));
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
 		idx = (hval + i) % MAX_DATA_OBJS;
-		tmp_vid = INODE_GET_VID(inode, idx);
+		tmp_vid = sd_inode_get_vid(inode, idx);
 		if (tmp_vid)
 			continue;
 		else
@@ -477,7 +476,7 @@ static int bucket_iterate_object(uint32_t bucket_vid, object_iter_cb cb,
 		goto out;
 	}
 
-	traverse_btree(sheep_bnode_reader, inode, object_iterater, &arg);
+	traverse_btree(inode, object_iterater, &arg);
 out:
 	free(inode);
 	return ret;
@@ -591,8 +590,7 @@ int kv_iterate_bucket(const char *account, bucket_iter_cb cb, void *opaque)
 		goto out;
 	}
 
-	traverse_btree(sheep_bnode_reader, &account_inode,
-		       bucket_iterater, &arg);
+	traverse_btree(&account_inode, bucket_iterater, &arg);
 out:
 	sys->cdrv->unlock(account_vid);
 	return ret;
@@ -767,9 +765,8 @@ static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
 	if (!create)
 		goto out;
 
-	INODE_SET_VID(inode, idx, vid);
-	ret = sd_inode_write_vid(sheep_bnode_writer, inode, idx,
-				 vid, vid, 0, false, false);
+	sd_inode_set_vid(inode, idx, vid);
+	ret = sd_inode_write_vid(inode, idx, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update inode, %" PRIx64,
 		       vid_to_vdi_oid(vid));
@@ -799,7 +796,7 @@ static int onode_create(struct kv_onode *onode, uint32_t bucket_vid)
 	hval = sd_hash(onode->name, strlen(onode->name));
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
 		idx = (hval + i) % MAX_DATA_OBJS;
-		tmp_vid = INODE_GET_VID(inode, idx);
+		tmp_vid = sd_inode_get_vid(inode, idx);
 		if (tmp_vid) {
 			uint64_t oid = vid_to_data_oid(bucket_vid, idx);
 			char name[SD_MAX_OBJECT_NAME] = { };
@@ -920,7 +917,7 @@ static int onode_lookup(struct kv_onode *onode, uint32_t ovid, const char *name)
 	hval = sd_hash(name, strlen(name));
 	for (i = 0; i < MAX_DATA_OBJS; i++) {
 		idx = (hval + i) % MAX_DATA_OBJS;
-		tmp_vid = INODE_GET_VID(inode, idx);
+		tmp_vid = sd_inode_get_vid(inode, idx);
 		if (tmp_vid) {
 			uint64_t oid = vid_to_data_oid(ovid, idx);
 

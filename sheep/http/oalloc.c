@@ -90,9 +90,8 @@ int oalloc_init(uint32_t vid)
 		       sd_strerror(ret));
 		goto out;
 	}
-	INODE_SET_VID(inode, 0, vid);
-	ret = sd_inode_write_vid(sheep_bnode_writer, inode, 0,
-				 vid, vid, 0, false, false);
+	sd_inode_set_vid(inode, 0, vid);
+	ret = sd_inode_write_vid(inode, 0, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update inode, %" PRIx32", %s", vid,
 		       sd_strerror(ret));
@@ -179,9 +178,9 @@ int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count)
 	}
 
 	sd_debug("start %"PRIu64" end %"PRIu64, start, start + count - 1);
-	INODE_SET_VID_RANGE(inode, start, (start + count - 1), vid);
+	sd_inode_set_vid_range(inode, start, (start + count - 1), vid);
 
-	ret = sd_inode_write(sheep_bnode_writer, inode, 0, false, false);
+	ret = sd_inode_write(inode, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update inode, %" PRIx64", %s",
 		       vid_to_vdi_oid(vid), sd_strerror(ret));
@@ -278,9 +277,9 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 
 	sd_debug("discard start %"PRIu64" end %"PRIu64, start,
 		 start + count - 1);
-	INODE_SET_VID_RANGE(inode, start, (start + count - 1), 0);
+	sd_inode_set_vid_range(inode, start, (start + count - 1), 0);
 
-	ret = sd_inode_write(sheep_bnode_writer, inode, 0, false, false);
+	ret = sd_inode_write(inode, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update inode, %" PRIx64", %s",
 		       vid_to_vdi_oid(vid), sd_strerror(ret));

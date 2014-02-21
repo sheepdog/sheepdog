@@ -494,6 +494,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (sd_inode_actor_init(dog_bnode_writer, dog_bnode_reader) < 0)
+		exit(EXIT_SYSFAIL);
+
 	if (!is_stdout_console() || raw_output)
 		highlight = false;
 

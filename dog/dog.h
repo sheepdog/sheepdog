@@ -99,16 +99,6 @@ int dog_bnode_writer(uint64_t oid, void *mem, unsigned int len, uint64_t offset,
 int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 		     uint64_t offset);
 
-#define INODE_GET_VID(inode, idx) (sd_inode_get_vid(dog_bnode_reader, \
-							inode, idx))
-#define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid(dog_bnode_writer, \
-					   dog_bnode_reader, inode, idx, idx, \
-					   vdi_id))
-#define INODE_SET_VID_RANGE(inode, idx_start, idx_end, vdi_id) \
-				(sd_inode_set_vid(dog_bnode_writer, \
-				dog_bnode_reader, inode, idx_start, \
-				idx_end, vdi_id))
-
 extern struct command vdi_command;
 extern struct command node_command;
 extern struct command cluster_command;

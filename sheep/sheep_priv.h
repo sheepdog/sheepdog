@@ -399,16 +399,6 @@ int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
 int sheep_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 		       uint64_t offset);
 
-#define INODE_GET_VID(inode, idx) (sd_inode_get_vid(sheep_bnode_reader, \
-					inode, idx))
-#define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid(sheep_bnode_writer,\
-					   sheep_bnode_reader, inode, idx, idx,\
-					   vdi_id))
-#define INODE_SET_VID_RANGE(inode, idx_start, idx_end, vdi_id) \
-				(sd_inode_set_vid(sheep_bnode_writer,\
-				sheep_bnode_reader, inode, idx_start, \
-				idx_end, vdi_id))
-
 /* Operations */
 
 const struct sd_op_template *get_sd_op(uint8_t opcode);

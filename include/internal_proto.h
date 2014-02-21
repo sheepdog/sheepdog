@@ -263,8 +263,7 @@ struct sd_stat {
 	} r;
 };
 
-void sd_inode_stat(const struct sd_inode *inode, uint64_t *, uint64_t *,
-		   read_node_fn reader);
+void sd_inode_stat(const struct sd_inode *inode, uint64_t *, uint64_t *);
 
 #ifdef HAVE_TRACE
 

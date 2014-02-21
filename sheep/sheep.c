@@ -766,6 +766,10 @@ int main(int argc, char **argv)
 		dirp = strtok(argv[optind], ",");
 	}
 
+	ret = sd_inode_actor_init(sheep_bnode_writer, sheep_bnode_reader);
+	if (ret)
+		exit(1);
+
 	ret = init_base_path(dirp);
 	if (ret)
 		exit(1);

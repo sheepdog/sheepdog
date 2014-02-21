@@ -316,14 +316,14 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	if (i->store_policy == 0) {
 		nr_objs = count_data_objs(i);
 		for (uint32_t idx = 0; idx < nr_objs; idx++) {
-			vdi_id = INODE_GET_VID(i, idx);
+			vdi_id = sd_inode_get_vid(i, idx);
 			if (!vdi_id)
 				continue;
 			uint64_t oid = vid_to_data_oid(vdi_id, idx);
 			object_tree_insert(oid, i->nr_copies, i->copy_policy);
 		}
 	} else
-		traverse_btree(dog_bnode_reader, i, fill_cb, &i);
+		traverse_btree(i, fill_cb, &i);
 
 	/* fill vmstate object id */
 	nr_vmstate_object = DIV_ROUND_UP(i->vm_state_size, SD_DATA_OBJ_SIZE);

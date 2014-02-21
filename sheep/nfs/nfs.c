@@ -639,7 +639,7 @@ void *nfs3_fsstat(struct svc_req *req, struct nfs_arg *argp)
 		goto out;
 	}
 
-	sd_inode_stat(sd_inode, &my, &cow, sheep_bnode_reader);
+	sd_inode_stat(sd_inode, &my, &cow);
 
 	sd_debug("%"PRIx32" contains %lu objects", vid, my);
 

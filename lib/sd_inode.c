@@ -108,6 +108,13 @@ struct find_path {
 	int depth;
 };
 
+struct sd_inode_actor {
+	write_node_fn writer;
+	read_node_fn reader;
+};
+
+static struct sd_inode_actor inode_actor;
+
 static int index_compare(struct sd_index *a, struct sd_index *b)
 {
 	return intcmp(a->idx, b->idx);
@@ -123,8 +130,7 @@ static int indirect_idx_compare(struct sd_indirect_idx *a,
  * traverse the whole btree that include all the inode->data_vdi_id, bnode,
  * data objects and call btree_cb_fn()
  */
-void traverse_btree(read_node_fn reader, const struct sd_inode *inode,
-		    btree_cb_fn fn, void *arg)
+void traverse_btree(const struct sd_inode *inode, btree_cb_fn fn, void *arg)
 {
 	struct sd_index_header *header = INDEX_HEADER(inode->data_vdi_id);
 	struct sd_index_header *leaf_node = NULL;
@@ -148,8 +154,8 @@ void traverse_btree(read_node_fn reader, const struct sd_inode *inode,
 		tmp = (void *)leaf_node;
 
 		while (iter_idx != last_idx) {
-			reader(iter_idx->oid, &tmp,
-			       SD_INODE_DATA_INDEX_SIZE, 0);
+			inode_actor.reader(iter_idx->oid, &tmp,
+					   SD_INODE_DATA_INDEX_SIZE, 0);
 
 			fn(iter_idx, BTREE_INDIRECT_IDX, arg);
 			fn(leaf_node, BTREE_HEAD, arg);
@@ -193,11 +199,11 @@ static void dump_cb(void *data, enum btree_node_type type, void *arg)
 #endif
 
 /* dump the information of B-tree */
-static void dump_btree(read_node_fn reader, struct sd_inode *inode)
+static void dump_btree(struct sd_inode *inode)
 {
 #ifdef DEBUG
 	sd_info("btree> BEGIN");
-	traverse_btree(reader, inode, dump_cb, NULL);
+	traverse_btree(inode, dump_cb, NULL);
 	sd_info("btree> END");
 #endif
 }
@@ -208,8 +214,6 @@ static void dump_btree(read_node_fn reader, struct sd_inode *inode)
  * so it could only be used in sd_inode_set_vid() which will be protected by
  * distributed lock and should be released in the end of sd_inode_set_vid().
  */
-static write_node_fn caller_writer;
-static read_node_fn caller_reader;
 
 /* no rationale */
 #define NUMBER_OF_CACHE	4
@@ -225,23 +229,23 @@ static void icache_init(void)
 	cache_idx = 0;
 }
 
-static void icache_writeout(write_node_fn writer, int copies, int policy)
+static void icache_writeout(int copies, int policy)
 {
 	int i;
 	for (i = 0; i < cache_idx; i++) {
-		writer(cache_array[i].oid, cache_array[i].mem,
-		       SD_INODE_DATA_INDEX_SIZE, 0, 0, copies, policy,
-		       false, false);
+		inode_actor.writer(cache_array[i].oid, cache_array[i].mem,
+				   SD_INODE_DATA_INDEX_SIZE, 0, 0, copies,
+				   policy, false, false);
 	}
 }
 
-static void icache_release(write_node_fn writer, int copies, int policy)
+static void icache_release(int copies, int policy)
 {
-	icache_writeout(writer, copies, policy);
+	icache_writeout(copies, policy);
 	icache_init();
 }
 
-static void icache_insert(write_node_fn writer, int copies, int policy,
+static void icache_insert(int copies, int policy,
 			  uint64_t oid, void *mem)
 {
 	int i;
@@ -255,7 +259,7 @@ static void icache_insert(write_node_fn writer, int copies, int policy,
 
 	if (cache_idx == (NUMBER_OF_CACHE - 1)) {
 		sd_debug("cache for B-tree is full, so write all out");
-		icache_release(writer, copies, policy);
+		icache_release(copies, policy);
 	}
 
 	/* insert new cache */
@@ -280,11 +284,11 @@ static int icache_writer(uint64_t id, void *mem, unsigned int len,
 {
 	/* Only try to cache entire ext-node */
 	if (!offset && !create && !direct && len == SD_INODE_DATA_INDEX_SIZE) {
-		icache_insert(caller_writer, copies, copy_policy, id, mem);
+		icache_insert(copies, copy_policy, id, mem);
 		return SD_RES_SUCCESS;
 	}
-	return caller_writer(id, mem, len, offset, flags, copies, copy_policy,
-			     create, direct);
+	return inode_actor.writer(id, mem, len, offset, flags, copies,
+				  copy_policy, create, direct);
 }
 
 static int icache_reader(uint64_t id, void **mem, unsigned int len,
@@ -299,7 +303,7 @@ static int icache_reader(uint64_t id, void **mem, unsigned int len,
 			return SD_RES_SUCCESS;
 		}
 	}
-	return caller_reader(id, mem, len, offset);
+	return inode_actor.reader(id, mem, len, offset);
 }
 
 void sd_inode_init(void *data, int depth)
@@ -511,8 +515,7 @@ out:
 	return ret;
 }
 
-uint32_t sd_inode_get_vid(read_node_fn reader, const struct sd_inode *inode,
-			  uint32_t idx)
+uint32_t sd_inode_get_vid(const struct sd_inode *inode, uint32_t idx)
 {
 	struct find_path path;
 	int ret;
@@ -525,7 +528,7 @@ uint32_t sd_inode_get_vid(read_node_fn reader, const struct sd_inode *inode,
 			return 0;
 
 		memset(&path, 0, sizeof(path));
-		ret = search_whole_btree(reader, inode, idx, &path);
+		ret = search_whole_btree(inode_actor.reader, inode, idx, &path);
 		if (ret == SD_RES_SUCCESS)
 			return path.p_index->vdi_id;
 		if (path.p_index_header)
@@ -679,16 +682,11 @@ out:
 		free(path.p_index_header);
 }
 
-void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
-		      struct sd_inode *inode, uint32_t idx_start,
-		      uint32_t idx_end, uint32_t vdi_id)
+int sd_inode_set_vid_range(struct sd_inode *inode, uint32_t idx_start,
+			   uint32_t idx_end, uint32_t vdi_id)
 {
 	struct sd_index_header *header;
 	int idx;
-
-	/* save default writer and reader */
-	caller_writer = writer;
-	caller_reader = reader;
 
 	for (idx = idx_start; idx <= idx_end; idx++) {
 		if (inode->store_policy == 0)
@@ -700,15 +698,26 @@ void sd_inode_set_vid(write_node_fn writer, read_node_fn reader,
 			if (header->magic != INODE_BTREE_MAGIC)
 				panic("%s() B-tree in inode is corrupt!",
 				      __func__);
-			/* use cache version of writer and reader */
+			/*
+			 * use icache(write buffer) to accelerate batch set
+			 * operation. icache will be released after this
+			 * transaction to assure consistency.
+			 */
 			set_vid_for_btree(icache_writer, icache_reader, inode,
 					  idx, vdi_id);
 		}
 	}
 	if (inode->store_policy != 0)
-		dump_btree(reader, inode);
+		dump_btree(inode);
 
-	icache_release(caller_writer, inode->nr_copies, inode->copy_policy);
+	icache_release(inode->nr_copies, inode->copy_policy);
+	/* XXX: return error code */
+	return 0;
+}
+
+int sd_inode_set_vid(struct sd_inode *inode, uint32_t idx, uint32_t vdi_id)
+{
+	return sd_inode_set_vid_range(inode, idx, idx, vdi_id);
 }
 
 /*
@@ -740,53 +749,57 @@ uint32_t sd_inode_get_meta_size(struct sd_inode *inode, size_t size)
 }
 
 /* Write the whole meta-data of inode out */
-int sd_inode_write(write_node_fn writer, struct sd_inode *inode, int flags,
-		   bool create, bool direct)
+int sd_inode_write(struct sd_inode *inode, int flags, bool create, bool direct)
 {
 	uint32_t len;
 	int ret;
 
 	if (inode->store_policy == 0)
-		ret = writer(vid_to_vdi_oid(inode->vdi_id), inode,
-			     SD_INODE_HEADER_SIZE, 0,
-			     flags, inode->nr_copies, inode->copy_policy,
-			     create, direct);
+		ret = inode_actor.writer(vid_to_vdi_oid(inode->vdi_id), inode,
+					 SD_INODE_HEADER_SIZE, 0,
+					 flags, inode->nr_copies,
+					 inode->copy_policy,
+					 create, direct);
 	else {
 		len = SD_INODE_HEADER_SIZE + sd_inode_get_meta_size(inode, 0);
-		ret = writer(vid_to_vdi_oid(inode->vdi_id), inode, len, 0,
-			     flags, inode->nr_copies, inode->copy_policy,
-			     create, false);
+		ret = inode_actor.writer(vid_to_vdi_oid(inode->vdi_id), inode,
+					 len, 0, flags, inode->nr_copies,
+					 inode->copy_policy, create, false);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
-		ret = writer(vid_to_vdi_oid(inode->vdi_id),
-			     &(inode->btree_counter),
-			     sizeof(uint32_t),
-			     offsetof(struct sd_inode, btree_counter), flags,
-			     inode->nr_copies, inode->copy_policy,
-			     create, false);
+		ret = inode_actor.writer(vid_to_vdi_oid(inode->vdi_id),
+					 &(inode->btree_counter),
+					 sizeof(uint32_t),
+					 offsetof(struct sd_inode,
+						  btree_counter),
+					 flags,
+					 inode->nr_copies, inode->copy_policy,
+					 create, false);
 	}
 out:
 	return ret;
 }
 
 /* Write the meta-data of inode out */
-int sd_inode_write_vid(write_node_fn writer, struct sd_inode *inode,
+int sd_inode_write_vid(struct sd_inode *inode,
 		       uint32_t idx, uint32_t vid, uint32_t value,
 		       int flags, bool create, bool direct)
 {
 	int ret = SD_RES_SUCCESS;
 
 	if (inode->store_policy == 0)
-		ret = writer(vid_to_vdi_oid(vid), &value, sizeof(value),
-			     SD_INODE_HEADER_SIZE + sizeof(value) * idx,
-			     flags, inode->nr_copies, inode->copy_policy,
-			     create, direct);
+		ret = inode_actor.writer(vid_to_vdi_oid(vid), &value,
+					 sizeof(value),
+				SD_INODE_HEADER_SIZE + sizeof(value) * idx,
+					 flags, inode->nr_copies,
+					 inode->copy_policy,
+					 create, direct);
 	else {
 		/*
 		 * For btree type sd_inode, we only have to write all
 		 * meta-data of sd_inode out.
 		 */
-		ret = sd_inode_write(writer, inode, flags, create, direct);
+		ret = sd_inode_write(inode, flags, create, direct);
 	}
 	return ret;
 }
@@ -849,11 +862,10 @@ static void stat_cb(void *data, enum btree_node_type type, void *arg)
 }
 
 static void hypver_volume_stat(const struct sd_inode *inode,
-			       uint64_t *my_objs, uint64_t *cow_objs,
-			       read_node_fn reader)
+			       uint64_t *my_objs, uint64_t *cow_objs)
 {
 	struct stat_arg arg = {my_objs, cow_objs, inode->vdi_id};
-	traverse_btree(reader, inode, stat_cb, &arg);
+	traverse_btree(inode, stat_cb, &arg);
 }
 
 static void volume_stat(const struct sd_inode *inode, uint64_t *my_objs,
@@ -913,10 +925,21 @@ static void volume_stat(const struct sd_inode *inode, uint64_t *my_objs,
  * means the number of the other objects.
  */
 void sd_inode_stat(const struct sd_inode *inode, uint64_t *my_objs,
-		   uint64_t *cow_objs, read_node_fn reader)
+		   uint64_t *cow_objs)
 {
 	if (inode->store_policy == 0)
 		volume_stat(inode, my_objs, cow_objs);
 	else
-		hypver_volume_stat(inode, my_objs, cow_objs, reader);
+		hypver_volume_stat(inode, my_objs, cow_objs);
+}
+
+int sd_inode_actor_init(write_node_fn writer, read_node_fn reader)
+{
+	if (!writer || !reader) {
+		sd_err("failed to init sd inode actor");
+		return -1;
+	}
+	inode_actor.writer = writer;
+	inode_actor.reader = reader;
+	return 0;
 }

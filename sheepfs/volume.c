@@ -64,28 +64,10 @@ struct vdi_inode {
 static struct rb_root vdi_inode_tree = RB_ROOT;
 static struct sd_rw_lock vdi_inode_tree_lock = SD_RW_LOCK_INITIALIZER;
 
-
-static int sheepfs_bnode_writer(uint64_t oid, void *mem, unsigned int len,
-				uint64_t offset, uint32_t flags, int copies,
-				int copy_policy, bool create, bool direct);
-static int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
-				uint64_t offset);
-
-#define INODE_GET_VID(inode, idx) (sd_inode_get_vid(\
-					sheepfs_bnode_reader, inode, idx))
-#define INODE_SET_VID(inode, idx, vdi_id) (sd_inode_set_vid( \
-					sheepfs_bnode_writer, \
-					sheepfs_bnode_reader, \
-					inode, idx, idx, vdi_id))
-#define INODE_SET_VID_RANGE(inode, idx_start, idx_end, vdi_id) \
-				(sd_inode_set_vid(sheepfs_bnode_writer, \
-				sheepfs_bnode_reader, inode, idx_start, \
-				idx_end, vdi_id))
-
 static inline bool is_data_obj_writeable(const struct sd_inode *inode,
 					 uint32_t idx)
 {
-	return inode->vdi_id == INODE_GET_VID(inode, idx);
+	return inode->vdi_id == sd_inode_get_vid(inode, idx);
 }
 
 static int vdi_inode_cmp(const struct vdi_inode *a, const struct vdi_inode *b)
@@ -153,7 +135,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	if (is_data_obj(oid)) {
 		idx = data_oid_to_idx(oid);
 		assert(vdi);
-		vdi_id = INODE_GET_VID(vdi->inode, idx);
+		vdi_id = sd_inode_get_vid(vdi->inode, idx);
 		if (!vdi_id) {
 			/* if object doesn't exist, we'er done */
 			if (rw == VOLUME_READ) {
@@ -200,10 +182,10 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	}
 
 	if (create) {
-		INODE_SET_VID(vdi->inode, idx, vid);
+		sd_inode_set_vid(vdi->inode, idx, vid);
 		/* writeback inode update */
-		if (sd_inode_write_vid(sheepfs_bnode_writer, vdi->inode, idx,
-					vid, vid, 0, false, false) < 0)
+		if (sd_inode_write_vid(vdi->inode, idx, vid, vid, 0, false,
+				       false) < 0)
 			return -1;
 	}
 done:
