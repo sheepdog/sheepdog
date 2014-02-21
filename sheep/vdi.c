@@ -1097,8 +1097,6 @@ static int start_deletion(struct request *req, uint32_t vid)
 		goto out;
 	}
 
-	clear_parent_child_vdi(vid);
-
 	ret = fill_delete_vid_array(dw, root_vid);
 	if (ret < 0) {
 		ret = SD_RES_EIO;
@@ -1113,6 +1111,18 @@ static int start_deletion(struct request *req, uint32_t vid)
 		if (cloned) {
 			dw->delete_vid_array[0] = vid;
 			dw->delete_vid_count = 1;
+			/*
+			 * FIXME:
+			 *
+			 * We can't clear snapshot's parent because it is not
+			 * removed. We only remove the whole snapshot chain. So
+			 * we can only create MAX_CHILDREN snapshots for one
+			 * base even if we later remove some of them.
+			 *
+			 * But for clone (writable snapshot, we can clear
+			 * parent for deletion, thus make room for new clones.
+			 */
+			clear_parent_child_vdi(vid);
 		} else {
 			sd_debug("snapshot chain has valid vdi, just mark vdi %"
 				 PRIx32 " as deleted.", dw->target_vid);
