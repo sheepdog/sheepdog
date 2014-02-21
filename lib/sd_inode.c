@@ -102,34 +102,14 @@ struct find_path {
 	int depth;
 };
 
-typedef int (*comp)(void *a, void *b);
-
-/* compare function for sd_extent */
-static int extent_comp(void *a, void *b)
+static int extent_compare(struct sd_extent *a, struct sd_extent *b)
 {
-	struct sd_extent *ea = (struct sd_extent *)a;
-	struct sd_extent *eb = (struct sd_extent *)b;
-
-	if (ea->idx > eb->idx)
-		return 1;
-	else if (ea->idx < eb->idx)
-		return -1;
-	else
-		return 0;
+	return intcmp(a->idx, b->idx);
 }
 
-/* compare function for sd_extent_idx */
-static int index_comp(void *a, void *b)
+static int index_compare(struct sd_extent_idx *a, struct sd_extent_idx *b)
 {
-	struct sd_extent_idx *ia = (struct sd_extent_idx *)a;
-	struct sd_extent_idx *ib = (struct sd_extent_idx *)b;
-
-	if (ia->idx > ib->idx)
-		return 1;
-	else if (ia->idx < ib->idx)
-		return -1;
-	else
-		return 0;
+	return intcmp(a->idx, b->idx);
 }
 
 /*
@@ -315,31 +295,6 @@ static int icache_reader(uint64_t id, void **mem, unsigned int len,
 	return caller_reader(id, mem, len, offset);
 }
 
-/*
- * Search for the key in a B-tree node. If can't find it, return the position
- * for insert operation. So we can't just use xbsearch().
- */
-static void *binary_search(void *first, void *last, void *key,
-			   size_t obj_size, comp cmp)
-{
-	const char *l, *r, *m;
-	int ret;
-
-	l = (const char *)first;
-	r = (const char *)last - obj_size;
-	while (l <= r) {
-		m = l + ((r - l) / obj_size / 2) * obj_size;
-		ret = cmp((void *)key, (void *)m);
-		if (ret < 0)
-			r = m - obj_size;
-		else if (ret > 0)
-			l = m + obj_size;
-		else
-			return (void *)m;
-	}
-	return (void *)l;
-}
-
 void sd_inode_init(void *data, int depth)
 {
 	struct sd_extent_header *header = EXT_HEADER(data);
@@ -373,8 +328,8 @@ static struct sd_extent *search_ext_entry(struct sd_extent_header *header,
 {
 	struct sd_extent tmp;
 	tmp.idx = idx;
-	return binary_search(FIRST_EXT(header), LAST_EXT(header), &tmp,
-			sizeof(struct sd_extent), extent_comp);
+	return nbsearch(&tmp, FIRST_EXT(header), header->entries,
+			extent_compare);
 }
 
 /* search idx in middle-node */
@@ -383,8 +338,8 @@ static struct sd_extent_idx *search_idx_entry(struct sd_extent_header *header,
 {
 	struct sd_extent_idx tmp;
 	tmp.idx = idx;
-	return binary_search(FIRST_IDX(header), LAST_IDX(header), &tmp,
-			sizeof(struct sd_extent_idx), index_comp);
+	return nbsearch(&tmp, FIRST_IDX(header), header->entries,
+			index_compare);
 }
 
 static void insert_ext_entry_nosearch(struct sd_extent_header *header,

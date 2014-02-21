@@ -145,6 +145,30 @@ int atomic_create_and_write(const char *path, const char *buf, size_t len,
 	__ret;								\
 })
 
+/*
+ * Binary Search of the ascending sorted array. When the key is not found, this
+ * returns the next greater position.
+ */
+#define nbsearch(key, base, nmemb, compar)				\
+({									\
+	typeof(key) __m,  __l = base, __r = base + nmemb - 1;		\
+	int __ret;							\
+									\
+	while(__l <= __r && likely(nmemb > 0)) {			\
+		__m = __l + (__r - __l) / 2;				\
+		__ret = compar(key, __m);				\
+		if (__ret < 0)						\
+			__r = __m - 1;					\
+		else if (__ret > 0)					\
+			__l = __m + 1;					\
+		else {							\
+			__l = __m;					\
+			break;						\
+		}							\
+	}								\
+	__l;								\
+})
+
 /* a type safe version of lfind() */
 #define xlfind(key, base, nmemb, compar)				\
 ({									\
