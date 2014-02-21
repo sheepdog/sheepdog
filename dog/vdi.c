@@ -2480,7 +2480,7 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 's':
 		vdi_cmd_data.snapshot_id = strtol(opt, &p, 10);
-		if (opt == p) {
+		if (opt == p || *p != '\0') {
 			vdi_cmd_data.snapshot_id = 0;
 			pstrcpy(vdi_cmd_data.snapshot_tag,
 				sizeof(vdi_cmd_data.snapshot_tag), opt);
@@ -2515,7 +2515,7 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 'F':
 		vdi_cmd_data.from_snapshot_id = strtol(opt, &p, 10);
-		if (opt == p) {
+		if (opt == p || *p != '\0') {
 			vdi_cmd_data.from_snapshot_id = 0;
 			pstrcpy(vdi_cmd_data.from_snapshot_tag,
 				sizeof(vdi_cmd_data.from_snapshot_tag), opt);
