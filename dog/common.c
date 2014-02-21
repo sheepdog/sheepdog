@@ -155,9 +155,9 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 
 		oid = vid_to_vdi_oid(nr);
 
-		/* for B-tree inode, we also need sd_extent_header */
+		/* for B-tree inode, we also need sd_index_header */
 		ret = dog_read_object(oid, &i, SD_INODE_HEADER_SIZE +
-				      sizeof(struct sd_extent_header), 0, true);
+				      sizeof(struct sd_index_header), 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read inode header");
 			continue;

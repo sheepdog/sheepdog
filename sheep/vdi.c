@@ -826,15 +826,15 @@ struct delete_arg {
 
 static void delete_cb(void *data, enum btree_node_type type, void *arg)
 {
-	struct sd_extent *ext;
+	struct sd_index *ext;
 	struct delete_arg *darg = (struct delete_arg *)arg;
 	uint64_t oid;
 	int ret;
 
-	if (type != BTREE_EXT)
+	if (type != BTREE_INDEX)
 		return;
 
-	ext = (struct sd_extent *)data;
+	ext = (struct sd_index *)data;
 	if (ext->vdi_id) {
 		oid = vid_to_data_oid(ext->vdi_id, ext->idx);
 		if (ext->vdi_id != darg->inode->vdi_id)

@@ -231,28 +231,28 @@ struct sd_inode {
 	uint32_t btree_counter;
 };
 
-struct sd_extent {
-	uint32_t idx;
+struct sd_index {
+	uint32_t idx; /* Index of data object */
 	uint32_t vdi_id;
 };
 
-struct sd_extent_idx {
-	uint32_t idx;
+struct sd_indirect_idx {
+	uint32_t idx; /* Max index of data object within this indirect node */
 	uint64_t oid;
 };
 
 #define INODE_BTREE_MAGIC	0x6274
 
-struct sd_extent_header {
+struct sd_index_header {
 	uint16_t magic;
-	uint16_t depth;	/* 1 -- ext node; 2 -- idx node */
+	uint16_t depth;	/* 2: root node; 1: indirect node */
 	uint32_t entries;
 };
 
 enum btree_node_type {
 	BTREE_HEAD = 1,
-	BTREE_EXT,
-	BTREE_IDX,
+	BTREE_INDEX,
+	BTREE_INDIRECT_IDX,
 };
 
 typedef int (*write_node_fn)(uint64_t id, void *mem, unsigned int len,

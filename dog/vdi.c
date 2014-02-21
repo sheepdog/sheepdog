@@ -1789,12 +1789,12 @@ struct check_arg {
 
 static void check_cb(void *data, enum btree_node_type type, void *arg)
 {
-	struct sd_extent *ext;
+	struct sd_index *ext;
 	struct check_arg *carg = arg;
 	uint64_t oid;
 
-	if (type == BTREE_EXT) {
-		ext = (struct sd_extent *)data;
+	if (type == BTREE_INDEX) {
+		ext = (struct sd_index *)data;
 		if (ext->vdi_id) {
 			oid = vid_to_data_oid(ext->vdi_id, ext->idx);
 			*(carg->done) = (uint64_t)ext->idx * SD_DATA_OBJ_SIZE;

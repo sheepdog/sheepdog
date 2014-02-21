@@ -92,14 +92,14 @@ int kv_create_account(const char *account)
 
 static void bucket_iterater(void *data, enum btree_node_type type, void *arg)
 {
-	struct sd_extent *ext;
+	struct sd_index *ext;
 	struct bucket_iterater_arg *biarg = arg;
 	struct kv_bnode bnode;
 	uint64_t oid;
 	int ret;
 
-	if (type == BTREE_EXT) {
-		ext = (struct sd_extent *)data;
+	if (type == BTREE_INDEX) {
+		ext = (struct sd_index *)data;
 		if (!ext->vdi_id)
 			return;
 
@@ -433,14 +433,14 @@ struct object_iterater_arg {
 
 static void object_iterater(void *data, enum btree_node_type type, void *arg)
 {
-	struct sd_extent *ext;
+	struct sd_index *ext;
 	struct object_iterater_arg *oiarg = arg;
 	struct kv_onode *onode = NULL;
 	uint64_t oid;
 	int ret;
 
-	if (type == BTREE_EXT) {
-		ext = (struct sd_extent *)data;
+	if (type == BTREE_INDEX) {
+		ext = (struct sd_index *)data;
 		if (!ext->vdi_id)
 			goto out;
 

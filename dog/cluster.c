@@ -283,12 +283,12 @@ out:
 
 static void fill_cb(void *data, enum btree_node_type type, void *arg)
 {
-	struct sd_extent *ext;
+	struct sd_index *ext;
 	struct sd_inode *inode = (struct sd_inode *)arg;
 	uint64_t oid;
 
-	if (type == BTREE_EXT) {
-		ext = (struct sd_extent *)data;
+	if (type == BTREE_INDEX) {
+		ext = (struct sd_index *)data;
 		if (ext->vdi_id) {
 			oid = vid_to_data_oid(ext->vdi_id, ext->idx);
 			object_tree_insert(oid, inode->nr_copies,
