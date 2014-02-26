@@ -30,6 +30,30 @@ struct onode_extent {
 	uint64_t count;
 };
 
+/*
+ * The processes of creating object is:
+ *
+ *   1. lock container
+ *   2. check whether the onode is exists.
+ *   3. allocate data space for object, and create onode, then write it done
+ *   4. unlock container
+ *   5. upload object
+ *
+ * This routine will avoid uploading duplicated objects but have  an exception:
+ * if the client halt the uploading progress, we will have a
+ * "uploading incompleted" onode.
+ *
+ * The solution is: we can add code for onode to identify its status.
+ * A new onode will be set to "ONODE_INIT", and after uploading completed, the
+ * onode will be set to  "ONODE_COMPLETE". So, when users try to use swift
+ * interface to GET a "incompleted" object, sheep will find out the onode is
+ * "ONODE_INIT" which means "not completed", so sheep will return
+ * "partial content" for http request, and user could remove the object and
+ * upload it again.
+ */
+#define ONODE_INIT	1	/* created and allocated space, but no data */
+#define ONODE_COMPLETE	2	/* data upload complete */
+
 struct kv_onode {
 	union {
 		struct {
@@ -42,6 +66,7 @@ struct kv_onode {
 			uint32_t nr_extent;
 			uint64_t oid;
 			uint8_t inlined;
+			uint8_t flags;
 		};
 
 		uint8_t pad[BLOCK_SIZE];
@@ -735,7 +760,7 @@ out:
 static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 {
 	ssize_t size;
-	int ret = SD_RES_SUCCESS;
+	int ret = SD_RES_SUCCESS, offset;
 
 	if (req->data_length <= KV_ONODE_INLINE_SIZE) {
 		size = http_request_read(req, onode->data, sizeof(onode->data));
@@ -754,6 +779,13 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 	}
+	/* write ONODE_COMPLETE to onode->flags */
+	onode->flags = ONODE_COMPLETE;
+	offset = offsetof(struct kv_onode, flags);
+	ret = sd_write_object(onode->oid, (char *)onode + offset,
+			      sizeof(uint8_t), offset, false);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("Failed to write flags of onode %s", onode->name);
 out:
 	return ret;
 }
@@ -1040,6 +1072,12 @@ static int onode_allocate_space(struct http_request *req, const char *account,
 	sys->cdrv->lock(bucket_vid);
 	ret = onode_lookup_nolock(onode, bucket_vid, name);
 	if (ret == SD_RES_SUCCESS) {
+		/* if the exists onode has not been uploaded complete */
+		if (onode->flags != ONODE_COMPLETE) {
+			ret = SD_RES_INCOMPLETE;
+			sd_err("The exists onode %s is incomplete", name);
+			goto out;
+		}
 		/* For overwrite, we delete old object and then create */
 		ret = onode_delete(onode);
 		if (ret != SD_RES_SUCCESS) {
@@ -1051,8 +1089,10 @@ static int onode_allocate_space(struct http_request *req, const char *account,
 			sd_err("Failed to update bnode for %s", name);
 			goto out;
 		}
-	} else if (ret != SD_RES_NO_OBJ)
+	} else if (ret != SD_RES_NO_OBJ) {
+		sd_err("Failed to lookup onode %s %s", name, sd_strerror(ret));
 		goto out;
+	}
 
 	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account, bucket);
 	ret = sd_lookup_vdi(vdi_name, &data_vid);
@@ -1062,6 +1102,7 @@ static int onode_allocate_space(struct http_request *req, const char *account,
 	memset(onode, 0, sizeof(*onode));
 	pstrcpy(onode->name, sizeof(onode->name), name);
 	onode->data_vid = data_vid;
+	onode->flags = ONODE_INIT;
 
 	ret = onode_allocate_data(onode, req);
 	if (ret != SD_RES_SUCCESS) {
@@ -1171,9 +1212,15 @@ int kv_read_object(struct http_request *req, const char *account,
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
+	/* this object has not been uploaded complete */
+	if (onode->flags != ONODE_COMPLETE) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
+
 	ret = onode_read_data(onode, req);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to read data for %s", name);
+		sd_err("failed to read data for %s ret %d", name, ret);
 out:
 	free(onode);
 	return ret;
@@ -1195,6 +1242,12 @@ int kv_delete_object(const char *account, const char *bucket, const char *name)
 	ret = onode_lookup(onode, bucket_vid, name);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
+
+	/* this object has not been uploaded complete */
+	if (onode->flags != ONODE_COMPLETE) {
+		ret = SD_RES_INCOMPLETE;
+		goto out;
+	}
 
 	ret = onode_delete(onode);
 	if (ret != SD_RES_SUCCESS) {
@@ -1260,6 +1313,12 @@ int kv_read_object_meta(struct http_request *req, const char *account,
 	req->data_length = onode->size;
 	http_request_writef(req, "Last-Modified: %s\n",
 			    http_time(onode->mtime));
+
+	/* this object has not been uploaded complete */
+	if (onode->flags != ONODE_COMPLETE) {
+		ret = SD_RES_INCOMPLETE;
+		goto out;
+	}
 out:
 	free(onode);
 	return ret;

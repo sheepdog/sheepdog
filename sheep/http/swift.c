@@ -210,6 +210,9 @@ static void swift_head_object(struct http_request *req, const char *account,
 	case SD_RES_NO_OBJ:
 		http_response_header(req, NOT_FOUND);
 		break;
+	case SD_RES_INCOMPLETE:
+		http_response_header(req, PARTIAL_CONTENT);
+		break;
 	default:
 		http_response_header(req, INTERNAL_SERVER_ERROR);
 		break;
@@ -256,6 +259,10 @@ static void swift_put_object(struct http_request *req, const char *account,
 		break;
 	case SD_RES_NO_SPACE:
 		http_response_header(req, SERVICE_UNAVAILABLE);
+		break;
+	case SD_RES_INCOMPLETE:
+		http_response_header(req, CONFLICT);
+		break;
 	default:
 		http_response_header(req, INTERNAL_SERVER_ERROR);
 		break;
@@ -281,6 +288,9 @@ static void swift_delete_object(struct http_request *req, const char *account,
 	case SD_RES_NO_VDI:
 	case SD_RES_NO_OBJ:
 		http_response_header(req, NOT_FOUND);
+		break;
+	case SD_RES_INCOMPLETE:
+		http_response_header(req, CONFLICT);
 		break;
 	default:
 		http_response_header(req, INTERNAL_SERVER_ERROR);
