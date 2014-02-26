@@ -776,7 +776,6 @@ static int onode_create(struct kv_onode *onode, uint32_t bucket_vid)
 	int ret;
 	bool create = true;
 
-	sys->cdrv->lock(bucket_vid);
 	ret = sd_read_object(vid_to_vdi_oid(bucket_vid), (char *)inode,
 			       sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
@@ -811,7 +810,6 @@ create:
 	ret = onode_do_create(onode, inode, idx, create);
 out:
 	free(inode);
-	sys->cdrv->unlock(bucket_vid);
 	return ret;
 }
 
@@ -890,14 +888,14 @@ out:
  *
  * [ sheep, dog, wolve, '\0', fish, {unallocated}, tiger, ]
  */
-static int onode_lookup(struct kv_onode *onode, uint32_t ovid, const char *name)
+static int onode_lookup_nolock(struct kv_onode *onode, uint32_t ovid,
+			       const char *name)
 {
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 	uint32_t tmp_vid, idx;
 	uint64_t hval, i;
 	int ret;
 
-	sys->cdrv->lock(ovid);
 	ret = sd_read_object(vid_to_vdi_oid(ovid), (char *)inode,
 			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
@@ -930,7 +928,17 @@ static int onode_lookup(struct kv_onode *onode, uint32_t ovid, const char *name)
 	}
 out:
 	free(inode);
+	return ret;
+}
+
+static int onode_lookup(struct kv_onode *onode, uint32_t ovid, const char *name)
+{
+	int ret;
+
+	sys->cdrv->lock(ovid);
+	ret = onode_lookup_nolock(onode, ovid, name);
 	sys->cdrv->unlock(ovid);
+
 	return ret;
 }
 
