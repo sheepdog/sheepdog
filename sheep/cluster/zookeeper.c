@@ -418,6 +418,38 @@ static void lock_table_lookup_release(uint64_t lock_id)
 	sd_mutex_unlock(table_locks + hval);
 }
 
+/*
+ * If this node leave the cluster, we need to delete the znode which created
+ * for distributed lock. Otherwise, the lock will never be released.
+ */
+static void lock_table_remove_znodes(void)
+{
+	uint64_t hval;
+	int rc;
+	struct hlist_node *iter;
+	struct cluster_lock *lock;
+
+	for (hval = 0; hval < HASH_BUCKET_NR; hval++) {
+		sd_mutex_lock(table_locks + hval);
+		hlist_for_each_entry(lock, iter, cluster_locks_table + hval,
+				     hnode) {
+			while (true) {
+				rc = zk_delete_node(lock->lock_path, -1);
+				if (rc == ZOK || rc == ZNONODE) {
+					sd_debug("delete path: %s ok",
+						 lock->lock_path);
+					break;
+				}
+				sd_err("Failed to delete path: %s %s",
+				       lock->lock_path,
+				       zerror(rc));
+				zk_wait();
+			}
+		}
+		sd_mutex_unlock(table_locks + hval);
+	}
+}
+
 /* ZooKeeper-based queue give us an totally ordered events */
 static int efd;
 static int32_t queue_pos;
@@ -958,6 +990,7 @@ static int zk_leave(void)
 	snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
 		 node_to_str(&this_node.node));
 	add_event(EVENT_LEAVE, &this_node, NULL, 0);
+	lock_table_remove_znodes();
 	zk_delete_node(path, -1);
 	return 0;
 }
