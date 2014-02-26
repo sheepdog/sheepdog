@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Test http service with Incompleted-objects
+
+. ./common
+
+_need_to_be_root
+
+which nginx > /dev/null || _notrun "Require nginx but it's not running"
+pkill nginx > /dev/null
+nginx -c `pwd`/nginx.conf
+
+for i in `seq 0 5`; do
+	_start_sheep $i "-r swift,port=800$i"
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 4:2
+
+curl -s -X PUT http://localhost/v1/sd
+curl -s -X PUT http://localhost/v1/sd/sheep
+
+_random | dd iflag=fullblock of=$STORE/data_ bs=4M count=48 &> /dev/null
+dd if=$STORE/data_ bs=4M count=48 2> /dev/null | md5sum > $STORE/data_.ck
+
+# upload objects with different names and kill them suddenly
+
+for i in `seq 4 5`; do
+       port=8$(($i % 6))
+       curl -s -T $STORE/data_ -X PUT http://localhost:$port/v1/sd/sheep/data$i &> /dev/null &
+done
+sleep 2
+pkill -9 "curl -s -T" > /dev/null
+
+# get incomplete-objects
+for i in `seq 4 5`; do
+       port=8$(($i % 6))
+       curl -s -I -X GET http://localhost:$port/v1/sd/sheep/data$i > $STORE/data$i.2 &
+done
+wait
+
+for i in `seq 4 5`; do
+	grep HTTP $STORE/data$i.2|awk '{print $2}'
+done
+
+_vdi_list
+
+for i in `seq 0 5`; do
+       port=8$(($i % 6))
+       curl -s -X DELETE http://localhost:$port/v1/sd/sheep/data$i &
+done
+wait
+
+_vdi_list
+
+# upload objects with same name
+for i in `seq 0 5`; do
+       port=8$(($i % 6))
+       curl -s -T $STORE/data_ -X PUT http://localhost:$port/v1/sd/sheep/data_ -v &> $STORE/data$i.3 &
+done
+wait
+
+for i in `seq 0 5`; do
+	grep "HTTP/1.1 409" $STORE/data$i.3|awk '{print $3}'
+done
+
+curl -s -X GET http://localhost/v1/sd/sheep
+curl -s -X GET http://localhost/v1/sd/sheep/data_ | md5sum >$STORE/data_download.ck
+
+diff -u $STORE/data_.ck $STORE/data_download.ck
+
+curl -s -X DELETE http://localhost/v1/sd/sheep/data_
+
+_vdi_list
+
+# create and delete simultaneously
+curl -s -T $STORE/data_ -X PUT http://localhost:80/v1/sd/sheep/data_ -v &> $STORE/data1.4 &
+sleep 1
+curl -s -X DELETE http://localhost:81/v1/sd/sheep/data_ -v &> $STORE/data2.4
+
+grep "HTTP/1.1 409" $STORE/data2.4|awk '{print $3}'
+wait
+
+_vdi_list
+
+curl -s -X DELETE http://localhost/v1/sd/sheep/data_
+
+# only DELETE with HEADER 'Force: true' can remove "Incomplete" object
+curl -s -T $STORE/data_ -X PUT http://localhost:80/v1/sd/sheep/data_ &> /dev/null &
+sleep 1
+pkill -9 "curl -s -T" > /dev/null
+
+curl -s -X DELETE http://localhost/v1/sd/sheep/data_ -v &> $STORE/data1.5
+
+grep "HTTP/1.1 409" $STORE/data1.5|awk '{print $3}'
+
+curl -s -X DELETE -H 'Force: true' http://localhost/v1/sd/sheep/data_ -v &> $STORE/data2.5
+
+grep "HTTP/1.1 409" $STORE/data2.5|awk '{print $3}'
+
+_vdi_list

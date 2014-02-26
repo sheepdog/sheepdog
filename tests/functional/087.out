@@ -1,0 +1,32 @@
+QA output created by 087
+using backend plain store
+206
+206
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2    4:2              
+  sd/sheep     0   16 PB  8.0 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep/allocator     0   16 PB  388 MB  0.0 MB DATE   fd57fc    4:2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2    4:2              
+  sd/sheep     0   16 PB  8.0 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc    4:2              
+409
+409
+409
+409
+409
+data_
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2    4:2              
+  sd/sheep     0   16 PB   12 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc    4:2              
+409
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2    4:2              
+  sd/sheep     0   16 PB   12 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep/allocator     0   16 PB  196 MB  0.0 MB DATE   fd57fc    4:2              
+409
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2    4:2              
+  sd/sheep     0   16 PB   12 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc    4:2              
