@@ -636,15 +636,12 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 	return local_req_wait(iocb);
 }
 
-static int onode_populate_extents(struct kv_onode *onode,
+static int onode_allocate_extents(struct kv_onode *onode,
 				  struct http_request *req)
 {
-	ssize_t size;
-	uint64_t start = 0, count, done = 0, total, offset;
+	uint64_t start = 0, count;
 	int ret;
-	char *data_buf = NULL;
 	uint32_t data_vid = onode->data_vid;
-	uint64_t write_buffer_size = MIN(kv_rw_buffer, req->data_length);
 
 	count = DIV_ROUND_UP(req->data_length, SD_DATA_OBJ_SIZE);
 	sys->cdrv->lock(data_vid);
@@ -654,32 +651,6 @@ static int onode_populate_extents(struct kv_onode *onode,
 		sd_err("oalloc_new_prepare failed for %s, %s", onode->name,
 		       sd_strerror(ret));
 		goto out;
-	}
-
-	data_buf = xmalloc(write_buffer_size);
-	offset = start * SD_DATA_OBJ_SIZE;
-	total = req->data_length;
-	while (done < total) {
-		size = http_request_read(req, data_buf, write_buffer_size);
-		if (size <= 0) {
-			sd_err("Failed to read http request: %ld", size);
-			sys->cdrv->lock(data_vid);
-			oalloc_free(data_vid, start, count);
-			sys->cdrv->unlock(data_vid);
-			ret = SD_RES_EIO;
-			goto out;
-		}
-		ret = vdi_read_write(data_vid, data_buf, size, offset, false);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to write data object for %s, %s",
-			       onode->name, sd_strerror(ret));
-			sys->cdrv->lock(data_vid);
-			oalloc_free(data_vid, start, count);
-			sys->cdrv->unlock(data_vid);
-			goto out;
-		}
-		done += size;
-		offset += size;
 	}
 
 	sys->cdrv->lock(data_vid);
@@ -695,6 +666,40 @@ static int onode_populate_extents(struct kv_onode *onode,
 	onode->o_extent[0].count = count;
 	onode->nr_extent = 1;
 out:
+	return ret;
+}
+
+static int onode_populate_extents(struct kv_onode *onode,
+				  struct http_request *req)
+{
+	ssize_t size;
+	uint64_t start = onode->o_extent[0].start;
+	uint64_t done = 0, total, offset;
+	uint64_t write_buffer_size = MIN(kv_rw_buffer, req->data_length);
+	int ret = SD_RES_SUCCESS;
+	char *data_buf = NULL;
+	uint32_t data_vid = onode->data_vid;
+
+	data_buf = xmalloc(write_buffer_size);
+	offset = start * SD_DATA_OBJ_SIZE;
+	total = req->data_length;
+	while (done < total) {
+		size = http_request_read(req, data_buf, write_buffer_size);
+		if (size <= 0) {
+			sd_err("Failed to read http request: %ld", size);
+			ret = SD_RES_EIO;
+			goto out;
+		}
+		ret = vdi_read_write(data_vid, data_buf, size, offset, false);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to write data object for %s, %s",
+			       onode->name, sd_strerror(ret));
+			goto out;
+		}
+		done += size;
+		offset += size;
+	}
+out:
 	free(data_buf);
 	return ret;
 }
@@ -709,13 +714,30 @@ static uint64_t get_seconds(void)
 	return seconds;
 }
 
+static int onode_allocate_data(struct kv_onode *onode, struct http_request *req)
+{
+	int ret = SD_RES_SUCCESS;
+
+	if (req->data_length <= KV_ONODE_INLINE_SIZE)
+		onode->inlined = 1;
+	else {
+		ret = onode_allocate_extents(onode, req);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+	}
+
+	onode->mtime = get_seconds();
+	onode->size = req->data_length;
+out:
+	return ret;
+}
+
 static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 {
 	ssize_t size;
 	int ret = SD_RES_SUCCESS;
 
 	if (req->data_length <= KV_ONODE_INLINE_SIZE) {
-		onode->inlined = 1;
 		size = http_request_read(req, onode->data, sizeof(onode->data));
 		if (size < 0 || req->data_length != size) {
 			sd_err("Failed to read from web server for %s",
@@ -723,14 +745,15 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 			ret = SD_RES_SYSTEM_ERROR;
 			goto out;
 		}
+		ret = sd_write_object(onode->oid, (char *)onode,
+				      BLOCK_SIZE + size, 0, false);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
 	} else {
 		ret = onode_populate_extents(onode, req);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 	}
-
-	onode->mtime = get_seconds();
-	onode->size = req->data_length;
 out:
 	return ret;
 }
@@ -777,7 +800,7 @@ static int onode_create(struct kv_onode *onode, uint32_t bucket_vid)
 	bool create = true;
 
 	ret = sd_read_object(vid_to_vdi_oid(bucket_vid), (char *)inode,
-			       sizeof(*inode), 0);
+			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read %" PRIx32 " %s", bucket_vid,
 		       sd_strerror(ret));
@@ -856,8 +879,8 @@ static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 			size = MIN(total - done, read_buffer_size);
 			ret = vdi_read_write(onode->data_vid, data_buf,
 					     size, offset, true);
-			sd_debug("vdi_read_write size: %"PRIx64", offset: %"
-				 PRIx64, size, offset);
+			sd_debug("vdi_read_write size: %"PRIu64", offset: %"
+				 PRIu64", ret:%d", size, offset, ret);
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("Failed to read for vid %"PRIx32,
 				       onode->data_vid);
@@ -1005,32 +1028,27 @@ static int onode_delete(struct kv_onode *onode)
 	return SD_RES_SUCCESS;
 }
 
-/*
- * user object name -> struct kv_onode -> sheepdog objects -> user data
- *
- * onode is a index node that maps name to sheepdog objects which hold the user
- * data, similar to UNIX inode. We use simple hashing for [name, onode] mapping.
- */
-int kv_create_object(struct http_request *req, const char *account,
-		     const char *bucket, const char *name)
+/* Create onode and allocate space for it */
+static int onode_allocate_space(struct http_request *req, const char *account,
+				uint32_t bucket_vid, const char *bucket,
+				const char *name, struct kv_onode *onode)
 {
 	char vdi_name[SD_MAX_VDI_LEN];
-	struct kv_onode *onode;
-	uint32_t bucket_vid, data_vid;
-	int ret;
+	uint32_t data_vid;
+	int ret = SD_RES_SUCCESS;
 
-	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
-	ret = sd_lookup_vdi(vdi_name, &bucket_vid);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
-	onode = xzalloc(sizeof(*onode));
-	ret = onode_lookup(onode, bucket_vid, name);
+	sys->cdrv->lock(bucket_vid);
+	ret = onode_lookup_nolock(onode, bucket_vid, name);
 	if (ret == SD_RES_SUCCESS) {
 		/* For overwrite, we delete old object and then create */
-		ret = kv_delete_object(account, bucket, name);
+		ret = onode_delete(onode);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to delete exists object %s", name);
+			goto out;
+		}
+		ret = bnode_update(account, bucket, onode->size, false);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to update bnode for %s", name);
 			goto out;
 		}
 	} else if (ret != SD_RES_NO_OBJ)
@@ -1045,7 +1063,7 @@ int kv_create_object(struct http_request *req, const char *account,
 	pstrcpy(onode->name, sizeof(onode->name), name);
 	onode->data_vid = data_vid;
 
-	ret = onode_populate_data(onode, req);
+	ret = onode_allocate_data(onode, req);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to write data for %s", name);
 		goto out;
@@ -1062,6 +1080,72 @@ int kv_create_object(struct http_request *req, const char *account,
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to update bucket for %s", name);
 		onode_delete(onode);
+		goto out;
+	}
+out:
+	sys->cdrv->unlock(bucket_vid);
+	return ret;
+}
+
+/*
+ * user object name -> struct kv_onode -> sheepdog objects -> user data
+ *
+ * onode is a index node that maps name to sheepdog objects which hold the user
+ * data, similar to UNIX inode. We use simple hashing for [name, onode] mapping.
+ *
+ * At before, the implemention of swift interface for creating object in
+ * sheepdog is:
+ *     1. lock container
+ *     2. check whether the onode with same object name is exists.
+ *     3. unlock container
+ *     4. upload object
+ *     5. create onode
+ * this sequence have a problem: if two clients uploading same objects
+ * concurrently, it will create two objects with same names in container.
+ * To avoid duplicated names, we must put "create onode" operation in container
+ * lock regions.
+ *
+ * Therefore we need to change the processes of creating object to:
+ *     1. lock container
+ *     2. check whether the onode is exists.
+ *     3. allocate data space for object, and create onode, then write it done
+ *     4. unlock container
+ *     5. upload object
+ * this routine will avoid uploading duplicated objects.
+ *
+ * Cases:
+ * 1. create objects with same name simultaneously,
+ *    only one object will be create.
+ * 2. create object and delete object simultaneously,
+ *    return FAIL for "delete object" request if "create object" is running.
+ * 3. kill client if it is uploading object,
+ *    the object is "INCOMPLETED", it will return "PARTIAL_CONTENT" when
+ *    client GET or HEAD object.
+ */
+int kv_create_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *name)
+{
+	char vdi_name[SD_MAX_VDI_LEN];
+	struct kv_onode *onode = NULL;
+	uint32_t bucket_vid;
+	int ret;
+
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
+	ret = sd_lookup_vdi(vdi_name, &bucket_vid);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	onode = xzalloc(sizeof(*onode));
+	ret = onode_allocate_space(req, account, bucket_vid, bucket,
+				   name, onode);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to create onode and allocate space %s", name);
+		goto out;
+	}
+
+	ret = onode_populate_data(onode, req);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to write data to onode %s", name);
 		goto out;
 	}
 out:
