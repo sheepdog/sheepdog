@@ -197,6 +197,11 @@ static int request_init_operation(struct http_request *req)
 		req->data_length = max - req->offset;
 		sd_debug("HTTP_RANGE: %"PRIu64" %"PRIu64, req->offset, max);
 	}
+	p = FCGX_GetParam("FORCE", env);
+	if (p && p[0] != '\0') {
+		if (!strcmp("true", p))
+			req->force = true;
+	}
 
 	req->status = UNKNOWN;
 

@@ -49,6 +49,7 @@ struct http_request {
 	enum http_status status;
 	uint64_t data_length;
 	uint64_t offset;
+	bool force;
 };
 
 struct http_driver {
@@ -146,7 +147,8 @@ int kv_read_object(struct http_request *req, const char *account,
 		   const char *bucket, const char *object);
 int kv_read_object_meta(struct http_request *req, const char *account,
 			const char *bucket, const char *object);
-int kv_delete_object(const char *account, const char *bucket, const char *);
+int kv_delete_object(const char *account, const char *bucket, const char *,
+		     bool force);
 int kv_iterate_object(const char *account, const char *bucket,
 		      void (*cb)(const char *object, void *opaque),
 		      void *opaque);

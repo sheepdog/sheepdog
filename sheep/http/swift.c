@@ -280,7 +280,7 @@ static void swift_delete_object(struct http_request *req, const char *account,
 {
 	int ret;
 
-	ret = kv_delete_object(account, container, object);
+	ret = kv_delete_object(account, container, object, req->force);
 	switch (ret) {
 	case SD_RES_SUCCESS:
 		http_response_header(req, NO_CONTENT);

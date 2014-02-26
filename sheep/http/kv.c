@@ -1226,7 +1226,26 @@ out:
 	return ret;
 }
 
-int kv_delete_object(const char *account, const char *bucket, const char *name)
+/*
+ * Imaging a scenario:
+ *
+ * 1. Client A is uploading a large object which names 'elephant', it
+ *    only allocate meta-data in oalloc and is creating SD_OBJ_DATA files.
+ * 2. Client B send a DELETE request to remove object 'elephant', it
+ *    will remove all the backend files for 'elephant'.
+ *    At the same time, Client A dosen't know what happend because uploading
+ *    progress don't need to lock any vdi.
+ * 3. Client A return Create-object-success, but the real data have all been
+ *    removed.
+ *
+ * To avoid this scenario, we let DELETE operation do nothing but only return
+ * 'CONFLICT' when the object is 'incompleted'. And, users can send the DELETE
+ * request with a new header 'Force: true' which will remove 'incompleted'
+ * object forcely when users make sure that there isn't any uploading progress
+ * for this object.
+ */
+int kv_delete_object(const char *account, const char *bucket, const char *name,
+		     bool force)
 {
 	char vdi_name[SD_MAX_VDI_LEN];
 	uint32_t bucket_vid;
@@ -1244,7 +1263,7 @@ int kv_delete_object(const char *account, const char *bucket, const char *name)
 		goto out;
 
 	/* this object has not been uploaded complete */
-	if (onode->flags != ONODE_COMPLETE) {
+	if (!force && onode->flags != ONODE_COMPLETE) {
 		ret = SD_RES_INCOMPLETE;
 		goto out;
 	}

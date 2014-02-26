@@ -137,7 +137,7 @@ static void s3_post_object(struct http_request *req, const char *bucket,
 static void s3_delete_object(struct http_request *req, const char *bucket,
 			     const char *object)
 {
-	kv_delete_object("s3", bucket, object);
+	kv_delete_object("s3", bucket, object, 0);
 
 	if (req->status == NOT_FOUND)
 		s3_write_err_response(req, "NoSuchKey",
