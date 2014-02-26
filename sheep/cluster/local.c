@@ -30,17 +30,24 @@
 
 static const char *shmfile = "/tmp/sheepdog_shm";
 static const char *lockdir = "/tmp/sheepdog_locks/";
-/*
- * we have to use sd_rw_lock because flock isn't thread exclusive
- * and it also serves to project lock_tree
- */
-static struct sd_rw_lock lock_tree_lock = SD_RW_LOCK_INITIALIZER;
+
+/* use lock_tree to find lock quickly */
 static struct rb_root lock_tree_root = RB_ROOT;
 
+/* use global_lock to protect lock_tree */
+static struct sd_mutex *global_lock;
+
+/*
+ * a lock may be used by several processes(or threads) at the same time,
+ * so we should add 'ref' to avoid one process release a lock which
+ * still used by another process.
+ */
 struct lock_entry {
 	struct rb_node rb;
 	int fd;
 	uint64_t lock_id;
+	uint64_t ref;
+	struct sd_mutex *mutex;
 };
 
 static int shmfd;
@@ -539,10 +546,63 @@ static int local_get_local_addr(uint8_t *myaddr)
 	return 0;
 }
 
+/*
+ * pthread_mutex with attribute of PTHREAD_PROCESS_SHARED could be
+ * used by different threads in different processes.
+ * We put pthread_mutex_t in shared-memory so any process could easily
+ * get it.
+ */
+static struct sd_mutex *get_shared_lock(const char *path, int *fd)
+{
+	struct sd_mutex *pmutex;
+	pthread_mutexattr_t mutex_attr;
+	int ret, flags = O_RDWR;
+	bool created = false;
+
+	ret = access(path, R_OK|W_OK);
+	if (!ret)
+		created = true;
+	else if (errno != ENOENT)
+		panic("failed to access %s, %m", path);
+
+	if (!created)
+		flags |= O_CREAT;
+
+	*fd = open(path, flags, sd_def_fmode);
+	if (*fd < 0)
+		panic("failed to open %s, %m", path);
+
+	if (!created) {
+		ret = ftruncate(*fd, sizeof(pthread_mutex_t));
+		if (ret < 0)
+			panic("failed to ftruncate %s, %m", path);
+	}
+
+	pmutex = (struct sd_mutex *)mmap(NULL, sizeof(struct sd_mutex),
+					 PROT_READ|PROT_WRITE,
+					 MAP_SHARED, *fd, 0);
+	if (!pmutex)
+		panic("failed to mmap %s, %m", path);
+
+	if (!created) {
+		if (pthread_mutexattr_init(&mutex_attr))
+			panic("failed to init mutexattr, %m");
+
+		if (pthread_mutexattr_setpshared(&mutex_attr,
+						 PTHREAD_PROCESS_SHARED))
+			panic("failed to setpshared mutexattr, %m");
+
+		sd_init_mutex_attr(pmutex, &mutex_attr);
+	}
+
+	return pmutex;
+}
+
 static int local_init(const char *option)
 {
 	sigset_t mask;
-	int ret;
+	int ret, fd;
+	char path[PATH_MAX];
 	static struct timer t = {
 		.callback = check_pids,
 		.data = &t,
@@ -583,6 +643,9 @@ static int local_init(const char *option)
 		return -1;
 	}
 
+	snprintf(path, sizeof(path), "%s%s", lockdir, "global_lock");
+	global_lock = get_shared_lock(path, &fd);
+	sd_debug("create global_lock");
 	return 0;
 }
 
@@ -609,41 +672,51 @@ static void local_lock(uint64_t lock_id)
 {
 	struct lock_entry *entry;
 
-	sd_write_lock(&lock_tree_lock);
+	sd_mutex_lock(global_lock);
+
 	entry = lock_tree_lookup(lock_id);
 	if (!entry) {
 		char path[PATH_MAX];
 		int fd;
 
 		snprintf(path, sizeof(path), "%s%016"PRIx64, lockdir, lock_id);
-		fd = open(path, O_RDONLY | O_CREAT, sd_def_fmode);
-		if (fd < 0)
-			panic("failed to open %s, %m", path);
 		entry = xmalloc(sizeof(*entry));
 		entry->lock_id = lock_id;
+		entry->mutex = get_shared_lock(path, &fd);
 		entry->fd = fd;
+		entry->ref = 0;
 		lock_tree_add(entry);
 	}
 
-	if (xflock(entry->fd, LOCK_EX) < 0)
-		panic("lock failed %"PRIx64", %m", lock_id);
+	entry->ref++;
+
+	sd_mutex_unlock(global_lock);
+
+	sd_mutex_lock(entry->mutex);
 }
 
 static void local_unlock(uint64_t lock_id)
 {
 	struct lock_entry *entry;
 
+	sd_mutex_lock(global_lock);
+
 	entry = lock_tree_lookup(lock_id);
 	if (!entry)
 		panic("can't find fd for lock %"PRIx64, lock_id);
 
-	if (xflock(entry->fd, LOCK_UN) < 0)
-		panic("unlock failed %"PRIx64", %m", lock_id);
+	sd_mutex_unlock(entry->mutex);
 
-	close(entry->fd);
-	rb_erase(&entry->rb, &lock_tree_root);
-	free(entry);
-	sd_rw_unlock(&lock_tree_lock);
+	entry->ref--;
+
+	if (!entry->ref) {
+		munmap(entry->mutex, sizeof(pthread_mutex_t));
+		close(entry->fd);
+		rb_erase(&entry->rb, &lock_tree_root);
+		free(entry);
+	}
+
+	sd_mutex_unlock(global_lock);
 }
 
 static int local_update_node(struct sd_node *node)

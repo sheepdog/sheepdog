@@ -286,6 +286,20 @@ static inline void sd_init_mutex(struct sd_mutex *mutex)
 		panic("failed to initialize a lock, %s", strerror(ret));
 }
 
+static inline void sd_init_mutex_attr(struct sd_mutex *mutex,
+				      pthread_mutexattr_t *attr)
+{
+	int ret;
+
+	do {
+		ret = pthread_mutex_init(&mutex->mutex, attr);
+	} while (ret == EAGAIN);
+
+	if (unlikely(ret != 0))
+		panic("failed to initialize a lock with attr, %s",
+		      strerror(ret));
+}
+
 static inline void sd_destroy_mutex(struct sd_mutex *mutex)
 {
 	int ret;
