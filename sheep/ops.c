@@ -1015,6 +1015,19 @@ static int local_set_loglevel(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
+static int local_oid_exist(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+	uint8_t ec_index = local_ec_index(req->vinfo, oid);
+
+	if (is_erasure_oid(oid) && ec_index == SD_MAX_COPIES)
+		return SD_RES_NO_OBJ;
+
+	if (sd_store->exist(oid, ec_index))
+		return SD_RES_SUCCESS;
+	return SD_RES_NO_OBJ;
+}
+
 #ifdef HAVE_NFS
 
 static int local_nfs_create(struct request *req)
@@ -1334,6 +1347,13 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
 		.process_work = local_set_loglevel,
+	},
+
+	[SD_OP_EXIST] =  {
+		.name = "EXIST",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_work = local_oid_exist,
 	},
 
 #ifdef HAVE_NFS

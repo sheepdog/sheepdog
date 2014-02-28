@@ -210,122 +210,23 @@ static void print_vdi_graph(uint32_t vid, const char *name, const char *tag,
 
 }
 
-static void vdi_info_filler(uint32_t vid, const char *name, const char *tag,
-			    uint32_t snapid, uint32_t flags,
-			    const struct sd_inode *i, void *data)
+static void for_each_node_print(uint64_t oid)
 {
-	struct get_vdi_info *info = data;
-
-	if (info->name) {
-		if (info->tag && info->tag[0]) {
-			if (!strcmp(name, info->name) &&
-			    !strcmp(tag, info->tag)) {
-				info->vid = vid;
-			info->nr_copies = i->nr_copies;
-			info->copy_policy = i->copy_policy;
-			}
-		} else if (info->snapid) {
-			if (!strcmp(name, info->name) &&
-			    snapid == info->snapid) {
-				info->vid = vid;
-				info->nr_copies = i->nr_copies;
-				info->copy_policy = i->copy_policy;
-			}
-		} else {
-			if (!strcmp(name, info->name)) {
-				info->vid = vid;
-				info->nr_copies = i->nr_copies;
-				info->copy_policy = i->copy_policy;
-			}
-		}
-	}
-}
-
-typedef int (*obj_parser_func_t)(const char *sheep, uint64_t oid,
-				 struct sd_rsp *rsp, char *buf, void *data);
-
-static int do_print_obj(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
-			char *buf, void *data)
-{
-	switch (rsp->result) {
-	case SD_RES_SUCCESS:
-		printf("%s has the object\n", sheep);
-		break;
-	case SD_RES_NO_OBJ:
-		printf("%s doesn't have the object\n", sheep);
-		break;
-	case SD_RES_OLD_NODE_VER:
-	case SD_RES_NEW_NODE_VER:
-		sd_err("The node list has changed: please try again");
-		break;
-	default:
-		sd_err("%s: hit an unexpected error (%s)", sheep,
-		       sd_strerror(rsp->result));
-		break;
-	}
-
-	return 0;
-}
-
-struct obj_info_filler_info {
-	bool success;
-	uint64_t data_oid;
-	unsigned idx;
-};
-
-static int obj_info_filler(const char *sheep, uint64_t oid, struct sd_rsp *rsp,
-			   char *buf, void *data)
-{
-	struct obj_info_filler_info *info = data;
-	struct sd_inode *inode = (struct sd_inode *)buf;
-	uint32_t vdi_id;
-
-	switch (rsp->result) {
-	case SD_RES_SUCCESS:
-		if (info->success)
-			break;
-		info->success = true;
-		vdi_id = sd_inode_get_vid(inode, info->idx);
-		if (vdi_id) {
-			info->data_oid = vid_to_data_oid(vdi_id, info->idx);
-			return 1;
-		}
-		break;
-	case SD_RES_NO_OBJ:
-		break;
-	case SD_RES_OLD_NODE_VER:
-	case SD_RES_NEW_NODE_VER:
-		sd_err("The node list has changed: please try again");
-		break;
-	default:
-		sd_err("%s: hit an unexpected error (%s)", sheep,
-		       sd_strerror(rsp->result));
-		break;
-	}
-
-	return 0;
-}
-
-static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data,
-		       size_t size)
-{
-	int ret, cb_ret;
+	int ret;
 	struct sd_node *n;
-	char *buf;
+	const char *sheep;
 
-	buf = xzalloc(size);
 	rb_for_each_entry(n, &sd_nroot, rb) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 
-		sd_init_req(&hdr, SD_OP_READ_PEER);
-		hdr.data_length = size;
+		sd_init_req(&hdr, SD_OP_EXIST);
+		hdr.data_length = 0;
 		hdr.flags = 0;
 		hdr.epoch = sd_epoch;
 		hdr.obj.oid = oid;
-		hdr.obj.ec_index = SD_MAX_COPIES + 1; /* Ignore index */
 
-		ret = dog_exec_req(&n->nid, &hdr, buf);
+		ret = dog_exec_req(&n->nid, &hdr, NULL);
 		if (ret < 0)
 			continue;
 		switch (rsp->result) {
@@ -333,15 +234,25 @@ static void parse_objs(uint64_t oid, obj_parser_func_t func, void *data,
 			continue;
 		}
 
-		cb_ret = func(addr_to_str(n->nid.addr, n->nid.port),
-			      oid, rsp, buf, data);
-		if (cb_ret)
+		sheep = addr_to_str(n->nid.addr, n->nid.port);
+		switch (rsp->result) {
+		case SD_RES_SUCCESS:
+			printf("%s has the object\n", sheep);
 			break;
+		case SD_RES_NO_OBJ:
+			printf("%s doesn't have the object\n", sheep);
+			break;
+		case SD_RES_OLD_NODE_VER:
+		case SD_RES_NEW_NODE_VER:
+			sd_err("The node list has changed: please try again");
+			break;
+		default:
+			sd_err("%s: hit an unexpected error (%s)", sheep,
+			       sd_strerror(rsp->result));
+			break;
+		}
 	}
-
-	free(buf);
 }
-
 
 static int vdi_list(int argc, char **argv)
 {
@@ -901,67 +812,52 @@ static int vdi_object_map(int argc, char **argv)
 static int vdi_object_location(int argc, char **argv)
 {
 	const char *vdiname = argv[optind];
-	uint64_t idx = vdi_cmd_data.index;
-	struct get_vdi_info info;
-	uint32_t vid;
-	size_t size;
+	uint64_t idx = vdi_cmd_data.index, oid;
+	struct sd_inode *inode = xmalloc(sizeof(*inode));
+	uint32_t vid, vdi_id;
+	int ret;
 
-	memset(&info, 0, sizeof(info));
-	info.name = vdiname;
-	info.tag = vdi_cmd_data.snapshot_tag;
-	info.vid = 0;
-	info.snapid = vdi_cmd_data.snapshot_id;
-
-	if (parse_vdi(vdi_info_filler, SD_INODE_HEADER_SIZE, &info) < 0)
-		return EXIT_SYSFAIL;
-
-	vid = info.vid;
-	if (vid == 0) {
-		sd_err("VDI not found");
-		return EXIT_MISSING;
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS) {
+		sd_err("FATAL: no inode objects");
+		return ret;
 	}
+	vid = inode->vdi_id;
 
 	if (idx == ~0) {
-		printf("Looking for the inode object 0x%" PRIx32 " with %d nodes\n\n",
+		printf("Looking for the inode object 0x%" PRIx32 " with %d"
+		       " nodes\n\n",
 		       vid, sd_nodes_nr);
-		parse_objs(vid_to_vdi_oid(vid), do_print_obj, NULL,
-			   SD_INODE_SIZE);
-	} else {
-		struct obj_info_filler_info oid_info = {0};
-
-		oid_info.success = false;
-		oid_info.idx = idx;
-
-		if (idx >= MAX_DATA_OBJS) {
-			printf("The offset is too large!\n");
-			exit(EXIT_FAILURE);
-		}
-
-		size = get_store_objsize(info.copy_policy,
-					 vid_to_data_oid(vid, 0));
-		parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
-			   size);
-
-		if (oid_info.success) {
-			if (oid_info.data_oid) {
-				printf("Looking for the object 0x%" PRIx64
-				       " (vid 0x%" PRIx32 " idx %"PRIu64
-				       ", %u copies) with %d nodes\n\n",
-				       oid_info.data_oid, vid, idx,
-				       info.nr_copies, sd_nodes_nr);
-
-				parse_objs(oid_info.data_oid, do_print_obj,
-					   NULL, size);
-			} else
-				printf("The inode object 0x%" PRIx32 " idx"
-				       " %"PRIu64" is not allocated\n",
-				       vid, idx);
-		} else
-			sd_err("Failed to read the inode object 0x%" PRIx32,
-			       vid);
+		for_each_node_print(vid_to_vdi_oid(vid));
+		ret = EXIT_SUCCESS;
+		goto out;
 	}
 
-	return EXIT_SUCCESS;
+	if (idx >= MAX_DATA_OBJS) {
+		printf("The offset is too large!\n");
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	vdi_id = sd_inode_get_vid(inode, idx);
+	oid = vid_to_data_oid(vdi_id, idx);
+	if (vdi_id) {
+		printf("Looking for the object 0x%" PRIx64
+		       " (vid 0x%" PRIx32 " idx %"PRIu64
+		       ", %u copies) with %d nodes\n\n",
+			oid, vid, idx, inode->nr_copies, sd_nodes_nr);
+
+		for_each_node_print(oid);
+	} else
+		printf("The inode object 0x%" PRIx32 " idx"
+		       " %"PRIu64" is not allocated\n",
+		       vid, idx);
+
+out:
+	free(inode);
+	return ret;
 }
 
 static int do_track_object(uint64_t oid, uint8_t nr_copies)
@@ -1032,59 +928,37 @@ static int vdi_track(int argc, char **argv)
 {
 	const char *vdiname = argv[optind];
 	unsigned idx = vdi_cmd_data.index;
-	struct get_vdi_info info;
-	struct obj_info_filler_info oid_info = {0};
-	uint32_t vid;
 	uint8_t nr_copies;
 	uint64_t oid = vdi_cmd_data.oid;
+	struct sd_inode *inode = xmalloc(sizeof(*inode));
+	uint32_t vid, vdi_id;
+	int ret;
 
-	memset(&info, 0, sizeof(info));
-	info.name = vdiname;
-	info.tag = vdi_cmd_data.snapshot_tag;
-	info.vid = 0;
-	info.snapid = vdi_cmd_data.snapshot_id;
-
-	if (parse_vdi(vdi_info_filler, SD_INODE_HEADER_SIZE, &info) < 0)
-		return EXIT_SYSFAIL;
-
-	vid = info.vid;
-	nr_copies = info.nr_copies;
-	if (vid == 0) {
-		sd_err("VDI not found");
-		return EXIT_MISSING;
+	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
+			   vdi_cmd_data.snapshot_tag, NULL, inode,
+			   SD_INODE_SIZE);
+	if (ret != EXIT_SUCCESS) {
+		sd_err("FATAL: no inode objects");
+		return ret;
 	}
+	vid = inode->vdi_id;
+	nr_copies = inode->nr_copies;
 
 	if (!oid) {
 		if (idx == ~0) {
 			printf("Tracking the inode object 0x%" PRIx32
 			       " with %d nodes\n", vid, sd_nodes_nr);
+			free(inode);
 			return do_track_object(vid_to_vdi_oid(vid), nr_copies);
 		}
-
-		oid_info.success = false;
-		oid_info.idx = idx;
 
 		if (idx >= MAX_DATA_OBJS) {
 			printf("The offset is too large!\n");
 			goto err;
 		}
 
-		parse_objs(vid_to_vdi_oid(vid), obj_info_filler, &oid_info,
-			   get_store_objsize(info.copy_policy,
-					     vid_to_data_oid(vid, 0)));
-
-		if (!oid_info.success) {
-			sd_err("Failed to read the inode object 0x%" PRIx32,
-			       vid);
-			goto err;
-		}
-		if (!oid_info.data_oid) {
-			printf("The inode object 0x%"PRIx32
-			       " idx %u is not allocated\n", vid, idx);
-			goto err;
-		}
-
-		oid = oid_info.data_oid;
+		vdi_id = sd_inode_get_vid(inode, idx);
+		oid = vid_to_data_oid(vdi_id, idx);
 
 		printf("Tracking the object 0x%" PRIx64
 		       " (the inode vid 0x%" PRIx32 " idx %u)"
@@ -1094,9 +968,10 @@ static int vdi_track(int argc, char **argv)
 		       " (the inode vid 0x%" PRIx32 ")"
 		       " with %d nodes\n", oid, vid, sd_nodes_nr);
 
+	free(inode);
 	return do_track_object(oid, nr_copies);
-
 err:
+	free(inode);
 	return EXIT_FAILURE;
 }
 

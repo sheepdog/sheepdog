@@ -445,19 +445,20 @@ out:
 	return lost;
 }
 
-static uint8_t local_node_copy_index(struct vnode_info *vinfo, uint64_t oid)
+uint8_t local_ec_index(struct vnode_info *vinfo, uint64_t oid)
 {
-	int idx;
+	int idx, m = min(get_vdi_copy_number(oid_to_vid(oid)), vinfo->nr_zones);
 
 	if (!is_erasure_oid(oid))
-		return 0; /* no need to proceed */
+		return SD_MAX_COPIES;
 
-	for (idx = 0; idx < vinfo->nr_zones; idx++) {
+	for (idx = 0; idx < m; idx++) {
 		const struct sd_node *n = oid_to_node(oid, &vinfo->vroot, idx);
 		if (node_is_local(n))
 			return idx;
 	}
-	panic("can't get valid index for %"PRIx64, oid);
+	sd_debug("can't get valid index for %"PRIx64, oid);
+	return SD_MAX_COPIES;
 }
 
 /*
@@ -486,7 +487,7 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 	uint8_t idx;
 	int ret = -1;
 
-	idx = local_node_copy_index(cur, oid);
+	idx = local_ec_index(cur, oid);
 	buf = read_erasure_object(oid, idx, row);
 	if (!buf && !row->stop)
 		buf = rebuild_erasure_object(oid, idx, row);
@@ -530,7 +531,7 @@ static void recover_object_work(struct work *work)
 	struct vnode_info *cur = rw->cur_vinfo;
 	int ret, epoch;
 
-	if (sd_store->exist(oid, local_node_copy_index(cur, oid))) {
+	if (sd_store->exist(oid, local_ec_index(cur, oid))) {
 		sd_debug("the object is already recovered");
 		return;
 	}
@@ -585,7 +586,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		return false;
 
 	cur = rinfo->cur_vinfo;
-	if (sd_store->exist(oid, local_node_copy_index(cur, oid))) {
+	if (sd_store->exist(oid, local_ec_index(cur, oid))) {
 		sd_debug("the object %" PRIx64 " is already recoverd", oid);
 		return false;
 	}

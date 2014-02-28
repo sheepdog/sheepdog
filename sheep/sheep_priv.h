@@ -436,6 +436,7 @@ int gateway_write_obj(struct request *req);
 int gateway_create_and_write_obj(struct request *req);
 int gateway_remove_obj(struct request *req);
 bool is_erasure_oid(uint64_t oid);
+uint8_t local_ec_index(struct vnode_info *vinfo, uint64_t oid);
 
 /* object_cache */
 
