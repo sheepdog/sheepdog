@@ -374,7 +374,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
-	bool ec = is_erasure_obj(oid, iocb->copy_policy);
+	bool ec = is_erasure_oid(oid);
 	size_t obj_size;
 
 	sd_debug("%"PRIx64, oid);

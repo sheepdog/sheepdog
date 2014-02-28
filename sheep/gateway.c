@@ -179,30 +179,6 @@ out:
 	return reqs;
 }
 
-/*
- * We have two kinds of requests that might go for erasured object:
- *  1. requests without setting copy_policy but expect vdi's copy policy is
- *     registered in vdi states, e.g, normal requests from QEMU
- *  2. requests with copy_policy explicitly set because vdi's copy policy is
- *     not registered, e.g, requests from 'cluster snapshot load'.
- *
- * So we have to firstly check copy_policy from heaher directly and then call
- * get_vdi_copy_policy(oid).
- */
-bool is_erasure_obj(uint64_t oid, uint8_t copy_policy)
-{
-	if (is_vdi_obj(oid))
-		return false;
-
-	if (is_vdi_btree_obj(oid))
-		return false;
-
-	if (copy_policy > 0)
-		return true;
-
-	return get_vdi_copy_policy(oid_to_vid(oid)) > 0;
-}
-
 bool is_erasure_oid(uint64_t oid)
 {
 	return !is_vdi_obj(oid) && !is_vdi_btree_obj(oid) &&
@@ -212,7 +188,7 @@ bool is_erasure_oid(uint64_t oid)
 /* Prepare request iterator and buffer for each replica */
 static struct req_iter *prepare_requests(struct request *req, int *nr)
 {
-	if (is_erasure_obj(req->rq.obj.oid, req->rq.obj.copy_policy))
+	if (is_erasure_oid(req->rq.obj.oid))
 		return prepare_erasure_requests(req, nr);
 	else
 		return prepare_replication_requests(req, nr);
@@ -229,7 +205,7 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 	int end = DIV_ROUND_UP(off + len, SD_EC_DATA_STRIPE_SIZE), i, j;
 	int nr_stripe = end - start;
 
-	if (!is_erasure_obj(oid, req->rq.obj.copy_policy))
+	if (!is_erasure_oid(oid))
 		goto out;
 
 	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
