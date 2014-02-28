@@ -21,8 +21,16 @@
 static char farm_object_dir[PATH_MAX];
 static char farm_dir[PATH_MAX];
 
-static struct sd_rw_lock vdi_list_lock = SD_RW_LOCK_INITIALIZER;
-struct vdi_entry {
+static struct sd_rw_lock active_vdi_lock = SD_RW_LOCK_INITIALIZER;
+static struct sd_rw_lock registered_vdi_lock = SD_RW_LOCK_INITIALIZER;
+
+struct registered_vdi_entry {
+	struct rb_node rb;
+	uint32_t vid;
+};
+
+struct active_vdi_entry {
+	struct rb_node rb;
 	char name[SD_MAX_VDI_LEN];
 	uint64_t vdi_size;
 	uint32_t vdi_id;
@@ -30,9 +38,12 @@ struct vdi_entry {
 	uint8_t  nr_copies;
 	uint8_t copy_policy;
 	uint8_t store_policy;
-	struct rb_node rb;
 };
-static struct rb_root last_vdi_tree = RB_ROOT;
+
+/* We use active_vdi_tree to create active vdi on top of the snapshot chain */
+static struct rb_root active_vdi_tree = RB_ROOT;
+/* We have to register vdi information first before loading objects */
+static struct rb_root registered_vdi_tree = RB_ROOT;
 
 struct snapshot_work {
 	struct trunk_entry entry;
@@ -42,65 +53,71 @@ struct snapshot_work {
 static struct work_queue *wq;
 static uatomic_bool work_error;
 
-static int vdi_cmp(const struct vdi_entry *e1, const struct vdi_entry *e2)
+static int vdi_cmp(const struct active_vdi_entry *e1,
+		   const struct active_vdi_entry *e2)
 {
 	return strcmp(e1->name, e2->name);
 }
 
-static struct vdi_entry *find_vdi(const char *name)
+static void update_active_vdi_entry(struct active_vdi_entry *vdi,
+				    struct sd_inode *new)
 {
-	struct vdi_entry key = {};
-
-	pstrcpy(key.name, sizeof(key.name), name);
-
-	return rb_search(&last_vdi_tree, &key, rb, vdi_cmp);
+	pstrcpy(vdi->name, sizeof(vdi->name), new->name);
+	vdi->vdi_size = new->vdi_size;
+	vdi->vdi_id = new->vdi_id;
+	vdi->snap_id = new->snap_id;
+	vdi->nr_copies = new->nr_copies;
+	vdi->copy_policy = new->copy_policy;
+	vdi->store_policy = new->store_policy;
 }
 
-static struct vdi_entry *new_vdi(const char *name, uint64_t vdi_size,
-				 uint32_t vdi_id, uint32_t snap_id,
-				 uint8_t nr_copies, uint8_t copy_policy,
-				 uint8_t store_policy)
+static void add_active_vdi(struct sd_inode *new)
 {
-	struct vdi_entry *vdi;
-	vdi = xmalloc(sizeof(struct vdi_entry));
-	pstrcpy(vdi->name, sizeof(vdi->name), name);
-	vdi->vdi_size = vdi_size;
-	vdi->vdi_id = vdi_id;
-	vdi->snap_id = snap_id;
-	vdi->nr_copies = nr_copies;
-	vdi->copy_policy = copy_policy;
-	vdi->store_policy = store_policy;
-	return vdi;
-}
+	struct active_vdi_entry *vdi, *ret;
 
-static void insert_vdi(struct sd_inode *new)
-{
-	struct vdi_entry *vdi;
-	vdi = find_vdi(new->name);
-	if (!vdi) {
-		vdi = new_vdi(new->name,
-			      new->vdi_size,
-			      new->vdi_id,
-			      new->snap_id,
-			      new->nr_copies,
-			      new->copy_policy,
-			      new->store_policy);
-		rb_insert(&last_vdi_tree, vdi, rb, vdi_cmp);
-	} else if (vdi->snap_id < new->snap_id) {
-		vdi->vdi_size = new->vdi_size;
-		vdi->vdi_id = new->vdi_id;
-		vdi->snap_id = new->snap_id;
-		vdi->nr_copies = new->nr_copies;
-		vdi->copy_policy = new->copy_policy;
-		vdi->store_policy = new->store_policy;
+	vdi = xmalloc(sizeof(struct active_vdi_entry));
+
+	update_active_vdi_entry(vdi, new);
+	sd_write_lock(&active_vdi_lock);
+	ret = rb_insert(&active_vdi_tree, vdi, rb, vdi_cmp);
+	if (ret && ret->snap_id < new->snap_id) {
+		update_active_vdi_entry(ret, new);
+		free(vdi);
 	}
+	sd_rw_unlock(&active_vdi_lock);
+}
+
+static int registered_vdi_cmp(struct registered_vdi_entry *a,
+			      struct registered_vdi_entry *b)
+{
+	return intcmp(a->vid, b->vid);
+}
+
+static bool register_vdi(uint32_t vid)
+{
+	struct registered_vdi_entry *new = xmalloc(sizeof(*new)), *ret;
+
+	new->vid = vid;
+
+	sd_read_lock(&registered_vdi_lock);
+	ret = rb_search(&registered_vdi_tree, new, rb, registered_vdi_cmp);
+	sd_rw_unlock(&registered_vdi_lock);
+	if (ret) {
+		free(new);
+		return false;
+	}
+
+	sd_write_lock(&registered_vdi_lock);
+	rb_insert(&registered_vdi_tree, new, rb, registered_vdi_cmp);
+	sd_rw_unlock(&registered_vdi_lock);
+	return true;
 }
 
 static int create_active_vdis(void)
 {
-	struct vdi_entry *vdi;
+	struct active_vdi_entry *vdi;
 	uint32_t new_vid;
-	rb_for_each_entry(vdi, &last_vdi_tree, rb) {
+	rb_for_each_entry(vdi, &active_vdi_tree, rb) {
 		if (do_vdi_create(vdi->name,
 				  vdi->vdi_size,
 				  vdi->vdi_id, &new_vid,
@@ -110,15 +127,6 @@ static int create_active_vdis(void)
 			return -1;
 	}
 	return 0;
-}
-
-static void free_vdi_list(void)
-{
-	struct vdi_entry *vdi;
-	rb_for_each_entry(vdi, &last_vdi_tree, rb) {
-		rb_erase(&vdi->rb, &last_vdi_tree);
-		free(vdi);
-	}
 }
 
 char *get_object_directory(void)
@@ -353,6 +361,7 @@ static void do_load_object(struct work *work)
 	size_t size;
 	struct snapshot_work *sw;
 	static unsigned long loaded;
+	uint32_t vid;
 
 	if (uatomic_is_true(&work_error))
 		return;
@@ -364,21 +373,20 @@ static void do_load_object(struct work *work)
 	if (!buffer)
 		goto error;
 
-	if (dog_write_object(sw->entry.oid, 0, buffer, size, 0, 0,
-			    sw->entry.nr_copies, sw->entry.copy_policy,
-			    true, true) != 0)
-		goto error;
-
-	if (is_vdi_obj(sw->entry.oid)) {
-		if (notify_vdi_add(oid_to_vid(sw->entry.oid),
-				   sw->entry.nr_copies,
+	vid = oid_to_vid(sw->entry.oid);
+	if (register_vdi(vid)) {
+		if (notify_vdi_add(vid, sw->entry.nr_copies,
 				   sw->entry.copy_policy) < 0)
 			goto error;
-
-		sd_write_lock(&vdi_list_lock);
-		insert_vdi(buffer);
-		sd_rw_unlock(&vdi_list_lock);
 	}
+
+	if (dog_write_object(sw->entry.oid, 0, buffer, size, 0, 0,
+			     sw->entry.nr_copies, sw->entry.copy_policy,
+			     true, true) != 0)
+		goto error;
+
+	if (is_vdi_obj(sw->entry.oid))
+		add_active_vdi(buffer);
 
 	farm_show_progress(uatomic_add_return(&loaded, 1), trunk_get_count());
 	free(buffer);
@@ -431,6 +439,7 @@ int farm_load_snapshot(uint32_t idx, const char *tag)
 
 	ret = 0;
 out:
-	free_vdi_list();
+	rb_destroy(&active_vdi_tree, struct active_vdi_entry, rb);
+	rb_destroy(&registered_vdi_tree, struct registered_vdi_entry, rb);
 	return ret;
 }
