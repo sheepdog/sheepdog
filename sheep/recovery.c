@@ -873,17 +873,6 @@ static void recover_object_main(struct work *work)
 		return;
 	}
 
-	if (row->stop) {
-		/*
-		 * Stop this recovery process and wait for epoch to be
-		 * lifted and flush wait queue to requeue those
-		 * requests
-		 */
-		rinfo->notify_complete = false;
-		sd_debug("recovery is stopped");
-		goto finish_recovery;
-	}
-
 	wakeup_requests_on_oid(row->oid);
 
 	sd_info("object %"PRIx64" is recovered (%"PRIu64"/%"PRIu64")", row->oid,

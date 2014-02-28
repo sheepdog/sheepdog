@@ -822,7 +822,7 @@ static int vdi_object_location(int argc, char **argv)
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("FATAL: no inode objects");
-		return ret;
+		goto out;
 	}
 	vid = inode->vdi_id;
 
@@ -939,7 +939,7 @@ static int vdi_track(int argc, char **argv)
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("FATAL: no inode objects");
-		return ret;
+		goto err;
 	}
 	vid = inode->vdi_id;
 	nr_copies = inode->nr_copies;
