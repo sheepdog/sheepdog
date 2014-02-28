@@ -449,6 +449,9 @@ static uint8_t local_node_copy_index(struct vnode_info *vinfo, uint64_t oid)
 {
 	int idx;
 
+	if (!is_erasure_oid(oid))
+		return 0; /* no need to proceed */
+
 	for (idx = 0; idx < vinfo->nr_zones; idx++) {
 		const struct sd_node *n = oid_to_node(oid, &vinfo->vroot, idx);
 		if (node_is_local(n))
@@ -524,9 +527,10 @@ static void recover_object_work(struct work *work)
 						     struct recovery_obj_work,
 						     base);
 	uint64_t oid = row->oid;
+	struct vnode_info *cur = rw->cur_vinfo;
 	int ret, epoch;
 
-	if (sd_store->exist(oid)) {
+	if (sd_store->exist(oid, local_node_copy_index(cur, oid))) {
 		sd_debug("the object is already recovered");
 		return;
 	}
@@ -575,11 +579,13 @@ static inline void prepare_schedule_oid(uint64_t oid)
 main_fn bool oid_in_recovery(uint64_t oid)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
+	struct vnode_info *cur;
 
 	if (!node_in_recovery())
 		return false;
 
-	if (sd_store->exist(oid)) {
+	cur = rinfo->cur_vinfo;
+	if (sd_store->exist(oid, local_node_copy_index(cur, oid))) {
 		sd_debug("the object %" PRIx64 " is already recoverd", oid);
 		return false;
 	}

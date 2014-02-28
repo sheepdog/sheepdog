@@ -922,10 +922,11 @@ static int local_kill_node(const struct sd_req *req, struct sd_rsp *rsp,
 static int peer_remove_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
+	uint8_t ec_index = req->rq.obj.ec_index;
 
 	objlist_cache_remove(oid);
 
-	return sd_store->remove_object(oid);
+	return sd_store->remove_object(oid, ec_index);
 }
 
 int peer_read_obj(struct request *req)
@@ -945,6 +946,7 @@ int peer_read_obj(struct request *req)
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
 	iocb.ec_index = hdr->obj.ec_index;
+	iocb.copy_policy = hdr->obj.copy_policy;
 	ret = sd_store->read(hdr->obj.oid, &iocb);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
@@ -964,6 +966,8 @@ static int peer_write_obj(struct request *req)
 	iocb.buf = req->data;
 	iocb.length = hdr->data_length;
 	iocb.offset = hdr->obj.offset;
+	iocb.ec_index = hdr->obj.ec_index;
+	iocb.copy_policy = hdr->obj.copy_policy;
 
 	return sd_store->write(oid, &iocb);
 }

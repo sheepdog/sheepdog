@@ -208,13 +208,13 @@ struct store_driver {
 	struct list_node list;
 	const char *name;
 	int (*init)(void);
-	bool (*exist)(uint64_t oid);
+	bool (*exist)(uint64_t oid, uint8_t ec_index);
 	/* create_and_write must be an atomic operation*/
 	int (*create_and_write)(uint64_t oid, const struct siocb *);
 	int (*write)(uint64_t oid, const struct siocb *);
 	int (*read)(uint64_t oid, const struct siocb *);
 	int (*format)(void);
-	int (*remove_object)(uint64_t oid);
+	int (*remove_object)(uint64_t oid, uint8_t ec_index);
 	int (*get_hash)(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 	/* Operations in recovery */
 	int (*link)(uint64_t oid, uint32_t tgt_epoch);
@@ -228,7 +228,7 @@ struct store_driver {
 int peer_read_obj(struct request *req);
 
 int default_init(void);
-bool default_exist(uint64_t oid);
+bool default_exist(uint64_t oid, uint8_t ec_index);
 int default_create_and_write(uint64_t oid, const struct siocb *iocb);
 int default_write(uint64_t oid, const struct siocb *iocb);
 int default_read(uint64_t oid, const struct siocb *iocb);
@@ -236,16 +236,18 @@ int default_link(uint64_t oid, uint32_t tgt_epoch);
 int default_update_epoch(uint32_t epoch);
 int default_cleanup(void);
 int default_format(void);
-int default_remove_object(uint64_t oid);
+int default_remove_object(uint64_t oid, uint8_t ec_index);
 int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 int default_purge_obj(void);
-int for_each_object_in_wd(int (*func)(uint64_t, const char *, uint32_t, void *),
+int for_each_object_in_wd(int (*func)(uint64_t, const char *, uint32_t,
+				      uint8_t, void *),
 			  bool, void *);
 int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
-					 uint32_t epoch, void *arg),
+					 uint32_t epoch, uint8_t, void *arg),
 			     void *arg);
 int for_each_obj_path(int (*func)(const char *path));
 size_t get_store_objsize(uint64_t oid);
+int get_store_path(uint64_t oid, uint8_t ec_index, char *path);
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)				\
@@ -472,15 +474,35 @@ int journal_remove_object(uint64_t oid);
 /* md.c */
 bool md_add_disk(const char *path, bool);
 uint64_t md_init_space(void);
-const char *md_get_object_path(uint64_t oid);
+const char *md_get_object_dir(uint64_t oid);
 int md_handle_eio(const char *);
-bool md_exist(uint64_t oid);
-int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path, size_t size);
+bool md_exist(uint64_t oid, uint8_t ec_index);
+int md_get_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index, char *);
 uint32_t md_get_info(struct sd_md_info *info);
 int md_plug_disks(char *disks);
 int md_unplug_disks(char *disks);
 uint64_t md_get_size(uint64_t *used);
 uint32_t md_nr_disks(void);
+
+static inline bool is_stale_path(const char *path)
+{
+	return !!strstr(path, ".stale");
+}
+
+static inline bool is_stale_dentry(const char *dentry)
+{
+	return !!strstr(dentry, ".");
+}
+
+static inline bool is_tmp_dentry(const char *dentry)
+{
+	return !!strstr(dentry, ".tmp");
+}
+
+static inline bool is_ec_dentry(const char *dentry)
+{
+	return !!strstr(dentry, "_");
+}
 
 /* http.c */
 #ifdef HAVE_HTTP
