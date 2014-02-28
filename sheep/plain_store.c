@@ -15,26 +15,6 @@
 
 #define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
 
-#define ECNAME "user.ec.index"
-#define ECSIZE sizeof(uint8_t)
-static int set_erasure_index(const char *path, uint8_t idx)
-{
-	if (setxattr(path, ECNAME, &idx, ECSIZE, 0) < 0) {
-		sd_err("failed to setxattr %s, %m", path);
-		return -1;
-	}
-	return 0;
-}
-
-static int get_erasure_index(const char *path, uint8_t *idx)
-{
-	if (getxattr(path, ECNAME, idx, ECSIZE) < 0) {
-		sd_err("failed to getxattr %s, %m", path);
-		return -1;
-	}
-	return 0;
-}
-
 static inline bool iocb_is_aligned(const struct siocb *iocb)
 {
 	return  sector_algined(iocb->offset) && sector_algined(iocb->length);
@@ -59,31 +39,45 @@ static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 	return flags;
 }
 
-static int get_obj_path(uint64_t oid, char *path, size_t size)
+int get_store_path(uint64_t oid, uint8_t ec_index, char *path)
 {
-	return snprintf(path, size, "%s/%016" PRIx64,
-			md_get_object_path(oid), oid);
+	if (is_erasure_oid(oid)) {
+		if (unlikely(ec_index >= SD_MAX_COPIES))
+			panic("invalid ec_index %d", ec_index);
+		return snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d",
+				md_get_object_dir(oid), oid, ec_index);
+	}
+
+	return snprintf(path, PATH_MAX, "%s/%016" PRIx64,
+			md_get_object_dir(oid), oid);
 }
 
-static int get_tmp_obj_path(uint64_t oid, char *path, size_t size)
+static int get_store_tmp_path(uint64_t oid, uint8_t ec_index, char *path)
 {
-	return snprintf(path, size, "%s/%016"PRIx64".tmp",
-			md_get_object_path(oid), oid);
+	if (is_erasure_oid(oid)) {
+		if (unlikely(ec_index >= SD_MAX_COPIES))
+			panic("invalid ec_index %d", ec_index);
+		return snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d.tmp",
+				md_get_object_dir(oid), oid, ec_index);
+	}
+
+	return snprintf(path, PATH_MAX, "%s/%016" PRIx64".tmp",
+			md_get_object_dir(oid), oid);
 }
 
-static int get_stale_obj_path(uint64_t oid, uint32_t epoch, char *path,
-			      size_t size)
+static int get_store_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
+				char *path)
 {
-	return md_get_stale_path(oid, epoch, path, size);
+	return md_get_stale_path(oid, epoch, ec_index, path);
 }
 
 /*
  * Check if oid is in this nodes (if oid is in the wrong place, it will be moved
  * to the correct one after this call in a MD setup.
  */
-bool default_exist(uint64_t oid)
+bool default_exist(uint64_t oid, uint8_t ec_index)
 {
-	return md_exist(oid);
+	return md_exist(oid, ec_index);
 }
 
 static int err_to_sderr(const char *path, uint64_t oid, int err)
@@ -95,7 +89,7 @@ static int err_to_sderr(const char *path, uint64_t oid, int err)
 	pstrcpy(p, sizeof(p), path);
 	dir = dirname(p);
 
-	sd_debug("%s", dir);
+	sd_debug("%s", path);
 	switch (err) {
 	case ENOENT:
 		if (stat(dir, &s) < 0) {
@@ -144,14 +138,14 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		sync();
 	}
 
-	get_obj_path(oid, path, sizeof(path));
+	get_store_path(oid, iocb->ec_index, path);
 
 	/*
 	 * Make sure oid is in the right place because oid might be misplaced
 	 * in a wrong place, due to 'shutdown/restart with less/more disks' or
 	 * any bugs. We need call err_to_sderr() to return EIO if disk is broken
 	 */
-	if (!default_exist(oid))
+	if (!default_exist(oid, iocb->ec_index))
 		return err_to_sderr(path, oid, ENOENT);
 
 	fd = open(path, flags, sd_def_fmode);
@@ -238,7 +232,8 @@ out:
 }
 
 static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
-				       uint32_t epoch, void *arg)
+				       uint32_t epoch, uint8_t ec_index,
+				       void *arg)
 {
 	int ret;
 	objlist_cache_insert(oid);
@@ -267,11 +262,6 @@ int default_init(void)
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 
-static inline bool is_stale_path(const char *path)
-{
-	return !!strstr(path, "stale");
-}
-
 static int default_read_from_path(uint64_t oid, const char *path,
 				  const struct siocb *iocb)
 {
@@ -284,30 +274,14 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	 * in a wrong place, due to 'shutdown/restart with less disks' or any
 	 * bugs. We need call err_to_sderr() to return EIO if disk is broken.
 	 *
-	 * For stale path, get_stale_obj_path() already does default_exist job.
+	 * For stale path, get_store_stale_path already does default_exist job.
 	 */
-	if (!is_stale_path(path) && !default_exist(oid))
+	if (!is_stale_path(path) && !default_exist(oid, iocb->ec_index))
 		return err_to_sderr(path, oid, ENOENT);
 
 	fd = open(path, flags);
-
 	if (fd < 0)
 		return err_to_sderr(path, oid, errno);
-
-	if (is_erasure_oid(oid) && iocb->ec_index <= SD_MAX_COPIES) {
-		uint8_t idx;
-
-		if (get_erasure_index(path, &idx) < 0) {
-			close(fd);
-			return err_to_sderr(path, oid, errno);
-		}
-		/* We pretend NO-OBJ to read old object in the stale dir */
-		if (idx != iocb->ec_index) {
-			sd_debug("ec_index %d != %d", iocb->ec_index, idx);
-			close(fd);
-			return SD_RES_NO_OBJ;
-		}
-	}
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (unlikely(size != iocb->length)) {
@@ -325,7 +299,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	int ret;
 	char path[PATH_MAX];
 
-	get_obj_path(oid, path, sizeof(path));
+	get_store_path(oid, iocb->ec_index, path);
 	ret = default_read_from_path(oid, path, iocb);
 
 	/*
@@ -334,7 +308,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	 */
 	if (ret == SD_RES_NO_OBJ && iocb->epoch > 0 &&
 	    iocb->epoch < sys_epoch()) {
-		get_stale_obj_path(oid, iocb->epoch, path, sizeof(path));
+		get_store_stale_path(oid, iocb->epoch, iocb->ec_index, path);
 		ret = default_read_from_path(oid, path, iocb);
 	}
 
@@ -374,12 +348,11 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
-	bool ec = is_erasure_oid(oid);
 	size_t obj_size;
 
 	sd_debug("%"PRIx64, oid);
-	get_obj_path(oid, path, sizeof(path));
-	get_tmp_obj_path(oid, tmp_path, sizeof(tmp_path));
+	get_store_path(oid, iocb->ec_index, path);
+	get_store_tmp_path(oid, iocb->ec_index, tmp_path);
 
 	if (uatomic_is_true(&sys->use_journal) &&
 	    journal_write_store(oid, iocb->buf, iocb->length,
@@ -409,15 +382,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		return err_to_sderr(path, oid, errno);
 	}
 
-	if (ec) {
-		uint8_t policy = iocb->copy_policy ?:
-			get_vdi_copy_policy(oid_to_vid(oid));
-		int d;
-		ec_policy_to_dp(policy, &d, NULL);
-		obj_size = SD_DATA_OBJ_SIZE / d;
-	} else
-		obj_size = get_objsize(oid);
-
+	obj_size = get_store_objsize(oid);
 	ret = prealloc(fd, obj_size);
 	if (ret < 0) {
 		ret = err_to_sderr(path, oid, errno);
@@ -428,11 +393,6 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	if (ret != len) {
 		sd_err("failed to write object. %m");
 		ret = err_to_sderr(path, oid, errno);
-		goto out;
-	}
-
-	if (ec && set_erasure_index(tmp_path, iocb->ec_index) < 0) {
-		ret = err_to_sderr(tmp_path, oid, errno);
 		goto out;
 	}
 
@@ -459,8 +419,8 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 	sd_debug("try link %"PRIx64" from snapshot with epoch %d", oid,
 		 tgt_epoch);
 
-	get_obj_path(oid, path, sizeof(path));
-	get_stale_obj_path(oid, tgt_epoch, stale_path, sizeof(stale_path));
+	snprintf(path, PATH_MAX, "%s/%016"PRIx64, md_get_object_dir(oid), oid);
+	get_store_stale_path(oid, tgt_epoch, 0, stale_path);
 
 	if (link(stale_path, path) < 0) {
 		/*
@@ -485,7 +445,7 @@ out:
  * node(index gets changed even it has some other copy belongs to it) because
  * of hash ring changes, we consider it stale.
  */
-static bool oid_stale(uint64_t oid)
+static bool oid_stale(uint64_t oid, int ec_index)
 {
 	uint32_t i, nr_copies;
 	struct vnode_info *vinfo;
@@ -499,14 +459,8 @@ static bool oid_stale(uint64_t oid)
 	for (i = 0; i < nr_copies; i++) {
 		v = obj_vnodes[i];
 		if (vnode_is_local(v)) {
-			if (is_erasure_oid(oid)) {
-				char path[PATH_MAX];
-				uint8_t idx;
-
-				get_obj_path(oid, path, sizeof(path));
-				if (get_erasure_index(path, &idx) < 0)
-					break;
-				if (idx == i)
+			if (ec_index < SD_MAX_COPIES) {
+				if (i == ec_index)
 					ret = false;
 			} else {
 				ret = false;
@@ -520,14 +474,24 @@ static bool oid_stale(uint64_t oid)
 }
 
 static int move_object_to_stale_dir(uint64_t oid, const char *wd,
-				    uint32_t epoch, void *arg)
+				    uint32_t epoch, uint8_t ec_index, void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
-	uint32_t tgt_epoch = *(int *)arg;
+	uint32_t tgt_epoch = *(uint32_t *)arg;
 
-	snprintf(path, PATH_MAX, "%s/%016" PRIx64, wd, oid);
-	snprintf(stale_path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32, wd,
-		 oid, tgt_epoch);
+	/* ec_index from md.c is reliable so we can directly use it */
+	if (ec_index < SD_MAX_COPIES) {
+		snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d",
+			 md_get_object_dir(oid), oid, ec_index);
+		snprintf(stale_path, PATH_MAX,
+			 "%s/.stale/%016"PRIx64"_%d.%"PRIu32,
+			 md_get_object_dir(oid), oid, ec_index, tgt_epoch);
+	} else {
+		snprintf(path, PATH_MAX, "%s/%016" PRIx64,
+			 md_get_object_dir(oid), oid);
+		snprintf(stale_path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+			 md_get_object_dir(oid), oid, tgt_epoch);
+	}
 
 	if (unlikely(rename(path, stale_path)) < 0) {
 		sd_err("failed to move stale object %" PRIX64 " to %s, %m", oid,
@@ -540,10 +504,10 @@ static int move_object_to_stale_dir(uint64_t oid, const char *wd,
 }
 
 static int check_stale_objects(uint64_t oid, const char *wd, uint32_t epoch,
-			       void *arg)
+			       uint8_t ec_index, void *arg)
 {
-	if (oid_stale(oid))
-		return move_object_to_stale_dir(oid, wd, 0, arg);
+	if (oid_stale(oid, ec_index))
+		return move_object_to_stale_dir(oid, wd, 0, ec_index, arg);
 
 	return SD_RES_SUCCESS;
 }
@@ -569,20 +533,20 @@ int default_format(void)
 	return SD_RES_SUCCESS;
 }
 
-int default_remove_object(uint64_t oid)
+int default_remove_object(uint64_t oid, uint8_t ec_index)
 {
 	char path[PATH_MAX];
 
 	if (uatomic_is_true(&sys->use_journal))
 		journal_remove_object(oid);
 
-	get_obj_path(oid, path, sizeof(path));
+	get_store_path(oid, ec_index, path);
 
 	if (unlink(path) < 0) {
 		if (errno == ENOENT)
 			return SD_RES_NO_OBJ;
 
-		sd_err("failed to remove object %"PRIx64", %m", oid);
+		sd_err("failed, %s, %m", path);
 		return SD_RES_EIO;
 	}
 
@@ -619,10 +583,11 @@ static int set_object_sha1(const char *path, const uint8_t *sha1)
 static int get_object_path(uint64_t oid, uint32_t epoch, char *path,
 			   size_t size)
 {
-	if (default_exist(oid)) {
-		get_obj_path(oid, path, size);
+	if (default_exist(oid, 0)) {
+		snprintf(path, PATH_MAX, "%s/%016"PRIx64,
+			 md_get_object_dir(oid), oid);
 	} else {
-		get_stale_obj_path(oid, epoch, path, size);
+		get_store_stale_path(oid, epoch, 0, path);
 		if (access(path, F_OK) < 0) {
 			if (errno == ENOENT)
 				return SD_RES_NO_OBJ;

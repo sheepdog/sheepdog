@@ -143,7 +143,7 @@ static struct disk *path_to_disk(const char *path)
 }
 
 static int get_total_object_size(uint64_t oid, const char *wd, uint32_t epoch,
-				 void *total)
+				 uint8_t ec_index, void *total)
 {
 	uint64_t *t = total;
 	struct stat s;
@@ -158,17 +158,30 @@ static int get_total_object_size(uint64_t oid, const char *wd, uint32_t epoch,
 	return SD_RES_SUCCESS;
 }
 
+static int64_t find_string_integer(const char *str, const char *delimiter)
+{
+	char *pos = strstr(str, delimiter), *p;
+	int64_t ret;
+
+	ret = strtoll(pos + 1, &p, 10);
+	if (ret == LLONG_MAX || p == pos + 1) {
+		sd_err("%s strtoul failed, delimiter %s, %m", str, delimiter);
+		return -1;
+	}
+
+	return ret;
+}
+
 /* If cleanup is true, temporary objects will be removed */
 static int for_each_object_in_path(const char *path,
 				   int (*func)(uint64_t, const char *, uint32_t,
-					       void *),
+					       uint8_t, void *),
 				   bool cleanup, void *arg)
 {
 	DIR *dir;
 	struct dirent *d;
 	uint64_t oid;
 	int ret = SD_RES_SUCCESS;
-	char p[PATH_MAX];
 
 	dir = opendir(path);
 	if (unlikely(!dir)) {
@@ -178,36 +191,39 @@ static int for_each_object_in_path(const char *path,
 
 	while ((d = readdir(dir))) {
 		uint32_t epoch = 0;
+		uint8_t ec_index = SD_MAX_COPIES;
 
+		/* skip ".", ".." and ".stale" */
 		if (unlikely(!strncmp(d->d_name, ".", 1)))
 			continue;
 
+		sd_debug("%s, %s", path, d->d_name);
 		oid = strtoull(d->d_name, NULL, 16);
 		if (oid == 0 || oid == ULLONG_MAX)
 			continue;
 
 		/* don't call callback against temporary objects */
-		if (strlen(d->d_name) == 20 &&
-		    strcmp(d->d_name + 16, ".tmp") == 0) {
+		if (is_tmp_dentry(d->d_name)) {
 			if (cleanup) {
-				snprintf(p, PATH_MAX, "%s/%016"PRIx64".tmp",
-					 path, oid);
-				sd_debug("remove tmp object %s", p);
-				unlink(p);
+				sd_debug("remove tmp object %s", d->d_name);
+				unlink(d->d_name);
 			}
 			continue;
 		}
 
-		if (strlen(d->d_name) > 17 && d->d_name[16] == '.') {
-			epoch = strtoul(d->d_name + 17, NULL, 10);
-			if (epoch == 0 || epoch == ULONG_MAX) {
-				sd_info("%s ignored, strtoul failed %m",
-					d->d_name);
+		if (is_stale_dentry(d->d_name)) {
+			epoch = find_string_integer(d->d_name, ".");
+			if (epoch < 0)
 				continue;
-			}
 		}
 
-		ret = func(oid, path, epoch, arg);
+		if (is_ec_dentry(d->d_name)) {
+			ec_index = find_string_integer(d->d_name, "_");
+			if (ec_index < 0)
+				continue;
+		}
+
+		ret = func(oid, path, epoch, ec_index, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
@@ -332,7 +348,7 @@ uint64_t md_init_space(void)
 	return md.space;
 }
 
-static const char *md_get_object_path_nolock(uint64_t oid)
+static const char *md_get_object_dir_nolock(uint64_t oid)
 {
 	const struct vdisk *vd;
 
@@ -343,12 +359,12 @@ static const char *md_get_object_path_nolock(uint64_t oid)
 	return vd->disk->path;
 }
 
-const char *md_get_object_path(uint64_t oid)
+const char *md_get_object_dir(uint64_t oid)
 {
 	const char *p;
 
 	sd_read_lock(&md.lock);
-	p = md_get_object_path_nolock(oid);
+	p = md_get_object_dir_nolock(oid);
 	sd_rw_unlock(&md.lock);
 
 	return p;
@@ -356,7 +372,7 @@ const char *md_get_object_path(uint64_t oid)
 
 struct process_path_arg {
 	const char *path;
-	int (*func)(uint64_t oid, const char *path, uint32_t epoch, void *arg);
+	int (*func)(uint64_t oid, const char *, uint32_t, uint8_t, void *arg);
 	bool cleanup;
 	void *opaque;
 	int result;
@@ -376,7 +392,8 @@ static void *thread_process_path(void *arg)
 }
 
 int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
-				      uint32_t epoch, void *arg),
+				      uint32_t epoch, uint8_t ec_index,
+				      void *arg),
 			  bool cleanup, void *arg)
 {
 	int ret = SD_RES_SUCCESS;
@@ -437,7 +454,7 @@ int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 }
 
 int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
-					 uint32_t epoch, void *arg),
+					 uint32_t epoch, uint8_t, void *arg),
 			     void *arg)
 {
 	int ret = SD_RES_SUCCESS;
@@ -533,19 +550,37 @@ static inline bool md_access(const char *path)
 	return true;
 }
 
-static int get_old_new_path(uint64_t oid, uint32_t epoch, const char *path,
-			    char *old, size_t old_size, char *new,
-			    size_t new_size)
+static int get_old_new_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
+			    const char *path, char *old, char *new)
 {
 	if (!epoch) {
-		snprintf(old, old_size, "%s/%016" PRIx64, path, oid);
-		snprintf(new, new_size, "%s/%016" PRIx64,
-			 md_get_object_path_nolock(oid), oid);
+		if (!is_erasure_oid(oid)) {
+			snprintf(old, PATH_MAX, "%s/%016" PRIx64, path, oid);
+			snprintf(new, PATH_MAX, "%s/%016" PRIx64,
+				 md_get_object_dir_nolock(oid), oid);
+		} else {
+			snprintf(old, PATH_MAX, "%s/%016" PRIx64"_%d", path,
+				 oid, ec_index);
+			snprintf(new, PATH_MAX, "%s/%016" PRIx64"_%d",
+				 md_get_object_dir_nolock(oid), oid, ec_index);
+		}
 	} else {
-		snprintf(old, old_size, "%s/.stale/%016"PRIx64".%"PRIu32, path,
-			 oid, epoch);
-		snprintf(new, new_size, "%s/.stale/%016"PRIx64".%"PRIu32,
-			 md_get_object_path_nolock(oid), oid, epoch);
+		if (!is_erasure_oid(oid)) {
+			snprintf(old, PATH_MAX,
+				 "%s/.stale/%016"PRIx64".%"PRIu32, path,
+				 oid, epoch);
+			snprintf(new, PATH_MAX,
+				 "%s/.stale/%016"PRIx64".%"PRIu32,
+				 md_get_object_dir_nolock(oid), oid, epoch);
+		} else {
+			snprintf(old, PATH_MAX,
+				 "%s/.stale/%016"PRIx64"_%d.%"PRIu32, path,
+				 oid, ec_index, epoch);
+			snprintf(new, PATH_MAX,
+				 "%s/.stale/%016"PRIx64"_%d.%"PRIu32,
+				 md_get_object_dir_nolock(oid),
+				 oid, ec_index ,epoch);
+		}
 	}
 
 	if (!md_access(old))
@@ -587,12 +622,12 @@ out:
 	return ret;
 }
 
-static int md_check_and_move(uint64_t oid, uint32_t epoch, const char *path)
+static int md_check_and_move(uint64_t oid, uint32_t epoch, uint8_t ec_index,
+			     const char *path)
 {
 	char old[PATH_MAX], new[PATH_MAX];
 
-	if (get_old_new_path(oid, epoch, path, old, sizeof(old), new,
-			     sizeof(new)) < 0)
+	if (get_old_new_path(oid, epoch, ec_index, path, old, new) < 0)
 		return SD_RES_EIO;
 	/*
 	 * Recovery thread and main thread might try to recover the same object.
@@ -613,14 +648,14 @@ static int md_check_and_move(uint64_t oid, uint32_t epoch, const char *path)
 	return SD_RES_SUCCESS;
 }
 
-static int scan_wd(uint64_t oid, uint32_t epoch)
+static int scan_wd(uint64_t oid, uint32_t epoch, uint8_t ec_index)
 {
 	int ret = SD_RES_EIO;
 	const struct disk *disk;
 
 	sd_read_lock(&md.lock);
 	rb_for_each_entry(disk, &md.root, rb) {
-		ret = md_check_and_move(oid, epoch, disk->path);
+		ret = md_check_and_move(oid, epoch, ec_index, disk->path);
 		if (ret == SD_RES_SUCCESS)
 			break;
 	}
@@ -628,12 +663,11 @@ static int scan_wd(uint64_t oid, uint32_t epoch)
 	return ret;
 }
 
-bool md_exist(uint64_t oid)
+bool md_exist(uint64_t oid, uint8_t ec_index)
 {
 	char path[PATH_MAX];
 
-	snprintf(path, PATH_MAX, "%s/%016" PRIx64, md_get_object_path(oid),
-		 oid);
+	get_store_path(oid, ec_index, path);
 	if (md_access(path))
 		return true;
 	/*
@@ -641,21 +675,32 @@ bool md_exist(uint64_t oid)
 	 * track to locate the objects for multiple disk failure. Simply do
 	 * hard iteration simplify the code a lot.
 	 */
-	if (scan_wd(oid, 0) == SD_RES_SUCCESS)
+	if (scan_wd(oid, 0, ec_index) == SD_RES_SUCCESS)
 		return true;
 
 	return false;
 }
 
-int md_get_stale_path(uint64_t oid, uint32_t epoch, char *path, size_t size)
+int md_get_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
+		      char *path)
 {
-	snprintf(path, size, "%s/.stale/%016"PRIx64".%"PRIu32,
-		 md_get_object_path(oid), oid, epoch);
+	if (unlikely(!epoch))
+		panic("invalid 0 epoch");
+
+	if (is_erasure_oid(oid)) {
+		if (unlikely(ec_index >= SD_MAX_COPIES))
+			panic("invalid ec index %d", ec_index);
+
+		snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64"_%d.%"PRIu32,
+			 md_get_object_dir(oid), oid, ec_index, epoch);
+	} else
+		snprintf(path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
+			 md_get_object_dir(oid), oid, epoch);
+
 	if (md_access(path))
 		return SD_RES_SUCCESS;
 
-	assert(epoch);
-	if (scan_wd(oid, epoch) == SD_RES_SUCCESS)
+	if (scan_wd(oid, epoch, ec_index) == SD_RES_SUCCESS)
 		return SD_RES_SUCCESS;
 
 	return SD_RES_NO_OBJ;

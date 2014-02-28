@@ -142,7 +142,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 	char *p = (char *)jd;
 
 	snprintf(path, PATH_MAX, "%s/%016"PRIx64,
-		 md_get_object_path(jd->oid), jd->oid);
+		 md_get_object_dir(jd->oid), jd->oid);
 
 	if (jd->flag == JF_REMOVE_OBJ) {
 		sd_info("%s (remove)", path);
