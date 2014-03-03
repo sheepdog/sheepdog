@@ -107,8 +107,10 @@ int init_config_file(void)
 					sd_err("failed to reload config file,"
 					       " %m");
 					ret = -1;
-				} else
+				} else {
 					ret = 0;
+					goto reload;
+				}
 			}
 			goto out;
 		}
@@ -117,6 +119,8 @@ int init_config_file(void)
 		ret = -1;
 		goto out;
 	}
+
+reload:
 	ret = 0;
 	get_cluster_config(&sys->cinfo);
 out:
