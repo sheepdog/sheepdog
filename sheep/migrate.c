@@ -425,10 +425,87 @@ static int migrate_from_v2_to_v3(void)
 	return -1;
 }
 
+#define OLD_ECNAME "user.ec.index"
+
+static int convert_ecidx_xattr2path(uint64_t oid, const char *wd,
+				    uint32_t epoch, uint8_t ec_index,
+				    void *arg)
+{
+	int ret = 0;
+	uint8_t idx;
+	char path[PATH_MAX + 1], new_path[PATH_MAX + 1];
+	bool is_stale = *(bool *)arg;
+
+	if (is_stale)
+		snprintf(path, PATH_MAX, "%s/%016"PRIx64".%u", wd, oid, epoch);
+	else
+		snprintf(path, PATH_MAX, "%s/%016"PRIx64, wd, oid);
+
+	if (getxattr(path, OLD_ECNAME, &idx, sizeof(uint8_t)) < 0) {
+		sd_info("object: %s doesn't have its ec index in xattr: %m",
+			path);
+		goto out;
+	}
+
+	if (is_stale)
+		snprintf(new_path, PATH_MAX, "%s/%016"PRIx64"_%u.%u",
+			 wd, oid, idx, epoch);
+	else
+		snprintf(new_path, PATH_MAX, "%s/%016"PRIx64"_%u",
+			 wd, oid, idx);
+
+	if (rename(path, new_path) < 0) {
+		sd_emerg("rename from %s to %s failed: %m", path, new_path);
+		ret = -1;
+
+		goto out;
+	}
+
+	if (removexattr(new_path, OLD_ECNAME) < 0) {
+		sd_emerg("remove xattr %s from path %s failed: %m",
+			 OLD_ECNAME, new_path);
+		ret = -1;
+	}
+
+out:
+	return ret;
+}
+
+static int migrate_from_v3_to_v4(void)
+{
+	bool is_stale = true;
+	int ret;
+
+	ret = for_each_object_in_stale(convert_ecidx_xattr2path,
+				       (void *)&is_stale);
+	if (ret < 0) {
+		sd_emerg("converting store format of stale object directory"
+			 "failed");
+		return ret;
+	}
+
+	is_stale = false;
+	ret = for_each_object_in_wd(convert_ecidx_xattr2path, false,
+				    (void *)&is_stale);
+	if (ret < 0) {
+		sd_emerg("converting store format of object directory failed");
+		return ret;
+	}
+
+	sd_info("converting store format v3 to v4 is ended successfully");
+	return 0;
+}
+
 static int (*migrate[])(void) = {
 	migrate_from_v0_to_v1, /* from 0.4.0 or 0.5.0 to 0.5.1 */
 	migrate_from_v1_to_v2, /* from 0.5.x to 0.6.0 */
 	migrate_from_v2_to_v3, /* from 0.6.x or 0.7.x to 0.8.x */
+
+	/*
+	 * from v0.8.0 to v0.8.x (0 < x), for solving incompatibility
+	 * produced by the commit 79706e07a068
+	 */
+	migrate_from_v3_to_v4,
 };
 
 int sd_migrate_store(int from, int to)
