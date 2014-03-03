@@ -1348,7 +1348,7 @@ create_seq_node:
 static void zk_unlock(uint64_t lock_id)
 {
 	lock_table_lookup_release(lock_id);
-	sd_debug("unlock %"PRIx64, lock_id);
+	sd_debug("unlock %"PRIu64, lock_id);
 }
 
 static int zk_init(const char *option)
