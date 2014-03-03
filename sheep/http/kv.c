@@ -54,6 +54,8 @@ struct onode_extent {
 #define ONODE_INIT	1	/* created and allocated space, but no data */
 #define ONODE_COMPLETE	2	/* data upload complete */
 
+#define ONODE_HDR_SIZE  BLOCK_SIZE
+
 struct kv_onode {
 	union {
 		struct {
@@ -69,10 +71,10 @@ struct kv_onode {
 			uint8_t flags;
 		};
 
-		uint8_t pad[BLOCK_SIZE];
+		uint8_t pad[ONODE_HDR_SIZE];
 	};
 	union {
-		uint8_t data[SD_DATA_OBJ_SIZE - BLOCK_SIZE];
+		uint8_t data[SD_DATA_OBJ_SIZE - ONODE_HDR_SIZE];
 		struct onode_extent o_extent[0];
 	};
 };
@@ -615,7 +617,7 @@ out:
 
 /* Object operations */
 
-#define KV_ONODE_INLINE_SIZE (SD_DATA_OBJ_SIZE - BLOCK_SIZE)
+#define KV_ONODE_INLINE_SIZE (SD_DATA_OBJ_SIZE - ONODE_HDR_SIZE)
 
 static int vdi_read_write(uint32_t vid, char *data, size_t length,
 			  off_t offset, bool is_read)
@@ -771,7 +773,7 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 			goto out;
 		}
 		ret = sd_write_object(onode->oid, (char *)onode,
-				      BLOCK_SIZE + size, 0, false);
+				      ONODE_HDR_SIZE + size, 0, false);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 	} else {
@@ -803,7 +805,7 @@ static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
 	else
 		len = sizeof(struct onode_extent) * onode->nr_extent;
 
-	ret = sd_write_object(oid, (char *)onode, BLOCK_SIZE + len,
+	ret = sd_write_object(oid, (char *)onode, ONODE_HDR_SIZE + len,
 			      0, create);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to create object, %" PRIx64, oid);
