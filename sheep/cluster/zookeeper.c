@@ -1271,7 +1271,6 @@ kick_block_event:
  */
 static void zk_lock(uint64_t lock_id)
 {
-	int flags = ZOO_SEQUENCE | ZOO_EPHEMERAL;
 	int rc, len = MAX_NODE_STR_LEN;
 	char *my_path;
 	char parent[MAX_NODE_STR_LEN];
@@ -1295,9 +1294,9 @@ static void zk_lock(uint64_t lock_id)
 create_seq_node:
 	/* compete owner of lock is just like zk_compete_master() */
 	while (true) {
-		rc = zk_create_node(parent, node_to_str(&this_node.node),
-				    MAX_NODE_STR_LEN, &ZOO_OPEN_ACL_UNSAFE,
-				    flags, my_path, MAX_NODE_STR_LEN);
+		rc = zk_create_seq_node(parent, node_to_str(&this_node.node),
+					MAX_NODE_STR_LEN, my_path,
+					MAX_NODE_STR_LEN, true);
 		if (rc == ZOK)
 			break;
 		if (rc == ZNONODE) {
