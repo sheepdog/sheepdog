@@ -63,6 +63,7 @@ struct kv_onode {
 			/* a hash value for etag */
 			uint8_t sha1[round_up(SHA1_DIGEST_SIZE, 8)];
 			uint64_t size;
+			uint64_t ctime;
 			uint64_t mtime;
 			uint32_t data_vid;
 			uint32_t nr_extent;
@@ -753,7 +754,7 @@ static int onode_allocate_data(struct kv_onode *onode, struct http_request *req)
 			goto out;
 	}
 
-	onode->mtime = get_seconds();
+	onode->ctime = get_seconds();
 	onode->size = req->data_length;
 out:
 	return ret;
@@ -762,7 +763,10 @@ out:
 static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 {
 	ssize_t size;
-	int ret = SD_RES_SUCCESS, offset;
+	int ret = SD_RES_SUCCESS;
+
+	onode->mtime = get_seconds();
+	onode->flags = ONODE_COMPLETE;
 
 	if (req->data_length <= KV_ONODE_INLINE_SIZE) {
 		size = http_request_read(req, onode->data, sizeof(onode->data));
@@ -780,14 +784,15 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 		ret = onode_populate_extents(onode, req);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
+		/* write mtime and flag ONODE_COMPLETE to onode */
+		ret = sd_write_object(onode->oid, (char *)onode,
+				      ONODE_HDR_SIZE, 0, false);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to write mtime and flags of onode %s",
+			       onode->name);
+			goto out;
+		}
 	}
-	/* write ONODE_COMPLETE to onode->flags */
-	onode->flags = ONODE_COMPLETE;
-	offset = offsetof(struct kv_onode, flags);
-	ret = sd_write_object(onode->oid, (char *)onode + offset,
-			      sizeof(uint8_t), offset, false);
-	if (ret != SD_RES_SUCCESS)
-		sd_err("Failed to write flags of onode %s", onode->name);
 out:
 	return ret;
 }
@@ -1332,6 +1337,8 @@ int kv_read_object_meta(struct http_request *req, const char *account,
 		goto out;
 
 	req->data_length = onode->size;
+	http_request_writef(req, "Created: %s\n",
+			    http_time(onode->ctime));
 	http_request_writef(req, "Last-Modified: %s\n",
 			    http_time(onode->mtime));
 
