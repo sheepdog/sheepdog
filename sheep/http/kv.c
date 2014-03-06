@@ -589,7 +589,7 @@ out:
 
 int kv_iterate_bucket(const char *account, bucket_iter_cb cb, void *opaque)
 {
-	struct sd_inode account_inode;
+	struct sd_inode *account_inode;
 	struct bucket_iterater_arg arg = {opaque, cb, 0, 0, 0};
 	uint32_t account_vid;
 	uint64_t oid;
@@ -601,18 +601,20 @@ int kv_iterate_bucket(const char *account, bucket_iter_cb cb, void *opaque)
 		return ret;
 	}
 
+	account_inode = xmalloc(sizeof(*account_inode));
 	oid = vid_to_vdi_oid(account_vid);
 	sys->cdrv->lock(account_vid);
-	ret = sd_read_object(oid, (char *)&account_inode,
+	ret = sd_read_object(oid, (char *)account_inode,
 			     sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to read account inode header %s", account);
 		goto out;
 	}
 
-	sd_inode_index_walk(&account_inode, bucket_iterater, &arg);
+	sd_inode_index_walk(account_inode, bucket_iterater, &arg);
 out:
 	sys->cdrv->unlock(account_vid);
+	free(account_inode);
 	return ret;
 }
 

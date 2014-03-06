@@ -2153,18 +2153,19 @@ out:
 
 static int vid_to_name_tag(uint32_t vid, char *name, char *tag)
 {
-	struct sd_inode inode;
+	struct sd_inode *inode = xmalloc(SD_INODE_HEADER_SIZE);
 	int ret;
 
-	ret = dog_read_object(vid_to_vdi_oid(vid), &inode, SD_INODE_HEADER_SIZE,
-			     0, true);
+	ret = dog_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE,
+			      0, true);
 	if (ret != SD_RES_SUCCESS)
-		return ret;
+		goto out;
 
-	pstrcpy(name, SD_MAX_VDI_LEN, inode.name);
-	pstrcpy(tag, SD_MAX_VDI_TAG_LEN, inode.tag);
-
-	return SD_RES_SUCCESS;
+	pstrcpy(name, SD_MAX_VDI_LEN, inode->name);
+	pstrcpy(tag, SD_MAX_VDI_TAG_LEN, inode->tag);
+out:
+	free(inode);
+	return ret;
 }
 
 static int vdi_cache_info(int argc, char **argv)
