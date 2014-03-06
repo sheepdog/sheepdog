@@ -458,15 +458,16 @@ static void object_iterater(struct sd_index *idx, void *arg, int ignore)
 {
 	struct object_iterater_arg *oiarg = arg;
 	struct kv_onode *onode = NULL;
-	uint64_t oid;
+	uint64_t oid, read_size;
 	int ret;
 
 	if (!idx->vdi_id)
 		goto out;
 
-	onode = xmalloc(SD_DATA_OBJ_SIZE);
+	read_size = offsetof(struct kv_onode, name) + sizeof(onode->name);
+	onode = xmalloc(read_size);
 	oid = vid_to_data_oid(idx->vdi_id, idx->idx);
-	ret = sd_read_object(oid, (char *)onode, SD_DATA_OBJ_SIZE, 0);
+	ret = sd_read_object(oid, (char *)onode, read_size, 0);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to read data object %"PRIx64, oid);
 		goto out;
