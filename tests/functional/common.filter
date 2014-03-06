@@ -139,6 +139,11 @@ _filter_short_date()
     sed -e 's/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]/DATE/g'
 }
 
+_filter_ip()
+{
+    sed -e 's/[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+/IP/g'
+}
+
 # remove trailing whitespace, some versions of sg3_utils do that
 _filter_spaces()
 {

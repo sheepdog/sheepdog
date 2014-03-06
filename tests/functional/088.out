@@ -1,0 +1,41 @@
+QA output created by 088
+1. start sheep with my address
+----- cluster format ------
+using backend plain store
+----- cluster info -----
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [IP:7000]
+----- vdi create -----
+----- vdi list -----
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   40 MB   40 MB  0.0 MB DATE   7c2b25      1              
+----- cluster shutdown -----
+2. start sheep with default
+----- cluster info -----
+Cluster status: Waiting for other nodes to join cluster
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [IP:7000]
+----- node info -----
+Response's result: Waiting for other nodes to join cluster
+Cannot get information from any nodes
+Id	Size	Used	Avail	Use%
+----- cluster shutdown -----
+3. start sheep with my address again
+----- cluster info -----
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [IP:7000]
+----- vdi list -----
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   40 MB   40 MB  0.0 MB DATE   7c2b25      1              
+----- cluster shutdown -----
