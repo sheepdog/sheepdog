@@ -327,6 +327,8 @@ static int object_create_entry(const char *entry, const char *url)
 	}
 	ret = 0;
 out:
+	for (int i = 0; i < ARRAY_SIZE(args); i++)
+		free(args[i]);
 	strbuf_release(&buf);
 	return ret;
 }
