@@ -392,11 +392,12 @@ int main(int argc, char **argv)
 		exit(1);
 
 	t = sheepfs_run_cmd("dog");
-	if (!strlen(t->buf)) {
+	if (t && !strlen(t->buf)) {
 		fprintf(stderr, "command dog not found\n");
 		exit(1);
 	}
 	strbuf_release(t);
+	free(t);
 
 	if (optind != argc)
 		dir = argv[optind];
