@@ -1,0 +1,6 @@
+QA output created by 089
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  sd           0   16 PB  4.0 MB  0.0 MB DATE   7927f2    4:2              
+  sd/sheep     0   16 PB   16 MB  0.0 MB DATE   8ad11e    4:2              
+  sd/sheep/allocator     0   16 PB  268 MB  0.0 MB DATE   fd57fc    4:2              
