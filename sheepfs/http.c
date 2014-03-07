@@ -49,7 +49,8 @@ int create_http_layout(void)
 	return 0;
 }
 
-int http_address_read(const char *path, char *buf, size_t size, off_t ignore)
+int http_address_read(const char *path, char *buf, size_t size, off_t ignore,
+		      struct fuse_file_info *fi)
 {
 	return shadow_file_read(path, buf, size, 0);
 }
@@ -159,8 +160,11 @@ static size_t curl_read_object(const char *url, char *buf, size_t size,
 			       "content_length: %"PRIu64", get_size: %"PRIu64,
 			       (size_t)content_length, size);
 			size = 0;
-		} else
-			sd_debug("Read out %"PRIu64" data from %s", size, url);
+		} else {
+			sheepfs_pr("Read out %"PRIu64" data from %s",
+				   size, url);
+			size = (size_t)content_length;
+		}
 	} else {
 		sheepfs_pr("Failed to call libcurl res: %s, url: %s",
 		       curl_easy_strerror(res), url);
@@ -228,11 +232,22 @@ out:
 	return ret;
 }
 
-int object_read(const char *path, char *buf, size_t size, off_t offset)
+/* no rationale */
+#define CACHE_SIZE	(64 * 1024 * 1024)
+
+struct cache_handle {
+	char *mem;
+	off_t offset;
+	size_t size;
+};
+
+int object_read(const char *path, char *buf, size_t size, off_t offset,
+		struct fuse_file_info *fi)
 {
 	char url[PATH_MAX];
 	char *pos;
 	int ret;
+	struct cache_handle *ch;
 
 	pos = strstr(path, PATH_HTTP);
 	if (!pos) {
@@ -241,16 +256,65 @@ int object_read(const char *path, char *buf, size_t size, off_t offset)
 		goto out;
 	}
 
-	pos += strlen(PATH_HTTP);
-	/* don't need '\n' at the end of 'path' */
-	ret = generate_url(pos, strlen(path) - strlen(PATH_HTTP),
-			   url, PATH_MAX);
-	if (ret)
-		goto out;
+	ch = (struct cache_handle *)fi->fh;
 
-	ret = curl_read_object(url, buf, size, offset);
+	while (true) {
+		/* try to read from cache first */
+		if (offset >= ch->offset && (ch->offset + ch->size) > offset) {
+			if ((ch->offset + ch->size) > (offset + size))
+				ret = size;
+			else
+				ret = (ch->offset + ch->size) - offset;
+			memcpy(buf, ch->mem + (offset - ch->offset), ret);
+			break;
+		} else { /* update cache */
+			if (!ch->mem)
+				ch->mem = xmalloc(CACHE_SIZE);
+
+			pos += strlen(PATH_HTTP);
+			/* don't need '\n' at the end of 'path' */
+			ret = generate_url(pos,
+					   strlen(path) - strlen(PATH_HTTP),
+					   url, PATH_MAX);
+			if (ret)
+				goto out;
+
+			ret = curl_read_object(url, ch->mem, CACHE_SIZE,
+					       offset);
+			ch->offset = offset;
+			ch->size = ret;
+			sheepfs_pr("update cache offset %lu size %d",
+				   offset, ret);
+			if (ret <= 0)
+				break;
+		}
+	}
 out:
 	return ret;
+}
+
+int object_open(const char *path, struct fuse_file_info *fi)
+{
+	struct cache_handle *ch;
+
+	/* don't need page cache of fuse */
+	fi->direct_io = 1;
+
+	ch = xzalloc(sizeof(*ch));
+	fi->fh = (uint64_t)ch;
+
+	return 0;
+}
+
+int object_release(const char *path, struct fuse_file_info *fi)
+{
+	struct cache_handle *ch = (struct cache_handle *)fi->fh;
+
+	free(ch->mem);
+	free(ch);
+	fi->fh = 0;
+
+	return 0;
 }
 
 size_t object_get_size(const char *path)

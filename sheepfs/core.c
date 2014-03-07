@@ -53,13 +53,15 @@ static struct option const long_options[] = {
 static const char *short_options = "a:dfhknp:";
 
 static struct sheepfs_file_operation {
-	int (*read)(const char *path, char *buf, size_t size, off_t);
+	int (*read)(const char *path, char *buf, size_t size, off_t,
+		    struct fuse_file_info *fi);
 	int (*write)(const char *path, const char *buf, size_t size, off_t);
 	size_t (*get_size)(const char *path);
 	int (*sync)(const char *path);
 	int (*open)(const char *path, struct fuse_file_info *);
 	int (*unlink)(const char *path);
 	int (*rmdir)(const char *path);
+	int (*release)(const char *path, struct fuse_file_info *);
 } sheepfs_file_ops[] = {
 	[OP_NULL]           = { NULL, NULL, NULL },
 	[OP_CLUSTER_INFO]   = { cluster_info_read, NULL,
@@ -82,8 +84,9 @@ static struct sheepfs_file_operation {
 	[OP_HTTP_ADDRESS]   = { http_address_read, http_address_write,
 				http_address_get_size },
 	[OP_HTTP_OBJECT]    = { NULL, http_object_write },
-	[OP_OBJECT]         = { object_read, NULL, object_get_size, NULL, NULL,
-				object_unlink },
+	[OP_OBJECT]         = { object_read, NULL, object_get_size, NULL,
+				object_open, object_unlink,
+				NULL, object_release },
 	[OP_CONTAINER]      = { NULL, NULL, NULL, NULL, NULL, NULL,
 				container_rmdir },
 #endif
@@ -218,7 +221,7 @@ static int sheepfs_read(const char *path, char *buf, size_t size,
 	unsigned op = sheepfs_get_op(path);
 
 	if (sheepfs_file_ops[op].read)
-		ret = sheepfs_file_ops[op].read(path, buf, size, offset);
+		ret = sheepfs_file_ops[op].read(path, buf, size, offset, fi);
 
 	return ret;
 }
@@ -274,6 +277,17 @@ static int sheepfs_open(const char *path, struct fuse_file_info *fi)
 	return ret;
 }
 
+static int sheepfs_release(const char *path, struct fuse_file_info *fi)
+{
+	int ret = 0;
+	unsigned op = sheepfs_get_op(path);
+
+	if (sheepfs_file_ops[op].release)
+		ret = sheepfs_file_ops[op].release(path, fi);
+
+	return ret;
+}
+
 static struct fuse_operations sheepfs_ops =  {
 	.getattr  = sheepfs_getattr,
 	.unlink   = sheepfs_unlink,
@@ -284,6 +298,7 @@ static struct fuse_operations sheepfs_ops =  {
 	.write    = sheepfs_write,
 	.fsync    = sheepfs_fsync,
 	.open     = sheepfs_open,
+	.release  = sheepfs_release,
 };
 
 static int sheepfs_main_loop(char *mountpoint)

@@ -39,7 +39,8 @@ int create_cluster_layout(void)
 	return 0;
 }
 
-int cluster_info_read(const char *path, char *buf, size_t size, off_t ignore)
+int cluster_info_read(const char *path, char *buf, size_t size, off_t ignore,
+		      struct fuse_file_info *fi)
 {
 	return shadow_file_read(path, buf, size, 0);
 }

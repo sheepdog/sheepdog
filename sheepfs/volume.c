@@ -267,7 +267,8 @@ int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 	return ret;
 }
 
-int volume_read(const char *path, char *buf, size_t size, off_t offset)
+int volume_read(const char *path, char *buf, size_t size, off_t offset,
+		struct fuse_file_info *fi)
 {
 	ssize_t done;
 

@@ -51,7 +51,8 @@ int create_config_layout(void)
 	return 0;
 }
 
-int config_pcache_read(const char *path, char *buf, size_t size, off_t ignore)
+int config_pcache_read(const char *path, char *buf, size_t size, off_t ignore,
+		       struct fuse_file_info *fi)
 {
 	snprintf(buf, size, "%d\n", sheepfs_page_cache);
 	return strlen(buf);
@@ -74,7 +75,8 @@ size_t config_pcache_get_size(const char *path)
 	return sizeof(int) + 1/* \n */;
 }
 
-int config_ocache_read(const char *path, char *buf, size_t size, off_t ignore)
+int config_ocache_read(const char *path, char *buf, size_t size, off_t ignore,
+		       struct fuse_file_info *fi)
 {
 	snprintf(buf, size, "%d\n", sheepfs_object_cache);
 	return strlen(buf);
@@ -98,7 +100,7 @@ size_t config_ocache_get_size(const char *path)
 }
 
 int config_sheep_info_read(const char *path, char *buf, size_t size,
-			   off_t ignore)
+			   off_t ignore, struct fuse_file_info *fi)
 {
 	snprintf(buf, size, "%s:%d\n", sdhost, sdport);
 	return strlen(buf);

@@ -58,7 +58,8 @@ bool shadow_file_stat(const char *path, struct stat *st);
 
 /* volume.c */
 int create_volume_layout(void);
-int volume_read(const char *path, char *buf, size_t size, off_t offset);
+int volume_read(const char *path, char *buf, size_t size, off_t offset,
+		struct fuse_file_info *fi);
 int volume_write(const char *, const char *buf, size_t size, off_t);
 size_t volume_get_size(const char *);
 int volume_create_entry(const char *entry);
@@ -73,37 +74,44 @@ int sheepfs_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 			 uint64_t offset);
 
 /* cluster.c */
-int cluster_info_read(const char *path, char *buf, size_t size, off_t);
+int cluster_info_read(const char *path, char *buf, size_t size, off_t,
+		      struct fuse_file_info *fi);
 size_t cluster_info_get_size(const char *path);
 int create_cluster_layout(void);
 
 /* vdi.c */
 int create_vdi_layout(void);
-int vdi_list_read(const char *path, char *buf, size_t size, off_t);
+int vdi_list_read(const char *path, char *buf, size_t size, off_t,
+		  struct fuse_file_info *fi);
 size_t vdi_list_get_size(const char *path);
 
 int vdi_mount_write(const char *, const char *buf, size_t size, off_t);
 int vdi_unmount_write(const char *, const char *buf, size_t, off_t);
 
 /* node.c */
-int node_list_read(const char *path, char *buf, size_t size, off_t);
+int node_list_read(const char *path, char *buf, size_t size, off_t,
+		   struct fuse_file_info *fi);
 size_t node_list_get_size(const char *path);
-int node_info_read(const char *path, char *buf, size_t size, off_t);
+int node_info_read(const char *path, char *buf, size_t size, off_t,
+		   struct fuse_file_info *fi);
 size_t node_info_get_size(const char *path);
 int create_node_layout(void);
 
 /* config.c */
 int create_config_layout(void);
 
-int config_pcache_read(const char *path, char *buf, size_t size, off_t);
+int config_pcache_read(const char *path, char *buf, size_t size, off_t,
+		       struct fuse_file_info *fi);
 int config_pcache_write(const char *path, const char *, size_t, off_t);
 size_t config_pcache_get_size(const char *path);
 
-int config_ocache_read(const char *path, char *buf, size_t size, off_t);
+int config_ocache_read(const char *path, char *buf, size_t size, off_t,
+		       struct fuse_file_info *fi);
 int config_ocache_write(const char *path, const char *, size_t, off_t);
 size_t config_ocache_get_size(const char *path);
 
-int config_sheep_info_read(const char *path, char *, size_t size, off_t);
+int config_sheep_info_read(const char *path, char *, size_t size, off_t,
+			   struct fuse_file_info *fi);
 int config_sheep_info_write(const char *, const char *, size_t, off_t);
 size_t config_sheep_info_get_size(const char *path);
 
@@ -114,14 +122,18 @@ int create_http_layout(void);
 static inline int create_http_layout(void) { return 0; }
 #endif
 
-int http_address_read(const char *path, char *buf, size_t size, off_t ignore);
+int http_address_read(const char *path, char *buf, size_t size, off_t ignore,
+		      struct fuse_file_info *fi);
 int http_address_write(const char *path, const char *buf, size_t size,
 		       off_t ignore);
 size_t http_address_get_size(const char *path);
 int http_object_write(const char *path, const char *buf, size_t size,
 		      off_t ignore);
 
-int object_read(const char *path, char *buf, size_t size, off_t ignore);
+int object_open(const char *path, struct fuse_file_info *fi);
+int object_release(const char *path, struct fuse_file_info *fi);
+int object_read(const char *path, char *buf, size_t size, off_t ignore,
+		struct fuse_file_info *fi);
 size_t object_get_size(const char *path);
 int object_unlink(const char *path);
 int container_rmdir(const char *path);

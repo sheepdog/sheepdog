@@ -46,7 +46,8 @@ int create_node_layout(void)
 	return 0;
 }
 
-int node_info_read(const char *path, char *buf, size_t size, off_t ignore)
+int node_info_read(const char *path, char *buf, size_t size, off_t ignore,
+		   struct fuse_file_info *fi)
 {
 	return shadow_file_read(path, buf, size, 0);
 }
@@ -69,7 +70,8 @@ size_t node_info_get_size(const char *path)
 	return len;
 }
 
-int node_list_read(const char *path, char *buf, size_t size, off_t ignore)
+int node_list_read(const char *path, char *buf, size_t size, off_t ignore,
+		   struct fuse_file_info *fi)
 {
 	return shadow_file_read(path, buf, size, 0);
 }
