@@ -102,5 +102,5 @@
 085 auto quick vdi md
 086 auto quick vdi md
 087 auto quick vdi md
-089 auto quick sheepfs
 088 auto quick cluster
+089 auto quick sheepfs
