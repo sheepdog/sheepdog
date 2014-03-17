@@ -5,6 +5,8 @@ DOG COMMAND INTERFACE:
  - remove "dog vdi object"
   - instead, "dog vdi object location" is the new name of the previous "dog vdi object"
  - new subcommand "dog vdi object map" for printing map of inode objects
+ - new option "-l" to "dog node kill" for killing sheep daemon on localhost without specifying ID
+ - allow snapshot tags which start with decimal number (e.g. "123abc")
 
 ## 0.8.0
 
