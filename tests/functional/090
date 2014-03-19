@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Test 'append operation' in http service
+
+. ./common
+
+_need_to_be_root
+
+which nginx > /dev/null || _notrun "Require nginx but it's not running"
+pkill nginx > /dev/null
+nginx -c `pwd`/nginx.conf
+
+for i in `seq 0 5`; do
+       _start_sheep $i "-r swift,port=800$i"
+done
+
+_wait_for_sheep 6
+
+_cluster_format -c 4:2
+
+curl -s -X PUT http://localhost/v1/sd
+curl -s -X PUT http://localhost/v1/sd/sheep
+curl -s -X PUT http://localhost/v1/sd/dog
+
+# create large files
+rm -rf $STORE/data_merge
+for i in `seq 3 7`; do
+    _random | dd iflag=fullblock of=$STORE/data$i bs=1037475 count=$i &> /dev/null
+    cat $STORE/data$i >> $STORE/data_merge
+done
+
+cat $STORE/data_merge | md5sum > $STORE/ck1
+
+# upload the files to one object with append operation
+for i in `seq 3 7`; do
+       port=8$(($i % 6))
+       cat $STORE/data$i | curl -s -T - -X PUT http://localhost:$port/v1/sd/sheep/upload_merge -H 'FLAG: append'
+done
+curl -s -X PUT http://localhost/v1/sd/sheep/upload_merge -H 'FLAG: eof'
+
+# download the object
+curl -s -X GET http://localhost/v1/sd/sheep/upload_merge | md5sum > $STORE/ck2
+
+diff -u $STORE/ck1 $STORE/ck2
+_vdi_list
+
+# create small files
+rm -rf $STORE/data_merge_small
+for i in `seq 7 13`; do
+    _random | dd iflag=fullblock of=$STORE/data$i bs=137475 count=$i &> /dev/null
+    cat $STORE/data$i >> $STORE/data_merge_small
+done
+
+cat $STORE/data_merge_small | md5sum > $STORE/ck3
+
+# upload the files to one object with append operation
+for i in `seq 7 13`; do
+       port=8$(($i % 6))
+       cat $STORE/data$i | curl -s -T - -X PUT http://localhost:$port/v1/sd/sheep/upload_merge_small -H 'FLAG: append'
+done
+curl -s -X PUT http://localhost/v1/sd/sheep/upload_merge_small -H 'FLAG: eof'
+
+# download the object
+curl -s -X GET http://localhost/v1/sd/sheep/upload_merge_small | md5sum > $STORE/ck4
+
+diff -u $STORE/ck3 $STORE/ck4
+_vdi_list
+
+# create aligned files
+rm -rf $STORE/data_merge_aligned
+for i in `seq 3 5`; do
+    _random | dd iflag=fullblock of=$STORE/data$i bs=4M count=$i &> /dev/null
+    cat $STORE/data$i >> $STORE/data_merge_aligned
+done
+
+cat $STORE/data_merge_aligned | md5sum > $STORE/ck5
+
+# upload the files to one object with append operation
+for i in `seq 3 5`; do
+       port=8$(($i % 6))
+       cat $STORE/data$i | curl -s -T - -X PUT http://localhost:$port/v1/sd/sheep/upload_merge_aligned -H 'FLAG: append'
+done
+curl -s -X PUT http://localhost/v1/sd/sheep/upload_merge_aligned -H 'FLAG: eof'
+
+# download the object
+curl -s -X GET http://localhost/v1/sd/sheep/upload_merge_aligned | md5sum > $STORE/ck6
+
+diff -u $STORE/ck5 $STORE/ck6
+_vdi_list
