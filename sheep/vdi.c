@@ -1187,7 +1187,7 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 	struct sheepdog_vdi_attr tmp_attr;
 	uint64_t oid;
 	uint32_t end;
-	int ret;
+	int ret = SD_RES_NO_OBJ;
 
 	vattr->ctime = create_time;
 
@@ -1196,8 +1196,9 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len,
 	end = *attrid - 1;
 	while (*attrid != end) {
 		oid = vid_to_attr_oid(vid, *attrid);
-		ret = sd_read_object(oid, (char *)&tmp_attr,
-				     sizeof(tmp_attr), 0);
+		if (excl || !wr)
+			ret = sd_read_object(oid, (char *)&tmp_attr,
+					sizeof(tmp_attr), 0);
 
 		if (ret == SD_RES_NO_OBJ && wr) {
 			ret = sd_write_object(oid, (char *)vattr, data_len, 0,
