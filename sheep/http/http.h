@@ -50,6 +50,8 @@ struct http_request {
 	uint64_t data_length;
 	uint64_t offset;
 	bool force;
+	bool append;
+	bool eof;
 };
 
 struct http_driver {
@@ -143,6 +145,10 @@ int kv_iterate_bucket(const char *account,
 /* Object operations */
 int kv_create_object(struct http_request *req, const char *account,
 		     const char *bucket, const char *object);
+int kv_append_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *object);
+int kv_complete_object(struct http_request *req, const char *account,
+		       const char *bucket, const char *object);
 int kv_read_object(struct http_request *req, const char *account,
 		   const char *bucket, const char *object);
 int kv_read_object_meta(struct http_request *req, const char *account,

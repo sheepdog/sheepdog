@@ -249,7 +249,13 @@ static void swift_put_object(struct http_request *req, const char *account,
 {
 	int ret;
 
-	ret = kv_create_object(req, account, container, object);
+	if (req->eof)
+		ret = kv_complete_object(req, account, container, object);
+	else if (req->append)
+		ret = kv_append_object(req, account, container, object);
+	else
+		ret = kv_create_object(req, account, container, object);
+
 	switch (ret) {
 	case SD_RES_SUCCESS:
 		http_response_header(req, CREATED);

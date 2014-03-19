@@ -202,6 +202,13 @@ static int request_init_operation(struct http_request *req)
 		if (!strcmp("true", p))
 			req->force = true;
 	}
+	p = FCGX_GetParam("HTTP_FLAG", env);
+	if (p && p[0] != '\0') {
+		if (!strcmp("append", p))
+			req->append = true;
+		else if (!strcmp("eof", p))
+			req->eof = true;
+	}
 
 	req->status = UNKNOWN;
 

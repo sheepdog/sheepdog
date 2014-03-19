@@ -672,7 +672,7 @@ static int onode_allocate_extents(struct kv_onode *onode,
 {
 	uint64_t start = 0, count;
 	int ret;
-	uint32_t data_vid = onode->data_vid;
+	uint32_t data_vid = onode->data_vid, idx;
 
 	count = DIV_ROUND_UP(req->data_length, SD_DATA_OBJ_SIZE);
 	sys->cdrv->lock(data_vid);
@@ -693,9 +693,10 @@ static int onode_allocate_extents(struct kv_onode *onode,
 		goto out;
 	}
 
-	onode->o_extent[0].start = start;
-	onode->o_extent[0].count = count;
-	onode->nr_extent = 1;
+	idx = onode->nr_extent;
+	onode->o_extent[idx].start = start;
+	onode->o_extent[idx].count = count;
+	onode->nr_extent++;
 out:
 	return ret;
 }
@@ -704,7 +705,7 @@ static int onode_populate_extents(struct kv_onode *onode,
 				  struct http_request *req)
 {
 	ssize_t size;
-	uint64_t start = onode->o_extent[0].start;
+	uint64_t start = onode->o_extent[onode->nr_extent - 1].start;
 	uint64_t done = 0, total, offset;
 	uint64_t write_buffer_size = MIN(kv_rw_buffer, req->data_length);
 	int ret = SD_RES_SUCCESS;
@@ -758,7 +759,20 @@ static int onode_allocate_data(struct kv_onode *onode, struct http_request *req)
 	}
 
 	onode->ctime = get_seconds();
-	onode->size = req->data_length;
+	onode->size += req->data_length;
+out:
+	return ret;
+}
+
+static int onode_append_data(struct kv_onode *onode, struct http_request *req)
+{
+	int ret = SD_RES_SUCCESS;
+
+	ret = onode_allocate_extents(onode, req);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	onode->size += req->data_length;
 out:
 	return ret;
 }
@@ -795,6 +809,29 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 			       onode->name);
 			goto out;
 		}
+	}
+out:
+	return ret;
+}
+
+static int onode_populate_append_data(struct kv_onode *onode,
+				      struct http_request *req)
+{
+	uint64_t len;
+	int ret = SD_RES_SUCCESS;
+
+	onode->mtime = get_seconds();
+
+	ret = onode_populate_extents(onode, req);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+	len = sizeof(struct onode_extent) * onode->nr_extent;
+	ret = sd_write_object(onode->oid, (char *)onode,
+			      ONODE_HDR_SIZE + len, 0, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to write mtime and flags of onode %s",
+		       onode->name);
+		goto out;
 	}
 out:
 	return ret;
@@ -881,16 +918,22 @@ out:
 static int onode_free_data(struct kv_onode *onode)
 {
 	uint32_t data_vid = onode->data_vid;
-	int ret = SD_RES_SUCCESS;
+	int ret = SD_RES_SUCCESS, i;
 
 	/* it don't need to free data for inlined onode */
 	if (!onode->inlined) {
 		sys->cdrv->lock(data_vid);
-		ret = oalloc_free(data_vid, onode->o_extent[0].start,
-				  onode->o_extent[0].count);
+		for (i = 0; i < onode->nr_extent; i++) {
+			ret = oalloc_free(data_vid, onode->o_extent[i].start,
+					  onode->o_extent[i].count);
+			if (ret != SD_RES_SUCCESS)
+				sd_err("failed to free start: %"PRIu64
+				       ", count: %"PRIu64", for %s",
+				       onode->o_extent[i].start,
+				       onode->o_extent[i].count,
+				       onode->name);
+		}
 		sys->cdrv->unlock(data_vid);
-		if (ret != SD_RES_SUCCESS)
-			sd_err("failed to free %s", onode->name);
 	}
 	return ret;
 }
@@ -1070,6 +1113,30 @@ static int onode_delete(struct kv_onode *onode)
 	return SD_RES_SUCCESS;
 }
 
+static int
+onode_create_and_update_bnode(struct http_request *req, const char *account,
+			      uint32_t bucket_vid, const char *bucket,
+			      uint32_t data_vid, struct kv_onode *onode)
+{
+	int ret;
+
+	ret = onode_create(onode, bucket_vid);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to create onode for %s", onode->name);
+		onode_delete(onode);
+		goto out;
+	}
+
+	ret = bnode_update(account, bucket, req->data_length, true);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to update bucket for %s", onode->name);
+		onode_delete(onode);
+		goto out;
+	}
+out:
+	return ret;
+}
+
 /* Create onode and allocate space for it */
 static int onode_allocate_space(struct http_request *req, const char *account,
 				uint32_t bucket_vid, const char *bucket,
@@ -1120,17 +1187,103 @@ static int onode_allocate_space(struct http_request *req, const char *account,
 		goto out;
 	}
 
-	ret = onode_create(onode, bucket_vid);
+	ret = onode_create_and_update_bnode(req, account, bucket_vid, bucket,
+					    data_vid, onode);
+out:
+	sys->cdrv->unlock(bucket_vid);
+	return ret;
+}
+
+static int onode_append_space(struct http_request *req, const char *account,
+			      uint32_t bucket_vid, const char *bucket,
+			      const char *name, struct kv_onode *onode)
+{
+	char vdi_name[SD_MAX_VDI_LEN];
+	uint32_t data_vid;
+	uint64_t len;
+	int ret = SD_RES_SUCCESS;
+	bool object_exists = false;
+
+	sys->cdrv->lock(bucket_vid);
+	ret = onode_lookup_nolock(onode, bucket_vid, name);
+
+	if (ret == SD_RES_SUCCESS) {
+		object_exists = true;
+		if (onode->flags == ONODE_COMPLETE) {
+			/* Not allowed "append" to a COMPLETED onode */
+			sd_err("Failed to append data to the object %s, which"
+			       " is marked COMPLETE", onode->name);
+			goto out;
+		}
+	}
+
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s/allocator", account, bucket);
+	ret = sd_lookup_vdi(vdi_name, &data_vid);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	if (!object_exists) {
+		memset(onode, 0, sizeof(*onode));
+		pstrcpy(onode->name, sizeof(onode->name), name);
+		onode->data_vid = data_vid;
+		onode->flags = ONODE_INIT;
+	}
+
+	ret = onode_append_data(onode, req);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to create onode for %s", name);
-		onode_free_data(onode);
+		sd_err("failed to write data for %s", name);
 		goto out;
 	}
 
-	ret = bnode_update(account, bucket, req->data_length, true);
+	if (!object_exists)
+		ret = onode_create_and_update_bnode(req, account, bucket_vid,
+						    bucket, data_vid, onode);
+	else {
+		/* update new appended o_extent[] */
+		len = sizeof(struct onode_extent) * onode->nr_extent;
+		ret = sd_write_object(onode->oid, (char *)onode,
+				      ONODE_HDR_SIZE + len, 0, 0);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to write o_extent[] for %s %s",
+			       onode->name, sd_strerror(ret));
+			goto out;
+		}
+	}
+out:
+	sys->cdrv->unlock(bucket_vid);
+	return ret;
+}
+
+int kv_complete_object(struct http_request *req, const char *account,
+		       const char *bucket, const char *object)
+{
+	char vdi_name[SD_MAX_VDI_LEN];
+	struct kv_onode *onode = NULL;
+	uint32_t bucket_vid;
+	int ret;
+
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
+	ret = sd_lookup_vdi(vdi_name, &bucket_vid);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	onode = xzalloc(sizeof(*onode));
+
+	sys->cdrv->lock(bucket_vid);
+	ret = onode_lookup_nolock(onode, bucket_vid, object);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update bucket for %s", name);
-		onode_delete(onode);
+		sd_err("Failed to lookup onode %s (%s)", object,
+		       sd_strerror(ret));
+		goto out;
+	}
+
+	/* update flag of onode */
+	onode->flags = ONODE_COMPLETE;
+	ret = sd_write_object(onode->oid, (char *)onode, ONODE_HDR_SIZE, 0,
+			      false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to update onode %s to COMPLETE (%s)",
+		       onode->name, sd_strerror(ret));
 		goto out;
 	}
 out:
@@ -1195,6 +1348,45 @@ int kv_create_object(struct http_request *req, const char *account,
 	}
 
 	ret = onode_populate_data(onode, req);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to write data to onode %s", name);
+		goto out;
+	}
+out:
+	free(onode);
+	return ret;
+}
+
+/*
+ * We allow append write for PUT operation. When 'FLAG: append' is specified
+ * in the http PUT request header, we append the new data at the tail of the
+ * existing object instead of a 'delete-then-create' semantic.
+ * When we append objects, we mark them as ONODE_INIT. When all the append
+ * operations are done, we specify 'FLAG: eof' in the PUT request hearder to
+ * finalize the whole transaction, which mark the
+ * objects as ONODE_COMPLETE.
+ */
+int kv_append_object(struct http_request *req, const char *account,
+		     const char *bucket, const char *name)
+{
+	char vdi_name[SD_MAX_VDI_LEN];
+	struct kv_onode *onode = NULL;
+	uint32_t bucket_vid;
+	int ret;
+
+	snprintf(vdi_name, SD_MAX_VDI_LEN, "%s/%s", account, bucket);
+	ret = sd_lookup_vdi(vdi_name, &bucket_vid);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	onode = xzalloc(sizeof(*onode));
+	ret = onode_append_space(req, account, bucket_vid, bucket, name, onode);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to create onode and allocate space %s", name);
+		goto out;
+	}
+
+	ret = onode_populate_append_data(onode, req);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to write data to onode %s", name);
 		goto out;
