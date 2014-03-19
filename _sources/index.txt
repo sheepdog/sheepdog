@@ -52,6 +52,8 @@ Sheepdog is an Open Source software, released under the terms of the
   + client: git://git.qemu.org/qemu.git
     [`browse <http://git.qemu.org/qemu.git>`__]
 
++ The latest stable binary package is `rpm <packages/sheep-rpm/sheep-rpm-latest>`__
+
 Mailing list and IRC
 --------------------
 
