@@ -28,6 +28,7 @@ struct kv_bnode {
 struct onode_extent {
 	uint64_t start;
 	uint64_t count;
+	uint64_t data_len;
 };
 
 /*
@@ -624,7 +625,7 @@ out:
 #define KV_ONODE_INLINE_SIZE (SD_DATA_OBJ_SIZE - ONODE_HDR_SIZE)
 
 static int vdi_read_write(uint32_t vid, char *data, size_t length,
-			  off_t offset, bool is_read)
+			  off_t offset, bool is_read, bool create)
 {
 	struct sd_req hdr;
 	uint32_t idx = offset / SD_DATA_OBJ_SIZE;
@@ -643,7 +644,10 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 		if (is_read) {
 			sd_init_req(&hdr, SD_OP_READ_OBJ);
 		} else {
-			sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+			if (create)
+				sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
+			else
+				sd_init_req(&hdr, SD_OP_WRITE_OBJ);
 			hdr.flags = SD_FLAG_CMD_WRITE;
 		}
 		hdr.data_length = len;
@@ -662,6 +666,7 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 		}
 		done += len;
 		data += len;
+		create = true;
 	}
 
 	return local_req_wait(iocb);
@@ -670,11 +675,22 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 static int onode_allocate_extents(struct kv_onode *onode,
 				  struct http_request *req)
 {
-	uint64_t start = 0, count;
-	int ret;
-	uint32_t data_vid = onode->data_vid, idx;
+	uint64_t start = 0, count, reserv_len = 0;
+	int ret = SD_RES_SUCCESS;
+	uint32_t data_vid = onode->data_vid, idx = onode->nr_extent;
 
-	count = DIV_ROUND_UP(req->data_length, SD_DATA_OBJ_SIZE);
+	/* if the previous o_extent[] has some extra sapce, use it */
+	if (idx) {
+		reserv_len = onode->o_extent[idx - 1].count * SD_DATA_OBJ_SIZE -
+			     onode->o_extent[idx - 1].data_len;
+		/*
+		 * if we can put whole request data into extra space of last
+		 * o_extent, it don't need to allocate new extent.
+		 */
+		if (req->data_length <= reserv_len)
+			goto out;
+	}
+	count = DIV_ROUND_UP((req->data_length - reserv_len), SD_DATA_OBJ_SIZE);
 	sys->cdrv->lock(data_vid);
 	ret = oalloc_new_prepare(data_vid, &start, count);
 	sys->cdrv->unlock(data_vid);
@@ -693,9 +709,9 @@ static int onode_allocate_extents(struct kv_onode *onode,
 		goto out;
 	}
 
-	idx = onode->nr_extent;
 	onode->o_extent[idx].start = start;
 	onode->o_extent[idx].count = count;
+	onode->o_extent[idx].data_len = 0;
 	onode->nr_extent++;
 out:
 	return ret;
@@ -704,16 +720,40 @@ out:
 static int onode_populate_extents(struct kv_onode *onode,
 				  struct http_request *req)
 {
+	struct onode_extent *ext;
+	struct onode_extent *last_ext = onode->o_extent + onode->nr_extent - 1;
 	ssize_t size;
-	uint64_t start = onode->o_extent[onode->nr_extent - 1].start;
-	uint64_t done = 0, total, offset;
+	uint64_t done = 0, total, offset = 0, reserv_len;
 	uint64_t write_buffer_size = MIN(kv_rw_buffer, req->data_length);
 	int ret = SD_RES_SUCCESS;
 	char *data_buf = NULL;
 	uint32_t data_vid = onode->data_vid;
+	bool create = true;
 
 	data_buf = xmalloc(write_buffer_size);
-	offset = start * SD_DATA_OBJ_SIZE;
+	if (last_ext->data_len == 0 && onode->nr_extent == 1) {
+		offset = last_ext->start * SD_DATA_OBJ_SIZE +
+			 last_ext->data_len;
+		last_ext->data_len += req->data_length;
+	} else if (last_ext->data_len > 0) {
+		offset = last_ext->start * SD_DATA_OBJ_SIZE +
+			 last_ext->data_len;
+		last_ext->data_len += req->data_length;
+		create = false;
+	} else {
+		ext = last_ext - 1;
+		reserv_len = ext->count * SD_DATA_OBJ_SIZE - ext->data_len;
+		offset = ext->start * SD_DATA_OBJ_SIZE + ext->data_len;
+		ext->data_len += reserv_len;
+		last_ext->data_len = req->data_length - reserv_len;
+		/*
+		 * if the previous oid has extra space, we don't need
+		 * to use SD_OP_CREATE_AND_WRITE_OBJ on this oid.
+		 */
+		if (reserv_len > 0)
+			create = false;
+	}
+
 	total = req->data_length;
 	while (done < total) {
 		size = http_request_read(req, data_buf, write_buffer_size);
@@ -722,7 +762,10 @@ static int onode_populate_extents(struct kv_onode *onode,
 			ret = SD_RES_EIO;
 			goto out;
 		}
-		ret = vdi_read_write(data_vid, data_buf, size, offset, false);
+		ret = vdi_read_write(data_vid, data_buf, size, offset,
+				     false, create);
+		sd_debug("vdi_write size: %"PRIu64", offset: %"
+			 PRIu64", ret:%d", size, offset, ret);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write data object for %s, %s",
 			       onode->name, sd_strerror(ret));
@@ -777,6 +820,23 @@ out:
 	return ret;
 }
 
+static int onode_do_update(struct kv_onode *onode)
+{
+	uint64_t len;
+	int ret;
+
+	if (onode->inlined)
+		len = onode->size;
+	else
+		len = sizeof(struct onode_extent) * onode->nr_extent;
+
+	ret = sd_write_object(onode->oid, (char *)onode, ONODE_HDR_SIZE + len,
+			      0, false);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("Failed to update object, %" PRIx64, onode->oid);
+	return ret;
+}
+
 static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 {
 	ssize_t size;
@@ -802,8 +862,7 @@ static int onode_populate_data(struct kv_onode *onode, struct http_request *req)
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		/* write mtime and flag ONODE_COMPLETE to onode */
-		ret = sd_write_object(onode->oid, (char *)onode,
-				      ONODE_HDR_SIZE, 0, false);
+		ret = onode_do_update(onode);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to write mtime and flags of onode %s",
 			       onode->name);
@@ -817,7 +876,6 @@ out:
 static int onode_populate_append_data(struct kv_onode *onode,
 				      struct http_request *req)
 {
-	uint64_t len;
 	int ret = SD_RES_SUCCESS;
 
 	onode->mtime = get_seconds();
@@ -825,12 +883,9 @@ static int onode_populate_append_data(struct kv_onode *onode,
 	ret = onode_populate_extents(onode, req);
 	if (ret != SD_RES_SUCCESS)
 		goto out;
-	len = sizeof(struct onode_extent) * onode->nr_extent;
-	ret = sd_write_object(onode->oid, (char *)onode,
-			      ONODE_HDR_SIZE + len, 0, false);
+	ret = onode_do_update(onode);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("Failed to write mtime and flags of onode %s",
-		       onode->name);
+		sd_err("Failed to write mtime of onode %s", onode->name);
 		goto out;
 	}
 out:
@@ -951,7 +1006,7 @@ static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 	total_size = len;
 	for (i = 0; i < onode->nr_extent; i++) {
 		ext = onode->o_extent + i;
-		ext_len = ext->count * SD_DATA_OBJ_SIZE;
+		ext_len = ext->data_len;
 		if (off >= ext_len) {
 			off -= ext_len;
 			continue;
@@ -963,8 +1018,8 @@ static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 		while (done < total) {
 			size = MIN(total - done, read_buffer_size);
 			ret = vdi_read_write(onode->data_vid, data_buf,
-					     size, offset, true);
-			sd_debug("vdi_read_write size: %"PRIu64", offset: %"
+					     size, offset, true, false);
+			sd_debug("vdi_read size: %"PRIu64", offset: %"
 				 PRIu64", ret:%d", size, offset, ret);
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("Failed to read for vid %"PRIx32,
