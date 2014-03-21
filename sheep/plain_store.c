@@ -233,6 +233,7 @@ out:
 
 static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
 				       uint32_t epoch, uint8_t ec_index,
+				       struct vnode_info *vinfo,
 				       void *arg)
 {
 	int ret;
@@ -445,14 +446,12 @@ out:
  * node(index gets changed even it has some other copy belongs to it) because
  * of hash ring changes, we consider it stale.
  */
-static bool oid_stale(uint64_t oid, int ec_index)
+static bool oid_stale(uint64_t oid, int ec_index, struct vnode_info *vinfo)
 {
 	uint32_t i, nr_copies;
-	struct vnode_info *vinfo;
 	const struct sd_vnode *v;
 	bool ret = true;
 	const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
-	vinfo = get_vnode_info();
 
 	nr_copies = get_obj_copy_number(oid, vinfo->nr_zones);
 	oid_to_vnodes(oid, &vinfo->vroot, nr_copies, obj_vnodes);
@@ -469,12 +468,12 @@ static bool oid_stale(uint64_t oid, int ec_index)
 		}
 	}
 
-	put_vnode_info(vinfo);
 	return ret;
 }
 
 static int move_object_to_stale_dir(uint64_t oid, const char *wd,
-				    uint32_t epoch, uint8_t ec_index, void *arg)
+				    uint32_t epoch, uint8_t ec_index,
+				    struct vnode_info *vinfo, void *arg)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 	uint32_t tgt_epoch = *(uint32_t *)arg;
@@ -504,10 +503,12 @@ static int move_object_to_stale_dir(uint64_t oid, const char *wd,
 }
 
 static int check_stale_objects(uint64_t oid, const char *wd, uint32_t epoch,
-			       uint8_t ec_index, void *arg)
+			       uint8_t ec_index, struct vnode_info *vinfo,
+			       void *arg)
 {
-	if (oid_stale(oid, ec_index))
-		return move_object_to_stale_dir(oid, wd, 0, ec_index, arg);
+	if (oid_stale(oid, ec_index, vinfo))
+		return move_object_to_stale_dir(oid, wd, 0, ec_index,
+						NULL, arg);
 
 	return SD_RES_SUCCESS;
 }
