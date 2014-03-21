@@ -324,6 +324,15 @@ static void *fetch_thread_run(void *arg)
 	return NULL;
 }
 
+static int object_wait_cache(struct cache_handle *ch)
+{
+	sem_wait(&ch->ready_sem);
+	swap_cache(ch);
+	ch->fetch_offset = ch->ready->offset + ch->ready->size;
+	sem_post(&ch->prepare_sem);
+	return  ch->ready->size;
+}
+
 int object_read(const char *path, char *buf, size_t size, off_t offset,
 		struct fuse_file_info *fi)
 {
@@ -351,19 +360,24 @@ int object_read(const char *path, char *buf, size_t size, off_t offset,
 			else
 				ret = (cache->offset + cache->size) - offset;
 			memcpy(buf, cache->mem + (offset - cache->offset), ret);
+			/* read next cache if not fulfill the 'size' */
+			if (ret < size && object_wait_cache(ch) > 0) {
+				int extra_read;
+				buf += ret;
+				offset += ret;
+				cache = ch->ready;
+				extra_read = min(cache->size, size - ret);
+				memcpy(buf, cache->mem +
+				       (offset - cache->offset), extra_read);
+				ret += extra_read;
+			}
 			break;
 		} else if (offset >= ch->obj_size) {
 			ret = 0;
 			break;
-		} else {
-			sem_wait(&ch->ready_sem);
-			swap_cache(ch);
-			ch->fetch_offset = ch->ready->offset + ch->ready->size;
-			sem_post(&ch->prepare_sem);
-			if (ch->ready->size == 0) {
-				ret = 0;
-				break;
-			}
+		} else if (!object_wait_cache(ch)) {
+			ret = 0;
+			break;
 		}
 	}
 out:
