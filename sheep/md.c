@@ -143,7 +143,8 @@ static struct disk *path_to_disk(const char *path)
 }
 
 static int get_total_object_size(uint64_t oid, const char *wd, uint32_t epoch,
-				 uint8_t ec_index, void *total)
+				 uint8_t ec_index, struct vnode_info *vinfo,
+				 void *total)
 {
 	uint64_t *t = total;
 	struct stat s;
@@ -175,8 +176,10 @@ static int64_t find_string_integer(const char *str, const char *delimiter)
 /* If cleanup is true, temporary objects will be removed */
 static int for_each_object_in_path(const char *path,
 				   int (*func)(uint64_t, const char *, uint32_t,
-					       uint8_t, void *),
-				   bool cleanup, void *arg)
+					       uint8_t, struct vnode_info *,
+					       void *),
+				   bool cleanup, struct vnode_info *vinfo,
+				   void *arg)
 {
 	DIR *dir;
 	struct dirent *d;
@@ -223,7 +226,7 @@ static int for_each_object_in_path(const char *path,
 				continue;
 		}
 
-		ret = func(oid, path, epoch, ec_index, arg);
+		ret = func(oid, path, epoch, ec_index, vinfo, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}
@@ -244,7 +247,8 @@ static uint64_t get_path_free_size(const char *path, uint64_t *used)
 
 	if (!used)
 		goto out;
-	if (for_each_object_in_path(path, get_total_object_size, false, used)
+	if (for_each_object_in_path(path, get_total_object_size, false,
+				    NULL, used)
 	    != SD_RES_SUCCESS)
 		return 0;
 out:
@@ -372,7 +376,9 @@ const char *md_get_object_dir(uint64_t oid)
 
 struct process_path_arg {
 	const char *path;
-	int (*func)(uint64_t oid, const char *, uint32_t, uint8_t, void *arg);
+	struct vnode_info *vinfo;
+	int (*func)(uint64_t oid, const char *, uint32_t, uint8_t,
+		    struct vnode_info *, void *arg);
 	bool cleanup;
 	void *opaque;
 	int result;
@@ -384,7 +390,7 @@ static void *thread_process_path(void *arg)
 	struct process_path_arg *parg = (struct process_path_arg *)arg;
 
 	ret = for_each_object_in_path(parg->path, parg->func, parg->cleanup,
-				      parg->opaque);
+				      parg->vinfo, parg->opaque);
 	if (ret != SD_RES_SUCCESS)
 		parg->result = ret;
 
@@ -393,12 +399,13 @@ static void *thread_process_path(void *arg)
 
 main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 				      uint32_t epoch, uint8_t ec_index,
-				      void *arg),
+				      struct vnode_info *vinfo, void *arg),
 				  bool cleanup, void *arg)
 {
 	int ret = SD_RES_SUCCESS;
 	const struct disk *disk;
 	struct process_path_arg *thread_args, *path_arg;
+	struct vnode_info *vinfo;
 	void *ret_arg;
 	pthread_t *thread_array;
 	int nr_thread = 0, idx = 0;
@@ -412,8 +419,11 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 	thread_args = xmalloc(nr_thread * sizeof(struct process_path_arg));
 	thread_array = xmalloc(nr_thread * sizeof(pthread_t));
 
+	vinfo = get_vnode_info();
+
 	rb_for_each_entry(disk, &md.root, rb) {
 		thread_args[idx].path = disk->path;
+		thread_args[idx].vinfo = vinfo;
 		thread_args[idx].func = func;
 		thread_args[idx].cleanup = cleanup;
 		thread_args[idx].opaque = arg;
@@ -446,6 +456,8 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 				       sd_strerror(path_arg->result));
 		}
 	}
+
+	put_vnode_info(vinfo);
 	sd_rw_unlock(&md.lock);
 
 	free(thread_args);
@@ -454,7 +466,8 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 }
 
 int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
-					 uint32_t epoch, uint8_t, void *arg),
+					 uint32_t epoch, uint8_t,
+					 struct vnode_info *, void *arg),
 			     void *arg)
 {
 	int ret = SD_RES_SUCCESS;
@@ -464,7 +477,7 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
 	sd_read_lock(&md.lock);
 	rb_for_each_entry(disk, &md.root, rb) {
 		snprintf(path, sizeof(path), "%s/.stale", disk->path);
-		ret = for_each_object_in_path(path, func, false, arg);
+		ret = for_each_object_in_path(path, func, false, NULL, arg);
 		if (ret != SD_RES_SUCCESS)
 			break;
 	}

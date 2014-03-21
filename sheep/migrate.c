@@ -429,6 +429,7 @@ static int migrate_from_v2_to_v3(void)
 
 static int convert_ecidx_xattr2path(uint64_t oid, const char *wd,
 				    uint32_t epoch, uint8_t ec_index,
+				    struct vnode_info *info,
 				    void *arg)
 {
 	int ret = 0;

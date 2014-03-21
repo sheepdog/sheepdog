@@ -240,10 +240,11 @@ int default_remove_object(uint64_t oid, uint8_t ec_index);
 int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 int default_purge_obj(void);
 int for_each_object_in_wd(int (*func)(uint64_t, const char *, uint32_t,
-				      uint8_t, void *),
+				      uint8_t, struct vnode_info *, void *),
 			  bool, void *);
 int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
-					 uint32_t epoch, uint8_t, void *arg),
+					 uint32_t epoch, uint8_t,
+					 struct vnode_info *, void *arg),
 			     void *arg);
 int for_each_obj_path(int (*func)(const char *path));
 size_t get_store_objsize(uint64_t oid);
