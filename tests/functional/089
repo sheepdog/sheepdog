@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test http interface of sheepfs
+# Test http interface of sheepfs for cache
 
 . ./common
 
@@ -55,6 +55,14 @@ for i in 4 19 97 137; do
 	cat $STORE/sheepfs/http/sd/sheep/data$i | md5sum > $STORE/data$i.2 &
 done
 wait
+
+# read with recored-size of 10K to step over two caches should return 10K
+offset=`echo "64 * 1024 / 10"|bc`
+for i in 97 137; do
+	dd if=$STORE/sheepfs/http/sd/sheep/data$i skip=$offset bs=10K count=1 2> /dev/null | md5sum > $STORE/data$i.5
+	dd if=$STORE/data$i skip=$offset bs=10K count=1 2> /dev/null | md5sum > $STORE/data$i.6
+	diff -u $STORE/data$i.5 $STORE/data$i.6
+done
 
 # read objects with 'dd'
 for i in 4 19 97 137; do
