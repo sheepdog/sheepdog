@@ -391,10 +391,10 @@ static void *thread_process_path(void *arg)
 	return arg;
 }
 
-int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
+main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 				      uint32_t epoch, uint8_t ec_index,
 				      void *arg),
-			  bool cleanup, void *arg)
+				  bool cleanup, void *arg)
 {
 	int ret = SD_RES_SUCCESS;
 	const struct disk *disk;
