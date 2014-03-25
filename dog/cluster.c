@@ -269,7 +269,7 @@ static int list_snapshot(int argc, char **argv)
 		goto out;
 
 	buf = snap_log_read(&log_nr);
-	if (!buf)
+	if (IS_ERR(buf))
 		goto out;
 
 	print_list(buf, log_nr * sizeof(struct snap_log));

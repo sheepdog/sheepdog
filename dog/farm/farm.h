@@ -31,6 +31,17 @@ struct trunk_file {
 	struct trunk_entry *entries;
 };
 
+#define FARM_VERSION 1
+#define FARM_MAGIC 0xfee1c001
+
+struct snap_log_hdr {
+	uint32_t magic;
+	uint32_t version;
+	uint8_t copy_number;
+	uint8_t copy_policy;
+	uint8_t reserved[22];
+};
+
 struct snap_log {
 	uint32_t idx;
 	char tag[SD_MAX_SNAPSHOT_TAG_LEN];
@@ -57,7 +68,9 @@ uint64_t trunk_get_count(void);
 /* snap.c */
 int snap_init(const char *path);
 void *snap_log_read(int *out_nr);
-int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1);
+int snap_log_read_hdr(struct snap_log_hdr *);
+int snap_log_append(uint32_t idx, const char *tag, unsigned char *sha1);
+int snap_log_write_hdr(struct snap_log_hdr *);
 
 /* sha1_file.c */
 int sha1_file_write(void *buf, size_t len, unsigned char *sha1);

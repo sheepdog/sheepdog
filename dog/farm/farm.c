@@ -178,7 +178,7 @@ static int get_trunk_sha1(uint32_t idx, const char *tag, unsigned char *outsha1)
 	struct snap_log *log_buf, *log_free = NULL;
 
 	log_free = log_buf = snap_log_read(&nr_logs);
-	if (nr_logs < 0)
+	if (IS_ERR(log_free))
 		goto out;
 
 	for (int i = 0; i < nr_logs; i++, log_buf++) {
@@ -312,32 +312,66 @@ int farm_save_snapshot(const char *tag)
 	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 	struct strbuf trunk_buf;
 	void *snap_log = NULL;
-	int log_nr, idx, ret = -1;
+	int log_nr, idx, ret;
 	uint64_t nr_objects = object_tree_size();
 
 	snap_log = snap_log_read(&log_nr);
-	if (!snap_log)
+	if (IS_ERR(snap_log)) {
+		ret = -1;
 		goto out;
+	}
 
 	idx = log_nr + 1;
+	if (!log_nr) {
+		struct sd_req hdr;
+		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+		struct cluster_info cinfo;
+		struct snap_log_hdr log_hdr;
+
+		sd_init_req(&hdr, SD_OP_CLUSTER_INFO);
+		hdr.data_length = sizeof(cinfo);
+		ret = dog_exec_req(&sd_nid, &hdr, &cinfo);
+		if (ret < 0) {
+			sd_err("Fail to execute request");
+			goto out;
+		}
+		if (rsp->result != SD_RES_SUCCESS) {
+			sd_err("%s", sd_strerror(rsp->result));
+			ret = -1;
+			goto out;
+		}
+		log_hdr.magic = FARM_MAGIC;
+		log_hdr.version = FARM_VERSION;
+		log_hdr.copy_number = cinfo.nr_copies;
+		log_hdr.copy_policy = cinfo.copy_policy;
+		snap_log_write_hdr(&log_hdr);
+	}
 
 	strbuf_init(&trunk_buf, sizeof(struct trunk_entry) * nr_objects);
 
 	wq = create_work_queue("save snapshot", WQ_ORDERED);
 	if (for_each_object_in_tree(queue_save_snapshot_work,
-				    &trunk_buf) < 0)
+				    &trunk_buf) < 0) {
+		ret = -1;
 		goto out;
+	}
 
 	work_queue_wait(wq);
-	if (uatomic_is_true(&work_error))
+	if (uatomic_is_true(&work_error)) {
+		ret = -1;
 		goto out;
+	}
 
 	if (trunk_file_write(nr_objects, (struct trunk_entry *)trunk_buf.buf,
-			     trunk_sha1) < 0)
+			     trunk_sha1) < 0) {
+		ret = -1;
 		goto out;
+	}
 
-	if (snap_log_write(idx, tag, trunk_sha1) < 0)
+	if (snap_log_append(idx, tag, trunk_sha1) < 0) {
+		ret = -1;
 		goto out;
+	}
 
 	ret = 0;
 out:

@@ -49,7 +49,7 @@ out:
 	return ret;
 }
 
-int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1)
+int snap_log_append(uint32_t idx, const char *tag, unsigned char *sha1)
 {
 	int fd, ret = -1;
 	struct strbuf buf = STRBUF_INIT;
@@ -78,11 +78,65 @@ out:
 	return ret;
 }
 
+/*
+ * Empty file, return 0;
+ * Failure, return -1;
+ * Success, return > 0;
+ */
+int snap_log_read_hdr(struct snap_log_hdr *hdr)
+{
+	struct stat st;
+	int fd, ret = -1;
+
+	fd = open(snap_log_path, O_RDONLY);
+	if (fd < 0) {
+		sd_err("%m");
+		goto out;
+	}
+
+	if (fstat(fd, &st) < 0) {
+		sd_err("%m");
+		goto out_close;
+	}
+
+	if (st.st_size == 0) {
+		ret = 0;
+		goto out_close;
+	}
+
+	ret = xread(fd, hdr, sizeof(*hdr));
+	if (ret != sizeof(*hdr)) {
+		sd_err("failed to read log header, %m, ret = %d", ret);
+		ret = -1;
+		goto out_close;
+	}
+	if (hdr->magic != FARM_MAGIC) {
+		sd_err("magic number mismatch");
+		ret = -1;
+		goto out_close;
+	}
+	/* If we don't keep backward compatibility, check version */
+out_close:
+	close(fd);
+out:
+	return ret;
+}
+
 void *snap_log_read(int *out_nr)
 {
 	struct stat st;
-	void *buffer = NULL;
-	int len, fd;
+	void *buffer = (void *)-1;
+	struct snap_log_hdr hdr;
+	int len, fd, ret;
+
+	ret = snap_log_read_hdr(&hdr);
+	if (ret < 0)
+		goto out;
+	else if (ret == 0) {
+		*out_nr = 0;
+		buffer = NULL;
+		goto out;
+	}
 
 	fd = open(snap_log_path, O_RDONLY);
 	if (fd < 0) {
@@ -94,12 +148,12 @@ void *snap_log_read(int *out_nr)
 		goto out_close;
 	}
 
-	len = st.st_size;
+	len = st.st_size - sizeof(hdr);
 	buffer = xmalloc(len);
-	len = xread(fd, buffer, len);
-	if (len != st.st_size) {
+	ret = xpread(fd, buffer, len, sizeof(hdr));
+	if (len != len) {
 		free(buffer);
-		buffer = NULL;
+		buffer = (void *)-1;
 		goto out_close;
 	}
 	*out_nr = len / sizeof(struct snap_log);
@@ -107,4 +161,22 @@ out_close:
 	close(fd);
 out:
 	return buffer;
+}
+
+int snap_log_write_hdr(struct snap_log_hdr *hdr)
+{
+	int fd, ret;
+
+	fd = open(snap_log_path, O_WRONLY);
+	if (fd < 0) {
+		sd_err("%m");
+		return -1;
+	}
+
+	ret = xwrite(fd, hdr, sizeof(*hdr));
+	if (ret != sizeof(*hdr)) {
+		sd_err("failed to write log hdr, %m, ret = %d", ret);
+		return -1;
+	}
+	return 0;
 }
