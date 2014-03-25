@@ -31,16 +31,11 @@ struct trunk_file {
 	struct trunk_entry *entries;
 };
 
-struct snap_file {
-	int idx;
-	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
-};
-
 struct snap_log {
 	uint32_t idx;
 	char tag[SD_MAX_SNAPSHOT_TAG_LEN];
 	uint64_t time;
-	unsigned char sha1[SHA1_DIGEST_SIZE];
+	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 };
 
 /* farm.c */
@@ -61,9 +56,6 @@ uint64_t trunk_get_count(void);
 
 /* snap.c */
 int snap_init(const char *path);
-struct snap_file *snap_file_read(unsigned char *sha1);
-int snap_file_write(uint32_t idx, unsigned char *trunk_sha1,
-		    unsigned char *outsha1);
 void *snap_log_read(int *out_nr);
 int snap_log_write(uint32_t idx, const char *tag, unsigned char *sha1);
 

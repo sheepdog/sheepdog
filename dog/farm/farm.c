@@ -176,7 +176,6 @@ static int get_trunk_sha1(uint32_t idx, const char *tag, unsigned char *outsha1)
 {
 	int nr_logs = -1, ret = -1;
 	struct snap_log *log_buf, *log_free = NULL;
-	struct snap_file *snap_buf = NULL;
 
 	log_free = log_buf = snap_log_read(&nr_logs);
 	if (nr_logs < 0)
@@ -185,16 +184,12 @@ static int get_trunk_sha1(uint32_t idx, const char *tag, unsigned char *outsha1)
 	for (int i = 0; i < nr_logs; i++, log_buf++) {
 		if (log_buf->idx != idx && strcmp(log_buf->tag, tag))
 			continue;
-		snap_buf = snap_file_read(log_buf->sha1);
-		if (!snap_buf)
-			goto out;
-		memcpy(outsha1, snap_buf->trunk_sha1, SHA1_DIGEST_SIZE);
+		memcpy(outsha1, log_buf->trunk_sha1, SHA1_DIGEST_SIZE);
 		ret = 0;
 		goto out;
 	}
 out:
 	free(log_free);
-	free(snap_buf);
 	return ret;
 }
 
@@ -314,7 +309,6 @@ static int queue_save_snapshot_work(uint64_t oid, uint32_t nr_copies,
 
 int farm_save_snapshot(const char *tag)
 {
-	unsigned char snap_sha1[SHA1_DIGEST_SIZE];
 	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 	struct strbuf trunk_buf;
 	void *snap_log = NULL;
@@ -342,10 +336,7 @@ int farm_save_snapshot(const char *tag)
 			     trunk_sha1) < 0)
 		goto out;
 
-	if (snap_file_write(idx, trunk_sha1, snap_sha1) < 0)
-		goto out;
-
-	if (snap_log_write(idx, tag, snap_sha1) < 0)
+	if (snap_log_write(idx, tag, trunk_sha1) < 0)
 		goto out;
 
 	ret = 0;
