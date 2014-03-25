@@ -1028,6 +1028,14 @@ static int local_oid_exist(struct request *req)
 	return SD_RES_NO_OBJ;
 }
 
+static int local_cluster_info(const struct sd_req *req, struct sd_rsp *rsp,
+			      void *data)
+{
+	memcpy(data, &sys->cinfo, sizeof(sys->cinfo));
+	rsp->data_length = sizeof(sys->cinfo);
+	return SD_RES_SUCCESS;
+}
+
 #ifdef HAVE_NFS
 
 static int local_nfs_create(struct request *req)
@@ -1354,6 +1362,13 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
 		.process_work = local_oid_exist,
+	},
+
+	[SD_OP_CLUSTER_INFO] = {
+		.name = "CLUSTER INFO",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_main = local_cluster_info,
 	},
 
 #ifdef HAVE_NFS
