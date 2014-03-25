@@ -376,6 +376,7 @@ static int load_snapshot(int argc, char **argv)
 	char *path, *p;
 	uint32_t idx;
 	int ret = EXIT_SYSFAIL;
+	struct snap_log_hdr hdr;
 
 	idx = strtol(tag, &p, 10);
 	if (tag == p)
@@ -395,6 +396,11 @@ static int load_snapshot(int argc, char **argv)
 		goto out;
 	}
 
+	if (snap_log_read_hdr(&hdr) <= 0)
+		goto out;
+
+	cluster_cmd_data.copies = hdr.copy_number;
+	cluster_cmd_data.copy_policy = hdr.copy_policy;
 	if (cluster_format(0, NULL) != SD_RES_SUCCESS)
 		goto out;
 
@@ -508,7 +514,7 @@ static struct subcommand cluster_snapshot_cmd[] = {
 	{"list", NULL, "h", "list snapshot of localpath",
 	 NULL, CMD_NEED_ARG, list_snapshot, NULL},
 	{"load", NULL, "h", "load snapshot from localpath",
-	 NULL, CMD_NEED_ARG, load_snapshot, NULL},
+	 NULL, CMD_NEED_ARG | CMD_NEED_NODELIST, load_snapshot, NULL},
 	{NULL},
 };
 
