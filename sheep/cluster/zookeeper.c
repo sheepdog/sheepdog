@@ -16,6 +16,7 @@
 #include <sys/epoll.h>
 #include <zookeeper/zookeeper.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #include "cluster.h"
 #include "config.h"
@@ -42,8 +43,7 @@ struct cluster_lock {
 	/* referenced by different threads in one sheepdog daemon */
 	uint64_t ref;
 	/* wait for the release of id by other lock owner */
-	struct sd_cond wait_wakeup;
-	struct sd_mutex wait_mutex;
+	sem_t wait_wakeup;
 	/* lock for different threads of the same node on the same id */
 	struct sd_mutex id_lock;
 	char lock_path[MAX_NODE_STR_LEN];
@@ -315,7 +315,7 @@ static int lock_table_lookup_wakeup(uint64_t lock_id)
 	sd_mutex_lock(table_locks + hval);
 	hlist_for_each_entry(lock, iter, cluster_locks_table + hval, hnode) {
 		if (lock->id == lock_id) {
-			sd_cond_signal(&lock->wait_wakeup);
+			sem_post(&lock->wait_wakeup);
 			res = 0;
 			break;
 		}
@@ -352,8 +352,7 @@ static struct cluster_lock *lock_table_lookup_acquire(uint64_t lock_id)
 		if (rc)
 			panic("Failed to init node %s", path);
 
-		sd_cond_init(&ret_lock->wait_wakeup);
-		sd_init_mutex(&ret_lock->wait_mutex);
+		sem_init(&ret_lock->wait_wakeup, 0, 1);
 		sd_init_mutex(&ret_lock->id_lock);
 
 		hlist_add_head(&(ret_lock->hnode), cluster_locks_table + hval);
@@ -398,8 +397,7 @@ static void lock_table_lookup_release(uint64_t lock_id)
 			hlist_del(iter);
 			/* free all resource used by this lock */
 			sd_destroy_mutex(&lock->id_lock);
-			sd_destroy_mutex(&lock->wait_mutex);
-			sd_destroy_cond(&lock->wait_wakeup);
+			sem_destroy(&lock->wait_wakeup);
 			snprintf(path, MAX_NODE_STR_LEN, LOCK_ZNODE "/%"PRIu64,
 				 lock->id);
 			/*
@@ -1267,7 +1265,7 @@ kick_block_event:
  * This operation will create a seq-ephemeral znode in lock directory
  * of zookeeper (use lock-id as dir name). The smallest file path in
  * this directory wil be the owner of the lock; the other threads will
- * wait on a struct sd_cond (cluster_lock->wait_wakeup)
+ * wait on a sem_t (cluster_lock->wait_wakeup)
  */
 static void zk_lock(uint64_t lock_id)
 {
@@ -1334,9 +1332,7 @@ create_seq_node:
 		if (rc == ZOK) {
 			sd_debug("call zoo_exists success %s", lowest_seq_path);
 			/* Use wait_timeout to avoid missing wakeup signal */
-			sd_cond_wait_timeout(&cluster_lock->wait_wakeup,
-					     &cluster_lock->wait_mutex,
-					     WAIT_TIME * 2);
+			sem_wait(&cluster_lock->wait_wakeup);
 		} else {
 			sd_debug("failed to call zoo_exists %s", zerror(rc));
 			if (rc != ZNONODE)
