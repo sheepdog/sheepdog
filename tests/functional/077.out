@@ -14,3 +14,48 @@ finish check&repair test
 original data
 no majority of 7c2b2500000000
 finish check&repair test
+
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend plain store
+hello, copy0
+hello, copy1
+hello, copy2
+no majority of 7c2b2500000000
+finish check&repair test
+hello, copy0
+hello, copy1
+hello, copy2
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend plain store
+hello, copy0
+hello, copy0
+hello, copy1
+hello, copy1
+hello, copy1
+fixed replica 7c2b2500000000
+fixed replica 7c2b2500000000
+finish check&repair test
+hello, copy1
+hello, copy1
+hello, copy1
+hello, copy1
+hello, copy1
+hello, copy1
+hello, copy0
+hello, copy1
+hello, copy0
+hello, copy1
+fixed replica 7c2b2500000000
+fixed replica 7c2b2500000000
+finish check&repair test
+hello, copy1
+hello, copy1
+hello, copy1
+hello, copy1
+hello, copy1

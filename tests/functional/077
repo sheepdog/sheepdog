@@ -82,3 +82,67 @@ _wait_for_sheep 3
 $DOG vdi check test
 
 $DOG cluster shutdown
+
+
+
+read_vdi_from_nodes()
+{
+	for i in `seq 0 $(($1-1))`; do
+		$DOG vdi read test 0 12 -p $((7000+$i))
+		echo ""
+	done
+}
+
+check_vdi_consistance()
+{
+	read_vdi_from_nodes $1
+	$DOG vdi check test
+	read_vdi_from_nodes $1
+}
+
+echo ""
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+
+echo "yes" | $DOG cluster format -c 3
+$DOG vdi create test 4M
+echo "hello, copy0" | $DOG vdi write test 0 12
+cp $STORE/0/obj/007c2b2500000000 $STORE/copy0
+echo "hello, copy1" | $DOG vdi write test 0 12
+cp $STORE/1/obj/007c2b2500000000 $STORE/copy1
+echo "hello, copy2" | $DOG vdi write test 0 12
+
+# three copies, two broken objects, no majority
+
+cp $STORE/copy0 $STORE/0/obj/007c2b2500000000
+cp $STORE/copy1 $STORE/1/obj/007c2b2500000000
+check_vdi_consistance 3
+
+for i in 3 4; do
+    _start_sheep $i
+done
+_wait_for_sheep 5
+
+echo "yes" | $DOG cluster format -c 5
+$DOG vdi create test 4M
+echo "hello, copy0" | $DOG vdi write test 0 12
+cp $STORE/0/obj/007c2b2500000000 $STORE/copy0
+echo "hello, copy1" | $DOG vdi write test 0 12
+cp $STORE/1/obj/007c2b2500000000 $STORE/copy1
+
+# five copies, two broken objects(AABBB)
+
+cp $STORE/copy0 $STORE/0/obj/007c2b2500000000
+cp $STORE/copy0 $STORE/1/obj/007c2b2500000000
+check_vdi_consistance 5
+
+# five copies, two broken objects(BABAB)
+
+cp $STORE/copy0 $STORE/1/obj/007c2b2500000000
+cp $STORE/copy0 $STORE/3/obj/007c2b2500000000
+check_vdi_consistance 5
+
+$DOG cluster shutdown
