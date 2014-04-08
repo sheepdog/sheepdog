@@ -1578,6 +1578,7 @@ static void vote_majority_object(struct vdi_check_info *info)
 	int count = 0, nr_live_copies = 0;
 	struct vdi_check_work *majority = NULL;
 
+	/* step 1 */
 	for (int i = 0; i < info->nr_copies; i++) {
 		struct vdi_check_work *vcw = &info->vcw[i];
 
@@ -1594,14 +1595,29 @@ static void vote_majority_object(struct vdi_check_info *info)
 			count--;
 	}
 
+	/* step 2 */
+	if (count > 0 && count <= nr_live_copies / 2) {
+		count = 0;
+		for (int i = 0; i < info->nr_copies; i++) {
+			struct vdi_check_work *vcw = &info->vcw[i];
+
+			if (!vcw->object_found)
+				continue;
+			if (!memcmp(majority->hash, vcw->hash,
+						sizeof(vcw->hash)))
+				count++;
+		}
+	}
+
 	if (!majority)
 		info->result = VDI_CHECK_NO_OBJ_FOUND;
-	else if (count < nr_live_copies / 2) {
+	else if (count > nr_live_copies / 2)
+		info->result = VDI_CHECK_SUCCESS;
+	else {
 		/* no majority found */
 		majority = NULL;
 		info->result = VDI_CHECK_NO_MAJORITY_FOUND;
-	} else
-		info->result = VDI_CHECK_SUCCESS;
+	}
 
 	info->majority = majority;
 }
