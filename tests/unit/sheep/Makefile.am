@@ -27,7 +27,8 @@ test_cluster_driver_CFLAGS	+= -DBUILD_ZOOKEEPER
 LIBS += -lzookeeper_mt
 endif
 
-test_hash_SOURCES	= test_hash.c mock_sheep.c mock_group.c
+test_hash_SOURCES	= test_hash.c mock_sheep.c mock_group.c \
+				mock_plain_store.c mock_gateway.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o

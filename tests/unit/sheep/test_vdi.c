@@ -17,9 +17,9 @@
 
 START_TEST(test_vdi)
 {
-	add_vdi_state(1, 1, true);
-	add_vdi_state(2, 1, true);
-	add_vdi_state(3, 2, false);
+	add_vdi_state(1, 1, true, 0);
+	add_vdi_state(2, 1, true, 0);
+	add_vdi_state(3, 2, false, 0);
 
 	ck_assert_int_eq(get_vdi_copy_number(1), 1);
 	ck_assert_int_eq(get_vdi_copy_number(2), 1);
