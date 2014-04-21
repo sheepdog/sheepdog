@@ -151,7 +151,7 @@ void *snap_log_read(int *out_nr)
 	len = st.st_size - sizeof(hdr);
 	buffer = xmalloc(len);
 	ret = xpread(fd, buffer, len, sizeof(hdr));
-	if (len != len) {
+	if (ret != len) {
 		free(buffer);
 		buffer = (void *)-1;
 		goto out_close;
