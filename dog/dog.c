@@ -467,7 +467,8 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 			sdport = strtol(optarg, &p, 10);
-			if (optarg == p || sdport < 1 || sdport > UINT16_MAX) {
+			if (optarg == p || sdport < 1 || sdport > UINT16_MAX
+					|| !is_numeric(optarg)) {
 				sd_err("Invalid port number '%s'", optarg);
 				exit(EXIT_USAGE);
 			}
