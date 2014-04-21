@@ -1293,11 +1293,13 @@ int object_cache_remove(uint64_t oid)
 {
 	/* Inc the entry refcount to exclude the reclaimer */
 	struct object_cache_entry *entry = oid_to_entry(oid);
-	struct object_cache *oc = entry->oc;
+	struct object_cache *oc;
 	int ret;
 
 	if (!entry)
 		return SD_RES_NO_OBJ;
+
+	oc = entry->oc;
 
 	sd_debug("%" PRIx64, oid);
 	while (refcount_read(&entry->refcnt) > 1)
