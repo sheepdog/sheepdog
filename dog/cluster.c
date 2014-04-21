@@ -427,21 +427,10 @@ static int cluster_force_recover(int argc, char **argv)
 	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	char str[123] = {'\0'};
 	struct sd_node nodes[SD_MAX_NODES];
 
-	if (!cluster_cmd_data.force) {
-		int i, l;
-		printf(RECOVER_PRINT);
-		ret = scanf("%s", str);
-		if (ret < 0)
-			return EXIT_SYSFAIL;
-		l = strlen(str);
-		for (i = 0; i < l; i++)
-			str[i] = tolower(str[i]);
-		if (strncmp(str, "yes", 3) != 0)
-			return EXIT_SUCCESS;
-	}
+	if (!cluster_cmd_data.force)
+		confirm(RECOVER_PRINT);
 
 	sd_init_req(&hdr, SD_OP_FORCE_RECOVER);
 	hdr.data_length = sizeof(nodes);
