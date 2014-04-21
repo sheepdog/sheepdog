@@ -449,7 +449,7 @@ static int local_stat_cluster(struct request *req)
 	max_elogs = req->rq.data_length / sizeof(*elog);
 	epoch = get_latest_epoch();
 	for (i = 0; i < max_elogs; i++) {
-		size_t nr_nodes;
+		int nr_nodes;
 
 		if (epoch <= 0)
 			break;
