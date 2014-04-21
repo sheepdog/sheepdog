@@ -72,7 +72,7 @@ static uint64_t curl_get_object_size(const char *url)
 {
 	CURL *curl;
 	CURLcode res;
-	double content_length;
+	double content_length = 0;
 
 	curl = curl_easy_init();
 	if (!curl) {
