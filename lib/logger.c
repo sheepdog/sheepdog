@@ -171,7 +171,7 @@ static int server_log_formatter(char *buff, size_t size,
 {
 	char *p = buff;
 	struct tm tm;
-	size_t len;
+	ssize_t len;
 	char thread_name[MAX_THREAD_NAME_LEN];
 
 	if (print_time) {
@@ -193,7 +193,7 @@ static int server_log_formatter(char *buff, size_t size,
 		       msg->str, colorize ? TEXT_NORMAL : "");
 	if (len < 0)
 		len = 0;
-	p += min(len, size - 1);
+	p += min((size_t)len, size - 1);
 
 	return p - buff;
 }
@@ -212,7 +212,7 @@ static int json_log_formatter(char *buff, size_t size,
 			      const struct logmsg *msg, bool print_time)
 {
 	char *p = buff;
-	size_t len;
+	ssize_t len;
 
 	assert(logger_user_info);
 
@@ -229,7 +229,7 @@ static int json_log_formatter(char *buff, size_t size,
 		       msg->worker_idx, msg->func, msg->line);
 	if (len < 0)
 		return 0;
-	len = min(len, size - 1);
+	len = min((size_t)len, size - 1);
 	p += len;
 	size -= len;
 
