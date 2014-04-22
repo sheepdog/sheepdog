@@ -790,6 +790,7 @@ static int vdi_object_map(int argc, char **argv)
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("FATAL: %s not found", vdiname);
+		free(inode);
 		return ret;
 	}
 
@@ -1750,10 +1751,13 @@ static int vdi_check(int argc, char **argv)
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("FATAL: no inode objects");
-		return ret;
+		goto out;
 	}
 
-	return do_vdi_check(inode);
+	ret = do_vdi_check(inode);
+out:
+	free(inode);
+	return ret;
 }
 
 /* vdi backup format */
