@@ -102,10 +102,12 @@ void *slice_read(const unsigned char *sha1, size_t *outsize)
 
 	object = xmalloc(*outsize);
 	strbuf_copyout(&buf, object, *outsize);
+	free(file->slices);
 	free(file);
 	strbuf_release(&buf);
 	return object;
 err:
+	free(file->slices);
 	free(file);
 	strbuf_release(&buf);
 	return NULL;
