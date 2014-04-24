@@ -396,11 +396,19 @@ static int node_md_info(struct node_id *nid)
 		uint64_t size = info.disk[i].free + info.disk[i].used;
 		int ratio = (int)(((double)info.disk[i].used / size) * 100);
 
-		fprintf(stdout, "%2d\t%s\t%s\t%s\t%3d%%\t%s\n",
-			info.disk[i].idx, strnumber(size),
-			strnumber(info.disk[i].used),
-			strnumber(info.disk[i].free),
-			ratio, info.disk[i].path);
+		if (raw_output)
+			fprintf(stdout, "%s %d %s %s %s %d%% %s\n",
+				addr_to_str(nid->addr, nid->port),
+				info.disk[i].idx, strnumber(size),
+				strnumber(info.disk[i].used),
+				strnumber(info.disk[i].free),
+				ratio, info.disk[i].path);
+		else
+			fprintf(stdout, "%2d\t%s\t%s\t%s\t%3d%%\t%s\n",
+				info.disk[i].idx, strnumber(size),
+				strnumber(info.disk[i].used),
+				strnumber(info.disk[i].free),
+				ratio, info.disk[i].path);
 	}
 	return EXIT_SUCCESS;
 }
@@ -410,13 +418,15 @@ static int md_info(int argc, char **argv)
 	struct sd_node *n;
 	int ret, i = 0;
 
-	fprintf(stdout, "Id\tSize\tUsed\tAvail\tUse%%\tPath\n");
+	if (!raw_output)
+		fprintf(stdout, "Id\tSize\tUsed\tAvail\tUse%%\tPath\n");
 
 	if (!node_cmd_data.all_nodes)
 		return node_md_info(&sd_nid);
 
 	rb_for_each_entry(n, &sd_nroot, rb) {
-		fprintf(stdout, "Node %d:\n", i++);
+		if (!raw_output)
+			fprintf(stdout, "Node %d:\n", i++);
 		ret = node_md_info(&n->nid);
 		if (ret != EXIT_SUCCESS)
 			return EXIT_FAILURE;
@@ -429,6 +439,9 @@ static int do_plug_unplug(char *disks, bool plug)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
+
+	if (!disks)
+		return EXIT_USAGE;
 
 	if (!strlen(disks)) {
 		sd_err("Empty path isn't allowed");
@@ -604,7 +617,7 @@ static struct subcommand node_cmd[] = {
 	 CMD_NEED_NODELIST, node_info},
 	{"recovery", NULL, "aphPr", "show recovery information of nodes", NULL,
 	 CMD_NEED_NODELIST, node_recovery, node_options},
-	{"md", "[disks]", "apAh", "See 'dog node md' for more information",
+	{"md", "[disks]", "aprAh", "See 'dog node md' for more information",
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
 	{"stat", NULL, "aprwh", "show stat information about the node", NULL,
 	 0, node_stat, node_options},
