@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# Test sheep recovery when restart whole cluster after some nodes be killed
+
+. ./common
+
+for i in `seq 0 15`; do _start_sheep $i; done
+_wait_for_sheep 16
+
+_cluster_format -c 8:4
+
+$DOG vdi create test 100M
+
+# write data
+_random | dd iflag=fullblock bs=1M count=100 2> /dev/null | $DOG vdi write test 0
+
+$DOG vdi read test | md5sum > $STORE/ck.1
+
+_vdi_list
+
+# kill 4 nodes
+for i in 9 5 3 2; do
+    _kill_sheep $i
+    _wait_for_sheep_recovery 1
+done
+
+# shutdown whole cluster and restart
+$DOG cluster shutdown
+
+for i in `seq 0 15`; do _start_sheep $i; done
+_wait_for_sheep 16
+
+# read data
+$DOG vdi read test -p 7001 | md5sum > $STORE/ck.2
+
+diff -u $STORE/ck.1 $STORE/ck.2
+
+_vdi_list
