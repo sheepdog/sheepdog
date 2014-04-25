@@ -555,22 +555,21 @@ int inc_and_log_epoch(void)
 				sys->cinfo.nr_nodes);
 }
 
-static struct vnode_info *alloc_old_vnode_info(const struct sd_node *joined,
-					       const struct rb_root *nroot)
+static struct vnode_info *alloc_old_vnode_info(void)
 {
 	struct rb_root old_root = RB_ROOT;
-	struct sd_node *n;
 	struct vnode_info *old;
 
-	/* exclude the newly added one */
-	rb_for_each_entry(n, nroot, rb) {
+	/*
+	 * If the previous cluster has failed node, (For example, 3 good nodes
+	 * and 1 failed node), the 'nroot' will present 4 good nodes after
+	 * shutdown and restart this 4 nodes cluster, this is incorrect.
+	 * We should use old nodes information which is stored in epoch to
+	 * rebuild old_vnode_info.
+	 */
+	for (int i = 0; i < sys->cinfo.nr_nodes; i++) {
 		struct sd_node *new = xmalloc(sizeof(*new));
-
-		*new = *n;
-		if (node_eq(joined, new)) {
-			free(new);
-			continue;
-		}
+		*new = sys->cinfo.nodes[i];
 		if (rb_insert(&old_root, new, rb, node_cmp))
 			panic("node hash collision");
 	}
@@ -669,14 +668,15 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 			set_cluster_config(&sys->cinfo);
 
 		if (nr_nodes != cinfo->nr_nodes) {
-			int ret = inc_and_log_epoch();
+			int ret;
+			if (old_vnode_info)
+				put_vnode_info(old_vnode_info);
+
+			old_vnode_info = alloc_old_vnode_info();
+			ret = inc_and_log_epoch();
 			if (ret != 0)
 				panic("cannot log current epoch %d",
 				      sys->cinfo.epoch);
-
-			if (!old_vnode_info)
-				old_vnode_info = alloc_old_vnode_info(joined,
-								      nroot);
 
 			start_recovery(main_thread_get(current_vnode_info),
 				       old_vnode_info, true);
