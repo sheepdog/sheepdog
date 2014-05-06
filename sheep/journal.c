@@ -151,9 +151,11 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 		return 0;
 	}
 
-	if (jd->flag != JF_STORE)
-		panic("flag is not JF_STORE, the journaling file is broken."
+	if (jd->flag != JF_STORE) {
+		sd_emerg("flag is not JF_STORE, the journaling file is broken."
 		      " please remove the journaling file and restart sheep daemon");
+		return -1;
+	}
 
 	sd_info("%s, size %" PRIu64 ", off %" PRIu64 ", %d", path, jd->size,
 		jd->offset, jd->create);
@@ -245,21 +247,27 @@ skip:
  * we actually only recover one jfile, the other would be empty. This process
  * is fast with buffered IO that only take several secends at most.
  */
-static void check_recover_journal_file(const char *p)
+static int check_recover_journal_file(const char *p)
 {
 	int old = 0, new = 0;
 
 	if (get_old_new_jfile(p, &old, &new) < 0)
-		return;
+		return -1;
 
 	/* No journal file found */
 	if (old == 0)
-		return;
+		return 0;
 
-	if (do_recover(old) < 0)
-		panic("recoverying from journal file (old) failed");
-	if (do_recover(new) < 0)
-		panic("recoverying from journal file (new) failed");
+	if (do_recover(old) < 0) {
+		sd_emerg("recoverying from journal file (old) failed");
+		return -1;
+	}
+	if (do_recover(new) < 0) {
+		sd_emerg("recoverying from journal file (new) failed");
+		return -1;
+	}
+
+	return 0;
 }
 
 int journal_file_init(const char *path, size_t size, bool skip)
@@ -267,7 +275,8 @@ int journal_file_init(const char *path, size_t size, bool skip)
 	int fd;
 
 	if (!skip)
-		check_recover_journal_file(path);
+		if (check_recover_journal_file(path) != 0)
+			return -1;
 
 	jfile_size = size / 2;
 

@@ -611,7 +611,7 @@ static void sighup_handler(int signum)
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
-	int nr_vnodes = SD_DEFAULT_VNODES;
+	int nr_vnodes = SD_DEFAULT_VNODES, rc = 1;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
@@ -770,16 +770,6 @@ int main(int argc, char **argv)
 	if (ret)
 		exit(1);
 
-	ret = init_base_path(dirp);
-	if (ret)
-		exit(1);
-
-	dir = realpath(dirp, NULL);
-	if (!dir) {
-		sd_err("%m");
-		exit(1);
-	}
-
 	if (!strcmp(log_dst, "default"))
 		log_dst_type = LOG_DST_DEFAULT;
 	else if (!strcmp(log_dst, "stdout"))
@@ -813,6 +803,16 @@ int main(int argc, char **argv)
 		}
 	}
 
+	ret = init_base_path(dirp);
+	if (ret)
+		exit(1);
+
+	dir = realpath(dirp, NULL);
+	if (!dir) {
+		sd_err("%m");
+		exit(1);
+	}
+
 	snprintf(log_path, sizeof(log_path), "%s/" LOG_FILE_NAME,
 		 logdir ?: dir);
 
@@ -820,52 +820,56 @@ int main(int argc, char **argv)
 
 	srandom(port);
 
-	if (lock_and_daemon(log_dst_type != LOG_DST_STDOUT, dir))
-		exit(1);
+	if (lock_and_daemon(log_dst_type != LOG_DST_STDOUT, dir)) {
+		free(argp);
+		goto cleanup_dir;
+	}
 
 	ret = log_init(program_name, log_dst_type, log_level, log_path);
-	if (ret)
-		exit(1);
-
-	ret = init_event(EPOLL_SIZE);
-	if (ret)
-		exit(1);
+	if (ret) {
+		free(argp);
+		goto cleanup_dir;
+	}
 
 	ret = init_global_pathnames(dir, argp);
 	free(argp);
 	if (ret)
-		exit(1);
+		goto cleanup_log;
+
+	ret = init_event(EPOLL_SIZE);
+	if (ret)
+		goto cleanup_log;
 
 	ret = init_config_file();
 	if (ret)
-		exit(1);
+		goto cleanup_log;
 
 	ret = create_listen_port(bindaddr, port);
 	if (ret)
-		exit(1);
+		goto cleanup_log;
 
 	if (io_addr && create_listen_port(io_addr, io_port))
-		exit(1);
+		goto cleanup_log;
 
 	ret = init_unix_domain_socket(dir);
 	if (ret)
-		exit(1);
+		goto cleanup_log;
 
 	local_request_init();
 
 	ret = init_signal();
 	if (ret)
-		exit(1);
+		goto cleanup_log;
 
 	/* This function must be called before create_cluster() */
 	ret = init_disk_space(dir);
 	if (ret)
-		exit(1);
+		goto cleanup_log;
 
 	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
 	if (ret) {
 		sd_err("failed to create sheepdog cluster");
-		exit(1);
+		goto cleanup_log;
 	}
 
 	/* We should init journal file before backend init */
@@ -876,7 +880,7 @@ int main(int argc, char **argv)
 		sd_debug("%s, %"PRIu64", %d", jpath, jsize, jskip);
 		ret = journal_file_init(jpath, jsize, jskip);
 		if (ret)
-			exit(1);
+			goto cleanup_cluster;
 	}
 
 	init_fec();
@@ -890,15 +894,15 @@ int main(int argc, char **argv)
 	 */
 	ret = create_work_queues();
 	if (ret)
-		exit(1);
+		goto cleanup_journal;
 
 	ret = sockfd_init();
 	if (ret)
-		exit(1);
+		goto cleanup_journal;
 
 	ret = init_store_driver(sys->gateway_only);
 	if (ret)
-		exit(1);
+		goto cleanup_journal;
 
 	if (sys->enable_object_cache) {
 		if (!strlen(ocpath))
@@ -906,31 +910,30 @@ int main(int argc, char **argv)
 			memcpy(ocpath, dir, strlen(dir));
 		ret = object_cache_init(ocpath);
 		if (ret)
-			exit(1);
+			goto cleanup_journal;
 	}
 
 	ret = trace_init();
 	if (ret)
-		exit(1);
+		goto cleanup_journal;
 
 	if (http_options && http_init(http_options) != 0)
-		exit(1);
+		goto cleanup_journal;
 
 	ret = nfs_init(NULL);
 	if (ret)
-		exit(1);
+		goto cleanup_journal;
 
 	if (pid_file && (create_pidfile(pid_file) != 0)) {
 		sd_err("failed to pid file '%s' - %m", pid_file);
-		exit(1);
+		goto cleanup_journal;
 	}
 
 	if (chdir(dir) < 0) {
 		sd_err("failed to chdir to %s: %m", dir);
-		exit(1);
+		goto cleanup_pid_file;
 	}
 
-	free(dir);
 	check_host_env();
 	sd_info("sheepdog daemon (version %s) started", PACKAGE_VERSION);
 
@@ -939,19 +942,27 @@ int main(int argc, char **argv)
 		sys->cinfo.status != SD_STATUS_SHUTDOWN))
 		event_loop(-1);
 
+	rc = 0;
 	sd_info("shutdown");
 
-	leave_cluster();
+cleanup_pid_file:
+	if (pid_file)
+		unlink(pid_file);
 
+cleanup_journal:
 	if (uatomic_is_true(&sys->use_journal)) {
 		sd_info("cleaning journal file");
 		clean_journal_file(jpath);
 	}
 
+cleanup_cluster:
+	leave_cluster();
+
+cleanup_log:
 	log_close();
 
-	if (pid_file)
-		unlink(pid_file);
+cleanup_dir:
+	free(dir);
 
-	return 0;
+	return rc;
 }
