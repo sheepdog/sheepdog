@@ -567,7 +567,7 @@ static int vdi_clone(int argc, char **argv)
 		goto out;
 
 	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, false,
-			    vdi_cmd_data.nr_copies, inode->copy_policy,
+			    inode->nr_copies, inode->copy_policy,
 			    inode->store_policy);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
