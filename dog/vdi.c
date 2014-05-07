@@ -506,6 +506,11 @@ static int vdi_snapshot(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		return ret;
 
+	if (inode->store_policy) {
+		sd_err("creating a snapshot of hypervolume is not supported");
+		return EXIT_FAILURE;
+	}
+
 	ret = dog_write_object(vid_to_vdi_oid(vid), 0,
 			       vdi_cmd_data.snapshot_tag,
 			       SD_MAX_VDI_TAG_LEN,
