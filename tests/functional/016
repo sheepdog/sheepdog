@@ -13,7 +13,7 @@ _wait_for_sheep 6
 _cluster_format -c 6
 _vdi_create base 100M -P
 
-$QEMU_IMG snapshot -c tag sheepdog:base
+$DOG vdi snapshot base -s tag
 
 sleep 1
 
