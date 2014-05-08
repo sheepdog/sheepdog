@@ -7,6 +7,9 @@ DOG COMMAND INTERFACE:
  - new subcommand "dog vdi object map" for printing map of inode objects
  - new option "-l" to "dog node kill" for killing sheep daemon on localhost without specifying ID
  - allow snapshot tags which start with decimal number (e.g. "123abc")
+ - enhance "dog cluster snapshot' to restore previous default format redundancy.
+  - add a version control to cluster snapshot.
+  - 'cluster snapshot' layout is changed and DO NOT keep backward compatibility.
 
 ## 0.8.0
 
