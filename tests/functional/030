@@ -14,7 +14,7 @@ rm -rf $TMPDIR
 _cluster_format -c 6
 
 _vdi_create test1 10M
-_vdi_create test2 10M
+$DOG vdi create test2 -c 3 10M
 
 _random | $DOG vdi write test1
 _random | $DOG vdi write test2
@@ -83,3 +83,7 @@ $DOG vdi read -s 1 test1 | md5sum > $STORE/csum.11.new
 $DOG vdi read -s 1 test2 | md5sum > $STORE/csum.21.new
 diff -u $STORE/csum.11.org $STORE/csum.11.new
 diff -u $STORE/csum.21.org $STORE/csum.21.new
+
+$DOG cluster info -s | _filter_cluster_info
+_vdi_create test3 10M
+_vdi_list
