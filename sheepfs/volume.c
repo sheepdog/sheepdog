@@ -359,20 +359,13 @@ static void destroy_socket_pool(int array[], int len)
 
 static int setup_socket_pool(int array[], int len)
 {
-	int fd, i, ret;
+	int fd, i;
 
 	for (i = 0; i < len; i++) {
 		fd = connect_to(sdhost, sdport);
 		if (fd < 0) {
 			sheepfs_pr("connect_to %m\n");
 			destroy_socket_pool(array, --i);
-			return -1;
-		}
-
-		ret = set_nodelay(fd);
-		if (ret) {
-			sheepfs_pr("%m\n");
-			destroy_socket_pool(array, i);
 			return -1;
 		}
 
