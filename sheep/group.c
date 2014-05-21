@@ -146,7 +146,10 @@ struct vnode_info *alloc_vnode_info(const struct rb_root *nroot)
 
 	recalculate_vnodes(&vnode_info->nroot);
 
-	nodes_to_vnodes(&vnode_info->nroot, &vnode_info->vroot);
+	if (is_cluster_diskmode(&sys->cinfo))
+		disks_to_vnodes(&vnode_info->nroot, &vnode_info->vroot);
+	else
+		nodes_to_vnodes(&vnode_info->nroot, &vnode_info->vroot);
 	vnode_info->nr_zones = get_zones_nr_from(&vnode_info->nroot);
 	refcount_set(&vnode_info->refcnt, 1);
 	return vnode_info;

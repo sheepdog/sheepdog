@@ -204,6 +204,41 @@ static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 	return node_cmp(a, b) == 0;
 }
 
+static inline uint64_t
+node_disk_to_vnodes(const struct sd_node *n, struct rb_root *vroot)
+{
+
+	uint64_t node_hval = sd_hash(&n->nid, offsetof(typeof(n->nid),
+						       io_addr));
+	uint64_t hval, disk_vnodes, total = 0;
+
+	for (int j = 0; j < DISK_MAX; j++) {
+		if (!n->disks[j].disk_id)
+			continue;
+		hval = fnv_64a_64(node_hval, n->disks[j].disk_id);
+		disk_vnodes = n->disks[j].disk_space / WEIGHT_MIN;
+		total += disk_vnodes;
+		for (int k = 0; k < disk_vnodes; k++) {
+			hval = sd_hash_next(hval);
+			struct sd_vnode *v = xmalloc(sizeof(*v));
+			v->hash = hval;
+			v->node = n;
+			if (unlikely(rb_insert(vroot, v, rb, vnode_cmp)))
+				panic("vdisk hash collison");
+		}
+	}
+	return total;
+}
+
+static inline void
+disks_to_vnodes(struct rb_root *nroot, struct rb_root *vroot)
+{
+	struct sd_node *n;
+
+	rb_for_each_entry(n, nroot, rb)
+		n->nr_vnodes = node_disk_to_vnodes(n, vroot);
+}
+
 static inline void
 node_to_vnodes(const struct sd_node *n, struct rb_root *vroot)
 {

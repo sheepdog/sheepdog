@@ -65,6 +65,8 @@ int update_node_list(int max_nodes)
 	struct sd_node *ent;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct epoch_log *logs = NULL;
+	int log_length;
 
 	size = sizeof(*ent) * max_nodes;
 	buf = xzalloc(size);
@@ -111,13 +113,27 @@ int update_node_list(int max_nodes)
 		if (j == sd_zones_nr)
 			sd_zones[sd_zones_nr++] = n->zone;
 	}
+	/* check whether cluster use diskmode */
+	log_length = sizeof(struct epoch_log);
+	logs = xmalloc(log_length);
 
-	nodes_to_vnodes(&sd_nroot, &sd_vroot);
+	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
+	hdr.data_length = log_length;
+
+	ret = dog_exec_req(&sd_nid, &hdr, logs);
+	if (ret < 0)
+		goto out;
+
+	if (logs->flags & SD_CLUSTER_FLAG_DISKMODE)
+		disks_to_vnodes(&sd_nroot, &sd_vroot);
+	else
+		nodes_to_vnodes(&sd_nroot, &sd_vroot);
+
 	sd_epoch = hdr.epoch;
 out:
 	if (buf)
 		free(buf);
-
+	free(logs);
 	return ret;
 }
 

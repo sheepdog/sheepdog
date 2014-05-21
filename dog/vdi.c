@@ -913,7 +913,10 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 		}
 		for (int k = 0; k < logs[i].nr_nodes; k++)
 			rb_insert(&nroot, &logs[i].nodes[k], rb, node_cmp);
-		nodes_to_vnodes(&nroot, &vroot);
+		if (logs->flags & SD_CLUSTER_FLAG_DISKMODE)
+			disks_to_vnodes(&nroot, &vroot);
+		else
+			nodes_to_vnodes(&nroot, &vroot);
 		oid_to_vnodes(oid, &vroot, nr_copies, vnode_buf);
 		for (j = 0; j < nr_copies; j++) {
 			const struct node_id *n = &vnode_buf[j]->node->nid;
