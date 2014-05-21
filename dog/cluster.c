@@ -23,7 +23,6 @@ static struct sd_option cluster_options[] = {
 	{'f', "force", false, "do not prompt for confirmation"},
 	{'t', "strict", false,
 	 "do not serve write request if number of nodes is not sufficient"},
-	{'s', "backend", false, "show backend store information"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -31,7 +30,6 @@ static struct cluster_cmd_data {
 	uint8_t copies;
 	uint8_t copy_policy;
 	bool force;
-	bool show_store;
 	bool strict;
 	char name[STORE_LEN];
 } cluster_cmd_data;
@@ -143,6 +141,29 @@ static int cluster_format(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static void print_nodes(const struct epoch_log *logs, int epoch)
+{
+	int i, nr_disk;
+	const struct sd_node *entry;
+
+	for (i = 0; i < logs[epoch].nr_nodes; i++) {
+		entry = logs[epoch].nodes + i;
+		if (logs->flags & SD_CLUSTER_FLAG_DISKMODE) {
+			for (nr_disk = 0; nr_disk < DISK_MAX; nr_disk++) {
+				if (entry->disks[nr_disk].disk_id == 0)
+					break;
+			}
+			printf("%s%s(%d)",
+			       (i == 0) ? "" : ", ",
+			       addr_to_str(entry->nid.addr, entry->nid.port),
+			       nr_disk);
+		} else
+			printf("%s%s",
+			       (i == 0) ? "" : ", ",
+			       addr_to_str(entry->nid.addr, entry->nid.port));
+	}
+}
+
 static int cluster_info(int argc, char **argv)
 {
 	int i, ret;
@@ -173,8 +194,8 @@ static int cluster_info(int argc, char **argv)
 	else
 		printf("%s\n", sd_strerror(rsp->result));
 
-	/* show cluster backend store */
-	if (cluster_cmd_data.show_store) {
+	if (verbose) {
+		/* show cluster backend store */
 		if (!raw_output)
 			printf("Cluster store: ");
 		if (rsp->result == SD_RES_SUCCESS) {
@@ -193,6 +214,14 @@ static int cluster_info(int argc, char **argv)
 			       logs->drv_name, copy);
 		} else
 			printf("%s\n", sd_strerror(rsp->result));
+
+		/* show vnode mode (node or disk) for cluster */
+		if (!raw_output)
+			printf("Cluster vnode mode: ");
+		if (logs->flags & SD_CLUSTER_FLAG_DISKMODE)
+			printf("disk");
+		else
+			printf("node");
 	}
 
 	if (!raw_output && rsp->data_length > 0) {
@@ -203,8 +232,6 @@ static int cluster_info(int argc, char **argv)
 
 	nr_logs = rsp->data_length / sizeof(struct epoch_log);
 	for (i = 0; i < nr_logs; i++) {
-		int j;
-		const struct sd_node *entry;
 
 		ti = logs[i].time;
 		if (raw_output) {
@@ -216,12 +243,7 @@ static int cluster_info(int argc, char **argv)
 
 		printf(raw_output ? "%s %d" : "%s %6d", time_str, logs[i].epoch);
 		printf(" [");
-		for (j = 0; j < logs[i].nr_nodes; j++) {
-			entry = logs[i].nodes + j;
-			printf("%s%s",
-			       (j == 0) ? "" : ", ",
-			       addr_to_str(entry->nid.addr, entry->nid.port));
-		}
+		print_nodes(logs, i);
 		printf("]\n");
 	}
 
@@ -550,7 +572,7 @@ static int cluster_check(int argc, char **argv)
 }
 
 static struct subcommand cluster_cmd[] = {
-	{"info", NULL, "aprhs", "show cluster information",
+	{"info", NULL, "aprhv", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
 	{"format", NULL, "bctaph", "create a Sheepdog store",
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
@@ -593,9 +615,6 @@ static int cluster_parser(int ch, const char *opt)
 		break;
 	case 'f':
 		cluster_cmd_data.force = true;
-		break;
-	case 's':
-		cluster_cmd_data.show_store = true;
 		break;
 	case 't':
 		cluster_cmd_data.strict = true;
