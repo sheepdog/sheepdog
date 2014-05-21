@@ -17,6 +17,7 @@ struct recovery_work {
 	uint32_t epoch;
 	uint32_t tgt_epoch;
 
+	struct recovery_info *rinfo;
 	struct vnode_info *old_vinfo;
 	struct vnode_info *cur_vinfo;
 
@@ -71,6 +72,10 @@ struct recovery_info {
 
 	struct vnode_info *old_vinfo;
 	struct vnode_info *cur_vinfo;
+
+	int max_epoch;
+	struct vnode_info **vinfo_array;
+	struct sd_mutex vinfo_lock;
 };
 
 static struct recovery_info *next_rinfo;
@@ -96,22 +101,37 @@ static inline bool node_is_gateway_only(void)
 }
 
 static struct vnode_info *rollback_vnode_info(uint32_t *epoch,
+					      struct recovery_info *rinfo,
 					      struct vnode_info *cur)
 {
-	struct vnode_info *vinfo;
+	struct sd_node nodes[SD_MAX_NODES];
+	int nr_nodes;
+	struct rb_root nroot = RB_ROOT;
+
 rollback:
 	*epoch -= 1;
 	if (*epoch < last_gathered_epoch)
 		return NULL;
 
-	vinfo = get_vnode_info_epoch(*epoch, cur);
-	if (!vinfo) {
+	nr_nodes = get_nodes_epoch(*epoch, cur, nodes, sizeof(nodes));
+	if (!nr_nodes) {
 		/* We rollback in case we don't get a valid epoch */
 		sd_alert("cannot get epoch %d", *epoch);
 		sd_alert("clients may see old data");
 		goto rollback;
 	}
-	return vinfo;
+	/* double check */
+	if (rinfo->vinfo_array[*epoch] == NULL) {
+		sd_mutex_lock(&rinfo->vinfo_lock);
+		if (rinfo->vinfo_array[*epoch] == NULL) {
+			for (int i = 0; i < nr_nodes; i++)
+				rb_insert(&nroot, &nodes[i], rb, node_cmp);
+			rinfo->vinfo_array[*epoch] = alloc_vnode_info(&nroot);
+		}
+		sd_mutex_unlock(&rinfo->vinfo_lock);
+	}
+	grab_vnode_info(rinfo->vinfo_array[*epoch]);
+	return rinfo->vinfo_array[*epoch];
 }
 
 /*
@@ -202,7 +222,8 @@ again:
 		break;
 	default:
 rollback:
-		new_old = rollback_vnode_info(&tgt_epoch, rw->cur_vinfo);
+		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
+					      rw->cur_vinfo);
 		if (!new_old) {
 			sd_err("can not read %"PRIx64" idx %d", oid, idx);
 			free(buf);
@@ -385,7 +406,8 @@ again:
 		/* fall through */
 	default:
 		/* No luck, roll back to an older configuration and try again */
-		new_old = rollback_vnode_info(&tgt_epoch, rw->cur_vinfo);
+		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
+					      rw->cur_vinfo);
 		if (!new_old) {
 			sd_err("can not recover oid %"PRIx64, oid);
 			ret = -1;
@@ -673,6 +695,10 @@ static void free_recovery_info(struct recovery_info *rinfo)
 	put_vnode_info(rinfo->old_vinfo);
 	free(rinfo->oids);
 	free(rinfo->prio_oids);
+	for (int i = 0; i < rinfo->max_epoch; i++)
+		put_vnode_info(rinfo->vinfo_array[i]);
+	free(rinfo->vinfo_array);
+	sd_destroy_mutex(&rinfo->vinfo_lock);
 	free(rinfo);
 }
 
@@ -1069,6 +1095,10 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 	rinfo->tgt_epoch = epoch_lifted ? sys->cinfo.epoch - 1 :
 		sys->cinfo.epoch;
 	rinfo->count = 0;
+	rinfo->max_epoch = sys->cinfo.epoch;
+	rinfo->vinfo_array = xzalloc(sizeof(struct vnode_info *) *
+				     rinfo->max_epoch);
+	sd_init_mutex(&rinfo->vinfo_lock);
 	if (epoch_lifted)
 		rinfo->notify_complete = true; /* Reweight or node recovery */
 	else
@@ -1136,6 +1166,7 @@ static void queue_recovery_work(struct recovery_info *rinfo)
 
 	rw->epoch = rinfo->epoch;
 	rw->tgt_epoch = rinfo->tgt_epoch;
+	rw->rinfo = rinfo;
 	rw->cur_vinfo = grab_vnode_info(rinfo->cur_vinfo);
 	rw->old_vinfo = grab_vnode_info(rinfo->old_vinfo);
 

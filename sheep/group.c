@@ -175,6 +175,18 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 	return alloc_vnode_info(&nroot);
 }
 
+int get_nodes_epoch(uint32_t epoch, struct vnode_info *cur_vinfo,
+		    struct sd_node *nodes, int len)
+{
+	int nr_nodes;
+
+	nr_nodes = epoch_log_read(epoch, nodes, len);
+	if (nr_nodes < 0)
+		nr_nodes = epoch_log_read_remote(epoch, nodes, len,
+						 NULL, cur_vinfo);
+	return nr_nodes;
+}
+
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
 			void *data)
 {

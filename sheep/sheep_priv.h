@@ -352,6 +352,9 @@ void put_vnode_info(struct vnode_info *vinfo);
 struct vnode_info *alloc_vnode_info(const struct rb_root *);
 struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 					struct vnode_info *cur_vinfo);
+int get_nodes_epoch(uint32_t epoch, struct vnode_info *cur_vinfo,
+		    struct sd_node *nodes, int len);
+
 void wait_get_vdis_done(void);
 
 int get_nr_copies(struct vnode_info *vnode_info);
