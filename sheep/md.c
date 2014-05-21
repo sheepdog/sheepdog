@@ -70,7 +70,18 @@ static struct vdisk *oid_to_vdisk(uint64_t oid)
 static void create_vdisks(const struct disk *disk)
 {
 	uint64_t hval = sd_hash(disk->path, strlen(disk->path));
-	int nr = vdisk_number(disk);
+	const struct sd_node *n = &sys->this_node;
+	uint64_t node_hval;
+	int nr;
+
+	if (is_cluster_diskmode(&sys->cinfo)) {
+		node_hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
+		hval = fnv_64a_64(node_hval, hval);
+		nr = disk->space / WEIGHT_MIN;
+		if (0 == n->nid.port)
+			return;
+	} else
+		nr = vdisk_number(disk);
 
 	for (int i = 0; i < nr; i++) {
 		struct vdisk *v = xmalloc(sizeof(*v));
@@ -92,7 +103,16 @@ static inline void vdisk_free(struct vdisk *v)
 static void remove_vdisks(const struct disk *disk)
 {
 	uint64_t hval = sd_hash(disk->path, strlen(disk->path));
-	int nr = vdisk_number(disk);
+	const struct sd_node *n = &sys->this_node;
+	uint64_t node_hval;
+	int nr;
+
+	if (is_cluster_diskmode(&sys->cinfo)) {
+		node_hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
+		hval = fnv_64a_64(node_hval, hval);
+		nr = disk->space / WEIGHT_MIN;
+	} else
+		nr = vdisk_number(disk);
 
 	for (int i = 0; i < nr; i++) {
 		struct vdisk *v;
@@ -490,8 +510,12 @@ static inline void kick_recover(void)
 {
 	struct vnode_info *vinfo = get_vnode_info();
 
-	start_recovery(vinfo, vinfo, false);
-	put_vnode_info(vinfo);
+	if (is_cluster_diskmode(&sys->cinfo))
+		sys->cdrv->update_node(&sys->this_node);
+	else {
+		start_recovery(vinfo, vinfo, false);
+		put_vnode_info(vinfo);
+	}
 }
 
 static void md_do_recover(struct work *work)

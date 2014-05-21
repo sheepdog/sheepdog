@@ -638,6 +638,32 @@ void wait_get_vdis_done(void)
 	sd_debug("vdi list ready");
 }
 
+static bool membership_changed(const struct cluster_info *cinfo,
+			  const struct rb_root *nroot,
+			  size_t nr_nodes)
+{
+	const struct sd_node *key, *n;
+	int i, ret;
+
+	if (nr_nodes != cinfo->nr_nodes)
+		return true;
+
+	if (!is_cluster_diskmode(cinfo))
+		return false;
+
+	for (i = 0; i < cinfo->nr_nodes; i++) {
+		key = cinfo->nodes + i;
+		n = rb_search(nroot, key, rb, node_cmp);
+		if (!n)
+			continue;
+		ret = memcmp(n->disks, key->disks,
+			     sizeof(struct disk_info) * DISK_MAX);
+		if (ret)
+			return true;
+	}
+	return false;
+}
+
 static void update_cluster_info(const struct cluster_info *cinfo,
 				const struct sd_node *joined,
 				const struct rb_root *nroot,
@@ -670,7 +696,7 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 			/* initialize config file */
 			set_cluster_config(&sys->cinfo);
 
-		if (nr_nodes != cinfo->nr_nodes) {
+		if (membership_changed(cinfo, nroot, nr_nodes)) {
 			int ret;
 			if (old_vnode_info)
 				put_vnode_info(old_vnode_info);
