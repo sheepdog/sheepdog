@@ -123,6 +123,12 @@ int init_config_file(void)
 reload:
 	ret = 0;
 	get_cluster_config(&sys->cinfo);
+	if ((config.flags & SD_CLUSTER_FLAG_DISKMODE) !=
+	    (sys->cinfo.flags & SD_CLUSTER_FLAG_DISKMODE)) {
+		sd_err("This sheep can't run because "
+		       "exists data format mismatch");
+		return -1;
+	}
 out:
 	close(fd);
 

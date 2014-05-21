@@ -131,7 +131,8 @@
 #define SD_RES_VDI_NOT_EMPTY    0x92 /* VDI is not empty */
 #define SD_RES_NOT_FOUND	0x93 /* Cannot found target */
 
-#define SD_CLUSTER_FLAG_STRICT  0x0001 /* Strict mode for write */
+#define SD_CLUSTER_FLAG_STRICT		0x0001 /* Strict mode for write */
+#define SD_CLUSTER_FLAG_DISKMODE	0x0002 /* Disk mode for cluster */
 
 enum sd_status {
 	SD_STATUS_OK = 1,

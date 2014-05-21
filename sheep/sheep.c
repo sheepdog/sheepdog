@@ -753,6 +753,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	#ifdef HAVE_DISKVNODES
+	sys->cinfo.flags |= SD_CLUSTER_FLAG_DISKMODE;
+	#endif
+
 	sheep_info.port = port;
 	early_log_init(log_format, &sheep_info);
 
