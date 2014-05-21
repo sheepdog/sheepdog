@@ -965,7 +965,12 @@ static void update_node_size(struct sd_node *node)
 	if (unlikely(!n))
 		panic("can't find %s", node_to_str(node));
 	n->space = node->space;
-
+	if (is_cluster_diskmode(&sys->cinfo)) {
+		memset(n->disks, 0, sizeof(struct disk_info) * DISK_MAX);
+		for (int i = 0; i < DISK_MAX; i++)
+			if (node->disks[i].disk_id)
+				n->disks[i] = node->disks[i];
+	}
 	put_vnode_info(cur_vinfo);
 }
 
@@ -1025,6 +1030,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	sd_debug("zone id = %u", sys->this_node.zone);
 
 	sys->this_node.space = sys->disk_space;
+
+	update_node_disks();
 
 	sys->cinfo.epoch = get_latest_epoch();
 	if (sys->cinfo.epoch) {

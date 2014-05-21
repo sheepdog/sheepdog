@@ -17,27 +17,7 @@
 
 #define NONE_EXIST_PATH "/all/disks/are/broken/,ps/əʌo7/!"
 
-struct disk {
-	struct rb_node rb;
-	char path[PATH_MAX];
-	uint64_t space;
-};
-
-struct vdisk {
-	struct rb_node rb;
-	struct disk *disk;
-	uint64_t hash;
-};
-
-struct md {
-	struct rb_root vroot;
-	struct rb_root root;
-	struct sd_rw_lock lock;
-	uint64_t space;
-	uint32_t nr_disks;
-};
-
-static struct md md = {
+struct md md = {
 	.vroot = RB_ROOT,
 	.root = RB_ROOT,
 	.lock = SD_RW_LOCK_INITIALIZER,
@@ -87,7 +67,7 @@ static struct vdisk *oid_to_vdisk(uint64_t oid)
 	return hval_to_vdisk(sd_hash_oid(oid));
 }
 
-static void create_vdisks(struct disk *disk)
+static void create_vdisks(const struct disk *disk)
 {
 	uint64_t hval = sd_hash(disk->path, strlen(disk->path));
 	int nr = vdisk_number(disk);
@@ -751,6 +731,42 @@ static inline void md_del_disk(const char *path)
 	md_remove_disk(disk);
 }
 
+#ifdef HAVE_DISKVNODES
+void update_node_disks(void)
+{
+	const struct disk *disk;
+	int i = 0;
+	bool rb_empty = false;
+
+	if (!sys)
+		return;
+
+	memset(sys->this_node.disks, 0, sizeof(struct disk_info) * DISK_MAX);
+	sd_read_lock(&md.lock);
+	rb_for_each_entry(disk, &md.root, rb) {
+		sys->this_node.disks[i].disk_id =
+			sd_hash(disk->path, strlen(disk->path));
+		sys->this_node.disks[i].disk_space = disk->space;
+		i++;
+	}
+	sd_rw_unlock(&md.lock);
+
+	if (RB_EMPTY_ROOT(&md.vroot))
+		rb_empty = true;
+	sd_write_lock(&md.lock);
+	rb_for_each_entry(disk, &md.root, rb) {
+		if (!rb_empty)
+			remove_vdisks(disk);
+		create_vdisks(disk);
+	}
+	sd_rw_unlock(&md.lock);
+}
+#else
+void update_node_disks(void)
+{
+}
+#endif
+
 static int do_plug_unplug(char *disks, bool plug)
 {
 	const char *path;
@@ -776,8 +792,10 @@ static int do_plug_unplug(char *disks, bool plug)
 out:
 	sd_rw_unlock(&md.lock);
 
-	if (ret == SD_RES_SUCCESS)
+	if (ret == SD_RES_SUCCESS) {
+		update_node_disks();
 		kick_recover();
+	}
 
 	return ret;
 }

@@ -164,6 +164,30 @@ struct system_info {
 	struct sd_stat stat;
 };
 
+struct disk {
+	struct rb_node rb;
+	char path[PATH_MAX];
+	uint64_t space;
+};
+
+struct vdisk {
+	struct rb_node rb;
+	const struct disk *disk;
+	uint64_t hash;
+};
+
+struct md {
+	struct rb_root vroot;
+	struct rb_root root;
+	struct sd_rw_lock lock;
+	uint64_t space;
+	uint32_t nr_disks;
+};
+
+extern struct md md;
+
+void update_node_disks(void);
+
 struct siocb {
 	uint32_t epoch;
 	void *buf;

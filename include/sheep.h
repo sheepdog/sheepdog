@@ -276,4 +276,9 @@ static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
 	return id;
 }
 
+static inline bool is_cluster_diskmode(const struct cluster_info *cinfo)
+{
+	return (cinfo->flags & SD_CLUSTER_FLAG_DISKMODE) > 0;
+}
+
 #endif

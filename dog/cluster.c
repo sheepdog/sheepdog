@@ -123,6 +123,10 @@ static int cluster_format(int argc, char **argv)
 	if (cluster_cmd_data.strict)
 		hdr.cluster.flags |= SD_CLUSTER_FLAG_STRICT;
 
+#ifdef HAVE_DISKVNODES
+	hdr.cluster.flags |= SD_CLUSTER_FLAG_DISKMODE;
+#endif
+
 	printf("using backend %s store\n", store_name);
 	ret = dog_exec_req(&sd_nid, &hdr, store_name);
 	if (ret < 0)
