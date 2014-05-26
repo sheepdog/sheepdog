@@ -35,21 +35,26 @@ static int sbd_submit_request(struct request *req)
 	return sheep_aiocb_submit(aiocb);
 }
 
-static void sbd_request_submiter(struct request_queue *q)
+static void sbd_request_fn(struct request_queue *q)
+__releases(q->queue_lock) __acquires(q->queue_lock)
 {
 	struct request *req;
+	struct sbd_device *dev = q->queuedata;
 
 	while ((req = blk_fetch_request(q)) != NULL) {
-		int ret;
 
 		/* filter out block requests we don't understand */
-		if (req->cmd_type != REQ_TYPE_FS) {
+		if (unlikely(req->cmd_type != REQ_TYPE_FS)) {
 			__blk_end_request_all(req, 0);
 			continue;
 		}
-		ret = sbd_submit_request(req);
-		if (ret < 0)
-			break;
+
+		list_add_tail(&req->queuelist, &dev->request_head);
+		spin_unlock_irq(q->queue_lock);
+
+		wake_up(&dev->submiter_wq);
+
+		spin_lock_irq(q->queue_lock);
 	}
 }
 
@@ -68,7 +73,7 @@ static int sbd_add_disk(struct sbd_device *dev)
 	disk->fops = &sbd_bd_ops;
 	disk->private_data = dev;
 
-	rq = blk_init_queue(sbd_request_submiter, &dev->queue_lock);
+	rq = blk_init_queue(sbd_request_fn, &dev->queue_lock);
 	if (!rq) {
 		put_disk(disk);
 		return -ENOMEM;
@@ -93,16 +98,53 @@ static int sbd_add_disk(struct sbd_device *dev)
 static int sbd_request_reaper(void *data)
 {
 	struct sbd_device *dev = data;
+	int ret;
 
 	while (!kthread_should_stop() || !list_empty(&dev->inflight_head)) {
-		wait_event_interruptible(dev->inflight_wq,
+		bool empty;
+
+		wait_event_interruptible(dev->reaper_wq,
 					 kthread_should_stop() ||
 					 !list_empty(&dev->inflight_head));
 
-		if (list_empty(&dev->inflight_head))
+		read_lock(&dev->inflight_lock);
+		empty = list_empty(&dev->inflight_head);
+		read_unlock(&dev->inflight_lock);
+
+		if (unlikely(empty))
 			continue;
 
-		sheep_handle_reply(dev);
+		ret = sheep_handle_reply(dev);
+		if (unlikely(ret < 0))
+			pr_err("reaper: failed to handle reply\n");
+	}
+	return 0;
+}
+
+static int sbd_request_submiter(void *data)
+{
+	struct sbd_device *dev = data;
+	int ret;
+
+	while (!kthread_should_stop() || !list_empty(&dev->request_head)) {
+		struct request *req;
+
+		wait_event_interruptible(dev->submiter_wq,
+					 kthread_should_stop() ||
+					 !list_empty(&dev->request_head));
+
+		spin_lock_irq(&dev->queue_lock);
+		if (unlikely(list_empty(&dev->request_head))) {
+			spin_unlock_irq(&dev->queue_lock);
+			continue;
+		}
+		req = list_entry_rq(dev->request_head.next);
+		list_del_init(&req->queuelist);
+		spin_unlock_irq(&dev->queue_lock);
+
+		ret = sbd_submit_request(req);
+		if (unlikely(ret < 0))
+			pr_err("submiter: failed to submit request\n");
 	}
 	return 0;
 }
@@ -138,9 +180,14 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 	}
 
 	spin_lock_init(&dev->queue_lock);
+	spin_lock_init(&dev->vdi_lock);
 	INIT_LIST_HEAD(&dev->inflight_head);
 	INIT_LIST_HEAD(&dev->blocking_head);
-	init_waitqueue_head(&dev->inflight_wq);
+	INIT_LIST_HEAD(&dev->request_head);
+	init_waitqueue_head(&dev->reaper_wq);
+	init_waitqueue_head(&dev->submiter_wq);
+	rwlock_init(&dev->inflight_lock);
+	rwlock_init(&dev->blocking_lock);
 
 	list_for_each_entry(tmp, &sbd_dev_list, list) {
 		if (tmp->id > new_id)
@@ -159,6 +206,11 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 	dev->major = ret;
 	dev->minor = 0;
 	dev->reaper = kthread_run(sbd_request_reaper, dev, "sbd_reaper");
+	if (IS_ERR(dev->reaper))
+		goto err_unreg_blkdev;
+	dev->submiter = kthread_run(sbd_request_submiter, dev, "sbd_submiter");
+	if (IS_ERR(dev->submiter))
+		goto err_unreg_blkdev;
 
 	ret = sbd_add_disk(dev);
 	if (ret < 0)
@@ -222,7 +274,9 @@ static ssize_t sbd_remove(struct bus_type *bus, const char *buf,
 		return -ENOENT;
 
 	kthread_stop(dev->reaper);
-	wake_up_interruptible(&dev->inflight_wq);
+	kthread_stop(dev->submiter);
+	wake_up(&dev->reaper_wq);
+	wake_up(&dev->submiter_wq);
 
 	sbd_del_disk(dev);
 	free_sbd_device(dev);

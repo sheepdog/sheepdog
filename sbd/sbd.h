@@ -43,13 +43,19 @@ struct sbd_device {
 	spinlock_t queue_lock;   /* request queue lock */
 
 	struct sheep_vdi vdi;		/* Associated sheep image */
+	spinlock_t vdi_lock;
 
-	struct list_head inflight_head;
-	wait_queue_head_t inflight_wq;
-	struct list_head blocking_head;
+	struct list_head request_head; /* protected by queue lock */
+	struct list_head inflight_head; /* for inflight sheep requests */
+	struct list_head blocking_head; /* for blocking sheep requests */
+	rwlock_t inflight_lock;
+	rwlock_t blocking_lock;
 
 	struct list_head list;
 	struct task_struct *reaper;
+	struct task_struct *submiter;
+	wait_queue_head_t reaper_wq;
+	wait_queue_head_t submiter_wq;
 };
 
 struct sheep_aiocb {
@@ -57,10 +63,10 @@ struct sheep_aiocb {
 	u64 offset;
 	u64 length;
 	int ret;
-	u32 nr_requests;
+	atomic_t nr_requests;
 	char *buf;
 	int buf_iter;
-	void (*aio_done_func)(struct sheep_aiocb *, bool);
+	void (*aio_done_func)(struct sheep_aiocb *);
 };
 
 enum sheep_request_type {

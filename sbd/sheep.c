@@ -11,10 +11,23 @@
 
 #include "sbd.h"
 
+/* FIXME I need this hack to compile DEFINE_MUTEX successfully */
+#ifdef __SPIN_LOCK_UNLOCKED
+# undef __SPIN_LOCK_UNLOCKED
+# define __SPIN_LOCK_UNLOCKED(lockname) __SPIN_LOCK_INITIALIZER(lockname)
+#endif
+
+static DEFINE_MUTEX(socket_mutex);
+
 void socket_shutdown(struct socket *sock)
 {
 	if (sock)
 		kernel_sock_shutdown(sock, SHUT_RDWR);
+}
+
+static struct sbd_device *sheep_request_to_device(struct sheep_request *req)
+{
+	return req->aiocb->request->q->queuedata;
 }
 
 static struct sbd_device *sheep_aiocb_to_device(struct sheep_aiocb *aiocb)
@@ -49,7 +62,7 @@ static int socket_create(struct socket **sock, const char *ip_addr, int port)
 			      (char *)&nodelay, sizeof(nodelay));
 	set_fs(oldmm);
 	if (ret != 0) {
-		pr_err("Can't set SO_LINGER: %d\n", ret);
+		pr_err("Can't set nodelay: %d\n", ret);
 		goto shutdown;
 	}
 
@@ -129,14 +142,20 @@ static int socket_write(struct socket *sock, void *buf, int len)
 static int sheep_submit_sdreq(struct socket *sock, struct sd_req *hdr,
 			      void *data, unsigned int wlen)
 {
-	int ret = socket_write(sock, hdr, sizeof(*hdr));
+	int ret;
 
+	/* Make sheep_submit_sdreq thread safe */
+	mutex_lock(&socket_mutex);
+
+	ret = socket_write(sock, hdr, sizeof(*hdr));
 	if (ret < 0)
-		return ret;
+		goto out;
 
 	if (wlen)
-		return socket_write(sock, data, wlen);
-	return 0;
+		ret = socket_write(sock, data, wlen);
+out:
+	mutex_unlock(&socket_mutex);
+	return ret;
 }
 
 /* Run the request synchronously */
@@ -252,33 +271,58 @@ out:
 
 static void submit_sheep_request(struct sheep_request *req)
 {
+	struct sd_req hdr = {};
+	struct sbd_device *dev = sheep_request_to_device(req);
+
+	hdr.id = req->seq_num;
+	hdr.data_length = req->length;
+	hdr.obj.oid = req->oid;
+	hdr.obj.offset = req->offset;
+
+	write_lock(&dev->inflight_lock);
+	BUG_ON(!list_empty(&req->list));
+	list_add_tail(&req->list, &dev->inflight_head);
+	write_unlock(&dev->inflight_lock);
+
+	switch (req->type) {
+	case SHEEP_CREATE:
+	case SHEEP_WRITE:
+		if (req->type == SHEEP_CREATE)
+			hdr.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
+		else
+			hdr.opcode = SD_OP_WRITE_OBJ;
+		hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
+		sheep_submit_sdreq(dev->sock, &hdr, req->buf, req->length);
+		break;
+	case SHEEP_READ:
+		hdr.opcode = SD_OP_READ_OBJ;
+		sheep_submit_sdreq(dev->sock, &hdr, NULL, 0);
+		break;
+	}
+	sbd_debug("add oid %llx off %d, len %d, seq %u\n", req->oid,
+		  req->offset, req->length, req->seq_num);
+	wake_up(&dev->reaper_wq);
 }
 
 static inline void free_sheep_aiocb(struct sheep_aiocb *aiocb)
 {
-	kfree(aiocb->buf);
+	vfree(aiocb->buf);
 	kfree(aiocb);
 }
 
-static void aio_write_done(struct sheep_aiocb *aiocb, bool locked)
+static void aio_write_done(struct sheep_aiocb *aiocb)
 {
-	sbd_debug("off %llu, len %llu\n", aiocb->offset, aiocb->length);
+	sbd_debug("wdone off %llu, len %llu\n", aiocb->offset, aiocb->length);
 
-	if (locked)
-		__blk_end_request_all(aiocb->request, aiocb->ret);
-	else
-		blk_end_request_all(aiocb->request, aiocb->ret);
+	blk_end_request_all(aiocb->request, aiocb->ret);
 	free_sheep_aiocb(aiocb);
 }
 
-static void aio_read_done(struct sheep_aiocb *aiocb, bool locked)
+static void aio_read_done(struct sheep_aiocb *aiocb)
 {
-	sbd_debug("off %llu, len %llu\n", aiocb->offset, aiocb->length);
+	sbd_debug("rdone off %llu, len %llu\n", aiocb->offset, aiocb->length);
 
-	if (locked)
-		__blk_end_request_all(aiocb->request, aiocb->ret);
-	else
-		blk_end_request_all(aiocb->request, aiocb->ret);
+	blk_end_request_all(aiocb->request, aiocb->ret);
 	free_sheep_aiocb(aiocb);
 }
 
@@ -294,11 +338,16 @@ struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 
 	aiocb->offset = blk_rq_pos(req) * SECTOR_SIZE;
 	aiocb->length = blk_rq_bytes(req);
-	aiocb->nr_requests = 0;
 	aiocb->ret = 0;
 	aiocb->buf_iter = 0;
 	aiocb->request = req;
-	aiocb->buf = kzalloc(aiocb->length, GFP_KERNEL);
+	aiocb->buf = vzalloc(aiocb->length);
+	atomic_set(&aiocb->nr_requests, 0);
+
+	if (!aiocb->buf) {
+		kfree(aiocb);
+		return ERR_PTR(-ENOMEM);
+	}
 
 	switch (rq_data_dir(req)) {
 	case WRITE:
@@ -343,6 +392,7 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 	req->aiocb = aiocb;
 	req->buf = aiocb->buf + aiocb->buf_iter;
 	req->seq_num = atomic_inc_return(&dev->seq_num);
+	INIT_LIST_HEAD(&req->list);
 
 	switch (rq_data_dir(aiocb->request)) {
 	case WRITE:
@@ -359,21 +409,49 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 	}
 
 	aiocb->buf_iter += len;
-	aiocb->nr_requests++;
+	atomic_inc(&aiocb->nr_requests);
 
 	return req;
 }
 
-static void end_sheep_request(struct sheep_request *req, bool queue_locked)
+static void end_sheep_request(struct sheep_request *req)
 {
 	struct sheep_aiocb *aiocb = req->aiocb;
 
-	if (--aiocb->nr_requests == 0)
-		aiocb->aio_done_func(aiocb, queue_locked);
-
 	sbd_debug("end oid %llx off %d, len %d, seq %u\n", req->oid,
 		  req->offset, req->length, req->seq_num);
+
+	if (atomic_dec_return(&aiocb->nr_requests) <= 0)
+		aiocb->aio_done_func(aiocb);
+	BUG_ON(!list_empty(&req->list));
 	kfree(req);
+}
+
+static struct sheep_request *find_inflight_request_oid(struct sbd_device *dev,
+						       uint64_t oid)
+{
+	struct sheep_request *req;
+
+	read_lock(&dev->inflight_lock);
+	list_for_each_entry(req, &dev->inflight_head, list) {
+		if (req->oid == oid) {
+			read_unlock(&dev->inflight_lock);
+			return req;
+		}
+	}
+	read_unlock(&dev->inflight_lock);
+	return NULL;
+}
+
+static bool sheep_inode_has_idx(struct sbd_device *dev, u32 idx)
+{
+	spin_lock(&dev->vdi_lock);
+	if (dev->vdi.inode->data_vdi_id[idx]) {
+		spin_unlock(&dev->vdi_lock);
+		return true;
+	}
+	spin_unlock(&dev->vdi_lock);
+	return false;
 }
 
 int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
@@ -384,35 +462,59 @@ int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
 	u64 start = offset % SD_DATA_OBJ_SIZE;
 	u32 vid = dev->vdi.vid;
 	u64 oid = vid_to_data_oid(vid, offset / SD_DATA_OBJ_SIZE);
-	u32 idx = data_oid_to_idx(oid);
 	int len = SD_DATA_OBJ_SIZE - start;
 
 	if (total < len)
 		len = total;
 
-	sbd_debug("submit oid %llx off %llu, len %llu\n", oid, offset, total);
+	sbd_debug("submit off %llu, len %llu\n", offset, total);
 	/*
 	 * Make sure we don't free the aiocb before we are done with all
 	 * requests.This additional reference is dropped at the end of this
 	 * function.
 	 */
-	aiocb->nr_requests++;
+	atomic_inc(&aiocb->nr_requests);
 
 	do {
 		struct sheep_request *req;
+		u32 idx = data_oid_to_idx(oid);
 
 		req = alloc_sheep_request(aiocb, oid, len, start);
 		if (IS_ERR(req))
 			return PTR_ERR(req);
 
-		if (likely(dev->vdi.inode->data_vdi_id[idx]))
+		if (likely(sheep_inode_has_idx(dev, idx)))
 			goto submit;
 
 		/* Object is not created yet... */
 		switch (req->type) {
 		case SHEEP_WRITE:
+			/*
+			 * Sheepdog can't handle concurrent creation on the same
+			 * object. We send one create req first and then send
+			 * write reqs in next.
+			 */
+			if (find_inflight_request_oid(dev, oid)) {
+				write_lock(&dev->blocking_lock);
+				/*
+				 * There are slim chance object was created
+				 * before we grab blocking_lock
+				 */
+				if (unlikely(sheep_inode_has_idx(dev, idx))) {
+					write_unlock(&dev->blocking_lock);
+					goto submit;
+				}
+				list_add_tail(&req->list, &dev->blocking_head);
+				sbd_debug("block oid %llx off %d, len %d,"
+					  " seq %u\n", req->oid, req->offset,
+					  req->length, req->seq_num);
+				write_unlock(&dev->blocking_lock);
+				goto done;
+			}
+			req->type = SHEEP_CREATE;
+			break;
 		case SHEEP_READ:
-			end_sheep_request(req, true);
+			end_sheep_request(req);
 			goto done;
 		}
 submit:
@@ -424,13 +526,108 @@ done:
 		len = total > SD_DATA_OBJ_SIZE ? SD_DATA_OBJ_SIZE : total;
 	} while (total > 0);
 
-	if (--aiocb->nr_requests == 0)
-		aiocb->aio_done_func(aiocb, true);
+	if (atomic_dec_return(&aiocb->nr_requests) <= 0)
+		aiocb->aio_done_func(aiocb);
 
 	return 0;
 }
 
+static struct sheep_request *fetch_inflight_request(struct sbd_device *dev,
+						    u32 seq_num)
+{
+	struct sheep_request *req, *t;
+
+	write_lock(&dev->inflight_lock);
+	list_for_each_entry_safe(req, t, &dev->inflight_head, list) {
+		if (req->seq_num == seq_num) {
+			list_del_init(&req->list);
+			goto out;
+		}
+	}
+	req = NULL;
+out:
+	write_unlock(&dev->inflight_lock);
+	return req;
+}
+
+static void submit_blocking_sheep_request(struct sbd_device *dev, uint64_t oid)
+{
+	struct sheep_request *req, *t;
+
+	write_lock(&dev->blocking_lock);
+	list_for_each_entry_safe(req, t, &dev->blocking_head, list) {
+		if (req->oid != oid)
+			continue;
+		list_del_init(&req->list);
+		submit_sheep_request(req);
+	}
+	write_unlock(&dev->blocking_lock);
+}
+
 int sheep_handle_reply(struct sbd_device *dev)
 {
+	struct sd_rsp rsp = {};
+	struct sheep_request *req, *new;
+	uint32_t vid, idx;
+	uint64_t oid;
+	int ret;
+
+	ret = socket_read(dev->sock, (char *)&rsp, sizeof(rsp));
+	if (ret < 0) {
+		pr_err("failed to read reply header\n");
+		goto err;
+	}
+
+	req = fetch_inflight_request(dev, rsp.id);
+	if (!req) {
+		pr_err("failed to find req %u\n", rsp.id);
+		return 0;
+	}
+	if (rsp.data_length > 0) {
+		ret = socket_read(dev->sock, req->buf, req->length);
+		if (ret < 0) {
+			pr_err("failed to read reply payload\n");
+			goto err;
+		}
+	}
+
+	switch (req->type) {
+	case SHEEP_CREATE:
+		/* We need to update inode for create */
+		new = kmalloc(sizeof(*new), GFP_KERNEL);
+		if (!new) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		vid = dev->vdi.vid;
+		oid = vid_to_vdi_oid(vid);
+		idx = data_oid_to_idx(req->oid);
+		new->offset = SD_INODE_HEADER_SIZE + sizeof(vid) * idx;
+		new->length = sizeof(vid);
+		new->oid = oid;
+		new->aiocb = req->aiocb;
+		new->buf = (char *)&vid;
+		new->seq_num = atomic_inc_return(&dev->seq_num);
+		new->type = SHEEP_WRITE;
+		atomic_inc(&req->aiocb->nr_requests);
+		INIT_LIST_HEAD(&new->list);
+
+		/* Make sure no request is queued while we update inode */
+		spin_lock(&dev->vdi_lock);
+		dev->vdi.inode->data_vdi_id[idx] = vid;
+		spin_unlock(&dev->vdi_lock);
+
+		submit_sheep_request(new);
+		submit_blocking_sheep_request(dev, req->oid);
+		/* fall thru */
+	case SHEEP_WRITE:
+	case SHEEP_READ:
+		end_sheep_request(req);
+		break;
+	}
+
 	return 0;
+err:
+	return ret;
 }
