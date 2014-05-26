@@ -299,8 +299,8 @@ static void submit_sheep_request(struct sheep_request *req)
 		sheep_submit_sdreq(dev->sock, &hdr, NULL, 0);
 		break;
 	}
-	sbd_debug("add oid %llx off %d, len %d, seq %u\n", req->oid,
-		  req->offset, req->length, req->seq_num);
+	sbd_debug("add oid %llx off %d, len %d, seq %u, type %d\n", req->oid,
+		  req->offset, req->length, req->seq_num, req->type);
 	wake_up(&dev->reaper_wq);
 }
 
@@ -320,7 +320,23 @@ static void aio_write_done(struct sheep_aiocb *aiocb)
 
 static void aio_read_done(struct sheep_aiocb *aiocb)
 {
+	struct req_iterator iter;
+	struct bio_vec *bvec;
+	struct request *req = aiocb->request;
+	int len = 0;
+
 	sbd_debug("rdone off %llu, len %llu\n", aiocb->offset, aiocb->length);
+
+	rq_for_each_segment(bvec, req, iter) {
+		unsigned long flags;
+		void *addr = bvec_kmap_irq(bvec, &flags);
+
+		memcpy(addr, aiocb->buf + len, bvec->bv_len);
+		flush_dcache_page(bvec->bv_page);
+		bvec_kunmap_irq(addr, &flags);
+
+		len += bvec->bv_len;
+	}
 
 	blk_end_request_all(aiocb->request, aiocb->ret);
 	free_sheep_aiocb(aiocb);
@@ -574,7 +590,7 @@ int sheep_handle_reply(struct sbd_device *dev)
 
 	ret = socket_read(dev->sock, (char *)&rsp, sizeof(rsp));
 	if (ret < 0) {
-		pr_err("failed to read reply header\n");
+		pr_err("failed to read reply header %d\n", ret);
 		goto err;
 	}
 
@@ -586,7 +602,7 @@ int sheep_handle_reply(struct sbd_device *dev)
 	if (rsp.data_length > 0) {
 		ret = socket_read(dev->sock, req->buf, req->length);
 		if (ret < 0) {
-			pr_err("failed to read reply payload\n");
+			pr_err("failed to read reply payload %d\n", ret);
 			goto err;
 		}
 	}
