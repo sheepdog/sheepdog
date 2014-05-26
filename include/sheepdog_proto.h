@@ -11,14 +11,19 @@
 #ifndef __SHEEPDOG_PROTO_H__
 #define __SHEEPDOG_PROTO_H__
 
-#include <inttypes.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <string.h>
-#include <linux/limits.h>
+#ifdef __KERNEL__
+# define UINT64_MAX (18446744073709551615ULL)
+# define UINT64_C(x) ((x) + (UINT64_MAX - UINT64_MAX))
+#else
+# include <inttypes.h>
+# include <stdint.h>
+# include <string.h>
+# include "compiler.h"
+# include "bitops.h"
+#endif
 
-#include "compiler.h"
-#include "bitops.h"
+#include <stdbool.h>
+#include <linux/limits.h>
 
 #define SD_PROTO_VER 0x02
 
@@ -297,8 +302,9 @@ void sd_inode_index_walk(const struct sd_inode *inode, index_cb_fn, void *);
 static inline uint64_t fnv_64a_buf(const void *buf, size_t len, uint64_t hval)
 {
 	const unsigned char *p = (const unsigned char *) buf;
+	int i;
 
-	for (int i = 0; i < len; i++) {
+	for (i = 0; i < len; i++) {
 		hval ^= (uint64_t) p[i];
 		hval *= FNV_64_PRIME;
 	}
@@ -371,10 +377,12 @@ static inline uint32_t sd_hash_vdi(const char *name)
 	return (uint32_t)(hval & (SD_NR_VDIS - 1));
 }
 
+#ifndef __KERNEL__
 static inline uint64_t hash_64(uint64_t val, unsigned int bits)
 {
 	return sd_hash_64(val) >> (64 - bits);
 }
+#endif
 
 static inline bool is_vdi_obj(uint64_t oid)
 {
