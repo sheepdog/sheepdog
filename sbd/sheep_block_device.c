@@ -241,6 +241,8 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 	dev->submiter = kthread_run(sbd_request_submiter, dev, "sbd_submiter");
 	if (IS_ERR(dev->submiter))
 		goto err_stop_reaper;
+	dev->reaper->flags = PF_MEMALLOC;
+	dev->submiter->flags = PF_MEMALLOC;
 
 	ret = sbd_add_disk(dev);
 	if (ret < 0)

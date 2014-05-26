@@ -23,6 +23,17 @@
 #define SBD_MINORS_SHIFT 5 /* at most 31 partitions for a single device */
 #define SECTOR_SIZE 512
 
+/* __GFP_MEMALLOC was introduced since v3.6, if not defined, nullify it */
+#ifndef __GFP_MEMALLOC
+# define __GFP_MEMALLOC GFP_NOIO
+#endif
+
+/*
+ * Try our best to handle low memory situation, when dirty pages should be
+ * written out over network, not local disks.
+ */
+#define SBD_GFP_FLAGS (GFP_NOIO | __GFP_MEMALLOC)
+
 struct sheep_vdi {
 	struct sd_inode *inode;
 	u32 vid;

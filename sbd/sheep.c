@@ -71,6 +71,8 @@ static int socket_create(struct socket **sock, const char *ip_addr, int port)
 		goto shutdown;
 	}
 
+	(*sock)->sk->sk_allocation = SBD_GFP_FLAGS;
+
 	return ret;
 shutdown:
 	socket_shutdown(*sock);
@@ -94,7 +96,6 @@ static int socket_xmit(struct socket *sock, void *buf, int size, bool send,
 	sigprocmask(SIG_SETMASK, &blocked, &oldset);
 
 	do {
-		sock->sk->sk_allocation = GFP_NOIO;
 		iov.iov_base = buf;
 		iov.iov_len = size;
 		msg.msg_name = NULL;
@@ -348,7 +349,7 @@ static void aio_read_done(struct sheep_aiocb *aiocb)
 
 struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 {
-	struct sheep_aiocb *aiocb = kmalloc(sizeof(*aiocb), GFP_KERNEL);
+	struct sheep_aiocb *aiocb = kmalloc(sizeof(*aiocb), SBD_GFP_FLAGS);
 	struct req_iterator iter;
 	struct bio_vec *bvec;
 	int len = 0;
@@ -400,7 +401,7 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 						 u64 oid, int len,
 						 int offset)
 {
-	struct sheep_request *req = kmalloc(sizeof(*req), GFP_KERNEL);
+	struct sheep_request *req = kmalloc(sizeof(*req), SBD_GFP_FLAGS);
 	struct sbd_device *dev = sheep_aiocb_to_device(aiocb);
 
 	if (!req)
@@ -616,7 +617,7 @@ int sheep_handle_reply(struct sbd_device *dev)
 	switch (req->type) {
 	case SHEEP_CREATE:
 		/* We need to update inode for create */
-		new = kmalloc(sizeof(*new), GFP_KERNEL);
+		new = kmalloc(sizeof(*new), SBD_GFP_FLAGS);
 		if (!new) {
 			ret = -ENOMEM;
 			req->aiocb->ret = EIO;
