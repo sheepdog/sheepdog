@@ -1,5 +1,5 @@
 MODULE_NAME=sbd
 
-ccflags-y	:= -I$(PWD)/../include -DDEBUG
+ccflags-y	:= -I$(PWD)/../include
 obj-m		:= $(MODULE_NAME).o
 $(MODULE_NAME)-y := sheep_block_device.o sheep.o

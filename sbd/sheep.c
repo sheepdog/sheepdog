@@ -191,6 +191,16 @@ static int sheep_run_sdreq(struct socket *sock, struct sd_req *hdr,
 		}
 	}
 
+	switch (rsp->result) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_NO_OBJ:
+	case SD_RES_NO_VDI:
+		return -ENOENT;
+	default:
+		return -EIO;
+	}
+
 	return 0;
 }
 
@@ -207,12 +217,6 @@ static int lookup_sheep_vdi(struct sbd_device *dev)
 	if (ret < 0)
 		return ret;
 
-	/* XXX switch case */
-	if (rsp->result != SD_RES_SUCCESS) {
-		sbd_debug("Cannot get VDI info for %s\n", dev->vdi.name);
-		return -EIO;
-	}
-
 	dev->vdi.vid = rsp->vdi.vdi_id;
 
 	return 0;
@@ -221,7 +225,6 @@ static int lookup_sheep_vdi(struct sbd_device *dev)
 int sheep_setup_vdi(struct sbd_device *dev)
 {
 	struct sd_req hdr = {};
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct sd_inode *inode;
 	int ret;
 
@@ -235,23 +238,20 @@ int sheep_setup_vdi(struct sbd_device *dev)
 		goto out;
 
 	ret = lookup_sheep_vdi(dev);
-	if (ret < 0)
+	if (ret < 0) {
+		pr_err("Cannot get VDI for %s, %d\n", dev->vdi.name, ret);
 		goto out_release;
+	}
 
 	hdr.opcode = SD_OP_READ_OBJ;
 	hdr.data_length = SD_INODE_SIZE;
 	hdr.obj.oid = vid_to_vdi_oid(dev->vdi.vid);
 	hdr.obj.offset = 0;
 	ret = sheep_run_sdreq(dev->sock, &hdr, inode);
-	if (ret < 0)
-		goto out_release;
-
-	/* XXX switch case */
-	if (rsp->result != SD_RES_SUCCESS) {
-		ret = -EIO;
+	if (ret < 0) {
+		pr_err("Cannot read inode for %s, %d\n", dev->vdi.name, ret);
 		goto out_release;
 	}
-
 	dev->vdi.inode = inode;
 	pr_info("%s: Associated to %s\n", DRV_NAME, inode->name);
 	return 0;
@@ -263,10 +263,12 @@ out:
 	return ret;
 }
 
-static void submit_sheep_request(struct sheep_request *req)
+/* FIXME: handle submit failure */
+static int submit_sheep_request(struct sheep_request *req)
 {
 	struct sd_req hdr = {};
 	struct sbd_device *dev = sheep_request_to_device(req);
+	int ret;
 
 	hdr.id = req->seq_num;
 	hdr.data_length = req->length;
@@ -286,16 +288,24 @@ static void submit_sheep_request(struct sheep_request *req)
 		else
 			hdr.opcode = SD_OP_WRITE_OBJ;
 		hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
-		sheep_submit_sdreq(dev->sock, &hdr, req->buf, req->length);
+		ret = sheep_submit_sdreq(dev->sock, &hdr, req->buf,
+					 req->length);
+		if (ret < 0)
+			goto err;
 		break;
 	case SHEEP_READ:
 		hdr.opcode = SD_OP_READ_OBJ;
-		sheep_submit_sdreq(dev->sock, &hdr, NULL, 0);
+		ret = sheep_submit_sdreq(dev->sock, &hdr, NULL, 0);
+		if (ret < 0)
+			goto err;
 		break;
 	}
 	sbd_debug("add oid %llx off %d, len %d, seq %u, type %d\n", req->oid,
 		  req->offset, req->length, req->seq_num, req->type);
 	wake_up(&dev->reaper_wq);
+	return 0;
+err:
+	return ret;
 }
 
 static inline void free_sheep_aiocb(struct sheep_aiocb *aiocb)
@@ -574,6 +584,7 @@ static void submit_blocking_sheep_request(struct sbd_device *dev, uint64_t oid)
 	write_unlock(&dev->blocking_lock);
 }
 
+/* FIXME: add auto-reconnect support */
 int sheep_handle_reply(struct sbd_device *dev)
 {
 	struct sd_rsp rsp = {};
@@ -597,7 +608,8 @@ int sheep_handle_reply(struct sbd_device *dev)
 		ret = socket_read(dev->sock, req->buf, req->length);
 		if (ret < 0) {
 			pr_err("failed to read reply payload %d\n", ret);
-			goto err;
+			req->aiocb->ret = EIO;
+			goto end_request;
 		}
 	}
 
@@ -607,7 +619,8 @@ int sheep_handle_reply(struct sbd_device *dev)
 		new = kmalloc(sizeof(*new), GFP_KERNEL);
 		if (!new) {
 			ret = -ENOMEM;
-			goto err;
+			req->aiocb->ret = EIO;
+			goto end_request;
 		}
 
 		vid = dev->vdi.vid;
@@ -633,11 +646,10 @@ int sheep_handle_reply(struct sbd_device *dev)
 		/* fall thru */
 	case SHEEP_WRITE:
 	case SHEEP_READ:
-		end_sheep_request(req);
 		break;
 	}
-
-	return 0;
+end_request:
+	end_sheep_request(req);
 err:
 	return ret;
 }
