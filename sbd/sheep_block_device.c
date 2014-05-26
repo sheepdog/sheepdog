@@ -15,11 +15,40 @@
  * This file implements the glue functions to export sheep vdi as Linux block
  * device.
  *
+ * Instructions for use
+ * --------------------
+ *
+ * 1) Map a Linux block device to an existing sheep vdi.
+ *
+ *    In this example, we will try to connect to vdi test with sheep daemon IP
+ *    127.0.0.1 and port 7000.
+ *
+ *    $ echo "127.0.0.1 7000 test" > /sys/bus/sbd/add
+ *
+ * 2) List all active sbd<->vdi mappings.
+ *
+ *    In this example, we have already attached sheep disk1, disk2, disk3
+ *
+ *    $ cat /sys/bus/sbd/list
+ *    0 disk1
+ *    1 disk2
+ *    2 disk3
+ *
+ *    The columns, in order, are:
+ *    - blkdev unique id
+ *    - sheep vdi name
+ *
+ * 3) Remove an active sbd<->vdi mapping.
+ *
+ *    In this example, we remove the mapping with blkdev unique id 1.
+ *
+ *    $ echo 1 > /sys/bus/sbd/remove
  */
 
 #include "sbd.h"
 
 static LIST_HEAD(sbd_dev_list);
+static DEFINE_MUTEX(dev_list_mutex);
 
 static const struct block_device_operations sbd_bd_ops = {
 	.owner		= THIS_MODULE,
@@ -189,10 +218,12 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 	rwlock_init(&dev->inflight_lock);
 	rwlock_init(&dev->blocking_lock);
 
+	mutex_lock(&dev_list_mutex);
 	list_for_each_entry(tmp, &sbd_dev_list, list) {
-		if (tmp->id > new_id)
+		if (tmp->id >= new_id)
 			new_id = tmp->id + 1;
 	}
+	mutex_unlock(&dev_list_mutex);
 
 	ret = sheep_setup_vdi(dev);
 	if (ret < 0)
@@ -216,7 +247,9 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 	if (ret < 0)
 		goto err_unreg_blkdev;
 
+	mutex_lock(&dev_list_mutex);
 	list_add_tail(&dev->list, &sbd_dev_list);
+	mutex_unlock(&dev_list_mutex);
 
 	return count;
 err_unreg_blkdev:
@@ -285,9 +318,25 @@ static ssize_t sbd_remove(struct bus_type *bus, const char *buf,
 	return count;
 }
 
+static ssize_t sbd_list(struct bus_type *bus, char *buf)
+{
+	ssize_t ret = 0;
+	struct sbd_device *dev;
+
+	mutex_lock(&dev_list_mutex);
+	list_for_each_entry(dev, &sbd_dev_list, list) {
+		ret += sprintf(buf + ret, "%d %s\n", dev->id,
+			       dev->vdi.inode->name);
+	}
+	mutex_unlock(&dev_list_mutex);
+
+	return ret;
+}
+
 static struct bus_attribute sbd_bus_attrs[] = {
 	__ATTR(add, S_IWUSR, NULL, sbd_add),
 	__ATTR(remove, S_IWUSR, NULL, sbd_remove),
+	__ATTR(list, S_IRUSR, sbd_list, NULL),
 	__ATTR_NULL
 };
 

@@ -11,12 +11,6 @@
 
 #include "sbd.h"
 
-/* FIXME I need this hack to compile DEFINE_MUTEX successfully */
-#ifdef __SPIN_LOCK_UNLOCKED
-# undef __SPIN_LOCK_UNLOCKED
-# define __SPIN_LOCK_UNLOCKED(lockname) __SPIN_LOCK_INITIALIZER(lockname)
-#endif
-
 static DEFINE_MUTEX(socket_mutex);
 
 void socket_shutdown(struct socket *sock)
