@@ -50,6 +50,8 @@
 static LIST_HEAD(sbd_dev_list);
 static DEFINE_MUTEX(dev_list_mutex);
 
+static int sbd_major;
+
 static const struct block_device_operations sbd_bd_ops = {
 	.owner		= THIS_MODULE,
 };
@@ -92,13 +94,13 @@ static int sbd_add_disk(struct sbd_device *dev)
 	struct gendisk *disk;
 	struct request_queue *rq;
 
-	disk = alloc_disk(SBD_MINORS_PER_MAJOR);
+	disk = alloc_disk(1 << SBD_MINORS_SHIFT);
 	if (!disk)
 		return -ENOMEM;
 
 	snprintf(disk->disk_name, DEV_NAME_LEN, DRV_NAME "%d", dev->id);
 	disk->major = dev->major;
-	disk->first_minor = 0;
+	disk->first_minor = dev->minor;
 	disk->fops = &sbd_bd_ops;
 	disk->private_data = dev;
 
@@ -231,29 +233,30 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 
 	dev->id = new_id;
 	snprintf(name, DEV_NAME_LEN, DRV_NAME "%d", dev->id);
-	ret = register_blkdev(0, name);
-	if (ret < 0)
-		goto err_free_dev;
-	dev->major = ret;
-	dev->minor = 0;
+	dev->major = sbd_major;
+	dev->minor = sbd_dev_id_to_minor(dev->id);
 	dev->reaper = kthread_run(sbd_request_reaper, dev, "sbd_reaper");
 	if (IS_ERR(dev->reaper))
-		goto err_unreg_blkdev;
+		goto err_free_dev;
 	dev->submiter = kthread_run(sbd_request_submiter, dev, "sbd_submiter");
 	if (IS_ERR(dev->submiter))
-		goto err_unreg_blkdev;
+		goto err_stop_reaper;
 
 	ret = sbd_add_disk(dev);
 	if (ret < 0)
-		goto err_unreg_blkdev;
+		goto err_stop_kthreads;
 
 	mutex_lock(&dev_list_mutex);
 	list_add_tail(&dev->list, &sbd_dev_list);
 	mutex_unlock(&dev_list_mutex);
 
 	return count;
-err_unreg_blkdev:
-	unregister_blkdev(dev->major, name);
+err_stop_kthreads:
+	kthread_stop(dev->submiter);
+	wake_up(&dev->submiter_wq);
+err_stop_reaper:
+	kthread_stop(dev->reaper);
+	wake_up(&dev->reaper_wq);
 err_free_dev:
 	free_sbd_device(dev);
 err_put:
@@ -380,17 +383,27 @@ int __init sbd_init(void)
 {
 	int ret;
 
-	ret = sbd_sysfs_init();
+	ret = register_blkdev(0, DRV_NAME);
 	if (ret < 0)
 		return ret;
 
+	sbd_major = ret;
+
+	ret = sbd_sysfs_init();
+	if (ret < 0)
+		goto err;
+
 	pr_info("%s: Sheepdog block device loaded\n", DRV_NAME);
 	return 0;
+err:
+	unregister_blkdev(sbd_major, DRV_NAME);
+	return ret;
 }
 
 void __exit sbd_exit(void)
 {
 	sbd_sysfs_cleanup();
+	unregister_blkdev(sbd_major, DRV_NAME);
 	pr_info("%s: Sheepdog block device unloaded\n", DRV_NAME);
 }
 

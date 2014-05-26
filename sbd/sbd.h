@@ -20,7 +20,7 @@
 
 #define DRV_NAME "sbd"
 #define DEV_NAME_LEN 32
-#define SBD_MINORS_PER_MAJOR 32
+#define SBD_MINORS_SHIFT 5 /* at most 31 partitions for a single device */
 #define SECTOR_SIZE 512
 
 struct sheep_vdi {
@@ -91,6 +91,11 @@ int sheep_setup_vdi(struct sbd_device *dev);
 struct sheep_aiocb *sheep_aiocb_setup(struct request *req);
 int sheep_aiocb_submit(struct sheep_aiocb *aiocb);
 int sheep_handle_reply(struct sbd_device *dev);
+
+static inline int sbd_dev_id_to_minor(int id)
+{
+	return id << SBD_MINORS_SHIFT;
+}
 
 #if defined(CONFIG_DYNAMIC_DEBUG) && defined _DPRINTK_FLAGS_INCL_MODNAME
 
