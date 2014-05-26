@@ -207,7 +207,7 @@ static ssize_t sbd_add(struct bus_type *bus, const char *buf,
 	if (sscanf(buf, "%s %d %s", dev->vdi.ip, &dev->vdi.port,
 		   dev->vdi.name) != 3) {
 		ret = -EINVAL;
-		goto err_put;
+		goto err_free_dev;
 	}
 
 	spin_lock_init(&dev->queue_lock);
@@ -393,11 +393,18 @@ int __init sbd_init(void)
 
 	ret = sbd_sysfs_init();
 	if (ret < 0)
-		goto err;
+		goto err_unreg_blkdev;
+
+	ret = sheep_slab_create();
+	if (ret < 0)
+		goto err_sysfs_cleanup;
 
 	pr_info("%s: Sheepdog block device loaded\n", DRV_NAME);
 	return 0;
-err:
+
+err_sysfs_cleanup:
+	sbd_sysfs_cleanup();
+err_unreg_blkdev:
 	unregister_blkdev(sbd_major, DRV_NAME);
 	return ret;
 }
@@ -406,6 +413,7 @@ void __exit sbd_exit(void)
 {
 	sbd_sysfs_cleanup();
 	unregister_blkdev(sbd_major, DRV_NAME);
+	sheep_slab_destroy();
 	pr_info("%s: Sheepdog block device unloaded\n", DRV_NAME);
 }
 

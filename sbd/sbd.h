@@ -102,6 +102,8 @@ int sheep_setup_vdi(struct sbd_device *dev);
 struct sheep_aiocb *sheep_aiocb_setup(struct request *req);
 int sheep_aiocb_submit(struct sheep_aiocb *aiocb);
 int sheep_handle_reply(struct sbd_device *dev);
+int sheep_slab_create(void);
+void sheep_slab_destroy(void);
 
 static inline int sbd_dev_id_to_minor(int id)
 {

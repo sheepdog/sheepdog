@@ -12,6 +12,8 @@
 #include "sbd.h"
 
 static DEFINE_MUTEX(socket_mutex);
+static struct kmem_cache *sheep_aiocb_pool;
+static struct kmem_cache *sheep_request_pool;
 
 void socket_shutdown(struct socket *sock)
 {
@@ -312,7 +314,7 @@ err:
 static inline void free_sheep_aiocb(struct sheep_aiocb *aiocb)
 {
 	vfree(aiocb->buf);
-	kfree(aiocb);
+	kmem_cache_free(sheep_aiocb_pool, aiocb);
 }
 
 static void aio_write_done(struct sheep_aiocb *aiocb)
@@ -349,7 +351,8 @@ static void aio_read_done(struct sheep_aiocb *aiocb)
 
 struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 {
-	struct sheep_aiocb *aiocb = kmalloc(sizeof(*aiocb), SBD_GFP_FLAGS);
+	struct sheep_aiocb *aiocb = kmem_cache_alloc(sheep_aiocb_pool,
+						     SBD_GFP_FLAGS);
 	struct req_iterator iter;
 	struct bio_vec *bvec;
 	int len = 0;
@@ -366,7 +369,7 @@ struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 	atomic_set(&aiocb->nr_requests, 0);
 
 	if (!aiocb->buf) {
-		kfree(aiocb);
+		kmem_cache_free(sheep_aiocb_pool, aiocb);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -401,7 +404,8 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 						 u64 oid, int len,
 						 int offset)
 {
-	struct sheep_request *req = kmalloc(sizeof(*req), SBD_GFP_FLAGS);
+	struct sheep_request *req = kmem_cache_alloc(sheep_request_pool,
+						     SBD_GFP_FLAGS);
 	struct sbd_device *dev = sheep_aiocb_to_device(aiocb);
 
 	if (!req)
@@ -425,7 +429,7 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 	default:
 		/* impossible case */
 		WARN_ON(1);
-		kfree(req);
+		kmem_cache_free(sheep_request_pool, req);
 		return ERR_PTR(-EINVAL);
 	}
 
@@ -445,7 +449,7 @@ static void end_sheep_request(struct sheep_request *req)
 	if (atomic_dec_return(&aiocb->nr_requests) <= 0)
 		aiocb->aio_done_func(aiocb);
 	BUG_ON(!list_empty(&req->list));
-	kfree(req);
+	kmem_cache_free(sheep_request_pool, req);
 }
 
 static struct sheep_request *find_inflight_request_oid(struct sbd_device *dev,
@@ -617,7 +621,7 @@ int sheep_handle_reply(struct sbd_device *dev)
 	switch (req->type) {
 	case SHEEP_CREATE:
 		/* We need to update inode for create */
-		new = kmalloc(sizeof(*new), SBD_GFP_FLAGS);
+		new = kmem_cache_alloc(sheep_request_pool, SBD_GFP_FLAGS);
 		if (!new) {
 			ret = -ENOMEM;
 			req->aiocb->ret = EIO;
@@ -653,4 +657,24 @@ end_request:
 	end_sheep_request(req);
 err:
 	return ret;
+}
+
+int sheep_slab_create(void)
+{
+	sheep_aiocb_pool = KMEM_CACHE(sheep_aiocb, 0);
+	if (!sheep_aiocb_pool)
+		return -ENOMEM;
+
+	sheep_request_pool = KMEM_CACHE(sheep_request, 0);
+	if (!sheep_request_pool) {
+		kmem_cache_destroy(sheep_aiocb_pool);
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+void sheep_slab_destroy(void)
+{
+	kmem_cache_destroy(sheep_aiocb_pool);
+	kmem_cache_destroy(sheep_request_pool);
 }
