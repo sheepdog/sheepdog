@@ -90,6 +90,7 @@ struct sheep_request {
 	struct list_head list;
 	struct sheep_aiocb *aiocb;
 	u64 oid;
+	u64 cow_oid;
 	u32 seq_num;
 	int type;
 	int offset;

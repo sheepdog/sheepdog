@@ -276,6 +276,7 @@ static int submit_sheep_request(struct sheep_request *req)
 	hdr.id = req->seq_num;
 	hdr.data_length = req->length;
 	hdr.obj.oid = req->oid;
+	hdr.obj.cow_oid = req->cow_oid;
 	hdr.obj.offset = req->offset;
 
 	write_lock(&dev->inflight_lock);
@@ -291,6 +292,8 @@ static int submit_sheep_request(struct sheep_request *req)
 		else
 			hdr.opcode = SD_OP_WRITE_OBJ;
 		hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_DIRECT;
+		if (req->cow_oid)
+			hdr.flags |= SD_FLAG_CMD_COW;
 		ret = sheep_submit_sdreq(dev->sock, &hdr, req->buf,
 					 req->length);
 		if (ret < 0)
@@ -400,8 +403,13 @@ struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 	return aiocb;
 }
 
+static inline bool aiocb_is_write(struct sheep_aiocb *aiocb)
+{
+	return aiocb->aio_done_func == aio_write_done;
+}
+
 static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
-						 u64 oid, int len,
+						 u64 oid, u64 cow_oid, int len,
 						 int offset)
 {
 	struct sheep_request *req = kmem_cache_alloc(sheep_request_pool,
@@ -414,24 +422,15 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 	req->offset = offset;
 	req->length = len;
 	req->oid = oid;
+	req->cow_oid = cow_oid;
 	req->aiocb = aiocb;
 	req->buf = aiocb->buf + aiocb->buf_iter;
 	req->seq_num = atomic_inc_return(&dev->seq_num);
 	INIT_LIST_HEAD(&req->list);
-
-	switch (rq_data_dir(aiocb->request)) {
-	case WRITE:
+	if (aiocb_is_write(aiocb))
 		req->type = SHEEP_WRITE;
-		break;
-	case READ:
+	else
 		req->type = SHEEP_READ;
-		break;
-	default:
-		/* impossible case */
-		WARN_ON(1);
-		kmem_cache_free(sheep_request_pool, req);
-		return ERR_PTR(-EINVAL);
-	}
 
 	aiocb->buf_iter += len;
 	atomic_inc(&aiocb->nr_requests);
@@ -468,15 +467,15 @@ static struct sheep_request *find_inflight_request_oid(struct sbd_device *dev,
 	return NULL;
 }
 
-static bool sheep_inode_has_idx(struct sbd_device *dev, u32 idx)
+static uint32_t sheep_inode_get_idx(struct sbd_device *dev, u32 idx)
 {
+	uint32_t vid;
+
 	spin_lock(&dev->vdi_lock);
-	if (dev->vdi.inode->data_vdi_id[idx]) {
-		spin_unlock(&dev->vdi_lock);
-		return true;
-	}
+	vid = dev->vdi.inode->data_vdi_id[idx];
 	spin_unlock(&dev->vdi_lock);
-	return false;
+
+	return vid;
 }
 
 int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
@@ -485,8 +484,7 @@ int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
 	u64 offset = aiocb->offset;
 	u64 total = aiocb->length;
 	u64 start = offset % SD_DATA_OBJ_SIZE;
-	u32 vid = dev->vdi.vid;
-	u64 oid = vid_to_data_oid(vid, offset / SD_DATA_OBJ_SIZE);
+	u32 idx = offset / SD_DATA_OBJ_SIZE;
 	int len = SD_DATA_OBJ_SIZE - start;
 
 	if (total < len)
@@ -502,16 +500,27 @@ int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
 
 	do {
 		struct sheep_request *req;
-		u32 idx = data_oid_to_idx(oid);
+		u64 oid = vid_to_data_oid(dev->vdi.vid, idx), cow_oid = 0;
+		uint32_t vid = sheep_inode_get_idx(dev, idx);
 
-		req = alloc_sheep_request(aiocb, oid, len, start);
+		/*
+		 * For read, either read cow object or end the request.
+		 * For write, copy-on-write cow object
+		 */
+		if (vid && vid != dev->vdi.vid) {
+			if (aiocb_is_write(aiocb))
+				cow_oid = vid_to_data_oid(vid, idx);
+			else
+				oid = vid_to_data_oid(vid, idx);
+		}
+
+		req = alloc_sheep_request(aiocb, oid, cow_oid, len, start);
 		if (IS_ERR(req))
 			return PTR_ERR(req);
 
-		if (likely(sheep_inode_has_idx(dev, idx)))
+		if (likely(vid && !cow_oid))
 			goto submit;
 
-		/* Object is not created yet... */
 		switch (req->type) {
 		case SHEEP_WRITE:
 			/*
@@ -520,12 +529,16 @@ int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
 			 * write reqs in next.
 			 */
 			if (find_inflight_request_oid(dev, oid)) {
+				uint32_t tmp_vid;
+
 				write_lock(&dev->blocking_lock);
 				/*
 				 * There are slim chance object was created
 				 * before we grab blocking_lock
 				 */
-				if (unlikely(sheep_inode_has_idx(dev, idx))) {
+				tmp_vid = sheep_inode_get_idx(dev, idx);
+				if (unlikely(tmp_vid && tmp_vid ==
+					     dev->vdi.vid)) {
 					write_unlock(&dev->blocking_lock);
 					goto submit;
 				}
@@ -545,7 +558,7 @@ int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
 submit:
 		submit_sheep_request(req);
 done:
-		oid++;
+		idx++;
 		total -= len;
 		start = (start + len) % SD_DATA_OBJ_SIZE;
 		len = total > SD_DATA_OBJ_SIZE ? SD_DATA_OBJ_SIZE : total;
@@ -634,6 +647,7 @@ int sheep_handle_reply(struct sbd_device *dev)
 		new->offset = SD_INODE_HEADER_SIZE + sizeof(vid) * idx;
 		new->length = sizeof(vid);
 		new->oid = oid;
+		new->cow_oid = 0;
 		new->aiocb = req->aiocb;
 		new->buf = (char *)&vid;
 		new->seq_num = atomic_inc_return(&dev->seq_num);
