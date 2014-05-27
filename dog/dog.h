@@ -99,9 +99,13 @@ int dog_bnode_writer(uint64_t oid, void *mem, unsigned int len, uint64_t offset,
 int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 		     uint64_t offset);
 
+int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
+			uint32_t *pvid, struct sd_inode *inode, size_t size);
+
 extern struct command vdi_command;
 extern struct command node_command;
 extern struct command cluster_command;
+extern struct command alter_command;
 
 #ifdef HAVE_TRACE
 extern struct command trace_command;

@@ -23,6 +23,8 @@
 
 static struct sd_option vdi_options[] = {
 	{'P', "prealloc", false, "preallocate all the data objects"},
+	{'n', "no-share", false, "share nothing with its parent, "
+				"prealloc also enabled"},
 	{'i', "index", true, "specify the index of data objects"},
 	{'s', "snapshot", true, "specify a snapshot id or tag name"},
 	{'x', "exclusive", false, "write in an exclusive mode"},
@@ -51,6 +53,7 @@ static struct vdi_cmd_data {
 	uint8_t copy_policy;
 	uint8_t store_policy;
 	uint64_t oid;
+	bool no_share;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -336,7 +339,7 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 	return 0;
 }
 
-static int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
+int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 			uint32_t *pvid, struct sd_inode *inode,
 			size_t size)
 {
@@ -565,6 +568,9 @@ static int vdi_clone(int argc, char **argv)
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS)
 		goto out;
+
+	if (vdi_cmd_data.no_share == true)
+		base_vid = 0;
 
 	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, false,
 			    inode->nr_copies, inode->copy_policy,
@@ -2359,7 +2365,7 @@ static struct subcommand vdi_cmd[] = {
 	{"snapshot", "<vdiname>", "saphrv", "create a snapshot",
 	 NULL, CMD_NEED_ARG,
 	 vdi_snapshot, vdi_options},
-	{"clone", "<src vdi> <dst vdi>", "sPcaphrv", "clone an image",
+	{"clone", "<src vdi> <dst vdi>", "sPnaphrv", "clone an image",
 	 NULL, CMD_NEED_ARG,
 	 vdi_clone, vdi_options},
 	{"delete", "<vdiname>", "saph", "delete an image",
@@ -2414,6 +2420,10 @@ static int vdi_parser(int ch, const char *opt)
 
 	switch (ch) {
 	case 'P':
+		vdi_cmd_data.prealloc = true;
+		break;
+	case 'n':
+		vdi_cmd_data.no_share = true;
 		vdi_cmd_data.prealloc = true;
 		break;
 	case 'i':

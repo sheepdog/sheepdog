@@ -715,6 +715,35 @@ static int cluster_recovery_completion(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
+static int cluster_alter_cluster_copy(const struct sd_req *req,
+			struct sd_rsp *rsp, void *data)
+{
+	if (req->cluster.copy_policy != 0)
+		return SD_RES_INVALID_PARMS;
+
+	sys->cinfo.nr_copies = req->cluster.copies;
+	return set_cluster_config(&sys->cinfo);
+}
+
+static int cluster_alter_vdi_copy(const struct sd_req *req,
+			struct sd_rsp *rsp, void *data)
+{
+	if (req->cluster.copy_policy != 0)
+		return SD_RES_INVALID_PARMS;
+
+	uint32_t vid = req->vdi_state.new_vid;
+	int nr_copies = req->vdi_state.copies;
+	struct vnode_info *vinfo;
+
+	add_vdi_state(vid, nr_copies, false, 0);
+
+	vinfo = get_vnode_info();
+	start_recovery(vinfo, vinfo, false);
+	put_vnode_info(vinfo);
+
+	return SD_RES_SUCCESS;
+}
+
 static bool node_size_varied(void)
 {
 	uint64_t new, used, old = sys->this_node.space;
@@ -1178,6 +1207,20 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 		.is_admin_op = true,
 		.process_main = cluster_disable_recover,
+	},
+
+	[SD_OP_ALTER_CLUSTER_COPY] = {
+		.name = "ALTER_CLUSTER_COPY",
+		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
+		.process_main = cluster_alter_cluster_copy,
+	},
+
+	[SD_OP_ALTER_VDI_COPY] = {
+		.name = "ALTER_VDI_COPY",
+		.type = SD_OP_TYPE_CLUSTER,
+		.is_admin_op = true,
+		.process_main = cluster_alter_vdi_copy,
 	},
 
 	/* local operations */
