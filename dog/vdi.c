@@ -23,8 +23,7 @@
 
 static struct sd_option vdi_options[] = {
 	{'P', "prealloc", false, "preallocate all the data objects"},
-	{'n', "no-share", false, "share nothing with its parent, "
-				"prealloc also enabled"},
+	{'n', "no-share", false, "share nothing with its parent"},
 	{'i', "index", true, "specify the index of data objects"},
 	{'s', "snapshot", true, "specify a snapshot id or tag name"},
 	{'x', "exclusive", false, "write in an exclusive mode"},
@@ -575,7 +574,8 @@ static int vdi_clone(int argc, char **argv)
 	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, false,
 			    inode->nr_copies, inode->copy_policy,
 			    inode->store_policy);
-	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
+	if (ret != EXIT_SUCCESS ||
+			(!vdi_cmd_data.prealloc && !vdi_cmd_data.no_share))
 		goto out;
 
 	new_inode = xmalloc(sizeof(*inode));
@@ -601,8 +601,11 @@ static int vdi_clone(int argc, char **argv)
 				goto out;
 			}
 			size = SD_DATA_OBJ_SIZE;
-		} else
+		} else {
+			if (vdi_cmd_data.no_share && !vdi_cmd_data.prealloc)
+				continue;
 			size = 0;
+		}
 
 		oid = vid_to_data_oid(new_vid, idx);
 		ret = dog_write_object(oid, 0, buf, size, 0, 0,
@@ -2424,7 +2427,6 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 'n':
 		vdi_cmd_data.no_share = true;
-		vdi_cmd_data.prealloc = true;
 		break;
 	case 'i':
 		vdi_cmd_data.index = strtol(opt, &p, 10);
