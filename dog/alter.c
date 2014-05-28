@@ -15,6 +15,7 @@
 #include <sys/time.h>
 
 #include "dog.h"
+#include "treeview.h"
 
 static struct sd_option alter_options[] = {
 	{'c', "copies", true, "specify the data redundancy level"},
@@ -107,6 +108,30 @@ failure:
 	return EXIT_FAILURE;
 }
 
+static void construct_vdi_tree(uint32_t vid, const char *name, const char *tag,
+			       uint32_t snapid, uint32_t flags,
+			       const struct sd_inode *i, void *data)
+{
+	add_vdi_tree(name, tag, vid, i->parent_vdi_id, false);
+}
+
+static bool is_vdi_standalone(uint32_t vid, const char *name)
+{
+	struct vdi_tree *vdi;
+
+	init_tree();
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
+
+	vdi = find_vdi_from_root(vid, name);
+	if (!vdi) {
+		sd_err("failed to construct vdi tree");
+		return false;
+	}
+
+	return !vdi->pvid && list_empty(&vdi->children);
+}
+
 #define ALTER_VDI_COPY_PRINT				\
 	"    __\n"				\
 	"   ()'`;\n"				\
@@ -117,7 +142,7 @@ failure:
 static int alter_vdi_copy(int argc, char **argv)
 {
 	int ret, old_nr_copies;
-	uint32_t vid, child_vdi_id[MAX_CHILDREN];
+	uint32_t vid;
 	const char *vdiname = argv[optind++];
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
@@ -162,10 +187,7 @@ static int alter_vdi_copy(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	memset(child_vdi_id, 0, sizeof(uint32_t) * MAX_CHILDREN);
-	if (inode->parent_vdi_id != 0 ||
-			memcmp(inode->child_vdi_id, child_vdi_id,
-			sizeof(uint32_t) * MAX_CHILDREN) != 0) {
+	if (!is_vdi_standalone(vid, inode->name)) {
 		sd_err("Only standalone vdi supports "
 			   "changing redundancy level.");
 		sd_err("Please clone %s with -n (--no-share) "

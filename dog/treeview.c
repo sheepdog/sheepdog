@@ -20,21 +20,11 @@
 #define MAX_DEPTH    100
 #endif
 
-struct vdi_tree {
-	char name[1024];
-	char label[256];
-	uint32_t vid;
-	uint32_t pvid;
-	bool highlight;
-	struct list_head children;
-	struct list_node siblings;
-};
-
 static int *width, *more;
 static struct vdi_tree *root;
 
 static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint32_t vid,
-				 const char *name)
+			  const char *name)
 {
 	struct vdi_tree *vdi, *ret;
 
@@ -67,6 +57,11 @@ static struct vdi_tree *new_vdi(const char *name, const char *label,
 void init_tree(void)
 {
 	root = new_vdi("", "", 0, 0, 0);
+}
+
+struct vdi_tree *find_vdi_from_root(uint32_t vid, const char *name)
+{
+	return find_vdi(root, vid, name);
 }
 
 void add_vdi_tree(const char *name, const char *label, uint32_t vid,
