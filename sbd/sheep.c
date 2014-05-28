@@ -255,6 +255,14 @@ int sheep_setup_vdi(struct sbd_device *dev)
 		pr_err("Cannot read inode for %s, %d\n", dev->vdi.name, ret);
 		goto out_release;
 	}
+
+	if (vdi_is_snapshot(inode)) {
+		pr_err("%s: don't support to add snapshot %s\n", DRV_NAME,
+		       dev->vdi.name);
+		ret = -EINVAL;
+		goto out_release;
+	}
+
 	dev->vdi.inode = inode;
 	pr_info("%s: Associated to %s\n", DRV_NAME, inode->name);
 	return 0;
