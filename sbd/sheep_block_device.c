@@ -338,6 +338,27 @@ static ssize_t sbd_list(struct bus_type *bus, char *buf)
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
+
+static BUS_ATTR(add, S_IWUSR, NULL, sbd_add);
+static BUS_ATTR(remove, S_IWUSR, NULL, sbd_remove);
+static BUS_ATTR(list, S_IRUSR, sbd_list, NULL);
+
+static struct attribute *sbd_bus_attrs[] = {
+	&bus_attr_add.attr,
+	&bus_attr_remove.attr,
+	&bus_attr_list.attr,
+	NULL,
+};
+ATTRIBUTE_GROUPS(sbd_bus);
+
+static struct bus_type sbd_bus_type = {
+	.name		= "sbd",
+	.bus_groups	= sbd_bus_groups,
+};
+
+#else
+
 static struct bus_attribute sbd_bus_attrs[] = {
 	__ATTR(add, S_IWUSR, NULL, sbd_add),
 	__ATTR(remove, S_IWUSR, NULL, sbd_remove),
@@ -349,6 +370,8 @@ static struct bus_type sbd_bus_type = {
 	.name		= "sbd",
 	.bus_attrs	= sbd_bus_attrs,
 };
+
+#endif
 
 static void sbd_root_dev_release(struct device *dev)
 {

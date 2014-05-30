@@ -15,6 +15,7 @@
 #include <linux/blkdev.h>
 #include <linux/kthread.h>
 #include <linux/gfp.h>
+#include <linux/version.h>
 
 #include "sheepdog_proto.h"
 
