@@ -336,10 +336,24 @@ static void aio_write_done(struct sheep_aiocb *aiocb)
 	free_sheep_aiocb(aiocb);
 }
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(3, 14, 0)
+
+# define DEFINE_BVEC(x) struct bio_vec *x
+# define BVEC_ADDR(x) x
+# define BVEC_FIELD(x, y) x->y
+
+#else
+
+# define DEFINE_BVEC(x) struct bio_vec x
+# define BVEC_ADDR(x) &x
+# define BVEC_FIELD(x, y) x.y
+
+#endif
+
 static void aio_read_done(struct sheep_aiocb *aiocb)
 {
 	struct req_iterator iter;
-	struct bio_vec *bvec;
+	DEFINE_BVEC(bvec);
 	struct request *req = aiocb->request;
 	int len = 0;
 
@@ -347,13 +361,13 @@ static void aio_read_done(struct sheep_aiocb *aiocb)
 
 	rq_for_each_segment(bvec, req, iter) {
 		unsigned long flags;
-		void *addr = bvec_kmap_irq(bvec, &flags);
+		void *addr = bvec_kmap_irq(BVEC_ADDR(bvec), &flags);
 
-		memcpy(addr, aiocb->buf + len, bvec->bv_len);
-		flush_dcache_page(bvec->bv_page);
+		memcpy(addr, aiocb->buf + len, BVEC_FIELD(bvec, bv_len));
+		flush_dcache_page(BVEC_FIELD(bvec, bv_page));
 		bvec_kunmap_irq(addr, &flags);
 
-		len += bvec->bv_len;
+		len += BVEC_FIELD(bvec, bv_len);
 	}
 
 	blk_end_request_all(aiocb->request, aiocb->ret);
@@ -365,7 +379,7 @@ struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 	struct sheep_aiocb *aiocb = kmem_cache_alloc(sheep_aiocb_pool,
 						     SBD_GFP_FLAGS);
 	struct req_iterator iter;
-	struct bio_vec *bvec;
+	DEFINE_BVEC(bvec);
 	int len = 0;
 
 	if (!aiocb)
@@ -388,13 +402,14 @@ struct sheep_aiocb *sheep_aiocb_setup(struct request *req)
 	case WRITE:
 		rq_for_each_segment(bvec, req, iter) {
 			unsigned long flags;
-			void *addr = bvec_kmap_irq(bvec, &flags);
+			void *addr = bvec_kmap_irq(BVEC_ADDR(bvec), &flags);
 
-			memcpy(aiocb->buf + len, addr, bvec->bv_len);
-			flush_dcache_page(bvec->bv_page);
+			memcpy(aiocb->buf + len, addr,
+			       BVEC_FIELD(bvec, bv_len));
+			flush_dcache_page(BVEC_FIELD(bvec, bv_page));
 			bvec_kunmap_irq(addr, &flags);
 
-			len += bvec->bv_len;
+			len += BVEC_FIELD(bvec, bv_len);
 		}
 		aiocb->aio_done_func = aio_write_done;
 		break;
