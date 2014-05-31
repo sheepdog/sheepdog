@@ -114,7 +114,7 @@ static inline int sbd_dev_id_to_minor(int id)
 
 #if defined(CONFIG_DYNAMIC_DEBUG) && defined _DPRINTK_FLAGS_INCL_MODNAME
 
-# define _SBD_FLAGS (_DPRINTK_FLAGS_PRINT | _DPRINTK_FLAGS_INCL_MODNAME \
+# define _SBD_FLAGS ( _DPRINTK_FLAGS_INCL_MODNAME \
 	| _DPRINTK_FLAGS_INCL_FUNCNAME | _DPRINTK_FLAGS_INCL_LINENO)
 
 # define SBD_DYNAMIC_DEBUG_METADATA(name, fmt)                  \
