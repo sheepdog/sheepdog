@@ -541,13 +541,6 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 
-		if (vdi_is_deleted(inode)) {
-			/* Recycle the deleted inode for fresh vdi create */
-			if (!iocb->create_snapshot)
-				info->free_bit = i;
-			continue;
-		}
-
 		if (!strncmp(inode->name, name, strlen(inode->name))) {
 			sd_debug("%s = %s, %u = %u", iocb->tag, inode->tag,
 				 iocb->snapid, inode->snap_id);
