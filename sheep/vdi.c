@@ -803,40 +803,10 @@ int read_vdis(char *data, int len, unsigned int *rsp_len)
 
 struct deletion_work {
 	struct work work;
-
 	uint32_t target_vid;
-	int delete_vid_count;
-	uint32_t *delete_vid_array;
-
+	bool succeed;
 	int finish_fd;		/* eventfd for notifying finish */
 };
-
-static int delete_inode(uint32_t vid)
-{
-	struct sd_inode *inode = NULL;
-	int ret = SD_RES_SUCCESS;
-
-	inode = xzalloc(sizeof(*inode));
-	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
-			     SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	memset(inode->name, 0, sizeof(inode->name));
-
-	ret = sd_write_object(vid_to_vdi_oid(vid), (char *)inode,
-			      SD_INODE_HEADER_SIZE, 0, false);
-	if (ret != 0) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-out:
-	free(inode);
-	return ret;
-}
 
 static int notify_vdi_deletion(uint32_t vdi_id)
 {
@@ -881,16 +851,20 @@ static void delete_cb(struct sd_index *idx, void *arg, int ignore)
 	}
 }
 
-static int delete_one_vdi(uint32_t vdi_id)
+static void delete_vdi_work(struct work *work)
 {
+	struct deletion_work *dw =
+		container_of(work, struct deletion_work, work);
 	int ret = 0;
 	uint32_t i, nr_deleted, nr_objs;
 	struct sd_inode *inode = NULL;
+	uint32_t vdi_id = dw->target_vid;
 
 	inode = malloc(sizeof(*inode));
 	if (!inode) {
 		sd_err("failed to allocate memory");
-		return -1;
+		dw->succeed = false;
+		return;
 	}
 
 	ret = read_backend_object(vid_to_vdi_oid(vdi_id),
@@ -898,7 +872,7 @@ static int delete_one_vdi(uint32_t vdi_id)
 
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("cannot find VDI object");
-		ret = -1;
+		dw->succeed = false;
 		goto out;
 	}
 
@@ -915,21 +889,20 @@ static int delete_one_vdi(uint32_t vdi_id)
 				continue;
 
 			oid = vid_to_data_oid(vid, i);
-
-			if (vid != inode->vdi_id) {
-				sd_debug("object %" PRIx64 " is base's data, "
-					 "would not be deleted.", oid);
-				continue;
-			}
-
-			ret = sd_remove_object(oid);
+			ret = sd_dec_object_refcnt(oid,
+						inode->gref[i].generation,
+						inode->gref[i].count);
 			if (ret != SD_RES_SUCCESS)
-				sd_err("remove object %" PRIx64 " fail, %d",
+				sd_err("discard ref %" PRIx64 " fail, %d",
 				       oid, ret);
 
 			nr_deleted++;
 		}
 	} else {
+		/*
+		 * todo: generational reference counting is not supported by
+		 * hypervolume yet
+		 */
 		struct delete_arg arg = {inode, &nr_deleted};
 		sd_inode_index_walk(inode, delete_cb, &arg);
 	}
@@ -939,6 +912,8 @@ static int delete_one_vdi(uint32_t vdi_id)
 
 	inode->vdi_size = 0;
 	memset(inode->name, 0, sizeof(inode->name));
+	memset((char *)inode + SD_INODE_HEADER_SIZE, 0,
+	       SD_INODE_SIZE - SD_INODE_HEADER_SIZE);
 
 	sd_write_object(vid_to_vdi_oid(vdi_id), (void *)inode,
 			sizeof(*inode), 0, false);
@@ -947,173 +922,27 @@ static int delete_one_vdi(uint32_t vdi_id)
 		notify_vdi_deletion(vdi_id);
 out:
 	free(inode);
-	return ret;
+	dw->succeed = true;
 }
 
-static void delete_vdis_work(struct work *work)
-{
-	struct deletion_work *dw =
-		container_of(work, struct deletion_work, work);
-
-	for (int i = 0; i < dw->delete_vid_count; i++) {
-		int ret;
-
-		ret = delete_one_vdi(dw->delete_vid_array[i]);
-		if (ret < 0)
-			sd_err("deleting VDI %x failed",
-			       dw->delete_vid_array[i]);
-	}
-}
-
-static void delete_vdis_done(struct work *work)
+static void delete_vdi_done(struct work *work)
 {
 	struct deletion_work *dw =
 		container_of(work, struct deletion_work, work);
 
 	eventfd_xwrite(dw->finish_fd, 1);
-
-	/* the deletion info is completed */
-	free(dw->delete_vid_array);
+	if (!dw->succeed)
+		sd_err("deleting vdi: %x failed", dw->target_vid);
+	/* the deletion work is completed */
 	free(dw);
-}
-
-static int fill_delete_vid_array(struct deletion_work *dw, uint32_t root_vid)
-{
-	int ret = 0;
-	struct sd_inode *inode = NULL;
-	int done = 0;
-	uint32_t vid;
-
-	inode = malloc(SD_INODE_HEADER_SIZE);
-	if (!inode) {
-		sd_err("failed to allocate memory");
-		return -1;
-	}
-
-	dw->delete_vid_array[dw->delete_vid_count++] = root_vid;
-
-	do {
-		vid = dw->delete_vid_array[done++];
-		ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
-					  SD_INODE_HEADER_SIZE, 0);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("cannot find VDI object");
-			ret = -1;
-			break;
-		}
-
-		if (!vdi_is_deleted(inode) && vid != dw->target_vid) {
-			ret = 1;
-			break;
-		}
-
-		for (int i = 0; i < ARRAY_SIZE(inode->child_vdi_id); i++) {
-			if (!inode->child_vdi_id[i])
-				continue;
-
-			dw->delete_vid_array[dw->delete_vid_count++] =
-				inode->child_vdi_id[i];
-		}
-	} while (dw->delete_vid_array[done]);
-
-	free(inode);
-	return ret;
-}
-
-static uint64_t get_vdi_root(uint32_t vid, bool *cloned)
-{
-	int ret;
-	struct sd_inode *inode = NULL;
-
-	*cloned = false;
-
-	inode = malloc(SD_INODE_HEADER_SIZE);
-	if (!inode) {
-		sd_err("failed to allocate memory");
-		return 0;
-	}
-
-	do {
-		ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
-					  SD_INODE_HEADER_SIZE, 0);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("cannot find VDI object");
-			vid = 0;
-			break;
-		}
-
-		if (vid == inode->vdi_id && inode->snap_id == 1
-		    && inode->parent_vdi_id != 0 && !inode->snap_ctime) {
-			sd_debug("vdi %" PRIx32 " is a cloned vdi.", vid);
-			/* current vdi is a cloned vdi */
-			*cloned = true;
-		}
-
-		if (!inode->parent_vdi_id)
-			break;
-
-		vid = inode->parent_vdi_id;
-	} while (true);
-
-	free(inode);
-	return vid;
-}
-
-static void clear_parent_child_vdi(uint32_t vid)
-{
-	struct sd_inode * inode = xmalloc(SD_INODE_HEADER_SIZE);
-	uint32_t pvid, i;
-	int ret;
-
-	ret = read_backend_object(vid_to_vdi_oid(vid), (char *)inode,
-				  SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read inode %"PRIx32, vid);
-		goto out;
-	}
-
-	pvid = inode->parent_vdi_id;
-	if (!pvid)
-		goto out;
-	ret = read_backend_object(vid_to_vdi_oid(pvid), (char *)inode,
-				  SD_INODE_HEADER_SIZE, 0);
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read parent inode %"PRIx32, pvid);
-		goto out;
-	}
-
-	for (i = 0; i < MAX_CHILDREN; i++)
-		if (inode->child_vdi_id[i] == vid) {
-			inode->child_vdi_id[i] = 0;
-			break;
-		}
-
-	if (i == MAX_CHILDREN) {
-		sd_info("failed to find child %"PRIx32, vid);
-		goto out;
-	}
-
-	ret = sd_write_object(vid_to_vdi_oid(pvid), (char *)inode,
-			      SD_INODE_HEADER_SIZE, 0, false);
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update parent %"PRIx32, pvid);
-		goto out;
-	}
-	sd_debug("parent %"PRIx32, pvid);
-out:
-	free(inode);
 }
 
 static int start_deletion(struct request *req, uint32_t vid)
 {
 	struct deletion_work *dw = NULL;
 	int ret = SD_RES_SUCCESS, finish_fd;
-	bool cloned;
-	uint32_t root_vid;
 
 	dw = xzalloc(sizeof(*dw));
-	dw->delete_vid_array = xzalloc(SD_INODE_SIZE - SD_INODE_HEADER_SIZE);
-	dw->delete_vid_count = 0;
 	dw->target_vid = vid;
 	finish_fd = dw->finish_fd = eventfd(0, 0);
 	if (dw->finish_fd < 0) {
@@ -1122,67 +951,20 @@ static int start_deletion(struct request *req, uint32_t vid)
 		goto out;
 	}
 
-	root_vid = get_vdi_root(dw->target_vid, &cloned);
-	if (!root_vid) {
-		ret = SD_RES_EIO;
-		goto out;
-	}
-
-	ret = fill_delete_vid_array(dw, root_vid);
-	if (ret < 0) {
-		ret = SD_RES_EIO;
-		goto out;
-	} else if (ret == 1) {
-		/*
-		 * if the VDI is a cloned VDI, delete its objects
-		 * no matter whether the VDI tree is clear.
-		 */
-		ret = SD_RES_SUCCESS;
-
-		if (cloned) {
-			dw->delete_vid_array[0] = vid;
-			dw->delete_vid_count = 1;
-			/*
-			 * FIXME:
-			 *
-			 * We can't clear snapshot's parent because it is not
-			 * removed. We only remove the whole snapshot chain. So
-			 * we can only create MAX_CHILDREN snapshots for one
-			 * base even if we later remove some of them.
-			 *
-			 * But for clone (writable snapshot, we can clear
-			 * parent for deletion, thus make room for new clones.
-			 */
-			clear_parent_child_vdi(vid);
-		} else {
-			sd_debug("snapshot chain has valid vdi, just mark vdi %"
-				 PRIx32 " as deleted.", dw->target_vid);
-			delete_inode(dw->target_vid);
-			goto out;
-		}
-	}
-
-	sd_debug("number of VDI deletion: %d", dw->delete_vid_count);
-
-	if (dw->delete_vid_count == 0)
-		goto out;
-
-	dw->work.fn = delete_vdis_work;
-	dw->work.done = delete_vdis_done;
+	dw->work.fn = delete_vdi_work;
+	dw->work.done = delete_vdi_done;
 
 	queue_work(sys->deletion_wqueue, &dw->work);
 
 	/*
-	 * the event fd is written by delete_one_vdi_done(), when all vdis of
-	 * deletion_work are deleted
+	 * the event fd is written by delete_vdi_done(), when all reference
+	 * counters are decremented
 	 */
 	eventfd_xread(finish_fd);
 	close(finish_fd);
 
 	return ret;
 out:
-	if (dw)
-		free(dw->delete_vid_array);
 	free(dw);
 
 	return ret;
