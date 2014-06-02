@@ -548,6 +548,85 @@ out:
 	return err_ret;
 }
 
+static int prepare_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
+			      struct generation_reference *refs)
+{
+	int ret;
+	size_t nr_vids = hdr->data_length / sizeof(*vids);
+	uint64_t offset;
+	int start;
+
+	offset = hdr->obj.offset - offsetof(struct sd_inode, data_vdi_id);
+	start = offset / sizeof(*vids);
+
+	ret = sd_read_object(hdr->obj.oid, (char *)vids,
+			     nr_vids * sizeof(vids[0]),
+			     offsetof(struct sd_inode, data_vdi_id[start]));
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read vdi, %" PRIx64, hdr->obj.oid);
+		return ret;
+	}
+
+	ret = sd_read_object(hdr->obj.oid, (char *)refs,
+			     nr_vids * sizeof(refs[0]),
+			     offsetof(struct sd_inode, gref[start]));
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read vdi, %" PRIx64, hdr->obj.oid);
+		return ret;
+	}
+
+	return ret;
+}
+
+/*
+ * This function decreases a refcnt of vid_to_data_oid(old_vid, idx) and
+ * increases one of vid_to_data_oid(new_vid, idx)
+ */
+static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
+			     uint32_t *new_vids,
+			     struct generation_reference *refs)
+{
+	int i, start, ret = SD_RES_SUCCESS;
+	size_t nr_vids = hdr->data_length / sizeof(*vids);
+	uint64_t offset;
+
+	offset = hdr->obj.offset - offsetof(struct sd_inode, data_vdi_id);
+	start = offset / sizeof(*vids);
+
+	for (i = 0; i < nr_vids; i++) {
+		if (vids[i] == 0 || vids[i] == new_vids[i])
+			continue;
+
+		ret = sd_dec_object_refcnt(vid_to_data_oid(vids[i], i + start),
+					   refs[i].generation, refs[i].count);
+		if (ret != SD_RES_SUCCESS)
+			sd_err("fail, %d", ret);
+
+		refs[i].generation = 0;
+		refs[i].count = 0;
+	}
+
+	return sd_write_object(hdr->obj.oid, (char *)refs,
+			       nr_vids * sizeof(*refs),
+			       offsetof(struct sd_inode, gref)
+			       + start * sizeof(*refs),
+			       false);
+}
+
+/*
+ * return true if the request updates a data_vdi_id field of a vdi object
+ *
+ * XXX: we assume that VMs don't update the inode header and the data_vdi_id
+ * field at the same time.
+ */
+static bool is_data_vid_update(const struct sd_req *hdr)
+{
+	return is_vdi_obj(hdr->obj.oid) &&
+		SD_INODE_HEADER_SIZE <= hdr->obj.offset &&
+		hdr->obj.offset + hdr->data_length <=
+			offsetof(struct sd_inode, gref);
+}
+
 int gateway_read_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
@@ -564,6 +643,10 @@ int gateway_read_obj(struct request *req)
 int gateway_write_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
+	int ret;
+	struct sd_req *hdr = &req->rq;
+	uint32_t *vids = NULL, *new_vids = req->data;
+	struct generation_reference *refs = NULL;
 
 	if (oid_is_readonly(oid))
 		return SD_RES_READONLY;
@@ -571,7 +654,29 @@ int gateway_write_obj(struct request *req)
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
-	return gateway_forward_request(req);
+	if (is_data_vid_update(hdr)) {
+		size_t nr_vids = hdr->data_length / sizeof(*vids);
+
+		/* read the previous vids to discard their references later */
+		vids = xzalloc(sizeof(*vids) * nr_vids);
+		refs = xzalloc(sizeof(*refs) * nr_vids);
+		ret = prepare_obj_refcnt(hdr, vids, refs);
+		if (ret != SD_RES_SUCCESS)
+			goto out;
+	}
+
+	ret = gateway_forward_request(req);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	if (is_data_vid_update(hdr)) {
+		sd_debug("udpate reference counts, %" PRIx64, hdr->obj.oid);
+		update_obj_refcnt(hdr, vids, new_vids, refs);
+	}
+out:
+	free(vids);
+	free(refs);
+	return ret;
 }
 
 static int gateway_handle_cow(struct request *req)
