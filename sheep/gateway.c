@@ -182,6 +182,7 @@ out:
 bool is_erasure_oid(uint64_t oid)
 {
 	return !is_vdi_obj(oid) && !is_vdi_btree_obj(oid) &&
+		!is_ledger_object(oid) &&
 		get_vdi_copy_policy(oid_to_vid(oid)) > 0;
 }
 
@@ -621,6 +622,11 @@ int gateway_create_and_write_obj(struct request *req)
 }
 
 int gateway_remove_obj(struct request *req)
+{
+	return gateway_forward_request(req);
+}
+
+int gateway_decref_object(struct request *req)
 {
 	return gateway_forward_request(req);
 }

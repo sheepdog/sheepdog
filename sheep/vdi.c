@@ -390,7 +390,7 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		 base_vid, iocb->nr_copies, new_snapid);
 
 	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
-			     SD_INODE_HEADER_SIZE, 0);
+			     sizeof(*base), 0);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_READ;
 		goto out;
@@ -407,23 +407,6 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	/* update a base vdi */
 	base->snap_ctime = iocb->time;
 	base->child_vdi_id[idx] = new_vid;
-
-	/* TODO: multiple sd_write_object should be performed atomically */
-
-	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base,
-			      SD_INODE_HEADER_SIZE, 0, false);
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("updating header of VDI %" PRIx32 "failed", base_vid);
-		ret = SD_RES_BASE_VDI_WRITE;
-		goto out;
-	}
-
-	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
-			     sizeof(*base), 0);
-	if (ret != SD_RES_SUCCESS) {
-		ret = SD_RES_BASE_VDI_READ;
-		goto out;
-	}
 
 	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
 		if (!base->data_vdi_id[i])

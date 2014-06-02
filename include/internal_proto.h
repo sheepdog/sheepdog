@@ -102,6 +102,8 @@
 #define SD_OP_CLUSTER_INFO	0xBE
 #define SD_OP_ALTER_CLUSTER_COPY	0xBF
 #define SD_OP_ALTER_VDI_COPY	0xC0
+#define SD_OP_DECREF_OBJ     0xC1
+#define SD_OP_DECREF_PEER    0xC2
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
