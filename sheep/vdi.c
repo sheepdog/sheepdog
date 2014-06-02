@@ -842,21 +842,13 @@ static void delete_vdi_work(struct work *work)
 	if (inode->store_policy == 0) {
 		nr_objs = count_data_objs(inode);
 		for (nr_deleted = 0, i = 0; i < nr_objs; i++) {
-			uint64_t oid;
 			uint32_t vid = sd_inode_get_vid(inode, i);
 
-			if (!vid)
-				continue;
-
-			oid = vid_to_data_oid(vid, i);
-			ret = sd_dec_object_refcnt(oid,
-						inode->gref[i].generation,
-						inode->gref[i].count);
-			if (ret != SD_RES_SUCCESS)
-				sd_err("discard ref %" PRIx64 " fail, %d",
-				       oid, ret);
-
-			nr_deleted++;
+			if (vid) {
+				sd_err("vid: %"PRIx32" still has objects", vid);
+				dw->succeed = false;
+				goto out;
+			}
 		}
 	} else {
 		/*

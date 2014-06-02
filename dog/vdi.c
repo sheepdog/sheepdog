@@ -706,18 +706,23 @@ static int vdi_resize(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+#define NR_BATCHED_DISCARD 128	/* TODO: the value should be optional */
+
 static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 {
-	int ret;
+	int ret, nr_objs;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
 	uint32_t vid;
+	struct sd_inode *inode = xzalloc(sizeof(*inode));
+	int i = 0;
 
 	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid, 0);
 	if (ret < 0) {
 		sd_err("Failed to open VDI %s", vdiname);
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
 	sd_init_req(&hdr, SD_OP_DELETE_CACHE);
@@ -726,7 +731,50 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	ret = send_light_req(&sd_nid, &hdr);
 	if (ret) {
 		sd_err("failed to execute request");
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	ret = dog_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode),
+			      0, false);
+	if (ret) {
+		sd_err("failed to read inode object: %"PRIx64,
+		       vid_to_vdi_oid(vid));
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+
+	nr_objs = count_data_objs(inode);
+	while (i < nr_objs) {
+		int start_idx, nr_filled_idx;
+
+		while (i < nr_objs && !inode->data_vdi_id[i])
+			i++;
+		start_idx = i;
+
+		nr_filled_idx = 0;
+		while (i < nr_objs && nr_filled_idx < NR_BATCHED_DISCARD) {
+			if (inode->data_vdi_id[i]) {
+				inode->data_vdi_id[i] = 0;
+				nr_filled_idx++;
+			}
+
+			i++;
+		}
+
+		ret = dog_write_object(vid_to_vdi_oid(vid), 0,
+				       &inode->data_vdi_id[start_idx],
+				       (i - start_idx) * sizeof(uint32_t),
+				       offsetof(struct sd_inode,
+						data_vdi_id[start_idx]),
+				       0, inode->nr_copies, inode->copy_policy,
+				       false, true);
+		if (ret) {
+			sd_err("failed to update inode for discarding objects:"
+			       " %"PRIx64, vid_to_vdi_oid(vid));
+			ret = EXIT_FAILURE;
+			goto out;
+		}
 	}
 
 	sd_init_req(&hdr, SD_OP_DEL_VDI);
@@ -739,18 +787,22 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 		pstrcpy(data + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, snap_tag);
 
 	ret = dog_exec_req(&sd_nid, &hdr, data);
-	if (ret < 0)
-		return EXIT_SYSFAIL;
+	if (ret < 0) {
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		sd_err("Failed to delete %s: %s", vdiname,
 		       sd_strerror(rsp->result));
 		if (rsp->result == SD_RES_NO_VDI)
-			return EXIT_MISSING;
+			ret = EXIT_MISSING;
 		else
-			return EXIT_FAILURE;
+			ret = EXIT_FAILURE;
 	}
 
+out:
+	free(inode);
 	return EXIT_SUCCESS;
 }
 
