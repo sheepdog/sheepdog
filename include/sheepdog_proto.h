@@ -101,7 +101,6 @@
 #define LEDGER_BIT (UINT64_C(1) << 59)
 #define OLD_MAX_DATA_OBJS (1ULL << 20)
 #define MAX_DATA_OBJS (1ULL << 32)
-#define MAX_CHILDREN 1024U
 #define SD_MAX_VDI_LEN 256U
 #define SD_MAX_VDI_TAG_LEN 256U
 #define SD_MAX_VDI_ATTR_KEY_LEN 256U
@@ -224,6 +223,19 @@ struct sd_rsp {
 	};
 };
 
+/*
+ * Historical notes: previous version of sheepdog (< v0.9.0) has a limit of
+ * maximum number of children which can be created from single VDI. So the inode
+ * object has an array for storing the IDs of the child VDIs. The constant
+ * OLD_MAX_CHILDREN represents it. Current sheepdog doesn't have the limitation,
+ * so we are recycling the area (4 * OLD_MAX_CHILDREN = 4KB) for storing new
+ * metadata.
+ *
+ * users of the released area:
+ * - uint32_t btree_counter
+ */
+#define OLD_MAX_CHILDREN 1024U
+
 struct generation_reference {
 	int32_t generation;
 	int32_t count;
@@ -244,9 +256,11 @@ struct sd_inode {
 	uint32_t snap_id;
 	uint32_t vdi_id;
 	uint32_t parent_vdi_id;
-	uint32_t __unused[MAX_CHILDREN];
-	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
+
 	uint32_t btree_counter;
+	uint32_t __unused[OLD_MAX_CHILDREN - 1];
+
+	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
 	struct generation_reference gref[SD_INODE_DATA_INDEX];
 };
 
