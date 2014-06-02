@@ -244,7 +244,7 @@ struct sd_inode {
 	uint32_t snap_id;
 	uint32_t vdi_id;
 	uint32_t parent_vdi_id;
-	uint32_t child_vdi_id[MAX_CHILDREN];
+	uint32_t __unused[MAX_CHILDREN];
 	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
 	uint32_t btree_counter;
 	struct generation_reference gref[SD_INODE_DATA_INDEX];
@@ -506,6 +506,11 @@ static inline uint64_t ledger_oid_to_data_oid(uint64_t oid)
 static inline uint64_t data_oid_to_ledger_oid(uint64_t oid)
 {
 	return LEDGER_BIT | oid;
+}
+
+static inline uint64_t data_vid_offset(int idx)
+{
+	return offsetof(struct sd_inode, data_vdi_id[idx]);
 }
 
 #endif

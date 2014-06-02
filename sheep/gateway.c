@@ -622,9 +622,9 @@ static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 static bool is_data_vid_update(const struct sd_req *hdr)
 {
 	return is_vdi_obj(hdr->obj.oid) &&
-		SD_INODE_HEADER_SIZE <= hdr->obj.offset &&
+		data_vid_offset(0) <= hdr->obj.offset &&
 		hdr->obj.offset + hdr->data_length <=
-			offsetof(struct sd_inode, gref);
+			data_vid_offset(SD_INODE_DATA_INDEX);
 }
 
 int gateway_read_obj(struct request *req)
