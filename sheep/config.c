@@ -11,7 +11,7 @@
 
 #include "sheep_priv.h"
 
-#define SD_FORMAT_VERSION 0x0004
+#define SD_FORMAT_VERSION 0x0005
 #define SD_CONFIG_SIZE 40
 
 static struct sheepdog_config {

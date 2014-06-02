@@ -497,6 +497,12 @@ static int migrate_from_v3_to_v4(void)
 	return 0;
 }
 
+static int migrate_from_v4_to_v5(void)
+{
+	panic("not implemented yet");
+	return -1;
+}
+
 static int (*migrate[])(void) = {
 	migrate_from_v0_to_v1, /* from 0.4.0 or 0.5.0 to 0.5.1 */
 	migrate_from_v1_to_v2, /* from 0.5.x to 0.6.0 */
@@ -507,6 +513,16 @@ static int (*migrate[])(void) = {
 	 * produced by the commit 79706e07a068
 	 */
 	migrate_from_v3_to_v4,
+
+	/*
+	 * from v0.8.x to v0.9.y
+	 *
+	 * introduced changes:
+	 * 1. generational reference counting: adding ledger object and expand
+	 *    inode object for generation reference
+	 * 2. changing a place of btree_counter in inode object
+	 */
+	migrate_from_v4_to_v5,
 };
 
 int sd_migrate_store(int from, int to)
