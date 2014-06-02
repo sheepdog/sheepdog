@@ -425,6 +425,7 @@ int objlist_cache_insert(uint64_t oid);
 void objlist_cache_remove(uint64_t oid);
 
 void put_request(struct request *req);
+void get_request(struct request *req);
 
 int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
 		       uint64_t offset, uint32_t flags, int copies,

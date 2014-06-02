@@ -709,6 +709,11 @@ main_fn void put_request(struct request *req)
 	}
 }
 
+main_fn void get_request(struct request *req)
+{
+	refcount_inc(&req->refcnt);
+}
+
 static void rx_work(struct work *work)
 {
 	struct client_info *ci = container_of(work, struct client_info,
