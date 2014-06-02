@@ -8,8 +8,8 @@ _need_to_be_root
 
 _make_device 0 $((1024 ** 3))
 _make_device 1 $((1024 ** 3))
-_make_device 2 $((20 * 1024 ** 2))
-_make_device 3 $((20 * 1024 ** 2))
+_make_device 2 $((30 * 1024 ** 2))
+_make_device 3 $((30 * 1024 ** 2))
 
 # create log files of sheep 2 and 3 on other places
 touch $STORE/0/sheep2.log $STORE/0/sheep3.log

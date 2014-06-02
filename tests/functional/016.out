@@ -3,10 +3,10 @@ using backend plain store
 there should be no vdi
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 there should be no object
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	0	3	0	0	0
-1	0	3	0	0	0
-2	0	3	0	0	0
-3	0	3	0	0	0
-4	0	3	0	0	0
-5	0	3	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	0	3	0	0	0	0
+1	0	3	0	0	0	0
+2	0	3	0	0	0	0
+3	0	3	0	0	0	0
+4	0	3	0	0	0	0
+5	0	3	0	0	0	0

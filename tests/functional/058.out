@@ -28,10 +28,10 @@ The inode object 0x7c2b25 idx 21 is not allocated
 The inode object 0x7c2b25 idx 22 is not allocated
 The inode object 0x7c2b25 idx 23 is not allocated
 The inode object 0x7c2b25 idx 24 is not allocated
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	0	1	0	0	0
-1	0	1	0	0	0
-2	0	1	0	0	0
-3	0	1	0	0	0
-4	0	1	0	0	0
-5	0	1	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	0	1	0	0	0	0
+1	0	1	0	0	0	0
+2	0	1	0	0	0	0
+3	0	1	0	0	0	0
+4	0	1	0	0	0	0
+5	0	1	0	0	0	0

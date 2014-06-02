@@ -411,7 +411,7 @@ _cleanup_devices()
 
 _list_data_obj()
 {
-    find $STORE/$1 | grep -E /0[0-9a-f]\{15\} | grep -v .stale
+    find $STORE/$1 | grep -E /00[0-9a-f]\{14\} | grep -v .stale
 }
 
 _list_vdi_obj()
@@ -429,6 +429,11 @@ _list_attr_obj()
     find $STORE/$1 | grep -E /2[0-9a-f]\{15\} | grep -v .stale
 }
 
+_list_ledger_obj()
+{
+    find $STORE/$1 | grep -E /08[0-9a-f]\{14\} | grep -v .stale
+}
+
 _list_stale_obj()
 {
     find $STORE/$1 | grep -E /[0-9a-f]\{16\} | grep .stale
@@ -438,14 +443,15 @@ _stat_store()
 {
     local pattern=$1
     local idx
-    echo -e "STORE\tDATA\tVDI\tVMSTATE\tATTR\tSTALE"
+    echo -e "STORE\tDATA\tVDI\tVMSTATE\tATTR\tLEDGER\tSTALE"
     for idx in `ls -d $STORE/$pattern | sed s#$STORE/##g`; do
 	local data_obj=$(_list_data_obj $idx | wc -l)
 	local vdi_obj=$(_list_vdi_obj $idx | wc -l)
 	local vmstate_obj=$(_list_vmstate_obj $idx | wc -l)
 	local attr_obj=$(_list_attr_obj $idx | wc -l)
+	local ledger_obj=$(_list_ledger_obj $idx | wc -l)
 	local stale_obj=$(_list_stale_obj $idx | wc -l)
-	echo -e "$idx\t$data_obj\t$vdi_obj\t$vmstate_obj\t$attr_obj\t$stale_obj"
+	echo -e "$idx\t$data_obj\t$vdi_obj\t$vmstate_obj\t$attr_obj\t$ledger_obj\t$stale_obj"
     done
 }
 

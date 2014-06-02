@@ -1,35 +1,35 @@
 QA output created by 064
 using backend plain store
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	12	0	0	0	0
-1	16	1	0	0	0
-2	22	1	0	0	0
-3	0	0	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	12	0	0	0	0	0
+1	16	1	0	0	0	0
+2	22	1	0	0	0	0
+3	0	0	0	0	0	0
   Id   Host:Port         V-Nodes       Zone
    0   127.0.0.1:7000      	96          0
    1   127.0.0.1:7001      	96          1
    2   127.0.0.1:7002      	192          2
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	9	0	0	0	0
-1	16	1	0	0	0
-2	22	1	0	0	0
-3	3	0	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	9	0	0	0	0	0
+1	16	1	0	0	0	0
+2	22	1	0	0	0	0
+3	3	0	0	0	0	0
   Id   Host:Port         V-Nodes       Zone
    0   127.0.0.1:7000      	96          0
    1   127.0.0.1:7001      	96          1
    2   127.0.0.1:7002      	192          2
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	17	0	0	0	0
-1	25	1	0	0	0
-3	8	1	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	17	0	0	0	0	0
+1	25	1	0	0	0	0
+3	8	1	0	0	0	0
   Id   Host:Port         V-Nodes       Zone
    0   127.0.0.1:7000      	171          0
    1   127.0.0.1:7001      	85          1
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0	11	0	0	0	0
-1	16	1	0	0	0
-2	20	1	0	0	0
-3	3	0	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	11	0	0	0	0	0
+1	16	1	0	0	0	0
+2	20	1	0	0	0	0
+3	3	0	0	0	0	0
   Id   Host:Port         V-Nodes       Zone
    0   127.0.0.1:7000      	153          0
    1   127.0.0.1:7001      	77          1

@@ -1,30 +1,30 @@
 QA output created by 057
 using backend plain store
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0/d0	6	0	0	0	0
-0/d1	13	1	0	0	0
-0/d2	6	0	0	0	0
-1/d0	11	1	0	0	0
-1/d1	4	0	0	0	0
-1/d2	10	0	0	0	0
-2/d0	6	1	0	0	0
-2/d1	14	0	0	0	0
-2/d2	5	0	0	0	0
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0/d0	1	0	0	0	0
-0/d1	5	0	0	0	0
-0/d2	4	0	0	0	0
-0/d3	1	0	0	0	0
-0/d4	4	0	0	0	0
-1/d0	10	1	0	0	0
-1/d1	3	0	0	0	0
-1/d2	8	0	0	0	0
-2/d0	4	1	0	0	0
-2/d1	10	0	0	0	0
-2/d2	5	0	0	0	0
-3/d0	7	0	0	0	0
-3/d1	8	0	0	0	0
-3/d2	5	1	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0/d0	6	0	0	0	0	0
+0/d1	13	1	0	0	0	0
+0/d2	6	0	0	0	0	0
+1/d0	11	1	0	0	0	0
+1/d1	4	0	0	0	0	0
+1/d2	10	0	0	0	0	0
+2/d0	6	1	0	0	0	0
+2/d1	14	0	0	0	0	0
+2/d2	5	0	0	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0/d0	1	0	0	0	0	0
+0/d1	5	0	0	0	0	0
+0/d2	4	0	0	0	0	0
+0/d3	1	0	0	0	0	0
+0/d4	4	0	0	0	0	0
+1/d0	10	1	0	0	0	0
+1/d1	3	0	0	0	0	0
+1/d2	8	0	0	0	0	0
+2/d0	4	1	0	0	0	0
+2/d1	10	0	0	0	0	0
+2/d2	5	0	0	0	0	0
+3/d0	7	0	0	0	0	0
+3/d1	8	0	0	0	0	0
+3/d2	5	1	0	0	0	0
 finish check&repair test
 Cluster status: running, auto-recovery enabled
 
@@ -36,36 +36,36 @@ DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 Failed to execute request, look for sheep.log for more information
 Nodes In Recovery:
   Id   Host:Port         V-Nodes       Zone       Progress
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0/d0	1	0	0	0	0
-0/d1	5	0	0	0	0
-0/d2	4	0	0	0	0
-0/d3	1	0	0	0	0
-0/d4	4	0	0	0	0
-1/d0	10	1	0	0	0
-1/d1	3	0	0	0	0
-1/d2	8	0	0	0	0
-2/d0	4	1	0	0	0
-2/d1	10	0	0	0	0
-2/d2	5	0	0	0	0
-3/d0	7	0	0	0	0
-3/d1	8	0	0	0	0
-3/d2	5	1	0	0	0
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0/d0	1	0	0	0	0
-0/d1	5	0	0	0	0
-0/d2	6	0	0	0	0
-0/d3	1	0	0	0	0
-0/d4	8	0	0	0	0
-1/d0	10	1	0	0	0
-1/d1	3	0	0	0	0
-1/d2	8	0	0	0	0
-2/d0	4	1	0	0	0
-2/d1	10	0	0	0	0
-2/d2	5	0	0	0	0
-3/d0	7	0	0	0	0
-3/d1	8	0	0	0	0
-3/d2	5	1	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0/d0	1	0	0	0	0	0
+0/d1	5	0	0	0	0	0
+0/d2	4	0	0	0	0	0
+0/d3	1	0	0	0	0	0
+0/d4	4	0	0	0	0	0
+1/d0	10	1	0	0	0	0
+1/d1	3	0	0	0	0	0
+1/d2	8	0	0	0	0	0
+2/d0	4	1	0	0	0	0
+2/d1	10	0	0	0	0	0
+2/d2	5	0	0	0	0	0
+3/d0	7	0	0	0	0	0
+3/d1	8	0	0	0	0	0
+3/d2	5	1	0	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0/d0	1	0	0	0	0	0
+0/d1	5	0	0	0	0	0
+0/d2	6	0	0	0	0	0
+0/d3	1	0	0	0	0	0
+0/d4	8	0	0	0	0	0
+1/d0	10	1	0	0	0	0
+1/d1	3	0	0	0	0	0
+1/d2	8	0	0	0	0	0
+2/d0	4	1	0	0	0	0
+2/d1	10	0	0	0	0	0
+2/d2	5	0	0	0	0	0
+3/d0	7	0	0	0	0	0
+3/d1	8	0	0	0	0	0
+3/d2	5	1	0	0	0	0
 finish check&repair test
 Cluster status: running, auto-recovery enabled
 
@@ -77,21 +77,21 @@ DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002]
 Failed to execute request, look for sheep.log for more information
 Nodes In Recovery:
   Id   Host:Port         V-Nodes       Zone       Progress
-STORE	DATA	VDI	VMSTATE	ATTR	STALE
-0/d0	1	0	0	0	0
-0/d1	5	0	0	0	0
-0/d2	6	0	0	0	0
-0/d3	1	0	0	0	0
-0/d4	8	0	0	0	0
-1/d0	10	1	0	0	0
-1/d1	3	0	0	0	0
-1/d2	8	0	0	0	0
-2/d0	4	1	0	0	0
-2/d1	10	0	0	0	0
-2/d2	5	0	0	0	0
-3/d0	7	0	0	0	0
-3/d1	8	0	0	0	0
-3/d2	5	1	0	0	0
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0/d0	1	0	0	0	0	0
+0/d1	5	0	0	0	0	0
+0/d2	6	0	0	0	0	0
+0/d3	1	0	0	0	0	0
+0/d4	8	0	0	0	0	0
+1/d0	10	1	0	0	0	0
+1/d1	3	0	0	0	0	0
+1/d2	8	0	0	0	0	0
+2/d0	4	1	0	0	0	0
+2/d1	10	0	0	0	0	0
+2/d2	5	0	0	0	0	0
+3/d0	7	0	0	0	0	0
+3/d1	8	0	0	0	0	0
+3/d2	5	1	0	0	0	0
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
