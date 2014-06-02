@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Test object reclaim for continuously snapshotted and partially updated VDI
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+_cluster_format -c 3
+
+$DOG vdi create test 16M
+cat /dev/zero | $DOG vdi write test 0 512
+_node_info
+
+$DOG vdi snapshot test
+cat /dev/zero | $DOG vdi write test $((4 * 1024 * 1024)) 512
+_node_info
+
+$DOG vdi snapshot test
+cat /dev/zero | $DOG vdi write test $((4 * 1024 * 1024 * 2)) 512
+_node_info
+
+$DOG vdi delete test -s 2
+_node_info
+
+$DOG vdi delete test -s 1
+_node_info
+
+$DOG vdi delete test
+_node_info
