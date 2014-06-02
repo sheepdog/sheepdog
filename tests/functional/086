@@ -1,30 +1,30 @@
 #!/bin/bash
 
-# Test vdi clone
+# Test object reclaim
 
 . ./common
 
-for i in `seq 0 2`; do
+for i in 0 1 2; do
     _start_sheep $i
 done
-
 _wait_for_sheep 3
+_cluster_format -c 2
 
-_cluster_format -c 3
+$DOG vdi create test 16M -P
+_node_info
 
-$DOG vdi create test 100M
-$DOG vdi snapshot -s base test
+for i in `seq 0 3`; do
+    $DOG vdi snapshot test -s snap$i
+    $DOG vdi write test $((4 * 1024 ** 2 * $i)) 512 < /dev/zero
+    _node_info
+done
 
-for i in `seq 0 1023`; do
-	$DOG vdi clone test -s base clone$i
-done;
+for i in `seq 0 3`; do
+    $DOG vdi delete test -s snap$i
+    sleep 1
+    _node_info
+done
 
-for i in `seq 0 1022`; do
-	$DOG vdi delete clone$i
-done;
-
-for i in `seq 0 1023`; do
-	$DOG vdi clone test -s base clone$i
-done;
-
-_vdi_list
+$DOG vdi delete test
+sleep 1
+_node_info
