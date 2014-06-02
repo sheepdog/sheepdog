@@ -2396,12 +2396,28 @@ static int vdi_object_dump_inode(int argc, char **argv)
 	printf("parent_vdi_id: %"PRIx32"\n", inode->parent_vdi_id);
 	printf("btree_counter: %"PRIu32"\n", inode->btree_counter);
 
-	printf("data_vdi_id:");
+	printf("data_vdi_id:\n");
 	for (int i = 0; i < SD_INODE_DATA_INDEX; i++) {
 		if (!inode->data_vdi_id[i])
 			continue;
 
 		printf("%d: %"PRIu32"\n", i, inode->data_vdi_id[i]);
+	}
+
+	printf("gref:\n");
+	for (int i = 0; i < SD_INODE_DATA_INDEX; i++) {
+		if (!inode->data_vdi_id[i]) {
+			if (inode->gref[i].generation || inode->gref[i].count)
+				printf("WARNING: index %d doesn't have data vdi"
+				       " ID but its generation and count is not"
+				       " zero(%d, %d)", i,
+				       inode->gref[i].generation,
+				       inode->gref[i].count);
+			continue;
+		}
+
+		printf("%d: %"PRIx32", %d, %d\n", i, inode->data_vdi_id[i],
+		       inode->gref[i].generation, inode->gref[i].count);
 	}
 
 	close(fd);
