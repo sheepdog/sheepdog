@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# Test object reclaim for cloned VDIs
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+_cluster_format -c 2
+
+$DOG vdi create test 16M -P
+_node_info
+
+$DOG vdi snapshot test
+$DOG vdi clone test -s 1 test_cloned
+
+$DOG vdi write test_cloned 0 512 < /dev/zero
+$DOG vdi write test_cloned $((4 * 1024 ** 2 * 1)) 512 < /dev/zero
+_node_info
+
+_vdi_list
+
+$DOG vdi clone test -s 1 test_cloned2 # create branch
+
+$DOG vdi write test_cloned2 0 512 < /dev/zero
+$DOG vdi write test_cloned2 $((4 * 1024 ** 2 * 1)) 512 < /dev/zero
+_node_info
+
+_vdi_list
+
+$DOG vdi delete test
+_node_info
+
+$DOG vdi delete test -s 1
+_node_info
+
+$DOG vdi delete test_cloned
+_node_info
+
+$DOG vdi delete test_cloned2
+echo there should be no object
+_node_info
+
+echo there should be no vdi
+_vdi_list
