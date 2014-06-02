@@ -1149,6 +1149,14 @@ int peer_decref_object(struct request *req)
 	ledger[generation + 1] += count;
 
 	if (is_zero_ledger(ledger)) {
+		struct sd_node *nodes[SD_MAX_COPIES];
+		int nr_copies;
+		uint32_t vid;
+
+		vid = oid_to_vid(ledger_oid);
+		nr_copies = get_vdi_copy_number(vid);
+		memset(nodes, 0, sizeof(nodes));
+
 		/* reclaim object */
 		if (exist) {
 			ret = sd_store->remove_object(ledger_oid, -1);
@@ -1160,10 +1168,16 @@ int peer_decref_object(struct request *req)
 		sd_mutex_unlock(&lock);
 		locked = false;
 
-		ret = sd_remove_object(data_oid);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("error %s", sd_strerror(ret));
-			goto out;
+		oid_to_nodes(ledger_oid, &req->vinfo->vroot, nr_copies,
+			     (const struct sd_node **)nodes);
+
+		if (!node_cmp(&sys->this_node, nodes[0])) {
+			/* only first one node needs to remove the object */
+			ret = sd_remove_object(data_oid);
+			if (ret != SD_RES_SUCCESS) {
+				sd_err("error %s", sd_strerror(ret));
+				goto out;
+			}
 		}
 	} else {
 		/* update ledger */
