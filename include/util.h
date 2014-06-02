@@ -122,6 +122,9 @@ void make_path(char *path, size_t size, size_t nr_segs, const char **segs);
 int atomic_create_and_write(const char *path, const char *buf, size_t len,
 			    bool force_create);
 
+void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
+void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen);
+
 /* a type safe version of qsort() */
 #define xqsort(base, nmemb, compar)					\
 ({									\

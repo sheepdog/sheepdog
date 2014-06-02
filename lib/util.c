@@ -744,3 +744,65 @@ void list_sort(void *priv, struct list_head *head,
 
 	merge_and_restore_back_links(priv, cmp, head, part[max_lev], list);
 }
+
+/*
+ * Find zero blocks from the beginning and end of buffer
+ *
+ * The caller passes the offset of 'buf' with 'poffset' so that this funciton
+ * can align the return values to BLOCK_SIZE.  'plen' points the length of the
+ * buffer.  If there are zero blocks at the beginning of the buffer, this
+ * function increases the offset and decreases the length on condition that
+ * '*poffset' is block-aligned.  If there are zero blocks at the end of the
+ * buffer, this function also decreases the length on condition that '*plen' is
+ * block-aligned.
+ */
+void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen)
+{
+	const uint8_t zero[BLOCK_SIZE] = {0};
+	const uint8_t *p = buf;
+	uint64_t start = *poffset;
+	uint64_t offset = 0;
+	uint32_t len = *plen;
+
+	/* trim zero blocks from the beginning of buffer */
+	while (len >= BLOCK_SIZE) {
+		size_t size = BLOCK_SIZE - (start + offset) % BLOCK_SIZE;
+
+		if (memcmp(p + offset, zero, size) != 0)
+			break;
+
+		offset += size;
+		len -= size;
+	}
+
+	/* trim zero sectors from the end of buffer */
+	while (len >= BLOCK_SIZE) {
+		size_t size = (start + offset + len) % BLOCK_SIZE;
+		if (size == 0)
+			size = BLOCK_SIZE;
+
+		if (memcmp(p + offset + len - size, zero, size) != 0)
+			break;
+
+		len -= size;
+	}
+
+	*plen = len;
+	*poffset = start + offset;
+}
+
+/*
+ * Trim zero blocks from the beginning and end of buffer
+ *
+ * This function is similar to find_zero_blocks(), but this updates 'buf' so
+ * that the zero block are removed from the beginning of buffer.
+ */
+void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
+{
+	uint8_t *p = buf;
+	uint64_t orig_offset = *poffset;
+
+	find_zero_blocks(buf, poffset, plen);
+	if (orig_offset < *poffset)
+		memmove(p, p + *poffset - orig_offset, *plen);
+}
