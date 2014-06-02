@@ -217,6 +217,11 @@ struct sd_rsp {
 	};
 };
 
+struct generation_reference {
+	int32_t generation;
+	int32_t count;
+};
+
 struct sd_inode {
 	char name[SD_MAX_VDI_LEN];
 	char tag[SD_MAX_VDI_TAG_LEN];
@@ -235,6 +240,7 @@ struct sd_inode {
 	uint32_t child_vdi_id[MAX_CHILDREN];
 	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
 	uint32_t btree_counter;
+	struct generation_reference gref[SD_INODE_DATA_INDEX];
 };
 
 struct sd_index {

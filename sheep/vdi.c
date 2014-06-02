@@ -224,7 +224,8 @@ out:
 
 static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 				    uint32_t new_snapid, uint32_t new_vid,
-				    uint32_t *data_vdi_id)
+				    uint32_t *data_vdi_id,
+				    struct generation_reference *gref)
 {
 	struct sd_inode *new = xzalloc(sizeof(*new));
 	unsigned long block_size = SD_DATA_OBJ_SIZE;
@@ -246,6 +247,17 @@ static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 	else if (new->store_policy)
 		sd_inode_init(new->data_vdi_id, 1);
 
+	if (gref) {
+		assert(data_vdi_id);
+
+		for (int i = 0; i < SD_INODE_DATA_INDEX; i++) {
+			if (!data_vdi_id[i])
+				continue;
+
+			new->gref[i].generation = gref[i].generation + 1;
+		}
+	}
+
 	return new;
 }
 
@@ -264,7 +276,8 @@ static int find_free_idx(uint32_t *vdi_id, size_t max_idx)
 static int create_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		      uint32_t new_vid)
 {
-	struct sd_inode *new = alloc_inode(iocb, new_snapid, new_vid, NULL);
+	struct sd_inode *new = alloc_inode(iocb, new_snapid, new_vid, NULL,
+					   NULL);
 	int ret;
 
 	sd_debug("%s: size %" PRIu64 ", new_vid %" PRIx32 ", copies %d, "
@@ -323,18 +336,22 @@ static int clone_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 
 	/* TODO: multiple sd_write_object should be performed atomically */
 
-	/* update a base vdi */
-	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)&new_vid,
-			      sizeof(new_vid),
-			      offsetof(struct sd_inode, child_vdi_id[idx]),
-			      false);
+	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
+		if (base->data_vdi_id[i])
+			base->gref[i].count++;
+	}
+
+	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base->gref,
+			      sizeof(base->gref),
+			      offsetof(struct sd_inode, gref), false);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_WRITE;
 		goto out;
 	}
 
 	/* create a new vdi */
-	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id);
+	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id,
+			  base->gref);
 	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
 			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
@@ -373,7 +390,7 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		 base_vid, iocb->nr_copies, new_snapid);
 
 	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
-			     sizeof(*base), 0);
+			     SD_INODE_HEADER_SIZE, 0);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_BASE_VDI_READ;
 		goto out;
@@ -390,15 +407,47 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	/* update a base vdi */
 	base->snap_ctime = iocb->time;
 	base->child_vdi_id[idx] = new_vid;
+
+	/* TODO: multiple sd_write_object should be performed atomically */
+
 	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base,
 			      SD_INODE_HEADER_SIZE, 0, false);
 	if (ret != SD_RES_SUCCESS) {
+		sd_err("updating header of VDI %" PRIx32 "failed", base_vid);
+		ret = SD_RES_BASE_VDI_WRITE;
+		goto out;
+	}
+
+	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
+			     sizeof(*base), 0);
+	if (ret != SD_RES_SUCCESS) {
+		ret = SD_RES_BASE_VDI_READ;
+		goto out;
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
+		if (!base->data_vdi_id[i])
+			continue;
+
+		base->gref[i].count++;
+	}
+
+	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base,
+			      sizeof(*base), 0, false);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("updating gref of VDI %" PRIx32 "failed", base_vid);
 		ret = SD_RES_BASE_VDI_WRITE;
 		goto out;
 	}
 
 	/* create a new vdi */
-	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id);
+	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id, NULL);
+	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
+		if (!base->data_vdi_id[i])
+			continue;
+
+		new->gref[i].generation = base->gref[i].generation + 1;
+	}
 	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
 			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
@@ -456,10 +505,20 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 
 	/* TODO: multiple sd_write_object should be performed atomically */
 
+       ret = sd_write_object(vid_to_vdi_oid(cur_vid), (char *)&iocb->time,
+                             sizeof(iocb->time),
+                             offsetof(struct sd_inode, snap_ctime), false);
+	if (ret != SD_RES_SUCCESS) {
+		ret = SD_RES_VDI_WRITE;
+		goto out;
+	}
+
+	for (int i = 0; i < ARRAY_SIZE(base->gref); i++)
+		base->gref[i].count++;
 	/* update current working vdi */
-	ret = sd_write_object(vid_to_vdi_oid(cur_vid), (char *)&iocb->time,
-			      sizeof(iocb->time),
-			      offsetof(struct sd_inode, snap_ctime), false);
+	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base->gref,
+			      sizeof(base->gref),
+			      offsetof(struct sd_inode, gref), false);
 	if (ret != SD_RES_SUCCESS) {
 		ret = SD_RES_VDI_WRITE;
 		goto out;
@@ -476,7 +535,8 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	}
 
 	/* create a new vdi */
-	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id);
+	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id,
+			  base->gref);
 	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
 			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
