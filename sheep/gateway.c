@@ -613,20 +613,6 @@ static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 			       false);
 }
 
-/*
- * return true if the request updates a data_vdi_id field of a vdi object
- *
- * XXX: we assume that VMs don't update the inode header and the data_vdi_id
- * field at the same time.
- */
-static bool is_data_vid_update(const struct sd_req *hdr)
-{
-	return is_vdi_obj(hdr->obj.oid) &&
-		data_vid_offset(0) <= hdr->obj.offset &&
-		hdr->obj.offset + hdr->data_length <=
-			data_vid_offset(SD_INODE_DATA_INDEX);
-}
-
 int gateway_read_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;

@@ -1184,6 +1184,44 @@ out:
 	return ret;
 }
 
+static int local_prevent_cow(const struct sd_req *req, struct sd_rsp *rsp,
+			     void *data)
+{
+	/* FIXME: change type of process_main() */
+	struct request *rq = container_of(req, struct request, rq);
+
+	sd_debug("preventing COW request, ongoing COW requests: %d",
+		 sys->nr_ongoing_cow_request);
+
+	sys->prevent_cow = true;
+
+	if (sys->nr_ongoing_cow_request) {
+		list_add_tail(&rq->pending_prevent_cow_request_list,
+			      &sys->pending_prevent_cow_request_queue);
+		get_request(rq);
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+static int local_allow_cow(const struct sd_req *req, struct sd_rsp *rsp,
+			   void *data)
+{
+	struct request *rq;
+
+	sd_debug("allowing COW request");
+
+	sys->prevent_cow = false;
+
+	list_for_each_entry(rq, &sys->prevented_cow_request_queue,
+			    prevented_cow_request_list) {
+		list_del(&rq->prevented_cow_request_list);
+		requeue_request(rq);
+	}
+
+	return SD_RES_SUCCESS;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1522,6 +1560,18 @@ static struct sd_op_template sd_ops[] = {
 		.process_work = local_nfs_delete,
 	},
 #endif
+
+	[SD_OP_PREVENT_COW] = {
+		.name = "PREVENT_COW",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_prevent_cow,
+	},
+
+	[SD_OP_ALLOW_COW] = {
+		.name = "ALLOW_COW",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_allow_cow,
+	},
 
 	/* gateway I/O operations */
 	[SD_OP_CREATE_AND_WRITE_OBJ] = {

@@ -497,6 +497,7 @@ static int vdi_snapshot(int argc, char **argv)
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
+	struct sd_req hdr;
 
 	if (vdi_cmd_data.snapshot_id != 0) {
 		sd_err("Please specify a non-integer value for "
@@ -510,6 +511,13 @@ static int vdi_snapshot(int argc, char **argv)
 
 	if (inode->store_policy) {
 		sd_err("creating a snapshot of hypervolume is not supported");
+		return EXIT_FAILURE;
+	}
+
+	sd_init_req(&hdr, SD_OP_PREVENT_COW);
+	ret = dog_exec_req(&sd_nid, &hdr, NULL);
+	if (ret < 0) {
+		sd_err("preventing COW failed");
 		return EXIT_FAILURE;
 	}
 
@@ -532,6 +540,13 @@ static int vdi_snapshot(int argc, char **argv)
 		else
 			printf("new VID of original VDI: %x,"
 			       " VDI ID of newly created snapshot: %x\n", new_vid, vid);
+	}
+
+	sd_init_req(&hdr, SD_OP_ALLOW_COW);
+	ret = dog_exec_req(&sd_nid, &hdr, NULL);
+	if (ret < 0) {
+		sd_err("allowing COW failed");
+		return EXIT_FAILURE;
 	}
 
 	return ret;

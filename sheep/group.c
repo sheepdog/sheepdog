@@ -1098,6 +1098,9 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 	if (ret != 0)
 		return -1;
 
+	INIT_LIST_HEAD(&sys->prevented_cow_request_queue);
+	INIT_LIST_HEAD(&sys->pending_prevent_cow_request_queue);
+
 	return 0;
 }
 

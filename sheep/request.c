@@ -13,8 +13,6 @@
 
 #include "sheep_priv.h"
 
-static void requeue_request(struct request *req);
-
 static void del_requeue_request(struct request *req)
 {
 	list_del(&req->request_list);
@@ -91,6 +89,24 @@ static void gateway_op_done(struct work *work)
 {
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = &req->rq;
+
+	if (hdr->opcode == SD_OP_WRITE_OBJ && is_data_vid_update(hdr)) {
+		struct request *rq;
+
+		sys->nr_ongoing_cow_request--;
+		assert(0 <= sys->nr_ongoing_cow_request);
+		sd_debug("a number of ongoing cow request: %d",
+			 sys->nr_ongoing_cow_request);
+
+		if (!sys->nr_ongoing_cow_request) {
+			list_for_each_entry(rq,
+				    &sys->pending_prevent_cow_request_queue,
+				    pending_prevent_cow_request_list) {
+				list_del(&rq->pending_prevent_cow_request_list);
+				put_request(rq);
+			}
+		}
+	}
 
 	switch (req->rp.result) {
 	case SD_RES_OLD_NODE_VER:
@@ -336,6 +352,20 @@ queue_work:
 		goto end_request;
 	}
 
+	if (req->rq.opcode == SD_OP_WRITE_OBJ && is_data_vid_update(&req->rq)) {
+		if (sys->prevent_cow) {
+			sd_debug("preventing COW");
+			list_add_tail(&req->prevented_cow_request_list,
+				      &sys->prevented_cow_request_queue);
+			return;
+		} else {
+			assert(0 <= sys->nr_ongoing_cow_request);
+			sys->nr_ongoing_cow_request++;
+			sd_debug("a number of ongoing cow request: %d",
+				 sys->nr_ongoing_cow_request);
+		}
+	}
+
 	req->work.fn = do_process_work;
 	req->work.done = gateway_op_done;
 	queue_work(sys->gateway_wqueue, &req->work);
@@ -497,7 +527,7 @@ done:
 	put_request(req);
 }
 
-static void requeue_request(struct request *req)
+void requeue_request(struct request *req)
 {
 	if (req->vinfo) {
 		put_vnode_info(req->vinfo);
@@ -836,6 +866,7 @@ static void tx_main(struct work *work)
 			 ci->conn.ipstr,
 			 ci->conn.port);
 	}
+
 	free_request(ci->tx_req);
 	ci->tx_req = NULL;
 

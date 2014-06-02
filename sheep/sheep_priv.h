@@ -114,6 +114,9 @@ struct request {
 	struct work work;
 	enum REQUST_STATUS status;
 	bool stat; /* true if this request is during stat */
+
+	struct list_node prevented_cow_request_list;
+	struct list_node pending_prevent_cow_request_list;
 };
 
 struct system_info {
@@ -162,6 +165,11 @@ struct system_info {
 	/* upgrade data layout before starting service if necessary*/
 	bool upgrade;
 	struct sd_stat stat;
+
+	bool prevent_cow;
+	int nr_ongoing_cow_request;
+	struct list_head prevented_cow_request_queue;
+	struct list_head pending_prevent_cow_request_queue;
 };
 
 struct disk {
@@ -426,6 +434,7 @@ void objlist_cache_remove(uint64_t oid);
 
 void put_request(struct request *req);
 void get_request(struct request *req);
+void requeue_request(struct request *req);
 
 int sheep_bnode_writer(uint64_t oid, void *mem, unsigned int len,
 		       uint64_t offset, uint32_t flags, int copies,
@@ -482,6 +491,20 @@ int gateway_decref_object(struct request *req);
 
 bool is_erasure_oid(uint64_t oid);
 uint8_t local_ec_index(struct vnode_info *vinfo, uint64_t oid);
+
+/*
+ * return true if the request updates a data_vdi_id field of a vdi object
+ *
+ * XXX: we assume that VMs don't update the inode header and the data_vdi_id
+ * field at the same time.
+ */
+static inline bool is_data_vid_update(const struct sd_req *hdr)
+{
+	return is_vdi_obj(hdr->obj.oid) &&
+		data_vid_offset(0) <= hdr->obj.offset &&
+		hdr->obj.offset + hdr->data_length <=
+			data_vid_offset(SD_INODE_DATA_INDEX);
+}
 
 /* object_cache */
 
