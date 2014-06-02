@@ -1,0 +1,73 @@
+This is a brief explanation of the object reclaim algorithm.  If you want to
+know the details or correctness proof of the generational reference counting,
+please refer the original paper [1]:
+==
+
+Each data object contains the following structure in its inode:
+
+    struct generation_reference {
+        int32_t generation;
+        int32_t count;
+    } gref;
+
+The generation field identifies the generation of the reference and
+the count field records the number of references copied from this
+particular reference.
+
+We also introduce a new type of object, a ledger object.  The ledger
+object exists for each data object and contains an array of int32_t
+values. The i-th element of the array contains information about the
+number of outstanding data object references in the i-th generation.
+Generational reference counting is performed as follows:
+
+1. When a vdi A is created, the initial data object references are
+   initialized as follows:
+
+       for (i = 0; i < MAX_DATA_OBJS; i++) {
+           A.gref[i].generation = 0;
+           A.gref[i].count = 0;
+       }
+
+   and a ledger object for each data object is initialized as follows:
+
+       ledger_object[0] = 1;
+       for (i = 1; i < MAX_DATA_OBJS; i++) {
+           ledger_object[i] = 0;
+       }
+
+   In practice, the ledger object is created and initialized when the
+   object is accessed for the first time, so we don't have to create
+   all the ledger objects when the vdi is created.
+
+2. When a VDI B is created as a clone (or snapshot) of A, the new
+   reference B is initialized as follows:
+
+       for (i = 0; i < MAX_DATA_OBJS; i++) {
+           B.gref[i].generation = A.gref[i].generation + 1;
+           B.gref[i].count = 0;
+       }
+
+   In addition, A.gref.count's are incremented:
+
+       for (i = 0; i < MAX_DATA_OBJS; i++) {
+           A.gref[i].count++;
+       }
+
+3. When a object o is removed, a decrement message is sent to its
+   ledger object containing the values of o.generation and o.count.
+
+4. When a decrement message to o is received, in which the generation
+   field has the value i and the count field has the value c, the
+   following actions are performed:
+
+   o.ledger[i]--;
+   o.ledger[i + 1] += c;
+
+   When every element of the ledger becomes zero (for all i >= 0,
+   o.ledger[i] = 0), o can be reclaimed.
+
+   Note that some elements of the ledger may hold negative values.
+
+
+[1] B. Goldberg, Generation reference counting: A reduced
+communication distributed storage reclamation scheme, PLDI '89
