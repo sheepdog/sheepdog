@@ -40,6 +40,9 @@ Looking for the object 0xfd381500000001 (vid 0xfd3816 idx 1, 2 copies) with 23 n
 127.0.0.1:7022 has the object
 127.0.0.1:7023 doesn't have the object
 127.0.0.1:7024 doesn't have the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7016 127.0.0.1:7022
 Looking for the object 0xfd366200000001 (vid 0xfd3662 idx 1, 3 copies) with 23 nodes
 
 127.0.0.1:7000 doesn't have the object
@@ -65,6 +68,9 @@ Looking for the object 0xfd366200000001 (vid 0xfd3662 idx 1, 3 copies) with 23 n
 127.0.0.1:7022 doesn't have the object
 127.0.0.1:7023 doesn't have the object
 127.0.0.1:7024 doesn't have the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7007 127.0.0.1:7012 127.0.0.1:7001
 Looking for the object 0xfd2de300000001 (vid 0xfd2de3 idx 1, 4 copies) with 23 nodes
 
 127.0.0.1:7000 doesn't have the object
@@ -90,6 +96,9 @@ Looking for the object 0xfd2de300000001 (vid 0xfd2de3 idx 1, 4 copies) with 23 n
 127.0.0.1:7022 doesn't have the object
 127.0.0.1:7023 doesn't have the object
 127.0.0.1:7024 doesn't have the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7005 127.0.0.1:7001 127.0.0.1:7014 127.0.0.1:7019
 Looking for the object 0xfd2c3000000001 (vid 0xfd2c30 idx 1, 6 copies) with 23 nodes
 
 127.0.0.1:7000 has the object
@@ -115,6 +124,9 @@ Looking for the object 0xfd2c3000000001 (vid 0xfd2c30 idx 1, 6 copies) with 23 n
 127.0.0.1:7022 doesn't have the object
 127.0.0.1:7023 has the object
 127.0.0.1:7024 doesn't have the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7021 127.0.0.1:7000 127.0.0.1:7009 127.0.0.1:7001 127.0.0.1:7023 127.0.0.1:7011
 Looking for the object 0xfd314900000001 (vid 0xfd3149 idx 1, 7 copies) with 23 nodes
 
 127.0.0.1:7000 doesn't have the object
@@ -140,6 +152,9 @@ Looking for the object 0xfd314900000001 (vid 0xfd3149 idx 1, 7 copies) with 23 n
 127.0.0.1:7022 has the object
 127.0.0.1:7023 doesn't have the object
 127.0.0.1:7024 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7024 127.0.0.1:7022 127.0.0.1:7011 127.0.0.1:7008 127.0.0.1:7019 127.0.0.1:7012 127.0.0.1:7001
 Looking for the object 0xfd2f9600000001 (vid 0xfd2f96 idx 1, 8 copies) with 23 nodes
 
 127.0.0.1:7000 doesn't have the object
@@ -165,6 +180,9 @@ Looking for the object 0xfd2f9600000001 (vid 0xfd2f96 idx 1, 8 copies) with 23 n
 127.0.0.1:7022 doesn't have the object
 127.0.0.1:7023 doesn't have the object
 127.0.0.1:7024 doesn't have the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7004 127.0.0.1:7019 127.0.0.1:7012 127.0.0.1:7013 127.0.0.1:7014 127.0.0.1:7008 127.0.0.1:7001 127.0.0.1:7006
 Looking for the object 0xfd424700000001 (vid 0xfd4247 idx 1, 9 copies) with 23 nodes
 
 127.0.0.1:7000 doesn't have the object
@@ -190,6 +208,9 @@ Looking for the object 0xfd424700000001 (vid 0xfd4247 idx 1, 9 copies) with 23 n
 127.0.0.1:7022 has the object
 127.0.0.1:7023 has the object
 127.0.0.1:7024 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7006 127.0.0.1:7024 127.0.0.1:7023 127.0.0.1:7004 127.0.0.1:7022 127.0.0.1:7015 127.0.0.1:7011 127.0.0.1:7014 127.0.0.1:7010
 Looking for the object 0xfd409400000001 (vid 0xfd4094 idx 1, 23 copies) with 23 nodes
 
 127.0.0.1:7000 has the object
@@ -215,3 +236,6 @@ Looking for the object 0xfd409400000001 (vid 0xfd4094 idx 1, 23 copies) with 23 
 127.0.0.1:7022 has the object
 127.0.0.1:7023 has the object
 127.0.0.1:7024 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7018 127.0.0.1:7020 127.0.0.1:7019 127.0.0.1:7015 127.0.0.1:7000 127.0.0.1:7021 127.0.0.1:7023 127.0.0.1:7005 127.0.0.1:7017 127.0.0.1:7004 127.0.0.1:7008 127.0.0.1:7007 127.0.0.1:7022 127.0.0.1:7014 127.0.0.1:7001 127.0.0.1:7006 127.0.0.1:7016 127.0.0.1:7009 127.0.0.1:7012 127.0.0.1:7024 127.0.0.1:7010 127.0.0.1:7011 127.0.0.1:7013

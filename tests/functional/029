@@ -23,7 +23,7 @@ $DOG vdi create -c 4:5 test8 20M -P
 $DOG vdi create -c 16:7 test9 20M -P
 $DOG vdi create -c 16:16 fail 20M -P
 $DOG vdi snapshot -s tag test2
-$DOG vdi clone -s 1 test2 clone -c 3
+$DOG vdi clone -s 1 test2 clone
 
 for i in `seq 2 3`; do
 	_kill_sheep $i;

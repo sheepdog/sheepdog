@@ -824,6 +824,20 @@ static int vdi_object_map(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+static void print_expected_location(uint64_t oid, int copies)
+{
+	const struct sd_vnode *vnodes[SD_MAX_COPIES];
+
+	printf("\nAccording to sheepdog algorithm, "
+		   "the object should be located at:\n");
+	oid_to_vnodes(oid, &sd_vroot, copies, vnodes);
+	for (int i = 0; i < copies; i++)
+		printf((i < copies - 1) ? "%s " : "%s",
+			addr_to_str(vnodes[i]->node->nid.addr,
+				vnodes[i]->node->nid.port));
+	printf("\n");
+}
+
 static int vdi_object_location(int argc, char **argv)
 {
 	const char *vdiname = argv[optind];
@@ -846,6 +860,7 @@ static int vdi_object_location(int argc, char **argv)
 		       " nodes\n\n",
 		       vid, sd_nodes_nr);
 		for_each_node_print(vid_to_vdi_oid(vid));
+		print_expected_location(vid_to_vdi_oid(vid), inode->nr_copies);
 		ret = EXIT_SUCCESS;
 		goto out;
 	}
@@ -865,6 +880,7 @@ static int vdi_object_location(int argc, char **argv)
 			oid, vid, idx, inode->nr_copies, sd_nodes_nr);
 
 		for_each_node_print(oid);
+		print_expected_location(oid, inode->nr_copies);
 	} else
 		printf("The inode object 0x%" PRIx32 " idx"
 		       " %"PRIu64" is not allocated\n",
