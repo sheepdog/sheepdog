@@ -129,16 +129,16 @@ reload:
 		       "exists data format mismatch");
 		return -1;
 	}
-out:
-	close(fd);
 
-	return ret;
 create:
 	config.version = SD_FORMAT_VERSION;
 	if (write_config() != SD_RES_SUCCESS)
 		return -1;
 
-	return 0;
+out:
+	close(fd);
+
+	return ret;
 }
 
 void init_config_path(const char *base_path)
