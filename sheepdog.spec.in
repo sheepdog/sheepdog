@@ -28,7 +28,7 @@ a distributed object storage system for QEMU.
 
 %build
 ./autogen.sh
-%{configure} --with-initddir=%{_initrddir} %{_config_opts}
+%{configure} --with-initddir=%{_initrddir} %{_configopts}
 
 make %{_smp_mflags}
 
