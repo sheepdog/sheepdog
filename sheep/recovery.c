@@ -901,7 +901,7 @@ static void recover_object_main(struct work *work)
 
 	wakeup_requests_on_oid(row->oid);
 
-	if (!(rinfo->done % (rinfo->count/100)))
+	if (!(rinfo->done % DIV_ROUND_UP(rinfo->count, 100)))
 		sd_info("object recovery progress %3.0lf%% ",
 			(double)rinfo->done / rinfo->count * 100);
 	sd_debug("object %"PRIx64" is recovered (%"PRIu64"/%"PRIu64")",
