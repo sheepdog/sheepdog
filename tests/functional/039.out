@@ -10,7 +10,7 @@ snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 test---[DATE]---(you are here)
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3         snap1
-  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b26     3              
+  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b27     3              
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 wrote 512/512 bytes at offset 0
@@ -22,16 +22,16 @@ test---[DATE]-+-[DATE]
                           `-(you are here)
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3         snap1
-s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b26     3         snap2
-  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b27     3              
+s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27     3         snap2
+  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b29     3              
 This operation dicards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]---[DATE]---(you are here)
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3         snap1
-s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b26     3         snap2
-  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b27     3              
+s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27     3         snap2
+  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b2a     3              
 This operation dicards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
@@ -39,8 +39,8 @@ test---[DATE]-+-[DATE]
                           `-(you are here)
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3         snap1
-s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b26     3         snap2
-  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b27     3              
+s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27     3         snap2
+  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b2b     3              
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 wrote 512/512 bytes at offset 0
@@ -56,7 +56,7 @@ test---[DATE]-+-[DATE]
                                                `-(you are here)
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25     3         snap1
-s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b26     3         snap2
-s test         3  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27     3         snap3
-s test         4  4.0 GB  4.0 MB  0.0 MB DATE   7c2b28     3         snap4
-  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b29     3              
+s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27     3         snap2
+s test         3  4.0 GB  4.0 MB  0.0 MB DATE   7c2b2b     3         snap3
+s test         4  4.0 GB  4.0 MB  0.0 MB DATE   7c2b2c     3         snap4
+  test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b2e     3              
