@@ -449,7 +449,7 @@ int main(int argc, char **argv)
 	struct option *long_options;
 	const struct command *commands;
 	const char *short_options;
-	char *p;
+	char *p, *env;
 	const struct sd_option *sd_opts;
 	uint8_t sdhost[16];
 	int sdport;
@@ -470,6 +470,26 @@ int main(int argc, char **argv)
 	sd_opts = build_sd_options(command_opts);
 	long_options = build_long_options(sd_opts);
 	short_options = build_short_options(sd_opts);
+
+	env = getenv("SHEEPDOG_DOG_ADDR");
+	if (env) {
+		if (!str_to_addr(env, sdhost)) {
+			sd_err("Invalid ip address %s", env);
+			return EXIT_FAILURE;
+		}
+		memcpy(sd_nid.addr, sdhost, sizeof(sdhost));
+	}
+
+	env = getenv("SHEEPDOG_DOG_PORT");
+	if (env) {
+		sdport = strtol(env, &p, 10);
+		if (env == p || sdport < 1 || sdport > UINT16_MAX
+		    || !is_numeric(env)) {
+			sd_err("Invalid port number '%s'", env);
+			exit(EXIT_USAGE);
+		}
+		sd_nid.port = sdport;
+	}
 
 	while ((ch = getopt_long(argc, argv, short_options, long_options,
 				&longindex)) >= 0) {
