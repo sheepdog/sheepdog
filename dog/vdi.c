@@ -514,10 +514,10 @@ static int vdi_snapshot(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	sd_init_req(&hdr, SD_OP_PREVENT_COW);
+	sd_init_req(&hdr, SD_OP_PREVENT_INODE_UPDATE);
 	ret = dog_exec_req(&sd_nid, &hdr, NULL);
 	if (ret < 0) {
-		sd_err("preventing COW failed");
+		sd_err("preventing inode update failed");
 		return EXIT_FAILURE;
 	}
 
@@ -542,10 +542,10 @@ static int vdi_snapshot(int argc, char **argv)
 			       " VDI ID of newly created snapshot: %x\n", new_vid, vid);
 	}
 
-	sd_init_req(&hdr, SD_OP_ALLOW_COW);
+	sd_init_req(&hdr, SD_OP_ALLOW_INODE_UPDATE);
 	ret = dog_exec_req(&sd_nid, &hdr, NULL);
 	if (ret < 0) {
-		sd_err("allowing COW failed");
+		sd_err("allowing inode update failed");
 		return EXIT_FAILURE;
 	}
 

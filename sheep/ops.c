@@ -1198,40 +1198,40 @@ out:
 	return ret;
 }
 
-static int local_prevent_cow(const struct sd_req *req, struct sd_rsp *rsp,
-			     void *data)
+static int local_prevent_inode_update(const struct sd_req *req,
+				      struct sd_rsp *rsp, void *data)
 {
 	/* FIXME: change type of process_main() */
 	struct request *rq = container_of(req, struct request, rq);
 
-	sd_debug("preventing COW request, ongoing COW requests: %d",
-		 sys->nr_ongoing_cow_request);
+	sd_debug("preventing inode update request, ongoing inode update"
+		 " requests: %d", sys->nr_ongoing_inode_update_request);
 
-	sys->nr_prevent_cow++;
+	sys->nr_prevent_inode_update++;
 
-	if (sys->nr_ongoing_cow_request) {
-		list_add_tail(&rq->pending_prevent_cow_request_list,
-			      &sys->pending_prevent_cow_request_queue);
+	if (sys->nr_ongoing_inode_update_request) {
+		list_add_tail(&rq->pending_prevent_inode_update_reqs,
+			      &sys->pending_prevent_inode_update_request_queue);
 		get_request(rq);
 	}
 
 	return SD_RES_SUCCESS;
 }
 
-static int local_allow_cow(const struct sd_req *req, struct sd_rsp *rsp,
-			   void *data)
+static int local_allow_inode_update(const struct sd_req *req,
+				    struct sd_rsp *rsp, void *data)
 {
 	struct request *rq;
 
-	sd_debug("allowing COW request");
-	sys->nr_prevent_cow--;
+	sd_debug("allowing inode update request");
+	sys->nr_prevent_inode_update--;
 
-	if (sys->nr_prevent_cow)
+	if (sys->nr_prevent_inode_update)
 		return SD_RES_SUCCESS;
 
-	list_for_each_entry(rq, &sys->prevented_cow_request_queue,
-			    prevented_cow_request_list) {
-		list_del(&rq->prevented_cow_request_list);
+	list_for_each_entry(rq, &sys->prevented_inode_update_request_queue,
+			    prevented_inode_update_request_list) {
+		list_del(&rq->prevented_inode_update_request_list);
 		requeue_request(rq);
 	}
 
@@ -1577,16 +1577,16 @@ static struct sd_op_template sd_ops[] = {
 	},
 #endif
 
-	[SD_OP_PREVENT_COW] = {
-		.name = "PREVENT_COW",
+	[SD_OP_PREVENT_INODE_UPDATE] = {
+		.name = "PREVENT_INODE_UPDATE",
 		.type = SD_OP_TYPE_LOCAL,
-		.process_main = local_prevent_cow,
+		.process_main = local_prevent_inode_update,
 	},
 
-	[SD_OP_ALLOW_COW] = {
-		.name = "ALLOW_COW",
+	[SD_OP_ALLOW_INODE_UPDATE] = {
+		.name = "ALLOW_INODE_UPDATE",
 		.type = SD_OP_TYPE_LOCAL,
-		.process_main = local_allow_cow,
+		.process_main = local_allow_inode_update,
 	},
 
 	/* gateway I/O operations */

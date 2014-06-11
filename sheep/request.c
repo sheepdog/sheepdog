@@ -93,16 +93,17 @@ static void gateway_op_done(struct work *work)
 	if (hdr->opcode == SD_OP_WRITE_OBJ && is_data_vid_update(hdr)) {
 		struct request *rq;
 
-		sys->nr_ongoing_cow_request--;
-		assert(0 <= sys->nr_ongoing_cow_request);
-		sd_debug("a number of ongoing cow request: %d",
-			 sys->nr_ongoing_cow_request);
+		sys->nr_ongoing_inode_update_request--;
+		assert(0 <= sys->nr_ongoing_inode_update_request);
+		sd_debug("a number of ongoing inode update request: %d",
+			 sys->nr_ongoing_inode_update_request);
 
-		if (!sys->nr_ongoing_cow_request) {
+		if (!sys->nr_ongoing_inode_update_request) {
 			list_for_each_entry(rq,
-				    &sys->pending_prevent_cow_request_queue,
-				    pending_prevent_cow_request_list) {
-				list_del(&rq->pending_prevent_cow_request_list);
+			    &sys->pending_prevent_inode_update_request_queue,
+			    pending_prevent_inode_update_reqs) {
+				list_del(
+					&rq->pending_prevent_inode_update_reqs);
 				put_request(rq);
 			}
 		}
@@ -353,16 +354,16 @@ queue_work:
 	}
 
 	if (req->rq.opcode == SD_OP_WRITE_OBJ && is_data_vid_update(&req->rq)) {
-		if (sys->nr_prevent_cow) {
-			sd_debug("preventing COW");
-			list_add_tail(&req->prevented_cow_request_list,
-				      &sys->prevented_cow_request_queue);
+		if (sys->nr_prevent_inode_update) {
+			sd_debug("preventing inode update");
+			list_add_tail(&req->prevented_inode_update_request_list,
+			      &sys->prevented_inode_update_request_queue);
 			return;
 		} else {
-			assert(0 <= sys->nr_ongoing_cow_request);
-			sys->nr_ongoing_cow_request++;
-			sd_debug("a number of ongoing cow request: %d",
-				 sys->nr_ongoing_cow_request);
+			assert(0 <= sys->nr_ongoing_inode_update_request);
+			sys->nr_ongoing_inode_update_request++;
+			sd_debug("a number of ongoing inode update request: %d",
+				 sys->nr_ongoing_inode_update_request);
 		}
 	}
 
