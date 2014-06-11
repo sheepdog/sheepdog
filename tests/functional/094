@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Test disk error handling on different size of disks
+
+. ./common
+
+# make different size of devices
+for i in `seq 0 2`; do
+	dd if=/dev/zero of=$STORE/big$i.img seek=1048576 bs=1M count=1 &> /dev/null
+	dd if=/dev/zero of=$STORE/small$i.img seek=512 bs=1M count=1 &> /dev/null
+
+	mkops="-t ext4 -q -F -O ^has_journal -I 128 -N 100"
+	mntops="-o user_xattr"
+
+	mkfs $mkops $STORE/big$i.img 2>&1
+	mkdir -p $STORE/$i/d0
+	mount -o loop $mntops $STORE/big$i.img $STORE/$i/d0
+
+	mkfs $mkops $STORE/small$i.img 2>&1
+	mkdir -p $STORE/$i/d1
+	mount -o loop $mntops $STORE/small$i.img $STORE/$i/d1
+done
+
+for i in `seq 0 2`; do
+	MD_STORE=",$STORE/$i/d0,$STORE/$i/d1"
+	_start_sheep $i
+done
+
+_wait_for_sheep 3
+
+_cluster_format -c 2:1
+
+_vdi_create test 99M
+
+_random | $DOG vdi write test
+
+$DOG vdi read test | md5sum > $STORE/csum.1
+
+# remove obj directory to occut EIO
+umount $STORE/0/d0
+rm -rf $STORE/0/d0
+
+$DOG vdi read test | md5sum > $STORE/csum.2
+
+diff -u $STORE/csum.1 $STORE/csum.2
+
+for i in `seq 0 2`; do
+	umount $STORE/$i/d0 &> /dev/null
+	umount $STORE/$i/d1 &> /dev/null
+done
