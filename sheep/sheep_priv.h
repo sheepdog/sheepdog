@@ -166,7 +166,7 @@ struct system_info {
 	bool upgrade;
 	struct sd_stat stat;
 
-	bool prevent_cow;
+	int nr_prevent_cow;
 	int nr_ongoing_cow_request;
 	struct list_head prevented_cow_request_queue;
 	struct list_head pending_prevent_cow_request_queue;

@@ -1207,7 +1207,7 @@ static int local_prevent_cow(const struct sd_req *req, struct sd_rsp *rsp,
 	sd_debug("preventing COW request, ongoing COW requests: %d",
 		 sys->nr_ongoing_cow_request);
 
-	sys->prevent_cow = true;
+	sys->nr_prevent_cow++;
 
 	if (sys->nr_ongoing_cow_request) {
 		list_add_tail(&rq->pending_prevent_cow_request_list,
@@ -1224,8 +1224,10 @@ static int local_allow_cow(const struct sd_req *req, struct sd_rsp *rsp,
 	struct request *rq;
 
 	sd_debug("allowing COW request");
+	sys->nr_prevent_cow--;
 
-	sys->prevent_cow = false;
+	if (sys->nr_prevent_cow)
+		return SD_RES_SUCCESS;
 
 	list_for_each_entry(rq, &sys->prevented_cow_request_queue,
 			    prevented_cow_request_list) {

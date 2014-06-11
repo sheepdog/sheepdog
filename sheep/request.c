@@ -353,7 +353,7 @@ queue_work:
 	}
 
 	if (req->rq.opcode == SD_OP_WRITE_OBJ && is_data_vid_update(&req->rq)) {
-		if (sys->prevent_cow) {
+		if (sys->nr_prevent_cow) {
 			sd_debug("preventing COW");
 			list_add_tail(&req->prevented_cow_request_list,
 				      &sys->prevented_cow_request_queue);
