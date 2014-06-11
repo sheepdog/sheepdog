@@ -2,6 +2,7 @@
 
 NEW FEATURE:
  - new object reclaim scheme: Sheep uses new garbage collection algorithm for reclaiming objects. Disk consumption of deleted VDIs are reduced dramatically.
+ -- In addition, the limitation of maximum number of children (snapshots and clones) is resolved. Creating more than 1024 snapshots or clones from single virtual disk is allowed.
 
 DOG COMMAND INTERFACE:
  - output format of "dog vdi snapshot" with -v option is changed
