@@ -216,7 +216,7 @@ node_disk_to_vnodes(const struct sd_node *n, struct rb_root *vroot)
 		if (!n->disks[j].disk_id)
 			continue;
 		hval = fnv_64a_64(node_hval, n->disks[j].disk_id);
-		disk_vnodes = n->disks[j].disk_space / WEIGHT_MIN;
+		disk_vnodes = DIV_ROUND_UP(n->disks[j].disk_space, WEIGHT_MIN);
 		total += disk_vnodes;
 		for (int k = 0; k < disk_vnodes; k++) {
 			hval = sd_hash_next(hval);

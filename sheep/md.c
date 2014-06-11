@@ -77,7 +77,7 @@ static void create_vdisks(const struct disk *disk)
 	if (is_cluster_diskmode(&sys->cinfo)) {
 		node_hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
 		hval = fnv_64a_64(node_hval, hval);
-		nr = disk->space / WEIGHT_MIN;
+		nr = DIV_ROUND_UP(disk->space, WEIGHT_MIN);
 		if (0 == n->nid.port)
 			return;
 	} else
@@ -110,7 +110,7 @@ static void remove_vdisks(const struct disk *disk)
 	if (is_cluster_diskmode(&sys->cinfo)) {
 		node_hval = sd_hash(&n->nid, offsetof(typeof(n->nid), io_addr));
 		hval = fnv_64a_64(node_hval, hval);
-		nr = disk->space / WEIGHT_MIN;
+		nr = DIV_ROUND_UP(disk->space, WEIGHT_MIN);
 	} else
 		nr = vdisk_number(disk);
 
