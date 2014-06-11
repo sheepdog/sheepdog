@@ -711,13 +711,27 @@ int log_init(const char *program_name, enum log_dst_type type, int level,
 
 void log_close(void)
 {
-	if (la) {
-		la->active = false;
-		waitpid(logger_pid, NULL, 0);
+	pid_t pid;
 
-		syslog(LOG_WARNING, "logger pid %d stopped\n", logger_pid);
-		closelog();
-		free_logarea();
+	if (!la)
+		return;
+
+	while (true) {
+		la->active = false;
+		pid = waitpid(logger_pid, NULL, WNOHANG);
+		if (pid == 0) {
+			usleep(100000);
+			continue;
+		} else if (pid > 0) {
+			syslog(LOG_WARNING, "logger pid %d stopped\n",
+					logger_pid);
+			closelog();
+			free_logarea();
+			break;
+		} else {
+			syslog(LOG_ERR, "waitpid() failure\n");
+			exit(1);
+		}
 	}
 }
 
