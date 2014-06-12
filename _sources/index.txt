@@ -34,6 +34,7 @@ Documentations
 
 + Presentations
 
+  + Sheepdog: Software Defined Storage System for Converged Infrastructure, CloudOpen Japan 2014, May 2014. (`Slides <_static/sheepdog_COJ14.pdf>`__)
   + Sheepdog: Yet Another All-In-One Storage For Openstack, Openstack Hong Kong Summit, Nov 2013. (`Slides <_static/sheepdog-openstack.pdf>`__)
   + Sheepdog: Distributed Storage System for QEMU, KVM Forum 2010, Aug 2010. (`Slides <_static/kvmforum2010.pdf>`__)
   + Sheepdog: Distributed Storage System for QEMU/KVM, LCA 2010 DS&R miniconf, Jan 2010. (`Slides <_static/lca2010_miniconf.pdf>`__)
