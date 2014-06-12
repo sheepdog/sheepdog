@@ -123,16 +123,16 @@ int init_config_file(void)
 reload:
 	ret = 0;
 	get_cluster_config(&sys->cinfo);
-out:
-	close(fd);
 
-	return ret;
 create:
 	config.version = SD_FORMAT_VERSION;
 	if (write_config() != SD_RES_SUCCESS)
 		return -1;
 
-	return 0;
+out:
+	close(fd);
+
+	return ret;
 }
 
 void init_config_path(const char *base_path)
