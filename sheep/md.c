@@ -322,6 +322,7 @@ bool md_add_disk(const char *path, bool purge)
 
 	new = xmalloc(sizeof(*new));
 	pstrcpy(new->path, PATH_MAX, path);
+	trim_last_slash(new->path);
 	new->space = init_path_space(new->path, purge);
 	if (!new->space) {
 		free(new);
