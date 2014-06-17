@@ -978,6 +978,9 @@ retry:
 	sd_init_req(&hdr, SD_OP_GET_OBJ_LIST);
 	hdr.data_length = buf_size;
 	hdr.epoch = epoch;
+	memcpy(hdr.node_addr.addr, sys->this_node.nid.addr,
+			sizeof(hdr.node_addr.addr));
+	hdr.node_addr.port = sys->this_node.nid.port;
 	ret = sheep_exec_req(&e->nid, &hdr, buf);
 
 	switch (ret) {
@@ -997,40 +1000,28 @@ retry:
 	}
 
 	*nr_oids = rsp->data_length / sizeof(uint64_t);
-	sd_debug("%zu", *nr_oids);
+	sd_debug("%s: %zu objects to be fetched",
+			addr_to_str(e->nid.addr, e->nid.port), *nr_oids);
 	return buf;
 }
 
-/* Screen out objects that don't belong to this node */
-static void screen_object_list(struct recovery_list_work *rlw,
+/* Merge object lists fetched from other nodes */
+static void merge_object_list(struct recovery_list_work *rlw,
 			       uint64_t *oids, size_t nr_oids)
 {
-	struct recovery_work *rw = &rlw->base;
-	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 	uint64_t old_count = rlw->count;
-	uint64_t nr_objs;
-	uint64_t i, j;
+	uint64_t i;
 
 	for (i = 0; i < nr_oids; i++) {
 		if (xbsearch(&oids[i], rlw->oids, old_count, obj_cmp))
 			/* the object is already scheduled to be recovered */
 			continue;
 
-		nr_objs = get_obj_copy_number(oids[i], rw->cur_vinfo->nr_zones);
-
-		oid_to_vnodes(oids[i], &rw->cur_vinfo->vroot, nr_objs, vnodes);
-		for (j = 0; j < nr_objs; j++) {
-			if (!vnode_is_local(vnodes[j]))
-				continue;
-
-			rlw->oids[rlw->count++] = oids[i];
-			/* enlarge the list buffer if full */
-			if (rlw->count == list_buffer_size / sizeof(uint64_t)) {
-				list_buffer_size *= 2;
-				rlw->oids = xrealloc(rlw->oids,
-						     list_buffer_size);
-			}
-			break;
+		rlw->oids[rlw->count++] = oids[i];
+		/* enlarge the list buffer if full */
+		if (rlw->count == list_buffer_size / sizeof(uint64_t)) {
+			list_buffer_size *= 2;
+			rlw->oids = xrealloc(rlw->oids, list_buffer_size);
 		}
 	}
 
@@ -1072,7 +1063,7 @@ again:
 		oids = fetch_object_list(node, rw->epoch, &nr_oids);
 		if (!oids)
 			continue;
-		screen_object_list(rlw, oids, nr_oids);
+		merge_object_list(rlw, oids, nr_oids);
 		free(oids);
 	}
 

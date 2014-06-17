@@ -97,8 +97,17 @@ int objlist_cache_insert(uint64_t oid)
 
 int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 {
-	int nr = 0;
+	int i = 0, j, copies;
 	struct objlist_cache_entry *entry;
+	struct node_id peer_nid;
+	struct request *req = container_of(hdr, struct request, rq);
+	struct vnode_info *peer_vinfo = req->vinfo;
+	const struct sd_vnode *vnodes[SD_MAX_COPIES];
+	int last = 0, end = 4096;
+	uint64_t *oids = xmalloc(end * sizeof(uint64_t));
+
+	memcpy(peer_nid.addr, hdr->node_addr.addr, sizeof(peer_nid.addr));
+	peer_nid.port = hdr->node_addr.port;
 
 	/* first try getting the cached buffer with only a read lock held */
 	sd_read_lock(&obj_list_cache.lock);
@@ -116,19 +125,38 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 				obj_list_cache.cache_size * sizeof(uint64_t));
 
 	rb_for_each_entry(entry, &obj_list_cache.root, node) {
-		obj_list_cache.buf[nr++] = entry->oid;
+		obj_list_cache.buf[i++] = entry->oid;
 	}
 
 out:
-	if (hdr->data_length < obj_list_cache.cache_size * sizeof(uint64_t)) {
+	/* Screen out objects that don't belong to that node */
+	for (i = 0; i < obj_list_cache.cache_size; i++) {
+		copies = get_obj_copy_number(obj_list_cache.buf[i],
+				peer_vinfo->nr_zones);
+		oid_to_vnodes(obj_list_cache.buf[i],
+				&peer_vinfo->vroot, copies, vnodes);
+		for (j = 0; j < copies; j++) {
+			if (!vnode_is_peer(vnodes[j], &peer_nid))
+				continue;
+			oids[last++] = obj_list_cache.buf[i];
+			if (last >= end) {
+				end *= 2;
+				oids = xrealloc(oids, end * sizeof(uint64_t));
+			}
+		}
+	}
+
+	if (hdr->data_length < last * sizeof(uint64_t)) {
 		sd_rw_unlock(&obj_list_cache.lock);
 		sd_err("GET_OBJ_LIST buffer too small");
+		free(oids);
 		return SD_RES_BUFFER_SMALL;
 	}
 
-	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
-	memcpy(data, obj_list_cache.buf, rsp->data_length);
+	rsp->data_length = last * sizeof(uint64_t);
+	memcpy(data, oids, rsp->data_length);
 	sd_rw_unlock(&obj_list_cache.lock);
+	free(oids);
 	return SD_RES_SUCCESS;
 }
 
