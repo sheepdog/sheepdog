@@ -36,10 +36,11 @@ int snap_init(const char *farm_dir)
 
 	fd = open(snap_log_path, O_CREAT | O_EXCL, 0666);
 	if (fd < 0) {
-		if (errno != EEXIST) {
+		if (errno != EEXIST)
 			sd_err("%m");
-			goto out;
-		}
+		else
+			ret = 0;
+		goto out;
 	}
 
 	ret = 0;
