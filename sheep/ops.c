@@ -242,12 +242,12 @@ static int remove_epoch(uint32_t epoch)
 	sd_debug("remove epoch %"PRIu32, epoch);
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 	ret = unlink(path);
-	if (ret && ret != -ENOENT) {
-		sd_err("failed to remove %s: %s", path, strerror(-ret));
+	if (ret && errno != ENOENT) {
+		sd_err("failed to remove %s: %m", path);
 		return SD_RES_EIO;
 	}
 
-	return SD_RES_EIO;
+	return SD_RES_SUCCESS;
 }
 
 static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
