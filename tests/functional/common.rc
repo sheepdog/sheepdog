@@ -399,7 +399,7 @@ _make_device()
 _cleanup_devices()
 {
     local d
-    for d in `mount | grep $WD | sort | uniq | awk '{print $3}'`; do
+    for d in `mount | grep $WD | sort -r | uniq | awk '{print $3}'`; do
         umount -l $d
         rm -f $d.img
     done
