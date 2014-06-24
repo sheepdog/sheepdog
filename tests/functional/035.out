@@ -8,6 +8,9 @@ Looking for the object 0x7c2b2500000000 (vid 0x7c2b25 idx 0, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7008 127.0.0.1:7009 127.0.0.1:7006 127.0.0.1:7007 127.0.0.1:7000 127.0.0.1:7005
 Looking for the object 0x7c2b2500000001 (vid 0x7c2b25 idx 1, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -16,6 +19,9 @@ Looking for the object 0x7c2b2500000001 (vid 0x7c2b25 idx 1, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7007 127.0.0.1:7000 127.0.0.1:7006 127.0.0.1:7005 127.0.0.1:7008 127.0.0.1:7009
 Looking for the object 0x7c2b2500000002 (vid 0x7c2b25 idx 2, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -24,6 +30,9 @@ Looking for the object 0x7c2b2500000002 (vid 0x7c2b25 idx 2, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7006 127.0.0.1:7000 127.0.0.1:7005 127.0.0.1:7009 127.0.0.1:7007 127.0.0.1:7008
 Looking for the object 0x7c2b2500000003 (vid 0x7c2b25 idx 3, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -32,6 +41,9 @@ Looking for the object 0x7c2b2500000003 (vid 0x7c2b25 idx 3, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7006 127.0.0.1:7008 127.0.0.1:7005 127.0.0.1:7007 127.0.0.1:7009 127.0.0.1:7000
 Looking for the object 0x7c2b2500000004 (vid 0x7c2b25 idx 4, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -40,6 +52,9 @@ Looking for the object 0x7c2b2500000004 (vid 0x7c2b25 idx 4, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7005 127.0.0.1:7006 127.0.0.1:7000 127.0.0.1:7008 127.0.0.1:7009 127.0.0.1:7007
 Looking for the object 0x7c2b2500000005 (vid 0x7c2b25 idx 5, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -48,6 +63,9 @@ Looking for the object 0x7c2b2500000005 (vid 0x7c2b25 idx 5, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7009 127.0.0.1:7007 127.0.0.1:7005 127.0.0.1:7006 127.0.0.1:7008 127.0.0.1:7000
 Looking for the object 0x7c2b2500000006 (vid 0x7c2b25 idx 6, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -56,6 +74,9 @@ Looking for the object 0x7c2b2500000006 (vid 0x7c2b25 idx 6, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7000 127.0.0.1:7007 127.0.0.1:7005 127.0.0.1:7006 127.0.0.1:7008 127.0.0.1:7009
 Looking for the object 0x7c2b2500000007 (vid 0x7c2b25 idx 7, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -64,6 +85,9 @@ Looking for the object 0x7c2b2500000007 (vid 0x7c2b25 idx 7, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7008 127.0.0.1:7006 127.0.0.1:7005 127.0.0.1:7000 127.0.0.1:7009 127.0.0.1:7007
 Looking for the object 0x7c2b2500000008 (vid 0x7c2b25 idx 8, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -72,6 +96,9 @@ Looking for the object 0x7c2b2500000008 (vid 0x7c2b25 idx 8, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7006 127.0.0.1:7005 127.0.0.1:7000 127.0.0.1:7008 127.0.0.1:7009 127.0.0.1:7007
 Looking for the object 0x7c2b2500000009 (vid 0x7c2b25 idx 9, 6 copies) with 6 nodes
 
 127.0.0.1:7000 has the object
@@ -80,3 +107,6 @@ Looking for the object 0x7c2b2500000009 (vid 0x7c2b25 idx 9, 6 copies) with 6 no
 127.0.0.1:7007 has the object
 127.0.0.1:7008 has the object
 127.0.0.1:7009 has the object
+
+According to sheepdog algorithm, the object should be located at:
+127.0.0.1:7008 127.0.0.1:7005 127.0.0.1:7006 127.0.0.1:7007 127.0.0.1:7009 127.0.0.1:7000

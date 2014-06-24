@@ -84,6 +84,6 @@ $DOG vdi read -s 1 test2 | md5sum > $STORE/csum.21.new
 diff -u $STORE/csum.11.org $STORE/csum.11.new
 diff -u $STORE/csum.21.org $STORE/csum.21.new
 
-$DOG cluster info -s | _filter_cluster_info
+$DOG cluster info -v | _filter_cluster_info
 _vdi_create test3 10M
 _vdi_list
