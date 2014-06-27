@@ -346,10 +346,7 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 	if (tag)
 		pstrcpy(buf + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, tag);
 
-	if (for_snapshot)
-		sd_init_req(&hdr, SD_OP_GET_VDI_INFO);
-	else
-		sd_init_req(&hdr, SD_OP_LOCK_VDI);
+	sd_init_req(&hdr, SD_OP_GET_VDI_INFO);
 	hdr.data_length = SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	hdr.vdi.snapid = snapid;
