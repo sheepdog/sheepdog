@@ -627,9 +627,11 @@ static int md_move_object(uint64_t oid, const char *old, const char *new)
 	}
 
 	if (atomic_create_and_write(new, buf.buf, buf.len, false) < 0) {
-		sd_err("failed to create %s", new);
-		ret = -1;
-		goto out_close;
+		if (errno != EEXIST) {
+			sd_err("failed to create %s", new);
+			ret = -1;
+			goto out_close;
+		}
 	}
 	unlink(old);
 	ret = 0;
