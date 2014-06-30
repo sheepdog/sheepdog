@@ -605,7 +605,9 @@ static Suite *test_suite(void)
 
 int main(void)
 {
+	struct system_info __sys;
 	int number_failed;
+	sys = &__sys;
 	Suite *s = test_suite();
 	SRunner *sr = srunner_create(s);
 	srunner_run_all(sr, CK_NORMAL);
