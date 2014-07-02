@@ -185,6 +185,7 @@ static int for_each_object_in_path(const char *path,
 	struct dirent *d;
 	uint64_t oid;
 	int ret = SD_RES_SUCCESS;
+	char file_name[PATH_MAX];
 
 	dir = opendir(path);
 	if (unlikely(!dir)) {
@@ -208,8 +209,12 @@ static int for_each_object_in_path(const char *path,
 		/* don't call callback against temporary objects */
 		if (is_tmp_dentry(d->d_name)) {
 			if (cleanup) {
-				sd_debug("remove tmp object %s", d->d_name);
-				unlink(d->d_name);
+				snprintf(file_name, sizeof(file_name),
+						"%s/%s", path, d->d_name);
+				sd_debug("remove tmp object %s", file_name);
+				if (unlink(file_name) < 0)
+					sd_err("failed to unlink %s: %m",
+							file_name);
 			}
 			continue;
 		}
