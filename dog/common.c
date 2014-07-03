@@ -256,9 +256,9 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 			}
 		}
 
-		if (flags & CMD_NEED_ARG && argc < 5 + subcmd_depth)
-			subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 		optind++;
+		if (flags & CMD_NEED_ARG && argc == optind)
+			subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 		ret = sub[i].fn(argc, argv);
 		if (ret == EXIT_USAGE)
 			subcommand_usage(argv[1], argv[2], EXIT_USAGE);
