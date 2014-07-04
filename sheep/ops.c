@@ -412,9 +412,7 @@ static int local_read_vdis(const struct sd_req *req, struct sd_rsp *rsp,
 static int local_get_vdi_copies(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data)
 {
-	rsp->data_length = fill_vdi_state_list(data);
-
-	return SD_RES_SUCCESS;
+	return fill_vdi_state_list(req, rsp, data);
 }
 
 static int local_stat_sheep(struct request *req)

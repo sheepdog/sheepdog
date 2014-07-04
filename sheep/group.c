@@ -471,21 +471,31 @@ static int get_vdis_from(struct sd_node *node)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct vdi_state *vs = NULL;
-	int i, ret = SD_RES_SUCCESS;
+	int i, ret;
 	unsigned int rlen;
 	int count;
 
 	if (node_is_local(node))
-		goto out;
+		return SD_RES_SUCCESS;
 
-	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
+#define DEFAULT_VDI_STATE_COUNT 512
+	rlen = DEFAULT_VDI_STATE_COUNT * sizeof(struct vdi_state);
 	vs = xzalloc(rlen);
+retry:
 	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
 	hdr.data_length = rlen;
 	hdr.epoch = sys_epoch();
 	ret = sheep_exec_req(&node->nid, &hdr, (char *)vs);
-	if (ret != SD_RES_SUCCESS)
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_BUFFER_SMALL:
+		rlen *= 2;
+		vs = xrealloc(vs, rlen);
+		goto retry;
+	default:
 		goto out;
+	}
 
 	count = rsp->data_length / sizeof(*vs);
 	for (i = 0; i < count; i++) {

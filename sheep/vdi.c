@@ -172,25 +172,38 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 	return SD_RES_SUCCESS;
 }
 
-int fill_vdi_state_list(void *data)
+int fill_vdi_state_list(const struct sd_req *hdr,
+			struct sd_rsp *rsp, void *data)
 {
-	int nr = 0;
-	struct vdi_state *vs = data;
+#define DEFAULT_VDI_STATE_COUNT 512
+	int last = 0, end = DEFAULT_VDI_STATE_COUNT;
 	struct vdi_state_entry *entry;
+	struct vdi_state *vs = xzalloc(end * sizeof(struct vdi_state));
 
 	sd_read_lock(&vdi_state_lock);
 	rb_for_each_entry(entry, &vdi_state_root, node) {
-		memset(vs, 0, sizeof(*vs));
-		vs->vid = entry->vid;
-		vs->nr_copies = entry->nr_copies;
-		vs->snapshot = entry->snapshot;
-		vs->copy_policy = entry->copy_policy;
-		vs++;
-		nr++;
+		if (last >= end) {
+			end *= 2;
+			vs = xrealloc(vs, end * sizeof(struct vdi_state));
+		}
+
+		vs[last].vid = entry->vid;
+		vs[last].nr_copies = entry->nr_copies;
+		vs[last].snapshot = entry->snapshot;
+		vs[last].copy_policy = entry->copy_policy;
+		last++;
 	}
 	sd_rw_unlock(&vdi_state_lock);
 
-	return nr * sizeof(*vs);
+	if (hdr->data_length < last * sizeof(struct vdi_state)) {
+		free(vs);
+		return SD_RES_BUFFER_SMALL;
+	}
+
+	rsp->data_length = last * sizeof(struct vdi_state);
+	memcpy(data, vs, rsp->data_length);
+	free(vs);
+	return SD_RES_SUCCESS;
 }
 
 static inline bool vdi_is_deleted(struct sd_inode *inode)
