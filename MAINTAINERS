@@ -18,8 +18,9 @@ Descriptions of section entries:
 
 Sheepdog Overall
 ------------------------------
-M: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 M: Liu Yuan <namei.unix@gmail.com>
+M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
 B: sheeepdog/*
 L: sheepdog@lists.wpkg.org
 
@@ -31,7 +32,7 @@ L: sheepdog@lists.wpkg.org
 
 QEMU Driver
 ------------------------------
-M: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 M: Liu Yuan <namei.unix@gmail.com>
 F: qemu/block/sheedog.c
 L: qemu-devel@nongnu.org
@@ -50,7 +51,7 @@ L: libvir-list@redhat.com
 
 Openstack Drivers
 ------------------------------
-M: MORITA Kazutaka <morita.kazutaka@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 M: Liu Yuan <namei.unix@gmail.com>
 F: openstack/glance/store/sheepdog.py
 F: openstack/cinder/volume/drivers/sheepdog.py
