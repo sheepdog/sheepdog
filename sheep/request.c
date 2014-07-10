@@ -687,8 +687,6 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 	if (!req)
 		return NULL;
 
-	req->ci = ci;
-	refcount_inc(&ci->refcnt);
 	if (data_length) {
 		req->data_length = data_length;
 		req->data = valloc(data_length);
@@ -697,6 +695,9 @@ static struct request *alloc_request(struct client_info *ci, int data_length)
 			return NULL;
 		}
 	}
+
+	req->ci = ci;
+	refcount_inc(&ci->refcnt);
 
 	refcount_set(&req->refcnt, 1);
 
