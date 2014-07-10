@@ -114,7 +114,7 @@ int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_ADD, fd, &ev);
 	if (ret) {
-		sd_err("failed to add epoll event: %m");
+		sd_err("failed to add epoll event for fd %d: %m", fd);
 		free(ei);
 	} else
 		rb_insert(&events_tree, ei, rb, event_cmp);
@@ -163,7 +163,7 @@ int modify_event(int fd, unsigned int new_events)
 
 	ret = epoll_ctl(efd, EPOLL_CTL_MOD, fd, &ev);
 	if (ret) {
-		sd_err("failed to delete epoll event for fd %d: %m", fd);
+		sd_err("failed to modify epoll event for fd %d: %m", fd);
 		return 1;
 	}
 	return 0;
