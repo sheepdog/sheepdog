@@ -176,10 +176,6 @@ struct sd_req {
 			uint32_t	generation;
 			uint32_t	count;
 		} ref;
-		struct {
-			uint8_t		addr[16];
-			uint16_t	port;
-		} node_addr;
 
 		uint32_t		__pad[8];
 	};
