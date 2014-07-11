@@ -736,7 +736,16 @@ main_fn void put_request(struct request *req)
 
 			if (ci->tx_req == NULL)
 				/* There is no request being sent. */
-				conn_tx_on(&ci->conn);
+				if (conn_tx_on(&ci->conn)) {
+					sd_err("switch on sending flag failure, "
+						"connection maybe closed");
+					/*
+					 * should not free_request(req) here
+					 * because it is already in done list
+					 * clear_client_info will free it
+					 */
+					clear_client_info(ci);
+				}
 		}
 	}
 }
@@ -801,7 +810,9 @@ static void rx_main(struct work *work)
 		return;
 	}
 
-	conn_rx_on(&ci->conn);
+	if (conn_rx_on(&ci->conn))
+		sd_err("switch on receiving flag failure, "
+				"connection maybe closed");
 
 	if (is_logging_op(get_sd_op(req->rq.opcode))) {
 		sd_info("req=%p, fd=%d, client=%s:%d, op=%s, data=%s",
@@ -878,7 +889,9 @@ static void tx_main(struct work *work)
 	}
 
 	if (!list_empty(&ci->done_reqs))
-		conn_tx_on(&ci->conn);
+		if (conn_tx_on(&ci->conn))
+			sd_err("switch on sending flag failure, "
+					"connection maybe closed");
 }
 
 static void destroy_client(struct client_info *ci)
@@ -957,8 +970,11 @@ static void client_handler(int fd, int events, void *data)
 		return clear_client_info(ci);
 
 	if (events & EPOLLIN) {
-		if (conn_rx_off(&ci->conn) != 0)
+		if (conn_rx_off(&ci->conn) != 0) {
+			sd_err("switch off receiving flag failure, "
+					"connection maybe closed");
 			return;
+		}
 
 		/*
 		 * Increment refcnt so that the client_info isn't freed while
@@ -971,8 +987,11 @@ static void client_handler(int fd, int events, void *data)
 	}
 
 	if (events & EPOLLOUT) {
-		if (conn_tx_off(&ci->conn) != 0)
+		if (conn_tx_off(&ci->conn) != 0) {
+			sd_err("switch off sending flag failure, "
+					"connection maybe closed");
 			return;
+		}
 
 		assert(ci->tx_req == NULL);
 		ci->tx_req = list_first_entry(&ci->done_reqs, struct request,
