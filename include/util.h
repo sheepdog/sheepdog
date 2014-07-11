@@ -125,6 +125,10 @@ int atomic_create_and_write(const char *path, const char *buf, size_t len,
 void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
 void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen);
 
+struct timespec get_time_tick(void);
+double get_time_interval(const struct timespec *start,
+						 const struct timespec *end);
+
 /* a type safe version of qsort() */
 #define xqsort(base, nmemb, compar)					\
 ({									\

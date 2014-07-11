@@ -32,6 +32,7 @@ struct node_id sd_nid = {
 bool highlight = true;
 bool raw_output;
 bool verbose;
+bool elapsed_time;
 
 static const struct sd_option dog_options[] = {
 
@@ -42,6 +43,7 @@ static const struct sd_option dog_options[] = {
 	 "                          single spaces and print all sizes in decimal bytes"},
 	{'v', "verbose", false, "print more information than default"},
 	{'h', "help", false, "display this help and exit"},
+	{'t', "time", false, "show elapsed time"},
 
 	{ 0, NULL, false, NULL },
 };
@@ -453,6 +455,9 @@ int main(int argc, char **argv)
 	const struct sd_option *sd_opts;
 	uint8_t sdhost[16];
 	int sdport;
+	struct timespec start, end;
+
+	start = get_time_tick();
 
 	log_dog_operation(argc, argv);
 
@@ -520,6 +525,9 @@ int main(int argc, char **argv)
 		case 'h':
 			subcommand_usage(argv[1], argv[2], EXIT_SUCCESS);
 			break;
+		case 't':
+			elapsed_time = true;
+			break;
 		case '?':
 			usage(commands, EXIT_USAGE);
 			break;
@@ -565,5 +573,12 @@ int main(int argc, char **argv)
 	ret = command_fn(argc, argv);
 	if (ret == EXIT_USAGE)
 		subcommand_usage(argv[1], argv[2], EXIT_USAGE);
+
+	if (elapsed_time) {
+		end = get_time_tick();
+		printf("\nElapsed time: %.3lf seconds\n",
+				get_time_interval(&start, &end));
+	}
+
 	return ret;
 }

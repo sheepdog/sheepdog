@@ -223,9 +223,9 @@ static int alter_vdi_copy(int argc, char **argv)
 }
 
 static struct subcommand alter_cmd[] = {
-	{"cluster-copy", NULL, "caph", "set the cluster's redundancy level",
+	{"cluster-copy", NULL, "capht", "set the cluster's redundancy level",
 	 NULL, CMD_NEED_NODELIST, alter_cluster_copy, alter_options},
-	{"vdi-copy", "<vdiname>", "caph", "set the vdi's redundancy level",
+	{"vdi-copy", "<vdiname>", "capht", "set the vdi's redundancy level",
 	 NULL, CMD_NEED_ARG|CMD_NEED_NODELIST, alter_vdi_copy, alter_options},
 	{NULL,},
 };

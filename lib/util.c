@@ -806,3 +806,28 @@ void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen)
 	if (orig_offset < *poffset)
 		memmove(p, p + *poffset - orig_offset, *plen);
 }
+
+struct timespec get_time_tick(void)
+{
+	struct timespec ts;
+	int ret;
+
+	ts.tv_sec = 0;
+	ts.tv_nsec = 0;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ret < 0)
+		sd_err("clock_gettime failure: %m");
+
+	return ts;
+}
+
+double get_time_interval(const struct timespec *start,
+						 const struct timespec *end)
+{
+	assert(start);
+	assert(end);
+
+	return ((end->tv_nsec - start->tv_nsec) * 0.000000001)
+			+ end->tv_sec - start->tv_sec;
+}
