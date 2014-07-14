@@ -479,7 +479,7 @@ static inline bool node_is_local(const struct sd_node *n)
  */
 static inline bool is_sparse_object(uint64_t oid)
 {
-	return !is_data_obj(oid) || oid_is_readonly(oid);
+	return is_ledger_object(oid);
 }
 
 /* gateway operations */
