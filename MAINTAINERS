@@ -30,6 +30,12 @@ M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
 B: sheepdog/stable-*
 L: sheepdog@lists.wpkg.org
 
+HTTP interface
+------------------------------
+M: Robin Dong <robin.k.dong@gmail.com>
+B: sheeepdog/sheep/http/*
+L: sheepdog@lists.wpkg.org
+
 QEMU Driver
 ------------------------------
 M: MORITA Kazutaka <morita.kazutaka@gmail.com>
