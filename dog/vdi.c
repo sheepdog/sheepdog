@@ -256,6 +256,22 @@ static void for_each_node_print(uint64_t oid)
 	}
 }
 
+static void print_obj_ref(uint32_t vid, const char *name, const char *tag,
+			   uint32_t snapid, uint32_t flags,
+			   const struct sd_inode *i, void *data)
+{
+	uint64_t oid = *(uint64_t *)data;
+	uint64_t idx = data_oid_to_idx(oid);
+	struct get_vdi_info info;
+
+	if (i->data_vdi_id[idx] != 0 &&
+			i->data_vdi_id[idx] == oid_to_vid(oid)) {
+		memset(&info, 0, sizeof(info));
+		info.name = name;
+		print_vdi_list(vid, name, tag, snapid, flags, i, &info);
+	}
+}
+
 static int vdi_list(int argc, char **argv)
 {
 	const char *vdiname = argv[optind];
@@ -270,11 +286,20 @@ static int vdi_list(int argc, char **argv)
 		if (parse_vdi(print_vdi_list, SD_INODE_SIZE, &info) < 0)
 			return EXIT_SYSFAIL;
 		return EXIT_SUCCESS;
-	} else {
-		if (parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL) < 0)
+	}
+
+	if (vdi_cmd_data.oid) {
+		if (!is_data_obj(vdi_cmd_data.oid))
+			return EXIT_FAILURE;
+		if (parse_vdi(print_obj_ref, SD_INODE_SIZE,
+					&vdi_cmd_data.oid) < 0)
 			return EXIT_SYSFAIL;
 		return EXIT_SUCCESS;
 	}
+
+	if (parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
+	return EXIT_SUCCESS;
 }
 
 static int vdi_tree(int argc, char **argv)
@@ -2584,7 +2609,7 @@ static struct subcommand vdi_cmd[] = {
 	{"rollback", "<vdiname>", "saphfrvt", "rollback to a snapshot",
 	 NULL, CMD_NEED_ARG,
 	 vdi_rollback, vdi_options},
-	{"list", "[vdiname]", "aprht", "list images",
+	{"list", "[vdiname]", "aprhot", "list images",
 	 NULL, 0, vdi_list, vdi_options},
 	{"tree", NULL, "apht", "show images in tree view format",
 	 NULL, 0, vdi_tree, vdi_options},
