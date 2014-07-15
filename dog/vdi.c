@@ -2534,9 +2534,13 @@ static int vdi_parser(int ch, const char *opt)
 		vdi_cmd_data.no_share = true;
 		break;
 	case 'i':
-		vdi_cmd_data.index = strtol(opt, &p, 10);
+		if (strncmp(opt, "0x", 2) == 0)
+			vdi_cmd_data.index = strtol(opt, &p, 16);
+		else
+			vdi_cmd_data.index = strtol(opt, &p, 10);
 		if (opt == p) {
-			sd_err("The index must be an integer");
+			sd_err("The index must be a decimal integer "
+				"or a hexadecimal integer started with 0x");
 			exit(EXIT_FAILURE);
 		}
 		break;
