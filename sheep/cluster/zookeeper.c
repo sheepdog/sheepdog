@@ -668,6 +668,7 @@ static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,
 	struct zk_event ev;
 	int rc;
 
+	memset(&ev, 0, sizeof(ev));
 	ev.id = get_uniq_id();
 	ev.type = type;
 	ev.sender = *znode;
