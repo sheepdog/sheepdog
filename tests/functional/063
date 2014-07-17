@@ -24,7 +24,7 @@ $DOG vdi create test 200M -P
 _node_info
 $DOG node list
 
-$DOG node md plug $STORE/4
+$DOG node md plug -f $STORE/4
 _wait_for_sheep_recovery 0
 
 $DOG cluster reweight

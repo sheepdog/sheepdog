@@ -27,26 +27,26 @@ _md_info
 # plug during node event
 _start_sheep 3
 _wait_for_sheep 4
-$DOG node md plug  $STORE/0/d3,$STORE/0/d4
+$DOG node md plug -f $STORE/0/d3,$STORE/0/d4
 _wait_for_sheep_recovery 0
 _md_info
 $DOG vdi check test
 $DOG cluster info | _filter_cluster_info
 
 # plug duplicate path
-$DOG node md plug  $STORE/0/d3
+$DOG node md plug -f $STORE/0/d3
 $DOG node recovery
 _md_info
 
 # unplug
-$DOG node md unplug  $STORE/0/d0,$STORE/0/d1
+$DOG node md unplug -f $STORE/0/d0,$STORE/0/d1
 _wait_for_sheep_recovery 0
 _md_info
 $DOG vdi check test
 $DOG cluster info | _filter_cluster_info
 
 # unplug invalid path
-$DOG node md unplug  $STORE/0/d0
+$DOG node md unplug -f $STORE/0/d0
 $DOG node recovery
 _md_info
 $DOG cluster info | _filter_cluster_info

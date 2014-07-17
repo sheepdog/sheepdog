@@ -21,7 +21,7 @@ $DOG vdi create test 100M -P
 _node_info
 $DOG node list
 
-$DOG node md plug $STORE/3
+$DOG node md plug -f $STORE/3
 _wait_for_sheep_recovery 0
 _node_info
 $DOG node list

@@ -16,6 +16,7 @@ static struct node_cmd_data {
 	bool recovery_progress;
 	bool watch;
 	bool local;
+	bool force;
 } node_cmd_data;
 
 static void cal_total_vdi_size(uint32_t vid, const char *name, const char *tag,
@@ -468,13 +469,33 @@ static int do_plug_unplug(char *disks, bool plug)
 	return EXIT_SUCCESS;
 }
 
+#define MD_PLUG_PRINT				\
+	"    __\n"				\
+	"   ()'`;\n"				\
+	"   /\\|`\n"				\
+	"  /  |   Caution! The directories to be plugged will be purged.\n" \
+	"(/_)_|_  Are you sure you want to continue? [yes/no]: "
+
 static int md_plug(int argc, char **argv)
 {
+	if (!node_cmd_data.force)
+		confirm(MD_PLUG_PRINT);
+
 	return do_plug_unplug(argv[optind], true);
 }
 
+#define MD_UNPLUG_PRINT				\
+	"    __\n"				\
+	"   ()'`;\n"				\
+	"   /\\|`\n"				\
+	"  /  |   Caution! Recovery will be triggered after unplugging.\n" \
+	"(/_)_|_  Are you sure you want to continue? [yes/no]: "
+
 static int md_unplug(int argc, char **argv)
 {
+	if (!node_cmd_data.force)
+		confirm(MD_UNPLUG_PRINT);
+
 	return do_plug_unplug(argv[optind], false);
 }
 
@@ -508,6 +529,9 @@ static int node_parser(int ch, const char *opt)
 	case 'l':
 		node_cmd_data.local = true;
 		break;
+	case 'f':
+		node_cmd_data.force = true;
+		break;
 	}
 
 	return 0;
@@ -518,6 +542,7 @@ static struct sd_option node_options[] = {
 	{'P', "progress", false, "show progress of recovery in the node"},
 	{'w', "watch", false, "watch the stat every second"},
 	{'l', "local", false, "issue request to local node"},
+	{'f', "force", false, "ignore the confirmation"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -617,7 +642,7 @@ static struct subcommand node_cmd[] = {
 	 CMD_NEED_NODELIST, node_info},
 	{"recovery", NULL, "aphPrt", "show recovery information of nodes", NULL,
 	 CMD_NEED_NODELIST, node_recovery, node_options},
-	{"md", "[disks]", "aprAht", "See 'dog node md' for more information",
+	{"md", "[disks]", "aprAfht", "See 'dog node md' for more information",
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
 	{"stat", NULL, "aprwht", "show stat information about the node", NULL,
 	 0, node_stat, node_options},
