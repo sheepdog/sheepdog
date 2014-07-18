@@ -88,6 +88,7 @@ AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
+AC_CHECK_LIB([rt], [clock_gettime], , AC_MSG_ERROR(librt not found))
 
 # Checks for header files.
 AC_FUNC_ALLOCA
@@ -334,8 +335,6 @@ if test "x${enable_trace}" = xyes; then
 		AC_MSG_ERROR(requires binutils-dev))
 	AC_CHECK_HEADERS([bfd.h],,
 		AC_MSG_ERROR(requires binutils-dev))
-	AC_CHECK_LIB([rt], [clock_gettime],,
-		AC_MSG_ERROR(librt not found))
 	AC_DEFINE_UNQUOTED([HAVE_TRACE], 1, [have trace])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES trace"
 fi
