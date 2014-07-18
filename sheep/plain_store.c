@@ -345,7 +345,7 @@ static int default_read_from_path(uint64_t oid, const char *path,
 		return err_to_sderr(path, oid, errno);
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
-	if (unlikely(size != iocb->length)) {
+	if (size < 0) {
 		sd_err("failed to read object %"PRIx64", path=%s, offset=%"
 		       PRId32", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
