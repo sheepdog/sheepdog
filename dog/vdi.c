@@ -1395,41 +1395,6 @@ out:
 	return ret;
 }
 
-static void *read_object_from(const struct sd_vnode *vnode, uint64_t oid)
-{
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int ret;
-	void *buf;
-	size_t size = get_objsize(oid);
-
-	buf = xmalloc(size);
-
-	sd_init_req(&hdr, SD_OP_READ_PEER);
-	hdr.epoch = sd_epoch;
-	hdr.flags = 0;
-	hdr.data_length = size;
-
-	hdr.obj.oid = oid;
-
-	ret = dog_exec_req(&vnode->node->nid, &hdr, buf);
-	if (ret < 0)
-		exit(EXIT_SYSFAIL);
-
-	switch (rsp->result) {
-	case SD_RES_SUCCESS:
-		break;
-	case SD_RES_NO_OBJ:
-		free(buf);
-		return NULL;
-	default:
-		sd_err("FATAL: failed to read %"PRIx64", %s", oid,
-		       sd_strerror(rsp->result));
-		exit(EXIT_FAILURE);
-	}
-	return buf;
-}
-
 static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 			    void *buf, bool create, uint8_t ec_index)
 {
@@ -1501,11 +1466,27 @@ static void vdi_repair_work(struct work *work)
 	struct vdi_check_work *vcw = container_of(work, struct vdi_check_work,
 						  work);
 	struct vdi_check_info *info = vcw->info;
-	void *buf;
+	const struct sd_vnode *src = info->majority->vnode;
+	const struct sd_vnode *dst = vcw->vnode;
+	struct sd_req hdr;
+	int ret;
+	char n1[MAX_NODE_STR_LEN], n2[MAX_NODE_STR_LEN];
 
-	buf = read_object_from(info->majority->vnode, info->oid);
-	write_object_to(vcw->vnode, info->oid, buf, !vcw->object_found, 0);
-	free(buf);
+	sd_init_req(&hdr, SD_OP_REPAIR_REPLICA);
+	hdr.epoch = sd_epoch;
+	memcpy(hdr.forw.addr, src->node->nid.addr, sizeof(hdr.forw.addr));
+	hdr.forw.port = src->node->nid.port;
+	hdr.forw.oid = info->oid;
+
+	ret = send_light_req(&dst->node->nid, &hdr);
+	if (ret) {
+		strcpy(n1, addr_to_str(src->node->nid.addr,
+					   src->node->nid.port));
+		strcpy(n2, addr_to_str(dst->node->nid.addr,
+					   dst->node->nid.port));
+		sd_err("failed to repair object %016"PRIx64
+				" from %s to %s", info->oid, n1, n2);
+	}
 }
 
 static void vdi_repair_main(struct work *work)

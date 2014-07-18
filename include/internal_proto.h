@@ -106,6 +106,7 @@
 #define SD_OP_DECREF_PEER    0xC2
 #define SD_OP_PREVENT_INODE_UPDATE    0xC3
 #define SD_OP_ALLOW_INODE_UPDATE      0xC4
+#define SD_OP_REPAIR_REPLICA	0xC5
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080

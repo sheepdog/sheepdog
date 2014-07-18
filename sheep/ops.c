@@ -1238,6 +1238,48 @@ static int local_allow_inode_update(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
+static int local_repair_replica(struct request *req)
+{
+	int ret;
+	struct node_id nid;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct siocb iocb = { 0 };
+	uint64_t oid = req->rq.forw.oid;
+	size_t rlen = get_store_objsize(oid);
+	void *buf = xvalloc(rlen);
+
+	sd_init_req(&hdr, SD_OP_READ_PEER);
+	hdr.epoch = req->rq.epoch;
+	hdr.data_length = rlen;
+	hdr.obj.oid = oid;
+
+	memcpy(nid.addr, req->rq.forw.addr, sizeof(nid.addr));
+	nid.port = req->rq.forw.port;
+	ret = sheep_exec_req(&nid, &hdr, buf);
+	if (ret == SD_RES_SUCCESS) {
+		sd_debug("read object %016"PRIx64" from %s successfully, "
+				"try saving to local", oid,
+				addr_to_str(nid.addr, nid.port));
+		iocb.epoch = req->rq.epoch;
+		iocb.length = rsp->data_length;
+		iocb.offset = rsp->obj.offset;
+		iocb.buf = buf;
+		ret = sd_store->create_and_write(oid, &iocb);
+		if (ret != SD_RES_SUCCESS)
+			sd_err("failed to write object %016"PRIx64
+					" to local", oid);
+	} else {
+		sd_err("failed to read object %016"PRIx64
+				" from %s: %s", oid,
+				addr_to_str(nid.addr, nid.port),
+				sd_strerror(ret));
+	}
+
+	free(buf);
+	return ret;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1587,6 +1629,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "ALLOW_INODE_UPDATE",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_allow_inode_update,
+	},
+
+	[SD_OP_REPAIR_REPLICA] = {
+		.name = "REPAIR_REPLICA",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_repair_replica,
 	},
 
 	/* gateway I/O operations */

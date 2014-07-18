@@ -176,6 +176,11 @@ struct sd_req {
 			uint32_t	generation;
 			uint32_t	count;
 		} ref;
+		struct {
+			uint64_t	oid;
+			uint8_t		addr[16];
+			uint16_t	port;
+		} forw;
 
 		uint32_t		__pad[8];
 	};
