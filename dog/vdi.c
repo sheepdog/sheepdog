@@ -2438,6 +2438,120 @@ static int vdi_cache(int argc, char **argv)
 	return do_generic_subcommand(vdi_cache_cmd, argc, argv);
 }
 
+static void construct_vdi_tree(uint32_t vid, const char *name, const char *tag,
+			       uint32_t snapid, uint32_t flags,
+			       const struct sd_inode *i, void *data)
+{
+	add_vdi_tree(name, tag, vid, i->parent_vdi_id, false);
+}
+
+static bool is_vdi_standalone(uint32_t vid, const char *name)
+{
+	struct vdi_tree *vdi;
+
+	init_tree();
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
+
+	vdi = find_vdi_from_root(vid, name);
+	if (!vdi) {
+		sd_err("failed to construct vdi tree");
+		return false;
+	}
+
+	return !vdi->pvid && list_empty(&vdi->children);
+}
+
+#define ALTER_VDI_COPY_PRINT				\
+	"    __\n"				\
+	"   ()'`;\n"				\
+	"   /\\|`  Caution! Changing VDI's redundancy level will affect\n" \
+	"  /  |   the VDI itself only and trigger recovery.\n" \
+	"(/_)_|_  Are you sure you want to continue? [yes/no]: "
+
+static int vdi_alter_copy(int argc, char **argv)
+{
+	int ret, old_nr_copies;
+	uint32_t vid;
+	const char *vdiname = argv[optind++];
+	char buf[SD_INODE_HEADER_SIZE];
+	struct sd_inode *inode = (struct sd_inode *)buf;
+	struct sd_req hdr;
+
+	if (vdi_cmd_data.copy_policy != 0) {
+		sd_err("Changing redundancy level of erasure coded vdi "
+			   "is not supported yet.");
+		return EXIT_USAGE;
+	}
+	if (!vdi_cmd_data.nr_copies) {
+		vdi_cmd_data.nr_copies = SD_DEFAULT_COPIES;
+		printf("The vdi's redundancy level is not specified, "
+			   "use %d as default.\n", SD_DEFAULT_COPIES);
+	}
+
+	if (vdi_cmd_data.nr_copies > sd_nodes_nr) {
+		char info[1024];
+		snprintf(info, sizeof(info), "Number of copies (%d) is larger "
+			 "than number of nodes (%d).\n"
+			 "Are you sure you want to continue? [yes/no]: ",
+			 vdi_cmd_data.nr_copies, sd_nodes_nr);
+		confirm(info);
+	}
+
+	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_HEADER_SIZE);
+	if (ret != EXIT_SUCCESS) {
+		sd_err("Reading %s's vdi object failure.", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	if (inode->copy_policy) {
+		sd_err("%s's copy policy is erasure code, "
+			   "changing it is not supported yet.", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	old_nr_copies = inode->nr_copies;
+	if (old_nr_copies == vdi_cmd_data.nr_copies) {
+		sd_err("%s's redundancy level is already set to %d, "
+			   "nothing changed.", vdiname, old_nr_copies);
+		return EXIT_FAILURE;
+	}
+
+	if (!is_vdi_standalone(vid, inode->name)) {
+		sd_err("Only standalone vdi supports "
+			   "changing redundancy level.");
+		sd_err("Please clone %s with -n (--no-share) "
+			   "option first.", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	confirm(ALTER_VDI_COPY_PRINT);
+
+	inode->nr_copies = vdi_cmd_data.nr_copies;
+	ret = dog_write_object(vid_to_vdi_oid(vid), 0, inode,
+			SD_INODE_HEADER_SIZE, 0, 0, old_nr_copies,
+			inode->copy_policy, false, true);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Overwrite the vdi object's header of %s failure "
+			   "while setting its redundancy level.", vdiname);
+		return EXIT_FAILURE;
+	}
+
+	sd_init_req(&hdr, SD_OP_ALTER_VDI_COPY);
+	hdr.vdi_state.new_vid = vid;
+	hdr.vdi_state.copies = vdi_cmd_data.nr_copies;
+	hdr.vdi_state.copy_policy = vdi_cmd_data.copy_policy;
+
+	ret = send_light_req(&sd_nid, &hdr);
+	if (ret == 0) {
+		sd_info("%s's redundancy level is set to %d, the old one was %d.",
+				vdiname, vdi_cmd_data.nr_copies, old_nr_copies);
+		return EXIT_SUCCESS;
+	}
+	sd_err("Changing %s's redundancy level failure.", vdiname);
+	return EXIT_FAILURE;
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "sapht", "check and repair image's consistency",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
@@ -2500,6 +2614,8 @@ static struct subcommand vdi_cmd[] = {
 	 "Run 'dog vdi cache' for more information",
 	 vdi_cache_cmd, CMD_NEED_ARG,
 	 vdi_cache, vdi_options},
+	{"alter-copy", "<vdiname>", "capht", "set the vdi's redundancy level",
+	 NULL, CMD_NEED_ARG|CMD_NEED_NODELIST, vdi_alter_copy, vdi_options},
 	{NULL,},
 };
 

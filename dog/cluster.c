@@ -571,6 +571,87 @@ static int cluster_check(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
+#define ALTER_CLUSTER_COPY_PRINT				\
+	"    __\n"				\
+	"   ()'`;\n"				\
+	"   /\\|`  Caution! Changing cluster's redundancy level will affect\n" \
+	"  /  |   all the VDIs to be created later.\n" \
+	"(/_)_|_  Are you sure you want to continue? [yes/no]: "
+
+static int cluster_alter_copy(int argc, char **argv)
+{
+	int ret, log_length;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct epoch_log *logs;
+
+	if (cluster_cmd_data.copy_policy != 0) {
+		sd_err("Changing redundancy level of erasure coded vdi "
+			   "is not supported yet.");
+		return EXIT_USAGE;
+	}
+	if (!cluster_cmd_data.copies) {
+		cluster_cmd_data.copies = SD_DEFAULT_COPIES;
+		printf("The cluster's redundancy level is not specified, "
+			   "use %d as default.\n", SD_DEFAULT_COPIES);
+	}
+
+	if (cluster_cmd_data.copies > sd_nodes_nr) {
+		char info[1024];
+		snprintf(info, sizeof(info), "Number of copies (%d) is larger "
+			 "than number of nodes (%d).\n"
+			 "Are you sure you want to continue? [yes/no]: ",
+			 cluster_cmd_data.copies, sd_nodes_nr);
+		confirm(info);
+	}
+
+	log_length = sd_epoch * sizeof(struct epoch_log);
+	logs = xmalloc(log_length);
+	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
+	hdr.data_length = log_length;
+	ret = dog_exec_req(&sd_nid, &hdr, logs);
+	if (ret < 0)
+		goto failure;
+
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("Response's result: %s", sd_strerror(rsp->result));
+		goto failure;
+	}
+	if (logs->copy_policy) {
+		sd_err("The cluster's copy policy is erasure code, "
+			   "changing it is not supported yet.");
+		goto failure;
+	}
+	if (logs->nr_copies == cluster_cmd_data.copies) {
+		sd_err("The cluster's redundancy level is already set to %d, "
+			   "nothing changed.", cluster_cmd_data.copies);
+		goto failure;
+	}
+
+	confirm(ALTER_CLUSTER_COPY_PRINT);
+
+	sd_init_req(&hdr, SD_OP_ALTER_CLUSTER_COPY);
+	hdr.cluster.copies = cluster_cmd_data.copies;
+	hdr.cluster.copy_policy = cluster_cmd_data.copy_policy;
+	ret = send_light_req(&sd_nid, &hdr);
+	if (ret == 0) {
+		sd_info("The cluster's redundancy level is set to %d, "
+				"the old one was %d.",
+				cluster_cmd_data.copies, logs->nr_copies);
+		goto success;
+	} else {
+		sd_err("Changing the cluster's redundancy level failure.");
+		goto failure;
+	}
+
+success:
+	free(logs);
+	return EXIT_SUCCESS;
+failure:
+	free(logs);
+	return EXIT_FAILURE;
+}
+
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhvt", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
@@ -589,6 +670,8 @@ static struct subcommand cluster_cmd[] = {
 	 cluster_reweight, cluster_options},
 	{"check", NULL, "apht", "check and repair cluster", NULL,
 	 CMD_NEED_NODELIST, cluster_check, cluster_options},
+	{"alter-copy", NULL, "aphtc", "set the cluster's redundancy level",
+	 NULL, CMD_NEED_NODELIST, cluster_alter_copy, cluster_options},
 	{NULL,},
 };
 
