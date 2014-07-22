@@ -78,6 +78,7 @@ static const char *tracefile = "/tmp/tracefile";
 static int trace_read_buffer(void)
 {
 	int ret, tfd;
+	int rval = EXIT_SUCCESS;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 #define TRACE_BUF_LEN      (1024 * 1024 * 20)
@@ -86,7 +87,8 @@ static int trace_read_buffer(void)
 	tfd = open(tracefile, O_CREAT | O_RDWR | O_APPEND | O_TRUNC, 0644);
 	if (tfd < 0) {
 		sd_err("can't create tracefile");
-		return EXIT_SYSFAIL;
+		rval = EXIT_SYSFAIL;
+		goto out;
 	}
 
 read_buffer:
@@ -95,22 +97,25 @@ read_buffer:
 
 	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
-		return EXIT_SYSFAIL;
+		rval = EXIT_SYSFAIL;
+		goto out;
 
 	if (rsp->result == SD_RES_AGAIN)
 		goto read_buffer;
 
 	if (rsp->result != SD_RES_SUCCESS) {
 		sd_err("Trace failed: %s", sd_strerror(rsp->result));
-		return EXIT_FAILURE;
+		rval = EXIT_FAILURE;
+		goto out;
 	}
 
 	xwrite(tfd, buf, rsp->data_length);
 	if (rsp->data_length == TRACE_BUF_LEN)
 		goto read_buffer;
 
+out:
 	free(buf);
-	return EXIT_SUCCESS;
+	return rval;
 }
 
 static int trace_enable(int argc, char **argv)
