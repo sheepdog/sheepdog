@@ -1351,7 +1351,7 @@ static void zk_unlock(uint64_t lock_id)
 static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
-	int ret;
+	int ret, interval, retry = 0, max_retry;
 
 	if (!option) {
 		sd_err("You must specify zookeeper servers.");
@@ -1371,8 +1371,20 @@ static int zk_init(const char *option)
 		 ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
 	zhandle = zookeeper_init(hosts, zk_watcher, zk_timeout, NULL, NULL, 0);
 	if (!zhandle) {
-		sd_err("failed to connect to zk server %s", option);
+		sd_err("failed to initialize zk server %s", option);
 		return -1;
+	}
+
+	/* the simplest way to wait and check zk connection */
+	interval = 100;
+	max_retry = zk_timeout / interval;
+	while (zoo_state(zhandle) != ZOO_CONNECTED_STATE) {
+		usleep(interval * 1000);
+		if (++retry >= max_retry) {
+			sd_err("failed to connect to zk server %s "
+					"after %d retries", option, retry);
+			return -1;
+		}
 	}
 
 	uatomic_set_false(&stop);
