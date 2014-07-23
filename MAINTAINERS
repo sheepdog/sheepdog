@@ -33,7 +33,13 @@ L: sheepdog@lists.wpkg.org
 HTTP interface
 ------------------------------
 M: Robin Dong <robin.k.dong@gmail.com>
-B: sheeepdog/sheep/http/*
+F: sheeepdog/sheep/http/*
+L: sheepdog@lists.wpkg.org
+
+Zookeeper driver and utility
+M: Ruoyu <liangry@ucweb.com>
+F: sheepdog/sheep/cluster/zookeeper.c
+F: sheepdog/tools/zk_control.c
 L: sheepdog@lists.wpkg.org
 
 QEMU Driver
