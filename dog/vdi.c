@@ -864,15 +864,14 @@ static int vdi_object_map(int argc, char **argv)
 	uint64_t idx = vdi_cmd_data.index;
 	struct sd_inode *inode = xmalloc(sizeof(*inode));
 	uint32_t vid;
-	int ret;
+	int ret = EXIT_SUCCESS;
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, NULL, inode,
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("FATAL: %s not found", vdiname);
-		free(inode);
-		return ret;
+		goto out;
 	}
 
 	printf("Index       VID\n");
@@ -888,7 +887,10 @@ static int vdi_object_map(int argc, char **argv)
 				printf("%08"PRIu64" %8"PRIx32"\n", idx, vid);
 		}
 	}
-	return EXIT_SUCCESS;
+
+out:
+	free(inode);
+	return ret;
 }
 
 static void print_expected_location(uint64_t oid, int copies)
