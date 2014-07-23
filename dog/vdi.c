@@ -1126,17 +1126,19 @@ static int find_vdi_attr_oid(const char *vdiname, const char *tag, uint32_t snap
 
 static int vdi_setattr(int argc, char **argv)
 {
-	int ret, value_len = 0;
+	int value_len = 0;
+	int ret = EXIT_SUCCESS;
 	uint64_t attr_oid = 0;
 	uint32_t vid = 0, nr_copies = 0;
 	const char *vdiname = argv[optind++], *key;
-	char *value;
+	char *value = NULL;
 	uint64_t offset;
 
 	key = argv[optind++];
 	if (!key) {
 		sd_err("Please specify the attribute key");
-		return EXIT_USAGE;
+		ret = EXIT_USAGE;
+		goto out;
 	}
 
 	value = argv[optind++];
@@ -1149,7 +1151,8 @@ reread:
 			   SD_MAX_VDI_ATTR_VALUE_LEN - offset);
 		if (ret < 0) {
 			sd_err("Failed to read attribute value from stdin: %m");
-			return EXIT_SYSFAIL;
+			ret = EXIT_SYSFAIL;
+			goto out;
 		}
 		if (ret > 0) {
 			offset += ret;
@@ -1168,19 +1171,27 @@ reread:
 	if (ret) {
 		if (ret == SD_RES_VDI_EXIST) {
 			sd_err("The attribute '%s' already exists", key);
-			return EXIT_EXISTS;
+			ret = EXIT_EXISTS;
+			goto out;
 		} else if (ret == SD_RES_NO_OBJ) {
 			sd_err("Attribute '%s' not found", key);
-			return EXIT_MISSING;
+			ret = EXIT_MISSING;
+			goto out;
 		} else if (ret == SD_RES_NO_VDI) {
 			sd_err("VDI not found");
-			return EXIT_MISSING;
+			ret = EXIT_MISSING;
+			goto out;
 		} else
 			sd_err("Failed to set attribute: %s", sd_strerror(ret));
-		return EXIT_FAILURE;
+		ret = EXIT_FAILURE;
+		goto out;
 	}
 
-	return EXIT_SUCCESS;
+out:
+	if (value)
+		free(value);
+
+	return ret;
 }
 
 static int vdi_getattr(int argc, char **argv)
