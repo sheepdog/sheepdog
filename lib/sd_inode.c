@@ -70,7 +70,7 @@
  *                         +-------+    +-------+    +-------+
  *
  *
- * We now only support tow levels, which support up to:
+ * We now only support two levels, which support up to:
  *
  *  (nr of sd_indirect_idx in root node) * (nr of sd_index in indirect node)
  *

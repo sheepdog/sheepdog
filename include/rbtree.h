@@ -3,7 +3,7 @@
 
 #include "compiler.h"
 
-/* We have to be 64-bytes aligned to get 32/64 bits compatibility */
+/* We have to be 8-bytes aligned to get 32/64 bits compatibility */
 struct rb_node {
 	unsigned long  rb_parent_color __attribute__ ((aligned (8)));
 #define RB_RED          0
