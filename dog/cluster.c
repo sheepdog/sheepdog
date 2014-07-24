@@ -605,7 +605,7 @@ static int cluster_alter_copy(int argc, char **argv)
 		confirm(info);
 	}
 
-	log_length = sd_epoch * sizeof(struct epoch_log);
+	log_length = sizeof(struct epoch_log);
 	logs = xmalloc(log_length);
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
