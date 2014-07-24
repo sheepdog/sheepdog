@@ -71,7 +71,7 @@ static int get_cluster_config(struct cluster_info *cinfo)
 
 int init_config_file(void)
 {
-	int fd, ret;
+	int fd, ret = 0;
 
 	check_tmp_config();
 
