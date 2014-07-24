@@ -467,25 +467,25 @@ static void shepherd_comm_handler(int fd, int events, void *data)
 
 static int shepherd_init(const char *option)
 {
-	int ret, port;
+	int ret = -1, port;
 	char *copied, *s_addr, *s_port, *saveptr;
 
 	if (!option) {
 		sd_err("shepherd cluster driver requires at least IP"
 		       " address of shepherd as an option");
-		exit(1);
+		return ret;
 	}
 
 	copied = strdup(option);
 	if (!copied) {
 		sd_err("strdup() failed: %m");
-		exit(1);
+		return ret;
 	}
 
 	s_addr = strtok_r(copied, ":", &saveptr);
 	if (!s_addr) {
-		sd_err("strdup() failed: %m");
-		exit(1);
+		sd_err("strtok_r() failed: %m");
+		goto out;
 	}
 
 	s_port = strtok_r(NULL, ":", &saveptr);
@@ -495,7 +495,7 @@ static int shepherd_init(const char *option)
 
 		if (*p != '\0') {
 			sd_err("invalid option for host and port: %s", option);
-			exit(1);
+			goto out;
 		}
 	} else
 		port = SHEPHERD_PORT;
@@ -504,19 +504,20 @@ static int shepherd_init(const char *option)
 	if (sph_comm_fd == -1) {
 		sd_err("cannot connect to shepherd,"
 		       " is shepherd running? errno: %m");
-		return -1;
+		goto out;
 	}
 
 	sph_event_fd = eventfd(0, EFD_NONBLOCK);
 	ret = register_event(sph_event_fd, sph_event_handler, NULL);
 	if (ret) {
 		sd_err("register_event() failed: %m");
-		exit(1);
+		goto out;
 	}
 
+	ret = 0;
+out:
 	free(copied);
-
-	return 0;
+	return ret;
 }
 
 static int shepherd_join(const struct sd_node *myself,
