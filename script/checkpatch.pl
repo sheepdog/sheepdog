@@ -2919,6 +2919,12 @@ sub process {
 		    WARN("STRERROR",
 			 "use %m instead of strerror(errno)\n" . $herecurr);
 		}
+
+# check for direct calling of pthread_create()
+		if ($line =~ /\bpthread_create\(/) {
+		    WARN("PTHREAD_CREATE",
+			 "use sd_thread_create() instead of pthread_create()\n" . $herecurr);
+		}
 	}
 
 	# If we have no input at all, then there is nothing to report on
