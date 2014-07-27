@@ -322,6 +322,7 @@ static void *http_main_loop(void *ignored)
 {
 	int err;
 
+	sd_info("http main loop");
 	for (;;) {
 		struct http_request *req = http_new_request(http_sockfd);
 		int ret;
@@ -414,7 +415,7 @@ static struct option_parser http_opt_parsers[] = {
 
 int http_init(const char *options)
 {
-	pthread_t t;
+	sd_thread_t t;
 	int err;
 	char *s, address[HOST_NAME_MAX + 8];
 
@@ -446,7 +447,7 @@ int http_init(const char *options)
 		return -1;
 	}
 	sd_info("http service listen at %s", address);
-	err = pthread_create(&t, NULL, http_main_loop, NULL);
+	err = sd_thread_create("http", &t, http_main_loop, NULL);
 	if (err) {
 		sd_err("%s", strerror(err));
 		return -1;

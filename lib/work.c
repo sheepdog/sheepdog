@@ -444,3 +444,60 @@ bool work_queue_empty(struct work_queue *q)
 
 	return uatomic_read(&wi->nr_queued_work) == 0;
 }
+
+struct thread_args {
+	const char *name;
+	void *(*start_routine)(void *);
+	void *arg;
+	bool show_idx;
+};
+
+static void *thread_starter(void *arg)
+{
+	struct thread_args *args = (struct thread_args *)arg;
+	void *ret;
+
+	set_thread_name(args->name, args->show_idx);
+	ret = args->start_routine(args->arg);
+	free(arg);
+
+	return ret;
+}
+
+static int __sd_thread_create(const char *name, sd_thread_t *thread,
+			      void *(*start_routine)(void *), void *arg,
+			      bool show_idx)
+{
+	struct thread_args *args;
+
+
+	args = xzalloc(sizeof(*args));
+	args->name = name;
+	args->start_routine = start_routine;
+	args->arg = arg;
+	args->show_idx = show_idx;
+
+	/*
+	 * currently, there isn't a thread which uses ptread_attr_t
+	 * in sheepdog
+	 */
+	return pthread_create(thread, NULL, thread_starter, args);
+}
+
+int sd_thread_create(const char *name, sd_thread_t *thread,
+		     void *(*start_routine)(void *), void *arg)
+{
+	return __sd_thread_create(name, thread, start_routine, arg, false);
+}
+
+int sd_thread_create_with_idx(const char *name, sd_thread_t *thread,
+			      void *(*start_routine)(void *), void *arg)
+{
+	return __sd_thread_create(name, thread, start_routine, arg, true);
+}
+
+int sd_thread_join(sd_thread_t thread, void **retval)
+{
+	return pthread_join(thread, retval);
+}
+

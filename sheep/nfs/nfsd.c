@@ -198,10 +198,10 @@ uint64_t nfs_boot_time;
 
 int nfs_init(const char *options)
 {
-	pthread_t t;
+	sd_thread_t t;
 	int err;
 
-	err = pthread_create(&t, NULL, nfsd, NULL);
+	err = sd_thread_create("nfs, "&t, nfsd, NULL);
 	if (err) {
 		sd_err("%s", strerror(err));
 		return -1;

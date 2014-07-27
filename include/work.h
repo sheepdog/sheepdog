@@ -69,4 +69,11 @@ void suspend_worker_threads(void);
 void resume_worker_threads(void);
 #endif	/* HAVE_TRACE */
 
+typedef pthread_t sd_thread_t;
+int sd_thread_create(const char *, sd_thread_t *,
+		     void *(*start_routine)(void *), void *);
+int sd_thread_create_with_idx(const char *, sd_thread_t *,
+		     void *(*start_routine)(void *), void *);
+int sd_thread_join(sd_thread_t , void **);
+
 #endif

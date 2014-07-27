@@ -413,7 +413,7 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 	struct process_path_arg *thread_args, *path_arg;
 	struct vnode_info *vinfo;
 	void *ret_arg;
-	pthread_t *thread_array;
+	sd_thread_t *thread_array;
 	int nr_thread = 0, idx = 0;
 
 	sd_read_lock(&md.lock);
@@ -423,7 +423,7 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 	}
 
 	thread_args = xmalloc(nr_thread * sizeof(struct process_path_arg));
-	thread_array = xmalloc(nr_thread * sizeof(pthread_t));
+	thread_array = xmalloc(nr_thread * sizeof(sd_thread_t));
 
 	vinfo = get_vnode_info();
 
@@ -434,9 +434,10 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 		thread_args[idx].cleanup = cleanup;
 		thread_args[idx].opaque = arg;
 		thread_args[idx].result = SD_RES_SUCCESS;
-		ret = pthread_create(thread_array + idx, NULL,
-				     thread_process_path,
-				     (void *)(thread_args + idx));
+		ret = sd_thread_create_with_idx("foreach wd",
+						thread_array + idx,
+						thread_process_path,
+						(void *)(thread_args + idx));
 		if (ret) {
 			/*
 			 * If we can't create enough threads to process
@@ -452,7 +453,7 @@ main_fn int for_each_object_in_wd(int (*func)(uint64_t oid, const char *path,
 	sd_debug("Create %d threads for all path", nr_thread);
 	/* wait for all threads to exit */
 	for (idx = 0; idx < nr_thread; idx++) {
-		ret = pthread_join(thread_array[idx], &ret_arg);
+		ret = sd_thread_join(thread_array[idx], &ret_arg);
 		if (ret)
 			sd_err("Failed to join thread");
 		if (ret_arg) {
