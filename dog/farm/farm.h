@@ -49,11 +49,19 @@ struct snap_log {
 	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 };
 
+struct vdi_option {
+	int count;
+	char **name;
+	void (*func)(struct sd_inode *inode);
+	bool enable_if_blank;
+};
+
 /* farm.c */
 int farm_init(const char *path);
 bool farm_contain_snapshot(uint32_t idx, const char *tag);
 int farm_save_snapshot(const char *tag);
-int farm_load_snapshot(uint32_t idx, const char *tag);
+int farm_load_snapshot(uint32_t idx, const char *tag, int count, char **name);
+int farm_show_snapshot(uint32_t idx, const char *tag, int count, char **name);
 char *get_object_directory(void);
 
 /* trunk.c */

@@ -326,10 +326,24 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	uint64_t vdi_oid = vid_to_vdi_oid(vid), vmstate_oid;
 	uint32_t vdi_id;
 	uint32_t nr_objs, nr_vmstate_object;
+	struct vdi_option *opt = (struct vdi_option *)data;
+	bool matched;
 
 	/* ignore active vdi */
 	if (!vdi_is_snapshot(i))
 		return;
+
+	/* iff vdi specified in command line */
+	if (opt->count > 0) {
+		matched = false;
+		for (int n = 0; n < opt->count; n++)
+			if (strcmp(name, opt->name[n]) == 0) {
+				matched = true;
+				break;
+			}
+		if (!matched)
+			return;
+	}
 
 	/* fill vdi object id */
 	object_tree_insert(vdi_oid, i->nr_copies, i->copy_policy);
@@ -360,6 +374,7 @@ static int save_snapshot(int argc, char **argv)
 	const char *tag = argv[optind++];
 	char *path, *p;
 	int ret = EXIT_SYSFAIL, uninitialized_var(unused);
+	struct vdi_option opt;
 
 	unused = strtol(tag, &p, 10);
 	if (tag != p) {
@@ -367,11 +382,11 @@ static int save_snapshot(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
-	if (!argv[optind]) {
+	path = argv[optind++];
+	if (!path) {
 		sd_err("Please specify the path to save snapshot.");
 		return EXIT_USAGE;
 	}
-	path = argv[optind];
 
 	if (farm_init(path) != SD_RES_SUCCESS)
 		goto out;
@@ -382,8 +397,23 @@ static int save_snapshot(int argc, char **argv)
 		goto out;
 	}
 
-	if (parse_vdi(fill_object_tree, SD_INODE_SIZE, NULL) != SD_RES_SUCCESS)
+	opt.count = argc - optind;
+	opt.name = argv + optind;
+	if (parse_vdi(fill_object_tree, SD_INODE_SIZE, &opt) != SD_RES_SUCCESS)
 		goto out;
+
+	if (object_tree_size() == 0) {
+		sd_err("Object not found. It may be caused by:");
+		if (opt.count > 0) {
+			sd_err("1. The specified VDIs are not found.");
+			sd_err("2. The specified VDIs don't have snapshots.");
+		} else {
+			sd_err("1. The cluster is empty.");
+			sd_err("2. All VDIs of the cluster "
+					  "don't have snapshots.");
+		}
+		goto out;
+	}
 
 	if (farm_save_snapshot(tag) != SD_RES_SUCCESS)
 		goto out;
@@ -408,11 +438,11 @@ static int load_snapshot(int argc, char **argv)
 	if (tag == p)
 		idx = 0;
 
-	if (!argv[optind]) {
+	path = argv[optind++];
+	if (!path) {
 		sd_err("Please specify the path to save snapshot.");
 		return EXIT_USAGE;
 	}
-	path = argv[optind];
 
 	if (farm_init(path) != SD_RES_SUCCESS)
 		goto out;
@@ -430,13 +460,52 @@ static int load_snapshot(int argc, char **argv)
 	if (cluster_format(0, NULL) != SD_RES_SUCCESS)
 		goto out;
 
-	if (farm_load_snapshot(idx, tag) != SD_RES_SUCCESS)
+	if (farm_load_snapshot(idx, tag, argc - optind, argv + optind)
+			!= SD_RES_SUCCESS)
 		goto out;
 
 	ret = EXIT_SUCCESS;
+
 out:
 	if (ret)
 		sd_err("Fail to load snapshot");
+	return ret;
+}
+
+static int show_snapshot(int argc, char **argv)
+{
+	char *tag = argv[optind++];
+	char *path, *p;
+	uint32_t idx;
+	int ret = EXIT_SYSFAIL;
+
+	idx = strtol(tag, &p, 10);
+	if (tag == p)
+		idx = 0;
+
+	path = argv[optind++];
+	if (!path) {
+		sd_err("Please specify the path to show snapshot.");
+		return EXIT_USAGE;
+	}
+
+	if (farm_init(path) != SD_RES_SUCCESS)
+		goto out;
+
+	if (!farm_contain_snapshot(idx, tag)) {
+		sd_err("Snapshot index or tag does not exist.");
+		goto out;
+	}
+
+	if (farm_show_snapshot(idx, tag, argc - optind, argv + optind)
+			!= SD_RES_SUCCESS)
+		goto out;
+
+	ret = EXIT_SUCCESS;
+
+out:
+	if (ret)
+		sd_err("Fail to show snapshot");
 	return ret;
 }
 
@@ -530,6 +599,8 @@ static struct subcommand cluster_snapshot_cmd[] = {
 	 NULL, CMD_NEED_ARG, list_snapshot, NULL},
 	{"load", NULL, "h", "load snapshot from localpath",
 	 NULL, CMD_NEED_ARG | CMD_NEED_NODELIST, load_snapshot, NULL},
+	{"show", NULL, "h", "show vdi list from snapshot",
+	 NULL, CMD_NEED_ARG | CMD_NEED_NODELIST, show_snapshot, NULL},
 	{NULL},
 };
 
@@ -659,7 +730,8 @@ static struct subcommand cluster_cmd[] = {
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "apht", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
-	{"snapshot", "<tag|idx> <path>", "apht", "snapshot/restore the cluster",
+	{"snapshot", "<tag|idx> <path> [vdi1] [vdi2] ...",
+	 "apht", "snapshot/restore the cluster",
 	 cluster_snapshot_cmd, CMD_NEED_ARG,
 	 cluster_snapshot, cluster_options},
 	{"recover", NULL, "afpht",

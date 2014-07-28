@@ -40,10 +40,18 @@ struct active_vdi_entry {
 	uint8_t store_policy;
 };
 
+struct registered_obj_entry {
+	struct rb_node rb;
+	uint64_t oid;
+};
+
 /* We use active_vdi_tree to create active vdi on top of the snapshot chain */
 static struct rb_root active_vdi_tree = RB_ROOT;
 /* We have to register vdi information first before loading objects */
 static struct rb_root registered_vdi_tree = RB_ROOT;
+/* register object iff vdi specified */
+static struct rb_root registered_obj_tree = RB_ROOT;
+static uint64_t obj_to_load;
 
 struct snapshot_work {
 	struct trunk_entry entry;
@@ -413,7 +421,8 @@ static void do_load_object(struct work *work)
 	if (is_vdi_obj(sw->entry.oid))
 		add_active_vdi(buffer);
 
-	farm_show_progress(uatomic_add_return(&loaded, 1), trunk_get_count());
+	farm_show_progress(uatomic_add_return(&loaded, 1),
+			(obj_to_load > 0) ? obj_to_load : trunk_get_count());
 	free(buffer);
 	return;
 error:
@@ -430,9 +439,25 @@ static void load_object_done(struct work *work)
 	free(sw);
 }
 
+static int registered_obj_cmp(struct registered_obj_entry *a,
+			      struct registered_obj_entry *b)
+{
+	return intcmp(a->oid, b->oid);
+}
+
 static int queue_load_snapshot_work(struct trunk_entry *entry, void *data)
 {
-	struct snapshot_work *sw = xzalloc(sizeof(struct snapshot_work));
+	struct snapshot_work *sw;
+	struct registered_obj_entry key;
+
+	if (obj_to_load > 0) {
+		key.oid = entry->oid;
+		if (!rb_search(&registered_obj_tree, &key, rb,
+				registered_obj_cmp))
+			return 0;
+	}
+
+	sw = xzalloc(sizeof(struct snapshot_work));
 
 	memcpy(&sw->entry, entry, sizeof(struct trunk_entry));
 	sw->work.fn = do_load_object;
@@ -442,13 +467,88 @@ static int queue_load_snapshot_work(struct trunk_entry *entry, void *data)
 	return 0;
 }
 
-int farm_load_snapshot(uint32_t idx, const char *tag)
+static int visit_vdi_obj_entry(struct trunk_entry *entry, void *data)
+{
+	int ret = -1;
+	size_t size;
+	struct sd_inode *inode;
+	struct vdi_option *opt = (struct vdi_option *)data;
+
+	if (!is_vdi_obj(entry->oid))
+		return 0;
+
+	inode = slice_read(entry->sha1, &size);
+	if (!inode) {
+		sd_err("Fail to load vdi object, oid %"PRIx64, entry->oid);
+		goto out;
+	}
+
+	if (opt->count == 0) {
+		if (opt->enable_if_blank)
+			opt->func(inode);
+	} else {
+		for (int i = 0; i < opt->count; i++)
+			if (!strcmp(inode->name, opt->name[i])) {
+				opt->func(inode);
+				break;
+			}
+	}
+
+	ret = 0;
+out:
+	free(inode);
+	return ret;
+}
+
+static void do_register_obj(uint64_t oid)
+{
+	struct registered_obj_entry *new;
+
+	new = xmalloc(sizeof(*new));
+	new->oid = oid;
+	if (rb_search(&registered_obj_tree, new, rb, registered_obj_cmp)) {
+		free(new);
+		return;
+	}
+
+	rb_insert(&registered_obj_tree, new, rb, registered_obj_cmp);
+	obj_to_load++;
+}
+
+static void register_obj(struct sd_inode *inode)
+{
+	do_register_obj(vid_to_vdi_oid(inode->vdi_id));
+
+	for (int i = 0; i < SD_INODE_DATA_INDEX; i++) {
+		if (!inode->data_vdi_id[i])
+			continue;
+
+		do_register_obj(vid_to_data_oid(inode->data_vdi_id[i], i));
+	}
+}
+
+int farm_load_snapshot(uint32_t idx, const char *tag, int count, char **name)
 {
 	int ret = -1;
 	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
+	struct vdi_option opt;
 
 	if (get_trunk_sha1(idx, tag, trunk_sha1) < 0)
 		goto out;
+
+	opt.count = count;
+	opt.name = name;
+	opt.func = register_obj;
+	opt.enable_if_blank = false;
+
+	if (for_each_entry_in_trunk(trunk_sha1, visit_vdi_obj_entry, &opt) < 0)
+		goto out;
+
+	if (count > 0 && obj_to_load == 0) {
+		sd_err("Objects of specified VDIs are not found "
+			   "in local cluster snapshot storage.");
+		goto out;
+	}
 
 	wq = create_work_queue("load snapshot", WQ_DYNAMIC);
 	if (for_each_entry_in_trunk(trunk_sha1, queue_load_snapshot_work,
@@ -466,5 +566,38 @@ int farm_load_snapshot(uint32_t idx, const char *tag)
 out:
 	rb_destroy(&active_vdi_tree, struct active_vdi_entry, rb);
 	rb_destroy(&registered_vdi_tree, struct registered_vdi_entry, rb);
+	rb_destroy(&registered_obj_tree, struct registered_obj_entry, rb);
+	return ret;
+}
+
+static void print_vdi(struct sd_inode *inode)
+{
+	static int seq;
+
+	sd_info("%d. VDI id: %"PRIx32", name: %s, tag: %s",
+			++seq, inode->vdi_id, inode->name, inode->tag);
+}
+
+int farm_show_snapshot(uint32_t idx, const char *tag, int count, char **name)
+{
+	int ret = -1;
+	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
+	struct vdi_option opt;
+
+	if (get_trunk_sha1(idx, tag, trunk_sha1) < 0)
+		goto out;
+
+	opt.count = count;
+	opt.name = name;
+	opt.func = print_vdi;
+	opt.enable_if_blank = true;
+
+	if (for_each_entry_in_trunk(trunk_sha1, visit_vdi_obj_entry, &opt) < 0)
+		goto out;
+
+	ret = 0;
+out:
+	if (ret)
+		sd_err("Fail to show snapshot.");
 	return ret;
 }
