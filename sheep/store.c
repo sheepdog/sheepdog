@@ -44,7 +44,7 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 			     time_t *timestamp)
 {
-	int fd, ret, nr_nodes;
+	int fd, ret, nr_nodes, buf_len;
 	char path[PATH_MAX];
 	struct stat epoch_stat;
 
@@ -62,12 +62,13 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 		goto err;
 	}
 
-	if (len < epoch_stat.st_size - sizeof(*timestamp)) {
+	buf_len = epoch_stat.st_size - sizeof(*timestamp);
+	if (buf_len < 0 || len < buf_len) {
 		sd_err("invalid epoch %"PRIu32" log", epoch);
 		goto err;
 	}
 
-	ret = xread(fd, nodes, epoch_stat.st_size - sizeof(*timestamp));
+	ret = xread(fd, nodes, buf_len);
 	if (ret < 0) {
 		sd_err("failed to read epoch %"PRIu32" log, %m", epoch);
 		goto err;
