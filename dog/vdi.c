@@ -21,6 +21,8 @@
 #include "sha1.h"
 #include "fec.h"
 
+struct rb_root oid_tree = RB_ROOT;
+
 static struct sd_option vdi_options[] = {
 	{'P', "prealloc", false, "preallocate all the data objects"},
 	{'n', "no-share", false, "share nothing with its parent"},
@@ -34,6 +36,8 @@ static struct sd_option vdi_options[] = {
 	{'f', "force", false, "do operation forcibly"},
 	{'y', "hyper", false, "create a hyper volume"},
 	{'o', "oid", true, "specify the object id of the tracking object"},
+	{'e', "exist", false, "only check objects exist or not,\n"
+	 "                          neither comparing nor repairing"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -53,6 +57,7 @@ static struct vdi_cmd_data {
 	uint8_t store_policy;
 	uint64_t oid;
 	bool no_share;
+	bool exist;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -985,6 +990,106 @@ out:
 	return ret;
 }
 
+#define OIDS_INIT_LENGTH 1024
+
+static void save_oid(uint64_t oid, int copies)
+{
+	const struct sd_vnode *vnodes[SD_MAX_COPIES];
+	struct oid_entry *entry;
+
+	oid_to_vnodes(oid, &sd_vroot, copies, vnodes);
+	for (int i = 0; i < copies; i++) {
+		struct oid_entry key = {
+			.node = (struct sd_node *) vnodes[i]->node
+		};
+		entry = rb_search(&oid_tree, &key, rb, oid_entry_cmp);
+		if (!entry)
+			panic("rb_search() failure.");
+
+		if (entry->last >= entry->end) {
+			entry->end *= 2;
+			entry->oids = xrealloc(entry->oids,
+					sizeof(uint64_t) * entry->end);
+		}
+		entry->oids[entry->last] = oid;
+		entry->last++;
+	}
+}
+
+static void build_oid_tree(const struct sd_inode *inode)
+{
+	uint32_t max_idx, vid;
+	uint64_t oid;
+	struct sd_node *node;
+	struct oid_entry *entry;
+	int copies = min((int)inode->nr_copies, sd_zones_nr);
+
+	rb_for_each_entry(node, &sd_nroot, rb) {
+		entry = xmalloc(sizeof(*entry));
+		entry->node = node;
+		entry->oids = xmalloc(sizeof(uint64_t) * OIDS_INIT_LENGTH);
+		entry->end  = OIDS_INIT_LENGTH;
+		entry->last = 0;
+		rb_insert(&oid_tree, entry, rb, oid_entry_cmp);
+	}
+
+	save_oid(vid_to_vdi_oid(inode->vdi_id), copies);
+	max_idx = count_data_objs(inode);
+	for (uint32_t idx = 0; idx < max_idx; idx++) {
+		vid = sd_inode_get_vid(inode, idx);
+		if (vid == 0)
+			continue;
+		oid = vid_to_data_oid(vid, idx);
+		save_oid(oid, copies);
+	}
+}
+
+static void destroy_oid_tree(void)
+{
+	struct oid_entry *entry;
+
+	rb_for_each_entry(entry, &oid_tree, rb)
+		free(entry->oids);
+	rb_destroy(&oid_tree, struct oid_entry, rb);
+}
+
+static int do_vdi_check_exist(const struct sd_inode *inode)
+{
+	int total = 0;
+	struct oid_entry *entry;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+
+	build_oid_tree(inode);
+
+	rb_for_each_entry(entry, &oid_tree, rb) {
+		sd_init_req(&hdr, SD_OP_OIDS_EXIST);
+		hdr.data_length = sizeof(uint64_t) * entry->last;
+		hdr.flags = SD_FLAG_CMD_FILTER;
+		int ret = dog_exec_req(&entry->node->nid, &hdr, entry->oids);
+		if (ret < 0)
+			panic("dog_exec_req() failure.");
+
+		int n = rsp->data_length / sizeof(uint64_t);
+		total += n;
+		for (int i = 0; i < n; i++)
+			printf("[%s] oid %016"PRIx64" is missing.\n",
+					addr_to_str(entry->node->nid.addr,
+							entry->node->nid.port),
+					entry->oids[i]);
+	}
+
+	destroy_oid_tree();
+
+	if (total == 0) {
+		printf("%s is fine, no object is missing.\n", inode->name);
+		return EXIT_SUCCESS;
+	} else {
+		printf("%s lost %d object(s).\n", inode->name, total);
+		return EXIT_FAILURE;
+	}
+}
+
 static int do_track_object(uint64_t oid, uint8_t nr_copies)
 {
 	int i, j, ret;
@@ -1873,7 +1978,10 @@ static int vdi_check(int argc, char **argv)
 		goto out;
 	}
 
-	ret = do_vdi_check(inode);
+	if (vdi_cmd_data.exist)
+		ret = do_vdi_check_exist(inode);
+	else
+		ret = do_vdi_check(inode);
 out:
 	free(inode);
 	return ret;
@@ -2591,7 +2699,7 @@ static int vdi_alter_copy(int argc, char **argv)
 }
 
 static struct subcommand vdi_cmd[] = {
-	{"check", "<vdiname>", "sapht", "check and repair image's consistency",
+	{"check", "<vdiname>", "seapht", "check and repair image's consistency",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_check, vdi_options},
 	{"create", "<vdiname> <size>", "Pycaphrvt", "create an image",
@@ -2734,6 +2842,9 @@ static int vdi_parser(int ch, const char *opt)
 			sd_err("object id must be a hex integer");
 			exit(EXIT_FAILURE);
 		}
+		break;
+	case 'e':
+		vdi_cmd_data.exist = true;
 		break;
 	}
 

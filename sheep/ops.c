@@ -1056,6 +1056,30 @@ static int local_oid_exist(struct request *req)
 	return SD_RES_NO_OBJ;
 }
 
+static int local_oids_exist(const struct sd_req *req, struct sd_rsp *rsp,
+			      void *data)
+{
+	struct request *r = container_of(req, struct request, rq);
+	uint64_t *oids = (uint64_t *) data;
+	uint8_t ec_index;
+	int i, j, n = req->data_length / sizeof(uint64_t);
+
+	for (i = 0, j = 0; i < n; i++) {
+		ec_index = local_ec_index(r->vinfo, oids[i]);
+		if (is_erasure_oid(oids[i]) && ec_index == SD_MAX_COPIES)
+			oids[j++] = oids[i];
+		else if (!sd_store->exist(oids[i], ec_index))
+			oids[j++] = oids[i];
+	}
+
+	if (j > 0) {
+		rsp->data_length = sizeof(uint64_t) * j;
+		return SD_RES_NO_OBJ;
+	}
+
+	return SD_RES_SUCCESS;
+}
+
 static int local_cluster_info(const struct sd_req *req, struct sd_rsp *rsp,
 			      void *data)
 {
@@ -1592,6 +1616,13 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
 		.process_work = local_oid_exist,
+	},
+
+	[SD_OP_OIDS_EXIST] =  {
+		.name = "OIDS_EXIST",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_main = local_oids_exist,
 	},
 
 	[SD_OP_CLUSTER_INFO] = {

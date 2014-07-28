@@ -334,6 +334,9 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
 		wlen = hdr->data_length;
 		rlen = 0;
+	} else if (hdr->flags & SD_FLAG_CMD_FILTER) {
+		wlen = hdr->data_length;
+		rlen = hdr->data_length;
 	} else {
 		wlen = 0;
 		rlen = hdr->data_length;

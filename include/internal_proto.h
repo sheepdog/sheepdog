@@ -107,6 +107,7 @@
 #define SD_OP_PREVENT_INODE_UPDATE    0xC3
 #define SD_OP_ALLOW_INODE_UPDATE      0xC4
 #define SD_OP_REPAIR_REPLICA	0xC5
+#define SD_OP_OIDS_EXIST	0xC6
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
@@ -178,6 +179,14 @@ struct sd_node {
 	#define SD_NODE_SIZE 80
 	struct disk_info disks[0];
 #endif
+};
+
+struct oid_entry {
+	struct rb_node rb;
+	struct sd_node *node; /* key */
+	uint64_t *oids;       /* object id array */
+	int end;              /* idx to the end of the allocated oid array */
+	int last;             /* idx to the last element of the oid array */
 };
 
 /*

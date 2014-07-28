@@ -199,6 +199,12 @@ static inline int node_cmp(const struct sd_node *node1,
 	return node_id_cmp(&node1->nid, &node2->nid);
 }
 
+static inline int oid_entry_cmp(const struct oid_entry *entry1,
+			   const struct oid_entry *entry2)
+{
+	return node_cmp(entry1->node, entry2->node);
+}
+
 static inline bool node_eq(const struct sd_node *a, const struct sd_node *b)
 {
 	return node_cmp(a, b) == 0;
