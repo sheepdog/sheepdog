@@ -33,6 +33,15 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 	memcpy(buf, nodes, nodes_len);
 	memcpy(buf + nodes_len, &t, sizeof(time_t));
 
+	/*
+	 * rb field is unused in epoch file, zero-filling it
+	 * is good for epoch file recovery because it is unified
+	 */
+	for (int i = 0; i < nr_nodes; i++)
+		memset(buf + i * sizeof(struct sd_node)
+				+ offsetof(struct sd_node, rb),
+				0, sizeof(struct rb_node));
+
 	snprintf(path, sizeof(path), "%s%08u", epoch_path, epoch);
 
 	ret = atomic_create_and_write(path, buf, len, true);

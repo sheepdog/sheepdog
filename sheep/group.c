@@ -359,7 +359,7 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 	rb_for_each_entry(node, &vinfo->nroot, rb) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		int nodes_len;
+		int nodes_len, nr_nodes;
 
 		if (node_is_local(node))
 			continue;
@@ -377,7 +377,10 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 		if (timestamp)
 			memcpy(timestamp, buf + nodes_len, sizeof(*timestamp));
 
-		return nodes_len / sizeof(struct sd_node);
+		nr_nodes = nodes_len / sizeof(struct sd_node);
+		/* epoch file is missing in local node, try to create one */
+		update_epoch_log(epoch, nodes, nr_nodes);
+		return nr_nodes;
 	}
 
 	/*
