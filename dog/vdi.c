@@ -1065,7 +1065,7 @@ static int do_vdi_check_exist(const struct sd_inode *inode)
 	rb_for_each_entry(entry, &oid_tree, rb) {
 		sd_init_req(&hdr, SD_OP_OIDS_EXIST);
 		hdr.data_length = sizeof(uint64_t) * entry->last;
-		hdr.flags = SD_FLAG_CMD_FILTER;
+		hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_PIGGYBACK;
 		int ret = dog_exec_req(&entry->node->nid, &hdr, entry->oids);
 		if (ret < 0)
 			panic("dog_exec_req() failure.");

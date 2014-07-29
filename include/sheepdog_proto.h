@@ -46,11 +46,13 @@
 #define SD_OP_FLUSH_VDI      0x16
 #define SD_OP_DEL_VDI        0x17
 
+/* macros in the SD_FLAG_CMD_XXX group are mutually exclusive */
 #define SD_FLAG_CMD_WRITE    0x01
 #define SD_FLAG_CMD_COW      0x02
 #define SD_FLAG_CMD_CACHE    0x04
 #define SD_FLAG_CMD_DIRECT   0x08 /* don't use object cache */
-#define SD_FLAG_CMD_FILTER   0x11 /* write & read, output is subset of input */
+/* return something back while sending something to sheep */
+#define SD_FLAG_CMD_PIGGYBACK   0x10
 /* flags above 0x80 are sheepdog-internal */
 
 #define SD_RES_SUCCESS       0x00 /* Success */
