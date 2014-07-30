@@ -39,6 +39,37 @@ static struct vdi_tree *find_vdi(struct vdi_tree *parent, uint32_t vid,
 	return NULL;
 }
 
+static struct vdi_tree *find_vdi_with_vid(struct vdi_tree *parent, uint32_t vid)
+{
+	struct vdi_tree *vdi, *ret;
+
+	list_for_each_entry(vdi, &parent->children, siblings) {
+		if (vdi->vid == vid)
+			return vdi;
+
+		ret = find_vdi_with_vid(vdi, vid);
+		if (ret)
+			return ret;
+	}
+	return NULL;
+}
+
+static struct vdi_tree *find_vdi_with_name(struct vdi_tree *parent,
+					   const char *name)
+{
+	struct vdi_tree *vdi, *ret;
+
+	list_for_each_entry(vdi, &parent->children, siblings) {
+		if (!strcmp(vdi->name, name))
+			return vdi;
+
+		ret = find_vdi_with_name(vdi, name);
+		if (ret)
+			return ret;
+	}
+	return NULL;
+}
+
 static struct vdi_tree *new_vdi(const char *name, const char *label,
 				uint64_t vid, uint64_t pvid, bool highlight)
 {
@@ -62,6 +93,16 @@ void init_tree(void)
 struct vdi_tree *find_vdi_from_root(uint32_t vid, const char *name)
 {
 	return find_vdi(root, vid, name);
+}
+
+struct vdi_tree *find_vdi_from_root_with_vid(uint32_t vid)
+{
+	return find_vdi_with_vid(root, vid);
+}
+
+struct vdi_tree *find_vdi_from_root_with_name(const char *name)
+{
+	return find_vdi_with_name(root, name);
 }
 
 void add_vdi_tree(const char *name, const char *label, uint32_t vid,

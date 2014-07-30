@@ -2695,6 +2695,71 @@ static int vdi_alter_copy(int argc, char **argv)
 	return EXIT_FAILURE;
 }
 
+static int lock_list(int argc, char **argv)
+{
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct vdi_state *vs = NULL;
+	unsigned int rlen;
+	int ret, count;
+
+#define DEFAULT_VDI_STATE_COUNT 512
+	rlen = DEFAULT_VDI_STATE_COUNT * sizeof(struct vdi_state);
+	vs = xzalloc(rlen);
+retry:
+	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
+	hdr.data_length = rlen;
+
+	ret = dog_exec_req(&sd_nid, &hdr, (char *)vs);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_BUFFER_SMALL:
+		rlen *= 2;
+		vs = xrealloc(vs, rlen);
+		goto retry;
+	default:
+		sd_err("failed to execute SD_OP_GET_VDI_COPIES: %s",
+		       sd_strerror(ret));
+		goto out;
+	}
+
+	init_tree();
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
+
+	count = rsp->data_length / sizeof(*vs);
+
+	printf("VDI | owner node\n");
+	for (int i = 0; i < count; i++) {
+		struct vdi_tree *vdi;
+
+		if (vs[i].lock_state != LOCK_STATE_LOCKED)
+			continue;
+
+		vdi = find_vdi_from_root_with_vid(vs[i].vid);
+		printf("%s | %s\n", vdi->name,
+		       node_id_to_str(&vs[i].lock_owner));
+	}
+
+out:
+	free(vs);
+	return ret;
+}
+
+static struct subcommand vdi_lock_cmd[] = {
+	{"list", NULL, NULL, "list locked VDIs", NULL, 0, lock_list},
+	{NULL},
+};
+
+static int vdi_lock(int argc, char **argv)
+{
+	return do_generic_subcommand(vdi_lock_cmd, argc, argv);
+}
+
 static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "seapht", "check and repair image's consistency",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
@@ -2759,6 +2824,8 @@ static struct subcommand vdi_cmd[] = {
 	 vdi_cache, vdi_options},
 	{"alter-copy", "<vdiname>", "capht", "set the vdi's redundancy level",
 	 NULL, CMD_NEED_ARG|CMD_NEED_NODELIST, vdi_alter_copy, vdi_options},
+	{"lock", NULL, "apht", "See 'dog vdi lock' for more information",
+	 vdi_lock_cmd, CMD_NEED_ARG, vdi_lock, vdi_options},
 	{NULL,},
 };
 

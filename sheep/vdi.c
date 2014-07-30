@@ -11,12 +11,6 @@
 
 #include "sheep_priv.h"
 
-enum lock_state {
-	LOCK_STATE_INIT,
-	LOCK_STATE_LOCKED,
-	LOCK_STATE_UNLOCKED,
-};
-
 struct vdi_lock_state {
 	enum lock_state state;
 	struct node_id owner;
