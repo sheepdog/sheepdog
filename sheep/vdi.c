@@ -206,6 +206,8 @@ int fill_vdi_state_list(const struct sd_req *hdr,
 		vs[last].nr_copies = entry->nr_copies;
 		vs[last].snapshot = entry->snapshot;
 		vs[last].copy_policy = entry->copy_policy;
+		vs[last].lock_state = entry->lock_state.state;
+		vs[last].lock_owner = entry->lock_state.owner;
 		last++;
 	}
 	sd_rw_unlock(&vdi_state_lock);
@@ -219,6 +221,36 @@ int fill_vdi_state_list(const struct sd_req *hdr,
 	memcpy(data, vs, rsp->data_length);
 	free(vs);
 	return SD_RES_SUCCESS;
+}
+
+static struct vdi_state *fill_vdi_state_list_with_alloc(int *result_nr)
+{
+	struct vdi_state *vs;
+	struct vdi_state_entry *entry;
+	int i = 0, nr = 0;
+
+	sd_read_lock(&vdi_state_lock);
+	rb_for_each_entry(entry, &vdi_state_root, node) {
+		nr++;
+	}
+
+	vs = xcalloc(nr, sizeof(*vs));
+	rb_for_each_entry(entry, &vdi_state_root, node) {
+		vs[i].vid = entry->vid;
+		vs[i].nr_copies = entry->nr_copies;
+		vs[i].snapshot = entry->snapshot;
+		vs[i].copy_policy = entry->copy_policy;
+		vs[i].lock_state = entry->lock_state.state;
+		vs[i].lock_owner = entry->lock_state.owner;
+
+		i++;
+		assert(i < nr);
+	}
+
+	sd_rw_unlock(&vdi_state_lock);
+
+	*result_nr = nr;
+	return vs;
 }
 
 static inline bool vdi_is_deleted(struct sd_inode *inode)
@@ -319,6 +351,79 @@ bool vdi_unlock(uint32_t vid, const struct node_id *owner)
 out:
 	sd_rw_unlock(&vdi_state_lock);
 	return ret;
+}
+
+void apply_vdi_lock_state(struct vdi_state *vs)
+{
+	struct vdi_state_entry *entry;
+
+	sd_write_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vs->vid);
+	if (!entry) {
+		sd_err("no vdi state entry of %"PRIx32" found", vs->vid);
+		goto out;
+	}
+
+	entry->lock_state.state = vs->lock_state;
+	memcpy(&entry->lock_state.owner, &vs->lock_owner,
+	       sizeof(vs->lock_owner));
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
+}
+
+static LIST_HEAD(logged_vdi_ops);
+
+struct vdi_op_log {
+	bool lock;
+	uint32_t vid;
+	struct node_id owner;
+
+	struct list_node list;
+};
+
+void log_vdi_op_lock(uint32_t vid, const struct node_id *owner)
+{
+	struct vdi_op_log *op;
+
+	op = xzalloc(sizeof(*op));
+	op->lock = true;
+	op->vid = vid;
+	memcpy(&op->owner, owner, sizeof(*owner));
+	INIT_LIST_NODE(&op->list);
+	list_add_tail(&op->list, &logged_vdi_ops);
+}
+
+void log_vdi_op_unlock(uint32_t vid, const struct node_id *owner)
+{
+	struct vdi_op_log *op;
+
+	op = xzalloc(sizeof(*op));
+	op->lock = false;
+	op->vid = vid;
+	memcpy(&op->owner, owner, sizeof(*owner));
+	INIT_LIST_NODE(&op->list);
+	list_add_tail(&op->list, &logged_vdi_ops);
+}
+
+void play_logged_vdi_ops(void)
+{
+	struct vdi_op_log *op;
+
+	list_for_each_entry(op, &logged_vdi_ops, list) {
+		struct vdi_state entry;
+
+		memset(&entry, 0, sizeof(entry));
+		entry.vid = op->vid;
+		memcpy(&entry.lock_owner, &op->owner,
+		       sizeof(op->owner));
+		if (op->lock)
+			entry.lock_state = LOCK_STATE_LOCKED;
+		else
+			entry.lock_state = LOCK_STATE_UNLOCKED;
+
+		apply_vdi_lock_state(&entry);
+	}
 }
 
 static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
@@ -1197,4 +1302,73 @@ int sd_create_hyper_volume(const char *name, uint32_t *vdi_id)
 		*vdi_id = rsp->vdi.vdi_id;
 out:
 	return ret;
+}
+
+struct vdi_state_snapshot {
+	int epoch, nr_vs;
+	struct vdi_state *vs;
+
+	struct list_node list;
+};
+
+static LIST_HEAD(vdi_state_snapshot_list);
+
+main_fn void take_vdi_state_snapshot(int epoch)
+{
+	/*
+	 * take a snapshot of current vdi state and associate it with
+	 * the given epoch
+	 */
+	struct vdi_state_snapshot *snapshot;
+
+	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
+		if (snapshot->epoch == epoch) {
+			sd_debug("duplicate snapshot of epoch %d", epoch);
+			return;
+		}
+
+	}
+
+	snapshot = xzalloc(sizeof(*snapshot));
+	snapshot->epoch = epoch;
+	snapshot->vs = fill_vdi_state_list_with_alloc(&snapshot->nr_vs);
+	INIT_LIST_NODE(&snapshot->list);
+	list_add_tail(&snapshot->list, &vdi_state_snapshot_list);
+
+	sd_debug("taking a snapshot of vdi state at epoch %d succeed", epoch);
+	sd_debug("a number of vdi state: %d", snapshot->nr_vs);
+}
+
+main_fn int get_vdi_state_snapshot(int epoch, void *data)
+{
+	struct vdi_state_snapshot *snapshot;
+
+	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
+		if (snapshot->epoch == epoch) {
+			memcpy(data, snapshot->vs,
+			       sizeof(*snapshot->vs) * snapshot->nr_vs);
+			return sizeof(*snapshot->vs) * snapshot->nr_vs;
+		}
+	}
+
+	sd_info("get request for not prepared vdi state snapshot, epoch: %d",
+		epoch);
+	return -1;
+}
+
+main_fn void free_vdi_state_snapshot(int epoch)
+{
+	struct vdi_state_snapshot *snapshot;
+
+	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
+		if (snapshot->epoch == epoch) {
+			list_del(&snapshot->list);
+			free(snapshot->vs);
+			free(snapshot);
+
+			return;
+		}
+	}
+
+	panic("invalid free request for vdi state snapshot, epoch: %d", epoch);
 }

@@ -83,6 +83,7 @@
 #define SD_RES_HALT          0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_READONLY      0x1A /* Object is read-only */
 #define SD_RES_INCOMPLETE    0x1B /* Object (in kv) is incomplete uploading */
+#define SD_RES_COLLECTING_CINFO 0x1C /* sheep is collecting cluster wide status, not ready for operation */
 
 /* errors above 0x80 are sheepdog-internal */
 
@@ -184,6 +185,11 @@ struct sd_req {
 			uint8_t		addr[16];
 			uint16_t	port;
 		} forw;
+		struct {
+			uint32_t        get; /* 0 means free, 1 means get */
+			uint32_t        tgt_epoch;
+		} vdi_state_snapshot;
+
 
 		uint32_t		__pad[8];
 	};

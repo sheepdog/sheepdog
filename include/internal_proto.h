@@ -108,6 +108,7 @@
 #define SD_OP_ALLOW_INODE_UPDATE      0xC4
 #define SD_OP_REPAIR_REPLICA	0xC5
 #define SD_OP_OIDS_EXIST	0xC6
+#define SD_OP_VDI_STATE_SNAPSHOT_CTL  0xC7
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080
@@ -146,6 +147,12 @@ enum sd_status {
 	SD_STATUS_WAIT,
 	SD_STATUS_SHUTDOWN,
 	SD_STATUS_KILLED,
+};
+
+enum sd_node_status {
+	SD_NODE_STATUS_INITIALIZATION = 1,
+	SD_NODE_STATUS_COLLECTING_CINFO,
+	SD_NODE_STATUS_OK,
 };
 
 struct node_id {
