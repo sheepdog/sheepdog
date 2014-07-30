@@ -11,11 +11,23 @@
 
 #include "sheep_priv.h"
 
+enum lock_state {
+	LOCK_STATE_INIT,
+	LOCK_STATE_LOCKED,
+	LOCK_STATE_UNLOCKED,
+};
+
+struct vdi_lock_state {
+	enum lock_state state;
+	struct node_id owner;
+};
+
 struct vdi_state_entry {
 	uint32_t vid;
 	unsigned int nr_copies;
 	bool snapshot;
 	uint8_t copy_policy;
+	struct vdi_lock_state lock_state;
 	struct rb_node node;
 };
 
@@ -148,6 +160,9 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 	entry->snapshot = snapshot;
 	entry->copy_policy = cp;
 
+	entry->lock_state.state = LOCK_STATE_INIT;
+	memset(&entry->lock_state.owner, 0, sizeof(struct node_id));
+
 	if (cp) {
 		int d;
 
@@ -232,6 +247,77 @@ int vdi_exist(uint32_t vid)
 	ret = 1;
 out:
 	free(inode);
+	return ret;
+}
+
+bool lock_vdi(uint32_t vid, const struct node_id *owner)
+{
+	struct vdi_state_entry *entry;
+	bool ret = false;
+
+	sd_write_lock(&vdi_state_lock);
+
+	entry = vdi_state_search(&vdi_state_root, vid);
+	if (!entry) {
+		sd_err("no vdi state entry of %"PRIx32" found", vid);
+		goto out;
+	}
+
+	switch (entry->lock_state.state) {
+	case LOCK_STATE_INIT:
+	case LOCK_STATE_UNLOCKED:
+		entry->lock_state.state = LOCK_STATE_LOCKED;
+		memcpy(&entry->lock_state.owner, owner, sizeof(*owner));
+		sd_info("VDI %"PRIx32" is locked", vid);
+		ret = true;
+		goto out;
+	case LOCK_STATE_LOCKED:
+		sd_info("VDI %"PRIx32" is already locked", vid);
+		break;
+	default:
+		sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
+			 vid, entry->lock_state.state);
+		break;
+	}
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
+	return ret;
+}
+
+bool unlock_vdi(uint32_t vid, const struct node_id *owner)
+{
+	struct vdi_state_entry *entry;
+	bool ret = false;
+
+	sd_write_lock(&vdi_state_lock);
+
+	entry = vdi_state_search(&vdi_state_root, vid);
+	if (!entry) {
+		sd_err("no vdi state entry of %"PRIx32" found", vid);
+		ret = false;
+		goto out;
+	}
+
+	switch (entry->lock_state.state) {
+	case LOCK_STATE_INIT:
+	case LOCK_STATE_UNLOCKED:
+		sd_err("unlocking unlocked VDI: %"PRIx32, vid);
+		break;
+	case LOCK_STATE_LOCKED:
+		entry->lock_state.state = LOCK_STATE_UNLOCKED;
+		memset(&entry->lock_state.owner, 0,
+		       sizeof(entry->lock_state.owner));
+		ret = true;
+		break;
+	default:
+		sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
+			 vid, entry->lock_state.state);
+		break;
+	}
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
 	return ret;
 }
 

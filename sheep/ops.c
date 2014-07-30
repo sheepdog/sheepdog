@@ -1306,6 +1306,34 @@ static int local_repair_replica(struct request *req)
 	return ret;
 }
 
+static int cluster_lock_vdi(const struct sd_req *req, struct sd_rsp *rsp,
+			    void *data, const struct sd_node *sender)
+{
+	uint32_t vid = rsp->vdi.vdi_id;
+
+	sd_info("node: %s is locking VDI: %"PRIx32, node_to_str(sender), vid);
+
+	if (!lock_vdi(vid, &sender->nid)) {
+		sd_err("locking %"PRIx32 "failed", vid);
+		return SD_RES_VDI_NOT_LOCKED;
+	}
+
+	return SD_RES_SUCCESS;
+}
+
+static int cluster_release_vdi_main(const struct sd_req *req,
+				    struct sd_rsp *rsp, void *data,
+				    const struct sd_node *sender)
+{
+	uint32_t vid = req->vdi.base_vdi_id;
+
+	sd_info("node: %s is unlocking VDI: %"PRIx32, node_to_str(sender), vid);
+
+	unlock_vdi(vid, &sender->nid);
+
+	return SD_RES_SUCCESS;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1400,6 +1428,14 @@ static struct sd_op_template sd_ops[] = {
 		.name = "LOCK_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
 		.process_work = cluster_get_vdi_info,
+		.process_main = cluster_lock_vdi,
+	},
+
+	[SD_OP_RELEASE_VDI] = {
+		.name = "RELEASE_VDI",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_work = local_release_vdi,
+		.process_main = cluster_release_vdi_main,
 	},
 
 	[SD_OP_REWEIGHT] = {
@@ -1438,11 +1474,6 @@ static struct sd_op_template sd_ops[] = {
 	},
 
 	/* local operations */
-	[SD_OP_RELEASE_VDI] = {
-		.name = "RELEASE_VDI",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_work = local_release_vdi,
-	},
 
 	[SD_OP_GET_STORE_LIST] = {
 		.name = "GET_STORE_LIST",

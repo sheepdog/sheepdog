@@ -345,6 +345,9 @@ int sd_delete_vdi(const char *name);
 int sd_lookup_vdi(const char *name, uint32_t *vid);
 int sd_create_hyper_volume(const char *name, uint32_t *vdi_id);
 
+bool lock_vdi(uint32_t vid, const struct node_id *owner);
+bool unlock_vdi(uint32_t vid, const struct node_id *owner);
+
 extern int ec_max_data_strip;
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
