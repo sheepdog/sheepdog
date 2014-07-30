@@ -624,6 +624,8 @@ int main(int argc, char **argv)
 	struct stat logdir_st;
 	enum log_dst_type log_dst_type;
 
+	sys->node_status = SD_NODE_STATUS_INITIALIZATION;
+
 	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
 

@@ -126,6 +126,7 @@ struct system_info {
 	struct sd_node this_node;
 
 	struct cluster_info cinfo;
+	enum sd_node_status node_status;
 
 	uint64_t disk_space;
 
@@ -233,7 +234,8 @@ struct vdi_state {
 	uint8_t nr_copies;
 	uint8_t snapshot;
 	uint8_t copy_policy;
-	uint8_t _pad;
+	uint8_t lock_state;
+	struct node_id lock_owner;
 };
 
 struct store_driver {
@@ -347,6 +349,13 @@ int sd_create_hyper_volume(const char *name, uint32_t *vdi_id);
 
 bool lock_vdi(uint32_t vid, const struct node_id *owner);
 bool unlock_vdi(uint32_t vid, const struct node_id *owner);
+void apply_vdi_lock_state(struct vdi_state *vs);
+void take_vdi_state_snapshot(int epoch);
+int get_vdi_state_snapshot(int epoch, void *data);
+void free_vdi_state_snapshot(int epoch);
+void log_vdi_op_lock(uint32_t vid, const struct node_id *owner);
+void log_vdi_op_unlock(uint32_t vid, const struct node_id *owner);
+void play_logged_vdi_ops(void);
 
 extern int ec_max_data_strip;
 

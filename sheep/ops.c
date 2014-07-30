@@ -1306,10 +1306,30 @@ static int local_repair_replica(struct request *req)
 	return ret;
 }
 
-static int cluster_lock_vdi(const struct sd_req *req, struct sd_rsp *rsp,
-			    void *data, const struct sd_node *sender)
+static int cluster_lock_vdi_work(struct request *req)
+{
+	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
+		/*
+		 * this node is collecting vdi locking status, not ready for
+		 * allowing lock by itself
+		 */
+		sd_err("This node is not ready for vdi locking, try later");
+		return SD_RES_COLLECTING_CINFO;
+	}
+
+	return cluster_get_vdi_info(req);
+}
+
+static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
+				 void *data, const struct sd_node *sender)
 {
 	uint32_t vid = rsp->vdi.vdi_id;
+
+	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
+		sd_debug("logging vdi unlock information for later replay");
+		log_vdi_op_lock(vid, &sender->nid);
+		return SD_RES_SUCCESS;
+	}
 
 	sd_info("node: %s is locking VDI: %"PRIx32, node_to_str(sender), vid);
 
@@ -1327,9 +1347,42 @@ static int cluster_release_vdi_main(const struct sd_req *req,
 {
 	uint32_t vid = req->vdi.base_vdi_id;
 
+	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
+		sd_debug("logging vdi lock information for later replay");
+		log_vdi_op_unlock(vid, &sender->nid);
+		return SD_RES_SUCCESS;
+	}
+
 	sd_info("node: %s is unlocking VDI: %"PRIx32, node_to_str(sender), vid);
 
 	unlock_vdi(vid, &sender->nid);
+
+	return SD_RES_SUCCESS;
+}
+
+static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
+					struct sd_rsp *rsp, void *data,
+					const struct sd_node *sender)
+{
+	bool get = !!req->vdi_state_snapshot.get;
+	int epoch = req->vdi_state_snapshot.tgt_epoch;
+	int ret;
+
+	sd_info("%s vdi state snapshot at epoch %d",
+		get ? "getting" : "freeing", epoch);
+
+	if (get) {
+		/*
+		 * FIXME: assuming request has enough space for storing
+		 * the snapshot
+		 */
+		ret = get_vdi_state_snapshot(epoch, data);
+		if (0 <= ret)
+			rsp->data_length = ret;
+		else
+			return SD_RES_AGAIN;
+	} else
+		free_vdi_state_snapshot(epoch);
 
 	return SD_RES_SUCCESS;
 }
@@ -1427,8 +1480,8 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_LOCK_VDI] = {
 		.name = "LOCK_VDI",
 		.type = SD_OP_TYPE_CLUSTER,
-		.process_work = cluster_get_vdi_info,
-		.process_main = cluster_lock_vdi,
+		.process_work = cluster_lock_vdi_work,
+		.process_main = cluster_lock_vdi_main,
 	},
 
 	[SD_OP_RELEASE_VDI] = {
@@ -1699,6 +1752,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "REPAIR_REPLICA",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_repair_replica,
+	},
+
+	[SD_OP_VDI_STATE_SNAPSHOT_CTL] = {
+		.name = "VDI_STATE_SNAPSHOT_CTL",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_vdi_state_snapshot_ctl,
 	},
 
 	/* gateway I/O operations */
