@@ -2750,8 +2750,32 @@ out:
 	return ret;
 }
 
+static int lock_force_unlock(int argc, char **argv)
+{
+	struct sd_req hdr;
+	const char *vdiname = argv[optind];
+	struct vdi_tree *vdi;
+
+	init_tree();
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+		return EXIT_SYSFAIL;
+
+	vdi = find_vdi_from_root_by_name(vdiname);
+	if (!vdi) {
+		sd_err("VDI: %s not found", vdiname);
+		return EXIT_SYSFAIL;
+	}
+
+	sd_init_req(&hdr, SD_OP_RELEASE_VDI);
+	hdr.vdi.base_vdi_id = vdi->vid;
+
+	return dog_exec_req(&sd_nid, &hdr, NULL);
+}
+
 static struct subcommand vdi_lock_cmd[] = {
 	{"list", NULL, NULL, "list locked VDIs", NULL, 0, lock_list},
+	{"force-unlock", "<vdiname>", NULL, "unlock locked VDI forcibly", NULL, 0,
+	 lock_force_unlock},
 	{NULL},
 };
 
