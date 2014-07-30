@@ -30,10 +30,11 @@
 #define BASE_ZNODE "/sheepdog"
 #define QUEUE_ZNODE BASE_ZNODE "/queue"
 #define MEMBER_ZNODE BASE_ZNODE "/member"
-#define MASTER_ZNONE BASE_ZNODE "/master"
+#define MASTER_ZNODE BASE_ZNODE "/master"
 #define LOCK_ZNODE BASE_ZNODE "/lock"
 
 static int zk_timeout = SESSION_TIMEOUT;
+static int my_master_seq;
 
 /* structure for distributed lock */
 struct cluster_lock {
@@ -641,7 +642,7 @@ static inline void build_node_list(void)
 static int zk_queue_init(void)
 {
 	RETURN_IF_ERROR(zk_init_node(BASE_ZNODE), "path %s", BASE_ZNODE);
-	RETURN_IF_ERROR(zk_init_node(MASTER_ZNONE), "path %s", MASTER_ZNONE);
+	RETURN_IF_ERROR(zk_init_node(MASTER_ZNODE), "path %s", MASTER_ZNODE);
 	RETURN_IF_ERROR(zk_init_node(QUEUE_ZNODE), "path %s", QUEUE_ZNODE);
 	RETURN_IF_ERROR(zk_init_node(MEMBER_ZNODE), "path %s", MEMBER_ZNODE);
 	return ZOK;
@@ -722,7 +723,7 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 			return;
 		}
 
-		ret = sscanf(path, MASTER_ZNONE "/%s", str);
+		ret = sscanf(path, MASTER_ZNODE "/%s", str);
 		if (ret == 1) {
 			zk_compete_master();
 			return;
@@ -816,17 +817,17 @@ static int zk_find_master(int *master_seq, char *master_name)
 	char master_compete_path[MAX_NODE_STR_LEN];
 
 	if (*master_seq < 0) {
-		RETURN_IF_ERROR(zk_get_least_seq(MASTER_ZNONE,
+		RETURN_IF_ERROR(zk_get_least_seq(MASTER_ZNODE,
 						 master_compete_path,
 						 MAX_NODE_STR_LEN, master_name,
 						 &len), "");
-		sscanf(master_compete_path, MASTER_ZNONE "/%"PRId32,
+		sscanf(master_compete_path, MASTER_ZNODE "/%"PRId32,
 		       master_seq);
 		return ZOK;
 	} else {
 		while (true) {
 			snprintf(master_compete_path, len,
-				 MASTER_ZNONE "/%010"PRId32, *master_seq);
+				 MASTER_ZNODE "/%010"PRId32, *master_seq);
 			rc = zk_get_data(master_compete_path, master_name,
 					 &len);
 			switch (rc) {
@@ -855,7 +856,7 @@ static int zk_verify_last_sheep_join(int seq, int *last_sheep)
 	char path[MAX_NODE_STR_LEN], name[MAX_NODE_STR_LEN];
 
 	for (*last_sheep = seq - 1; *last_sheep >= 0; (*last_sheep)--) {
-		snprintf(path, MAX_NODE_STR_LEN, MASTER_ZNONE "/%010"PRId32,
+		snprintf(path, MAX_NODE_STR_LEN, MASTER_ZNODE "/%010"PRId32,
 			 *last_sheep);
 		rc = zk_get_data(path, name, &len);
 		switch (rc) {
@@ -913,18 +914,18 @@ static void zk_compete_master(void)
 			if (uatomic_is_true(&stop))
 				goto out_unlock;
 			/* duplicate sequential node has no side-effect */
-			rc = zk_create_seq_node(MASTER_ZNONE "/",
+			rc = zk_create_seq_node(MASTER_ZNODE "/",
 						node_to_str(&this_node.node),
 						MAX_NODE_STR_LEN,
 						my_compete_path,
 						MAX_NODE_STR_LEN, true);
 		} while (rc == ZOPERATIONTIMEOUT || rc == ZCONNECTIONLOSS);
-		CHECK_ZK_RC(rc, MASTER_ZNONE "/");
+		CHECK_ZK_RC(rc, MASTER_ZNODE "/");
 		if (rc != ZOK)
 			goto out_unlock;
 
 		sd_debug("my compete path: %s", my_compete_path);
-		sscanf(my_compete_path, MASTER_ZNONE "/%"PRId32,
+		sscanf(my_compete_path, MASTER_ZNODE "/%"PRId32,
 		       &my_seq);
 	}
 
@@ -952,6 +953,7 @@ static void zk_compete_master(void)
 	}
 success:
 	uatomic_set_true(&is_master);
+	my_master_seq = master_seq;
 	sd_debug("success");
 out_unlock:
 	sd_rw_unlock(&zk_compete_master_lock);
@@ -985,6 +987,12 @@ static int zk_leave(void)
 
 	sd_info("leaving from cluster");
 	uatomic_set_true(&stop);
+
+	if (uatomic_is_true(&is_master)) {
+		snprintf(path, sizeof(path), MASTER_ZNODE "/%010"PRId32,
+				my_master_seq);
+		zk_delete_node(path, -1);
+	}
 
 	snprintf(path, sizeof(path), MEMBER_ZNODE"/%s",
 		 node_to_str(&this_node.node));
