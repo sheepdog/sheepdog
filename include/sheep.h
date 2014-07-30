@@ -282,11 +282,11 @@ static inline void nodes_to_buffer(struct rb_root *nroot, void *buffer)
 
 #define MAX_NODE_STR_LEN 256
 
-static inline const char *node_to_str(const struct sd_node *id)
+static inline const char *node_id_to_str(const struct node_id *id)
 {
 	static __thread char str[MAX_NODE_STR_LEN];
 	int af = AF_INET6;
-	const uint8_t *addr = id->nid.addr;
+	const uint8_t *addr = id->addr;
 
 	/* Find address family type */
 	if (addr[12]) {
@@ -299,9 +299,14 @@ static inline const char *node_to_str(const struct sd_node *id)
 
 	snprintf(str, sizeof(str), "%s ip:%s port:%d",
 		(af == AF_INET) ? "IPv4" : "IPv6",
-		addr_to_str(id->nid.addr, 0), id->nid.port);
+		addr_to_str(id->addr, 0), id->port);
 
 	return str;
+}
+
+static inline const char *node_to_str(const struct sd_node *id)
+{
+	return node_id_to_str(&id->nid);
 }
 
 static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
