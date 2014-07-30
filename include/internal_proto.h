@@ -334,4 +334,20 @@ struct trace_graph_item;
 
 #endif	/* HAVE_TRACE */
 
+/* VDI locking state, used by both of sheep and dog */
+enum lock_state {
+	LOCK_STATE_INIT,
+	LOCK_STATE_LOCKED,
+	LOCK_STATE_UNLOCKED,
+};
+
+struct vdi_state {
+	uint32_t vid;
+	uint8_t nr_copies;
+	uint8_t snapshot;
+	uint8_t copy_policy;
+	uint8_t lock_state;
+	struct node_id lock_owner;
+};
+
 #endif /* __INTERNAL_PROTO_H__ */

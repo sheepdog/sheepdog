@@ -29,5 +29,7 @@ void add_vdi_tree(const char *label, const char *tag, uint32_t vid,
 		  uint32_t pvid, bool highlight);
 void dump_tree(void);
 struct vdi_tree *find_vdi_from_root(uint32_t vid, const char *name);
+struct vdi_tree *find_vdi_from_root_by_vid(uint32_t vid);
+struct vdi_tree *find_vdi_from_root_by_name(const char *name);
 
 #endif

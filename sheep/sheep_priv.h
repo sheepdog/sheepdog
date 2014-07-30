@@ -229,15 +229,6 @@ struct vdi_info {
 	uint64_t create_time;
 };
 
-struct vdi_state {
-	uint32_t vid;
-	uint8_t nr_copies;
-	uint8_t snapshot;
-	uint8_t copy_policy;
-	uint8_t lock_state;
-	struct node_id lock_owner;
-};
-
 struct store_driver {
 	struct list_node list;
 	const char *name;
