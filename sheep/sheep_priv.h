@@ -354,7 +354,7 @@ int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len, uint32_t vid,
 		bool excl, bool delete);
 
 int local_get_node_list(const struct sd_req *req, struct sd_rsp *rsp,
-		void *data);
+			void *data, const struct sd_node *sender);
 
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info);
 struct vnode_info *get_vnode_info(void);
@@ -457,7 +457,8 @@ bool has_process_work(const struct sd_op_template *op);
 bool has_process_main(const struct sd_op_template *op);
 void do_process_work(struct work *work);
 int do_process_main(const struct sd_op_template *op, const struct sd_req *req,
-		    struct sd_rsp *rsp, void *data);
+		    struct sd_rsp *rsp, void *data,
+		    const struct sd_node *sender);
 int gateway_to_peer_opcode(int opcode);
 
 extern uint32_t last_gathered_epoch;
