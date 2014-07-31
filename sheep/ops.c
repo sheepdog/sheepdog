@@ -1342,7 +1342,9 @@ static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
 		return SD_RES_SUCCESS;
 	}
 
-	sd_info("node: %s is locking VDI: %"PRIx32, node_to_str(sender), vid);
+	sd_info("node: %s is locking VDI (type: %s): %"PRIx32,
+		node_to_str(sender),
+		req->vdi.type == LOCK_TYPE_NORMAL ? "normal" : "shared", vid);
 
 	if (!vdi_lock(vid, &sender->nid)) {
 		sd_err("locking %"PRIx32 "failed", vid);
