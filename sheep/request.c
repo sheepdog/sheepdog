@@ -697,8 +697,14 @@ main_fn void put_request(struct request *req)
 		eventfd_xwrite(req->local_req_efd, 1);
 	else {
 		if (ci->conn.dead) {
-			clear_client_info(ci);
+			/*
+			 * free_request should be called prior to
+			 * clear_client_info because refcnt of ci will
+			 * be decreased in free_request. Otherwise, ci
+			 * cannot be freed in clear_client_info.
+			 */
 			free_request(req);
+			clear_client_info(ci);
 		} else {
 			list_add_tail(&req->request_list, &ci->done_reqs);
 
@@ -915,7 +921,14 @@ static void client_handler(int fd, int events, void *data)
 
 	sd_debug("%x, %d", events, ci->conn.dead);
 
-	if (events & (EPOLLERR | EPOLLHUP) || ci->conn.dead)
+	if (events & (EPOLLERR | EPOLLHUP))
+		ci->conn.dead = true;
+	/*
+	 * Although dead is true, ci might not be freed immediately
+	 * because of refcnt. Never mind, we will complete it later
+	 * as long as dead is true.
+	 */
+	if (ci->conn.dead)
 		return clear_client_info(ci);
 
 	if (events & EPOLLIN) {
