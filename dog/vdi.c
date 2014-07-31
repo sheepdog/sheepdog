@@ -2755,12 +2755,38 @@ retry:
 	for (int i = 0; i < count; i++) {
 		struct vdi_tree *vdi;
 
-		if (vs[i].lock_state != LOCK_STATE_LOCKED)
+		if (vs[i].lock_state == LOCK_STATE_UNLOCKED)
 			continue;
 
 		vdi = find_vdi_from_root_by_vid(vs[i].vid);
-		printf("%s | %s\n", vdi->name,
-		       node_id_to_str(&vs[i].lock_owner));
+		if (vs[i].lock_state == LOCK_STATE_LOCKED) {
+			printf("%s | %s\n", vdi->name,
+			       node_id_to_str(&vs[i].lock_owner));
+		} else {	/* LOCK_STATE_SHARED */
+			printf("%s |", vdi->name);
+
+			for (int j = 0; j < vs[i].nr_participants; j++) {
+				printf(" %s",
+				       node_id_to_str(&vs[i].participants[j]));
+				switch(vs[i].participants_state[j]) {
+				case SHARED_LOCK_STATE_MODIFIED:
+					printf("(modified)");
+					break;
+				case SHARED_LOCK_STATE_SHARED:
+					printf("(shared)");
+					break;
+				case SHARED_LOCK_STATE_INVALIDATED:
+					printf("(invalidated)");
+					break;
+				default:
+					printf("(UNKNOWN %d, BUG!)",
+					       vs[i].participants_state[j]);
+					break;
+				}
+			}
+
+			printf("\n");
+		}
 	}
 
 out:

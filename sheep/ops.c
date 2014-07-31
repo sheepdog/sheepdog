@@ -1338,7 +1338,7 @@ static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
 
 	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
 		sd_debug("logging vdi unlock information for later replay");
-		log_vdi_op_lock(vid, &sender->nid);
+		log_vdi_op_lock(vid, &sender->nid, req->vdi.type);
 		return SD_RES_SUCCESS;
 	}
 
@@ -1346,7 +1346,7 @@ static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
 		node_to_str(sender),
 		req->vdi.type == LOCK_TYPE_NORMAL ? "normal" : "shared", vid);
 
-	if (!vdi_lock(vid, &sender->nid)) {
+	if (!vdi_lock(vid, &sender->nid, req->vdi.type)) {
 		sd_err("locking %"PRIx32 "failed", vid);
 		return SD_RES_VDI_NOT_LOCKED;
 	}
@@ -1362,13 +1362,14 @@ static int cluster_release_vdi_main(const struct sd_req *req,
 
 	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
 		sd_debug("logging vdi lock information for later replay");
-		log_vdi_op_unlock(vid, &sender->nid);
+		log_vdi_op_unlock(vid, &sender->nid, req->vdi.type);
 		return SD_RES_SUCCESS;
 	}
 
-	sd_info("node: %s is unlocking VDI: %"PRIx32, node_to_str(sender), vid);
+	sd_info("node: %s is unlocking VDI (type: %s): %"PRIx32, node_to_str(sender),
+		req->vdi.type == LOCK_TYPE_NORMAL ? "normal" : "shared", vid);
 
-	vdi_unlock(vid, &sender->nid);
+	vdi_unlock(vid, &sender->nid, req->vdi.type);
 
 	return SD_RES_SUCCESS;
 }

@@ -11,18 +11,22 @@
 
 #include "sheep_priv.h"
 
-struct vdi_lock_state {
-	enum lock_state state;
-	struct node_id owner;
-};
-
 struct vdi_state_entry {
 	uint32_t vid;
 	unsigned int nr_copies;
 	bool snapshot;
 	uint8_t copy_policy;
-	struct vdi_lock_state lock_state;
 	struct rb_node node;
+
+	enum lock_state lock_state;
+
+	/* used for normal locking */
+	struct node_id owner;
+
+	/* used for shared locking (iSCSI multipath) */
+	int nr_participants;
+	enum shared_lock_state participants_state[SD_MAX_COPIES];
+	struct node_id participants[SD_MAX_COPIES];
 };
 
 static struct rb_root vdi_state_root = RB_ROOT;
@@ -154,8 +158,8 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 	entry->snapshot = snapshot;
 	entry->copy_policy = cp;
 
-	entry->lock_state.state = LOCK_STATE_INIT;
-	memset(&entry->lock_state.owner, 0, sizeof(struct node_id));
+	entry->lock_state = LOCK_STATE_UNLOCKED;
+	memset(&entry->owner, 0, sizeof(struct node_id));
 
 	if (cp) {
 		int d;
@@ -200,8 +204,15 @@ int fill_vdi_state_list(const struct sd_req *hdr,
 		vs[last].nr_copies = entry->nr_copies;
 		vs[last].snapshot = entry->snapshot;
 		vs[last].copy_policy = entry->copy_policy;
-		vs[last].lock_state = entry->lock_state.state;
-		vs[last].lock_owner = entry->lock_state.owner;
+		vs[last].lock_state = entry->lock_state;
+		vs[last].lock_owner = entry->owner;
+		vs[last].nr_participants = entry->nr_participants;
+		for (int i = 0; i < vs[last].nr_participants; i++) {
+			vs[last].participants_state[i] =
+				entry->participants_state[i];
+			vs[last].participants[i] = entry->participants[i];
+		}
+
 		last++;
 	}
 	sd_rw_unlock(&vdi_state_lock);
@@ -234,8 +245,14 @@ static struct vdi_state *fill_vdi_state_list_with_alloc(int *result_nr)
 		vs[i].nr_copies = entry->nr_copies;
 		vs[i].snapshot = entry->snapshot;
 		vs[i].copy_policy = entry->copy_policy;
-		vs[i].lock_state = entry->lock_state.state;
-		vs[i].lock_owner = entry->lock_state.owner;
+		vs[i].lock_state = entry->lock_state;
+		vs[i].lock_owner = entry->owner;
+		vs[i].nr_participants = entry->nr_participants;
+		for (int j = 0; j < vs[i].nr_participants; j++) {
+			vs[i].participants_state[j] =
+				entry->participants_state[j];
+			vs[i].participants[j] = entry->participants[j];
+		}
 
 		assert(i < nr);
 		i++;
@@ -276,7 +293,134 @@ out:
 	return ret;
 }
 
-bool vdi_lock(uint32_t vid, const struct node_id *owner)
+static bool is_valid_shared_state(struct vdi_state_entry *entry)
+{
+	struct node_id *current_owner = NULL;	/* modified */
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		enum shared_lock_state state = entry->participants_state[i];
+
+		if (state == SHARED_LOCK_STATE_MODIFIED) {
+			if (current_owner) {
+				sd_err("invalid shared state, two (or more)"
+				       " nodes are owning VDI %"PRIx32":"
+				       " %s and %s", entry->vid,
+				       node_id_to_str(current_owner),
+				       node_id_to_str(&entry->participants[i]));
+
+				return false;
+			}
+
+			current_owner = &entry->participants[i];
+		}
+	}
+
+	return true;
+}
+
+static bool is_modified(struct vdi_state_entry *entry)
+{
+	if (!is_valid_shared_state(entry))
+		panic("invalid shared state");
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		if (SHARED_LOCK_STATE_MODIFIED == entry->participants_state[i])
+			return true;
+	}
+
+	return false;
+}
+
+static bool add_new_participant(struct vdi_state_entry *entry,
+				const struct node_id *owner)
+{
+	int idx;
+
+	if (entry->lock_state == LOCK_STATE_UNLOCKED) {
+		assert(!entry->nr_participants);
+
+		sd_debug("%s is first owner of %"PRIx32, node_id_to_str(owner),
+			entry->vid);
+
+		entry->nr_participants = 1;
+		memcpy(&entry->participants[0], owner, sizeof(*owner));
+		entry->participants_state[0] = SHARED_LOCK_STATE_MODIFIED;
+		entry->lock_state = LOCK_STATE_SHARED;
+
+		return true;
+	}
+
+	assert(entry->lock_state == LOCK_STATE_UNLOCKED);
+	assert(0 < entry->nr_participants);
+
+	if (entry->nr_participants == SD_MAX_COPIES) {
+		sd_err("VDI: %"PRIx32 " already has SD_MAX_COPIES participants",
+			entry->vid);
+		return false;
+	}
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		if (node_id_cmp(&entry->participants[i], owner))
+			continue;
+
+		/*
+		 * already exist, VDI locking with reloading inode causes
+		 * this case
+		 */
+		sd_debug("%s is already locking %"PRIx32, node_id_to_str(owner),
+			 entry->vid);
+		return true;
+	}
+
+	idx = entry->nr_participants++;
+	memcpy(&entry->participants[idx], owner, sizeof(*owner));
+	entry->participants_state[idx] =
+		is_modified(entry) ?
+		SHARED_LOCK_STATE_INVALIDATED : SHARED_LOCK_STATE_SHARED;
+
+	sd_debug("new participant %s (%d) joined to VID: %"PRIx32", state is %d",
+		 node_id_to_str(&entry->participants[idx]), idx, entry->vid,
+		 entry->participants_state[idx]);
+
+	return true;
+}
+
+static void del_participant(struct vdi_state_entry *entry,
+			    const struct node_id *owner)
+{
+	int idx = -1;
+
+	assert(0 < entry->nr_participants);
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		if (!node_id_cmp(&entry->participants[i], owner)) {
+			idx = i;
+			break;
+		}
+	}
+
+	if (idx == -1) {
+		sd_err("unknown participants: %s", node_id_to_str(owner));
+		return;
+	}
+
+	for (int i = idx; i < entry->nr_participants - 1; i++) {
+		memcpy(&entry->participants[i], &entry->participants[i + 1],
+		       sizeof(entry->participants[i]));
+		entry->participants_state[i] = entry->participants_state[i + 1];
+	}
+	entry->nr_participants--;
+
+	sd_debug("participant: %s is deleted, current participants are below:",
+		 node_id_to_str(owner));
+	for (int i = 0; i < entry->nr_participants; i++)
+		sd_debug("%d: %s", i, node_id_to_str(&entry->participants[i]));
+
+	if (!entry->nr_participants)
+		entry->lock_state = LOCK_STATE_UNLOCKED;
+}
+
+bool vdi_lock(uint32_t vid, const struct node_id *owner, int type)
 {
 	struct vdi_state_entry *entry;
 	bool ret = false;
@@ -289,21 +433,46 @@ bool vdi_lock(uint32_t vid, const struct node_id *owner)
 		goto out;
 	}
 
-	switch (entry->lock_state.state) {
-	case LOCK_STATE_INIT:
-	case LOCK_STATE_UNLOCKED:
-		entry->lock_state.state = LOCK_STATE_LOCKED;
-		memcpy(&entry->lock_state.owner, owner, sizeof(*owner));
-		sd_info("VDI %"PRIx32" is locked", vid);
-		ret = true;
+	if (type != LOCK_TYPE_NORMAL && type != LOCK_TYPE_SHARED) {
+		sd_crit("unknown type of locking: %d", type);
 		goto out;
-	case LOCK_STATE_LOCKED:
-		sd_info("VDI %"PRIx32" is already locked", vid);
-		break;
-	default:
-		sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
-			 vid, entry->lock_state.state);
-		break;
+	}
+
+	if (type == LOCK_TYPE_NORMAL) {
+		switch (entry->lock_state) {
+		case LOCK_STATE_UNLOCKED:
+			entry->lock_state = LOCK_STATE_LOCKED;
+			memcpy(&entry->owner, owner, sizeof(*owner));
+			sd_info("VDI %"PRIx32" is locked", vid);
+			ret = true;
+			goto out;
+		case LOCK_STATE_LOCKED:
+			sd_info("VDI %"PRIx32" is already locked", vid);
+			break;
+		case LOCK_STATE_SHARED:
+			sd_info("VDI %"PRIx32" is already locked as shared"
+				" mode", vid);
+			break;
+		default:
+			sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
+				 vid, entry->lock_state);
+			break;
+		}
+	} else {		/* LOCK_TYPE_SHARED */
+		switch (entry->lock_state) {
+		case LOCK_STATE_UNLOCKED:
+		case LOCK_STATE_SHARED:
+			ret = add_new_participant(entry, owner);
+			break;
+		case LOCK_STATE_LOCKED:
+			sd_info("VDI %"PRIx32" is already locked as normal"
+				" mode", vid);
+			break;
+		default:
+			sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
+				 vid, entry->lock_state);
+			break;
+		}
 	}
 
 out:
@@ -311,7 +480,7 @@ out:
 	return ret;
 }
 
-bool vdi_unlock(uint32_t vid, const struct node_id *owner)
+bool vdi_unlock(uint32_t vid, const struct node_id *owner, int type)
 {
 	struct vdi_state_entry *entry;
 	bool ret = false;
@@ -325,23 +494,40 @@ bool vdi_unlock(uint32_t vid, const struct node_id *owner)
 		goto out;
 	}
 
-	switch (entry->lock_state.state) {
-	case LOCK_STATE_INIT:
-	case LOCK_STATE_UNLOCKED:
-		sd_err("unlocking unlocked VDI: %"PRIx32, vid);
-		break;
-	case LOCK_STATE_LOCKED:
-		entry->lock_state.state = LOCK_STATE_UNLOCKED;
-		memset(&entry->lock_state.owner, 0,
-		       sizeof(entry->lock_state.owner));
-		ret = true;
-		break;
-	default:
-		sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
-			 vid, entry->lock_state.state);
-		break;
+	if (type == LOCK_TYPE_NORMAL) {
+		switch (entry->lock_state) {
+		case LOCK_STATE_UNLOCKED:
+			sd_err("unlocking unlocked VDI: %"PRIx32, vid);
+			break;
+		case LOCK_STATE_LOCKED:
+			entry->lock_state = LOCK_STATE_UNLOCKED;
+			memset(&entry->owner, 0, sizeof(entry->owner));
+			ret = true;
+			break;
+		default:
+			sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
+				 vid, entry->lock_state);
+			break;
+		}
+	} else {		/* LOCK_TYPE_SHARED */
+		switch (entry->lock_state) {
+		case LOCK_STATE_UNLOCKED:
+			sd_alert("leaving from unlocked VDI: %"PRIx32, vid);
+			break;
+		case LOCK_STATE_SHARED:
+			del_participant(entry, owner);
+			ret = true;
+			break;
+		case LOCK_STATE_LOCKED:
+			sd_alert("leaving from normally locked VDI %"PRIx32,
+				 vid);
+			break;
+		default:
+			sd_alert("lock state of VDI (%"PRIx32") is unknown: %d",
+				 vid, entry->lock_state);
+			break;
+		}
 	}
-
 out:
 	sd_rw_unlock(&vdi_state_lock);
 	return ret;
@@ -358,9 +544,35 @@ void apply_vdi_lock_state(struct vdi_state *vs)
 		goto out;
 	}
 
-	entry->lock_state.state = vs->lock_state;
-	memcpy(&entry->lock_state.owner, &vs->lock_owner,
-	       sizeof(vs->lock_owner));
+	entry->lock_state = vs->lock_state;
+	memcpy(&entry->owner, &vs->lock_owner, sizeof(vs->lock_owner));
+
+	entry->nr_participants = vs->nr_participants;
+	memcpy(entry->participants_state, vs->participants_state,
+	       sizeof(entry->participants_state[0]) * SD_MAX_COPIES);
+	memcpy(entry->participants, vs->participants,
+	       sizeof(entry->participants[0]) * SD_MAX_COPIES);
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
+}
+
+static void apply_vdi_lock_state_shared(uint32_t vid, bool lock,
+					struct node_id *locker)
+{
+	struct vdi_state_entry *entry;
+
+	sd_write_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	if (!entry) {
+		sd_err("no vdi state entry of %"PRIx32" found", vid);
+		goto out;
+	}
+
+	if (lock)
+		add_new_participant(entry, locker);
+	else
+		del_participant(entry, locker);
 
 out:
 	sd_rw_unlock(&vdi_state_lock);
@@ -370,30 +582,33 @@ static LIST_HEAD(logged_vdi_ops);
 
 struct vdi_op_log {
 	bool lock;
+	int type;
 	uint32_t vid;
 	struct node_id owner;
 
 	struct list_node list;
 };
 
-void log_vdi_op_lock(uint32_t vid, const struct node_id *owner)
+void log_vdi_op_lock(uint32_t vid, const struct node_id *owner, int type)
 {
 	struct vdi_op_log *op;
 
 	op = xzalloc(sizeof(*op));
 	op->lock = true;
+	op->type = type;
 	op->vid = vid;
 	memcpy(&op->owner, owner, sizeof(*owner));
 	INIT_LIST_NODE(&op->list);
 	list_add_tail(&op->list, &logged_vdi_ops);
 }
 
-void log_vdi_op_unlock(uint32_t vid, const struct node_id *owner)
+void log_vdi_op_unlock(uint32_t vid, const struct node_id *owner, int type)
 {
 	struct vdi_op_log *op;
 
 	op = xzalloc(sizeof(*op));
 	op->lock = false;
+	op->type = type;
 	op->vid = vid;
 	memcpy(&op->owner, owner, sizeof(*owner));
 	INIT_LIST_NODE(&op->list);
@@ -409,14 +624,22 @@ void play_logged_vdi_ops(void)
 
 		memset(&entry, 0, sizeof(entry));
 		entry.vid = op->vid;
-		memcpy(&entry.lock_owner, &op->owner,
-		       sizeof(op->owner));
-		if (op->lock)
-			entry.lock_state = LOCK_STATE_LOCKED;
-		else
-			entry.lock_state = LOCK_STATE_UNLOCKED;
 
-		apply_vdi_lock_state(&entry);
+		if (op->type == LOCK_TYPE_NORMAL) {
+			memcpy(&entry.lock_owner, &op->owner,
+			       sizeof(op->owner));
+			if (op->lock)
+				entry.lock_state = LOCK_STATE_LOCKED;
+			else
+				entry.lock_state = LOCK_STATE_UNLOCKED;
+
+			apply_vdi_lock_state(&entry);
+		} else {
+			assert(op->type == LOCK_TYPE_SHARED);
+
+			apply_vdi_lock_state_shared(op->vid,
+						    op->lock, &op->owner);
+		}
 	}
 }
 

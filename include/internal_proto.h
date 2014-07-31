@@ -336,9 +336,16 @@ struct trace_graph_item;
 
 /* VDI locking state, used by both of sheep and dog */
 enum lock_state {
-	LOCK_STATE_INIT,
+	LOCK_STATE_UNLOCKED = 1,
 	LOCK_STATE_LOCKED,
-	LOCK_STATE_UNLOCKED,
+	LOCK_STATE_SHARED,
+};
+
+enum shared_lock_state {
+	/* for iSCSI multipath, per node shared state */
+	SHARED_LOCK_STATE_MODIFIED = 1,
+	SHARED_LOCK_STATE_SHARED,
+	SHARED_LOCK_STATE_INVALIDATED,
 };
 
 struct vdi_state {
@@ -346,8 +353,22 @@ struct vdi_state {
 	uint8_t nr_copies;
 	uint8_t snapshot;
 	uint8_t copy_policy;
-	uint8_t lock_state;
+
+	uint32_t lock_state;
+
+	/* for normal locking */
 	struct node_id lock_owner;
+
+	/* for iSCSI multipath */
+	uint32_t nr_participants;
+	/*
+	 * XXX: participants should be able to have arbital length
+	 *
+	 * But if a number of tgtd can be equal to SD_MAX_COPIES, sheepdog can
+	 * tolerate enough hardware faults.
+	 */
+	uint32_t participants_state[SD_MAX_COPIES];
+	struct node_id participants[SD_MAX_COPIES];
 };
 
 #endif /* __INTERNAL_PROTO_H__ */
