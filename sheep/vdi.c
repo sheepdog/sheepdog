@@ -237,8 +237,8 @@ static struct vdi_state *fill_vdi_state_list_with_alloc(int *result_nr)
 		vs[i].lock_state = entry->lock_state.state;
 		vs[i].lock_owner = entry->lock_state.owner;
 
-		i++;
 		assert(i < nr);
+		i++;
 	}
 
 	sd_rw_unlock(&vdi_state_lock);
