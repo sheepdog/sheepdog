@@ -397,11 +397,13 @@ int set_cluster_shutdown(bool);
 int store_file_write(void *buffer, size_t len);
 void *store_file_read(void);
 
-int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len);
+int epoch_log_read(uint32_t epoch, struct sd_node *nodes,
+				int len, int *nr_nodes);
 int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
-				int len, time_t *timestamp);
-int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
-			  time_t *timestamp, struct vnode_info *vinfo);
+				int len, int *nr_nodes, time_t *timestamp);
+int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes,
+				int len, int *nr_nodes, time_t *timestamp,
+				struct vnode_info *vinfo);
 uint32_t get_latest_epoch(void);
 void init_config_path(const char *base_path);
 int init_config_file(void);

@@ -1093,47 +1093,63 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	const struct sd_vnode *vnode_buf[SD_MAX_COPIES];
-	struct epoch_log *logs;
+	struct epoch_log *logs, *log;
+	char *next_log;
 	int nr_logs, log_length;
+	uint32_t nodes_nr;
 
-	log_length = sd_epoch * sizeof(struct epoch_log);
+	nodes_nr = sd_nodes_nr;
+	log_length = sd_epoch * (sizeof(struct epoch_log)
+			+ nodes_nr * sizeof(struct sd_node));
 	logs = xmalloc(log_length);
 
+retry:
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
+	hdr.cluster.nodes_nr = nodes_nr;
 
 	ret = dog_exec_req(&sd_nid, &hdr, logs);
 	if (ret < 0)
 		goto error;
 
+	if (rsp->result == SD_RES_BUFFER_SMALL) {
+		nodes_nr *= 2;
+		log_length = sd_epoch * (sizeof(struct epoch_log)
+				+ nodes_nr * sizeof(struct sd_node));
+		logs = xrealloc(logs, log_length);
+		goto retry;
+	}
 	if (rsp->result != SD_RES_SUCCESS) {
 		printf("%s\n", sd_strerror(rsp->result));
 		goto error;
 	}
 
-	nr_logs = rsp->data_length / sizeof(struct epoch_log);
+	nr_logs = rsp->data_length / (sizeof(struct epoch_log)
+			+ nodes_nr * sizeof(struct sd_node));
+	next_log = (char *)logs;
 	for (i = nr_logs - 1; i >= 0; i--) {
 		struct rb_root vroot = RB_ROOT;
 		struct rb_root nroot = RB_ROOT;
 
+		log = (struct epoch_log *)next_log;
 		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
-		       oid, logs[i].epoch, nr_copies);
+		       oid, log->epoch, nr_copies);
 		printf("---------------------------------------------------\n");
 
 		/*
 		 * When # of nodes is less than nr_copies, we only print
 		 * remaining nodes that holds all the remaining copies.
 		 */
-		if (logs[i].nr_nodes < nr_copies) {
-			for (j = 0; j < logs[i].nr_nodes; j++) {
-				const struct node_id *n = &logs[i].nodes[j].nid;
+		if (log->nr_nodes < nr_copies) {
+			for (j = 0; j < log->nr_nodes; j++) {
+				const struct node_id *n = &log->nodes[j].nid;
 
 				printf("%s\n", addr_to_str(n->addr, n->port));
 			}
 			continue;
 		}
-		for (int k = 0; k < logs[i].nr_nodes; k++)
-			rb_insert(&nroot, &logs[i].nodes[k], rb, node_cmp);
+		for (int k = 0; k < log->nr_nodes; k++)
+			rb_insert(&nroot, &log->nodes[k], rb, node_cmp);
 		if (logs->flags & SD_CLUSTER_FLAG_DISKMODE)
 			disks_to_vnodes(&nroot, &vroot);
 		else
@@ -1145,6 +1161,8 @@ static int do_track_object(uint64_t oid, uint8_t nr_copies)
 			printf("%s\n", addr_to_str(n->addr, n->port));
 		}
 		rb_destroy(&vroot, struct sd_vnode, rb);
+		next_log = (char *)log->nodes
+				+ nodes_nr * sizeof(struct sd_node);
 	}
 
 	free(logs);

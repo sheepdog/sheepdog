@@ -141,14 +141,14 @@ static int cluster_format(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-static void print_nodes(const struct epoch_log *logs, int epoch)
+static void print_nodes(const struct epoch_log *logs, uint16_t flags)
 {
 	int i, nr_disk;
 	const struct sd_node *entry;
 
-	for (i = 0; i < logs[epoch].nr_nodes; i++) {
-		entry = logs[epoch].nodes + i;
-		if (logs->flags & SD_CLUSTER_FLAG_DISKMODE) {
+	for (i = 0; i < logs->nr_nodes; i++) {
+		entry = logs->nodes + i;
+		if (flags & SD_CLUSTER_FLAG_DISKMODE) {
 			for (nr_disk = 0; nr_disk < DISK_MAX; nr_disk++) {
 				if (entry->disks[nr_disk].disk_id == 0)
 					break;
@@ -169,21 +169,34 @@ static int cluster_info(int argc, char **argv)
 	int i, ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct epoch_log *logs;
+	struct epoch_log *logs, *log;
+	char *next_log;
 	int nr_logs, log_length;
 	time_t ti, ct;
 	struct tm tm;
 	char time_str[128];
+	uint32_t nodes_nr;
 
-	log_length = sd_epoch * sizeof(struct epoch_log);
+	nodes_nr = sd_nodes_nr;
+	log_length = sd_epoch * (sizeof(struct epoch_log)
+			+ nodes_nr * sizeof(struct sd_node));
 	logs = xmalloc(log_length);
 
+retry:
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
+	hdr.cluster.nodes_nr = nodes_nr;
 
 	ret = dog_exec_req(&sd_nid, &hdr, logs);
 	if (ret < 0)
 		goto error;
+	if (rsp->result == SD_RES_BUFFER_SMALL) {
+		nodes_nr *= 2;
+		log_length = sd_epoch * (sizeof(struct epoch_log)
+				+ nodes_nr * sizeof(struct sd_node));
+		logs = xrealloc(logs, log_length);
+		goto retry;
+	}
 
 	/* show cluster status */
 	if (!raw_output)
@@ -230,10 +243,12 @@ static int cluster_info(int argc, char **argv)
 		printf("Epoch Time           Version\n");
 	}
 
-	nr_logs = rsp->data_length / sizeof(struct epoch_log);
+	nr_logs = rsp->data_length / (sizeof(struct epoch_log)
+			+ nodes_nr * sizeof(struct sd_node));
+	next_log = (char *)logs;
 	for (i = 0; i < nr_logs; i++) {
-
-		ti = logs[i].time;
+		log = (struct epoch_log *)next_log;
+		ti = log->time;
 		if (raw_output) {
 			snprintf(time_str, sizeof(time_str), "%" PRIu64, (uint64_t) ti);
 		} else {
@@ -241,10 +256,12 @@ static int cluster_info(int argc, char **argv)
 			strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &tm);
 		}
 
-		printf(raw_output ? "%s %d" : "%s %6d", time_str, logs[i].epoch);
+		printf(raw_output ? "%s %d" : "%s %6d", time_str, log->epoch);
 		printf(" [");
-		print_nodes(logs, i);
+		print_nodes(log, logs->flags);
 		printf("]\n");
+		next_log = (char *)log->nodes
+				+ nodes_nr * sizeof(struct sd_node);
 	}
 
 	free(logs);

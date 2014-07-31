@@ -166,6 +166,7 @@ struct sd_req {
 			uint8_t		copy_policy;
 			uint16_t	flags;
 			uint32_t	tag;
+			uint32_t	nodes_nr;
 		} cluster;
 		struct {
 			uint32_t	old_vid;

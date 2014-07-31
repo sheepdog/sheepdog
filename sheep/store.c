@@ -51,9 +51,9 @@ int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 }
 
 static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
-			     time_t *timestamp)
+			     int *nr_nodes, time_t *timestamp)
 {
-	int fd, ret, nr_nodes, buf_len;
+	int fd, ret, buf_len;
 	char path[PATH_MAX];
 	struct stat epoch_stat;
 
@@ -72,9 +72,13 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 	}
 
 	buf_len = epoch_stat.st_size - sizeof(*timestamp);
-	if (buf_len < 0 || len < buf_len) {
+	if (buf_len < 0) {
 		sd_err("invalid epoch %"PRIu32" log", epoch);
 		goto err;
+	}
+	if (len < buf_len) {
+		close(fd);
+		return SD_RES_BUFFER_SMALL;
 	}
 
 	ret = xread(fd, nodes, buf_len);
@@ -89,7 +93,7 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 		goto err;
 	}
 
-	nr_nodes = ret / sizeof(struct sd_node);
+	*nr_nodes = ret / sizeof(struct sd_node);
 
 	if (timestamp) {
 		ret = xread(fd, timestamp, sizeof(*timestamp));
@@ -100,22 +104,23 @@ static int do_epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len,
 	}
 
 	close(fd);
-	return nr_nodes;
+	return SD_RES_SUCCESS;
 err:
 	if (fd >= 0)
 		close(fd);
-	return -1;
+	return SD_RES_NO_TAG;
 }
 
-int epoch_log_read(uint32_t epoch, struct sd_node *nodes, int len)
+int epoch_log_read(uint32_t epoch, struct sd_node *nodes,
+				int len, int *nr_nodes)
 {
-	return do_epoch_log_read(epoch, nodes, len, NULL);
+	return do_epoch_log_read(epoch, nodes, len, nr_nodes, NULL);
 }
 
 int epoch_log_read_with_timestamp(uint32_t epoch, struct sd_node *nodes,
-				int len, time_t *timestamp)
+				int len, int *nr_nodes, time_t *timestamp)
 {
-	return do_epoch_log_read(epoch, nodes, len, timestamp);
+	return do_epoch_log_read(epoch, nodes, len, nr_nodes, timestamp);
 }
 
 uint32_t get_latest_epoch(void)

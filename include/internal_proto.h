@@ -228,7 +228,7 @@ struct epoch_log {
 	uint8_t  __pad[3];
 	uint16_t flags;
 	char drv_name[STORE_LEN];
-	struct sd_node nodes[SD_MAX_NODES];
+	struct sd_node nodes[0];
 };
 
 struct vdi_op_message {

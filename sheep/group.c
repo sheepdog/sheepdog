@@ -160,13 +160,13 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 {
 	struct sd_node nodes[SD_MAX_NODES];
 	struct rb_root nroot = RB_ROOT;
-	int nr_nodes;
+	int nr_nodes = 0, ret;
 
-	nr_nodes = epoch_log_read(epoch, nodes, sizeof(nodes));
-	if (nr_nodes < 0) {
-		nr_nodes = epoch_log_read_remote(epoch, nodes, sizeof(nodes),
-						 NULL, cur_vinfo);
-		if (nr_nodes == 0)
+	ret = epoch_log_read(epoch, nodes, sizeof(nodes), &nr_nodes);
+	if (ret != SD_RES_SUCCESS) {
+		ret = epoch_log_read_remote(epoch, nodes, sizeof(nodes),
+						 &nr_nodes, NULL, cur_vinfo);
+		if (ret != SD_RES_SUCCESS)
 			return NULL;
 	}
 	for (int i = 0; i < nr_nodes; i++)
@@ -178,12 +178,12 @@ struct vnode_info *get_vnode_info_epoch(uint32_t epoch,
 int get_nodes_epoch(uint32_t epoch, struct vnode_info *cur_vinfo,
 		    struct sd_node *nodes, int len)
 {
-	int nr_nodes;
+	int nr_nodes = 0, ret;
 
-	nr_nodes = epoch_log_read(epoch, nodes, len);
-	if (nr_nodes < 0)
-		nr_nodes = epoch_log_read_remote(epoch, nodes, len,
-						 NULL, cur_vinfo);
+	ret = epoch_log_read(epoch, nodes, len, &nr_nodes);
+	if (ret != SD_RES_SUCCESS)
+		epoch_log_read_remote(epoch, nodes, len, &nr_nodes,
+				NULL, cur_vinfo);
 	return nr_nodes;
 }
 
@@ -350,16 +350,17 @@ error:
 }
 
 int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
-			  time_t *timestamp, struct vnode_info *vinfo)
+					  int *nr_nodes, time_t *timestamp,
+					  struct vnode_info *vinfo)
 {
-	char buf[SD_MAX_NODES * sizeof(struct sd_node) + sizeof(time_t)];
+	char *buf = xzalloc(len + sizeof(time_t));
 	const struct sd_node *node;
 	int ret;
 
 	rb_for_each_entry(node, &vinfo->nroot, rb) {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-		int nodes_len, nr_nodes;
+		int nodes_len;
 
 		if (node_is_local(node))
 			continue;
@@ -369,6 +370,10 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 		hdr.obj.tgt_epoch = epoch;
 		hdr.epoch = sys_epoch();
 		ret = sheep_exec_req(&node->nid, &hdr, buf);
+		if (ret == SD_RES_BUFFER_SMALL) {
+			free(buf);
+			return ret;
+		}
 		if (ret != SD_RES_SUCCESS)
 			continue;
 
@@ -376,18 +381,16 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes, int len,
 		memcpy((void *)nodes, buf, nodes_len);
 		if (timestamp)
 			memcpy(timestamp, buf + nodes_len, sizeof(*timestamp));
+		free(buf);
 
-		nr_nodes = nodes_len / sizeof(struct sd_node);
+		*nr_nodes = nodes_len / sizeof(struct sd_node);
 		/* epoch file is missing in local node, try to create one */
-		update_epoch_log(epoch, nodes, nr_nodes);
-		return nr_nodes;
+		update_epoch_log(epoch, nodes, *nr_nodes);
+		return SD_RES_SUCCESS;
 	}
 
-	/*
-	 * If no node has targeted epoch log, return 0 here to at least
-	 * allow reading older epoch logs.
-	 */
-	return 0;
+	free(buf);
+	return SD_RES_NO_TAG;
 }
 
 static bool cluster_ctime_check(const struct cluster_info *cinfo)
@@ -1201,7 +1204,7 @@ main_fn void sd_update_node_handler(struct sd_node *node)
 int create_cluster(int port, int64_t zone, int nr_vnodes,
 		   bool explicit_addr)
 {
-	int ret;
+	int nr_nodes = 0, ret;
 
 	if (!sys->cdrv) {
 		sys->cdrv = find_cdrv(DEFAULT_CLUSTER_DRIVER);
@@ -1236,11 +1239,11 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	sys->cinfo.epoch = get_latest_epoch();
 	if (sys->cinfo.epoch) {
-		sys->cinfo.nr_nodes = epoch_log_read(sys->cinfo.epoch,
-						     sys->cinfo.nodes,
-						     sizeof(sys->cinfo.nodes));
-		if (sys->cinfo.nr_nodes == -1)
+		ret = epoch_log_read(sys->cinfo.epoch, sys->cinfo.nodes,
+				sizeof(sys->cinfo.nodes), &nr_nodes);
+		if (ret != SD_RES_SUCCESS)
 			return -1;
+		sys->cinfo.nr_nodes = nr_nodes;
 	}
 	sys->cinfo.status = SD_STATUS_WAIT;
 

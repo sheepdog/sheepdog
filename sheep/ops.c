@@ -437,23 +437,27 @@ static int local_stat_cluster(struct request *req)
 {
 	struct sd_rsp *rsp = &req->rp;
 	struct epoch_log *elog;
+	char *next_elog;
 	int i, max_elogs;
 	uint32_t epoch;
+	uint32_t nodes_nr = req->rq.cluster.nodes_nr;
 
 	if (req->vinfo == NULL) {
 		sd_debug("cluster is not started up");
 		goto out;
 	}
 
-	max_elogs = req->rq.data_length / sizeof(*elog);
+	max_elogs = req->rq.data_length / (sizeof(*elog)
+			+ nodes_nr * sizeof(struct sd_node));
+	next_elog = (char *)req->data;
 	epoch = get_latest_epoch();
 	for (i = 0; i < max_elogs; i++) {
-		int nr_nodes;
+		int nr_nodes = 0, ret;
 
 		if (epoch <= 0)
 			break;
 
-		elog = (struct epoch_log *)req->data + i;
+		elog = (struct epoch_log *)next_elog;
 		memset(elog, 0, sizeof(*elog));
 
 		/* some filed only need to store in first elog */
@@ -468,20 +472,27 @@ static int local_stat_cluster(struct request *req)
 		}
 
 		elog->epoch = epoch;
-		nr_nodes = epoch_log_read_with_timestamp(epoch, elog->nodes,
-							 sizeof(elog->nodes),
-							 (time_t *)&elog->time);
-		if (nr_nodes == -1)
-			nr_nodes = epoch_log_read_remote(epoch, elog->nodes,
-							 sizeof(elog->nodes),
-							 (time_t *)&elog->time,
-							 req->vinfo);
-		assert(nr_nodes >= 0);
-		assert(nr_nodes <= SD_MAX_NODES);
-		elog->nr_nodes = nr_nodes;
+		if (nodes_nr > 0) {
+			ret = epoch_log_read_with_timestamp(
+					epoch, elog->nodes,
+					nodes_nr * sizeof(struct sd_node),
+					&nr_nodes, (time_t *)&elog->time);
+			if (ret == SD_RES_NO_TAG)
+				ret = epoch_log_read_remote(
+					epoch, elog->nodes,
+					nodes_nr * sizeof(struct sd_node),
+					&nr_nodes, (time_t *)&elog->time,
+					req->vinfo);
+			if (ret == SD_RES_BUFFER_SMALL)
+				return ret;
+			elog->nr_nodes = nr_nodes;
+		} else
+			elog->nr_nodes = 0;
 
-
-		rsp->data_length += sizeof(*elog);
+		next_elog = (char *)elog->nodes
+				+ nodes_nr * sizeof(struct sd_node);
+		rsp->data_length += sizeof(*elog)
+				+ nodes_nr * sizeof(struct sd_node);
 		epoch--;
 	}
 out:
@@ -508,17 +519,17 @@ static int local_get_obj_list(struct request *req)
 static int local_get_epoch(struct request *req)
 {
 	uint32_t epoch = req->rq.obj.tgt_epoch;
-	int nr_nodes, nodes_len;
+	int nr_nodes = 0, nodes_len, ret;
 	time_t timestamp;
 
 	sd_debug("%d", epoch);
 
-	nr_nodes =
+	ret =
 		epoch_log_read_with_timestamp(epoch, req->data,
 					req->rq.data_length - sizeof(timestamp),
-					&timestamp);
-	if (nr_nodes == -1)
-		return SD_RES_NO_TAG;
+					&nr_nodes, &timestamp);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
 
 	nodes_len = nr_nodes * sizeof(struct sd_node);
 	memcpy((void *)((char *)req->data + nodes_len), &timestamp,
