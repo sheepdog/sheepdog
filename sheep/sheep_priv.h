@@ -347,6 +347,11 @@ void free_vdi_state_snapshot(int epoch);
 void log_vdi_op_lock(uint32_t vid, const struct node_id *owner, int type);
 void log_vdi_op_unlock(uint32_t vid, const struct node_id *owner, int type);
 void play_logged_vdi_ops(void);
+bool is_refresh_required(uint32_t vid);
+void validate_myself(uint32_t vid);
+void invalidate_other_nodes(uint32_t vid);
+int inode_coherence_update(uint32_t vid, bool validate,
+			   const struct node_id *sender);
 
 extern int ec_max_data_strip;
 

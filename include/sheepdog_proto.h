@@ -84,6 +84,7 @@
 #define SD_RES_READONLY      0x1A /* Object is read-only */
 #define SD_RES_INCOMPLETE    0x1B /* Object (in kv) is incomplete uploading */
 #define SD_RES_COLLECTING_CINFO 0x1C /* sheep is collecting cluster wide status, not ready for operation */
+#define SD_RES_INODE_INVALIDATED 0x1D /* inode object in client is invalidated, refreshing is required */
 
 /* errors above 0x80 are sheepdog-internal */
 
@@ -194,6 +195,11 @@ struct sd_req {
 			uint32_t        get; /* 0 means free, 1 means get */
 			uint32_t        tgt_epoch;
 		} vdi_state_snapshot;
+		struct {
+			/* 1 means validate, 0 means invalidate */
+			uint32_t        vid;
+			uint32_t        validate;
+		} inode_coherence;
 
 
 		uint32_t		__pad[8];

@@ -643,6 +643,176 @@ void play_logged_vdi_ops(void)
 	}
 }
 
+worker_fn bool is_refresh_required(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+
+	sd_read_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	sd_rw_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		sd_alert("VID: %"PRIx32" doesn't exist", vid);
+		return false;
+	}
+
+	if (entry->snapshot)
+		return false;
+
+	if (entry->lock_state != LOCK_STATE_SHARED)
+		return false;
+
+	if (!is_modified(entry))
+		return false;
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
+			continue;
+
+		if (entry->participants_state[i] ==
+		    SHARED_LOCK_STATE_INVALIDATED)
+			return true;
+		else
+			return false;
+	}
+
+	sd_alert("this node isn't locking VID: %"PRIx32, vid);
+	return false;
+}
+
+worker_fn void validate_myself(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+	struct sd_req hdr;
+	int ret;
+
+	sd_read_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	sd_rw_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		sd_alert("VID: %"PRIx32" doesn't exist", vid);
+		return;
+	}
+
+	if (entry->snapshot)
+		return;
+
+	if (entry->lock_state != LOCK_STATE_SHARED)
+		return;
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
+			continue;
+
+		if (entry->participants_state[i] !=
+		    SHARED_LOCK_STATE_INVALIDATED)
+			return;
+		goto validate;
+	}
+
+	sd_alert("this node isn't locking VID: %"PRIx32, vid);
+	return;
+
+validate:
+	sd_init_req(&hdr, SD_OP_INODE_COHERENCE);
+	hdr.inode_coherence.vid = vid;
+	hdr.inode_coherence.validate = 1;
+	ret = sheep_exec_req(&sys->this_node.nid, &hdr, NULL);
+	if (ret == SD_RES_SUCCESS)
+		return;
+
+	sd_err("failed to validate VID: %"PRIx32" by %s",
+	       vid, node_id_to_str(&sys->this_node.nid));
+}
+
+worker_fn void invalidate_other_nodes(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+	struct sd_req hdr;
+	int ret;
+
+	sd_read_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	sd_rw_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		sd_alert("VID: %"PRIx32" doesn't exist", vid);
+		return;
+	}
+
+	if (entry->lock_state != LOCK_STATE_SHARED)
+		return;
+
+	for (int i = 0; i < entry->nr_participants; i++) {
+		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
+			continue;
+
+		if (entry->participants_state[i] !=
+		    SHARED_LOCK_STATE_MODIFIED)
+			goto invalidate;
+
+		/* already owned by myself */
+		return;
+	}
+
+	sd_alert("this node isn't locking VID: %"PRIx32, vid);
+	return;
+
+invalidate:
+	sd_init_req(&hdr, SD_OP_INODE_COHERENCE);
+	hdr.inode_coherence.vid = vid;
+	hdr.inode_coherence.validate = 0;
+	ret = sheep_exec_req(&sys->this_node.nid, &hdr, NULL);
+	if (ret == SD_RES_SUCCESS)
+		return;
+
+	sd_err("failed to validate VID: %"PRIx32" by %s",
+	       vid, node_id_to_str(&sys->this_node.nid));
+}
+
+main_fn int inode_coherence_update(uint32_t vid, bool validate,
+				   const struct node_id *sender)
+{
+	struct vdi_state_entry *entry;
+	bool invalidated = false;
+
+	sd_read_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	sd_rw_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		sd_alert("VID: %"PRIx32" doesn't exist", vid);
+		return SD_RES_NO_VDI;
+	}
+
+	assert(entry->lock_state == LOCK_STATE_SHARED);
+
+	if (validate) {
+		for (int i = 0; i < entry->nr_participants; i++)
+			entry->participants_state[i] = SHARED_LOCK_STATE_SHARED;
+	} else {
+		for (int i = 0; i < entry->nr_participants; i++) {
+			if (node_id_cmp(&entry->participants[i], sender))
+				entry->participants_state[i] =
+					SHARED_LOCK_STATE_INVALIDATED;
+			else {
+				entry->participants_state[i] =
+					SHARED_LOCK_STATE_MODIFIED;
+				invalidated = true;
+			}
+		}
+
+		if (!invalidated) {
+			sd_err("%s isn't participating in VID: %"PRIx32,
+			       node_id_to_str(sender), vid);
+			return SD_RES_NO_VDI;
+		}
+	}
+
+	return SD_RES_SUCCESS;
+}
+
 static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 				    uint32_t new_snapid, uint32_t new_vid,
 				    uint32_t *data_vdi_id,

@@ -616,14 +616,27 @@ static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 int gateway_read_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
+	int ret;
 
+	if (!is_vdi_obj(oid) && is_refresh_required(oid_to_vid(oid))) {
+		sd_debug("refresh is required: %"PRIx64, oid);
+		return SD_RES_INODE_INVALIDATED;
+	}
+
+	/* XXX: object cache and iSCSI multipath cannot coexist */
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
 	if (is_erasure_oid(oid))
-		return gateway_forward_request(req);
+		ret = gateway_forward_request(req);
 	else
-		return gateway_replication_read(req);
+		ret = gateway_replication_read(req);
+
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
+	validate_myself(oid_to_vid(oid));
+	return ret;
 }
 
 int gateway_write_obj(struct request *req)
@@ -633,6 +646,11 @@ int gateway_write_obj(struct request *req)
 	struct sd_req *hdr = &req->rq;
 	uint32_t *vids = NULL, *new_vids = req->data;
 	struct generation_reference *refs = NULL;
+
+	if (is_refresh_required(oid_to_vid(oid))) {
+		sd_debug("refresh is required: %"PRIx64, oid);
+		return SD_RES_INODE_INVALIDATED;
+	}
 
 	if (oid_is_readonly(oid))
 		return SD_RES_READONLY;
@@ -660,6 +678,8 @@ int gateway_write_obj(struct request *req)
 		update_obj_refcnt(hdr, vids, new_vids, refs);
 	}
 out:
+	invalidate_other_nodes(oid_to_vid(oid));
+
 	free(vids);
 	free(refs);
 	return ret;

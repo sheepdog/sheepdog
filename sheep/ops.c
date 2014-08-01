@@ -1401,6 +1401,18 @@ static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
+static int cluster_inode_coherence(const struct sd_req *req,
+				   struct sd_rsp *rsp, void *data,
+				   const struct sd_node *sender)
+{
+	sd_debug("inode coherence: %s %"PRIx32" from %s",
+		 req->inode_coherence.validate ? "validate" : "invalidate",
+		 req->inode_coherence.vid, node_to_str(sender));
+
+	return inode_coherence_update(req->inode_coherence.vid,
+			       !!req->inode_coherence.validate, &sender->nid);
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1538,6 +1550,12 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_CLUSTER,
 		.is_admin_op = true,
 		.process_main = cluster_alter_vdi_copy,
+	},
+
+	[SD_OP_INODE_COHERENCE] = {
+		.name = "INODE_COHERENCE",
+		.type = SD_OP_TYPE_CLUSTER,
+		.process_main = cluster_inode_coherence,
 	},
 
 	/* local operations */
