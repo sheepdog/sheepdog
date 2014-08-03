@@ -201,7 +201,7 @@ int nfs_init(const char *options)
 	sd_thread_t t;
 	int err;
 
-	err = sd_thread_create("nfs, "&t, nfsd, NULL);
+	err = sd_thread_create("nfs", &t, nfsd, NULL);
 	if (err) {
 		sd_err("%s", strerror(err));
 		return -1;
