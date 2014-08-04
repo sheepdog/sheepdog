@@ -352,6 +352,7 @@ void validate_myself(uint32_t vid);
 void invalidate_other_nodes(uint32_t vid);
 int inode_coherence_update(uint32_t vid, bool validate,
 			   const struct node_id *sender);
+void remove_node_from_participants(const struct node_id *left);
 
 extern int ec_max_data_strip;
 
