@@ -1527,7 +1527,7 @@ int kv_delete_object(const char *account, const char *bucket, const char *name,
 
 	ret = onode_delete(onode);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to delete bnode for %s", name);
+		sd_err("failed to delete onode for %s", name);
 		goto out;
 	}
 	ret = bnode_update(account, bucket, onode->size, false);
