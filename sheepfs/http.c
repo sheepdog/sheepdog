@@ -269,7 +269,7 @@ struct read_cache {
  * thread to lock same mutex twice; and a mutex with PTHREAD_MUTEX_RECURSIVE
  * could be locked twice without waiting which is not satisfied for our model;
  * pthread_cond_t may lose signal......so, after all, the best choice is
- * the sandard semaphore - 'sem_t'.
+ * the standard semaphore - 'sem_t'.
  *
  *
  *

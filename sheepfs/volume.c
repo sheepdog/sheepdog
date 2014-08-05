@@ -54,7 +54,7 @@ struct vdi_inode {
 #define SOCKET_POOL_SIZE  31
 /*
  * Socket pool is used for FUSE read threads, which use threads
- * to simulate aysnc read. All sockets point to the same gateway
+ * to simulate async read. All sockets point to the same gateway
  */
 	int socket_pool[SOCKET_POOL_SIZE];
 	uatomic_bool socket_in_use[SOCKET_POOL_SIZE];
@@ -137,7 +137,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 		assert(vdi);
 		vdi_id = sd_inode_get_vid(vdi->inode, idx);
 		if (!vdi_id) {
-			/* if object doesn't exist, we'er done */
+			/* if object doesn't exist, we're done */
 			if (rw == VOLUME_READ) {
 				memset(buf, 0, size);
 				goto done;
@@ -459,7 +459,7 @@ int volume_create_entry(const char *entry)
 		*ch = '\0';
 
 	snprintf(path, sizeof(path), "%s/%s", PATH_VOLUME, entry);
-	if (shadow_file_exsit(path))
+	if (shadow_file_exist(path))
 		return 0;
 
 	if (init_vdi_info(entry, &vid, &size) < 0)
@@ -519,7 +519,7 @@ int volume_remove_entry(const char *entry)
 		*ch = '\0';
 
 	snprintf(path, sizeof(path), "%s/%s", PATH_VOLUME, entry);
-	if (!shadow_file_exsit(path))
+	if (!shadow_file_exist(path))
 		return -1;
 
 	if (shadow_file_getxattr(path, SH_VID_NAME, &vid, SH_VID_SIZE) < 0)

@@ -144,7 +144,7 @@ int shadow_file_delete(const char *path)
 	return 0;
 }
 
-bool shadow_file_exsit(const char *path)
+bool shadow_file_exist(const char *path)
 {
 	char p[PATH_MAX];
 

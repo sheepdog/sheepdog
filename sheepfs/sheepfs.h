@@ -53,7 +53,7 @@ int shadow_file_setxattr(const char *path, const char *name,
 int shadow_file_getxattr(const char *path, const char *name,
 				void *value, size_t size);
 int shadow_file_delete(const char *path);
-bool shadow_file_exsit(const char *path);
+bool shadow_file_exist(const char *path);
 bool shadow_file_stat(const char *path, struct stat *st);
 
 /* volume.c */
