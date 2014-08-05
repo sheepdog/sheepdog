@@ -49,7 +49,7 @@ struct wq_info {
 	struct sd_mutex finished_lock;
 	struct sd_mutex startup_lock;
 
-	/* wokers sleep on this and signaled by work producer */
+	/* workers sleep on this and signaled by work producer */
 	struct sd_cond pending_cond;
 	/* locked by work producer and workers */
 	struct sd_mutex pending_lock;
@@ -100,7 +100,7 @@ void suspend_worker_threads(void)
 	/*
 	 * Wait for all the worker thread to suspend.  We cannot use
 	 * wi->nr_threads here because some thread may have not called set_bit()
-	 * yet (then, the thread doesn't recieve SIGUSR2).
+	 * yet (then, the thread doesn't receive SIGUSR2).
 	 */
 	FOR_EACH_BIT(tid, tid_map, tid_max) {
 		eventfd_xread(ack_efd);

@@ -686,7 +686,7 @@ int log_init(const char *program_name, enum log_dst_type type, int level,
 		/*
 		 * Store the pid of the sheep process for use by the death
 		 * signal handler.  By the time the child is notified of
-		 * the parents death the parent has been reparanted to init
+		 * the parents death the parent has been reparented to init
 		 * and getppid() will always return 1.
 		 */
 		sheep_pid = getpid();

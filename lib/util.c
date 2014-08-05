@@ -1,5 +1,5 @@
 /*
- * Taken and modfied from git by Liu Yuan <namei.unix@gmail.com>
+ * Taken and modified from git by Liu Yuan <namei.unix@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -468,7 +468,7 @@ void reraise_crash_signal(int signo, int status)
 			  signo, strsignal(signo));
 	else
 		sd_emerg("default handler for the re-raised "
-			  "signal %d (%s) didn't work expectedly", signo,
+			  "signal %d (%s) didn't work as expected", signo,
 			  strsignal(signo));
 
 	exit(status);
@@ -508,9 +508,9 @@ const char *my_exe_path(void)
 }
 
 /*
- * Split the given path and sets the splitted parts to 'segs'.
+ * Split the given path and sets the split parts to 'segs'.
  *
- * This returns the number of splitted segments.
+ * This returns the number of split segments.
  *
  * For example:
  *   split_path("/a/b/c", 3, segs);
@@ -748,7 +748,7 @@ void list_sort(void *priv, struct list_head *head,
 /*
  * Find zero blocks from the beginning and end of buffer
  *
- * The caller passes the offset of 'buf' with 'poffset' so that this funciton
+ * The caller passes the offset of 'buf' with 'poffset' so that this function
  * can align the return values to BLOCK_SIZE.  'plen' points the length of the
  * buffer.  If there are zero blocks at the beginning of the buffer, this
  * function increases the offset and decreases the length on condition that

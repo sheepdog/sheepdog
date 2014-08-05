@@ -332,7 +332,7 @@ found_piv:
 		pivot_row = &src[icol * d];
 		c = pivot_row[icol];
 		assert(c != 0);
-		if (c != 1) {   /* otherwhise this is a NOP */
+		if (c != 1) {   /* otherwise this is a NOP */
 			/*
 			 * this is done often , but optimizing is not so
 			 * fruitful, at least in the obvious ways (unrolling)

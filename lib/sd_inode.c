@@ -28,7 +28,7 @@
  *  R: root index node
  *  I: Indirect index node
  *  D: data node that hold user data
- *                                                             Detph:
+ *                                                             Depth:
  *     +------------------+-----------+-----------+--------+
  *  R: | sd_index_header  | sd_index | sd_index   | ...... |    1
  *     +------------------+-----------+-----------+--------+
@@ -38,7 +38,7 @@
  *                          +-------+    +-------+
  *
  * After adding more oid into it, the leaf-node will be full of struct sd_index
- * and should be splited to two leaf-nodes, after it, the inode->data_vdi_id[]
+ * and should be split to two leaf-nodes, after it, the inode->data_vdi_id[]
  * should become root-node which store sd_indirect_idx and point to the two
  * leaf-nodes:
  *

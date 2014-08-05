@@ -13,7 +13,7 @@
 
 /*
  * The sockfd cache provides us long TCP connections connected to the nodes
- * in the cluster to accerlater the data transfer, which has the following
+ * in the cluster to accelerator the data transfer, which has the following
  * characteristics:
  *    0 dynamically allocated/deallocated at node granularity.
  *    1 cached fds are multiplexed by all threads.
@@ -49,7 +49,7 @@ static struct sockfd_cache sockfd_cache = {
 /*
  * Suppose request size from Guest is 512k, then 4M / 512k = 8, so at
  * most 8 requests can be issued to the same sheep object. Based on this
- * assumption, '8' would be effecient for servers that only host 2~4
+ * assumption, '8' would be efficient for servers that only host 2~4
  * Guests.
  *
  * This fd count will be dynamically grown when the idx reaches watermark which
@@ -321,7 +321,7 @@ grab:
 	entry = sockfd_cache_grab(nid, &idx);
 	if (!entry) {
 		/*
-		 * The node is deleted, but someone askes us to grab it.
+		 * The node is deleted, but someone asks us to grab it.
 		 * The nid is not in the sockfd cache but probably it might be
 		 * still alive due to broken network connection or was just too
 		 * busy to serve any request that makes other nodes deleted it
@@ -478,7 +478,7 @@ void sockfd_cache_del_node(const struct node_id *nid)
 /*
  * Delete a sockfd connected to the node.
  *
- * If it is a long FD, de-refcount it and tres to destroy all the cached FDs of
+ * If it is a long FD, de-refcount it and try to destroy all the cached FDs of
  * this node in the cache.
  * If it is a short FD, just close it.
  */
