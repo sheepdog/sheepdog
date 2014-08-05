@@ -138,7 +138,7 @@ static int node_recovery_progress(void)
 	 *    required.
 	 *
 	 * 2. Print remaining physical time.
-	 *    Even if it is not so acculate, the information is helpful for
+	 *    Even if it is not so accurate, the information is helpful for
 	 *    administrators.
 	 */
 
@@ -388,7 +388,7 @@ static int node_md_info(struct node_id *nid)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("failed to get multi-disk infomation: %s",
+		sd_err("failed to get multi-disk information: %s",
 		       sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}

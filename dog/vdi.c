@@ -861,7 +861,7 @@ static int vdi_rollback(int argc, char **argv)
 		return ret;
 
 	if (!vdi_cmd_data.force)
-		confirm("This operation dicards any changes made since the"
+		confirm("This operation discards any changes made since the"
 			" previous\nsnapshot was taken.  Continue? [yes/no]: ");
 
 	ret = do_vdi_delete(vdiname, 0, NULL);
@@ -2444,7 +2444,7 @@ static int vdi_cache_info(int argc, char **argv)
 		return EXIT_SYSFAIL;
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("failed to get cache infomation: %s",
+		sd_err("failed to get cache information: %s",
 		       sd_strerror(rsp->result));
 		return EXIT_FAILURE;
 	}
@@ -2513,13 +2513,13 @@ static int vdi_object_dump_inode(int argc, char **argv)
 
 	fd = open(argv[optind], O_RDONLY);
 	if (fd < 0) {
-		sd_err("fialed to open inode object file: %m");
+		sd_err("failed to open inode object file: %m");
 		return EXIT_FAILURE;
 	}
 
 	ret = xread(fd, inode, sizeof(*inode));
 	if (ret != sizeof(*inode)) {
-		sd_err("fialed to read inode object file: %m");
+		sd_err("failed to read inode object file: %m");
 		close(fd);
 		return EXIT_FAILURE;
 	}

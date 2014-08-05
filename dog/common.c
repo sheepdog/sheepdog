@@ -301,7 +301,7 @@ static int get_screen_width(void)
 }
 
 /*
- * Show prograss bar as follows.
+ * Show progress bar as follows.
  *
  *  45.0 % [===============>                  ] 180 MB / 400 MB
  */
