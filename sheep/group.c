@@ -434,8 +434,8 @@ static bool enough_nodes_gathered(struct cluster_info *cinfo,
 }
 
 /*
- * We have to use memcpy beause some cluster drivers like corosync can't support
- * to send the whole cluster_info structure.
+ * We have to use memcpy because some cluster drivers like corosync can't
+ * support to send the whole cluster_info structure.
  */
 static void cluster_info_copy(struct cluster_info *dst,
 			      const struct cluster_info *src)
@@ -1073,9 +1073,9 @@ static bool cluster_join_check(const struct cluster_info *cinfo)
 	/*
 	 * Sheepdog's recovery code assumes every node have the same epoch
 	 * history. But we don't check epoch history of joining node because:
-	 * 1. inconsist epoch history only happens in the network partition case
-	 *    for the corosync driver, but corosync driver will panic for such
-	 *    case to prevent epoch inconsistency.
+	 * 1. inconsistent epoch history only happens in the network partition
+	 *    case for the corosync driver, but corosync driver will panic for
+	 *    such case to prevent epoch inconsistency.
 	 * 2. checking epoch history with joining node is too expensive and is
 	 *    unneeded for zookeeper driver.
 	 *

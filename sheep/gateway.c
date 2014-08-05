@@ -102,7 +102,7 @@ out:
 
 /*
  * We spread data strips of req along with its parity strips onto replica for
- * write opertaion. For read we only need to prepare data strip buffers.
+ * write operation. For read we only need to prepare data strip buffers.
  */
 static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 {
@@ -392,7 +392,7 @@ again:
 		}
 
 		nr_sent = fi->nr_sent;
-		/* XXX Blinedly close all the connections */
+		/* XXX Blindly close all the connections */
 		for (i = 0; i < nr_sent; i++)
 			sockfd_cache_del(fi->ent[i].nid, fi->ent[i].sfd);
 
@@ -656,7 +656,7 @@ int gateway_write_obj(struct request *req)
 		goto out;
 
 	if (is_data_vid_update(hdr)) {
-		sd_debug("udpate reference counts, %" PRIx64, hdr->obj.oid);
+		sd_debug("update reference counts, %" PRIx64, hdr->obj.oid);
 		update_obj_refcnt(hdr, vids, new_vids, refs);
 	}
 out:

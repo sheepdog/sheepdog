@@ -32,7 +32,7 @@ struct recovery_list_work {
 	uint64_t *oids;
 };
 
-/* for recoverying objects */
+/* for recovering objects */
 struct recovery_obj_work {
 	struct recovery_work base;
 
@@ -609,7 +609,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 
 	cur = rinfo->cur_vinfo;
 	if (sd_store->exist(oid, local_ec_index(cur, oid))) {
-		sd_debug("the object %" PRIx64 " is already recoverd", oid);
+		sd_debug("the object %" PRIx64 " is already recovered", oid);
 		return false;
 	}
 
@@ -659,7 +659,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		sd_debug("%"PRIx64" is not in the recovery list", oid);
 		return false;
 	case RW_NOTIFY_COMPLETION:
-		sd_debug("the object %" PRIx64 " is already recoverd", oid);
+		sd_debug("the object %" PRIx64 " is already recovered", oid);
 		return false;
 	}
 
@@ -719,7 +719,7 @@ static inline bool run_next_rw(void)
 
 	nrinfo = uatomic_xchg_ptr(&next_rinfo, NULL);
 	/*
-	 * When md recovery supersed the reweight or node recovery, we need to
+	 * When md recovery supersedes the reweight or node recovery, we need to
 	 * notify completion.
 	 */
 	if (!nrinfo->notify_complete && cur->notify_complete)
@@ -936,7 +936,7 @@ static void finish_object_list(struct work *work)
 	 *    chances to be blocked for write and also improve reliability.
 	 * 3. For disk failure in node, this is similar to adding a node. All
 	 *    the data on the broken disk will be recovered on other disks in
-	 *    this node. Speedy recoery not only improve data reliability but
+	 *    this node. Speedy recovery not only improve data reliability but
 	 *    also cause less writing blocking on the lost data.
 	 *
 	 * We choose md_nr_disks() * 2 threads for recovery, no rationale.
@@ -1122,7 +1122,7 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 		sd_debug("recovery skipped");
 
 		/*
-		 * This is necesary to invoke run_next_rw when
+		 * This is necessary to invoke run_next_rw when
 		 * recovery work is suspended.
 		 */
 		resume_suspended_recovery();
@@ -1163,7 +1163,7 @@ static void queue_recovery_work(struct recovery_info *rinfo)
 		rw->work.done = notify_recovery_completion_main;
 		break;
 	default:
-		panic("unknow recovery state %d", rinfo->state);
+		panic("unknown recovery state %d", rinfo->state);
 		break;
 	}
 
