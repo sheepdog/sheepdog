@@ -377,7 +377,7 @@ out:
  * We should inform the user the deletion failure if bnode_update() fails even
  * though we might delete the onode successfully. Then subsequent 'delete' for
  * the same object won't skew up the bnode metadata.
- * The true fix for the inconsistency (for whatever reaons it happens), is a
+ * The true fix for the inconsistency (for whatever reason it happens), is a
  * check request that does a server side consistency check. This is left for a
  * future patch.
  *
@@ -564,7 +564,7 @@ int kv_update_bucket(const char *account, const char *bucket)
 	return -1;
 }
 
-/* return SD_RES_NO_VDI if bucket is not existss */
+/* return SD_RES_NO_VDI if bucket is not existed */
 int kv_delete_bucket(const char *account, const char *bucket)
 {
 	uint32_t account_vid, vid;
@@ -679,7 +679,7 @@ static int onode_allocate_extents(struct kv_onode *onode,
 	int ret = SD_RES_SUCCESS;
 	uint32_t data_vid = onode->data_vid, idx = onode->nr_extent;
 
-	/* if the previous o_extent[] has some extra sapce, use it */
+	/* if the previous o_extent[] has some extra space, use it */
 	if (idx) {
 		reserv_len = onode->o_extent[idx - 1].count * SD_DATA_OBJ_SIZE -
 			     onode->o_extent[idx - 1].data_len;
@@ -1145,7 +1145,7 @@ static int onode_read_data(struct kv_onode *onode, struct http_request *req)
  *    exists or not by checking adjacent objects
  * 2. discard data
  *
- * If (1) success, we consdier it a successful deletion of user object. If (2)
+ * If (1) success, we consider it a successful deletion of user object. If (2)
  * fails, data objects become orphan(s).
  *
  * XXX: GC the orphans
@@ -1352,7 +1352,7 @@ out:
  * onode is a index node that maps name to sheepdog objects which hold the user
  * data, similar to UNIX inode. We use simple hashing for [name, onode] mapping.
  *
- * At before, the implemention of swift interface for creating object in
+ * At before, the implementation of swift interface for creating object in
  * sheepdog is:
  *     1. lock container
  *     2. check whether the onode with same object name is exists.
@@ -1417,7 +1417,7 @@ out:
  * in the http PUT request header, we append the new data at the tail of the
  * existing object instead of a 'delete-then-create' semantic.
  * When we append objects, we mark them as ONODE_INIT. When all the append
- * operations are done, we specify 'FLAG: eof' in the PUT request hearder to
+ * operations are done, we specify 'FLAG: eof' in the PUT request header to
  * finalize the whole transaction, which mark the
  * objects as ONODE_COMPLETE.
  */
@@ -1490,7 +1490,7 @@ out:
  *    only allocate meta-data in oalloc and is creating SD_OBJ_DATA files.
  * 2. Client B send a DELETE request to remove object 'elephant', it
  *    will remove all the backend files for 'elephant'.
- *    At the same time, Client A dosen't know what happend because uploading
+ *    At the same time, Client A doesn't know what happened because uploading
  *    progress don't need to lock any vdi.
  * 3. Client A return Create-object-success, but the real data have all been
  *    removed.

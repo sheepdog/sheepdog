@@ -28,7 +28,7 @@
  * |<--           4M             -->|
  *
  * Best-fit algorithm for allocation and merge and sort the free list at
- * deallocation. One simple sorted list is effecient enough for extent based
+ * deallocation. One simple sorted list is efficient enough for extent based
  * invariable user object.
  *
  * XXX: Add allocation group for scalability and solve the meta size limitation
@@ -104,7 +104,7 @@ out:
 }
 
 /*
- * Allocate the objects and upate the free list.
+ * Allocate the objects and update the free list.
  *
  * Callers are expected to call oalloc_new_finish() to update the inode bitmap
  * after filling up the data.
@@ -251,7 +251,7 @@ static inline int update_and_merge_free_desc(char *meta, uint64_t start,
 }
 
 /*
- * Discard the allocted objects and update the free list of the allocator
+ * Discard the allocated objects and update the free list of the allocator
  *
  * Caller should check the return value since it might fail.
  *
@@ -306,7 +306,7 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 		hdr.obj.oid = vid_to_data_oid(vid, start + i);
 		res = exec_local_req(&hdr, NULL);
 		/*
-		 * return the error code if it doesnot
+		 * return the error code if it does not
 		 * success or can't find obj.
 		 */
 		if (res != SD_RES_SUCCESS && res != SD_RES_NO_OBJ)
