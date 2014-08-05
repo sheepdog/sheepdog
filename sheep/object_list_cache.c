@@ -105,7 +105,7 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
 		goto out;
 
-	/* if that fails grab a write lock for the usually nessecary update */
+	/* if that fails grab a write lock for the usually necessary update */
 	sd_rw_unlock(&obj_list_cache.lock);
 	sd_write_lock(&obj_list_cache.lock);
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
@@ -143,7 +143,7 @@ static void objlist_deletion_work(struct work *work)
 	 * Before reclaiming the cache belonging to the VDI just deleted,
 	 * we should test whether the VDI is exist, because after some node
 	 * deleting it and before the notification is sent to all the node,
-	 * another node may issus a VDI creation event and reused the VDI id
+	 * another node may issue a VDI creation event and reused the VDI id
 	 * again, in which case we should not reclaim the cached entry.
 	 */
 	if (vdi_exist(vid)) {

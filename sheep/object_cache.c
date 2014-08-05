@@ -19,7 +19,7 @@
  *  0 - 31 (32 bits): data object space
  *  32 - 51 (20 bits): reserved
  *  52 - 59 (8 bits): object flag space
- *  60 - 63 (4 bits): object type indentifier space
+ *  60 - 63 (4 bits): object type identifier space
  */
 #define CACHE_VDI_SHIFT       63 /* if the entry is identified as VDI object */
 #define CACHE_CREATE_SHIFT    59 /* If the entry should be created at backend */
@@ -36,7 +36,7 @@
 
 struct global_cache {
 	uint32_t capacity; /* The real capacity of object cache of this node */
-	uatomic_bool in_reclaim; /* If the relcaimer is working */
+	uatomic_bool in_reclaim; /* If the reclaimer is working */
 };
 
 struct object_cache_entry {
@@ -887,7 +887,7 @@ static void push_object_done(struct work *work)
  *
  * 1. Don't grab cache lock tight so we can serve RW requests while pushing.
  *    It is okay for allow subsequent RW after FLUSH because we only need to
- *    garantee the dirty objects before FLUSH to be pushed.
+ *    grantee the dirty objects before FLUSH to be pushed.
  * 2. Use threaded AIO to boost push performance, such as fsync(2) from VM.
  */
 static int object_cache_push(struct object_cache *oc)
@@ -944,7 +944,7 @@ void object_cache_delete(uint32_t vid)
 	if (!cache)
 		return;
 
-	/* Firstly we free memeory */
+	/* Firstly we free memory */
 	sd_write_lock(&hashtable_lock[h]);
 	hlist_del(&cache->hash);
 	sd_rw_unlock(&hashtable_lock[h]);
@@ -1067,7 +1067,7 @@ bool bypass_object_cache(const struct request *req)
 			object_cache_flush_and_delete(cache);
 			return true;
 		} else  {
-			/* For read requet, we can read cache if any */
+			/* For read request, we can read cache if any */
 			uint64_t idx = object_cache_oid_to_idx(oid);
 
 			if (object_cache_lookup(cache, idx, false, false) == 0)
@@ -1245,8 +1245,8 @@ static int load_cache_object(struct object_cache *cache)
 
 		/*
 		 * We don't know VM's cache type after restarting, so we assume
-		 * that it is writeback and mark all the objects diry to avoid
-		 * false reclaim. Donot try to reclaim at loading phase becaue
+		 * that it is writeback and mark all the objects dirty to avoid
+		 * false reclaim. Don't try to reclaim at loading phase because
 		 * cluster isn't fully working.
 		 */
 		add_to_lru_cache(cache, idx, true);
@@ -1309,7 +1309,7 @@ int object_cache_remove(uint64_t oid)
 	/*
 	 * We assume no other thread will inc the refcount of this entry
 	 * before we call write_lock_cache(). object_cache_remove() is called
-	 * in the DISCARD context, which means nornamly no other read/write
+	 * in the DISCARD context, which means normally no other read/write
 	 * requests.
 	 */
 	assert(refcount_read(&entry->refcnt) == 1);
