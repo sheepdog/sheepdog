@@ -348,7 +348,7 @@ out:
 	return ret;
 }
 
-/* Initilize all the global pathnames used internally */
+/* Initialize all the global pathnames used internally */
 int init_global_pathnames(const char *d, char *argp)
 {
 	int ret;

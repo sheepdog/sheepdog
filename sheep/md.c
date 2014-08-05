@@ -261,7 +261,7 @@ out:
 }
 
 /*
- * If path is broken during initilization or not support xattr return 0. We can
+ * If path is broken during initialization or not support xattr return 0. We can
  * safely use 0 to represent failure case  because 0 space path can be
  * considered as broken path.
  */
@@ -664,7 +664,7 @@ static int md_check_and_move(uint64_t oid, uint32_t epoch, uint8_t ec_index,
 	if (!strcmp(old, new))
 		return SD_RES_SUCCESS;
 
-	/* We can't use rename(2) accross device */
+	/* We can't use rename(2) across device */
 	if (md_move_object(oid, old, new) < 0) {
 		sd_err("move old %s to new %s failed", old, new);
 		return SD_RES_EIO;

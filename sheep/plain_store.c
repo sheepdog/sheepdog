@@ -364,7 +364,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	ret = default_read_from_path(oid, path, iocb);
 
 	/*
-	 * If the request is againt the older epoch, try to read from
+	 * If the request is against the older epoch, try to read from
 	 * the stale directory
 	 */
 	if (ret == SD_RES_NO_OBJ && iocb->epoch > 0 &&
@@ -511,9 +511,9 @@ out:
  * For replicated object, if any of the replica belongs to this node, we
  * consider it not stale.
  *
- * For erasured object, since every copy is unique and if it migrates to other
- * node(index gets changed even it has some other copy belongs to it) because
- * of hash ring changes, we consider it stale.
+ * For erasure coded object, since every copy is unique and if it migrates to
+ * other node(index gets changed even it has some other copy belongs to it)
+ * because of hash ring changes, we consider it stale.
  */
 static bool oid_stale(uint64_t oid, int ec_index, struct vnode_info *vinfo)
 {

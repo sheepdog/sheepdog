@@ -775,7 +775,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 				 */
 				info->snapid = inode->snap_id + 1;
 				if (vdi_is_snapshot(inode))
-					/* Current workding VDI is deleted */
+					/* Current working VDI is deleted */
 					break;
 			}
 			info->create_time = inode->create_time;
