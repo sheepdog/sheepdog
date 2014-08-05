@@ -366,9 +366,9 @@ static void __corosync_dispatch(void)
 	if (poll(&pfd, 1, 0)) {
 		/*
 		 * Corosync dispatches leave events one by one even
-		 * when network partition has occured.  To count the
+		 * when network partition has occurred.  To count the
 		 * number of alive nodes correctly, we postpone
-		 * processsing events if there are incoming ones.
+		 * processing events if there are incoming ones.
 		 */
 		sd_debug("wait for a next dispatch event");
 		return;

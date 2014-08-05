@@ -1260,10 +1260,10 @@ static void zk_event_handler(int listen_fd, int events, void *data)
 	}
 kick_block_event:
 	/*
-	 * Kick block event only if there is no nonblock event. We perfer to
-	 * handle nonblock event becasue:
+	 * Kick block event only if there is no nonblock event. We prefer to
+	 * handle nonblock event because:
 	 *
-	 * 1. Sheep assuems that unblock() and notify() is a transaction, so we
+	 * 1. Sheep assumes that unblock() and notify() is a transaction, so we
 	 *    can only kick next block event after sd_notify_handler() is called
 	 * 2. We should process leave/join event as soon as possible.
 	 */
@@ -1312,7 +1312,7 @@ create_seq_node:
 			 * We don't need to check the return code of
 			 * zk_init_node() because the routine must stay in loop
 			 * if it doesn't take the lock, no matter what kind of
-			 * error happed.
+			 * error happened.
 			 */
 			continue;
 		}
@@ -1369,7 +1369,7 @@ static int zk_init(const char *option)
 	hosts = strtok((char *)option, "=");
 	if ((to = strtok(NULL, "="))) {
 		if (sscanf(to, "%u", &zk_timeout) != 1) {
-			sd_err("Invalid paramter for timeout");
+			sd_err("Invalid parameter for timeout");
 			return -1;
 		}
 		p = strstr(hosts, "timeout");

@@ -57,7 +57,7 @@ struct cluster_driver {
 	 * sd_join_handler() and sd_accept_handler().
 	 *
 	 * sd_join_handler() must be called on at least one node which already
-	 * paticipates in the cluster.  If the content of 'opaque' is changed in
+	 * participates in the cluster. If the content of 'opaque' is changed in
 	 * sd_join_handler(), the updated 'opaque' must be passed to
 	 * sd_accept_handler().
 	 *
