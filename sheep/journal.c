@@ -38,7 +38,7 @@ struct journal_descriptor {
 	uint8_t pad[475];
 } __packed;
 
-/* JOURNAL_DESC + JOURNAL_MARKER must be 512 algined for DIO */
+/* JOURNAL_DESC + JOURNAL_MARKER must be 512 aligned for DIO */
 #define JOURNAL_DESC_MAGIC 0xfee1900d
 #define JOURNAL_DESC_SIZE 508
 #define JOURNAL_MARKER_SIZE 4 /* Use marker to detect partial write */
@@ -245,7 +245,7 @@ skip:
  * We recover the journal file in order of wall time in the corner case that
  * sheep crashes while in the middle of journal committing. For most of cases,
  * we actually only recover one jfile, the other would be empty. This process
- * is fast with buffered IO that only take several secends at most.
+ * is fast with buffered IO that only take several seconds at most.
  */
 static int check_recover_journal_file(const char *p)
 {
@@ -259,11 +259,11 @@ static int check_recover_journal_file(const char *p)
 		return 0;
 
 	if (do_recover(old) < 0) {
-		sd_emerg("recoverying from journal file (old) failed");
+		sd_emerg("recovering from journal file (old) failed");
 		return -1;
 	}
 	if (do_recover(new) < 0) {
-		sd_emerg("recoverying from journal file (new) failed");
+		sd_emerg("recovering from journal file (new) failed");
 		return -1;
 	}
 
@@ -324,7 +324,7 @@ static struct sd_mutex journal_commit_mutex = SD_MUTEX_INITIALIZER;
 
 /*
  * We rely on the kernel's page cache to cache data objects to 1) boost read
- * perfmance 2) simplify read path so that data commiting is simply a
+ * performance 2) simplify read path so that data committing is simply a
  * sync() operation and We do it in a dedicated thread to avoid blocking
  * the writer by switch back and forth between two journal files.
  */
@@ -351,7 +351,7 @@ static void switch_journal_file(void)
 	struct work *w;
 
 	if (sd_mutex_trylock(&journal_commit_mutex) == EBUSY) {
-		sd_err("journal file in commiting, you might need"
+		sd_err("journal file in committing, you might need"
 		       " enlarge jfile size");
 		sd_mutex_lock(&journal_commit_mutex);
 	}

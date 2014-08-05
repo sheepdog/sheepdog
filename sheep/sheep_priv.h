@@ -482,7 +482,7 @@ static inline bool node_is_local(const struct sd_node *n)
  * If the object is read-only, the fragmentation doesn't happen.  In addition,
  * if the object is unlikely to be accessed sequentially, the fragmentation is
  * not a problem.  We can make such objects sparse so that we can use spaces
- * more efficently.
+ * more efficiently.
  */
 static inline bool is_sparse_object(uint64_t oid)
 {

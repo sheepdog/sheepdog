@@ -76,7 +76,7 @@ static void io_op_done(struct work *work)
  *         go process the request directly, if not put the request into wait
  *         queue of the receiver to wait for the finish of this oid recovery.
  *
- *      4. Object requested doesn't exist and is being recoverred
+ *      4. Object requested doesn't exist and is being recovered
  *         In this case, we put the request into wait queue of receiver and when
  *         we recover an object we try to wake up the request on this oid.
  */
@@ -119,7 +119,7 @@ static void gateway_op_done(struct work *work)
 			sleep_on_wait_queue(req);
 			return;
 		}
-		/*FALLTHRU*/
+		/* FALL THROUGH */
 	case SD_RES_NEW_NODE_VER:
 	case SD_RES_NETWORK_ERROR:
 	case SD_RES_WAIT_FOR_JOIN:
@@ -254,7 +254,7 @@ void wakeup_requests_on_epoch(void)
 	list_splice_init(&pending_list, &sys->req_wait_queue);
 }
 
-/* Wakeup the requests on the oid that was previously being recoverred */
+/* Wakeup the requests on the oid that was previously being recovered */
 void wakeup_requests_on_oid(uint64_t oid)
 {
 	struct request *req;
@@ -330,7 +330,7 @@ static void queue_gateway_request(struct request *req)
 	 * Even if it doesn't exist in cache, we'll rely on cache layer to pull
 	 * it.
 	 *
-	 * Not ture for local request because it might go for backend store
+	 * Not true for local request because it might go for backend store
 	 * such as pushing cache object, in this case we should check if request
 	 * is in recovery.
 	 */

@@ -68,7 +68,7 @@ static const char cluster_help[] =
 "\tlocal: use local driver\n"
 "\tcorosync: use corosync driver\n"
 "\tzookeeper: use zookeeper driver, need extra arguments\n"
-"\n\tzookeeper arguments: address-list,tiemout=value (default as 3000)\n"
+"\n\tzookeeper arguments: address-list,timeout=value (default as 3000)\n"
 "\nExample:\n\t"
 "$ sheep -c zookeeper:IP1:PORT1,IP2:PORT2,IP3:PORT3,timeout=1000 ...\n"
 "This tries to use 3 node zookeeper cluster, which can be reached by\n"
@@ -77,7 +77,7 @@ static const char cluster_help[] =
 
 static const char cache_help[] =
 "Available arguments:\n"
-"\tsize=: size of the cache in megabyes\n"
+"\tsize=: size of the cache in megabytes\n"
 "\tdir=: path to the location of the cache (default: $STORE/cache)\n"
 "\tdirectio: use directio mode for cache IO, "
 "if not specified use buffered IO\n"
@@ -122,11 +122,11 @@ static struct sd_option sheep_options[] = {
 	 "specify the cluster driver (default: "DEFAULT_CLUSTER_DRIVER")",
 	 cluster_help},
 	{'D', "directio", false, "use direct IO for backend store"},
-	{'g', "gateway", false, "make the progam run as a gateway mode"},
+	{'g', "gateway", false, "make the program run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
 	{'i', "ioaddr", true, "use separate network card to handle IO requests"
 	 " (default: disabled)", ioaddr_help},
-	{'j', "journal", true, "use jouranl file to log all the write "
+	{'j', "journal", true, "use journal file to log all the write "
 	 "operations. (default: disabled)", journal_help},
 	{'l', "log", true,
 	 "specify the log level, the log directory and the log format"
@@ -468,7 +468,7 @@ static int create_work_queues(void)
 /*
  * FIXME: Teach sheep handle EMFILE gracefully.
  *
- * For now we only set a large enough vaule to run sheep safely.
+ * For now we only set a large enough value to run sheep safely.
  *
  * We just estimate we at most run 100 VMs for each node and each VM consumes 10
  * FDs at peak rush hour.
