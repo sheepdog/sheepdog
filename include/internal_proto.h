@@ -258,7 +258,7 @@ static inline __attribute__((used)) void __sd_epoch_format_build_bug_ons(void)
 
 enum rw_state {
 	RW_PREPARE_LIST, /* the recovery thread is preparing object list */
-	RW_RECOVER_OBJ, /* the thread is recoering objects */
+	RW_RECOVER_OBJ, /* the thread is recovering objects */
 	RW_NOTIFY_COMPLETION, /* the thread is notifying recovery completion */
 };
 
