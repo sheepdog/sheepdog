@@ -441,14 +441,6 @@ static int do_plug_unplug(char *disks, bool plug)
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
 
-	if (!disks)
-		return EXIT_USAGE;
-
-	if (!strlen(disks)) {
-		sd_err("Empty path isn't allowed");
-		return EXIT_FAILURE;
-	}
-
 	if (plug)
 		sd_init_req(&hdr, SD_OP_MD_PLUG);
 	else
