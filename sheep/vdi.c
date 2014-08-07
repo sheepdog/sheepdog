@@ -350,7 +350,7 @@ static bool add_new_participant(struct vdi_state_entry *entry,
 		return true;
 	}
 
-	assert(entry->lock_state == LOCK_STATE_UNLOCKED);
+	assert(entry->lock_state == LOCK_STATE_SHARED);
 	assert(0 < entry->nr_participants);
 
 	if (entry->nr_participants == SD_MAX_COPIES) {
