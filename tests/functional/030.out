@@ -50,3 +50,52 @@ s test1        2   10 MB   12 MB  0.0 MB DATE   fd32fd      6
 s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815      3              
 s test2        2   10 MB   12 MB  0.0 MB DATE   fd3816      3              
   test2        0   10 MB  0.0 MB   12 MB DATE   fd3817      3              
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test5        1   10 MB   12 MB  0.0 MB DATE   fd2c30      3          snap
+  test5        0   10 MB  0.0 MB   12 MB DATE   fd2c31      3              
+s test4        1   10 MB   12 MB  0.0 MB DATE   fd2de3      3          snap
+  test4        0   10 MB  0.0 MB   12 MB DATE   fd2de4      3              
+s test7        1   10 MB   12 MB  0.0 MB DATE   fd2f96      3          snap
+  test7        0   10 MB  0.0 MB   12 MB DATE   fd2f97      3              
+s test6        1   10 MB   12 MB  0.0 MB DATE   fd3149      3          snap
+  test6        0   10 MB  0.0 MB   12 MB DATE   fd314a      3              
+s test1        1   10 MB   12 MB  0.0 MB DATE   fd32fc      3          snap
+  test1        0   10 MB  0.0 MB   12 MB DATE   fd32fd      3              
+s test0        1   10 MB   12 MB  0.0 MB DATE   fd34af      3          snap
+  test0        0   10 MB  0.0 MB   12 MB DATE   fd34b0      3              
+s test3        1   10 MB   12 MB  0.0 MB DATE   fd3662      3          snap
+  test3        0   10 MB  0.0 MB   12 MB DATE   fd3663      3              
+s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815      3          snap
+  test2        0   10 MB  0.0 MB   12 MB DATE   fd3816      3              
+s test9        1   10 MB   12 MB  0.0 MB DATE   fd4094      3          snap
+  test9        0   10 MB  0.0 MB   12 MB DATE   fd4095      3              
+s test8        1   10 MB   12 MB  0.0 MB DATE   fd4247      3          snap
+  test8        0   10 MB  0.0 MB   12 MB DATE   fd4248      3              
+1. VDI id: fd2de3, name: test4, tag: snap
+2. VDI id: fd3149, name: test6, tag: snap
+3. VDI id: fd34af, name: test0, tag: snap
+4. VDI id: fd3815, name: test2, tag: snap
+5. VDI id: fd4247, name: test8, tag: snap
+using backend plain store
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test4        1   10 MB   12 MB  0.0 MB DATE   fd2de3      3          snap
+  test4        0   10 MB  0.0 MB   12 MB DATE   fd2de4      3              
+s test6        1   10 MB   12 MB  0.0 MB DATE   fd3149      3          snap
+  test6        0   10 MB  0.0 MB   12 MB DATE   fd314a      3              
+s test0        1   10 MB   12 MB  0.0 MB DATE   fd34af      3          snap
+  test0        0   10 MB  0.0 MB   12 MB DATE   fd34b0      3              
+s test2        1   10 MB   12 MB  0.0 MB DATE   fd3815      3          snap
+  test2        0   10 MB  0.0 MB   12 MB DATE   fd3816      3              
+s test8        1   10 MB   12 MB  0.0 MB DATE   fd4247      3          snap
+  test8        0   10 MB  0.0 MB   12 MB DATE   fd4248      3              
+using backend plain store
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test4        1   10 MB   12 MB  0.0 MB DATE   fd2de3      3          snap
+  test4        0   10 MB  0.0 MB   12 MB DATE   fd2de4      3              
+s test0        1   10 MB   12 MB  0.0 MB DATE   fd34af      3          snap
+  test0        0   10 MB  0.0 MB   12 MB DATE   fd34b0      3              
+s test8        1   10 MB   12 MB  0.0 MB DATE   fd4247      3          snap
+  test8        0   10 MB  0.0 MB   12 MB DATE   fd4248      3              

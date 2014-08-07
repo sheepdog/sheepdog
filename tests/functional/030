@@ -87,3 +87,56 @@ diff -u $STORE/csum.21.org $STORE/csum.21.new
 $DOG cluster info -v | _filter_cluster_info
 _vdi_create test3 10M
 _vdi_list
+
+
+# save or load specified vdi
+
+_cleanup
+for i in `seq 0 5`; do
+	_start_sheep $i
+done
+_wait_for_sheep 6
+
+_cluster_format
+
+for i in `seq 0 9`; do
+	$DOG vdi create test$i 10M
+	_random | $DOG vdi write test$i
+	$DOG vdi read test$i | md5sum > $STORE/csum.${i}3.org
+	$DOG vdi snapshot test$i -s snap
+done
+_vdi_list
+
+$DOG cluster snapshot save s3 $TMPDIR test0 test2 test4 test6 test8
+
+$DOG cluster snapshot show s3 $TMPDIR
+
+_cleanup
+for i in `seq 0 5`; do
+	_start_sheep $i
+done
+_wait_for_sheep 6
+
+_cluster_format
+$DOG cluster snapshot load s3 $TMPDIR
+_vdi_list
+
+for i in 0 2 4 6 8; do
+	$DOG vdi read test$i | md5sum > $STORE/csum.${i}3.new
+	diff -u $STORE/csum.${i}3.org $STORE/csum.${i}3.new
+done
+
+_cleanup
+for i in `seq 0 5`; do
+	_start_sheep $i
+done
+_wait_for_sheep 6
+
+_cluster_format
+$DOG cluster snapshot load s3 $TMPDIR test0 test4 test8
+_vdi_list
+
+for i in 0 4 8; do
+	$DOG vdi read test$i | md5sum > $STORE/csum.${i}3.new
+	diff -u $STORE/csum.${i}3.org $STORE/csum.${i}3.new
+done
