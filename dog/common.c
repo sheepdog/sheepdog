@@ -257,7 +257,8 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 		}
 
 		optind++;
-		if (flags & CMD_NEED_ARG && argc == optind)
+		if ((flags & CMD_NEED_ARG) &&
+				(argc == optind || argv[optind][0] == '\0'))
 			subcommand_usage(argv[1], argv[2], EXIT_USAGE);
 		ret = sub[i].fn(argc, argv);
 		if (ret == EXIT_USAGE)
