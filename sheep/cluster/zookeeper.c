@@ -971,7 +971,8 @@ static int zk_join(const struct sd_node *myself,
 	rc = zk_node_exists(path);
 	if (rc == ZOK) {
 		sd_err("Previous zookeeper session exist, shoot myself. Please "
-		       "wait for %d seconds to join me again.", zk_timeout);
+			"wait for %d seconds to join me again.",
+			DIV_ROUND_UP(zk_timeout, 1000));
 		exit(1);
 	}
 
