@@ -29,6 +29,8 @@ done
 
 _wait_for_sheep 3
 
+$DOG vdi check -e test
+
 $DOG vdi check test
 
 $DOG vdi read test 0 14
@@ -44,6 +46,8 @@ for i in `seq 0 2`; do
 done
 
 _wait_for_sheep 3
+
+$DOG vdi check -e test
 
 $DOG vdi check test
 
@@ -62,6 +66,8 @@ done
 
 _wait_for_sheep 3
 
+$DOG vdi check -e test
+
 $DOG vdi check test
 
 $DOG vdi read test 0 14
@@ -78,6 +84,8 @@ for i in `seq 0 2`; do
 done
 
 _wait_for_sheep 3
+
+$DOG vdi check -e test
 
 $DOG vdi check test
 
@@ -96,6 +104,7 @@ read_vdi_from_nodes()
 check_vdi_consistance()
 {
 	read_vdi_from_nodes $1
+	$DOG vdi check -e test
 	$DOG vdi check test
 	read_vdi_from_nodes $1
 }

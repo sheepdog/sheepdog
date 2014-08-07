@@ -34,6 +34,8 @@ _start_sheep 2 "-z 1"
 
 _wait_for_sheep 3
 
+$DOG vdi check -e test
+
 $DOG vdi check test
 
 $DOG vdi read test 0 14
