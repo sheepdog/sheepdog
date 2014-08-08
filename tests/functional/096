@@ -1,0 +1,102 @@
+#!/bin/bash
+
+# Test changing replica number
+
+num=6
+
+. ./common
+
+_log_and_exec()
+{
+	echo -e "\n\$ $1"
+	$1
+}
+
+_log_and_exec_force()
+{
+	echo -e "\n\$ $1"
+	echo "yes" | $1
+}
+
+_list_obj()
+{
+    echo -e "\n#### VDI OBJECT LIST\n"
+    ls $STORE/[0-9]/obj/80*
+    echo -e "\n#### DATA OBJECT LIST\n"
+    ls $STORE/[0-9]/obj/00*
+}
+
+_vdi_alter_copy()
+{
+    echo -e "\n### CHANGE TO $2 REPLICA"
+	_log_and_exec_force "$DOG vdi alter-copy $1 -c $2"
+    _wait_for_sheep_recovery 0
+	_log_and_exec "$DOG vdi list" | _filter_short_date
+	_list_obj
+}
+
+for i in `seq 0 $(($num-1))`; do
+    _start_sheep $i
+done
+_wait_for_sheep $num
+
+echo -e "\n## EC NOT SUPPORTED"
+_log_and_exec "$DOG cluster format -c 4:2"
+_log_and_exec "$DOG cluster alter-copy -c 3"
+_log_and_exec "$DOG vdi create test 4M"
+_log_and_exec "$DOG vdi alter-copy test -c 3"
+echo -e "\n-----\n"
+
+echo -e "## INITIAL STATUS"
+_log_and_exec_force "$DOG cluster format -c 3"
+_log_and_exec "$DOG cluster info -v" | _filter_cluster_info
+echo -e "\n-----\n"
+
+echo -e "## INVALID CLUSTER REPLICA"
+_log_and_exec "$DOG cluster alter-copy -c something"
+_log_and_exec "$DOG cluster alter-copy -c 0"
+_log_and_exec "$DOG cluster alter-copy -c 3"
+_log_and_exec "$DOG cluster alter-copy -c 4:2"
+echo -e "\n-----\n"
+
+echo -e "## VALID CLUSTER REPLICA"
+_log_and_exec_force "$DOG cluster alter-copy -c 2"
+_log_and_exec "$DOG cluster info -v" | _filter_cluster_info
+_log_and_exec "$DOG vdi create test 12M -P"
+_log_and_exec "$DOG vdi list" | _filter_short_date
+_list_obj
+echo -e "\n-----\n"
+
+echo -e "## INVALID VDI REPLICA"
+_log_and_exec "$DOG vdi alter-copy test -c something"
+_log_and_exec "$DOG vdi alter-copy test -c 0"
+_log_and_exec "$DOG vdi alter-copy test -c 2"
+_log_and_exec "$DOG vdi alter-copy test -c 4:2"
+echo -e "\n-----\n"
+
+echo -e "## VALID VDI REPLICA (INCREASE)"
+for i in `seq 3 $num`; do
+    _vdi_alter_copy test $i
+done
+echo -e "\n-----\n"
+
+echo -e "## VALID VDI REPLICA (DECREASE)"
+for i in `seq $(($num-1)) -1 1`; do
+    _vdi_alter_copy test $i
+done
+echo -e "\n-----\n"
+
+echo -e "## CANNOT CHANGE REPLICA IF OBJECTS SHARED WITH OTHER VDI"
+_log_and_exec "$DOG vdi snapshot -s s1 test"
+_log_and_exec "$DOG vdi clone -s s1 test clone1"
+_vdi_alter_copy test 2
+_vdi_alter_copy clone1 2
+echo -e "\n-----\n"
+
+echo -e "## IT IS OK IF OBJECTS NOT SHARED WITH OTHER VDI"
+_log_and_exec "$DOG vdi clone -n -s s1 test clone2"
+_vdi_alter_copy clone2 2
+echo -e "\n-----\n"
+
+$DOG cluster shutdown
+

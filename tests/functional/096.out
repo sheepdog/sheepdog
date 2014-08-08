@@ -1,0 +1,552 @@
+QA output created by 096
+
+## EC NOT SUPPORTED
+
+$ ../../dog/dog cluster format -c 4:2
+using backend plain store
+
+$ ../../dog/dog cluster alter-copy -c 3
+The cluster's copy policy is erasure code, changing it is not supported yet.
+
+$ ../../dog/dog vdi create test 4M
+
+$ ../../dog/dog vdi alter-copy test -c 3
+test's copy policy is erasure code, changing it is not supported yet.
+
+-----
+
+## INITIAL STATUS
+
+$ ../../dog/dog cluster format -c 3
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend plain store
+
+$ ../../dog/dog cluster info -v
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 3 redundancy policy
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
+
+-----
+
+## INVALID CLUSTER REPLICA
+
+$ ../../dog/dog cluster alter-copy -c something
+Invalid parameter something
+To create replicated vdi, set -c x
+  x(1 to 31)   - number of replicated copies
+To create erasure coded vdi, set -c x:y
+  x(2,4,8,16)  - number of data strips
+  y(1 to 15)   - number of parity strips
+
+$ ../../dog/dog cluster alter-copy -c 0
+Invalid parameter 0
+To create replicated vdi, set -c x
+  x(1 to 31)   - number of replicated copies
+To create erasure coded vdi, set -c x:y
+  x(2,4,8,16)  - number of data strips
+  y(1 to 15)   - number of parity strips
+
+$ ../../dog/dog cluster alter-copy -c 3
+The cluster's redundancy level is already set to 3, nothing changed.
+
+$ ../../dog/dog cluster alter-copy -c 4:2
+Changing redundancy level of erasure coded vdi is not supported yet.
+Usage: dog cluster alter-copy [-a address] [-p port] [-h] [-t] [-c copies]
+Options:
+  -a, --address           specify the daemon address (default: localhost)
+  -p, --port              specify the daemon port
+  -h, --help              display this help and exit
+  -t, --time              show elapsed time
+  -c, --copies            specify the default data redundancy (number of copies)
+
+-----
+
+## VALID CLUSTER REPLICA
+
+$ ../../dog/dog cluster alter-copy -c 2
+The cluster's redundancy level is set to 2, the old one was 3.
+    __
+   ()'`;
+   /\|`  Caution! Changing cluster's redundancy level will affect
+  /  |   all the VDIs to be created later.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog cluster info -v
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
+
+$ ../../dog/dog vdi create test 12M -P
+
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      2              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+-----
+
+## INVALID VDI REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c something
+Invalid parameter something
+To create replicated vdi, set -c x
+  x(1 to 31)   - number of replicated copies
+To create erasure coded vdi, set -c x:y
+  x(2,4,8,16)  - number of data strips
+  y(1 to 15)   - number of parity strips
+
+$ ../../dog/dog vdi alter-copy test -c 0
+Invalid parameter 0
+To create replicated vdi, set -c x
+  x(1 to 31)   - number of replicated copies
+To create erasure coded vdi, set -c x:y
+  x(2,4,8,16)  - number of data strips
+  y(1 to 15)   - number of parity strips
+
+$ ../../dog/dog vdi alter-copy test -c 2
+test's redundancy level is already set to 2, nothing changed.
+
+$ ../../dog/dog vdi alter-copy test -c 4:2
+Changing redundancy level of erasure coded vdi is not supported yet.
+Usage: dog vdi alter-copy [-c copies] [-a address] [-p port] [-h] [-t] <vdiname>
+Options:
+  -c, --copies            specify the data redundancy level
+  -a, --address           specify the daemon address (default: localhost)
+  -p, --port              specify the daemon port
+  -h, --help              display this help and exit
+  -t, --time              show elapsed time
+
+-----
+
+## VALID VDI REPLICA (INCREASE)
+
+### CHANGE TO 3 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 3
+test's redundancy level is set to 3, the old one was 2.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      3              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 4 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 4
+test's redundancy level is set to 4, the old one was 3.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      4              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+/tmp/sheepdog/096/5/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/3/obj/007c2b2500000001
+/tmp/sheepdog/096/4/obj/007c2b2500000000
+/tmp/sheepdog/096/4/obj/007c2b2500000002
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 5 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 5
+test's redundancy level is set to 5, the old one was 4.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      5              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/3/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+/tmp/sheepdog/096/5/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/3/obj/007c2b2500000001
+/tmp/sheepdog/096/3/obj/007c2b2500000002
+/tmp/sheepdog/096/4/obj/007c2b2500000000
+/tmp/sheepdog/096/4/obj/007c2b2500000002
+/tmp/sheepdog/096/5/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 6 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 6
+test's redundancy level is set to 6, the old one was 5.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      6              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/807c2b2500000000
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/3/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+/tmp/sheepdog/096/5/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/1/obj/007c2b2500000002
+/tmp/sheepdog/096/2/obj/007c2b2500000000
+/tmp/sheepdog/096/2/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/3/obj/007c2b2500000001
+/tmp/sheepdog/096/3/obj/007c2b2500000002
+/tmp/sheepdog/096/4/obj/007c2b2500000000
+/tmp/sheepdog/096/4/obj/007c2b2500000001
+/tmp/sheepdog/096/4/obj/007c2b2500000002
+/tmp/sheepdog/096/5/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+-----
+
+## VALID VDI REPLICA (DECREASE)
+
+### CHANGE TO 5 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 5
+test's redundancy level is set to 5, the old one was 6.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      5              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/3/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+/tmp/sheepdog/096/5/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/3/obj/007c2b2500000001
+/tmp/sheepdog/096/3/obj/007c2b2500000002
+/tmp/sheepdog/096/4/obj/007c2b2500000000
+/tmp/sheepdog/096/4/obj/007c2b2500000002
+/tmp/sheepdog/096/5/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 4 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 4
+test's redundancy level is set to 4, the old one was 5.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      4              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+/tmp/sheepdog/096/5/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/3/obj/007c2b2500000001
+/tmp/sheepdog/096/4/obj/007c2b2500000000
+/tmp/sheepdog/096/4/obj/007c2b2500000002
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 3 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 3
+test's redundancy level is set to 3, the old one was 4.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      3              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/1/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000000
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/2/obj/007c2b2500000002
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000001
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 2 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 2
+test's redundancy level is set to 2, the old one was 3.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      2              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/4/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/007c2b2500000001
+/tmp/sheepdog/096/3/obj/007c2b2500000000
+/tmp/sheepdog/096/5/obj/007c2b2500000002
+
+### CHANGE TO 1 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 1
+test's redundancy level is set to 1, the old one was 2.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  test         0   12 MB   12 MB  0.0 MB DATE   7c2b25      1              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+
+-----
+
+## CANNOT CHANGE REPLICA IF OBJECTS SHARED WITH OTHER VDI
+
+$ ../../dog/dog vdi snapshot -s s1 test
+
+$ ../../dog/dog vdi clone -s s1 test clone1
+
+### CHANGE TO 2 REPLICA
+
+$ ../../dog/dog vdi alter-copy test -c 2
+Only standalone vdi supports changing redundancy level.
+Please clone test with -n (--no-share) option first.
+
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test         1   12 MB   12 MB  0.0 MB DATE   7c2b25      1            s1
+  test         0   12 MB  0.0 MB   12 MB DATE   7c2b26      1              
+c clone1       0   12 MB  0.0 MB   12 MB DATE   c8f989      1              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/807c2b2600000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/80c8f98900000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+
+### CHANGE TO 2 REPLICA
+
+$ ../../dog/dog vdi alter-copy clone1 -c 2
+Only standalone vdi supports changing redundancy level.
+Please clone clone1 with -n (--no-share) option first.
+
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test         1   12 MB   12 MB  0.0 MB DATE   7c2b25      1            s1
+  test         0   12 MB  0.0 MB   12 MB DATE   7c2b26      1              
+c clone1       0   12 MB  0.0 MB   12 MB DATE   c8f989      1              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/807c2b2600000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/80c8f98900000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+
+-----
+
+## IT IS OK IF OBJECTS NOT SHARED WITH OTHER VDI
+
+$ ../../dog/dog vdi clone -n -s s1 test clone2
+
+### CHANGE TO 2 REPLICA
+
+$ ../../dog/dog vdi alter-copy clone2 -c 2
+clone2's redundancy level is set to 2, the old one was 1.
+    __
+   ()'`;
+   /\|`  Caution! Changing VDI's redundancy level will affect
+  /  |   the VDI itself only and trigger recovery.
+(/_)_|_  Are you sure you want to continue? [yes/no]: 
+$ ../../dog/dog vdi list
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test         1   12 MB   12 MB  0.0 MB DATE   7c2b25      1            s1
+  test         0   12 MB  0.0 MB   12 MB DATE   7c2b26      1              
+  clone2       0   12 MB   12 MB  0.0 MB DATE   c8f470      2              
+c clone1       0   12 MB  0.0 MB   12 MB DATE   c8f989      1              
+
+#### VDI OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/807c2b2600000000
+/tmp/sheepdog/096/2/obj/807c2b2500000000
+/tmp/sheepdog/096/2/obj/80c8f47000000000
+/tmp/sheepdog/096/2/obj/80c8f98900000000
+/tmp/sheepdog/096/5/obj/80c8f47000000000
+
+#### DATA OBJECT LIST
+
+/tmp/sheepdog/096/0/obj/007c2b2500000001
+/tmp/sheepdog/096/0/obj/007c2b2500000002
+/tmp/sheepdog/096/0/obj/00c8f47000000001
+/tmp/sheepdog/096/1/obj/007c2b2500000000
+/tmp/sheepdog/096/1/obj/00c8f47000000002
+/tmp/sheepdog/096/2/obj/00c8f47000000000
+/tmp/sheepdog/096/3/obj/00c8f47000000001
+/tmp/sheepdog/096/5/obj/00c8f47000000000
+/tmp/sheepdog/096/5/obj/00c8f47000000002
+
+-----
+
