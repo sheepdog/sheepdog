@@ -59,7 +59,7 @@ struct vdi_option {
 /* farm.c */
 int farm_init(const char *path);
 bool farm_contain_snapshot(uint32_t idx, const char *tag);
-int farm_save_snapshot(const char *tag);
+int farm_save_snapshot(const char *tag, bool);
 int farm_load_snapshot(uint32_t idx, const char *tag, int count, char **name);
 int farm_show_snapshot(uint32_t idx, const char *tag, int count, char **name);
 char *get_object_directory(void);

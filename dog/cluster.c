@@ -21,6 +21,8 @@ static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
 	{'f', "force", false, "do not prompt for confirmation"},
+	{'m', "multithread", false,
+	 "use multi-thread for 'cluster snapshot save'"},
 	{'t', "strict", false,
 	 "do not serve write request if number of nodes is not sufficient"},
 	{ 0, NULL, false, NULL },
@@ -29,6 +31,7 @@ static struct sd_option cluster_options[] = {
 static struct cluster_cmd_data {
 	uint8_t copies;
 	uint8_t copy_policy;
+	uint8_t multithread;
 	bool force;
 	bool strict;
 	char name[STORE_LEN];
@@ -432,7 +435,8 @@ static int save_snapshot(int argc, char **argv)
 		goto out;
 	}
 
-	if (farm_save_snapshot(tag) != SD_RES_SUCCESS)
+	if (farm_save_snapshot(tag, cluster_cmd_data.multithread)
+	    != SD_RES_SUCCESS)
 		goto out;
 
 	ret = EXIT_SUCCESS;
@@ -748,7 +752,7 @@ static struct subcommand cluster_cmd[] = {
 	{"shutdown", NULL, "apht", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
 	{"snapshot", "<tag|idx> <path> [vdi1] [vdi2] ...",
-	 "apht", "snapshot/restore the cluster",
+	 "aphtm", "snapshot/restore the cluster",
 	 cluster_snapshot_cmd, CMD_NEED_ARG,
 	 cluster_snapshot, cluster_options},
 	{"recover", NULL, "afpht",
@@ -788,6 +792,8 @@ static int cluster_parser(int ch, const char *opt)
 	case 'f':
 		cluster_cmd_data.force = true;
 		break;
+	case 'm':
+		cluster_cmd_data.multithread = true;
 	case 't':
 		cluster_cmd_data.strict = true;
 		break;

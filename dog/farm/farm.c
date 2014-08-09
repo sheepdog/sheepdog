@@ -315,7 +315,7 @@ static int queue_save_snapshot_work(uint64_t oid, uint32_t nr_copies,
 	return 0;
 }
 
-int farm_save_snapshot(const char *tag)
+int farm_save_snapshot(const char *tag, bool multithread)
 {
 	unsigned char trunk_sha1[SHA1_DIGEST_SIZE];
 	struct strbuf trunk_buf;
@@ -357,7 +357,8 @@ int farm_save_snapshot(const char *tag)
 
 	strbuf_init(&trunk_buf, sizeof(struct trunk_entry) * nr_objects);
 
-	wq = create_work_queue("save snapshot", WQ_ORDERED);
+	wq = create_work_queue("save snapshot",
+			       multithread ? WQ_DYNAMIC : WQ_ORDERED);
 	if (for_each_object_in_tree(queue_save_snapshot_work,
 				    &trunk_buf) < 0) {
 		ret = -1;
