@@ -626,19 +626,19 @@ static int node_log(int argc, char **argv)
 }
 
 static struct subcommand node_cmd[] = {
-	{"kill", "<node id>", "aprhlt", "kill node", NULL,
+	{"kill", "<node id>", "aprhlT", "kill node", NULL,
 	 CMD_NEED_NODELIST, node_kill, node_options},
-	{"list", NULL, "aprht", "list nodes", NULL,
+	{"list", NULL, "aprhT", "list nodes", NULL,
 	 CMD_NEED_NODELIST, node_list},
-	{"info", NULL, "aprht", "show information about each node", NULL,
+	{"info", NULL, "aprhT", "show information about each node", NULL,
 	 CMD_NEED_NODELIST, node_info},
-	{"recovery", NULL, "aphPrt", "show recovery information of nodes", NULL,
+	{"recovery", NULL, "aphPrT", "show recovery information of nodes", NULL,
 	 CMD_NEED_NODELIST, node_recovery, node_options},
-	{"md", "[disks]", "aprAfht", "See 'dog node md' for more information",
+	{"md", "[disks]", "aprAfhT", "See 'dog node md' for more information",
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
-	{"stat", NULL, "aprwht", "show stat information about the node", NULL,
+	{"stat", NULL, "aprwhT", "show stat information about the node", NULL,
 	 0, node_stat, node_options},
-	{"log", NULL, "apht", "show or set log level of the node", node_log_cmd,
+	{"log", NULL, "aphT", "show or set log level of the node", node_log_cmd,
 	 CMD_NEED_ARG, node_log},
 	{NULL,},
 };

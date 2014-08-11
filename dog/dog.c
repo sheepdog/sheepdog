@@ -43,7 +43,7 @@ static const struct sd_option dog_options[] = {
 	 "                          single spaces and print all sizes in decimal bytes"},
 	{'v', "verbose", false, "print more information than default"},
 	{'h', "help", false, "display this help and exit"},
-	{'t', "time", false, "show elapsed time"},
+	{'T', "time", false, "show elapsed time"},
 
 	{ 0, NULL, false, NULL },
 };
@@ -524,7 +524,7 @@ int main(int argc, char **argv)
 		case 'h':
 			subcommand_usage(argv[1], argv[2], EXIT_SUCCESS);
 			break;
-		case 't':
+		case 'T':
 			elapsed_time = true;
 			break;
 		case '?':
