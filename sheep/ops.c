@@ -1348,7 +1348,7 @@ static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
 
 	if (!vdi_lock(vid, &sender->nid, req->vdi.type)) {
 		sd_err("locking %"PRIx32 "failed", vid);
-		return SD_RES_VDI_NOT_LOCKED;
+		return SD_RES_VDI_LOCKED;
 	}
 
 	return SD_RES_SUCCESS;
