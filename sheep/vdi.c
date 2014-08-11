@@ -390,7 +390,8 @@ static void del_participant(struct vdi_state_entry *entry,
 {
 	int idx = -1;
 
-	assert(0 < entry->nr_participants);
+	if (entry->nr_participants == 0)
+		return;
 
 	for (int i = 0; i < entry->nr_participants; i++) {
 		if (!node_id_cmp(&entry->participants[i], owner)) {
