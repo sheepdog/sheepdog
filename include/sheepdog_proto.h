@@ -130,8 +130,8 @@
 #define SD_REQ_SIZE 48
 #define SD_RSP_SIZE 48
 
-#define LOCK_TYPE_NORMAL 1
-#define LOCK_TYPE_SHARED 2	/* for iSCSI multipath */
+#define LOCK_TYPE_NORMAL 0
+#define LOCK_TYPE_SHARED 1	/* for iSCSI multipath */
 
 struct sd_req {
 	uint8_t		proto_ver;
