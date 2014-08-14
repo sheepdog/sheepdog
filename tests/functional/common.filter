@@ -168,6 +168,11 @@ _filter_store()
     sed -e "s|$STORE|STORE|g"
 }
 
+_filter_md_store()
+{
+    sed -e "s|/d[0-9]*/|/obj/|g"
+}
+
 _filter_info()
 {
 	awk '{if ($2 ~ /^[0-9.]+$/) {$2="MASKED";$6="MASKED";$8="MASTERD"};print $0}'

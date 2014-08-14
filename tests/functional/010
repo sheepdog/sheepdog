@@ -34,7 +34,8 @@ done
 $DOG cluster recover enable
 _wait_for_sheep_recovery 0
 $DOG cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | _filter_store | sort
+ls $STORE/*/{obj,d[0-9]*}/* 2> /dev/null | \
+	_filter_store | _filter_md_store | sort
 
 $DOG cluster recover disable
 for i in 3 4; do
@@ -52,5 +53,6 @@ done
 $DOG cluster recover enable
 _wait_for_sheep_recovery 0
 $DOG cluster info | head -6 | _filter_cluster_info
-ls $STORE/*/obj/* | _filter_store | sort
+ls $STORE/*/{obj,d[0-9]*}/* 2> /dev/null | \
+	_filter_store | _filter_md_store | sort
 $DOG vdi read test 0 32m | md5sum

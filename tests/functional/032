@@ -37,10 +37,13 @@ done
 _wait_for_sheep 8
 _wait_for_sheep_recovery 0
 
-ls $STORE/*/obj/807c2b2500000000 | _filter_store | sort
+ls $STORE/*/{obj,d[0-9]*}/807c2b2500000000 2> /dev/null | \
+	_filter_store | _filter_md_store | sort
 for i in `seq 0 24`; do
-    ls $STORE/*/obj/007c2b25000000`printf "%02x" $i` | _filter_store | sort
+    ls $STORE/*/{obj,d[0-9]*}/007c2b25000000`printf "%02x" $i` 2> /dev/null | \
+		_filter_store | _filter_md_store | sort
 done
-ls $STORE/*/obj/.stale | _filter_store | sort
+ls $STORE/*/{obj,d[0-9]*}/.stale 2> /dev/null | \
+	_filter_store | _filter_md_store | sort -u
 
 $DOG vdi read test | md5sum
