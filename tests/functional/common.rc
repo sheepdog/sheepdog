@@ -314,7 +314,7 @@ _start_sheep()
 
 _kill_all_dogs()
 {
-    pkill -9 -f "$DOG_PROG (cluster|vdi|node|debug)"
+    pkill -f "$DOG_PROG (cluster|vdi|node|debug)"
 
     while [ $? == 0 ]; do
         pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" > /dev/null
@@ -323,12 +323,39 @@ _kill_all_dogs()
 
 _kill_all_sheeps()
 {
-    pkill -9 -f "$SHEEP_PROG $WD"
+    pkill -f "$SHEEP_PROG $WD"
 
     _wait_for_sheep_stop
 }
 
 _kill_sheep()
+{
+    pkill -f "$SHEEP_PROG $STORE/$1 "
+
+    if [ $? != 0 ]; then
+        _die "cannot kill sheep $1"
+    fi
+
+    _wait_for_sheep_stop $1
+}
+
+_kill_all_dogs_force()
+{
+    pkill -9 -f "$DOG_PROG (cluster|vdi|node|debug)"
+
+    while [ $? == 0 ]; do
+        pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" > /dev/null
+    done
+}
+
+_kill_all_sheeps_force()
+{
+    pkill -9 -f "$SHEEP_PROG $WD"
+
+    _wait_for_sheep_stop
+}
+
+_kill_sheep_force()
 {
     pkill -9 -f "$SHEEP_PROG $STORE/$1 "
 
