@@ -4,7 +4,7 @@ wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
-This operation dicards any changes made since the previous
+This operation discards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]---(you are here)
@@ -15,7 +15,7 @@ wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 wrote 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
-This operation dicards any changes made since the previous
+This operation discards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]-+-[DATE]
@@ -24,7 +24,7 @@ test---[DATE]-+-[DATE]
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25      6         snap1
 s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27      6         snap2
   test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b29      6              
-This operation dicards any changes made since the previous
+This operation discards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]---[DATE]---(you are here)
@@ -32,7 +32,7 @@ test---[DATE]---[DATE]---(you are here)
 s test         1  4.0 GB  4.0 MB  0.0 MB DATE   7c2b25      6         snap1
 s test         2  4.0 GB  4.0 MB  0.0 MB DATE   7c2b27      6         snap2
   test         0  4.0 GB  0.0 MB  4.0 MB DATE   7c2b2a      6              
-This operation dicards any changes made since the previous
+This operation discards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]-+-[DATE]
@@ -48,7 +48,7 @@ wrote 512/512 bytes at offset 0
 The snapshot id must be larger than zero
 Cannot get VDI info for test 5 : Failed to find requested tag
 Failed to open VDI test
-This operation dicards any changes made since the previous
+This operation discards any changes made since the previous
 snapshot was taken.  Continue? [yes/no]: read 512/512 bytes at offset 0
 512 bytes, X ops; XX:XX:XX.X (XXX YYY/sec and XXX ops/sec)
 test---[DATE]-+-[DATE]
