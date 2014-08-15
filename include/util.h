@@ -215,7 +215,7 @@ double get_time_interval(const struct timespec *start,
 #error "Don't include assert.h, use util.h for assert()"
 #endif
 
-#ifndef NDEBUG
+#ifndef NASSERT
 #define assert(expr)						\
 ({								\
 	if (!(expr)) {						\
@@ -225,7 +225,7 @@ double get_time_interval(const struct timespec *start,
 })
 #else
 #define assert(expr) ((void)0)
-#endif	/* NDEBUG */
+#endif	/* NASSERT */
 
 #define SWAP(a, b) { typeof(a) tmp; tmp = a; a = b; b = tmp; }
 
