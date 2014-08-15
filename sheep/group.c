@@ -842,10 +842,19 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 		sockfd_cache_add_group(nroot);
 
 		if (0 < cinfo->epoch && cinfo->status == SD_STATUS_OK) {
-			collect_work = xzalloc(sizeof(*collect_work));
-			collect_work->epoch = cinfo->epoch - 1;
-			collect_work->members = grab_vnode_info(
+			struct vnode_info *members = grab_vnode_info(
 				main_thread_get(current_vnode_info));
+
+			if (members->nr_nodes == 1) {
+				sd_debug("Currently, there are no other"
+					 " members. I don't have to collect"
+					 "CINFO from others");
+				put_vnode_info(members);
+			} else {
+				collect_work = xzalloc(sizeof(*collect_work));
+				collect_work->epoch = cinfo->epoch - 1;
+				collect_work->members = members;
+			}
 		}
 	} else {
 		if (0 < cinfo->epoch && cinfo->status == SD_STATUS_OK)
