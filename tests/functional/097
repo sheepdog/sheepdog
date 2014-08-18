@@ -1,0 +1,157 @@
+#! /bin/bash
+
+# Test iSCSI multipath functionality
+# heavly depends on Debian or Ubuntu conventions
+
+. ./common
+
+_need_to_be_root
+
+which $TGTD > /dev/null || _notrun "Require tgtd but it's not installed"
+which $TGTADM > /dev/null || _notrun "Require tgtadm but it's not installed"
+which $ISCSID > /dev/null || _notrun "Require iscsid but it's not installed"
+which $ISCSIADM > /dev/null || _notrun "Require iscsiadm but it's not installed"
+which $MULTIPATHD > /dev/null || _notrun "Require multipathd but it's not installed"
+which $SCSI_ID > /dev/null || _notrun "Require scsi_id but it's not installed"
+
+$ISCSIADM -m node --logout &> /dev/null
+pkill -9 $ISCSID > /dev/null
+pkill -9 $ISCSIADM > /dev/null
+pkill -9 $MULTIPATHD > /dev/null
+pkill -9 $TGTD > /dev/null
+pkill -9 $TGTADM > /dev/null
+
+ORIG_DEVFILES=097_orig_devfiles
+LOGIN_DEVFILES=097_login_devfiles
+DIFF_DEVFILES=097_diff_devfiles
+
+/bin/ls /dev/sd* > $ORIG_DEVFILES
+
+for i in `seq 0 2`; do
+      _start_sheep $i
+done
+
+_wait_for_sheep 3
+_cluster_format
+
+$DOG vdi create test 128M
+
+_setup_tgtd()
+# $1: control port
+# $2: iscsi portal
+# $3: VDI name for backing store
+{
+    $TGTD -t 1 -C $1 --iscsi portal=$2
+    $TGTADM -C $1 --lld iscsi --mode target --op new --tid 1 --targetname iqn.2014-06.org.sheepdog-project
+    $TGTADM -C $1 --mode logicalunit --op new --tid 1 --lun 1 --bstype sheepdog --backing-store $3
+    $TGTADM -C $1 --mode target --op bind --tid 1 --initiator-address ALL
+}
+PORTAL1=127.0.0.1:3260
+PORTAL2=127.0.0.1:3261
+
+_setup_tgtd 0 $PORTAL1 unix:$STORE/0/sock:test
+_setup_tgtd 1 $PORTAL2 unix:$STORE/1/sock:test
+
+$DOG vdi lock list
+
+$ISCSID -c `pwd`/iscsid.conf
+
+$ISCSIADM -m discovery -t sendtargets -p $PORTAL1
+$ISCSIADM -m discovery -t sendtargets -p $PORTAL2
+
+$ISCSIADM -m node --login &> /dev/null
+sleep 15
+
+/bin/ls /dev/sd* > $LOGIN_DEVFILES
+
+comm -3 $LOGIN_DEVFILES $ORIG_DEVFILES > $DIFF_DEVFILES
+
+if [[ "2 $DIFF_DEVFILES" != `wc -l $DIFF_DEVFILES` ]]
+then
+    exit 2
+    _notrun "Device files were not created correctly"
+fi
+
+declare -a SCSI_IDS
+IDX=0
+for line in `cat $DIFF_DEVFILES`; do
+    SCSI_IDS[$IDX]=`$SCSI_ID --whitelisted --device=$line`
+    IDX=`expr $IDX + 1`
+done
+
+if [ ${SCSI_IDS[0]} != ${SCSI_IDS[1]} ]
+then
+    _notrun "SCSI IDs are different: ${SCSI_IDS[0]}, ${SCSI_IDS[1]}"
+fi
+
+SCSI_ID=${SCSI_IDS[0]}
+
+MULTIPATH_CONF=`pwd`/multipath.conf
+
+cat <<EOF > $MULTIPATH_CONF
+multipaths {
+        multipath {
+                wwid                    $SCSI_ID
+                alias                   sheepdog-iscsi
+                path_grouping_policy    multibus
+                path_checker            readsector0
+                path_selector           "round-robin 0"
+                failback                manual
+                rr_weight               priorities
+                no_path_retry           5
+        }
+}
+EOF
+
+SAVED_MULTIPATH_CONF=`pwd`/saved_multipath.conf
+ORIG_MULTIPATH_CONF=/etc/multipath.conf
+
+cp $ORIG_MULTIPATH_CONF $SAVED_MULTIPATH_CONF
+cp $MULTIPATH_CONF $ORIG_MULTIPATH_CONF
+
+/etc/init.d/multipath-tools restart
+sleep 3
+
+if [ ! -b /dev/mapper/sheepdog-iscsi ]
+then
+    _notrun "device file doesn't exist"
+fi
+
+file /dev/mapper/sheepdog-iscsi
+
+MNTPOINT=`pwd`/mnt
+if [ ! -d $MNTPOINT ]
+then
+    mkdir $MNTPOINT
+else
+    umount $MNTPOINT 2> /dev/null
+fi
+
+mkfs.ext4 /dev/mapper/sheepdog-iscsi &> /dev/null
+mount /dev/mapper/sheepdog-iscsi $MNTPOINT
+
+TESTFILE=$MNTPOINT/rand
+dd if=/dev/urandom of=$TESTFILE bs=1M count=64 oflag=direct iflag=fullblock &> /dev/null
+
+BEFORE=`md5sum $TESTFILE`
+
+sync
+echo 1 > /proc/sys/vm/drop_caches # drop page caches
+
+# kill the default tgtd with control port 0
+for pid in `pgrep -f "tgtd -C 0"`; do
+    kill -9 $pid 2> /dev/null
+done
+sleep 20			# wait fallback
+AFTER=`md5sum $TESTFILE`
+
+if [[ $BEFORE = $AFTER ]]
+then
+    echo "checksum matched, success"
+else
+    echo "checksum not matched, fail"
+fi
+
+umount mnt
+
+cp $SAVED_MULTIPATH_CONF $ORIG_MULTIPATH_CONF
