@@ -148,6 +148,7 @@ static inline const char *sd_strerror(int err)
 		[SD_RES_HALT] =
 			"IO has halted as there are not enough living nodes",
 		[SD_RES_READONLY] = "Object is read-only",
+		[SD_RES_INODE_INVALIDATED] = "Inode object is invalidated",
 
 		/* from internal_proto.h */
 		[SD_RES_OLD_NODE_VER] = "Request has an old epoch",
