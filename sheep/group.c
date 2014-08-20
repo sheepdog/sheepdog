@@ -784,7 +784,7 @@ static int send_join_request(void)
 {
 	struct sd_node *n = &sys->this_node;
 
-	sd_info("%s", node_to_str(n));
+	sd_info("%s going to join the cluster", node_to_str(n));
 	return sys->cdrv->join(n, &sys->cinfo, sizeof(sys->cinfo));
 }
 
