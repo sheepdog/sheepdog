@@ -20,8 +20,9 @@ $DOG vdi read test | md5sum
 
 for i in 2 3; do
     _start_sheep $i
-    sleep 1
+    _wait_for_sheep 3 $i
     _kill_sheep $(($i-2))
+    _wait_for_sheep 2 $i
     _wait_for_sheep_recovery $i
 done
 
@@ -34,8 +35,9 @@ $DOG vdi read test -p 7002 | md5sum
 
 for i in 2 3; do
     _start_sheep $(($i-2))
-    sleep 1
+    _wait_for_sheep 3 $(($i-2))
     _kill_sheep $i
+    _wait_for_sheep 2 $(($i-2))
     _wait_for_sheep_recovery $(($i-2))
 done
 
