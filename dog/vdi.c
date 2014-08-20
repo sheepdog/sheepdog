@@ -1286,7 +1286,8 @@ static int vdi_setattr(int argc, char **argv)
 		goto out;
 	}
 
-	value = argv[optind++];
+	value = argv[optind] ? xstrdup(argv[optind]) : NULL;
+	optind++;
 	if (!value && !vdi_cmd_data.delete) {
 		value = xmalloc(SD_MAX_VDI_ATTR_VALUE_LEN);
 
