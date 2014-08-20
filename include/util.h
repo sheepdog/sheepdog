@@ -573,4 +573,6 @@ static inline uint64_t clock_get_time(void)
 	return (uint64_t)ts.tv_sec * 1000000000LL + (uint64_t)ts.tv_nsec;
 }
 
+char *xstrdup(const char *s);
+
 #endif

@@ -831,3 +831,15 @@ double get_time_interval(const struct timespec *start,
 	return ((end->tv_nsec - start->tv_nsec) * 0.000000001)
 			+ end->tv_sec - start->tv_sec;
 }
+
+char *xstrdup(const char *s)
+{
+	char *ret;
+
+	ret = strdup(s);
+	if (!ret)
+		panic("Out of memory");
+
+	return ret;
+}
+
