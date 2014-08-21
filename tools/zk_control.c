@@ -19,7 +19,7 @@
 #include "rbtree.h"
 #include "internal_proto.h"
 
-#define QUEUE_ZONE "/sheepdog/queue"
+#define QUEUE_ZNODE "/sheepdog/queue"
 #define MIN_THRESHOLD 86400
 
 #define FOR_EACH_ZNODE(parent, path, strs)			       \
@@ -246,10 +246,10 @@ static int do_list(int argc, char **argv)
 	fprintf(stdout, "     QUEUE                ID          TYPE"
 		"                 SENDER  MSG LEN    NR  BUF LEN"
 		"          CREATE TIME          MODIFY TIME\n");
-	rc = zk_get_children(QUEUE_ZONE, &strs);
+	rc = zk_get_children(QUEUE_ZNODE, &strs);
 	switch (rc) {
 	case ZOK:
-		FOR_EACH_ZNODE(QUEUE_ZONE, path, &strs) {
+		FOR_EACH_ZNODE(QUEUE_ZNODE, path, &strs) {
 			len = sizeof(struct zk_event);
 			rc = zk_get_data(path, &ev, &len, &stat);
 			if (rc != ZOK) {
@@ -269,7 +269,7 @@ static int do_list(int argc, char **argv)
 			strftime(str_mtime, sizeof(str_mtime),
 					"%Y-%m-%d %H:%M:%S", &tm_mtime);
 
-			sscanf(path, QUEUE_ZONE "/%"PRId32, &seq);
+			sscanf(path, QUEUE_ZNODE "/%"PRId32, &seq);
 			nid = &ev.sender.node.nid;
 			fprintf(stdout, "%010"PRId32"  %016"PRIx64
 				"  %12s  %21s  %7zd  %4zd  %7zd  %s  %s\n",
@@ -287,7 +287,7 @@ static int do_list(int argc, char **argv)
 	fprintf(stdout, "\ntotal nodes: %d\n", total);
 	return 0;
 err:
-	fprintf(stderr, "failed to list %s, %s\n", QUEUE_ZONE, zerror(rc));
+	fprintf(stderr, "failed to list %s, %s\n", QUEUE_ZNODE, zerror(rc));
 	return -1;
 }
 
@@ -319,10 +319,10 @@ static int do_purge(int argc, char **argv)
 
 	gettimeofday(&tv, NULL);
 
-	rc = zk_get_children(QUEUE_ZONE, &strs);
+	rc = zk_get_children(QUEUE_ZNODE, &strs);
 	switch (rc) {
 	case ZOK:
-		FOR_EACH_ZNODE(QUEUE_ZONE, path, &strs) {
+		FOR_EACH_ZNODE(QUEUE_ZNODE, path, &strs) {
 			len = sizeof(struct zk_event);
 			rc = zk_get_data(path, &ev, &len, &stat);
 			if (rc != ZOK) {
@@ -355,7 +355,7 @@ static int do_purge(int argc, char **argv)
 	fprintf(stdout, "completed. %d queue nodes are deleted\n", deleted);
 	return 0;
 err:
-	fprintf(stderr, "failed to purge %s, %s\n", QUEUE_ZONE, zerror(rc));
+	fprintf(stderr, "failed to purge %s, %s\n", QUEUE_ZNODE, zerror(rc));
 	return -1;
 }
 
