@@ -517,6 +517,47 @@ out:
 	return ret;
 }
 
+static struct vdi_state *get_vdi_state(int *count)
+{
+	int ret;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	struct vdi_state *vs = NULL;
+	unsigned int rlen;
+
+#define DEFAULT_VDI_STATE_COUNT 512
+	rlen = DEFAULT_VDI_STATE_COUNT * sizeof(struct vdi_state);
+	vs = xzalloc(rlen);
+retry:
+	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
+	hdr.data_length = rlen;
+
+	ret = dog_exec_req(&sd_nid, &hdr, (char *)vs);
+	if (ret < 0)
+		goto fail;
+
+	switch (ret) {
+	case SD_RES_SUCCESS:
+		break;
+	case SD_RES_BUFFER_SMALL:
+		rlen *= 2;
+		vs = xrealloc(vs, rlen);
+		goto retry;
+	default:
+		sd_err("failed to execute SD_OP_GET_VDI_COPIES: %s",
+		       sd_strerror(ret));
+		goto fail;
+	}
+
+	*count = rsp->data_length / sizeof(*vs);
+	return vs;
+
+fail:
+	free(vs);
+	vs = NULL;
+	return NULL;
+}
+
 static int vdi_snapshot(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
@@ -525,6 +566,10 @@ static int vdi_snapshot(int argc, char **argv)
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
 	struct sd_req hdr;
+	struct vdi_state *vs = NULL;
+	int vs_count = 0;
+	struct node_id owners[SD_MAX_COPIES];
+	int nr_owners = 0, nr_issued_prevent_inode_update = 0;
 
 	if (vdi_cmd_data.snapshot_id != 0) {
 		sd_err("Please specify a non-integer value for "
@@ -541,11 +586,43 @@ static int vdi_snapshot(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	sd_init_req(&hdr, SD_OP_PREVENT_INODE_UPDATE);
-	ret = dog_exec_req(&sd_nid, &hdr, NULL);
-	if (ret < 0) {
-		sd_err("preventing inode update failed");
+	vs = get_vdi_state(&vs_count);
+	if (!vs)
 		return EXIT_FAILURE;
+
+	for (int i = 0; i < vs_count; i++) {
+		struct vdi_state *s = &vs[i];
+
+		if (s->vid != vid)
+			continue;
+
+		if (s->lock_state == LOCK_STATE_LOCKED) {
+			/* QEMU is using it */
+			memset(&owners[0], 0, sizeof(owners[0]));
+			memcpy(&owners[0], &s->lock_owner, sizeof(owners[0]));
+			nr_owners = 1;
+		} else {
+			/* tgt is using it */
+			for (int j = 0; j < s->nr_participants; i++) {
+				memset(&owners[nr_owners], 0,
+				       sizeof(owners[nr_owners]));
+				memcpy(&owners[nr_owners],
+				       &s->participants[nr_owners],
+				       sizeof(owners[nr_owners]));
+				nr_owners++;
+			}
+		}
+	}
+
+	for (int i = 0; i < nr_owners; i++) {
+		sd_init_req(&hdr, SD_OP_PREVENT_INODE_UPDATE);
+		ret = dog_exec_req(&owners[i], &hdr, NULL);
+		if (ret < 0) {
+			sd_err("preventing inode update failed");
+			goto out;
+		}
+
+		nr_issued_prevent_inode_update++;
 	}
 
 	ret = dog_write_object(vid_to_vdi_oid(vid), 0,
@@ -555,7 +632,7 @@ static int vdi_snapshot(int argc, char **argv)
 			       0, inode->nr_copies, inode->copy_policy,
 			       false, false);
 	if (ret != SD_RES_SUCCESS)
-		return EXIT_FAILURE;
+		goto out;
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, vid, &new_vid, true,
 			    inode->nr_copies, inode->copy_policy,
@@ -569,11 +646,12 @@ static int vdi_snapshot(int argc, char **argv)
 			       " VDI ID of newly created snapshot: %x\n", new_vid, vid);
 	}
 
-	sd_init_req(&hdr, SD_OP_ALLOW_INODE_UPDATE);
-	ret = dog_exec_req(&sd_nid, &hdr, NULL);
-	if (ret < 0) {
-		sd_err("allowing inode update failed");
-		return EXIT_FAILURE;
+out:
+	for (int i = 0; i < nr_issued_prevent_inode_update; i++) {
+		sd_init_req(&hdr, SD_OP_ALLOW_INODE_UPDATE);
+		ret = dog_exec_req(&owners[i], &hdr, NULL);
+		if (ret < 0)
+			sd_err("allowing inode update failed");
 	}
 
 	return ret;
@@ -2716,41 +2794,14 @@ static int vdi_alter_copy(int argc, char **argv)
 
 static int lock_list(int argc, char **argv)
 {
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct vdi_state *vs = NULL;
-	unsigned int rlen;
-	int ret, count;
+	int ret = 0, count = 0;
 
-#define DEFAULT_VDI_STATE_COUNT 512
-	rlen = DEFAULT_VDI_STATE_COUNT * sizeof(struct vdi_state);
-	vs = xzalloc(rlen);
-retry:
-	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
-	hdr.data_length = rlen;
-
-	ret = dog_exec_req(&sd_nid, &hdr, (char *)vs);
-	if (ret < 0)
-		return EXIT_SYSFAIL;
-
-	switch (ret) {
-	case SD_RES_SUCCESS:
-		break;
-	case SD_RES_BUFFER_SMALL:
-		rlen *= 2;
-		vs = xrealloc(vs, rlen);
-		goto retry;
-	default:
-		sd_err("failed to execute SD_OP_GET_VDI_COPIES: %s",
-		       sd_strerror(ret));
-		goto out;
-	}
+	vs = get_vdi_state(&count);
 
 	init_tree();
 	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
-		return EXIT_SYSFAIL;
-
-	count = rsp->data_length / sizeof(*vs);
+		goto out;
 
 	printf("VDI | owner node\n");
 	for (int i = 0; i < count; i++) {
