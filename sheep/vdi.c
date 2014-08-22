@@ -992,10 +992,8 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	base->snap_ctime = iocb->time;
 
 	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
-		if (!base->data_vdi_id[i])
-			continue;
-
-		base->gref[i].count++;
+		if (base->data_vdi_id[i])
+			base->gref[i].count++;
 	}
 
 	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base,
@@ -1007,13 +1005,8 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	}
 
 	/* create a new vdi */
-	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id, NULL);
-	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
-		if (!base->data_vdi_id[i])
-			continue;
-
-		new->gref[i].generation = base->gref[i].generation + 1;
-	}
+	new = alloc_inode(iocb, new_snapid, new_vid, base->data_vdi_id,
+			  base->gref);
 	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
 			      sizeof(*new), 0, true);
 	if (ret != SD_RES_SUCCESS)
@@ -1073,8 +1066,10 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 		goto out;
 	}
 
-	for (int i = 0; i < ARRAY_SIZE(base->gref); i++)
-		base->gref[i].count++;
+	for (int i = 0; i < ARRAY_SIZE(base->gref); i++) {
+		if (base->data_vdi_id[i])
+			base->gref[i].count++;
+	}
 	/* update current working vdi */
 	ret = sd_write_object(vid_to_vdi_oid(base_vid), (char *)base->gref,
 			      sizeof(base->gref),

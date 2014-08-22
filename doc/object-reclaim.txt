@@ -43,6 +43,9 @@ Generational reference counting is performed as follows:
    reference B is initialized as follows:
 
        for (i = 0; i < MAX_DATA_OBJS; i++) {
+       	   if (!A.data_vdi_id[i])
+              continue;
+
            B.gref[i].generation = A.gref[i].generation + 1;
            B.gref[i].count = 0;
        }
@@ -50,7 +53,8 @@ Generational reference counting is performed as follows:
    In addition, A.gref.count's are incremented:
 
        for (i = 0; i < MAX_DATA_OBJS; i++) {
-           A.gref[i].count++;
+       	   if (A.data_vdi_id[i])
+              A.gref[i].count++;
        }
 
 3. When a object o is removed, a decrement message is sent to its
