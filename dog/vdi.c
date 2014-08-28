@@ -2018,7 +2018,7 @@ int do_vdi_check(const struct sd_inode *inode)
 	struct work_queue *wq;
 	int nr_copies = min((int)inode->nr_copies, sd_zones_nr);
 
-	if (0 < inode->copy_policy && sd_zones_nr < nr_copies) {
+	if (0 < inode->copy_policy && sd_zones_nr < (int)inode->nr_copies) {
 		sd_err("ABORT: Not enough active zones for consistency-checking"
 		       " erasure coded VDI");
 		return EXIT_FAILURE;
