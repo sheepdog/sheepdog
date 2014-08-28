@@ -2870,8 +2870,8 @@ static int lock_force_unlock(int argc, char **argv)
 
 static struct subcommand vdi_lock_cmd[] = {
 	{"list", NULL, NULL, "list locked VDIs", NULL, 0, lock_list},
-	{"force-unlock", "<vdiname>", NULL, "unlock locked VDI forcibly", NULL, 0,
-	 lock_force_unlock},
+	{"force-unlock", "<vdiname>", NULL, "unlock locked VDI forcibly", NULL,
+	 CMD_NEED_ARG, lock_force_unlock},
 	{NULL},
 };
 
