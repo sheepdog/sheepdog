@@ -1633,7 +1633,7 @@ out:
 }
 
 static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
-			    void *buf, bool create, uint8_t ec_index)
+			void *buf, unsigned int len, bool create, uint8_t ec_index)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -1645,7 +1645,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 		sd_init_req(&hdr, SD_OP_WRITE_PEER);
 	hdr.epoch = sd_epoch;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	hdr.data_length = get_objsize(oid);
+	hdr.data_length = len;
 	hdr.obj.oid = oid;
 	hdr.obj.ec_index = ec_index;
 
@@ -1872,8 +1872,8 @@ static void check_erasure_object(struct vdi_check_info *info)
 			for (i = 0; i < d; i++)
 				ds[i] = input[i];
 			ec_decode_buffer(ctx, ds, input_idx, obj, m);
-			write_object_to(info->vcw[m].vnode, oid, obj, true,
-					info->vcw[m].ec_index);
+			write_object_to(info->vcw[m].vnode, oid, obj,
+					len, true, info->vcw[m].ec_index);
 			fprintf(stdout, "fixed missing %"PRIx64", "
 				"copy index %d\n", info->oid, m);
 		}
