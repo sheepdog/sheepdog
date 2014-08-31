@@ -3024,7 +3024,7 @@ static int vdi_parser(int ch, const char *opt)
 		vdi_cmd_data.store_policy = 1;
 		break;
 	case 'o':
-		vdi_cmd_data.oid = strtoll(opt, &p, 16);
+		vdi_cmd_data.oid = strtoull(opt, &p, 16);
 		if (opt == p) {
 			sd_err("object id must be a hex integer");
 			exit(EXIT_FAILURE);
