@@ -140,3 +140,17 @@ for i in 0 4 8; do
 	$DOG vdi read test$i | md5sum > $STORE/csum.${i}3.new
 	diff -u $STORE/csum.${i}3.org $STORE/csum.${i}3.new
 done
+
+
+# delete vdi snapshot before saving cluster snapshot
+
+echo "yes" | _cluster_format
+$DOG vdi create test 10M
+_random | $DOG vdi write test
+$DOG vdi snapshot -s vs1 test
+$DOG cluster snapshot save s4 $TMPDIR
+$DOG vdi delete -s 1 test
+$DOG vdi snapshot -s vs2 test
+$DOG cluster snapshot save s5 $TMPDIR
+echo "yes" | $DOG cluster snapshot load s5 $TMPDIR
+_vdi_list
