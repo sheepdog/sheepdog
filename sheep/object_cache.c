@@ -1277,8 +1277,8 @@ static int load_cache(void)
 	while ((d = readdir(dir))) {
 		if (!strncmp(d->d_name, ".", 1))
 			continue;
-		vid = strtoul(d->d_name, NULL, 16);
-		if (vid == ULONG_MAX)
+		vid = strtoull(d->d_name, NULL, 16);
+		if (vid == ULLONG_MAX)
 			continue;
 
 		load_cache_object(find_object_cache(vid, true));
