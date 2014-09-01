@@ -288,7 +288,7 @@ static int vdi_list(int argc, char **argv)
 		struct get_vdi_info info;
 		memset(&info, 0, sizeof(info));
 		info.name = vdiname;
-		if (parse_vdi(print_vdi_list, SD_INODE_SIZE, &info) < 0)
+		if (parse_vdi(print_vdi_list, SD_INODE_SIZE, &info, true) < 0)
 			return EXIT_SYSFAIL;
 		return EXIT_SUCCESS;
 	}
@@ -297,12 +297,12 @@ static int vdi_list(int argc, char **argv)
 		if (!is_data_obj(vdi_cmd_data.oid))
 			return EXIT_FAILURE;
 		if (parse_vdi(print_obj_ref, SD_INODE_SIZE,
-					&vdi_cmd_data.oid) < 0)
+					&vdi_cmd_data.oid, true) < 0)
 			return EXIT_SYSFAIL;
 		return EXIT_SUCCESS;
 	}
 
-	if (parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL) < 0)
+	if (parse_vdi(print_vdi_list, SD_INODE_SIZE, NULL, true) < 0)
 		return EXIT_SYSFAIL;
 	return EXIT_SUCCESS;
 }
@@ -310,7 +310,7 @@ static int vdi_list(int argc, char **argv)
 static int vdi_tree(int argc, char **argv)
 {
 	init_tree();
-	if (parse_vdi(print_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+	if (parse_vdi(print_vdi_tree, SD_INODE_HEADER_SIZE, NULL, true) < 0)
 		return EXIT_SYSFAIL;
 	dump_tree();
 
@@ -324,7 +324,7 @@ static int vdi_graph(int argc, char **argv)
 	printf("  node [shape = \"box\", fontname = \"Courier\"];\n\n");
 	printf("  \"0\" [shape = \"ellipse\", label = \"root\"];\n\n");
 
-	if (parse_vdi(print_vdi_graph, SD_INODE_HEADER_SIZE, NULL) < 0)
+	if (parse_vdi(print_vdi_graph, SD_INODE_HEADER_SIZE, NULL, true) < 0)
 		return EXIT_SYSFAIL;
 
 	/* print a footer */
@@ -2690,7 +2690,8 @@ static bool is_vdi_standalone(uint32_t vid, const char *name)
 	struct vdi_tree *vdi;
 
 	init_tree();
-	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE,
+			NULL, true) < 0)
 		return EXIT_SYSFAIL;
 
 	vdi = find_vdi_from_root(vid, name);
@@ -2800,7 +2801,8 @@ static int lock_list(int argc, char **argv)
 	vs = get_vdi_state(&count);
 
 	init_tree();
-	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE,
+			NULL, true) < 0)
 		goto out;
 
 	printf("VDI | owner node\n");
@@ -2853,7 +2855,8 @@ static int lock_unlock(int argc, char **argv)
 	struct vdi_tree *vdi;
 
 	init_tree();
-	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE, NULL) < 0)
+	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE,
+			NULL, true) < 0)
 		return EXIT_SYSFAIL;
 
 	vdi = find_vdi_from_root_by_name(vdiname);

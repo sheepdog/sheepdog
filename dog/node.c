@@ -87,7 +87,7 @@ static int node_info(int argc, char **argv)
 	}
 
 	if (parse_vdi(cal_total_vdi_size, SD_INODE_HEADER_SIZE,
-			&total_vdi_size) < 0)
+			&total_vdi_size, true) < 0)
 		return EXIT_SYSFAIL;
 
 	printf(raw_output ? "Total %s %s %s %d%% %s\n"

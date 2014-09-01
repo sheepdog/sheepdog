@@ -128,7 +128,8 @@ int dog_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 
 #define FOR_EACH_VDI(nr, vdis) FOR_EACH_BIT(nr, vdis, SD_NR_VDIS)
 
-int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
+int parse_vdi(vdi_parser_func_t func, size_t size, void *data,
+		bool no_deleted)
 {
 	int ret;
 	unsigned long nr;
@@ -163,7 +164,8 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data)
 			continue;
 		}
 
-		if (i->name[0] == '\0') /* this VDI has been deleted */
+		/* this VDI has been deleted, and no need to handle it */
+		if (no_deleted && i->name[0] == '\0')
 			continue;
 
 		if (size > SD_INODE_HEADER_SIZE) {
