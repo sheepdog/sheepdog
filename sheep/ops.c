@@ -881,7 +881,7 @@ static int local_discard_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 	uint32_t vid = oid_to_vid(oid), tmp_vid;
-	int ret = SD_RES_SUCCESS, idx = data_oid_to_idx(oid);
+	int ret, idx = data_oid_to_idx(oid);
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 
 	sd_debug("%"PRIx64, oid);
@@ -1146,7 +1146,7 @@ int peer_decref_object(struct request *req)
 	uint32_t generation = hdr->ref.generation;
 	uint32_t count = hdr->ref.count;
 	uint32_t *ledger = NULL;
-	bool exist = false, locked = false;
+	bool exist = false, locked;
 	static struct sd_mutex lock = SD_MUTEX_INITIALIZER;
 
 	sd_debug("%" PRIx64 ", %" PRIu32 ", %" PRIu32 ", %" PRIu32,
