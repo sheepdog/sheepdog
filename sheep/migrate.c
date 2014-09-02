@@ -114,7 +114,7 @@ static void for_each_epoch(int (*func)(uint32_t epoch))
 static int backup_file(char *fname, char *suffix)
 {
 	char dst_file[PATH_MAX];
-	int fd = -1, ret = -1, len;
+	int fd, ret = -1, len;
 	void *buf = NULL;
 
 	snprintf(dst_file, sizeof(dst_file), "%s.%s", fname, suffix);
