@@ -849,7 +849,7 @@ out:
 
 static int onode_append_data(struct kv_onode *onode, struct http_request *req)
 {
-	int ret = SD_RES_SUCCESS;
+	int ret;
 
 	ret = onode_allocate_extents(onode, req);
 	if (ret != SD_RES_SUCCESS)
@@ -916,7 +916,7 @@ out:
 static int onode_populate_append_data(struct kv_onode *onode,
 				      struct http_request *req)
 {
-	int ret = SD_RES_SUCCESS;
+	int ret;
 
 	onode->mtime = get_seconds();
 
@@ -1239,7 +1239,7 @@ static int onode_allocate_space(struct http_request *req, const char *account,
 {
 	char vdi_name[SD_MAX_VDI_LEN];
 	uint32_t data_vid;
-	int ret = SD_RES_SUCCESS;
+	int ret;
 
 	sys->cdrv->lock(bucket_vid);
 	ret = onode_lookup_nolock(onode, bucket_vid, name);
@@ -1296,7 +1296,7 @@ static int onode_append_space(struct http_request *req, const char *account,
 	char vdi_name[SD_MAX_VDI_LEN];
 	uint32_t data_vid;
 	uint64_t len;
-	int ret = SD_RES_SUCCESS;
+	int ret;
 	bool object_exists = false;
 
 	sys->cdrv->lock(bucket_vid);
