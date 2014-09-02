@@ -272,7 +272,7 @@ static inline bool vdi_is_deleted(struct sd_inode *inode)
 int vdi_exist(uint32_t vid)
 {
 	struct sd_inode *inode;
-	int ret = 1;
+	int ret;
 
 	inode = xzalloc(sizeof(*inode));
 	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
@@ -1236,7 +1236,7 @@ int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info)
 static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid,
 			  uint8_t copy_policy)
 {
-	int ret = SD_RES_SUCCESS;
+	int ret;
 	struct sd_req hdr;
 
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_ADD);
@@ -1373,7 +1373,7 @@ struct deletion_work {
 static int notify_vdi_deletion(uint32_t vdi_id)
 {
 	struct sd_req hdr;
-	int ret = SD_RES_SUCCESS;
+	int ret;
 
 	sd_init_req(&hdr, SD_OP_NOTIFY_VDI_DEL);
 	hdr.flags = SD_FLAG_CMD_WRITE;
