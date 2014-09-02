@@ -194,7 +194,7 @@ static void sdlog_help(void)
 
 static int create_pidfile(const char *filename)
 {
-	int fd = -1;
+	int fd;
 	int len;
 	char buffer[128];
 
