@@ -204,7 +204,7 @@ out:
 static int notify_vdi_add(uint32_t vdi_id, uint8_t nr_copies,
 			  uint8_t copy_policy)
 {
-	int ret = -1;
+	int ret;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char *buf = NULL;
