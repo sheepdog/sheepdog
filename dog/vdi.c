@@ -969,7 +969,7 @@ static int vdi_object_map(int argc, char **argv)
 	uint64_t idx = vdi_cmd_data.index;
 	struct sd_inode *inode = xmalloc(sizeof(*inode));
 	uint32_t vid;
-	int ret = EXIT_SUCCESS;
+	int ret;
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, NULL, inode,
