@@ -802,7 +802,7 @@ out:
 static int object_cache_pull(struct object_cache *oc, uint64_t idx)
 {
 	struct sd_req hdr;
-	int ret = SD_RES_NO_MEM;
+	int ret;
 	uint64_t oid = idx_to_oid(oc->vid, idx);
 	uint32_t data_length = get_objsize(oid);
 	void *buf;
