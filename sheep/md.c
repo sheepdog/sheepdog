@@ -392,7 +392,7 @@ struct process_path_arg {
 
 static void *thread_process_path(void *arg)
 {
-	int ret = SD_RES_SUCCESS;
+	int ret;
 	struct process_path_arg *parg = (struct process_path_arg *)arg;
 
 	ret = for_each_object_in_path(parg->path, parg->func, parg->cleanup,
