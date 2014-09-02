@@ -531,7 +531,7 @@ int http_object_write(const char *path, const char *buf, size_t size,
 		      off_t ignore)
 {
 	char entry[PATH_MAX], url[PATH_MAX];
-	int ret = -EINVAL;
+	int ret;
 
 	/* don't need '\n' at the end of 'buf' */
 	ret = generate_url(buf, size - 1, url, PATH_MAX);
