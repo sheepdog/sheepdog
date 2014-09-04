@@ -334,7 +334,7 @@ static int vdi_graph(int argc, char **argv)
 }
 
 static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
-			 uint32_t *vid, int for_snapshot)
+			 uint32_t *vid)
 {
 	int ret;
 	struct sd_req hdr;
@@ -372,7 +372,7 @@ int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 	int ret;
 	uint32_t vid;
 
-	ret = find_vdi_name(vdiname, snapid, tag, &vid, 0);
+	ret = find_vdi_name(vdiname, snapid, tag, &vid);
 	if (ret < 0) {
 		sd_err("Failed to open VDI %s", vdiname);
 		return EXIT_FAILURE;
@@ -823,7 +823,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
 	int i = 0;
 
-	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid, 0);
+	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid);
 	if (ret < 0) {
 		sd_err("Failed to open VDI %s", vdiname);
 		ret = EXIT_FAILURE;
@@ -2438,7 +2438,7 @@ static int vdi_cache_flush(int argc, char **argv)
 	}
 
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &vid, 0);
+			    vdi_cmd_data.snapshot_tag, &vid);
 	if (ret < 0) {
 		sd_err("Failed to open VDI %s", vdiname);
 		ret = EXIT_FAILURE;
@@ -2473,7 +2473,7 @@ static int vdi_cache_delete(int argc, char **argv)
 	}
 
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &vid, 0);
+			    vdi_cmd_data.snapshot_tag, &vid);
 	if (ret < 0) {
 		sd_err("Failed to open VDI %s", vdiname);
 		ret = EXIT_FAILURE;
@@ -2562,7 +2562,7 @@ static int vdi_cache_purge(int argc, char **argv)
 	if (optind < argc) {
 		vdiname = argv[optind++];
 		ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-				    vdi_cmd_data.snapshot_tag, &vid, 0);
+				    vdi_cmd_data.snapshot_tag, &vid);
 		if (ret < 0) {
 			sd_err("Failed to open VDI %s", vdiname);
 			ret = EXIT_FAILURE;
