@@ -574,6 +574,23 @@ static int vdi_snapshot(int argc, char **argv)
 		return EXIT_USAGE;
 	}
 
+	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
+			vdi_cmd_data.snapshot_tag, &vid);
+	switch (ret) {
+	case SD_RES_NO_VDI:
+		sd_err("Failed to create snapshot for %s: %s",
+			vdiname, sd_strerror(ret));
+		return EXIT_FAILURE;
+	case SD_RES_NO_TAG:
+		break;
+	default:
+		sd_err("Failed to create snapshot for %s, maybe "
+			"snapshot id (%d) or tag (%s) is existed",
+			vdiname, vdi_cmd_data.snapshot_id,
+			vdi_cmd_data.snapshot_tag);
+		return EXIT_FAILURE;
+	}
+
 	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_HEADER_SIZE);
 	if (ret != EXIT_SUCCESS)
 		return ret;
