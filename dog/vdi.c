@@ -353,16 +353,12 @@ static int find_vdi_name(const char *vdiname, uint32_t snapid, const char *tag,
 
 	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
-		return -1;
+		return SD_RES_EIO;
 
-	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("Cannot get VDI info for %s %d %s: %s", vdiname, snapid,
-		       tag, sd_strerror(rsp->result));
-		return -1;
-	}
-	*vid = rsp->vdi.vdi_id;
+	if (rsp->result == SD_RES_SUCCESS)
+		*vid = rsp->vdi.vdi_id;
 
-	return 0;
+	return rsp->result;
 }
 
 int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
@@ -373,8 +369,9 @@ int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 	uint32_t vid;
 
 	ret = find_vdi_name(vdiname, snapid, tag, &vid);
-	if (ret < 0) {
-		sd_err("Failed to open VDI %s", vdiname);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
+				": %s", vdiname, snapid, tag, sd_strerror(ret));
 		return EXIT_FAILURE;
 	}
 
@@ -824,8 +821,9 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	int i = 0;
 
 	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid);
-	if (ret < 0) {
-		sd_err("Failed to open VDI %s", vdiname);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
+				": %s", vdiname, snap_id, snap_tag, sd_strerror(ret));
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -2439,8 +2437,10 @@ static int vdi_cache_flush(int argc, char **argv)
 
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 			    vdi_cmd_data.snapshot_tag, &vid);
-	if (ret < 0) {
-		sd_err("Failed to open VDI %s", vdiname);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
+				": %s", vdiname, vdi_cmd_data.snapshot_id,
+				vdi_cmd_data.snapshot_tag, sd_strerror(ret));
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -2474,8 +2474,10 @@ static int vdi_cache_delete(int argc, char **argv)
 
 	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 			    vdi_cmd_data.snapshot_tag, &vid);
-	if (ret < 0) {
-		sd_err("Failed to open VDI %s", vdiname);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
+				": %s", vdiname, vdi_cmd_data.snapshot_id,
+				vdi_cmd_data.snapshot_tag, sd_strerror(ret));
 		ret = EXIT_FAILURE;
 		goto out;
 	}
@@ -2563,8 +2565,10 @@ static int vdi_cache_purge(int argc, char **argv)
 		vdiname = argv[optind++];
 		ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
 				    vdi_cmd_data.snapshot_tag, &vid);
-		if (ret < 0) {
-			sd_err("Failed to open VDI %s", vdiname);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
+					": %s", vdiname, vdi_cmd_data.snapshot_id,
+					vdi_cmd_data.snapshot_tag, sd_strerror(ret));
 			ret = EXIT_FAILURE;
 			goto out;
 		}
