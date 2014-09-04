@@ -1,5 +1,6 @@
 QA output created by 016
 using backend plain store
+Failed to create snapshot for base, maybe snapshot id (0) or tag (tag) is existed
 there should be no vdi
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 there should be no object
