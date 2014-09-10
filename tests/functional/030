@@ -150,6 +150,7 @@ _random | $DOG vdi write test
 $DOG vdi snapshot -s vs1 test
 $DOG cluster snapshot save s4 $TMPDIR
 $DOG vdi delete -s 1 test
+$DOG cluster snapshot save s5 $TMPDIR
 $DOG vdi snapshot -s vs2 test
 $DOG cluster snapshot save s5 $TMPDIR
 echo "yes" | $DOG cluster snapshot load s5 $TMPDIR

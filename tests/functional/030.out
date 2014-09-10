@@ -104,6 +104,10 @@ s test8        1   10 MB   12 MB  0.0 MB DATE   fd4247      3          snap
    /\|`
   /  |   Caution! The cluster is not empty.
 (/_)_|_  Are you sure you want to continue? [yes/no]: using backend plain store
+Cannot execute. It may be caused by:
+1. The cluster is empty.
+2. All VDIs of the cluster don't have snapshots.
+Fail to save snapshot to path: /tmp/sheepdog/030/tmp.
     __
    ()'`;
    /\|`
