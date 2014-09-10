@@ -365,6 +365,9 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 			return;
 	}
 
+	if (i->name[0] != '\0')
+		opt->nr_snapshot++;
+
 	/* fill vdi object id */
 	object_tree_insert(vdi_oid, i->nr_copies, i->copy_policy);
 
@@ -417,14 +420,15 @@ static int save_snapshot(int argc, char **argv)
 		goto out;
 	}
 
+	opt.nr_snapshot = 0;
 	opt.count = argc - optind;
 	opt.name = argv + optind;
 	if (parse_vdi(fill_object_tree, SD_INODE_SIZE,
 			&opt, false) != SD_RES_SUCCESS)
 		goto out;
 
-	if (object_tree_size() == 0) {
-		sd_err("Object not found. It may be caused by:");
+	if (opt.nr_snapshot == 0) {
+		sd_err("Cannot execute. It may be caused by:");
 		if (opt.count > 0) {
 			sd_err("1. The specified VDIs are not found.");
 			sd_err("2. The specified VDIs don't have snapshots.");

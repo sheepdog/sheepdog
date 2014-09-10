@@ -50,6 +50,7 @@ struct snap_log {
 };
 
 struct vdi_option {
+	int nr_snapshot;
 	int count;
 	char **name;
 	void (*func)(struct sd_inode *inode);
