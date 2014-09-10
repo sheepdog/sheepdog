@@ -116,3 +116,11 @@ Fail to save snapshot to path: /tmp/sheepdog/030/tmp.
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
 s test         2   10 MB  0.0 MB   12 MB DATE   7c2b26      3           vs2
   test         0   10 MB  0.0 MB   12 MB DATE   7c2b27      3              
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+s test         2   10 MB  0.0 MB   12 MB DATE   7c2b26      3           vs2
+  test         0   10 MB  0.0 MB   12 MB DATE   7c2b27      3              

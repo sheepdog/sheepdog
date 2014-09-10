@@ -155,3 +155,5 @@ $DOG vdi snapshot -s vs2 test
 $DOG cluster snapshot save s5 $TMPDIR
 echo "yes" | $DOG cluster snapshot load s5 $TMPDIR
 _vdi_list
+echo "yes" | $DOG cluster snapshot load s5 $TMPDIR test
+_vdi_list
