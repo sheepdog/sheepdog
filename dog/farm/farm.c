@@ -487,6 +487,9 @@ static int visit_vdi_obj_entry(struct trunk_entry *entry, void *data)
 	if (opt->count == 0) {
 		if (opt->enable_if_blank)
 			opt->func(inode);
+	} else if (inode->name[0] == '\0') {
+		if (opt->enable_if_deleted)
+			opt->func(inode);
 	} else {
 		for (int i = 0; i < opt->count; i++)
 			if (!strcmp(inode->name, opt->name[i])) {
@@ -541,6 +544,7 @@ int farm_load_snapshot(uint32_t idx, const char *tag, int count, char **name)
 	opt.name = name;
 	opt.func = register_obj;
 	opt.enable_if_blank = false;
+	opt.enable_if_deleted = true;
 
 	if (for_each_entry_in_trunk(trunk_sha1, visit_vdi_obj_entry, &opt) < 0)
 		goto out;
@@ -592,6 +596,7 @@ int farm_show_snapshot(uint32_t idx, const char *tag, int count, char **name)
 	opt.name = name;
 	opt.func = print_vdi;
 	opt.enable_if_blank = true;
+	opt.enable_if_deleted = false;
 
 	if (for_each_entry_in_trunk(trunk_sha1, visit_vdi_obj_entry, &opt) < 0)
 		goto out;

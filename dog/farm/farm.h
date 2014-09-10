@@ -55,6 +55,7 @@ struct vdi_option {
 	char **name;
 	void (*func)(struct sd_inode *inode);
 	bool enable_if_blank;
+	bool enable_if_deleted;
 };
 
 /* farm.c */
