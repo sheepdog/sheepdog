@@ -47,7 +47,6 @@ struct wq_info {
 	struct list_node list;
 
 	struct sd_mutex finished_lock;
-	struct sd_mutex startup_lock;
 
 	/* workers sleep on this and signaled by work producer */
 	struct sd_cond pending_cond;
@@ -247,18 +246,15 @@ static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 	pthread_t thread;
 	int ret;
 
-	sd_mutex_lock(&wi->startup_lock);
 	while (wi->nr_threads < nr_threads) {
 		ret = pthread_create(&thread, NULL, worker_routine, wi);
 		if (ret != 0) {
 			sd_err("failed to create worker thread: %m");
-			sd_mutex_unlock(&wi->startup_lock);
 			return -1;
 		}
 		wi->nr_threads++;
 		sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
 	}
-	sd_mutex_unlock(&wi->startup_lock);
 
 	return 0;
 }
@@ -313,10 +309,6 @@ static void *worker_routine(void *arg)
 	int tid = gettid();
 
 	set_thread_name(wi->name, (wi->tc != WQ_ORDERED));
-
-	sd_mutex_lock(&wi->startup_lock);
-	/* started this thread */
-	sd_mutex_unlock(&wi->startup_lock);
 
 	trace_set_tid_map(tid);
 	while (true) {
@@ -414,7 +406,6 @@ struct work_queue *create_work_queue(const char *name,
 
 	sd_init_mutex(&wi->finished_lock);
 	sd_init_mutex(&wi->pending_lock);
-	sd_init_mutex(&wi->startup_lock);
 
 	ret = create_worker_threads(wi, 1);
 	if (ret < 0)
@@ -424,7 +415,6 @@ struct work_queue *create_work_queue(const char *name,
 
 	return &wi->q;
 destroy_threads:
-	sd_mutex_unlock(&wi->startup_lock);
 	sd_destroy_cond(&wi->pending_cond);
 	sd_destroy_mutex(&wi->pending_lock);
 	sd_destroy_mutex(&wi->finished_lock);
