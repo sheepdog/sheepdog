@@ -541,11 +541,14 @@ static void md_do_recover(struct work *work)
 out:
 	sd_rw_unlock(&md.lock);
 
-	if (disk)
-		update_node_disks();
-
-	if (nr > 0)
-		kick_recover();
+	if (disk) {
+		if (nr > 0) {
+			update_node_disks();
+			kick_recover();
+		} else {
+			leave_cluster();
+		}
+	}
 
 	free(mw);
 }
