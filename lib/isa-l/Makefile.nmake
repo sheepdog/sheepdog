@@ -1,0 +1,78 @@
+########################################################################
+#  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions 
+#  are met:
+#    * Redistributions of source code must retain the above copyright
+#      notice, this list of conditions and the following disclaimer.
+#    * Redistributions in binary form must reproduce the above copyright
+#      notice, this list of conditions and the following disclaimer in
+#      the documentation and/or other materials provided with the
+#      distribution.
+#    * Neither the name of Intel Corporation nor the names of its
+#      contributors may be used to endorse or promote products derived
+#      from this software without specific prior written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+#  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+#  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+#  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+#  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+#  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+#  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+#  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+#  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+#  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+#  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+########################################################################
+
+objs = bin\ec_base.obj bin\ec_highlevel_func.obj bin\ec_multibinary.obj bin\gf_2vect_dot_prod_sse.obj bin\gf_3vect_dot_prod_sse.obj bin\gf_4vect_dot_prod_sse.obj bin\gf_5vect_dot_prod_sse.obj bin\gf_6vect_dot_prod_sse.obj bin\gf_vect_dot_prod_sse.obj bin\gf_vect_mul_avx.obj bin\gf_vect_mul_sse.obj
+
+libpath  = c:\openssl\lib     #set to ossl path for tests
+libinc   = c:\openssl\include
+zlibpath   = c:\zlib\lib
+zlibinc   = c:\zlib\include
+INCLUDES = -Ierasure_code -Iinclude -I$(libinc) -I$(zlibinc)
+CFLAGS   = -O2 -D ZLIB_WINAPI -D NDEBUG /nologo -D_USE_MATH_DEFINES -Qstd=c99 $(INCLUDES)
+AFLAGS   = -f win64 $(INCLUDES)
+CC       = icl
+AS       = yasm
+
+lib: bin isa-l.lib
+
+bin: ; -mkdir $@
+
+isa-l.lib: $(objs)
+	lib -out:$@ $?
+
+{erasure_code}.c.obj:
+	$(CC) $(CFLAGS) /c -Fo$@ $?
+{erasure_code}.asm.obj:
+	$(AS) $(AFLAGS) -o $@ $?
+
+
+
+.obj.exe:
+	link /out:$@ /nologo /libpath:$(libpath) /libpath:$(zlibpath) isa-l.lib $?
+
+# Unit tests
+tests = erasure_code_base_test.exe erasure_code_sse_test.exe erasure_code_test.exe gf_2vect_dot_prod_sse_test.exe gf_3vect_dot_prod_sse_test.exe gf_4vect_dot_prod_sse_test.exe gf_5vect_dot_prod_sse_test.exe gf_6vect_dot_prod_sse_test.exe gf_inverse_test.exe gf_vect_dot_prod_base_test.exe gf_vect_dot_prod_sse_test.exe gf_vect_dot_prod_test.exe gf_vect_mul_avx_test.exe gf_vect_mul_base_test.exe gf_vect_mul_sse_test.exe gf_vect_mul_test.exe
+
+tests: lib $(tests)
+$(tests): $(@B).obj
+
+# Performance tests
+perfs = erasure_code_base_perf.exe erasure_code_perf.exe erasure_code_sse_perf.exe gf_2vect_dot_prod_sse_perf.exe gf_3vect_dot_prod_sse_perf.exe gf_4vect_dot_prod_sse_perf.exe gf_5vect_dot_prod_sse_perf.exe gf_6vect_dot_prod_sse_perf.exe gf_vect_dot_prod_1tbl.exe gf_vect_dot_prod_perf.exe gf_vect_dot_prod_sse_perf.exe gf_vect_mul_avx_perf.exe gf_vect_mul_perf.exe gf_vect_mul_sse_perf.exe
+
+perfs: lib $(perfs)
+$(perfs): $(@B).obj
+
+clean:
+	-if exist *.obj del *.obj
+	-if exist bin\*.obj del bin\*.obj
+	-if exist *.exe del *.exe
+	-if exist isa-l.lib del isa-l.lib
+
+zlib.lib:
+libeay32.lib:

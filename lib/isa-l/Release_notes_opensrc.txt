@@ -1,0 +1,35 @@
+================================================================================
+v2.8 Intel Intelligent Storage Acceleration Library Release Notes
+     Open Source Version
+================================================================================
+
+================================================================================
+RELEASE NOTE CONTENTS
+================================================================================
+1. KNOWN ISSUES
+2. CHANGE LOG & FEATURES ADDED
+
+================================================================================
+1.  KNOWN ISSUES
+================================================================================
+
+* Only erasure code unit included in open source version at this time.
+
+* Perf tests do not run in Windows environment.
+
+* AVX2 code not supported on FreeBSD
+
+* Leaving <unit>/bin directories from builds in unit directories will cause the
+  top-level make build to fail.  Build only in top-level or ensure unit
+  directories are clean of objects and /bin.
+
+* 32-bit lib is not supported in Windows.
+
+
+================================================================================
+3. CHANGE LOG & FEATURES ADDED 
+================================================================================
+
+v2.8
+
+* First open release of erasure code unit that is part of ISA-L.
