@@ -727,8 +727,11 @@ static int onode_allocate_extents(struct kv_onode *onode,
 		 * if we can put whole request data into extra space of last
 		 * o_extent, it don't need to allocate new extent.
 		 */
-		if (req->data_length <= reserv_len)
+		if (req->data_length <= reserv_len) {
+			onode->o_extent[idx - 1].data_len += req->data_length;
 			goto out;
+		} else
+			onode->o_extent[idx - 1].data_len += reserv_len;
 	}
 	count = DIV_ROUND_UP((req->data_length - reserv_len), SD_DATA_OBJ_SIZE);
 	sys->cdrv->lock(data_vid);
@@ -751,8 +754,40 @@ static int onode_allocate_extents(struct kv_onode *onode,
 
 	onode->o_extent[idx].start = start;
 	onode->o_extent[idx].count = count;
-	onode->o_extent[idx].data_len = 0;
+	onode->o_extent[idx].data_len = req->data_length - reserv_len;
 	onode->nr_extent++;
+out:
+	return ret;
+}
+
+static int do_vdi_write(struct http_request *req, uint32_t data_vid,
+			uint64_t offset, uint64_t total, char *data_buf,
+			bool create)
+{
+	uint64_t done = 0, size;
+	int ret = SD_RES_SUCCESS;
+
+	while (done < total) {
+		size = http_request_read(req, data_buf,
+					 MIN(kv_rw_buffer, total - done));
+		if (size <= 0) {
+			sd_err("Failed to read http request: %ld", size);
+			ret = SD_RES_EIO;
+			goto out;
+		}
+		ret = vdi_read_write(data_vid, data_buf, size, offset,
+				     false, create);
+		sd_debug("vdi_write offset: %"PRIu64", size: %" PRIu64
+			 ", for %" PRIx32 "ret: %d", offset, size,
+			 data_vid, ret);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to write data object for %" PRIx32
+			       ", %s", data_vid, sd_strerror(ret));
+			goto out;
+		}
+		done += size;
+		offset += size;
+	}
 out:
 	return ret;
 }
@@ -762,8 +797,7 @@ static int onode_populate_extents(struct kv_onode *onode,
 {
 	struct onode_extent *ext;
 	struct onode_extent *last_ext = onode->o_extent + onode->nr_extent - 1;
-	ssize_t size;
-	uint64_t done = 0, total, offset = 0, reserv_len;
+	uint64_t total, offset = 0, reserv_len;
 	uint64_t write_buffer_size = MIN(kv_rw_buffer, req->data_length);
 	int ret = SD_RES_SUCCESS;
 	char *data_buf = NULL;
@@ -771,49 +805,37 @@ static int onode_populate_extents(struct kv_onode *onode,
 	bool create = true;
 
 	data_buf = xmalloc(write_buffer_size);
-	if (last_ext->data_len == 0 && onode->nr_extent == 1) {
-		offset = last_ext->start * SD_DATA_OBJ_SIZE +
-			 last_ext->data_len;
-		last_ext->data_len += req->data_length;
-	} else if (last_ext->data_len > 0) {
-		offset = last_ext->start * SD_DATA_OBJ_SIZE +
-			 last_ext->data_len;
-		last_ext->data_len += req->data_length;
-		create = false;
-	} else {
+
+	if (last_ext->data_len < req->data_length) {
 		ext = last_ext - 1;
-		reserv_len = ext->count * SD_DATA_OBJ_SIZE - ext->data_len;
-		offset = ext->start * SD_DATA_OBJ_SIZE + ext->data_len;
-		ext->data_len += reserv_len;
-		last_ext->data_len = req->data_length - reserv_len;
-		/*
-		 * if the previous oid has extra space, we don't need
-		 * to use SD_OP_CREATE_AND_WRITE_OBJ on this oid.
-		 */
-		if (reserv_len > 0)
+		reserv_len = (req->data_length - last_ext->data_len);
+		offset = (ext->start + ext->count) * SD_DATA_OBJ_SIZE -
+			 reserv_len;
+		ret = do_vdi_write(req, data_vid, offset, reserv_len,
+				   data_buf, false);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("Failed to do_vdi_write data_vid: %" PRIx32
+			       ", offset: %" PRIx64 ", total: %" PRIx64
+			       ", ret: %s", data_vid, offset, reserv_len,
+			       sd_strerror(ret));
+			goto out;
+		}
+		offset = last_ext->start * SD_DATA_OBJ_SIZE;
+		total = last_ext->data_len;
+	} else {
+		reserv_len = (last_ext->data_len - req->data_length);
+		offset = last_ext->start * SD_DATA_OBJ_SIZE + reserv_len;
+		total = req->data_length;
+		if (last_ext->data_len > req->data_length)
 			create = false;
 	}
 
-	total = req->data_length;
-	while (done < total) {
-		size = http_request_read(req, data_buf, write_buffer_size);
-		if (size <= 0) {
-			sd_err("Failed to read http request: %ld", size);
-			ret = SD_RES_EIO;
-			goto out;
-		}
-		ret = vdi_read_write(data_vid, data_buf, size, offset,
-				     false, create);
-		sd_debug("vdi_write size: %"PRIu64", offset: %"
-			 PRIu64", ret:%d", size, offset, ret);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to write data object for %s, %s",
-			       onode->name, sd_strerror(ret));
-			goto out;
-		}
-		done += size;
-		offset += size;
-	}
+	ret = do_vdi_write(req, data_vid, offset, total, data_buf, create);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("Failed to do_vdi_write data_vid: %" PRIx32
+		       ", offset: %" PRIx64 ", total: %" PRIx64
+		       ", ret: %s", data_vid, offset, total,
+		       sd_strerror(ret));
 out:
 	free(data_buf);
 	return ret;
