@@ -454,6 +454,8 @@ void fec_free(struct fec *p)
 	assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->d) ^ p->dp) ^
 					 (unsigned long) (p->enc_matrix)));
 	free(p->enc_matrix);
+	if (cpu_has_ssse3)
+		free(p->ec_tbl);
 	free(p);
 }
 
@@ -494,6 +496,12 @@ struct fec *fec_new(unsigned short d, unsigned short dp)
 		*p = 1;
 	free(tmp_m);
 
+	if (cpu_has_ssse3) {
+		retval->ec_tbl = xmalloc(dp * d * 32);
+		ec_init_tables(d, dp - d, retval->enc_matrix + (d * d),
+			       retval->ec_tbl);
+	} else
+		retval->ec_tbl = NULL;
 	return retval;
 }
 
@@ -687,7 +695,7 @@ out:
 	memcpy(output, dp[idx], strip_size);
 }
 
-void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
+void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 		      char *buf, int idx)
 {
 	int i, j, d = ctx->d;
@@ -702,4 +710,32 @@ void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 		ec_decode(ctx, in, in_idx, out, idx);
 		memcpy(buf + strip_size * i, out, strip_size);
 	}
+}
+
+void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
+		       char *buf, int idx)
+{
+	int ed = ctx->d, edp = ctx->dp, len = SD_DATA_OBJ_SIZE / ed, i;
+	unsigned char ec_tbl[ed * edp * 32];
+	unsigned char bm[ed * ed];
+	unsigned char cm[ed];
+	unsigned char dm[ed * ed];
+	unsigned char em[ed * ed];
+	unsigned char *lost[1];
+
+	for (i = 0; i < ed; i++)
+		memcpy(bm + (i * ed), ctx->enc_matrix + (in_idx[i] * ed), ed);
+
+	gf_invert_matrix(bm, dm, ed);
+
+	if (idx < ed)
+		memcpy(cm, dm + (idx * ed), ed);
+	else {
+		memcpy(em, ctx->enc_matrix + (idx * ed), ed);
+		_matmul(em, dm, cm, 1, ed, ed);
+	}
+
+	lost[0] = (unsigned char *)buf;
+	ec_init_tables(ed, 1, cm, ec_tbl);
+	ec_encode_data_sse(len, ed, 1, ec_tbl, input, lost);
 }

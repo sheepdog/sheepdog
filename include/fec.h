@@ -64,11 +64,13 @@
 
 #include "util.h"
 #include "sheepdog_proto.h"
+#include "../lib/isa-l/include/erasure_code.h"
 
 struct fec {
 	unsigned long magic;
 	unsigned short d, dp;                     /* parameters of the code */
 	uint8_t *enc_matrix;
+	unsigned char *ec_tbl;                    /* for isa-l */
 };
 
 void init_fec(void);
@@ -92,6 +94,14 @@ void fec_encode(const struct fec *code,
 		uint8_t *const *const fecs,
 		const int *const block_nums,
 		size_t num_block_nums, size_t sz);
+
+void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
+		       char *buf, int idx);
+
+/* for isa-l */
+
+void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
+		       char *buf, int idx);
 
 /*
  * @param inpkts an array of packets (size k); If a primary block, i, is present
@@ -167,7 +177,12 @@ static inline void ec_encode(struct fec *ctx, const uint8_t *ds[],
 	for (int i = 0; i < p; i++)
 		pidx[i] = ctx->d + i;
 
-	fec_encode(ctx, ds, ps, pidx, p, SD_EC_DATA_STRIPE_SIZE / ctx->d);
+	if (cpu_has_ssse3)
+		ec_encode_data_sse(SD_EC_DATA_STRIPE_SIZE / ctx->d, ctx->d, p,
+				   ctx->ec_tbl, (unsigned char **)ds, ps);
+	else
+		fec_encode(ctx, ds, ps, pidx, p, SD_EC_DATA_STRIPE_SIZE /
+			   ctx->d);
 }
 
 /*
@@ -189,6 +204,12 @@ static inline void ec_destroy(struct fec *ctx)
 	fec_free(ctx);
 }
 
-void ec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		      char *buf, int idx);
+static inline void ec_decode_buffer(struct fec *ctx, uint8_t *input[],
+				    const int in_idx[], char *buf, int idx)
+{
+	if (cpu_has_ssse3)
+		isa_decode_buffer(ctx, input, in_idx, buf, idx);
+	else
+		fec_decode_buffer(ctx, input, in_idx, buf, idx);
+}
 #endif
