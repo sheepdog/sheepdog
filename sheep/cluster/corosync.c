@@ -17,6 +17,7 @@
 #include "cluster.h"
 #include "event.h"
 #include "work.h"
+#include "sheep_priv.h"
 
 #define CPG_INIT_RETRY_CNT 10
 #define COROSYNC_MAX_NODES 1024
@@ -530,6 +531,7 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	struct cpg_node joined_sheep[COROSYNC_MAX_NODES];
 	struct cpg_node left_sheep[COROSYNC_MAX_NODES];
 	bool promote = true;
+	struct vnode_info *vinfo;
 
 	sd_debug("mem:%zu, joined:%zu, left:%zu", member_list_entries,
 		 joined_list_entries, left_list_entries);
@@ -538,6 +540,17 @@ static void cdrv_cpg_confchg(cpg_handle_t handle,
 	build_cpg_node_list(member_sheep, member_list, member_list_entries);
 	build_cpg_node_list(left_sheep, left_list, left_list_entries);
 	build_cpg_node_list(joined_sheep, joined_list, joined_list_entries);
+
+	vinfo = get_vnode_info();
+	if (vinfo) {
+		/* !vinfo is true during joining */
+		if (vinfo->nr_nodes / 2 + 1 <= left_list_entries)
+			panic("a number of leaving node (%zu) is larger than"
+			      " majority (%d), network partition",
+			      left_list_entries, vinfo->nr_nodes / 2 + 1);
+		else
+			put_vnode_info(vinfo);
+	}
 
 	/* dispatch leave_handler */
 	for (i = 0; i < left_list_entries; i++) {
