@@ -790,8 +790,18 @@ main_fn int inode_coherence_update(uint32_t vid, bool validate,
 	assert(entry->lock_state == LOCK_STATE_SHARED);
 
 	if (validate) {
-		for (int i = 0; i < entry->nr_participants; i++)
+		for (int i = 0; i < entry->nr_participants; i++) {
+			if (node_id_cmp(&entry->participants[i], sender)
+			    && entry->participants_state[i] ==
+			    SHARED_LOCK_STATE_INVALIDATED)
+				/*
+				 * don't validate other invalidated, they need
+				 * to validate by themselves
+				 */
+				continue;
+
 			entry->participants_state[i] = SHARED_LOCK_STATE_SHARED;
+		}
 	} else {
 		for (int i = 0; i < entry->nr_participants; i++) {
 			if (node_id_cmp(&entry->participants[i], sender))
