@@ -650,21 +650,21 @@ void play_logged_vdi_ops(void)
 worker_fn bool is_refresh_required(uint32_t vid)
 {
 	struct vdi_state_entry *entry;
+	bool ret = false;
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("VID: %"PRIx32" doesn't exist", vid);
-		return false;
+		goto out;
 	}
 
 	if (entry->snapshot)
-		return false;
+		goto out;
 
 	if (entry->lock_state != LOCK_STATE_SHARED)
-		return false;
+		goto out;
 
 	for (int i = 0; i < entry->nr_participants; i++) {
 		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
@@ -672,13 +672,16 @@ worker_fn bool is_refresh_required(uint32_t vid)
 
 		if (entry->participants_state[i] ==
 		    SHARED_LOCK_STATE_INVALIDATED)
-			return true;
-		else
-			return false;
+			ret = true;
+		goto out;
 	}
 
 	sd_alert("this node isn't locking VID: %"PRIx32, vid);
-	return false;
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
+
+	return ret;
 }
 
 worker_fn void validate_myself(uint32_t vid)
@@ -689,18 +692,17 @@ worker_fn void validate_myself(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("VID: %"PRIx32" doesn't exist", vid);
-		return;
+		goto out;
 	}
 
 	if (entry->snapshot)
-		return;
+		goto out;
 
 	if (entry->lock_state != LOCK_STATE_SHARED)
-		return;
+		goto out;
 
 	for (int i = 0; i < entry->nr_participants; i++) {
 		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
@@ -708,23 +710,30 @@ worker_fn void validate_myself(uint32_t vid)
 
 		if (entry->participants_state[i] !=
 		    SHARED_LOCK_STATE_INVALIDATED)
-			return;
+			goto out;
+
 		goto validate;
 	}
 
 	sd_alert("this node isn't locking VID: %"PRIx32, vid);
-	return;
+	goto out;
 
 validate:
+	sd_rw_unlock(&vdi_state_lock);
+
 	sd_init_req(&hdr, SD_OP_INODE_COHERENCE);
 	hdr.inode_coherence.vid = vid;
 	hdr.inode_coherence.validate = 1;
 	ret = sheep_exec_req(&sys->this_node.nid, &hdr, NULL);
-	if (ret == SD_RES_SUCCESS)
-		return;
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to validate VID: %"PRIx32" by %s",
+		       vid, node_id_to_str(&sys->this_node.nid));
+	}
 
-	sd_err("failed to validate VID: %"PRIx32" by %s",
-	       vid, node_id_to_str(&sys->this_node.nid));
+	return;
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
 }
 
 worker_fn void invalidate_other_nodes(uint32_t vid)
@@ -735,15 +744,14 @@ worker_fn void invalidate_other_nodes(uint32_t vid)
 
 	sd_read_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("VID: %"PRIx32" doesn't exist", vid);
-		return;
+		goto out;
 	}
 
 	if (entry->lock_state != LOCK_STATE_SHARED)
-		return;
+		goto out;
 
 	for (int i = 0; i < entry->nr_participants; i++) {
 		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
@@ -754,22 +762,28 @@ worker_fn void invalidate_other_nodes(uint32_t vid)
 			goto invalidate;
 
 		/* already owned by myself */
-		return;
+		goto out;
 	}
 
 	sd_alert("this node isn't locking VID: %"PRIx32, vid);
-	return;
+	goto out;
 
 invalidate:
+	sd_rw_unlock(&vdi_state_lock);
+
 	sd_init_req(&hdr, SD_OP_INODE_COHERENCE);
 	hdr.inode_coherence.vid = vid;
 	hdr.inode_coherence.validate = 0;
 	ret = sheep_exec_req(&sys->this_node.nid, &hdr, NULL);
-	if (ret == SD_RES_SUCCESS)
-		return;
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to validate VID: %"PRIx32" by %s",
+		       vid, node_id_to_str(&sys->this_node.nid));
+	}
 
-	sd_err("failed to validate VID: %"PRIx32" by %s",
-	       vid, node_id_to_str(&sys->this_node.nid));
+	return;
+
+out:
+	sd_rw_unlock(&vdi_state_lock);
 }
 
 main_fn int inode_coherence_update(uint32_t vid, bool validate,
@@ -777,14 +791,15 @@ main_fn int inode_coherence_update(uint32_t vid, bool validate,
 {
 	struct vdi_state_entry *entry;
 	bool invalidated = false;
+	int ret = SD_RES_SUCCESS;
 
-	sd_read_lock(&vdi_state_lock);
+	sd_write_lock(&vdi_state_lock);
 	entry = vdi_state_search(&vdi_state_root, vid);
-	sd_rw_unlock(&vdi_state_lock);
 
 	if (!entry) {
 		sd_alert("VID: %"PRIx32" doesn't exist", vid);
-		return SD_RES_NO_VDI;
+		ret = SD_RES_NO_VDI;
+		goto out;
 	}
 
 	assert(entry->lock_state == LOCK_STATE_SHARED);
@@ -817,11 +832,13 @@ main_fn int inode_coherence_update(uint32_t vid, bool validate,
 		if (!invalidated) {
 			sd_err("%s isn't participating in VID: %"PRIx32,
 			       node_id_to_str(sender), vid);
-			return SD_RES_NO_VDI;
+			ret = SD_RES_NO_VDI;
 		}
 	}
 
-	return SD_RES_SUCCESS;
+out:
+	sd_rw_unlock(&vdi_state_lock);
+	return ret;
 }
 
 main_fn void remove_node_from_participants(const struct node_id *left)
