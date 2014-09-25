@@ -613,12 +613,32 @@ static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 			       false);
 }
 
+static bool is_inode_refresh_req(struct request *req)
+{
+	uint64_t oid = req->rq.obj.oid;
+	uint32_t data_length = req->rq.data_length;
+	uint32_t offset = req->rq.obj.offset;
+
+	if (!is_vdi_obj(oid))
+		return false;
+
+	if (offset)
+		return false;
+
+	if (data_length != data_vid_offset(SD_INODE_DATA_INDEX))
+		return false;
+
+	return true;
+}
+
 int gateway_read_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 	int ret;
 
-	if (!is_vdi_obj(oid) && is_refresh_required(oid_to_vid(oid))) {
+	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
+	    !is_inode_refresh_req(req) &&
+	    is_refresh_required(oid_to_vid(oid))) {
 		sd_debug("refresh is required: %"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
@@ -635,7 +655,9 @@ int gateway_read_obj(struct request *req)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	validate_myself(oid_to_vid(oid));
+	if (is_inode_refresh_req(req))
+		validate_myself(oid_to_vid(oid));
+
 	return ret;
 }
 
@@ -647,7 +669,8 @@ int gateway_write_obj(struct request *req)
 	uint32_t *vids = NULL, *new_vids = req->data;
 	struct generation_reference *refs = NULL;
 
-	if (is_refresh_required(oid_to_vid(oid))) {
+	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
+	    is_refresh_required(oid_to_vid(oid))) {
 		sd_debug("refresh is required: %"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
@@ -678,7 +701,8 @@ int gateway_write_obj(struct request *req)
 		update_obj_refcnt(hdr, vids, new_vids, refs);
 	}
 out:
-	invalidate_other_nodes(oid_to_vid(oid));
+	if (is_data_vid_update(hdr))
+		invalidate_other_nodes(oid_to_vid(oid));
 
 	free(vids);
 	free(refs);
@@ -719,6 +743,12 @@ out:
 int gateway_create_and_write_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
+
+	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
+	    is_refresh_required(oid_to_vid(oid))) {
+		sd_debug("refresh is required: %"PRIx64, oid);
+		return SD_RES_INODE_INVALIDATED;
+	}
 
 	if (oid_is_readonly(oid))
 		return SD_RES_READONLY;

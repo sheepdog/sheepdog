@@ -53,6 +53,7 @@
 #define SD_FLAG_CMD_DIRECT   0x08 /* don't use object cache */
 /* return something back while sending something to sheep */
 #define SD_FLAG_CMD_PIGGYBACK   0x10
+#define SD_FLAG_CMD_TGT   0x20
 /* flags above 0x80 are sheepdog-internal */
 
 #define SD_RES_SUCCESS       0x00 /* Success */

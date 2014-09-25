@@ -666,9 +666,6 @@ worker_fn bool is_refresh_required(uint32_t vid)
 	if (entry->lock_state != LOCK_STATE_SHARED)
 		return false;
 
-	if (!is_modified(entry))
-		return false;
-
 	for (int i = 0; i < entry->nr_participants; i++) {
 		if (node_id_cmp(&entry->participants[i], &sys->this_node.nid))
 			continue;
