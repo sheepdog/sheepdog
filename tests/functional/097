@@ -41,7 +41,7 @@ _setup_tgtd()
 # $2: iscsi portal
 # $3: VDI name for backing store
 {
-    $TGTD -t 1 -C $1 --iscsi portal=$2
+    $TGTD -C $1 --iscsi portal=$2
     $TGTADM -C $1 --lld iscsi --mode target --op new --tid 1 --targetname iqn.2014-06.org.sheepdog-project
     $TGTADM -C $1 --mode logicalunit --op new --tid 1 --lun 1 --bstype sheepdog --backing-store $3
     $TGTADM -C $1 --mode target --op bind --tid 1 --initiator-address ALL
