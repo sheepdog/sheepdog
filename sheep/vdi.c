@@ -363,13 +363,9 @@ static bool add_new_participant(struct vdi_state_entry *entry,
 		if (node_id_cmp(&entry->participants[i], owner))
 			continue;
 
-		/*
-		 * already exist, VDI locking with reloading inode causes
-		 * this case
-		 */
-		sd_debug("%s is already locking %"PRIx32, node_id_to_str(owner),
+		sd_err("%s is already locking %"PRIx32, node_id_to_str(owner),
 			 entry->vid);
-		return true;
+		return false;
 	}
 
 	idx = entry->nr_participants++;
