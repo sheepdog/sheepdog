@@ -129,7 +129,7 @@ static int corosync_get_local_addr(uint8_t *addr)
 	int ret, nr;
 	corosync_cfg_node_address_t caddr;
 	struct sockaddr_storage *ss = (struct sockaddr_storage *)caddr.address;
-	struct sockaddr_in *sin = (struct sockaddr_in *)caddr.address;
+	struct sockaddr_in *sin4 = (struct sockaddr_in *)caddr.address;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)caddr.address;
 	void *saddr;
 
@@ -149,7 +149,7 @@ static int corosync_get_local_addr(uint8_t *addr)
 		saddr = &sin6->sin6_addr;
 		memcpy(addr, saddr, 16);
 	} else if (ss->ss_family == AF_INET) {
-		saddr = &sin->sin_addr;
+		saddr = &sin4->sin_addr;
 		memset(addr, 0, 16);
 		memcpy(addr + 12, saddr, 4);
 	} else {
