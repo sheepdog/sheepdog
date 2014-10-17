@@ -618,7 +618,7 @@ static void logger(char *log_dir, char *outfile)
 
 		unblock_sighup();
 
-		if (getppid() == 1)
+		if (getppid() != sheep_pid)
 			/* My parent (sheep process) is dead. */
 			break;
 
