@@ -1024,6 +1024,7 @@ static int peer_create_and_write_obj(struct request *req)
 	iocb.ec_index = hdr->obj.ec_index;
 	iocb.copy_policy = hdr->obj.copy_policy;
 	iocb.offset = hdr->obj.offset;
+	iocb.tgt = req->rq.flags & SD_FLAG_CMD_TGT;
 
 	return sd_store->create_and_write(hdr->obj.oid, &iocb);
 }

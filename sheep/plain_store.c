@@ -407,7 +407,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];
 	int flags = prepare_iocb(oid, iocb, true);
-	int ret, fd;
+	int ret, tmp_fd = -1, create_fd = -1;
 	uint32_t len = iocb->length;
 	size_t obj_size;
 	uint64_t offset = iocb->offset;
@@ -426,8 +426,8 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		sync();
 	}
 
-	fd = open(tmp_path, flags, sd_def_fmode);
-	if (fd < 0) {
+	tmp_fd = open(tmp_path, flags, sd_def_fmode);
+	if (tmp_fd < 0) {
 		if (errno == EEXIST) {
 			/*
 			 * This happens if node membership changes during object
@@ -450,20 +450,48 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 
 	if (offset != 0 || len != get_objsize(oid)) {
 		if (is_sparse_object(oid))
-			ret = xftruncate(fd, obj_size);
+			ret = xftruncate(tmp_fd, obj_size);
 		else
-			ret = prealloc(fd, obj_size);
+			ret = prealloc(tmp_fd, obj_size);
 		if (ret < 0) {
 			ret = err_to_sderr(path, oid, errno);
 			goto out;
 		}
 	}
 
-	ret = xpwrite(fd, iocb->buf, len, offset);
+	ret = xpwrite(tmp_fd, iocb->buf, len, offset);
 	if (ret != len) {
 		sd_err("failed to write object. %m");
 		ret = err_to_sderr(path, oid, errno);
 		goto out;
+	}
+
+	if (iocb->tgt) {
+		/*
+		 * In a case of iSCSI multipath, there is a possibility of
+		 * duplicated CREATE_AND_WRITE request. For avoiding overwriting
+		 * existing objects by second (or later) requests, we need to
+		 * check by open(2) with O_EXCL.
+		 */
+
+		/*
+		 * The flags is created by the above prepare_iocb(), it must
+		 * have O_EXCL
+		 */
+		assert(flags & O_EXCL);
+
+		create_fd = open(path, flags, sd_def_fmode);
+		if (create_fd < 0) {
+			if (errno == EEXIST) {
+				sd_debug("duplicated CREATE_AND_WRITE request");
+				ret = SD_RES_SUCCESS;
+				goto out;
+			}
+
+			sd_err("failed to create path: %s", path);
+			ret = default_write(oid, iocb);
+			goto out;
+		}
 	}
 
 	ret = rename(tmp_path, path);
@@ -478,7 +506,8 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 out:
 	if (ret != SD_RES_SUCCESS)
 		unlink(tmp_path);
-	close(fd);
+	close(tmp_fd);
+	close(create_fd);
 	return ret;
 }
 

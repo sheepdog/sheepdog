@@ -204,6 +204,7 @@ struct siocb {
 	uint32_t offset;
 	uint8_t ec_index;
 	uint8_t copy_policy;
+	bool tgt;
 };
 
 /* This structure is used to pass parameters to vdi_* functions. */
