@@ -89,10 +89,7 @@ static size_t list_buffer_size = DEFAULT_LIST_BUFFER_SIZE;
 
 static int obj_cmp(const uint64_t *oid1, const uint64_t *oid2)
 {
-	const uint64_t hval1 = sd_hash_oid(*oid1);
-	const uint64_t hval2 = sd_hash_oid(*oid2);
-
-	return intcmp(hval1, hval2);
+	return intcmp(*oid1, *oid2);
 }
 
 static inline bool node_is_gateway_only(void)
