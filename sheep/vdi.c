@@ -163,9 +163,13 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 
 	if (cp) {
 		int d;
+		static struct sd_mutex m = SD_MUTEX_INITIALIZER;
 
 		ec_policy_to_dp(cp, &d, NULL);
+
+		sd_mutex_lock(&m);
 		ec_max_data_strip = max(d, ec_max_data_strip);
+		sd_mutex_unlock(&m);
 	}
 
 	sd_debug("%" PRIx32 ", %d, %d", vid, nr_copies, cp);
