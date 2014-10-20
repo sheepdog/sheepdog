@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Test recovery process of erasure coding in a case of nr nodes < nr data stripe
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+_cluster_format -c 2:1
+
+$DOG vdi create test 64M
+
+_random | $DOG vdi write test 0 $((4 * 1024 * 1024 * 64))
+
+$DOG node list
+
+BEFORE=`$DOG vdi read test | md5sum`
+
+_kill_sheep 1
+_wait_for_sheep_stop 1
+$DOG cluster info | _filter_cluster_info
+
+_kill_sheep 2
+_wait_for_sheep_stop 2
+$DOG cluster info | _filter_cluster_info
+
+for i in 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+$DOG cluster info | _filter_cluster_info
+
+$DOG node list
+
+AFTER=`$DOG vdi read test | md5sum`
+
+if [[ $BEFORE = $AFTER ]]
+then
+    echo "checksum matched, success"
+else
+    echo "checksum not matched, fail"
+    echo "before: " $BEFORE
+    echo "after:  " $AFTER
+fi

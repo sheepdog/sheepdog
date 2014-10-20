@@ -112,3 +112,4 @@
 095 auto quick store md
 096 auto quick cluster
 097 vdi cluster
+098 auto quick vdi cluster
