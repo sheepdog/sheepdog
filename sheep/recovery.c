@@ -99,7 +99,8 @@ static inline bool node_is_gateway_only(void)
 
 static struct vnode_info *rollback_vnode_info(uint32_t *epoch,
 					      struct recovery_info *rinfo,
-					      struct vnode_info *cur)
+					      struct vnode_info *cur,
+					      bool ec)
 {
 	struct sd_node nodes[SD_MAX_NODES];
 	int nr_nodes;
@@ -107,7 +108,7 @@ static struct vnode_info *rollback_vnode_info(uint32_t *epoch,
 
 rollback:
 	*epoch -= 1;
-	if (*epoch < last_gathered_epoch)
+	if ((!ec && *epoch < last_gathered_epoch) || !*epoch)
 		return NULL;
 
 	nr_nodes = get_nodes_epoch(*epoch, cur, nodes, sizeof(nodes));
@@ -115,6 +116,7 @@ rollback:
 		/* We rollback in case we don't get a valid epoch */
 		sd_alert("cannot get epoch %d", *epoch);
 		sd_alert("clients may see old data");
+
 		goto rollback;
 	}
 	/* double check */
@@ -220,7 +222,7 @@ again:
 	default:
 rollback:
 		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
-					      rw->cur_vinfo);
+					      rw->cur_vinfo, true);
 		if (!new_old) {
 			sd_err("can not read %"PRIx64" idx %d", oid, idx);
 			free(buf);
@@ -404,7 +406,7 @@ again:
 	default:
 		/* No luck, roll back to an older configuration and try again */
 		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
-					      rw->cur_vinfo);
+					      rw->cur_vinfo, false);
 		if (!new_old) {
 			sd_err("can not recover oid %"PRIx64, oid);
 			ret = -1;
