@@ -350,6 +350,56 @@ char *chomp(char *str)
 	return str;
 }
 
+struct purge_work_unit {
+	bool is_dir;
+	char path[PATH_MAX];
+};
+
+struct purge_work {
+	struct work work;
+
+	int nr_units, units_size;
+	struct purge_work_unit *units;
+};
+
+static void purge_work_fn(struct work *work)
+{
+	struct purge_work *pw = container_of(work, struct purge_work, work);
+	int ret;
+
+	for (int i = 0 ; i < pw->nr_units; i++) {
+		struct purge_work_unit *unit;
+
+		unit = &pw->units[i];
+
+		if (unit->is_dir)
+			ret = rmdir_r(unit->path);
+		else
+			ret = unlink(unit->path);
+
+		if (ret)
+			sd_err("failed to remove %s %s: %m",
+			       unit->is_dir ? "directory" : "file", unit->path);
+
+		/*
+		 * We cannot check and do something even above rmdir_r() and
+		 * unlink() cause error. Actually, sd_store->cleanup() (typical
+		 * user of purge_directory()) call of
+		 * cluster_recovery_completion() ignores its error code.
+		 */
+	}
+}
+
+static void purge_work_done(struct work *work)
+{
+	struct purge_work *pw = container_of(work, struct purge_work, work);
+
+	sd_debug("purging work done, number of units: %d", pw->nr_units);
+
+	free(pw->units);
+	free(pw);
+}
+
 /* Purge directory recursively */
 int purge_directory(const char *dir_path)
 {
@@ -358,12 +408,21 @@ int purge_directory(const char *dir_path)
 	DIR *dir;
 	struct dirent *d;
 	char path[PATH_MAX];
+	struct purge_work *w = NULL;
 
 	dir = opendir(dir_path);
 	if (!dir) {
 		if (errno != ENOENT)
 			sd_err("failed to open %s: %m", dir_path);
 		return -errno;
+	}
+
+	if (util_wqueue) {
+		/* we have workqueue for it, don't unlink in this thread */
+		w = xzalloc(sizeof(*w));
+		w->nr_units = 0;
+		w->units_size = 512; /* should this value be configurable? */
+		w->units = xcalloc(w->units_size, sizeof(w->units[0]));
 	}
 
 	while ((d = readdir(dir))) {
@@ -376,17 +435,43 @@ int purge_directory(const char *dir_path)
 			sd_err("failed to stat %s: %m", path);
 			goto out;
 		}
-		if (S_ISDIR(s.st_mode))
-			ret = rmdir_r(path);
-		else
-			ret = unlink(path);
 
-		if (ret != 0) {
-			sd_err("failed to remove %s %s: %m",
-			       S_ISDIR(s.st_mode) ? "directory" : "file", path);
-			goto out;
+		if (util_wqueue) {
+			struct purge_work_unit *unit;
+
+			unit = &w->units[w->nr_units++];
+
+			unit->is_dir = S_ISDIR(s.st_mode);
+			strcpy(unit->path, path);
+
+			if (w->nr_units == w->units_size) {
+				w->units_size *= 2;
+				w->units = xrealloc(w->units,
+					    sizeof(struct purge_work_unit) *
+						    w->units_size);
+			}
+		} else {
+			if (S_ISDIR(s.st_mode))
+				ret = rmdir_r(path);
+			else
+				ret = unlink(path);
+
+			if (ret != 0) {
+				sd_err("failed to remove %s %s: %m",
+				       S_ISDIR(s.st_mode) ?
+				       "directory" : "file",
+				       path);
+				goto out;
+			}
 		}
 	}
+
+	if (util_wqueue) {
+		w->work.fn = purge_work_fn;
+		w->work.done = purge_work_done;
+		queue_work(util_wqueue, &w->work);
+	}
+
 out:
 	closedir(dir);
 	return ret;
