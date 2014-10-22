@@ -21,6 +21,14 @@
 #include <fcntl.h>
 
 #include "util.h"
+#include "work.h"
+
+static struct work_queue *util_wqueue;
+
+void register_util_wq(struct work_queue *wq)
+{
+	util_wqueue = wq;
+}
 
 mode_t sd_def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 mode_t sd_def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;

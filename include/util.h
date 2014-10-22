@@ -575,4 +575,7 @@ static inline uint64_t clock_get_time(void)
 
 char *xstrdup(const char *s);
 
+struct work_queue;
+void register_util_wq(struct work_queue *wq);
+
 #endif
