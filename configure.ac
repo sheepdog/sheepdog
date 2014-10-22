@@ -265,6 +265,39 @@ AC_ARG_ENABLE([diskvnodes],
 	[ enable_diskvnodes="no" ],)
 AM_CONDITIONAL(BUILD_DISKVNODES, test x$enable_diskvnodes = xyes)
 
+AC_ARG_ENABLE(systemd, AS_HELP_STRING([--enable-systemd],[enable systemd support]),enable_systemd=$enableval,enable_systemd=auto)
+
+dnl systemd detection
+if test x$enable_systemd = xno ; then
+    have_systemd=no;
+else
+    PKG_CHECK_MODULES([SYSTEMD],
+        [libsystemd >= 209],
+        [have_systemd=yes])
+fi
+
+if test x$have_systemd = xyes; then
+    AC_DEFINE(HAVE_SYSTEMD,1,[Have systemd])
+fi
+
+if test x$enable_systemd = xyes -a x$have_systemd != xyes ; then
+    AC_MSG_ERROR([Explicitly requested systemd support, but systemd not found])
+fi
+
+##### systemd unit files
+AC_ARG_WITH([systemdsystemunitdir],
+AS_HELP_STRING([--with-systemdsystemunitdir=DIR], [Directory for systemd service files]),
+    [],
+    [
+    PKG_CHECK_EXISTS([systemd],
+      [with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)],
+      [with_systemdsystemunitdir=no])
+    ])
+if test "x$with_systemdsystemunitdir" != xno; then
+   AC_SUBST([systemdsystemunitdir], [$with_systemdsystemunitdir])
+fi
+AM_CONDITIONAL(HAVE_SYSTEMD, [test "x$have_systemd" != "xno" -a -n "$with_systemdsystemunitdir" -a "x$with_systemdsystemunitdir" != xno ])
+
 
 CP=cp
 OS_LDL="-ldl"

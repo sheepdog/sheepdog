@@ -1,0 +1,15 @@
+[Unit]
+Description=Sheepdog QEMU/KVM Block Storage
+After=network.target
+Wants=syslog.target
+
+[Service]
+EnvironmentFile=-@SYSCONFDIR@/conf.d/sheepdog.conf
+EnvironmentFile=-@SYSCONFDIR@/sysconfig/sheepdog
+EnvironmentFile=-@SYSCONFDIR@/default/sheepdog
+ExecStart=@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid ${SHEEP_OPTS:-"--cluster local --log syslog --pidfile @LOCALSTATEDIR@/run/sheep.pid --upgrade @LOCALSTATEDIR@/lib/sheepdog"}
+PIDFile=@LOCALSTATEDIR@/run/sheep.pid
+Type=forking
+
+[Install]
+WantedBy=multi-user.target
