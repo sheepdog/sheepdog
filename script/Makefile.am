@@ -1,11 +1,14 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-EXTRA_DIST		= sheepdog.in
+EXTRA_DIST		= sheepdog.in sheepdog.service.in
 
 noinst_HEADERS		= checkarch.sh vditest gen_man.pl gen_bash_completion.pl
 
 initscript_SCRIPTS	= sheepdog
 initscriptdir		= $(INITDDIR)
+
+systemd_DATA = sheepdog.service
+systemddir = $(systemdsystemunitdir)
 
 completion_DATA		= dog
 completiondir		= $(sysconfdir)/bash_completion.d
@@ -23,10 +26,10 @@ dog: gen_bash_completion.pl Makefile
 		-e 's#@''INITDDIR@#$(INITDDIR)#g' \
 		-e 's#@''LOCALSTATEDIR@#$(localstatedir)#g' \
 		$< > $@-t
-	chmod 0755 $@-t
+	if [ $@ != "sheepdog.service" ]; then chmod 0755 $@-t; fi
 	mv $@-t $@
 
-all-local: $(initscript_SCRIPTS) $(completion_DATA)
+all-local: $(initscript_SCRIPTS) $(systemd_SERVICES) $(completion_DATA)
 
 clean-local:
-	rm -rf $(initscript_SCRIPTS) $(completion_DATA)
+	rm -rf $(initscript_SCRIPTS) $(systemd_SERVICES) $(completion_DATA)
