@@ -265,7 +265,7 @@ AC_ARG_ENABLE([diskvnodes],
 	[ enable_diskvnodes="no" ],)
 AM_CONDITIONAL(BUILD_DISKVNODES, test x$enable_diskvnodes = xyes)
 
-AC_ARG_ENABLE(systemd, AS_HELP_STRING([--enable-systemd],[enable systemd support]),enable_systemd=$enableval,enable_systemd=auto)
+AC_ARG_ENABLE(systemd, AS_HELP_STRING([--enable-systemd],[enable systemd support]),enable_systemd=$enableval,enable_systemd="no")
 
 dnl systemd detection
 if test x$enable_systemd = xno ; then
