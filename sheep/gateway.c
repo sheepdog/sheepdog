@@ -681,6 +681,9 @@ int gateway_write_obj(struct request *req)
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
 
+	if (is_data_vid_update(hdr))
+		invalidate_other_nodes(oid_to_vid(oid));
+
 	if (is_data_vid_update(hdr)) {
 		size_t nr_vids = hdr->data_length / sizeof(*vids);
 
@@ -701,8 +704,6 @@ int gateway_write_obj(struct request *req)
 		update_obj_refcnt(hdr, vids, new_vids, refs);
 	}
 out:
-	if (is_data_vid_update(hdr))
-		invalidate_other_nodes(oid_to_vid(oid));
 
 	free(vids);
 	free(refs);
