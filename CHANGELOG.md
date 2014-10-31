@@ -1,4 +1,4 @@
-## 0.9.0 (not released yet)
+## 0.9.0
 
 NEW FEATURE:
  - new object reclaim scheme: Sheep uses new garbage collection algorithm for reclaiming objects. Disk consumption of deleted VDIs are reduced dramatically.
