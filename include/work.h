@@ -63,6 +63,7 @@ struct work_queue *create_work_queue(const char *name, enum wq_thread_control);
 struct work_queue *create_ordered_work_queue(const char *name);
 void queue_work(struct work_queue *q, struct work *work);
 bool work_queue_empty(struct work_queue *q);
+int wq_trace_init(void);
 
 #ifdef HAVE_TRACE
 void suspend_worker_threads(void);

@@ -134,7 +134,7 @@ static void suspend(int num)
 	eventfd_xwrite(ack_efd, 1); /* ack of resume */
 }
 
-static int wq_trace_init(void)
+int wq_trace_init(void)
 {
 	tid_max = TID_MAX_DEFAULT;
 	tid_map = alloc_bitmap(NULL, 0, tid_max);
@@ -180,7 +180,7 @@ static void trace_clear_tid_map(int tid)
 
 #else
 
-static inline int wq_trace_init(void) { return 0; }
+int wq_trace_init(void) { return 0; }
 static inline void trace_set_tid_map(int tid) {}
 static inline void trace_clear_tid_map(int tid) {}
 
@@ -363,10 +363,6 @@ int init_work_queue(size_t (*get_nr_nodes)(void))
 		sd_err("failed to create event fd: %m");
 		return -1;
 	}
-
-	ret = wq_trace_init();
-	if (ret < 0)
-		return ret;
 
 	ret = register_event(efd, worker_thread_request_done, NULL);
 	if (ret) {

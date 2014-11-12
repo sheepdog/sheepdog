@@ -885,6 +885,13 @@ int main(int argc, char **argv)
 		goto cleanup_log;
 	}
 
+	/* We should init trace for work queue before journal init */
+	ret = wq_trace_init();
+	if (ret) {
+		sd_err("failed to init trace for work queue");
+		goto cleanup_log;
+	}
+
 	/* We should init journal file before backend init */
 	if (uatomic_is_true(&sys->use_journal)) {
 		if (!strlen(jpath))
