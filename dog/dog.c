@@ -559,6 +559,9 @@ int main(int argc, char **argv)
 	if (init_event(EPOLL_SIZE) < 0)
 		exit(EXIT_SYSFAIL);
 
+	if (wq_trace_init() < 0)
+		exit(EXIT_SYSFAIL);
+
 	if (init_work_queue(get_nr_nodes) != 0) {
 		sd_err("Failed to init work queue");
 		exit(EXIT_SYSFAIL);
