@@ -7,7 +7,7 @@ Wants=syslog.target
 EnvironmentFile=-@SYSCONFDIR@/conf.d/sheepdog.conf
 EnvironmentFile=-@SYSCONFDIR@/sysconfig/sheepdog
 EnvironmentFile=-@SYSCONFDIR@/default/sheepdog
-ExecStart=@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid --log dst=syslog $SHEEP_OPTS @LOCALSTATEDIR@/lib/sheepdog
+ExecStart=@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid $SHEEP_OPTS
 PIDFile=@LOCALSTATEDIR@/run/sheep.pid
 Type=forking
 
