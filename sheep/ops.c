@@ -1186,10 +1186,9 @@ int peer_decref_object(struct request *req)
 	if (is_zero_ledger(ledger)) {
 		struct sd_node *nodes[SD_MAX_COPIES];
 		int nr_copies;
-		uint32_t vid;
 
-		vid = oid_to_vid(ledger_oid);
-		nr_copies = get_vdi_copy_number(vid);
+		nr_copies = get_obj_copy_number(ledger_oid,
+						req->vinfo->nr_zones);
 		memset(nodes, 0, sizeof(nodes));
 
 		/* reclaim object */
