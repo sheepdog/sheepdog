@@ -4,11 +4,11 @@ After=network.target
 Wants=syslog.target
 
 [Service]
-EnvironmentFile=-/etc/conf.d/sheepdog.conf
-EnvironmentFile=-/etc/sysconfig/sheepdog
-EnvironmentFile=-/etc/default/sheepdog
-ExecStart=/usr/sbin/sheep --pidfile /var/run/sheep.pid --log dst=syslog $SHEEP_OPTS /var/lib/sheepdog
-PIDFile=/var/run/sheep.pid
+EnvironmentFile=-@SYSCONFDIR@/conf.d/sheepdog.conf
+EnvironmentFile=-@SYSCONFDIR@/sysconfig/sheepdog
+EnvironmentFile=-@SYSCONFDIR@/default/sheepdog
+ExecStart=@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid --log dst=syslog $SHEEP_OPTS @LOCALSTATEDIR@/lib/sheepdog
+PIDFile=@LOCALSTATEDIR@/run/sheep.pid
 Type=forking
 
 [Install]
