@@ -137,6 +137,7 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data,
 	struct sd_req req;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req;
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	static DECLARE_BITMAP(vdi_deleted, SD_NR_VDIS);
 	uint32_t rlen;
 
 	sd_init_req(&req, SD_OP_READ_VDIS);
@@ -150,9 +151,23 @@ int parse_vdi(vdi_parser_func_t func, size_t size, void *data,
 		goto out;
 	}
 
+	sd_init_req(&req, SD_OP_READ_DEL_VDIS);
+	req.data_length = sizeof(vdi_deleted);
+
+	ret = dog_exec_req(&sd_nid, &req, vdi_deleted);
+	if (ret < 0)
+		goto out;
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
+		goto out;
+	}
+
 	FOR_EACH_VDI(nr, vdi_inuse) {
 		uint64_t oid;
 		uint32_t snapid;
+
+		if (test_bit(nr, vdi_deleted))
+			continue;
 
 		oid = vid_to_vdi_oid(nr);
 

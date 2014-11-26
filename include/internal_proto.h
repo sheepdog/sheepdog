@@ -24,7 +24,7 @@
 #include "rbtree.h"
 #include "fec.h"
 
-#define SD_SHEEP_PROTO_VER 0x09
+#define SD_SHEEP_PROTO_VER 0x0a
 
 #define SD_DEFAULT_COPIES 3
 /*

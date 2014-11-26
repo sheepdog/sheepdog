@@ -131,6 +131,7 @@ struct system_info {
 	uint64_t disk_space;
 
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	DECLARE_BITMAP(vdi_deleted, SD_NR_VDIS);
 
 	int local_req_efd;
 
@@ -357,6 +358,7 @@ void remove_node_from_participants(const struct node_id *left);
 extern int ec_max_data_strip;
 
 int read_vdis(char *data, int len, unsigned int *rsp_len);
+int read_del_vdis(char *data, int len, unsigned int *rsp_len);
 
 int get_vdi_attr(struct sheepdog_vdi_attr *vattr, int data_len, uint32_t vid,
 		uint32_t *attrid, uint64_t ctime, bool write,

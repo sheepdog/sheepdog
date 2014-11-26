@@ -19,6 +19,7 @@ struct node {
 struct get_vdis_work {
 	struct work work;
 	DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	DECLARE_BITMAP(vdi_deleted, SD_NR_VDIS);
 	struct sd_node joined;
 	struct rb_root nroot;
 };
