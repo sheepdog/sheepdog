@@ -15,6 +15,7 @@ struct vdi_state_entry {
 	uint32_t vid;
 	unsigned int nr_copies;
 	bool snapshot;
+	bool deleted;
 	uint8_t copy_policy;
 	struct rb_node node;
 
@@ -248,6 +249,7 @@ static struct vdi_state *fill_vdi_state_list_with_alloc(int *result_nr)
 		vs[i].vid = entry->vid;
 		vs[i].nr_copies = entry->nr_copies;
 		vs[i].snapshot = entry->snapshot;
+		vs[i].deleted = entry->deleted;
 		vs[i].copy_policy = entry->copy_policy;
 		vs[i].lock_state = entry->lock_state;
 		vs[i].lock_owner = entry->owner;
@@ -1574,6 +1576,22 @@ int vdi_delete(const struct vdi_iocb *iocb, struct request *req)
 	ret = start_deletion(req, info.vid);
 out:
 	return ret;
+}
+
+void vdi_mark_deleted(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+
+	sd_write_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	if (!entry) {
+		sd_err("VID: %"PRIx32" not found", vid);
+		goto out;
+	}
+
+	entry->deleted = true;
+out:
+	sd_rw_unlock(&vdi_state_lock);
 }
 
 /* Calculate a vdi attribute id from sheepdog_vdi_attr. */

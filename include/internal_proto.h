@@ -353,6 +353,7 @@ struct vdi_state {
 	uint32_t vid;
 	uint8_t nr_copies;
 	uint8_t snapshot;
+	uint8_t deleted;
 	uint8_t copy_policy;
 
 	uint32_t lock_state;
