@@ -2888,22 +2888,55 @@ static int lock_unlock(int argc, char **argv)
 	struct sd_req hdr;
 	const char *vdiname = argv[optind];
 	struct vdi_tree *vdi;
+	struct vdi_state *vs = NULL;
+	int ret = EXIT_SYSFAIL, vs_count = 0;
+	uint32_t type;
 
 	init_tree();
 	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE,
 			NULL, true) < 0)
-		return EXIT_SYSFAIL;
+		goto out;
 
 	vdi = find_vdi_from_root_by_name(vdiname);
 	if (!vdi) {
 		sd_err("VDI: %s not found", vdiname);
-		return EXIT_SYSFAIL;
+		goto out;
 	}
 
-	sd_init_req(&hdr, SD_OP_RELEASE_VDI);
-	hdr.vdi.base_vdi_id = vdi->vid;
+	vs = get_vdi_state(&vs_count);
+	if (!vs)
+		goto out;
 
-	return dog_exec_req(&sd_nid, &hdr, NULL);
+	for (int i = 0; i < vs_count; i++) {
+		if (vs[i].vid != vdi->vid)
+			continue;
+
+		switch (vs[i].lock_state) {
+		case LOCK_STATE_UNLOCKED:
+			sd_err("VDI: %s is not locked", vdiname);
+			goto out;
+		case LOCK_STATE_LOCKED:
+			type = LOCK_TYPE_NORMAL;
+			break;
+		case LOCK_STATE_SHARED:
+			type = LOCK_TYPE_SHARED;
+			break;
+		default:
+			sd_err("VDI: %s unknown lock state", vdiname);
+			goto out;
+		}
+
+		sd_init_req(&hdr, SD_OP_RELEASE_VDI);
+		hdr.vdi.base_vdi_id = vdi->vid;
+		hdr.vdi.type = type;
+		ret = dog_exec_req(&sd_nid, &hdr, NULL);
+		goto out;
+	}
+
+out:
+	if (vs)
+		free(vs);
+	return ret;
 }
 
 static struct subcommand vdi_lock_cmd[] = {
