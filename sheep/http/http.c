@@ -175,7 +175,7 @@ static int request_init_operation(struct http_request *req)
 		char *left, *right, num[64];
 		uint64_t max;
 		left = strstr(p, prefix);
-		if (!p)
+		if (!left)
 			goto invalid_range;
 		right = strchr(left, '-');
 		strncpy(num, left + sizeof(prefix) - 1, right - left);
