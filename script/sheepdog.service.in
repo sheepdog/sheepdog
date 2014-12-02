@@ -7,7 +7,7 @@ Wants=syslog.target
 EnvironmentFile=-@SYSCONFDIR@/conf.d/sheepdog.conf
 EnvironmentFile=-@SYSCONFDIR@/sysconfig/sheepdog
 EnvironmentFile=-@SYSCONFDIR@/default/sheepdog
-ExecStart=@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid ${SHEEP_OPTS:-"--cluster local --log syslog --pidfile @LOCALSTATEDIR@/run/sheep.pid --upgrade @LOCALSTATEDIR@/lib/sheepdog"}
+ExecStart=/bin/sh -c '@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid $(if [ -z "$SHEEP_OPTS" ]; then echo "--cluster local --log dst=syslog --upgrade @LOCALSTATEDIR@/lib/sheepdog"; else echo $SHEEP_OPTS; fi)'
 PIDFile=@LOCALSTATEDIR@/run/sheep.pid
 Type=forking
 
