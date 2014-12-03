@@ -631,7 +631,7 @@ static int vdi_snapshot(int argc, char **argv)
 			nr_owners = 1;
 		} else {
 			/* tgt is using it */
-			for (int j = 0; j < s->nr_participants; i++) {
+			for (int j = 0; j < s->nr_participants; j++) {
 				memset(&owners[nr_owners], 0,
 				       sizeof(owners[nr_owners]));
 				memcpy(&owners[nr_owners],
