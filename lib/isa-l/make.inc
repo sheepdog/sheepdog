@@ -38,7 +38,7 @@
 #	trace - get simulator trace
 #	clean - remove object files
 
-CC  = gcc
+CC  ?= gcc
 AS  = yasm
 SIM = sde $(SIMFLAGS) --
 
@@ -78,10 +78,9 @@ endif
 
 
 INCLUDE   = $(patsubst %,-I%,$(subst :, ,$(VPATH)))
-CFLAGS   = $(CFLAGS_$(arch)) $(CFLAGS_$(CC)) $(DEBUG) -O2 $(DEFINES) $(INCLUDE)
-ASFLAGS  = $(ASFLAGS_$(arch)) $(ASFLAGS_$(CC)) $(DEBUG_$(AS)) $(DEFINES) $(INCLUDE)
+CFLAGS   += $(DEFINES) $(INCLUDE)
+ASFLAGS  += $(ASFLAGS_$(arch)) $(DEFINES) $(INCLUDE)
 ARFLAGS  = $(ARFLAGS_$(arch))
-DEFINES += $(addprefix -D , $D)
 
 O = bin
 lobj  += $(patsubst %.c,%.o,$(patsubst %.asm,%.o,$(lsrc$(arch))))
@@ -137,15 +136,15 @@ msg = $(if $(DEBUG),DEBUG) $(patsubst 32,32-bit,$(arch)) $D
 
 $(O)/%.o: %.asm
 	@echo "  ---> Building $< $(msg)"
-	@$(AS) $(ASFLAGS) -o $@ $<
+	$(AS) $(ASFLAGS) -o $@ $<
 
 $(O)/%.o %.o: %.c
 	@echo "  ---> Building $< $(msg)"
-	@$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
 $(all_tests):
 	@echo "  ---> Building Test $@ $(msg)"
-	@$(LINK.o) $(CFLAGS)  $^ $(LDLIBS) -o $@
+	$(LINK.o) $(CFLAGS)  $^ $(LDLIBS) -o $@
 
 
 # Target to build lib files
@@ -162,8 +161,7 @@ endif
 #lib $(lib_name): $(lib_name)(${objs})
 $(lib_name): $(objs)
 	@echo "  ---> Creating Lib $@"
-	@$(AR) $(ARFLAGS) $^
-	@$(STRIP_$(CC))
+	$(AR) $(ARFLAGS) $^
 
 
 # Target for shared lib
@@ -174,7 +172,7 @@ shared_objs  += $(addprefix $(O)/shared_ver_,$(patsubst %.c,%.o,$(filter %.c,$(l
 
 $(O)/shared_ver_%.o: %.c
 	@echo "  ---> Building shared $< $(msg)"
-	@$(COMPILE.c) $(OUTPUT_OPTION) $<
+	$(COMPILE.c) $(OUTPUT_OPTION) $<
 
 ifneq ($(lib_debug),1)
  $(so_lib_name): DEBUG_$(AS)=
@@ -186,7 +184,7 @@ $(shared_objs): CFLAGS += -fPIC
 $(shared_objs) $(aobjs): | $(O)
 $(so_lib_name): $(shared_objs) $(aobjs)
 	@echo "  ---> Creating Shared Lib $@"
-	@$(CC) $(CFLAGS) --shared  $(LDFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) --shared  $(LDFLAGS) -Wl,-z,noexecstack -o $@ $^
 
 
 # Collect performance data
@@ -201,7 +199,7 @@ perf_report:
 
 clean:
 	@echo Cleaning up
-	@$(RM) -r $(O) *.o *.a $(all_tests) $(lib_name) $(so_lib_name)
+	$(RM) -r $(O) *.o *.a $(all_tests) $(lib_name) $(so_lib_name)
 
 
 
