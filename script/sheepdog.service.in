@@ -10,6 +10,9 @@ EnvironmentFile=-@SYSCONFDIR@/default/sheepdog
 ExecStart=/bin/sh -c '@SBINDIR@/sheep --pidfile @LOCALSTATEDIR@/run/sheep.pid $(if [ -z "$SHEEP_OPTS" ]; then echo "--cluster local --log dst=syslog --upgrade @LOCALSTATEDIR@/lib/sheepdog"; else echo $SHEEP_OPTS; fi)'
 PIDFile=@LOCALSTATEDIR@/run/sheep.pid
 Type=forking
+Restart=on-abort
+StartLimitInterval=10s
+StartLimitBurst=3
 
 [Install]
 WantedBy=multi-user.target
