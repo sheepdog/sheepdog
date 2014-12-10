@@ -118,6 +118,7 @@ int update_node_list(int max_nodes)
 	/* check whether cluster use diskmode */
 	log_length = sizeof(struct epoch_log);
 	logs = xmalloc(log_length);
+	memset(logs, 0, log_length);
 
 	sd_init_req(&hdr, SD_OP_STAT_CLUSTER);
 	hdr.data_length = log_length;
