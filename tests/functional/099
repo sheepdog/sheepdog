@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Test recovery process orphan object revival
+
+. ./common
+
+for i in 0 1 2 3; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+_cluster_format -c 3
+
+$DOG vdi create test 16M -P
+
+$DOG vdi list | _filter_short_date
+
+ls $STORE/*/{obj,d[0-9]*}/* 2> /dev/null | \
+	_filter_store | _filter_md_store | sort
+
+_kill_sheep 3
+_wait_for_sheep_stop 3
+
+$DOG vdi delete test
+
+$DOG vdi list | _filter_short_date
+
+_start_sheep 3
+_wait_for_sheep 4
+
+ls $STORE/*/{obj,d[0-9]*}/* 2> /dev/null | \
+	_filter_store | _filter_md_store | sort
