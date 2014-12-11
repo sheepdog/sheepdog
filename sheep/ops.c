@@ -1061,6 +1061,9 @@ static int local_oid_exist(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	uint8_t ec_index = local_ec_index(req->vinfo, oid);
 
+	if (sys->this_node.nr_vnodes == 0)
+		return SD_RES_NO_OBJ;
+
 	if (is_erasure_oid(oid) && ec_index == SD_MAX_COPIES)
 		return SD_RES_NO_OBJ;
 
