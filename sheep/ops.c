@@ -629,7 +629,7 @@ static int cluster_force_recover_main(const struct sd_req *req,
 
 	vnode_info = get_vnode_info();
 	old_vnode_info = alloc_vnode_info(&nroot);
-	start_recovery(vnode_info, old_vnode_info, true);
+	start_recovery(vnode_info, old_vnode_info, true, NULL);
 	put_vnode_info(vnode_info);
 	put_vnode_info(old_vnode_info);
 	return ret;
@@ -775,7 +775,7 @@ static int cluster_alter_vdi_copy(const struct sd_req *req, struct sd_rsp *rsp,
 	add_vdi_state(vid, nr_copies, false, 0, block_size_shift);
 
 	vinfo = get_vnode_info();
-	start_recovery(vinfo, vinfo, false);
+	start_recovery(vinfo, vinfo, false, NULL);
 	put_vnode_info(vinfo);
 
 	return SD_RES_SUCCESS;
