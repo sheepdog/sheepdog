@@ -159,7 +159,7 @@ struct sd_req {
 			uint8_t		copies;
 			uint8_t		copy_policy;
 			uint8_t		store_policy;
-			uint8_t		reserved;
+			uint8_t		block_size_shift;
 			uint32_t	snapid;
 			uint32_t        type;
 		} vdi;
@@ -173,6 +173,8 @@ struct sd_req {
 			uint16_t	flags;
 			uint32_t	tag;
 			uint32_t	nodes_nr;
+			uint8_t		block_size_shift;
+			uint8_t		reserved[3];
 		} cluster;
 		struct {
 			uint32_t	old_vid;
@@ -181,6 +183,7 @@ struct sd_req {
 			uint8_t		set_bitmap; /* 0 means false */
 						    /* others mean true */
 			uint8_t		copy_policy;
+			uint8_t		block_size_shift;
 		} vdi_state;
 		struct {
 			uint64_t	oid;
@@ -228,7 +231,8 @@ struct sd_rsp {
 			uint32_t	vdi_id;
 			uint32_t	attr_id;
 			uint8_t		copies;
-			uint8_t		reserved[3];
+			uint8_t		block_size_shift;
+			uint8_t		reserved[2];
 		} vdi;
 
 		/* sheepdog-internal */
