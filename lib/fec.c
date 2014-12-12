@@ -696,12 +696,13 @@ out:
 }
 
 void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		      char *buf, int idx)
+		      char *buf, int idx, uint32_t object_size)
 {
 	int i, j, d = ctx->d;
 	size_t strip_size = SD_EC_DATA_STRIPE_SIZE / d;
+	uint32_t nr_stripe_per_object = object_size / SD_EC_DATA_STRIPE_SIZE;
 
-	for (i = 0; i < SD_EC_NR_STRIPE_PER_OBJECT; i++) {
+	for (i = 0; i < nr_stripe_per_object; i++) {
 		const uint8_t *in[d];
 		uint8_t out[strip_size];
 
@@ -713,9 +714,9 @@ void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 }
 
 void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		       char *buf, int idx)
+		       char *buf, int idx, uint32_t object_size)
 {
-	int ed = ctx->d, edp = ctx->dp, len = SD_DATA_OBJ_SIZE / ed, i;
+	int ed = ctx->d, edp = ctx->dp, len = object_size / ed, i;
 	unsigned char ec_tbl[ed * edp * 32];
 	unsigned char bm[ed * ed];
 	unsigned char cm[ed];

@@ -96,12 +96,12 @@ void fec_encode(const struct fec *code,
 		size_t num_block_nums, size_t sz);
 
 void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		       char *buf, int idx);
+		       char *buf, int idx, uint32_t object_size);
 
 /* for isa-l */
 
 void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
-		       char *buf, int idx);
+		       char *buf, int idx, uint32_t object_size);
 
 /*
  * @param inpkts an array of packets (size k); If a primary block, i, is present
@@ -119,7 +119,6 @@ void fec_decode(const struct fec *code,
 
 /* Set data stripe as sector size to make VM happy */
 #define SD_EC_DATA_STRIPE_SIZE (512) /* 512 Byte */
-#define SD_EC_NR_STRIPE_PER_OBJECT (SD_DATA_OBJ_SIZE / SD_EC_DATA_STRIPE_SIZE)
 #define SD_EC_MAX_STRIP (16)
 
 static inline int ec_policy_to_dp(uint8_t policy, int *d, int *p)
@@ -205,11 +204,12 @@ static inline void ec_destroy(struct fec *ctx)
 }
 
 static inline void ec_decode_buffer(struct fec *ctx, uint8_t *input[],
-				    const int in_idx[], char *buf, int idx)
+				    const int in_idx[], char *buf,
+				    int idx, uint32_t object_size)
 {
 	if (cpu_has_ssse3)
-		isa_decode_buffer(ctx, input, in_idx, buf, idx);
+		isa_decode_buffer(ctx, input, in_idx, buf, idx, object_size);
 	else
-		fec_decode_buffer(ctx, input, in_idx, buf, idx);
+		fec_decode_buffer(ctx, input, in_idx, buf, idx, object_size);
 }
 #endif

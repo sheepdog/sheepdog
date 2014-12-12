@@ -126,7 +126,8 @@ static inline bool idx_has_vdi_bit(uint64_t idx)
 
 static inline size_t get_cache_block_size(uint64_t oid)
 {
-	size_t bsize = DIV_ROUND_UP(get_objsize(oid),
+	uint32_t object_size = get_vdi_object_size(oid_to_vid(oid));
+	size_t bsize = DIV_ROUND_UP(get_objsize(oid, object_size),
 				    sizeof(uint64_t) * BITS_PER_BYTE);
 
 	return round_up(bsize, BLOCK_SIZE); /* To be FS friendly */
@@ -457,6 +458,7 @@ static int push_cache_object(uint32_t vid, uint64_t idx, uint64_t bmap,
 	void *buf;
 	off_t offset;
 	uint64_t oid = idx_to_oid(vid, idx);
+	uint32_t object_size = get_objsize(oid, get_vdi_object_size(vid));
 	size_t data_length, bsize = get_cache_block_size(oid);
 	int ret = SD_RES_NO_MEM;
 	int first_bit, last_bit;
@@ -473,7 +475,7 @@ static int push_cache_object(uint32_t vid, uint64_t idx, uint64_t bmap,
 		 oid, bsize, bmap, first_bit, last_bit);
 	offset = first_bit * bsize;
 	data_length = min((last_bit - first_bit + 1) * bsize,
-			  get_objsize(oid) - (size_t)offset);
+			  object_size - (size_t)offset);
 
 	buf = xvalloc(data_length);
 	ret = read_cache_object_noupdate(vid, idx, buf, data_length, offset);
@@ -517,6 +519,7 @@ static void do_reclaim_object(struct object_cache *oc)
 	struct object_cache_entry *entry;
 	uint64_t oid;
 	uint32_t cap;
+	uint32_t cache_object_size = get_vdi_object_size(oc->vid) / 1048576;
 
 	write_lock_cache(oc);
 	list_for_each_entry(entry, &oc->lru_head, lru_list) {
@@ -539,7 +542,7 @@ static void do_reclaim_object(struct object_cache *oc)
 		if (remove_cache_object(oc, entry_idx(entry)) != SD_RES_SUCCESS)
 			continue;
 		free_cache_entry(entry);
-		cap = uatomic_sub_return(&gcache.capacity, CACHE_OBJECT_SIZE);
+		cap = uatomic_sub_return(&gcache.capacity, cache_object_size);
 		sd_debug("%"PRIx64" reclaimed. capacity:%"PRId32, oid, cap);
 		if (cap <= HIGH_WATERMARK)
 			break;
@@ -685,13 +688,14 @@ alloc_cache_entry(struct object_cache *oc, uint64_t idx)
 static void add_to_lru_cache(struct object_cache *oc, uint64_t idx, bool create)
 {
 	struct object_cache_entry *entry = alloc_cache_entry(oc, idx);
+	uint32_t cache_object_size = get_vdi_object_size(oc->vid) / 1048576;
 
 	sd_debug("oid %"PRIx64" added", idx_to_oid(oc->vid, idx));
 
 	write_lock_cache(oc);
 	if (unlikely(lru_tree_insert(&oc->lru_tree, entry)))
 		panic("the object already exist");
-	uatomic_add(&gcache.capacity, CACHE_OBJECT_SIZE);
+	uatomic_add(&gcache.capacity, cache_object_size);
 	list_add_tail(&entry->lru_list, &oc->lru_head);
 	oc->total_count++;
 	if (create) {
@@ -736,7 +740,8 @@ static int object_cache_lookup(struct object_cache *oc, uint64_t idx,
 		ret = SD_RES_EIO;
 		goto out;
 	}
-	ret = prealloc(fd, get_objsize(idx_to_oid(oc->vid, idx)));
+	ret = prealloc(fd, get_objsize(idx_to_oid(oc->vid, idx),
+				       get_vdi_object_size(oc->vid)));
 	if (unlikely(ret < 0)) {
 		ret = SD_RES_EIO;
 		goto out_close;
@@ -804,7 +809,7 @@ static int object_cache_pull(struct object_cache *oc, uint64_t idx)
 	struct sd_req hdr;
 	int ret;
 	uint64_t oid = idx_to_oid(oc->vid, idx);
-	uint32_t data_length = get_objsize(oid);
+	uint32_t data_length = get_objsize(oid, get_vdi_object_size(oc->vid));
 	void *buf;
 
 	buf = xvalloc(data_length);
@@ -939,10 +944,13 @@ void object_cache_delete(uint32_t vid)
 	int h = hash(vid);
 	struct object_cache_entry *entry;
 	char path[PATH_MAX];
+	uint32_t cache_object_size;
 
 	cache = find_object_cache(vid, false);
 	if (!cache)
 		return;
+
+	cache_object_size = get_vdi_object_size(cache->vid) / 1048576;
 
 	/* Firstly we free memory */
 	sd_write_lock(&hashtable_lock[h]);
@@ -952,7 +960,7 @@ void object_cache_delete(uint32_t vid)
 	write_lock_cache(cache);
 	list_for_each_entry(entry, &cache->lru_head, lru_list) {
 		free_cache_entry(entry);
-		uatomic_sub(&gcache.capacity, CACHE_OBJECT_SIZE);
+		uatomic_sub(&gcache.capacity, cache_object_size);
 	}
 	unlock_cache(cache);
 	sd_destroy_rw_lock(&cache->lock);
@@ -1294,6 +1302,7 @@ int object_cache_remove(uint64_t oid)
 	/* Inc the entry refcount to exclude the reclaimer */
 	struct object_cache_entry *entry = oid_to_entry(oid);
 	struct object_cache *oc;
+	uint32_t cache_object_size;
 	int ret;
 
 	if (!entry)
@@ -1304,6 +1313,8 @@ int object_cache_remove(uint64_t oid)
 	sd_debug("%" PRIx64, oid);
 	while (refcount_read(&entry->refcnt) > 1)
 		usleep(100000); /* Object might be in push */
+
+	cache_object_size = get_vdi_object_size(oc->vid) / 1048576;
 
 	write_lock_cache(oc);
 	/*
@@ -1321,7 +1332,7 @@ int object_cache_remove(uint64_t oid)
 	free_cache_entry(entry);
 	unlock_cache(oc);
 
-	uatomic_sub(&gcache.capacity, CACHE_OBJECT_SIZE);
+	uatomic_sub(&gcache.capacity, cache_object_size);
 
 	return SD_RES_SUCCESS;
 }

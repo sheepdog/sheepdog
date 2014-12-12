@@ -713,7 +713,7 @@ out:
 static int gateway_handle_cow(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
-	size_t len = get_objsize(oid);
+	size_t len = get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
 	struct sd_req hdr, *req_hdr = &req->rq;
 	char *buf = xvalloc(len);
 	int ret;

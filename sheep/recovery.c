@@ -429,6 +429,7 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 	char *lost = xvalloc(len);
 	int i, j;
 	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+	uint32_t object_size = get_vdi_object_size(oid_to_vid(oid));
 	int ed = 0, edp;
 	edp = ec_policy_to_dp(policy, &ed, NULL);
 	struct fec *ctx = ec_init(ed, edp);
@@ -458,7 +459,7 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 	}
 
 	/* Rebuild the lost replica */
-	ec_decode_buffer(ctx, bufs, idxs, lost, idx);
+	ec_decode_buffer(ctx, bufs, idxs, lost, idx, object_size);
 out:
 	ec_destroy(ctx);
 	for (i = 0; i < ed; i++)

@@ -476,10 +476,11 @@ static inline bool is_data_obj(uint64_t oid)
 
 static inline size_t count_data_objs(const struct sd_inode *inode)
 {
-	return DIV_ROUND_UP(inode->vdi_size, SD_DATA_OBJ_SIZE);
+	return DIV_ROUND_UP(inode->vdi_size,
+			    (UINT32_C(1) << inode->block_size_shift));
 }
 
-static inline size_t get_objsize(uint64_t oid)
+static inline size_t get_objsize(uint64_t oid, uint32_t object_size)
 {
 	if (is_vdi_obj(oid))
 		return SD_INODE_SIZE;
@@ -493,7 +494,7 @@ static inline size_t get_objsize(uint64_t oid)
 	if (is_ledger_object(oid))
 		return SD_LEDGER_OBJ_SIZE;
 
-	return SD_DATA_OBJ_SIZE;
+	return object_size;
 }
 
 static inline uint64_t data_oid_to_idx(uint64_t oid)

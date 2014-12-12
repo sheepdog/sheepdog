@@ -137,6 +137,7 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 {
 	char path[PATH_MAX];
 	ssize_t size;
+	uint32_t object_size = 0;
 	int fd, flags = O_WRONLY, ret = 0;
 	void *buf = NULL;
 	char *p = (char *)jd;
@@ -168,9 +169,9 @@ static int replay_journal_entry(struct journal_descriptor *jd)
 		sd_err("open %m");
 		return -1;
 	}
-
 	if (jd->create) {
-		ret = prealloc(fd, get_objsize(jd->oid));
+		object_size = get_vdi_object_size(oid_to_vid(jd->oid));
+		ret = prealloc(fd, object_size);
 		if (ret < 0)
 			goto out;
 	}

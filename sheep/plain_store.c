@@ -152,7 +152,8 @@ static int default_trim(int fd, uint64_t oid, const struct siocb *iocb,
 
 	if (*poffset + *plen < iocb->offset + iocb->length) {
 		uint64_t end = iocb->offset + iocb->length;
-		if (end == get_objsize(oid))
+		uint32_t object_size = get_vdi_object_size(oid_to_vid(oid));
+		if (end == get_objsize(oid, object_size))
 			/* This is necessary to punch the last block */
 			end = round_up(end, BLOCK_SIZE);
 		sd_debug("discard between %ld, %ld, %" PRIx64, *poffset + *plen,
@@ -280,9 +281,9 @@ static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 		       "wat %s", oid, epoch, wd);
 		goto out;
 	}
-
 	add_vdi_state(oid_to_vid(oid), inode->nr_copies,
-		      vdi_is_snapshot(inode), inode->copy_policy);
+		      vdi_is_snapshot(inode), inode->copy_policy,
+		      inode->block_size_shift);
 
 	if (inode->name[0] == '\0')
 		atomic_set_bit(oid_to_vid(oid), sys->vdi_deleted);
@@ -402,9 +403,9 @@ size_t get_store_objsize(uint64_t oid)
 		uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
 		int d;
 		ec_policy_to_dp(policy, &d, NULL);
-		return SD_DATA_OBJ_SIZE / d;
+		return get_vdi_object_size(oid_to_vid(oid)) / d;
 	}
-	return get_objsize(oid);
+	return get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
 }
 
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
@@ -413,6 +414,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
+	uint32_t object_size = 0;
 	size_t obj_size;
 	uint64_t offset = iocb->offset;
 
@@ -452,7 +454,9 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 
 	trim_zero_blocks(iocb->buf, &offset, &len);
 
-	if (offset != 0 || len != get_objsize(oid)) {
+	object_size = get_vdi_object_size(oid_to_vid(oid));
+
+	if (offset != 0 || len != get_objsize(oid, object_size)) {
 		if (is_sparse_object(oid))
 			ret = xftruncate(fd, obj_size);
 		else

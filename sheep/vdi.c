@@ -14,6 +14,7 @@
 struct vdi_state_entry {
 	uint32_t vid;
 	unsigned int nr_copies;
+	uint8_t block_size_shift;
 	bool snapshot;
 	bool deleted;
 	uint8_t copy_policy;
@@ -132,6 +133,44 @@ int get_vdi_copy_policy(uint32_t vid)
 	return entry->copy_policy;
 }
 
+uint32_t get_vdi_object_size(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+	uint32_t object_size;
+
+	sd_read_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	sd_rw_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		object_size = UINT32_C(1) << sys->cinfo.block_size_shift;
+		sd_alert("object_size for %" PRIx32 " not found, set %" PRIu32,
+			 vid, object_size);
+		return object_size;
+	}
+
+	object_size = UINT32_C(1) << entry->block_size_shift;
+	return object_size;
+}
+
+uint8_t get_vdi_block_size_shift(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+
+	sd_read_lock(&vdi_state_lock);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	sd_rw_unlock(&vdi_state_lock);
+
+	if (!entry) {
+		sd_alert("block_size_shift for %" PRIx32
+			 " not found, set %" PRIu8, vid,
+			 sys->cinfo.block_size_shift);
+		return sys->cinfo.block_size_shift;
+	}
+
+	return entry->block_size_shift;
+}
+
 int get_obj_copy_number(uint64_t oid, int nr_zones)
 {
 	return min(get_vdi_copy_number(oid_to_vid(oid)), nr_zones);
@@ -149,7 +188,8 @@ int get_req_copy_number(struct request *req)
 	return nr_copies;
 }
 
-int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
+int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
+		  uint8_t cp, uint8_t block_size_shift)
 {
 	struct vdi_state_entry *entry, *old;
 
@@ -158,6 +198,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 	entry->nr_copies = nr_copies;
 	entry->snapshot = snapshot;
 	entry->copy_policy = cp;
+	entry->block_size_shift = block_size_shift;
 
 	entry->lock_state = LOCK_STATE_UNLOCKED;
 	memset(&entry->owner, 0, sizeof(struct node_id));
@@ -173,7 +214,8 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 		sd_mutex_unlock(&m);
 	}
 
-	sd_debug("%" PRIx32 ", %d, %d", vid, nr_copies, cp);
+	sd_debug("%" PRIx32 ", %d, %d, %"PRIu8,
+		 vid, nr_copies, cp, block_size_shift);
 
 	sd_write_lock(&vdi_state_lock);
 	old = vdi_state_insert(&vdi_state_root, entry);
@@ -183,6 +225,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot, uint8_t cp)
 		entry->nr_copies = nr_copies;
 		entry->snapshot = snapshot;
 		entry->copy_policy = cp;
+		entry->block_size_shift = block_size_shift;
 	}
 
 	sd_rw_unlock(&vdi_state_lock);
@@ -209,6 +252,7 @@ int fill_vdi_state_list(const struct sd_req *hdr,
 		vs[last].nr_copies = entry->nr_copies;
 		vs[last].snapshot = entry->snapshot;
 		vs[last].copy_policy = entry->copy_policy;
+		vs[last].block_size_shift = entry->block_size_shift;
 		vs[last].lock_state = entry->lock_state;
 		vs[last].lock_owner = entry->owner;
 		vs[last].nr_participants = entry->nr_participants;
@@ -251,6 +295,7 @@ static struct vdi_state *fill_vdi_state_list_with_alloc(int *result_nr)
 		vs[i].snapshot = entry->snapshot;
 		vs[i].deleted = entry->deleted;
 		vs[i].copy_policy = entry->copy_policy;
+		vs[i].block_size_shift = entry->block_size_shift;
 		vs[i].lock_state = entry->lock_state;
 		vs[i].lock_owner = entry->owner;
 		vs[i].nr_participants = entry->nr_participants;
@@ -861,7 +906,7 @@ static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 				    struct generation_reference *gref)
 {
 	struct sd_inode *new = xzalloc(sizeof(*new));
-	unsigned long block_size = SD_DATA_OBJ_SIZE;
+	unsigned long block_size = (UINT32_C(1) << iocb->block_size_shift);
 
 	pstrcpy(new->name, sizeof(new->name), iocb->name);
 	new->vdi_id = new_vid;
@@ -903,9 +948,10 @@ static int create_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	int ret;
 
 	sd_debug("%s: size %" PRIu64 ", new_vid %" PRIx32 ", copies %d, "
-		 "snapid %" PRIu32 " copy policy %"PRIu8 "store policy %"PRIu8,
-		 iocb->name, iocb->size, new_vid, iocb->nr_copies, new_snapid,
-		 new->copy_policy, new->store_policy);
+		 "snapid %" PRIu32 " copy policy %"PRIu8 "store policy %"PRIu8
+		 "block_size_shift %"PRIu8, iocb->name, iocb->size, new_vid,
+		  iocb->nr_copies, new_snapid, new->copy_policy,
+		  new->store_policy, iocb->block_size_shift);
 
 	ret = sd_write_object(vid_to_vdi_oid(new_vid), (char *)new,
 			      sizeof(*new), 0, true);
@@ -940,8 +986,9 @@ static int clone_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	int ret;
 
 	sd_debug("%s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32 ", "
-		 "copies %d, snapid %" PRIu32, iocb->name, iocb->size, new_vid,
-		 base_vid, iocb->nr_copies, new_snapid);
+		 "copies %d, block_size_shift %" PRIu8 ", snapid %" PRIu32,
+		 iocb->name, iocb->size, new_vid, base_vid,
+		 iocb->nr_copies, iocb->block_size_shift, new_snapid);
 
 	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
 			     sizeof(*base), 0);
@@ -1002,8 +1049,9 @@ static int snapshot_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	int ret;
 
 	sd_debug("%s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32 ", "
-		 "copies %d, snapid %" PRIu32, iocb->name, iocb->size, new_vid,
-		 base_vid, iocb->nr_copies, new_snapid);
+		 "copies %d, block_size_shift %"PRIu8 ", snapid %" PRIu32,
+		 iocb->name, iocb->size, new_vid, base_vid,
+		 iocb->nr_copies, iocb->block_size_shift, new_snapid);
 
 	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
 			     sizeof(*base), 0);
@@ -1071,8 +1119,9 @@ static int rebase_vdi(const struct vdi_iocb *iocb, uint32_t new_snapid,
 	int ret;
 
 	sd_debug("%s: size %" PRIu64 ", vid %" PRIx32 ", base %" PRIx32 ", "
-		 "cur %" PRIx32 ", copies %d, snapid %" PRIu32, iocb->name,
-		 iocb->size, new_vid, base_vid, cur_vid, iocb->nr_copies,
+		 "cur %" PRIx32 ", copies %d, block_size_shift %"PRIu8
+		 ", snapid %" PRIu32, iocb->name, iocb->size, new_vid,
+		 base_vid, cur_vid, iocb->nr_copies, iocb->block_size_shift,
 		 new_snapid);
 
 	ret = sd_read_object(vid_to_vdi_oid(base_vid), (char *)base,
@@ -1260,7 +1309,7 @@ int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info)
 }
 
 static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid,
-			  uint8_t copy_policy)
+			  uint8_t copy_policy, uint8_t block_size_shift)
 {
 	int ret;
 	struct sd_req hdr;
@@ -1271,11 +1320,13 @@ static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid,
 	hdr.vdi_state.copies = nr_copies;
 	hdr.vdi_state.set_bitmap = false;
 	hdr.vdi_state.copy_policy = copy_policy;
+	hdr.vdi_state.block_size_shift = block_size_shift;
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
 		sd_err("fail to notify vdi add event(%" PRIx32 ", %d, %" PRIx32
-		       ")", vdi_id, nr_copies, old_vid);
+		       ", %"PRIu8 ")", vdi_id, nr_copies,
+		       old_vid, block_size_shift);
 
 	return ret;
 }
@@ -1326,7 +1377,7 @@ int vdi_create(const struct vdi_iocb *iocb, uint32_t *new_vid)
 		info.snapid = 1;
 	*new_vid = info.free_bit;
 	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid,
-			     iocb->copy_policy);
+			     iocb->copy_policy, iocb->block_size_shift);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -1366,7 +1417,7 @@ int vdi_snapshot(const struct vdi_iocb *iocb, uint32_t *new_vid)
 	assert(info.snapid > 0);
 	*new_vid = info.free_bit;
 	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid,
-			     iocb->copy_policy);
+			     iocb->copy_policy, iocb->block_size_shift);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -1745,6 +1796,15 @@ int sd_create_hyper_volume(const char *name, uint32_t *vdi_id)
 	hdr.vdi.copies = sys->cinfo.nr_copies;
 	hdr.vdi.copy_policy = sys->cinfo.copy_policy;
 	hdr.vdi.store_policy = 1;
+	/* XXX Cannot use both features, Hypervolume and Change object size */
+	if (sys->cinfo.block_size_shift != SD_DEFAULT_BLOCK_SIZE_SHIFT) {
+		hdr.vdi.block_size_shift = SD_DEFAULT_BLOCK_SIZE_SHIFT;
+		sd_warn("Cluster default object size is not"
+			" SD_DATA_OBJ_SIZE(%d)."
+			"Set VDI object size %d and create HyperVolume",
+			SD_DEFAULT_BLOCK_SIZE_SHIFT,
+			SD_DEFAULT_BLOCK_SIZE_SHIFT);
+	}
 
 	ret = exec_local_req(&hdr, buf);
 	if (ret != SD_RES_SUCCESS) {

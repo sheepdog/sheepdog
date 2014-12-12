@@ -510,7 +510,7 @@ retry:
 		if (vs[i].deleted)
 			atomic_set_bit(vs[i].vid, sys->vdi_deleted);
 		add_vdi_state(vs[i].vid, vs[i].nr_copies, vs[i].snapshot,
-			      vs[i].copy_policy);
+			      vs[i].copy_policy, vs[i].block_size_shift);
 	}
 out:
 	free(vs);
@@ -766,6 +766,7 @@ static void cinfo_collection_done(struct work *work)
 		sd_debug("nr_copies: %d", vs->nr_copies);
 		sd_debug("snapshot: %d", vs->snapshot);
 		sd_debug("copy_policy: %d", vs->copy_policy);
+		sd_debug("block_size_shift: %"PRIu8, vs->block_size_shift);
 		sd_debug("lock_state: %x", vs->lock_state);
 		sd_debug("owner: %s",
 			 addr_to_str(vs->lock_owner.addr, vs->lock_owner.port));

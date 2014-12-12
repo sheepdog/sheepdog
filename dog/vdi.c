@@ -38,6 +38,8 @@ static struct sd_option vdi_options[] = {
 	{'o', "oid", true, "specify the object id of the tracking object"},
 	{'e', "exist", false, "only check objects exist or not,\n"
 	 "                          neither comparing nor repairing"},
+	{'z', "block_size_shift", true, "specify the bit shift num for"
+			       " data object size"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -49,6 +51,7 @@ static struct vdi_cmd_data {
 	bool delete;
 	bool prealloc;
 	int nr_copies;
+	uint8_t block_size_shift;
 	bool writeback;
 	int from_snapshot_id;
 	char from_snapshot_tag[SD_MAX_VDI_TAG_LEN];
@@ -67,6 +70,7 @@ struct get_vdi_info {
 	uint32_t snapid;
 	uint8_t nr_copies;
 	uint8_t copy_policy;
+	uint8_t block_size_shift;
 };
 
 int dog_bnode_writer(uint64_t oid, void *mem, unsigned int len, uint64_t offset,
@@ -118,6 +122,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 	struct tm tm;
 	char dbuf[128];
 	struct get_vdi_info *info = data;
+	uint32_t object_size = (UINT32_C(1) << i->block_size_shift);
 
 	if (info && strcmp(name, info->name) != 0)
 		return;
@@ -143,23 +148,24 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 				putchar('\\');
 			putchar(*name++);
 		}
-		printf(" %d %s %s %s %s %" PRIx32 " %s %s\n", snapid,
-		       strnumber(i->vdi_size),
-		       strnumber(my_objs * SD_DATA_OBJ_SIZE),
-		       strnumber(cow_objs * SD_DATA_OBJ_SIZE),
+		printf(" %d %s %s %s %s %" PRIx32 " %s %s %" PRIu8 "\n",
+		       snapid, strnumber(i->vdi_size),
+		       strnumber(my_objs * object_size),
+		       strnumber(cow_objs * object_size),
 		       dbuf, vid,
 		       redundancy_scheme(i->nr_copies, i->copy_policy),
-		       i->tag);
+		       i->tag, i->block_size_shift);
 	} else {
-		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32 " %6s %13s\n",
+		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32
+		       " %6s %13s %3" PRIu8 "\n",
 		       vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
 		       name, snapid,
 		       strnumber(i->vdi_size),
-		       strnumber(my_objs * SD_DATA_OBJ_SIZE),
-		       strnumber(cow_objs * SD_DATA_OBJ_SIZE),
+		       strnumber(my_objs * object_size),
+		       strnumber(cow_objs * object_size),
 		       dbuf, vid,
 		       redundancy_scheme(i->nr_copies, i->copy_policy),
-		       i->tag);
+		       i->tag, i->block_size_shift);
 	}
 }
 
@@ -282,7 +288,9 @@ static int vdi_list(int argc, char **argv)
 	const char *vdiname = argv[optind];
 
 	if (!raw_output)
-		printf("  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag\n");
+		printf("  Name        Id    Size    Used  Shared"
+		       "    Creation time   VDI id  Copies  Tag"
+		       "   Block Size Shift\n");
 
 	if (vdiname) {
 		struct get_vdi_info info;
@@ -396,7 +404,8 @@ int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 
 int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
-		  uint8_t nr_copies, uint8_t copy_policy, uint8_t store_policy)
+		  uint8_t nr_copies, uint8_t copy_policy,
+		  uint8_t store_policy, uint8_t block_size_shift)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -416,6 +425,7 @@ int do_vdi_create(const char *vdiname, int64_t vdi_size,
 	hdr.vdi.copies = nr_copies;
 	hdr.vdi.copy_policy = copy_policy;
 	hdr.vdi.store_policy = store_policy;
+	hdr.vdi.block_size_shift = block_size_shift;
 
 	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
@@ -440,6 +450,8 @@ static int vdi_create(int argc, char **argv)
 	uint32_t vid;
 	uint64_t oid;
 	uint32_t idx, max_idx;
+	uint32_t object_size;
+	uint64_t old_max_total_size = 0;
 	struct sd_inode *inode = NULL;
 	int ret;
 
@@ -451,10 +463,35 @@ static int vdi_create(int argc, char **argv)
 	if (ret < 0)
 		return EXIT_USAGE;
 
-	if (size > SD_OLD_MAX_VDI_SIZE && 0 == vdi_cmd_data.store_policy) {
+	if (vdi_cmd_data.block_size_shift) {
+		object_size = (UINT32_C(1) << vdi_cmd_data.block_size_shift);
+		old_max_total_size = object_size * OLD_MAX_DATA_OBJS;
+	} else {
+		struct sd_req hdr;
+		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+		struct cluster_info cinfo;
+		sd_init_req(&hdr, SD_OP_CLUSTER_INFO);
+		hdr.data_length = sizeof(cinfo);
+		ret = dog_exec_req(&sd_nid, &hdr, &cinfo);
+		if (ret < 0) {
+			sd_err("Fail to execute request: SD_OP_CLUSTER_INFO");
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+		if (rsp->result != SD_RES_SUCCESS) {
+			sd_err("%s", sd_strerror(rsp->result));
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+		object_size = (UINT32_C(1) << cinfo.block_size_shift);
+		old_max_total_size = object_size * OLD_MAX_DATA_OBJS;
+	}
+
+	if (size > old_max_total_size && 0 == vdi_cmd_data.store_policy) {
 		sd_err("VDI size is larger than %s bytes, please use '-y' to "
-		       "create a hyper volume with size up to %s bytes",
-		       strnumber(SD_OLD_MAX_VDI_SIZE),
+		       "create a hyper volume with size up to %s bytes"
+		       " or use '-z' to create larger object size volume",
+		       strnumber(old_max_total_size),
 		       strnumber(SD_MAX_VDI_SIZE));
 		return EXIT_USAGE;
 	}
@@ -466,7 +503,8 @@ static int vdi_create(int argc, char **argv)
 
 	ret = do_vdi_create(vdiname, size, 0, &vid, false,
 			    vdi_cmd_data.nr_copies, vdi_cmd_data.copy_policy,
-			    vdi_cmd_data.store_policy);
+			    vdi_cmd_data.store_policy,
+			    vdi_cmd_data.block_size_shift);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
@@ -479,10 +517,11 @@ static int vdi_create(int argc, char **argv)
 		ret = EXIT_FAILURE;
 		goto out;
 	}
-	max_idx = DIV_ROUND_UP(size, SD_DATA_OBJ_SIZE);
+	object_size = (UINT32_C(1) << inode->block_size_shift);
+	max_idx = DIV_ROUND_UP(size, object_size);
 
 	for (idx = 0; idx < max_idx; idx++) {
-		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+		vdi_show_progress(idx * object_size, inode->vdi_size);
 		oid = vid_to_data_oid(vid, idx);
 
 		ret = dog_write_object(oid, 0, NULL, 0, 0, 0, inode->nr_copies,
@@ -499,7 +538,7 @@ static int vdi_create(int argc, char **argv)
 			goto out;
 		}
 	}
-	vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+	vdi_show_progress(idx * object_size, inode->vdi_size);
 	ret = EXIT_SUCCESS;
 
 out:
@@ -664,7 +703,7 @@ static int vdi_snapshot(int argc, char **argv)
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, vid, &new_vid, true,
 			    inode->nr_copies, inode->copy_policy,
-			    inode->store_policy);
+			    inode->store_policy, inode->block_size_shift);
 
 	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
@@ -691,6 +730,7 @@ static int vdi_clone(int argc, char **argv)
 	uint32_t base_vid, new_vid, vdi_id;
 	uint64_t oid;
 	uint32_t idx, max_idx, ret;
+	uint32_t object_size;
 	struct sd_inode *inode = NULL, *new_inode = NULL;
 	char *buf = NULL;
 
@@ -719,9 +759,10 @@ static int vdi_clone(int argc, char **argv)
 	if (vdi_cmd_data.no_share == true)
 		base_vid = 0;
 
+	object_size = (UINT32_C(1) << inode->block_size_shift);
 	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, false,
 			    inode->nr_copies, inode->copy_policy,
-			    inode->store_policy);
+			    inode->store_policy, inode->block_size_shift);
 	if (ret != EXIT_SUCCESS ||
 			(!vdi_cmd_data.prealloc && !vdi_cmd_data.no_share))
 		goto out;
@@ -732,23 +773,23 @@ static int vdi_clone(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		goto out;
 
-	buf = xzalloc(SD_DATA_OBJ_SIZE);
+	buf = xzalloc(object_size);
 	max_idx = count_data_objs(inode);
 
 	for (idx = 0; idx < max_idx; idx++) {
 		size_t size;
 
-		vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+		vdi_show_progress(idx * object_size, inode->vdi_size);
 		vdi_id = sd_inode_get_vid(inode, idx);
 		if (vdi_id) {
 			oid = vid_to_data_oid(vdi_id, idx);
-			ret = dog_read_object(oid, buf, SD_DATA_OBJ_SIZE, 0,
+			ret = dog_read_object(oid, buf, object_size, 0,
 					      true);
 			if (ret) {
 				ret = EXIT_FAILURE;
 				goto out;
 			}
-			size = SD_DATA_OBJ_SIZE;
+			size = object_size;
 		} else {
 			if (vdi_cmd_data.no_share && !vdi_cmd_data.prealloc)
 				continue;
@@ -772,7 +813,7 @@ static int vdi_clone(int argc, char **argv)
 			goto out;
 		}
 	}
-	vdi_show_progress(idx * SD_DATA_OBJ_SIZE, inode->vdi_size);
+	vdi_show_progress(idx * object_size, inode->vdi_size);
 	ret = EXIT_SUCCESS;
 
 out:
@@ -979,7 +1020,7 @@ static int vdi_rollback(int argc, char **argv)
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, base_vid, &new_vid,
 			     false, vdi_cmd_data.nr_copies, inode->copy_policy,
-			     inode->store_policy);
+			     inode->store_policy, inode->block_size_shift);
 
 	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
@@ -1494,6 +1535,7 @@ static int vdi_read(int argc, char **argv)
 	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
 	uint32_t vdi_id, idx;
+	uint32_t object_size;
 	unsigned int len;
 	char *buf = NULL;
 
@@ -1509,25 +1551,27 @@ static int vdi_read(int argc, char **argv)
 	}
 
 	inode = malloc(sizeof(*inode));
-	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, NULL, inode,
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS)
-		goto out;
+		goto load_inode_err;
 
 	if (inode->vdi_size < offset) {
 		sd_err("Read offset is beyond the end of the VDI");
 		ret = EXIT_FAILURE;
-		goto out;
+		goto load_inode_err;
 	}
 
+	object_size = (UINT32_C(1) << inode->block_size_shift);
+	buf = xmalloc(object_size);
+
 	total = min(total, inode->vdi_size - offset);
-	idx = offset / SD_DATA_OBJ_SIZE;
-	offset %= SD_DATA_OBJ_SIZE;
+	idx = offset / object_size;
+	offset %= object_size;
 	while (done < total) {
-		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
+		len = min(total - done, object_size - offset);
 		vdi_id = sd_inode_get_vid(inode, idx);
 		if (vdi_id) {
 			oid = vid_to_data_oid(vdi_id, idx);
@@ -1554,8 +1598,9 @@ static int vdi_read(int argc, char **argv)
 	fsync(STDOUT_FILENO);
 	ret = EXIT_SUCCESS;
 out:
-	free(inode);
 	free(buf);
+load_inode_err:
+	free(inode);
 
 	return ret;
 }
@@ -1564,6 +1609,7 @@ static int vdi_write(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
 	uint32_t vid, flags, vdi_id, idx;
+	uint32_t object_size;
 	int ret;
 	struct sd_inode *inode = NULL;
 	uint64_t offset = 0, oid, old_oid, done = 0, total = (uint64_t) -1;
@@ -1583,26 +1629,28 @@ static int vdi_write(int argc, char **argv)
 	}
 
 	inode = xmalloc(sizeof(*inode));
-	buf = xmalloc(SD_DATA_OBJ_SIZE);
 
 	ret = read_vdi_obj(vdiname, 0, "", &vid, inode, SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS)
-		goto out;
+		goto load_inode_err;
 
 	if (inode->vdi_size < offset) {
 		sd_err("Write offset is beyond the end of the VDI");
 		ret = EXIT_FAILURE;
-		goto out;
+		goto load_inode_err;
 	}
 
+	object_size = (UINT32_C(1) << inode->block_size_shift);
+	buf = xmalloc(object_size);
+
 	total = min(total, inode->vdi_size - offset);
-	idx = offset / SD_DATA_OBJ_SIZE;
-	offset %= SD_DATA_OBJ_SIZE;
+	idx = offset / object_size;
+	offset %= object_size;
 	while (done < total) {
 		create = false;
 		old_oid = 0;
 		flags = 0;
-		len = min(total - done, SD_DATA_OBJ_SIZE - offset);
+		len = min(total - done, object_size - offset);
 
 		vdi_id = sd_inode_get_vid(inode, idx);
 		if (!vdi_id)
@@ -1647,7 +1695,7 @@ static int vdi_write(int argc, char **argv)
 		}
 
 		offset += len;
-		if (offset == SD_DATA_OBJ_SIZE) {
+		if (offset == object_size) {
 			offset = 0;
 			idx++;
 		}
@@ -1655,8 +1703,9 @@ static int vdi_write(int argc, char **argv)
 	}
 	ret = EXIT_SUCCESS;
 out:
-	free(inode);
 	free(buf);
+load_inode_err:
+	free(inode);
 
 	return ret;
 }
@@ -1709,6 +1758,7 @@ struct vdi_check_info {
 	uint64_t oid;
 	uint8_t nr_copies;
 	uint8_t copy_policy;
+	uint8_t block_size_shift;
 	uint64_t total;
 	uint64_t *done;
 	int refcnt;
@@ -1720,8 +1770,9 @@ struct vdi_check_info {
 
 static void free_vdi_check_info(struct vdi_check_info *info)
 {
+	uint32_t object_size = (UINT32_C(1) << info->block_size_shift);
 	if (info->done) {
-		*info->done += SD_DATA_OBJ_SIZE;
+		*info->done += object_size;
 		vdi_show_progress(*info->done, info->total);
 	}
 	free(info);
@@ -1783,6 +1834,7 @@ static void vdi_check_object_work(struct work *work)
 	if (is_erasure_oid(info->oid, info->copy_policy)) {
 		sd_init_req(&hdr, SD_OP_READ_PEER);
 		hdr.data_length = get_store_objsize(info->copy_policy,
+						    info->block_size_shift,
 						    info->oid);
 		hdr.obj.ec_index = vcw->ec_index;
 		hdr.epoch = sd_epoch;
@@ -1856,7 +1908,8 @@ static void check_erasure_object(struct vdi_check_info *info)
 	struct fec *ctx = ec_init(d, dp);
 	int miss_idx[dp], input_idx[dp];
 	uint64_t oid = info->oid;
-	size_t len = get_store_objsize(info->copy_policy, oid);
+	size_t len = get_store_objsize(info->copy_policy,
+				       info->block_size_shift, oid);
 	char *obj = xmalloc(len);
 	uint8_t *input[dp];
 
@@ -1882,7 +1935,8 @@ static void check_erasure_object(struct vdi_check_info *info)
 			uint8_t *ds[d];
 			for (j = 0; j < d; j++)
 				ds[j] = info->vcw[j].buf;
-			ec_decode_buffer(ctx, ds, idx, obj, d + k);
+			ec_decode_buffer(ctx, ds, idx, obj, d + k,
+					 info->block_size_shift);
 			if (memcmp(obj, info->vcw[d + k].buf, len) != 0) {
 				/* TODO repair the inconsistency */
 				sd_err("object %"PRIx64" is inconsistent", oid);
@@ -1900,7 +1954,8 @@ static void check_erasure_object(struct vdi_check_info *info)
 
 			for (i = 0; i < d; i++)
 				ds[i] = input[i];
-			ec_decode_buffer(ctx, ds, input_idx, obj, m);
+			ec_decode_buffer(ctx, ds, input_idx, obj, m,
+					 info->block_size_shift);
 			write_object_to(info->vcw[m].vnode, oid, obj,
 					len, true, info->vcw[m].ec_index);
 			fprintf(stdout, "fixed missing %"PRIx64", "
@@ -2029,10 +2084,11 @@ static void check_cb(struct sd_index *idx, void *arg, int ignore)
 {
 	struct check_arg *carg = arg;
 	uint64_t oid;
+	uint32_t object_size = (UINT32_C(1) << carg->inode->block_size_shift);
 
 	if (idx->vdi_id) {
 		oid = vid_to_data_oid(idx->vdi_id, idx->idx);
-		*(carg->done) = (uint64_t)idx->idx * SD_DATA_OBJ_SIZE;
+		*(carg->done) = (uint64_t)idx->idx * object_size;
 		vdi_show_progress(*(carg->done), carg->inode->vdi_size);
 		queue_vdi_check_work(carg->inode, oid, NULL, carg->wq,
 				     carg->nr_copies);
@@ -2046,6 +2102,7 @@ int do_vdi_check(const struct sd_inode *inode)
 	uint32_t vid;
 	struct work_queue *wq;
 	int nr_copies = min((int)inode->nr_copies, sd_zones_nr);
+	uint32_t object_size = (UINT32_C(1) << inode->block_size_shift);
 
 	if (0 < inode->copy_policy && sd_zones_nr < (int)inode->nr_copies) {
 		sd_err("ABORT: Not enough active zones for consistency-checking"
@@ -2070,7 +2127,7 @@ int do_vdi_check(const struct sd_inode *inode)
 				queue_vdi_check_work(inode, oid, &done, wq,
 						     nr_copies);
 			} else {
-				done += SD_DATA_OBJ_SIZE;
+				done += object_size;
 				vdi_show_progress(done, inode->vdi_size);
 			}
 		}
@@ -2125,11 +2182,12 @@ struct obj_backup {
 	uint32_t offset;
 	uint32_t length;
 	uint32_t reserved;
-	uint8_t data[SD_DATA_OBJ_SIZE];
+	uint8_t *data;
 };
 
 /* discards redundant area from backup data */
-static void compact_obj_backup(struct obj_backup *backup, uint8_t *from_data)
+static void compact_obj_backup(struct obj_backup *backup, uint8_t *from_data,
+			       uint32_t object_size)
 {
 	uint8_t *p1, *p2;
 
@@ -2142,8 +2200,8 @@ static void compact_obj_backup(struct obj_backup *backup, uint8_t *from_data)
 		backup->length -= SECTOR_SIZE;
 	}
 
-	p1 = backup->data + SD_DATA_OBJ_SIZE - SECTOR_SIZE;
-	p2 = from_data + SD_DATA_OBJ_SIZE - SECTOR_SIZE;
+	p1 = backup->data + object_size - SECTOR_SIZE;
+	p2 = from_data + object_size - SECTOR_SIZE;
 	while (backup->length > 0 && memcmp(p1, p2, SECTOR_SIZE) == 0) {
 		p1 -= SECTOR_SIZE;
 		p2 -= SECTOR_SIZE;
@@ -2152,29 +2210,29 @@ static void compact_obj_backup(struct obj_backup *backup, uint8_t *from_data)
 }
 
 static int get_obj_backup(uint32_t idx, uint32_t from_vid, uint32_t to_vid,
-			  struct obj_backup *backup)
+			  struct obj_backup *backup, uint32_t object_size)
 {
 	int ret;
-	uint8_t *from_data = xzalloc(SD_DATA_OBJ_SIZE);
+	uint8_t *from_data = xzalloc(object_size);
 
 	backup->idx = idx;
 	backup->offset = 0;
-	backup->length = SD_DATA_OBJ_SIZE;
+	backup->length = object_size;
 
 	if (to_vid) {
 		ret = dog_read_object(vid_to_data_oid(to_vid, idx),
-				      backup->data, SD_DATA_OBJ_SIZE, 0, true);
+				      backup->data, object_size, 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read object %" PRIx32 ", %d", to_vid,
 			       idx);
 			return EXIT_FAILURE;
 		}
 	} else
-		memset(backup->data, 0, SD_DATA_OBJ_SIZE);
+		memset(backup->data, 0, object_size);
 
 	if (from_vid) {
 		ret = dog_read_object(vid_to_data_oid(from_vid, idx), from_data,
-				      SD_DATA_OBJ_SIZE, 0, true);
+				      object_size, 0, true);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("Failed to read object %" PRIx32 ", %d",
 			       from_vid, idx);
@@ -2182,7 +2240,7 @@ static int get_obj_backup(uint32_t idx, uint32_t from_vid, uint32_t to_vid,
 		}
 	}
 
-	compact_obj_backup(backup, from_data);
+	compact_obj_backup(backup, from_data, object_size);
 
 	free(from_data);
 
@@ -2194,13 +2252,13 @@ static int vdi_backup(int argc, char **argv)
 	const char *vdiname = argv[optind++];
 	int ret = EXIT_SUCCESS;
 	uint32_t idx, nr_objs;
+	uint32_t object_size;
 	struct sd_inode *from_inode = xzalloc(sizeof(*from_inode));
 	struct sd_inode *to_inode = xzalloc(sizeof(*to_inode));
 	struct backup_hdr hdr = {
 		.version = VDI_BACKUP_FORMAT_VERSION,
 		.magic = VDI_BACKUP_MAGIC,
 	};
-	struct obj_backup *backup = xzalloc(sizeof(*backup));
 
 	if ((!vdi_cmd_data.snapshot_id && !vdi_cmd_data.snapshot_tag[0]) ||
 	    (!vdi_cmd_data.from_snapshot_id &&
@@ -2214,21 +2272,25 @@ static int vdi_backup(int argc, char **argv)
 			   vdi_cmd_data.from_snapshot_tag, NULL,
 			   from_inode, SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS)
-		goto out;
+		goto load_inode_err;
 
 	ret = read_vdi_obj(vdiname, vdi_cmd_data.snapshot_id,
 			   vdi_cmd_data.snapshot_tag, NULL, to_inode,
 			   SD_INODE_SIZE);
 	if (ret != EXIT_SUCCESS)
-		goto out;
+		goto load_inode_err;
 
 	nr_objs = count_data_objs(to_inode);
+
+	struct obj_backup *backup = xzalloc(sizeof(*backup));
+	object_size = (UINT32_C(1) << from_inode->block_size_shift);
+	backup->data = xzalloc(sizeof(uint8_t) * object_size);
 
 	ret = xwrite(STDOUT_FILENO, &hdr, sizeof(hdr));
 	if (ret < 0) {
 		sd_err("failed to write backup header, %m");
 		ret = EXIT_SYSFAIL;
-		goto out;
+		goto error;
 	}
 
 	for (idx = 0; idx < nr_objs; idx++) {
@@ -2238,9 +2300,10 @@ static int vdi_backup(int argc, char **argv)
 		if (to_vid == 0 && from_vid == 0)
 			continue;
 
-		ret = get_obj_backup(idx, from_vid, to_vid, backup);
+		ret = get_obj_backup(idx, from_vid, to_vid,
+				     backup, object_size);
 		if (ret != EXIT_SUCCESS)
-			goto out;
+			goto error;
 
 		if (backup->length == 0)
 			continue;
@@ -2250,14 +2313,14 @@ static int vdi_backup(int argc, char **argv)
 		if (ret < 0) {
 			sd_err("failed to write backup data, %m");
 			ret = EXIT_SYSFAIL;
-			goto out;
+			goto error;
 		}
 		ret = xwrite(STDOUT_FILENO, backup->data + backup->offset,
 			     backup->length);
 		if (ret < 0) {
 			sd_err("failed to write backup data, %m");
 			ret = EXIT_SYSFAIL;
-			goto out;
+			goto error;
 		}
 	}
 
@@ -2269,15 +2332,18 @@ static int vdi_backup(int argc, char **argv)
 	if (ret < 0) {
 		sd_err("failed to write end marker, %m");
 		ret = EXIT_SYSFAIL;
-		goto out;
+		goto error;
 	}
 
 	fsync(STDOUT_FILENO);
 	ret = EXIT_SUCCESS;
-out:
+error:
+	free(backup->data);
+	free(backup);
+load_inode_err:
 	free(from_inode);
 	free(to_inode);
-	free(backup);
+out:
 	return ret;
 }
 
@@ -2331,7 +2397,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid,
 			    false, inode->nr_copies, inode->copy_policy,
-			    inode->store_policy);
+			    inode->store_policy, inode->block_size_shift);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("Failed to read VDI");
 		goto out;
@@ -2440,7 +2506,8 @@ out:
 					     current_inode->parent_vdi_id, NULL,
 					     true, current_inode->nr_copies,
 					     current_inode->copy_policy,
-					     current_inode->store_policy);
+					     current_inode->store_policy,
+					     current_inode->block_size_shift);
 		if (recovery_ret != EXIT_SUCCESS) {
 			sd_err("failed to resume the current vdi");
 			ret = recovery_ret;
@@ -2563,9 +2630,25 @@ static int vdi_cache_info(int argc, char **argv)
 
 	fprintf(stdout, "Name\tTag\tTotal\tDirty\tClean\n");
 	for (i = 0; i < info.count; i++) {
-		uint64_t total = info.caches[i].total * SD_DATA_OBJ_SIZE,
-			 dirty = info.caches[i].dirty * SD_DATA_OBJ_SIZE,
+		uint32_t object_size;
+		uint32_t vid = info.caches[i].vid;
+		struct sd_inode *inode = NULL;
+		int r;
+
+		r = dog_read_object(vid_to_vdi_oid(vid), inode,
+				    SD_INODE_HEADER_SIZE, 0, true);
+		if (r != EXIT_SUCCESS)
+			return r;
+
+		if (!inode->block_size_shift)
+			return EXIT_FAILURE;
+
+		object_size = (UINT32_C(1) << inode->block_size_shift);
+
+		uint64_t total = info.caches[i].total * object_size,
+			 dirty = info.caches[i].dirty * object_size,
 			 clean = total - dirty;
+
 		char name[SD_MAX_VDI_LEN], tag[SD_MAX_VDI_TAG_LEN];
 
 		ret = vid_to_name_tag(info.caches[i].vid, name, tag);
@@ -2955,7 +3038,7 @@ static struct subcommand vdi_cmd[] = {
 	{"check", "<vdiname>", "seaphT", "check and repair image's consistency",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_check, vdi_options},
-	{"create", "<vdiname> <size>", "PycaphrvT", "create an image",
+	{"create", "<vdiname> <size>", "PycaphrvzT", "create an image",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_create, vdi_options},
 	{"snapshot", "<vdiname>", "saphrvT", "create a snapshot",
@@ -3023,6 +3106,7 @@ static struct subcommand vdi_cmd[] = {
 static int vdi_parser(int ch, const char *opt)
 {
 	char *p;
+	uint8_t block_size_shift;
 
 	switch (ch) {
 	case 'P':
@@ -3100,6 +3184,19 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 'e':
 		vdi_cmd_data.exist = true;
+		break;
+	case 'z':
+		block_size_shift = (uint8_t)atoi(opt);
+		if (block_size_shift > 31) {
+			sd_err("Object Size is limited to 2^31."
+			       " Please set shift bit lower than 31");
+			exit(EXIT_FAILURE);
+		} else if (block_size_shift < 20) {
+			sd_err("Object Size is larger than 2^20."
+			       " Please set shift bit larger than 20");
+			exit(EXIT_FAILURE);
+		}
+		vdi_cmd_data.block_size_shift = block_size_shift;
 		break;
 	}
 

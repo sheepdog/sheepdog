@@ -365,19 +365,22 @@ void show_progress(uint64_t done, uint64_t total, bool raw)
 	free(buf);
 }
 
-size_t get_store_objsize(uint8_t copy_policy, uint64_t oid)
+size_t get_store_objsize(uint8_t copy_policy, uint8_t block_size_shift,
+			 uint64_t oid)
 {
 	if (is_vdi_obj(oid))
 		return SD_INODE_SIZE;
 	if (is_vdi_btree_obj(oid))
 		return SD_INODE_DATA_INDEX_SIZE;
+
+	uint32_t object_size = (UINT32_C(1) << block_size_shift);
 	if (copy_policy != 0) {
 		int d;
 
 		ec_policy_to_dp(copy_policy, &d, NULL);
-		return SD_DATA_OBJ_SIZE / d;
+		return object_size / d;
 	}
-	return get_objsize(oid);
+	return get_objsize(oid, object_size);
 }
 
 bool is_erasure_oid(uint64_t oid, uint8_t policy)
