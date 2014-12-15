@@ -116,6 +116,7 @@
 #define SD_DATA_OBJ_SIZE (UINT64_C(1) << 22)
 #define SD_OLD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * OLD_MAX_DATA_OBJS)
 #define SD_MAX_VDI_SIZE (SD_DATA_OBJ_SIZE * MAX_DATA_OBJS)
+#define SD_DEFAULT_BLOCK_SIZE_SHIFT 22
 
 #define SD_INODE_SIZE (sizeof(struct sd_inode))
 #define SD_INODE_INDEX_SIZE (sizeof(uint32_t) * MAX_DATA_OBJS)

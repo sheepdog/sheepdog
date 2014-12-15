@@ -25,6 +25,8 @@ static struct sd_option cluster_options[] = {
 	 "use multi-thread for 'cluster snapshot save'"},
 	{'t', "strict", false,
 	 "do not serve write request if number of nodes is not sufficient"},
+	{'z', "block_size_shift", true, "specify the shift num of default"
+	      " data object size"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -32,6 +34,7 @@ static struct cluster_cmd_data {
 	uint8_t copies;
 	uint8_t copy_policy;
 	uint8_t multithread;
+	uint8_t block_size_shift;
 	bool force;
 	bool strict;
 	char name[STORE_LEN];
@@ -113,6 +116,7 @@ static int cluster_format(int argc, char **argv)
 	sd_init_req(&hdr, SD_OP_MAKE_FS);
 	hdr.cluster.copies = cluster_cmd_data.copies;
 	hdr.cluster.copy_policy = cluster_cmd_data.copy_policy;
+	hdr.cluster.block_size_shift = cluster_cmd_data.block_size_shift;
 	hdr.cluster.ctime = (uint64_t) tv.tv_sec << 32 | tv.tv_usec * 1000;
 
 	if (strlen(cluster_cmd_data.name))
@@ -335,7 +339,7 @@ static void fill_cb(struct sd_index *idx, void *arg, int ignore)
 	if (idx->vdi_id) {
 		oid = vid_to_data_oid(idx->vdi_id, idx->idx);
 		object_tree_insert(oid, inode->nr_copies,
-				   inode->copy_policy);
+				   inode->copy_policy, inode->block_size_shift);
 	}
 }
 
@@ -346,6 +350,7 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 	uint64_t vdi_oid = vid_to_vdi_oid(vid), vmstate_oid;
 	uint32_t vdi_id;
 	uint32_t nr_objs, nr_vmstate_object;
+	uint32_t object_size = (UINT32_C(1) << i->block_size_shift);
 	struct vdi_option *opt = (struct vdi_option *)data;
 	bool matched;
 
@@ -369,7 +374,8 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 		opt->nr_snapshot++;
 
 	/* fill vdi object id */
-	object_tree_insert(vdi_oid, i->nr_copies, i->copy_policy);
+	object_tree_insert(vdi_oid, i->nr_copies, i->copy_policy,
+			   i->block_size_shift);
 
 	/* fill data object id */
 	if (i->store_policy == 0) {
@@ -379,16 +385,18 @@ static void fill_object_tree(uint32_t vid, const char *name, const char *tag,
 			if (!vdi_id)
 				continue;
 			uint64_t oid = vid_to_data_oid(vdi_id, idx);
-			object_tree_insert(oid, i->nr_copies, i->copy_policy);
+			object_tree_insert(oid, i->nr_copies, i->copy_policy,
+					   i->block_size_shift);
 		}
 	} else
 		sd_inode_index_walk(i, fill_cb, &i);
 
 	/* fill vmstate object id */
-	nr_vmstate_object = DIV_ROUND_UP(i->vm_state_size, SD_DATA_OBJ_SIZE);
+	nr_vmstate_object = DIV_ROUND_UP(i->vm_state_size, object_size);
 	for (uint32_t idx = 0; idx < nr_vmstate_object; idx++) {
 		vmstate_oid = vid_to_vmstate_oid(vid, idx);
-		object_tree_insert(vmstate_oid, i->nr_copies, i->copy_policy);
+		object_tree_insert(vmstate_oid, i->nr_copies,
+				   i->copy_policy, i->block_size_shift);
 	}
 }
 
@@ -483,6 +491,7 @@ static int load_snapshot(int argc, char **argv)
 
 	cluster_cmd_data.copies = hdr.copy_number;
 	cluster_cmd_data.copy_policy = hdr.copy_policy;
+	cluster_cmd_data.block_size_shift = hdr.block_size_shift;
 	if (cluster_format(0, NULL) != SD_RES_SUCCESS)
 		goto out;
 
@@ -752,7 +761,7 @@ failure:
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhvT", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bctaphT", "create a Sheepdog store",
+	{"format", NULL, "bctaphzT", "create a Sheepdog store",
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aphT", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
@@ -775,6 +784,7 @@ static struct subcommand cluster_cmd[] = {
 
 static int cluster_parser(int ch, const char *opt)
 {
+	uint32_t block_size_shift;
 	switch (ch) {
 	case 'b':
 		pstrcpy(cluster_cmd_data.name, sizeof(cluster_cmd_data.name),
@@ -801,6 +811,21 @@ static int cluster_parser(int ch, const char *opt)
 		cluster_cmd_data.multithread = true;
 	case 't':
 		cluster_cmd_data.strict = true;
+		break;
+	case 'z':
+		block_size_shift = (uint32_t)atoi(opt);
+		if (block_size_shift > 31) {
+			sd_err("Object Size is limited to 2^31."
+			" Please set shift bit lower than 31");
+			exit(EXIT_FAILURE);
+		} else if (block_size_shift < 20) {
+			sd_err("Object Size is larger than 2^20."
+			" Please set shift bit larger than 20");
+			exit(EXIT_FAILURE);
+		}
+
+		cluster_cmd_data.block_size_shift = block_size_shift;
+
 		break;
 	}
 

@@ -299,7 +299,8 @@ out:
 }
 
 static int queue_save_snapshot_work(uint64_t oid, uint32_t nr_copies,
-				    uint8_t copy_policy, void *data)
+				    uint8_t copy_policy,
+				    uint8_t block_size_shift, void *data)
 {
 	struct snapshot_work *sw = xzalloc(sizeof(struct snapshot_work));
 	struct strbuf *trunk_buf = data;
@@ -307,6 +308,7 @@ static int queue_save_snapshot_work(uint64_t oid, uint32_t nr_copies,
 	sw->entry.oid = oid;
 	sw->entry.nr_copies = nr_copies;
 	sw->entry.copy_policy = copy_policy;
+	sw->entry.block_size_shift = block_size_shift;
 	sw->trunk_buf = trunk_buf;
 	sw->work.fn = do_save_object;
 	sw->work.done = save_object_done;
@@ -352,6 +354,7 @@ int farm_save_snapshot(const char *tag, bool multithread)
 		log_hdr.version = FARM_VERSION;
 		log_hdr.copy_number = cinfo.nr_copies;
 		log_hdr.copy_policy = cinfo.copy_policy;
+		log_hdr.block_size_shift = cinfo.block_size_shift;
 		snap_log_write_hdr(&log_hdr);
 	}
 

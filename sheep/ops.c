@@ -125,6 +125,8 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	unsigned long nr = rsp->vdi.vdi_id;
 	int ret = rsp->result;
 
+	sd_info("req->vdi.base_vdi_id: %x, rsp->vdi.vdi_id: %x", req->vdi.base_vdi_id, rsp->vdi.vdi_id);
+
 	sd_debug("done %d %lx", ret, nr);
 	if (ret == SD_RES_SUCCESS)
 		atomic_set_bit(nr, sys->vdi_inuse);
@@ -283,9 +285,12 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	sys->cinfo.nr_copies = req->cluster.copies;
 	sys->cinfo.copy_policy = req->cluster.copy_policy;
+	sys->cinfo.block_size_shift = req->cluster.block_size_shift;
 	sys->cinfo.flags = req->cluster.flags;
 	if (!sys->cinfo.nr_copies)
 		sys->cinfo.nr_copies = SD_DEFAULT_COPIES;
+	if (!sys->cinfo.block_size_shift)
+		sys->cinfo.block_size_shift = SD_DEFAULT_BLOCK_SIZE_SHIFT;
 	sys->cinfo.ctime = req->cluster.ctime;
 	set_cluster_config(&sys->cinfo);
 
