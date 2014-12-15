@@ -694,43 +694,69 @@ struct cinfo_collection_work {
 
 static struct cinfo_collection_work *collect_work;
 
+static struct vdi_state *do_cinfo_collection_work(uint32_t epoch,
+						  struct sd_node *n,
+						  int *nr_vdi_states)
+{
+	struct vdi_state *vs = NULL;
+	unsigned int rlen = 512;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+	int ret;
+
+	vs = xcalloc(rlen, sizeof(*vs));
+
+retry:
+	sd_init_req(&hdr, SD_OP_VDI_STATE_SNAPSHOT_CTL);
+	hdr.vdi_state_snapshot.get = 1;
+	hdr.vdi_state_snapshot.tgt_epoch = epoch;
+	hdr.data_length = rlen;
+
+	ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
+	if (ret == SD_RES_SUCCESS) {
+		sd_debug("succeed to obtain snapshot of vdi states");
+		*nr_vdi_states = rsp->data_length / sizeof(*vs);
+		return vs;
+	} else if (ret == SD_RES_BUFFER_SMALL) {
+		sd_debug("buffer is small for obtaining snapshot of vdi states,"
+			 " doubling it (%lu -> %lu)", rlen * sizeof(*vs),
+			 rlen * 2 * sizeof(*vs));
+		rlen *= 2;
+		vs = xrealloc(vs, sizeof(*vs) * rlen);
+		goto retry;
+	}
+
+	sd_err("failed to obtain snapshot of vdi states from node %s",
+	       node_to_str(n));
+	return NULL;
+}
+
 static void cinfo_collection_work(struct work *work)
 {
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct vdi_state *vs = NULL;
-	unsigned int rlen;
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
 	struct sd_node *n;
-	int ret;
+	int ret, nr_vdi_states = 0;
 
 	sd_debug("start collection of cinfo...");
 
 	assert(w == collect_work);
 
-	rlen = SD_DATA_OBJ_SIZE; /* FIXME */
-	vs = xzalloc(rlen);
-
 	rb_for_each_entry(n, &w->members->nroot, rb) {
 		if (node_is_local(n))
 			continue;
 
-		sd_init_req(&hdr, SD_OP_VDI_STATE_SNAPSHOT_CTL);
-		hdr.vdi_state_snapshot.get = 1;
-		hdr.vdi_state_snapshot.tgt_epoch = w->epoch;
-		hdr.data_length = rlen;
-
-		ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
-		if (ret == SD_RES_SUCCESS)
+		vs = do_cinfo_collection_work(w->epoch, n, &nr_vdi_states);
+		if (vs)
 			goto get_succeed;
 	}
 
 	panic("getting a snapshot of vdi state at epoch %d failed", w->epoch);
 
 get_succeed:
-
-	w->nr_vdi_states = rsp->data_length / sizeof(*vs);
+	w->nr_vdi_states = nr_vdi_states;
 	w->result = vs;
 
 	sd_debug("collecting cinfo done, freeing from remote nodes");
