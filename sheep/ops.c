@@ -1380,21 +1380,22 @@ static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
 {
 	bool get = !!req->vdi_state_snapshot.get;
 	int epoch = req->vdi_state_snapshot.tgt_epoch;
-	int ret;
+	int ret, length = 0;
 
 	sd_info("%s vdi state snapshot at epoch %d",
 		get ? "getting" : "freeing", epoch);
 
 	if (get) {
-		/*
-		 * FIXME: assuming request has enough space for storing
-		 * the snapshot
-		 */
-		ret = get_vdi_state_snapshot(epoch, data);
-		if (0 <= ret)
-			rsp->data_length = ret;
-		else
-			return SD_RES_AGAIN;
+		ret = get_vdi_state_snapshot(epoch, data, req->data_length,
+					     &length);
+		if (ret == SD_RES_SUCCESS)
+			rsp->data_length = length;
+		else {
+			sd_err("failed to get vdi state snapshot: %s",
+			       sd_strerror(ret));
+
+			return ret;
+		}
 	} else
 		free_vdi_state_snapshot(epoch);
 

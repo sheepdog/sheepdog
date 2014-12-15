@@ -1761,21 +1761,31 @@ main_fn void take_vdi_state_snapshot(int epoch)
 	sd_debug("a number of vdi state: %d", snapshot->nr_vs);
 }
 
-main_fn int get_vdi_state_snapshot(int epoch, void *data)
+main_fn int get_vdi_state_snapshot(int epoch, void *data, int data_len_max,
+				   int *data_len_result)
 {
 	struct vdi_state_snapshot *snapshot;
+	int len;
 
 	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
-		if (snapshot->epoch == epoch) {
-			memcpy(data, snapshot->vs,
-			       sizeof(*snapshot->vs) * snapshot->nr_vs);
-			return sizeof(*snapshot->vs) * snapshot->nr_vs;
-		}
+		if (snapshot->epoch == epoch)
+			goto found;
 	}
 
 	sd_info("get request for not prepared vdi state snapshot, epoch: %d",
 		epoch);
-	return -1;
+	return SD_RES_AGAIN;
+
+found:
+	len = sizeof(*snapshot->vs) * snapshot->nr_vs;
+	if (data_len_max < len) {
+		sd_info("maximum allowed length: %d, required length: %d",
+			data_len_max, len);
+		return SD_RES_BUFFER_SMALL;
+	}
+
+	memcpy(data, snapshot->vs, len);
+	return SD_RES_SUCCESS;
 }
 
 main_fn void free_vdi_state_snapshot(int epoch)
