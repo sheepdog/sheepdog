@@ -30,10 +30,124 @@ struct vdi_state_entry {
 	int nr_participants;
 	enum shared_lock_state participants_state[SD_MAX_COPIES];
 	struct node_id participants[SD_MAX_COPIES];
+
+	struct vdi_family_member *family_member;
 };
 
 static struct rb_root vdi_state_root = RB_ROOT;
 static struct sd_rw_lock vdi_state_lock = SD_RW_LOCK_INITIALIZER;
+
+struct vdi_family_member {
+	uint32_t vid, parent_vid;
+	struct vdi_family_member *parent;
+	struct vdi_state_entry *entry;
+
+	struct list_node roots_list; /* only used for root VDIs */
+
+	struct list_head child_list_head;
+	struct list_node child_list_node;
+};
+
+static LIST_HEAD(vdi_family_roots);
+static LIST_HEAD(vdi_family_temporal_orphans);
+static struct sd_mutex vdi_family_mutex = SD_MUTEX_INITIALIZER;
+
+static struct vdi_family_member *lookup_vdi_family_member(uint32_t vid,
+				  struct vdi_family_member *family_member)
+{
+	/* FIXME: more effective data structure */
+	struct vdi_family_member *vdi;
+
+	if (family_member->vid == vid)
+		return family_member;
+
+	list_for_each_entry(vdi, &family_member->child_list_head,
+			    child_list_node) {
+		struct vdi_family_member *ret;
+
+		ret = lookup_vdi_family_member(vid, vdi);
+		if (ret)
+			return ret;
+	}
+
+	return NULL;
+}
+
+static void update_vdi_family(uint32_t parent_vid,
+			      struct vdi_state_entry *entry, bool unordered)
+{
+	uint32_t vid = entry->vid;
+	struct vdi_family_member *new, *vdi, *parent;
+
+	sd_mutex_lock(&vdi_family_mutex);
+
+	if (!parent_vid) {
+		new = xzalloc(sizeof(*new));
+		new->vid = vid;
+		new->entry = entry;
+		entry->family_member = new;
+
+		INIT_LIST_NODE(&new->roots_list);
+		INIT_LIST_HEAD(&new->child_list_head);
+
+		list_add_tail(&new->roots_list, &vdi_family_roots);
+
+		sd_debug("new vid %"PRIx32 " is added as a root VDI", vid);
+		goto out;
+	}
+
+	new = xzalloc(sizeof(*new));
+	new->vid = vid;
+	new->parent_vid = parent_vid;
+	new->entry = entry;
+	entry->family_member = new;
+
+	INIT_LIST_HEAD(&new->child_list_head);
+	INIT_LIST_NODE(&new->child_list_node);
+
+	list_for_each_entry(vdi, &vdi_family_roots, roots_list) {
+		parent = lookup_vdi_family_member(parent_vid, vdi);
+		if (parent) {
+			new->parent = parent;
+			goto found;
+		}
+	}
+
+	if (unordered) {
+		sd_debug("parent of VID: %"PRIx32" (%"PRIx32") is not"
+			 " initialized yet", vid, parent_vid);
+
+		list_add_tail(&new->child_list_node,
+			      &vdi_family_temporal_orphans);
+		goto ret;
+	}
+
+	panic("parent VID: %"PRIx32" not found", parent_vid);
+
+found:
+	list_add_tail(&new->child_list_node, &parent->child_list_head);
+	sd_debug("new child vid %"PRIx32" is added to parent %"PRIx32
+		 " correctly", vid, parent_vid);
+
+out:
+	/* correct children from orphan list */
+
+	list_for_each_entry(vdi, &vdi_family_temporal_orphans,
+			    child_list_node) {
+		if (vdi->parent_vid != vid)
+			continue;
+
+		list_del(&vdi->child_list_node);
+		list_add_tail(&vdi->child_list_node, &new->child_list_head);
+		vdi->parent = new;
+
+		sd_debug("new vid %"PRIx32" rescued orphan vid %"PRIx32"",
+			 vid, vdi->vid);
+	}
+
+ret:
+	sd_mutex_unlock(&vdi_family_mutex);
+}
 
 /*
  * ec_max_data_strip represent max number of data strips in the cluster. When
@@ -189,10 +303,12 @@ int get_req_copy_number(struct request *req)
 	return nr_copies;
 }
 
-int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
-		  uint8_t cp, uint8_t block_size_shift, uint32_t parent_vid)
+static int do_add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
+			    uint8_t cp, uint8_t block_size_shift,
+			    uint32_t parent_vid, bool unordered)
 {
 	struct vdi_state_entry *entry, *old;
+	bool already_exists = false;
 
 	entry = xzalloc(sizeof(*entry));
 	entry->vid = vid;
@@ -216,8 +332,8 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
 		sd_mutex_unlock(&m);
 	}
 
-	sd_debug("%" PRIx32 ", %d, %d, %"PRIu8,
-		 vid, nr_copies, cp, block_size_shift);
+	sd_debug("%" PRIx32 ", %d, %d, %"PRIu8", %"PRIx32,
+		 vid, nr_copies, cp, block_size_shift, parent_vid);
 
 	sd_write_lock(&vdi_state_lock);
 	old = vdi_state_insert(&vdi_state_root, entry);
@@ -238,11 +354,30 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
 
 			entry->parent_vid = parent_vid;
 		}
+
+		already_exists = true;
 	}
+
+	if (!already_exists)
+		update_vdi_family(parent_vid, entry, unordered);
 
 	sd_rw_unlock(&vdi_state_lock);
 
 	return SD_RES_SUCCESS;
+}
+
+int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
+		  uint8_t cp, uint8_t block_size_shift, uint32_t parent_vid)
+{
+	return do_add_vdi_state(vid, nr_copies, snapshot, cp, block_size_shift,
+				parent_vid, false);
+}
+
+int add_vdi_state_unordered(uint32_t vid, int nr_copies, bool snapshot,
+		  uint8_t cp, uint8_t block_size_shift, uint32_t parent_vid)
+{
+	return do_add_vdi_state(vid, nr_copies, snapshot, cp, block_size_shift,
+				parent_vid, true);
 }
 
 int fill_vdi_state_list(const struct sd_req *hdr,
@@ -1389,7 +1524,8 @@ int vdi_create(const struct vdi_iocb *iocb, uint32_t *new_vid)
 	if (info.snapid == 0)
 		info.snapid = 1;
 	*new_vid = info.free_bit;
-	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid,
+	ret = notify_vdi_add(*new_vid, iocb->nr_copies,
+			     iocb->base_vid == 0 ? info.vid : iocb->base_vid,
 			     iocb->copy_policy, iocb->block_size_shift);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
