@@ -1173,6 +1173,18 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 	}
 }
 
+static bool is_gateway_only_cluster(const struct rb_root *nroot)
+{
+	struct sd_node *n;
+
+	rb_for_each_entry(n, nroot, rb) {
+		if (n->space)
+			return false;
+	}
+
+	return true;
+}
+
 main_fn void sd_leave_handler(const struct sd_node *left,
 			      const struct rb_root *nroot, size_t nr_nodes)
 {
@@ -1199,6 +1211,11 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 	old_vnode_info = main_thread_get(current_vnode_info);
 	main_thread_set(current_vnode_info, alloc_vnode_info(nroot));
 	if (sys->cinfo.status == SD_STATUS_OK) {
+		if (is_gateway_only_cluster(nroot)) {
+			sd_info("only gateway nodes are remaining, exiting");
+			exit(0);
+		}
+
 		ret = inc_and_log_epoch();
 		if (ret != 0)
 			panic("cannot log current epoch %d", sys->cinfo.epoch);
