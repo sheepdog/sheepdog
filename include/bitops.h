@@ -146,6 +146,11 @@ static inline void atomic_set_bit(int nr, unsigned long *addr)
 	uatomic_or(addr + nr / BITS_PER_LONG, 1UL << (nr % BITS_PER_LONG));
 }
 
+static inline void atomic_clear_bit(int nr, unsigned long *addr)
+{
+	uatomic_and(addr + nr / BITS_PER_LONG, ~(1UL << (nr % BITS_PER_LONG)));
+}
+
 static inline int test_bit(unsigned int nr, const unsigned long *addr)
 {
 	return ((1UL << (nr % BITS_PER_LONG)) &
