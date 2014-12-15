@@ -198,6 +198,7 @@ static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	if (ret == SD_RES_SUCCESS) {
 		atomic_set_bit(vid, sys->vdi_deleted);
 		vdi_mark_deleted(vid);
+		run_vid_gc(vid);
 	}
 
 	if (!sys->enable_object_cache)

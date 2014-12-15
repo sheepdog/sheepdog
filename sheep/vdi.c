@@ -89,6 +89,7 @@ static void update_vdi_family(uint32_t parent_vid,
 
 		INIT_LIST_NODE(&new->roots_list);
 		INIT_LIST_HEAD(&new->child_list_head);
+		INIT_LIST_NODE(&new->child_list_node);
 
 		list_add_tail(&new->roots_list, &vdi_family_roots);
 
@@ -102,6 +103,7 @@ static void update_vdi_family(uint32_t parent_vid,
 	new->entry = entry;
 	entry->family_member = new;
 
+	INIT_LIST_NODE(&new->roots_list);
 	INIT_LIST_HEAD(&new->child_list_head);
 	INIT_LIST_NODE(&new->child_list_node);
 
@@ -147,6 +149,30 @@ out:
 
 ret:
 	sd_mutex_unlock(&vdi_family_mutex);
+}
+
+static main_fn struct vdi_family_member *lookup_root(struct vdi_family_member
+						     *member)
+{
+	if (!member->parent)
+		return member;
+
+	return lookup_root(member->parent);
+}
+
+static main_fn bool is_all_members_deleted(struct vdi_family_member *member)
+{
+	struct vdi_family_member *child;
+
+	if (!member->entry->deleted)
+		return false;
+
+	list_for_each_entry(child, &member->child_list_head, child_list_node) {
+		if (!is_all_members_deleted(child))
+			return false;
+	}
+
+	return true;
 }
 
 /*
@@ -1879,12 +1905,39 @@ out:
 	return ret;
 }
 
+static void clean_family(struct vdi_family_member *member)
+{
+	struct vdi_family_member *child;
+
+	list_for_each_entry(child, &member->child_list_head, child_list_node) {
+		clean_family(child);
+	}
+
+	if (list_linked(&member->child_list_node))
+		list_del(&member->child_list_node);
+
+	if (!list_linked(&member->roots_list))
+		free(member);
+}
+
 void clean_vdi_state(void)
 {
+	struct vdi_family_member *member;
+
 	sd_write_lock(&vdi_state_lock);
 	rb_destroy(&vdi_state_root, struct vdi_state_entry, node);
 	INIT_RB_ROOT(&vdi_state_root);
 	sd_rw_unlock(&vdi_state_lock);
+
+	sd_mutex_lock(&vdi_family_mutex);
+
+	list_for_each_entry(member, &vdi_family_roots, roots_list) {
+		clean_family(member);
+		list_del(&member->roots_list);
+		free(member);
+	}
+
+	sd_mutex_unlock(&vdi_family_mutex);
 }
 
 int sd_delete_vdi(const char *name)
@@ -2044,4 +2097,61 @@ main_fn void free_vdi_state_snapshot(int epoch)
 	}
 
 	panic("invalid free request for vdi state snapshot, epoch: %d", epoch);
+}
+
+static main_fn void do_vid_gc(struct vdi_family_member *member)
+{
+	struct vdi_state_entry *entry = member->entry;
+	uint32_t vid = entry->vid;
+	uint64_t oid = vid_to_vdi_oid(vid);
+	struct vdi_family_member *child;
+
+	rb_erase(&entry->node, &vdi_state_root);
+	free(entry);
+
+	list_for_each_entry(child, &member->child_list_head, child_list_node) {
+		do_vid_gc(child);
+	}
+
+	if (list_linked(&member->roots_list))
+		list_del(&member->roots_list);
+
+	free(member);
+
+	if (sd_store && sd_store->exist(oid, -1))
+		/* TODO: gc other objects */
+		sd_store->remove_object(oid, -1);
+
+	atomic_clear_bit(vid, sys->vdi_inuse);
+	atomic_clear_bit(vid, sys->vdi_deleted);
+}
+
+main_fn void run_vid_gc(uint32_t vid)
+{
+	struct vdi_state_entry *entry;
+	struct vdi_family_member *member, *root;
+
+	sd_write_lock(&vdi_state_lock);
+	sd_mutex_lock(&vdi_family_mutex);
+	entry = vdi_state_search(&vdi_state_root, vid);
+	if (!entry) {
+		sd_alert("vid %"PRIx32" doesn't have its entry", vid);
+		goto out;
+	}
+
+	member = entry->family_member;
+	root = lookup_root(member);
+
+	if (is_all_members_deleted(root)) {
+		sd_info("all members of the family (root: %"PRIx32
+			") are deleted", root->vid);
+		do_vid_gc(root);
+	} else
+		sd_info("not all members of the family (root: %"PRIx32
+			") are deleted", root->vid);
+
+out:
+	sd_mutex_unlock(&vdi_family_mutex);
+	sd_rw_unlock(&vdi_state_lock);
+
 }

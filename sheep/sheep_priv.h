@@ -364,6 +364,7 @@ void invalidate_other_nodes(uint32_t vid);
 int inode_coherence_update(uint32_t vid, bool validate,
 			   const struct node_id *sender);
 void remove_node_from_participants(const struct node_id *left);
+void run_vid_gc(uint32_t vid);
 
 extern int ec_max_data_strip;
 
