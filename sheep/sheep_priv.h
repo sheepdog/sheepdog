@@ -334,7 +334,7 @@ uint8_t get_vdi_block_size_shift(uint32_t vid);
 int get_obj_copy_number(uint64_t oid, int nr_zones);
 int get_req_copy_number(struct request *req);
 int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
-		  uint8_t, uint8_t block_size_shift);
+		  uint8_t, uint8_t block_size_shift, uint32_t parent_vid);
 int vdi_exist(uint32_t vid);
 int vdi_create(const struct vdi_iocb *iocb, uint32_t *new_vid);
 int vdi_snapshot(const struct vdi_iocb *iocb, uint32_t *new_vid);

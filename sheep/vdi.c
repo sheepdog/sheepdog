@@ -18,6 +18,7 @@ struct vdi_state_entry {
 	bool snapshot;
 	bool deleted;
 	uint8_t copy_policy;
+	uint32_t parent_vid;
 	struct rb_node node;
 
 	enum lock_state lock_state;
@@ -189,7 +190,7 @@ int get_req_copy_number(struct request *req)
 }
 
 int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
-		  uint8_t cp, uint8_t block_size_shift)
+		  uint8_t cp, uint8_t block_size_shift, uint32_t parent_vid)
 {
 	struct vdi_state_entry *entry, *old;
 
@@ -199,6 +200,7 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
 	entry->snapshot = snapshot;
 	entry->copy_policy = cp;
 	entry->block_size_shift = block_size_shift;
+	entry->parent_vid = parent_vid;
 
 	entry->lock_state = LOCK_STATE_UNLOCKED;
 	memset(&entry->owner, 0, sizeof(struct node_id));
@@ -226,6 +228,16 @@ int add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
 		entry->snapshot = snapshot;
 		entry->copy_policy = cp;
 		entry->block_size_shift = block_size_shift;
+
+		if (parent_vid) {
+			if (!snapshot)
+				sd_warn("caution, updating parent VID of VID: %"
+					PRIx32 " (old parent VID: %" PRIx32
+					", new parent VID: %"PRIx32 ")", vid,
+					entry->parent_vid, parent_vid);
+
+			entry->parent_vid = parent_vid;
+		}
 	}
 
 	sd_rw_unlock(&vdi_state_lock);
@@ -256,6 +268,7 @@ int fill_vdi_state_list(const struct sd_req *hdr,
 		vs[last].lock_state = entry->lock_state;
 		vs[last].lock_owner = entry->owner;
 		vs[last].nr_participants = entry->nr_participants;
+		vs[last].parent_vid = entry->parent_vid;
 		for (int i = 0; i < vs[last].nr_participants; i++) {
 			vs[last].participants_state[i] =
 				entry->participants_state[i];
