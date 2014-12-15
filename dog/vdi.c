@@ -157,7 +157,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 		       i->tag, i->block_size_shift);
 	} else {
 		printf("%c %-8s %5d %7s %7s %7s %s  %7" PRIx32
-		       " %6s %13s %3" PRIu8 "\n",
+		       " %6s %13s\n",
 		       vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
 		       name, snapid,
 		       strnumber(i->vdi_size),
@@ -165,7 +165,7 @@ static void print_vdi_list(uint32_t vid, const char *name, const char *tag,
 		       strnumber(cow_objs * object_size),
 		       dbuf, vid,
 		       redundancy_scheme(i->nr_copies, i->copy_policy),
-		       i->tag, i->block_size_shift);
+		       i->tag);
 	}
 }
 
@@ -289,8 +289,7 @@ static int vdi_list(int argc, char **argv)
 
 	if (!raw_output)
 		printf("  Name        Id    Size    Used  Shared"
-		       "    Creation time   VDI id  Copies  Tag"
-		       "   Block Size Shift\n");
+		       "    Creation time   VDI id  Copies  Tag\n");
 
 	if (vdiname) {
 		struct get_vdi_info info;
