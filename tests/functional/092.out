@@ -8,19 +8,19 @@ STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
 0	5	1	0	0	2	0
 1	4	2	0	0	0	0
 2	3	3	0	0	2	0
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-c test_cloned     0   16 MB  8.0 MB  8.0 MB DATE   34f19d      2              
-s test         1   16 MB   16 MB  0.0 MB DATE   7c2b25      2              
-  test         0   16 MB  0.0 MB   16 MB DATE   7c2b26      2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+c test_cloned     0   16 MB  8.0 MB  8.0 MB DATE   34f19d      2                22
+s test         1   16 MB   16 MB  0.0 MB DATE   7c2b25      2                22
+  test         0   16 MB  0.0 MB   16 MB DATE   7c2b26      2                22
 STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
 0	5	2	0	0	2	0
 1	6	3	0	0	0	0
 2	5	3	0	0	2	0
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-c test_cloned     0   16 MB  8.0 MB  8.0 MB DATE   34f19d      2              
-s test         1   16 MB   16 MB  0.0 MB DATE   7c2b25      2              
-  test         0   16 MB  0.0 MB   16 MB DATE   7c2b26      2              
-c test_cloned2     0   16 MB  8.0 MB  8.0 MB DATE   f6ac5d      2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+c test_cloned     0   16 MB  8.0 MB  8.0 MB DATE   34f19d      2                22
+s test         1   16 MB   16 MB  0.0 MB DATE   7c2b25      2                22
+  test         0   16 MB  0.0 MB   16 MB DATE   7c2b26      2                22
+c test_cloned2     0   16 MB  8.0 MB  8.0 MB DATE   f6ac5d      2                22
 STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
 0	5	2	0	0	4	0
 1	6	3	0	0	2	0
@@ -39,4 +39,4 @@ STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
 1	0	3	0	0	0	0
 2	0	3	0	0	0	0
 there should be no vdi
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift

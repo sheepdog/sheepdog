@@ -1,11 +1,11 @@
 QA output created by 078
 using backend plain store
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test1        0   20 MB  0.0 MB  0.0 MB DATE   fd32fc    4:2              
-  test3        0   20 MB  0.0 MB  0.0 MB DATE   fd3662    2:1              
-  test2        0   20 MB  0.0 MB  0.0 MB DATE   fd3815      2              
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test4        0   20 MB  0.0 MB  0.0 MB DATE   fd2de3    4:2              
-  test1        0   20 MB  0.0 MB  0.0 MB DATE   fd32fc    4:2              
-  test3        0   20 MB  0.0 MB  0.0 MB DATE   fd3662    2:1              
-  test2        0   20 MB  0.0 MB  0.0 MB DATE   fd3815      2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test1        0   20 MB  0.0 MB  0.0 MB DATE   fd32fc    4:2                22
+  test3        0   20 MB  0.0 MB  0.0 MB DATE   fd3662    2:1                22
+  test2        0   20 MB  0.0 MB  0.0 MB DATE   fd3815      2                22
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test4        0   20 MB  0.0 MB  0.0 MB DATE   fd2de3    4:2                22
+  test1        0   20 MB  0.0 MB  0.0 MB DATE   fd32fc    4:2                22
+  test3        0   20 MB  0.0 MB  0.0 MB DATE   fd3662    2:1                22
+  test2        0   20 MB  0.0 MB  0.0 MB DATE   fd3815      2                22

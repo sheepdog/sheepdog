@@ -14,7 +14,7 @@ Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Cluster status: Waiting for other nodes to join cluster
 
 Cluster created at DATE
@@ -23,7 +23,7 @@ Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Cluster status: Waiting for other nodes to join cluster
 
 Cluster created at DATE
@@ -32,7 +32,7 @@ Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Cluster status: Waiting for other nodes to join cluster
 
 Cluster created at DATE
@@ -41,7 +41,7 @@ Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Cluster status: Waiting for other nodes to join cluster
 
 Cluster created at DATE
@@ -50,11 +50,11 @@ Epoch Time           Version
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Cluster status: Waiting for other nodes to join cluster
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Caution! Please try starting all the cluster nodes normally before
 running this command.
 
@@ -71,8 +71,8 @@ Cluster created at DATE
 Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -80,8 +80,8 @@ Cluster created at DATE
 Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -89,8 +89,8 @@ Cluster created at DATE
 Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -98,8 +98,8 @@ Cluster created at DATE
 Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -107,8 +107,8 @@ Cluster created at DATE
 Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -116,18 +116,8 @@ Cluster created at DATE
 Epoch Time           Version
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
-Cluster status: running, auto-recovery enabled
-
-Cluster created at DATE
-
-Epoch Time           Version
-DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
-DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
-DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -136,8 +126,8 @@ Epoch Time           Version
 DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -146,8 +136,8 @@ Epoch Time           Version
 DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -156,8 +146,8 @@ Epoch Time           Version
 DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -166,8 +156,8 @@ Epoch Time           Version
 DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -176,8 +166,8 @@ Epoch Time           Version
 DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
 Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
@@ -186,5 +176,15 @@ Epoch Time           Version
 DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
 DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
 DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
+Cluster status: running, auto-recovery enabled
+
+Cluster created at DATE
+
+Epoch Time           Version
+DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006]
+DATE      2 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7006]
+DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   20 MB   20 MB  0.0 MB DATE   7c2b25      6                22
