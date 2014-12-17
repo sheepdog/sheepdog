@@ -478,6 +478,13 @@ static int vdi_create(int argc, char **argv)
 			ret = EXIT_FAILURE;
 			goto out;
 		}
+
+		if (rsp->result == SD_RES_WAIT_FOR_FORMAT) {
+			sd_err("Failed to create VDI %s: %s", vdiname,
+			       sd_strerror(rsp->result));
+			return EXIT_FAILURE;
+		}
+
 		if (rsp->result != SD_RES_SUCCESS) {
 			sd_err("%s", sd_strerror(rsp->result));
 			ret = EXIT_FAILURE;
