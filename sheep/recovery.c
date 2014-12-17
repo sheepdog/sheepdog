@@ -66,9 +66,6 @@ struct recovery_info {
 
 	uint64_t count;
 	uint64_t *oids;
-	uint64_t *prio_oids;
-	uint64_t nr_prio_oids;
-	uint64_t nr_scheduled_prio_oids;
 
 	struct vnode_info *old_vinfo;
 	struct vnode_info *cur_vinfo;
@@ -93,6 +90,7 @@ static struct recovery_info *next_rinfo;
 static main_thread(struct recovery_info *) current_rinfo;
 
 static void queue_recovery_work(struct recovery_info *rinfo);
+static void free_recovery_obj_work(struct recovery_obj_work *row);
 
 /* Dynamically grown list buffer default as 4M (2T storage) */
 #define DEFAULT_LIST_BUFFER_SIZE (UINT64_C(1) << 22)
@@ -615,22 +613,38 @@ bool node_in_recovery(void)
 	return main_thread_get(current_rinfo) != NULL;
 }
 
-static inline void prepare_schedule_oid(uint64_t oid)
+static void direct_recover_object_main(struct work *work)
+{
+	struct recovery_work *rw = container_of(work, struct recovery_work,
+						work);
+	struct recovery_obj_work *row = container_of(rw,
+						struct recovery_obj_work,
+						base);
+
+	wakeup_requests_on_oid(row->oid);
+	free_recovery_obj_work(row);
+}
+
+static inline void direct_queue_recovery_work(uint64_t oid)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
 
-	if (xlfind(&oid, rinfo->prio_oids, rinfo->nr_prio_oids, oid_cmp)) {
-		sd_debug("%" PRIx64 " has been already in prio_oids", oid);
-		return;
-	}
+	struct recovery_work *rw;
+	struct recovery_obj_work *row;
+	row = xzalloc(sizeof(*row));
+	row->oid = oid;
 
-	rinfo->nr_prio_oids++;
-	rinfo->prio_oids = xrealloc(rinfo->prio_oids,
-				    rinfo->nr_prio_oids * sizeof(uint64_t));
-	rinfo->prio_oids[rinfo->nr_prio_oids - 1] = oid;
-	sd_debug("%"PRIx64" nr_prio_oids %"PRIu64, oid, rinfo->nr_prio_oids);
+	rw = &row->base;
+	rw->work.fn = recover_object_work;
+	rw->work.done = direct_recover_object_main;
 
-	resume_suspended_recovery();
+	rw->epoch = rinfo->epoch;
+	rw->tgt_epoch = rinfo->tgt_epoch;
+	rw->rinfo = rinfo;
+	rw->cur_vinfo = grab_vnode_info(rinfo->cur_vinfo);
+	rw->old_vinfo = grab_vnode_info(rinfo->old_vinfo);
+
+	queue_work(sys->recovery_wqueue, &rw->work);
 }
 
 main_fn bool oid_in_recovery(uint64_t oid)
@@ -697,7 +711,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		return false;
 	}
 
-	prepare_schedule_oid(oid);
+	direct_queue_recovery_work(oid);
 	return true;
 }
 
@@ -728,7 +742,6 @@ static void free_recovery_info(struct recovery_info *rinfo)
 	put_vnode_info(rinfo->cur_vinfo);
 	put_vnode_info(rinfo->old_vinfo);
 	free(rinfo->oids);
-	free(rinfo->prio_oids);
 	for (int i = 0; i < rinfo->max_epoch; i++)
 		put_vnode_info(rinfo->vinfo_array[i]);
 	free(rinfo->vinfo_array);
@@ -812,78 +825,12 @@ static inline void finish_recovery(struct recovery_info *rinfo)
 	sd_debug("recovery complete: new epoch %"PRIu32, recovered_epoch);
 }
 
-static inline bool oid_in_prio_oids(struct recovery_info *rinfo, uint64_t oid)
-{
-	for (uint64_t i = 0; i < rinfo->nr_prio_oids; i++)
-		if (rinfo->prio_oids[i] == oid)
-			return true;
-	return false;
-}
-
-/*
- * Schedule prio_oids to be recovered first in FIFO order
- *
- * rw->next is index of the original next object to be recovered and also the
- * number of objects already recovered and being recovered.
- * we just move rw->prio_oids in between:
- *   new_oids = [0..rw->next - 1] + [rw->prio_oids] + [rw->next]
- */
-static inline void finish_schedule_oids(struct recovery_info *rinfo)
-{
-	uint64_t i, nr_recovered = rinfo->next, new_idx;
-	uint64_t *new_oids;
-
-	/* If I am the last oid, done */
-	if (nr_recovered == rinfo->count - 1)
-		goto done;
-
-	new_oids = xmalloc(list_buffer_size);
-	memcpy(new_oids, rinfo->oids, nr_recovered * sizeof(uint64_t));
-	memcpy(new_oids + nr_recovered, rinfo->prio_oids,
-	       rinfo->nr_prio_oids * sizeof(uint64_t));
-	new_idx = nr_recovered + rinfo->nr_prio_oids;
-
-	for (i = rinfo->next; i < rinfo->count; i++) {
-		if (oid_in_prio_oids(rinfo, rinfo->oids[i]))
-			continue;
-		new_oids[new_idx++] = rinfo->oids[i];
-	}
-	/* rw->count should eq new_idx, otherwise something is wrong */
-	sd_debug("%snr_recovered %" PRIu64 ", nr_prio_oids %" PRIu64 ", count %"
-		 PRIu64 " = new %" PRIu64,
-		 rinfo->count == new_idx ? "" : "WARN: ", nr_recovered,
-		 rinfo->nr_prio_oids, rinfo->count, new_idx);
-
-	free(rinfo->oids);
-	rinfo->oids = new_oids;
-done:
-	free(rinfo->prio_oids);
-	rinfo->prio_oids = NULL;
-	rinfo->nr_scheduled_prio_oids += rinfo->nr_prio_oids;
-	rinfo->nr_prio_oids = 0;
-}
-
-/*
- * When automatic object recovery is disabled, the behavior of the
- * recovery process is like 'lazy recovery'.  This function returns
- * true if the recovery queue contains objects being accessed by
- * clients.  Sheep recovers such objects for availability even when
- * automatic object recovery is not enabled.
- */
-static bool has_scheduled_objects(struct recovery_info *rinfo)
-{
-	return rinfo->done < rinfo->nr_scheduled_prio_oids;
-}
-
 static void recover_next_object(struct recovery_info *rinfo)
 {
 	if (run_next_rw())
 		return;
 
-	if (rinfo->nr_prio_oids)
-		finish_schedule_oids(rinfo);
-
-	if (sys->cinfo.disable_recovery && !has_scheduled_objects(rinfo)) {
+	if (sys->cinfo.disable_recovery) {
 		sd_debug("suspended");
 		rinfo->suspended = true;
 		/* suspend until resume_suspended_recovery() is called */
