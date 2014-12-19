@@ -265,6 +265,11 @@ AC_ARG_ENABLE([diskvnodes],
 	[ enable_diskvnodes="no" ],)
 AM_CONDITIONAL(BUILD_DISKVNODES, test x$enable_diskvnodes = xyes)
 
+AC_ARG_ENABLE([earthquake],
+	[ --enable-earthquake : enable earthquake debugger (default no) ],,
+	[ enable_earthquake="no" ],)
+AM_CONDITIONAL(BUILD_EARTHQUAKE, test x$enable_earthquake = xyes)
+
 AC_ARG_ENABLE(systemd, AS_HELP_STRING([--enable-systemd],[enable systemd support]),enable_systemd=$enableval,enable_systemd="no")
 
 dnl systemd detection
@@ -418,6 +423,10 @@ fi
 
 if test "x${enable_diskvnodes}" = xyes; then
 	AC_DEFINE_UNQUOTED(HAVE_DISKVNODES, 1, [have diskvnodes])
+fi
+
+if test "x${enable_earthquake}" = xyes; then
+	AC_DEFINE_UNQUOTED(HAVE_EARTHQUAKE, 1, [have earthquake])
 fi
 
 # extra warnings

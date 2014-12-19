@@ -68,6 +68,10 @@ noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h
 
 EXTRA_DIST		= 
 
+if BUILD_EARTHQUAKE
+sheep_LDADD		+= -leq_embed
+endif
+
 all-local: 
 	@echo Built sheep
 
