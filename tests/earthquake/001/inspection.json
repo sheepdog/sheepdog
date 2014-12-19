@@ -1,0 +1,4 @@
+[
+    { "component": "dog", "file": "vdi.c", "rule": "dog_inspection.json" },
+    { "component": "tgt", "file": "usr/bs_sheepdog.c", "rule": "tgt_inspection.json" }
+]

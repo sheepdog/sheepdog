@@ -81,3 +81,5 @@ man/dog.8
 man/sheepfs.8
 
 *.deb
+
+compile_commands.json
