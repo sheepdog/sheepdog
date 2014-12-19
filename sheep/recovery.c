@@ -78,6 +78,15 @@ struct recovery_info {
 	struct sd_mutex vinfo_lock;
 
 	struct sd_node *excluded;
+
+	uint32_t max_exec_count;
+	uint64_t queue_work_interval;
+	bool throttling;
+};
+
+struct recovery_timer {
+	void (*callback)(void *);
+	void *data;
 };
 
 static struct recovery_info *next_rinfo;
@@ -900,6 +909,91 @@ void resume_suspended_recovery(void)
 	}
 }
 
+static void recovery_timer_handler(int fd, int events, void *data)
+{
+	struct recovery_timer *t = data;
+	uint64_t val;
+
+	if (read(fd, &val, sizeof(val)) < 0)
+		return;
+	t->callback(t->data);
+	unregister_event(fd);
+	close(fd);
+}
+
+static void add_recovery_timer(struct recovery_timer *t, unsigned int mseconds)
+{
+	struct itimerspec it;
+	int tfd;
+
+	tfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+	if (tfd < 0) {
+		sd_err("timerfd_create: %m");
+		return;
+	}
+
+	memset(&it, 0, sizeof(it));
+	it.it_value.tv_sec = mseconds / 1000;
+	it.it_value.tv_nsec = (mseconds % 1000) * 1000000;
+
+	if (timerfd_settime(tfd, 0, &it, NULL) < 0) {
+		sd_err("timerfd_settime: %m");
+		return;
+	}
+
+	if (register_event(tfd, recovery_timer_handler, t) < 0)
+		sd_err("failed to register timer fd");
+}
+
+static void recover_next_object_delay(void *arg)
+{
+	struct recovery_info *rinfo = main_thread_get(current_rinfo);
+	uint32_t nr_threads = md_nr_disks() * 2;
+	double thread_unit_exec = 0;
+	double mod = 0;
+
+	if (!rinfo)
+		return;
+
+	thread_unit_exec = (double) rinfo->max_exec_count / nr_threads;
+	mod = rinfo->max_exec_count % nr_threads;
+
+	if (rinfo->max_exec_count <= nr_threads || mod != 0) {
+		if (rand() % 100 + 1 <= (mod / nr_threads) * 100)
+			thread_unit_exec = ceil(thread_unit_exec);
+		else
+			thread_unit_exec = floor(thread_unit_exec);
+	}
+
+	for (int i = 0; i < thread_unit_exec; i++) {
+		rinfo = main_thread_get(current_rinfo);
+
+		if (!rinfo)
+			return;
+
+		if (rinfo->next - rinfo->done > rinfo->max_exec_count)
+			break;
+
+		recover_next_object(rinfo);
+	}
+
+	if (rinfo->throttling != sys->rthrottling.throttling) {
+		rinfo->max_exec_count = sys->rthrottling.max_exec_count;
+		rinfo->queue_work_interval =
+				 sys->rthrottling.queue_work_interval;
+		rinfo->throttling = sys->rthrottling.throttling;
+	}
+
+	if (rinfo->throttling) {
+		static struct recovery_timer rt = {
+			.callback = recover_next_object_delay,
+			.data = &rt,
+		};
+		add_recovery_timer(&rt, rinfo->queue_work_interval);
+	} else
+		recover_next_object(rinfo);
+}
+
 static void recover_object_main(struct work *work)
 {
 	struct recovery_work *rw = container_of(work, struct recovery_work,
@@ -935,7 +1029,16 @@ static void recover_object_main(struct work *work)
 	if (rinfo->done >= rinfo->count)
 		goto finish_recovery;
 
-	recover_next_object(rinfo);
+	if (!rinfo->throttling && !sys->rthrottling.throttling)
+		recover_next_object(rinfo);
+	else if (!rinfo->throttling && sys->rthrottling.throttling) {
+		static struct recovery_timer rt = {
+			.callback = recover_next_object_delay,
+			.data = &rt,
+		};
+		add_recovery_timer(&rt, sys->rthrottling.queue_work_interval);
+	}
+
 	free_recovery_obj_work(row);
 	return;
 finish_recovery:
@@ -982,8 +1085,17 @@ static void finish_object_list(struct work *work)
 		return;
 	}
 
-	for (uint32_t i = 0; i < nr_threads; i++)
-		recover_next_object(rinfo);
+	for (uint32_t i = 0; i < nr_threads; i++) {
+		if (rinfo->throttling) {
+			static struct recovery_timer rt = {
+				.callback = recover_next_object_delay,
+				.data = &rt,
+			};
+			add_recovery_timer(&rt, rinfo->queue_work_interval);
+		} else
+			recover_next_object(rinfo);
+	}
+
 	return;
 }
 
@@ -1143,6 +1255,9 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 	rinfo->max_epoch = sys->cinfo.epoch;
 	rinfo->vinfo_array = xzalloc(sizeof(struct vnode_info *) *
 				     rinfo->max_epoch);
+	rinfo->max_exec_count = sys->rthrottling.max_exec_count;
+	rinfo->queue_work_interval = sys->rthrottling.queue_work_interval;
+	rinfo->throttling = sys->rthrottling.throttling;
 	sd_init_mutex(&rinfo->vinfo_lock);
 	if (epoch_lifted)
 		rinfo->notify_complete = true; /* Reweight or node recovery */
@@ -1236,3 +1351,21 @@ void get_recovery_state(struct recovery_state *state)
 	state->nr_finished = rinfo->done;
 	state->nr_total = rinfo->count;
 }
+
+void set_recovery(struct recovery_throttling *rthrottling)
+{
+	sys->rthrottling.max_exec_count = rthrottling->max_exec_count;
+	sys->rthrottling.queue_work_interval =
+				 rthrottling->queue_work_interval;
+	if (rthrottling->max_exec_count > 0 &&
+	 rthrottling->queue_work_interval > 0)
+		sys->rthrottling.throttling = true;
+	else
+		sys->rthrottling.throttling = false;
+}
+
+struct recovery_throttling get_recovery(void)
+{
+	return sys->rthrottling;
+}
+

@@ -143,6 +143,8 @@ struct system_info {
 	bool gateway_only;
 	bool nosync;
 
+	struct recovery_throttling rthrottling;
+
 	struct work_queue *net_wqueue;
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
@@ -429,6 +431,8 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *, bool,
 bool oid_in_recovery(uint64_t oid);
 bool node_in_recovery(void);
 void get_recovery_state(struct recovery_state *state);
+void set_recovery(struct recovery_throttling *rthrottling);
+struct recovery_throttling get_recovery(void);
 
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 		       uint64_t offset);

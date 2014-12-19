@@ -272,6 +272,12 @@ struct generation_reference {
 	int32_t count;
 };
 
+struct recovery_throttling {
+	uint32_t max_exec_count;
+	uint64_t queue_work_interval;
+	bool throttling;
+};
+
 struct sd_inode {
 	char name[SD_MAX_VDI_LEN];
 	char tag[SD_MAX_VDI_TAG_LEN];

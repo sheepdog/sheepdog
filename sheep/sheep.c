@@ -115,6 +115,12 @@ static const char log_help[] =
 "  syslog             syslog of the system\n"
 "  stdout             standard output\n";
 
+static const char recovery_help[] =
+"Available arguments:\n"
+"\tmax=: object recovery process maximum count of each interval\n"
+"\tinterval=: object recovery interval time (millisec)\n"
+"Example:\n\t$ sheep -R max=50,interval=1000 ...\n";
+
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
 	 bind_help},
@@ -137,6 +143,8 @@ static struct sd_option sheep_options[] = {
 	{'P', "pidfile", true, "create a pid file"},
 	{'r', "http", true, "enable http service. (default: disabled)",
 	 http_help},
+	{'R', "recovery", true, "specify the recovery speed throttling",
+	 recovery_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "cache", true, "enable object cache", cache_help},
@@ -424,6 +432,26 @@ static struct option_parser journal_parsers[] = {
 	{ NULL, NULL },
 };
 
+static uint32_t max_exec_count;
+static uint64_t queue_work_interval;
+static int max_exec_count_parser(const char *s)
+{
+	max_exec_count = strtol(s, NULL, 10);
+	return 0;
+}
+
+static int queue_work_interval_parser(const char *s)
+{
+	queue_work_interval = strtol(s, NULL, 10);
+	return 0;
+}
+
+static struct option_parser recovery_parsers[] = {
+	{ "max=", max_exec_count_parser },
+	{ "interval=", queue_work_interval_parser },
+	{ NULL, NULL },
+};
+
 static size_t get_nr_nodes(void)
 {
 	struct vnode_info *vinfo;
@@ -633,6 +661,10 @@ int main(int argc, char **argv)
 
 	sys->node_status = SD_NODE_STATUS_INITIALIZATION;
 
+	sys->rthrottling.max_exec_count = 0;
+	sys->rthrottling.queue_work_interval = 0;
+	sys->rthrottling.throttling = false;
+
 	install_crash_handler(crash_handler);
 	signal(SIGPIPE, SIG_IGN);
 
@@ -750,6 +782,15 @@ int main(int argc, char **argv)
 			break;
 		case 'h':
 			usage(0);
+			break;
+		case 'R':
+			if (option_parse(optarg, ",", recovery_parsers) < 0)
+				exit(1);
+			sys->rthrottling.max_exec_count = max_exec_count;
+			sys->rthrottling.queue_work_interval
+						 = queue_work_interval;
+			if (max_exec_count > 0 && queue_work_interval > 0)
+				sys->rthrottling.throttling = true;
 			break;
 		case 'v':
 			fprintf(stdout, "Sheepdog daemon version %s\n",
