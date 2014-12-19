@@ -110,6 +110,9 @@
 #define SD_OP_OIDS_EXIST	0xC6
 #define SD_OP_VDI_STATE_SNAPSHOT_CTL  0xC7
 #define SD_OP_INODE_COHERENCE 0xC8
+#define SD_OP_READ_DEL_VDIS  0xC9
+#define SD_OP_GET_RECOVERY      0xCA
+#define SD_OP_SET_RECOVERY      0xCB
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080

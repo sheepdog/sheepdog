@@ -1430,6 +1430,30 @@ static int cluster_inode_coherence(const struct sd_req *req,
 			       !!req->inode_coherence.validate, &sender->nid);
 }
 
+static int local_get_recovery(struct request *req)
+{
+	struct recovery_throttling rthrottling;
+
+	rthrottling = get_recovery();
+	memcpy(req->data, &rthrottling, sizeof(rthrottling));
+	req->rp.data_length = sizeof(rthrottling);
+
+	return SD_RES_SUCCESS;
+}
+
+static int local_set_recovery(struct request *req)
+{
+	struct recovery_throttling *rthrottling;
+
+	rthrottling = xmalloc(sizeof(struct recovery_throttling));
+
+	memcpy(rthrottling, req->data, sizeof(struct recovery_throttling));
+	set_recovery(rthrottling);
+
+	free(rthrottling);
+	return SD_RES_SUCCESS;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1869,6 +1893,20 @@ static struct sd_op_template sd_ops[] = {
 		.name = "DECREF_PEER",
 		.type = SD_OP_TYPE_PEER,
 		.process_work = peer_decref_object,
+	},
+
+	[SD_OP_GET_RECOVERY] = {
+		.name = "GET_RECOVERY",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_work = local_get_recovery,
+	},
+
+	[SD_OP_SET_RECOVERY] = {
+		.name = "SET_RECOVERY",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_work = local_set_recovery,
 	},
 };
 

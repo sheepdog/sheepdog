@@ -183,7 +183,7 @@ static int node_recovery_progress(void)
 	return result < 0 ? EXIT_SYSFAIL : EXIT_SUCCESS;
 }
 
-static int node_recovery(int argc, char **argv)
+static int node_recovery_info(int argc, char **argv)
 {
 	struct sd_node *n;
 	int ret, i = 0;
@@ -233,6 +233,120 @@ static int node_recovery(int argc, char **argv)
 	}
 
 	return EXIT_SUCCESS;
+}
+
+static int node_recovery_set(int argc, char **argv)
+{
+	char *p;
+	struct recovery_throttling *rthrottling;
+
+	rthrottling = xmalloc(sizeof(struct recovery_throttling));
+
+	if (!argv[optind] || !argv[optind + 1]) {
+		sd_err("Invalid interval max (%s), interval (%s)",
+		 argv[optind], argv[optind + 1]);
+		exit(EXIT_USAGE);
+	}
+
+	rthrottling->max_exec_count = strtoul(argv[optind], &p, 10);
+	if (argv[optind] == p || rthrottling->max_exec_count < 0 ||
+	 UINT32_MAX <= rthrottling->max_exec_count || errno != 0 ||
+	 *p != '\0') {
+		sd_err("Invalid max (%s)", argv[optind]);
+		exit(EXIT_USAGE);
+	}
+
+	optind++;
+
+	rthrottling->queue_work_interval = strtoull(argv[optind], &p, 10);
+	if (argv[optind] == p || rthrottling->queue_work_interval < 0 ||
+	 UINT64_MAX <= rthrottling->queue_work_interval || errno != 0 ||
+	 *p != '\0') {
+		sd_err("Invalid interval (%s)", argv[optind]);
+		exit(EXIT_USAGE);
+	}
+
+	if ((rthrottling->max_exec_count == 0 &&
+	 rthrottling->queue_work_interval != 0) ||
+	 (rthrottling->max_exec_count != 0 &&
+	 rthrottling->queue_work_interval == 0)) {
+		sd_err("Invalid interval max (%"PRIu32"), interval (%"PRIu64")",
+		rthrottling->max_exec_count, rthrottling->queue_work_interval);
+		exit(EXIT_USAGE);
+	}
+
+	int ret = 0;
+	struct sd_req req;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req;
+
+	sd_init_req(&req, SD_OP_SET_RECOVERY);
+	req.flags = SD_FLAG_CMD_WRITE;
+	req.data_length = sizeof(struct recovery_throttling);
+	ret = dog_exec_req(&sd_nid, &req, rthrottling);
+
+	if (ret < 0)
+		ret = EXIT_SYSFAIL;
+
+	if (rsp->result == SD_RES_SUCCESS)
+		ret = EXIT_SUCCESS;
+	else
+		ret = EXIT_FAILURE;
+
+	switch (ret) {
+	case EXIT_FAILURE:
+	case EXIT_SYSFAIL:
+		sd_err("Failed to execute request");
+		ret = -1;
+		break;
+	case EXIT_SUCCESS:
+		/* do nothing */
+		break;
+	default:
+		sd_err("unknown return code: %d", ret);
+		ret = -1;
+		break;
+	}
+
+	free(rthrottling);
+	return ret;
+}
+
+static int node_recovery_get(int argc, char **argv)
+{
+	struct recovery_throttling rthrottling;
+	int ret = 0;
+
+	struct sd_req req;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req;
+
+	sd_init_req(&req, SD_OP_GET_RECOVERY);
+	req.data_length = sizeof(rthrottling);
+
+	ret = dog_exec_req(&sd_nid, &req, &rthrottling);
+	if (ret < 0)
+		ret = EXIT_SYSFAIL;
+
+	if (rsp->result == SD_RES_SUCCESS)
+		ret = EXIT_SUCCESS;
+	else
+		ret = EXIT_FAILURE;
+
+	switch (ret) {
+	case EXIT_FAILURE:
+	case EXIT_SYSFAIL:
+		sd_err("Failed to execute request");
+		ret = -1;
+		break;
+	case EXIT_SUCCESS:
+		sd_info("max (%"PRIu32"), interval (%"PRIu64")",
+		 rthrottling.max_exec_count, rthrottling.queue_work_interval);
+		break;
+	default:
+		sd_err("unknown return code: %d", ret);
+		ret = -1;
+		break;
+	}
+	return ret;
 }
 
 static struct sd_node *idx_to_node(struct rb_root *nroot, int idx)
@@ -538,6 +652,31 @@ static struct sd_option node_options[] = {
 	{ 0, NULL, false, NULL },
 };
 
+static struct subcommand node_recovery_cmd[] = {
+	{"info", NULL, "aphPrT", "show recovery information of nodes (default)",
+	 NULL, CMD_NEED_NODELIST, node_recovery_info, node_options},
+	{"set-throttle", "<max> <interval>", NULL, "set new throttling", NULL,
+	 CMD_NEED_ARG|CMD_NEED_NODELIST, node_recovery_set, node_options},
+	{"get-throttle", NULL, NULL, "get current throttling", NULL,
+	 CMD_NEED_NODELIST, node_recovery_get, node_options},
+	{NULL},
+};
+
+static int node_recovery(int argc, char **argv)
+{
+	int ret;
+	if (argc == optind) {
+		ret = update_node_list(SD_MAX_NODES);
+		if (ret < 0) {
+			sd_err("Failed to get node list");
+			exit(EXIT_SYSFAIL);
+		}
+		return node_recovery_info(argc, argv);
+	}
+
+	return do_generic_subcommand(node_recovery_cmd, argc, argv);
+}
+
 static int node_log_level_set(int argc, char **argv)
 {
 	int ret = 0;
@@ -694,8 +833,9 @@ static struct subcommand node_cmd[] = {
 	 CMD_NEED_NODELIST, node_list},
 	{"info", NULL, "aprhT", "show information about each node", NULL,
 	 CMD_NEED_NODELIST, node_info},
-	{"recovery", NULL, "aphPrT", "show recovery information of nodes", NULL,
-	 CMD_NEED_NODELIST, node_recovery, node_options},
+	{"recovery", "<max> <interval>", "aphPrT",
+	 "show recovery information or set/get recovery speed throttling of nodes",
+	 node_recovery_cmd, 0, node_recovery, node_options},
 	{"md", "[disks]", "aprAfhT", "See 'dog node md' for more information",
 	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
 	{"stat", NULL, "aprwhT", "show stat information about the node", NULL,
