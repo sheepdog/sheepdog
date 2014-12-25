@@ -68,3 +68,9 @@ M: Liu Yuan <namei.unix@gmail.com>
 F: openstack/glance/store/sheepdog.py
 F: openstack/cinder/volume/drivers/sheepdog.py
 L: openstack-dev@lists.openstack.org
+
+Earthquake testing stuff
+------------------------------
+M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+F: tests/earthquake/*
+L: sheepdog@lists.wpkg.org
