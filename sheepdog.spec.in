@@ -74,6 +74,7 @@ fi
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/sheepfs.8*
 %{_mandir}/man8/dog.8*
+%{_prefix}/lib/systemd/system/sheepdog.service
 
 %changelog
 * @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
