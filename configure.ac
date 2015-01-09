@@ -270,6 +270,11 @@ AC_ARG_ENABLE([earthquake],
 	[ enable_earthquake="no" ],)
 AM_CONDITIONAL(BUILD_EARTHQUAKE, test x$enable_earthquake = xyes)
 
+AC_ARG_ENABLE([lttng-ust],
+	[ --enable-lttng-ust : enable tracing feature based on LTTng UST (default no) ],,
+	[ enable_lttng_ust="no" ],)
+AM_CONDITIONAL(BUILD_LTTNG_UST, test x$enable_lttng_ust = xyes)
+
 AC_ARG_ENABLE(systemd, AS_HELP_STRING([--enable-systemd],[enable systemd support]),enable_systemd=$enableval,enable_systemd="no")
 
 dnl systemd detection
@@ -429,6 +434,13 @@ if test "x${enable_earthquake}" = xyes; then
 	AC_DEFINE_UNQUOTED(HAVE_EARTHQUAKE, 1, [have earthquake])
 fi
 
+if test "x${enable_lttng_ust}" = xyes; then
+	AC_CHECK_HEADERS([lttng/tracepoint.h lttng/tracepoint-event.h],,
+		AC_MSG_ERROR(headers of LTTng not found))
+	AC_DEFINE_UNQUOTED(HAVE_LTTNG_UST, 1, [have LTTng ust])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES LTTng-ust"
+fi
+
 # extra warnings
 EXTRA_WARNINGS=""
 
@@ -502,10 +514,18 @@ else
 	TRACE_CFLAGS=""
 fi
 
+if test "x${enable_lttng_ust}" = xyes ; then
+	AC_MSG_NOTICE([Enabling LTTng ust (-llttng-ust -lurcu-bp)])
+	LIBS+="-llttng-ust -lurcu-bp -ldl"
+	LTTNG_UST_CFLAGS="-DENABLE_LTTNG_UST"
+else
+	LTTNG_UST_CFLAGS=""
+fi
+
 # final build of *FLAGS
 CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
 	$TRACE_CFLAGS $COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS \
-	-D_GNU_SOURCE -D_LGPL_SOURCE -std=gnu99"
+	$LTTNG_UST_CFLAGS -D_GNU_SOURCE -D_LGPL_SOURCE -std=gnu99"
 CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS"
 LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 
