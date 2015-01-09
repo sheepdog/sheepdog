@@ -571,7 +571,7 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 			if (ret != sizeof(status))
 				panic("read exit status failed: %m");
 
-			exit(status);
+			_exit(status);
 			break;
 		}
 
@@ -589,7 +589,7 @@ static int lock_and_daemon(bool daemonize, const char *base_dir)
 			status = 1;
 			goto end;
 		default:
-			exit(0);
+			_exit(0);
 			break;
 		}
 
