@@ -1125,9 +1125,6 @@ static int local_oids_exist(const struct sd_req *req, struct sd_rsp *rsp,
 static int local_cluster_info(const struct sd_req *req, struct sd_rsp *rsp,
 			      void *data, const struct sd_node *sender)
 {
-	if (sys->cinfo.ctime == 0)
-		return SD_RES_WAIT_FOR_FORMAT;
-
 	memcpy(data, &sys->cinfo, sizeof(sys->cinfo));
 	rsp->data_length = sizeof(sys->cinfo);
 	return SD_RES_SUCCESS;
