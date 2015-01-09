@@ -1430,6 +1430,17 @@ static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
+static int local_get_cluster_default(const struct sd_req *req,
+				     struct sd_rsp *rsp,
+				     void *data, const struct sd_node *sender)
+{
+	rsp->cluster_default.nr_copies = sys->cinfo.nr_copies;
+	rsp->cluster_default.copy_policy = sys->cinfo.copy_policy;
+	rsp->cluster_default.block_size_shift = sys->cinfo.block_size_shift;
+
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_inode_coherence(const struct sd_req *req,
 				   struct sd_rsp *rsp, void *data,
 				   const struct sd_node *sender)
@@ -1850,6 +1861,13 @@ static struct sd_op_template sd_ops[] = {
 		.name = "VDI_STATE_SNAPSHOT_CTL",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_vdi_state_snapshot_ctl,
+	},
+
+	[SD_OP_GET_CLUSTER_DEFAULT] = {
+		.name = "GET_CLUSTER_DEFAULT",
+		.type = SD_OP_TYPE_LOCAL,
+		.force = true,
+		.process_main = local_get_cluster_default,
 	},
 
 	/* gateway I/O operations */

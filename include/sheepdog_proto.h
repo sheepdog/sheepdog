@@ -45,6 +45,7 @@
 #define SD_OP_READ_VDIS      0x15
 #define SD_OP_FLUSH_VDI      0x16
 #define SD_OP_DEL_VDI        0x17
+#define SD_OP_GET_CLUSTER_DEFAULT   0x18
 
 /* macros in the SD_FLAG_CMD_XXX group are mutually exclusive */
 #define SD_FLAG_CMD_WRITE    0x01
@@ -249,6 +250,13 @@ struct sd_rsp {
 			uint32_t	__pad2;
 			uint8_t		digest[20];
 		} hash;
+		struct {
+			uint32_t	__pad1;
+			uint8_t		nr_copies;
+			uint8_t		copy_policy;
+			uint8_t		block_size_shift;
+			uint8_t		__pad2;
+		} cluster_default;
 
 		uint32_t		__pad[8];
 	};
