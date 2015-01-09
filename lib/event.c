@@ -19,6 +19,9 @@
 #include "util.h"
 #include "event.h"
 
+#define TRACEPOINT_DEFINE
+#include "event_tp.h"
+
 static int efd;
 static struct rb_root events_tree = RB_ROOT;
 
@@ -119,6 +122,8 @@ int register_event_prio(int fd, event_handler_t h, void *data, int prio)
 	} else
 		rb_insert(&events_tree, ei, rb, event_cmp);
 
+	tracepoint(event, _register, fd, (void *)h, data, prio);
+
 	return ret;
 }
 
@@ -143,6 +148,8 @@ void unregister_event(int fd)
 	 * to be called in do_event_loop().  Refreshing the event loop is safe.
 	 */
 	event_force_refresh();
+
+	tracepoint(event, unregister, fd);
 }
 
 int modify_event(int fd, unsigned int new_events)
@@ -203,6 +210,8 @@ refresh:
 		sd_err("epoll_wait failed: %m");
 		exit(1);
 	} else if (nr) {
+		tracepoint(event, loop_start, nr_events);
+
 		for (i = 0; i < nr; i++) {
 			struct event_info *ei;
 
