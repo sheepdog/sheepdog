@@ -35,6 +35,14 @@ if BUILD_TRACE
 AM_CPPFLAGS		+= -DENABLE_TRACE
 endif
 
+# for LTTng ust tracepoints
+AM_CPPFLAGS		= -I$(top_srcdir)/lib/tracepoint
+noinst_HEADERS		=  tracepoint/work_tp.h
+
+if BUILD_LTTNG_UST
+libsheepdog_a_SOURCES	+= tracepoint/work_tp.c
+endif
+
 # support for GNU Flymake
 check-syntax:
 	$(COMPILE) -fsyntax-only $(CHK_SOURCES)
