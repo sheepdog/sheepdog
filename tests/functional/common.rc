@@ -164,7 +164,7 @@ _cleanup()
 
 _count_sheep_processes()
 {
-    pgrep -f "$SHEEP_PROG $STORE/" -l | awk '{ $1=""; print }' | sort | uniq | wc -l
+    pgrep -f "$SHEEP_PROG $STORE/" -a | awk '{ $1=""; print }' | sort | uniq | wc -l
 }
 
 # Wait for the specified sheep to be stopped.  If no argument is
@@ -174,12 +174,13 @@ _wait_for_sheep_stop()
     local cnt
     for cnt in `seq 60`; do # wait at most 60 seconds
 	# check sheep process
+	local SHEEPS=0
 	if [ "$1" == "" ]; then
-	    pgrep -f "$SHEEP_PROG $WD" > /dev/null
+	    SHEEPS=`pgrep -f "$SHEEP_PROG $WD" | wc -l`
 	else
-	    pgrep -f "$SHEEP_PROG $STORE/$1 " > /dev/null
+	    SHEEPS=`pgrep -f "$SHEEP_PROG $STORE/$1 " | wc -l`
 	fi
-	if [ $? == 0 ]; then
+	if [ $SHEEPS != 0 ]; then
 	    sleep 1
 	    continue
 	fi
@@ -259,8 +260,8 @@ _valgrind_sheep()
 
     # wait for sheep to start up
     while true; do
-	pgrep -f "$SHEEP_PROG $1" > /dev/null
-	if [ $? != 0 ]; then
+	local SHEEPS=`pgrep -f "$SHEEP_PROG $1" | wc -l`
+	if [ $SHEEPS == 0 ]; then
 	    # failed to start sheep $1
 	    break
 	fi
@@ -288,11 +289,11 @@ _start_sheep()
     local running=true
     local cnt
     for cnt in `seq 1 10`; do  # wait at most 10 seconds
-        pgrep -f "$SHEEP_PROG $STORE/$1 " > /dev/null
-        if [ $? != 0 ]; then
+	local SHEEPS=`pgrep -f "$SHEEP_PROG $STORE/$1 " | wc -l`
+        if [ $SHEEPS == 0 ]; then
             running=false
             break
-        fi
+	fi
         sleep 1
     done
 
@@ -316,8 +317,13 @@ _kill_all_dogs()
 {
     pkill -f "$DOG_PROG (cluster|vdi|node|debug)"
 
-    while [ $? == 0 ]; do
-        pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" > /dev/null
+    if [ $? == 1 ]; then
+	return			# no dogs
+    fi
+
+    local DOGS=1
+    while [ $DOGS != "0" ]; do
+        DOGS=`pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" | wc -l`
     done
 }
 
@@ -343,8 +349,13 @@ _kill_all_dogs_force()
 {
     pkill -9 -f "$DOG_PROG (cluster|vdi|node|debug)"
 
-    while [ $? == 0 ]; do
-        pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" > /dev/null
+    if [ $? == 1 ]; then
+	return			# no dogs
+    fi
+
+    local DOGS=1
+    while [ $DOGS != 0 ]; do
+        DOGS=`pgrep -f "$DOG_PROG (cluster|vdi|node|debug)" | wc -l`
     done
 }
 
