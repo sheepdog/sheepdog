@@ -62,7 +62,11 @@ static int get_cluster_config(struct cluster_info *cinfo)
 {
 	cinfo->ctime = config.ctime;
 	cinfo->nr_copies = config.copies;
-	cinfo->flags = config.flags;
+	if (config.ctime > 0)
+		cinfo->flags = config.flags;
+	else
+		cinfo->flags = (config.flags & ~SD_CLUSTER_FLAG_AUTO_VNODES) |
+			(cinfo->flags & SD_CLUSTER_FLAG_AUTO_VNODES);
 	cinfo->copy_policy = config.copy_policy;
 	cinfo->block_size_shift = config.block_size_shift;
 	memcpy(cinfo->store, config.store, sizeof(config.store));
@@ -122,6 +126,14 @@ int init_config_file(void)
 	}
 
 reload:
+	if ((config.flags & SD_CLUSTER_FLAG_AUTO_VNODES) !=
+			(sys->cinfo.flags & SD_CLUSTER_FLAG_AUTO_VNODES)
+		&& !sys->gateway_only
+		&& config.ctime > 0) {
+		sd_err("Designation of before a restart and a vnodes option is different.");
+		return -1;
+	}
+
 	ret = 0;
 	get_cluster_config(&sys->cinfo);
 	if ((config.flags & SD_CLUSTER_FLAG_DISKMODE) !=

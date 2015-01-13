@@ -15,6 +15,7 @@
 #include <sys/time.h>
 
 #include "dog.h"
+#include "sheep.h"
 #include "farm/farm.h"
 
 static struct sd_option cluster_options[] = {
@@ -27,6 +28,7 @@ static struct sd_option cluster_options[] = {
 	 "do not serve write request if number of nodes is not sufficient"},
 	{'z', "block_size_shift", true, "specify the shift num of default"
 	      " data object size"},
+	{'V', "fixedvnodes", false, "disable automatic vnodes calculation"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -38,6 +40,7 @@ static struct cluster_cmd_data {
 	bool force;
 	bool strict;
 	char name[STORE_LEN];
+	bool fixed_vnodes;
 } cluster_cmd_data;
 
 #define DEFAULT_STORE	"plain"
@@ -87,6 +90,41 @@ static int cluster_format(int argc, char **argv)
 	struct timeval tv;
 	char store_name[STORE_LEN];
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	struct sd_node *n;
+
+	rb_for_each_entry(n, &sd_nroot, rb) {
+		struct sd_req info_req;
+		struct sd_rsp *info_rsp = (struct sd_rsp *)&info_req;
+		struct cluster_info cinfo;
+
+		sd_init_req(&info_req, SD_OP_CLUSTER_INFO);
+		info_req.data_length = sizeof(cinfo);
+		ret = dog_exec_req(&n->nid, &info_req, &cinfo);
+		if (ret < 0) {
+			sd_err("Fail to execute request");
+			return EXIT_FAILURE;
+		}
+		if (info_rsp->result != SD_RES_SUCCESS) {
+			sd_err("%s", sd_strerror(info_rsp->result));
+			return EXIT_FAILURE;
+		}
+
+		if (n->nr_vnodes != 0) {
+			if ((cinfo.flags & SD_CLUSTER_FLAG_AUTO_VNODES)
+				&& cluster_cmd_data.fixed_vnodes) {
+				sd_err("Can not apply the option of '-V', "
+					"because there are vnode strategy of sheep "
+					"is auto in the cluster");
+				return EXIT_FAILURE;
+			} else if (!(cinfo.flags & SD_CLUSTER_FLAG_AUTO_VNODES)
+				&& !cluster_cmd_data.fixed_vnodes) {
+				sd_err("Need to specify the option of '-V', "
+					"because there are vnode strategy of sheep "
+					"is fixed in the cluster");
+				return EXIT_FAILURE;
+			}
+		}
+	}
 
 	if (cluster_cmd_data.copies > sd_nodes_nr) {
 		char info[1024];
@@ -132,6 +170,11 @@ static int cluster_format(int argc, char **argv)
 	hdr.cluster.flags |= SD_CLUSTER_FLAG_DISKMODE;
 #endif
 
+	if (cluster_cmd_data.fixed_vnodes)
+		hdr.cluster.flags &= ~SD_CLUSTER_FLAG_AUTO_VNODES;
+	else
+		hdr.cluster.flags |= SD_CLUSTER_FLAG_AUTO_VNODES;
+
 	printf("using backend %s store\n", store_name);
 	ret = dog_exec_req(&sd_nid, &hdr, store_name);
 	if (ret < 0)
@@ -160,14 +203,15 @@ static void print_nodes(const struct epoch_log *logs, uint16_t flags)
 				if (entry->disks[nr_disk].disk_id == 0)
 					break;
 			}
-			printf("%s%s(%d)",
-			       (i == 0) ? "" : ", ",
-			       addr_to_str(entry->nid.addr, entry->nid.port),
-			       nr_disk);
+			printf("%s%s:%d(%d)",
+				(i == 0) ? "" : ", ",
+				addr_to_str(entry->nid.addr, entry->nid.port),
+					entry->nr_vnodes, nr_disk);
 		} else
-			printf("%s%s",
-			       (i == 0) ? "" : ", ",
-			       addr_to_str(entry->nid.addr, entry->nid.port));
+			printf("%s%s:%d",
+				(i == 0) ? "" : ", ",
+				addr_to_str(entry->nid.addr, entry->nid.port),
+					entry->nr_vnodes);
 	}
 }
 
@@ -232,6 +276,15 @@ retry:
 			}
 			printf("%s with %s redundancy policy\n",
 			       logs->drv_name, copy);
+
+			/* show vnode strategy */
+			if (!raw_output)
+				printf("Cluster vnodes strategy: ");
+			if (logs->flags & SD_CLUSTER_FLAG_AUTO_VNODES)
+				printf("auto\n");
+			else
+				printf("fixed\n");
+
 		} else
 			printf("%s\n", sd_strerror(rsp->result));
 
@@ -239,15 +292,17 @@ retry:
 		if (!raw_output)
 			printf("Cluster vnode mode: ");
 		if (logs->flags & SD_CLUSTER_FLAG_DISKMODE)
-			printf("disk");
+			printf("disk\n");
 		else
-			printf("node");
-	}
+			printf("node\n");
+	} else
+		printf("\n");
 
 	if (!raw_output && rsp->data_length > 0) {
 		ct = logs[0].ctime >> 32;
-		printf("\nCluster created at %s\n", ctime(&ct));
-		printf("Epoch Time           Version\n");
+		printf("Cluster created at %s\n", ctime(&ct));
+		printf("Epoch Time           Version [Host:Port:V-Nodes,,,]");
+		printf("\n");
 	}
 
 	nr_logs = rsp->data_length / (sizeof(struct epoch_log)
@@ -761,7 +816,7 @@ failure:
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhvT", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bctaphzT", "create a Sheepdog store",
+	{"format", NULL, "bctaphzTV", "create a Sheepdog store",
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aphT", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
@@ -823,9 +878,10 @@ static int cluster_parser(int ch, const char *opt)
 			" Please set shift bit larger than 20");
 			exit(EXIT_FAILURE);
 		}
-
 		cluster_cmd_data.block_size_shift = block_size_shift;
-
+		break;
+	case 'V':
+		cluster_cmd_data.fixed_vnodes = true;
 		break;
 	}
 

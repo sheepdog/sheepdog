@@ -87,6 +87,8 @@
 #define SD_RES_INCOMPLETE    0x1B /* Object (in kv) is incomplete uploading */
 #define SD_RES_COLLECTING_CINFO 0x1C /* sheep is collecting cluster wide status, not ready for operation */
 #define SD_RES_INODE_INVALIDATED 0x1D /* inode object in client is invalidated, refreshing is required */
+#define SD_RES_GATEWAY_MODE  0x1E /* Target node is gateway mode */
+#define SD_RES_INVALID_VNODES_STRATEGY 0x1F /* Invalid vnodes strategy */
 
 /* errors above 0x80 are sheepdog-internal */
 

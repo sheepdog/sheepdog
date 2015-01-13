@@ -265,6 +265,29 @@ static int remove_epoch(uint32_t epoch)
 	return SD_RES_SUCCESS;
 }
 
+static int get_vnodes(struct vnode_info *vinfo, int *nr_vnodes)
+{
+	int ret;
+	struct sd_node *node;
+
+	rb_for_each_entry(node, &vinfo->nroot, rb) {
+		struct sd_req hdr;
+		if (node_is_local(node))
+			continue;
+		if (node->nr_vnodes == 0)
+			continue;
+
+		sd_init_req(&hdr, SD_OP_GET_VNODES);
+		hdr.data_length = sizeof(*nr_vnodes);
+		hdr.epoch = sys_epoch();
+		ret = sheep_exec_req(&node->nid, &hdr, nr_vnodes);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+		node->nr_vnodes = *nr_vnodes;
+	}
+	return SD_RES_SUCCESS;
+}
+
 static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data, const struct sd_node *sender)
 {
@@ -272,6 +295,8 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	uint32_t latest_epoch;
 	struct store_driver *driver;
 	char *store_name = data;
+	int32_t nr_vnodes;
+	struct vnode_info *vinfo = get_vnode_info();
 
 	driver = find_store_driver(data);
 	if (!driver)
@@ -289,6 +314,12 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	ret = sd_store->init();
 	if (ret != SD_RES_SUCCESS)
 		return ret;
+
+	if (sys->gateway_only) {
+		ret = get_vnodes(vinfo, &nr_vnodes);
+		if (ret != SD_RES_SUCCESS)
+			return ret;
+	}
 
 	sys->cinfo.nr_copies = req->cluster.copies;
 	sys->cinfo.copy_policy = req->cluster.copy_policy;
@@ -1479,6 +1510,45 @@ static int local_set_recovery(struct request *req)
 	return SD_RES_SUCCESS;
 }
 
+static int local_get_vnodes(struct request *req)
+{
+	int *nr_vnodes;
+
+	nr_vnodes = req->data;
+	req->rp.data_length = sizeof(nr_vnodes);
+	*nr_vnodes = sys->this_node.nr_vnodes;
+
+	return SD_RES_SUCCESS;
+}
+
+static int local_set_vnodes(const struct sd_req *req,
+				struct sd_rsp *rsp, void *data,
+				const struct sd_node *sender)
+{
+	int ret;
+	int *nr_vnodes = (int *)data;
+
+	if (sys->gateway_only) {
+		sd_err("failed to set vnodes, cause operating in gateway mode.");
+		return SD_RES_GATEWAY_MODE;
+	}
+	if (is_cluster_autovnodes(&sys->cinfo)) {
+		sd_err("failed to set vnodes, cause operating in auto vnodes strategy.");
+		return SD_RES_INVALID_VNODES_STRATEGY;
+	}
+
+	if (1 > *nr_vnodes || *nr_vnodes > UINT16_MAX) {
+		sd_err("invalid vnodes: %d", *nr_vnodes);
+		return SD_RES_INVALID_PARMS;
+	}
+
+	sys->this_node.nr_vnodes = *nr_vnodes;
+
+	ret = sys->cdrv->update_node(&sys->this_node);
+
+	return ret;
+}
+
 static struct sd_op_template sd_ops[] = {
 
 	/* cluster operations */
@@ -1870,6 +1940,18 @@ static struct sd_op_template sd_ops[] = {
 		.type = SD_OP_TYPE_LOCAL,
 		.force = true,
 		.process_main = local_get_cluster_default,
+	},
+
+	[SD_OP_GET_VNODES] = {
+		.name = "GET_VNODES",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_get_vnodes,
+	},
+
+	[SD_OP_SET_VNODES] = {
+		.name = "SET_VNODES",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_main = local_set_vnodes,
 	},
 
 	/* gateway I/O operations */

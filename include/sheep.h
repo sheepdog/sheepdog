@@ -149,6 +149,9 @@ static inline const char *sd_strerror(int err)
 			"IO has halted as there are not enough living nodes",
 		[SD_RES_READONLY] = "Object is read-only",
 		[SD_RES_INODE_INVALIDATED] = "Inode object is invalidated",
+		[SD_RES_INVALID_VNODES_STRATEGY] =
+			"Invalid cluster vnodes strategy",
+		[SD_RES_GATEWAY_MODE] = "Targeted node is gateway mode",
 
 		/* from internal_proto.h */
 		[SD_RES_OLD_NODE_VER] = "Request has an old epoch",
@@ -326,6 +329,11 @@ static inline struct sd_node *str_to_node(const char *str, struct sd_node *id)
 static inline bool is_cluster_diskmode(const struct cluster_info *cinfo)
 {
 	return (cinfo->flags & SD_CLUSTER_FLAG_DISKMODE) > 0;
+}
+
+static inline bool is_cluster_autovnodes(const struct cluster_info *cinfo)
+{
+	return (cinfo->flags & SD_CLUSTER_FLAG_AUTO_VNODES) > 0;
 }
 
 #endif

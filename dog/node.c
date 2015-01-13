@@ -764,6 +764,71 @@ static int node_log(int argc, char **argv)
 	return do_generic_subcommand(node_log_cmd, argc, argv);
 }
 
+static int do_vnodes_set(const struct node_id *nid, int *nr_vnodes)
+{
+	int ret = 0;
+	struct sd_req hdr;
+	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
+
+	sd_init_req(&hdr, SD_OP_SET_VNODES);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = sizeof(nr_vnodes);
+
+	ret = dog_exec_req(nid, &hdr, nr_vnodes);
+	if (ret < 0)
+		return EXIT_SYSFAIL;
+
+	if (rsp->result != SD_RES_SUCCESS)
+		return EXIT_FAILURE;
+
+	return ret;
+}
+
+static int node_vnodes_set(int argc, char **argv)
+{
+	int ret = 0;
+	char *p;
+	int32_t nr_vnodes = strtol(argv[optind], &p, 10);
+
+	if (argv[optind] == p || nr_vnodes < 1 || nr_vnodes > UINT16_MAX
+		|| *p != '\0') {
+		sd_err("Invalid number of vnodes '%s': must be an integer "
+			"between 1 and %u",
+			argv[optind], UINT16_MAX);
+		exit(EXIT_USAGE);
+	}
+
+	ret = do_vnodes_set(&sd_nid, &nr_vnodes);
+
+	switch (ret) {
+	case EXIT_FAILURE:
+	case EXIT_SYSFAIL:
+		sd_err("Failed to execute request");
+		ret = -1;
+		break;
+	case EXIT_SUCCESS:
+		/* do nothing */
+		break;
+	default:
+		sd_err("unknown return code of do_vnodes_set(): %d", ret);
+		ret = -1;
+		break;
+	}
+
+	return ret;
+}
+
+static struct subcommand node_vnodes_cmd[] = {
+	{"set", "<num of vnodes>", NULL, "set new vnodes",
+	 NULL, CMD_NEED_ARG, node_vnodes_set},
+	{NULL},
+};
+
+static int node_vnodes(int argc, char **argv)
+{
+	return do_generic_subcommand(node_vnodes_cmd, argc, argv);
+}
+
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprhlT", "kill node", NULL,
 	 CMD_NEED_NODELIST, node_kill, node_options},
@@ -780,6 +845,8 @@ static struct subcommand node_cmd[] = {
 	 0, node_stat, node_options},
 	{"log", NULL, "aphT", "show or set log level of the node", node_log_cmd,
 	 CMD_NEED_ARG, node_log},
+	{"vnodes", "<num of vnodes>", "aph", "set new vnodes", node_vnodes_cmd,
+	 CMD_NEED_ARG, node_vnodes},
 	{NULL,},
 };
 

@@ -121,6 +121,10 @@ static const char recovery_help[] =
 "\tinterval=: object recovery interval time (millisec)\n"
 "Example:\n\t$ sheep -R max=50,interval=1000 ...\n";
 
+static const char vnodes_help[] =
+"Example:\n\t$ sheep -V 128\n"
+"\tset number of vnodes\n";
+
 static struct sd_option sheep_options[] = {
 	{'b', "bindaddr", true, "specify IP address of interface to listen on",
 	 bind_help},
@@ -147,6 +151,7 @@ static struct sd_option sheep_options[] = {
 	 recovery_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
+	{'V', "vnodes", true, "set number of vnodes", vnodes_help},
 	{'w', "cache", true, "enable object cache", cache_help},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
@@ -646,11 +651,12 @@ static void sighup_handler(int signum)
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
-	int nr_vnodes = SD_DEFAULT_VNODES, rc = 1;
+	int rc = 1;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
 	bool explicit_addr = false;
+	int32_t nr_vnodes = -1;
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
@@ -659,6 +665,7 @@ int main(int argc, char **argv)
 	struct stat logdir_st;
 	enum log_dst_type log_dst_type;
 
+	sys->cinfo.flags |= SD_CLUSTER_FLAG_AUTO_VNODES;
 	sys->node_status = SD_NODE_STATUS_INITIALIZATION;
 
 	sys->rthrottling.max_exec_count = 0;
@@ -707,7 +714,10 @@ int main(int argc, char **argv)
 			sys->backend_dio = true;
 			break;
 		case 'g':
-			/* same as '-v 0' */
+			if (nr_vnodes > 0) {
+				sd_err("Options '-g' and '-V' can not be both specified");
+				exit(1);
+			}
 			nr_vnodes = 0;
 			break;
 		case 'z':
@@ -797,6 +807,21 @@ int main(int argc, char **argv)
 				PACKAGE_VERSION);
 			exit(0);
 			break;
+		case 'V':
+			sys->cinfo.flags &= ~SD_CLUSTER_FLAG_AUTO_VNODES;
+			if (nr_vnodes == 0) {
+				sd_err("Options '-g' and '-V' can not be both specified");
+				exit(1);
+			}
+			nr_vnodes = strtol(optarg, &p, 10);
+			if (optarg == p || nr_vnodes < 1
+				|| UINT16_MAX < nr_vnodes || *p != '\0') {
+				sd_err("Invalid number of vnodes '%s': must be "
+					"an integer between 1 and %u",
+					optarg, UINT16_MAX);
+				exit(1);
+			}
+			break;
 		default:
 			usage(1);
 			break;
@@ -813,7 +838,8 @@ int main(int argc, char **argv)
 	if (nr_vnodes == 0) {
 		sys->gateway_only = true;
 		sys->disk_space = 0;
-	}
+	} else if (nr_vnodes == -1)
+		nr_vnodes = SD_DEFAULT_VNODES;
 
 	if (optind != argc) {
 		argp = strdup(argv[optind]);
