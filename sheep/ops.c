@@ -292,7 +292,7 @@ static int get_vnodes(struct vnode_info *vinfo, int *nr_vnodes)
 static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 			   void *data, const struct sd_node *sender)
 {
-	int i, ret;
+	int i, ret = SD_RES_SUCCESS;
 	uint32_t latest_epoch;
 	struct store_driver *driver;
 	char *store_name = data;
@@ -300,8 +300,10 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	struct vnode_info *vinfo = get_vnode_info();
 
 	driver = find_store_driver(data);
-	if (!driver)
-		return SD_RES_NO_STORE;
+	if (!driver) {
+		ret = SD_RES_NO_STORE;
+		goto out;
+	}
 
 	pstrcpy((char *)sys->cinfo.store, sizeof(sys->cinfo.store),
 		store_name);
@@ -310,16 +312,16 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 
 	ret = sd_store->format();
 	if (ret != SD_RES_SUCCESS)
-		return ret;
+		goto out;
 
 	ret = sd_store->init();
 	if (ret != SD_RES_SUCCESS)
-		return ret;
+		goto out;
 
 	if (sys->gateway_only) {
 		ret = get_vnodes(vinfo, &nr_vnodes);
 		if (ret != SD_RES_SUCCESS)
-			return ret;
+			goto out;
 	}
 
 	sys->cinfo.nr_copies = req->cluster.copies;
@@ -343,12 +345,16 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	sys->cinfo.epoch = 0;
 
 	ret = inc_and_log_epoch();
-	if (ret)
-		return SD_RES_EIO;
+	if (ret) {
+		ret = SD_RES_EIO;
+		goto out;
+	}
 
 	sys->cinfo.status = SD_STATUS_OK;
 
-	return SD_RES_SUCCESS;
+out:
+	put_vnode_info(vinfo);
+	return ret;
 }
 
 static int cluster_shutdown(const struct sd_req *req, struct sd_rsp *rsp,
