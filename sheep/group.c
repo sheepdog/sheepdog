@@ -1360,12 +1360,8 @@ int create_cluster(int port, int64_t zone, int nr_vnodes,
 
 	if (!is_cluster_autovnodes(&sys->cinfo)) {
 		for (i = 0; i < nr_nodes; i++) {
-			if ((addr_to_str(sys->this_node.nid.addr,
-					sys->this_node.nid.port)
-				== addr_to_str(sys->cinfo.nodes[i].nid.addr,
-					sys->cinfo.nodes[i].nid.port))
-				&& (sys->this_node.nid.port
-					== sys->cinfo.nodes[i].nid.port)) {
+			if (!node_id_cmp(&sys->this_node.nid,
+					 &sys->cinfo.nodes[i].nid)) {
 				vnodes = sys->cinfo.nodes[i].nr_vnodes;
 				break;
 			}
