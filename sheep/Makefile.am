@@ -72,6 +72,14 @@ if BUILD_EARTHQUAKE
 sheep_LDADD		+= -leq_embed
 endif
 
+# for LTTng ust tracepoints
+AM_CPPFLAGS		= -I$(top_srcdir)/sheep/tracepoint
+noinst_HEADERS		=  tracepoint/request_tp.h
+
+if BUILD_LTTNG_UST
+sheep_SOURCES	+= tracepoint/request_tp.c
+endif
+
 all-local: 
 	@echo Built sheep
 
