@@ -405,7 +405,8 @@ int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 int do_vdi_create(const char *vdiname, int64_t vdi_size,
 		  uint32_t base_vid, uint32_t *vdi_id, bool snapshot,
 		  uint8_t nr_copies, uint8_t copy_policy,
-		  uint8_t store_policy, uint8_t block_size_shift)
+		  uint8_t store_policy, uint8_t block_size_shift,
+		  bool cut_relation)
 {
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -426,6 +427,7 @@ int do_vdi_create(const char *vdiname, int64_t vdi_size,
 	hdr.vdi.copy_policy = copy_policy;
 	hdr.vdi.store_policy = store_policy;
 	hdr.vdi.block_size_shift = block_size_shift;
+	hdr.vdi.cut_relation = cut_relation ? 1 : 0;
 
 	ret = dog_exec_req(&sd_nid, &hdr, buf);
 	if (ret < 0)
@@ -511,7 +513,7 @@ static int vdi_create(int argc, char **argv)
 	ret = do_vdi_create(vdiname, size, 0, &vid, false,
 			    vdi_cmd_data.nr_copies, vdi_cmd_data.copy_policy,
 			    vdi_cmd_data.store_policy,
-			    vdi_cmd_data.block_size_shift);
+			    vdi_cmd_data.block_size_shift, false);
 	if (ret != EXIT_SUCCESS || !vdi_cmd_data.prealloc)
 		goto out;
 
@@ -606,14 +608,16 @@ static int vdi_snapshot(int argc, char **argv)
 	const char *vdiname = argv[optind++];
 	uint32_t vid, new_vid;
 	int ret;
-	char buf[SD_INODE_HEADER_SIZE];
-	struct sd_inode *inode = (struct sd_inode *)buf;
+	struct sd_inode *inode, *new_inode;
 	struct sd_req hdr;
 	struct vdi_state *vs = NULL;
 	int vs_count = 0;
 	struct node_id owners[SD_MAX_COPIES];
 	int nr_owners = 0, nr_issued_prevent_inode_update = 0;
 	bool fail_if_snapshot = false;
+	uint32_t object_size;
+	char *data_obj_buf = NULL;
+	uint32_t idx, max_idx;
 
 	if (vdi_cmd_data.snapshot_id != 0) {
 		sd_err("Please specify a non-integer value for "
@@ -635,9 +639,11 @@ static int vdi_snapshot(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
+	inode = xzalloc(sizeof(*inode));
+
 	if (fail_if_snapshot) {
-		ret = dog_read_object(vid_to_vdi_oid(vid), inode,
-				      SD_INODE_HEADER_SIZE, 0, true);
+		ret = dog_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode), 0,
+				      true);
 		if (ret != EXIT_SUCCESS)
 			return ret;
 
@@ -649,8 +655,7 @@ static int vdi_snapshot(int argc, char **argv)
 			return EXIT_FAILURE;
 		}
 	} else {
-		ret = read_vdi_obj(vdiname, 0, "", &vid, inode,
-				   SD_INODE_HEADER_SIZE);
+		ret = read_vdi_obj(vdiname, 0, "", &vid, inode, sizeof(*inode));
 		if (ret != EXIT_SUCCESS)
 			return ret;
 	}
@@ -708,16 +713,80 @@ static int vdi_snapshot(int argc, char **argv)
 	if (ret != SD_RES_SUCCESS)
 		goto out;
 
-	ret = do_vdi_create(vdiname, inode->vdi_size, vid, &new_vid, true,
+	ret = do_vdi_create(vdiname, inode->vdi_size,
+			    vid, &new_vid, true,
 			    inode->nr_copies, inode->copy_policy,
-			    inode->store_policy, inode->block_size_shift);
+			    inode->store_policy, inode->block_size_shift,
+			    vdi_cmd_data.no_share);
+	if (!vdi_cmd_data.no_share) {
+		if (ret == EXIT_SUCCESS)
+			goto print_result;
+		else
+			goto out;
+	}
 
-	if (ret == EXIT_SUCCESS && verbose) {
+	new_inode = xmalloc(sizeof(*inode));
+	ret = read_vdi_obj(vdiname, 0, "", &new_vid, new_inode,
+			   SD_INODE_HEADER_SIZE);
+	if (ret != EXIT_SUCCESS)
+		goto out;
+
+	/*
+	 * Clients (QEMU, tgtd) cannot find the new working VDI because
+	 * COW requests are prevented by SD_OP_PREVENT_INODE_UPDATE.
+	 * So we don't have to worry about that clients see working VDI with
+	 * inconsistent data_vdi_id.
+	 */
+	object_size = (UINT32_C(1) << inode->block_size_shift);
+	data_obj_buf = xzalloc(object_size);
+	max_idx = count_data_objs(inode);
+
+	for (idx = 0; idx < max_idx; idx++) {
+		uint32_t vdi_id;
+		uint64_t oid;
+
+		vdi_show_progress(idx * object_size, inode->vdi_size);
+
+		vdi_id = sd_inode_get_vid(inode, idx);
+		if (!vdi_id)
+			continue;
+
+		oid = vid_to_data_oid(vdi_id, idx);
+		ret = dog_read_object(oid, data_obj_buf, object_size, 0,
+				      true);
+		if (ret) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+
+		oid = vid_to_data_oid(new_vid, idx);
+		ret = dog_write_object(oid, 0, data_obj_buf, object_size, 0, 0,
+				       inode->nr_copies,
+				       inode->copy_policy, true, true);
+		if (ret != SD_RES_SUCCESS) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+
+		sd_inode_set_vid(new_inode, idx, new_vid);
+		ret = sd_inode_write_vid(new_inode, idx, new_vid, new_vid, 0,
+					 false, true);
+		if (ret) {
+			ret = EXIT_FAILURE;
+			goto out;
+		}
+	}
+
+	vdi_show_progress(idx * object_size, inode->vdi_size);
+
+print_result:
+	if (verbose) {
 		if (raw_output)
 			printf("%x %x\n", new_vid, vid);
 		else
 			printf("new VID of original VDI: %x,"
-			       " VDI ID of newly created snapshot: %x\n", new_vid, vid);
+			       " VDI ID of newly created snapshot:"
+			       " %x\n", new_vid, vid);
 	}
 
 out:
@@ -769,7 +838,7 @@ static int vdi_clone(int argc, char **argv)
 	object_size = (UINT32_C(1) << inode->block_size_shift);
 	ret = do_vdi_create(dst_vdi, inode->vdi_size, base_vid, &new_vid, false,
 			    inode->nr_copies, inode->copy_policy,
-			    inode->store_policy, inode->block_size_shift);
+			    inode->store_policy, inode->block_size_shift, false);
 	if (ret != EXIT_SUCCESS ||
 			(!vdi_cmd_data.prealloc && !vdi_cmd_data.no_share))
 		goto out;
@@ -1027,7 +1096,7 @@ static int vdi_rollback(int argc, char **argv)
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, base_vid, &new_vid,
 			     false, vdi_cmd_data.nr_copies, inode->copy_policy,
-			     inode->store_policy, inode->block_size_shift);
+			    inode->store_policy, inode->block_size_shift, false);
 
 	if (ret == EXIT_SUCCESS && verbose) {
 		if (raw_output)
@@ -2404,7 +2473,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, inode->vdi_id, &vid,
 			    false, inode->nr_copies, inode->copy_policy,
-			    inode->store_policy, inode->block_size_shift);
+			    inode->store_policy, inode->block_size_shift, false);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("Failed to read VDI");
 		goto out;
@@ -2514,7 +2583,8 @@ out:
 					     true, current_inode->nr_copies,
 					     current_inode->copy_policy,
 					     current_inode->store_policy,
-					     current_inode->block_size_shift);
+					     current_inode->block_size_shift,
+					     false);
 		if (recovery_ret != EXIT_SUCCESS) {
 			sd_err("failed to resume the current vdi");
 			ret = recovery_ret;
@@ -3048,7 +3118,7 @@ static struct subcommand vdi_cmd[] = {
 	{"create", "<vdiname> <size>", "PycaphrvzT", "create an image",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_create, vdi_options},
-	{"snapshot", "<vdiname>", "saphrvT", "create a snapshot",
+	{"snapshot", "<vdiname>", "saphrvTn", "create a snapshot",
 	 NULL, CMD_NEED_ARG,
 	 vdi_snapshot, vdi_options},
 	{"clone", "<src vdi> <dst vdi>", "sPnaphrvT", "clone an image",
