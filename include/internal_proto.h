@@ -115,6 +115,7 @@
 #define SD_OP_SET_RECOVERY      0xCB
 #define SD_OP_SET_VNODES 0xCC
 #define SD_OP_GET_VNODES 0xCD
+#define SD_OP_FAST_DEEP_COPY 0xCE
 
 /* internal flags for hdr.flags, must be above 0x80 */
 #define SD_FLAG_CMD_RECOVERY 0x0080

@@ -1487,6 +1487,16 @@ static int cluster_inode_coherence(const struct sd_req *req,
 			       !!req->inode_coherence.validate, &sender->nid);
 }
 
+static int local_fast_deep_copy(struct request *req)
+{
+	sd_debug("fast deep copy, source VID: %"PRIx32", destination VID: %"
+		 PRIx32, req->rq.fast_deep_copy.src_vid,
+		 req->rq.fast_deep_copy.dst_vid);
+
+	return fast_deep_copy(req->vinfo, req->rq.fast_deep_copy.src_vid,
+			      req->rq.fast_deep_copy.dst_vid);
+}
+
 static int local_get_recovery(struct request *req)
 {
 	struct recovery_throttling rthrottling;
@@ -1953,6 +1963,12 @@ static struct sd_op_template sd_ops[] = {
 		.name = "SET_VNODES",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_main = local_set_vnodes,
+	},
+
+	[SD_OP_FAST_DEEP_COPY] = {
+		.name = "FAST_DEEP_COPY",
+		.type = SD_OP_TYPE_LOCAL,
+		.process_work = local_fast_deep_copy,
 	},
 
 	/* gateway I/O operations */

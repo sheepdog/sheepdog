@@ -40,6 +40,8 @@ static struct sd_option vdi_options[] = {
 	 "                          neither comparing nor repairing"},
 	{'z', "block_size_shift", true, "specify the bit shift num for"
 			       " data object size"},
+	{'D', "fast-deep-copy", false, "fast deep copy for"
+	 "snapshot with --no-share"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -61,6 +63,7 @@ static struct vdi_cmd_data {
 	uint64_t oid;
 	bool no_share;
 	bool exist;
+	bool fast_deep_copy;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -603,6 +606,36 @@ fail:
 	return NULL;
 }
 
+struct req_fast_deep_copy {
+	struct work work;
+
+	struct sd_node *node;
+	uint32_t src, dst;
+};
+
+static void req_fast_deep_copy_work(struct work *work)
+{
+	struct req_fast_deep_copy *w =
+		container_of(work, struct req_fast_deep_copy, work);
+	struct sd_req hdr;
+	int ret;
+
+	sd_init_req(&hdr, SD_OP_FAST_DEEP_COPY);
+	hdr.fast_deep_copy.src_vid = w->src;
+	hdr.fast_deep_copy.dst_vid = w->dst;
+	ret = dog_exec_req(&w->node->nid, &hdr, NULL);
+	if (ret < 0)
+		sd_err("deep copy failed");
+	/* TODO: error handling */
+}
+
+static void req_fast_deep_copy_done(struct work *work)
+{
+	struct req_fast_deep_copy *w =
+		container_of(work, struct req_fast_deep_copy, work);
+	free(w);
+}
+
 static int vdi_snapshot(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
@@ -727,7 +760,7 @@ static int vdi_snapshot(int argc, char **argv)
 
 	new_inode = xmalloc(sizeof(*inode));
 	ret = read_vdi_obj(vdiname, 0, "", &new_vid, new_inode,
-			   SD_INODE_HEADER_SIZE);
+			   sizeof(*inode));
 	if (ret != EXIT_SUCCESS)
 		goto out;
 
@@ -737,47 +770,94 @@ static int vdi_snapshot(int argc, char **argv)
 	 * So we don't have to worry about that clients see working VDI with
 	 * inconsistent data_vdi_id.
 	 */
-	object_size = (UINT32_C(1) << inode->block_size_shift);
-	data_obj_buf = xzalloc(object_size);
-	max_idx = count_data_objs(inode);
+	if (vdi_cmd_data.fast_deep_copy) {
+		struct work_queue *q;
+		struct sd_node *n;
 
-	for (idx = 0; idx < max_idx; idx++) {
-		uint32_t vdi_id;
-		uint64_t oid;
+		q = create_work_queue("deep copy", WQ_DYNAMIC);
+
+		rb_for_each_entry(n, &sd_nroot, rb) {
+			struct req_fast_deep_copy *w;
+
+			w = xzalloc(sizeof(*w));
+
+			w->src = vid;
+			w->dst = new_vid;
+			w->node = n;
+
+			w->work.fn = req_fast_deep_copy_work;
+			w->work.done = req_fast_deep_copy_done;
+
+			queue_work(q, &w->work);
+		}
+
+		work_queue_wait(q);
+
+		/* fast deep copy completed */
+
+		for (int new_idx = 0; new_idx < SD_INODE_DATA_INDEX;
+		     new_idx++) {
+			if (inode->data_vdi_id[new_idx])
+				new_inode->data_vdi_id[new_idx] = new_vid;
+		}
+
+		ret = dog_write_object(vid_to_vdi_oid(new_vid), 0,
+				       new_inode->data_vdi_id,
+				       SD_INODE_DATA_INDEX *
+				       sizeof(new_inode->data_vdi_id[0]),
+				       offsetof(struct sd_inode,
+						data_vdi_id[0]),
+				       0, new_inode->nr_copies,
+				       new_inode->copy_policy,
+				       false, true);
+		if (ret < 0) {
+			sd_err("updating inode failed");
+			goto out;
+		}
+	} else {
+		object_size = (UINT32_C(1) << inode->block_size_shift);
+		data_obj_buf = xzalloc(object_size);
+		max_idx = count_data_objs(inode);
+
+		for (idx = 0; idx < max_idx; idx++) {
+			uint32_t vdi_id;
+			uint64_t oid;
+
+			vdi_show_progress(idx * object_size, inode->vdi_size);
+
+			vdi_id = sd_inode_get_vid(inode, idx);
+			if (!vdi_id)
+				continue;
+
+			oid = vid_to_data_oid(vdi_id, idx);
+			ret = dog_read_object(oid, data_obj_buf, object_size, 0,
+					      true);
+			if (ret) {
+				ret = EXIT_FAILURE;
+				goto out;
+			}
+
+			oid = vid_to_data_oid(new_vid, idx);
+			ret = dog_write_object(oid, 0, data_obj_buf,
+					       object_size, 0, 0,
+					       inode->nr_copies,
+					       inode->copy_policy, true, true);
+			if (ret != SD_RES_SUCCESS) {
+				ret = EXIT_FAILURE;
+				goto out;
+			}
+
+			sd_inode_set_vid(new_inode, idx, new_vid);
+			ret = sd_inode_write_vid(new_inode, idx, new_vid, new_vid,
+						 0, false, true);
+			if (ret) {
+				ret = EXIT_FAILURE;
+				goto out;
+			}
+		}
 
 		vdi_show_progress(idx * object_size, inode->vdi_size);
-
-		vdi_id = sd_inode_get_vid(inode, idx);
-		if (!vdi_id)
-			continue;
-
-		oid = vid_to_data_oid(vdi_id, idx);
-		ret = dog_read_object(oid, data_obj_buf, object_size, 0,
-				      true);
-		if (ret) {
-			ret = EXIT_FAILURE;
-			goto out;
-		}
-
-		oid = vid_to_data_oid(new_vid, idx);
-		ret = dog_write_object(oid, 0, data_obj_buf, object_size, 0, 0,
-				       inode->nr_copies,
-				       inode->copy_policy, true, true);
-		if (ret != SD_RES_SUCCESS) {
-			ret = EXIT_FAILURE;
-			goto out;
-		}
-
-		sd_inode_set_vid(new_inode, idx, new_vid);
-		ret = sd_inode_write_vid(new_inode, idx, new_vid, new_vid, 0,
-					 false, true);
-		if (ret) {
-			ret = EXIT_FAILURE;
-			goto out;
-		}
 	}
-
-	vdi_show_progress(idx * object_size, inode->vdi_size);
 
 print_result:
 	if (verbose) {
@@ -3118,8 +3198,8 @@ static struct subcommand vdi_cmd[] = {
 	{"create", "<vdiname> <size>", "PycaphrvzT", "create an image",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_create, vdi_options},
-	{"snapshot", "<vdiname>", "saphrvTn", "create a snapshot",
-	 NULL, CMD_NEED_ARG,
+	{"snapshot", "<vdiname>", "saphrvTnD", "create a snapshot",
+	 NULL, CMD_NEED_ARG|CMD_NEED_NODELIST,
 	 vdi_snapshot, vdi_options},
 	{"clone", "<src vdi> <dst vdi>", "sPnaphrvT", "clone an image",
 	 NULL, CMD_NEED_ARG,
@@ -3274,6 +3354,9 @@ static int vdi_parser(int ch, const char *opt)
 			exit(EXIT_FAILURE);
 		}
 		vdi_cmd_data.block_size_shift = block_size_shift;
+		break;
+	case 'D':
+		vdi_cmd_data.fast_deep_copy = true;
 		break;
 	}
 

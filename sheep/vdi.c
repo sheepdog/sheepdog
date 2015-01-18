@@ -2178,3 +2178,187 @@ out:
 	sd_rw_unlock(&vdi_state_lock);
 
 }
+
+struct fast_deep_copy_work {
+	struct work work;
+
+	uint32_t src, dst;
+	int nr_copies, block_size_shift;
+	struct vnode_info *vinfo;
+	int epoch;
+
+	refcnt_t refcnt;
+	eventfd_t finish_fd;
+};
+
+struct copy_single_object_work {
+	struct work work;
+
+	uint64_t src, new;
+	int block_size_shift;
+	int epoch;
+
+	struct fast_deep_copy_work *dcw;
+};
+
+static void copy_single_object_worker(struct work *work)
+{
+	struct copy_single_object_work *w =
+		container_of(work, struct copy_single_object_work, work);
+	char *obj;
+	int obj_size, ret;
+	struct siocb iocb = { 0 };
+
+	sd_debug("copying from %"PRIx64 " to %"PRIx64, w->src, w->new);
+
+	obj_size = 1 << w->block_size_shift;
+	obj = xzalloc(obj_size);
+
+	ret = sd_read_object(w->src, obj, obj_size, 0);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read source object: %"PRIx64, w->src);
+		goto out;
+	}
+
+	iocb.epoch = w->epoch;
+	iocb.length = obj_size;
+	iocb.offset = 0;
+	iocb.buf = obj;
+
+	sd_debug("writing new obj: %"PRIx64, w->new);
+	sd_store->create_and_write(w->new, &iocb);
+	if (ret != SD_RES_SUCCESS)
+		sd_err("failed to write object: %"PRIx64, w->new);
+
+out:
+	refcount_dec(&w->dcw->refcnt);
+	if (refcount_read(&w->dcw->refcnt) == 0)
+		eventfd_xwrite(w->dcw->finish_fd, 1);
+
+	free(obj);
+}
+
+static void copy_single_object_done(struct work *work)
+{
+	struct copy_single_object_work *w =
+		container_of(work, struct copy_single_object_work, work);
+	free(w);
+}
+
+static void fast_deep_copy_worker(struct work *work)
+{
+	struct fast_deep_copy_work *w =
+		container_of(work, struct fast_deep_copy_work, work);
+	uint32_t *src_data_vdi_id;
+	int ret;
+
+	src_data_vdi_id = xcalloc(SD_INODE_DATA_INDEX, sizeof(uint32_t));
+
+	ret = sd_read_object(vid_to_vdi_oid(w->src), (char *)src_data_vdi_id,
+			     SD_INODE_DATA_INDEX * sizeof(uint32_t),
+			     offsetof(struct sd_inode, data_vdi_id[0]));
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("failed to read data_vdi_id of source VDI: %"PRIx32,
+		       w->src);
+		goto out;
+	}
+
+	for (int idx = 0; idx < SD_INODE_DATA_INDEX; idx++) {
+		/*
+		 * FIXME: need to calculate refcnt before actual queuing work.
+		 * cleaning is needed...
+		 */
+		uint64_t new_oid;
+		const struct sd_vnode *v;
+		const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
+
+		if (!src_data_vdi_id[idx])
+			continue;
+
+		new_oid = vid_to_data_oid(w->dst, idx);
+		oid_to_vnodes(new_oid, &w->vinfo->vroot, w->nr_copies,
+			      obj_vnodes);
+		for (int i = 0; i < w->nr_copies; i++) {
+			v = obj_vnodes[i];
+			if (vnode_is_local(v))
+				refcount_inc(&w->refcnt);
+		}
+	}
+
+	sd_debug("a number of objects to copy: %d", refcount_read(&w->refcnt));
+
+	for (int idx = 0; idx < SD_INODE_DATA_INDEX; idx++) {
+		struct copy_single_object_work *single;
+		uint64_t new_oid;
+		const struct sd_vnode *v;
+		const struct sd_vnode *obj_vnodes[SD_MAX_COPIES];
+
+		if (!src_data_vdi_id[idx])
+			continue;
+
+		new_oid = vid_to_data_oid(w->dst, idx);
+		oid_to_vnodes(new_oid, &w->vinfo->vroot, w->nr_copies,
+			      obj_vnodes);
+		for (int i = 0; i < w->nr_copies; i++) {
+			v = obj_vnodes[i];
+			if (vnode_is_local(v))
+				goto do_copy;
+
+		}
+		continue;
+
+do_copy:
+		single = xzalloc(sizeof(*single));
+
+		single->src = vid_to_data_oid(src_data_vdi_id[idx], idx);
+		single->new = new_oid;
+		single->block_size_shift = w->block_size_shift;
+		single->epoch = w->epoch;
+		single->dcw = w;
+
+		single->work.fn = copy_single_object_worker;
+		single->work.done = copy_single_object_done;
+
+		queue_work(sys->io_wqueue, &single->work);
+	}
+
+out:
+	free(src_data_vdi_id);
+}
+
+static void fast_deep_copy_done(struct work *work)
+{
+	struct fast_deep_copy_work *w =
+		container_of(work, struct fast_deep_copy_work, work);
+
+	sd_debug("fast deep copy finished (%"PRIx32" -> %"PRIx32")",
+		 w->src, w->dst);
+	put_vnode_info(w->vinfo);
+	free(w);
+}
+
+worker_fn int fast_deep_copy(struct vnode_info *vinfo,
+			     uint32_t src, uint32_t dst)
+{
+	struct fast_deep_copy_work *w;
+
+	w = xzalloc(sizeof(*w));
+
+	w->src = src;
+	w->dst = dst;
+	w->vinfo = grab_vnode_info(vinfo);
+	w->nr_copies = get_vdi_copy_number(src);
+	w->block_size_shift = get_vdi_block_size_shift(src);
+	w->epoch = get_latest_epoch();
+	w->finish_fd = eventfd(0, EFD_SEMAPHORE);
+
+	w->work.fn = fast_deep_copy_worker;
+	w->work.done = fast_deep_copy_done;
+
+	queue_work(sys->io_wqueue, &w->work);
+
+	eventfd_xread(w->finish_fd);
+	close(w->finish_fd);
+
+	return SD_RES_SUCCESS;
+}
