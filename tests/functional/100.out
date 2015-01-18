@@ -1,0 +1,39 @@
+QA output created by 100
+using backend plain store
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	5	1	0	0	2	0
+1	4	2	0	0	0	0
+2	3	3	0	0	2	0
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+c test_cloned     0   16 MB  8.0 MB  8.0 MB DATE   34f19d      2                22
+s test         1   16 MB   16 MB  0.0 MB DATE   7c2b25      2                22
+  test         0   16 MB  0.0 MB   16 MB DATE   7c2b26      2                22
+creating deep copied snapshot and its clone
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	9	3	0	0	6	0
+1	9	4	0	0	3	0
+2	6	5	0	0	3	0
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+c test_cloned     0   16 MB  8.0 MB  8.0 MB DATE   34f19d      2                22
+s test         1   16 MB   16 MB  0.0 MB DATE   7c2b25      2                22
+s test         2   16 MB  0.0 MB   16 MB DATE   7c2b26      2                22
+s test         3   16 MB   16 MB  0.0 MB DATE   7c2b27      2                22
+  test         0   16 MB  0.0 MB   16 MB DATE   7c2b28      2                22
+c test_cloned2     0   16 MB  8.0 MB  8.0 MB DATE   f6ac5d      2                22
+deleting original VDI tree
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	4	2	0	0	2	0
+1	5	2	0	0	1	0
+2	3	2	0	0	1	0
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         3   16 MB   16 MB  0.0 MB DATE   7c2b27      2                22
+  test         0   16 MB  0.0 MB   16 MB DATE   7c2b28      2                22
+c test_cloned2     0   16 MB  8.0 MB  8.0 MB DATE   f6ac5d      2                22
+deleting deep copied snapshot and its clone
+there should be no object
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	0	0	0	0	0	0
+1	0	0	0	0	0	0
+2	0	0	0	0	0	0
+there should be no vdi
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift

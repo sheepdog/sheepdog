@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Test deepcopy snapshot
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+_cluster_format -c 2
+
+$DOG vdi create test 16M -P
+$DOG vdi snapshot test
+$DOG vdi clone test -s 1 test_cloned
+
+$DOG vdi write test_cloned 0 512 < /dev/zero
+$DOG vdi write test_cloned $((4 * 1024 ** 2 * 1)) 512 < /dev/zero
+_node_info
+
+_vdi_list
+
+echo creating deep copied snapshot and its clone
+$DOG vdi snapshot test --no-share     # deep copy snapshot
+$DOG vdi snapshot test
+$DOG vdi clone test -s 3 test_cloned2
+
+$DOG vdi write test_cloned2 0 512 < /dev/zero
+$DOG vdi write test_cloned2 $((4 * 1024 ** 2 * 1)) 512 < /dev/zero
+_node_info
+
+_vdi_list
+
+echo deleting original VDI tree
+$DOG vdi delete test -s 1
+$DOG vdi delete test -s 2
+$DOG vdi delete test_cloned
+_node_info
+_vdi_list
+
+echo deleting deep copied snapshot and its clone
+$DOG vdi delete test
+$DOG vdi delete test -s 3
+$DOG vdi delete test_cloned2
+
+echo there should be no object
+_node_info
+
+echo there should be no vdi
+_vdi_list
