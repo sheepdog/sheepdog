@@ -1,0 +1,16 @@
+QA output created by 101
+using backend plain store
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	37	1	0	0	23	0
+1	50	1	0	0	20	0
+2	41	2	0	0	21	0
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1  128 MB  128 MB  0.0 MB DATE   7c2b25      2                22
+  test         0  128 MB  128 MB  0.0 MB DATE   7c2b26      2                22
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	37	1	0	0	23	0
+1	50	1	0	0	20	0
+2	41	2	0	0	21	0
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1  128 MB  128 MB  0.0 MB DATE   7c2b25      2                22
+  test         0  128 MB  128 MB  0.0 MB DATE   7c2b26      2                22
