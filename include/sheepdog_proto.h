@@ -493,7 +493,7 @@ static inline bool is_data_obj(uint64_t oid)
 static inline size_t count_data_objs(const struct sd_inode *inode)
 {
 	return DIV_ROUND_UP(inode->vdi_size,
-			    (UINT32_C(1) << inode->block_size_shift));
+			    (1UL << inode->block_size_shift));
 }
 
 static inline size_t get_objsize(uint64_t oid, uint32_t object_size)
