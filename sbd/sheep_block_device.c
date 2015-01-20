@@ -290,7 +290,7 @@ static ssize_t sbd_remove(struct bus_type *bus, const char *buf,
 	unsigned long ul;
 	int target_id, ret;
 
-	ret = strict_strtoul(buf, 10, &ul);
+	ret = kstrtoul(buf, 10, &ul);
 	if (ret)
 		return ret;
 
