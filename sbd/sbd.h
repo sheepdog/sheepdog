@@ -112,34 +112,8 @@ static inline int sbd_dev_id_to_minor(int id)
 	return id << SBD_MINORS_SHIFT;
 }
 
-#if defined(CONFIG_DYNAMIC_DEBUG) && defined _DPRINTK_FLAGS_INCL_MODNAME
-
-# define _SBD_FLAGS ( _DPRINTK_FLAGS_INCL_MODNAME \
-	| _DPRINTK_FLAGS_INCL_FUNCNAME | _DPRINTK_FLAGS_INCL_LINENO)
-
-# define SBD_DYNAMIC_DEBUG_METADATA(name, fmt)                  \
-	static struct _ddebug  __aligned(8)                     \
-	 __attribute__((section("__verbose"))) name = {          \
-		.modname = KBUILD_MODNAME,                      \
-		.function = __func__,                           \
-		.filename = __FILE__,                           \
-		.format = (fmt),                                \
-		.lineno = __LINE__,                             \
-		.flags =  _SBD_FLAGS,                           \
-	}
-
-# define sbd_debug(fmt, ...)                            \
-({                                                      \
-	SBD_DYNAMIC_DEBUG_METADATA(descriptor, fmt);    \
-	__dynamic_pr_debug(&descriptor, pr_fmt(fmt),    \
-			   ##__VA_ARGS__);              \
-})
-
-#else
-
-/* If -DDEBUG is not set, pr_debug = no_printk */
-# define sbd_debug pr_debug
-
-#endif /* CONFIG_DYNAMIC_DEBUG */
+#define sbd_debug(fmt, ...) \
+	pr_debug("%s:%s:%u " fmt, KBUILD_MODNAME,  __func__, \
+		 __LINE__, ##__VA_ARGS__)
 
 #endif /* _SBD_H_ */
