@@ -470,7 +470,10 @@ static int vdi_create(int argc, char **argv)
 
 	if (vdi_cmd_data.block_size_shift) {
 		object_size = (UINT32_C(1) << vdi_cmd_data.block_size_shift);
-		old_max_total_size = object_size * OLD_MAX_DATA_OBJS;
+	} else if (vdi_cmd_data.store_policy == 1) {
+		/* Force to use default block_size_shift for hyper volume */
+		vdi_cmd_data.block_size_shift = SD_DEFAULT_BLOCK_SIZE_SHIFT;
+		object_size = (UINT32_C(1) << vdi_cmd_data.block_size_shift);
 	} else {
 		struct sd_req hdr;
 		struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -496,8 +499,9 @@ static int vdi_create(int argc, char **argv)
 			goto out;
 		}
 		object_size = (UINT32_C(1) << cinfo.block_size_shift);
-		old_max_total_size = object_size * OLD_MAX_DATA_OBJS;
 	}
+
+	old_max_total_size = object_size * OLD_MAX_DATA_OBJS;
 
 	if (size > old_max_total_size && 0 == vdi_cmd_data.store_policy) {
 		sd_err("VDI size is larger than %s bytes, please use '-y' to "
@@ -3331,6 +3335,10 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 'y':
 		vdi_cmd_data.store_policy = 1;
+		if (vdi_cmd_data.block_size_shift) {
+			sd_info("Don't specify both -y and -z options, please");
+			exit(EXIT_FAILURE);
+		}
 		break;
 	case 'o':
 		vdi_cmd_data.oid = strtoull(opt, &p, 16);
@@ -3351,6 +3359,10 @@ static int vdi_parser(int ch, const char *opt)
 		} else if (block_size_shift < 20) {
 			sd_err("Object Size is larger than 2^20."
 			       " Please set shift bit larger than 20");
+			exit(EXIT_FAILURE);
+		}
+		if (vdi_cmd_data.store_policy == 1) {
+			sd_info("Don't specify both -y and -z options, please");
 			exit(EXIT_FAILURE);
 		}
 		vdi_cmd_data.block_size_shift = block_size_shift;
