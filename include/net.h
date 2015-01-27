@@ -39,7 +39,7 @@ int conn_tx_off(struct connection *conn);
 int conn_tx_on(struct connection *conn);
 int conn_rx_off(struct connection *conn);
 int conn_rx_on(struct connection *conn);
-int do_read(int sockfd, void *buf, int len,
+int do_read(int sockfd, void *buf, uint32_t len,
 	    bool (*need_retry)(uint32_t), uint32_t, uint32_t);
 int rx(struct connection *conn, enum conn_state next_state);
 int tx(struct connection *conn, enum conn_state next_state);

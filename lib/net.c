@@ -210,7 +210,8 @@ success:
 	return fd;
 }
 
-int do_read(int sockfd, void *buf, int len, bool (*need_retry)(uint32_t epoch),
+int do_read(int sockfd, void *buf, uint32_t len,
+	    bool (*need_retry)(uint32_t epoch),
 	    uint32_t epoch, uint32_t max_count)
 {
 	int ret, repeat = max_count;

@@ -683,7 +683,8 @@ worker_fn int exec_local_req_async(struct sd_req *rq, void *data,
 	return SD_RES_SUCCESS;
 }
 
-static struct request *alloc_request(struct client_info *ci, int data_length)
+static struct request *alloc_request(struct client_info *ci,
+				     uint32_t data_length)
 {
 	struct request *req;
 
