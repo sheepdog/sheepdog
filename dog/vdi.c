@@ -2536,6 +2536,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 {
 	int ret;
 	uint32_t vid;
+	uint32_t object_size;
 	struct backup_hdr hdr;
 	struct obj_backup *backup = xzalloc(sizeof(*backup));
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
@@ -2562,6 +2563,9 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 		sd_err("Failed to read VDI");
 		goto out;
 	}
+
+	object_size = (UINT32_C(1) << inode->block_size_shift);
+	backup->data = xzalloc(sizeof(uint8_t) * object_size);
 
 	while (true) {
 		ret = xread(STDIN_FILENO, backup,
@@ -2592,6 +2596,7 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 			break;
 		}
 	}
+	free(backup->data);
 out:
 	free(backup);
 	free(inode);
