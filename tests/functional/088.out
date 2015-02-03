@@ -7,8 +7,8 @@ Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      1 [IP:7000]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [IP:7000:128]
 ----- vdi create -----
 ----- vdi list -----
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
@@ -20,8 +20,8 @@ Cluster status: Waiting for other nodes to join cluster
 
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      1 [IP:7000]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [IP:7000:128]
 ----- node info -----
 Response's result: Waiting for other nodes to join cluster
 Cannot get information from any nodes
@@ -33,8 +33,8 @@ Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      1 [IP:7000]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [IP:7000:128]
 ----- vdi list -----
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
   test         0   40 MB   40 MB  0.0 MB DATE   7c2b25      1                22

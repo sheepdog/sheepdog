@@ -10,8 +10,8 @@ Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      3 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7005, 127.0.0.1:7006, 127.0.0.1:7007]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      3 [127.0.0.1:7000:128, 127.0.0.1:7001:128, 127.0.0.1:7002:128, 127.0.0.1:7005:128, 127.0.0.1:7006:128, 127.0.0.1:7007:128]
 STORE/0/obj/007c2b2500000000
 STORE/0/obj/007c2b2500000001
 STORE/0/obj/007c2b2500000002
@@ -89,8 +89,8 @@ Cluster status: running, auto-recovery enabled
 
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      5 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005, 127.0.0.1:7006, 127.0.0.1:7007]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      5 [127.0.0.1:7000:128, 127.0.0.1:7001:128, 127.0.0.1:7002:128, 127.0.0.1:7003:128, 127.0.0.1:7004:128, 127.0.0.1:7005:128, 127.0.0.1:7006:128, 127.0.0.1:7007:128]
 STORE/0/obj/007c2b2500000000
 STORE/0/obj/007c2b2500000001
 STORE/0/obj/007c2b2500000002

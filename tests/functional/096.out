@@ -30,8 +30,8 @@ Cluster store: plain with 3 redundancy policy
 Cluster vnode mode: node
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:128, 127.0.0.1:7001:128, 127.0.0.1:7002:128, 127.0.0.1:7003:128, 127.0.0.1:7004:128, 127.0.0.1:7005:128]
 
 -----
 
@@ -83,8 +83,8 @@ Cluster store: plain with 2 redundancy policy
 Cluster vnode mode: node
 Cluster created at DATE
 
-Epoch Time           Version
-DATE      1 [127.0.0.1:7000, 127.0.0.1:7001, 127.0.0.1:7002, 127.0.0.1:7003, 127.0.0.1:7004, 127.0.0.1:7005]
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:128, 127.0.0.1:7001:128, 127.0.0.1:7002:128, 127.0.0.1:7003:128, 127.0.0.1:7004:128, 127.0.0.1:7005:128]
 
 $ ../../dog/dog vdi create test 12M -P
 
