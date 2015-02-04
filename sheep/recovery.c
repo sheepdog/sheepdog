@@ -240,7 +240,7 @@ rollback:
 		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
 					      rw->cur_vinfo, true);
 		if (!new_old) {
-			sd_err("can not read %"PRIx64" idx %d", oid, idx);
+			sd_warn("can not read %"PRIx64" idx %d", oid, idx);
 			free(buf);
 			buf = NULL;
 			goto done;
