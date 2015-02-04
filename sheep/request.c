@@ -1182,7 +1182,7 @@ worker_fn int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr,
 	}
 	ret = rsp->result;
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed %s, remote address: %s, op name: %s",
+		sd_warn("failed %s, remote address: %s, op name: %s",
 				sd_strerror(ret),
 				addr_to_str(nid->addr, nid->port),
 				op_name(get_sd_op(hdr->opcode)));
