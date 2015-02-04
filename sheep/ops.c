@@ -1458,7 +1458,7 @@ static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
 		if (ret == SD_RES_SUCCESS)
 			rsp->data_length = length;
 		else {
-			sd_err("failed to get vdi state snapshot: %s",
+			sd_info("failed to get vdi state snapshot: %s",
 			       sd_strerror(ret));
 
 			return ret;
