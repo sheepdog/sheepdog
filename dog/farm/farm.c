@@ -134,7 +134,7 @@ static int create_active_vdis(void)
 				  false, vdi->nr_copies,
 				  vdi->copy_policy,
 				  vdi->store_policy,
-				  vdi->block_size_shift, false) < 0)
+				  vdi->block_size_shift) < 0)
 			return -1;
 	}
 	return 0;

@@ -223,7 +223,6 @@ struct vdi_iocb {
 	uint8_t nr_copies;
 	uint8_t block_size_shift;
 	uint64_t time;
-	bool cut_relation;
 };
 
 /* This structure is used to get information from sheepdog. */

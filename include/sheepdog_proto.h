@@ -166,8 +166,6 @@ struct sd_req {
 			uint8_t		block_size_shift;
 			uint32_t	snapid;
 			uint32_t        type;
-			uint8_t		cut_relation;
-			uint8_t		__pad[3];
 		} vdi;
 
 		/* sheepdog-internal */

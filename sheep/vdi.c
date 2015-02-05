@@ -1404,10 +1404,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
-	for (i = right - 1; i && i >= left; i--) {
-		if (!test_bit(i, sys->vdi_inuse))
-			continue;
-
+	for (i = right - 1; i >= left; i--) {
 		ret = sd_read_object(vid_to_vdi_oid(i), (char *)inode,
 				     SD_INODE_HEADER_SIZE, 0);
 		if (ret != SD_RES_SUCCESS)
@@ -1477,25 +1474,6 @@ int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info)
 	sd_debug("%s left %lx right %lx, %x", iocb->name, left, right, ret);
 	switch (ret) {
 	case SD_RES_NO_VDI:
-		/*
-		 * handle a case like this:
-		 * dog vdi create A
-		 * dog vdi snapshot A --no-share
-		 * dog vdi delete A -s 1
-		 * try to find vdi A
-		 *
-		 * In this case, the above get_vdi_bitmap_range() cannot find
-		 * bitmap range for vdi A, because original VID is already
-		 * freed (newly working vdi A shares nothing with the snapshot
-		 * because it is created with --no-share).
-		 *
-		 * Of course, the below fill_vdi_info() can take long time. But
-		 * another case (SD_RES_SUCCESS) can also have similar cost.
-		 *
-		 * TODO: for checking before creation, the below fill_vdi_info()
-		 * isn't required. It must be eliminated.
-		 */
-		return fill_vdi_info(0, SD_NR_VDIS, iocb, info);
 	case SD_RES_FULL_VDI:
 		return ret;
 	case SD_RES_SUCCESS:
@@ -1613,8 +1591,7 @@ int vdi_snapshot(const struct vdi_iocb *iocb, uint32_t *new_vid)
 
 	assert(info.snapid > 0);
 	*new_vid = info.free_bit;
-	ret = notify_vdi_add(*new_vid, iocb->nr_copies,
-			     iocb->cut_relation ? 0 : info.vid,
+	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid,
 			     iocb->copy_policy, iocb->block_size_shift);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
