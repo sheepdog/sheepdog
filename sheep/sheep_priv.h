@@ -366,7 +366,6 @@ int inode_coherence_update(uint32_t vid, bool validate,
 			   const struct node_id *sender);
 void remove_node_from_participants(const struct node_id *left);
 void run_vid_gc(uint32_t vid);
-int fast_deep_copy(struct vnode_info *vinfo, uint32_t src, uint32_t dst);
 
 extern int ec_max_data_strip;
 

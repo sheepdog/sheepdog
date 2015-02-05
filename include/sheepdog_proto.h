@@ -210,10 +210,7 @@ struct sd_req {
 			uint32_t        vid;
 			uint32_t        validate;
 		} inode_coherence;
-		struct {
-			uint32_t        src_vid;
-			uint32_t        dst_vid;
-		} fast_deep_copy;
+
 
 		uint32_t		__pad[8];
 	};
