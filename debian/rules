@@ -9,7 +9,7 @@ UPSTREAM_GIT    ?= git://github.com/sheepdog/sheepdog.git
 GIT_TAG         ?= $(shell echo v'$(VERSION)' | sed -e 's/~/_/')
 
 %:
-	dh $@ --with autoreconf
+	dh $@ --with autoreconf,systemd
 
 override_dh_builddeb:
 	dh_builddeb -- -Zxz -z9

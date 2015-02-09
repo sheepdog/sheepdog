@@ -5,6 +5,7 @@ Maintainer: PKG OpenStack <openstack-devel@lists.alioth.debian.org>
 Uploaders: YunQiang Su <wzssyqa@gmail.com>
 Build-Depends: debhelper (>= 9),
  dh-autoreconf,
+ dh-systemd,
  bash-completion,
  pkg-config,
  libcorosync-dev,
