@@ -1,0 +1,17 @@
+[Unit]
+Description=Sheepdog QEMU/KVM Block Storage
+After=network.target
+Wants=syslog.target
+
+[Service]
+EnvironmentFile=/etc/default/sheepdog
+ExecStart=/usr/sbin/sheep $DAEMON_ARGS --pidfile /var/run/sheep.pid $SHEEPDOG_PATH
+PIDFile=/var/run/sheep.pid
+Type=forking
+Restart=on-abort
+StartLimitInterval=10s
+StartLimitBurst=3
+LimitNOFILE=32768
+
+[Install]
+WantedBy=multi-user.target
