@@ -702,7 +702,7 @@ static struct vdi_state *do_cinfo_collection_work(uint32_t epoch,
 						  int *nr_vdi_states)
 {
 	struct vdi_state *vs = NULL;
-	unsigned int rlen = 512;
+	unsigned int rlen = 4096;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
