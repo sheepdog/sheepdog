@@ -2916,6 +2916,7 @@ static int vdi_alter_copy(int argc, char **argv)
 	hdr.vdi_state.new_vid = vid;
 	hdr.vdi_state.copies = vdi_cmd_data.nr_copies;
 	hdr.vdi_state.copy_policy = vdi_cmd_data.copy_policy;
+	hdr.vdi_state.block_size_shift = inode->block_size_shift;
 
 	ret = send_light_req(&sd_nid, &hdr);
 	if (ret == 0) {
