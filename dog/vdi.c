@@ -847,8 +847,8 @@ out:
 static int vdi_resize(int argc, char **argv)
 {
 	const char *vdiname = argv[optind++];
-	uint64_t new_size;
-	uint32_t vid;
+	uint64_t new_size, old_max_total_size;
+	uint32_t vid, object_size;
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
@@ -865,13 +865,19 @@ static int vdi_resize(int argc, char **argv)
 	if (ret != EXIT_SUCCESS)
 		return ret;
 
-	if (new_size > SD_OLD_MAX_VDI_SIZE && 0 == inode->store_policy) {
-		sd_err("New VDI size is too large");
-		return EXIT_USAGE;
-	}
-
-	if (new_size > SD_MAX_VDI_SIZE) {
-		sd_err("New VDI size is too large");
+	object_size = (UINT32_C(1) << inode->block_size_shift);
+	old_max_total_size = object_size * OLD_MAX_DATA_OBJS;
+	if (0 == inode->store_policy) {
+		if (new_size > old_max_total_size) {
+			sd_err("New VDI size is too large."
+			       " This volume's max size is %"PRIu64,
+			       old_max_total_size);
+			return EXIT_USAGE;
+		}
+	} else if (new_size > SD_MAX_VDI_SIZE) {
+		sd_err("New VDI size is too large"
+			" This volume's max size is %llu",
+			SD_MAX_VDI_SIZE);
 		return EXIT_USAGE;
 	}
 
