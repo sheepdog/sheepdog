@@ -449,7 +449,8 @@ static int vdi_create(int argc, char **argv)
 	uint64_t size;
 	uint32_t vid;
 	uint64_t oid;
-	uint32_t idx, max_idx;
+	uint64_t idx;
+	uint32_t max_idx;
 	uint32_t object_size;
 	uint64_t old_max_total_size = 0;
 	struct sd_inode *inode = NULL;
@@ -740,7 +741,8 @@ static int vdi_clone(int argc, char **argv)
 	const char *src_vdi = argv[optind++], *dst_vdi;
 	uint32_t base_vid, new_vid, vdi_id;
 	uint64_t oid;
-	uint32_t idx, max_idx, ret;
+	uint64_t idx;
+	uint32_t max_idx, ret;
 	uint32_t object_size;
 	struct sd_inode *inode = NULL, *new_inode = NULL;
 	char *buf = NULL;
