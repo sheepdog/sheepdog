@@ -52,6 +52,7 @@ Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 Cluster status: Waiting for other nodes to join cluster
+
 Failed to read object 807c2b2500000000 Waiting for other nodes to join cluster
 Failed to read inode header
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
