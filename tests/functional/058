@@ -10,7 +10,7 @@ _wait_for_sheep 6
 _cluster_format -c 6
 _vdi_create test 100M
 dd if=/dev/zero | $DOG vdi write -w test
-$QEMU_IO -c "discard 0 100m" sheepdog:test | _filter_qemu_io
+$QEMU_IO -f raw -c "discard 0 100m" sheepdog:test | _filter_qemu_io
 $DOG vdi check test
 for i in `seq 0 24`; do
 	$DOG vdi object location test -i $i;

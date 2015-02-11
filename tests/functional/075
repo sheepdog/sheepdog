@@ -26,4 +26,4 @@ _input()
     echo quit
 }
 
-_input | $QEMU_IO sheepdog:test | sed 's/qemu-io> //g'
+_input | $QEMU_IO -f raw sheepdog:test | sed 's/qemu-io> //g'

@@ -20,7 +20,7 @@ $QEMU_IMG snapshot -c tag3 sheepdog:test
 _vdi_create test2 4G
 $QEMU_IMG snapshot -c tag1 sheepdog:test2
 $QEMU_IMG snapshot -c tag2 sheepdog:test2
-$QEMU_IO -c "write 0 512" sheepdog:test2:1 | _filter_qemu_io
+$QEMU_IO -f raw -c "write 0 512" sheepdog:test2:1 | _filter_qemu_io
 $QEMU_IMG snapshot -c tag3 sheepdog:test2
 
 $DOG vdi tree | _filter_short_date

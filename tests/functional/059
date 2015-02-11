@@ -31,7 +31,7 @@ _input()
     echo quit
 }
 
-_input | $QEMU_IO sheepdog:test > $STORE/qemu-io.log
+_input | $QEMU_IO -f raw sheepdog:test > $STORE/qemu-io.log
 
 
 _vdi_list
