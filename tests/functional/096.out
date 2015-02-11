@@ -27,6 +27,7 @@ $ ../../dog/dog cluster format -c 3
 $ ../../dog/dog cluster info -v
 Cluster status: running, auto-recovery enabled
 Cluster store: plain with 3 redundancy policy
+Cluster vnodes strategy: auto
 Cluster vnode mode: node
 Cluster created at DATE
 
@@ -80,6 +81,7 @@ The cluster's redundancy level is set to 2, the old one was 3.
 $ ../../dog/dog cluster info -v
 Cluster status: running, auto-recovery enabled
 Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: auto
 Cluster vnode mode: node
 Cluster created at DATE
 

@@ -37,6 +37,7 @@ s test2        2   10 MB   12 MB  0.0 MB DATE   fd3816      3                22
   test2        0   10 MB  0.0 MB   12 MB DATE   fd3817      3                22
 Cluster status: running, auto-recovery enabled
 Cluster store: plain with 6 redundancy policy
+Cluster vnodes strategy: auto
 Cluster vnode mode: node
 Cluster created at DATE
 
