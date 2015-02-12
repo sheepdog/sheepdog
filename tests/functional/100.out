@@ -1,0 +1,9 @@
+QA output created by 100
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1   16 MB  0.0 MB  0.0 MB DATE   7c2b25      3                22
+s test         2   16 MB  0.0 MB  0.0 MB DATE   7c2b26      3                22
+  test         0   16 MB  0.0 MB  0.0 MB DATE   7c2b27      3                22
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1   16 MB  4.0 MB  0.0 MB DATE   7c2b25      3                22
+  test         0   16 MB  0.0 MB  4.0 MB DATE   7c2b26      3                22
