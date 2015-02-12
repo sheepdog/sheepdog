@@ -148,6 +148,8 @@
 #define SD_CLUSTER_FLAG_STRICT		0x0001 /* Strict mode for write */
 #define SD_CLUSTER_FLAG_DISKMODE	0x0002 /* Disk mode for cluster */
 #define SD_CLUSTER_FLAG_AUTO_VNODES	0x0004 /* Cluster vnodes strategy */
+#define SD_CLUSTER_FLAG_USE_LOCK	0x0008 /* Lock/Unlock vdi */
+
 
 enum sd_status {
 	SD_STATUS_OK = 1,

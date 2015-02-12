@@ -22,6 +22,7 @@ static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
 	{'f', "force", false, "do not prompt for confirmation"},
+	{'l', "lock", false, "Lock vdi to exclude multiple users"},
 	{'m', "multithread", false,
 	 "use multi-thread for 'cluster snapshot save'"},
 	{'t', "strict", false,
@@ -41,6 +42,7 @@ static struct cluster_cmd_data {
 	bool strict;
 	char name[STORE_LEN];
 	bool fixed_vnodes;
+	bool use_lock;
 } cluster_cmd_data;
 
 #define DEFAULT_STORE	"plain"
@@ -165,6 +167,8 @@ static int cluster_format(int argc, char **argv)
 	hdr.flags |= SD_FLAG_CMD_WRITE;
 	if (cluster_cmd_data.strict)
 		hdr.cluster.flags |= SD_CLUSTER_FLAG_STRICT;
+	if (cluster_cmd_data.use_lock)
+		hdr.cluster.flags |= SD_CLUSTER_FLAG_USE_LOCK;
 
 #ifdef HAVE_DISKVNODES
 	hdr.cluster.flags |= SD_CLUSTER_FLAG_DISKMODE;
@@ -816,7 +820,7 @@ failure:
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhvT", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bctaphzTV", "create a Sheepdog store",
+	{"format", NULL, "bcltaphzTV", "create a Sheepdog store",
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aphT", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
@@ -861,6 +865,9 @@ static int cluster_parser(int ch, const char *opt)
 		break;
 	case 'f':
 		cluster_cmd_data.force = true;
+		break;
+	case 'l':
+		cluster_cmd_data.use_lock = true;
 		break;
 	case 'm':
 		cluster_cmd_data.multithread = true;

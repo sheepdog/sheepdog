@@ -1409,6 +1409,11 @@ static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
 		return SD_RES_SUCCESS;
 	}
 
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_debug("vdi lock is disabled");
+		return SD_RES_SUCCESS;
+	}
+
 	sd_info("node: %s is locking VDI (type: %s): %"PRIx32,
 		node_to_str(sender),
 		req->vdi.type == LOCK_TYPE_NORMAL ? "normal" : "shared", vid);
@@ -1430,6 +1435,11 @@ static int cluster_release_vdi_main(const struct sd_req *req,
 	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
 		sd_debug("logging vdi lock information for later replay");
 		log_vdi_op_unlock(vid, &sender->nid, req->vdi.type);
+		return SD_RES_SUCCESS;
+	}
+
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_debug("vdi lock is disabled");
 		return SD_RES_SUCCESS;
 	}
 
