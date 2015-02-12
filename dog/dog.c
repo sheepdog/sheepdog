@@ -368,7 +368,7 @@ static const struct sd_option *build_sd_options(const char *opts)
 	return sd_opts;
 }
 
-static void crash_handler(int signo)
+static void crash_handler(int signo, siginfo_t *info, void *context)
 {
 	sd_err("dog exits unexpectedly (%s).", strsignal(signo));
 

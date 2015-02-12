@@ -531,7 +531,7 @@ static bool is_sheep_dead(int signo)
 	return signo == SIGHUP;
 }
 
-static void crash_handler(int signo)
+static void crash_handler(int signo, siginfo_t *info, void *context)
 {
 	if (is_sheep_dead(signo))
 		sd_err("sheep pid %d exited unexpectedly.", sheep_pid);
@@ -552,7 +552,7 @@ static void crash_handler(int signo)
 	reraise_crash_signal(signo, 1);
 }
 
-static void sighup_handler(int signo)
+static void sighup_handler(int signo, siginfo_t *info, void *context)
 {
 	rotate_log();
 }

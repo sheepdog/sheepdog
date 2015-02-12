@@ -239,7 +239,7 @@ static void signal_handler(int listen_fd, int events, void *data)
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
 	assert(ret == sizeof(siginfo));
-	sd_debug("signal %d", siginfo.ssi_signo);
+	sd_debug("signal %d, ssi pid %d", siginfo.ssi_signo, siginfo.ssi_pid);
 	switch (siginfo.ssi_signo) {
 	case SIGTERM:
 		sys->cinfo.status = SD_STATUS_KILLED;
@@ -276,9 +276,12 @@ static int init_signal(void)
 	return 0;
 }
 
-static void crash_handler(int signo)
+static void crash_handler(int signo, siginfo_t *info, void *context)
 {
-	sd_emerg("sheep exits unexpectedly (%s).", strsignal(signo));
+	sd_emerg("sheep exits unexpectedly (%s), "
+		"si pid %d, uid %d, errno %d, code %d",
+		strsignal(signo), info->si_pid, info->si_uid,
+		info->si_errno, info->si_code);
 
 	sd_backtrace();
 	sd_dump_variable(__sys);
@@ -639,7 +642,7 @@ end:
 	return status;
 }
 
-static void sighup_handler(int signum)
+static void sighup_handler(int signo, siginfo_t *info, void *context)
 {
 	if (unlikely(logger_pid == -1))
 		return;

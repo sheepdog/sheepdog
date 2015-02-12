@@ -637,7 +637,7 @@ static int set_listen_fd_cb(int fd, void *data)
 	return 0;
 }
 
-static void crash_handler(int signo)
+static void crash_handler(int signo, siginfo_t *info, void *context)
 {
 	sd_emerg("shepherd exits unexpectedly (%s).", strsignal(signo));
 

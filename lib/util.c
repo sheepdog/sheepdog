@@ -524,25 +524,29 @@ const char *data_to_str(void *data, size_t data_length)
  * If 'once' is true, the signal will be restored to the default state
  * after 'handler' is called.
  */
-int install_sighandler(int signum, void (*handler)(int), bool once)
+int install_sighandler(int signum, void (*handler)(int, siginfo_t *, void *),
+	bool once)
 {
 	struct sigaction sa = {};
 
-	sa.sa_handler = handler;
+	sa.sa_sigaction = handler;
+	sa.sa_flags = SA_SIGINFO;
+
 	if (once)
-		sa.sa_flags = SA_RESETHAND | SA_NODEFER;
+		sa.sa_flags = sa.sa_flags | SA_RESETHAND | SA_NODEFER;
 	sigemptyset(&sa.sa_mask);
 
 	return sigaction(signum, &sa, NULL);
 }
 
-int install_crash_handler(void (*handler)(int))
+int install_crash_handler(void (*handler)(int, siginfo_t *, void *))
 {
 	return install_sighandler(SIGSEGV, handler, true) ||
 		install_sighandler(SIGABRT, handler, true) ||
 		install_sighandler(SIGBUS, handler, true) ||
 		install_sighandler(SIGILL, handler, true) ||
-		install_sighandler(SIGFPE, handler, true);
+		install_sighandler(SIGFPE, handler, true) ||
+		install_sighandler(SIGQUIT, handler, true);
 }
 
 /*
