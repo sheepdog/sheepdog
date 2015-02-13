@@ -2125,6 +2125,7 @@ static void queue_vdi_check_work(const struct sd_inode *inode, uint64_t oid,
 	info->done = done;
 	info->wq = wq;
 	info->copy_policy = inode->copy_policy;
+	info->block_size_shift = inode->block_size_shift;
 
 	oid_to_vnodes(oid, &sd_vroot, nr_copies, tgt_vnodes);
 	for (int i = 0; i < nr_copies; i++) {
