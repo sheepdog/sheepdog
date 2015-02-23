@@ -1973,6 +1973,7 @@ static void check_erasure_object(struct vdi_check_info *info)
 	struct fec *ctx = ec_init(d, dp);
 	int miss_idx[dp], input_idx[dp];
 	uint64_t oid = info->oid;
+	uint32_t object_size = (UINT32_C(1) << info->block_size_shift);
 	size_t len = get_store_objsize(info->copy_policy,
 				       info->block_size_shift, oid);
 	char *obj = xmalloc(len);
@@ -2001,7 +2002,7 @@ static void check_erasure_object(struct vdi_check_info *info)
 			for (j = 0; j < d; j++)
 				ds[j] = info->vcw[j].buf;
 			ec_decode_buffer(ctx, ds, idx, obj, d + k,
-					 info->block_size_shift);
+					 object_size);
 			if (memcmp(obj, info->vcw[d + k].buf, len) != 0) {
 				/* TODO repair the inconsistency */
 				sd_err("object %"PRIx64" is inconsistent", oid);
@@ -2020,7 +2021,7 @@ static void check_erasure_object(struct vdi_check_info *info)
 			for (i = 0; i < d; i++)
 				ds[i] = input[i];
 			ec_decode_buffer(ctx, ds, input_idx, obj, m,
-					 info->block_size_shift);
+					 object_size);
 			write_object_to(info->vcw[m].vnode, oid, obj,
 					len, true, info->vcw[m].ec_index);
 			fprintf(stdout, "fixed missing %"PRIx64", "
