@@ -12,6 +12,7 @@ Build-Depends: debhelper (>= 9),
  liburcu-dev,
  libzookeeper-mt-dev [linux-any],
  libfuse-dev,
+ yasm,
  po-debconf
 Standards-Version: 3.9.4
 Homepage: http://sheepdog.github.io/sheepdog
