@@ -695,11 +695,8 @@ static int scan_wd(uint64_t oid, uint32_t epoch, uint8_t ec_index)
 	return ret;
 }
 
-bool md_exist(uint64_t oid, uint8_t ec_index)
+bool md_exist(uint64_t oid, uint8_t ec_index, char *path)
 {
-	char path[PATH_MAX];
-
-	get_store_path(oid, ec_index, path);
 	if (md_access(path))
 		return true;
 	/*
