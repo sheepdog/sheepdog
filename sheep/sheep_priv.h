@@ -278,7 +278,6 @@ int for_each_object_in_stale(int (*func)(uint64_t oid, const char *path,
 			     void *arg);
 int for_each_obj_path(int (*func)(const char *path));
 size_t get_store_objsize(uint64_t oid);
-int get_store_path(uint64_t oid, uint8_t ec_index, char *path);
 
 extern struct list_head store_drivers;
 #define add_store_driver(driver)				\
@@ -572,7 +571,7 @@ bool md_add_disk(const char *path, bool);
 uint64_t md_init_space(void);
 const char *md_get_object_dir(uint64_t oid);
 int md_handle_eio(const char *);
-bool md_exist(uint64_t oid, uint8_t ec_index);
+bool md_exist(uint64_t oid, uint8_t ec_index, char *path);
 int md_get_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index, char *);
 uint32_t md_get_info(struct sd_md_info *info);
 int md_plug_disks(char *disks);

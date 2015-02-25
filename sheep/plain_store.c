@@ -44,7 +44,7 @@ static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 	return flags;
 }
 
-int get_store_path(uint64_t oid, uint8_t ec_index, char *path)
+static int get_store_path(uint64_t oid, uint8_t ec_index, char *path)
 {
 	if (is_erasure_oid(oid)) {
 		if (unlikely(ec_index >= SD_MAX_COPIES))
@@ -82,7 +82,11 @@ static int get_store_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
  */
 bool default_exist(uint64_t oid, uint8_t ec_index)
 {
-	return md_exist(oid, ec_index);
+	char path[PATH_MAX];
+
+	get_store_path(oid, ec_index, path);
+
+	return md_exist(oid, ec_index, path);
 }
 
 static int err_to_sderr(const char *path, uint64_t oid, int err)
