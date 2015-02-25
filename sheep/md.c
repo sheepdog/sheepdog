@@ -142,6 +142,17 @@ static struct disk *path_to_disk(const char *path)
 	return rb_search(&md.root, &key, rb, disk_cmp);
 }
 
+size_t get_store_objsize(uint64_t oid)
+{
+	if (is_erasure_oid(oid)) {
+		uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
+		int d;
+		ec_policy_to_dp(policy, &d, NULL);
+		return get_vdi_object_size(oid_to_vid(oid)) / d;
+	}
+	return get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
+}
+
 static int get_total_object_size(uint64_t oid, const char *wd, uint32_t epoch,
 				 uint8_t ec_index, struct vnode_info *vinfo,
 				 void *total)

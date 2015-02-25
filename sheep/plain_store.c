@@ -381,33 +381,6 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	return ret;
 }
 
-/* Preallocate the whole object to get a better filesystem layout. */
-int prealloc(int fd, uint32_t size)
-{
-	int ret = xfallocate(fd, 0, 0, size);
-	if (ret < 0) {
-		if (errno != ENOSYS && errno != EOPNOTSUPP) {
-			sd_err("failed to preallocate space, %m");
-			return ret;
-		}
-
-		return xftruncate(fd, size);
-	}
-
-	return 0;
-}
-
-size_t get_store_objsize(uint64_t oid)
-{
-	if (is_erasure_oid(oid)) {
-		uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
-		int d;
-		ec_policy_to_dp(policy, &d, NULL);
-		return get_vdi_object_size(oid_to_vid(oid)) / d;
-	}
-	return get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
-}
-
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
 	char path[PATH_MAX], tmp_path[PATH_MAX];

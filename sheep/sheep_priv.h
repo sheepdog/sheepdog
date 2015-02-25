@@ -455,8 +455,6 @@ int local_req_wait(struct request_iocb *iocb);
 
 void local_request_init(void);
 
-int prealloc(int fd, uint32_t size);
-
 int objlist_cache_insert(uint64_t oid);
 void objlist_cache_remove(uint64_t oid);
 

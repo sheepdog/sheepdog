@@ -111,6 +111,22 @@ void *xvalloc(size_t size)
 	return ret;
 }
 
+/* preallocate the whole object */
+int prealloc(int fd, uint32_t size)
+{
+	int ret = xfallocate(fd, 0, 0, size);
+	if (ret < 0) {
+		if (errno != ENOSYS && errno != EOPNOTSUPP) {
+			sd_err("failed to preallocate space, %m");
+			return ret;
+		}
+
+		return xftruncate(fd, size);
+	}
+
+	return 0;
+}
+
 static ssize_t _read(int fd, void *buf, size_t len)
 {
 	ssize_t nr;
