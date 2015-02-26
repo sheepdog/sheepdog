@@ -685,6 +685,27 @@ static int add_event(enum zk_event_type type, struct zk_node *znode, void *buf,
 	}
 }
 
+/*
+ * Type value:
+ * -1 SESSION_EVENT, use State to indicate what kind of sub-event
+ *   State value:
+ *   -122 SESSION EXPIRED
+ *   1    CONNECTING
+ *   3    CONNECTED
+ * 1  CREATED_EVENT
+ * 2  DELETED_EVENT
+ * 3  CHANGED_EVENT
+ * 4  CHILD_EVENT
+ *
+ * While connection to zk is disconnected (zk cluster in election, network is
+ * broken, etc.), zk library will try to reconnect zk cluster on its own and
+ * report both the connection state and session state to sheep via zk_watcher.
+ *
+ * Once the connection is reestablished (state changed from 1 to 3)within the
+ * timeout window, the session is still valid, meaning that all the watchers
+ * will function as before. If not within the timeout window, zk_watcher will
+ * report to sheep that session is expired.
+ */
 static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		       void *ctx)
 {
@@ -692,6 +713,8 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 	char str[MAX_NODE_STR_LEN], *p;
 	uint64_t lock_id;
 	int ret;
+
+	sd_debug("path:%s, type:%d, state:%d", path, type, state);
 
 	if (type == ZOO_SESSION_EVENT && state == ZOO_EXPIRED_SESSION_STATE) {
 		/*
@@ -702,8 +725,6 @@ static void zk_watcher(zhandle_t *zh, int type, int state, const char *path,
 		return;
 	}
 
-/* CREATED_EVENT 1, DELETED_EVENT 2, CHANGED_EVENT 3, CHILD_EVENT 4 */
-	sd_debug("path:%s, type:%d, state:%d", path, type, state);
 	if (type == ZOO_CREATED_EVENT || type == ZOO_CHANGED_EVENT) {
 		ret = sscanf(path, MEMBER_ZNODE "/%s", str);
 		if (ret == 1)
