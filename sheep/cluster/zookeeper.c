@@ -1360,7 +1360,7 @@ static void zk_unlock(uint64_t lock_id)
 static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
-	int ret, interval, retry = 0, max_retry;
+	int ret, interval, retry = 0, max_retry, timeo;
 
 	if (!option) {
 		sd_err("You must specify zookeeper servers.");
@@ -1376,8 +1376,8 @@ static int zk_init(const char *option)
 		p = strstr(hosts, "timeout");
 		*--p = '\0';
 	}
-	sd_debug("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
-		 ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
+	sd_info("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
+		ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
 	zhandle = zookeeper_init(hosts, zk_watcher, zk_timeout, NULL, NULL, 0);
 	if (!zhandle) {
 		sd_err("failed to initialize zk server %s", option);
@@ -1395,6 +1395,9 @@ static int zk_init(const char *option)
 			return -1;
 		}
 	}
+
+	timeo = zoo_recv_timeout(zhandle);
+	sd_info("the negociated session timeout is %d", timeo);
 
 	uatomic_set_false(&stop);
 	uatomic_set_false(&is_master);
