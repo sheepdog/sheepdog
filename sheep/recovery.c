@@ -73,9 +73,6 @@ struct recovery_info {
 	int max_epoch;
 	struct vnode_info **vinfo_array;
 	struct sd_mutex vinfo_lock;
-
-	struct sd_node *excluded;
-
 	uint32_t max_exec_count;
 	uint64_t queue_work_interval;
 	bool throttling;
@@ -197,8 +194,6 @@ static void *read_erasure_object(uint64_t oid, uint8_t idx,
 	uint8_t policy = get_vdi_copy_policy(oid_to_vid(oid));
 	int edp = ec_policy_to_dp(policy, NULL, NULL);
 	int ret;
-	struct sd_node *excluded = row->base.rinfo->excluded;
-
 again:
 	if (unlikely(old->nr_zones < edp)) {
 		if (search_erasure_object(oid, idx, &old->nroot, rw,
@@ -213,11 +208,6 @@ again:
 		 oid, epoch, tgt_epoch, idx, node_to_str(node));
 	if (invalid_node(node, rw->cur_vinfo))
 		goto rollback;
-	if (excluded && !node_cmp(excluded, node)) {
-		sd_debug("skipping reading object from %s", node_to_str(node));
-		goto rollback;
-	}
-
 	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY;
@@ -332,7 +322,6 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 	uint32_t epoch = row->base.epoch;
 	int nr_copies, ret = SD_RES_SUCCESS, start = 0;
 	bool fully_replicated = true;
-	struct sd_node *excluded = row->base.rinfo->excluded;
 
 	nr_copies = get_obj_copy_number(oid, old->nr_zones);
 
@@ -357,12 +346,6 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 
 		if (invalid_node(node, row->base.cur_vinfo))
 			continue;
-
-		if (excluded && !node_cmp(excluded, node)) {
-			sd_debug("skipping reading from %s because it is"
-				 " excluded", node_to_str(node));
-			continue;
-		}
 
 		ret = recover_object_from(row, node, tgt_epoch);
 		switch (ret) {
@@ -575,18 +558,10 @@ static void recover_object_work(struct work *work)
 	uint64_t oid = row->oid;
 	struct vnode_info *cur = rw->cur_vinfo;
 	int ret, epoch;
-	struct sd_node *excluded = rw->rinfo->excluded;
 
 	if (sd_store->exist(oid, local_ec_index(cur, oid))) {
 		sd_debug("the object is already recovered");
 		return;
-	}
-
-	if (excluded && !node_cmp(excluded, &sys->this_node)) {
-		sd_debug("skipping recovery from stale dir because"
-			 " I'm newly joining node (%s)",
-			 node_to_str(&sys->this_node));
-		goto remote_recover;
 	}
 
 	/* find object in the stale directory */
@@ -602,7 +577,6 @@ static void recover_object_work(struct work *work)
 			}
 		}
 
-remote_recover:
 	ret = do_recover_object(row);
 	if (ret != 0)
 		sd_err("failed to recover object %"PRIx64, oid);
@@ -1133,7 +1107,6 @@ static void prepare_object_list(struct work *work)
 	int start = random() % nr_nodes, i, end = nr_nodes;
 	uint64_t *oids;
 	struct sd_node *nodes;
-	struct sd_node *excluded = rw->rinfo->excluded;
 
 	if (node_is_gateway_only())
 		return;
@@ -1154,13 +1127,6 @@ again:
 			goto out;
 		}
 
-		if (excluded && !node_cmp(excluded, node)) {
-			sd_info("skipping object list reading from %s because"
-				"it is marked as excluded node",
-				node_to_str(excluded));
-			continue;
-		}
-
 		oids = fetch_object_list(node, rw->epoch, &nr_oids);
 		if (!oids)
 			continue;
@@ -1179,17 +1145,8 @@ out:
 	free(nodes);
 }
 
-/*
- * notes on the parameter excluded of start_recovery():
- * When a status of a cluster is SD_STATUS_OK and a new node is joining to the
- * cluster, the recovery process should avoid reading objects from the newly
- * joining node. Because the newly joining node can have orphan objects.
- * If the cluster status is already SD_STATUS_OK, the cluster must have every
- * replica, so the newly joining node shouldn't provide any objects for the
- * recovery process.
- */
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
-		   bool epoch_lifted, struct sd_node *excluded)
+		   bool epoch_lifted)
 {
 	struct recovery_info *rinfo;
 
@@ -1213,8 +1170,6 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 
 	rinfo->cur_vinfo = grab_vnode_info(cur_vinfo);
 	rinfo->old_vinfo = grab_vnode_info(old_vinfo);
-
-	rinfo->excluded = excluded;
 
 	if (!node_is_gateway_only())
 		sd_store->update_epoch(rinfo->tgt_epoch);

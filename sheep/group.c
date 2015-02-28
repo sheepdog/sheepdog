@@ -868,7 +868,7 @@ static bool membership_changed(const struct cluster_info *cinfo,
 static void update_cluster_info(const struct cluster_info *cinfo,
 				const struct sd_node *joined,
 				const struct rb_root *nroot,
-				size_t nr_nodes, enum sd_status prev_status)
+				size_t nr_nodes)
 {
 	struct vnode_info *old_vnode_info;
 
@@ -920,8 +920,6 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 
 		if (membership_changed(cinfo, nroot, nr_nodes)) {
 			int ret;
-			struct sd_node *excluded = NULL;
-
 			if (old_vnode_info)
 				put_vnode_info(old_vnode_info);
 
@@ -931,17 +929,12 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 				panic("cannot log current epoch %d",
 				      sys->cinfo.epoch);
 
-			if (prev_status == SD_STATUS_OK ||
-			    (prev_status == SD_STATUS_WAIT &&
-			     !node_cmp(joined, &sys->this_node)))
-				excluded = (struct sd_node *)joined;
-
 			start_recovery(main_thread_get(current_vnode_info),
-				       old_vnode_info, true, excluded);
+				       old_vnode_info, true);
 		} else if (!was_cluster_shutdowned()) {
 			start_recovery(main_thread_get(current_vnode_info),
 				       main_thread_get(current_vnode_info),
-				       false, NULL);
+				       false);
 		}
 		set_cluster_shutdown(false);
 	}
@@ -1169,7 +1162,6 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 {
 	const struct cluster_info *cinfo = opaque;
 	struct sd_node *n;
-	enum sd_status prev_status = sys->cinfo.status;
 	uint16_t flags;
 
 	if (node_is_local(joined) && sys->gateway_only
@@ -1196,7 +1188,7 @@ main_fn void sd_accept_handler(const struct sd_node *joined,
 	if (sys->cinfo.status == SD_STATUS_SHUTDOWN)
 		return;
 
-	update_cluster_info(cinfo, joined, nroot, nr_nodes, prev_status);
+	update_cluster_info(cinfo, joined, nroot, nr_nodes);
 
 	if (node_is_local(joined)) {
  		/* this output is used for testing */
@@ -1259,7 +1251,7 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 		if (ret != 0)
 			panic("cannot log current epoch %d", sys->cinfo.epoch);
 		start_recovery(main_thread_get(current_vnode_info),
-			       old_vnode_info, true, NULL);
+			       old_vnode_info, true);
 	}
 
 	put_vnode_info(old_vnode_info);
@@ -1303,7 +1295,7 @@ static void kick_node_recover(void)
 	ret = inc_and_log_epoch();
 	if (ret != 0)
 		panic("cannot log current epoch %d", sys->cinfo.epoch);
-	start_recovery(main_thread_get(current_vnode_info), old, true, NULL);
+	start_recovery(main_thread_get(current_vnode_info), old, true);
 	put_vnode_info(old);
 }
 

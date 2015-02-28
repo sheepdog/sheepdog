@@ -531,7 +531,7 @@ static inline void kick_recover(void)
 	if (is_cluster_diskmode(&sys->cinfo))
 		sys->cdrv->update_node(&sys->this_node);
 	else {
-		start_recovery(vinfo, vinfo, false, NULL);
+		start_recovery(vinfo, vinfo, false);
 		put_vnode_info(vinfo);
 	}
 }
