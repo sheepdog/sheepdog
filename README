@@ -46,10 +46,10 @@ Usage
    cluster. It is very easy and fast setup and especially useful to test
    functionality without involving any other software.
 
-   To set up a 3 node cluster using local driver in one liner bash with debug mode:
+   To set up a 3 node cluster using local driver in one liner bash:
 
       $ mkdir /path/to/store
-      $ for i in 0 1 2; do sheep -c local -d /path/to/store/$i -z $i -p 700$i;sleep 1;done
+      $ for i in 0 1 2; do sheep -c local /path/to/store/$i -z $i -p 700$i;done
 
 * Configure corosync.
 
