@@ -265,13 +265,6 @@ static int recover_object_from(struct recovery_obj_work *row,
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	struct siocb iocb = { 0 };
 
-	if (node_is_local(node)) {
-		if (tgt_epoch < sys_epoch())
-			return sd_store->link(oid, tgt_epoch);
-
-		return SD_RES_NO_OBJ;
-	}
-
 	/* compare sha1 hash value first */
 	if (local_epoch > 0) {
 		sd_init_req(&hdr, SD_OP_GET_HASH);
@@ -288,6 +281,13 @@ static int recover_object_from(struct recovery_obj_work *row,
 			if (ret == SD_RES_SUCCESS)
 				return ret;
 		}
+	}
+
+	if (node_is_local(node)) {
+		if (tgt_epoch < sys_epoch())
+			return sd_store->link(oid, tgt_epoch);
+
+		return SD_RES_NO_OBJ;
 	}
 
 	rlen = get_store_objsize(oid);
