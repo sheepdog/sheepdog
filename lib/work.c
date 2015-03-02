@@ -127,7 +127,7 @@ void resume_worker_threads(void)
 	}
 }
 
-static void suspend(int num)
+static void suspend(int num, siginfo_t *info, void *context)
 {
 	int uninitialized_var(value);
 
