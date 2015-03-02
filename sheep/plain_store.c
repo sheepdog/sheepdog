@@ -255,7 +255,11 @@ static int purge_stale_dir(const char *path)
 	char p[PATH_MAX];
 
 	snprintf(p, PATH_MAX, "%s/.stale", path);
-	return purge_dir(p);
+
+	if (purge_directory_async(p) < 0)
+		return SD_RES_EIO;
+
+	return SD_RES_SUCCESS;
 }
 
 int default_cleanup(void)
