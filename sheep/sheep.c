@@ -68,12 +68,14 @@ static const char cluster_help[] =
 "\tlocal: use local driver\n"
 "\tcorosync: use corosync driver\n"
 "\tzookeeper: use zookeeper driver, need extra arguments\n"
-"\n\tzookeeper arguments: address-list,timeout=value (default as 3000)\n"
+"\n\tzookeeper arguments: connection-string,timeout=value (default as 3000)\n"
 "\nExample:\n\t"
-"$ sheep -c zookeeper:IP1:PORT1,IP2:PORT2,IP3:PORT3,timeout=1000 ...\n"
+"$ sheep -c zookeeper:IP1:PORT1,IP2:PORT2,IP3:PORT3[/cluster_id][,timeout=1000] ...\n"
 "This tries to use 3 node zookeeper cluster, which can be reached by\n"
 "IP1:PORT1, IP2:PORT2, IP3:PORT3 to manage membership and broadcast message\n"
-"and set the timeout of node heartbeat as 1000 milliseconds\n";
+"and set the timeout of node heartbeat as 1000 milliseconds.\n"
+"cluster_id is used to identify which cluster it belongs to,\n"
+"if not set, /sheepdog is used internally as default.\n";
 
 static const char cache_help[] =
 "Available arguments:\n"

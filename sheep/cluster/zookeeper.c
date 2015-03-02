@@ -27,11 +27,11 @@
 
 #define SESSION_TIMEOUT 30000		/* millisecond */
 
-#define BASE_ZNODE "/sheepdog"
-#define QUEUE_ZNODE BASE_ZNODE "/queue"
-#define MEMBER_ZNODE BASE_ZNODE "/member"
-#define MASTER_ZNODE BASE_ZNODE "/master"
-#define LOCK_ZNODE BASE_ZNODE "/lock"
+#define DEFAULT_BASE "/sheepdog"
+#define QUEUE_ZNODE "/queue"
+#define MEMBER_ZNODE "/member"
+#define MASTER_ZNODE "/master"
+#define LOCK_ZNODE "/lock"
 
 static int zk_timeout = SESSION_TIMEOUT;
 static int my_master_seq;
@@ -641,7 +641,6 @@ static inline void build_node_list(void)
 
 static int zk_queue_init(void)
 {
-	RETURN_IF_ERROR(zk_init_node(BASE_ZNODE), "path %s", BASE_ZNODE);
 	RETURN_IF_ERROR(zk_init_node(MASTER_ZNODE), "path %s", MASTER_ZNODE);
 	RETURN_IF_ERROR(zk_init_node(QUEUE_ZNODE), "path %s", QUEUE_ZNODE);
 	RETURN_IF_ERROR(zk_init_node(MEMBER_ZNODE), "path %s", MEMBER_ZNODE);
@@ -1378,6 +1377,57 @@ static void zk_unlock(uint64_t lock_id)
 	sd_debug("unlock %"PRIu64, lock_id);
 }
 
+static int zk_prepare_root(const char *hosts)
+{
+	char root[MAX_NODE_STR_LEN];
+	char conn[MAX_NODE_STR_LEN];
+	const char *p = strchr(hosts, '/');
+	int interval, max_retry, retry;
+	int i = 0;
+	if (p) {
+		if (strlen(p) >= MAX_NODE_STR_LEN) {
+			strncpy(root, p, MAX_NODE_STR_LEN - 1);
+			root[MAX_NODE_STR_LEN - 1] = '\0';
+		} else
+			strcpy(root, p);
+		while (hosts != p) {
+			conn[i++] = *hosts++;
+			if (i >= MAX_NODE_STR_LEN - 1)
+				break;
+		}
+		conn[i] = '\0';
+	} else {
+		strcpy(root, DEFAULT_BASE);
+		if (strlen(hosts) >= MAX_NODE_STR_LEN) {
+			strncpy(conn, hosts, MAX_NODE_STR_LEN - 1);
+			conn[MAX_NODE_STR_LEN - 1] = '\0';
+		} else
+			strcpy(conn, hosts);
+	}
+
+	zhandle = zookeeper_init(conn, zk_watcher, zk_timeout, NULL, NULL, 0);
+	if (!zhandle) {
+		sd_err("failed to initialize zk server %s", conn);
+		return -1;
+	}
+
+	interval = 100;
+	retry = 0;
+	max_retry = zk_timeout / interval;
+	while (zoo_state(zhandle) != ZOO_CONNECTED_STATE) {
+		usleep(interval * 1000);
+		if (++retry >= max_retry) {
+			sd_err("failed to connect to zk server %s "
+					"after %d retries", conn, retry);
+			return -1;
+		}
+	}
+	sd_debug("sheepdog cluster_id %s", root);
+	RETURN_IF_ERROR(zk_init_node(root), "path %s", root);
+	zookeeper_close(zhandle);
+	return 0;
+}
+
 static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
@@ -1397,6 +1447,11 @@ static int zk_init(const char *option)
 		p = strstr(hosts, "timeout");
 		*--p = '\0';
 	}
+	if (zk_prepare_root(hosts) != 0) {
+		sd_err("failed to initialize zk server %s", hosts);
+		return -1;
+	}
+
 	sd_info("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
 		ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
 	zhandle = zookeeper_init(hosts, zk_watcher, zk_timeout, NULL, NULL, 0);
