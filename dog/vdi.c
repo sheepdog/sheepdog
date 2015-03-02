@@ -2798,6 +2798,8 @@ static int vdi_object_dump_inode(int argc, char **argv)
 	printf("create_time: %"PRIx64"\n", inode->create_time);
 	printf("snap_ctime: %"PRIx64"\n", inode->snap_ctime);
 	printf("vm_clock_nsec: %"PRIx64"\n", inode->vm_clock_nsec);
+	printf("vdi_size: %"PRIu64"\n", inode->vdi_size);
+	printf("vm_state_size: %"PRIu64"\n", inode->vm_state_size);
 	printf("copy_policy: %d\n", inode->copy_policy);
 	printf("store_policy: %d\n", inode->store_policy);
 	printf("nr_copies: %d\n", inode->nr_copies);
