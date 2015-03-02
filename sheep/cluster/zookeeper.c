@@ -1377,12 +1377,36 @@ static void zk_unlock(uint64_t lock_id)
 	sd_debug("unlock %"PRIu64, lock_id);
 }
 
+static int zk_connect(const char *host, watcher_fn watcher, int timeout)
+{
+	int interval, max_retry, retry;
+
+	zhandle = zookeeper_init(host, watcher, timeout, NULL, NULL, 0);
+
+	if (!zhandle) {
+		sd_err("failed to initialize zk server %s", host);
+		return -1;
+	}
+
+	interval = 100;
+	retry = 0;
+	max_retry = timeout / interval;
+	while (zoo_state(zhandle) != ZOO_CONNECTED_STATE) {
+		usleep(interval * 1000);
+		if (++retry >= max_retry) {
+			sd_err("failed to connect to zk server %s "
+					"after %d retries", host, retry);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 static int zk_prepare_root(const char *hosts)
 {
 	char root[MAX_NODE_STR_LEN];
 	char conn[MAX_NODE_STR_LEN];
 	const char *p = strchr(hosts, '/');
-	int interval, max_retry, retry;
 	int i = 0;
 	if (p) {
 		if (strlen(p) >= MAX_NODE_STR_LEN) {
@@ -1405,25 +1429,13 @@ static int zk_prepare_root(const char *hosts)
 			strcpy(conn, hosts);
 	}
 
-	zhandle = zookeeper_init(conn, zk_watcher, zk_timeout, NULL, NULL, 0);
-	if (!zhandle) {
-		sd_err("failed to initialize zk server %s", conn);
+	if (zk_connect(conn, zk_watcher, zk_timeout) < 0)
 		return -1;
-	}
 
-	interval = 100;
-	retry = 0;
-	max_retry = zk_timeout / interval;
-	while (zoo_state(zhandle) != ZOO_CONNECTED_STATE) {
-		usleep(interval * 1000);
-		if (++retry >= max_retry) {
-			sd_err("failed to connect to zk server %s "
-					"after %d retries", conn, retry);
-			return -1;
-		}
-	}
 	sd_debug("sheepdog cluster_id %s", root);
 	RETURN_IF_ERROR(zk_init_node(root), "path %s", root);
+
+	/* We need to close(zhandle) because we might chroot later */
 	zookeeper_close(zhandle);
 	return 0;
 }
@@ -1431,7 +1443,7 @@ static int zk_prepare_root(const char *hosts)
 static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
-	int ret, interval, retry = 0, max_retry, timeo;
+	int ret, timeo;
 
 	if (!option) {
 		sd_err("You must specify zookeeper servers.");
@@ -1454,23 +1466,8 @@ static int zk_init(const char *option)
 
 	sd_info("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
 		ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
-	zhandle = zookeeper_init(hosts, zk_watcher, zk_timeout, NULL, NULL, 0);
-	if (!zhandle) {
-		sd_err("failed to initialize zk server %s", option);
+	if (zk_connect(hosts, zk_watcher, zk_timeout) < 0)
 		return -1;
-	}
-
-	/* the simplest way to wait and check zk connection */
-	interval = 100;
-	max_retry = zk_timeout / interval;
-	while (zoo_state(zhandle) != ZOO_CONNECTED_STATE) {
-		usleep(interval * 1000);
-		if (++retry >= max_retry) {
-			sd_err("failed to connect to zk server %s "
-					"after %d retries", option, retry);
-			return -1;
-		}
-	}
 
 	timeo = zoo_recv_timeout(zhandle);
 	sd_info("the negociated session timeout is %d", timeo);
