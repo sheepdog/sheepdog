@@ -280,6 +280,9 @@ static int recover_object_from(struct recovery_obj_work *row,
 			ret = sd_store->link(oid, local_epoch);
 			if (ret == SD_RES_SUCCESS)
 				return ret;
+		} else {
+			/* Non-identical, bury the mind */
+			row->local_epoch = 0;
 		}
 	}
 
