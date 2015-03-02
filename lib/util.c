@@ -401,7 +401,7 @@ static void purge_work_done(struct work *work)
 }
 
 /* Purge directory recursively */
-int purge_directory(const char *dir_path)
+static int raw_purge_directory(const char *dir_path, bool async)
 {
 	int ret = 0;
 	struct stat s;
@@ -417,7 +417,7 @@ int purge_directory(const char *dir_path)
 		return -errno;
 	}
 
-	if (util_wqueue) {
+	if (async && util_wqueue) {
 		/* we have workqueue for it, don't unlink in this thread */
 		w = xzalloc(sizeof(*w));
 		w->nr_units = 0;
@@ -436,7 +436,7 @@ int purge_directory(const char *dir_path)
 			goto out;
 		}
 
-		if (util_wqueue) {
+		if (async && util_wqueue) {
 			struct purge_work_unit *unit;
 
 			unit = &w->units[w->nr_units++];
@@ -466,7 +466,7 @@ int purge_directory(const char *dir_path)
 		}
 	}
 
-	if (util_wqueue) {
+	if (async && util_wqueue) {
 		w->work.fn = purge_work_fn;
 		w->work.done = purge_work_done;
 		queue_work(util_wqueue, &w->work);
@@ -475,6 +475,16 @@ int purge_directory(const char *dir_path)
 out:
 	closedir(dir);
 	return ret;
+}
+
+int purge_directory(const char *dir_path)
+{
+	return raw_purge_directory(dir_path, false);
+}
+
+int purge_directory_async(const char *dir_path)
+{
+	return raw_purge_directory(dir_path, true);
 }
 
 /* remove directory recursively */
