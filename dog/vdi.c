@@ -1137,6 +1137,13 @@ static void print_expected_location(uint64_t oid, int copies)
 {
 	const struct sd_vnode *vnodes[SD_MAX_COPIES];
 
+	if (sd_nodes_nr < copies) {
+		printf("\nBecause number of nodes (%d) is less than "
+			"number of copies (%d), the object should be located "
+			"at every nodes.\n", sd_nodes_nr, copies);
+		return;
+	}
+
 	printf("\nAccording to sheepdog algorithm, "
 		   "the object should be located at:\n");
 	oid_to_vnodes(oid, &sd_vroot, copies, vnodes);
