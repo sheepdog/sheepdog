@@ -1084,7 +1084,7 @@ static int vdi_rollback(int argc, char **argv)
 	}
 
 	ret = do_vdi_create(vdiname, inode->vdi_size, base_vid, &new_vid,
-			     false, vdi_cmd_data.nr_copies, inode->copy_policy,
+			     false, inode->nr_copies, inode->copy_policy,
 			     inode->store_policy, inode->block_size_shift);
 
 	if (ret == EXIT_SUCCESS && verbose) {
