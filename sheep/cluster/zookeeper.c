@@ -820,7 +820,7 @@ static int zk_get_least_seq(const char *parent, char *least_seq_path,
 		rc = zk_get_data(path, buf, buf_len);
 		switch (rc) {
 		case ZOK:
-			strncpy(least_seq_path, path, path_len);
+			pstrcpy(least_seq_path, path_len, path);
 			return ZOK;
 		case ZNONODE:
 			break;
@@ -1410,10 +1410,10 @@ static int zk_prepare_root(const char *hosts)
 	int i = 0;
 	if (p) {
 		if (strlen(p) >= MAX_NODE_STR_LEN) {
-			strncpy(root, p, MAX_NODE_STR_LEN - 1);
+			pstrcpy(root, MAX_NODE_STR_LEN - 1, p);
 			root[MAX_NODE_STR_LEN - 1] = '\0';
 		} else
-			strcpy(root, p);
+			pstrcpy(root, MAX_NODE_STR_LEN, p);
 		while (hosts != p) {
 			conn[i++] = *hosts++;
 			if (i >= MAX_NODE_STR_LEN - 1)
@@ -1421,12 +1421,12 @@ static int zk_prepare_root(const char *hosts)
 		}
 		conn[i] = '\0';
 	} else {
-		strcpy(root, DEFAULT_BASE);
+		pstrcpy(root, MAX_NODE_STR_LEN, DEFAULT_BASE);
 		if (strlen(hosts) >= MAX_NODE_STR_LEN) {
-			strncpy(conn, hosts, MAX_NODE_STR_LEN - 1);
+			pstrcpy(conn, MAX_NODE_STR_LEN - 1, hosts);
 			conn[MAX_NODE_STR_LEN - 1] = '\0';
 		} else
-			strcpy(conn, hosts);
+			pstrcpy(conn, MAX_NODE_STR_LEN, hosts);
 	}
 
 	if (zk_connect(conn, zk_watcher, zk_timeout) < 0)

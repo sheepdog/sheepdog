@@ -528,8 +528,8 @@ static int local_stat_cluster(struct request *req)
 			elog->nr_copies = sys->cinfo.nr_copies;
 			elog->copy_policy = sys->cinfo.copy_policy;
 			elog->flags = sys->cinfo.flags;
-			strncpy(elog->drv_name, (char *)sys->cinfo.store,
-				STORE_LEN);
+			pstrcpy(elog->drv_name, STORE_LEN,
+				(char *)sys->cinfo.store);
 		}
 
 		elog->epoch = epoch;

@@ -178,7 +178,7 @@ static int request_init_operation(struct http_request *req)
 		if (!left)
 			goto invalid_range;
 		right = strchr(left, '-');
-		strncpy(num, left + sizeof(prefix) - 1, right - left);
+		pstrcpy(num, right - left, left + sizeof(prefix) - 1);
 		req->offset = strtoll(num, &endp, 10);
 		if (num == endp)
 			goto invalid_range;

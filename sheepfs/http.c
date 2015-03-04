@@ -422,7 +422,7 @@ int object_open(const char *path, struct fuse_file_info *fi)
 
 	sem_init(&ch->ready_sem, 0, 0);
 	sem_init(&ch->prepare_sem, 0, 1);
-	strncpy(ch->path, path, PATH_MAX);
+	pstrcpy(ch->path, PATH_MAX, path);
 	ret = pthread_create(&ch->fetch_thread, NULL, fetch_thread_run, ch);
 	if (ret != 0) {
 		sheepfs_pr("failed to create thread to fetch data");
