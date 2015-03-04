@@ -1490,7 +1490,7 @@ static int zk_init(const char *option)
 	}
 
 	/* init distributed lock structures */
-	cluster_locks_table = xzalloc(sizeof(struct list_head) *
+	cluster_locks_table = xzalloc(sizeof(struct hlist_head) *
 				      HASH_BUCKET_NR);
 	for (uint64_t i = 0; i < HASH_BUCKET_NR; i++) {
 		INIT_HLIST_HEAD(cluster_locks_table + i);
