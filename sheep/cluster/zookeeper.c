@@ -1408,26 +1408,14 @@ static int zk_prepare_root(const char *hosts)
 	char conn[MAX_NODE_STR_LEN];
 	const char *p = strchr(hosts, '/');
 	int i = 0;
-	if (p) {
-		if (strlen(p) >= MAX_NODE_STR_LEN) {
-			pstrcpy(root, MAX_NODE_STR_LEN - 1, p);
-			root[MAX_NODE_STR_LEN - 1] = '\0';
-		} else
-			pstrcpy(root, MAX_NODE_STR_LEN, p);
-		while (hosts != p) {
-			conn[i++] = *hosts++;
-			if (i >= MAX_NODE_STR_LEN - 1)
-				break;
-		}
-		conn[i] = '\0';
-	} else {
-		pstrcpy(root, MAX_NODE_STR_LEN, DEFAULT_BASE);
-		if (strlen(hosts) >= MAX_NODE_STR_LEN) {
-			pstrcpy(conn, MAX_NODE_STR_LEN - 1, hosts);
-			conn[MAX_NODE_STR_LEN - 1] = '\0';
-		} else
-			pstrcpy(conn, MAX_NODE_STR_LEN, hosts);
+
+	pstrcpy(root, MAX_NODE_STR_LEN, p);
+	while (hosts != p) {
+		conn[i++] = *hosts++;
+		if (i >= MAX_NODE_STR_LEN - 1)
+			break;
 	}
+	conn[i] = '\0';
 
 	if (zk_connect(conn, zk_watcher, zk_timeout) < 0)
 		return -1;
@@ -1444,6 +1432,7 @@ static int zk_init(const char *option)
 {
 	char *hosts, *to, *p;
 	int ret, timeo;
+	char conn[MAX_NODE_STR_LEN];
 
 	if (!option) {
 		sd_err("You must specify zookeeper servers.");
@@ -1459,14 +1448,17 @@ static int zk_init(const char *option)
 		p = strstr(hosts, "timeout");
 		*--p = '\0';
 	}
-	if (zk_prepare_root(hosts) != 0) {
-		sd_err("failed to initialize zk server %s", hosts);
+	pstrcpy(conn, MAX_NODE_STR_LEN, hosts);
+	if (!strchr(conn, '/'))
+		strcat(conn, DEFAULT_BASE);
+	if (zk_prepare_root(conn) != 0) {
+		sd_err("failed to initialize zk server %s", conn);
 		return -1;
 	}
 
 	sd_info("version %d.%d.%d, address %s, timeout %d", ZOO_MAJOR_VERSION,
-		ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, hosts, zk_timeout);
-	if (zk_connect(hosts, zk_watcher, zk_timeout) < 0)
+		ZOO_MINOR_VERSION, ZOO_PATCH_VERSION, conn, zk_timeout);
+	if (zk_connect(conn, zk_watcher, zk_timeout) < 0)
 		return -1;
 
 	timeo = zoo_recv_timeout(zhandle);
