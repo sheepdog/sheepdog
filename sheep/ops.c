@@ -1531,7 +1531,7 @@ static int local_get_vnodes(struct request *req)
 	int *nr_vnodes;
 
 	nr_vnodes = req->data;
-	req->rp.data_length = sizeof(nr_vnodes);
+	req->rp.data_length = sizeof(*nr_vnodes);
 	*nr_vnodes = sys->this_node.nr_vnodes;
 
 	return SD_RES_SUCCESS;
