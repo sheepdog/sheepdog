@@ -2876,6 +2876,11 @@ sub process {
 			ERROR("SPRINTF", "sprintf() is not buffer safe, use snprintf()\n" . $herecurr);
 		}
 
+# forbid strncpy/strcpy
+		if ($line =~ /\bstrncpy|\bstrcpy\(/) {
+			ERROR("STRCPY", "strncpy()/strcpy is not buffer safe, use pstrcpy()\n" . $herecurr);
+		}
+
 # 1. forbid empty lines after break; of a switch statement
 # e.g.
 # +        break;
