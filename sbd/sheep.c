@@ -279,7 +279,7 @@ static int submit_sheep_request(struct sheep_request *req)
 {
 	struct sd_req hdr = {};
 	struct sbd_device *dev = sheep_request_to_device(req);
-	int ret;
+	int ret = 0;
 
 	hdr.id = req->seq_num;
 	hdr.data_length = req->length;
@@ -316,9 +316,8 @@ static int submit_sheep_request(struct sheep_request *req)
 	}
 	sbd_debug("add oid %llx off %d, len %d, seq %u, type %d\n", req->oid,
 		  req->offset, req->length, req->seq_num, req->type);
-	wake_up(&dev->reaper_wq);
-	return 0;
 err:
+	wake_up(&dev->reaper_wq);
 	return ret;
 }
 
@@ -611,6 +610,22 @@ out:
 	return req;
 }
 
+static struct sheep_request *fetch_first_inflight_request(
+	struct sbd_device *dev)
+{
+	struct sheep_request *req;
+
+	write_lock(&dev->inflight_lock);
+	if (!list_empty(&dev->inflight_head)) {
+		req = list_first_entry(&dev->inflight_head,
+			struct sheep_request, list);
+		list_del_init(&req->list);
+	} else
+		req = NULL;
+	write_unlock(&dev->inflight_lock);
+	return req;
+}
+
 static void submit_blocking_sheep_request(struct sbd_device *dev, uint64_t oid)
 {
 	struct sheep_request *req, *t;
@@ -637,6 +652,11 @@ int sheep_handle_reply(struct sbd_device *dev)
 	ret = socket_read(dev->sock, (char *)&rsp, sizeof(rsp));
 	if (ret < 0) {
 		pr_err("failed to read reply header %d\n", ret);
+		req = fetch_first_inflight_request(dev);
+		if (req != NULL) {
+			req->aiocb->ret = EIO;
+			goto end_request;
+		}
 		goto err;
 	}
 
