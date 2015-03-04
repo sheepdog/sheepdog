@@ -27,10 +27,11 @@ static inline bool iocb_is_aligned(const struct siocb *iocb)
 
 static int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 {
-	int flags = O_DSYNC | O_RDWR;
+	int syncflag = create ? O_SYNC : O_DSYNC;
+	int flags = syncflag | O_RDWR;
 
 	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
-		flags &= ~O_DSYNC;
+		flags &= ~syncflag;
 
 	if (sys->backend_dio && iocb_is_aligned(iocb)) {
 		if (!is_aligned_to_pagesize(iocb->buf))
@@ -391,7 +392,7 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 
 int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
-	char path[PATH_MAX], tmp_path[PATH_MAX];
+	char path[PATH_MAX], tmp_path[PATH_MAX], *dir;
 	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
@@ -409,7 +410,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	    != SD_RES_SUCCESS) {
 		sd_err("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
-		flags |= O_DSYNC;
+		flags |= O_SYNC;
 		sync();
 	}
 
@@ -462,11 +463,35 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		goto out;
 	}
 
-	ret = SD_RES_SUCCESS;
+	close(fd);
+
+	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true) {
+		objlist_cache_insert(oid);
+		return SD_RES_SUCCESS;
+	}
+
+	dir = dirname(path);
+	fd = open(dir, O_DIRECTORY | O_RDONLY);
+	if (fd < 0) {
+		sd_err("failed to open directory %s: %m", dir);
+		return err_to_sderr(path, oid, errno);
+	}
+
+	if (fsync(fd) != 0) {
+		sd_err("failed to write directory %s: %m", dir);
+		ret = err_to_sderr(path, oid, errno);
+		close(fd);
+		if (unlink(path) != 0)
+			sd_err("failed to unlink %s: %m", path);
+		return ret;
+	}
+	close(fd);
 	objlist_cache_insert(oid);
+	return SD_RES_SUCCESS;
+
 out:
-	if (ret != SD_RES_SUCCESS)
-		unlink(tmp_path);
+	if (unlink(tmp_path) != 0)
+		sd_err("failed to unlink %s: %m", tmp_path);
 	close(fd);
 	return ret;
 }
