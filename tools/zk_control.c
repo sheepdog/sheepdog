@@ -14,6 +14,7 @@
 #include <zookeeper/zookeeper.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <stdlib.h>
 
 #include "list.h"
 #include "rbtree.h"
@@ -231,6 +232,11 @@ err:
 	return -1;
 }
 
+static int seq_cmp(const void *a, const void *b)
+{
+	return -strcmp(*(const char **)a, *(const char **)b);
+}
+
 static int do_list(int argc, char **argv)
 {
 	struct String_vector strs;
@@ -249,6 +255,10 @@ static int do_list(int argc, char **argv)
 	rc = zk_get_children(QUEUE_ZNODE, &strs);
 	switch (rc) {
 	case ZOK:
+		if (strs.count > 1) {
+			qsort(strs.data, strs.count, sizeof(*(strs.data)),
+				(comparison_fn_t)seq_cmp);
+		}
 		FOR_EACH_ZNODE(QUEUE_ZNODE, path, &strs) {
 			len = sizeof(struct zk_event);
 			rc = zk_get_data(path, &ev, &len, &stat);
