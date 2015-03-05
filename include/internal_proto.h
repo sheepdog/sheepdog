@@ -144,6 +144,14 @@
 #define SD_RES_CLUSTER_ERROR    0x91 /* Cluster driver error */
 #define SD_RES_VDI_NOT_EMPTY    0x92 /* VDI is not empty */
 #define SD_RES_NOT_FOUND	0x93 /* Cannot found target */
+#define SD_RES_INCOMPLETE    0x94 /* Object (in kv) is incomplete uploading */
+/* sheep is collecting cluster wide status, not ready for operation */
+#define SD_RES_COLLECTING_CINFO 0x95
+/* inode object in client is invalidated, refreshing is required */
+#define SD_RES_INODE_INVALIDATED 0x96
+#define SD_RES_GATEWAY_MODE  0x97 /* Target node is gateway mode */
+#define SD_RES_INVALID_VNODES_STRATEGY 0x98 /* Invalid vnodes strategy */
+
 
 #define SD_CLUSTER_FLAG_STRICT		0x0001 /* Strict mode for write */
 #define SD_CLUSTER_FLAG_DISKMODE	0x0002 /* Disk mode for cluster */

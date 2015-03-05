@@ -84,11 +84,6 @@
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 #define SD_RES_HALT          0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_READONLY      0x1A /* Object is read-only */
-#define SD_RES_INCOMPLETE    0x1B /* Object (in kv) is incomplete uploading */
-#define SD_RES_COLLECTING_CINFO 0x1C /* sheep is collecting cluster wide status, not ready for operation */
-#define SD_RES_INODE_INVALIDATED 0x1D /* inode object in client is invalidated, refreshing is required */
-#define SD_RES_GATEWAY_MODE  0x1E /* Target node is gateway mode */
-#define SD_RES_INVALID_VNODES_STRATEGY 0x1F /* Invalid vnodes strategy */
 
 /* errors above 0x80 are sheepdog-internal */
 
