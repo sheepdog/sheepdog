@@ -24,7 +24,7 @@ m4_define([git_version],
 
 AC_INIT([sheepdog], m4_default(git_version, sheepdog_version),
 	[sheepdog@lists.wpkg.org])
-AM_INIT_AUTOMAKE([-Wno-portability])
+AM_INIT_AUTOMAKE([-Wno-portability, subdir-objects])
 
 AC_CONFIG_SRCDIR([dog/dog.c])
 AC_CONFIG_HEADER([include/config.h])
