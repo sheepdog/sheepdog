@@ -470,7 +470,8 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		return SD_RES_SUCCESS;
 	}
 
-	dir = dirname(path);
+	pstrcpy(tmp_path, sizeof(tmp_path), path);
+	dir = dirname(tmp_path);
 	fd = open(dir, O_DIRECTORY | O_RDONLY);
 	if (fd < 0) {
 		sd_err("failed to open directory %s: %m", dir);
