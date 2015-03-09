@@ -21,6 +21,7 @@
 #include "internal_proto.h"
 
 #define QUEUE_ZNODE "/sheepdog/queue"
+#define QUEUE_POS_ZNODE "/sheepdog/queue_pos"
 #define MIN_THRESHOLD 86400
 
 #define FOR_EACH_ZNODE(parent, path, strs)			       \
@@ -369,6 +370,90 @@ err:
 	return -1;
 }
 
+static int do_delete(int argc, char **argv)
+{
+	struct String_vector strs;
+	int rc, len, deleted = 0;
+	int32_t pos, min_pos = INT32_MAX;
+	char path[256];
+	struct zk_event ev;
+	struct Stat stat;
+	if (argc != 2) {
+		fprintf(stderr, "remove queue, no more arguments\n");
+		return -1;
+	}
+
+	rc = zk_get_children(QUEUE_POS_ZNODE, &strs);
+	switch (rc) {
+	case ZOK:
+		FOR_EACH_ZNODE(QUEUE_POS_ZNODE, path, &strs) {
+			len = sizeof(int32_t);
+			rc = zk_get_data(path, &pos, &len, &stat);
+			if (rc != ZOK) {
+				fprintf(stderr, "failed to get data "
+					"%s, %s\n",
+					path, zerror(rc));
+				goto err;
+			}
+
+			if (pos < min_pos && pos != -1)
+				min_pos = pos;
+		}
+		break;
+	default:
+		goto err;
+	}
+
+	fprintf(stdout, "queue nodes seq < %d will be deleted\n", min_pos);
+
+	if (min_pos == INT32_MAX) {
+		fprintf(stdout, "no queue nodes to be deleted\n");
+		return 0;
+	}
+
+	rc = zk_get_children(QUEUE_ZNODE, &strs);
+	fprintf(stdout, "There are %d znode in queue\n", strs.count);
+	switch (rc) {
+	case ZOK:
+		FOR_EACH_ZNODE(QUEUE_ZNODE, path, &strs) {
+			len = sizeof(struct zk_event);
+			rc = zk_get_data(path, &ev, &len, &stat);
+			if (rc != ZOK) {
+				fprintf(stderr, "failed to get data "
+					"%s, %s\n",
+					path, zerror(rc));
+				goto err;
+			}
+
+			sscanf(path, QUEUE_ZNODE "/%"PRId32, &pos);
+			if (pos >= min_pos)
+				continue;
+
+			rc = zk_delete_node(path);
+			if (rc != ZOK) {
+				fprintf(stderr, "failed to delete "
+					"%s, %s\n",
+					path, zerror(rc));
+				goto err;
+			}
+
+			deleted++;
+			if (deleted % 100 == 0)
+				fprintf(stdout, "%d queue nodes are deleted\n",
+						deleted);
+		}
+		break;
+	default:
+		goto err;
+	}
+
+	fprintf(stdout, "completed. %d queue nodes are deleted\n", deleted);
+	return 0;
+err:
+	fprintf(stderr, "failed to delete %s, %s\n", QUEUE_ZNODE, zerror(rc));
+	return -1;
+}
+
 static struct control_handler {
 	const char *name;
 	int (*execute)(int, char **);
@@ -377,7 +462,8 @@ static struct control_handler {
 	{ "kill", do_kill, "Kill the session" },
 	{ "remove", do_remove, "Remove the node recursively" },
 	{ "list", do_list, "List the data in queue node" },
-	{ "purge", do_purge, "Remove the data in queue node" },
+	{ "purge", do_purge, "Remove the data in queue node by time" },
+	{ "delete", do_delete, "Remove the data in queue node not used" },
 	{ NULL, NULL, NULL },
 };
 
