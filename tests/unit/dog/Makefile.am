@@ -14,10 +14,17 @@ LIBS			= $(top_srcdir)/lib/libsheepdog.a -lpthread	\
 			  ../mock/libmock.a @CHECK_LIBS@
 
 test_common_SOURCES	= test_common.c mock_dog.c			\
-			  $(top_srcdir)/dog/common.c
+			  dog/common.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o
 
 coverage:
 	@lcov -d . -c -o dog.info
+
+dog/%.c: $(top_srcdir)/dog/%.c
+	@mkdir -p $(@D)
+	@cp $< $@
+
+distclean-local:
+	rm -rf dog
