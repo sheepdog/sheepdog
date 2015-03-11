@@ -591,7 +591,8 @@ static int zk_queue_pop_advance(struct zk_event *ev)
 	sd_debug("%s, type:%d, len:%d, pos:%" PRId32, path, ev->type, len,
 		 queue_pos);
 
-	if (queue_pos % QUEUE_DEL_BATCH == 0 && ev->type != EVENT_JOIN) {
+	if (queue_pos % QUEUE_DEL_BATCH == 0 && ev->type != EVENT_JOIN
+		&& ev->type != EVENT_ACCEPT) {
 		snprintf(queue_pos_path, sizeof(queue_pos_path),
 			QUEUE_POS_ZNODE"/%s", node_to_str(&this_node.node));
 		RETURN_IF_ERROR(zk_set_data(queue_pos_path, (char *)&queue_pos,
