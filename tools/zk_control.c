@@ -15,13 +15,15 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "list.h"
 #include "rbtree.h"
 #include "internal_proto.h"
 
-#define QUEUE_ZNODE "/sheepdog/queue"
-#define QUEUE_POS_ZNODE "/sheepdog/queue_pos"
+#define DEFAULT_BASE "/sheepdog"
+#define QUEUE_ZNODE "/queue"
+#define QUEUE_POS_ZNODE "/queue_pos"
 #define MIN_THRESHOLD 86400
 
 #define FOR_EACH_ZNODE(parent, path, strs)			       \
@@ -467,26 +469,133 @@ static struct control_handler {
 	{ NULL, NULL, NULL },
 };
 
+static struct zkc_option {
+	char ch;
+	const char *name;
+	bool has_arg;
+	const char *help;
+} zkc_options[] = {
+	{ 'c', "cluster", true, "specified the sheep cluster" },
+	{ 0, 0, 0, 0},
+};
+
+#define zkc_for_each_option(opt, opts)		\
+	for (opt = (opts); opt->name; opt++)
+
+static struct option *build_long_options(const struct zkc_option *zkc_opts)
+{
+	static struct option lopts[256], *p;
+	const struct zkc_option *opt;
+
+	p = lopts;
+	zkc_for_each_option(opt, zkc_opts) {
+		p->name = opt->name;
+		p->has_arg = opt->has_arg;
+		p->flag = NULL;
+		p->val = opt->ch;
+		p++;
+	}
+	memset(p, 0, sizeof(struct option));
+
+	return lopts;
+}
+
+static char *build_short_options(const struct zkc_option *zkc_opts)
+{
+	static char sopts[256], *p;
+	const struct zkc_option *opt;
+
+	p = sopts;
+	zkc_for_each_option(opt, zkc_opts) {
+		*p++ = opt->ch;
+		if (opt->has_arg)
+			*p++ = ':';
+	}
+	*p = '\0';
+
+	return sopts;
+}
+
+static char *prepare_cluster(char *cluster)
+{
+	char *hosts_cluster = NULL;
+	if (cluster != NULL) {
+		hosts_cluster = calloc(1, strlen(hosts) + strlen(cluster) + 2);
+		if (NULL == hosts_cluster) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
+		strncat(hosts_cluster, hosts, strlen(hosts));
+		strncat(hosts_cluster, "/", 1);
+		strncat(hosts_cluster, cluster, strlen(cluster));
+	} else {
+		hosts_cluster = calloc(1, strlen(hosts)
+					+ strlen(DEFAULT_BASE) + 1);
+		if (NULL == hosts_cluster) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
+		strncat(hosts_cluster, hosts, strlen(hosts));
+		strncat(hosts_cluster, DEFAULT_BASE, strlen(DEFAULT_BASE));
+	}
+	return hosts_cluster;
+}
+
 static void usage(char *prog)
 {
 	struct control_handler *h;
+	struct zkc_option *o;
 
-	fprintf(stderr, "Usage:\n\t%s command [parameters]\n", prog);
+	fprintf(stderr, "Usage:\n\t%s command [parameters] [options]\n", prog);
 	fprintf(stderr, "Available commands:\n");
 	for (h = handlers; h->name; h++)
 		fprintf(stderr, "\t%s\t%s\n", h->name, h->help);
+	fprintf(stderr, "Available options:\n");
+	for (o = zkc_options; o->name; o++)
+		fprintf(stderr, "\t-%c --%s\t%s\n", o->ch, o->name, o->help);
 }
 
 int main(int argc, char **argv)
 {
 	struct control_handler *h, *cmd = NULL;
+	const char *short_options;
+	struct option *long_options;
+	int longindex, nr_arg, i;
+	char *hosts_cluster = NULL, ch, *cluster = NULL, *argp[256];
 
-	if (argc < 2) {
-		usage(argv[0]);
+	long_options = build_long_options(zkc_options);
+	short_options = build_short_options(zkc_options);
+	while ((ch = getopt_long(argc, argv, short_options, long_options,
+				 &longindex)) >= 0) {
+		switch (ch) {
+		case 'c':
+			cluster = optarg;
+			break;
+		default:
+			usage(argv[0]);
+			exit(0);
+		}
+	}
+
+	if (argc > 256) {
+		fprintf(stderr, "too many arguments\n");
+		exit(1);
+	}
+	argp[0] = argv[0];
+	nr_arg = 1;
+	i = optind;
+	while (i < argc)
+		argp[nr_arg++] = argv[i++];
+
+	hosts_cluster = prepare_cluster(cluster);
+
+	if (nr_arg < 2) {
+		usage(argp[0]);
 		exit(0);
 	}
+
 	for (h = handlers; h->name; h++)
-		if (strcmp(h->name, argv[1]) == 0) {
+		if (strcmp(h->name, argp[1]) == 0) {
 			cmd = h;
 			break;
 		}
@@ -498,13 +607,13 @@ int main(int argc, char **argv)
 
 	zoo_set_debug_level(0);
 
-	zk_handle = zookeeper_init(hosts, NULL, 1000, NULL, NULL, 0);
+	zk_handle = zookeeper_init(hosts_cluster, NULL, 1000, NULL, NULL, 0);
 	if (!zk_handle) {
 		fprintf(stderr, "failed to init zookeeper\n");
 		exit(1);
 	}
 
-	if (cmd->execute(argc, argv) < 0)
+	if (cmd->execute(nr_arg, argp) < 0)
 		fprintf(stderr, "%s failed\n", cmd->name);
 
 	if (zookeeper_close(zk_handle) != ZOK) {
@@ -512,5 +621,6 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
+	free(hosts_cluster);
 	return 0;
 }
