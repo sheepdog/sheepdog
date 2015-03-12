@@ -34,6 +34,7 @@ Documentations
 
 + Presentations
 
+  + Lambert: Achieve High Durability, Low Cost & Flexibility at Same Time. Open source storage engine for exabyte data in Alibaba, Vault, March 2015. (`Slides <_static/LFVault2015_Alibaba.pdf>`__)
   + Sheepdog: Software Defined Storage System for Converged Infrastructure, CloudOpen Japan 2014, May 2014. (`Slides <_static/sheepdog_COJ14.pdf>`__)
   + Sheepdog: Yet Another All-In-One Storage For Openstack, Openstack Hong Kong Summit, Nov 2013. (`Slides <_static/sheepdog-openstack.pdf>`__)
   + Sheepdog: Distributed Storage System for QEMU, KVM Forum 2010, Aug 2010. (`Slides <_static/kvmforum2010.pdf>`__)
