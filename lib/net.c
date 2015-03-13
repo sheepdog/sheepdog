@@ -519,7 +519,6 @@ int get_local_addr(uint8_t *bytes)
 			sin = (struct sockaddr_in *)ifa->ifa_addr;
 			memset(bytes, 0, 12);
 			memcpy(bytes + 12, &sin->sin_addr, 4);
-			memcpy(bytes + 12, &sin->sin_addr, 4);
 			sd_notice("found IPv4 address");
 			goto out;
 		case AF_INET6:
