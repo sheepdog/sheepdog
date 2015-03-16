@@ -11,10 +11,10 @@ Failed to open VDI test (snapshot id: 0 snapshot tag: ): No VDI found
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
 delete current image before snapshot one
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
-s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25      6          snap  22
-  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b26      6                22
+s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b27      6          snap  22
+  test         0  4.0 GB  0.0 MB  0.0 MB DATE   7c2b28      6                22
 Failed to open VDI test (snapshot id: 0 snapshot tag: ): No VDI found
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
-s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b25      6          snap  22
+s test         1  4.0 GB  0.0 MB  0.0 MB DATE   7c2b27      6          snap  22
 Failed to open VDI test (snapshot id: 0 snapshot tag: snap): No VDI found
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
