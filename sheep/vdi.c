@@ -384,7 +384,7 @@ static int do_add_vdi_state(uint32_t vid, int nr_copies, bool snapshot,
 		already_exists = true;
 	}
 
-	if (!already_exists)
+	if (sys->cinfo.flags & SD_CLUSTER_FLAG_RECYCLE_VID && !already_exists)
 		update_vdi_family(parent_vid, entry, unordered);
 
 	sd_rw_unlock(&vdi_state_lock);

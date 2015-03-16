@@ -25,6 +25,7 @@ static struct sd_option cluster_options[] = {
 	{'l', "lock", false, "Lock vdi to exclude multiple users"},
 	{'m', "multithread", false,
 	 "use multi-thread for 'cluster snapshot save'"},
+	{'R', "recyclevid", false, "enable recycling of VID"},
 	{'t', "strict", false,
 	 "do not serve write request if number of nodes is not sufficient"},
 	{'z', "block_size_shift", true, "specify the shift num of default"
@@ -43,6 +44,7 @@ static struct cluster_cmd_data {
 	char name[STORE_LEN];
 	bool fixed_vnodes;
 	bool use_lock;
+	bool recycle_vid;
 } cluster_cmd_data;
 
 #define DEFAULT_STORE	"plain"
@@ -169,6 +171,8 @@ static int cluster_format(int argc, char **argv)
 		hdr.cluster.flags |= SD_CLUSTER_FLAG_STRICT;
 	if (cluster_cmd_data.use_lock)
 		hdr.cluster.flags |= SD_CLUSTER_FLAG_USE_LOCK;
+	if (cluster_cmd_data.recycle_vid)
+		hdr.cluster.flags |= SD_CLUSTER_FLAG_RECYCLE_VID;
 
 #ifdef HAVE_DISKVNODES
 	hdr.cluster.flags |= SD_CLUSTER_FLAG_DISKMODE;
@@ -820,7 +824,7 @@ failure:
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhvT", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bcltaphzTV", "create a Sheepdog store",
+	{"format", NULL, "bcltaphzTVR", "create a Sheepdog store",
 	 NULL, CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aphT", "stop Sheepdog",
 	 NULL, 0, cluster_shutdown, cluster_options},
@@ -889,6 +893,9 @@ static int cluster_parser(int ch, const char *opt)
 		break;
 	case 'V':
 		cluster_cmd_data.fixed_vnodes = true;
+		break;
+	case 'R':
+		cluster_cmd_data.recycle_vid = true;
 		break;
 	}
 

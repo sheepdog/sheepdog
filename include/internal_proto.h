@@ -157,6 +157,7 @@
 #define SD_CLUSTER_FLAG_DISKMODE	0x0002 /* Disk mode for cluster */
 #define SD_CLUSTER_FLAG_AUTO_VNODES	0x0004 /* Cluster vnodes strategy */
 #define SD_CLUSTER_FLAG_USE_LOCK	0x0008 /* Lock/Unlock vdi */
+#define SD_CLUSTER_FLAG_RECYCLE_VID	0x0010 /* Enable recycling of VID */
 
 
 enum sd_status {
