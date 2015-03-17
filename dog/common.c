@@ -240,14 +240,13 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 		exit(EXIT_USAGE);
 	}
 
-	subcmd_stack[++subcmd_depth] = sub;
-
 	for (i = 0; sub[i].name; i++) {
 		unsigned long flags;
 
 		if (strcmp(sub[i].name, argv[optind]))
 			continue;
 
+		subcmd_stack[++subcmd_depth] = &sub[i];
 		flags = sub[i].flags;
 
 		if (flags & CMD_NEED_NODELIST) {
