@@ -1004,14 +1004,19 @@ out_unlock:
 static int zk_join(const struct sd_node *myself,
 		   void *opaque, size_t opaque_len)
 {
-	int rc;
+	int rc1, rc2;
 	char path[MAX_NODE_STR_LEN];
 
 	this_node.node = *myself;
 
 	snprintf(path, sizeof(path), MEMBER_ZNODE "/%s", node_to_str(myself));
-	rc = zk_node_exists(path);
-	if (rc == ZOK) {
+	rc1 = zk_node_exists(path);
+
+	snprintf(path, sizeof(path), QUEUE_POS_ZNODE "/%s",
+		node_to_str(myself));
+	rc2 = zk_node_exists(path);
+
+	if (rc1 == ZOK || rc2 == ZOK) {
 		sd_err("Previous zookeeper session exist, shoot myself. Please "
 			"wait for %d seconds to join me again.",
 			DIV_ROUND_UP(zk_timeout, 1000));
