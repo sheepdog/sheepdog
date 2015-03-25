@@ -134,6 +134,7 @@ static struct sd_option sheep_options[] = {
 	 "specify the cluster driver (default: "DEFAULT_CLUSTER_DRIVER")",
 	 cluster_help},
 	{'D', "directio", false, "use direct IO for backend store"},
+	{'f', "foreground", false, "make the program run in foreground"},
 	{'g', "gateway", false, "make the program run as a gateway mode"},
 	{'h', "help", false, "display this help and exit"},
 	{'i', "ioaddr", true, "use separate network card to handle IO requests"
@@ -661,6 +662,7 @@ int main(int argc, char **argv)
 	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
 	bool explicit_addr = false;
+	bool daemonize = true;
 	int32_t nr_vnodes = -1;
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
@@ -717,6 +719,9 @@ int main(int argc, char **argv)
 			break;
 		case 'D':
 			sys->backend_dio = true;
+			break;
+		case 'f':
+			daemonize = false;
 			break;
 		case 'g':
 			if (nr_vnodes > 0) {
@@ -905,7 +910,10 @@ int main(int argc, char **argv)
 
 	srandom(port);
 
-	if (lock_and_daemon(log_dst_type != LOG_DST_STDOUT, dir)) {
+	if (daemonize && log_dst_type == LOG_DST_STDOUT)
+		daemonize = false;
+
+	if (lock_and_daemon(daemonize, dir)) {
 		free(argp);
 		goto cleanup_dir;
 	}
