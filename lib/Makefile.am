@@ -53,5 +53,6 @@ check-style:
 libisa.a:
 	cd isa-l/ && $(MAKE) && cd ..
 
-clean:
+clean-local:
+	rm -f *.o gmon.out *.da *.bb *.bbg
 	cd isa-l/ && $(MAKE) clean && cd ..
