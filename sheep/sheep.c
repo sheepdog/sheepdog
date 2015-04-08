@@ -527,21 +527,23 @@ static void check_host_env(void)
 
 	if (getrlimit(RLIMIT_NOFILE, &r) < 0)
 		sd_err("failed to get nofile %m");
-	/*
-	 * 1024 is default for NOFILE on most distributions, which is very
-	 * dangerous to run Sheepdog cluster.
-	 */
-	else if (r.rlim_cur == 1024)
-		sd_warn("Allowed open files 1024 too small, suggested %u",
-			SD_RLIM_NOFILE);
-	else if (r.rlim_cur < SD_RLIM_NOFILE)
-		sd_info("Allowed open files %lu, suggested %u", r.rlim_cur,
-			SD_RLIM_NOFILE);
+	else if (r.rlim_cur < SD_RLIM_NOFILE) {
+		r.rlim_cur = SD_RLIM_NOFILE;
+		r.rlim_max = SD_RLIM_NOFILE;
+		if (setrlimit(RLIMIT_NOFILE, &r) != 0) {
+			sd_err("failed to set nofile to suggested %lu, %m",
+			       r.rlim_cur);
+			sd_err("please increase nofile via sysctl fs.nr_open");
+		} else {
+			sd_info("allowed open files set to suggested %lu",
+				r.rlim_cur);
+		}
+	}
 
 	if (getrlimit(RLIMIT_CORE, &r) < 0)
 		sd_debug("failed to get core %m");
 	else if (r.rlim_cur < RLIM_INFINITY)
-		sd_debug("Allowed core file size %lu, suggested unlimited",
+		sd_debug("allowed core file size %lu, suggested unlimited",
 			 r.rlim_cur);
 
 	/*
