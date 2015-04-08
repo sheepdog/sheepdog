@@ -25,6 +25,7 @@
 #include "work.h"
 #include "event.h"
 #include "config.h"
+#include "common.h"
 
 #define CMD_NEED_NODELIST (1 << 0)
 #define CMD_NEED_ARG (1 << 1)
@@ -104,6 +105,10 @@ int dog_bnode_reader(uint64_t oid, void **mem, unsigned int len,
 
 int read_vdi_obj(const char *vdiname, int snapid, const char *tag,
 			uint32_t *pvid, struct sd_inode *inode, size_t size);
+
+struct timespec get_time_tick(void);
+double get_time_interval(const struct timespec *start,
+						 const struct timespec *end);
 
 extern struct command vdi_command;
 extern struct command node_command;

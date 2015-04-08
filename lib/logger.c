@@ -36,6 +36,7 @@
 #include <linux/limits.h>
 
 #include "util.h"
+#include "common.h"
 
 static bool colorize;
 static const char * const log_color[] = {

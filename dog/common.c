@@ -14,6 +14,31 @@
 #include "sockfd_cache.h"
 #include "fec.h"
 
+struct timespec get_time_tick(void)
+{
+	struct timespec ts;
+	int ret;
+
+	ts.tv_sec = 0;
+	ts.tv_nsec = 0;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ret < 0)
+		sd_err("clock_gettime failure: %m");
+
+	return ts;
+}
+
+double get_time_interval(const struct timespec *start,
+						 const struct timespec *end)
+{
+	assert(start);
+	assert(end);
+
+	return ((end->tv_nsec - start->tv_nsec) * 0.000000001)
+			+ end->tv_sec - start->tv_sec;
+}
+
 char *strnumber_raw(uint64_t _size, bool raw)
 {
 	const char *units[] = {"MB", "GB", "TB", "PB", "EB", "ZB", "YB"};

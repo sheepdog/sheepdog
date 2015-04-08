@@ -43,6 +43,7 @@
 #include "config.h"
 #include "sockfd_cache.h"
 #include "fec.h"
+#include "common.h"
 
  /*
   * Functions that update global info must be called in the main

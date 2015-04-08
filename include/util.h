@@ -106,15 +106,8 @@ int eventfd_xread(int efd);
 void eventfd_xwrite(int efd, int value);
 void pstrcpy(char *buf, int buf_size, const char *str);
 char *chomp(char *str);
-int rmdir_r(const char *dir_path);
-int purge_directory(const char *dir_path);
-int purge_directory_async(const char *dir_path);
 bool is_numeric(const char *p);
 const char *data_to_str(void *data, size_t data_length);
-int install_sighandler(int signum, void (*handler)(int, siginfo_t *, void *),
-	bool once);
-int install_crash_handler(void (*handler)(int, siginfo_t *, void *));
-void reraise_crash_signal(int signo, int status);
 pid_t gettid(void);
 int tkill(int tid, int sig);
 bool is_xattr_enabled(const char *path);
@@ -123,15 +116,8 @@ const char *my_exe_path(void);
 int split_path(const char *path, size_t nr_segs, char **segs);
 void make_path(char *path, size_t size, size_t nr_segs, const char **segs);
 
-int atomic_create_and_write(const char *path, const char *buf, size_t len,
-			    bool force_create);
-
 void find_zero_blocks(const void *buf, uint64_t *poffset, uint32_t *plen);
 void trim_zero_blocks(void *buf, uint64_t *poffset, uint32_t *plen);
-
-struct timespec get_time_tick(void);
-double get_time_interval(const struct timespec *start,
-						 const struct timespec *end);
 
 /* a type safe version of qsort() */
 #define xqsort(base, nmemb, compar)					\
@@ -562,8 +548,4 @@ static inline uint64_t clock_get_time(void)
 }
 
 char *xstrdup(const char *s);
-
-struct work_queue;
-void register_util_wq(struct work_queue *wq);
-
 #endif

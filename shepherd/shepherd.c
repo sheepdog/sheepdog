@@ -33,6 +33,7 @@
 #include "util.h"
 #include "option.h"
 #include "shepherd.h"
+#include "common.h"
 
 #define EPOLL_SIZE SD_MAX_NODES
 

@@ -26,6 +26,7 @@
 #include "util.h"
 #include "sheepfs.h"
 #include "sheepdog_proto.h"
+#include "common.h"
 
 #define SH_OP_NAME   "user.sheepfs.opcode"
 #define SH_OP_SIZE   sizeof(uint32_t)

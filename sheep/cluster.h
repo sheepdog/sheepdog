@@ -22,6 +22,7 @@
 #include "sheepdog_proto.h"
 #include "sheep.h"
 #include "config.h"
+#include "common.h"
 
 /*
  * maximum payload size sent in ->notify and ->unblock, it should be large
