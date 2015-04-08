@@ -23,6 +23,7 @@
 #include "util.h"
 
 #include <arpa/inet.h>
+#include <sys/eventfd.h>
 
 struct sd_cluster {
 	int sockfd;
@@ -50,6 +51,8 @@ struct sd_request {
 	size_t length;
 	off_t offset;
 	bool write;
+	int efd;
+	int ret;
 };
 
 struct sd_vdi {
@@ -57,12 +60,15 @@ struct sd_vdi {
 	struct sd_inode *inode;
 	uint32_t vid;
 	struct sd_rw_lock lock;
+	char *name;
 };
 
-int sd_init(void);
-void sd_free(void);
 struct sd_cluster *sd_connect(char *host);
 int sd_disconnect(struct sd_cluster *sd);
 int sd_run_sdreq(struct sd_cluster *c, struct sd_req *hdr, void *data);
+struct sd_vdi *sd_vdi_open(struct sd_cluster *sd, char *name);
+int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
+int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
+int sd_vdi_close(struct sd_vdi *vdi);
 
 #endif

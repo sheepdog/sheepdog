@@ -112,7 +112,8 @@ int sd_run_sdreq(struct sd_cluster *c, struct sd_req *hdr, void *data)
 
 static void aio_end_request(struct sd_request *req, int ret)
 {
-
+	req->ret = ret;
+	eventfd_xwrite(req->efd, 1);
 }
 
 static void aio_rw_done(struct sheep_aiocb *aiocb)
