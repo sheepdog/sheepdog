@@ -2,6 +2,20 @@ MAINTAINERCLEANFILES    = Makefile.in
 
 AM_CPPFLAGS                = -I$(top_builddir)/include -I$(top_srcdir)/include
 
+lib_LTLIBRARIES         = libsheepdog.la
+
+libsheepdog_la_DEPENDENCIES =
+
+libsheepdog_la_SOURCES  = shared/sheep.c shared/vdi.c util.c
+
+libsheepdog_la_LDFLAGS  = -avoid-version -shared -module -export-dynamic \
+			  -export-symbols-regex 'sd_'
+# Workaround for Objects ‘created with both libtool and without’ problem
+libsheepdog_la_CPPFLAGS = $(AM_CPPFLAGS) -DNO_SHEEPDOG_LOGGER
+
+pkginclude_HEADERS      = ../include/sheepdog_proto.h shared/sheepdog.h \
+			  ../include/util.h ../include/list.h
+
 libsheepdog_a_DEPENDENCIES =
 
 noinst_LIBRARIES	= libisa.a libsheepdog.a

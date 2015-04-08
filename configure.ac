@@ -33,6 +33,8 @@ AC_CANONICAL_HOST
 
 AC_LANG([C])
 
+LT_INIT
+
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES(yes)])
 
 if make --help 2>&1 | grep -q no-print-directory; then
@@ -77,11 +79,11 @@ if ! ${MAKE-make} --version /cannot/make/this >/dev/null 2>&1; then
 fi
 
 AC_PROG_CC
+AC_PROG_LIBTOOL
 AM_PROG_AS
 AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
-AC_PROG_RANLIB
 AC_CHECK_PROGS([GROFF], [groff])
 
 AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
