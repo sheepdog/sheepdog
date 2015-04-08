@@ -5,8 +5,6 @@
 
 #include <stdbool.h>
 
-#include "compiler.h"
-
 struct list_node {
 	struct list_node *next;
 	struct list_node *prev;

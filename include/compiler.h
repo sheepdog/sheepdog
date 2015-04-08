@@ -23,16 +23,9 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-#define __LOCAL(var, line) __ ## var ## line
-#define _LOCAL(var, line) __LOCAL(var, line)
-#define LOCAL(var) _LOCAL(var, __LINE__)
-
 #define container_of(ptr, type, member) ({			\
 	const typeof(((type *)0)->member) *__mptr = (ptr);	\
 	(type *)((char *)__mptr - offsetof(type, member)); })
-
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
 
 #define __packed __attribute((packed))
 
@@ -42,8 +35,6 @@
 
 /* Force a compilation error if the condition is true */
 #define BUILD_BUG_ON(condition) ((void)sizeof(struct { int: -!!(condition); }))
-
-#define __must_check            __attribute__((warn_unused_result))
 
 #ifdef HAVE_SYS_SIGNALFD_H
 #include <sys/signalfd.h>

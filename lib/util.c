@@ -19,6 +19,9 @@
 #include <ctype.h>
 #include <sys/xattr.h>
 #include <fcntl.h>
+#include <sys/eventfd.h>
+#include <sys/syscall.h>
+
 
 #include "util.h"
 
