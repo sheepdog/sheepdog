@@ -82,6 +82,7 @@
 
 #include "util.h"
 #include "internal_proto.h"
+#include "sheep.h"
 
 #define PAYLOAD_SIZE (SD_INODE_DATA_INDEX_SIZE - \
 		sizeof(struct sd_index_header))

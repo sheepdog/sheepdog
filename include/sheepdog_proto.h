@@ -18,12 +18,11 @@
 # include <inttypes.h>
 # include <stdint.h>
 # include <string.h>
-# include "compiler.h"
-# include "bitops.h"
 #endif
 
 #include <stdbool.h>
 #include <linux/limits.h>
+#include <stddef.h>
 
 #define SD_PROTO_VER 0x02
 
@@ -485,12 +484,6 @@ static inline bool is_data_obj(uint64_t oid)
 		!is_ledger_object(oid);
 }
 
-static inline size_t count_data_objs(const struct sd_inode *inode)
-{
-	return DIV_ROUND_UP(inode->vdi_size,
-			    (1UL << inode->block_size_shift));
-}
-
 static inline size_t get_objsize(uint64_t oid, uint32_t object_size)
 {
 	if (is_vdi_obj(oid))
@@ -546,13 +539,6 @@ static inline uint64_t vid_to_vmstate_oid(uint32_t vid, uint32_t idx)
 static inline bool vdi_is_snapshot(const struct sd_inode *inode)
 {
 	return !!inode->snap_ctime;
-}
-
-static inline __attribute__((used)) void __sd_proto_build_bug_ons(void)
-{
-	/* never called, only for checking BUILD_BUG_ON()s */
-	BUILD_BUG_ON(sizeof(struct sd_req) != SD_REQ_SIZE);
-	BUILD_BUG_ON(sizeof(struct sd_rsp) != SD_RSP_SIZE);
 }
 
 static inline uint64_t ledger_oid_to_data_oid(uint64_t oid)

@@ -337,4 +337,17 @@ static inline bool is_cluster_autovnodes(const struct cluster_info *cinfo)
 	return (cinfo->flags & SD_CLUSTER_FLAG_AUTO_VNODES) > 0;
 }
 
+static inline size_t count_data_objs(const struct sd_inode *inode)
+{
+	return DIV_ROUND_UP(inode->vdi_size,
+			    (1UL << inode->block_size_shift));
+}
+
+static inline __attribute__((used)) void __sd_proto_build_bug_ons(void)
+{
+	/* never called, only for checking BUILD_BUG_ON()s */
+	BUILD_BUG_ON(sizeof(struct sd_req) != SD_REQ_SIZE);
+	BUILD_BUG_ON(sizeof(struct sd_rsp) != SD_RSP_SIZE);
+}
+
 #endif
