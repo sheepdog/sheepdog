@@ -16,6 +16,7 @@
 #include <sys/epoll.h>
 
 #include "rbtree.h"
+#include "logger.h"
 #include "util.h"
 #include "event.h"
 

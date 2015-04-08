@@ -37,6 +37,7 @@
 
 #include "util.h"
 #include "common.h"
+#include "logger.h"
 
 static bool colorize;
 static const char * const log_color[] = {

@@ -88,12 +88,6 @@ void sd_backtrace(void);
 		log_write(SDOG_DEBUG, __func__, __LINE__, fmt, ##args);	\
 })
 
-#define panic(fmt, args...)			\
-({						\
-	sd_emerg("PANIC: " fmt, ##args);	\
-	abort();				\
-})
-
 #define sd_assert(expr)						\
 ({								\
 	if (!(expr)) {						\

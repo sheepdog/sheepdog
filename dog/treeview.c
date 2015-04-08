@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 #include "util.h"
+#include "logger.h"
 #include "treeview.h"
 
 #ifndef MAX_DEPTH

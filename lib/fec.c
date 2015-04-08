@@ -60,6 +60,7 @@
 #include <string.h>
 
 #include "fec.h"
+#include "logger.h"
 #include "util.h"
 
 /*

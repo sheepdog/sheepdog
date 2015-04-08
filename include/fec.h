@@ -63,6 +63,7 @@
 #include <stdint.h>
 
 #include "util.h"
+#include "logger.h"
 #include "sheepdog_proto.h"
 #include "../lib/isa-l/include/erasure_code.h"
 

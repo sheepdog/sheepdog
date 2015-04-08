@@ -26,6 +26,7 @@
 #include "event.h"
 #include "config.h"
 #include "common.h"
+#include "logger.h"
 
 #define CMD_NEED_NODELIST (1 << 0)
 #define CMD_NEED_ARG (1 << 1)

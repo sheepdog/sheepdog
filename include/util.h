@@ -15,7 +15,6 @@
 #include <sys/param.h>
 #include <assert.h>
 
-#include "logger.h"
 #include "list.h"
 #include "compiler.h"
 
@@ -44,6 +43,25 @@
 #endif
 
 #define uninitialized_var(x) x = x
+
+#ifndef NO_SHEEPDOG_LOGGER
+
+#include "logger.h"
+#define panic(fmt, args...)			\
+({						\
+	sd_emerg("PANIC: " fmt, ##args);	\
+	abort();				\
+})
+
+#else
+
+#define panic(fmt, args...)			\
+({						\
+	fprintf(stderr, "PANIC: " fmt, ##args);	\
+	abort();				\
+})
+
+#endif
 
 static inline int before(uint32_t seq1, uint32_t seq2)
 {

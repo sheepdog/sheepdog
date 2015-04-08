@@ -5,6 +5,7 @@
 
 #include "list.h"
 #include "util.h"
+#include "logger.h"
 
 struct work;
 
