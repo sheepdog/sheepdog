@@ -97,7 +97,7 @@ static void gateway_op_done(struct work *work)
 		struct request *rq;
 
 		sys->nr_ongoing_inode_update_request--;
-		assert(0 <= sys->nr_ongoing_inode_update_request);
+		sd_assert(0 <= sys->nr_ongoing_inode_update_request);
 		sd_debug("a number of ongoing inode update request: %d",
 			 sys->nr_ongoing_inode_update_request);
 
@@ -235,7 +235,7 @@ void wakeup_requests_on_epoch(void)
 			 * Gateway retries to send the request when
 			 * its epoch changes.
 			 */
-			assert(is_gateway_op(req->op));
+			sd_assert(is_gateway_op(req->op));
 			sd_debug("gateway %"PRIx64, req->rq.obj.oid);
 			req->rq.epoch = sys->cinfo.epoch;
 			del_requeue_request(req);
@@ -245,7 +245,7 @@ void wakeup_requests_on_epoch(void)
 			 * Peer retries the request locally when its epoch
 			 * changes.
 			 */
-			assert(!is_gateway_op(req->op));
+			sd_assert(!is_gateway_op(req->op));
 			sd_debug("peer %"PRIx64, req->rq.obj.oid);
 			del_requeue_request(req);
 			break;
@@ -364,7 +364,7 @@ queue_work:
 			      &sys->prevented_inode_update_request_queue);
 			return;
 		} else {
-			assert(0 <= sys->nr_ongoing_inode_update_request);
+			sd_assert(0 <= sys->nr_ongoing_inode_update_request);
 			sys->nr_ongoing_inode_update_request++;
 			sd_debug("a number of ongoing inode update request: %d",
 				 sys->nr_ongoing_inode_update_request);
@@ -1024,7 +1024,7 @@ static void client_handler(int fd, int events, void *data)
 			return;
 		}
 
-		assert(ci->tx_req == NULL);
+		sd_assert(ci->tx_req == NULL);
 		ci->tx_req = list_first_entry(&ci->done_reqs, struct request,
 					      request_list);
 		list_del(&ci->tx_req->request_list);

@@ -133,7 +133,7 @@ static void suspend(int num, siginfo_t *info, void *context)
 
 	eventfd_xwrite(ack_efd, 1); /* ack of suspend */
 	value = eventfd_xread(resume_efd);
-	assert(value == 1);
+	sd_assert(value == 1);
 	eventfd_xwrite(ack_efd, 1); /* ack of resume */
 }
 

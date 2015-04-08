@@ -214,7 +214,7 @@ static int json_log_formatter(char *buff, size_t size,
 	char *p = buff;
 	ssize_t len;
 
-	assert(logger_user_info);
+	sd_assert(logger_user_info);
 
 	len = snprintf(p, size, "{ \"user_info\": "
 		       "{\"program_name\": \"%s\", \"port\": %d},"
@@ -854,7 +854,7 @@ fallback:
 
 void set_loglevel(int new_loglevel)
 {
-	assert(SDOG_EMERG <= new_loglevel && new_loglevel <= SDOG_DEBUG);
+	sd_assert(SDOG_EMERG <= new_loglevel && new_loglevel <= SDOG_DEBUG);
 	sd_log_level = new_loglevel;
 }
 

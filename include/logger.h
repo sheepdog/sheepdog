@@ -94,6 +94,13 @@ void sd_backtrace(void);
 	abort();				\
 })
 
+#define sd_assert(expr)						\
+({								\
+	if (!(expr)) {						\
+		sd_emerg("Asserting `%s' failed.", #expr);	\
+		abort();					\
+	}							\
+})
 
 static inline int loglevel_str2num(const char *str)
 {

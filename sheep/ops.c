@@ -864,7 +864,7 @@ static int local_md_info(struct request *request)
 {
 	struct sd_rsp *rsp = &request->rp;
 
-	assert(request->rq.data_length == sizeof(struct sd_md_info));
+	sd_assert(request->rq.data_length == sizeof(struct sd_md_info));
 	rsp->data_length = md_get_info((struct sd_md_info *)request->data);
 
 	return rsp->data_length ? SD_RES_SUCCESS : SD_RES_UNKNOWN;
@@ -902,7 +902,7 @@ static int local_get_cache_info(struct request *request)
 {
 	struct sd_rsp *rsp = &request->rp;
 
-	assert(request->rq.data_length == sizeof(struct object_cache_info));
+	sd_assert(request->rq.data_length == sizeof(struct object_cache_info));
 	rsp->data_length = object_cache_get_info((struct object_cache_info *)
 						 request->data);
 
@@ -2141,6 +2141,6 @@ static int map_table[] = {
 
 int gateway_to_peer_opcode(int opcode)
 {
-	assert(opcode < ARRAY_SIZE(map_table));
+	sd_assert(opcode < ARRAY_SIZE(map_table));
 	return map_table[opcode];
 }

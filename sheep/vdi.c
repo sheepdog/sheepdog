@@ -479,7 +479,7 @@ static struct vdi_state *fill_vdi_state_list_with_alloc(int *result_nr)
 			vs[i].participants[j] = entry->participants[j];
 		}
 
-		assert(i < nr);
+		sd_assert(i < nr);
 		i++;
 	}
 
@@ -562,7 +562,7 @@ static bool add_new_participant(struct vdi_state_entry *entry,
 	int idx;
 
 	if (entry->lock_state == LOCK_STATE_UNLOCKED) {
-		assert(!entry->nr_participants);
+		sd_assert(!entry->nr_participants);
 
 		sd_debug("%s is first owner of %"PRIx32, node_id_to_str(owner),
 			entry->vid);
@@ -575,8 +575,8 @@ static bool add_new_participant(struct vdi_state_entry *entry,
 		return true;
 	}
 
-	assert(entry->lock_state == LOCK_STATE_SHARED);
-	assert(0 < entry->nr_participants);
+	sd_assert(entry->lock_state == LOCK_STATE_SHARED);
+	sd_assert(0 < entry->nr_participants);
 
 	if (entry->nr_participants == SD_MAX_COPIES) {
 		sd_err("VDI: %"PRIx32 " already has SD_MAX_COPIES participants",
@@ -860,7 +860,7 @@ void play_logged_vdi_ops(void)
 
 			apply_vdi_lock_state(&entry);
 		} else {
-			assert(op->type == LOCK_TYPE_SHARED);
+			sd_assert(op->type == LOCK_TYPE_SHARED);
 
 			apply_vdi_lock_state_shared(op->vid,
 						    op->lock, &op->owner);
@@ -1023,7 +1023,7 @@ main_fn int inode_coherence_update(uint32_t vid, bool validate,
 		goto out;
 	}
 
-	assert(entry->lock_state == LOCK_STATE_SHARED);
+	sd_assert(entry->lock_state == LOCK_STATE_SHARED);
 
 	if (validate) {
 		for (int i = 0; i < entry->nr_participants; i++) {
@@ -1100,7 +1100,7 @@ static struct sd_inode *alloc_inode(const struct vdi_iocb *iocb,
 		sd_inode_init(new->data_vdi_id, 1);
 
 	if (gref) {
-		assert(data_vdi_id);
+		sd_assert(data_vdi_id);
 
 		for (int i = 0; i < SD_INODE_DATA_INDEX; i++) {
 			if (!data_vdi_id[i])
@@ -1589,7 +1589,7 @@ int vdi_snapshot(const struct vdi_iocb *iocb, uint32_t *new_vid)
 		return ret;
 	}
 
-	assert(info.snapid > 0);
+	sd_assert(info.snapid > 0);
 	*new_vid = info.free_bit;
 	ret = notify_vdi_add(*new_vid, iocb->nr_copies, info.vid,
 			     iocb->copy_policy, iocb->block_size_shift);

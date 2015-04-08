@@ -13,6 +13,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/param.h>
+#include <assert.h>
 
 #include "logger.h"
 #include "list.h"
@@ -213,22 +214,6 @@ double get_time_interval(const struct timespec *start,
 	}								\
 	__removed;							\
 })
-
-#ifdef assert
-#error "Don't include assert.h, use util.h for assert()"
-#endif
-
-#ifndef NASSERT
-#define assert(expr)						\
-({								\
-	if (!(expr)) {						\
-		sd_emerg("Asserting `%s' failed.", #expr);	\
-		abort();					\
-	}							\
-})
-#else
-#define assert(expr) ((void)0)
-#endif	/* NASSERT */
 
 #define SWAP(a, b) { typeof(a) tmp; tmp = a; a = b; b = tmp; }
 

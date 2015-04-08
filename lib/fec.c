@@ -313,7 +313,7 @@ static void _invert_mat(uint8_t *src, unsigned d)
 							goto found_piv;
 						}
 					} else
-						assert(ipiv[ix] <= 1);
+						sd_assert(ipiv[ix] <= 1);
 				}
 			}
 		}
@@ -331,7 +331,7 @@ found_piv:
 		indxc[col] = icol;
 		pivot_row = &src[icol * d];
 		c = pivot_row[icol];
-		assert(c != 0);
+		sd_assert(c != 0);
 		if (c != 1) {   /* otherwise this is a NOP */
 			/*
 			 * this is done often , but optimizing is not so
@@ -451,7 +451,7 @@ void init_fec(void)
 
 void fec_free(struct fec *p)
 {
-	assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->d) ^ p->dp) ^
+	sd_assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->d) ^ p->dp) ^
 					 (unsigned long) (p->enc_matrix)));
 	free(p->enc_matrix);
 	if (cpu_has_ssse3)
@@ -528,7 +528,7 @@ void fec_encode(const struct fec *code,
 		size_t stride = ((sz-d) < STRIDE) ? (sz-d) : STRIDE;
 		for (i = 0; i < num_block_nums; i++) {
 			fecnum = block_nums[i];
-			assert(fecnum >= code->d);
+			sd_assert(fecnum >= code->d);
 			memset(fecs[i]+d, 0, stride);
 			p = &(code->enc_matrix[fecnum * code->d]);
 			for (j = 0; j < code->d; j++)
@@ -570,7 +570,7 @@ void fec_decode(const struct fec *code,
 	unsigned char row = 0;
 	unsigned char col = 0;
 
-	assert(code->d * code->d < 8 * 1024 * 1024);
+	sd_assert(code->d * code->d < 8 * 1024 * 1024);
 	build_decode_matrix_into_space(code, idx, code->d, m_dec);
 
 	for (row = 0; row < code->d; row++) {
@@ -578,7 +578,7 @@ void fec_decode(const struct fec *code,
 		 * If the block whose number is i is present, then it is
 		 * required to be in the i'th element.
 		 */
-		assert((idx[row] >= code->d) || (idx[row] == row));
+		sd_assert((idx[row] >= code->d) || (idx[row] == row));
 		if (idx[row] >= code->d) {
 			memset(outpkts[outix], 0, sz);
 			for (col = 0; col < code->d; col++)
@@ -614,7 +614,7 @@ static inline void decode_prepare(struct fec *ctx, const uint8_t *dp[],
 			out[i] = dp[i];
 			outidx[i] = i;
 		} else {
-			assert(p < ctx->dp);
+			sd_assert(p < ctx->dp);
 			out[i] = dp[p];
 			outidx[i] = p;
 			while (++p < ctx->dp && !dp[p])

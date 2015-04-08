@@ -225,7 +225,7 @@ static struct vdi_op_message *prepare_cluster_msg(struct request *req,
 		/* notify data that was set in process_work */
 		size = sizeof(*msg) + req->rp.data_length;
 
-	assert(size <= SD_MAX_EVENT_BUF_SIZE);
+	sd_assert(size <= SD_MAX_EVENT_BUF_SIZE);
 
 	msg = xzalloc(size);
 	memcpy(&msg->req, &req->rq, sizeof(struct sd_req));
@@ -745,7 +745,7 @@ static void cinfo_collection_work(struct work *work)
 
 	sd_debug("start collection of cinfo...");
 
-	assert(w == collect_work);
+	sd_assert(w == collect_work);
 
 	rb_for_each_entry(n, &w->members->nroot, rb) {
 		if (node_is_local(n))
@@ -786,7 +786,7 @@ static void cinfo_collection_done(struct work *work)
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
 
-	assert(w == collect_work);
+	sd_assert(w == collect_work);
 
 	for (int i = 0; i < w->nr_vdi_states; i++) {
 		struct vdi_state *vs = &w->result[i];

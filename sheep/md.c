@@ -119,7 +119,7 @@ static void remove_vdisks(const struct disk *disk)
 
 		hval = sd_hash_next(hval);
 		v = hval_to_vdisk(hval);
-		assert(v->hash == hval);
+		sd_assert(v->hash == hval);
 
 		vdisk_free(v);
 	}
@@ -127,7 +127,7 @@ static void remove_vdisks(const struct disk *disk)
 
 static inline void trim_last_slash(char *path)
 {
-	assert(path[0]);
+	sd_assert(path[0]);
 	while (path[strlen(path) - 1] == '/')
 		path[strlen(path) - 1] = '\0';
 }

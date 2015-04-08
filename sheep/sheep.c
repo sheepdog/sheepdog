@@ -241,7 +241,7 @@ static void signal_handler(int listen_fd, int events, void *data)
 	int uninitialized_var(ret);
 
 	ret = read(sigfd, &siginfo, sizeof(siginfo));
-	assert(ret == sizeof(siginfo));
+	sd_assert(ret == sizeof(siginfo));
 	sd_debug("signal %d, ssi pid %d", siginfo.ssi_signo, siginfo.ssi_pid);
 	switch (siginfo.ssi_signo) {
 	case SIGTERM:

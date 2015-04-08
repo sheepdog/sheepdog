@@ -319,7 +319,7 @@ static int read_cache_object_noupdate(uint32_t vid, uint64_t idx, void *buf,
 		 vid, idx);
 
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx)) {
-		assert(is_aligned_to_pagesize(buf));
+		sd_assert(is_aligned_to_pagesize(buf));
 		flags |= O_DIRECT;
 	}
 
@@ -355,7 +355,7 @@ static int write_cache_object_noupdate(uint32_t vid, uint64_t idx, void *buf,
 	snprintf(p, sizeof(p), "%s/%06"PRIx32"/%016"PRIx64, object_cache_dir,
 		 vid, idx);
 	if (sys->object_cache_directio && !idx_has_vdi_bit(idx)) {
-		assert(is_aligned_to_pagesize(buf));
+		sd_assert(is_aligned_to_pagesize(buf));
 		flags |= O_DIRECT;
 	}
 
@@ -1323,7 +1323,7 @@ int object_cache_remove(uint64_t oid)
 	 * in the DISCARD context, which means normally no other read/write
 	 * requests.
 	 */
-	assert(refcount_read(&entry->refcnt) == 1);
+	sd_assert(refcount_read(&entry->refcnt) == 1);
 	ret = remove_cache_object(oc, entry_idx(entry));
 	if (ret != SD_RES_SUCCESS) {
 		unlock_cache(oc);

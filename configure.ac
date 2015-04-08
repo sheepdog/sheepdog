@@ -206,10 +206,6 @@ AC_ARG_ENABLE([debug],
 	[  --enable-debug          : enable debug build. ],
 	[ default="no" ])
 
-AC_ARG_ENABLE([assert],
-	[  --enable-assert          : enable assert. ],,
-	[ enable_assert="yes" ],)
-
 AC_ARG_ENABLE([unittest],
 	[  --enable-unittest       : enable unittest. ],
 	[ default="no" ])
@@ -340,13 +336,6 @@ if test "x${enable_debug}" = xyes; then
 	PACKAGE_FEATURES="$PACKAGE_FEATURES debug"
 else
 	OPT_CFLAGS="-DNDEBUG"
-fi
-
-if test "x${enable_assert}" = xyes; then
-	AC_DEFINE_UNQUOTED([ASSERT], [1], [Enabling assert])
-	PACKAGE_FEATURES="$PACKAGE_FEATURES assert"
-else
-	OPT_CFLAGS="-DNASSERT"
 fi
 
 # gdb flags

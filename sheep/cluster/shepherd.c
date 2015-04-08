@@ -454,8 +454,8 @@ static void read_msg_from_shepherd(void)
 
 static void shepherd_comm_handler(int fd, int events, void *data)
 {
-	assert(fd == sph_comm_fd);
-	assert(data == NULL);
+	sd_assert(fd == sph_comm_fd);
+	sd_assert(data == NULL);
 
 	if (events & EPOLLIN)
 		read_msg_from_shepherd();

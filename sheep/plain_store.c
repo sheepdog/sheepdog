@@ -599,7 +599,7 @@ static int check_stale_objects(uint64_t oid, const char *wd, uint32_t epoch,
 
 int default_update_epoch(uint32_t epoch)
 {
-	assert(epoch);
+	sd_assert(epoch);
 	return for_each_object_in_wd(check_stale_objects, false, &epoch);
 }
 

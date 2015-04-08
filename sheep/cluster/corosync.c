@@ -317,7 +317,7 @@ static bool __corosync_dispatch_one(struct corosync_event *cevent)
 			this_node = cevent->sender;
 
 		idx = find_sd_node(cpg_nodes, nr_cpg_nodes, node);
-		assert(idx >= 0);
+		sd_assert(idx >= 0);
 		cpg_nodes[idx].node = *node;
 		sd_update_node_handler(node);
 		break;

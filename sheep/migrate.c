@@ -529,7 +529,7 @@ int sd_migrate_store(int from, int to)
 {
 	int ver, ret;
 
-	assert(to <= sizeof(migrate));
+	sd_assert(to <= sizeof(migrate));
 
 	ret = backup_store();
 	if (ret != 0) {

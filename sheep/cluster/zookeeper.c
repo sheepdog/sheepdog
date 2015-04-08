@@ -1235,7 +1235,7 @@ static void zk_handle_update_node(struct zk_event *ev)
 
 	sd_read_lock(&zk_tree_lock);
 	t = zk_tree_search_nolock(&snode->nid);
-	assert(t);
+	sd_assert(t);
 	t->node = *snode;
 	build_node_list();
 	sd_rw_unlock(&zk_tree_lock);

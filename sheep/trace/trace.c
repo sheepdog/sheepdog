@@ -111,7 +111,7 @@ void trace_function_enter(unsigned long ip, unsigned long *ret_addr)
 		return;
 	in_trace = true;
 
-	assert(ret_stack_index < ARRAY_SIZE(trace_ret_stack));
+	sd_assert(ret_stack_index < ARRAY_SIZE(trace_ret_stack));
 
 	caller = trace_lookup_ip(ip);
 
@@ -136,7 +136,7 @@ unsigned long trace_function_exit(void)
 {
 	struct tracer *tracer;
 
-	assert(!in_trace);
+	sd_assert(!in_trace);
 	in_trace = true;
 
 	ret_stack_index--;
