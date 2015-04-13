@@ -27,6 +27,7 @@
 #include <linux/types.h>
 #include <signal.h>
 
+#include "common.h"
 #include "list.h"
 #include "util.h"
 #include "bitops.h"
