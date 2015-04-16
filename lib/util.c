@@ -107,7 +107,7 @@ void *xvalloc(size_t size)
 }
 
 /* preallocate the whole object */
-int prealloc(int fd, uint32_t size)
+int prealloc(int fd, uint64_t size)
 {
 	int ret = xfallocate(fd, 0, 0, size);
 	if (ret < 0) {

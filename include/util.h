@@ -124,7 +124,7 @@ void *xzalloc(size_t size);
 void *xrealloc(void *ptr, size_t size);
 void *xcalloc(size_t nmemb, size_t size);
 void *xvalloc(size_t size);
-int prealloc(int fd, uint32_t size);
+int prealloc(int fd, uint64_t size);
 ssize_t xread(int fd, void *buf, size_t len);
 ssize_t xwrite(int fd, const void *buf, size_t len);
 ssize_t xpread(int fd, void *buf, size_t count, off_t offset);
