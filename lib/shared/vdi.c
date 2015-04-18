@@ -117,7 +117,7 @@ static void free_request(struct sd_request *req)
 }
 
 static struct sd_request *alloc_request(struct sd_vdi *vdi, void *buf,
-					size_t count, off_t offset, bool write)
+			size_t count, off_t offset, bool iswrite)
 {
 	struct sd_request *req;
 	int fd;
@@ -130,7 +130,7 @@ static struct sd_request *alloc_request(struct sd_vdi *vdi, void *buf,
 	req->data = buf;
 	req->length = count;
 	req->offset = offset;
-	req->write = write;
+	req->write = iswrite;
 	INIT_LIST_NODE(&req->list);
 	req->vdi = vdi;
 
