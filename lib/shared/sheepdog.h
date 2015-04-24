@@ -63,12 +63,78 @@ struct sd_vdi {
 	char *name;
 };
 
+/*
+ * Connect to the specified Sheepdog cluster.
+ *
+ * @host: string in the form of IP:PORT that identify a valid Sheepdog cluster.
+ *
+ * Return a cluster descriptor on success. Otherwise, return NULL in case of
+ * error and set errno as error code defined in sheepdog_proto.h.
+ */
 struct sd_cluster *sd_connect(char *host);
-int sd_disconnect(struct sd_cluster *sd);
+
+/*
+ * Disconnect to the specified sheepdog cluster.
+ *
+ * @c: pointer to the cluster descriptor.
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
+int sd_disconnect(struct sd_cluster *c);
+
+/*
+ * Run the Sheepdog request on the specified cluster synchronously.
+ *
+ * @c: pointer to the cluster descriptor.
+ * @hdr: pointer to the sheepdog request header descriptor.
+ * @data: pointer to the data for hdr.
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
 int sd_run_sdreq(struct sd_cluster *c, struct sd_req *hdr, void *data);
-struct sd_vdi *sd_vdi_open(struct sd_cluster *sd, char *name);
+
+/*
+ * Open the named vdi from the specified cluster.
+ *
+ * @c: pointer to the cluster descriptor.
+ * @name: the name of the vdi to be opened.
+ *
+ * Return a vdi descriptor on success. Otherwise, return NULL in case of
+ * error and set errno as error code defined in sheepdog_proto.h.
+ */
+struct sd_vdi *sd_vdi_open(struct sd_cluster *c, char *name);
+
+/*
+ * Read from a vdi descriptor at a given offset.
+ *
+ * @vdi: pointer to the vdi descriptor.
+ * @buf: the buffer to hold the data.
+ * @count: how many bytes we read up to.
+ * @offset: the start of the vdi we try to read.
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
 int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
+
+/*
+ * Write to a vdi descriptor at a given offset.
+ *
+ * @vdi: pointer to the vdi descriptor.
+ * @buf: the buffer to hold the data.
+ * @count: how many bytes we write up to.
+ * @offset: the start of the vdi we try to write.
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
 int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
+
+/*
+ * Close a vdi descriptor.
+ *
+ * @vdi: pointer to the vdi descriptor.
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
 int sd_vdi_close(struct sd_vdi *vdi);
 
 #endif
