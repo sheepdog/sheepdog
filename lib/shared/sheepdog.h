@@ -44,17 +44,6 @@ struct sd_cluster {
 	struct sd_mutex submit_mutex;
 };
 
-struct sd_request {
-	struct list_node list;
-	struct sd_vdi *vdi;
-	void *data;
-	size_t length;
-	off_t offset;
-	bool write;
-	int efd;
-	int ret;
-};
-
 struct sd_vdi {
 	struct sd_cluster *cluster;
 	struct sd_inode *inode;

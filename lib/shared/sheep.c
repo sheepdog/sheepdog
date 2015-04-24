@@ -12,6 +12,7 @@
  */
 
 #include "sheepdog.h"
+#include "internal.h"
 
 #include <unistd.h>
 #include <sys/types.h>

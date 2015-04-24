@@ -12,6 +12,7 @@
  */
 
 #include "sheepdog.h"
+#include "internal.h"
 
 static int lock_vdi(struct sd_vdi *vdi)
 {
