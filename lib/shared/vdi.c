@@ -23,12 +23,12 @@ static int lock_vdi(struct sd_vdi *vdi)
 	hdr.data_length = SD_MAX_VDI_LEN;
 	hdr.flags = SD_FLAG_CMD_WRITE;
 	ret = sd_run_sdreq(vdi->cluster, &hdr, vdi->name);
-	if (ret < 0)
+	if (ret != SD_RES_SUCCESS)
 		return ret;
 
 	vdi->vid = rsp->vdi.vdi_id;
 
-	return 0;
+	return SD_RES_SUCCESS;
 }
 
 static int unlock_vdi(struct sd_vdi *vdi)
@@ -40,9 +40,10 @@ static int unlock_vdi(struct sd_vdi *vdi)
 	hdr.vdi.type = LOCK_TYPE_NORMAL;
 	hdr.vdi.base_vdi_id = vdi->vid;
 	ret = sd_run_sdreq(vdi->cluster, &hdr, NULL);
-	if (ret < 0)
+	if (ret != SD_RES_SUCCESS)
 		return ret;
-	return 0;
+
+	return SD_RES_SUCCESS;
 }
 
 static struct sd_vdi *alloc_vdi(struct sd_cluster *c, char *name)
@@ -71,8 +72,8 @@ struct sd_vdi *sd_vdi_open(struct sd_cluster *c, char *name)
 	int ret;
 
 	ret = lock_vdi(new);
-	if (ret < 0) {
-		errno = -ret;
+	if (ret != SD_RES_SUCCESS) {
+		errno = ret;
 		goto out_free;
 	}
 
@@ -81,13 +82,13 @@ struct sd_vdi *sd_vdi_open(struct sd_cluster *c, char *name)
 	hdr.obj.oid = vid_to_vdi_oid(new->vid);
 	hdr.obj.offset = 0;
 	ret = sd_run_sdreq(c, &hdr, new->inode);
-	if (ret < 0) {
-		errno = -ret;
+	if (ret != SD_RES_SUCCESS) {
+		errno = ret;
 		goto out_unlock;
 	}
 
 	if (vdi_is_snapshot(new->inode)) {
-		errno = EINVAL;
+		errno = SD_RES_INVALID_PARMS;
 		goto out_unlock;
 	}
 
@@ -123,8 +124,10 @@ static struct sd_request *alloc_request(struct sd_vdi *vdi, void *buf,
 	int fd;
 
 	fd = eventfd(0, 0);
-	if (fd < 0)
-		return ERR_PTR(-errno);
+	if (fd < 0) {
+		errno = SD_RES_SYSTEM_ERROR;
+		return NULL;
+	}
 	req = xzalloc(sizeof(*req));
 	req->efd = fd;
 	req->data = buf;
@@ -142,8 +145,8 @@ int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset)
 	struct sd_request *req = alloc_request(vdi, buf, count, offset, false);
 	int ret;
 
-	if (IS_ERR(req))
-		return PTR_ERR(req);
+	if (!req)
+		return errno;
 
 	queue_request(req);
 
@@ -159,8 +162,8 @@ int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset)
 	struct sd_request *req = alloc_request(vdi, buf, count, offset, true);
 	int ret;
 
-	if (IS_ERR(req))
-		return PTR_ERR(req);
+	if (!req)
+		return errno;
 
 	queue_request(req);
 
@@ -176,7 +179,7 @@ int sd_vdi_close(struct sd_vdi *vdi)
 	int ret;
 
 	ret = unlock_vdi(vdi);
-	if (ret < 0) {
+	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "failed to unlock %s\n", vdi->name);
 		return ret;
 	}
