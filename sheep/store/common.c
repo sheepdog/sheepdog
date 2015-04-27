@@ -9,6 +9,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libgen.h>
+#include <linux/falloc.h>
+
 #include "sheep_priv.h"
 
 char *obj_path;
@@ -16,6 +19,88 @@ char *epoch_path;
 
 struct store_driver *sd_store;
 LIST_HEAD(store_drivers);
+
+#ifndef FALLOC_FL_PUNCH_HOLE
+#define FALLOC_FL_PUNCH_HOLE 0x02
+#endif
+
+#define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
+
+static inline bool iocb_is_aligned(const struct siocb *iocb)
+{
+	return  sector_algined(iocb->offset) && sector_algined(iocb->length);
+}
+
+int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
+{
+	int syncflag = create ? O_SYNC : O_DSYNC;
+	int flags = syncflag | O_RDWR;
+
+	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
+		flags &= ~syncflag;
+
+	if (sys->backend_dio && iocb_is_aligned(iocb)) {
+		if (!is_aligned_to_pagesize(iocb->buf))
+			panic("Memory isn't aligned to pagesize %p", iocb->buf);
+		flags |= O_DIRECT;
+	}
+
+	if (create)
+		flags |= O_CREAT | O_EXCL;
+
+	return flags;
+}
+
+int err_to_sderr(const char *path, uint64_t oid, int err)
+{
+	struct stat s;
+	char p[PATH_MAX], *dir;
+
+	/* Use a temporary buffer since dirname() may modify its argument. */
+	pstrcpy(p, sizeof(p), path);
+	dir = dirname(p);
+
+	sd_debug("%s", path);
+	switch (err) {
+	case ENOENT:
+		if (stat(dir, &s) < 0) {
+			sd_err("%s corrupted", dir);
+			return md_handle_eio(dir);
+		}
+		sd_debug("object %016" PRIx64 " not found locally", oid);
+		return SD_RES_NO_OBJ;
+	case ENOSPC:
+		/* TODO: stop automatic recovery */
+		sd_err("diskfull, oid=%"PRIx64, oid);
+		return SD_RES_NO_SPACE;
+	case EMFILE:
+	case ENFILE:
+	case EINTR:
+	case EAGAIN:
+	case EEXIST:
+		sd_err("%m, oid=%"PRIx64, oid);
+		/* make gateway try again */
+		return SD_RES_NETWORK_ERROR;
+	default:
+		sd_err("oid=%"PRIx64", %m", oid);
+		return md_handle_eio(dir);
+	}
+}
+
+int discard(int fd, uint64_t start, uint32_t end)
+{
+	int ret = xfallocate(fd, FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE,
+			     start, end - start);
+	if (ret < 0) {
+		if (errno == ENOSYS || errno == EOPNOTSUPP)
+			sd_info("FALLOC_FL_PUNCH_HOLE is not supported "
+				"on this filesystem");
+		else
+			sd_err("failed to discard object, %m");
+	}
+
+	return ret;
+}
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes)
 {
