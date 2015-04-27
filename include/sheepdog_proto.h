@@ -83,6 +83,8 @@
 #define SD_RES_JOIN_FAILED   0x18 /* Target node had failed to join sheepdog */
 #define SD_RES_HALT          0x19 /* Sheepdog is stopped doing IO */
 #define SD_RES_READONLY      0x1A /* Object is read-only */
+/* inode object in client is invalidated, refreshing is required */
+#define SD_RES_INODE_INVALIDATED 0x1D
 
 /* errors above 0x80 are sheepdog-internal */
 
