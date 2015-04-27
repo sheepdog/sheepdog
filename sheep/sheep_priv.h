@@ -84,6 +84,11 @@ enum REQUST_STATUS {
 	REQUEST_DROPPED
 };
 
+enum store_id {
+	PLAIN_STORE,
+	TREE_STORE
+};
+
 struct request_iocb {
 	uint32_t count;
 	int efd;
@@ -231,6 +236,7 @@ struct vdi_info {
 
 struct store_driver {
 	struct list_node list;
+	enum store_id id;
 	const char *name;
 	int (*init)(void);
 	bool (*exist)(uint64_t oid, uint8_t ec_index);
@@ -265,6 +271,20 @@ int default_format(void);
 int default_remove_object(uint64_t oid, uint8_t ec_index);
 int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1);
 int default_purge_obj(void);
+
+int tree_init(void);
+bool tree_exist(uint64_t oid, uint8_t ec_index);
+int tree_create_and_write(uint64_t oid, const struct siocb *iocb);
+int tree_write(uint64_t oid, const struct siocb *iocb);
+int tree_read(uint64_t oid, const struct siocb *iocb);
+int tree_link(uint64_t oid, uint32_t tgt_epoch);
+int tree_update_epoch(uint32_t epoch);
+int tree_cleanup(void);
+int tree_format(void);
+int tree_remove_object(uint64_t oid, uint8_t ec_index);
+int tree_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1);
+int tree_purge_obj(void);
+
 int for_each_object_in_wd(int (*func)(uint64_t, const char *, uint32_t,
 				      uint8_t, struct vnode_info *, void *),
 			  bool, void *);
@@ -392,6 +412,7 @@ void queue_cluster_request(struct request *req);
 int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create);
 int err_to_sderr(const char *path, uint64_t oid, int err);
 int discard(int fd, uint64_t start, uint32_t end);
+bool store_id_match(enum store_id id);
 
 int update_epoch_log(uint32_t epoch, struct sd_node *nodes, size_t nr_nodes);
 int inc_and_log_epoch(void);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Nippon Telegraph and Telephone Corporation.
+ * Copyright (C) 2012, 2015 Nippon Telegraph and Telephone Corporation.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -13,30 +13,55 @@
 
 #include "sheep_priv.h"
 
+#define TREE_DIR_MASK 0x000000FF00000000
+static inline int get_tree_directory(uint64_t oid)
+{
+	return (int) ((oid & TREE_DIR_MASK) >> VDI_SPACE_SHIFT) ;
+}
+
 static int get_store_path(uint64_t oid, uint8_t ec_index, char *path)
 {
+	char tree_path[PATH_MAX];
+
+	if (is_vdi_obj(oid) || is_vmstate_obj(oid) || is_vdi_attr_obj(oid)) {
+		snprintf(tree_path, PATH_MAX, "%s/meta",
+			 md_get_object_dir(oid));
+	} else {
+		snprintf(tree_path, PATH_MAX, "%s/%02x",
+			 md_get_object_dir(oid), get_tree_directory(oid));
+	}
+
 	if (is_erasure_oid(oid)) {
 		if (unlikely(ec_index >= SD_MAX_COPIES))
 			panic("invalid ec_index %d", ec_index);
 		return snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d",
-				md_get_object_dir(oid), oid, ec_index);
+				tree_path, oid, ec_index);
 	}
 
-	return snprintf(path, PATH_MAX, "%s/%016" PRIx64,
-			md_get_object_dir(oid), oid);
+	return snprintf(path, PATH_MAX, "%s/%016" PRIx64, tree_path, oid);
 }
 
 static int get_store_tmp_path(uint64_t oid, uint8_t ec_index, char *path)
 {
+	char tree_path[PATH_MAX];
+
+	if (is_vdi_obj(oid) || is_vmstate_obj(oid) || is_vdi_attr_obj(oid)) {
+		snprintf(tree_path, PATH_MAX, "%s/meta",
+			 md_get_object_dir(oid));
+	} else {
+		snprintf(tree_path, PATH_MAX, "%s/%02x",
+			 md_get_object_dir(oid), get_tree_directory(oid));
+	}
+
 	if (is_erasure_oid(oid)) {
 		if (unlikely(ec_index >= SD_MAX_COPIES))
 			panic("invalid ec_index %d", ec_index);
 		return snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d.tmp",
-				md_get_object_dir(oid), oid, ec_index);
+				tree_path, oid, ec_index);
 	}
 
 	return snprintf(path, PATH_MAX, "%s/%016" PRIx64".tmp",
-			md_get_object_dir(oid), oid);
+			tree_path, oid);
 }
 
 static int get_store_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
@@ -49,7 +74,7 @@ static int get_store_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
  * Check if oid is in this nodes (if oid is in the wrong place, it will be moved
  * to the correct one after this call in a MD setup.
  */
-bool default_exist(uint64_t oid, uint8_t ec_index)
+bool tree_exist(uint64_t oid, uint8_t ec_index)
 {
 	char path[PATH_MAX];
 
@@ -59,7 +84,7 @@ bool default_exist(uint64_t oid, uint8_t ec_index)
 }
 
 /* Trim zero blocks of the beginning and end of the object. */
-static int default_trim(int fd, uint64_t oid, const struct siocb *iocb,
+static int tree_trim(int fd, uint64_t oid, const struct siocb *iocb,
 			uint64_t *poffset, uint32_t *plen)
 {
 	trim_zero_blocks(iocb->buf, poffset, plen);
@@ -87,7 +112,7 @@ static int default_trim(int fd, uint64_t oid, const struct siocb *iocb,
 	return 0;
 }
 
-int default_write(uint64_t oid, const struct siocb *iocb)
+int tree_write(uint64_t oid, const struct siocb *iocb)
 {
 	int flags = prepare_iocb(oid, iocb, false), fd,
 	    ret = SD_RES_SUCCESS;
@@ -119,7 +144,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 	 * in a wrong place, due to 'shutdown/restart with less/more disks' or
 	 * any bugs. We need call err_to_sderr() to return EIO if disk is broken
 	 */
-	if (!default_exist(oid, iocb->ec_index))
+	if (!tree_exist(oid, iocb->ec_index))
 		return err_to_sderr(path, oid, ENOENT);
 
 	fd = open(path, flags, sd_def_fmode);
@@ -127,7 +152,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 		return err_to_sderr(path, oid, errno);
 
 	if (trim_is_supported && is_sparse_object(oid)) {
-		if (default_trim(fd, oid, iocb, &offset, &len) < 0) {
+		if (tree_trim(fd, oid, iocb, &offset, &len) < 0) {
 			trim_is_supported = false;
 			offset = iocb->offset;
 			len = iocb->length;
@@ -147,6 +172,28 @@ out:
 	return ret;
 }
 
+static int make_tree_dir(const char *path)
+{
+	int i;
+	char p[PATH_MAX];
+
+	snprintf(p, PATH_MAX, "%s/meta", path);
+	if (xmkdir(p, sd_def_dmode) < 0) {
+		sd_err("%s failed, %m", p);
+		return SD_RES_EIO;
+	}
+
+	for (i = 0 ; i < 256 ; i++) {
+		snprintf(p, PATH_MAX, "%s/%02x", path, i);
+		if (xmkdir(p, sd_def_dmode) < 0) {
+			sd_err("%s failed, %m", p);
+			return SD_RES_EIO;
+		}
+	}
+
+	return SD_RES_SUCCESS;
+}
+
 static int make_stale_dir(const char *path)
 {
 	char p[PATH_MAX];
@@ -156,6 +203,7 @@ static int make_stale_dir(const char *path)
 		sd_err("%s failed, %m", p);
 		return SD_RES_EIO;
 	}
+
 	return SD_RES_SUCCESS;
 }
 
@@ -179,7 +227,7 @@ static int purge_stale_dir(const char *path)
 	return SD_RES_SUCCESS;
 }
 
-int default_cleanup(void)
+int tree_cleanup(void)
 {
 	int ret;
 
@@ -200,15 +248,15 @@ static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 		.length = SD_INODE_HEADER_SIZE,
 	};
 
-	ret = default_read(oid, &iocb);
+	ret = tree_read(oid, &iocb);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read inode header %" PRIx64 " %" PRId32
 		       "wat %s", oid, epoch, wd);
 		goto out;
 	}
-
 	add_vdi_state(oid_to_vid(oid), inode->nr_copies,
 		      vdi_is_snapshot(inode), inode->copy_policy);
+
 	atomic_set_bit(oid_to_vid(oid), sys->vdi_inuse);
 
 	ret = SD_RES_SUCCESS;
@@ -223,33 +271,41 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
 				       void *arg)
 {
 	int ret;
+	char path[PATH_MAX];
 	objlist_cache_insert(oid);
+
+	snprintf(path, PATH_MAX, "%s/meta", wd);
 
 	if (is_vdi_obj(oid)) {
 		sd_debug("found the VDI object %" PRIx64" epoch %"PRIu32
-			 " at %s", oid, epoch, wd);
-		ret = init_vdi_state(oid, wd, epoch);
+			 " at %s", oid, epoch, path);
+		ret = init_vdi_state(oid, path, epoch);
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 	}
 	return SD_RES_SUCCESS;
 }
 
-int default_init(void)
+int tree_init(void)
 {
 	int ret;
 
-	sd_debug("use plain store driver");
+	sd_debug("use tree store driver");
+	ret = for_each_obj_path(make_tree_dir);
+	if (ret != SD_RES_SUCCESS)
+		return ret;
+
 	ret = for_each_obj_path(make_stale_dir);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
+
 
 	for_each_object_in_stale(init_objlist_and_vdi_bitmap, NULL);
 
 	return for_each_object_in_wd(init_objlist_and_vdi_bitmap, true, NULL);
 }
 
-static int default_read_from_path(uint64_t oid, const char *path,
+static int tree_read_from_path(uint64_t oid, const char *path,
 				  const struct siocb *iocb)
 {
 	int flags = prepare_iocb(oid, iocb, false), fd,
@@ -261,9 +317,9 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	 * in a wrong place, due to 'shutdown/restart with less disks' or any
 	 * bugs. We need call err_to_sderr() to return EIO if disk is broken.
 	 *
-	 * For stale path, get_store_stale_path already does default_exist job.
+	 * For stale path, get_store_stale_path already does tree_exist job.
 	 */
-	if (!is_stale_path(path) && !default_exist(oid, iocb->ec_index))
+	if (!is_stale_path(path) && !tree_exist(oid, iocb->ec_index))
 		return err_to_sderr(path, oid, ENOENT);
 
 	fd = open(path, flags);
@@ -281,13 +337,13 @@ static int default_read_from_path(uint64_t oid, const char *path,
 	return ret;
 }
 
-int default_read(uint64_t oid, const struct siocb *iocb)
+int tree_read(uint64_t oid, const struct siocb *iocb)
 {
 	int ret;
 	char path[PATH_MAX];
 
 	get_store_path(oid, iocb->ec_index, path);
-	ret = default_read_from_path(oid, path, iocb);
+	ret = tree_read_from_path(oid, path, iocb);
 
 	/*
 	 * If the request is against the older epoch, try to read from
@@ -296,15 +352,15 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	if (ret == SD_RES_NO_OBJ && iocb->epoch > 0 &&
 	    iocb->epoch < sys_epoch()) {
 		get_store_stale_path(oid, iocb->epoch, iocb->ec_index, path);
-		ret = default_read_from_path(oid, path, iocb);
+		ret = tree_read_from_path(oid, path, iocb);
 	}
 
 	return ret;
 }
 
-int default_create_and_write(uint64_t oid, const struct siocb *iocb)
+int tree_create_and_write(uint64_t oid, const struct siocb *iocb)
 {
-	char path[PATH_MAX], tmp_path[PATH_MAX];
+	char path[PATH_MAX], tmp_path[PATH_MAX], *dir;
 	int flags = prepare_iocb(oid, iocb, true);
 	int ret, fd;
 	uint32_t len = iocb->length;
@@ -321,7 +377,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	    != SD_RES_SUCCESS) {
 		sd_err("turn off journaling");
 		uatomic_set_false(&sys->use_journal);
-		flags |= O_DSYNC;
+		flags |= O_SYNC;
 		sync();
 	}
 
@@ -372,23 +428,56 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 		goto out;
 	}
 
-	ret = SD_RES_SUCCESS;
+	close(fd);
+
+	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true) {
+		objlist_cache_insert(oid);
+		return SD_RES_SUCCESS;
+	}
+
+	pstrcpy(tmp_path, sizeof(tmp_path), path);
+	dir = dirname(tmp_path);
+	fd = open(dir, O_DIRECTORY | O_RDONLY);
+	if (fd < 0) {
+		sd_err("failed to open directory %s: %m", dir);
+		return err_to_sderr(path, oid, errno);
+	}
+
+	if (fsync(fd) != 0) {
+		sd_err("failed to write directory %s: %m", dir);
+		ret = err_to_sderr(path, oid, errno);
+		close(fd);
+		if (unlink(path) != 0)
+			sd_err("failed to unlink %s: %m", path);
+		return ret;
+	}
+	close(fd);
 	objlist_cache_insert(oid);
+	return SD_RES_SUCCESS;
+
 out:
-	if (ret != SD_RES_SUCCESS)
-		unlink(tmp_path);
+	if (unlink(tmp_path) != 0)
+		sd_err("failed to unlink %s: %m", tmp_path);
 	close(fd);
 	return ret;
 }
 
-int default_link(uint64_t oid, uint32_t tgt_epoch)
+int tree_link(uint64_t oid, uint32_t tgt_epoch)
 {
-	char path[PATH_MAX], stale_path[PATH_MAX];
+	char path[PATH_MAX], stale_path[PATH_MAX], tree_path[PATH_MAX];
+
+	if (is_vdi_obj(oid) || is_vmstate_obj(oid) || is_vdi_attr_obj(oid)) {
+		snprintf(tree_path, PATH_MAX, "%s/meta",
+			 md_get_object_dir(oid));
+	} else {
+		snprintf(tree_path, PATH_MAX, "%s/%02x",
+			 md_get_object_dir(oid), get_tree_directory(oid));
+	}
 
 	sd_debug("try link %"PRIx64" from snapshot with epoch %d", oid,
 		 tgt_epoch);
 
-	snprintf(path, PATH_MAX, "%s/%016"PRIx64, md_get_object_dir(oid), oid);
+	snprintf(path, PATH_MAX, "%s/%016"PRIx64, tree_path, oid);
 	get_store_stale_path(oid, tgt_epoch, 0, stale_path);
 
 	if (link(stale_path, path) < 0) {
@@ -443,19 +532,27 @@ static int move_object_to_stale_dir(uint64_t oid, const char *wd,
 				    uint32_t epoch, uint8_t ec_index,
 				    struct vnode_info *vinfo, void *arg)
 {
-	char path[PATH_MAX], stale_path[PATH_MAX];
+	char path[PATH_MAX], stale_path[PATH_MAX], tree_path[PATH_MAX];
 	uint32_t tgt_epoch = *(uint32_t *)arg;
+
+	if (is_vdi_obj(oid) || is_vmstate_obj(oid) || is_vdi_attr_obj(oid)) {
+		snprintf(tree_path, PATH_MAX, "%s/meta",
+			 md_get_object_dir(oid));
+	} else {
+		snprintf(tree_path, PATH_MAX, "%s/%02x",
+			 md_get_object_dir(oid), get_tree_directory(oid));
+	}
 
 	/* ec_index from md.c is reliable so we can directly use it */
 	if (ec_index < SD_MAX_COPIES) {
 		snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d",
-			 md_get_object_dir(oid), oid, ec_index);
+			 tree_path, oid, ec_index);
 		snprintf(stale_path, PATH_MAX,
 			 "%s/.stale/%016"PRIx64"_%d.%"PRIu32,
 			 md_get_object_dir(oid), oid, ec_index, tgt_epoch);
 	} else {
 		snprintf(path, PATH_MAX, "%s/%016" PRIx64,
-			 md_get_object_dir(oid), oid);
+			 tree_path, oid);
 		snprintf(stale_path, PATH_MAX, "%s/.stale/%016"PRIx64".%"PRIu32,
 			 md_get_object_dir(oid), oid, tgt_epoch);
 	}
@@ -465,7 +562,6 @@ static int move_object_to_stale_dir(uint64_t oid, const char *wd,
 		       path);
 		return SD_RES_EIO;
 	}
-
 	sd_debug("moved object %"PRIx64, oid);
 	return SD_RES_SUCCESS;
 }
@@ -481,13 +577,13 @@ static int check_stale_objects(uint64_t oid, const char *wd, uint32_t epoch,
 	return SD_RES_SUCCESS;
 }
 
-int default_update_epoch(uint32_t epoch)
+int tree_update_epoch(uint32_t epoch)
 {
 	assert(epoch);
 	return for_each_object_in_wd(check_stale_objects, false, &epoch);
 }
 
-int default_format(void)
+int tree_format(void)
 {
 	unsigned ret;
 
@@ -502,7 +598,7 @@ int default_format(void)
 	return SD_RES_SUCCESS;
 }
 
-int default_remove_object(uint64_t oid, uint8_t ec_index)
+int tree_remove_object(uint64_t oid, uint8_t ec_index)
 {
 	char path[PATH_MAX];
 
@@ -552,9 +648,19 @@ static int set_object_sha1(const char *path, const uint8_t *sha1)
 static int get_object_path(uint64_t oid, uint32_t epoch, char *path,
 			   size_t size)
 {
-	if (default_exist(oid, 0)) {
+	char tree_path[PATH_MAX];
+
+	if (is_vdi_obj(oid) || is_vmstate_obj(oid) || is_vdi_attr_obj(oid)) {
+		snprintf(tree_path, PATH_MAX, "%s/meta",
+			 md_get_object_dir(oid));
+	} else {
+		snprintf(tree_path, PATH_MAX, "%s/%02x",
+			 md_get_object_dir(oid), get_tree_directory(oid));
+	}
+
+	if (tree_exist(oid, 0)) {
 		snprintf(path, PATH_MAX, "%s/%016"PRIx64,
-			 md_get_object_dir(oid), oid);
+			 tree_path, oid);
 	} else {
 		get_store_stale_path(oid, epoch, 0, path);
 		if (access(path, F_OK) < 0) {
@@ -568,7 +674,7 @@ static int get_object_path(uint64_t oid, uint32_t epoch, char *path,
 	return SD_RES_SUCCESS;
 }
 
-int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
+int tree_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 {
 	int ret;
 	void *buf;
@@ -598,7 +704,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	iocb.buf = buf;
 	iocb.length = length;
 
-	ret = default_read_from_path(oid, path, &iocb);
+	ret = tree_read_from_path(oid, path, &iocb);
 	if (ret != SD_RES_SUCCESS) {
 		free(buf);
 		return ret;
@@ -616,7 +722,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	return ret;
 }
 
-int default_purge_obj(void)
+int tree_purge_obj(void)
 {
 	uint32_t tgt_epoch = get_latest_epoch();
 
@@ -624,21 +730,21 @@ int default_purge_obj(void)
 				     &tgt_epoch);
 }
 
-static struct store_driver plain_store = {
-	.id = PLAIN_STORE,
-	.name = "plain",
-	.init = default_init,
-	.exist = default_exist,
-	.create_and_write = default_create_and_write,
-	.write = default_write,
-	.read = default_read,
-	.link = default_link,
-	.update_epoch = default_update_epoch,
-	.cleanup = default_cleanup,
-	.format = default_format,
-	.remove_object = default_remove_object,
-	.get_hash = default_get_hash,
-	.purge_obj = default_purge_obj,
+static struct store_driver tree_store = {
+	.id = TREE_STORE,
+	.name = "tree",
+	.init = tree_init,
+	.exist = tree_exist,
+	.create_and_write = tree_create_and_write,
+	.write = tree_write,
+	.read = tree_read,
+	.link = tree_link,
+	.update_epoch = tree_update_epoch,
+	.cleanup = tree_cleanup,
+	.format = tree_format,
+	.remove_object = tree_remove_object,
+	.get_hash = tree_get_hash,
+	.purge_obj = tree_purge_obj,
 };
 
-add_store_driver(plain_store);
+add_store_driver(tree_store);

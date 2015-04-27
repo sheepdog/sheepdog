@@ -212,6 +212,20 @@ static int for_each_object_in_path(const char *path,
 		if (unlikely(!strncmp(d->d_name, ".", 1)))
 			continue;
 
+		/* recursive call for tree store driver sub directories*/
+		if (store_id_match(TREE_STORE)) {
+			struct stat s;
+
+			snprintf(file_name, sizeof(file_name),
+				 "%s/%s", path, d->d_name);
+			stat(file_name, &s);
+			if (S_ISDIR(s.st_mode)) {
+				ret = for_each_object_in_path(file_name,
+					func, cleanup, vinfo, arg);
+				continue;
+			}
+		}
+
 		sd_debug("%s, %s", path, d->d_name);
 		oid = strtoull(d->d_name, NULL, 16);
 		if (oid == 0 || oid == ULLONG_MAX)
