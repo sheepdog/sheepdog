@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Test object creation for store_driver(tree)
+
+. ./common
+
+for i in 0 1 2 3 4 5; do
+    _start_sheep $i
+done
+_wait_for_sheep 6
+_cluster_format -c 3 -b tree
+
+echo "CHECK data/ledger object"
+
+echo "create inode/data/ledger objects"
+$DOG vdi create test 16M
+_random | $DOG vdi write test 0 512
+$DOG vdi snapshot test
+_random | $DOG vdi write test 0 512
+$DOG vdi clone -s 1 test test2
+_random | $DOG vdi write test2 0 512
+$DOG vdi delete test
+$DOG vdi list | _filter_short_date
+
+_node_info
+
+echo "after delete whole vdis"
+$DOG vdi delete test -s 1
+$DOG vdi delete test2
+
+_node_info
+
+echo "yes" | $DOG cluster format -b tree
+
+echo "CHECK erasure object"
+echo "create inode/data erasure code objects"
+
+$DOG vdi create -c 4:2 test 16M
+_random | $DOG vdi write test 0 512
+$DOG vdi list | _filter_short_date
+
+_node_info
+
+$DOG vdi delete test
+
+echo "yes" | $DOG cluster format -b tree
+
+echo "CHECK attr object"
+echo -n value > $STORE/tmp.dat
+
+$DOG vdi create test 16M
+$DOG vdi setattr test key value
+$DOG vdi getattr test key | diff - $STORE/tmp.dat
+
+echo "create attr objects"
+_node_info
+
+$DOG vdi delete test
