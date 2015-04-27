@@ -1,0 +1,30 @@
+QA output created by 101
+using backend tree store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1   16 MB  0.0 MB  0.0 MB DATE   7c2b25      3                22
+  test         0   16 MB  0.0 MB  0.0 MB DATE   7c2b26      3                22
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend tree store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   16 MB   16 MB  0.0 MB DATE   7c2b25    2:1                22
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend tree store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   16 MB   16 MB  0.0 MB DATE   7c2b25      3                22
+Format failed: Targeted backend store is not found
+    __
+   ()'`;
+   /\|`
+  /  |   Caution! The cluster is not empty.
+(/_)_|_  Are you sure you want to continue? [yes/no]: using backend dummy store
+Available stores:
+---------------------------------------
+plain tree

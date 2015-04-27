@@ -115,3 +115,7 @@
 098 auto quick vdi cluster
 099 auto quick vdi cluster
 100 auto quick vdi
+101 auto quick store vdi
+102 auto quick store vdi
+103 auto quick store vdi
+104 auto quick store vdi

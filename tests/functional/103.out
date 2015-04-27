@@ -1,0 +1,53 @@
+QA output created by 103
+using backend tree store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  test         0   40 MB   20 MB  0.0 MB DATE   7c2b25      3                22
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128          0
+   1   127.0.0.1:7001      	128          1
+   2   127.0.0.1:7002      	128          2
+   3   127.0.0.1:7003      	128          3
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	4	0	0	0	0	0
+1	4	1	0	0	0	0
+2	3	1	0	0	0	0
+3	4	1	0	0	0	0
+check remove node
+node=3 down
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128          0
+   1   127.0.0.1:7001      	128          1
+   2   127.0.0.1:7002      	128          2
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	5	1	0	0	0	0
+1	5	1	0	0	0	0
+2	5	1	0	0	0	0
+3	4	1	0	0	0	0
+write data while node stopped
+create vdi while node stopped
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1   40 MB   40 MB  0.0 MB DATE   7c2b25      3                22
+  test         0   40 MB  0.0 MB   40 MB DATE   7c2b26      3                22
+  test3        0   40 MB   40 MB  0.0 MB DATE   fd3662      3                22
+c test2        0   40 MB  0.0 MB   40 MB DATE   fd3815      3                22
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128          0
+   1   127.0.0.1:7001      	128          1
+   2   127.0.0.1:7002      	128          2
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	20	4	0	0	0	0
+1	20	4	0	0	0	0
+2	20	4	0	0	0	0
+3	4	1	0	0	0	0
+check recovery node
+node=3 up
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128          0
+   1   127.0.0.1:7001      	128          1
+   2   127.0.0.1:7002      	128          2
+   3   127.0.0.1:7003      	128          3
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	14	3	0	0	0	0
+1	17	4	0	0	0	0
+2	16	3	0	0	0	0
+3	13	2	0	0	0	0

@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# Test auto recovery for store_driver(tree)
+
+. ./common
+
+for i in 0 1 2 3 ; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+_cluster_format -c 3 -b tree
+
+$DOG vdi create test 40M
+
+for i in `seq 0 4`; do
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+
+$DOG vdi list | _filter_short_date
+$DOG node list
+_node_info
+
+echo "check remove node"
+_kill_sheep 3
+_wait_for_sheep_stop 3
+sleep 5
+
+echo "node=3 down"
+$DOG node list
+_node_info
+
+echo "write data while node stopped"
+for i in `seq 5 9`; do
+    echo $i | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
+done
+echo "create vdi while node stopped"
+$DOG vdi snapshot test
+$DOG vdi clone -s 1 test test2
+$DOG vdi create test3 40M -P
+
+$DOG vdi list | _filter_short_date
+$DOG node list
+_node_info
+
+echo "check recovery node"
+_start_sheep 3
+_wait_for_sheep 4
+
+echo "node=3 up"
+$DOG node list
+_node_info
+

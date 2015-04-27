@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Test restart cluster for store_driver(tree)
+
+. ./common
+
+for i in 0 1 2 3 ; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+_cluster_format -c 3 -b tree
+
+$DOG vdi create test 16M
+_random | $DOG vdi write test 0 512
+$DOG vdi snapshot test
+_random | $DOG vdi write test 0 512
+$DOG vdi clone -s 1 test test2
+_random | $DOG vdi write test2 0 512
+$DOG vdi delete test
+
+echo "check vdi/cluster status"
+$DOG vdi list | _filter_short_date
+$DOG node list
+$DOG cluster info | _filter_cluster_info | _filter_ip
+_node_info
+
+# restart sheepdog
+echo "restart sheepdog cluster"
+$DOG cluster shutdown
+for i in 0 1 2 3 ; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+
+echo "operation should be fail"
+$DOG vdi clone -s 1 test test2
+
+echo "check vdi/cluster status again"
+$DOG vdi list | _filter_short_date
+$DOG node list
+$DOG cluster info | _filter_cluster_info | _filter_ip
+_node_info
+
+status=0

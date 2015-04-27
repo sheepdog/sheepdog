@@ -1,0 +1,41 @@
+#!/bin/bash
+
+# Test format option for store_driver(tree)
+
+. ./common
+
+for i in 0 1 2 3; do
+    _start_sheep $i
+done
+_wait_for_sheep 4
+
+# cluster format with replica mode
+$DOG cluster format -c 3 -b tree
+
+$DOG vdi create test 16M
+$DOG vdi snapshot test
+
+$DOG vdi list | _filter_short_date
+
+$DOG vdi delete test -s 1
+$DOG vdi delete test
+
+$DOG vdi list | _filter_short_date
+
+# format with erasure code
+echo "yes" | $DOG cluster format -c 2:1 -b tree
+$DOG vdi create test 16M -P
+$DOG vdi list | _filter_short_date
+$DOG vdi delete test
+$DOG vdi list | _filter_short_date
+
+# format with long option
+echo "yes" | $DOG cluster format --copies 3 --store tree
+$DOG vdi create test 16M -P
+$DOG vdi list | _filter_short_date
+$DOG vdi delete test
+
+# invalid store name
+echo "yes" | $DOG cluster format -c 3 -b dummy | _filter_spaces
+
+status=0
