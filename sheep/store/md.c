@@ -620,7 +620,7 @@ static int get_old_new_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
 			snprintf(new, PATH_MAX,
 				 "%s/.stale/%016"PRIx64"_%d.%"PRIu32,
 				 md_get_object_dir_nolock(oid),
-				 oid, ec_index ,epoch);
+				 oid, ec_index, epoch);
 		}
 	}
 

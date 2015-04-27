@@ -24,10 +24,12 @@ AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include \
 
 sbin_PROGRAMS		= sheep
 
-sheep_SOURCES		= sheep.c group.c request.c gateway.c store.c vdi.c \
+sheep_SOURCES		= sheep.c group.c request.c gateway.c vdi.c \
 			  journal.c ops.c recovery.c cluster/local.c \
 			  object_cache.c object_list_cache.c \
-			  plain_store.c config.c migrate.c md.c
+			  store/common.c store/md.c \
+			  store/plain_store.c \
+			  config.c migrate.c
 
 if BUILD_HTTP
 sheep_SOURCES		+= http/http.c http/kv.c http/s3.c http/swift.c \
