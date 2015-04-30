@@ -18,7 +18,8 @@ prog="sheep"
 
 # set secure PATH
 PATH="/sbin:/bin:/usr/sbin:/usr/bin:@SBINDIR@"
-SHEEPDOGD=@SBINDIR@/sheep
+SHEEPDOGD=@SBINDIR@/$prog
+SHEEPDOG_PATH=@LOCALSTATEDIR@/lib/sheepdog 
 
 success()
 {
@@ -51,6 +52,7 @@ fi
 
 # deb based distros
 if [ -d @SYSCONFDIR@/default ]; then
+	[ -s @LIBDIR@/lsb/init-functions ] && . @LIBDIR@/lsb/init-functions
 	[ -f @SYSCONFDIR@/default/$prog ] && . @SYSCONFDIR@/default/$prog
 	[ -z "$LOCK_FILE" ] && LOCK_FILE="@LOCALSTATEDIR@/lock/$prog"
 fi
@@ -84,7 +86,7 @@ start()
 	if status $prog > /dev/null 2>&1; then
 		success
 	else
-		$prog -p 7000 @LOCALSTATEDIR@/lib/sheepdog > /dev/null 2>&1
+		$SHEEPDOGD -p 7000 $SHEEPDOG_PATH > /dev/null 2>&1
 
 		# give it time to fail
 		sleep 2
