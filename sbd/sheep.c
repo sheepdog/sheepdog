@@ -34,7 +34,6 @@ static struct sbd_device *sheep_aiocb_to_device(struct sheep_aiocb *aiocb)
 static int socket_create(struct socket **sock, const char *ip_addr, int port)
 {
 	struct sockaddr_in addr;
-	mm_segment_t oldmm = get_fs();
 	struct linger linger_opt = {1, 0};
 	int ret, nodelay = 1;
 
@@ -44,19 +43,15 @@ static int socket_create(struct socket **sock, const char *ip_addr, int port)
 		return ret;
 	}
 
-	set_fs(KERNEL_DS);
-	ret = sock_setsockopt(*sock, SOL_SOCKET, SO_LINGER,
-			      (char *)&linger_opt, sizeof(linger_opt));
-	set_fs(oldmm);
+	ret = kernel_setsockopt(*sock, SOL_SOCKET, SO_LINGER,
+				(char *)&linger_opt, sizeof(linger_opt));
 	if (ret != 0) {
 		pr_err("Can't set SO_LINGER: %d\n", ret);
 		goto shutdown;
 	}
 
-	set_fs(KERNEL_DS);
-	ret = sock_setsockopt(*sock, SOL_TCP, TCP_NODELAY,
-			      (char *)&nodelay, sizeof(nodelay));
-	set_fs(oldmm);
+	ret = kernel_setsockopt(*sock, SOL_TCP, TCP_NODELAY,
+				(char *)&nodelay, sizeof(nodelay));
 	if (ret != 0) {
 		pr_err("Can't set nodelay: %d\n", ret);
 		goto shutdown;
