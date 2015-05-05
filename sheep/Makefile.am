@@ -55,14 +55,14 @@ AM_CPPFLAGS		+= -DENABLE_TRACE
 sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c trace/checker.c
 endif
 
-sheep_LDADD	  	= ../lib/libsheepdog.a -lpthread -lm\
+sheep_LDADD	  	= ../lib/libsd.a -lpthread -lm\
 			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS) $(LIBS)
 
 if BUILD_NFS
 sheep_LDADD		+= -lrt
 endif
 
-sheep_DEPENDENCIES	= ../lib/libsheepdog.a
+sheep_DEPENDENCIES	= ../lib/libsd.a
 
 
 noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h

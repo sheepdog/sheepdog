@@ -10,7 +10,7 @@ AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  -I../mock					\
 			  @CHECK_CFLAGS@
 
-LIBS			= $(top_srcdir)/lib/libsheepdog.a -lpthread	\
+LIBS			= $(top_srcdir)/lib/libsd.a -lpthread	\
 			  ../mock/libmock.a @CHECK_LIBS@
 
 test_common_SOURCES	= test_common.c mock_dog.c			\

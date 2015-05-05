@@ -16,9 +16,9 @@ libsheepdog_la_CPPFLAGS = $(AM_CPPFLAGS) -DNO_SHEEPDOG_LOGGER
 pkginclude_HEADERS      = ../include/sheepdog_proto.h shared/sheepdog.h \
 			  ../include/util.h ../include/list.h
 
-libsheepdog_a_DEPENDENCIES =
+libsd_a_DEPENDENCIES =
 
-noinst_LIBRARIES	= libisa.a libsheepdog.a
+noinst_LIBRARIES	= libisa.a libsd.a
 
 libisa_a_SOURCES	= $(shell find isa-l/ -type f -regex ".*\.\(c\|h\|asm\)") \
 			  isa-l/erasure_code/Makefile \
@@ -26,11 +26,11 @@ libisa_a_SOURCES	= $(shell find isa-l/ -type f -regex ".*\.\(c\|h\|asm\)") \
 			  isa-l/Makefile.nmake \
 			  isa-l/make.inc
 
-libsheepdog_a_SOURCES	= event.c logger.c net.c util.c rbtree.c strbuf.c \
+libsd_a_SOURCES		= event.c logger.c net.c util.c rbtree.c strbuf.c \
 			  sha1.c option.c work.c sockfd_cache.c fec.c \
 			  sd_inode.c common.c
 
-libsheepdog_a_LIBADD	= isa-l/bin/ec_base.o \
+libsd_a_LIBADD		= isa-l/bin/ec_base.o \
 			  isa-l/bin/ec_highlevel_func.o \
 			  isa-l/bin/ec_multibinary.o \
 			  isa-l/bin/gf_2vect_dot_prod_sse.o \
@@ -43,7 +43,7 @@ libsheepdog_a_LIBADD	= isa-l/bin/ec_base.o \
 			  isa-l/bin/gf_vect_mul_sse.o
 
 if BUILD_SHA1_HW
-libsheepdog_a_SOURCES	+= sha1_ssse3.S
+libsd_a_SOURCES		+= sha1_ssse3.S
 endif
 
 if BUILD_TRACE
@@ -55,7 +55,7 @@ AM_CPPFLAGS		+= -I$(top_srcdir)/lib/tracepoint
 noinst_HEADERS		=  tracepoint/work_tp.h tracepoint/sockfd_cache_tp.h tracepoint/event_tp.h
 
 if BUILD_LTTNG_UST
-libsheepdog_a_SOURCES	+= tracepoint/work_tp.c tracepoint/sockfd_cache_tp.c tracepoint/event_tp.c
+libsd_a_SOURCES		+= tracepoint/work_tp.c tracepoint/sockfd_cache_tp.c tracepoint/event_tp.c
 endif
 
 # support for GNU Flymake
@@ -63,7 +63,7 @@ check-syntax:
 	$(COMPILE) -fsyntax-only $(CHK_SOURCES)
 
 check-style:
-	@$(CHECK_STYLE) $(libsheepdog_a_SOURCES)
+	@$(CHECK_STYLE) $(libsd_a_SOURCES)
 
 libisa.a:
 	cd isa-l/ && $(MAKE) && cd ..

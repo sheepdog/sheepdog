@@ -30,13 +30,13 @@ if BUILD_HTTP
 sheepfs_SOURCES		+= http.c
 endif
 
-sheepfs_LDADD	  	= ../lib/libsheepdog.a $(fuse_LIBS) $(LIBS) -lpthread
+sheepfs_LDADD	  	= ../lib/libsd.a $(fuse_LIBS) $(LIBS) -lpthread
 
 if BUILD_HTTP
 sheepfs_LDADD		+= -lcurl
 endif
 
-sheepfs_DEPENDENCIES	= ../lib/libsheepdog.a
+sheepfs_DEPENDENCIES	= ../lib/libsd.a
 
 noinst_HEADERS		= sheepfs.h
 

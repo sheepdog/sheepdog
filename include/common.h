@@ -11,7 +11,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* This file contains shared functionalities for libsheepdog.a */
+/* This file contains shared functionalities for libsd.a */
 
 #ifndef __COMMON_H__
 #define __COMMON_H__
