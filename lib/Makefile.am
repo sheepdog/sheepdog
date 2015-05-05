@@ -16,6 +16,14 @@ libsheepdog_la_CPPFLAGS = $(AM_CPPFLAGS) -DNO_SHEEPDOG_LOGGER
 pkginclude_HEADERS      = ../include/sheepdog_proto.h shared/sheepdog.h \
 			  ../include/util.h ../include/list.h
 
+
+lib_LIBRARIES 		= libsheepdog.a
+
+libsheepdog_a_SOURCES  	= shared/sheep.c shared/vdi.c util.c
+
+libsheepdog_a_CPPFLAGS  = $(AM_CPPFLAGS) -DNO_SHEEPDOG_LOGGER
+
+
 libsd_a_DEPENDENCIES =
 
 noinst_LIBRARIES	= libisa.a libsd.a
