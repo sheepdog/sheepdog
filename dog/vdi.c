@@ -779,6 +779,7 @@ out:
 			sd_err("allowing inode update failed");
 	}
 
+	free(vs);
 	return ret;
 }
 
