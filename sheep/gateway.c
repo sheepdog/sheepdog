@@ -152,6 +152,8 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	if (!buf) {
 		sd_err("failed to init erasure buffer %"PRIx64,
 		       req->rq.obj.oid);
+		for (i = 0; i < nr_to_send; i++)
+			free(reqs[i].buf);
 		free(reqs);
 		reqs = NULL;
 		goto out;
