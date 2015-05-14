@@ -86,7 +86,7 @@ int sd_run_sdreq(struct sd_cluster *c, struct sd_req *hdr, void *data)
 
 	ret = sheep_submit_sdreq(c, hdr, data, wlen);
 	if (ret < 0)
-		return ret;
+		return SD_RES_SYSTEM_ERROR;
 
 	ret = xread(c->sockfd, rsp, sizeof(*rsp));
 	if (ret < 0)
