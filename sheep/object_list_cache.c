@@ -196,3 +196,11 @@ int objlist_cache_cleanup(uint32_t vid)
 
 	return SD_RES_SUCCESS;
 }
+
+void objlist_cache_format(void)
+{
+	sd_write_lock(&obj_list_cache.lock);
+	rb_destroy(&obj_list_cache.root, struct objlist_cache_entry, node);
+	INIT_RB_ROOT(&obj_list_cache.root);
+	sd_rw_unlock(&obj_list_cache.lock);
+}

@@ -453,6 +453,7 @@ void init_config_path(const char *base_path);
 int init_config_file(void);
 int get_obj_list(const struct sd_req *, struct sd_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
+void objlist_cache_format(void);
 
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *, bool);
 bool oid_in_recovery(uint64_t oid);
