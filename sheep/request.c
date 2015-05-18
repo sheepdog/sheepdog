@@ -944,7 +944,7 @@ static void clear_client_info(struct client_info *ci)
 	destroy_client(ci);
 }
 
-static struct client_info *create_client(int fd, struct cluster_info *cluster)
+static struct client_info *create_client(int fd)
 {
 	struct client_info *ci;
 	struct sockaddr_storage from;
@@ -1070,7 +1070,7 @@ static void listen_handler(int listen_fd, int events, void *data)
 		}
 	}
 
-	ci = create_client(fd, data);
+	ci = create_client(fd);
 	if (!ci) {
 		close(fd);
 		return;
