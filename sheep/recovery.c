@@ -274,8 +274,7 @@ static int recover_object_from(struct recovery_obj_work *row,
 		if (ret != SD_RES_SUCCESS)
 			return ret;
 
-		if (memcmp(rsp->hash.digest, sha1,
-			   sizeof(SHA1_DIGEST_SIZE)) == 0) {
+		if (memcmp(rsp->hash.digest, sha1, SHA1_DIGEST_SIZE) == 0) {
 			sd_debug("use local replica at epoch %d", local_epoch);
 			ret = sd_store->link(oid, local_epoch);
 			if (ret == SD_RES_SUCCESS)
