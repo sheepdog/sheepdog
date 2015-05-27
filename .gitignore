@@ -20,6 +20,9 @@ cscope.*
 *.gcno
 *.info
 *~
+*.la
+*.lo
+*.service
 
 #
 # for GLOBAL
