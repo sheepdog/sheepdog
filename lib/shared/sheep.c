@@ -478,7 +478,9 @@ static void *reply_handler(void *data)
 	       !list_empty(&c->inflight_list)) {
 		bool empty;
 
-		eventfd_xread(c->reply_fd);
+		uint64_t events;
+		events = eventfd_xread(c->reply_fd);
+
 		sd_read_lock(&c->inflight_lock);
 		empty = list_empty(&c->inflight_list);
 		sd_rw_unlock(&c->inflight_lock);
@@ -486,7 +488,8 @@ static void *reply_handler(void *data)
 		if (empty)
 			continue;
 
-		sheep_handle_reply(c);
+		for (uint64_t i = 0; i < events; i++)
+			sheep_handle_reply(c);
 
 	}
 	pthread_detach(pthread_self());
