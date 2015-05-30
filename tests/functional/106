@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Test a functionality of VID recycle
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+_cluster_format -c 3 -R
+
+$DOG vdi create test 16M
+for i in `seq 0 7`; do
+    $DOG vdi snapshot test
+done
+
+_vdi_list
+_node_info
+
+echo "deletion a VDI with name \"test\""
+$DOG vdi delete test
+
+_vdi_list
+_node_info
+
+echo "create a VDI with name \"test\" again, it must fail"
+$DOG vdi create test 16M
+
+echo "delete snapshots of first \"test\""
+for i in `seq 1 8`; do
+    $DOG vdi delete test -s $i
+done
+
+echo "every inode object should be cleaned"
+_vdi_list
+_node_info

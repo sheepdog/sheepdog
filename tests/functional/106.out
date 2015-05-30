@@ -1,0 +1,39 @@
+QA output created by 106
+using backend plain store
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1   16 MB  0.0 MB  0.0 MB DATE        1      3                22
+s test         2   16 MB  0.0 MB  0.0 MB DATE        2      3                22
+s test         3   16 MB  0.0 MB  0.0 MB DATE        3      3                22
+s test         4   16 MB  0.0 MB  0.0 MB DATE        4      3                22
+s test         5   16 MB  0.0 MB  0.0 MB DATE        5      3                22
+s test         6   16 MB  0.0 MB  0.0 MB DATE        6      3                22
+s test         7   16 MB  0.0 MB  0.0 MB DATE        7      3                22
+s test         8   16 MB  0.0 MB  0.0 MB DATE        8      3                22
+  test         0   16 MB  0.0 MB  0.0 MB DATE        9      3                22
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	0	9	0	0	0	0
+1	0	9	0	0	0	0
+2	0	9	0	0	0	0
+deletion a VDI with name "test"
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+s test         1   16 MB  0.0 MB  0.0 MB DATE        1      3                22
+s test         2   16 MB  0.0 MB  0.0 MB DATE        2      3                22
+s test         3   16 MB  0.0 MB  0.0 MB DATE        3      3                22
+s test         4   16 MB  0.0 MB  0.0 MB DATE        4      3                22
+s test         5   16 MB  0.0 MB  0.0 MB DATE        5      3                22
+s test         6   16 MB  0.0 MB  0.0 MB DATE        6      3                22
+s test         7   16 MB  0.0 MB  0.0 MB DATE        7      3                22
+s test         8   16 MB  0.0 MB  0.0 MB DATE        8      3                22
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	0	9	0	0	0	0
+1	0	9	0	0	0	0
+2	0	9	0	0	0	0
+create a VDI with name "test" again, it must fail
+Failed to create VDI test: VDI exists already
+delete snapshots of first "test"
+every inode object should be cleaned
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+STORE	DATA	VDI	VMSTATE	ATTR	LEDGER	STALE
+0	0	0	0	0	0	0
+1	0	0	0	0	0	0
+2	0	0	0	0	0	0
