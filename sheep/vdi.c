@@ -1345,7 +1345,7 @@ out:
 /*
  * Return SUCCESS (range of bits set):
  * Iff we get a bitmap range [left, right) that VDI might be set between. if
- * right < start, this means a wrap around case where we should examine the
+ * right < left, this means a wrap around case where we should examine the
  * two split ranges, [left, SD_NR_VDIS - 1] and [0, right). 'Right' is the free
  * bit that might be used by newly created VDI.
  *
@@ -1356,13 +1356,17 @@ static int get_vdi_bitmap_range(const char *name, unsigned long *left,
 				unsigned long *right)
 {
 	*left = sd_hash_vdi(name);
+
+	if (unlikely(!*left))
+		*left = 1;	/* 0x000000 should be skipeed */
+
 	*right = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, *left);
 	if (*left == *right)
 		return SD_RES_NO_VDI;
 
 	if (*right == SD_NR_VDIS) {
 		/* Wrap around */
-		*right = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, 0);
+		*right = find_next_zero_bit(sys->vdi_inuse, SD_NR_VDIS, 1);
 		if (*right == SD_NR_VDIS)
 			return SD_RES_FULL_VDI;
 	}
@@ -1404,7 +1408,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
-	for (i = right - 1; i >= left; i--) {
+	for (i = right - 1; i >= left && i; i--) {
 		ret = sd_read_object(vid_to_vdi_oid(i), (char *)inode,
 				     SD_INODE_HEADER_SIZE, 0);
 		if (ret != SD_RES_SUCCESS)
@@ -1448,14 +1452,24 @@ static int fill_vdi_info(unsigned long left, unsigned long right,
 {
 	int ret;
 
+	assert(left != right);
+	/*
+	 * If left == right, fill_vdi_info() shouldn't called by vdi_lookup().
+	 * vdi_lookup() must return SD_RES_NO_VDI to its caller.
+	 */
+
 	if (left < right)
 		return fill_vdi_info_range(left, right, iocb, info);
 
-	ret = fill_vdi_info_range(0, right, iocb, info);
+	if (likely(1 < right))
+		ret = fill_vdi_info_range(1, right, iocb, info);
+	else
+		ret = SD_RES_NO_VDI;
+
 	switch (ret) {
 	case SD_RES_NO_VDI:
 	case SD_RES_NO_TAG:
-		ret = fill_vdi_info_range(left, SD_NR_VDIS - 1, iocb, info);
+		ret = fill_vdi_info_range(left, SD_NR_VDIS, iocb, info);
 		break;
 	default:
 		break;
