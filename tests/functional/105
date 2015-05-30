@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Test a case of VID overflow
+
+. ./common
+
+for i in 0 1 2; do
+    _start_sheep $i
+done
+_wait_for_sheep 3
+_cluster_format -c 3
+
+$DOG vdi create 01909709 16M
+$DOG vdi create 05421217 16M
+
+$DOG vdi create 00471718 16M
+
+for i in `seq 0 7`; do
+    $DOG vdi snapshot 00471718
+done
+
+_vdi_list
+
+echo "deletion with wrap around"
+
+for i in `seq 1 7`; do
+    $DOG vdi delete 00471718 -s $i
+done
+
+_vdi_list
+
+echo "create snapshots again"
+
+for i in `seq 0 7`; do
+    $DOG vdi snapshot 00471718
+done
+
+_vdi_list
+
