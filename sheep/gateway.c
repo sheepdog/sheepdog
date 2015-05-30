@@ -582,16 +582,11 @@ static int prepare_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
  * This function decreases a refcnt of vid_to_data_oid(old_vid, idx) and
  * increases one of vid_to_data_oid(new_vid, idx)
  */
-static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
-			     uint32_t *new_vids,
+static void update_obj_refcnt(uint64_t offset, int start,
+			     size_t nr_vids, uint32_t *vids, uint32_t *new_vids,
 			     struct generation_reference *refs)
 {
-	int i, start, ret = SD_RES_SUCCESS;
-	size_t nr_vids = hdr->data_length / sizeof(*vids);
-	uint64_t offset;
-
-	offset = hdr->obj.offset - offsetof(struct sd_inode, data_vdi_id);
-	start = offset / sizeof(*vids);
+	int i, ret = SD_RES_SUCCESS;
 
 	for (i = 0; i < nr_vids; i++) {
 		if (vids[i] == 0 || vids[i] == new_vids[i])
@@ -601,16 +596,7 @@ static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 					   refs[i].generation, refs[i].count);
 		if (ret != SD_RES_SUCCESS)
 			sd_err("fail, %d", ret);
-
-		refs[i].generation = 0;
-		refs[i].count = 0;
 	}
-
-	return sd_write_object(hdr->obj.oid, (char *)refs,
-			       nr_vids * sizeof(*refs),
-			       offsetof(struct sd_inode, gref)
-			       + start * sizeof(*refs),
-			       false);
 }
 
 static bool is_inode_refresh_req(struct request *req)
@@ -661,13 +647,51 @@ int gateway_read_obj(struct request *req)
 	return ret;
 }
 
+struct update_obj_refcnt_work {
+	struct work work;
+
+	uint64_t offset;
+	int start;
+
+	size_t nr_vids;
+	uint32_t *vids, *new_vids;
+
+	struct generation_reference *refs;
+};
+
+static void async_update_obj_refcnt_work(struct work *work)
+{
+	struct update_obj_refcnt_work *w =
+		container_of(work, struct update_obj_refcnt_work, work);
+
+	sd_debug("async update of object reference count start: %p", w);
+	update_obj_refcnt(w->offset, w->start, w->nr_vids, w->vids,
+			  w->new_vids, w->refs);
+}
+
+static void async_update_obj_refcnt_done(struct work *work)
+{
+	struct update_obj_refcnt_work *w =
+		container_of(work, struct update_obj_refcnt_work, work);
+
+	sd_debug("async update of object reference count done: %p", w);
+
+	free(w->vids);
+	free(w->new_vids);
+	free(w->refs);
+
+	free(w);
+}
+
 int gateway_write_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 	int ret;
 	struct sd_req *hdr = &req->rq;
 	uint32_t *vids = NULL, *new_vids = req->data;
-	struct generation_reference *refs = NULL;
+	struct generation_reference *refs = NULL, *zeroed_refs = NULL;
+	struct update_obj_refcnt_work *refcnt_work;
+	size_t nr_vids;
 
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    is_refresh_required(oid_to_vid(oid))) {
@@ -683,13 +707,14 @@ int gateway_write_obj(struct request *req)
 
 
 	if (is_data_vid_update(hdr)) {
-		size_t nr_vids = hdr->data_length / sizeof(*vids);
+		nr_vids = hdr->data_length / sizeof(*vids);
 
 		invalidate_other_nodes(oid_to_vid(oid));
 
 		/* read the previous vids to discard their references later */
 		vids = xzalloc(sizeof(*vids) * nr_vids);
 		refs = xzalloc(sizeof(*refs) * nr_vids);
+		zeroed_refs = xcalloc(sizeof(*zeroed_refs), nr_vids);
 		ret = prepare_obj_refcnt(hdr, vids, refs);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
@@ -700,13 +725,50 @@ int gateway_write_obj(struct request *req)
 		goto out;
 
 	if (is_data_vid_update(hdr)) {
-		sd_debug("update reference counts, %" PRIx64, hdr->obj.oid);
-		update_obj_refcnt(hdr, vids, new_vids, refs);
-	}
-out:
+		uint64_t offset;
+		int start;
 
-	free(vids);
-	free(refs);
+		offset = hdr->obj.offset
+			- offsetof(struct sd_inode, data_vdi_id);
+		start = offset / sizeof(*vids);
+
+		sd_debug("update reference counts, %" PRIx64, hdr->obj.oid);
+
+		ret = sd_write_object(hdr->obj.oid, (char *)zeroed_refs,
+				      nr_vids * sizeof(*zeroed_refs),
+				      offsetof(struct sd_inode, gref)
+				      + start * sizeof(*zeroed_refs), false);
+		if (ret != SD_RES_SUCCESS) {
+			sd_err("updating reference count of inode object %"
+			       PRIx64 " failed: %s", hdr->obj.oid,
+			       sd_strerror(ret));
+
+			goto out;
+		}
+
+		sd_debug("update ledger objects of %"PRIx64, hdr->obj.oid);
+		refcnt_work = xzalloc(sizeof(*refcnt_work));
+
+		refcnt_work->vids = vids;
+		refcnt_work->refs = refs;
+		refcnt_work->nr_vids = nr_vids;
+		refcnt_work->new_vids = xcalloc(hdr->data_length,
+						sizeof(uint32_t));
+		memcpy(refcnt_work->new_vids, new_vids, hdr->data_length);
+
+		refcnt_work->offset = offset;
+		refcnt_work->start = start;
+
+
+		refcnt_work->work.fn = async_update_obj_refcnt_work;
+		refcnt_work->work.done = async_update_obj_refcnt_done;
+
+		queue_work(sys->io_wqueue, &refcnt_work->work);
+	}
+
+out:
+	free(zeroed_refs);
+
 	return ret;
 }
 
