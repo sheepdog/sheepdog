@@ -1402,7 +1402,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 	uint32_t i;
 	const char *name = iocb->name;
 
-	inode = malloc(SD_INODE_HEADER_SIZE);
+	inode = malloc(offsetof(struct sd_inode, btree_counter));
 	if (!inode) {
 		sd_err("failed to allocate memory");
 		ret = SD_RES_NO_MEM;
@@ -1414,7 +1414,8 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 			continue;
 
 		ret = sd_read_object(vid_to_vdi_oid(i), (char *)inode,
-				     SD_INODE_HEADER_SIZE, 0);
+				     offsetof(struct sd_inode, btree_counter),
+				     0);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 
