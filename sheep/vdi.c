@@ -2197,6 +2197,26 @@ main_fn void free_vdi_state_snapshot(int epoch)
 	panic("invalid free request for vdi state snapshot, epoch: %d", epoch);
 }
 
+static int clean_matched_obj(uint64_t oid, const char *path,
+			     uint32_t epoch, uint8_t ec_index,
+			     struct vnode_info *vinfo, void *arg)
+{
+	uint32_t vid = oid_to_vid(*(uint64_t *)arg);
+	int ret = SD_RES_SUCCESS;
+
+	if (oid_to_vid(oid) == vid) {
+		sd_info("removing object %"PRIx64" (path: %s), it means the"
+			" object is leaked", oid, path);
+		ret = unlink(path);
+		if (ret) {
+			sd_err("failed to unlink %s", path);
+			ret = SD_RES_EIO;
+		}
+	}
+
+	return ret;
+}
+
 static main_fn void do_vid_gc(struct vdi_family_member *member)
 {
 	struct vdi_state_entry *entry = member->entry;
@@ -2216,9 +2236,10 @@ static main_fn void do_vid_gc(struct vdi_family_member *member)
 
 	free(member);
 
-	if (sd_store && sd_store->exist(oid, -1))
-		/* TODO: gc other objects */
+	if (sd_store && sd_store->exist(oid, -1)) {
 		sd_store->remove_object(oid, -1);
+		for_each_object_in_wd(clean_matched_obj, false, &oid);
+	}
 
 	atomic_clear_bit(vid, sys->vdi_inuse);
 	atomic_clear_bit(vid, sys->vdi_deleted);
