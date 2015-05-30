@@ -1398,7 +1398,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 {
 	struct sd_inode *inode;
 	bool vdi_found = false;
-	int ret;
+	int ret = SD_RES_NO_VDI;
 	uint32_t i;
 	const char *name = iocb->name;
 
@@ -1409,6 +1409,10 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 		goto out;
 	}
 	for (i = right - 1; i >= left && i; i--) {
+		if (!test_bit(i, sys->vdi_inuse) &&
+		    !test_bit(i, sys->vdi_deleted))
+			continue;
+
 		ret = sd_read_object(vid_to_vdi_oid(i), (char *)inode,
 				     SD_INODE_HEADER_SIZE, 0);
 		if (ret != SD_RES_SUCCESS)
@@ -1421,6 +1425,7 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 				/* Read, delete, clone on snapshots */
 				if (!vdi_is_snapshot(inode)) {
 					vdi_found = true;
+					info->vid = inode->vdi_id;
 					continue;
 				}
 				if (!vdi_tag_match(iocb, inode))
@@ -1431,9 +1436,11 @@ static int fill_vdi_info_range(uint32_t left, uint32_t right,
 				 * current working VDI
 				 */
 				info->snapid = inode->snap_id + 1;
-				if (vdi_is_snapshot(inode))
+				if (vdi_is_snapshot(inode)) {
 					/* Current working VDI is deleted */
+					info->vid = inode->vdi_id;
 					break;
+				}
 			}
 			info->create_time = inode->create_time;
 			info->vid = inode->vdi_id;
@@ -1483,17 +1490,93 @@ int vdi_lookup(const struct vdi_iocb *iocb, struct vdi_info *info)
 	unsigned long left, right;
 	int ret;
 
-	ret = get_vdi_bitmap_range(iocb->name, &left, &right);
-	info->free_bit = right;
-	sd_debug("%s left %lx right %lx, %x", iocb->name, left, right, ret);
-	switch (ret) {
-	case SD_RES_NO_VDI:
-	case SD_RES_FULL_VDI:
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_RECYCLE_VID)) {
+		ret = get_vdi_bitmap_range(iocb->name, &left, &right);
+		info->free_bit = right;
+		sd_debug("%s left %lx right %lx, %x", iocb->name, left, right,
+			 ret);
+		switch (ret) {
+		case SD_RES_NO_VDI:
+		case SD_RES_FULL_VDI:
+			return ret;
+		case SD_RES_SUCCESS:
+			break;
+		}
+		return fill_vdi_info(left, right, iocb, info);
+	} else {
+		/*
+		 * Why is the below heavy fill_vdi_info_range() required?
+		 *
+		 * Older sheepdog didn't have a functionality of recycling VID,
+		 * so the above get_vdi_bitmap_range() can detect correct range
+		 * of bitmap.
+		 *
+		 * But newer sheepdog (1.0 <=) recycles VID if a cluster is
+		 * formatted with -R option. It can produce situations like
+		 * below:
+		 *
+		 * The first state of VID bitmap:
+		 * 0 0 1* 1* 1 0 0 0
+		 * 1 is a VID bit of working VDI, 1* is a bit of snapshot.
+		 * Assume the above 1 and 1* are used for VDI named "A" and
+		 * its snapshots.
+		 *
+		 * Then, a user tries to create VDI "B". sd_hash_vdi() returns
+		 * VID which conflicts with existing bits for A.
+		 * 0 0 1* 1* 1 0 0 0
+		 *        ^
+		 *        |
+		 *        sd_hash_vdi() returns VID which conflicts with the
+		 *        above bit.
+		 *
+		 * So B acquires the left most free bit
+		 * 0 0 1* 1* 1 1 0 0
+		 *             ^
+		 *             |
+		 *             B acquires this bit.
+		 *
+		 * Then, the user deletes A and its snapshots. All of the family
+		 * members are deleted. The bitmap becomes like below
+		 * 0 0 0 0 0 1 0 0
+		 *       ^
+		 *       |
+		 *       B's original VID sd_hash_vdi() calculates.
+		 *
+		 * Now sheep fails to lookup VID of B, because the VID
+		 * calculated by sd_hash_vdi().
+		 *
+		 * The problem comes from that vdi bitmap is a hashtable with
+		 * open addressing. Deleting a member from the table requires
+		 * changeing places of the members. It is virtually impossible
+		 * in a case of sheepdog (every inode object must be updated).
+		 *
+		 * This is the reason of the below fill_vdi_info(). Of course it
+		 * is ugly and costly. But its cost is equal or less than
+		 * "dog vdi list"'s one.
+		 */
+
+		info->free_bit = find_next_zero_bit(sys->vdi_inuse,
+						    SD_NR_VDIS, 1);
+		ret = fill_vdi_info_range(1, SD_NR_VDIS, iocb, info);
+		if (ret == SD_RES_NO_VDI && info->vid != 0) {
+			/*
+			 * handle a case like below:
+			 * 1. create A
+			 * 2. create snapshots of A
+			 * 3. delete A
+			 * 4. create A again
+			 *
+			 * The inode object of A created in 1 shouldn't be
+			 * overwritten because snapshots created in 2 depend
+			 * on it.
+			 */
+
+			if (test_bit(info->vid, sys->vdi_inuse))
+				return SD_RES_SUCCESS;
+		}
+
 		return ret;
-	case SD_RES_SUCCESS:
-		break;
 	}
-	return fill_vdi_info(left, right, iocb, info);
 }
 
 static int notify_vdi_add(uint32_t vdi_id, uint32_t nr_copies, uint32_t old_vid,
