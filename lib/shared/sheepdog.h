@@ -148,4 +148,18 @@ int sd_vdi_snapshot(struct sd_cluster *c, char *name, char *tag);
  */
 int sd_vdi_create(struct sd_cluster *c, char *name, uint64_t size);
 
+/*
+ * Clone a new VDI from a snapshot
+ *
+ * @c: pointer to the cluster descriptor
+ * @srcname: the source VDI name
+ * @srctag: the source VDI tag
+ * @dstname: the destination VDI name
+ *
+ * Return error code defined in sheepdog_proto.h.
+ * Only snapshot VDI can be cloned.
+ */
+int sd_vdi_clone(struct sd_cluster *c, char *srcname,
+		 char *srctag, char *dstname);
+
 #endif

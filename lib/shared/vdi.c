@@ -442,3 +442,41 @@ int sd_vdi_create(struct sd_cluster *c, char *name, uint64_t size)
 
 	return ret;
 }
+
+int sd_vdi_clone(struct sd_cluster *c, char *srcname,
+		char *srctag, char *dstname)
+{
+	int ret;
+	struct sd_inode *inode = NULL;
+
+	if (!srcname || *srcname == '\0') {
+		ret = SD_RES_INVALID_PARMS;
+		fprintf(stderr, "VDI name can NOT  be null\n");
+		goto out;
+	}
+	if (!dstname || *dstname == '\0') {
+		ret = SD_RES_INVALID_PARMS;
+		fprintf(stderr, "Destination VDI name can NOT  be null\n");
+		goto out;
+	}
+	if (!srctag || *srctag == '\0') {
+		ret = SD_RES_INVALID_PARMS;
+		fprintf(stderr, "Snapshot tag can NOT be null when clone\n");
+		goto out;
+	}
+
+	inode = xmalloc(sizeof(struct sd_inode));
+	ret = vdi_read_inode(c, srcname, srctag, inode, false);
+	if (ret != SD_RES_SUCCESS)
+		goto out;
+
+	ret = do_vdi_create(c, dstname, inode->vdi_size, inode->vdi_id, false,
+			   inode->nr_copies, inode->copy_policy,
+			   inode->store_policy, inode->block_size_shift);
+	if (ret != SD_RES_SUCCESS)
+		fprintf(stderr, "Clone VDI failed: %s\n", sd_strerror(ret));
+
+out:
+	free(inode);
+	return ret;
+}
