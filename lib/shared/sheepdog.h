@@ -173,4 +173,15 @@ int sd_vdi_clone(struct sd_cluster *c, char *srcname,
  */
 int sd_vdi_delete(struct sd_cluster *c, char *name, char *tag);
 
+/*
+ * Rollback a VDI from it's early snapshot
+ *
+ * @c: pointer to the cluster descriptor
+ * @name: the name of the VDI to be deleted
+ * @tag: the snapshot tag of the VDI
+ *
+ * Return error code defined in sheepdog_proto.h
+ */
+int sd_vdi_rollback(struct sd_cluster *c, char *name, char *tag);
+
 #endif
