@@ -480,3 +480,91 @@ out:
 	free(inode);
 	return ret;
 }
+
+#define NR_BATCHED_DISCARD 128	/* TODO: the value should be optional */
+
+int sd_vdi_delete(struct sd_cluster *c, char *name, char *tag)
+{
+	int ret;
+	struct sd_req hdr = {};
+	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
+	uint32_t vid;
+	struct sd_inode *inode = NULL;
+
+	if (!name || *name == '\0') {
+		ret = SD_RES_INVALID_PARMS;
+		fprintf(stderr, "VDI name can NOT be null\n");
+		goto out;
+	}
+
+	ret = find_vdi(c, name, tag, &vid);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Maybe VDI %s(tag: %s) does NOT exist: %s\n",
+				name, tag, sd_strerror(ret));
+		goto out;
+	}
+
+	sd_init_req(&hdr, SD_OP_DELETE_CACHE);
+	hdr.obj.oid = vid_to_vdi_oid(vid);
+	ret = sd_run_sdreq(c, &hdr, NULL);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to delete cache :%s\n",
+				sd_strerror(ret));
+		goto out;
+	}
+
+	inode = xmalloc(sizeof(*inode));
+	ret = vdi_read_inode(c, name, tag, inode, false);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to read inode : %s\n",
+				sd_strerror(ret));
+		goto out;
+	}
+	int i = 0, nr_obj = count_data_objs(inode);
+	while (i < nr_obj) {
+		int start_idx, filled_idx;
+		while (i < nr_obj && !inode->data_vdi_id[i])
+			++i;
+
+		start_idx = i;
+		filled_idx = 0;
+		while (i < nr_obj && filled_idx < NR_BATCHED_DISCARD) {
+			if (inode->data_vdi_id[i]) {
+				inode->data_vdi_id[i] = 0;
+				++filled_idx;
+			}
+
+			++i;
+		}
+
+		ret = write_object(c, vid_to_vdi_oid(vid), 0,
+				&inode->data_vdi_id[start_idx],
+				(i - start_idx) * sizeof(uint32_t),
+				offsetof(struct sd_inode,
+				data_vdi_id[start_idx]),
+				0, inode->nr_copies, inode->copy_policy,
+				false, true);
+		if (ret != SD_RES_SUCCESS) {
+			fprintf(stderr,
+					"failed to update inode for discarding\n");
+			goto out;
+		}
+	}
+
+	sd_init_req(&hdr, SD_OP_DEL_VDI);
+	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.data_length = sizeof(data);
+	memset(data, 0, sizeof(data));
+	pstrcpy(data, SD_MAX_VDI_LEN, name);
+	if (tag)
+		pstrcpy(data + SD_MAX_VDI_LEN, SD_MAX_VDI_TAG_LEN, tag);
+
+	ret = sd_run_sdreq(c, &hdr, data);
+	if (ret != SD_RES_SUCCESS)
+		fprintf(stderr, "Failed to delete %s: %s\n",
+				name, sd_strerror(ret));
+
+out:
+	free(inode);
+	return ret;
+}
