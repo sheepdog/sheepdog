@@ -137,4 +137,15 @@ int sd_vdi_close(struct sd_vdi *vdi);
  */
 int sd_vdi_snapshot(struct sd_cluster *c, char *name, char *tag);
 
+/*
+ * Create a VDI in the specified cluster
+ *
+ * @c: pointer to the cluster descriptor
+ * @name: the name of the VDI to be created
+ * @size: the size(Byte) of the VDI to be created
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
+int sd_vdi_create(struct sd_cluster *c, char *name, uint64_t size);
+
 #endif

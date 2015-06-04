@@ -396,3 +396,49 @@ out:
 
 	return ret;
 }
+
+int sd_vdi_create(struct sd_cluster *c, char *name, uint64_t size)
+{
+	struct sd_req hdr = {};
+	struct cluster_info ci;
+	int ret;
+
+	if (size > SD_MAX_VDI_SIZE) {
+		fprintf(stderr, "VDI size is too large\n");
+		return SD_RES_INVALID_PARMS;
+	} else if (size == 0) {
+		fprintf(stderr, "VDI size can NOT be ZERO\n");
+		return SD_RES_INVALID_PARMS;
+	}
+
+	if (!name || *name == '\0') {
+		fprintf(stderr, "VDI name can NOT be null\n");
+		return SD_RES_INVALID_PARMS;
+	}
+
+	sd_init_req(&hdr, SD_OP_CLUSTER_INFO);
+	hdr.data_length = sizeof(ci);
+	ret = sd_run_sdreq(c, &hdr, &ci);
+	if (ret != SD_RES_SUCCESS) {
+		fprintf(stderr, "Failed to get cluster info: %s\n",
+				sd_strerror(ret));
+		return ret;
+	}
+	if (!ci.ctime) {
+		fprintf(stderr, "%s\n", sd_strerror(SD_RES_WAIT_FOR_FORMAT));
+		return SD_RES_WAIT_FOR_FORMAT;
+	}
+
+	uint8_t store_policy = 0;
+	if (size > SD_OLD_MAX_VDI_SIZE)
+		store_policy = 1;/** for hyper volume **/
+
+	ret = do_vdi_create(c, name, size,
+			0, false, ci.nr_copies, ci.copy_policy,
+			store_policy, SD_DEFAULT_BLOCK_SIZE_SHIFT);
+	if (ret != SD_RES_SUCCESS)
+		fprintf(stderr, "Failed to create VDI %s: %s\n",
+				name, sd_strerror(ret));
+
+	return ret;
+}
