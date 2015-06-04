@@ -126,4 +126,15 @@ int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
  */
 int sd_vdi_close(struct sd_vdi *vdi);
 
+/*
+ * Create a snapshot of a VDI
+ *
+ * @c: pointer to the cluster descriptor
+ * @name: the name of the VDI to snapshot
+ * @tag: the tag of the snapshot
+ *
+ * Return error code defined in sheepdog_proto.h.
+ */
+int sd_vdi_snapshot(struct sd_cluster *c, char *name, char *tag);
+
 #endif
