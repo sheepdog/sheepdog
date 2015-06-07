@@ -576,7 +576,7 @@ static void do_get_vdis(struct work *work)
 
 static void collect_cinfo(void);
 
-static void get_vdis_done(struct work *work)
+static main_fn void get_vdis_done(struct work *work)
 {
 	struct get_vdis_work *w =
 		container_of(work, struct get_vdis_work, work);
@@ -691,42 +691,32 @@ struct cinfo_collection_work {
 	int epoch;
 	struct vnode_info *members;
 
-	int nr_vdi_states;
 	struct vdi_state *result;
+	uint32_t next_vid;
 };
 
 static struct cinfo_collection_work *collect_work;
 
 static struct vdi_state *do_cinfo_collection_work(uint32_t epoch,
-						  struct sd_node *n,
-						  int *nr_vdi_states)
+						  uint32_t vid,
+						  struct sd_node *n)
 {
 	struct vdi_state *vs = NULL;
-	unsigned int rlen = 4096;
 	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	int ret;
 
-	vs = xcalloc(rlen, sizeof(*vs));
+	vs = xzalloc(sizeof(*vs));
 
-retry:
 	sd_init_req(&hdr, SD_OP_VDI_STATE_CHECKPOINT_CTL);
 	hdr.vdi_state_checkpoint.get = 1;
 	hdr.vdi_state_checkpoint.tgt_epoch = epoch;
-	hdr.data_length = rlen;
+	hdr.vdi_state_checkpoint.vid = vid;
+	hdr.data_length = sizeof(*vs);
 
 	ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
 	if (ret == SD_RES_SUCCESS) {
 		sd_debug("succeed to obtain checkpoint of vdi states");
-		*nr_vdi_states = rsp->data_length / sizeof(*vs);
 		return vs;
-	} else if (ret == SD_RES_BUFFER_SMALL) {
-		sd_debug("buffer is small for obtaining checkpoint of vdi states,"
-			 " doubling it (%lu -> %lu)", rlen * sizeof(*vs),
-			 rlen * 2 * sizeof(*vs));
-		rlen *= 2;
-		vs = xrealloc(vs, sizeof(*vs) * rlen);
-		goto retry;
 	}
 
 	sd_err("failed to obtain checkpoint of vdi states from node %s",
@@ -736,14 +726,13 @@ retry:
 
 static void cinfo_collection_work(struct work *work)
 {
-	struct sd_req hdr;
 	struct vdi_state *vs = NULL;
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
 	struct sd_node *n;
-	int ret, nr_vdi_states = 0;
 
-	sd_debug("start collection of cinfo...");
+	sd_debug("start collection of cinfo, epoch: %d, vid: %"PRIx32,
+		 w->epoch, w->next_vid);
 
 	sd_assert(w == collect_work);
 
@@ -751,18 +740,31 @@ static void cinfo_collection_work(struct work *work)
 		if (node_is_local(n))
 			continue;
 
-		vs = do_cinfo_collection_work(w->epoch, n, &nr_vdi_states);
-		if (vs)
-			goto get_succeed;
+		vs = do_cinfo_collection_work(w->epoch, w->next_vid, n);
+		if (vs) {
+			w->result = vs;
+			return;
+		}
 	}
 
+	/*
+	 * TODO: need to sleep and retry
+	 *
+	 * There is a possibility that other nodes is still preparing
+	 * their checkpoints.
+	 */
 	panic("getting a checkpoint of vdi state at epoch %d failed", w->epoch);
+}
 
-get_succeed:
-	w->nr_vdi_states = nr_vdi_states;
-	w->result = vs;
+static main_fn void free_cinfo(struct cinfo_collection_work *w)
+/* TODO: this should be done in worker */
+{
+	struct sd_node *n;
+	struct sd_req hdr;
+	int ret;
 
-	sd_debug("collecting cinfo done, freeing from remote nodes");
+	sd_info("collecting cinfo done at epoch %d, freeing from remote nodes",
+		w->epoch);
 
 	rb_for_each_entry(n, &w->members->nroot, rb) {
 		if (node_is_local(n))
@@ -772,55 +774,81 @@ get_succeed:
 		hdr.vdi_state_checkpoint.get = 0;
 		hdr.vdi_state_checkpoint.tgt_epoch = w->epoch;
 
-		ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
+		ret = sheep_exec_req(&n->nid, &hdr, NULL);
 		if (ret != SD_RES_SUCCESS)
 			sd_err("error at freeing a checkpoint of vdi state"
 			       " at epoch %d", w->epoch);
 	}
 
-	sd_debug("collection done");
+	sd_info("freeing done");
 }
 
-static void cinfo_collection_done(struct work *work)
+static main_fn void cinfo_collection_done(struct work *work)
 {
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
+	uint32_t next_vid;
+	struct vdi_state *vs = w->result;
 
 	sd_assert(w == collect_work);
 
-	for (int i = 0; i < w->nr_vdi_states; i++) {
-		struct vdi_state *vs = &w->result[i];
 
-		sd_debug("VID: %"PRIx32, vs->vid);
-		sd_debug("nr_copies: %d", vs->nr_copies);
-		sd_debug("snapshot: %d", vs->snapshot);
-		sd_debug("copy_policy: %d", vs->copy_policy);
-		sd_debug("block_size_shift: %"PRIu8, vs->block_size_shift);
-		sd_debug("lock_state: %x", vs->lock_state);
-		sd_debug("owner: %s",
-			 addr_to_str(vs->lock_owner.addr, vs->lock_owner.port));
+	sd_debug("VID: %"PRIx32, vs->vid);
+	sd_debug("nr_copies: %d", vs->nr_copies);
+	sd_debug("snapshot: %d", vs->snapshot);
+	sd_debug("copy_policy: %d", vs->copy_policy);
+	sd_debug("block_size_shift: %"PRIu8, vs->block_size_shift);
+	sd_debug("lock_state: %x", vs->lock_state);
+	sd_debug("owner: %s",
+		 addr_to_str(vs->lock_owner.addr, vs->lock_owner.port));
 
-		apply_vdi_lock_state(vs);
+	apply_vdi_lock_state(vs);
+	free(vs);
+
+	next_vid = find_next_bit(sys->vdi_inuse, SD_NR_VDIS, w->next_vid + 1);
+	if (next_vid == SD_NR_VDIS) {
+		sd_info("collecting checkpoint of epoch %d completed",
+			w->epoch);
+
+		free_cinfo(w);
+
+		put_vnode_info(w->members);
+		free(w);
+		collect_work = NULL;
+
+		play_logged_vdi_ops();
+
+		sd_debug("cluster info collection finished");
+		sys->node_status = SD_NODE_STATUS_OK;
+
+		return;
 	}
 
-	put_vnode_info(w->members);
-	free(w->result);
-	free(w);
-	collect_work = NULL;
-
-	play_logged_vdi_ops();
-
-	sd_debug("cluster info collection finished");
-	sys->node_status = SD_NODE_STATUS_OK;
+	w->next_vid = next_vid;
+	queue_work(sys->block_wqueue, &collect_work->work);
 }
 
-static void collect_cinfo(void)
+static main_fn void collect_cinfo(void)
 {
 	if (!collect_work)
 		return;
 
 	sd_debug("start cluster info collection for epoch %d",
 		 collect_work->epoch);
+
+	collect_work->next_vid = find_next_bit(sys->vdi_inuse, SD_NR_VDIS, 1);
+	if (collect_work->next_vid == SD_NR_VDIS) {
+		sd_debug("no VDIs are created yet");
+
+		put_vnode_info(collect_work->members);
+		free(collect_work);
+		collect_work = NULL;
+		sys->node_status = SD_NODE_STATUS_OK;
+
+		return;
+	}
+
+	sd_debug("initial vid: %"PRIx32, collect_work->next_vid);
 
 	collect_work->work.fn = cinfo_collection_work;
 	collect_work->work.done = cinfo_collection_done;

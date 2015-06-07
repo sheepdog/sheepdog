@@ -2154,15 +2154,20 @@ main_fn void create_vdi_state_checkpoint(int epoch)
 	sd_debug("a number of vdi state: %d", checkpoint->nr_vs);
 }
 
-main_fn int get_vdi_state_checkpoint(int epoch, void *data, int data_len_max,
-				     int *data_len_result)
+main_fn int get_vdi_state_checkpoint(int epoch, uint32_t vid, void *data)
 {
 	struct vdi_state_checkpoint *checkpoint;
-	int len;
+	struct vdi_state *vs;
 
 	list_for_each_entry(checkpoint, &vdi_state_checkpoint_list, list) {
-		if (checkpoint->epoch == epoch)
-			goto found;
+		if (checkpoint->epoch == epoch) {
+			for (int i = 0; i < checkpoint->nr_vs; i++) {
+				if (checkpoint->vs[i].vid == vid) {
+					vs = &checkpoint->vs[i];
+					goto found;
+				}
+			}
+		}
 	}
 
 	sd_info("get request for not prepared vdi state checkpoint, epoch: %d",
@@ -2170,14 +2175,7 @@ main_fn int get_vdi_state_checkpoint(int epoch, void *data, int data_len_max,
 	return SD_RES_AGAIN;
 
 found:
-	len = sizeof(*checkpoint->vs) * checkpoint->nr_vs;
-	if (data_len_max < len) {
-		sd_info("maximum allowed length: %d, required length: %d",
-			data_len_max, len);
-		return SD_RES_BUFFER_SMALL;
-	}
-
-	memcpy(data, checkpoint->vs, len);
+	memcpy(data, vs, sizeof(*vs));
 	return SD_RES_SUCCESS;
 }
 

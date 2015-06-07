@@ -198,6 +198,8 @@ struct sd_req {
 		struct {
 			uint32_t        get; /* 0 means free, 1 means get */
 			uint32_t        tgt_epoch;
+
+			uint32_t        vid; /* only used for get */
 		} vdi_state_checkpoint;
 		struct {
 			/* 1 means validate, 0 means invalidate */

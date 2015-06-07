@@ -1460,16 +1460,18 @@ static int local_vdi_state_checkpoint_ctl(const struct sd_req *req,
 {
 	bool get = !!req->vdi_state_checkpoint.get;
 	int epoch = req->vdi_state_checkpoint.tgt_epoch;
-	int ret, length = 0;
+	uint32_t vid = req->vdi_state_checkpoint.vid;
+	int ret;
 
 	sd_info("%s vdi state checkpoint at epoch %d",
 		get ? "getting" : "freeing", epoch);
 
 	if (get) {
-		ret = get_vdi_state_checkpoint(epoch, data, req->data_length,
-					       &length);
+		sd_debug("target VID: %"PRIx32, vid);
+
+		ret = get_vdi_state_checkpoint(epoch, vid, data);
 		if (ret == SD_RES_SUCCESS)
-			rsp->data_length = length;
+			rsp->data_length = sizeof(struct vdi_state);
 		else {
 			sd_info("failed to get vdi state checkpoint: %s",
 			       sd_strerror(ret));
