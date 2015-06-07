@@ -2118,83 +2118,85 @@ out:
 	return ret;
 }
 
-struct vdi_state_snapshot {
+struct vdi_state_checkpoint {
 	int epoch, nr_vs;
 	struct vdi_state *vs;
 
 	struct list_node list;
 };
 
-static LIST_HEAD(vdi_state_snapshot_list);
+static LIST_HEAD(vdi_state_checkpoint_list);
 
-main_fn void take_vdi_state_snapshot(int epoch)
+main_fn void create_vdi_state_checkpoint(int epoch)
 {
 	/*
-	 * take a snapshot of current vdi state and associate it with
+	 * take a checkpoint of current vdi state and associate it with
 	 * the given epoch
 	 */
-	struct vdi_state_snapshot *snapshot;
+	struct vdi_state_checkpoint *checkpoint;
 
-	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
-		if (snapshot->epoch == epoch) {
-			sd_debug("duplicate snapshot of epoch %d", epoch);
+	list_for_each_entry(checkpoint, &vdi_state_checkpoint_list, list) {
+		if (checkpoint->epoch == epoch) {
+			sd_debug("duplicate checkpoint of epoch %d", epoch);
 			return;
 		}
 
 	}
 
-	snapshot = xzalloc(sizeof(*snapshot));
-	snapshot->epoch = epoch;
-	snapshot->vs = fill_vdi_state_list_with_alloc(&snapshot->nr_vs);
-	INIT_LIST_NODE(&snapshot->list);
-	list_add_tail(&snapshot->list, &vdi_state_snapshot_list);
+	checkpoint = xzalloc(sizeof(*checkpoint));
+	checkpoint->epoch = epoch;
+	checkpoint->vs = fill_vdi_state_list_with_alloc(&checkpoint->nr_vs);
+	INIT_LIST_NODE(&checkpoint->list);
+	list_add_tail(&checkpoint->list, &vdi_state_checkpoint_list);
 
-	sd_debug("taking a snapshot of vdi state at epoch %d succeed", epoch);
-	sd_debug("a number of vdi state: %d", snapshot->nr_vs);
+	sd_debug("creating a checkpoint of vdi state at epoch %d succeed",
+		 epoch);
+	sd_debug("a number of vdi state: %d", checkpoint->nr_vs);
 }
 
-main_fn int get_vdi_state_snapshot(int epoch, void *data, int data_len_max,
-				   int *data_len_result)
+main_fn int get_vdi_state_checkpoint(int epoch, void *data, int data_len_max,
+				     int *data_len_result)
 {
-	struct vdi_state_snapshot *snapshot;
+	struct vdi_state_checkpoint *checkpoint;
 	int len;
 
-	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
-		if (snapshot->epoch == epoch)
+	list_for_each_entry(checkpoint, &vdi_state_checkpoint_list, list) {
+		if (checkpoint->epoch == epoch)
 			goto found;
 	}
 
-	sd_info("get request for not prepared vdi state snapshot, epoch: %d",
+	sd_info("get request for not prepared vdi state checkpoint, epoch: %d",
 		epoch);
 	return SD_RES_AGAIN;
 
 found:
-	len = sizeof(*snapshot->vs) * snapshot->nr_vs;
+	len = sizeof(*checkpoint->vs) * checkpoint->nr_vs;
 	if (data_len_max < len) {
 		sd_info("maximum allowed length: %d, required length: %d",
 			data_len_max, len);
 		return SD_RES_BUFFER_SMALL;
 	}
 
-	memcpy(data, snapshot->vs, len);
+	memcpy(data, checkpoint->vs, len);
 	return SD_RES_SUCCESS;
 }
 
-main_fn void free_vdi_state_snapshot(int epoch)
+main_fn void free_vdi_state_checkpoint(int epoch)
 {
-	struct vdi_state_snapshot *snapshot;
+	struct vdi_state_checkpoint *checkpoint;
 
-	list_for_each_entry(snapshot, &vdi_state_snapshot_list, list) {
-		if (snapshot->epoch == epoch) {
-			list_del(&snapshot->list);
-			free(snapshot->vs);
-			free(snapshot);
+	list_for_each_entry(checkpoint, &vdi_state_checkpoint_list, list) {
+		if (checkpoint->epoch == epoch) {
+			list_del(&checkpoint->list);
+			free(checkpoint->vs);
+			free(checkpoint);
 
 			return;
 		}
 	}
 
-	panic("invalid free request for vdi state snapshot, epoch: %d", epoch);
+	panic("invalid free request for vdi state checkpoint, epoch: %d",
+	      epoch);
 }
 
 static int clean_matched_obj(uint64_t oid, const char *path,

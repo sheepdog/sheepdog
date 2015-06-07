@@ -1454,30 +1454,30 @@ static int cluster_release_vdi_main(const struct sd_req *req,
 	return SD_RES_SUCCESS;
 }
 
-static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
+static int local_vdi_state_checkpoint_ctl(const struct sd_req *req,
 					struct sd_rsp *rsp, void *data,
 					const struct sd_node *sender)
 {
-	bool get = !!req->vdi_state_snapshot.get;
-	int epoch = req->vdi_state_snapshot.tgt_epoch;
+	bool get = !!req->vdi_state_checkpoint.get;
+	int epoch = req->vdi_state_checkpoint.tgt_epoch;
 	int ret, length = 0;
 
-	sd_info("%s vdi state snapshot at epoch %d",
+	sd_info("%s vdi state checkpoint at epoch %d",
 		get ? "getting" : "freeing", epoch);
 
 	if (get) {
-		ret = get_vdi_state_snapshot(epoch, data, req->data_length,
-					     &length);
+		ret = get_vdi_state_checkpoint(epoch, data, req->data_length,
+					       &length);
 		if (ret == SD_RES_SUCCESS)
 			rsp->data_length = length;
 		else {
-			sd_info("failed to get vdi state snapshot: %s",
+			sd_info("failed to get vdi state checkpoint: %s",
 			       sd_strerror(ret));
 
 			return ret;
 		}
 	} else
-		free_vdi_state_snapshot(epoch);
+		free_vdi_state_checkpoint(epoch);
 
 	return SD_RES_SUCCESS;
 }
@@ -1948,10 +1948,10 @@ static struct sd_op_template sd_ops[] = {
 		.process_work = local_repair_replica,
 	},
 
-	[SD_OP_VDI_STATE_SNAPSHOT_CTL] = {
-		.name = "VDI_STATE_SNAPSHOT_CTL",
+	[SD_OP_VDI_STATE_CHECKPOINT_CTL] = {
+		.name = "VDI_STATE_CHECKPOINT_CTL",
 		.type = SD_OP_TYPE_LOCAL,
-		.process_main = local_vdi_state_snapshot_ctl,
+		.process_main = local_vdi_state_checkpoint_ctl,
 	},
 
 	[SD_OP_GET_CLUSTER_DEFAULT] = {

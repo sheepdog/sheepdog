@@ -710,18 +710,18 @@ static struct vdi_state *do_cinfo_collection_work(uint32_t epoch,
 	vs = xcalloc(rlen, sizeof(*vs));
 
 retry:
-	sd_init_req(&hdr, SD_OP_VDI_STATE_SNAPSHOT_CTL);
-	hdr.vdi_state_snapshot.get = 1;
-	hdr.vdi_state_snapshot.tgt_epoch = epoch;
+	sd_init_req(&hdr, SD_OP_VDI_STATE_CHECKPOINT_CTL);
+	hdr.vdi_state_checkpoint.get = 1;
+	hdr.vdi_state_checkpoint.tgt_epoch = epoch;
 	hdr.data_length = rlen;
 
 	ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
 	if (ret == SD_RES_SUCCESS) {
-		sd_debug("succeed to obtain snapshot of vdi states");
+		sd_debug("succeed to obtain checkpoint of vdi states");
 		*nr_vdi_states = rsp->data_length / sizeof(*vs);
 		return vs;
 	} else if (ret == SD_RES_BUFFER_SMALL) {
-		sd_debug("buffer is small for obtaining snapshot of vdi states,"
+		sd_debug("buffer is small for obtaining checkpoint of vdi states,"
 			 " doubling it (%lu -> %lu)", rlen * sizeof(*vs),
 			 rlen * 2 * sizeof(*vs));
 		rlen *= 2;
@@ -729,7 +729,7 @@ retry:
 		goto retry;
 	}
 
-	sd_err("failed to obtain snapshot of vdi states from node %s",
+	sd_err("failed to obtain checkpoint of vdi states from node %s",
 	       node_to_str(n));
 	return NULL;
 }
@@ -756,7 +756,7 @@ static void cinfo_collection_work(struct work *work)
 			goto get_succeed;
 	}
 
-	panic("getting a snapshot of vdi state at epoch %d failed", w->epoch);
+	panic("getting a checkpoint of vdi state at epoch %d failed", w->epoch);
 
 get_succeed:
 	w->nr_vdi_states = nr_vdi_states;
@@ -768,13 +768,13 @@ get_succeed:
 		if (node_is_local(n))
 			continue;
 
-		sd_init_req(&hdr, SD_OP_VDI_STATE_SNAPSHOT_CTL);
-		hdr.vdi_state_snapshot.get = 0;
-		hdr.vdi_state_snapshot.tgt_epoch = w->epoch;
+		sd_init_req(&hdr, SD_OP_VDI_STATE_CHECKPOINT_CTL);
+		hdr.vdi_state_checkpoint.get = 0;
+		hdr.vdi_state_checkpoint.tgt_epoch = w->epoch;
 
 		ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
 		if (ret != SD_RES_SUCCESS)
-			sd_err("error at freeing a snapshot of vdi state"
+			sd_err("error at freeing a checkpoint of vdi state"
 			       " at epoch %d", w->epoch);
 	}
 
@@ -906,7 +906,7 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 		}
 	} else {
 		if (0 < cinfo->epoch && cinfo->status == SD_STATUS_OK)
-			take_vdi_state_snapshot(cinfo->epoch - 1);
+			create_vdi_state_checkpoint(cinfo->epoch - 1);
 	}
 
 	sockfd_cache_add(&joined->nid);

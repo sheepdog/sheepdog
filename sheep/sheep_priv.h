@@ -371,10 +371,10 @@ int sd_create_hyper_volume(const char *name, uint32_t *vdi_id);
 bool vdi_lock(uint32_t vid, const struct node_id *owner, int type);
 bool vdi_unlock(uint32_t vid, const struct node_id *owner, int type);
 void apply_vdi_lock_state(struct vdi_state *vs);
-void take_vdi_state_snapshot(int epoch);
-int get_vdi_state_snapshot(int epoch, void *data, int data_len_max,
-			   int *data_len_result);
-void free_vdi_state_snapshot(int epoch);
+void create_vdi_state_checkpoint(int epoch);
+int get_vdi_state_checkpoint(int epoch, void *data, int data_len_max,
+			     int *data_len_result);
+void free_vdi_state_checkpoint(int epoch);
 void log_vdi_op_lock(uint32_t vid, const struct node_id *owner, int type);
 void log_vdi_op_unlock(uint32_t vid, const struct node_id *owner, int type);
 void play_logged_vdi_ops(void);
