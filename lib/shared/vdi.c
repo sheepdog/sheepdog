@@ -297,7 +297,7 @@ static int find_vdi(struct sd_cluster *c, char *name,
 	if (vid)
 		*vid = rsp->vdi.vdi_id;
 
-	return ret;
+	return SD_RES_SUCCESS;
 }
 
 static int vdi_read_inode(struct sd_cluster *c, char *name,
@@ -589,6 +589,7 @@ int sd_vdi_rollback(struct sd_cluster *c, char *name, char *tag)
 		fprintf(stderr, "Working VDI %s does NOT exist\n", name);
 		return SD_RES_INVALID_PARMS;
 	}
+
 	ret = find_vdi(c, name, tag, NULL);
 	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "Snapshot VDI %s(tag: %s) does NOT exist\n",
@@ -618,5 +619,5 @@ int sd_vdi_rollback(struct sd_cluster *c, char *name, char *tag)
 		fprintf(stderr, "Failed to rollback VDI: %s\n",
 				sd_strerror(ret));
 
-	return ret;
+	return SD_RES_SUCCESS;
 }
