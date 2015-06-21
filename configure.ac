@@ -295,6 +295,11 @@ AM_CONDITIONAL(BUILD_LTTNG_UST, test x$enable_lttng_ust = xyes)
 
 AC_ARG_ENABLE(systemd, AS_HELP_STRING([--enable-systemd],[enable systemd support]),enable_systemd=$enableval,enable_systemd="no")
 
+AC_ARG_ENABLE([accelio],
+	[  --enable-accelio         : enable accelio (default no)],,
+	[ enable_accelio=$HAVE_ACCELIO ],)
+AM_CONDITIONAL(BUILD_ACCELIO, test x$enable_accelio = xyes)
+
 dnl systemd detection
 if test x$enable_systemd = xno ; then
     have_systemd=no;
@@ -460,6 +465,13 @@ if test "x${enable_lttng_ust}" = xyes; then
 	PACKAGE_FEATURES="$PACKAGE_FEATURES LTTng-ust"
 fi
 
+if test "x${enable_accelio}" = xyes; then
+	AC_CHECK_HEADERS([libxio.h],,
+		AC_MSG_ERROR(header of accelio not found))
+	AC_DEFINE_UNQUOTED(HAVE_ACCELIO, 1, [have accelio])
+	PACKAGE_FEATURES="$PACKAGE_FEATURES accelio"
+fi
+
 # extra warnings
 EXTRA_WARNINGS=""
 
@@ -541,10 +553,19 @@ else
 	LTTNG_UST_CFLAGS=""
 fi
 
+if test "x${enable_accelio}" = xyes ; then
+	AC_MSG_NOTICE([Enabling Accelio (-lxio)])
+	LIBS+="-lxio"
+	ACCELIO_CFLAGS="-DHAVE_ACCELIO"
+else
+	ACCELIO_CFLAGS=""
+fi
+
 # final build of *FLAGS
 CFLAGS="$ENV_CFLAGS $OPT_CFLAGS $GDB_FLAGS $OS_CFLAGS \
 	$TRACE_CFLAGS $COVERAGE_CFLAGS $EXTRA_WARNINGS $WERROR_CFLAGS \
-	$LTTNG_UST_CFLAGS -D_GNU_SOURCE -D_LGPL_SOURCE -std=gnu99"
+	$LTTNG_UST_CFLAGS $ACCELIO_CFLAGS -D_GNU_SOURCE -D_LGPL_SOURCE \
+	-std=gnu99"
 CPPFLAGS="$ENV_CPPFLAGS $ANSI_CPPFLAGS $OS_CPPFLAGS"
 LDFLAGS="$ENV_LDFLAGS $COVERAGE_LDFLAGS $OS_LDFLAGS"
 

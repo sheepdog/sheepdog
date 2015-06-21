@@ -21,6 +21,10 @@
 #include "util.h"
 #include "sockfd_cache.h"
 
+#ifdef HAVE_ACCELIO
+#include "xio.h"
+#endif
+
 #define EPOLL_SIZE 4096
 
 static const char program_name[] = "dog";
@@ -458,6 +462,11 @@ int main(int argc, char **argv)
 	int sdport;
 	struct timespec start, end;
 
+#ifdef HAVE_ACCELIO
+	sd_xio_init();
+	xio_init_main_ctx();
+#endif
+
 	start = get_time_tick();
 
 	log_dog_operation(argc, argv);
@@ -569,10 +578,12 @@ int main(int argc, char **argv)
 		exit(EXIT_SYSFAIL);
 	}
 
+#ifndef HAVE_ACCELIO
 	if (sockfd_init()) {
 		sd_err("sockfd_init() failed");
 		exit(EXIT_SYSFAIL);
 	}
+#endif
 
 	ret = command_fn(argc, argv);
 	if (ret == EXIT_USAGE)
