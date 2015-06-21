@@ -30,6 +30,10 @@ shepherd_DEPENDENCIES	= ../lib/libsd.a
 
 EXTRA_DIST		=
 
+if BUILD_ACCELIO
+shepherd_LDADD		+= -lxio
+endif
+
 lint:
 	-splint $(AM_CPPFLAGS) $(LINT_FLAGS) $(CFLAGS) *.c
 

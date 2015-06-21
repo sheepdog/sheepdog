@@ -55,6 +55,10 @@ AM_CPPFLAGS		+= -DENABLE_TRACE
 sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c trace/checker.c
 endif
 
+if BUILD_ACCELIO
+sheep_SOURCES		+= xio.c
+endif
+
 sheep_LDADD	  	= ../lib/libsd.a -lpthread -lm \
 			  $(libacrd_LIBS) $(corosync_LIBS) $(LIBS)
 
@@ -80,6 +84,10 @@ noinst_HEADERS		+=  tracepoint/request_tp.h
 
 if BUILD_LTTNG_UST
 sheep_SOURCES	+= tracepoint/request_tp.c
+endif
+
+if BUILD_ACCELIO
+sheep_LDADD		+= -lxio
 endif
 
 all-local:
