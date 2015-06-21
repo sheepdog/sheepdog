@@ -12,6 +12,10 @@
 
 #include "sheep_priv.h"
 
+#ifdef HAVE_ACCELIO
+#include "xio.h"
+#endif
+
 static inline void gateway_init_fwd_hdr(struct sd_req *fwd, struct sd_req *hdr)
 {
 	memcpy(fwd, hdr, sizeof(*fwd));
@@ -302,6 +306,8 @@ out:
 	return ret;
 }
 
+#ifndef HAVE_ACCELIO
+
 struct forward_info_entry {
 	struct pollfd pfd;
 	const struct node_id *nid;
@@ -469,22 +475,33 @@ forward_info_advance(struct forward_info *fi, const struct node_id *nid,
 	fi->nr_sent++;
 }
 
+#endif	/* HAVE_ACCELIO */
+
 static int gateway_forward_request(struct request *req)
 {
-	int i, err_ret = SD_RES_SUCCESS, ret;
-	unsigned wlen;
+	int i, err_ret = SD_RES_SUCCESS;
 	uint64_t oid = req->rq.obj.oid;
-	struct forward_info fi;
 	struct sd_req hdr;
 	const struct sd_node *target_nodes[SD_MAX_NODES];
 	int nr_copies = get_req_copy_number(req), nr_reqs, nr_to_send = 0;
 	struct req_iter *reqs = NULL;
 
+#ifdef HAVE_ACCELIO
+	struct xio_context *ctx;
+	struct xio_forward_info xio_fi;
+#else
+	unsigned wlen;
+	int ret;
+	struct forward_info fi;
+#endif
+
 	sd_debug("%"PRIx64, oid);
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
 	oid_to_nodes(oid, &req->vinfo->vroot, nr_copies, target_nodes);
+#ifndef HAVE_ACCELIO
 	forward_info_init(&fi, nr_copies);
+#endif
 	reqs = prepare_requests(req, &nr_to_send);
 	if (!reqs)
 		return SD_RES_NETWORK_ERROR;
@@ -510,6 +527,8 @@ static int gateway_forward_request(struct request *req)
 		}
 		nr_to_send = ds;
 	}
+
+#ifndef HAVE_ACCELIO
 
 	for (i = 0; i < nr_to_send; i++) {
 		struct sockfd *sfd;
@@ -545,6 +564,56 @@ static int gateway_forward_request(struct request *req)
 		if (ret != SD_RES_SUCCESS)
 			err_ret = ret;
 	}
+
+#else  /* HAVE_ACCELIO */
+
+	ctx = xio_context_create(NULL, 0, -1);
+
+	memset(&xio_fi, 0, sizeof(xio_fi));
+	xio_fi.nr_send = nr_to_send;
+	xio_fi.ctx = ctx;
+
+	for (i = 0; i < nr_to_send; i++) {
+		const struct node_id *nid = &target_nodes[i]->nid;
+		struct xio_forward_info_entry *fi_entry = &xio_fi.ent[i];
+		struct xio_session *session;
+		struct xio_connection *conn;
+		struct sd_req *copied_hdr;
+
+		fi_entry->nid = nid;
+		fi_entry->buf = reqs[i].buf;
+		fi_entry->wlen = reqs[i].wlen;
+		fi_entry->fi = &xio_fi;
+		session = sd_xio_gw_create_session(ctx, nid, fi_entry);
+		fi_entry->session = session;
+		conn = sd_xio_gw_create_connection(ctx, session, fi_entry);
+		fi_entry->conn = conn;
+
+		hdr.data_length = reqs[i].dlen;
+		hdr.obj.offset = reqs[i].off;
+		hdr.obj.ec_index = i;
+		hdr.obj.copy_policy = req->rq.obj.copy_policy;
+
+		copied_hdr = xzalloc(sizeof(*copied_hdr));
+		memcpy(copied_hdr, &hdr, sizeof(hdr));
+
+		xio_gw_send_req(conn, copied_hdr, reqs[i].buf, sheep_need_retry,
+				req->rq.epoch, MAX_RETRY_COUNT);
+	}
+
+	xio_context_run_loop(ctx, XIO_INFINITE);
+
+	for (i = 0; i < nr_to_send; i++) {
+		struct xio_forward_info_entry *fi_entry = &xio_fi.ent[i];
+
+		xio_connection_destroy(fi_entry->conn);
+		xio_session_destroy(fi_entry->session);
+	}
+
+	xio_context_destroy(ctx);
+
+#endif	/* HAVE_ACCELIO */
+
 out:
 	finish_requests(req, reqs, nr_reqs);
 	return err_ret;

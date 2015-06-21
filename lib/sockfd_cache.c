@@ -323,9 +323,15 @@ static struct sockfd *sockfd_cache_get_long(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *entry;
 	struct sockfd *sfd;
+#ifndef HAVE_ACCELIO
 	bool use_io = nid->io_port ? true : false;
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
 	int fd, idx = -1, port = use_io ? nid->io_port : nid->port;
+#else
+	bool use_io = false;
+	const uint8_t *addr = nid->addr;
+	int fd, idx = -1, port = nid->port;
+#endif
 grab:
 	entry = sockfd_cache_grab(nid, &idx);
 	if (!entry) {
