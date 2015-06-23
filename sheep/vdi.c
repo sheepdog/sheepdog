@@ -2167,6 +2167,10 @@ main_fn int get_vdi_state_checkpoint(int epoch, uint32_t vid, void *data)
 					goto found;
 				}
 			}
+
+			sd_info("this node doesn't have a required entry of VID:"
+				" %"PRIx32" at epoch %d", vid, epoch);
+			return SD_RES_NO_CHECKPOINT_ENTRY;
 		}
 	}
 

@@ -693,6 +693,8 @@ struct cinfo_collection_work {
 
 	struct vdi_state result;
 	uint32_t next_vid;
+
+	bool skip;
 };
 
 static struct cinfo_collection_work *collect_work;
@@ -711,12 +713,26 @@ static int do_cinfo_collection_work(uint32_t epoch, uint32_t vid,
 	return sheep_exec_req(&n->nid, &hdr, (char *)result);
 }
 
+static bool check_inode_obj_exist(uint32_t vid, int epoch)
+{
+	struct siocb iocb;
+	char buf[1];		/* dummy */
+
+	memset(&iocb, 0, sizeof(iocb));
+	iocb.epoch = epoch;
+	iocb.buf = &buf;
+	iocb.length = 1;
+	iocb.offset = 0;
+	iocb.ec_index = -1;
+	return SD_RES_SUCCESS == sd_store->read(vid_to_vdi_oid(vid), &iocb);
+}
+
 static void cinfo_collection_work(struct work *work)
 {
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
 	struct sd_node *n;
-	int ret;
+	int ret, nr_nodes_no_chkpt = 0;
 
 	sd_debug("start collection of cinfo, epoch: %d, vid: %"PRIx32,
 		 w->epoch, w->next_vid);
@@ -731,6 +747,21 @@ static void cinfo_collection_work(struct work *work)
 					       &w->result);
 		if (ret == SD_RES_SUCCESS)
 			return;
+		else if (ret == SD_RES_NO_CHECKPOINT_ENTRY)
+			nr_nodes_no_chkpt++;
+	}
+
+	if (nr_nodes_no_chkpt + 1 == w->members->nr_nodes) {
+		sd_info("other nodes doesn't have a entry of checkpoint for"
+			" VID: %"PRIx32" at epoch %d", w->next_vid, w->epoch);
+
+		if (check_inode_obj_exist(w->next_vid, w->epoch)) {
+			w->skip = true;
+			return;
+		}
+
+		panic("this node should have object of inode: %"PRIx64
+		      "but doesn't have", vid_to_vdi_oid(w->next_vid));
 	}
 
 	/*
@@ -787,7 +818,8 @@ static main_fn void cinfo_collection_done(struct work *work)
 	sd_debug("owner: %s",
 		 addr_to_str(vs->lock_owner.addr, vs->lock_owner.port));
 
-	apply_vdi_lock_state(vs);
+	if (!w->skip)
+		apply_vdi_lock_state(vs);
 
 	next_vid = find_next_bit(sys->vdi_inuse, SD_NR_VDIS, w->next_vid + 1);
 	if (next_vid == SD_NR_VDIS) {
