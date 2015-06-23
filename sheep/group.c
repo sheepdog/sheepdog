@@ -691,45 +691,32 @@ struct cinfo_collection_work {
 	int epoch;
 	struct vnode_info *members;
 
-	struct vdi_state *result;
+	struct vdi_state result;
 	uint32_t next_vid;
 };
 
 static struct cinfo_collection_work *collect_work;
 
-static struct vdi_state *do_cinfo_collection_work(uint32_t epoch,
-						  uint32_t vid,
-						  struct sd_node *n)
+static int do_cinfo_collection_work(uint32_t epoch, uint32_t vid,
+				    struct sd_node *n, struct vdi_state *result)
 {
-	struct vdi_state *vs = NULL;
 	struct sd_req hdr;
-	int ret;
-
-	vs = xzalloc(sizeof(*vs));
 
 	sd_init_req(&hdr, SD_OP_VDI_STATE_CHECKPOINT_CTL);
 	hdr.vdi_state_checkpoint.get = 1;
 	hdr.vdi_state_checkpoint.tgt_epoch = epoch;
 	hdr.vdi_state_checkpoint.vid = vid;
-	hdr.data_length = sizeof(*vs);
+	hdr.data_length = sizeof(*result);
 
-	ret = sheep_exec_req(&n->nid, &hdr, (char *)vs);
-	if (ret == SD_RES_SUCCESS) {
-		sd_debug("succeed to obtain checkpoint of vdi states");
-		return vs;
-	}
-
-	sd_err("failed to obtain checkpoint of vdi states from node %s",
-	       node_to_str(n));
-	return NULL;
+	return sheep_exec_req(&n->nid, &hdr, (char *)result);
 }
 
 static void cinfo_collection_work(struct work *work)
 {
-	struct vdi_state *vs = NULL;
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
 	struct sd_node *n;
+	int ret;
 
 	sd_debug("start collection of cinfo, epoch: %d, vid: %"PRIx32,
 		 w->epoch, w->next_vid);
@@ -740,11 +727,10 @@ static void cinfo_collection_work(struct work *work)
 		if (node_is_local(n))
 			continue;
 
-		vs = do_cinfo_collection_work(w->epoch, w->next_vid, n);
-		if (vs) {
-			w->result = vs;
+		ret = do_cinfo_collection_work(w->epoch, w->next_vid, n,
+					       &w->result);
+		if (ret == SD_RES_SUCCESS)
 			return;
-		}
 	}
 
 	/*
@@ -788,10 +774,9 @@ static main_fn void cinfo_collection_done(struct work *work)
 	struct cinfo_collection_work *w =
 		container_of(work, struct cinfo_collection_work, work);
 	uint32_t next_vid;
-	struct vdi_state *vs = w->result;
+	struct vdi_state *vs = &w->result;
 
 	sd_assert(w == collect_work);
-
 
 	sd_debug("VID: %"PRIx32, vs->vid);
 	sd_debug("nr_copies: %d", vs->nr_copies);
@@ -803,7 +788,6 @@ static main_fn void cinfo_collection_done(struct work *work)
 		 addr_to_str(vs->lock_owner.addr, vs->lock_owner.port));
 
 	apply_vdi_lock_state(vs);
-	free(vs);
 
 	next_vid = find_next_bit(sys->vdi_inuse, SD_NR_VDIS, w->next_vid + 1);
 	if (next_vid == SD_NR_VDIS) {
