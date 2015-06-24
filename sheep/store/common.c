@@ -409,7 +409,7 @@ int init_disk_space(const char *base_path)
 	if (sys->gateway_only)
 		goto out;
 
-	/* We need to init md even we don't need to update sapce */
+	/* We need to init md even we don't need to update space */
 	mds = md_init_space();
 
 	/* If it is restarted */
