@@ -97,12 +97,11 @@ done:
 	if (uatomic_sub_return(&aiocb->nr_requests, 1) <= 0)
 		aiocb->aio_done_func(aiocb);
 
-	return 0;
+	return SD_RES_SUCCESS;
 }
 
 static int vdi_create_respond(struct sheep_request *req)
 {
-	int ret = 0;
 	struct sd_vdi *vdi;
 	struct sheep_request *new;
 	uint32_t vid, idx;
@@ -135,20 +134,17 @@ static int vdi_create_respond(struct sheep_request *req)
 	submit_sheep_request(new);
 	submit_blocking_sheep_request(c, req->oid);
 
-	end_sheep_request(req);
-	return ret;
+	return SD_RES_SUCCESS;
 }
 
 static struct sd_op_template sd_ops[] = {
 	[VDI_READ] = {
 		.name = "VDI WRITE",
 		.request_process = vdi_rw_request,
-		.respond_process = end_sheep_request,
 	},
 	[VDI_WRITE] = {
 		.name = "VDI WRITE",
 		.request_process = vdi_rw_request,
-		.respond_process = end_sheep_request,
 	},
 	[VDI_CREATE] = {
 		.name = "VDI CREATE",

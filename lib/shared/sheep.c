@@ -335,7 +335,6 @@ static int sheep_handle_reply(struct sd_cluster *c)
 	aiocb->op = get_sd_op(req->opcode);
 	if (aiocb->op != NULL && !!aiocb->op->respond_process)
 		ret = aiocb->op->respond_process(req);
-	return ret;
 
 end_request:
 	end_sheep_request(req);
