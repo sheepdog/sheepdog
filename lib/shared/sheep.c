@@ -20,36 +20,7 @@
 #include <netinet/tcp.h>
 #include <pthread.h>
 
-struct sheep_aiocb {
-	struct sd_request *request;
-	off_t offset;
-	size_t length;
-	int ret;
-	uint32_t nr_requests;
-	char *buf;
-	int buf_iter;
-	void (*aio_done_func)(struct sheep_aiocb *);
-};
-
-enum sheep_request_type {
-	VDI_READ,
-	VDI_WRITE,
-	VDI_CREATE,
-};
-
-struct sheep_request {
-	struct list_node list;
-	struct sheep_aiocb *aiocb;
-	uint64_t oid;
-	uint64_t cow_oid;
-	uint32_t seq_num;
-	int type;
-	uint32_t offset;
-	uint32_t length;
-	char *buf;
-};
-
-static int sheep_submit_sdreq(struct sd_cluster *c, struct sd_req *hdr,
+int sheep_submit_sdreq(struct sd_cluster *c, struct sd_req *hdr,
 			      void *data, uint32_t wlen)
 {
 	int ret;
@@ -132,12 +103,12 @@ static struct sheep_aiocb *sheep_aiocb_setup(struct sd_request *req)
 	return aiocb;
 }
 
-static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
+struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 						 uint64_t oid, uint64_t cow_oid,
 						 int len, int offset)
 {
 	struct sheep_request *req = xzalloc(sizeof(*req));
-	struct sd_cluster *c = aiocb->request->vdi->cluster;
+	struct sd_cluster *c = aiocb->request->cluster;
 
 	req->offset = offset;
 	req->length = len;
@@ -146,31 +117,30 @@ static struct sheep_request *alloc_sheep_request(struct sheep_aiocb *aiocb,
 	req->aiocb = aiocb;
 	req->buf = aiocb->buf + aiocb->buf_iter;
 	req->seq_num = uatomic_add_return(&c->seq_num, 1);
-	INIT_LIST_NODE(&req->list);
-	if (aiocb->request->write)
-		req->type = VDI_WRITE;
-	else
-		req->type = VDI_READ;
-
+	req->opcode = aiocb->request->opcode;
 	aiocb->buf_iter += len;
+
+	INIT_LIST_NODE(&req->list);
 	uatomic_inc(&aiocb->nr_requests);
 
 	return req;
 }
 
-static void end_sheep_request(struct sheep_request *req)
+uint32_t sheep_inode_get_vid(struct sd_request *req, uint32_t idx)
 {
-	struct sheep_aiocb *aiocb = req->aiocb;
+	uint32_t vid;
 
-	if (uatomic_sub_return(&aiocb->nr_requests, 1) <= 0)
-		aiocb->aio_done_func(aiocb);
-	free(req);
+	sd_read_lock(&req->vdi->lock);
+	vid = req->vdi->inode->data_vdi_id[idx];
+	sd_rw_unlock(&req->vdi->lock);
+
+	return vid;
 }
 
-static int submit_sheep_request(struct sheep_request *req)
+int submit_sheep_request(struct sheep_request *req)
 {
 	struct sd_req hdr = {};
-	struct sd_cluster *c = req->aiocb->request->vdi->cluster;
+	struct sd_cluster *c = req->aiocb->request->cluster;
 	int ret = 0;
 
 	hdr.id = req->seq_num;
@@ -183,10 +153,10 @@ static int submit_sheep_request(struct sheep_request *req)
 	list_add_tail(&req->list, &c->inflight_list);
 	sd_rw_unlock(&c->inflight_lock);
 
-	switch (req->type) {
+	switch (req->opcode) {
 	case VDI_CREATE:
 	case VDI_WRITE:
-		if (req->type == VDI_CREATE)
+		if (req->opcode == VDI_CREATE)
 			hdr.opcode = SD_OP_CREATE_AND_WRITE_OBJ;
 		else
 			hdr.opcode = SD_OP_WRITE_OBJ;
@@ -209,19 +179,21 @@ err:
 	return ret;
 }
 
-static uint32_t sheep_inode_get_vid(struct sd_request *req, uint32_t idx)
+void submit_blocking_sheep_request(struct sd_cluster *c, uint64_t oid)
 {
-	uint32_t vid;
+	struct sheep_request *req;
 
-	sd_read_lock(&req->vdi->lock);
-	vid = req->vdi->inode->data_vdi_id[idx];
-	sd_rw_unlock(&req->vdi->lock);
-
-	return vid;
+	sd_write_lock(&c->blocking_lock);
+	list_for_each_entry(req, &c->blocking_list, list) {
+		if (req->oid != oid)
+			continue;
+		list_del(&req->list);
+		submit_sheep_request(req);
+	}
+	sd_rw_unlock(&c->blocking_lock);
 }
 
-
-static struct sheep_request *find_inflight_request_oid(struct sd_cluster *c,
+struct sheep_request *find_inflight_request_oid(struct sd_cluster *c,
 						       uint64_t oid)
 {
 	struct sheep_request *req;
@@ -240,87 +212,15 @@ static struct sheep_request *find_inflight_request_oid(struct sd_cluster *c,
 static int sheep_aiocb_submit(struct sheep_aiocb *aiocb)
 {
 	struct sd_request *request = aiocb->request;
-	uint64_t offset = aiocb->offset;
-	uint64_t total = aiocb->length;
-	int start = offset % SD_DATA_OBJ_SIZE;
-	uint32_t idx = offset / SD_DATA_OBJ_SIZE;
-	int len = SD_DATA_OBJ_SIZE - start;
-	struct sd_cluster *c = request->vdi->cluster;
+	uint8_t opcode = request->opcode;
+	int ret = -1;
 
-	if (total < len)
-		len = total;
+	aiocb->op = get_sd_op(opcode);
 
-	/*
-	 * Make sure we don't free the aiocb before we are done with all
-	 * requests.This additional reference is dropped at the end of this
-	 * function.
-	 */
-	uatomic_inc(&aiocb->nr_requests);
+	if (aiocb->op != NULL && aiocb->op->request_process)
+		ret = aiocb->op->request_process(aiocb);
 
-	do {
-		struct sheep_request *req;
-		uint64_t oid = vid_to_data_oid(request->vdi->vid, idx),
-			 cow_oid = 0;
-		uint32_t vid = sheep_inode_get_vid(request, idx);
-
-		/*
-		 * For read, either read cow object or end the request.
-		 * For write, copy-on-write cow object
-		 */
-		if (vid && vid != request->vdi->vid) {
-			if (request->write)
-				cow_oid = vid_to_data_oid(vid, idx);
-			else
-				oid = vid_to_data_oid(vid, idx);
-		}
-
-		req = alloc_sheep_request(aiocb, oid, cow_oid, len, start);
-		if (vid && !cow_oid)
-			goto submit;
-
-		switch (req->type) {
-		case VDI_WRITE:
-			/*
-			 * Sheepdog can't handle concurrent creation on the same
-			 * object. We send one create req first and then send
-			 * write reqs in next.
-			 */
-			if (find_inflight_request_oid(c, oid)) {
-				uint32_t tmp_vid;
-
-				sd_write_lock(&c->blocking_lock);
-				/*
-				 * There are slim chance object was created
-				 * before we grab blocking_lock
-				 */
-				tmp_vid = sheep_inode_get_vid(request, idx);
-				if (tmp_vid && tmp_vid == request->vdi->vid) {
-					sd_rw_unlock(&c->blocking_lock);
-					goto submit;
-				}
-				list_add_tail(&req->list, &c->blocking_list);
-				sd_rw_unlock(&c->blocking_lock);
-				goto done;
-			}
-			req->type = VDI_CREATE;
-			break;
-		case VDI_READ:
-			end_sheep_request(req);
-			goto done;
-		}
-submit:
-		submit_sheep_request(req);
-done:
-		idx++;
-		total -= len;
-		start = (start + len) % SD_DATA_OBJ_SIZE;
-		len = total > SD_DATA_OBJ_SIZE ? SD_DATA_OBJ_SIZE : total;
-	} while (total > 0);
-
-	if (uatomic_sub_return(&aiocb->nr_requests, 1) <= 0)
-		aiocb->aio_done_func(aiocb);
-
-	return 0;
+	return ret;
 }
 
 static int submit_request(struct sd_request *req)
@@ -388,28 +288,25 @@ out:
 	return req;
 }
 
-static void submit_blocking_sheep_request(struct sd_cluster *c, uint64_t oid)
+int end_sheep_request(struct sheep_request *req)
 {
-	struct sheep_request *req;
+	struct sheep_aiocb *aiocb = req->aiocb;
 
-	sd_write_lock(&c->blocking_lock);
-	list_for_each_entry(req, &c->blocking_list, list) {
-		if (req->oid != oid)
-			continue;
-		list_del(&req->list);
-		submit_sheep_request(req);
-	}
-	sd_rw_unlock(&c->blocking_lock);
+	if (uatomic_sub_return(&aiocb->nr_requests, 1) <= 0)
+		aiocb->aio_done_func(aiocb);
+
+	free(req);
+
+	return 0;
 }
+
 
 /* FIXME: add auto-reconnect support */
 static int sheep_handle_reply(struct sd_cluster *c)
 {
 	struct sd_rsp rsp = {};
-	struct sheep_request *req, *new;
-	struct sd_vdi *vdi;
-	uint32_t vid, idx;
-	uint64_t oid;
+	struct sheep_request *req;
+	struct sheep_aiocb *aiocb;
 	int ret;
 
 	ret = xread(c->sockfd, (char *)&rsp, sizeof(rsp));
@@ -425,6 +322,7 @@ static int sheep_handle_reply(struct sd_cluster *c)
 	req = fetch_inflight_request(c, rsp.id);
 	if (!req)
 		return 0;
+
 	if (rsp.data_length > 0) {
 		ret = xread(c->sockfd, req->buf, req->length);
 		if (ret < 0) {
@@ -433,37 +331,12 @@ static int sheep_handle_reply(struct sd_cluster *c)
 		}
 	}
 
-	vdi = req->aiocb->request->vdi;
-	switch (req->type) {
-	case VDI_CREATE:
-		/* We need to update inode for create */
-		new = xmalloc(sizeof(*new));
-		vid = vdi->vid;
-		oid = vid_to_vdi_oid(vid);
-		idx = data_oid_to_idx(req->oid);
-		new->offset = SD_INODE_HEADER_SIZE + sizeof(vid) * idx;
-		new->length = sizeof(vid);
-		new->oid = oid;
-		new->cow_oid = 0;
-		new->aiocb = req->aiocb;
-		new->buf = (char *)&vid;
-		new->seq_num = uatomic_add_return(&c->seq_num, 1);
-		new->type = VDI_WRITE;
-		uatomic_inc(&req->aiocb->nr_requests);
-		INIT_LIST_NODE(&new->list);
+	aiocb = req->aiocb;
+	aiocb->op = get_sd_op(req->opcode);
+	if (aiocb->op != NULL && !!aiocb->op->respond_process)
+		ret = aiocb->op->respond_process(req);
+	return ret;
 
-		/* Make sure no request is queued while we update inode */
-		sd_write_lock(&vdi->lock);
-		vdi->inode->data_vdi_id[idx] = vid;
-		sd_rw_unlock(&vdi->lock);
-
-		submit_sheep_request(new);
-		submit_blocking_sheep_request(c, req->oid);
-		/* fall thru */
-	case VDI_WRITE:
-	case VDI_READ:
-		break;
-	}
 end_request:
 	end_sheep_request(req);
 err:

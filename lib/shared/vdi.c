@@ -25,7 +25,7 @@ static int read_object(struct sd_cluster *c, uint64_t oid, void *data,
 static int vdi_read_inode(struct sd_cluster *c, char *name,
 	char *tag, struct sd_inode *inode, bool header);
 
-static int lock_vdi(struct sd_vdi *vdi)
+static int lock_vdi(struct sd_cluster *c, struct sd_vdi *vdi)
 {
 	struct sd_req hdr = {};
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
@@ -34,7 +34,7 @@ static int lock_vdi(struct sd_vdi *vdi)
 	hdr.opcode = SD_OP_LOCK_VDI;
 	hdr.data_length = SD_MAX_VDI_LEN;
 	hdr.flags = SD_FLAG_CMD_WRITE;
-	ret = sd_run_sdreq(vdi->cluster, &hdr, vdi->name);
+	ret = sd_run_sdreq(c, &hdr, vdi->name);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -43,7 +43,7 @@ static int lock_vdi(struct sd_vdi *vdi)
 	return SD_RES_SUCCESS;
 }
 
-static int unlock_vdi(struct sd_vdi *vdi)
+static int unlock_vdi(struct sd_cluster *c, struct sd_vdi *vdi)
 {
 	struct sd_req hdr = {};
 	int ret;
@@ -51,7 +51,7 @@ static int unlock_vdi(struct sd_vdi *vdi)
 	hdr.opcode = SD_OP_RELEASE_VDI;
 	hdr.vdi.type = LOCK_TYPE_NORMAL;
 	hdr.vdi.base_vdi_id = vdi->vid;
-	ret = sd_run_sdreq(vdi->cluster, &hdr, NULL);
+	ret = sd_run_sdreq(c, &hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
@@ -62,7 +62,6 @@ static struct sd_vdi *alloc_vdi(struct sd_cluster *c, char *name)
 {
 	struct sd_vdi *new = xzalloc(sizeof(*new));
 
-	new->cluster = c;
 	new->name = name;
 	new->inode = xmalloc(sizeof(struct sd_inode));
 	sd_init_rw_lock(&new->lock);
@@ -83,7 +82,7 @@ struct sd_vdi *sd_vdi_open(struct sd_cluster *c, char *name)
 	struct sd_vdi *new = alloc_vdi(c, name);
 	int ret;
 
-	ret = lock_vdi(new);
+	ret = lock_vdi(c, new);
 	if (ret != SD_RES_SUCCESS) {
 		errno = ret;
 		goto out_free;
@@ -106,7 +105,7 @@ struct sd_vdi *sd_vdi_open(struct sd_cluster *c, char *name)
 
 	return new;
 out_unlock:
-	unlock_vdi(new);
+	unlock_vdi(c, new);
 out_free:
 	free_vdi(new);
 	return NULL;
@@ -114,7 +113,7 @@ out_free:
 
 static void queue_request(struct sd_request *req)
 {
-	struct sd_cluster *c = req->vdi->cluster;
+	struct sd_cluster *c = req->cluster;
 
 	sd_write_lock(&c->request_lock);
 	list_add_tail(&req->list, &c->request_list);
@@ -129,8 +128,8 @@ static void free_request(struct sd_request *req)
 	free(req);
 }
 
-static struct sd_request *alloc_request(struct sd_vdi *vdi, void *buf,
-			size_t count, off_t offset, bool iswrite)
+static struct sd_request *alloc_request(struct sd_cluster  *c, void *buf,
+		struct sd_vdi *vdi, size_t count, off_t offset, uint8_t opcode)
 {
 	struct sd_request *req;
 	int fd;
@@ -142,19 +141,22 @@ static struct sd_request *alloc_request(struct sd_vdi *vdi, void *buf,
 	}
 	req = xzalloc(sizeof(*req));
 	req->efd = fd;
+	req->cluster = c;
 	req->data = buf;
 	req->length = count;
 	req->offset = offset;
-	req->write = iswrite;
+	req->opcode = opcode;
 	INIT_LIST_NODE(&req->list);
 	req->vdi = vdi;
 
 	return req;
 }
 
-int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset)
+int sd_vdi_read(struct sd_cluster *c, struct sd_vdi *vdi,
+			void *buf, size_t count, off_t offset)
 {
-	struct sd_request *req = alloc_request(vdi, buf, count, offset, false);
+	struct sd_request *req = alloc_request(c, buf, vdi,
+					count, offset, VDI_READ);
 	int ret;
 
 	if (!req)
@@ -169,9 +171,11 @@ int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset)
 	return ret;
 }
 
-int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset)
+int sd_vdi_write(struct sd_cluster *c, struct sd_vdi *vdi, void *buf,
+			size_t count, off_t offset)
 {
-	struct sd_request *req = alloc_request(vdi, buf, count, offset, true);
+	struct sd_request *req = alloc_request(c, buf, vdi,
+					count, offset, VDI_WRITE);
 	int ret;
 
 	if (!req)
@@ -186,11 +190,11 @@ int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset)
 	return ret;
 }
 
-int sd_vdi_close(struct sd_vdi *vdi)
+int sd_vdi_close(struct sd_cluster *c, struct sd_vdi *vdi)
 {
 	int ret;
 
-	ret = unlock_vdi(vdi);
+	ret = unlock_vdi(c, vdi);
 	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "failed to unlock %s\n", vdi->name);
 		return ret;

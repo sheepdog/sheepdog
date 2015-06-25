@@ -45,7 +45,6 @@ struct sd_cluster {
 };
 
 struct sd_vdi {
-	struct sd_cluster *cluster;
 	struct sd_inode *inode;
 	uint32_t vid;
 	struct sd_rw_lock lock;
@@ -103,7 +102,8 @@ struct sd_vdi *sd_vdi_open(struct sd_cluster *c, char *name);
  *
  * Return error code defined in sheepdog_proto.h.
  */
-int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
+int sd_vdi_read(struct sd_cluster *c, struct sd_vdi *vdi, void *buf,
+		size_t count, off_t offset);
 
 /*
  * Write to a vdi descriptor at a given offset.
@@ -115,7 +115,8 @@ int sd_vdi_read(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
  *
  * Return error code defined in sheepdog_proto.h.
  */
-int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
+int sd_vdi_write(struct sd_cluster *c, struct sd_vdi *vdi, void *buf,
+		size_t count, off_t offset);
 
 /*
  * Close a vdi descriptor.
@@ -124,7 +125,7 @@ int sd_vdi_write(struct sd_vdi *vdi, void *buf, size_t count, off_t offset);
  *
  * Return error code defined in sheepdog_proto.h.
  */
-int sd_vdi_close(struct sd_vdi *vdi);
+int sd_vdi_close(struct sd_cluster *c, struct sd_vdi *vdi);
 
 /*
  * Create a snapshot of a VDI
