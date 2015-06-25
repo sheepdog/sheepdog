@@ -512,7 +512,7 @@ int volume_remove_entry(const char *entry)
 {
 	char path[PATH_MAX], *ch;
 	uint32_t vid;
-	struct vdi_inode *vdi;
+	struct vdi_inode *vdi = NULL;
 
 	ch = strchr(entry, '\n');
 	if (ch != NULL)
@@ -531,6 +531,10 @@ int volume_remove_entry(const char *entry)
 	sd_read_lock(&vdi_inode_tree_lock);
 	vdi = vdi_inode_tree_search(vid);
 	sd_rw_unlock(&vdi_inode_tree_lock);
+
+	if(!vdi)
+		return -1;
+
 	destroy_socket_pool(vdi->socket_pool, SOCKET_POOL_SIZE);
 
 	sd_write_lock(&vdi_inode_tree_lock);
