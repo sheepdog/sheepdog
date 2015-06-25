@@ -444,10 +444,10 @@ static void *rebuild_erasure_object(uint64_t oid, uint8_t idx,
 	uint8_t *bufs[ed];
 	int idxs[ed];
 
-	for (i = 0; i < ed; i++)
+	for (i = 0; i < ed; i++) {
 		bufs[i] = NULL;
-	for (i = 0; i < ed; i++)
 		idxs[i] = 0;
+	}
 
 	/* Prepare replica */
 	for (i = 0, j = 0; i < edp && j < ed; i++) {
