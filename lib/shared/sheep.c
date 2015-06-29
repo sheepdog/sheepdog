@@ -43,36 +43,21 @@ out:
 /* Run the request synchronously */
 int sd_run_sdreq(struct sd_cluster *c, struct sd_req *hdr, void *data)
 {
-	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
-	unsigned int wlen, rlen;
+	struct sd_request *req = alloc_request(c, data,
+		hdr->data_length, SHEEP_CTL);
 	int ret;
 
-	if (hdr->flags & SD_FLAG_CMD_WRITE) {
-		wlen = hdr->data_length;
-		rlen = 0;
-	} else {
-		wlen = 0;
-		rlen = hdr->data_length;
-	}
-
-	ret = sheep_submit_sdreq(c, hdr, data, wlen);
-	if (ret < 0)
+	if (!req)
 		return SD_RES_SYSTEM_ERROR;
 
-	ret = xread(c->sockfd, rsp, sizeof(*rsp));
-	if (ret < 0)
-		return SD_RES_SYSTEM_ERROR;
+	req->hdr = hdr;
+	queue_request(req);
 
-	if (rlen > rsp->data_length)
-		rlen = rsp->data_length;
+	eventfd_xread(req->efd);
+	ret = req->ret;
+	free_request(req);
 
-	if (rlen) {
-		ret = xread(c->sockfd, data, rlen);
-		if (ret < 0)
-			return SD_RES_SYSTEM_ERROR;
-	}
-
-	return rsp->result;
+	return ret;
 }
 
 static void aio_end_request(struct sd_request *req, int ret)
@@ -330,6 +315,15 @@ static int sheep_handle_reply(struct sd_cluster *c)
 			goto end_request;
 		}
 	}
+
+	/*
+	* For synchronous single sheep requests, the caller
+	* would want to get the response by it's request header,
+	* so we copy the response to it's request data address.
+	*/
+	if (req->aiocb->request->hdr)
+		memcpy(req->aiocb->request->hdr, &rsp, sizeof(rsp));
+	req->aiocb->ret = rsp.result;
 
 	aiocb = req->aiocb;
 	aiocb->op = get_sd_op(req->opcode);

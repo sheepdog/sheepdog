@@ -137,6 +137,38 @@ static int vdi_create_respond(struct sheep_request *req)
 	return SD_RES_SUCCESS;
 }
 
+static int sheep_ctl_request(struct sheep_aiocb *aiocb)
+{
+	struct sd_req *hdr = aiocb->request->hdr;
+	struct sd_cluster *c = aiocb->request->cluster;
+	struct sheep_request *request = xzalloc(sizeof(struct sheep_request));
+
+	INIT_LIST_NODE(&request->list);
+	request->offset = hdr->obj.offset;
+	request->length = hdr->data_length;
+	request->oid = hdr->obj.oid;
+	request->cow_oid = hdr->obj.cow_oid;
+	request->aiocb = aiocb;
+	request->buf = aiocb->buf;
+	request->seq_num = uatomic_add_return(&c->seq_num, 1);
+	hdr->id = request->seq_num;
+
+	sd_write_lock(&c->inflight_lock);
+	list_add_tail(&request->list, &c->inflight_list);
+	sd_rw_unlock(&c->inflight_lock);
+
+	uint32_t wlen = 0;
+
+	if (hdr->flags & SD_FLAG_CMD_WRITE)
+		wlen = hdr->data_length;
+
+	uatomic_inc(&aiocb->nr_requests);
+	int ret = sheep_submit_sdreq(c, hdr, aiocb->buf, wlen);
+	eventfd_xwrite(c->reply_fd, 1);
+
+	return ret;
+}
+
 static struct sd_op_template sd_ops[] = {
 	[VDI_READ] = {
 		.name = "VDI WRITE",
@@ -150,6 +182,10 @@ static struct sd_op_template sd_ops[] = {
 		.name = "VDI CREATE",
 		/* The request is submitted by vdi_rw_request */
 		.respond_process = vdi_create_respond,
+	},
+	[SHEEP_CTL] = {
+		.name = "SHEEP CTL",
+		.request_process = sheep_ctl_request,
 	},
 };
 

@@ -111,7 +111,7 @@ out_free:
 	return NULL;
 }
 
-static void queue_request(struct sd_request *req)
+void queue_request(struct sd_request *req)
 {
 	struct sd_cluster *c = req->cluster;
 
@@ -122,14 +122,14 @@ static void queue_request(struct sd_request *req)
 	eventfd_xwrite(c->request_fd, 1);
 }
 
-static void free_request(struct sd_request *req)
+void free_request(struct sd_request *req)
 {
 	close(req->efd);
 	free(req);
 }
 
-static struct sd_request *alloc_request(struct sd_cluster  *c, void *buf,
-		struct sd_vdi *vdi, size_t count, off_t offset, uint8_t opcode)
+struct sd_request *alloc_request(struct sd_cluster *c,
+	void *data, size_t count, uint8_t op)
 {
 	struct sd_request *req;
 	int fd;
@@ -142,12 +142,10 @@ static struct sd_request *alloc_request(struct sd_cluster  *c, void *buf,
 	req = xzalloc(sizeof(*req));
 	req->efd = fd;
 	req->cluster = c;
-	req->data = buf;
+	req->data = data;
 	req->length = count;
-	req->offset = offset;
-	req->opcode = opcode;
+	req->opcode = op;
 	INIT_LIST_NODE(&req->list);
-	req->vdi = vdi;
 
 	return req;
 }
@@ -155,13 +153,15 @@ static struct sd_request *alloc_request(struct sd_cluster  *c, void *buf,
 int sd_vdi_read(struct sd_cluster *c, struct sd_vdi *vdi,
 			void *buf, size_t count, off_t offset)
 {
-	struct sd_request *req = alloc_request(c, buf, vdi,
-					count, offset, VDI_READ);
+	struct sd_request *req = alloc_request(c, buf,
+					count, VDI_READ);
 	int ret;
 
 	if (!req)
 		return errno;
 
+	req->vdi = vdi;
+	req->offset = offset;
 	queue_request(req);
 
 	eventfd_xread(req->efd);
@@ -174,13 +174,15 @@ int sd_vdi_read(struct sd_cluster *c, struct sd_vdi *vdi,
 int sd_vdi_write(struct sd_cluster *c, struct sd_vdi *vdi, void *buf,
 			size_t count, off_t offset)
 {
-	struct sd_request *req = alloc_request(c, buf, vdi,
-					count, offset, VDI_WRITE);
+	struct sd_request *req = alloc_request(c, buf,
+					count, VDI_WRITE);
 	int ret;
 
 	if (!req)
 		return errno;
 
+	req->vdi = vdi;
+	req->offset = offset;
 	queue_request(req);
 
 	eventfd_xread(req->efd);

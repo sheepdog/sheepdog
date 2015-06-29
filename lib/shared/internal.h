@@ -18,12 +18,14 @@ enum sheep_request_type {
 	VDI_READ = 1,
 	VDI_WRITE,
 	VDI_CREATE,
+	SHEEP_CTL,
 };
 
 struct sd_request {
 	struct sd_cluster *cluster;
 	struct list_node list;
 	struct sd_vdi *vdi;
+	struct sd_req *hdr;
 	void *data;
 	size_t length;
 	off_t offset;
@@ -76,5 +78,10 @@ const struct sd_op_template *get_sd_op(uint8_t opcode);
 void submit_blocking_sheep_request(struct sd_cluster *c, uint64_t oid);
 
 uint32_t sheep_inode_get_vid(struct sd_request *req, uint32_t idx);
+
+struct sd_request *alloc_request(struct sd_cluster *c, void *data,
+	size_t count, uint8_t op);
+void queue_request(struct sd_request *req);
+void free_request(struct sd_request *req);
 
 #endif
