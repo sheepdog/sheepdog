@@ -316,19 +316,10 @@ static int sheep_handle_reply(struct sd_cluster *c)
 		}
 	}
 
-	/*
-	* For synchronous single sheep requests, the caller
-	* would want to get the response by it's request header,
-	* so we copy the response to it's request data address.
-	*/
-	if (req->aiocb->request->hdr)
-		memcpy(req->aiocb->request->hdr, &rsp, sizeof(rsp));
-	req->aiocb->ret = rsp.result;
-
 	aiocb = req->aiocb;
 	aiocb->op = get_sd_op(req->opcode);
-	if (aiocb->op != NULL && !!aiocb->op->respond_process)
-		ret = aiocb->op->respond_process(req);
+	if (aiocb->op != NULL && !!aiocb->op->response_process)
+		ret = aiocb->op->response_process(req, &rsp);
 
 end_request:
 	end_sheep_request(req);

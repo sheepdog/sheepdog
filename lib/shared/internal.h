@@ -24,8 +24,10 @@ enum sheep_request_type {
 struct sd_request {
 	struct sd_cluster *cluster;
 	struct list_node list;
-	struct sd_vdi *vdi;
-	struct sd_req *hdr;
+	union {
+		struct sd_vdi *vdi;
+		struct sd_req *hdr;
+	};
 	void *data;
 	size_t length;
 	off_t offset;
@@ -61,7 +63,7 @@ struct sheep_request {
 struct sd_op_template {
 	const char *name;
 	int (*request_process)(struct sheep_aiocb *aiocb);
-	int (*respond_process)(struct sheep_request *req);
+	int (*response_process)(struct sheep_request *req, struct sd_rsp *rsp);
 };
 
 struct sheep_request *find_inflight_request_oid(struct sd_cluster *c,

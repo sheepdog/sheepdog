@@ -100,7 +100,7 @@ done:
 	return SD_RES_SUCCESS;
 }
 
-static int vdi_create_respond(struct sheep_request *req)
+static int vdi_create_response(struct sheep_request *req, struct sd_rsp *rsp)
 {
 	struct sd_vdi *vdi;
 	struct sheep_request *new;
@@ -169,6 +169,13 @@ static int sheep_ctl_request(struct sheep_aiocb *aiocb)
 	return ret;
 }
 
+static int sheep_ctl_response(struct sheep_request *req, struct sd_rsp *rsp)
+{
+	memcpy(req->aiocb->request->hdr, rsp, sizeof(*rsp));
+	req->aiocb->ret = rsp->result;
+	return SD_RES_SUCCESS;
+}
+
 static struct sd_op_template sd_ops[] = {
 	[VDI_READ] = {
 		.name = "VDI WRITE",
@@ -181,11 +188,12 @@ static struct sd_op_template sd_ops[] = {
 	[VDI_CREATE] = {
 		.name = "VDI CREATE",
 		/* The request is submitted by vdi_rw_request */
-		.respond_process = vdi_create_respond,
+		.response_process = vdi_create_response,
 	},
 	[SHEEP_CTL] = {
 		.name = "SHEEP CTL",
 		.request_process = sheep_ctl_request,
+		.response_process = sheep_ctl_response,
 	},
 };
 
