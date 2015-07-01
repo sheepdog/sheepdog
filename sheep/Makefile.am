@@ -20,7 +20,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 AM_CFLAGS		=
 
 AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include \
-			  $(libcpg_CFLAGS) $(libcfg_CFLAGS) $(libacrd_CFLAGS)
+			  $(libqb_CFLAGS) $(libcpg_CFLAGS) $(libcfg_CFLAGS) $(libacrd_CFLAGS)
 
 sbin_PROGRAMS		= sheep
 
@@ -56,7 +56,7 @@ sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c trace/checker.c
 endif
 
 sheep_LDADD	  	= ../lib/libsd.a -lpthread -lm\
-			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS) $(LIBS)
+			  $(libqb_LIBS) $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS) $(LIBS)
 
 if BUILD_NFS
 sheep_LDADD		+= -lrt
@@ -68,7 +68,7 @@ sheep_DEPENDENCIES	= ../lib/libsd.a
 noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h
 			  nfs/nfs.h nfs/fs.h
 
-EXTRA_DIST		= 
+EXTRA_DIST		=
 
 if BUILD_EARTHQUAKE
 sheep_LDADD		+= -leq_embed
@@ -82,7 +82,7 @@ if BUILD_LTTNG_UST
 sheep_SOURCES	+= tracepoint/request_tp.c
 endif
 
-all-local: 
+all-local:
 	@echo Built sheep
 
 clean-local:

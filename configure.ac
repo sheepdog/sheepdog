@@ -351,6 +351,7 @@ if test "x${enable_corosync}" = xyes; then
 	PKG_CHECK_MODULES([corosync],[corosync])
 	PKG_CHECK_MODULES([libcpg],[libcpg])
 	PKG_CHECK_MODULES([libcfg],[libcfg])
+	PKG_CHECK_MODULES([libqb],[libqb])
 	AC_DEFINE_UNQUOTED([HAVE_COROSYNC], 1, [have corosync])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES corosync"
 fi
