@@ -115,6 +115,7 @@ extern struct command vdi_command;
 extern struct command node_command;
 extern struct command cluster_command;
 extern struct command alter_command;
+extern struct command upgrade_command;
 
 #ifdef HAVE_TRACE
 extern struct command trace_command;

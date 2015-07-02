@@ -262,6 +262,54 @@ struct sd_rsp {
 	};
 };
 
+#define MAX_CHILDREN 1024U
+
+/*
+ * struct sd_inode_0_7: old inode format used in v0.7.x
+ * Just used by upgrade tools.
+ */
+struct sd_inode_0_7 {
+	char name[SD_MAX_VDI_LEN];
+	char tag[SD_MAX_VDI_TAG_LEN];
+	uint64_t create_time;
+	uint64_t snap_ctime;
+	uint64_t vm_clock_nsec;
+	uint64_t vdi_size;
+	uint64_t vm_state_size;
+	uint16_t copy_policy;
+	uint8_t  nr_copies;
+	uint8_t  block_size_shift;
+	uint32_t snap_id;
+	uint32_t vdi_id;
+	uint32_t parent_vdi_id;
+	uint32_t child_vdi_id[MAX_CHILDREN];
+	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
+};
+
+/*
+ * struct sd_inode_0_8: old inode format used in v0.8.x
+ * Just used by upgrade tools.
+ */
+struct sd_inode_0_8 {
+	char name[SD_MAX_VDI_LEN];
+	char tag[SD_MAX_VDI_TAG_LEN];
+	uint64_t create_time;
+	uint64_t snap_ctime;
+	uint64_t vm_clock_nsec;
+	uint64_t vdi_size;
+	uint64_t vm_state_size;
+	uint8_t  copy_policy;
+	uint8_t  store_policy;
+	uint8_t  nr_copies;
+	uint8_t  block_size_shift;
+	uint32_t snap_id;
+	uint32_t vdi_id;
+	uint32_t parent_vdi_id;
+	uint32_t child_vdi_id[MAX_CHILDREN];
+	uint32_t data_vdi_id[SD_INODE_DATA_INDEX];
+	uint32_t btree_counter;
+};
+
 /*
  * Historical notes: previous version of sheepdog (< v0.9.0) has a limit of
  * maximum number of children which can be created from single VDI. So the inode

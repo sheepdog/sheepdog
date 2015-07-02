@@ -182,6 +182,7 @@ static void init_commands(const struct command **commands)
 #ifdef HAVE_NFS
 		nfs_command,
 #endif
+		upgrade_command,
 		{NULL,}
 	};
 

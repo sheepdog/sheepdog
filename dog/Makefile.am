@@ -25,7 +25,8 @@ sbin_PROGRAMS		= dog
 
 dog_SOURCES		= farm/object_tree.c farm/sha1_file.c farm/snap.c \
 			  farm/trunk.c farm/farm.c farm/slice.c \
-			  dog.c common.c treeview.c vdi.c node.c cluster.c
+			  dog.c common.c treeview.c vdi.c node.c cluster.c \
+			  upgrade.c
 
 if BUILD_TRACE
 dog_SOURCES		+= trace.c
