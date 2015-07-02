@@ -151,6 +151,7 @@ static int sheep_ctl_request(struct sheep_aiocb *aiocb)
 	request->aiocb = aiocb;
 	request->buf = aiocb->buf;
 	request->seq_num = uatomic_add_return(&c->seq_num, 1);
+	request->opcode = SHEEP_CTL;
 	hdr->id = request->seq_num;
 
 	sd_write_lock(&c->inflight_lock);
