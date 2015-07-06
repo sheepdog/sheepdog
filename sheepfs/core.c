@@ -408,8 +408,10 @@ int main(int argc, char **argv)
 		exit(1);
 
 	t = sheepfs_run_cmd("dog");
-	if (t && !strlen(t->buf)) {
+	if (!t || (t && !strlen(t->buf))) {
 		fprintf(stderr, "command dog not found\n");
+		if(t)
+			free(t);
 		exit(1);
 	}
 	strbuf_release(t);
