@@ -392,12 +392,13 @@ void show_progress(uint64_t done, uint64_t total, bool raw)
 size_t get_store_objsize(uint8_t copy_policy, uint8_t block_size_shift,
 			 uint64_t oid)
 {
+	uint32_t object_size;
 	if (is_vdi_obj(oid))
 		return SD_INODE_SIZE;
 	if (is_vdi_btree_obj(oid))
 		return SD_INODE_DATA_INDEX_SIZE;
 
-	uint32_t object_size = (UINT32_C(1) << block_size_shift);
+	object_size = (UINT32_C(1) << block_size_shift);
 	if (copy_policy != 0) {
 		int d;
 
