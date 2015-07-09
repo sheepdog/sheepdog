@@ -28,15 +28,11 @@ static int get_store_path(uint64_t oid, uint8_t ec_index, char *path)
 
 static int get_store_tmp_path(uint64_t oid, uint8_t ec_index, char *path)
 {
-	if (is_erasure_oid(oid)) {
-		if (unlikely(ec_index >= SD_MAX_COPIES))
-			panic("invalid ec_index %d", ec_index);
-		return snprintf(path, PATH_MAX, "%s/%016"PRIx64"_%d.tmp",
-				md_get_object_dir(oid), oid, ec_index);
-	}
+	char tmp_path[PATH_MAX];
 
-	return snprintf(path, PATH_MAX, "%s/%016" PRIx64".tmp",
-			md_get_object_dir(oid), oid);
+	get_store_path(oid, ec_index, path);
+	memcpy(tmp_path, path, PATH_MAX);
+	return snprintf(path, PATH_MAX, "%s.tmp", tmp_path);
 }
 
 static int get_store_stale_path(uint64_t oid, uint32_t epoch, uint8_t ec_index,
