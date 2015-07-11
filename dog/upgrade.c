@@ -32,6 +32,71 @@ static struct upgrade_cmd_data {
 	enum orig_version orig;
 } upgrade_cmd_data = { ~0, };
 
+static int upgrade_config_convert(int argc, char **argv)
+{
+	const char *orig_file = argv[optind++], *dst_file = NULL;
+	struct stat config_stat;
+	int fd, ret, new_fd;
+	struct sheepdog_config config;
+
+	BUILD_BUG_ON(sizeof(config) != SD_CONFIG_SIZE);
+
+	if (optind < argc)
+		dst_file = argv[optind++];
+	else {
+		sd_info("please specify destination file path");
+		return EXIT_USAGE;
+	}
+
+	fd = open(orig_file, O_RDONLY);
+	if (fd < 0) {
+		sd_err("failed to open config file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	memset(&config_stat, 0, sizeof(config_stat));
+	ret = fstat(fd, &config_stat);
+	if (ret < 0) {
+		sd_err("failed to stat config file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	if (config_stat.st_size != SD_CONFIG_SIZE) {
+		sd_err("original config file has invalid size: %lu",
+		       config_stat.st_size);
+		return EXIT_USAGE;
+	}
+
+	ret = xread(fd, &config, sizeof(config));
+	if (ret != sizeof(config)) {
+		sd_err("failed to read config file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	if (!(config.version == 0x0002 || config.version == 0x0004)) {
+		/* 0x0002: v0.7.x, 0x0004: v0.8.x */
+		sd_err("unknown version config file: %x", config.version);
+		return EXIT_USAGE;
+	}
+
+	config.block_size_shift = SD_DEFAULT_BLOCK_SIZE_SHIFT;
+	config.version = 0x0006;
+
+	new_fd = open(dst_file, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+	if (new_fd < 0) {
+		sd_err("failed to create a new config file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	ret = xwrite(new_fd, &config, sizeof(config));
+	if (ret != sizeof(config)) {
+		sd_err("failed to write to a new config file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	return EXIT_SUCCESS;
+}
+
 static int upgrade_epoch_convert(int argc, char **argv)
 {
 	const char *orig_file = argv[optind++], *dst_file = NULL;
@@ -265,6 +330,10 @@ static struct subcommand upgrade_cmd[] = {
 	 " <path of new epoch log file>",
 	 "hTo", "upgrade epoch log file",
 	 NULL, CMD_NEED_ARG, upgrade_epoch_convert, upgrade_options},
+	{"config-convert", "<path of original config file>"
+	 " <path of new config file>",
+	 "hT", "upgrade config file",
+	 NULL, CMD_NEED_ARG, upgrade_config_convert, upgrade_options},
 	{NULL,},
 };
 

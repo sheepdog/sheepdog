@@ -350,4 +350,19 @@ static inline __attribute__((used)) void __sd_proto_build_bug_ons(void)
 	BUILD_BUG_ON(sizeof(struct sd_rsp) != SD_RSP_SIZE);
 }
 
+#define SD_FORMAT_VERSION 0x0006
+#define SD_CONFIG_SIZE 40
+
+struct sheepdog_config {
+	uint64_t ctime;
+	uint16_t flags;
+	uint8_t copies;
+	uint8_t store[STORE_LEN];
+	uint8_t shutdown;
+	uint8_t copy_policy;
+	uint8_t block_size_shift;
+	uint16_t version;
+	uint64_t space;
+};
+
 #endif
