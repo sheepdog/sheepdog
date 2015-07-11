@@ -32,6 +32,129 @@ static struct upgrade_cmd_data {
 	enum orig_version orig;
 } upgrade_cmd_data = { ~0, };
 
+/* FIXME: this is a ugly copy from group.c, unify is todo */
+static int get_zones_nr_from(struct rb_root *nroot)
+{
+	int nr_zones = 0, j;
+	uint32_t zones[SD_MAX_COPIES];
+	struct sd_node *n;
+
+	rb_for_each_entry(n, nroot, rb) {
+		/*
+		 * Only count zones that actually store data, pure gateways
+		 * don't contribute to the redundancy level.
+		 */
+		if (!n->nr_vnodes)
+			continue;
+
+		for (j = 0; j < nr_zones; j++) {
+			if (n->zone == zones[j])
+				break;
+		}
+
+		if (j == nr_zones) {
+			zones[nr_zones] = n->zone;
+			if (++nr_zones == ARRAY_SIZE(zones))
+				break;
+		}
+	}
+
+	return nr_zones;
+}
+
+static struct vnode_info *alloc_vnode_info_from_epoch_file(const char *epoch_file)
+{
+	int fd, buf_len, ret, nr_nodes;
+	struct stat epoch_stat;
+	struct vnode_info *vinfo = NULL;
+	struct sd_node *nodes;
+
+	fd = open(epoch_file, O_RDONLY);
+	if (fd < 0) {
+		sd_err("failed to read epoch file %s: %m", epoch_file);
+		return NULL;
+	}
+
+	memset(&epoch_stat, 0, sizeof(epoch_stat));
+	ret = fstat(fd, &epoch_stat);
+	if (ret < 0) {
+		sd_err("failed to stat epoch log file: %m");
+		goto close_fd;
+	}
+
+	buf_len = epoch_stat.st_size - sizeof(time_t);
+	if (buf_len < 0) {
+		sd_err("invalid epoch log file: %m");
+		goto close_fd;
+	}
+
+	sd_assert(buf_len % sizeof(struct sd_node) == 0);
+	nr_nodes = buf_len / sizeof(struct sd_node);
+
+	nodes = xzalloc(buf_len);
+
+	ret = xread(fd, nodes, buf_len);
+	if (ret != buf_len) {
+		sd_err("failed to read from epoch file: %m");
+		goto free_nodes;
+	}
+
+	vinfo = xzalloc(sizeof(*vinfo));
+
+	INIT_RB_ROOT(&vinfo->vroot);
+	INIT_RB_ROOT(&vinfo->nroot);
+
+	for (int i = 0; i < nr_nodes; i++) {
+		rb_insert(&vinfo->nroot, &nodes[i], rb, node_cmp);
+		vinfo->nr_nodes++;
+	}
+
+	nodes_to_vnodes(&vinfo->nroot, &vinfo->vroot);
+	vinfo->nr_zones = get_zones_nr_from(&vinfo->nroot);
+
+	return vinfo;
+
+free_nodes:
+	free(nodes);
+
+close_fd:
+	close(fd);
+
+	return vinfo;
+}
+
+/*
+ * caution: currently upgrade_object_location() doesn't assume disk vnodes mode
+ */
+static int upgrade_object_location(int argc, char **argv)
+{
+	const char *epoch_file = argv[optind++], *oid_string = NULL;
+	uint64_t oid;
+	struct vnode_info *vinfo;
+
+	if (optind < argc)
+		oid_string = argv[optind++];
+	else {
+		sd_info("please specify object id in hex format");
+		return EXIT_USAGE;
+	}
+
+	oid = strtoull(oid_string, NULL, 16);
+
+	vinfo = alloc_vnode_info_from_epoch_file(epoch_file);
+	if (!vinfo) {
+		sd_err("failed to construct vnode info from epoch file %s",
+		       epoch_file);
+		return EXIT_SYSFAIL;
+	}
+
+
+	/* TODO: erasure coded objects */
+	sd_info("%s", node_to_str(oid_to_node(oid, &vinfo->vroot, 0)));
+
+	return EXIT_SUCCESS;
+}
+
 static int upgrade_config_convert(int argc, char **argv)
 {
 	const char *orig_file = argv[optind++], *dst_file = NULL;
@@ -334,6 +457,9 @@ static struct subcommand upgrade_cmd[] = {
 	 " <path of new config file>",
 	 "hT", "upgrade config file",
 	 NULL, CMD_NEED_ARG, upgrade_config_convert, upgrade_options},
+	{"object-location", "<path of latest epoch file> <oid>",
+	 "hT", "print object location",
+	 NULL, CMD_NEED_ARG, upgrade_object_location, upgrade_options},
 	{NULL,},
 };
 
