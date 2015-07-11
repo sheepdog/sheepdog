@@ -188,6 +188,31 @@ struct disk_info {
 #define DISK_MAX     32
 #define WEIGHT_MIN   (1ULL << 32)       /* 4G */
 
+
+/*
+ * struct sd_node_0_7: an old sd_node struct used in 0.7.x
+ * This struct is defined just for upgrading.
+ */
+struct sd_node_0_7 {
+	struct node_id nid;
+	uint16_t       nr_vnodes;
+	uint32_t       zone;
+	uint64_t       space;
+};
+
+/*
+ * struct sd_node_0_8: an old sd_node struct used in 0.8.x
+ * This struct is defined just for upgrading.
+ * The difference is just things related to diskvnodes.
+ */
+struct sd_node_0_8 {
+	struct rb_node rb;
+	struct node_id nid;
+	uint16_t       nr_vnodes;
+	uint32_t       zone;
+	uint64_t       space;
+};
+
 struct sd_node {
 	struct rb_node  rb;
 	struct node_id  nid;
