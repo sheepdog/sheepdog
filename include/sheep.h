@@ -328,4 +328,19 @@ static inline bool is_cluster_diskmode(const struct cluster_info *cinfo)
 	return (cinfo->flags & SD_CLUSTER_FLAG_DISKMODE) > 0;
 }
 
+#define SD_FORMAT_VERSION 0x0005
+#define SD_CONFIG_SIZE 40
+
+struct sheepdog_config {
+	uint64_t ctime;
+	uint16_t flags;
+	uint8_t copies;
+	uint8_t store[STORE_LEN];
+	uint8_t shutdown;
+	uint8_t copy_policy;
+	uint8_t block_size_shift;
+	uint16_t version;
+	uint64_t space;
+};
+
 #endif
