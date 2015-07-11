@@ -32,6 +32,126 @@ static struct upgrade_cmd_data {
 	enum orig_version orig;
 } upgrade_cmd_data = { ~0, };
 
+static int upgrade_epoch_convert(int argc, char **argv)
+{
+	const char *orig_file = argv[optind++], *dst_file = NULL;
+	struct stat epoch_stat;
+	time_t timestamp;
+	int fd, new_fd, buf_len, ret, nr_nodes;
+	struct sd_node_0_7 *nodes_0_7 = NULL;
+	struct sd_node_0_8 *nodes_0_8 = NULL;
+	int node_size = -1;
+	struct sd_node *new_nodes;
+
+	if (optind < argc)
+		dst_file = argv[optind++];
+	else {
+		sd_info("please specify destination file path");
+		return EXIT_USAGE;
+	}
+
+	if (upgrade_cmd_data.orig == ORIG_VERSION_0_7)
+		node_size = sizeof(struct sd_node_0_7);
+	else if (upgrade_cmd_data.orig == ORIG_VERSION_0_8)
+		node_size = sizeof(struct sd_node_0_8);
+	else {
+		sd_info("please specify original version of epoch file");
+		return EXIT_USAGE;
+	}
+
+	fd = open(orig_file, O_RDONLY);
+	if (fd < 0) {
+		sd_err("failed to open epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	memset(&epoch_stat, 0, sizeof(epoch_stat));
+	ret = fstat(fd, &epoch_stat);
+	if (ret < 0) {
+		sd_err("failed to stat epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	buf_len = epoch_stat.st_size - sizeof(timestamp);
+	if (buf_len < 0) {
+		sd_err("invalid epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	if (upgrade_cmd_data.orig == ORIG_VERSION_0_7) {
+		nodes_0_7 = xzalloc(buf_len);
+		ret = xread(fd, nodes_0_7, buf_len);
+	} else {
+		sd_assert(upgrade_cmd_data.orig == ORIG_VERSION_0_8);
+		nodes_0_8 = xzalloc(buf_len);
+		ret = xread(fd, nodes_0_8, buf_len);
+	}
+
+	if (ret < 0) {
+		sd_err("failed to read epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	if (ret % node_size != 0) {
+		sd_err("invalid epoch log file size");
+		return EXIT_SYSFAIL;
+	}
+
+	nr_nodes = ret / node_size;
+	new_nodes = xcalloc(nr_nodes, sizeof(struct sd_node));
+
+	ret = xread(fd, &timestamp, sizeof(timestamp));
+	if (ret != sizeof(timestamp)) {
+		sd_err("invalid epoch log file, failed to read timestamp: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	for (int i = 0; i < nr_nodes; i++) {
+		if (upgrade_cmd_data.orig == ORIG_VERSION_0_7) {
+			memcpy(&new_nodes[i].nid, &nodes_0_7[i].nid,
+			       sizeof(struct node_id));
+			new_nodes[i].nr_vnodes = nodes_0_7[i].nr_vnodes;
+			new_nodes[i].zone = nodes_0_7[i].zone;
+			new_nodes[i].space = nodes_0_7[i].space;
+		} else {
+			sd_assert(upgrade_cmd_data.orig == ORIG_VERSION_0_8);
+
+			memcpy(&new_nodes[i].nid, &nodes_0_8[i].nid,
+			       sizeof(struct node_id));
+			new_nodes[i].nr_vnodes = nodes_0_8[i].nr_vnodes;
+			new_nodes[i].zone = nodes_0_8[i].zone;
+			new_nodes[i].space = nodes_0_8[i].space;
+		}
+	}
+
+	new_fd = open(dst_file, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+	if (new_fd < 0) {
+		sd_err("failed to create a new epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	ret = xwrite(new_fd, new_nodes, sizeof(struct sd_node) * nr_nodes);
+	if (ret != sizeof(struct sd_node) * nr_nodes) {
+		sd_err("failed to write node list to a new epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	ret = xwrite(new_fd, &timestamp, sizeof(timestamp));
+	if (ret != sizeof(timestamp)) {
+		sd_err("failed to write timestamp to a new epoch log file: %m");
+		return EXIT_SYSFAIL;
+	}
+
+	sd_info("number of vnodes of each nodes:");
+	for (int i = 0; i < nr_nodes; i++)
+		sd_info("\t%s == %"PRIu16, node_to_str(&new_nodes[i]),
+			new_nodes[i].nr_vnodes);
+
+	sd_info("please supply the above numbers to sheeps with -V option");
+
+	return EXIT_SUCCESS;
+}
+
 static int upgrade_inode_convert(int argc, char **argv)
 {
 	const char *orig_file = argv[optind++], *dst_file = NULL;
@@ -141,6 +261,10 @@ static struct subcommand upgrade_cmd[] = {
 	 " <path of new inode file>",
 	 "hTo", "upgrade inode object file",
 	 NULL, CMD_NEED_ARG, upgrade_inode_convert, upgrade_options},
+	{"epoch-convert", "<path of original epoch log file>"
+	 " <path of new epoch log file>",
+	 "hTo", "upgrade epoch log file",
+	 NULL, CMD_NEED_ARG, upgrade_epoch_convert, upgrade_options},
 	{NULL,},
 };
 
