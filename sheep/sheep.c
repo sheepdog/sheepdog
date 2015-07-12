@@ -156,6 +156,7 @@ static struct sd_option sheep_options[] = {
 	{'v', "version", false, "show the version"},
 	{'V', "vnodes", true, "set number of vnodes", vnodes_help},
 	{'w', "cache", true, "enable object cache", cache_help},
+	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
 	{'z', "zone", true,
@@ -833,6 +834,9 @@ int main(int argc, char **argv)
 					optarg, UINT16_MAX);
 				exit(1);
 			}
+			break;
+		case 'W':
+			wildcard_recovery = true;
 			break;
 		default:
 			usage(1);

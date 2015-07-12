@@ -294,8 +294,9 @@ int default_read(uint64_t oid, const struct siocb *iocb)
 	 * If the request is against the older epoch, try to read from
 	 * the stale directory
 	 */
-	if (ret == SD_RES_NO_OBJ && iocb->epoch > 0 &&
-	    iocb->epoch < sys_epoch()) {
+	if (ret == SD_RES_NO_OBJ &&
+	    (iocb->wildcard ||
+	     (0 < iocb->epoch && iocb->epoch < sys_epoch()))) {
 		get_store_stale_path(oid, iocb->epoch, iocb->ec_index, path);
 		ret = default_read_from_path(oid, path, iocb);
 	}

@@ -32,6 +32,8 @@ static main_thread(struct vnode_info *) current_vnode_info;
 static main_thread(struct list_head *) pending_block_list;
 static main_thread(struct list_head *) pending_notify_list;
 
+bool wildcard_recovery;
+
 static int get_zones_nr_from(struct rb_root *nroot)
 {
 	int nr_zones = 0, j;
@@ -974,11 +976,17 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 				      sys->cinfo.epoch);
 
 			start_recovery(main_thread_get(current_vnode_info),
-				       old_vnode_info, true);
-		} else if (!was_cluster_shutdowned()) {
+				       old_vnode_info, true, false);
+		} else if (!was_cluster_shutdowned() || wildcard_recovery) {
 			start_recovery(main_thread_get(current_vnode_info),
 				       main_thread_get(current_vnode_info),
-				       false);
+				       false, wildcard_recovery);
+
+			/*
+			 * wildcard recovery is invoked only at first time of
+			 * sheep process launch
+			 */
+			wildcard_recovery = false;
 		}
 		set_cluster_shutdown(false);
 	}
@@ -1295,7 +1303,7 @@ main_fn void sd_leave_handler(const struct sd_node *left,
 		if (ret != 0)
 			panic("cannot log current epoch %d", sys->cinfo.epoch);
 		start_recovery(main_thread_get(current_vnode_info),
-			       old_vnode_info, true);
+			       old_vnode_info, true, false);
 	}
 
 	put_vnode_info(old_vnode_info);
@@ -1339,7 +1347,7 @@ static void kick_node_recover(void)
 	ret = inc_and_log_epoch();
 	if (ret != 0)
 		panic("cannot log current epoch %d", sys->cinfo.epoch);
-	start_recovery(main_thread_get(current_vnode_info), old, true);
+	start_recovery(main_thread_get(current_vnode_info), old, true, false);
 	put_vnode_info(old);
 }
 

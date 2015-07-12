@@ -213,6 +213,7 @@ struct siocb {
 	uint32_t offset;
 	uint8_t ec_index;
 	uint8_t copy_policy;
+	uint8_t wildcard;
 };
 
 /* This structure is used to pass parameters to vdi_* functions. */
@@ -454,7 +455,8 @@ int get_obj_list(const struct sd_req *, struct sd_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
 void objlist_cache_format(void);
 
-int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *, bool);
+int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *, bool,
+		   bool);
 bool oid_in_recovery(uint64_t oid);
 bool node_in_recovery(void);
 void get_recovery_state(struct recovery_state *state);
@@ -646,5 +648,7 @@ static inline int nfs_init(const char *options)
 	return 0;
 }
 #endif
+
+extern bool wildcard_recovery;
 
 #endif
