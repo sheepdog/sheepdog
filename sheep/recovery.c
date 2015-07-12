@@ -42,6 +42,8 @@ struct recovery_obj_work {
 	/* local replica in the stale directory */
 	uint32_t local_epoch;
 	uint8_t local_sha1[SHA1_DIGEST_SIZE];
+
+	bool wildcard;
 };
 
 /*
@@ -80,6 +82,8 @@ struct recovery_info {
 	uint32_t max_exec_count;
 	uint64_t queue_work_interval;
 	bool throttling;
+
+	bool wildcard;
 };
 
 struct recovery_timer {
@@ -255,7 +259,7 @@ done:
  */
 static int recover_object_from(struct recovery_obj_work *row,
 			       const struct sd_node *node,
-			       uint32_t tgt_epoch)
+			       uint32_t tgt_epoch, bool wildcard)
 {
 	uint64_t oid = row->oid;
 	uint32_t local_epoch = row->local_epoch;
@@ -299,6 +303,8 @@ static int recover_object_from(struct recovery_obj_work *row,
 	sd_init_req(&hdr, SD_OP_READ_PEER);
 	hdr.epoch = epoch;
 	hdr.flags = SD_FLAG_CMD_RECOVERY;
+	if (wildcard)
+		hdr.flags |= SD_FLAG_CMD_WILDCARD;
 	hdr.data_length = rlen;
 	hdr.obj.oid = oid;
 	hdr.obj.tgt_epoch = tgt_epoch;
@@ -349,11 +355,55 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		if (invalid_node(node, row->base.cur_vinfo))
 			continue;
 
-		ret = recover_object_from(row, node, tgt_epoch);
+		ret = recover_object_from(row, node, tgt_epoch, false);
 		switch (ret) {
 		case SD_RES_SUCCESS:
 			sd_debug("recovered oid %"PRIx64" from %d to epoch %d",
 				 oid, tgt_epoch, epoch);
+			return ret;
+		case SD_RES_OLD_NODE_VER:
+			/* move to the next epoch recovery */
+			return ret;
+		case SD_RES_NO_OBJ:
+			fully_replicated = false;
+			/* fall through */
+		default:
+			break;
+		}
+	}
+
+	/*
+	 * sheep would return a stale object when
+	 *  - all the nodes hold the copies, and
+	 *  - all the nodes are gone
+	 * at the some epoch
+	 */
+	if (fully_replicated && ret != SD_RES_SUCCESS)
+		ret = SD_RES_STALE_OBJ;
+
+	return ret;
+}
+
+static int recover_object_wildcard(struct recovery_obj_work *row,
+				   struct vnode_info *old,
+				   uint32_t tgt_epoch)
+{
+	uint64_t oid = row->oid;
+	uint32_t epoch = row->base.epoch;
+	int ret = SD_RES_SUCCESS;
+	bool fully_replicated = true;
+	struct sd_node *n;
+
+	rb_for_each_entry(n, &old->nroot, rb) {
+		sd_info("doing wildcard recovery: at epoch %u, object %"PRIx64
+			", from %s", tgt_epoch, oid, node_to_str(n));
+
+		ret = recover_object_from(row, n, tgt_epoch, true);
+
+		switch (ret) {
+		case SD_RES_SUCCESS:
+			sd_debug("recovered oid %"PRIx64" from %d to epoch %d"
+				 " (wildcard)", oid, tgt_epoch, epoch);
 			return ret;
 		case SD_RES_OLD_NODE_VER:
 			/* move to the next epoch recovery */
@@ -397,7 +447,10 @@ again:
 	sd_debug("try recover object %"PRIx64" from epoch %"PRIu32, oid,
 		 tgt_epoch);
 
-	ret = recover_object_from_replica(row, old, tgt_epoch);
+	if (row->wildcard)
+		ret = recover_object_wildcard(row, old, tgt_epoch);
+	else
+		ret = recover_object_from_replica(row, old, tgt_epoch);
 
 	switch (ret) {
 	case SD_RES_SUCCESS:
@@ -592,10 +645,16 @@ static inline void prepare_schedule_oid(uint64_t oid)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
 
+	struct recovery_work *rw;
+	struct recovery_obj_work *row;
+
 	if (xlfind(&oid, rinfo->prio_oids, rinfo->nr_prio_oids, oid_cmp)) {
 		sd_debug("%" PRIx64 " has been already in prio_oids", oid);
 		return;
 	}
+	row = xzalloc(sizeof(*row));
+	row->oid = oid;
+	row->wildcard = rinfo->wildcard;
 
 	rinfo->nr_prio_oids++;
 	rinfo->prio_oids = xrealloc(rinfo->prio_oids,
@@ -1198,7 +1257,7 @@ out:
 }
 
 int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
-		   bool epoch_lifted)
+		   bool epoch_lifted, bool wildcard)
 {
 	struct recovery_info *rinfo;
 
@@ -1222,6 +1281,11 @@ int start_recovery(struct vnode_info *cur_vinfo, struct vnode_info *old_vinfo,
 
 	rinfo->cur_vinfo = grab_vnode_info(cur_vinfo);
 	rinfo->old_vinfo = grab_vnode_info(old_vinfo);
+
+	rinfo->wildcard = wildcard;
+	if (wildcard)
+		sd_info("starting wild card recovery, objects will be searched"
+			" from all nodes");
 
 	if (!node_is_gateway_only())
 		sd_store->update_epoch(rinfo->tgt_epoch);
@@ -1265,6 +1329,7 @@ static void queue_recovery_work(struct recovery_info *rinfo)
 	case RW_RECOVER_OBJ:
 		row = xzalloc(sizeof(*row));
 		row->oid = rinfo->oids[rinfo->next];
+		row->wildcard = rinfo->wildcard;
 
 		rw = &row->base;
 		rw->work.fn = recover_object_work;

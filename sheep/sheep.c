@@ -148,6 +148,7 @@ static struct sd_option sheep_options[] = {
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "cache", true, "enable object cache", cache_help},
+	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
 	{'z', "zone", true,
@@ -796,6 +797,9 @@ int main(int argc, char **argv)
 			fprintf(stdout, "Sheepdog daemon version %s\n",
 				PACKAGE_VERSION);
 			exit(0);
+			break;
+		case 'W':
+			wildcard_recovery = true;
 			break;
 		default:
 			usage(1);
