@@ -202,5 +202,12 @@ void objlist_cache_format(void)
 	sd_write_lock(&obj_list_cache.lock);
 	rb_destroy(&obj_list_cache.root, struct objlist_cache_entry, node);
 	INIT_RB_ROOT(&obj_list_cache.root);
+	obj_list_cache.tree_version = 1;
+	obj_list_cache.buf_version = 0;
+	if (NULL != obj_list_cache.buf) {
+		free(obj_list_cache.buf);
+		obj_list_cache.buf = NULL;
+	}
+	obj_list_cache.cache_size = 0;
 	sd_rw_unlock(&obj_list_cache.lock);
 }
