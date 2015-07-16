@@ -695,14 +695,14 @@ int gateway_write_obj(struct request *req)
 	struct update_obj_refcnt_work *refcnt_work;
 	size_t nr_vids;
 
+	if (oid_is_readonly(oid))
+		return SD_RES_READONLY;
+
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    is_refresh_required(oid_to_vid(oid))) {
 		sd_debug("refresh is required: %"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
-
-	if (oid_is_readonly(oid))
-		return SD_RES_READONLY;
 
 	if (!bypass_object_cache(req))
 		return object_cache_handle_request(req);
@@ -809,14 +809,14 @@ int gateway_create_and_write_obj(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 
+	if (oid_is_readonly(oid))
+		return SD_RES_READONLY;
+
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    is_refresh_required(oid_to_vid(oid))) {
 		sd_debug("refresh is required: %"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
-
-	if (oid_is_readonly(oid))
-		return SD_RES_READONLY;
 
 	if (req->rq.flags & SD_FLAG_CMD_COW)
 		return gateway_handle_cow(req);
