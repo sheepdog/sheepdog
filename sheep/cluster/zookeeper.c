@@ -351,7 +351,7 @@ static struct cluster_lock *lock_table_lookup_acquire(uint64_t lock_id)
 			 ret_lock->id);
 		rc = zk_init_node(path);
 		if (rc)
-			panic("Failed to init node %s", path);
+			panic("Failed to init node %s: %s", path, zerror(rc));
 
 		sem_init(&ret_lock->wait_wakeup, 0, 1);
 		sd_init_mutex(&ret_lock->id_lock);
