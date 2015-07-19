@@ -626,7 +626,7 @@ int gateway_read_obj(struct request *req)
 
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    !is_inode_refresh_req(req) &&
-	    is_refresh_required(oid_to_vid(oid))) {
+	    is_vdi_obj(oid) && is_refresh_required(oid_to_vid(oid))) {
 		sd_debug("refresh is required: %"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
