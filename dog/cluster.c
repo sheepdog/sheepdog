@@ -87,12 +87,12 @@ static int cluster_format(int argc, char **argv)
 	char store_name[STORE_LEN];
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 
-	if (cluster_cmd_data.copies > sd_nodes_nr) {
+	if (cluster_cmd_data.copies > sd_zones_nr) {
 		char info[1024];
 		snprintf(info, sizeof(info), "Number of copies (%d) is larger "
-			 "than number of nodes (%d).\n"
+			 "than number of zones (%d).\n"
 			 "Are you sure you want to continue? [yes/no]: ",
-			 cluster_cmd_data.copies, sd_nodes_nr);
+			 cluster_cmd_data.copies, sd_zones_nr);
 		confirm(info);
 	}
 
