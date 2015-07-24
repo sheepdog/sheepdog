@@ -1,0 +1,6 @@
+#!/bin/bash
+
+node=${NODE:-n1}
+docker=${DOCKER:-docker}
+
+$docker exec -t $node /usr/sbin/dog $*
