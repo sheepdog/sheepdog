@@ -916,9 +916,6 @@ worker_fn void validate_myself(uint32_t vid)
 		goto out;
 	}
 
-	if (entry->snapshot)
-		goto out;
-
 	if (entry->lock_state != LOCK_STATE_SHARED)
 		goto out;
 
