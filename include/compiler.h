@@ -155,6 +155,12 @@ static inline uint64_t xgetbv(uint32_t idx)
 #define cpu_has_avx		cpu_has(X86_FEATURE_AVX)
 #define cpu_has_osxsave		cpu_has(X86_FEATURE_OSXSAVE)
 
+#else  /* __x86_64__ */
+
+#define cpu_has_ssse3   0
+#define cpu_has_avx     0
+#define cpu_has_osxsave 0
+
 #endif /* __x86_64__ */
 
 #endif	/* SD_COMPILER_H */
