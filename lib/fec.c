@@ -739,5 +739,8 @@ void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 
 	lost[0] = (unsigned char *)buf;
 	ec_init_tables(ed, 1, cm, ec_tbl);
-	ec_encode_data_sse(len, ed, 1, ec_tbl, input, lost);
+	if (cpu_has_ssse3)
+		ec_encode_data_sse(len, ed, 1, ec_tbl, input, lost);
+	else
+		ec_encode_data(len, ed, 1, ec_tbl, input, lost);
 }
