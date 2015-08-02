@@ -54,7 +54,7 @@ static const char http_help[] =
 "communicate with http server, using 64MB buffer.\n";
 
 static const char myaddr_help[] =
-"Example:\n\t$ sheep -y 192.168.1.1:7000 ...\n"
+"Example:\n\t$ sheep -y 192.168.1.1 ...\n"
 "This tries to tell other nodes through what address they can talk to this\n"
 "sheep.\n";
 
