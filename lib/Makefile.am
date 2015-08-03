@@ -58,7 +58,7 @@ if !X86_64
 arch = 32
 endif
 
-libsd_a_LIBADD		= $(libsheepdog_a_LIBADD_$(arch))
+libsd_a_LIBADD		= $(libsd_a_LIBADD_$(arch))
 
 if BUILD_SHA1_HW
 libsd_a_SOURCES		+= sha1_ssse3.S
