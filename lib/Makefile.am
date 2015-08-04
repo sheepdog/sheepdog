@@ -38,7 +38,7 @@ libsd_a_SOURCES		= event.c logger.c net.c util.c rbtree.c strbuf.c \
 			  sha1.c option.c work.c sockfd_cache.c fec.c \
 			  sd_inode.c common.c
 
-libsd_a_LIBADD		= isa-l/bin/ec_base.o \
+libsd_a_LIBADD_		= isa-l/bin/ec_base.o \
 			  isa-l/bin/ec_highlevel_func.o \
 			  isa-l/bin/ec_multibinary.o \
 			  isa-l/bin/gf_2vect_dot_prod_sse.o \
@@ -49,6 +49,16 @@ libsd_a_LIBADD		= isa-l/bin/ec_base.o \
 			  isa-l/bin/gf_vect_dot_prod_sse.o \
 			  isa-l/bin/gf_vect_mul_avx.o \
 			  isa-l/bin/gf_vect_mul_sse.o
+
+libsd_a_LIBADD_32	= isa-l/bin/ec_base.o \
+			  isa-l/bin/ec_highlevel_func.o \
+			  isa-l/bin/ec_multibinary.o
+
+if !X86_64
+arch = 32
+endif
+
+libsd_a_LIBADD		= $(libsd_a_LIBADD_$(arch))
 
 if BUILD_SHA1_HW
 libsd_a_SOURCES		+= sha1_ssse3.S
@@ -74,7 +84,7 @@ check-style:
 	@$(CHECK_STYLE) $(libsd_a_SOURCES)
 
 libisa.a:
-	cd isa-l/ && $(MAKE) && cd ..
+	cd isa-l/ && $(MAKE) arch=$(arch) && cd ..
 
 clean-local:
 	rm -f *.o gmon.out *.da *.bb *.bbg
