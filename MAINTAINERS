@@ -70,3 +70,9 @@ Earthquake testing stuff
 M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
 F: tests/earthquake/*
 L: sheepdog@lists.wpkg.org
+
+Debian related stuff
+------------------------------
+M: Alexander Guy <alexander@andern.org>
+F: debian/*
+L: sheepdog@lists.wpkg.org
