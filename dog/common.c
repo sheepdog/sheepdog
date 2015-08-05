@@ -289,6 +289,13 @@ int do_generic_subcommand(struct subcommand *sub, int argc, char **argv)
 		subcmd_stack[++subcmd_depth] = &sub[i];
 		flags = sub[i].flags;
 
+		if (flags & CMD_NEED_ROOT) {
+			if (!is_root()) {
+				sd_err("Need run under root");
+				exit(EXIT_SYSFAIL);
+			}
+		}
+
 		if (flags & CMD_NEED_NODELIST) {
 			ret = update_node_list(SD_MAX_NODES);
 			if (ret < 0) {
@@ -532,4 +539,12 @@ uint8_t parse_copy(const char *str, uint8_t *copy_policy)
 	*copy_policy = ((copy / 2) << 4) + parity;
 	copy = copy + parity;
 	return copy;
+}
+
+bool is_root(void)
+{
+	if (geteuid() != 0)
+		return false;
+
+	return true;
 }
