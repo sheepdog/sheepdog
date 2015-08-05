@@ -17,6 +17,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
@@ -30,6 +31,7 @@
 
 #define CMD_NEED_NODELIST (1 << 0)
 #define CMD_NEED_ARG (1 << 1)
+#define CMD_NEED_ROOT (1 << 2)
 
 #define UINT64_DECIMAL_SIZE 21
 
@@ -67,6 +69,7 @@ extern struct rb_root sd_nroot;
 extern int sd_nodes_nr;
 extern int sd_zones_nr;
 
+bool is_root(void);
 bool is_current(const struct sd_inode *i);
 char *strnumber(uint64_t _size);
 char *strnumber_raw(uint64_t _size, bool raw);
