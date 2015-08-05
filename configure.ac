@@ -349,13 +349,19 @@ else
 fi
 
 if test "x${enable_corosync}" = xyes; then
-	PKG_CHECK_MODULES([corosync],[corosync])
 	PKG_CHECK_MODULES([libcpg],[libcpg])
 	PKG_CHECK_MODULES([libcfg],[libcfg])
-	PKG_CHECK_MODULES([libqb],[libqb])
-	PKG_CHECK_MODULES([libcorosync_common],[libcorosync_common])
 	AC_DEFINE_UNQUOTED([HAVE_COROSYNC], 1, [have corosync])
 	PACKAGE_FEATURES="$PACKAGE_FEATURES corosync"
+	corosync_LIBS="$libcpg_LIBS $libcfg_LIBS $libcorosync_LIBS"
+	corosync_CFLAGS="$libcorosync_CFLAGS $libcpg_CFLAGS $libcfg_CFLAGS"
+	PKG_CHECK_MODULES([corosync2],[corosync >= 2],
+		[PKG_CHECK_MODULES([libqb],[libqb])
+		PKG_CHECK_MODULES([libcorosync_common],[libcorosync_common])
+		corosync_LIBS="$corosync_LIBS $libqb_LIBS $libcorosync_common_LIBS"
+		corosync_CFLAGS="$corosync_CFLAGS $libqb_CFLAGS $libcorosync_common_CFLAGS"],)
+	AC_SUBST(corosync_LIBS)
+	AC_SUBST(corosync_CFLAGS)
 fi
 
 if test "x${enable_zookeeper}" = xyes; then
@@ -555,7 +561,7 @@ AC_MSG_RESULT([  State information        = ${localstatedir}])
 AC_MSG_RESULT([  System configuration     = ${sysconfdir}])
 AC_MSG_RESULT([  System init.d directory  = ${INITDDIR}])
 AC_MSG_RESULT([  sheepdog config dir      = ${COROSYSCONFDIR}])
-AC_MSG_RESULT([  Features                 =${PACKAGE_FEATURES}])
+AC_MSG_RESULT([  Features                 = ${PACKAGE_FEATURES}])
 AC_MSG_RESULT([])
 AC_MSG_RESULT([$PACKAGE build info:])
 AC_MSG_RESULT([  Library SONAME           = ${SONAME}])
