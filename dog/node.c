@@ -831,7 +831,7 @@ static int node_vnodes(int argc, char **argv)
 
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprhlT", "kill node", NULL,
-	 CMD_NEED_NODELIST, node_kill, node_options},
+	 CMD_NEED_ROOT|CMD_NEED_NODELIST, node_kill, node_options},
 	{"list", NULL, "aprhT", "list nodes", NULL,
 	 CMD_NEED_NODELIST, node_list},
 	{"info", NULL, "aprhT", "show information about each node", NULL,
@@ -840,13 +840,13 @@ static struct subcommand node_cmd[] = {
 	 "show recovery information or set/get recovery speed throttling of nodes",
 	 node_recovery_cmd, 0, node_recovery, node_options},
 	{"md", "[disks]", "aprAfhT", "See 'dog node md' for more information",
-	 node_md_cmd, CMD_NEED_ARG, node_md, node_options},
+	 node_md_cmd, CMD_NEED_ROOT|CMD_NEED_ARG, node_md, node_options},
 	{"stat", NULL, "aprwhT", "show stat information about the node", NULL,
 	 0, node_stat, node_options},
 	{"log", NULL, "aphT", "show or set log level of the node", node_log_cmd,
-	 CMD_NEED_ARG, node_log},
+	 CMD_NEED_ROOT|CMD_NEED_ARG, node_log},
 	{"vnodes", "<num of vnodes>", "aph", "set new vnodes", node_vnodes_cmd,
-	 CMD_NEED_ARG, node_vnodes},
+	 CMD_NEED_ROOT|CMD_NEED_ARG, node_vnodes},
 	{NULL,},
 };
 
