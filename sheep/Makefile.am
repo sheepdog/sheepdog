@@ -20,8 +20,7 @@ MAINTAINERCLEANFILES	= Makefile.in
 AM_CFLAGS		=
 
 AM_CPPFLAGS		= -I$(top_builddir)/include -I$(top_srcdir)/include \
-			  $(libacrd_CFLAGS) $(libcpg_CFLAGS) $(libcfg_CFLAGS) \
-			  $(libqb_CFLAGS)  $(libcorosync_common_CFLAGS)
+			  $(libacrd_CFLAGS) $(corosync_CFLAGS)
 
 sbin_PROGRAMS		= sheep
 
@@ -57,8 +56,7 @@ sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c trace/checker.c
 endif
 
 sheep_LDADD	  	= ../lib/libsd.a -lpthread -lm \
-			  $(libcpg_LIBS) $(libcfg_LIBS) $(libacrd_LIBS) $(LIBS) \
-			  $(libqb_LIBS) $(libcorosync_common_LIBS)
+			  $(libacrd_LIBS) $(corosync_LIBS) $(LIBS)
 
 if BUILD_NFS
 sheep_LDADD		+= -lrt
