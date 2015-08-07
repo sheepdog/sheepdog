@@ -416,14 +416,43 @@ char *sockaddr_in_to_str(struct sockaddr_in *sockaddr)
 
 uint8_t *str_to_addr(const char *ipstr, uint8_t *addr)
 {
-	int addr_start_idx = 0, af = strstr(ipstr, ":") ? AF_INET6 : AF_INET;
+	struct addrinfo hints;
+	struct addrinfo *result, *rp;
+	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	int res = -1;
+	int addr_start_idx = 0;
 
-	if (af == AF_INET) {
-		addr_start_idx = 12;
-		memset(addr, 0, addr_start_idx);
-	}
-	if (!inet_pton(af, ipstr, addr + addr_start_idx))
+	memset(&hints, 0, sizeof(struct addrinfo));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = 0;
+	hints.ai_protocol = 0;
+
+	res = getaddrinfo(ipstr, NULL, &hints, &result);
+	if (res != 0)
 		return NULL;
+
+	for (rp = result; rp != NULL; rp = rp->ai_next) {
+		switch (rp->ai_family) {
+		case AF_INET:
+			addr_start_idx = 12;
+			memset(addr, 0, addr_start_idx);
+			sin = (struct sockaddr_in *) rp->ai_addr;
+			addr = memcpy(addr+addr_start_idx, &sin->sin_addr, rp->ai_addrlen);
+			break;
+		case AF_INET6:
+			sin6 = (struct sockaddr_in6 *) rp->ai_addr;
+			addr = memcpy(addr+addr_start_idx, &sin6->sin6_addr, rp->ai_addrlen);
+			break;
+		}
+		break;
+	}
+
+	if (rp == NULL)
+		return NULL;
+
+	freeaddrinfo(result);
 
 	return addr;
 }
