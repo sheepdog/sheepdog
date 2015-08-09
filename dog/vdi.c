@@ -1609,7 +1609,7 @@ static int vdi_read(int argc, char **argv)
 	uint64_t offset = 0, oid, done = 0, total = (uint64_t) -1;
 	uint32_t vdi_id, idx;
 	uint32_t object_size;
-	unsigned int len;
+	uint64_t len;
 	char *buf = NULL;
 
 	if (argv[optind]) {
