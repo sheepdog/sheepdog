@@ -6,7 +6,7 @@ lib_LTLIBRARIES         = libsheepdog.la
 
 libsheepdog_la_DEPENDENCIES =
 
-libsheepdog_la_SOURCES  = shared/sheep.c shared/vdi.c util.c
+libsheepdog_la_SOURCES  = shared/sheep.c shared/vdi.c shared/ops.c util.c
 
 libsheepdog_la_LDFLAGS  = -avoid-version -shared -module -export-dynamic \
 			  -export-symbols-regex 'sd_'
