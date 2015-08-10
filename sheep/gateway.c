@@ -693,7 +693,7 @@ int gateway_write_obj(struct request *req)
 	uint32_t *vids = NULL, *new_vids = req->data;
 	struct generation_reference *refs = NULL, *zeroed_refs = NULL;
 	struct update_obj_refcnt_work *refcnt_work;
-	size_t nr_vids;
+	size_t nr_vids = hdr->data_length / sizeof(*vids);
 
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    is_refresh_required(oid_to_vid(oid))) {
@@ -709,8 +709,6 @@ int gateway_write_obj(struct request *req)
 
 
 	if (is_data_vid_update(hdr)) {
-		nr_vids = hdr->data_length / sizeof(*vids);
-
 		invalidate_other_nodes(oid_to_vid(oid));
 
 		/* read the previous vids to discard their references later */
