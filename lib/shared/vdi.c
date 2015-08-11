@@ -611,9 +611,11 @@ int sd_vdi_rollback(struct sd_cluster *c, char *name, char *tag)
 			false, inode->nr_copies, inode->copy_policy,
 			inode->store_policy, inode->block_size_shift);
 
-	if (ret != SD_RES_SUCCESS)
+	if (ret != SD_RES_SUCCESS) {
 		fprintf(stderr, "Failed to rollback VDI: %s\n",
 				sd_strerror(ret));
+		return ret;
+	}
 
 	return SD_RES_SUCCESS;
 }
