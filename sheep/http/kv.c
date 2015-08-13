@@ -1060,7 +1060,7 @@ static int onode_read_extents(struct kv_onode *onode, struct http_request *req)
 	struct onode_extent *ext;
 	uint64_t size, total, total_size, offset, done = 0, i, ext_len;
 	uint64_t off = req->offset, len = req->data_length;
-	int ret;
+	int ret = SD_RES_SUCCESS;
 	char *data_buf = NULL;
 	uint64_t read_buffer_size = MIN(kv_rw_buffer, onode->size);
 

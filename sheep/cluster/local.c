@@ -307,15 +307,15 @@ static int add_event(enum local_event_type type, struct local_node *lnode,
 		xlremove(lnode, ev.lnodes, &ev.nr_lnodes, lnode_cmp);
 		break;
 	case EVENT_GATEWAY:
-		n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp);
-		n->gateway = true;
+		if (n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp))
+			n->gateway = true;
 		break;
 	case EVENT_NOTIFY:
 	case EVENT_BLOCK:
 		break;
 	case EVENT_UPDATE_NODE:
-		n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp);
-		n->node = lnode->node;
+		if (n = xlfind(lnode, ev.lnodes, ev.nr_lnodes, lnode_cmp))
+			n->node = lnode->node;
 		break;
 	case EVENT_ACCEPT:
 		abort();
