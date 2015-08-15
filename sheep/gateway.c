@@ -712,9 +712,23 @@ int gateway_write_obj(struct request *req)
 		invalidate_other_nodes(oid_to_vid(oid));
 
 		/* read the previous vids to discard their references later */
-		vids = xzalloc(sizeof(*vids) * nr_vids);
-		refs = xzalloc(sizeof(*refs) * nr_vids);
-		zeroed_refs = xcalloc(sizeof(*zeroed_refs), nr_vids);
+		vids = calloc(nr_vids, sizeof(*vids));
+		if (!vids)
+			return SD_RES_NO_MEM;
+
+		refs = calloc(nr_vids, sizeof(*refs));
+		if (!refs) {
+			free(vids);
+			return SD_RES_NO_MEM;
+		}
+
+		zeroed_refs = calloc(nr_vids, sizeof(*zeroed_refs));
+		if (!zeroed_refs) {
+			free(vids);
+			free(refs);
+			return SD_RES_NO_MEM;
+		}
+
 		ret = prepare_obj_refcnt(hdr, vids, refs);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
@@ -747,23 +761,35 @@ int gateway_write_obj(struct request *req)
 		}
 
 		sd_debug("update ledger objects of %"PRIx64, hdr->obj.oid);
-		refcnt_work = xzalloc(sizeof(*refcnt_work));
+		refcnt_work = zalloc(sizeof(*refcnt_work));
+		if (!refcnt_work)
+			goto free_bufs;
 
 		refcnt_work->vids = vids;
 		refcnt_work->refs = refs;
 		refcnt_work->nr_vids = nr_vids;
-		refcnt_work->new_vids = xcalloc(hdr->data_length,
-						sizeof(uint32_t));
+		refcnt_work->new_vids = calloc(hdr->data_length,
+					       sizeof(uint32_t));
+		if (!refcnt_work->new_vids)
+			goto free_work;
 		memcpy(refcnt_work->new_vids, new_vids, hdr->data_length);
 
 		refcnt_work->offset = offset;
 		refcnt_work->start = start;
 
-
 		refcnt_work->work.fn = async_update_obj_refcnt_work;
 		refcnt_work->work.done = async_update_obj_refcnt_done;
 
 		queue_work(sys->io_wqueue, &refcnt_work->work);
+		goto out;
+
+free_work:
+		free(refcnt_work);
+free_bufs:
+		free(vids);
+		free(refs);
+
+		ret = SD_RES_NO_MEM;
 	}
 
 out:
