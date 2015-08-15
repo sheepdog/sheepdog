@@ -984,7 +984,10 @@ static void recover_object_main(struct work *work)
 	if (rinfo->oids[rinfo->done] != row->oid) {
 		uint64_t *p = xlfind(&row->oid, rinfo->oids + rinfo->done,
 				     rinfo->next - rinfo->done, oid_cmp);
-
+		if (p == NULL) {
+			free_recovery_obj_work(row);
+			return;
+		}
 		*p = rinfo->oids[rinfo->done];
 		rinfo->oids[rinfo->done] = row->oid;
 	}
@@ -1332,4 +1335,3 @@ struct recovery_throttling get_recovery(void)
 {
 	return sys->rthrottling;
 }
-

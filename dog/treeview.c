@@ -209,8 +209,8 @@ void dump_tree(void)
 
 	depth = get_depth(root);
 
-	width = malloc(sizeof(int) * depth);
-	more = malloc(sizeof(int) * depth);
+	width = malloc((size_t)(sizeof(int) * depth));
+	more = malloc((size_t)(sizeof(int) * depth));
 	if (!width || !more) {
 		sd_err("Failed to allocate memory");
 		return;
