@@ -258,6 +258,7 @@ static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 		}
 		wi->nr_threads++;
 		sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
+		tracepoint(work, create_thread, wi->name, wi, wi->nr_threads);
 	}
 
 	return 0;
@@ -330,6 +331,7 @@ static void *worker_routine(void *arg)
 			pthread_detach(pthread_self());
 			sd_debug("destroy thread %s %d, %zu", wi->name, tid,
 				 wi->nr_threads);
+			tracepoint(work, destroy_thread, wi->name, wi, wi->nr_threads);
 			break;
 		}
 retest:

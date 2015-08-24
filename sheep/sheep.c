@@ -10,6 +10,7 @@
  */
 
 #include <sys/resource.h>
+#include <sys/time.h>
 #include <malloc.h>
 
 #include "sheep_priv.h"
@@ -914,7 +915,7 @@ int main(int argc, char **argv)
 
 	free(logdir);
 
-	srandom(port);
+	srandom(clock_get_time());
 
 	if (daemonize && log_dst_type == LOG_DST_STDOUT)
 		daemonize = false;

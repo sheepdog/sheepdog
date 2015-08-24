@@ -54,11 +54,11 @@ TRACEPOINT_EVENT(
 TRACEPOINT_EVENT(
 	request,
 	rx_work,
-	TP_ARGS(int, _fd, void *, _work, void *, _req, int, _op),
+	TP_ARGS(int, _fd, void *, _work, int, _id, int, _op),
 	TP_FIELDS(
 		ctf_integer(int, fd, _fd)
 		ctf_integer_hex(void *, work, _work)
-		ctf_integer_hex(void *, request, _req)
+		ctf_integer_hex(int, id, _id)
 		ctf_integer_hex(int, opcode, _op)
 		)
 	)
@@ -66,33 +66,47 @@ TRACEPOINT_EVENT(
 TRACEPOINT_EVENT(
 	request,
 	rx_main,
-	TP_ARGS(int, _fd, void *, _work, void *, _req),
+	TP_ARGS(int, _fd, void *, _work, int, _id, int, _op),
 	TP_FIELDS(
 		ctf_integer(int, fd, _fd)
 		ctf_integer_hex(void *, work, _work)
-		ctf_integer_hex(void *, request, _req)
+		ctf_integer_hex(int, id, _id)
+		ctf_integer_hex(int, opcode, _op)
 		)
 	)
 
 TRACEPOINT_EVENT(
 	request,
 	tx_work,
-	TP_ARGS(int, _fd, void *, _work, void *, _req),
+	TP_ARGS(int, _fd, void *, _work, int, _id, int, _op),
 	TP_FIELDS(
 		ctf_integer(int, fd, _fd)
 		ctf_integer_hex(void *, work, _work)
-		ctf_integer(void *, request, _req)
+		ctf_integer_hex(int, id, _id)
+		ctf_integer_hex(int, opcode, _op)
 		)
 	)
 
 TRACEPOINT_EVENT(
 	request,
 	tx_main,
-	TP_ARGS(int, _fd, void *, _work, void *, _req),
+	TP_ARGS(int, _fd, void *, _work, int, _id, int, _op, int, _res),
 	TP_FIELDS(
 		ctf_integer(int, fd, _fd)
 		ctf_integer_hex(void *, work, _work)
-		ctf_integer_hex(void *, request, _req)
+		ctf_integer_hex(int, id, _id)
+		ctf_integer_hex(int, opcode, _op)
+		ctf_integer(int, result, _res)
+		)
+	)
+
+TRACEPOINT_EVENT(
+	request,
+	client_handler,
+	TP_ARGS(int, _events, int, _conn_dead),
+	TP_FIELDS(
+		ctf_integer(int, events, _events)
+		ctf_integer(int, conn_dead, _conn_dead)
 		)
 	)
 

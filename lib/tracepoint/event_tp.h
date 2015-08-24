@@ -37,8 +37,8 @@ TRACEPOINT_EVENT(
 	TP_ARGS(int, _fd, void *, _handler, void *, _data, int, _prio),
 	TP_FIELDS(
 		ctf_integer(int, fd, _fd)
-		ctf_integer(void *, handler, _handler)
-		ctf_integer(void *, data, _data)
+		ctf_integer_hex(void *, handler, _handler)
+		ctf_integer_hex(void *, data, _data)
 		ctf_integer(int, prio, _prio)
 		)
 	)
@@ -51,6 +51,21 @@ TRACEPOINT_EVENT(
 		ctf_integer(int, fd, _fd)
 		)
 	)
+
+TRACEPOINT_EVENT(
+	event,
+	wait_start,
+	TP_ARGS(),
+	TP_FIELDS()
+	)
+
+TRACEPOINT_EVENT(
+	event,
+	wait_return,
+	TP_ARGS(),
+	TP_FIELDS()
+	)
+
 
 #endif /* EVENT_TRACEPOINT_H */
 
