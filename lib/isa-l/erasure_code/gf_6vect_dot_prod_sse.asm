@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+;  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 ;
 ;  Redistribution and use in source and binary forms, with or without
 ;  modification, are permitted provided that the following conditions 
@@ -27,9 +27,11 @@
 ;  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;
 ;;; gf_6vect_dot_prod_sse(len, vec, *g_tbls, **buffs, **dests);
-;;; 
+;;;
 
+%include "reg_sizes.asm"
 
 %ifidn __OUTPUT_FORMAT__, elf64
  %define arg0  rdi
@@ -97,12 +99,12 @@
 	save_xmm128	xmm13, 7*16
 	save_xmm128	xmm14, 8*16
 	save_xmm128	xmm15, 9*16
-	save_reg	r12,  3*16 + 0*8
-	save_reg	r13,  3*16 + 1*8
-	save_reg	r14,  3*16 + 2*8
-	save_reg	r15,  3*16 + 3*8
-	save_reg	rdi,  3*16 + 4*8
-	save_reg	rsi,  3*16 + 5*8
+	save_reg	r12,  10*16 + 0*8
+	save_reg	r13,  10*16 + 1*8
+	save_reg	r14,  10*16 + 2*8
+	save_reg	r15,  10*16 + 3*8
+	save_reg	rdi,  10*16 + 4*8
+	save_reg	rsi,  10*16 + 5*8
 	end_prolog
 	mov	arg4, arg(4)
  %endmacro
@@ -118,12 +120,12 @@
 	movdqa	xmm13, [rsp + 7*16]
 	movdqa	xmm14, [rsp + 8*16]
 	movdqa	xmm15, [rsp + 9*16]
-	mov	r12,  [rsp + 3*16 + 0*8]
-	mov	r13,  [rsp + 3*16 + 1*8]
-	mov	r14,  [rsp + 3*16 + 2*8]
-	mov	r15,  [rsp + 3*16 + 3*8]
-	mov	rdi,  [rsp + 3*16 + 4*8]
-	mov	rsi,  [rsp + 3*16 + 5*8]
+	mov	r12,  [rsp + 10*16 + 0*8]
+	mov	r13,  [rsp + 10*16 + 1*8]
+	mov	r14,  [rsp + 10*16 + 2*8]
+	mov	r15,  [rsp + 10*16 + 3*8]
+	mov	rdi,  [rsp + 10*16 + 4*8]
+	mov	rsi,  [rsp + 10*16 + 5*8]
 	add	rsp, stack_size
  %endmacro
 %endif
@@ -164,20 +166,20 @@ default rel
 section .text
 
 %define xmask0f   xmm15
-%define xgft1_lo  xmm14
-%define xgft1_hi  xmm13
-%define xgft2_lo  xmm12
-%define xgft2_hi  xmm11
-%define xgft3_lo  xmm10
-%define xgft3_hi  xmm9
+%define xgft1_lo  xmm2
+%define xgft1_hi  xmm3
+%define xgft2_lo  xmm4
+%define xgft2_hi  xmm5
+%define xgft3_lo  xmm6
+%define xgft3_hi  xmm7
 %define x0     xmm0
 %define xtmpa  xmm1
-%define xp1    xmm2
-%define xp2    xmm3
-%define xp3    xmm4
-%define xp4    xmm5
-%define xp5    xmm6
-%define xp6    xmm7
+%define xp1    xmm8
+%define xp2    xmm9
+%define xp3    xmm10
+%define xp4    xmm11
+%define xp5    xmm12
+%define xp6    xmm13
 
 align 16
 global gf_6vect_dot_prod_sse:function
@@ -309,13 +311,5 @@ section .data
 align 16
 mask0f:	ddq 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
 
-%macro slversion 4
-global %1_slver_%2%3%4
-global %1_slver
-%1_slver:
-%1_slver_%2%3%4:
-	dw 0x%4
-	db 0x%3, 0x%2
-%endmacro
 ;;;       func                  core, ver, snum
-slversion gf_6vect_dot_prod_sse, 00,  02,  0066
+slversion gf_6vect_dot_prod_sse, 00,  05,  0066

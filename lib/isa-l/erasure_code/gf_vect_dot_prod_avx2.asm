@@ -28,7 +28,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;
-;;; gf_vect_dot_prod_sse(len, vec, *g_tbls, **buffs, *dest);
+;;; gf_vect_dot_prod_avx2(len, vec, *g_tbls, **buffs, *dest);
 ;;;
 
 %include "reg_sizes.asm"
@@ -39,15 +39,18 @@
  %define arg2  rdx
  %define arg3  rcx
  %define arg4  r8
+ %define arg5  r9
 
  %define tmp   r11
+ %define tmp.w r11d
+ %define tmp.b r11b
  %define tmp2  r10
  %define tmp3  r9
  %define return rax
- %macro  SLDR 2
+ %macro  SLDR   2
  %endmacro
- %define SSTR SLDR
- %define PS 8
+ %define SSTR   SLDR
+ %define PS     8
  %define func(x) x:
  %define FUNC_SAVE
  %define FUNC_RESTORE
@@ -61,13 +64,15 @@
 
  %define arg4   r12 		; must be saved and loaded
  %define tmp    r11
+ %define tmp.w  r11d
+ %define tmp.b  r11b
  %define tmp2   r10
  %define tmp3   rdi 		; must be saved and loaded
  %define return rax
- %macro  SLDR 2
+ %macro  SLDR   2
  %endmacro
- %define SSTR SLDR
- %define PS 8
+ %define SSTR   SLDR
+ %define PS     8
  %define frame_size 2*8
  %define arg(x)      [rsp + frame_size + PS + PS*x]
 
@@ -120,10 +125,12 @@
  %define arg4    trans
  %define arg4_m  arg(4)
  %define tmp	 edx
+ %define tmp.w   edx
+ %define tmp.b   dl
  %define tmp2    edi
  %define tmp3    esi
  %define return  eax
- %macro SLDR 2	;; stack load/restore
+ %macro SLDR     2			;stack load/restore
 	mov %1, %2
  %endmacro
  %define SSTR SLDR
@@ -157,97 +164,103 @@
 %define ptr   tmp3
 %define pos   return
 
- %ifidn PS,4				;32-bit code
-	%define  vec_m 	arg1_m
-	%define  len_m 	arg0_m
-	%define  dest_m arg4_m
- %endif
+%ifidn PS,4				;32-bit code
+ %define  vec_m  arg1_m
+ %define  len_m  arg0_m
+ %define  dest_m arg4_m
+%endif
 
 %ifndef EC_ALIGNED_ADDR
 ;;; Use Un-aligned load/store
- %define XLDR movdqu
- %define XSTR movdqu
+ %define XLDR vmovdqu
+ %define XSTR vmovdqu
 %else
 ;;; Use Non-temporal load/stor
  %ifdef NO_NT_LDST
-  %define XLDR movdqa
-  %define XSTR movdqa
+  %define XLDR vmovdqa
+  %define XSTR vmovdqa
  %else
-  %define XLDR movntdqa
-  %define XSTR movntdq
+  %define XLDR vmovntdqa
+  %define XSTR vmovntdq
  %endif
 %endif
 
 %ifidn PS,8				;64-bit code
  default rel
-  [bits 64]
+ [bits 64]
 %endif
 
 section .text
 
-%define xmask0f  xmm5
-%define xgft_lo  xmm4
-%define xgft_hi  xmm3
+%define xmask0f  ymm3
+%define xmask0fx xmm3
+%define xgft_lo  ymm4
+%define xgft_hi  ymm5
 
-%define x0     xmm0
-%define xtmpa  xmm1
-%define xp     xmm2
+%define x0     ymm0
+%define xtmpa  ymm1
+%define xp     ymm2
 
 align 16
-global gf_vect_dot_prod_sse:function
-func(gf_vect_dot_prod_sse)
+global gf_vect_dot_prod_avx2:function
+func(gf_vect_dot_prod_avx2)
 	FUNC_SAVE
 	SLDR 	len, len_m
-	sub	len, 16
+	sub	len, 32
 	SSTR 	len_m, len
 	jl	.return_fail
 	xor	pos, pos
-	movdqa	xmask0f, [mask0f]	;Load mask of lower nibble in each byte
+	mov	tmp.b, 0x0f
+	vpinsrb	xmask0fx, xmask0fx, tmp.w, 0
+	vpbroadcastb xmask0f, xmask0fx	;Construct mask 0x0f0f0f...
 
-.loop16:
-	pxor	xp, xp
+.loop32:
+	vpxor	xp, xp
 	mov	tmp, mul_array
 	xor	vec_i, vec_i
 
 .next_vect:
 
 	mov	ptr, [src+vec_i*PS]
-	movdqu	xgft_lo, [tmp]		;Load array Cx{00}, Cx{01}, ..., Cx{0f}
-	movdqu	xgft_hi, [tmp+16]	;     "     Cx{00}, Cx{10}, ..., Cx{f0}
+
+	vmovdqu	xgft_lo, [tmp]		;Load array Cx{00}, Cx{01}, Cx{02}, ...
+					; " Cx{00}, Cx{10}, Cx{20}, ... , Cx{f0}
+	vperm2i128 xgft_hi, xgft_lo, xgft_lo, 0x11 ; swapped to hi | hi
+	vperm2i128 xgft_lo, xgft_lo, xgft_lo, 0x00 ; swapped to lo | lo
+
 	XLDR	x0, [ptr+pos]		;Get next source vector
 
 	add	tmp, 32
 	add	vec_i, 1
 
-	movdqa	xtmpa, x0		;Keep unshifted copy of src
-	psraw	x0, 4			;Shift to put high nibble into bits 4-0
-	pand	x0, xmask0f		;Mask high src nibble in bits 4-0
-	pand	xtmpa, xmask0f		;Mask low src nibble in bits 4-0
+	vpand	xtmpa, x0, xmask0f	;Mask low src nibble in bits 4-0
+	vpsraw	x0, x0, 4		;Shift to put high nibble into bits 4-0
+	vpand	x0, x0, xmask0f		;Mask high src nibble in bits 4-0
 
-	pshufb	xgft_hi, x0		;Lookup mul table of high nibble
-	pshufb	xgft_lo, xtmpa		;Lookup mul table of low nibble
-	pxor	xgft_hi, xgft_lo	;GF add high and low partials
-	pxor	xp, xgft_hi		;xp += partial
+	vpshufb	xgft_hi, xgft_hi, x0	;Lookup mul table of high nibble
+	vpshufb	xgft_lo, xgft_lo, xtmpa	;Lookup mul table of low nibble
+	vpxor	xgft_hi, xgft_hi, xgft_lo ;GF add high and low partials
+	vpxor	xp, xp, xgft_hi		;xp += partial
 
-	SLDR 	vec, vec_m
+	SLDR	vec, vec_m
 	cmp	vec_i, vec
 	jl	.next_vect
 
 	SLDR 	dest, dest_m
 	XSTR	[dest+pos], xp
 
-	add	pos, 16			;Loop on 16 bytes at a time
+	add	pos, 32			;Loop on 32 bytes at a time
 	SLDR 	len, len_m
 	cmp	pos, len
-	jle	.loop16
+	jle	.loop32
 
-	lea	tmp, [len + 16]
+	lea	tmp, [len + 32]
 	cmp	pos, tmp
 	je	.return_pass
 
 	;; Tail len
-	mov	pos, len	;Overlapped offset length-16
-	jmp	.loop16		;Do one more overlap pass
+	mov	pos, len	;Overlapped offset length-32
+	jmp	.loop32		;Do one more overlap pass
 
 .return_pass:
 	mov	return, 0
@@ -263,9 +276,5 @@ endproc_frame
 
 section .data
 
-align 16
-
-mask0f:	ddq 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
-
-;;;       func                 core, ver, snum
-slversion gf_vect_dot_prod_sse, 00,  05,  0060
+;;;       func                  core, ver, snum
+slversion gf_vect_dot_prod_avx2, 04,  05,  0190

@@ -1,5 +1,5 @@
 ########################################################################
-#  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+#  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions 
@@ -27,7 +27,7 @@
 #  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ########################################################################
 
-objs = bin\ec_base.obj bin\ec_highlevel_func.obj bin\ec_multibinary.obj bin\gf_2vect_dot_prod_sse.obj bin\gf_3vect_dot_prod_sse.obj bin\gf_4vect_dot_prod_sse.obj bin\gf_5vect_dot_prod_sse.obj bin\gf_6vect_dot_prod_sse.obj bin\gf_vect_dot_prod_sse.obj bin\gf_vect_mul_avx.obj bin\gf_vect_mul_sse.obj
+objs = bin\ec_base.obj bin\ec_highlevel_func.obj bin\ec_multibinary.obj bin\gf_2vect_dot_prod_sse.obj bin\gf_3vect_dot_prod_sse.obj bin\gf_4vect_dot_prod_sse.obj bin\gf_5vect_dot_prod_sse.obj bin\gf_6vect_dot_prod_sse.obj bin\gf_vect_dot_prod_sse.obj bin\gf_vect_mul_avx.obj bin\gf_vect_mul_sse.obj bin\gf_2vect_dot_prod_avx.obj bin\gf_3vect_dot_prod_avx.obj bin\gf_4vect_dot_prod_avx.obj bin\gf_5vect_dot_prod_avx.obj bin\gf_6vect_dot_prod_avx.obj bin\gf_vect_dot_prod_avx.obj bin\gf_2vect_dot_prod_avx2.obj bin\gf_3vect_dot_prod_avx2.obj bin\gf_4vect_dot_prod_avx2.obj bin\gf_5vect_dot_prod_avx2.obj bin\gf_6vect_dot_prod_avx2.obj bin\gf_vect_dot_prod_avx2.obj
 
 libpath  = c:\openssl\lib     #set to ossl path for tests
 libinc   = c:\openssl\include
@@ -57,13 +57,13 @@ isa-l.lib: $(objs)
 	link /out:$@ /nologo /libpath:$(libpath) /libpath:$(zlibpath) isa-l.lib $?
 
 # Unit tests
-tests = erasure_code_base_test.exe erasure_code_sse_test.exe erasure_code_test.exe gf_2vect_dot_prod_sse_test.exe gf_3vect_dot_prod_sse_test.exe gf_4vect_dot_prod_sse_test.exe gf_5vect_dot_prod_sse_test.exe gf_6vect_dot_prod_sse_test.exe gf_inverse_test.exe gf_vect_dot_prod_base_test.exe gf_vect_dot_prod_sse_test.exe gf_vect_dot_prod_test.exe gf_vect_mul_avx_test.exe gf_vect_mul_base_test.exe gf_vect_mul_sse_test.exe gf_vect_mul_test.exe
+tests = erasure_code_base_test.exe erasure_code_sse_test.exe erasure_code_test.exe gf_2vect_dot_prod_sse_test.exe gf_3vect_dot_prod_sse_test.exe gf_4vect_dot_prod_sse_test.exe gf_5vect_dot_prod_sse_test.exe gf_6vect_dot_prod_sse_test.exe gf_inverse_test.exe gf_vect_dot_prod_base_test.exe gf_vect_dot_prod_sse_test.exe gf_vect_dot_prod_test.exe gf_vect_mul_avx_test.exe gf_vect_mul_base_test.exe gf_vect_mul_sse_test.exe gf_vect_mul_test.exe gf_vect_dot_prod_avx_test.exe
 
 tests: lib $(tests)
 $(tests): $(@B).obj
 
 # Performance tests
-perfs = erasure_code_base_perf.exe erasure_code_perf.exe erasure_code_sse_perf.exe gf_2vect_dot_prod_sse_perf.exe gf_3vect_dot_prod_sse_perf.exe gf_4vect_dot_prod_sse_perf.exe gf_5vect_dot_prod_sse_perf.exe gf_6vect_dot_prod_sse_perf.exe gf_vect_dot_prod_1tbl.exe gf_vect_dot_prod_perf.exe gf_vect_dot_prod_sse_perf.exe gf_vect_mul_avx_perf.exe gf_vect_mul_perf.exe gf_vect_mul_sse_perf.exe
+perfs = erasure_code_base_perf.exe erasure_code_perf.exe erasure_code_sse_perf.exe gf_2vect_dot_prod_sse_perf.exe gf_3vect_dot_prod_sse_perf.exe gf_4vect_dot_prod_sse_perf.exe gf_5vect_dot_prod_sse_perf.exe gf_6vect_dot_prod_sse_perf.exe gf_vect_dot_prod_1tbl.exe gf_vect_dot_prod_perf.exe gf_vect_dot_prod_sse_perf.exe gf_vect_mul_avx_perf.exe gf_vect_mul_perf.exe gf_vect_mul_sse_perf.exe gf_vect_dot_prod_avx_perf.exe
 
 perfs: lib $(perfs)
 $(perfs): $(@B).obj

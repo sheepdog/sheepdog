@@ -28,7 +28,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;
-;;; gf_5vect_dot_prod_sse(len, vec, *g_tbls, **buffs, **dests);
+;;; gf_5vect_dot_prod_avx(len, vec, *g_tbls, **buffs, **dests);
 ;;;
 
 %include "reg_sizes.asm"
@@ -110,16 +110,16 @@
  %endmacro
 
  %macro FUNC_RESTORE 0
-	movdqa	xmm6, [rsp + 0*16]
-	movdqa	xmm7, [rsp + 1*16]
-	movdqa	xmm8, [rsp + 2*16]
-	movdqa	xmm9, [rsp + 3*16]
-	movdqa	xmm10, [rsp + 4*16]
-	movdqa	xmm11, [rsp + 5*16]
-	movdqa	xmm12, [rsp + 6*16]
-	movdqa	xmm13, [rsp + 7*16]
-	movdqa	xmm14, [rsp + 8*16]
-	movdqa	xmm15, [rsp + 9*16]
+	vmovdqa	xmm6, [rsp + 0*16]
+	vmovdqa	xmm7, [rsp + 1*16]
+	vmovdqa	xmm8, [rsp + 2*16]
+	vmovdqa	xmm9, [rsp + 3*16]
+	vmovdqa	xmm10, [rsp + 4*16]
+	vmovdqa	xmm11, [rsp + 5*16]
+	vmovdqa	xmm12, [rsp + 6*16]
+	vmovdqa	xmm13, [rsp + 7*16]
+	vmovdqa	xmm14, [rsp + 8*16]
+	vmovdqa	xmm15, [rsp + 9*16]
 	mov	r12,  [rsp + 10*16 + 0*8]
 	mov	r13,  [rsp + 10*16 + 1*8]
 	mov	r14,  [rsp + 10*16 + 2*8]
@@ -146,16 +146,16 @@
 
 %ifndef EC_ALIGNED_ADDR
 ;;; Use Un-aligned load/store
- %define XLDR movdqu
- %define XSTR movdqu
+ %define XLDR vmovdqu
+ %define XSTR vmovdqu
 %else
 ;;; Use Non-temporal load/stor
  %ifdef NO_NT_LDST
-  %define XLDR movdqa
-  %define XSTR movdqa
+  %define XLDR vmovdqa
+  %define XSTR vmovdqa
  %else
-  %define XLDR movntdqa
-  %define XSTR movntdq
+  %define XLDR vmovntdqa
+  %define XSTR vmovntdq
  %endif
 %endif
 
@@ -165,32 +165,32 @@ default rel
 section .text
 
 %define xmask0f   xmm15
-%define xgft1_lo  xmm2
-%define xgft1_hi  xmm3
-%define xgft2_lo  xmm4
-%define xgft2_hi  xmm5
+%define xgft1_lo  xmm14
+%define xgft1_hi  xmm13
+%define xgft2_lo  xmm12
+%define xgft2_hi  xmm11
 %define xgft3_lo  xmm10
-%define xgft3_hi  xmm6
+%define xgft3_hi  xmm9
 %define xgft4_lo  xmm8
 %define xgft4_hi  xmm7
 
 
 %define x0     xmm0
 %define xtmpa  xmm1
-%define xp1    xmm9
-%define xp2    xmm11
-%define xp3    xmm12
-%define xp4    xmm13
-%define xp5    xmm14
+%define xp1    xmm2
+%define xp2    xmm3
+%define xp3    xmm4
+%define xp4    xmm5
+%define xp5    xmm6
 
 align 16
-global gf_5vect_dot_prod_sse:function
-func(gf_5vect_dot_prod_sse)
+global gf_5vect_dot_prod_avx:function
+func(gf_5vect_dot_prod_avx)
 	FUNC_SAVE
 	sub	len, 16
 	jl	.return_fail
 	xor	pos, pos
-	movdqa	xmask0f, [mask0f]	;Load mask of lower nibble in each byte
+	vmovdqa	xmask0f, [mask0f]	;Load mask of lower nibble in each byte
 	mov	vskip1, vec
 	imul	vskip1, 32
 	mov	vskip3, vec
@@ -203,11 +203,11 @@ func(gf_5vect_dot_prod_sse)
 .loop16:
 	mov	tmp, mul_array
 	xor	vec_i, vec_i
-	pxor	xp1, xp1
-	pxor	xp2, xp2
-	pxor	xp3, xp3
-	pxor	xp4, xp4
-	pxor	xp5, xp5
+	vpxor	xp1, xp1
+	vpxor	xp2, xp2
+	vpxor	xp3, xp3
+	vpxor	xp4, xp4
+	vpxor	xp5, xp5
 
 
 .next_vect:
@@ -215,48 +215,47 @@ func(gf_5vect_dot_prod_sse)
 	add	vec_i, PS
 	XLDR	x0, [ptr+pos]		;Get next source vector
 
-	movdqu	xgft1_lo, [tmp]			;Load array Ax{00}, Ax{01}, ..., Ax{0f}
-	movdqu	xgft1_hi, [tmp+16]		;     "     Ax{00}, Ax{10}, ..., Ax{f0}
-	movdqu	xgft2_lo, [tmp+vskip1*1]	;Load array Bx{00}, Bx{01}, ..., Bx{0f}
-	movdqu	xgft2_hi, [tmp+vskip1*1+16]	;     "     Bx{00}, Bx{10}, ..., Bx{f0}
-	movdqu	xgft3_lo, [tmp+vskip1*2]	;Load array Cx{00}, Cx{01}, ..., Cx{0f}
-	movdqu	xgft3_hi, [tmp+vskip1*2+16]	;     "     Cx{00}, Cx{10}, ..., Cx{f0}
-	movdqu	xgft4_lo, [tmp+vskip3]		;Load array Dx{00}, Dx{01}, ..., Dx{0f}
-	movdqu	xgft4_hi, [tmp+vskip3+16]	;     "     Dx{00}, Dx{10}, ..., Dx{f0}
+	vmovdqu	xgft1_lo, [tmp]			;Load array Ax{00}, Ax{01}, ..., Ax{0f}
+	vmovdqu	xgft1_hi, [tmp+16]		;     "     Ax{00}, Ax{10}, ..., Ax{f0}
+	vmovdqu	xgft2_lo, [tmp+vskip1*1]	;Load array Bx{00}, Bx{01}, ..., Bx{0f}
+	vmovdqu	xgft2_hi, [tmp+vskip1*1+16]	;     "     Bx{00}, Bx{10}, ..., Bx{f0}
+	vmovdqu	xgft3_lo, [tmp+vskip1*2]	;Load array Cx{00}, Cx{01}, ..., Cx{0f}
+	vmovdqu	xgft3_hi, [tmp+vskip1*2+16]	;     "     Cx{00}, Cx{10}, ..., Cx{f0}
+	vmovdqu	xgft4_lo, [tmp+vskip3]		;Load array Dx{00}, Dx{01}, ..., Dx{0f}
+	vmovdqu	xgft4_hi, [tmp+vskip3+16]	;     "     Dx{00}, Dx{10}, ..., Dx{f0}
 
-	movdqa	xtmpa, x0		;Keep unshifted copy of src
-	psraw	x0, 4			;Shift to put high nibble into bits 4-0
-	pand	x0, xmask0f		;Mask high src nibble in bits 4-0
-	pand	xtmpa, xmask0f		;Mask low src nibble in bits 4-0
+	vpand	xtmpa, x0, xmask0f	;Mask low src nibble in bits 4-0
+	vpsraw	x0, x0, 4		;Shift to put high nibble into bits 4-0
+	vpand	x0, x0, xmask0f		;Mask high src nibble in bits 4-0
 
-	pshufb	xgft1_hi, x0		;Lookup mul table of high nibble
-	pshufb	xgft1_lo, xtmpa		;Lookup mul table of low nibble
-	pxor	xgft1_hi, xgft1_lo	;GF add high and low partials
-	pxor	xp1, xgft1_hi		;xp1 += partial
+	vpshufb	xgft1_hi, x0		;Lookup mul table of high nibble
+	vpshufb	xgft1_lo, xtmpa		;Lookup mul table of low nibble
+	vpxor	xgft1_hi, xgft1_lo	;GF add high and low partials
+	vpxor	xp1, xgft1_hi		;xp1 += partial
 
-	pshufb	xgft2_hi, x0		;Lookup mul table of high nibble
-	pshufb	xgft2_lo, xtmpa		;Lookup mul table of low nibble
-	pxor	xgft2_hi, xgft2_lo	;GF add high and low partials
-	pxor	xp2, xgft2_hi		;xp2 += partial
+	vpshufb	xgft2_hi, x0		;Lookup mul table of high nibble
+	vpshufb	xgft2_lo, xtmpa		;Lookup mul table of low nibble
+	vpxor	xgft2_hi, xgft2_lo	;GF add high and low partials
+	vpxor	xp2, xgft2_hi		;xp2 += partial
 
-	movdqu	xgft1_lo, [tmp+vskip1*4]	;Load array Ex{00}, Ex{01}, ..., Ex{0f}
-	movdqu	xgft1_hi, [tmp+vskip1*4+16]	;     "     Ex{00}, Ex{10}, ..., Ex{f0}
+	vmovdqu	xgft1_lo, [tmp+vskip1*4]	;Load array Ex{00}, Ex{01}, ..., Ex{0f}
+	vmovdqu	xgft1_hi, [tmp+vskip1*4+16]	;     "     Ex{00}, Ex{10}, ..., Ex{f0}
 	add	tmp, 32
 
-	pshufb	xgft3_hi, x0		;Lookup mul table of high nibble
-	pshufb	xgft3_lo, xtmpa		;Lookup mul table of low nibble
-	pxor	xgft3_hi, xgft3_lo	;GF add high and low partials
-	pxor	xp3, xgft3_hi		;xp3 += partial
+	vpshufb	xgft3_hi, x0		;Lookup mul table of high nibble
+	vpshufb	xgft3_lo, xtmpa		;Lookup mul table of low nibble
+	vpxor	xgft3_hi, xgft3_lo	;GF add high and low partials
+	vpxor	xp3, xgft3_hi		;xp3 += partial
 
-	pshufb	xgft4_hi, x0		;Lookup mul table of high nibble
-	pshufb	xgft4_lo, xtmpa		;Lookup mul table of low nibble
-	pxor	xgft4_hi, xgft4_lo	;GF add high and low partials
-	pxor	xp4, xgft4_hi		;xp4 += partial
+	vpshufb	xgft4_hi, x0		;Lookup mul table of high nibble
+	vpshufb	xgft4_lo, xtmpa		;Lookup mul table of low nibble
+	vpxor	xgft4_hi, xgft4_lo	;GF add high and low partials
+	vpxor	xp4, xgft4_hi		;xp4 += partial
 
-	pshufb	xgft1_hi, x0		;Lookup mul table of high nibble
-	pshufb	xgft1_lo, xtmpa		;Lookup mul table of low nibble
-	pxor	xgft1_hi, xgft1_lo	;GF add high and low partials
-	pxor	xp5, xgft1_hi		;xp5 += partial
+	vpshufb	xgft1_hi, x0		;Lookup mul table of high nibble
+	vpshufb	xgft1_lo, xtmpa		;Lookup mul table of low nibble
+	vpxor	xgft1_hi, xgft1_lo	;GF add high and low partials
+	vpxor	xp5, xgft1_hi		;xp5 += partial
 
 	cmp	vec_i, vec
 	jl	.next_vect
@@ -301,4 +300,4 @@ align 16
 mask0f:	ddq 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
 
 ;;;       func                  core, ver, snum
-slversion gf_5vect_dot_prod_sse, 00,  05,  0065
+slversion gf_5vect_dot_prod_avx, 02,  04,  0194

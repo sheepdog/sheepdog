@@ -47,6 +47,18 @@ libsd_a_LIBADD_		= isa-l/bin/ec_base.o \
 			  isa-l/bin/gf_5vect_dot_prod_sse.o \
 			  isa-l/bin/gf_6vect_dot_prod_sse.o \
 			  isa-l/bin/gf_vect_dot_prod_sse.o \
+			  isa-l/bin/gf_2vect_dot_prod_avx.o \
+		  	  isa-l/bin/gf_3vect_dot_prod_avx.o \
+		  	  isa-l/bin/gf_4vect_dot_prod_avx.o \
+			  isa-l/bin/gf_5vect_dot_prod_avx.o \
+			  isa-l/bin/gf_6vect_dot_prod_avx.o \
+			  isa-l/bin/gf_vect_dot_prod_avx.o \
+			  isa-l/bin/gf_2vect_dot_prod_avx2.o \
+		  	  isa-l/bin/gf_3vect_dot_prod_avx2.o \
+		  	  isa-l/bin/gf_4vect_dot_prod_avx2.o \
+			  isa-l/bin/gf_5vect_dot_prod_avx2.o \
+			  isa-l/bin/gf_6vect_dot_prod_avx2.o \
+			  isa-l/bin/gf_vect_dot_prod_avx2.o \
 			  isa-l/bin/gf_vect_mul_avx.o \
 			  isa-l/bin/gf_vect_mul_sse.o
 

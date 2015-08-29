@@ -34,10 +34,10 @@
 #include "types.h"
 
 #ifndef FUNCTION_UNDER_TEST
-# define FUNCTION_UNDER_TEST gf_vect_dot_prod
+# define FUNCTION_UNDER_TEST gf_vect_dot_prod_avx
 #endif
 #ifndef TEST_MIN_SIZE
-# define TEST_MIN_SIZE  32
+# define TEST_MIN_SIZE  16
 #endif
 
 #define str(s) #s

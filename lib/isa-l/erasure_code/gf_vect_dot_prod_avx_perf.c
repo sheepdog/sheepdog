@@ -34,7 +34,7 @@
 #include "test.h"
 
 #ifndef FUNCTION_UNDER_TEST
-# define FUNCTION_UNDER_TEST gf_vect_dot_prod
+# define FUNCTION_UNDER_TEST gf_vect_dot_prod_avx
 #endif
 
 #define str(s) #s

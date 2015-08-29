@@ -1,5 +1,5 @@
 /**********************************************************************
-  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions 
@@ -29,7 +29,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>  // for memset
+#include <string.h>		// for memset
 #include "erasure_code.h"
 
 #define TEST_SIZE 8192
@@ -39,89 +39,62 @@
 
 typedef unsigned char u8;
 
-
-// Global GF(256) tables
-u8 gff[256];
-u8 gflog[256];
-
-void mk_gf_field()
-{
-	int i;
-	u8 s = 1;
-	gflog[0] = 0;
-
-	for(i=0; i<256; i++){
-		gff[i] = s;
-		gflog[s] = i;
-		s = (s << 1) ^ ( (s & 0x80) ? 0x1d : 0); // mult by GF{2}
-	}
-}
-
-
-
-
 int main(int argc, char *argv[])
 {
-	int i; 
+	int i;
 	u8 *buff1, *buff2, *buff3, gf_const_tbl[64], a = 2;
 	int align, size;
 	unsigned char *efence_buff1;
 	unsigned char *efence_buff2;
 
 	printf("gf_vect_mul_base_test:\n");
-	mk_gf_field();
+
 	gf_vect_mul_init(a, gf_const_tbl);
 
+	buff1 = (u8 *) malloc(TEST_SIZE);
+	buff2 = (u8 *) malloc(TEST_SIZE);
+	buff3 = (u8 *) malloc(TEST_SIZE);
 
-	buff1 = (u8*) malloc(TEST_SIZE);
-	buff2 = (u8*) malloc(TEST_SIZE);
-	buff3 = (u8*) malloc(TEST_SIZE);
-
-	if (NULL == buff1 || NULL == buff2 || NULL == buff3){
+	if (NULL == buff1 || NULL == buff2 || NULL == buff3) {
 		printf("buffer alloc error\n");
 		return -1;
 	}
-
 	// Fill with rand data
-	for(i=0; i<TEST_SIZE; i++)
+	for (i = 0; i < TEST_SIZE; i++)
 		buff1[i] = rand();
-
 
 	gf_vect_mul_base(TEST_SIZE, gf_const_tbl, buff1, buff2);
 
-	for (i=0; i<TEST_SIZE; i++)
+	for (i = 0; i < TEST_SIZE; i++)
 		if (gf_mul(a, buff1[i]) != buff2[i]) {
-			printf("fail at %d, 0x%x x 2 = 0x%x (0x%x)\n",i, buff1[i], buff2[i], gf_mul(2, buff1[i]));
+			printf("fail at %d, 0x%x x 2 = 0x%x (0x%x)\n", i, buff1[i], buff2[i],
+			       gf_mul(2, buff1[i]));
 			return 1;
 		}
-
 
 	gf_vect_mul_base(TEST_SIZE, gf_const_tbl, buff1, buff3);
 
 	// Check reference function
-	for (i=0; i<TEST_SIZE; i++)
+	for (i = 0; i < TEST_SIZE; i++)
 		if (buff2[i] != buff3[i]) {
 			printf("fail at %d, 0x%x x 0x%d = 0x%x (0x%x)\n",
-				i, a, buff1[i], buff2[i], gf_mul(a, buff1[i]));
+			       i, a, buff1[i], buff2[i], gf_mul(a, buff1[i]));
 			return 1;
 		}
 
-
-
-
-	for(i=0; i<TEST_SIZE; i++)
+	for (i = 0; i < TEST_SIZE; i++)
 		buff1[i] = rand();
 
 	// Check each possible constant
 	printf("Random tests ");
-	for(a=0; a!=255; a++){
+	for (a = 0; a != 255; a++) {
 		gf_vect_mul_init(a, gf_const_tbl);
 		gf_vect_mul_base(TEST_SIZE, gf_const_tbl, buff1, buff2);
 
-		for (i=0; i<TEST_SIZE; i++)
+		for (i = 0; i < TEST_SIZE; i++)
 			if (gf_mul(a, buff1[i]) != buff2[i]) {
 				printf("fail at %d, 0x%x x %d = 0x%x (0x%x)\n",
-					i, a, buff1[i], buff2[i], gf_mul(2, buff1[i]));
+				       i, a, buff1[i], buff2[i], gf_mul(2, buff1[i]));
 				return 1;
 			}
 		putchar('.');
@@ -130,19 +103,21 @@ int main(int argc, char *argv[])
 	// Run tests at end of buffer for Electric Fence
 	align = 32;
 	a = 2;
-	mk_gf_field();
+
 	gf_vect_mul_init(a, gf_const_tbl);
-	for(size=0; size<TEST_SIZE; size+=align){
+	for (size = 0; size < TEST_SIZE; size += align) {
 		// Line up TEST_SIZE from end
 		efence_buff1 = buff1 + size;
 		efence_buff2 = buff2 + size;
 
-		gf_vect_mul_base(TEST_SIZE-size, gf_const_tbl, efence_buff1, efence_buff2);
+		gf_vect_mul_base(TEST_SIZE - size, gf_const_tbl, efence_buff1, efence_buff2);
 
-		for (i=0; i<TEST_SIZE-size; i++)
+		for (i = 0; i < TEST_SIZE - size; i++)
 			if (gf_mul(a, efence_buff1[i]) != efence_buff2[i]) {
 				printf("fail at %d, 0x%x x 2 = 0x%x (0x%x)\n",
-					i, efence_buff1[i], efence_buff2[i], gf_mul(2, efence_buff1[i]));
+				       i, efence_buff1[i], efence_buff2[i], gf_mul(2,
+										   efence_buff1
+										   [i]));
 				return 1;
 			}
 
@@ -152,4 +127,3 @@ int main(int argc, char *argv[])
 	printf(" done: Pass\n");
 	return 0;
 }
-

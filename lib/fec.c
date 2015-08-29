@@ -455,8 +455,9 @@ void fec_free(struct fec *p)
 	sd_assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->d) ^ p->dp) ^
 					 (unsigned long) (p->enc_matrix)));
 	free(p->enc_matrix);
-	if (cpu_has_ssse3)
+#ifdef __x86_64__
 		free(p->ec_tbl);
+#endif
 	free(p);
 }
 
@@ -497,12 +498,13 @@ struct fec *fec_new(unsigned short d, unsigned short dp)
 		*p = 1;
 	free(tmp_m);
 
-	if (cpu_has_ssse3) {
+#ifdef __x86_64__
 		retval->ec_tbl = xmalloc(dp * d * 32);
 		ec_init_tables(d, dp - d, retval->enc_matrix + (d * d),
 			       retval->ec_tbl);
-	} else
+#else
 		retval->ec_tbl = NULL;
+#endif
 	return retval;
 }
 
@@ -739,8 +741,5 @@ void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 
 	lost[0] = (unsigned char *)buf;
 	ec_init_tables(ed, 1, cm, ec_tbl);
-	if (cpu_has_ssse3)
-		ec_encode_data_sse(len, ed, 1, ec_tbl, input, lost);
-	else
-		ec_encode_data(len, ed, 1, ec_tbl, input, lost);
+	ec_encode_data(len, ed, 1, ec_tbl, input, lost);
 }

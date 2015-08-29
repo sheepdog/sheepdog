@@ -177,12 +177,13 @@ static inline void ec_encode(struct fec *ctx, const uint8_t *ds[],
 	for (int i = 0; i < p; i++)
 		pidx[i] = ctx->d + i;
 
-	if (cpu_has_ssse3)
-		ec_encode_data_sse(SD_EC_DATA_STRIPE_SIZE / ctx->d, ctx->d, p,
+#ifdef __x86_64__
+		ec_encode_data(SD_EC_DATA_STRIPE_SIZE / ctx->d, ctx->d, p,
 				   ctx->ec_tbl, (unsigned char **)ds, ps);
-	else
+#else
 		fec_encode(ctx, ds, ps, pidx, p, SD_EC_DATA_STRIPE_SIZE /
 			   ctx->d);
+#endif
 }
 
 /*
@@ -208,9 +209,10 @@ static inline void ec_decode_buffer(struct fec *ctx, uint8_t *input[],
 				    const int in_idx[], char *buf,
 				    int idx, uint32_t object_size)
 {
-	if (cpu_has_ssse3)
+#ifdef __x86_64__
 		isa_decode_buffer(ctx, input, in_idx, buf, idx, object_size);
-	else
+#else
 		fec_decode_buffer(ctx, input, in_idx, buf, idx, object_size);
+#endif
 }
 #endif
