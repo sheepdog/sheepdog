@@ -300,7 +300,10 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	int32_t nr_vnodes;
 	struct vnode_info *vinfo = get_vnode_info();
 
-	driver = find_store_driver(data);
+	if (strlen((const char *)sys->ninfo.store))
+		driver = find_store_driver((const char *)sys->ninfo.store);
+	else
+		driver = find_store_driver(data);
 	if (!driver) {
 		ret = SD_RES_NO_STORE;
 		goto out;
