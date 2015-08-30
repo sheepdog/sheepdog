@@ -1,5 +1,5 @@
 ########################################################################
-#  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+#  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 #
 #  Redistribution and use in source and binary forms, with or without
 #  modification, are permitted provided that the following conditions 
@@ -32,10 +32,16 @@ lib_name    := 	erasure_code.a
 
 lsrc        += 	ec_highlevel_func.c ec_base.c \
 		gf_vect_mul_sse.asm gf_vect_mul_avx.asm \
-		gf_vect_dot_prod_sse.asm  \
+		gf_vect_dot_prod_sse.asm \
 		gf_2vect_dot_prod_sse.asm gf_3vect_dot_prod_sse.asm \
 		gf_4vect_dot_prod_sse.asm gf_5vect_dot_prod_sse.asm \
-		gf_6vect_dot_prod_sse.asm ec_multibinary.asm 
+		gf_6vect_dot_prod_sse.asm ec_multibinary.asm \
+		gf_2vect_dot_prod_avx.asm gf_2vect_dot_prod_avx2.asm \
+		gf_3vect_dot_prod_avx.asm gf_3vect_dot_prod_avx2.asm \
+		gf_4vect_dot_prod_avx.asm gf_4vect_dot_prod_avx2.asm \
+		gf_5vect_dot_prod_avx.asm gf_5vect_dot_prod_avx2.asm \
+		gf_6vect_dot_prod_avx.asm gf_6vect_dot_prod_avx2.asm \
+		gf_vect_dot_prod_avx.asm gf_vect_dot_prod_avx2.asm \
 
 lsrc32      	+=  ec_highlevel_func.c ec_multibinary.asm ec_base.c
 
@@ -54,7 +60,7 @@ unit_tests  += 	gf_vect_mul_test gf_vect_mul_sse_test gf_vect_mul_avx_test \
 		gf_3vect_dot_prod_sse_test gf_4vect_dot_prod_sse_test \
 		gf_5vect_dot_prod_sse_test gf_6vect_dot_prod_sse_test \
 		gf_inverse_test gf_vect_dot_prod_base_test \
-		gf_vect_dot_prod_test \
+		gf_vect_dot_prod_test gf_vect_dot_prod_avx_test \
 		erasure_code_test erasure_code_base_test erasure_code_sse_test
 
 perf_tests  += 	gf_vect_mul_perf gf_vect_mul_sse_perf gf_vect_mul_avx_perf \
@@ -62,6 +68,7 @@ perf_tests  += 	gf_vect_mul_perf gf_vect_mul_sse_perf gf_vect_mul_avx_perf \
 		gf_3vect_dot_prod_sse_perf gf_4vect_dot_prod_sse_perf \
 		gf_5vect_dot_prod_sse_perf gf_6vect_dot_prod_sse_perf \
 		gf_vect_dot_prod_perf gf_vect_dot_prod_1tbl\
+		gf_vect_dot_prod_avx_perf \
 		erasure_code_perf erasure_code_base_perf erasure_code_sse_perf
 
 other_src   += ec_base.h reg_sizes.asm

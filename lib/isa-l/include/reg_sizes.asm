@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+;  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 ;
 ;  Redistribution and use in source and binary forms, with or without
 ;  modification, are permitted provided that the following conditions 
@@ -27,6 +27,9 @@
 ;  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+%ifndef _REG_SIZES_ASM_
+%define _REG_SIZES_ASM_
+
 %define EFLAGS_HAS_CPUID        (1<<21)
 %define FLAG_CPUID1_ECX_CLMUL   (1<<1)
 %define FLAG_CPUID1_EDX_SSE2    (1<<26)
@@ -39,6 +42,8 @@
 %define FLAG_CPUID1_ECX_AVX     (1<<28)
 %define FLAG_CPUID1_EBX_AVX2    (1<<5)
 %define FLAG_XGETBV_EAX_XMM_YMM	0x6
+
+%define FLAG_CPUID1_EAX_AVOTON 0x000406d0
 
 ; define d and w variants for registers
 
@@ -92,3 +97,27 @@
 %define BYTE(reg)  reg %+ b
 
 %define XWORD(reg) reg %+ x
+
+%ifidn __OUTPUT_FORMAT__,elf32
+section .note.GNU-stack noalloc noexec nowrite progbits
+section .text
+%endif
+%ifidn __OUTPUT_FORMAT__,elf64
+section .note.GNU-stack noalloc noexec nowrite progbits
+section .text
+%endif
+%ifidn __OUTPUT_FORMAT__, macho64
+%define elf64 macho64
+%endif
+
+%macro slversion 4
+	section .text
+	global %1_slver_%2%3%4
+	global %1_slver
+	%1_slver:
+	%1_slver_%2%3%4:
+		dw 0x%4
+		db 0x%3, 0x%2
+%endmacro
+
+%endif ; ifndef _REG_SIZES_ASM_

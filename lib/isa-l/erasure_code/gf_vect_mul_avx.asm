@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+;  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 ;
 ;  Redistribution and use in source and binary forms, with or without
 ;  modification, are permitted provided that the following conditions 
@@ -27,9 +27,11 @@
 ;  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;;; 
+;;;
 ;;; gf_vect_mul_avx(len, mul_array, src, dest)
-;;; 
+;;;
+
+%include "reg_sizes.asm"
 
 %ifidn __OUTPUT_FORMAT__, elf64
  %define arg0  rdi
@@ -158,13 +160,5 @@ align 16
 mask0f:
 ddq 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f
 
-%macro slversion 4
-global %1_slver_%2%3%4
-global %1_slver
-%1_slver:
-%1_slver_%2%3%4:
-	dw 0x%4
-	db 0x%3, 0x%2
-%endmacro
 ;;;       func             core, ver, snum
-slversion gf_vect_mul_avx, 01,   02,  0036
+slversion gf_vect_mul_avx, 01,   03,  0036

@@ -1,5 +1,5 @@
 /**********************************************************************
-  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions 
@@ -28,11 +28,10 @@
 **********************************************************************/
 
 #include <limits.h>
-#include <string.h>  // for memset
+#include <string.h>		// for memset
 #include "erasure_code.h"
-#include "ec_base.h" // for GF tables
+#include "ec_base.h"		// for GF tables
 #include "types.h"
-
 
 unsigned char gf_mul(unsigned char a, unsigned char b)
 {
@@ -42,12 +41,11 @@ unsigned char gf_mul(unsigned char a, unsigned char b)
 	if ((a == 0) || (b == 0))
 		return 0;
 
-	return  gff_base[(i = gflog_base[a] + gflog_base[b]) > 254 ? i - 255 : i];
+	return gff_base[(i = gflog_base[a] + gflog_base[b]) > 254 ? i - 255 : i];
 #else
-	return  gf_mul_table_base[b*256 + a];
+	return gf_mul_table_base[b * 256 + a];
 #endif
 }
-
 
 unsigned char gf_inv(unsigned char a)
 {
@@ -61,26 +59,42 @@ unsigned char gf_inv(unsigned char a)
 #endif
 }
 
-
 void gf_gen_rs_matrix(unsigned char *a, int m, int k)
 {
 	int i, j;
 	unsigned char p, gen = 1;
 
-	memset(a, 0, k*m);
-	for (i=0; i<k; i++)
-		a[k*i+i] = 1;
+	memset(a, 0, k * m);
+	for (i = 0; i < k; i++)
+		a[k * i + i] = 1;
 
-	for (i=k; i<m; i++){
+	for (i = k; i < m; i++) {
 		p = 1;
-		for (j=0; j<k; j++){
-			a[k*i+j] = p;
+		for (j = 0; j < k; j++) {
+			a[k * i + j] = p;
 			p = gf_mul(p, gen);
 		}
 		gen = gf_mul(gen, 2);
 	}
 }
 
+void gf_gen_cauchy1_matrix(unsigned char *a, int m, int k)
+{
+	int i, j;
+	unsigned char *p;
+
+	// Identity matrix in high position
+	memset(a, 0, k * m);
+	for (i = 0; i < k; i++)
+		a[k * i + i] = 1;
+
+	// For the rest choose 1/(i + j) | i != j
+	p = &a[k * k];
+	for (i = k; i < m; i++)
+		for (j = 0; j < k; j++)
+			*p++ = gf_inv(i ^ j);
+
+}
 
 int gf_invert_matrix(unsigned char *in_mat, unsigned char *out_mat, const int n)
 {
@@ -88,73 +102,72 @@ int gf_invert_matrix(unsigned char *in_mat, unsigned char *out_mat, const int n)
 	unsigned char temp;
 
 	// Set out_mat[] to the identity matrix
-	for (i=0; i<n*n; i++)  // memset(out_mat, 0, n*n)
+	for (i = 0; i < n * n; i++)	// memset(out_mat, 0, n*n)
 		out_mat[i] = 0;
 
-	for (i=0; i<n; i++)
-		out_mat[i*n+i] = 1;
+	for (i = 0; i < n; i++)
+		out_mat[i * n + i] = 1;
 
 	// Inverse
-	for (i=0; i<n; i++) {
+	for (i = 0; i < n; i++) {
 		// Check for 0 in pivot element
-		if (in_mat[i*n+i] == 0) {
+		if (in_mat[i * n + i] == 0) {
 			// Find a row with non-zero in current column and swap
-			for (j=i+1; j<n; j++)
-				if (in_mat[j*n+i]) 
+			for (j = i + 1; j < n; j++)
+				if (in_mat[j * n + i])
 					break;
 
-			if (j == n)  // Couldn't find means it's singular
+			if (j == n)	// Couldn't find means it's singular
 				return -1;
 
-			for (k=0; k<n; k++) {  // Swap rows i,j
-				temp = in_mat[i*n+k];
-				in_mat[i*n+k] = in_mat[j*n+k];
-				in_mat[j*n+k] = temp;
-				
-				temp = out_mat[i*n+k];
-				out_mat[i*n+k] = out_mat[j*n+k];
-				out_mat[j*n+k] = temp;
+			for (k = 0; k < n; k++) {	// Swap rows i,j
+				temp = in_mat[i * n + k];
+				in_mat[i * n + k] = in_mat[j * n + k];
+				in_mat[j * n + k] = temp;
+
+				temp = out_mat[i * n + k];
+				out_mat[i * n + k] = out_mat[j * n + k];
+				out_mat[j * n + k] = temp;
 			}
 		}
 
-		temp = gf_inv(in_mat[i*n+i]); // 1/pivot
-		for (j=0; j<n; j++) {         // Scale row i by 1/pivot
-			in_mat[i*n+j] = gf_mul(in_mat[i*n+j], temp);
-			out_mat[i*n+j] = gf_mul(out_mat[i*n+j], temp);
+		temp = gf_inv(in_mat[i * n + i]);	// 1/pivot
+		for (j = 0; j < n; j++) {	// Scale row i by 1/pivot
+			in_mat[i * n + j] = gf_mul(in_mat[i * n + j], temp);
+			out_mat[i * n + j] = gf_mul(out_mat[i * n + j], temp);
 		}
 
-		for (j=0; j<n; j++) {
+		for (j = 0; j < n; j++) {
 			if (j == i)
 				continue;
 
-			temp = in_mat[j*n+i];
-			for (k=0; k<n; k++) {
-				out_mat[j*n+k] ^= gf_mul(temp, out_mat[i*n+k]);
-				in_mat[j*n+k] ^= gf_mul(temp, in_mat[i*n+k]);
+			temp = in_mat[j * n + i];
+			for (k = 0; k < n; k++) {
+				out_mat[j * n + k] ^= gf_mul(temp, out_mat[i * n + k]);
+				in_mat[j * n + k] ^= gf_mul(temp, in_mat[i * n + k]);
 			}
-		}		
+		}
 	}
 	return 0;
 }
 
-
 // Calculates const table gftbl in GF(2^8) from single input A
 // gftbl(A) = {A{00}, A{01}, A{02}, ... , A{0f} }, {A{00}, A{10}, A{20}, ... , A{f0} }
 
-void gf_vect_mul_init(unsigned char c, unsigned char* tbl)
+void gf_vect_mul_init(unsigned char c, unsigned char *tbl)
 {
-	unsigned char c2 = (c << 1) ^ ( (c & 0x80) ? 0x1d : 0);   //Mult by GF{2}
-	unsigned char c4 = (c2 << 1) ^ ( (c2 & 0x80) ? 0x1d : 0); //Mult by GF{2}
-	unsigned char c8 = (c4 << 1) ^ ( (c4 & 0x80) ? 0x1d : 0); //Mult by GF{2}
+	unsigned char c2 = (c << 1) ^ ((c & 0x80) ? 0x1d : 0);	//Mult by GF{2}
+	unsigned char c4 = (c2 << 1) ^ ((c2 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
+	unsigned char c8 = (c4 << 1) ^ ((c4 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
 
 #if __WORDSIZE == 64 || _WIN64 || __x86_64__
 	unsigned long long v1, v2, v4, v8, *t;
 	unsigned long long v10, v20, v40, v80;
 	unsigned char c17, c18, c20, c24;
 
-	t = (unsigned long long *) tbl;
+	t = (unsigned long long *)tbl;
 
-	v1 = c  * 0x0100010001000100ull;
+	v1 = c * 0x0100010001000100ull;
 	v2 = c2 * 0x0101000001010000ull;
 	v4 = c4 * 0x0101010100000000ull;
 	v8 = c8 * 0x0101010101010101ull;
@@ -163,10 +176,10 @@ void gf_vect_mul_init(unsigned char c, unsigned char* tbl)
 	t[0] = v4;
 	t[1] = v8 ^ v4;
 
-	c17 = (c8 << 1) ^ ( (c8 & 0x80) ? 0x1d : 0); //Mult by GF{2}
-	c18 = (c17 << 1) ^ ( (c17 & 0x80) ? 0x1d : 0); //Mult by GF{2}
-	c20 = (c18 << 1) ^ ( (c18 & 0x80) ? 0x1d : 0); //Mult by GF{2}
-	c24 = (c20 << 1) ^ ( (c20 & 0x80) ? 0x1d : 0); //Mult by GF{2}
+	c17 = (c8 << 1) ^ ((c8 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
+	c18 = (c17 << 1) ^ ((c17 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
+	c20 = (c18 << 1) ^ ((c18 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
+	c24 = (c20 << 1) ^ ((c20 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
 
 	v10 = c17 * 0x0100010001000100ull;
 	v20 = c18 * 0x0101000001010000ull;
@@ -177,9 +190,10 @@ void gf_vect_mul_init(unsigned char c, unsigned char* tbl)
 	t[2] = v40;
 	t[3] = v80 ^ v40;
 
-#else  // 32-bit or other
+#else // 32-bit or other
 	unsigned char c3, c5, c6, c7, c9, c10, c11, c12, c13, c14, c15;
-	unsigned char c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31;
+	unsigned char c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30,
+	    c31;
 
 	c3 = c2 ^ c;
 	c5 = c4 ^ c;
@@ -211,14 +225,14 @@ void gf_vect_mul_init(unsigned char c, unsigned char* tbl)
 	tbl[14] = c14;
 	tbl[15] = c15;
 
-	c17 = (c8 << 1) ^ ( (c8 & 0x80) ? 0x1d : 0); //Mult by GF{2}
-	c18 = (c17 << 1) ^ ( (c17 & 0x80) ? 0x1d : 0); //Mult by GF{2}
+	c17 = (c8 << 1) ^ ((c8 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
+	c18 = (c17 << 1) ^ ((c17 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
 	c19 = c18 ^ c17;
-	c20 = (c18 << 1) ^ ( (c18 & 0x80) ? 0x1d : 0); //Mult by GF{2}
+	c20 = (c18 << 1) ^ ((c18 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
 	c21 = c20 ^ c17;
 	c22 = c20 ^ c18;
 	c23 = c20 ^ c19;
-	c24 = (c20 << 1) ^ ( (c20 & 0x80) ? 0x1d : 0); //Mult by GF{2}
+	c24 = (c20 << 1) ^ ((c20 & 0x80) ? 0x1d : 0);	//Mult by GF{2}
 	c25 = c24 ^ c17;
 	c26 = c24 ^ c18;
 	c27 = c24 ^ c19;
@@ -244,65 +258,63 @@ void gf_vect_mul_init(unsigned char c, unsigned char* tbl)
 	tbl[30] = c30;
 	tbl[31] = c31;
 
-#endif  //__WORDSIZE == 64 || _WIN64 || __x86_64__
+#endif //__WORDSIZE == 64 || _WIN64 || __x86_64__
 }
 
-
-void gf_vect_dot_prod_base(int len, int vlen, unsigned char *v, 
-				unsigned char **src, unsigned char *dest)
+void gf_vect_dot_prod_base(int len, int vlen, unsigned char *v,
+			   unsigned char **src, unsigned char *dest)
 {
 	int i, j;
 	unsigned char s;
-	for (i=0; i < len; i++){
+	for (i = 0; i < len; i++) {
 		s = 0;
-		for (j=0; j < vlen; j++)
-			s ^= gf_mul(src[j][i], v[j*32 + 1]);
+		for (j = 0; j < vlen; j++)
+			s ^= gf_mul(src[j][i], v[j * 32 + 1]);
 
 		dest[i] = s;
 	}
 }
 
-
-void ec_encode_data_base(int len, int srcs, int dests, unsigned char *v, 
-				unsigned char **src, unsigned char **dest)
+void ec_encode_data_base(int len, int srcs, int dests, unsigned char *v,
+			 unsigned char **src, unsigned char **dest)
 {
 	int i, j, l;
 	unsigned char s;
 
-	for (l=0; l<dests; l++){
-		for (i=0; i<len; i++){
+	for (l = 0; l < dests; l++) {
+		for (i = 0; i < len; i++) {
 			s = 0;
-			for (j=0; j<srcs; j++)
-				s ^= gf_mul(src[j][i],v[j*32 + l*srcs*32  + 1]);
+			for (j = 0; j < srcs; j++)
+				s ^= gf_mul(src[j][i], v[j * 32 + l * srcs * 32 + 1]);
 
 			dest[l][i] = s;
 		}
 	}
 }
 
-
-void gf_vect_mul_base(int len, unsigned char *a, unsigned char *src,
-			unsigned char *dest)
+void gf_vect_mul_base(int len, unsigned char *a, unsigned char *src, unsigned char *dest)
 {
 	//2nd element of table array is ref value used to fill it in
 	unsigned char c = a[1];
-	while(len-- > 0)
+	while (len-- > 0)
 		*dest++ = gf_mul(c, *src++);
 }
 
-
-struct slver{
+struct slver {
 	UINT16 snum;
-	UINT8  ver;
-	UINT8  core;
+	UINT8 ver;
+	UINT8 core;
 };
 
 // Version info
 struct slver gf_vect_mul_init_slver_00020035;
-struct slver gf_vect_mul_init_slver = {0x0035, 0x02, 0x00};
+struct slver gf_vect_mul_init_slver = { 0x0035, 0x02, 0x00 };
+
 struct slver ec_encode_data_base_slver_00010135;
-struct slver ec_encode_data_base_slver = {0x0135, 0x01, 0x00};
+struct slver ec_encode_data_base_slver = { 0x0135, 0x01, 0x00 };
+
 struct slver gf_vect_mul_base_slver_00010136;
-struct slver gf_vect_mul_base_slver = {0x0136, 0x01, 0x00};
+struct slver gf_vect_mul_base_slver = { 0x0136, 0x01, 0x00 };
+
 struct slver gf_vect_dot_prod_base_slver_00010137;
-struct slver gf_vect_dot_prod_base_slver = {0x0137, 0x01, 0x00};
+struct slver gf_vect_dot_prod_base_slver = { 0x0137, 0x01, 0x00 };

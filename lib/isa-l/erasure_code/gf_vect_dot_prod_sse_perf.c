@@ -29,22 +29,29 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>  // for memset, memcmp
+#include <string.h>		// for memset, memcmp
 #include "erasure_code.h"
 #include "test.h"
+
+#ifndef FUNCTION_UNDER_TEST
+# define FUNCTION_UNDER_TEST gf_vect_dot_prod_sse
+#endif
+
+#define str(s) #s
+#define xstr(s) str(s)
 
 //#define CACHED_TEST
 #ifdef CACHED_TEST
 // Cached test, loop many times over small dataset
-# define TEST_SOURCES 16
+# define TEST_SOURCES 10
 # define TEST_LEN     8*1024
 # define TEST_LOOPS   40000
 # define TEST_TYPE_STR "_warm"
 #else
 # ifndef TEST_CUSTOM
 // Uncached test.  Pull from large mem base.
-#  define TEST_SOURCES 16
-#  define GT_L3_CACHE  32*1024*1024  /* some number > last level cache */
+#  define TEST_SOURCES 10
+#  define GT_L3_CACHE  32*1024*1024	/* some number > last level cache */
 #  define TEST_LEN     ((GT_L3_CACHE / TEST_SOURCES) & ~(64-1))
 #  define TEST_LOOPS   100
 #  define TEST_TYPE_STR "_cold"
@@ -56,14 +63,12 @@
 # endif
 #endif
 
-
 typedef unsigned char u8;
 
-
-void dump(unsigned char* buf, int len)
+void dump(unsigned char *buf, int len)
 {
 	int i;
-	for (i=0; i<len; ) {
+	for (i = 0; i < len;) {
 		printf(" %2x", 0xff & buf[i++]);
 		if (i % 32 == 0)
 			printf("\n");
@@ -74,8 +79,8 @@ void dump(unsigned char* buf, int len)
 void dump_matrix(unsigned char **s, int k, int m)
 {
 	int i, j;
-	for (i=0; i<k; i++) {
-		for (j=0; j<m; j++){
+	for (i = 0; i < k; i++) {
+		for (j = 0; j < m; j++) {
 			printf(" %2x", s[i][j]);
 		}
 		printf("\n");
@@ -83,38 +88,18 @@ void dump_matrix(unsigned char **s, int k, int m)
 	printf("\n");
 }
 
-// Global GF(256) tables
-u8 gff[256];
-u8 gflog[256];
-
-void mk_gf_field()
-{
-	int i;
-	u8 s = 1;
-	gflog[0] = 0;
-
-	for(i=0; i<256; i++){
-		gff[i] = s;
-		gflog[s] = i;
-		s = (s << 1) ^ ( (s & 0x80) ? 0x1d : 0); // mult by GF{2}
-	}
-}
-
-
 int main(int argc, char *argv[])
 {
-	int i,j;
+	int i, j;
 	void *buf;
-	u8 g[TEST_SOURCES], g_tbls[TEST_SOURCES*32], *dest, *dest_ref;
+	u8 g[TEST_SOURCES], g_tbls[TEST_SOURCES * 32], *dest, *dest_ref;
 	u8 *temp_buff, *buffs[TEST_SOURCES];
 	struct perf start, stop;
 
-	printf("gf_vect_dot_prod_sse: %dx%d\n", TEST_SOURCES, TEST_LEN);
-
-	mk_gf_field();
+	printf(xstr(FUNCTION_UNDER_TEST) ": %dx%d\n", TEST_SOURCES, TEST_LEN);
 
 	// Allocate the arrays
-	for(i=0; i<TEST_SOURCES; i++){
+	for (i = 0; i < TEST_SOURCES; i++) {
 		if (posix_memalign(&buf, 64, TEST_LEN)) {
 			printf("alloc error: Fail");
 			return -1;
@@ -133,17 +118,16 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	dest_ref = buf;
-	
+
 	if (posix_memalign(&buf, 64, TEST_LEN)) {
 		printf("alloc error: Fail");
 		return -1;
 	}
 	temp_buff = buf;
 
-
 	// Performance test
-	for(i=0; i<TEST_SOURCES; i++)
-		for(j=0; j<TEST_LEN; j++)
+	for (i = 0; i < TEST_SOURCES; i++)
+		for (j = 0; j < TEST_LEN; j++)
 			buffs[i][j] = rand();
 
 	memset(dest, 0, TEST_LEN);
@@ -151,48 +135,46 @@ int main(int argc, char *argv[])
 	memset(dest_ref, 0, TEST_LEN);
 	memset(g, 0, TEST_SOURCES);
 
-	for (i=0; i<TEST_SOURCES; i++)
+	for (i = 0; i < TEST_SOURCES; i++)
 		g[i] = rand();
 
-
-	for(j=0; j<TEST_SOURCES; j++)
-		gf_vect_mul_init(g[j], &g_tbls[j*32]);
-
+	for (j = 0; j < TEST_SOURCES; j++)
+		gf_vect_mul_init(g[j], &g_tbls[j * 32]);
 
 	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[0], buffs, dest_ref);
 
 #ifdef DO_REF_PERF
 	perf_start(&start);
-	for (i=0; i<TEST_LOOPS; i++) {
-		for(j=0; j<TEST_SOURCES; j++)
-			gf_vect_mul_init(g[j], &g_tbls[j*32]);
+	for (i = 0; i < TEST_LOOPS; i++) {
+		for (j = 0; j < TEST_SOURCES; j++)
+			gf_vect_mul_init(g[j], &g_tbls[j * 32]);
 
 		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[0], buffs, dest_ref);
 	}
 	perf_stop(&stop);
 	printf("gf_vect_dot_prod_base" TEST_TYPE_STR ": ");
-	perf_print(stop,start, (long long)TEST_LEN*(TEST_SOURCES+1)*i);
+	perf_print(stop, start, (long long)TEST_LEN * (TEST_SOURCES + 1) * i);
 #endif
 
-	gf_vect_dot_prod_sse(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest);
+	FUNCTION_UNDER_TEST(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest);
 
 	perf_start(&start);
-	for (i=0; i<TEST_LOOPS; i++) {
-		for (j=0; j<TEST_SOURCES; j++)
-			gf_vect_mul_init(g[j], &g_tbls[j*32]);
+	for (i = 0; i < TEST_LOOPS; i++) {
+		for (j = 0; j < TEST_SOURCES; j++)
+			gf_vect_mul_init(g[j], &g_tbls[j * 32]);
 
-		gf_vect_dot_prod_sse(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest);
+		FUNCTION_UNDER_TEST(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest);
 	}
 	perf_stop(&stop);
-	printf("gf_vect_dot_prod_sse" TEST_TYPE_STR ": ");
-	perf_print(stop,start, (long long)TEST_LEN*(TEST_SOURCES+1)*i);
+	printf(xstr(FUNCTION_UNDER_TEST) TEST_TYPE_STR ": ");
+	perf_print(stop, start, (long long)TEST_LEN * (TEST_SOURCES + 1) * i);
 
-	if (0 != memcmp(dest_ref, dest, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test\n");
+	if (0 != memcmp(dest_ref, dest, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref, 25);
-		printf("dprod_sse:"); 
+		printf("dprod:");
 		dump(dest, 25);
 		return -1;
 	}
@@ -200,4 +182,3 @@ int main(int argc, char *argv[])
 	printf("pass perf check\n");
 	return 0;
 }
-

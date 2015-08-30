@@ -1,5 +1,5 @@
 /**********************************************************************
-  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions 
@@ -29,7 +29,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>  // for memset
+#include <string.h>		// for memset
 #include "erasure_code.h"
 #include "test.h"
 
@@ -42,8 +42,8 @@
 #else
 # ifndef TEST_CUSTOM
 // Uncached test.  Pull from large mem base.
-#  define TEST_SOURCES 16
-#  define GT_L3_CACHE  32*1024*1024  /* some number > last level cache */
+#  define TEST_SOURCES 10
+#  define GT_L3_CACHE  32*1024*1024	/* some number > last level cache */
 #  define TEST_LEN     GT_L3_CACHE / 2
 #  define TEST_LOOPS   1000
 #  define TEST_TYPE_STR "_cold"
@@ -55,32 +55,9 @@
 # endif
 #endif
 
-
-
 #define TEST_MEM (2 * TEST_LEN)
 
-
 typedef unsigned char u8;
-
-
-// Global GF(256) tables
-u8 gff[256];
-u8 gflog[256];
-
-void mk_gf_field()
-{
-	int i;
-	u8 s = 1;
-	gflog[0] = 0;
-
-	for(i=0; i<256; i++){
-		gff[i] = s;
-		gflog[s] = i;
-		s = (s << 1) ^ ( (s & 0x80) ? 0x1d : 0); // mult by GF{2}
-	}
-}
-
-
 
 int main(int argc, char *argv[])
 {
@@ -89,13 +66,13 @@ int main(int argc, char *argv[])
 	struct perf start, stop;
 
 	printf("gf_vect_mul_perf:\n");
-	mk_gf_field();
+
 	gf_vect_mul_init(a, gf_const_tbl);
 
 	// Allocate large mem region
-	buff1 = (u8*) malloc(TEST_LEN);
-	buff2 = (u8*) malloc(TEST_LEN);
-	if (NULL == buff1 || NULL == buff2){
+	buff1 = (u8 *) malloc(TEST_LEN);
+	buff2 = (u8 *) malloc(TEST_LEN);
+	if (NULL == buff1 || NULL == buff2) {
 		printf("Failed to allocate %dB\n", TEST_LEN);
 		return 1;
 	}
@@ -105,20 +82,18 @@ int main(int argc, char *argv[])
 
 	gf_vect_mul(TEST_LEN, gf_const_tbl, buff1, buff2);
 
-	printf("Start timed tests\n"); 
+	printf("Start timed tests\n");
 	fflush(0);
 
 	gf_vect_mul(TEST_LEN, gf_const_tbl, buff1, buff2);
 	perf_start(&start);
-	for(i=0; i<TEST_LOOPS; i++){
+	for (i = 0; i < TEST_LOOPS; i++) {
 		gf_vect_mul_init(a, gf_const_tbl);
 		gf_vect_mul(TEST_LEN, gf_const_tbl, buff1, buff2);
 	}
 	perf_stop(&stop);
 	printf("gf_vect_mul" TEST_TYPE_STR ": ");
-	perf_print(stop,start,(long long)TEST_LEN*i);
-
+	perf_print(stop, start, (long long)TEST_LEN * i);
 
 	return 0;
 }
-

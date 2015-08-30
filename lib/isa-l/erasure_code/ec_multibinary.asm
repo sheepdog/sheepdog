@@ -1,5 +1,5 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+;  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 ;
 ;  Redistribution and use in source and binary forms, with or without
 ;  modification, are permitted provided that the following conditions 
@@ -28,38 +28,54 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 %ifidn __OUTPUT_FORMAT__, elf64
-%define WRT_OPT		wrt ..plt
+ %define WRT_OPT		wrt ..plt
 %else
-%define WRT_OPT
+ %define WRT_OPT
 %endif
+
+%include "reg_sizes.asm"
 
 %ifidn __OUTPUT_FORMAT__, elf32
 
 [bits 32]
 
-%define def_wrd		dd
-%define wrd_sz  	dword
-%define arg1		esi
+ %define def_wrd		dd
+ %define wrd_sz  	dword
+ %define arg1		esi
+ %define arg2		eax
+ %define arg3		ebx
+ %define arg4		ecx
+ %define arg5		edx
 
 %else
 
-%include "reg_sizes.asm"
-default rel
-[bits 64]
+ default rel
+ [bits 64]
 
-%define def_wrd 	dq
-%define wrd_sz  	qword
-%define arg1		rsi
+ %define def_wrd 	dq
+ %define wrd_sz  	qword
+ %define arg1		rsi
+ %define arg2		rax
+ %define arg3		rbx
+ %define arg4		rcx
+ %define arg5		rdx
 
-extern ec_encode_data_sse
-extern gf_vect_mul_sse
-extern gf_vect_mul_avx
-extern gf_vect_dot_prod_sse
+
+ extern gf_vect_mul_sse
+ extern gf_vect_mul_avx
 %endif
 
 extern gf_vect_mul_base
 extern ec_encode_data_base
 extern gf_vect_dot_prod_base
+
+extern gf_vect_dot_prod_sse
+extern gf_vect_dot_prod_avx
+extern gf_vect_dot_prod_avx2
+extern ec_encode_data_sse
+extern ec_encode_data_avx
+extern ec_encode_data_avx2
+
 
 section .data
 ;;; *_mbinit are initial values for *_dispatched; is updated on first call.
@@ -86,29 +102,48 @@ ec_encode_data:
 	jmp	wrd_sz [ec_encode_data_dispatched]
 
 ec_encode_data_dispatch_init:
-	push    arg1 
-%ifidn __OUTPUT_FORMAT__, elf32		;; 32-bit check
-	lea     arg1, [ec_encode_data_base]
-%else
-	push    rax
-	push    rbx
-	push    rcx
-	push    rdx
+	push    arg1
+	push    arg2
+	push    arg3
+	push    arg4
+	push    arg5
 	lea     arg1, [ec_encode_data_base WRT_OPT] ; Default
 
 	mov     eax, 1
 	cpuid
-	lea     rbx, [ec_encode_data_sse WRT_OPT]
+	lea     arg3, [ec_encode_data_sse WRT_OPT]
 	test    ecx, FLAG_CPUID1_ECX_SSE4_1
-	cmovne  arg1, rbx
-	
-	pop     rdx
-	pop     rcx
-	pop     rbx
-	pop     rax
-%endif			;; END 32-bit check
-	mov     [ec_encode_data_dispatched], arg1 
-	pop     arg1 
+	cmovne  arg1, arg3
+
+	and	ecx, (FLAG_CPUID1_ECX_AVX | FLAG_CPUID1_ECX_OSXSAVE)
+	cmp	ecx, (FLAG_CPUID1_ECX_AVX | FLAG_CPUID1_ECX_OSXSAVE)
+	lea	arg3, [ec_encode_data_avx WRT_OPT]
+
+	jne	_done_ec_encode_data_init
+	mov	arg1, arg3
+
+	;; Try for AVX2
+	xor	ecx, ecx
+	mov	eax, 7
+	cpuid
+	test	ebx, FLAG_CPUID1_EBX_AVX2
+	lea     arg3, [ec_encode_data_avx2 WRT_OPT]
+	cmovne	arg1, arg3
+	;; Does it have xmm and ymm support
+	xor	ecx, ecx
+	xgetbv
+	and	eax, FLAG_XGETBV_EAX_XMM_YMM
+	cmp	eax, FLAG_XGETBV_EAX_XMM_YMM
+	je	_done_ec_encode_data_init
+	lea     arg1, [ec_encode_data_sse WRT_OPT]
+
+_done_ec_encode_data_init:
+	pop     arg5
+	pop     arg4
+	pop     arg3
+	pop     arg2
+	mov     [ec_encode_data_dispatched], arg1
+	pop     arg1
 	ret
 
 ;;;;
@@ -122,7 +157,7 @@ gf_vect_mul:
 	jmp	wrd_sz [gf_vect_mul_dispatched]
 
 gf_vect_mul_dispatch_init:
-	push    arg1 
+	push    arg1
 %ifidn __OUTPUT_FORMAT__, elf32		;; 32-bit check
 	lea     arg1, [gf_vect_mul_base]
 %else
@@ -157,11 +192,10 @@ _done_gf_vect_mul_dispatch_init:
 	pop     rcx
 	pop     rbx
 	pop     rax
-%endif			;; END 32-bit check 
-	mov     [gf_vect_mul_dispatched], arg1 
+%endif			;; END 32-bit check
+	mov     [gf_vect_mul_dispatched], arg1
 	pop     arg1
 	ret
-
 
 ;;;;
 ; gf_vect_dot_prod multibinary function
@@ -175,26 +209,45 @@ gf_vect_dot_prod:
 
 gf_vect_dot_prod_dispatch_init:
 	push    arg1
-%ifidn __OUTPUT_FORMAT__, elf32         ;; 32-bit check
-	lea     arg1, [gf_vect_dot_prod_base]
-%else
-	push	rax
-	push	rbx
-	push	rcx
-	push	rdx
+	push    arg2
+	push    arg3
+	push    arg4
+	push    arg5
 	lea     arg1, [gf_vect_dot_prod_base WRT_OPT] ; Default
 
 	mov     eax, 1
 	cpuid
-	lea     rbx, [gf_vect_dot_prod_sse WRT_OPT]
+	lea     arg3, [gf_vect_dot_prod_sse WRT_OPT]
 	test    ecx, FLAG_CPUID1_ECX_SSE4_1
-	cmovne  arg1, rbx
+	cmovne  arg1, arg3
 
-	pop     rdx
-	pop     rcx
-	pop     rbx
-	pop     rax
-%endif			;; END 32-bit check
+	and		ecx, (FLAG_CPUID1_ECX_AVX | FLAG_CPUID1_ECX_OSXSAVE)
+	cmp		ecx, (FLAG_CPUID1_ECX_AVX | FLAG_CPUID1_ECX_OSXSAVE)
+	lea     arg3, [gf_vect_dot_prod_avx WRT_OPT]
+
+	jne     _done_gf_vect_dot_prod_init
+	mov		arg1, arg3
+
+	;; Try for AVX2
+	xor		ecx, ecx
+	mov		eax, 7
+	cpuid
+	test	ebx, FLAG_CPUID1_EBX_AVX2
+	lea     arg3, [gf_vect_dot_prod_avx2 WRT_OPT]
+	cmovne	arg1, arg3
+	;; Does it have xmm and ymm support
+	xor	ecx, ecx
+	xgetbv
+	and	eax, FLAG_XGETBV_EAX_XMM_YMM
+	cmp	eax, FLAG_XGETBV_EAX_XMM_YMM
+	je	_done_gf_vect_dot_prod_init
+	lea     arg1, [gf_vect_dot_prod_sse WRT_OPT]
+
+_done_gf_vect_dot_prod_init:
+	pop     arg5
+	pop     arg4
+	pop     arg3
+	pop     arg2
 	mov     [gf_vect_dot_prod_dispatched], arg1
 	pop	arg1
 	ret
@@ -208,7 +261,7 @@ global %1_slver
 	db 0x%3, 0x%2
 %endmacro
 
-;;;       func                  core, ver, snum
-slversion ec_encode_data,	00,   02,  0133
-slversion gf_vect_mul,		00,   02,  0134
-slversion gf_vect_dot_prod,	00,   01,  0138
+;;;       func                 		core, ver, snum
+slversion ec_encode_data,		00,   03,  0133
+slversion gf_vect_mul,			00,   02,  0134
+slversion gf_vect_dot_prod,		00,   02,  0138

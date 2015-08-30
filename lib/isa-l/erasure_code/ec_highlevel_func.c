@@ -1,5 +1,5 @@
 /**********************************************************************
-  Copyright(c) 2011-2013 Intel Corporation All rights reserved.
+  Copyright(c) 2011-2015 Intel Corporation All rights reserved.
 
   Redistribution and use in source and binary forms, with or without
   modification, are permitted provided that the following conditions 
@@ -30,36 +30,34 @@
 #include "erasure_code.h"
 #include "types.h"
 
-void ec_init_tables(int k, int rows, unsigned char* a, 
-			unsigned char* g_tbls)
+void ec_init_tables(int k, int rows, unsigned char *a, unsigned char *g_tbls)
 {
 	int i, j;
 
-	for (i=0; i<rows; i++){
-		for (j=0; j<k; j++){
+	for (i = 0; i < rows; i++) {
+		for (j = 0; j < k; j++) {
 			gf_vect_mul_init(*a++, g_tbls);
-			g_tbls+=32;
+			g_tbls += 32;
 		}
 	}
 }
 
-#if __WORDSIZE == 64 || _WIN64 || __x86_64__ 
-void ec_encode_data_sse(int len, int k, int rows, unsigned char *g_tbls, unsigned char **data, unsigned char **coding)
+void ec_encode_data_sse(int len, int k, int rows, unsigned char *g_tbls, unsigned char **data,
+			unsigned char **coding)
 {
 
-	if (len < 16){
+	if (len < 16) {
 		ec_encode_data_base(len, k, rows, g_tbls, data, coding);
 		return;
 	}
 
-	while (rows >= 4){
+	while (rows >= 4) {
 		gf_4vect_dot_prod_sse(len, k, g_tbls, data, coding);
-		g_tbls += 4*k*32;
+		g_tbls += 4 * k * 32;
 		coding += 4;
-		rows-=4;
+		rows -= 4;
 	}
-	switch (rows)
-	{
+	switch (rows) {
 	case 3:
 		gf_3vect_dot_prod_sse(len, k, g_tbls, data, coding);
 		break;
@@ -74,17 +72,77 @@ void ec_encode_data_sse(int len, int k, int rows, unsigned char *g_tbls, unsigne
 	}
 
 }
-#endif	//__WORDSIZE == 64 || _WIN64 || __x86_64__ 
 
+void ec_encode_data_avx(int len, int k, int rows, unsigned char *g_tbls, unsigned char **data,
+			unsigned char **coding)
+{
+	if (len < 16) {
+		ec_encode_data_base(len, k, rows, g_tbls, data, coding);
+		return;
+	}
 
-struct slver{
+	while (rows >= 4) {
+		gf_4vect_dot_prod_avx(len, k, g_tbls, data, coding);
+		g_tbls += 4 * k * 32;
+		coding += 4;
+		rows -= 4;
+	}
+	switch (rows) {
+	case 3:
+		gf_3vect_dot_prod_avx(len, k, g_tbls, data, coding);
+		break;
+	case 2:
+		gf_2vect_dot_prod_avx(len, k, g_tbls, data, coding);
+		break;
+	case 1:
+		gf_vect_dot_prod_avx(len, k, g_tbls, data, *coding);
+		break;
+	case 0:
+		break;
+	}
+
+}
+
+void ec_encode_data_avx2(int len, int k, int rows, unsigned char *g_tbls, unsigned char **data,
+			 unsigned char **coding)
+{
+
+	if (len < 32) {
+		ec_encode_data_base(len, k, rows, g_tbls, data, coding);
+		return;
+	}
+
+	while (rows >= 4) {
+		gf_4vect_dot_prod_avx2(len, k, g_tbls, data, coding);
+		g_tbls += 4 * k * 32;
+		coding += 4;
+		rows -= 4;
+	}
+	switch (rows) {
+	case 3:
+		gf_3vect_dot_prod_avx2(len, k, g_tbls, data, coding);
+		break;
+	case 2:
+		gf_2vect_dot_prod_avx2(len, k, g_tbls, data, coding);
+		break;
+	case 1:
+		gf_vect_dot_prod_avx2(len, k, g_tbls, data, *coding);
+		break;
+	case 0:
+		break;
+	}
+
+}
+
+struct slver {
 	UINT16 snum;
-	UINT8  ver;
-	UINT8  core;
+	UINT8 ver;
+	UINT8 core;
 };
 
 // Version info
 struct slver ec_init_tables_slver_00010068;
-struct slver ec_init_tables_slver = {0x0068, 0x01, 0x00};
+struct slver ec_init_tables_slver = { 0x0068, 0x01, 0x00 };
+
 struct slver ec_encode_data_sse_slver_00020069;
-struct slver ec_encode_data_sse_slver = {0x0069, 0x02, 0x00};
+struct slver ec_encode_data_sse_slver = { 0x0069, 0x02, 0x00 };

@@ -29,9 +29,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>  // for memset, memcmp
+#include <string.h>		// for memset, memcmp
 #include "erasure_code.h"
 #include "types.h"
+
+#ifndef FUNCTION_UNDER_TEST
+# define FUNCTION_UNDER_TEST gf_6vect_dot_prod_sse
+#endif
+#ifndef TEST_MIN_SIZE
+# define TEST_MIN_SIZE  16
+#endif
+
+#define str(s) #s
+#define xstr(s) str(s)
 
 #define TEST_LEN 8192
 #define TEST_SIZE (TEST_LEN/2)
@@ -46,25 +56,22 @@
 # define RANDOMS 20
 #endif
 
-
-#define EFENCE_TEST_MIN_SIZE 16
-
 #ifdef EC_ALIGNED_ADDR
 // Define power of 2 range to check ptr, len alignment
 # define PTR_ALIGN_CHK_B 0
-# define LEN_ALIGN_CHK_B 0 // 0 for aligned only
+# define LEN_ALIGN_CHK_B 0	// 0 for aligned only
 #else
 // Define power of 2 range to check ptr, len alignment
 # define PTR_ALIGN_CHK_B 32
-# define LEN_ALIGN_CHK_B 32 // 0 for aligned only
+# define LEN_ALIGN_CHK_B 32	// 0 for aligned only
 #endif
 
 typedef unsigned char u8;
 
-void dump(unsigned char* buf, int len)
+void dump(unsigned char *buf, int len)
 {
 	int i;
-	for (i=0; i<len; ) {
+	for (i = 0; i < len;) {
 		printf(" %2x", 0xff & buf[i++]);
 		if (i % 32 == 0)
 			printf("\n");
@@ -75,8 +82,8 @@ void dump(unsigned char* buf, int len)
 void dump_matrix(unsigned char **s, int k, int m)
 {
 	int i, j;
-	for (i=0; i<k; i++) {
-		for (j=0; j<m; j++){
+	for (i = 0; i < k; i++) {
+		for (j = 0; j < m; j++) {
 			printf(" %2x", s[i][j]);
 		}
 		printf("\n");
@@ -87,36 +94,18 @@ void dump_matrix(unsigned char **s, int k, int m)
 void dump_u8xu8(unsigned char *s, int k, int m)
 {
 	int i, j;
-	for (i=0; i<k; i++) {
-		for (j=0; j<m; j++){
-			printf(" %2x", 0xff & s[j+(i*m)]);
+	for (i = 0; i < k; i++) {
+		for (j = 0; j < m; j++) {
+			printf(" %2x", 0xff & s[j + (i * m)]);
 		}
 		printf("\n");
 	}
 	printf("\n");
 }
 
-// Global GF(256) tables
-u8 gff[256];
-u8 gflog[256];
-
-void mk_gf_field()
-{
-	int i;
-	u8 s = 1;
-	gflog[0] = 0;
-
-	for(i=0; i<256; i++){
-		gff[i] = s;
-		gflog[s] = i;
-		s = (s << 1) ^ ( (s & 0x80) ? 0x1d : 0); // mult by GF{2}
-	}
-}
-
-
 int main(int argc, char *argv[])
 {
-	int i,j, rtest, srcs;
+	int i, j, rtest, srcs;
 	void *buf;
 	u8 g1[TEST_SOURCES], g2[TEST_SOURCES], g3[TEST_SOURCES];
 	u8 g4[TEST_SOURCES], g5[TEST_SOURCES], g6[TEST_SOURCES], *g_tbls;
@@ -129,12 +118,10 @@ int main(int argc, char *argv[])
 	unsigned int offset;
 	u8 *ubuffs[TEST_SOURCES];
 	u8 *udest_ptrs[6];
-	printf("gf_6vect_dot_prod_sse: %dx%d ", TEST_SOURCES, TEST_LEN);
-
-	mk_gf_field();
+	printf(xstr(FUNCTION_UNDER_TEST) ": %dx%d ", TEST_SOURCES, TEST_LEN);
 
 	// Allocate the arrays
-	for(i=0; i<TEST_SOURCES; i++){
+	for (i = 0; i < TEST_SOURCES; i++) {
 		if (posix_memalign(&buf, 64, TEST_LEN)) {
 			printf("alloc error: Fail");
 			return -1;
@@ -142,7 +129,7 @@ int main(int argc, char *argv[])
 		buffs[i] = buf;
 	}
 
-	if (posix_memalign(&buf, 16, 2*(6*TEST_SOURCES*32))) {
+	if (posix_memalign(&buf, 16, 2 * (6 * TEST_SOURCES * 32))) {
 		printf("alloc error: Fail");
 		return -1;
 	}
@@ -227,9 +214,8 @@ int main(int argc, char *argv[])
 	dest_ptrs[4] = dest5;
 	dest_ptrs[5] = dest6;
 
-
 	// Test of all zeros
-	for(i=0; i<TEST_SOURCES; i++)
+	for (i = 0; i < TEST_SOURCES; i++)
 		memset(buffs[i], 0, TEST_LEN);
 
 	memset(dest1, 0, TEST_LEN);
@@ -251,76 +237,80 @@ int main(int argc, char *argv[])
 	memset(g5, 4, TEST_SOURCES);
 	memset(g6, 0xe6, TEST_SOURCES);
 
-
-	for(i=0; i<TEST_SOURCES; i++){
-		gf_vect_mul_init(g1[i], &g_tbls[i*32]);
-		gf_vect_mul_init(g2[i], &g_tbls[32*TEST_SOURCES + i*32]);
-		gf_vect_mul_init(g3[i], &g_tbls[64*TEST_SOURCES + i*32]);
-		gf_vect_mul_init(g4[i], &g_tbls[96*TEST_SOURCES + i*32]);
-		gf_vect_mul_init(g5[i], &g_tbls[128*TEST_SOURCES + i*32]);
-		gf_vect_mul_init(g6[i], &g_tbls[160*TEST_SOURCES + i*32]);
+	for (i = 0; i < TEST_SOURCES; i++) {
+		gf_vect_mul_init(g1[i], &g_tbls[i * 32]);
+		gf_vect_mul_init(g2[i], &g_tbls[32 * TEST_SOURCES + i * 32]);
+		gf_vect_mul_init(g3[i], &g_tbls[64 * TEST_SOURCES + i * 32]);
+		gf_vect_mul_init(g4[i], &g_tbls[96 * TEST_SOURCES + i * 32]);
+		gf_vect_mul_init(g5[i], &g_tbls[128 * TEST_SOURCES + i * 32]);
+		gf_vect_mul_init(g6[i], &g_tbls[160 * TEST_SOURCES + i * 32]);
 	}
 
 	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[0], buffs, dest_ref1);
-	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[32*TEST_SOURCES], buffs, dest_ref2);
-	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[64*TEST_SOURCES], buffs, dest_ref3);
-	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[96*TEST_SOURCES], buffs, dest_ref4);
-	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[128*TEST_SOURCES], buffs, dest_ref5);
-	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[160*TEST_SOURCES], buffs, dest_ref6);
+	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[32 * TEST_SOURCES], buffs,
+			      dest_ref2);
+	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[64 * TEST_SOURCES], buffs,
+			      dest_ref3);
+	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[96 * TEST_SOURCES], buffs,
+			      dest_ref4);
+	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[128 * TEST_SOURCES], buffs,
+			      dest_ref5);
+	gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[160 * TEST_SOURCES], buffs,
+			      dest_ref6);
 
-	gf_6vect_dot_prod_sse(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest_ptrs);
+	FUNCTION_UNDER_TEST(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest_ptrs);
 
-	if (0 != memcmp(dest_ref1, dest1, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test1\n");
+	if (0 != memcmp(dest_ref1, dest1, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test1\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref1, 25);
-		printf("dprod_sse:"); 
+		printf("dprod_dut:");
 		dump(dest1, 25);
 		return -1;
 	}
-	if (0 != memcmp(dest_ref2, dest2, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test2\n");
+	if (0 != memcmp(dest_ref2, dest2, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test2\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref2, 25);
-		printf("dprod_sse:"); 
+		printf("dprod_dut:");
 		dump(dest2, 25);
 		return -1;
 	}
-	if (0 != memcmp(dest_ref3, dest3, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test3\n");
+	if (0 != memcmp(dest_ref3, dest3, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test3\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref3, 25);
-		printf("dprod_sse:"); 
+		printf("dprod_dut:");
 		dump(dest3, 25);
 		return -1;
 	}
-	if (0 != memcmp(dest_ref4, dest4, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test4\n");
+	if (0 != memcmp(dest_ref4, dest4, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test4\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref4, 25);
-		printf("dprod_sse:"); 
+		printf("dprod_dut:");
 		dump(dest4, 25);
 		return -1;
 	}
-	if (0 != memcmp(dest_ref5, dest5, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test5\n");
+	if (0 != memcmp(dest_ref5, dest5, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test5\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref5, 25);
-		printf("dprod_sse:"); 
+		printf("dprod_dut:");
 		dump(dest5, 25);
 		return -1;
 	}
-	if (0 != memcmp(dest_ref6, dest6, TEST_LEN)){
-		printf("Fail zero vect_dot_prod_sse test6\n");
+	if (0 != memcmp(dest_ref6, dest6, TEST_LEN)) {
+		printf("Fail zero " xstr(FUNCTION_UNDER_TEST) " test6\n");
 		dump_matrix(buffs, 5, TEST_SOURCES);
-		printf("dprod_base:"); 
+		printf("dprod_base:");
 		dump(dest_ref6, 25);
-		printf("dprod_sse:"); 
+		printf("dprod_dut:");
 		dump(dest6, 25);
 		return -1;
 	}
@@ -328,12 +318,12 @@ int main(int argc, char *argv[])
 
 	// Rand data test
 
-	for(rtest=0; rtest<RANDOMS; rtest++){
-		for(i=0; i<TEST_SOURCES; i++)
-			for(j=0; j<TEST_LEN; j++)
+	for (rtest = 0; rtest < RANDOMS; rtest++) {
+		for (i = 0; i < TEST_SOURCES; i++)
+			for (j = 0; j < TEST_LEN; j++)
 				buffs[i][j] = rand();
 
-		for (i=0; i<TEST_SOURCES; i++){
+		for (i = 0; i < TEST_SOURCES; i++) {
 			g1[i] = rand();
 			g2[i] = rand();
 			g3[i] = rand();
@@ -342,76 +332,80 @@ int main(int argc, char *argv[])
 			g6[i] = rand();
 		}
 
-		for(i=0; i<TEST_SOURCES; i++){
-			gf_vect_mul_init(g1[i], &g_tbls[i*32]);
-			gf_vect_mul_init(g2[i], &g_tbls[(32*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g3[i], &g_tbls[(64*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g4[i], &g_tbls[(96*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g5[i], &g_tbls[(128*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g6[i], &g_tbls[(160*TEST_SOURCES) + (i*32)]);
+		for (i = 0; i < TEST_SOURCES; i++) {
+			gf_vect_mul_init(g1[i], &g_tbls[i * 32]);
+			gf_vect_mul_init(g2[i], &g_tbls[(32 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g3[i], &g_tbls[(64 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g4[i], &g_tbls[(96 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g5[i], &g_tbls[(128 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g6[i], &g_tbls[(160 * TEST_SOURCES) + (i * 32)]);
 		}
 
 		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[0], buffs, dest_ref1);
-		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[32*TEST_SOURCES], buffs, dest_ref2);
-		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[64*TEST_SOURCES], buffs, dest_ref3);
-		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[96*TEST_SOURCES], buffs, dest_ref4);
-		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[128*TEST_SOURCES], buffs, dest_ref5);
-		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[160*TEST_SOURCES], buffs, dest_ref6);
+		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[32 * TEST_SOURCES],
+				      buffs, dest_ref2);
+		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[64 * TEST_SOURCES],
+				      buffs, dest_ref3);
+		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[96 * TEST_SOURCES],
+				      buffs, dest_ref4);
+		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[128 * TEST_SOURCES],
+				      buffs, dest_ref5);
+		gf_vect_dot_prod_base(TEST_LEN, TEST_SOURCES, &g_tbls[160 * TEST_SOURCES],
+				      buffs, dest_ref6);
 
+		FUNCTION_UNDER_TEST(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest_ptrs);
 
-		gf_6vect_dot_prod_sse(TEST_LEN, TEST_SOURCES, g_tbls, buffs, dest_ptrs);
-
-		if (0 != memcmp(dest_ref1, dest1, TEST_LEN)){
-			printf("Fail rand 6vect_dot_prod_sse test1 %d\n", rtest);
+		if (0 != memcmp(dest_ref1, dest1, TEST_LEN)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test1 %d\n", rtest);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref1, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest1, 25);
 			return -1;
 		}
-		if (0 != memcmp(dest_ref2, dest2, TEST_LEN)){
-			printf("Fail rand 6vect_dot_prod_sse test2 %d\n", rtest);
+		if (0 != memcmp(dest_ref2, dest2, TEST_LEN)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test2 %d\n", rtest);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref2, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest2, 25);
 			return -1;
 		}
-		if (0 != memcmp(dest_ref3, dest3, TEST_LEN)){
-			printf("Fail rand 6vect_dot_prod_sse test3 %d\n", rtest);
+		if (0 != memcmp(dest_ref3, dest3, TEST_LEN)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test3 %d\n", rtest);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref3, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest3, 25);
 			return -1;
 		}
-		if (0 != memcmp(dest_ref4, dest4, TEST_LEN)){
-			printf("Fail rand 6vect_dot_prod_sse test4 %d\n", rtest);
+		if (0 != memcmp(dest_ref4, dest4, TEST_LEN)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test4 %d\n", rtest);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref4, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest4, 25);
 			return -1;
 		}
-		if (0 != memcmp(dest_ref5, dest5, TEST_LEN)){
-			printf("Fail rand 6vect_dot_prod_sse test5 %d\n", rtest);
+		if (0 != memcmp(dest_ref5, dest5, TEST_LEN)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test5 %d\n", rtest);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref5, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest5, 25);
 			return -1;
 		}
-		if (0 != memcmp(dest_ref6, dest6, TEST_LEN)){
-			printf("Fail rand 6vect_dot_prod_sse test6 %d\n", rtest);
+		if (0 != memcmp(dest_ref6, dest6, TEST_LEN)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test6 %d\n", rtest);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref6, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest6, 25);
 			return -1;
 		}
@@ -419,17 +413,14 @@ int main(int argc, char *argv[])
 		putchar('.');
 	}
 
-
-
 	// Rand data test with varied parameters
-	for(rtest=0; rtest<RANDOMS; rtest++){
-		for (srcs = TEST_SOURCES; srcs > 0; srcs--){
-			for(i=0; i<srcs; i++)
-				for(j=0; j<TEST_LEN; j++)
+	for (rtest = 0; rtest < RANDOMS; rtest++) {
+		for (srcs = TEST_SOURCES; srcs > 0; srcs--) {
+			for (i = 0; i < srcs; i++)
+				for (j = 0; j < TEST_LEN; j++)
 					buffs[i][j] = rand();
 
-
-			for (i=0; i<srcs; i++){
+			for (i = 0; i < srcs; i++) {
 				g1[i] = rand();
 				g2[i] = rand();
 				g3[i] = rand();
@@ -438,96 +429,105 @@ int main(int argc, char *argv[])
 				g6[i] = rand();
 			}
 
-			for(i=0; i<srcs; i++){
-				gf_vect_mul_init(g1[i], &g_tbls[i*32]);
-				gf_vect_mul_init(g2[i], &g_tbls[(32*srcs) + (i*32)]);
-				gf_vect_mul_init(g3[i], &g_tbls[(64*srcs) + (i*32)]);
-				gf_vect_mul_init(g4[i], &g_tbls[(96*srcs) + (i*32)]);
-				gf_vect_mul_init(g5[i], &g_tbls[(128*srcs) + (i*32)]);
-				gf_vect_mul_init(g6[i], &g_tbls[(160*srcs) + (i*32)]);
+			for (i = 0; i < srcs; i++) {
+				gf_vect_mul_init(g1[i], &g_tbls[i * 32]);
+				gf_vect_mul_init(g2[i], &g_tbls[(32 * srcs) + (i * 32)]);
+				gf_vect_mul_init(g3[i], &g_tbls[(64 * srcs) + (i * 32)]);
+				gf_vect_mul_init(g4[i], &g_tbls[(96 * srcs) + (i * 32)]);
+				gf_vect_mul_init(g5[i], &g_tbls[(128 * srcs) + (i * 32)]);
+				gf_vect_mul_init(g6[i], &g_tbls[(160 * srcs) + (i * 32)]);
 			}
 
 			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[0], buffs, dest_ref1);
-			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[32*srcs], buffs, dest_ref2);
-			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[64*srcs], buffs, dest_ref3);
-			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[96*srcs], buffs, dest_ref4);
-			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[128*srcs], buffs, dest_ref5);
-			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[160*srcs], buffs, dest_ref6);
+			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[32 * srcs], buffs,
+					      dest_ref2);
+			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[64 * srcs], buffs,
+					      dest_ref3);
+			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[96 * srcs], buffs,
+					      dest_ref4);
+			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[128 * srcs], buffs,
+					      dest_ref5);
+			gf_vect_dot_prod_base(TEST_LEN, srcs, &g_tbls[160 * srcs], buffs,
+					      dest_ref6);
 
-			gf_6vect_dot_prod_sse(TEST_LEN, srcs, g_tbls, buffs, dest_ptrs);
+			FUNCTION_UNDER_TEST(TEST_LEN, srcs, g_tbls, buffs, dest_ptrs);
 
-
-			if (0 != memcmp(dest_ref1, dest1, TEST_LEN)){
-				printf("Fail rand 6vect_dot_prod_sse test1 srcs=%d\n", srcs);
+			if (0 != memcmp(dest_ref1, dest1, TEST_LEN)) {
+				printf("Fail rand " xstr(FUNCTION_UNDER_TEST)
+				       " test1 srcs=%d\n", srcs);
 				dump_matrix(buffs, 5, TEST_SOURCES);
-				printf("dprod_base:"); 
+				printf("dprod_base:");
 				dump(dest_ref1, 25);
-				printf("dprod_sse:"); 
+				printf("dprod_dut:");
 				dump(dest1, 25);
 				return -1;
 			}
-			if (0 != memcmp(dest_ref2, dest2, TEST_LEN)){
-				printf("Fail rand 6vect_dot_prod_sse test2 srcs=%d\n", srcs);
+			if (0 != memcmp(dest_ref2, dest2, TEST_LEN)) {
+				printf("Fail rand " xstr(FUNCTION_UNDER_TEST)
+				       " test2 srcs=%d\n", srcs);
 				dump_matrix(buffs, 5, TEST_SOURCES);
-				printf("dprod_base:"); 
+				printf("dprod_base:");
 				dump(dest_ref2, 25);
-				printf("dprod_sse:"); 
+				printf("dprod_dut:");
 				dump(dest2, 25);
 				return -1;
 			}
-			if (0 != memcmp(dest_ref3, dest3, TEST_LEN)){
-				printf("Fail rand 6vect_dot_prod_sse test3 srcs=%d\n", srcs);
+			if (0 != memcmp(dest_ref3, dest3, TEST_LEN)) {
+				printf("Fail rand " xstr(FUNCTION_UNDER_TEST)
+				       " test3 srcs=%d\n", srcs);
 				dump_matrix(buffs, 5, TEST_SOURCES);
-				printf("dprod_base:"); 
+				printf("dprod_base:");
 				dump(dest_ref3, 25);
-				printf("dprod_sse:"); 
+				printf("dprod_dut:");
 				dump(dest3, 25);
 				return -1;
 			}
-			if (0 != memcmp(dest_ref4, dest4, TEST_LEN)){
-				printf("Fail rand 6vect_dot_prod_sse test4 srcs=%d\n", srcs);
+			if (0 != memcmp(dest_ref4, dest4, TEST_LEN)) {
+				printf("Fail rand " xstr(FUNCTION_UNDER_TEST)
+				       " test4 srcs=%d\n", srcs);
 				dump_matrix(buffs, 5, TEST_SOURCES);
-				printf("dprod_base:"); 
+				printf("dprod_base:");
 				dump(dest_ref4, 25);
-				printf("dprod_sse:"); 
+				printf("dprod_dut:");
 				dump(dest4, 25);
 				return -1;
 			}
-			if (0 != memcmp(dest_ref5, dest5, TEST_LEN)){
-				printf("Fail rand 6vect_dot_prod_sse test5 srcs=%d\n", srcs);
+			if (0 != memcmp(dest_ref5, dest5, TEST_LEN)) {
+				printf("Fail rand " xstr(FUNCTION_UNDER_TEST)
+				       " test5 srcs=%d\n", srcs);
 				dump_matrix(buffs, 5, TEST_SOURCES);
-				printf("dprod_base:"); 
+				printf("dprod_base:");
 				dump(dest_ref5, 25);
-				printf("dprod_sse:"); 
+				printf("dprod_dut:");
 				dump(dest5, 25);
 				return -1;
 			}
-			if (0 != memcmp(dest_ref6, dest6, TEST_LEN)){
-				printf("Fail rand 6vect_dot_prod_sse test6 srcs=%d\n", srcs);
+			if (0 != memcmp(dest_ref6, dest6, TEST_LEN)) {
+				printf("Fail rand " xstr(FUNCTION_UNDER_TEST)
+				       " test6 srcs=%d\n", srcs);
 				dump_matrix(buffs, 5, TEST_SOURCES);
-				printf("dprod_base:"); 
+				printf("dprod_base:");
 				dump(dest_ref6, 25);
-				printf("dprod_sse:"); 
+				printf("dprod_dut:");
 				dump(dest6, 25);
 				return -1;
 			}
 
-
-		putchar('.');
+			putchar('.');
 		}
 	}
 
 	// Run tests at end of buffer for Electric Fence
 	align = (LEN_ALIGN_CHK_B != 0) ? 1 : 16;
-	for(size=EFENCE_TEST_MIN_SIZE; size<=TEST_SIZE; size+=align){
-		for(i=0; i<TEST_SOURCES; i++)
-			for(j=0; j<TEST_LEN; j++)
+	for (size = TEST_MIN_SIZE; size <= TEST_SIZE; size += align) {
+		for (i = 0; i < TEST_SOURCES; i++)
+			for (j = 0; j < TEST_LEN; j++)
 				buffs[i][j] = rand();
 
-		for(i=0; i<TEST_SOURCES; i++) // Line up TEST_SIZE from end
+		for (i = 0; i < TEST_SOURCES; i++)	// Line up TEST_SIZE from end
 			efence_buffs[i] = buffs[i] + TEST_LEN - size;
 
-		for (i=0; i<TEST_SOURCES; i++){
+		for (i = 0; i < TEST_SOURCES; i++) {
 			g1[i] = rand();
 			g2[i] = rand();
 			g3[i] = rand();
@@ -536,81 +536,85 @@ int main(int argc, char *argv[])
 			g6[i] = rand();
 		}
 
-		for(i=0; i<TEST_SOURCES; i++){
-			gf_vect_mul_init(g1[i], &g_tbls[i*32]);
-			gf_vect_mul_init(g2[i], &g_tbls[(32*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g3[i], &g_tbls[(64*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g4[i], &g_tbls[(96*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g5[i], &g_tbls[(128*TEST_SOURCES) + (i*32)]);
-			gf_vect_mul_init(g6[i], &g_tbls[(160*TEST_SOURCES) + (i*32)]);
+		for (i = 0; i < TEST_SOURCES; i++) {
+			gf_vect_mul_init(g1[i], &g_tbls[i * 32]);
+			gf_vect_mul_init(g2[i], &g_tbls[(32 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g3[i], &g_tbls[(64 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g4[i], &g_tbls[(96 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g5[i], &g_tbls[(128 * TEST_SOURCES) + (i * 32)]);
+			gf_vect_mul_init(g6[i], &g_tbls[(160 * TEST_SOURCES) + (i * 32)]);
 		}
 
 		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[0], efence_buffs, dest_ref1);
-		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[32*TEST_SOURCES], efence_buffs, dest_ref2);
-		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[64*TEST_SOURCES], efence_buffs, dest_ref3);
-		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[96*TEST_SOURCES], efence_buffs, dest_ref4);
-		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[128*TEST_SOURCES], efence_buffs, dest_ref5);
-		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[160*TEST_SOURCES], efence_buffs, dest_ref6);
+		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[32 * TEST_SOURCES],
+				      efence_buffs, dest_ref2);
+		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[64 * TEST_SOURCES],
+				      efence_buffs, dest_ref3);
+		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[96 * TEST_SOURCES],
+				      efence_buffs, dest_ref4);
+		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[128 * TEST_SOURCES],
+				      efence_buffs, dest_ref5);
+		gf_vect_dot_prod_base(size, TEST_SOURCES, &g_tbls[160 * TEST_SOURCES],
+				      efence_buffs, dest_ref6);
 
+		FUNCTION_UNDER_TEST(size, TEST_SOURCES, g_tbls, efence_buffs, dest_ptrs);
 
-		gf_6vect_dot_prod_sse(size, TEST_SOURCES, g_tbls, efence_buffs, dest_ptrs);
-
-		if (0 != memcmp(dest_ref1, dest1, size)){
-			printf("Fail rand 6vect_dot_prod_sse test1 %d\n", rtest);
+		if (0 != memcmp(dest_ref1, dest1, size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test1 %d\n", rtest);
 			dump_matrix(efence_buffs, 5, TEST_SOURCES);
 			printf("dprod_base:");
 			dump(dest_ref1, align);
-			printf("dprod_sse:");
+			printf("dprod_dut:");
 			dump(dest1, align);
 			return -1;
 		}
-		
-		if (0 != memcmp(dest_ref2, dest2, size)){
-			printf("Fail rand 6vect_dot_prod_sse test2 %d\n", rtest);
+
+		if (0 != memcmp(dest_ref2, dest2, size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test2 %d\n", rtest);
 			dump_matrix(efence_buffs, 5, TEST_SOURCES);
 			printf("dprod_base:");
 			dump(dest_ref2, align);
-			printf("dprod_sse:");
+			printf("dprod_dut:");
 			dump(dest2, align);
 			return -1;
 		}
-		
-		if (0 != memcmp(dest_ref3, dest3, size)){
-			printf("Fail rand 6vect_dot_prod_sse test3 %d\n", rtest);
+
+		if (0 != memcmp(dest_ref3, dest3, size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test3 %d\n", rtest);
 			dump_matrix(efence_buffs, 5, TEST_SOURCES);
 			printf("dprod_base:");
 			dump(dest_ref3, align);
-			printf("dprod_sse:");
+			printf("dprod_dut:");
 			dump(dest3, align);
 			return -1;
 		}
-		
-		if (0 != memcmp(dest_ref4, dest4, size)){
-			printf("Fail rand 6vect_dot_prod_sse test4 %d\n", rtest);
+
+		if (0 != memcmp(dest_ref4, dest4, size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test4 %d\n", rtest);
 			dump_matrix(efence_buffs, 5, TEST_SOURCES);
 			printf("dprod_base:");
 			dump(dest_ref4, align);
-			printf("dprod_sse:");
+			printf("dprod_dut:");
 			dump(dest4, align);
 			return -1;
 		}
-		
-		if (0 != memcmp(dest_ref5, dest5, size)){
-			printf("Fail rand 6vect_dot_prod_sse test5 %d\n", rtest);
+
+		if (0 != memcmp(dest_ref5, dest5, size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test5 %d\n", rtest);
 			dump_matrix(efence_buffs, 5, TEST_SOURCES);
 			printf("dprod_base:");
 			dump(dest_ref5, align);
-			printf("dprod_sse:");
+			printf("dprod_dut:");
 			dump(dest5, align);
 			return -1;
 		}
-		
-		if (0 != memcmp(dest_ref6, dest6, size)){
-			printf("Fail rand 6vect_dot_prod_sse test6 %d\n", rtest);
+
+		if (0 != memcmp(dest_ref6, dest6, size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test6 %d\n", rtest);
 			dump_matrix(efence_buffs, 5, TEST_SOURCES);
 			printf("dprod_base:");
 			dump(dest_ref6, align);
-			printf("dprod_sse:");
+			printf("dprod_dut:");
 			dump(dest6, align);
 			return -1;
 		}
@@ -620,15 +624,15 @@ int main(int argc, char *argv[])
 
 	// Test rand ptr alignment if available
 
-	for(rtest=0; rtest<RANDOMS; rtest++){
-		size = (TEST_LEN - PTR_ALIGN_CHK_B) & ~15;
+	for (rtest = 0; rtest < RANDOMS; rtest++) {
+		size = (TEST_LEN - PTR_ALIGN_CHK_B) & ~(TEST_MIN_SIZE - 1);
 		srcs = rand() % TEST_SOURCES;
 		if (srcs == 0)
 			continue;
 
 		offset = (PTR_ALIGN_CHK_B != 0) ? 1 : PTR_ALIGN_CHK_B;
 		// Add random offsets
-		for(i=0; i<srcs; i++)
+		for (i = 0; i < srcs; i++)
 			ubuffs[i] = buffs[i] + (rand() & (PTR_ALIGN_CHK_B - offset));
 
 		udest_ptrs[0] = dest1 + (rand() & (PTR_ALIGN_CHK_B - offset));
@@ -638,18 +642,18 @@ int main(int argc, char *argv[])
 		udest_ptrs[4] = dest5 + (rand() & (PTR_ALIGN_CHK_B - offset));
 		udest_ptrs[5] = dest6 + (rand() & (PTR_ALIGN_CHK_B - offset));
 
-		memset(dest1, 0, TEST_LEN);  // zero pad to check write-over
+		memset(dest1, 0, TEST_LEN);	// zero pad to check write-over
 		memset(dest2, 0, TEST_LEN);
 		memset(dest3, 0, TEST_LEN);
 		memset(dest4, 0, TEST_LEN);
 		memset(dest5, 0, TEST_LEN);
 		memset(dest6, 0, TEST_LEN);
 
-		for(i=0; i<srcs; i++)
-			for(j=0; j<size; j++)
+		for (i = 0; i < srcs; i++)
+			for (j = 0; j < size; j++)
 				ubuffs[i][j] = rand();
 
-		for (i=0; i<srcs; i++){
+		for (i = 0; i < srcs; i++) {
 			g1[i] = rand();
 			g2[i] = rand();
 			g3[i] = rand();
@@ -658,138 +662,143 @@ int main(int argc, char *argv[])
 			g6[i] = rand();
 		}
 
-		for(i=0; i<srcs; i++){
-			gf_vect_mul_init(g1[i], &g_tbls[i*32]);
-			gf_vect_mul_init(g2[i], &g_tbls[(32*srcs) + (i*32)]);
-			gf_vect_mul_init(g3[i], &g_tbls[(64*srcs) + (i*32)]);
-			gf_vect_mul_init(g4[i], &g_tbls[(96*srcs) + (i*32)]);
-			gf_vect_mul_init(g5[i], &g_tbls[(128*srcs) + (i*32)]);
-			gf_vect_mul_init(g6[i], &g_tbls[(160*srcs) + (i*32)]);
+		for (i = 0; i < srcs; i++) {
+			gf_vect_mul_init(g1[i], &g_tbls[i * 32]);
+			gf_vect_mul_init(g2[i], &g_tbls[(32 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g3[i], &g_tbls[(64 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g4[i], &g_tbls[(96 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g5[i], &g_tbls[(128 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g6[i], &g_tbls[(160 * srcs) + (i * 32)]);
 		}
 
 		gf_vect_dot_prod_base(size, srcs, &g_tbls[0], ubuffs, dest_ref1);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[32*srcs], ubuffs, dest_ref2);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[64*srcs], ubuffs, dest_ref3);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[96*srcs], ubuffs, dest_ref4);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[128*srcs], ubuffs, dest_ref5);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[160*srcs], ubuffs, dest_ref6);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[32 * srcs], ubuffs, dest_ref2);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[64 * srcs], ubuffs, dest_ref3);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[96 * srcs], ubuffs, dest_ref4);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[128 * srcs], ubuffs, dest_ref5);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[160 * srcs], ubuffs, dest_ref6);
 
-		gf_6vect_dot_prod_sse(size, srcs, g_tbls, ubuffs, udest_ptrs);
+		FUNCTION_UNDER_TEST(size, srcs, g_tbls, ubuffs, udest_ptrs);
 
-		if (memcmp(dest_ref1, udest_ptrs[0], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign srcs=%d\n", srcs);
+		if (memcmp(dest_ref1, udest_ptrs[0], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign srcs=%d\n",
+			       srcs);
 			dump_matrix(ubuffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref1, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(udest_ptrs[0], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref2, udest_ptrs[1], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign srcs=%d\n", srcs);
+		if (memcmp(dest_ref2, udest_ptrs[1], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign srcs=%d\n",
+			       srcs);
 			dump_matrix(ubuffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref2, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(udest_ptrs[1], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref3, udest_ptrs[2], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign srcs=%d\n", srcs);
+		if (memcmp(dest_ref3, udest_ptrs[2], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign srcs=%d\n",
+			       srcs);
 			dump_matrix(ubuffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref3, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(udest_ptrs[2], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref4, udest_ptrs[3], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign srcs=%d\n", srcs);
+		if (memcmp(dest_ref4, udest_ptrs[3], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign srcs=%d\n",
+			       srcs);
 			dump_matrix(ubuffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref4, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(udest_ptrs[3], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref5, udest_ptrs[4], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign srcs=%d\n", srcs);
+		if (memcmp(dest_ref5, udest_ptrs[4], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign srcs=%d\n",
+			       srcs);
 			dump_matrix(ubuffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref5, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(udest_ptrs[4], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref6, udest_ptrs[5], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign srcs=%d\n", srcs);
+		if (memcmp(dest_ref6, udest_ptrs[5], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign srcs=%d\n",
+			       srcs);
 			dump_matrix(ubuffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref6, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(udest_ptrs[5], 25);
 			return -1;
 		}
-
 		// Confirm that padding around dests is unchanged
-		memset(dest_ref1, 0, PTR_ALIGN_CHK_B);  // Make reference zero buff
+		memset(dest_ref1, 0, PTR_ALIGN_CHK_B);	// Make reference zero buff
 		offset = udest_ptrs[0] - dest1;
 
-		if (memcmp(dest1, dest_ref1, offset)){
+		if (memcmp(dest1, dest_ref1, offset)) {
 			printf("Fail rand ualign pad1 start\n");
 			return -1;
 		}
-		if (memcmp(dest1 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)){
+		if (memcmp(dest1 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)) {
 			printf("Fail rand ualign pad1 end\n");
 			return -1;
 		}
 
 		offset = udest_ptrs[1] - dest2;
-		if (memcmp(dest2, dest_ref1, offset)){
+		if (memcmp(dest2, dest_ref1, offset)) {
 			printf("Fail rand ualign pad2 start\n");
 			return -1;
 		}
-		if (memcmp(dest2 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)){
+		if (memcmp(dest2 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)) {
 			printf("Fail rand ualign pad2 end\n");
 			return -1;
 		}
 
 		offset = udest_ptrs[2] - dest3;
-		if (memcmp(dest3, dest_ref1, offset)){
+		if (memcmp(dest3, dest_ref1, offset)) {
 			printf("Fail rand ualign pad3 start\n");
 			return -1;
 		}
-		if (memcmp(dest3 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)){
+		if (memcmp(dest3 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)) {
 			printf("Fail rand ualign pad3 end\n");
 			return -1;
 		}
 
 		offset = udest_ptrs[3] - dest4;
-		if (memcmp(dest4, dest_ref1, offset)){
+		if (memcmp(dest4, dest_ref1, offset)) {
 			printf("Fail rand ualign pad4 start\n");
 			return -1;
 		}
-		if (memcmp(dest4 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)){
+		if (memcmp(dest4 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)) {
 			printf("Fail rand ualign pad4 end\n");
 			return -1;
 		}
 
 		offset = udest_ptrs[4] - dest5;
-		if (memcmp(dest5, dest_ref1, offset)){
+		if (memcmp(dest5, dest_ref1, offset)) {
 			printf("Fail rand ualign pad5 start\n");
 			return -1;
 		}
-		if (memcmp(dest5 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)){
+		if (memcmp(dest5 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)) {
 			printf("Fail rand ualign pad5 end\n");
 			return -1;
 		}
 
 		offset = udest_ptrs[5] - dest6;
-		if (memcmp(dest6, dest_ref1, offset)){
+		if (memcmp(dest6, dest_ref1, offset)) {
 			printf("Fail rand ualign pad6 start\n");
 			return -1;
 		}
-		if (memcmp(dest6 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)){
+		if (memcmp(dest6 + offset + size, dest_ref1, PTR_ALIGN_CHK_B - offset)) {
 			printf("Fail rand ualign pad6 end\n");
 			return -1;
 		}
@@ -797,18 +806,17 @@ int main(int argc, char *argv[])
 		putchar('.');
 	}
 
-
 	// Test all size alignment
 	align = (LEN_ALIGN_CHK_B != 0) ? 1 : 16;
 
-	for(size=TEST_LEN; size>15; size-=align){
+	for (size = TEST_LEN; size >= TEST_MIN_SIZE; size -= align) {
 		srcs = TEST_SOURCES;
 
-		for(i=0; i<srcs; i++)
-			for(j=0; j<size; j++)
+		for (i = 0; i < srcs; i++)
+			for (j = 0; j < size; j++)
 				buffs[i][j] = rand();
 
-		for (i=0; i<srcs; i++){
+		for (i = 0; i < srcs; i++) {
 			g1[i] = rand();
 			g2[i] = rand();
 			g3[i] = rand();
@@ -817,75 +825,81 @@ int main(int argc, char *argv[])
 			g6[i] = rand();
 		}
 
-		for(i=0; i<srcs; i++){
-			gf_vect_mul_init(g1[i], &g_tbls[i*32]);
-			gf_vect_mul_init(g2[i], &g_tbls[(32*srcs) + (i*32)]);
-			gf_vect_mul_init(g3[i], &g_tbls[(64*srcs) + (i*32)]);
-			gf_vect_mul_init(g4[i], &g_tbls[(96*srcs) + (i*32)]);
-			gf_vect_mul_init(g5[i], &g_tbls[(128*srcs) + (i*32)]);
-			gf_vect_mul_init(g6[i], &g_tbls[(160*srcs) + (i*32)]);
+		for (i = 0; i < srcs; i++) {
+			gf_vect_mul_init(g1[i], &g_tbls[i * 32]);
+			gf_vect_mul_init(g2[i], &g_tbls[(32 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g3[i], &g_tbls[(64 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g4[i], &g_tbls[(96 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g5[i], &g_tbls[(128 * srcs) + (i * 32)]);
+			gf_vect_mul_init(g6[i], &g_tbls[(160 * srcs) + (i * 32)]);
 		}
 
 		gf_vect_dot_prod_base(size, srcs, &g_tbls[0], buffs, dest_ref1);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[32*srcs], buffs, dest_ref2);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[64*srcs], buffs, dest_ref3);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[96*srcs], buffs, dest_ref4);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[128*srcs], buffs, dest_ref5);
-		gf_vect_dot_prod_base(size, srcs, &g_tbls[160*srcs], buffs, dest_ref6);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[32 * srcs], buffs, dest_ref2);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[64 * srcs], buffs, dest_ref3);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[96 * srcs], buffs, dest_ref4);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[128 * srcs], buffs, dest_ref5);
+		gf_vect_dot_prod_base(size, srcs, &g_tbls[160 * srcs], buffs, dest_ref6);
 
-		gf_6vect_dot_prod_sse(size, srcs, g_tbls, buffs, dest_ptrs);
+		FUNCTION_UNDER_TEST(size, srcs, g_tbls, buffs, dest_ptrs);
 
-		if (memcmp(dest_ref1, dest_ptrs[0], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign len=%d\n", size);
+		if (memcmp(dest_ref1, dest_ptrs[0], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign len=%d\n",
+			       size);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref1, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest_ptrs[0], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref2, dest_ptrs[1], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign len=%d\n", size);
+		if (memcmp(dest_ref2, dest_ptrs[1], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign len=%d\n",
+			       size);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref2, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest_ptrs[1], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref3, dest_ptrs[2], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign len=%d\n", size);
+		if (memcmp(dest_ref3, dest_ptrs[2], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign len=%d\n",
+			       size);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref3, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest_ptrs[2], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref4, dest_ptrs[3], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign len=%d\n", size);
+		if (memcmp(dest_ref4, dest_ptrs[3], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign len=%d\n",
+			       size);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref4, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest_ptrs[3], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref5, dest_ptrs[4], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign len=%d\n", size);
+		if (memcmp(dest_ref5, dest_ptrs[4], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign len=%d\n",
+			       size);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref5, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest_ptrs[4], 25);
 			return -1;
 		}
-		if (memcmp(dest_ref6, dest_ptrs[5], size)){
-			printf("Fail rand 6vect_dot_prod_sse test ualign len=%d\n", size);
+		if (memcmp(dest_ref6, dest_ptrs[5], size)) {
+			printf("Fail rand " xstr(FUNCTION_UNDER_TEST) " test ualign len=%d\n",
+			       size);
 			dump_matrix(buffs, 5, TEST_SOURCES);
-			printf("dprod_base:"); 
+			printf("dprod_base:");
 			dump(dest_ref6, 25);
-			printf("dprod_sse:"); 
+			printf("dprod_dut:");
 			dump(dest_ptrs[5], 25);
 			return -1;
 		}
@@ -895,4 +909,3 @@ int main(int argc, char *argv[])
 	return 0;
 
 }
-
