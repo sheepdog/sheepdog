@@ -172,10 +172,13 @@ static inline void ec_encode(struct fec *ctx, const uint8_t *ds[],
 			     uint8_t *ps[])
 {
 	int p = ctx->dp - ctx->d;
+
+#ifndef __x86_64__
 	int pidx[p];
 
 	for (int i = 0; i < p; i++)
 		pidx[i] = ctx->d + i;
+#endif
 
 #ifdef __x86_64__
 		ec_encode_data(SD_EC_DATA_STRIPE_SIZE / ctx->d, ctx->d, p,
