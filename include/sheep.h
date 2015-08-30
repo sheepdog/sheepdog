@@ -335,7 +335,7 @@ struct sheepdog_config {
 	uint64_t ctime;
 	uint16_t flags;
 	uint8_t copies;
-	uint8_t store[STORE_LEN];
+	uint8_t default_store[STORE_LEN];
 	uint8_t shutdown;
 	uint8_t copy_policy;
 	uint8_t block_size_shift;

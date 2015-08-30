@@ -238,7 +238,7 @@ struct cluster_info {
 	uint8_t copy_policy;
 	enum sd_status status : 8;
 	uint32_t __pad;
-	uint8_t store[STORE_LEN];
+	uint8_t default_store[STORE_LEN];
 
 	/* Node list at cluster_info->epoch */
 	struct sd_node nodes[SD_MAX_NODES];

@@ -51,7 +51,8 @@ static int get_cluster_config(struct cluster_info *cinfo)
 	cinfo->nr_copies = config.copies;
 	cinfo->flags = config.flags;
 	cinfo->copy_policy = config.copy_policy;
-	memcpy(cinfo->store, config.store, sizeof(config.store));
+	memcpy(cinfo->default_store, config.default_store,
+	       sizeof(config.default_store));
 
 	return SD_RES_SUCCESS;
 }
@@ -142,9 +143,9 @@ int set_cluster_config(const struct cluster_info *cinfo)
 	config.copies = cinfo->nr_copies;
 	config.copy_policy = cinfo->copy_policy;
 	config.flags = cinfo->flags;
-	memset(config.store, 0, sizeof(config.store));
-	pstrcpy((char *)config.store, sizeof(config.store),
-		(char *)cinfo->store);
+	memset(config.default_store, 0, sizeof(config.default_store));
+	pstrcpy((char *)config.default_store, sizeof(config.default_store),
+		(char *)cinfo->default_store);
 
 	return write_config();
 }
