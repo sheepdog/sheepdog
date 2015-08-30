@@ -56,7 +56,8 @@ static int get_cluster_config(struct cluster_info *cinfo)
 			(cinfo->flags & SD_CLUSTER_FLAG_AUTO_VNODES);
 	cinfo->copy_policy = config.copy_policy;
 	cinfo->block_size_shift = config.block_size_shift;
-	memcpy(cinfo->store, config.store, sizeof(config.store));
+	memcpy(cinfo->default_store, config.default_store,
+	       sizeof(config.default_store));
 
 	return SD_RES_SUCCESS;
 }
@@ -156,9 +157,9 @@ int set_cluster_config(const struct cluster_info *cinfo)
 	config.copy_policy = cinfo->copy_policy;
 	config.flags = cinfo->flags;
 	config.block_size_shift = cinfo->block_size_shift;
-	memset(config.store, 0, sizeof(config.store));
-	pstrcpy((char *)config.store, sizeof(config.store),
-		(char *)cinfo->store);
+	memset(config.default_store, 0, sizeof(config.default_store));
+	pstrcpy((char *)config.default_store, sizeof(config.default_store),
+		(char *)cinfo->default_store);
 
 	return write_config();
 }

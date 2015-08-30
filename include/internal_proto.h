@@ -255,7 +255,7 @@ struct cluster_info {
 	enum sd_status status : 8;
 	uint8_t block_size_shift;
 	uint8_t __pad[3];
-	uint8_t store[STORE_LEN];
+	uint8_t default_store[STORE_LEN];
 
 	/* Node list at cluster_info->epoch */
 	struct sd_node nodes[SD_MAX_NODES];
