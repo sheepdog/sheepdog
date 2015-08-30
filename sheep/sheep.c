@@ -853,6 +853,10 @@ int main(int argc, char **argv)
 	if (ret)
 		goto cleanup_log;
 
+	ret = init_node_config_file();
+	if (ret)
+		goto cleanup_log;
+
 	ret = init_config_file();
 	if (ret)
 		goto cleanup_log;

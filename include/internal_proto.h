@@ -224,6 +224,18 @@ struct oid_entry {
 };
 
 /*
+ * node_info: node specific configuration
+ * This is a config data initialized with "dog node format".
+ * Currently, it is very simple so doesn't have different expressions
+ * like cluster_info and sheepdog_config.
+ */
+struct node_info {
+	uint8_t store[STORE_LEN];
+};
+
+#define NODE_CONFIG_PATH "node_config"
+
+/*
  * A joining sheep multicasts the local cluster info.  Then, the existing nodes
  * reply the latest cluster info which is unique among all of the nodes.
  */

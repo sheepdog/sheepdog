@@ -625,6 +625,68 @@ static int node_log(int argc, char **argv)
 	return do_generic_subcommand(node_log_cmd, argc, argv);
 }
 
+
+static int node_format(int argc, char **argv)
+{
+	char *dir = argv[optind++], *store_name;
+	char config_path[PATH_MAX];
+	struct stat st;
+	int ret, fd;
+	struct node_info info;
+
+	/*
+	 * TODO: for more safe operation, this command should acquire lock which
+	 * is shared with sheep process
+	 */
+
+	if (optind == argc) {
+		sd_err("specify store format");
+		return EXIT_USAGE;
+	}
+	store_name = argv[optind];
+
+	if (strcmp(store_name, "plain") && strcmp(store_name, "tree")) {
+		/*
+		 * FIXME: store names should be macro defined in somewhere
+		 * suitable
+		 */
+		sd_err("expected store format: plain, tree");
+		return EXIT_SYSFAIL;
+	}
+
+	memset(config_path, 0, sizeof(config_path));
+	snprintf(config_path, PATH_MAX, "%s/" NODE_CONFIG_PATH, dir);
+
+	ret = stat(config_path, &st);
+	if (ret < 0) {
+		if (errno != ENOENT) {
+			sd_err("failed to check existence of config (%s): %m",
+			       config_path);
+			return EXIT_SYSFAIL;
+		}
+	} else {
+		/* TODO: dialogue and force option? */
+		sd_err("config file already exists: %s", config_path);
+		return EXIT_SYSFAIL;
+	}
+
+	fd = open(config_path, O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
+	if (fd < 0) {
+		sd_err("failed to create a config file (%s): %m", config_path);
+		return EXIT_SYSFAIL;
+	}
+
+	memset(&info, 0, sizeof(info));
+	memcpy(info.store, store_name, STORE_LEN);
+	ret = xwrite(fd, &info, sizeof(info));
+	if (ret != sizeof(info)) {
+		sd_err("failed to write a config file (%s): %m", config_path);
+		return EXIT_SYSFAIL;
+	}
+
+	return 0;
+}
+
 static struct subcommand node_cmd[] = {
 	{"kill", "<node id>", "aprhlT", "kill node", NULL,
 	 CMD_NEED_NODELIST, node_kill, node_options},
@@ -640,6 +702,9 @@ static struct subcommand node_cmd[] = {
 	 0, node_stat, node_options},
 	{"log", NULL, "aphT", "show or set log level of the node", node_log_cmd,
 	 CMD_NEED_ARG, node_log},
+	{"format", "<directory of sheep> <a name of store format>",
+	 "aphT", "initialize store format of the node", NULL, CMD_NEED_ARG,
+	 node_format},
 	{NULL,},
 };
 

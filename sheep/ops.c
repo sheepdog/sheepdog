@@ -259,7 +259,11 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	struct store_driver *driver;
 	char *store_name = data;
 
-	driver = find_store_driver(data);
+	if (strlen((const char *)sys->ninfo.store))
+		driver = find_store_driver((const char *)sys->ninfo.store);
+	else
+		driver = find_store_driver(data);
+
 	if (!driver)
 		return SD_RES_NO_STORE;
 

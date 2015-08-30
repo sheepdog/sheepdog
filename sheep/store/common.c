@@ -364,8 +364,12 @@ int init_store_driver(bool is_gateway)
 {
 	char driver_name[STORE_LEN], *p;
 
-	pstrcpy(driver_name, sizeof(driver_name),
-		(char *)sys->cinfo.default_store);
+	if (strlen((const char *)sys->ninfo.store))
+		pstrcpy(driver_name, sizeof(driver_name),
+			(char *)sys->ninfo.store);
+	else
+		pstrcpy(driver_name, sizeof(driver_name),
+			(char *)sys->cinfo.default_store);
 
 	p = memchr(driver_name, '\0', STORE_LEN);
 	if (!p) {
