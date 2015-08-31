@@ -76,3 +76,9 @@ Debian related stuff
 M: Alexander Guy <alexander@andern.org>
 F: debian/*
 L: sheepdog@lists.wpkg.org
+
+Intel Intelligent Storage Acceleration Library
+------------------------------
+M: hongzhou zhang <hongzhou.h.zhang@intel.com>
+F: lib/isa-l/*
+L: sheepdog@lists.wpkg.org
