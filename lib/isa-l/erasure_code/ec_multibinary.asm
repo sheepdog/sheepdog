@@ -252,15 +252,6 @@ _done_gf_vect_dot_prod_init:
 	pop	arg1
 	ret
 
-%macro slversion 4
-global %1_slver_%2%3%4
-global %1_slver
-%1_slver:
-%1_slver_%2%3%4:
-	dw 0x%4
-	db 0x%3, 0x%2
-%endmacro
-
 ;;;       func                 		core, ver, snum
 slversion ec_encode_data,		00,   03,  0133
 slversion gf_vect_mul,			00,   02,  0134
