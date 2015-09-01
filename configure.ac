@@ -88,6 +88,21 @@ AC_CHECK_PROGS([GROFF], [groff])
 
 AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
 
+# Check for programs
+if [[[ $host = *x86_64* ]]]; then
+  AC_CHECK_PROG(HAVE_YASM, yasm, yes, no)
+  if test "$HAVE_YASM" = "no"; then
+    AC_MSG_ERROR([yasm not found as required.])
+  fi
+  AC_MSG_CHECKING([checking yasm version])
+  AC_LANG_CONFTEST([AC_LANG_SOURCE([[vextracti128 xmm0, ymm0, 0;]])])
+  if yasm -f elf64 -i lib/isa-l/include lib/isa-l/erasure_code/gf_vect_dot_prod_avx2.asm -o /dev/null 2> /dev/null ; then
+    AC_MSG_RESULT([yes])
+  else
+    AC_MSG_FAILURE([require yasm 1.2.0 or higher])
+  fi
+fi
+
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([rt], [clock_gettime], , AC_MSG_ERROR(librt not found))
