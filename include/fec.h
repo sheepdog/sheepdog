@@ -101,8 +101,10 @@ void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 
 /* for isa-l */
 
+#if defined __x86_64__ && defined(ENABLE_ISAL)
 void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 		       char *buf, int idx, uint32_t object_size);
+#endif
 
 /*
  * @param inpkts an array of packets (size k); If a primary block, i, is present
@@ -173,14 +175,14 @@ static inline void ec_encode(struct fec *ctx, const uint8_t *ds[],
 {
 	int p = ctx->dp - ctx->d;
 
-#ifndef __x86_64__
+#if !defined __x86_64__ || !defined(ENABLE_ISAL)
 	int pidx[p];
 
 	for (int i = 0; i < p; i++)
 		pidx[i] = ctx->d + i;
 #endif
 
-#ifdef __x86_64__
+#if defined __x86_64__ && defined(ENABLE_ISAL)
 		ec_encode_data(SD_EC_DATA_STRIPE_SIZE / ctx->d, ctx->d, p,
 				   ctx->ec_tbl, (unsigned char **)ds, ps);
 #else
@@ -212,7 +214,7 @@ static inline void ec_decode_buffer(struct fec *ctx, uint8_t *input[],
 				    const int in_idx[], char *buf,
 				    int idx, uint32_t object_size)
 {
-#ifdef __x86_64__
+#if defined __x86_64__ && defined(ENABLE_ISAL)
 		isa_decode_buffer(ctx, input, in_idx, buf, idx, object_size);
 #else
 		fec_decode_buffer(ctx, input, in_idx, buf, idx, object_size);
