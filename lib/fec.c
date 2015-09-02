@@ -455,7 +455,7 @@ void fec_free(struct fec *p)
 	sd_assert(p != NULL && p->magic == (((FEC_MAGIC ^ p->d) ^ p->dp) ^
 					 (unsigned long) (p->enc_matrix)));
 	free(p->enc_matrix);
-#ifdef __x86_64__
+#if defined __x86_64__ && defined(ENABLE_ISAL)
 		free(p->ec_tbl);
 #endif
 	free(p);
@@ -498,7 +498,7 @@ struct fec *fec_new(unsigned short d, unsigned short dp)
 		*p = 1;
 	free(tmp_m);
 
-#ifdef __x86_64__
+#if defined __x86_64__ && defined(ENABLE_ISAL)
 		retval->ec_tbl = xmalloc(dp * d * 32);
 		ec_init_tables(d, dp - d, retval->enc_matrix + (d * d),
 			       retval->ec_tbl);
@@ -716,6 +716,7 @@ void fec_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 	}
 }
 
+#if defined __x86_64__ && defined(ENABLE_ISAL)
 void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 		       char *buf, int idx, uint32_t object_size)
 {
@@ -743,3 +744,4 @@ void isa_decode_buffer(struct fec *ctx, uint8_t *input[], const int in_idx[],
 	ec_init_tables(ed, 1, cm, ec_tbl);
 	ec_encode_data(len, ed, 1, ec_tbl, input, lost);
 }
+#endif

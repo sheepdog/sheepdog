@@ -97,11 +97,15 @@ if [[[ $host = *x86_64* ]]]; then
   AC_MSG_CHECKING([checking yasm version])
   AC_LANG_CONFTEST([AC_LANG_SOURCE([[vextracti128 xmm0, ymm0, 0;]])])
   if yasm -f elf64 -i lib/isa-l/include lib/isa-l/erasure_code/gf_vect_dot_prod_avx2.asm -o /dev/null 2> /dev/null ; then
+    yasm_avx2_support=yes
+    AC_DEFINE_UNQUOTED([ENABLE_ISAL], 1, [enable isal])
     AC_MSG_RESULT([yes])
   else
-    AC_MSG_FAILURE([require yasm 1.2.0 or higher])
+    yasm_avx2_support=no
+    AC_MSG_NOTICE([avx2 requires yasm 1.2.0 or higher])
   fi
 fi
+AM_CONDITIONAL(YASM_AVX2_SUPPORT, test "$yasm_avx2_support" = "yes")
 
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
