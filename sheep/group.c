@@ -647,13 +647,13 @@ static void setup_backend_store(const struct cluster_info *cinfo)
 {
 	int ret;
 
-	if (cinfo->store[0] == '\0')
+	if (cinfo->default_store[0] == '\0')
 		return;
 
 	if (!sd_store) {
-		sd_store = find_store_driver((char *)cinfo->store);
+		sd_store = find_store_driver((char *)cinfo->default_store);
 		if (!sd_store)
-			panic("backend store %s not supported", cinfo->store);
+			panic("backend store %s not supported", cinfo->default_store);
 
 		ret = sd_store->init();
 		if (ret != SD_RES_SUCCESS)
