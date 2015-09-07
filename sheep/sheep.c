@@ -986,12 +986,16 @@ int main(int argc, char **argv)
 	if (ret)
 		goto cleanup_journal;
 
+	#ifdef HAVE_HTTP
 	if (http_options && http_init(http_options) != 0)
 		goto cleanup_journal;
+	#endif
 
+	#ifdef HAVE_NFS
 	ret = nfs_init(NULL);
 	if (ret)
 		goto cleanup_journal;
+	#endif
 
 	if (pid_file && (create_pidfile(pid_file) != 0)) {
 		sd_err("failed to pid file '%s' - %m", pid_file);
