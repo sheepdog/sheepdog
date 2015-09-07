@@ -827,7 +827,7 @@ static void rx_main(struct work *work)
 			ci->conn.fd,
 			ci->conn.ipstr, ci->conn.port,
 			op_name(get_sd_op(req->rq.opcode)),
-			data_to_str(req->data, req->rp.data_length));
+			data_to_str(req->data, req->rq.data_length));
 	} else {
 		sd_debug("%d, %s:%d",
 			 ci->conn.fd,
