@@ -48,6 +48,10 @@ if BUILD_EARTHQUAKE
 dog_LDADD		+= -leq_embed
 endif
 
+if BUILD_ACCELIO
+dog_LDADD		+= -lxio
+endif
+
 install-exec-hook:
 	if [ -z "${DESTDIR}" ];then $(LN_S) -f ${bindir}/dog ${bindir}/collie;fi
 

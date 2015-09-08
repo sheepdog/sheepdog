@@ -11,8 +11,9 @@
 
 #include "dog.h"
 #include "sha1.h"
-#include "sockfd_cache.h"
 #include "fec.h"
+
+#include "sockfd_cache.h"
 
 struct timespec get_time_tick(void)
 {
@@ -234,6 +235,13 @@ int dog_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 	struct sockfd *sfd;
 	int ret;
 
+#ifdef HAVE_ACCELIO
+	if (nid->io_transport_type == IO_TRANSPORT_TYPE_RDMA) {
+		ret = xio_exec_req(nid, hdr, buf, NULL, 0, UINT32_MAX);
+		goto end;
+	}
+#endif
+
 	sfd = sockfd_cache_get(nid);
 	if (!sfd)
 		return -1;
@@ -247,6 +255,7 @@ int dog_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 
 	sockfd_cache_put(nid, sfd);
 
+end:
 	return ret ? -1 : 0;
 }
 

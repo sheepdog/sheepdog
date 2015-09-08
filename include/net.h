@@ -33,14 +33,24 @@ struct connection {
 	char ipstr[INET6_ADDRSTRLEN];
 
 	bool dead;
+
+#ifdef HAVE_ACCELIO
+	struct xio_session *session;
+#endif
 };
+
+#ifdef HAVE_ACCELIO
+
+struct sd_xio_session {
+	int efd;
+};
+
+#endif
 
 int conn_tx_off(struct connection *conn);
 int conn_tx_on(struct connection *conn);
 int conn_rx_off(struct connection *conn);
 int conn_rx_on(struct connection *conn);
-int do_read(int sockfd, void *buf, uint32_t len,
-	    bool (*need_retry)(uint32_t), uint32_t, uint32_t);
 int rx(struct connection *conn, enum conn_state next_state);
 int tx(struct connection *conn, enum conn_state next_state);
 int connect_to(const char *name, int port);
@@ -48,6 +58,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen,
 	     bool (*need_retry)(uint32_t), uint32_t, uint32_t);
 int exec_req(int sockfd, struct sd_req *hdr, void *,
 	     bool (*need_retry)(uint32_t), uint32_t, uint32_t);
+int do_read(int sockfd, void *buf, uint32_t len,
+	    bool (*need_retry)(uint32_t), uint32_t, uint32_t);
 int create_listen_ports(const char *bindaddr, int port,
 			int (*callback)(int fd, void *), void *data);
 int create_unix_domain_socket(const char *unix_path,
