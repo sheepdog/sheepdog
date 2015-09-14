@@ -16,6 +16,7 @@
 
 #include <string.h>
 
+#include "util.h"
 #include "rbtree.h"
 
 struct mock_method {
