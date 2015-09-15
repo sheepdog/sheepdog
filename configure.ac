@@ -269,27 +269,27 @@ AC_ARG_ENABLE([sheepfs],
 AM_CONDITIONAL(BUILD_SHEEPFS, test x$enable_sheepfs = xyes)
 
 AC_ARG_ENABLE([http],
-	[ --enable-http : enable http request service (default no) ],,
+	[  --enable-http            : enable http request service (default no) ],,
 	[ enable_http="no" ],)
 AM_CONDITIONAL(BUILD_HTTP, test x$enable_http = xyes)
 
 AC_ARG_ENABLE([nfs],
-	[ --enable-nfs : enable nfs server service (default no) ],,
+	[  --enable-nfs             : enable nfs server service (default no) ],,
 	[ enable_nfs="no" ],)
 AM_CONDITIONAL(BUILD_NFS, test x$enable_nfs = xyes)
 
 AC_ARG_ENABLE([diskvnodes],
-	[ --enable-diskvnodes : enable disk as vnodes (default no) ],,
+	[  --enable-diskvnodes      : enable disk as vnodes (default no) ],,
 	[ enable_diskvnodes="no" ],)
 AM_CONDITIONAL(BUILD_DISKVNODES, test x$enable_diskvnodes = xyes)
 
 AC_ARG_ENABLE([earthquake],
-	[ --enable-earthquake : enable earthquake debugger (default no) ],,
+	[  --enable-earthquake      : enable earthquake debugger (default no) ],,
 	[ enable_earthquake="no" ],)
 AM_CONDITIONAL(BUILD_EARTHQUAKE, test x$enable_earthquake = xyes)
 
 AC_ARG_ENABLE([lttng-ust],
-	[ --enable-lttng-ust : enable tracing feature based on LTTng UST (default no) ],,
+	[  --enable-lttng-ust       : enable tracing feature based on LTTng UST (default no) ],,
 	[ enable_lttng_ust="no" ],)
 AM_CONDITIONAL(BUILD_LTTNG_UST, test x$enable_lttng_ust = xyes)
 
