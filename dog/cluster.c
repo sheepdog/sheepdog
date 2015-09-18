@@ -833,7 +833,7 @@ static int cluster_alter_copy(int argc, char **argv)
 			   "use %d as default.\n", SD_DEFAULT_COPIES);
 	}
 
-	if (cluster_cmd_data.copies > sd_nodes_nr) {
+	if (!cluster_cmd_data.force && (cluster_cmd_data.copies > sd_nodes_nr)) {
 		char info[1024];
 		snprintf(info, sizeof(info), "Number of copies (%d) is larger "
 			 "than number of nodes (%d).\n"
@@ -865,7 +865,9 @@ static int cluster_alter_copy(int argc, char **argv)
 		goto failure;
 	}
 
-	confirm(ALTER_CLUSTER_COPY_PRINT);
+	if (!cluster_cmd_data.force) {
+		confirm(ALTER_CLUSTER_COPY_PRINT);
+	}
 
 	sd_init_req(&hdr, SD_OP_ALTER_CLUSTER_COPY);
 	hdr.cluster.copies = cluster_cmd_data.copies;
@@ -908,7 +910,7 @@ static struct subcommand cluster_cmd[] = {
 	 cluster_reweight, cluster_options},
 	{"check", NULL, "aphT", "check and repair cluster", NULL,
 	 CMD_NEED_ROOT|CMD_NEED_NODELIST, cluster_check, cluster_options},
-	{"alter-copy", NULL, "aphTc", "set the cluster's redundancy level",
+	{"alter-copy", NULL, "aphTcf", "set the cluster's redundancy level",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_NODELIST, cluster_alter_copy, cluster_options},
 	{NULL,},
 };
