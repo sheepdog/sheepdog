@@ -131,6 +131,7 @@ struct system_info {
 
 	struct sd_node this_node;
 
+	struct node_info ninfo;
 	struct cluster_info cinfo;
 	enum sd_node_status node_status;
 
@@ -450,6 +451,7 @@ int epoch_log_read_remote(uint32_t epoch, struct sd_node *nodes,
 				struct vnode_info *vinfo);
 uint32_t get_latest_epoch(void);
 void init_config_path(const char *base_path);
+int init_node_config_file(void);
 int init_config_file(void);
 int get_obj_list(const struct sd_req *, struct sd_rsp *, void *);
 int objlist_cache_cleanup(uint32_t vid);
@@ -629,24 +631,12 @@ static inline bool is_ec_dentry(const char *dentry)
 /* http.c */
 #ifdef HAVE_HTTP
 int http_init(const char *options);
-#else
-static inline int http_init(const char *options)
-{
-	sd_notice("http service is not compiled");
-	return 0;
-}
 #endif /* END BUILD_HTTP */
 
 #ifdef HAVE_NFS
 int nfs_init(const char *options);
 int nfs_create(const char *name);
 int nfs_delete(const char *name);
-#else
-static inline int nfs_init(const char *options)
-{
-	sd_notice("nfs server service is not compiled");
-	return 0;
-}
 #endif
 
 extern bool wildcard_recovery;

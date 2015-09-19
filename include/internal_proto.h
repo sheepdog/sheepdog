@@ -240,6 +240,18 @@ struct oid_entry {
 };
 
 /*
+ * node_info: node specific configuration
+ * This is a config data initialized with "dog node format".
+ * Currently, it is very simple so doesn't have different expressions
+ * like cluster_info and sheepdog_config.
+ */
+struct node_info {
+	uint8_t store[STORE_LEN];
+};
+
+#define NODE_CONFIG_PATH "node_config"
+
+/*
  * A joining sheep multicasts the local cluster info.  Then, the existing nodes
  * reply the latest cluster info which is unique among all of the nodes.
  */
@@ -255,7 +267,7 @@ struct cluster_info {
 	enum sd_status status : 8;
 	uint8_t block_size_shift;
 	uint8_t __pad[3];
-	uint8_t store[STORE_LEN];
+	uint8_t default_store[STORE_LEN];
 
 	/* Node list at cluster_info->epoch */
 	struct sd_node nodes[SD_MAX_NODES];

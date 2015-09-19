@@ -129,8 +129,11 @@ static int post_cluster_new_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	unsigned long nr = rsp->vdi.vdi_id;
 	int ret = rsp->result;
+	char *name = data;
 
-	sd_info("req->vdi.base_vdi_id: %x, rsp->vdi.vdi_id: %x", req->vdi.base_vdi_id, rsp->vdi.vdi_id);
+	sd_info("name: %s, base_vdi_id: %x, new vdi_id: %x, sender: %s",
+		name, req->vdi.base_vdi_id, rsp->vdi.vdi_id,
+		node_to_str(sender));
 
 	sd_debug("done %d %lx", ret, nr);
 	if (ret == SD_RES_SUCCESS)
@@ -194,6 +197,11 @@ static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 	unsigned long vid = rsp->vdi.vdi_id;
 	struct cache_deletion_work *dw;
 	int ret = rsp->result;
+	char *name = data;
+
+	sd_info("name: %s, base_vdi_id: %x, new vdi_id: %x, sender: %s",
+		name, req->vdi.base_vdi_id, rsp->vdi.vdi_id,
+		node_to_str(sender));
 
 	if (ret == SD_RES_SUCCESS) {
 		atomic_set_bit(vid, sys->vdi_deleted);
@@ -300,14 +308,17 @@ static int cluster_make_fs(const struct sd_req *req, struct sd_rsp *rsp,
 	int32_t nr_vnodes;
 	struct vnode_info *vinfo = get_vnode_info();
 
-	driver = find_store_driver(data);
+	if (strlen((const char *)sys->ninfo.store))
+		driver = find_store_driver((const char *)sys->ninfo.store);
+	else
+		driver = find_store_driver(data);
 	if (!driver) {
 		ret = SD_RES_NO_STORE;
 		goto out;
 	}
 
-	pstrcpy((char *)sys->cinfo.store, sizeof(sys->cinfo.store),
-		store_name);
+	pstrcpy((char *)sys->cinfo.default_store,
+		sizeof(sys->cinfo.default_store), store_name);
 	sd_store = driver;
 	latest_epoch = get_latest_epoch();
 
@@ -532,7 +543,7 @@ static int local_stat_cluster(struct request *req)
 			elog->copy_policy = sys->cinfo.copy_policy;
 			elog->flags = sys->cinfo.flags;
 			pstrcpy(elog->drv_name, STORE_LEN,
-				(char *)sys->cinfo.store);
+				(char *)sys->cinfo.default_store);
 		}
 
 		elog->epoch = epoch;

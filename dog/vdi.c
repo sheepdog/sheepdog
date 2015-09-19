@@ -2930,7 +2930,7 @@ static int vdi_alter_copy(int argc, char **argv)
 			   "use %d as default.\n", SD_DEFAULT_COPIES);
 	}
 
-	if (vdi_cmd_data.nr_copies > sd_nodes_nr) {
+	if (!vdi_cmd_data.force && (vdi_cmd_data.nr_copies > sd_nodes_nr)) {
 		char info[1024];
 		snprintf(info, sizeof(info), "Number of copies (%d) is larger "
 			 "than number of nodes (%d).\n"
@@ -2966,7 +2966,8 @@ static int vdi_alter_copy(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	confirm(ALTER_VDI_COPY_PRINT);
+	if (!vdi_cmd_data.force)
+		confirm(ALTER_VDI_COPY_PRINT);
 
 	inode->nr_copies = vdi_cmd_data.nr_copies;
 	ret = dog_write_object(vid_to_vdi_oid(vid), 0, inode,
@@ -3179,7 +3180,7 @@ static struct subcommand vdi_cmd[] = {
 	 "Run 'dog vdi cache' for more information",
 	 vdi_cache_cmd, CMD_NEED_ROOT|CMD_NEED_ARG,
 	 vdi_cache, vdi_options},
-	{"alter-copy", "<vdiname>", "caphT", "set the vdi's redundancy level",
+	{"alter-copy", "<vdiname>", "caphTf", "set the vdi's redundancy level",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG|CMD_NEED_NODELIST, vdi_alter_copy, vdi_options},
 	{"lock", NULL, "aphT", "See 'dog vdi lock' for more information",
 	 vdi_lock_cmd, CMD_NEED_ROOT|CMD_NEED_ARG, vdi_lock, vdi_options},

@@ -13,7 +13,7 @@
 
 static struct sheepdog_config config;
 
-char *config_path;
+char *config_path, *node_config_path;
 
 #define CONFIG_PATH "/config"
 
@@ -56,9 +56,36 @@ static int get_cluster_config(struct cluster_info *cinfo)
 			(cinfo->flags & SD_CLUSTER_FLAG_AUTO_VNODES);
 	cinfo->copy_policy = config.copy_policy;
 	cinfo->block_size_shift = config.block_size_shift;
-	memcpy(cinfo->store, config.store, sizeof(config.store));
+	memcpy(cinfo->default_store, config.default_store,
+	       sizeof(config.default_store));
 
 	return SD_RES_SUCCESS;
+}
+
+int init_node_config_file(void)
+{
+	int fd, ret;
+	struct stat st;
+
+	ret = stat(node_config_path, &st);
+	if (ret < 0)
+		/* this node doesn't have a node config, do nothing */
+		return 0;
+
+	fd = open(node_config_path, O_RDONLY);
+	if (fd < 0) {
+		sd_err("failed to open node config (%s): %m", node_config_path);
+		return -1;
+	}
+
+	ret = xread(fd, &sys->ninfo, sizeof(sys->ninfo));
+	if (ret != sizeof(sys->ninfo)) {
+		sd_err("failed to read node config (%s): %m", node_config_path);
+		return -1;
+	}
+
+	close(fd);
+	return 0;
 }
 
 int init_config_file(void)
@@ -147,6 +174,10 @@ void init_config_path(const char *base_path)
 
 	config_path = xzalloc(len);
 	snprintf(config_path, len, "%s" CONFIG_PATH, base_path);
+
+	len = strlen(base_path) + strlen(NODE_CONFIG_PATH) + 1;
+	node_config_path = xzalloc(len);
+	snprintf(node_config_path, len, "%s" NODE_CONFIG_PATH, base_path);
 }
 
 int set_cluster_config(const struct cluster_info *cinfo)
@@ -156,9 +187,9 @@ int set_cluster_config(const struct cluster_info *cinfo)
 	config.copy_policy = cinfo->copy_policy;
 	config.flags = cinfo->flags;
 	config.block_size_shift = cinfo->block_size_shift;
-	memset(config.store, 0, sizeof(config.store));
-	pstrcpy((char *)config.store, sizeof(config.store),
-		(char *)cinfo->store);
+	memset(config.default_store, 0, sizeof(config.default_store));
+	pstrcpy((char *)config.default_store, sizeof(config.default_store),
+		(char *)cinfo->default_store);
 
 	return write_config();
 }

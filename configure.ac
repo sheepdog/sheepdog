@@ -88,6 +88,25 @@ AC_CHECK_PROGS([GROFF], [groff])
 
 AM_MISSING_PROG(AUTOM4TE, autom4te, $missing_dir)
 
+# Check for programs
+if [[[ $host = *x86_64* ]]]; then
+  AC_CHECK_PROG(HAVE_YASM, yasm, yes, no)
+  if test "$HAVE_YASM" = "no"; then
+    AC_MSG_ERROR([yasm not found as required.])
+  fi
+  AC_MSG_CHECKING([checking yasm version])
+  AC_LANG_CONFTEST([AC_LANG_SOURCE([[vextracti128 xmm0, ymm0, 0;]])])
+  if yasm -f elf64 -i lib/isa-l/include lib/isa-l/erasure_code/gf_vect_dot_prod_avx2.asm -o /dev/null 2> /dev/null ; then
+    yasm_avx2_support=yes
+    AC_DEFINE_UNQUOTED([ENABLE_ISAL], 1, [enable isal])
+    AC_MSG_RESULT([yes])
+  else
+    yasm_avx2_support=no
+    AC_MSG_NOTICE([avx2 requires yasm 1.2.0 or higher])
+  fi
+fi
+AM_CONDITIONAL(YASM_AVX2_SUPPORT, test "$yasm_avx2_support" = "yes")
+
 # Checks for libraries.
 AC_CHECK_LIB([socket], [socket])
 AC_CHECK_LIB([rt], [clock_gettime], , AC_MSG_ERROR(librt not found))
@@ -250,27 +269,27 @@ AC_ARG_ENABLE([sheepfs],
 AM_CONDITIONAL(BUILD_SHEEPFS, test x$enable_sheepfs = xyes)
 
 AC_ARG_ENABLE([http],
-	[ --enable-http : enable http request service (default no) ],,
+	[  --enable-http            : enable http request service (default no) ],,
 	[ enable_http="no" ],)
 AM_CONDITIONAL(BUILD_HTTP, test x$enable_http = xyes)
 
 AC_ARG_ENABLE([nfs],
-	[ --enable-nfs : enable nfs server service (default no) ],,
+	[  --enable-nfs             : enable nfs server service (default no) ],,
 	[ enable_nfs="no" ],)
 AM_CONDITIONAL(BUILD_NFS, test x$enable_nfs = xyes)
 
 AC_ARG_ENABLE([diskvnodes],
-	[ --enable-diskvnodes : enable disk as vnodes (default no) ],,
+	[  --enable-diskvnodes      : enable disk as vnodes (default no) ],,
 	[ enable_diskvnodes="no" ],)
 AM_CONDITIONAL(BUILD_DISKVNODES, test x$enable_diskvnodes = xyes)
 
 AC_ARG_ENABLE([earthquake],
-	[ --enable-earthquake : enable earthquake debugger (default no) ],,
+	[  --enable-earthquake      : enable earthquake debugger (default no) ],,
 	[ enable_earthquake="no" ],)
 AM_CONDITIONAL(BUILD_EARTHQUAKE, test x$enable_earthquake = xyes)
 
 AC_ARG_ENABLE([lttng-ust],
-	[ --enable-lttng-ust : enable tracing feature based on LTTng UST (default no) ],,
+	[  --enable-lttng-ust       : enable tracing feature based on LTTng UST (default no) ],,
 	[ enable_lttng_ust="no" ],)
 AM_CONDITIONAL(BUILD_LTTNG_UST, test x$enable_lttng_ust = xyes)
 
@@ -509,7 +528,7 @@ fi
 if test "x${enable_trace}" = xyes && \
 		cc_supports_flag -pg ; then
 	AC_MSG_NOTICE([Enabling trace (-pg)])
-	TRACE_CFLAGS="-pg"
+	TRACE_CFLAGS="-pg -nopie"
 else
 	TRACE_CFLAGS=""
 fi

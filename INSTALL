@@ -12,11 +12,11 @@ Run-time dependencies
 Compile-time dependencies
 -------------------------
 * GNU Autotools
-* corosync devel package
-* liburcu devel package
-* git
+* corosync devel package (needed for building cluster using corosync)
+* liburcu (userspace rcu) devel package
 * optional:fuse-devel (for sheepfs)
-* optional:libzookeeper-mt-dev (for zookeeper support)
+* optional:libzookeeper-mt-dev (needed for building cluster using zookeeper)
+* optional:curl, fcgi (for http request service)
 
 Installing from source
 ------------------------------------
