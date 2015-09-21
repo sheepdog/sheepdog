@@ -952,7 +952,8 @@ static void update_cluster_info(const struct cluster_info *cinfo,
 			}
 		}
 	} else {
-		if (0 < cinfo->epoch && cinfo->status == SD_STATUS_OK)
+		if (sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK &&
+		    0 < cinfo->epoch && cinfo->status == SD_STATUS_OK)
 			create_vdi_state_checkpoint(cinfo->epoch - 1);
 	}
 
