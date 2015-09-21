@@ -1418,14 +1418,14 @@ static int cluster_lock_vdi_main(const struct sd_req *req, struct sd_rsp *rsp,
 {
 	uint32_t vid = rsp->vdi.vdi_id;
 
-	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
-		sd_debug("logging vdi unlock information for later replay");
-		log_vdi_op_lock(vid, &sender->nid, req->vdi.type);
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_debug("vdi lock is disabled");
 		return SD_RES_SUCCESS;
 	}
 
-	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
-		sd_debug("vdi lock is disabled");
+	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
+		sd_debug("logging vdi unlock information for later replay");
+		log_vdi_op_lock(vid, &sender->nid, req->vdi.type);
 		return SD_RES_SUCCESS;
 	}
 
@@ -1447,14 +1447,14 @@ static int cluster_release_vdi_main(const struct sd_req *req,
 {
 	uint32_t vid = req->vdi.base_vdi_id;
 
-	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
-		sd_debug("logging vdi lock information for later replay");
-		log_vdi_op_unlock(vid, &sender->nid, req->vdi.type);
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_debug("vdi lock is disabled");
 		return SD_RES_SUCCESS;
 	}
 
-	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
-		sd_debug("vdi lock is disabled");
+	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
+		sd_debug("logging vdi lock information for later replay");
+		log_vdi_op_unlock(vid, &sender->nid, req->vdi.type);
 		return SD_RES_SUCCESS;
 	}
 
@@ -1474,6 +1474,12 @@ static int local_vdi_state_checkpoint_ctl(const struct sd_req *req,
 	int epoch = req->vdi_state_checkpoint.tgt_epoch;
 	uint32_t vid = req->vdi_state_checkpoint.vid;
 	int ret;
+
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_alert("checkpoint sync is issued, but this cluster isn't"
+			 " enabled vdi locking");
+		return SD_RES_SUCCESS; /* just ignore */
+	}
 
 	sd_info("%s vdi state checkpoint at epoch %d",
 		get ? "getting" : "freeing", epoch);
