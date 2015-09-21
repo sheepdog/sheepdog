@@ -1399,7 +1399,13 @@ static int local_vdi_state_snapshot_ctl(const struct sd_req *req,
 	int epoch = req->vdi_state_snapshot.tgt_epoch;
 	int ret, length = 0;
 
-	sd_info("%s vdi state snapshot at epoch %d",
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_alert("checkpoint sync is issued, but this cluster isn't"
+			 " enabled vdi locking");
+		return SD_RES_SUCCESS; /* just ignore */
+	}
+
+	sd_info("%s vdi state checkpoint at epoch %d",
 		get ? "getting" : "freeing", epoch);
 
 	if (get) {
