@@ -320,7 +320,6 @@ static int vdi_read_inode(struct sd_cluster *c, char *name,
 /** FIXME: tgtd multi-path support **/
 int sd_vdi_snapshot(struct sd_cluster *c, char *name, char *snap_tag)
 {
-	struct sd_req hdr = {};
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
 	int ret = 0;
@@ -357,14 +356,6 @@ int sd_vdi_snapshot(struct sd_cluster *c, char *name, char *snap_tag)
 		return SD_RES_INVALID_PARMS;
 	}
 
-	sd_init_req(&hdr, SD_OP_PREVENT_INODE_UPDATE);
-	ret = sd_run_sdreq(c, &hdr, NULL);
-	if (ret != SD_RES_SUCCESS) {
-		fprintf(stderr, "Failed to prevent inode update: %s\n",
-				sd_strerror(ret));
-		return ret;
-	}
-
 	ret = write_object(c, vid_to_vdi_oid(inode->vdi_id), 0, snap_tag,
 			SD_MAX_VDI_TAG_LEN, offsetof(struct sd_inode, tag), 0,
 			inode->nr_copies, inode->copy_policy, false, false);
@@ -384,12 +375,6 @@ int sd_vdi_snapshot(struct sd_cluster *c, char *name, char *snap_tag)
 	}
 
 out:
-	sd_init_req(&hdr, SD_OP_ALLOW_INODE_UPDATE);
-	int ret2 = sd_run_sdreq(c, &hdr, NULL);
-	if (ret2 != SD_RES_SUCCESS)
-		fprintf(stderr, "allowing inode update failed:%s\n",
-				sd_strerror(ret));
-
 	return ret;
 }
 
