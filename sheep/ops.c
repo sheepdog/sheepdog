@@ -1475,6 +1475,12 @@ static int local_vdi_state_checkpoint_ctl(const struct sd_req *req,
 	uint32_t vid = req->vdi_state_checkpoint.vid;
 	int ret;
 
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_alert("checkpoint sync is issued, but this cluster isn't"
+			 " enabled vdi locking");
+		return SD_RES_SUCCESS; /* just ignore */
+	}
+
 	sd_info("%s vdi state checkpoint at epoch %d",
 		get ? "getting" : "freeing", epoch);
 

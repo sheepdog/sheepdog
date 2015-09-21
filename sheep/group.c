@@ -591,7 +591,8 @@ static main_fn void get_vdis_done(struct work *work)
 	rb_destroy(&w->nroot, struct sd_node, rb);
 	free(w);
 
-	if (refcount_read(&nr_get_vdis_works) == 0)
+	if (refcount_read(&nr_get_vdis_works) == 0 &&
+	    sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)
 		/*
 		 * Now this sheep process could construct its vdi state.
 		 * It can collect other state e.g. vdi locking.
