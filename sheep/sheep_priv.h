@@ -120,9 +120,6 @@ struct request {
 	struct work work;
 	enum REQUST_STATUS status;
 	bool stat; /* true if this request is during stat */
-
-	struct list_node prevented_inode_update_request_list;
-	struct list_node pending_prevent_inode_update_reqs;
 };
 
 struct system_info {
@@ -176,11 +173,6 @@ struct system_info {
 	/* upgrade data layout before starting service if necessary*/
 	bool upgrade;
 	struct sd_stat stat;
-
-	int nr_prevent_inode_update;
-	int nr_ongoing_inode_update_request;
-	struct list_head prevented_inode_update_request_queue;
-	struct list_head pending_prevent_inode_update_request_queue;
 };
 
 struct disk {

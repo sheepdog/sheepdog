@@ -1315,48 +1315,6 @@ out:
 	return ret;
 }
 
-static int local_prevent_inode_update(const struct sd_req *req,
-				      struct sd_rsp *rsp,
-				      void *data, const struct sd_node *sender)
-{
-	/* FIXME: change type of process_main() */
-	struct request *rq = container_of(req, struct request, rq);
-
-	sd_debug("preventing inode update request, ongoing inode update"
-		 " requests: %d", sys->nr_ongoing_inode_update_request);
-
-	sys->nr_prevent_inode_update++;
-
-	if (sys->nr_ongoing_inode_update_request) {
-		list_add_tail(&rq->pending_prevent_inode_update_reqs,
-			      &sys->pending_prevent_inode_update_request_queue);
-		get_request(rq);
-	}
-
-	return SD_RES_SUCCESS;
-}
-
-static int local_allow_inode_update(const struct sd_req *req,
-				    struct sd_rsp *rsp,
-				    void *data, const struct sd_node *sender)
-{
-	struct request *rq;
-
-	sd_debug("allowing inode update request");
-	sys->nr_prevent_inode_update--;
-
-	if (sys->nr_prevent_inode_update)
-		return SD_RES_SUCCESS;
-
-	list_for_each_entry(rq, &sys->prevented_inode_update_request_queue,
-			    prevented_inode_update_request_list) {
-		list_del(&rq->prevented_inode_update_request_list);
-		requeue_request(rq);
-	}
-
-	return SD_RES_SUCCESS;
-}
-
 static int local_repair_replica(struct request *req)
 {
 	int ret;
@@ -1954,18 +1912,6 @@ static struct sd_op_template sd_ops[] = {
 		.process_work = local_nfs_delete,
 	},
 #endif
-
-	[SD_OP_PREVENT_INODE_UPDATE] = {
-		.name = "PREVENT_INODE_UPDATE",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_main = local_prevent_inode_update,
-	},
-
-	[SD_OP_ALLOW_INODE_UPDATE] = {
-		.name = "ALLOW_INODE_UPDATE",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_main = local_allow_inode_update,
-	},
 
 	[SD_OP_REPAIR_REPLICA] = {
 		.name = "REPAIR_REPLICA",
