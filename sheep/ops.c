@@ -1860,6 +1860,7 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_READ_OBJ] = {
 		.name = "READ_OBJ",
 		.type = SD_OP_TYPE_GATEWAY,
+		.force = true,
 		.process_work = gateway_read_obj,
 	},
 
@@ -1891,6 +1892,7 @@ static struct sd_op_template sd_ops[] = {
 	[SD_OP_READ_PEER] = {
 		.name = "READ_PEER",
 		.type = SD_OP_TYPE_PEER,
+		.force = true,
 		.process_work = peer_read_obj,
 	},
 

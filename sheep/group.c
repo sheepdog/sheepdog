@@ -478,47 +478,73 @@ static enum sd_status cluster_wait_check(const struct sd_node *joining,
 
 static int get_vdis_from(struct sd_node *node)
 {
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	struct vdi_state *vs = NULL;
-	int i, ret;
-	unsigned int rlen;
-	int count;
+	struct sd_req req;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req;
+	int ret;
+	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
+	static DECLARE_BITMAP(vdi_deleted, SD_NR_VDIS);
+	unsigned long nr;
+	struct sd_inode *inode = xzalloc(SD_INODE_HEADER_SIZE);
 
 	if (node_is_local(node))
 		return SD_RES_SUCCESS;
 
-#define DEFAULT_VDI_STATE_COUNT 512
-	rlen = DEFAULT_VDI_STATE_COUNT * sizeof(struct vdi_state);
-	vs = xzalloc(rlen);
-retry:
-	sd_init_req(&hdr, SD_OP_GET_VDI_COPIES);
-	hdr.data_length = rlen;
-	hdr.epoch = sys_epoch();
-	ret = sheep_exec_req(&node->nid, &hdr, (char *)vs);
-	switch (ret) {
-	case SD_RES_SUCCESS:
-		break;
-	case SD_RES_BUFFER_SMALL:
-		rlen *= 2;
-		vs = xrealloc(vs, rlen);
-		goto retry;
-	default:
+	sd_init_req(&req, SD_OP_READ_VDIS);
+	req.data_length = sizeof(vdi_inuse);
+
+	ret = sheep_exec_req(&node->nid, &req, vdi_inuse);
+	if (ret < 0)
+		goto out;
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
 		goto out;
 	}
 
-	count = rsp->data_length / sizeof(*vs);
-	for (i = 0; i < count; i++) {
-		atomic_set_bit(vs[i].vid, sys->vdi_inuse);
-		if (vs[i].deleted)
-			atomic_set_bit(vs[i].vid, sys->vdi_deleted);
-		add_vdi_state_unordered(vs[i].vid, vs[i].nr_copies,
-					vs[i].snapshot, vs[i].copy_policy,
-					vs[i].block_size_shift,
-					vs[i].parent_vid);
+	sd_init_req(&req, SD_OP_READ_DEL_VDIS);
+	req.data_length = sizeof(vdi_deleted);
+
+	ret = sheep_exec_req(&node->nid, &req, vdi_deleted);
+	if (ret < 0)
+		goto out;
+	if (rsp->result != SD_RES_SUCCESS) {
+		sd_err("%s", sd_strerror(rsp->result));
+		goto out;
 	}
+
+	FOR_EACH_BIT(nr, vdi_inuse, SD_NR_VDIS) {
+		uint64_t oid = vid_to_vdi_oid(nr);
+
+		if (test_bit(nr, sys->vdi_inuse))
+			continue; /* already have the information of the VDI */
+
+		sd_init_req(&req, SD_OP_READ_OBJ);
+		req.data_length = SD_INODE_HEADER_SIZE;
+		req.obj.oid = oid;
+		req.obj.offset = 0;
+		req.epoch = sys_epoch();
+
+		ret = sheep_exec_req(&node->nid, &req, inode);
+		if (ret < 0 || rsp->result != SD_RES_SUCCESS) {
+			sd_err("failed to read object %"PRIx64" for"
+			       " constructing vdi state", oid);
+			goto out;
+		}
+
+		atomic_set_bit(nr, sys->vdi_inuse);
+
+		add_vdi_state_unordered((uint32_t)nr, inode->nr_copies,
+					!!inode->snap_ctime, inode->copy_policy,
+					inode->block_size_shift,
+					inode->parent_vdi_id);
+	}
+
+	FOR_EACH_BIT(nr, vdi_deleted, SD_NR_VDIS) {
+		atomic_set_bit(nr, sys->vdi_deleted);
+	}
+
 out:
-	free(vs);
+	free(inode);
+
 	return ret;
 }
 
