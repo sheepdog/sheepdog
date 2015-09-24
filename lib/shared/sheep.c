@@ -222,18 +222,26 @@ static void *request_handler(void *data)
 
 	while (!uatomic_is_true(&c->stop_request_handler) ||
 	       !list_empty(&c->request_list)) {
+		bool empty;
+		uint64_t events;
 
-		eventfd_xread(c->request_fd);
-		sd_write_lock(&c->request_lock);
-		if (list_empty(&c->request_list)) {
-			sd_rw_unlock(&c->request_lock);
-			continue;
-		}
-		req = list_first_entry(&c->request_list, struct sd_request,
-				       list);
-		list_del(&req->list);
+		events = eventfd_xread(c->request_fd);
+		sd_read_lock(&c->request_lock);
+		empty = list_empty(&c->request_list);
 		sd_rw_unlock(&c->request_lock);
-		submit_request(req);
+
+		if (empty)
+			continue;
+
+		for (uint64_t i = 0; i < events; i++) {
+			sd_write_lock(&c->request_lock);
+			req = list_first_entry(&c->request_list,
+				struct sd_request, list);
+			list_del(&req->list);
+			sd_rw_unlock(&c->request_lock);
+
+			submit_request(req);
+		}
 	}
 	pthread_exit(NULL);
 }
