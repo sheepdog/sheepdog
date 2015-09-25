@@ -419,7 +419,7 @@ static inline int sd_cond_wait_timeout(struct sd_cond *cond,
 				       struct sd_mutex *mutex, int second)
 {
 	struct timespec wait_time;
-	wait_time.tv_sec = second;
+	wait_time.tv_sec = time(NULL) + second;
 	wait_time.tv_nsec = 0;
 	return pthread_cond_timedwait(&cond->cond, &mutex->mutex, &wait_time);
 }
