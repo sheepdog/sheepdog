@@ -289,8 +289,11 @@ static ssize_t sbd_remove(struct bus_type *bus, const char *buf,
 	struct sbd_device *dev;
 	unsigned long ul;
 	int target_id, ret;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 2, 0)
 	ret = strict_strtoul(buf, 10, &ul);
+#else
+	ret = kstrtoul(buf, 10, &ul);
+#endif
 	if (ret)
 		return ret;
 
