@@ -93,25 +93,6 @@ static void gateway_op_done(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	struct sd_req *hdr = &req->rq;
 
-	if (hdr->opcode == SD_OP_WRITE_OBJ && is_data_vid_update(hdr)) {
-		struct request *rq;
-
-		sys->nr_ongoing_inode_update_request--;
-		sd_assert(0 <= sys->nr_ongoing_inode_update_request);
-		sd_debug("a number of ongoing inode update request: %d",
-			 sys->nr_ongoing_inode_update_request);
-
-		if (!sys->nr_ongoing_inode_update_request) {
-			list_for_each_entry(rq,
-			    &sys->pending_prevent_inode_update_request_queue,
-			    pending_prevent_inode_update_reqs) {
-				list_del(
-					&rq->pending_prevent_inode_update_reqs);
-				put_request(rq);
-			}
-		}
-	}
-
 	switch (req->rp.result) {
 	case SD_RES_OLD_NODE_VER:
 		if (req->rp.epoch > sys->cinfo.epoch) {
@@ -355,20 +336,6 @@ queue_work:
 	    !has_enough_zones(req)) {
 		sd_err("not enough zones available");
 		goto end_request;
-	}
-
-	if (req->rq.opcode == SD_OP_WRITE_OBJ && is_data_vid_update(&req->rq)) {
-		if (sys->nr_prevent_inode_update) {
-			sd_debug("preventing inode update");
-			list_add_tail(&req->prevented_inode_update_request_list,
-			      &sys->prevented_inode_update_request_queue);
-			return;
-		} else {
-			sd_assert(0 <= sys->nr_ongoing_inode_update_request);
-			sys->nr_ongoing_inode_update_request++;
-			sd_debug("a number of ongoing inode update request: %d",
-				 sys->nr_ongoing_inode_update_request);
-		}
 	}
 
 	req->work.fn = do_process_work;

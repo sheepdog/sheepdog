@@ -642,11 +642,6 @@ static int vdi_snapshot(int argc, char **argv)
 	int ret;
 	char buf[SD_INODE_HEADER_SIZE];
 	struct sd_inode *inode = (struct sd_inode *)buf;
-	struct sd_req hdr;
-	struct vdi_state *vs = NULL;
-	int vs_count = 0;
-	struct node_id owners[SD_MAX_COPIES];
-	int nr_owners = 0, nr_issued_prevent_inode_update = 0;
 	bool fail_if_snapshot = false;
 
 	if (vdi_cmd_data.snapshot_id != 0) {
@@ -694,45 +689,6 @@ static int vdi_snapshot(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	vs = get_vdi_state(&vs_count);
-	if (!vs)
-		return EXIT_FAILURE;
-
-	for (int i = 0; i < vs_count; i++) {
-		struct vdi_state *s = &vs[i];
-
-		if (s->vid != vid)
-			continue;
-
-		if (s->lock_state == LOCK_STATE_LOCKED) {
-			/* QEMU is using it */
-			memset(&owners[0], 0, sizeof(owners[0]));
-			memcpy(&owners[0], &s->lock_owner, sizeof(owners[0]));
-			nr_owners = 1;
-		} else {
-			/* tgt is using it */
-			for (int j = 0; j < s->nr_participants; j++) {
-				memset(&owners[nr_owners], 0,
-				       sizeof(owners[nr_owners]));
-				memcpy(&owners[nr_owners],
-				       &s->participants[nr_owners],
-				       sizeof(owners[nr_owners]));
-				nr_owners++;
-			}
-		}
-	}
-
-	for (int i = 0; i < nr_owners; i++) {
-		sd_init_req(&hdr, SD_OP_PREVENT_INODE_UPDATE);
-		ret = dog_exec_req(&owners[i], &hdr, NULL);
-		if (ret < 0) {
-			sd_err("preventing inode update failed");
-			goto out;
-		}
-
-		nr_issued_prevent_inode_update++;
-	}
-
 	if (vdi_cmd_data.reduce_identical_snapshots) {
 		bool result;
 		ret = has_own_objects(vid, &result);
@@ -772,14 +728,6 @@ static int vdi_snapshot(int argc, char **argv)
 	}
 
 out:
-	for (int i = 0; i < nr_issued_prevent_inode_update; i++) {
-		sd_init_req(&hdr, SD_OP_ALLOW_INODE_UPDATE);
-		ret = dog_exec_req(&owners[i], &hdr, NULL);
-		if (ret < 0)
-			sd_err("allowing inode update failed");
-	}
-
-	free(vs);
 	return ret;
 }
 
