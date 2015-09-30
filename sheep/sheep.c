@@ -964,22 +964,27 @@ int main(int argc, char **argv)
 	if (ret)
 		goto cleanup_log;
 
+	if (pid_file && (create_pidfile(pid_file) != 0)) {
+		sd_err("failed to pid file '%s' - %m", pid_file);
+		goto cleanup_log;
+	}
+
 	/* This function must be called before create_cluster() */
 	ret = init_disk_space(dir);
 	if (ret)
-		goto cleanup_log;
+		goto cleanup_pid_file;
 
 	ret = create_cluster(port, zone, nr_vnodes, explicit_addr);
 	if (ret) {
 		sd_err("failed to create sheepdog cluster");
-		goto cleanup_log;
+		goto cleanup_pid_file;
 	}
 
 	/* We should init trace for work queue before journal init */
 	ret = wq_trace_init();
 	if (ret) {
 		sd_err("failed to init trace for work queue");
-		goto cleanup_log;
+		goto cleanup_pid_file;
 	}
 
 	/* We should init journal file before backend init */
@@ -1038,14 +1043,9 @@ int main(int argc, char **argv)
 		goto cleanup_journal;
 	#endif
 
-	if (pid_file && (create_pidfile(pid_file) != 0)) {
-		sd_err("failed to pid file '%s' - %m", pid_file);
-		goto cleanup_journal;
-	}
-
 	if (chdir(dir) < 0) {
 		sd_err("failed to chdir to %s: %m", dir);
-		goto cleanup_pid_file;
+		goto cleanup_journal;
 	}
 
 	check_host_env();
@@ -1059,10 +1059,6 @@ int main(int argc, char **argv)
 	rc = 0;
 	sd_info("shutdown");
 
-cleanup_pid_file:
-	if (pid_file)
-		unlink(pid_file);
-
 cleanup_journal:
 	if (uatomic_is_true(&sys->use_journal)) {
 		sd_info("cleaning journal file");
@@ -1071,6 +1067,10 @@ cleanup_journal:
 
 cleanup_cluster:
 	leave_cluster();
+
+cleanup_pid_file:
+	if (pid_file)
+		unlink(pid_file);
 
 cleanup_log:
 	log_close();
