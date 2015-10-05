@@ -1401,6 +1401,11 @@ static int local_repair_replica(struct request *req)
 
 static int cluster_lock_vdi_work(struct request *req)
 {
+	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
+		sd_debug("vdi lock is disabled");
+		return SD_RES_SUCCESS;
+	}
+
 	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
 		/*
 		 * this node is collecting vdi locking status, not ready for
