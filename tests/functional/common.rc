@@ -442,7 +442,7 @@ _cleanup_devices()
         rm -f $d.img
     done
 
-    for d in `find /dev/ -name "loop*"`; do
+    for d in `find /dev/ -maxdepth 1 -name "loop*"`; do
         losetup -d $d &> /dev/null
     done
 }
