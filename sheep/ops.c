@@ -1328,7 +1328,7 @@ static int cluster_lock_vdi_work(struct request *req)
 {
 	if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_USE_LOCK)) {
 		sd_debug("vdi lock is disabled");
-		return SD_RES_SUCCESS;
+		return cluster_get_vdi_info(req);
 	}
 
 	if (sys->node_status == SD_NODE_STATUS_COLLECTING_CINFO) {
