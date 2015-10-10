@@ -413,11 +413,11 @@ bool is_xattr_enabled(const char *path)
 const char *my_exe_path(void)
 {
 	static __thread char path[PATH_MAX];
-	int ret;
+	ssize_t ret;
 
 	if (path[0] == '\0') {
 		ret = readlink("/proc/self/exe", path, sizeof(path));
-		if (ret < -1)
+		if (ret == -1)
 			panic("%m");
 	}
 
