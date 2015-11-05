@@ -46,7 +46,7 @@ rm -rf %{buildroot}
 
 %post
 /sbin/chkconfig --add sheepdog
-ln -s -f %{_sbindir}/dog %{_sbindir}/collie
+ln -s -f %{_bindir}/dog %{_bindir}/collie
 
 %preun
 if [ $1 -eq 0 ] ; then
@@ -66,7 +66,7 @@ fi
 %doc COPYING README INSTALL
 %{_sbindir}/sheep
 %{_sbindir}/sheepfs
-%{_sbindir}/dog
+%{_bindir}/dog
 %{_sbindir}/shepherd
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
@@ -75,6 +75,14 @@ fi
 %{_mandir}/man8/sheepfs.8*
 %{_mandir}/man8/dog.8*
 %{_prefix}/lib/systemd/system/sheepdog.service
+%dir %{_includedir}/sheepdog
+%{_includedir}/sheepdog/internal.h
+%{_includedir}/sheepdog/list.h
+%{_includedir}/sheepdog/sheepdog.h
+%{_includedir}/sheepdog/sheepdog_proto.h
+%{_includedir}/sheepdog/util.h
+%{_libdir}/libsheepdog.la
+%{_libdir}/libsheepdog.so
 
 %changelog
 * @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
