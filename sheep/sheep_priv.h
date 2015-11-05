@@ -64,7 +64,16 @@
 #define worker_fn
 #endif
 
+enum client_info_type {
+	CLIENT_INFO_TYPE_DEFAULT = 1,
+#ifdef HAVE_ACCELIO
+	CLIENT_INFO_TYPE_XIO,
+#endif
+};
+
 struct client_info {
+	enum client_info_type type;
+
 	struct connection conn;
 
 	struct request *rx_req;
@@ -76,6 +85,10 @@ struct client_info {
 	struct list_head done_reqs;
 
 	refcnt_t refcnt;
+
+#ifdef HAVE_ACCELIO
+	struct xio_msg *xio_req;
+#endif
 };
 
 enum REQUST_STATUS {
@@ -329,6 +342,9 @@ static inline bool is_aligned_to_pagesize(void *p)
 }
 
 int create_listen_port(const char *bindaddr, int port);
+#ifdef HAVE_ACCELIO
+int xio_create_listen_port(const char *bindaddr, int port, bool rdma);
+#endif
 int init_unix_domain_socket(const char *dir);
 void unregister_listening_fds(void);
 
@@ -632,5 +648,13 @@ int nfs_delete(const char *name);
 #endif
 
 extern bool wildcard_recovery;
+
+struct request *alloc_request(struct client_info *ci, uint32_t data_length);
+void queue_request(struct request *req);
+void free_request(struct request *req);
+
+#ifdef HAVE_ACCELIO
+void xio_send_reply(struct client_info *ci);
+#endif
 
 #endif
