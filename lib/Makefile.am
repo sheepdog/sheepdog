@@ -13,7 +13,7 @@ libsheepdog_la_LDFLAGS  = -avoid-version -shared -module -export-dynamic \
 # Workaround for Objects ‘created with both libtool and without’ problem
 libsheepdog_la_CPPFLAGS = $(AM_CPPFLAGS) -DNO_SHEEPDOG_LOGGER
 
-pkginclude_HEADERS      = ../include/sheepdog_proto.h shared/sheepdog.h \
+pkginclude_HEADERS      = ../include/sheepdog_proto.h shared/sheepdog.h shared/internal.h \
 			  ../include/util.h ../include/list.h
 
 
