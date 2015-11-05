@@ -13,6 +13,10 @@
 
 #include "sheep_priv.h"
 
+#ifdef HAVE_ACCELIO
+#include "xio.h"
+#endif
+
 #define TRACEPOINT_DEFINE
 #include "request_tp.h"
 
@@ -424,7 +428,7 @@ static main_fn inline void stat_request_end(struct request *req)
 		sys->stat.r.gway_active_nr--;
 }
 
-static void queue_request(struct request *req)
+void queue_request(struct request *req)
 {
 	struct sd_req *hdr = &req->rq;
 	struct sd_rsp *rsp = &req->rp;
@@ -650,8 +654,7 @@ worker_fn int exec_local_req_async(struct sd_req *rq, void *data,
 	return SD_RES_SUCCESS;
 }
 
-static struct request *alloc_request(struct client_info *ci,
-				     uint32_t data_length)
+struct request *alloc_request(struct client_info *ci, uint32_t data_length)
 {
 	struct request *req;
 
@@ -678,7 +681,7 @@ static struct request *alloc_request(struct client_info *ci,
 	return req;
 }
 
-static void free_request(struct request *req)
+void free_request(struct request *req)
 {
 	uatomic_dec(&sys->nr_outstanding_reqs);
 
@@ -712,18 +715,34 @@ main_fn void put_request(struct request *req)
 		} else {
 			list_add_tail(&req->request_list, &ci->done_reqs);
 
-			if (ci->tx_req == NULL)
-				/* There is no request being sent. */
-				if (conn_tx_on(&ci->conn)) {
-					sd_err("switch on sending flag failure, "
-						"connection maybe closed");
-					/*
-					 * should not free_request(req) here
-					 * because it is already in done list
-					 * clear_client_info will free it
-					 */
-					clear_client_info(ci);
-				}
+			switch (ci->type) {
+			case CLIENT_INFO_TYPE_DEFAULT:
+				if (ci->tx_req == NULL)
+					/* There is no request being sent. */
+					if (conn_tx_on(&ci->conn)) {
+						sd_err("switch on sending flag"
+						       " failure, connection"
+						       " maybe closed");
+						/*
+						 * should not free_request(req)
+						 * here because it is already
+						 * in done list
+						 * clear_client_info will free
+						 * it
+						 */
+						clear_client_info(ci);
+					}
+				break;
+#ifdef HAVE_ACCELIO
+			case CLIENT_INFO_TYPE_XIO:
+				xio_send_reply(ci);
+				break;
+#endif
+			default:
+				panic("unknown type of client info: %d",
+				      ci->type);
+				break;
+			}
 		}
 	}
 }
@@ -921,6 +940,8 @@ static struct client_info *create_client(int fd)
 	if (!ci)
 		return NULL;
 
+	ci->type = CLIENT_INFO_TYPE_DEFAULT;
+
 	if (getpeername(fd, (struct sockaddr *)&from, &namesize)) {
 		free(ci);
 		return NULL;
@@ -1088,6 +1109,14 @@ int create_listen_port(const char *bindaddr, int port)
 				   &is_inet_socket);
 }
 
+#ifdef HAVE_ACCELIO
+int xio_create_listen_port(const char *bindaddr, int port, bool rdma)
+{
+	return xio_create_listen_ports(bindaddr, port, create_listen_port_fn,
+				       rdma);
+}
+#endif
+
 int init_unix_domain_socket(const char *dir)
 {
 	static bool is_inet_socket;
@@ -1133,8 +1162,11 @@ worker_fn int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr,
 			     void *buf)
 {
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
-	struct sockfd *sfd;
 	int ret;
+
+#ifndef HAVE_ACCELIO
+
+	struct sockfd *sfd;
 
 	sfd = sockfd_cache_get(nid);
 	if (!sfd)
@@ -1155,6 +1187,23 @@ worker_fn int sheep_exec_req(const struct node_id *nid, struct sd_req *hdr,
 				op_name(get_sd_op(hdr->opcode)));
 
 	sockfd_cache_put(nid, sfd);
+
+#else  /* HAVE_ACCELIO */
+
+	ret = xio_exec_req(nid, hdr, buf, sheep_need_retry, hdr->epoch,
+			   MAX_RETRY_COUNT);
+	if (ret) {
+		sd_debug("remote node might have gone away");
+		return SD_RES_NETWORK_ERROR;
+	}
+	ret = rsp->result;
+	if (ret != SD_RES_SUCCESS)
+		sd_warn("failed %s, remote address: %s, op name: %s",
+				sd_strerror(ret),
+				addr_to_str(nid->addr, nid->port),
+				op_name(get_sd_op(hdr->opcode)));
+
+#endif
 	return ret;
 }
 
