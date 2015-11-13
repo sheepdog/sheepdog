@@ -68,6 +68,9 @@ fi
 %{_sbindir}/sheepfs
 %{_bindir}/dog
 %{_sbindir}/shepherd
+%if 0%{_have_zookeeper}
+	%{_sbindir}/zk_control
+%endif
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
 %config %{_sysconfdir}/bash_completion.d/dog
