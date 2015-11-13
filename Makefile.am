@@ -67,6 +67,7 @@ RPMBUILD_REQ_OPTS =
 RPMBUILD_BUILD_REQ_OPTS =
 
 if BUILD_ZOOKEEPER
+RPMBUILDOPTS += --define "_have_zookeeper 1"
 RPMBUILD_CONFIG_OPTS += --enable-zookeeper
 RPMBUILD_BUILD_REQ_OPTS += zookeeper-native
 endif
