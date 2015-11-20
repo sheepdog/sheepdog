@@ -148,7 +148,6 @@ reload:
 		return -1;
 	}
 
-	ret = 0;
 	get_cluster_config(&sys->cinfo);
 	if ((config.flags & SD_CLUSTER_FLAG_DISKMODE) !=
 	    (sys->cinfo.flags & SD_CLUSTER_FLAG_DISKMODE)) {

@@ -992,7 +992,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 
 out:
 	free(inode);
-	return EXIT_SUCCESS;
+	return ret;
 }
 
 static int vdi_delete(int argc, char **argv)
@@ -2668,7 +2668,7 @@ static int vdi_cache_info(int argc, char **argv)
 		if (r != EXIT_SUCCESS)
 			return r;
 
-		if (!inode->block_size_shift)
+		if (inode == NULL || !inode->block_size_shift)
 			return EXIT_FAILURE;
 
 		object_size = (UINT32_C(1) << inode->block_size_shift);

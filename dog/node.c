@@ -324,7 +324,7 @@ static int node_recovery_get(int argc, char **argv)
 
 	ret = dog_exec_req(&sd_nid, &req, &rthrottling);
 	if (ret < 0)
-		ret = EXIT_SYSFAIL;
+		return EXIT_SYSFAIL;
 
 	if (rsp->result == SD_RES_SUCCESS)
 		ret = EXIT_SUCCESS;
@@ -333,7 +333,6 @@ static int node_recovery_get(int argc, char **argv)
 
 	switch (ret) {
 	case EXIT_FAILURE:
-	case EXIT_SYSFAIL:
 		sd_err("Failed to execute request");
 		ret = -1;
 		break;
