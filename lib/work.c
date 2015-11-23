@@ -247,20 +247,30 @@ static bool wq_need_shrink(struct wq_info *wi)
 
 static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 {
-	pthread_t thread;
-	int ret;
+        pthread_t thread;
+        cpu_set_t cpuset;
+        int ret, start = random();
+        unsigned int ncore = sysconf(_SC_NPROCESSORS_ONLN);
 
-	while (wi->nr_threads < nr_threads) {
-		ret = pthread_create(&thread, NULL, worker_routine, wi);
-		if (ret != 0) {
-			sd_err("failed to create worker thread: %m");
-			return -1;
-		}
-		wi->nr_threads++;
-		sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
-	}
+        CPU_ZERO(&cpuset);
 
-	return 0;
+        while (wi->nr_threads < nr_threads) {
+                ret = pthread_create(&thread, NULL, worker_routine, wi);
+                if (ret != 0) {
+                        sd_err("failed to create worker thread: %m");
+                        return -1;
+                }
+
+                /* Distribute worker threads to all cores */
+                CPU_SET((wi->nr_threads + start) % ncore, &cpuset);
+                if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset))
+                        sd_info("set thread affinity failed");
+
+                wi->nr_threads++;
+                sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
+        }
+
+        return 0;
 }
 
 void queue_work(struct work_queue *q, struct work *work)
