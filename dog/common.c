@@ -333,7 +333,7 @@ void confirm(const char *message)
 
 void work_queue_wait(struct work_queue *q)
 {
-	while (!work_queue_empty(q))
+	while (!work_queue_empty_all(q))
 		event_loop(-1);
 }
 

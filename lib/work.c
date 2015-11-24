@@ -26,6 +26,7 @@
 #include <sys/time.h>
 #include <linux/types.h>
 #include <signal.h>
+#include <sched.h>
 
 #include "common.h"
 #include "list.h"
@@ -53,19 +54,18 @@ struct wq_info {
 	struct sd_mutex finished_lock;
 
 	/* workers sleep on this and signaled by work producer */
-	struct sd_cond pending_cond;
+	struct sd_cond *pending_conds;
 	/* locked by work producer and workers */
-	struct sd_mutex pending_lock;
-	/* protected by pending_lock */
+	struct sd_mutex *pending_locks;
+	/* protected by pending_locks */
 	struct work_queue q;
-	size_t nr_threads;
-
-	/* protected by uatomic primitives */
-	size_t nr_queued_work;
 
 	/* we cannot shrink work queue till this time */
 	uint64_t tm_end_of_protection;
 	enum wq_thread_control tc;
+
+	/* worker_routine write to this after initialization */
+	int create_efd;
 };
 
 static int efd;
@@ -74,6 +74,20 @@ static size_t nr_nodes = 1;
 static size_t (*wq_get_nr_nodes)(void);
 
 static void *worker_routine(void *arg);
+
+unsigned long nr_cores;
+
+static int mycpu(void)
+{
+	int ret = sched_getcpu();
+
+	if (ret < 0) {
+		sd_warn("this kernel doesn't support sched_getcpu() syscall: %m");
+		ret = 0;	/* CPU0 must exist in all systems */
+	}
+
+	return ret;
+}
 
 #ifdef HAVE_TRACE
 
@@ -91,8 +105,10 @@ void suspend_worker_threads(void)
 	struct wq_info *wi;
 	int tid;
 
-	list_for_each_entry(wi, &wq_info_list, list) {
-		sd_mutex_lock(&wi->pending_lock);
+	for (int i = 0; i < nr_cores; i++) {
+		list_for_each_entry(wi, &wq_info_list, list) {
+			sd_mutex_lock(&wi->pending_locks[i]);
+		}
 	}
 
 	FOR_EACH_BIT(tid, tid_map, tid_max) {
@@ -123,8 +139,10 @@ void resume_worker_threads(void)
 	for (int i = 0; i < nr_threads; i++)
 		eventfd_xread(ack_efd);
 
-	list_for_each_entry(wi, &wq_info_list, list) {
-		sd_mutex_unlock(&wi->pending_lock);
+	for (int i = 0; i < nr_cores; i++) {
+		list_for_each_entry(wi, &wq_info_list, list) {
+			sd_mutex_unlock(&wi->pending_locks[i]);
+		}
 	}
 }
 
@@ -218,10 +236,10 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 	return nr;
 }
 
-static bool wq_need_grow(struct wq_info *wi)
+static bool wq_need_grow(struct wq_info *wi, int cpu)
 {
-	if (wi->nr_threads < uatomic_read(&wi->nr_queued_work) &&
-	    wi->nr_threads * 2 <= wq_get_roof(wi)) {
+	if (wi->q.nr_threads[cpu] < uatomic_read(&wi->q.nr_queued_work[cpu]) &&
+	    wi->q.nr_threads[cpu] * 2 <= wq_get_roof(wi)) {
 		wi->tm_end_of_protection = get_msec_time() +
 			WQ_PROTECTION_PERIOD;
 		return true;
@@ -234,9 +252,13 @@ static bool wq_need_grow(struct wq_info *wi)
  * Return true if more than half of threads are not used more than
  * WQ_PROTECTION_PERIOD seconds
  */
-static bool wq_need_shrink(struct wq_info *wi)
+static bool wq_need_shrink(struct wq_info *wi, int cpu)
 {
-	if (uatomic_read(&wi->nr_queued_work) < wi->nr_threads / 2)
+	if (uatomic_read(&wi->q.nr_queued_work[cpu]) == 1)
+		/* we need at least one thread on each core */
+		return false;
+
+	if (uatomic_read(&wi->q.nr_queued_work[cpu]) < wi->q.nr_threads[cpu] / 2)
 		/* we cannot shrink work queue during protection period. */
 		return wi->tm_end_of_protection <= get_msec_time();
 
@@ -245,30 +267,32 @@ static bool wq_need_shrink(struct wq_info *wi)
 	return false;
 }
 
-static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
+static int create_worker_threads(struct wq_info *wi, size_t nr_threads, int core)
 {
         pthread_t thread;
         cpu_set_t cpuset;
-        int ret, start = random();
-        unsigned int ncore = sysconf(_SC_NPROCESSORS_ONLN);
+        int ret;
 
         CPU_ZERO(&cpuset);
+	CPU_SET(core, &cpuset);
 
-        while (wi->nr_threads < nr_threads) {
-                ret = pthread_create(&thread, NULL, worker_routine, wi);
-                if (ret != 0) {
-                        sd_err("failed to create worker thread: %m");
-                        return -1;
-                }
+	while (wi->q.nr_threads[core] < nr_threads) {
+		ret = pthread_create(&thread, NULL, worker_routine, wi);
+		if (ret != 0) {
+			sd_err("failed to create worker thread: %m");
+			return -1;
+		}
 
-                /* Distribute worker threads to all cores */
-                CPU_SET((wi->nr_threads + start) % ncore, &cpuset);
-                if (pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset))
-                        sd_info("set thread affinity failed");
+		if (wi->q.wq_state != WQ_ORDERED &&
+		    pthread_setaffinity_np(thread, sizeof(cpu_set_t), &cpuset))
+			sd_info("set thread affinity failed");
 
-                wi->nr_threads++;
-                sd_debug("create thread %s %zu", wi->name, wi->nr_threads);
-        }
+		eventfd_xwrite(wi->create_efd, 1);
+
+		wi->q.nr_threads[core]++;
+		sd_debug("create thread %s %zu (CPU: %d)", wi->name,
+			 wi->q.nr_threads[core], core);
+	}
 
         return 0;
 }
@@ -276,20 +300,31 @@ static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 void queue_work(struct work_queue *q, struct work *work)
 {
 	struct wq_info *wi = container_of(q, struct wq_info, q);
+	int cpu;
+
+	if (q->wq_state == WQ_ORDERED)
+		cpu = 0;
+	else if (is_main_thread()) {
+		static __thread int next_core;
+		cpu = next_core++ % nr_cores;
+	} else
+		cpu = mycpu();
 
 	tracepoint(work, queue_work, wi, work);
 
-	uatomic_inc(&wi->nr_queued_work);
-	sd_mutex_lock(&wi->pending_lock);
+	uatomic_inc(&wi->q.nr_queued_work[cpu]);
+	sd_mutex_lock(&wi->pending_locks[cpu]);
 
-	if (wq_need_grow(wi))
+	work->cpu = cpu;
+
+	if (wq_need_grow(wi, cpu))
 		/* double the thread pool size */
-		create_worker_threads(wi, wi->nr_threads * 2);
+		create_worker_threads(wi, wi->q.nr_threads[cpu] * 2, cpu);
 
-	list_add_tail(&work->w_list, &wi->q.pending_list);
-	sd_mutex_unlock(&wi->pending_lock);
+	list_add_tail(&work->w_list, &wi->q.pending_lists[cpu]);
+	sd_mutex_unlock(&wi->pending_locks[cpu]);
 
-	sd_cond_signal(&wi->pending_cond);
+	sd_cond_signal(&wi->pending_conds[cpu]);
 }
 
 static void worker_thread_request_done(int fd, int events, void *data)
@@ -314,8 +349,8 @@ static void worker_thread_request_done(int fd, int events, void *data)
 
 			tracepoint(work, request_done, wi, work);
 
+			uatomic_dec(&wi->q.nr_queued_work[work->cpu]);
 			work->done(work);
-			uatomic_dec(&wi->nr_queued_work);
 		}
 	}
 }
@@ -325,34 +360,43 @@ static void *worker_routine(void *arg)
 	struct wq_info *wi = arg;
 	struct work *work;
 	int tid = gettid();
+	int cpu;
 
 	set_thread_name(wi->name, (wi->tc != WQ_ORDERED));
 
 	trace_set_tid_map(tid);
+
+	/* wait pthread_setaffinity_np() in create_worker_threads() */
+	eventfd_xread(wi->create_efd);
+	/* now I'm running on correct cpu */
+	cpu = wi->q.wq_state == WQ_ORDERED ? 0 : mycpu();
+
 	while (true) {
 
-		sd_mutex_lock(&wi->pending_lock);
-		if (wq_need_shrink(wi)) {
-			wi->nr_threads--;
+		sd_mutex_lock(&wi->pending_locks[cpu]);
+		if (wq_need_shrink(wi, cpu) &&
+		    nr_cores < wi->q.nr_threads[cpu]) {
+			wi->q.nr_threads[cpu]--;
 
 			trace_clear_tid_map(tid);
-			sd_mutex_unlock(&wi->pending_lock);
+			sd_mutex_unlock(&wi->pending_locks[cpu]);
 			pthread_detach(pthread_self());
 			sd_debug("destroy thread %s %d, %zu", wi->name, tid,
-				 wi->nr_threads);
+				 wi->q.nr_threads[cpu]);
 			break;
 		}
 retest:
-		if (list_empty(&wi->q.pending_list)) {
-			sd_cond_wait(&wi->pending_cond, &wi->pending_lock);
+		if (list_empty(&wi->q.pending_lists[cpu])) {
+			sd_cond_wait(&wi->pending_conds[cpu],
+				     &wi->pending_locks[cpu]);
 			goto retest;
 		}
 
-		work = list_first_entry(&wi->q.pending_list,
+		work = list_first_entry(&wi->q.pending_lists[cpu],
 				       struct work, w_list);
 
 		list_del(&work->w_list);
-		sd_mutex_unlock(&wi->pending_lock);
+		sd_mutex_unlock(&wi->pending_locks[cpu]);
 
 		tracepoint(work, do_work, wi, work);
 
@@ -415,26 +459,60 @@ struct work_queue *create_work_queue(const char *name,
 	wi->name = name;
 	wi->tc = tc;
 
-	INIT_LIST_HEAD(&wi->q.pending_list);
+	wi->q.pending_lists = xcalloc(nr_cores, sizeof(wi->q.pending_lists[0]));
+	for (int i = 0; i < nr_cores; i++)
+		INIT_LIST_HEAD(&wi->q.pending_lists[i]);
+
+	wi->q.nr_threads = xcalloc(nr_cores, sizeof(wi->q.nr_threads[0]));
+	wi->q.nr_queued_work = xcalloc(nr_cores, sizeof(wi->q.nr_queued_work[0]));
+
 	INIT_LIST_HEAD(&wi->finished_list);
 
-	sd_cond_init(&wi->pending_cond);
+	wi->pending_conds = xcalloc(nr_cores, sizeof(wi->pending_conds[0]));
+	for (int i = 0; i < nr_cores; i++)
+		sd_cond_init(&wi->pending_conds[i]);
 
 	sd_init_mutex(&wi->finished_lock);
-	sd_init_mutex(&wi->pending_lock);
 
-	ret = create_worker_threads(wi, 1);
-	if (ret < 0)
-		goto destroy_threads;
+	wi->pending_locks = xcalloc(nr_cores, sizeof(wi->pending_locks[0]));
+	for (int i = 0; i < nr_cores; i++)
+		sd_init_mutex(&wi->pending_locks[i]);
+
+	wi->create_efd = eventfd(0, EFD_SEMAPHORE);
+	if (wi->create_efd < 0)
+		panic("failed to create efd for workqueue: %m");
+
+	if (tc == WQ_ORDERED) {
+		ret = create_worker_threads(wi, 1, 0);
+		if (ret < 0)
+			goto destroy_threads;
+	} else {
+		for (int i = 0; i < nr_cores; i++) {
+			ret = create_worker_threads(wi, 1, i);
+			if (ret < 0)
+				goto destroy_threads;
+		}
+	}
 
 	list_add(&wi->list, &wq_info_list);
 
 	tracepoint(work, create_queue, wi->name, wi, tc);
 	return &wi->q;
 destroy_threads:
-	sd_destroy_cond(&wi->pending_cond);
-	sd_destroy_mutex(&wi->pending_lock);
+	for (int i = 0; i < nr_cores; i++)
+		sd_destroy_cond(&wi->pending_conds[i]);
+	free(wi->pending_conds);
+
+	for (int i = 0; i < nr_cores; i++)
+		sd_destroy_mutex(&wi->pending_locks[i]);
+	free(wi->pending_locks);
+
 	sd_destroy_mutex(&wi->finished_lock);
+
+	free(wi->q.nr_queued_work);
+	free(wi->q.nr_threads);
+	free(wi->q.pending_lists);
+
 	free(wi);
 
 	return NULL;
@@ -445,11 +523,23 @@ struct work_queue *create_ordered_work_queue(const char *name)
 	return create_work_queue(name, WQ_ORDERED);
 }
 
-bool work_queue_empty(struct work_queue *q)
+bool work_queue_empty(struct work_queue *q, int core)
 {
 	struct wq_info *wi = container_of(q, struct wq_info, q);
 
-	return uatomic_read(&wi->nr_queued_work) == 0;
+	return uatomic_read(&wi->q.nr_queued_work[core]) == 0;
+}
+
+bool work_queue_empty_all(struct work_queue *q)
+{
+	struct wq_info *wi = container_of(q, struct wq_info, q);
+
+	for (int core = 0; core < nr_cores; core++) {
+		if (uatomic_read(&wi->q.nr_queued_work[core]) != 0)
+			return false;
+	}
+
+	return true;
 }
 
 struct thread_args {
@@ -508,3 +598,7 @@ int sd_thread_join(sd_thread_t thread, void **retval)
 	return pthread_join(thread, retval);
 }
 
+static void __attribute__((constructor)) __nr_cores_init(void)
+{
+	nr_cores = sysconf(_SC_NPROCESSORS_ONLN);
+}
