@@ -844,6 +844,9 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (!daemonize)
+		pid_file = NULL;
+
 	#ifdef HAVE_DISKVNODES
 	sys->cinfo.flags |= SD_CLUSTER_FLAG_DISKMODE;
 	#endif
