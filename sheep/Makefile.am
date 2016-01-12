@@ -56,7 +56,7 @@ sheep_SOURCES		+= trace/trace.c trace/mcount.S trace/graph.c trace/checker.c
 endif
 
 if BUILD_ACCELIO
-sheep_SOURCES		+= xio.c
+sheep_SOURCES		+= xio_server.c xio_client.c
 endif
 
 sheep_LDADD	  	= ../lib/libsd.a -lpthread -lm \
