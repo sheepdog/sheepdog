@@ -116,9 +116,6 @@ static inline void *zalloc(size_t size)
 	_x < _y ? -1 : _x > _y ? 1 : 0;	\
 })
 
-typedef void (*try_to_free_t)(size_t);
-try_to_free_t set_try_to_free_routine(try_to_free_t);
-
 void *xmalloc(size_t size);
 void *xzalloc(size_t size);
 void *xrealloc(void *ptr, size_t size);

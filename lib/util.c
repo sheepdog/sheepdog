@@ -28,34 +28,11 @@
 mode_t sd_def_dmode = S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IXGRP;
 mode_t sd_def_fmode = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP;
 
-static void do_nothing(size_t size)
-{
-}
-
-static void (*try_to_free_routine)(size_t size) = do_nothing;
-
-try_to_free_t set_try_to_free_routine(try_to_free_t routine)
-{
-	try_to_free_t old = try_to_free_routine;
-	if (!routine)
-		routine = do_nothing;
-	try_to_free_routine = routine;
-	return old;
-}
-
 void *xmalloc(size_t size)
 {
 	void *ret = malloc(size);
-	if (unlikely(!ret) && unlikely(!size))
-		ret = malloc(1);
-	if (unlikely(!ret)) {
-		try_to_free_routine(size);
-		ret = malloc(size);
-		if (!ret && !size)
-			ret = malloc(1);
-		if (!ret)
-			panic("Out of memory");
-	}
+	if (unlikely(!ret))
+		panic("Out of memory");
 	return ret;
 }
 
@@ -67,32 +44,16 @@ void *xzalloc(size_t size)
 void *xrealloc(void *ptr, size_t size)
 {
 	void *ret = realloc(ptr, size);
-	if (unlikely(!ret) && unlikely(!size))
-		ret = realloc(ptr, 1);
-	if (unlikely(!ret)) {
-		try_to_free_routine(size);
-		ret = realloc(ptr, size);
-		if (!ret && !size)
-			ret = realloc(ptr, 1);
-		if (!ret)
-			panic("Out of memory");
-	}
+	if (unlikely(!ret))
+		panic("Out of memory");
 	return ret;
 }
 
 void *xcalloc(size_t nmemb, size_t size)
 {
 	void *ret = calloc(nmemb, size);
-	if (unlikely(!ret) && unlikely(!nmemb || !size))
-		ret = calloc(1, 1);
-	if (unlikely(!ret)) {
-		try_to_free_routine(nmemb * size);
-		ret = calloc(nmemb, size);
-		if (!ret && (!nmemb || !size))
-			ret = calloc(1, 1);
-		if (!ret)
-			panic("Out of memory");
-	}
+	if (unlikely(!ret))
+		panic("Out of memory");
 	return ret;
 }
 
