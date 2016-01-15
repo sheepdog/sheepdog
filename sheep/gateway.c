@@ -37,9 +37,13 @@ static struct req_iter *prepare_replication_requests(struct request *req,
 	void *data = req->data;
 	uint32_t len = req->rq.data_length;
 	uint64_t off = req->rq.obj.offset;
-	struct req_iter *reqs = xzalloc(sizeof(*reqs) * nr_copies);
+	struct req_iter *reqs;
 
 	sd_debug("%"PRIx64, req->rq.obj.oid);
+
+	reqs = zalloc(sizeof(*reqs) * nr_copies);
+	if(unlikely(!reqs))
+		return NULL;
 
 	*nr = nr_copies;
 	for (int i = 0; i < nr_copies; i++) {
@@ -61,7 +65,7 @@ static struct req_iter *prepare_replication_requests(struct request *req,
  */
 static void *init_erasure_buffer(struct request *req, int buf_len)
 {
-	char *buf = xvalloc(buf_len);
+	char *buf;
 	uint32_t len = req->rq.data_length;
 	uint64_t off = req->rq.obj.offset;
 	uint64_t oid = req->rq.obj.oid;
@@ -70,6 +74,11 @@ static void *init_erasure_buffer(struct request *req, int buf_len)
 	uint64_t head = round_down(off, SD_EC_DATA_STRIPE_SIZE);
 	uint64_t tail = round_down(off + len, SD_EC_DATA_STRIPE_SIZE);
 	int ret;
+
+	buf = valloc(buf_len);
+	if(unlikely(!buf))
+		return NULL;
+	memset(buf, 0, buf_len);
 
 	if (opcode != SD_OP_WRITE_OBJ)
 		goto out;
@@ -128,7 +137,9 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	ctx = ec_init(ed, edp);
 	*nr = nr_to_send = (opcode == SD_OP_READ_OBJ) ? ed : edp;
 	strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
-	reqs = xzalloc(sizeof(*reqs) * nr_to_send);
+	reqs = zalloc(sizeof(*reqs) * nr_to_send);
+	if(unlikely(!reqs))
+		goto out;
 
 	sd_debug("start %d, end %d, send %d, off %"PRIu64 ", len %"PRIu32,
 		 start, end, nr_to_send, off, len);
@@ -136,7 +147,15 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 	for (i = 0; i < nr_to_send; i++) {
 		int l = strip_size * nr_stripe;
 
-		reqs[i].buf = xmalloc(l);
+		reqs[i].buf = malloc(l);
+		if(!reqs[i].buf) {
+			sd_err("failed to init request buffer %"PRIx64,
+			       req->rq.obj.oid);
+			for(j = 0; j < i; j++)
+				free(reqs[j].buf);
+			reqs = NULL;
+			goto out;
+		}
 		reqs[i].dlen = l;
 		reqs[i].off = start * strip_size;
 		switch (opcode) {
@@ -220,10 +239,15 @@ static void finish_requests(struct request *req, struct req_iter *reqs,
 
 	/* We need to assemble the data strips into the req buffer for read */
 	if (opcode == SD_OP_READ_OBJ) {
-		char *p, *buf = xmalloc(SD_EC_DATA_STRIPE_SIZE * nr_stripe);
+		char *p, *buf;
 		uint8_t policy = req->rq.obj.copy_policy ?:
 			get_vdi_copy_policy(oid_to_vid(req->rq.obj.oid));
 		int ed = 0, strip_size;
+
+		buf = malloc(SD_EC_DATA_STRIPE_SIZE * nr_stripe);
+		if(unlikely(!buf)) {
+			goto out;
+		}
 
 		ec_policy_to_dp(policy, &ed, NULL);
 		strip_size = SD_EC_DATA_STRIPE_SIZE / ed;
@@ -594,7 +618,11 @@ static int gateway_forward_request(struct request *req)
 		hdr.obj.ec_index = i;
 		hdr.obj.copy_policy = req->rq.obj.copy_policy;
 
-		copied_hdr = xzalloc(sizeof(*copied_hdr));
+		copied_hdr = zalloc(sizeof(*copied_hdr));
+		if(unlikely(!copied_hdr)) {
+			err_ret = SD_RES_NO_MEM;
+			goto out;
+		}
 		memcpy(copied_hdr, &hdr, sizeof(hdr));
 
 		xio_gw_send_req(conn, copied_hdr, reqs[i].buf, sheep_need_retry,
@@ -872,8 +900,15 @@ static int gateway_handle_cow(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	size_t len = get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
 	struct sd_req hdr, *req_hdr = &req->rq;
-	char *buf = xvalloc(len);
+	char *buf;
 	int ret;
+
+	buf = valloc(len);
+	if(unlikely(!buf)) {
+		ret = SD_RES_NO_MEM;
+		goto out;
+	}
+	memset(buf, 0, len);
 
 	if (req->rq.data_length != len) {
 		/* Partial write, need read the copy first */
