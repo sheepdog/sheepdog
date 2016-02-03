@@ -72,7 +72,7 @@ static int get_zones_nr_from(struct rb_root *nroot)
  */
 struct vnode_info *grab_vnode_info(struct vnode_info *vnode_info)
 {
-	refcount_inc(&vnode_info->refcnt);
+	/* refcount_inc(&vnode_info->refcnt); */
 	return vnode_info;
 }
 
@@ -95,11 +95,11 @@ main_fn struct vnode_info *get_vnode_info(void)
 void put_vnode_info(struct vnode_info *vnode_info)
 {
 	if (vnode_info) {
-		if (refcount_dec(&vnode_info->refcnt) == 0) {
-			rb_destroy(&vnode_info->vroot, struct sd_vnode, rb);
-			rb_destroy(&vnode_info->nroot, struct sd_node, rb);
-			free(vnode_info);
-		}
+		/* if (refcount_dec(&vnode_info->refcnt) == 0) { */
+		/* 	rb_destroy(&vnode_info->vroot, struct sd_vnode, rb); */
+		/* 	rb_destroy(&vnode_info->nroot, struct sd_node, rb); */
+		/* 	free(vnode_info); */
+		/* } */
 	}
 }
 
