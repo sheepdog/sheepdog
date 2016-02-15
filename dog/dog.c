@@ -183,6 +183,7 @@ static void init_commands(const struct command **commands)
 		nfs_command,
 #endif
 		upgrade_command,
+		benchmark_command,
 		{NULL,}
 	};
 
