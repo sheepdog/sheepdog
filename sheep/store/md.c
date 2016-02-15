@@ -571,7 +571,9 @@ out:
 			update_node_disks();
 			kick_recover();
 		} else {
+			sd_warn("no disks available, going down");
 			leave_cluster();
+			sys->cinfo.status = SD_STATUS_KILLED;
 		}
 	}
 
@@ -831,7 +833,7 @@ void update_node_disks(void)
 static int do_plug_unplug(char *disks, bool plug)
 {
 	const char *path;
-	int old_nr, ret = SD_RES_UNKNOWN;
+	int old_nr, new_nr, ret = SD_RES_UNKNOWN;
 
 	sd_write_lock(&md.lock);
 	old_nr = md.nr_disks;
@@ -844,9 +846,10 @@ static int do_plug_unplug(char *disks, bool plug)
 			md_del_disk(path);
 		}
 	} while ((path = strtok(NULL, ",")));
+	new_nr = md.nr_disks;
 
 	/* If no disks change, bail out */
-	if (old_nr == md.nr_disks)
+	if (old_nr == new_nr)
 		goto out;
 
 	ret = SD_RES_SUCCESS;
@@ -854,8 +857,14 @@ out:
 	sd_rw_unlock(&md.lock);
 
 	if (ret == SD_RES_SUCCESS) {
-		update_node_disks();
-		kick_recover();
+		if (new_nr > 0) {
+			update_node_disks();
+			kick_recover();
+		} else {
+			sd_warn("no disks plugged, going down");
+			leave_cluster();
+			sys->cinfo.status = SD_STATUS_KILLED;
+		}
 	}
 
 	return ret;
