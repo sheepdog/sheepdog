@@ -28,7 +28,7 @@ struct xio_context *xio_get_main_ctx(void)
 }
 
 struct client_data {
-	struct xio_context	*ctx;
+	struct xio_context *ctx;
 	struct xio_msg *rsp;
 };
 
@@ -53,8 +53,6 @@ static int on_msg_error(struct xio_session *session,
 			struct xio_msg *msg,
 			void *cb_user_context)
 {
-	/* struct server_data *sdata = (struct server_data *)cb_user_context; */
-
 	if (direction == XIO_MSG_DIRECTION_OUT) {
 		sd_debug("**** [%p] message %lu failed. reason: %s",
 		       session, msg->sn, xio_strerror(error));
@@ -68,7 +66,6 @@ static int on_msg_error(struct xio_session *session,
 	case XIO_E_MSG_FLUSHED:
 		break;
 	default:
-		/* xio_disconnect(sdata->connection); */
 		break;
 	};
 
@@ -101,8 +98,8 @@ static int on_session_event(struct xio_session *session,
 
 static int client_assign_data_in_buf(struct xio_msg *msg, void *cb_user_context)
 {
-	struct xio_iovec_ex	*sglist = vmsg_sglist(&msg->in);
-	struct xio_reg_mem	in_xbuf;
+	struct xio_iovec_ex *sglist = vmsg_sglist(&msg->in);
+	struct xio_reg_mem in_xbuf;
 
 	sd_debug("assign buffer, msg vec len: %lu", sglist[0].iov_len);
 	if (!sglist[0].iov_len)
@@ -161,14 +158,14 @@ static struct xio_connection *sd_xio_create_connection(struct xio_context *ctx,
 
 static int client_msg_vec_init(struct xio_msg *msg)
 {
-	msg->in.sgl_type		= XIO_SGL_TYPE_IOV_PTR;
-	msg->in.pdata_iov.max_nents	= 2;
-	msg->in.pdata_iov.sglist	=
+	msg->in.sgl_type = XIO_SGL_TYPE_IOV_PTR;
+	msg->in.pdata_iov.max_nents = 2;
+	msg->in.pdata_iov.sglist =
 		(struct xio_iovec_ex *)calloc(2, sizeof(struct xio_iovec_ex));
 
-	msg->out.sgl_type		= XIO_SGL_TYPE_IOV_PTR;
-	msg->out.pdata_iov.max_nents	= 1;
-	msg->out.pdata_iov.sglist	=
+	msg->out.sgl_type = XIO_SGL_TYPE_IOV_PTR;
+	msg->out.pdata_iov.max_nents = 1;
+	msg->out.pdata_iov.sglist =
 		(struct xio_iovec_ex *)calloc(1, sizeof(struct xio_iovec_ex));
 
 	return 0;
