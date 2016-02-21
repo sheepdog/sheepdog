@@ -24,7 +24,7 @@
 
 /* server private data, per session */
 struct server_data {
-	struct xio_context	*ctx;
+	struct xio_context *ctx;
 
 	int nr_conn;
 	struct list_head conn_list;
@@ -173,13 +173,13 @@ static void msg_prep_for_reply(struct sd_rsp *rsp,
 
 static int server_msg_vec_init(struct xio_msg *msg)
 {
-	msg->in.sgl_type		= XIO_SGL_TYPE_IOV_PTR;
-	msg->in.pdata_iov.max_nents	= 0;
-	msg->in.pdata_iov.sglist	= NULL;
+	msg->in.sgl_type = XIO_SGL_TYPE_IOV_PTR;
+	msg->in.pdata_iov.max_nents = 0;
+	msg->in.pdata_iov.sglist = NULL;
 
-	msg->out.sgl_type		= XIO_SGL_TYPE_IOV_PTR;
-	msg->out.pdata_iov.max_nents	= 1;
-	msg->out.pdata_iov.sglist	=
+	msg->out.sgl_type = XIO_SGL_TYPE_IOV_PTR;
+	msg->out.pdata_iov.max_nents = 1;
+	msg->out.pdata_iov.sglist =
 		(struct xio_iovec_ex *)calloc(1, sizeof(struct xio_iovec_ex));
 
 	return 0;
@@ -229,16 +229,13 @@ static int server_assign_data_in_buf(struct xio_msg *msg, void *cb_user_context)
 	return 0;
 }
 
-/*---------------------------------------------------------------------------*/
-/* asynchronous callbacks						     */
-/*---------------------------------------------------------------------------*/
 static struct xio_session_ops  portal_server_ops = {
-	.on_session_event		=  server_on_session_event,
-	.on_new_session			=  server_on_new_session,
-	.on_msg_send_complete		=  server_on_send_response_complete,
-	.on_msg				=  server_on_request,
-	.on_msg_error			=  NULL,
-	.assign_data_in_buf		= server_assign_data_in_buf,
+	.on_session_event = server_on_session_event,
+	.on_new_session	= server_on_new_session,
+	.on_msg_send_complete = server_on_send_response_complete,
+	.on_msg	= server_on_request,
+	.on_msg_error = NULL,
+	.assign_data_in_buf = server_assign_data_in_buf,
 };
 
 static void xio_server_handler(int fd, int events, void *data)
