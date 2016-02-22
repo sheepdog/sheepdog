@@ -25,6 +25,7 @@ enum wq_thread_control {
 	WQ_ORDERED, /* Only 1 thread created for work queue */
 	WQ_DYNAMIC, /* # of threads proportional to nr_nodes created */
 	WQ_UNLIMITED, /* Unlimited # of threads created */
+	WQ_FIXED, /* Fixed # of threads created */
 };
 
 static inline bool is_main_thread(void)
@@ -61,6 +62,7 @@ static inline bool is_worker_thread(void)
 int init_work_queue(size_t (*get_nr_nodes)(void));
 struct work_queue *create_work_queue(const char *name, enum wq_thread_control);
 struct work_queue *create_ordered_work_queue(const char *name);
+struct work_queue *create_fixed_work_queue(const char *name, int nr_threads);
 void queue_work(struct work_queue *q, struct work *work);
 bool work_queue_empty(struct work_queue *q);
 int wq_trace_init(void);

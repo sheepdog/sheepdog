@@ -208,6 +208,9 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 	case WQ_UNLIMITED:
 		nr = SIZE_MAX;
 		break;
+	case WQ_FIXED:
+		nr = wi->nr_threads;
+		break;
 	default:
 		panic("Invalid threads control %d", wi->tc);
 	}
@@ -216,6 +219,9 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 
 static bool wq_need_grow(struct wq_info *wi)
 {
+	if (wi->tc == WQ_FIXED)
+		return false;
+
 	if (wi->nr_threads < uatomic_read(&wi->nr_queued_work) &&
 	    wi->nr_threads * 2 <= wq_get_roof(wi)) {
 		wi->tm_end_of_protection = get_msec_time() +
@@ -232,6 +238,9 @@ static bool wq_need_grow(struct wq_info *wi)
  */
 static bool wq_need_shrink(struct wq_info *wi)
 {
+	if (wi->tc == WQ_FIXED)
+		return false;
+
 	if (uatomic_read(&wi->nr_queued_work) < wi->nr_threads / 2)
 		/* we cannot shrink work queue during protection period. */
 		return wi->tm_end_of_protection <= get_msec_time();
@@ -403,9 +412,11 @@ struct work_queue *create_work_queue(const char *name,
 	sd_init_mutex(&wi->finished_lock);
 	sd_init_mutex(&wi->pending_lock);
 
-	ret = create_worker_threads(wi, 1);
-	if (ret < 0)
-		goto destroy_threads;
+	if (tc != WQ_FIXED) {
+		ret = create_worker_threads(wi, 1);
+		if (ret < 0)
+			goto destroy_threads;
+	}
 
 	list_add(&wi->list, &wq_info_list);
 
@@ -422,6 +433,25 @@ destroy_threads:
 struct work_queue *create_ordered_work_queue(const char *name)
 {
 	return create_work_queue(name, WQ_ORDERED);
+}
+
+struct work_queue *create_fixed_work_queue(const char *name, int nr_threads)
+{
+	struct work_queue *wq;
+	struct wq_info *wi;
+	int ret;
+
+	wq = create_work_queue(name, WQ_FIXED);
+	if (!wq)
+		return NULL;
+
+	wi = container_of(wq, struct wq_info, q);
+	ret = create_worker_threads(wi, nr_threads);
+	if (ret) {
+		panic("failed to create a fixed workqueue: %s", name);
+	}
+
+	return wq;
 }
 
 bool work_queue_empty(struct work_queue *q)
