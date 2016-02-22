@@ -22,6 +22,8 @@ static struct sd_option benchmark_options[] = {
 	{'w', "workqueue", true, "specify workqueue type"},
 	{'f', "force", false, "do not prompt for confirmation"},
 	{'t', "total", true, "a number of total operation (e.g. I/O request)"},
+	{'n', "nr-threads", true, "a number of worker threads"
+	 " (only used for fixed workqueue)"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -32,6 +34,7 @@ static struct benchmark_cmd_data {
 	char workqueue_type[WQ_TYPE_LEN];
 	bool force;
 	int total;
+	int nr_threads;
 } benchmark_cmd_data;
 
 struct benchmark_io_work {
@@ -83,6 +86,7 @@ static int benchmark_io(int argc, char **argv)
 	int nr_objects, buf_len;
 	uint64_t obj_index = 0, offset = 0;
 	char *buf;
+	int nr_threads = 1;
 
 	if (!benchmark_cmd_data.force)
 		confirm("Caution! benchmark io command will erase all data of"
@@ -98,6 +102,9 @@ static int benchmark_io(int argc, char **argv)
 		else if (!strcmp("unlimited",
 				   benchmark_cmd_data.workqueue_type))
 			wq_type = WQ_UNLIMITED;
+		else if (!strcmp("fixed",
+				 benchmark_cmd_data.workqueue_type))
+			wq_type = WQ_FIXED;
 		else {
 			sd_err("unknown workqueue type: %s",
 			       benchmark_cmd_data.workqueue_type);
@@ -107,7 +114,13 @@ static int benchmark_io(int argc, char **argv)
 		}
 	}
 
-	wq = create_work_queue("benchmark", wq_type);
+	if (benchmark_cmd_data.nr_threads)
+		nr_threads = benchmark_cmd_data.nr_threads;
+
+	if (wq_type != WQ_FIXED)
+		wq = create_work_queue("benchmark", wq_type);
+	else
+		wq = create_fixed_work_queue("benchmark", nr_threads);
 	if (!wq) {
 		sd_err("failed to create work queue");
 		return EXIT_SYSFAIL;
@@ -173,6 +186,9 @@ static int benchmark_parser(int ch, const char *opt)
 	case 't':
 		benchmark_cmd_data.total = atoi(opt);
 		break;
+	case 'n':
+		benchmark_cmd_data.nr_threads = atoi(opt);
+		break;
 	default:
 		sd_err("unknown option: %c", ch);
 		return -1;
@@ -182,7 +198,7 @@ static int benchmark_parser(int ch, const char *opt)
 }
 
 static struct subcommand benchmark_cmd[] = {
-	{"io", "<vdiname>", "aprhTfwt", "benchmark I/O performance",
+	{"io", "<vdiname>", "aprhTfwtn", "benchmark I/O performance",
 	 NULL, CMD_NEED_NODELIST|CMD_NEED_ARG, benchmark_io, benchmark_options},
 	{NULL,},
 };
