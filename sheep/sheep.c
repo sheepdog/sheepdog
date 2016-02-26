@@ -47,6 +47,7 @@ static const char journal_help[] =
 "\nExample:\n\t$ sheep -j dir=/journal,size=1G\n"
 "This tries to use /journal as the journal storage of the size 1G\n";
 
+#ifdef HAVE_HTTP
 static const char http_help[] =
 "Available arguments:\n"
 "\thost=: specify a host to communicate with http server (default: localhost)\n"
@@ -56,6 +57,7 @@ static const char http_help[] =
 "Example:\n\t$ sheep -r host=localhost,port=7001,buffer=64M,swift ...\n"
 "This tries to enable Swift API and use localhost:7001 to\n"
 "communicate with http server, using 64MB buffer.\n";
+#endif
 
 static const char myaddr_help[] =
 "Example:\n\t$ sheep -y 192.168.1.1 ...\n"
@@ -152,8 +154,10 @@ static struct sd_option sheep_options[] = {
 	{'p', "port", true, "specify the TCP port on which to listen "
 	 "(default: 7000)"},
 	{'P', "pidfile", true, "create a pid file"},
+#ifdef HAVE_HTTP
 	{'r', "http", true, "enable http service. (default: disabled)",
 	 http_help},
+#endif
 	{'R', "recovery", true, "specify the recovery speed throttling",
 	 recovery_help},
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
@@ -686,7 +690,9 @@ int main(int argc, char **argv)
 	int64_t zone = -1;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
+#ifdef HAVE_HTTP
 	const char *http_options = NULL;
+#endif
 	static struct logger_user_info sheep_info;
 	struct stat logdir_st;
 	enum log_dst_type log_dst_type;
@@ -719,9 +725,11 @@ int main(int argc, char **argv)
 		case 'P':
 			pid_file = optarg;
 			break;
+#ifdef HAVE_HTTP
 		case 'r':
 			http_options = optarg;
 			break;
+#endif
 		case 'l':
 			if (option_parse(optarg, ",", log_parsers) < 0)
 				exit(1);
