@@ -461,6 +461,13 @@ static int create_work_queues(void)
 	sys->block_wqueue = create_ordered_work_queue("block");
 	sys->md_wqueue = create_ordered_work_queue("md");
 	sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
+	sys->bitmap_collection_wqueue =
+		create_fixed_work_queue("bitmap_collection",
+					BITMAP_COLLECTION_WORKERS);
+	/*
+	 * FIXME: a number of threads in bitmap_collection should be
+	 * configurable
+	 */
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
 	    !sys->areq_wqueue)

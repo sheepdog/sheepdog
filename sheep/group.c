@@ -476,18 +476,107 @@ static enum sd_status cluster_wait_check(const struct sd_node *joining,
 	return sys->cinfo.status;
 }
 
+struct get_vdis_read_obj {
+	struct work work;
+
+	struct sd_node *node;
+
+	int *nr_ongoing;
+	int efd;
+
+	unsigned long *vdi_bitmap;
+	struct sd_mutex *vdi_bitmap_lock;
+};
+
+static void get_vdis_read_obj_work(struct work *work)
+{
+	struct get_vdis_read_obj *w =
+		container_of(work, struct get_vdis_read_obj, work);
+	struct sd_req req;
+	struct sd_rsp *rsp = (struct sd_rsp *)&req;
+	struct sd_inode *inode = xzalloc(SD_INODE_HEADER_SIZE);
+	int ret;
+
+	while (true) {
+		uint32_t vid;
+		uint64_t oid;
+
+		sd_mutex_lock(w->vdi_bitmap_lock);
+
+		vid = (uint32_t)find_next_bit(w->vdi_bitmap, SD_NR_VDIS, 0);
+		if (vid == SD_NR_VDIS) {
+			sd_mutex_unlock(w->vdi_bitmap_lock);
+			break;
+		}
+
+		clear_bit((unsigned long)vid, w->vdi_bitmap);
+		sd_mutex_unlock(w->vdi_bitmap_lock);
+
+		if (test_bit(vid, sys->vdi_inuse))
+			continue; /* already have the information of the VDI */
+
+		oid = vid_to_vdi_oid(vid);
+		sd_init_req(&req, SD_OP_READ_OBJ);
+		req.data_length = SD_INODE_HEADER_SIZE;
+		req.obj.oid = oid;
+		req.obj.offset = 0;
+		req.epoch = sys_epoch();
+
+		ret = sheep_exec_req(&w->node->nid, &req, inode);
+		if (ret < 0 || rsp->result != SD_RES_SUCCESS) {
+			sd_err("failed to read object %"PRIx64" for"
+			       " constructing vdi state", oid);
+			goto out;
+		}
+
+		atomic_set_bit((int)vid, sys->vdi_inuse);
+
+		add_vdi_state_unordered((uint32_t)vid, inode->nr_copies,
+					!!inode->snap_ctime, inode->copy_policy,
+					inode->block_size_shift,
+					inode->parent_vdi_id);
+
+out:
+		uatomic_dec(w->nr_ongoing);
+		if (!uatomic_read(w->nr_ongoing)) {
+			eventfd_xwrite(w->efd, 1);
+			break;
+		}
+	}
+
+	free(inode);
+}
+
+static void get_vdis_read_obj_main(struct work *work)
+{
+	struct get_vdis_read_obj *w =
+		container_of(work, struct get_vdis_read_obj, work);
+
+	free(w);
+}
+
+#define MAX_PARALLEL_REQ 32	/* TODO: customize? */
+
 static int get_vdis_from(struct sd_node *node)
 {
 	struct sd_req req;
 	struct sd_rsp *rsp = (struct sd_rsp *)&req;
-	int ret;
+	int ret = SD_RES_SUCCESS;
 	static DECLARE_BITMAP(vdi_inuse, SD_NR_VDIS);
 	static DECLARE_BITMAP(vdi_deleted, SD_NR_VDIS);
 	unsigned long nr;
-	struct sd_inode *inode = xzalloc(SD_INODE_HEADER_SIZE);
+	int nr_ongoing = 0;
+	int efd;
+	struct sd_mutex bitmap_lock = SD_MUTEX_INITIALIZER;
 
 	if (node_is_local(node))
 		return SD_RES_SUCCESS;
+
+	efd = eventfd(0, EFD_SEMAPHORE);
+	if (efd < 0) {
+		sd_err("failed to create efd for completion notification");
+		return SD_RES_EIO;
+	}
 
 	sd_init_req(&req, SD_OP_READ_VDIS);
 	req.data_length = sizeof(vdi_inuse);
@@ -512,39 +601,44 @@ static int get_vdis_from(struct sd_node *node)
 	}
 
 	FOR_EACH_BIT(nr, vdi_inuse, SD_NR_VDIS) {
-		uint64_t oid = vid_to_vdi_oid(nr);
+		if (test_bit(nr, sys->vdi_inuse))
+			continue; /* already have the information of the VDI */
+
+		nr_ongoing++;
+	}
+
+	if (!nr_ongoing)
+		goto out;
+
+	for (int i = 0; i < BITMAP_COLLECTION_WORKERS; i++) {
+		struct get_vdis_read_obj *w;
 
 		if (test_bit(nr, sys->vdi_inuse))
 			continue; /* already have the information of the VDI */
 
-		sd_init_req(&req, SD_OP_READ_OBJ);
-		req.data_length = SD_INODE_HEADER_SIZE;
-		req.obj.oid = oid;
-		req.obj.offset = 0;
-		req.epoch = sys_epoch();
+		w = xzalloc(sizeof(*w));
 
-		ret = sheep_exec_req(&node->nid, &req, inode);
-		if (ret < 0 || rsp->result != SD_RES_SUCCESS) {
-			sd_err("failed to read object %"PRIx64" for"
-			       " constructing vdi state", oid);
-			goto out;
-		}
+		w->work.fn = get_vdis_read_obj_work;
+		w->work.done = get_vdis_read_obj_main;
 
-		atomic_set_bit(nr, sys->vdi_inuse);
+		w->node = node;
 
-		add_vdi_state_unordered((uint32_t)nr, inode->nr_copies,
-					!!inode->snap_ctime, inode->copy_policy,
-					inode->block_size_shift,
-					inode->parent_vdi_id);
+		w->nr_ongoing = &nr_ongoing;
+		w->efd = efd;
+
+		w->vdi_bitmap = vdi_inuse;
+		w->vdi_bitmap_lock = &bitmap_lock;
+
+		queue_work(sys->bitmap_collection_wqueue, &w->work);
 	}
+
+	eventfd_xread(efd);
 
 	FOR_EACH_BIT(nr, vdi_deleted, SD_NR_VDIS) {
 		atomic_set_bit(nr, sys->vdi_deleted);
 	}
 
 out:
-	free(inode);
-
 	return ret;
 }
 
