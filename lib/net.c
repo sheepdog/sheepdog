@@ -421,7 +421,7 @@ uint8_t *str_to_addr(const char *ipstr, uint8_t *addr)
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	int res = -1;
-	int addr_start_idx = 0;
+	int addr_start_idx;
 
 	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_family = AF_UNSPEC;
@@ -436,14 +436,14 @@ uint8_t *str_to_addr(const char *ipstr, uint8_t *addr)
 	for (rp = result; rp != NULL; rp = rp->ai_next) {
 		switch (rp->ai_family) {
 		case AF_INET:
-			addr_start_idx = 12;
+			addr_start_idx = 16 - sizeof(struct in_addr);
 			memset(addr, 0, addr_start_idx);
 			sin = (struct sockaddr_in *) rp->ai_addr;
-			addr = memcpy(addr+addr_start_idx, &sin->sin_addr, rp->ai_addrlen);
+			addr = memcpy(addr+addr_start_idx, &sin->sin_addr, sizeof(struct in_addr));
 			break;
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *) rp->ai_addr;
-			addr = memcpy(addr+addr_start_idx, &sin6->sin6_addr, rp->ai_addrlen);
+			addr = memcpy(addr, &sin6->sin6_addr, sizeof(struct in6_addr));
 			break;
 		}
 		break;
