@@ -873,9 +873,7 @@ static int local_sd_stat(const struct sd_req *req, struct sd_rsp *rsp,
 /* Return SD_RES_INVALID_PARMS to ask client not to send flush req again */
 static int local_flush_vdi(struct request *req)
 {
-	int ret = SD_RES_INVALID_PARMS;
-
-	return ret;
+	return SD_RES_INVALID_PARMS;
 }
 
 static int local_discard_obj(struct request *req)

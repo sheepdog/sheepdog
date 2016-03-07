@@ -1774,8 +1774,8 @@ static void delete_vdi_work(struct work *work)
 		return;
 	}
 
-	ret = read_backend_object(vid_to_vdi_oid(vdi_id),
-				  (void *)inode, sizeof(*inode), 0);
+	ret = sd_read_object(vid_to_vdi_oid(vdi_id),
+			     (void *)inode, sizeof(*inode), 0);
 
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("cannot find VDI object");

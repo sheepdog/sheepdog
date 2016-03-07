@@ -469,8 +469,6 @@ void get_recovery_state(struct recovery_state *state);
 void set_recovery(struct recovery_throttling *rthrottling);
 struct recovery_throttling get_recovery(void);
 
-int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset);
 int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
 		    uint64_t offset, bool create);
 int sd_read_object(uint64_t oid, char *data, unsigned int datalen,

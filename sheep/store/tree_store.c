@@ -579,14 +579,8 @@ int tree_update_epoch(uint32_t epoch)
 
 int tree_format(void)
 {
-	unsigned ret;
-
 	sd_debug("try get a clean store");
-	ret = for_each_obj_path(purge_dir);
-	if (ret != SD_RES_SUCCESS)
-		return ret;
-
-	return SD_RES_SUCCESS;
+	return for_each_obj_path(purge_dir);
 }
 
 int tree_remove_object(uint64_t oid, uint8_t ec_index)

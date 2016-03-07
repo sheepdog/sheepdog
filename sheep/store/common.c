@@ -486,8 +486,8 @@ int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
 	return ret;
 }
 
-int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
-			uint64_t offset)
+int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
+		   uint64_t offset)
 {
 	struct sd_req hdr;
 	int ret;
@@ -502,16 +502,6 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 		sd_err("failed to read object %" PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 	return ret;
-}
-
-/*
- * Read data firstly from local object cache(if enabled), if fail,
- * try read backends
- */
-int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
-		   uint64_t offset)
-{
-	return read_backend_object(oid, data, datalen, offset);
 }
 
 int sd_remove_object(uint64_t oid)
