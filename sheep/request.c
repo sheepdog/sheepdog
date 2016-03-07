@@ -313,23 +313,10 @@ static void queue_gateway_request(struct request *req)
 	if (is_access_local(req, hdr->obj.oid))
 		req->local_oid = hdr->obj.oid;
 
-	/*
-	 * If we go for cache object, we don't care if it is being recovered
-	 * Even if it doesn't exist in cache, we'll rely on cache layer to pull
-	 * it.
-	 *
-	 * Not true for local request because it might go for backend store
-	 * such as pushing cache object, in this case we should check if request
-	 * is in recovery.
-	 */
-	if (sys->enable_object_cache && !req->local)
-		goto queue_work;
-
 	if (req->local_oid)
 		if (request_in_recovery(req))
 			return;
 
-queue_work:
 	if (RB_EMPTY_ROOT(&req->vinfo->vroot)) {
 		sd_err("there is no living nodes");
 		goto end_request;

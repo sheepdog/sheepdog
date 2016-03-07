@@ -728,10 +728,6 @@ int gateway_read_obj(struct request *req)
 		return SD_RES_INODE_INVALIDATED;
 	}
 
-	/* XXX: object cache and iSCSI multipath cannot coexist */
-	if (!bypass_object_cache(req))
-		return object_cache_handle_request(req);
-
 	if (is_erasure_oid(oid))
 		ret = gateway_forward_request(req);
 	else
@@ -800,10 +796,6 @@ int gateway_write_obj(struct request *req)
 
 	if (oid_is_readonly(oid))
 		return SD_RES_READONLY;
-
-	if (!bypass_object_cache(req))
-		return object_cache_handle_request(req);
-
 
 	if (is_data_vid_update(hdr)) {
 		invalidate_other_nodes(oid_to_vid(oid));
@@ -948,9 +940,6 @@ int gateway_create_and_write_obj(struct request *req)
 
 	if (req->rq.flags & SD_FLAG_CMD_COW)
 		return gateway_handle_cow(req);
-
-	if (!bypass_object_cache(req))
-		return object_cache_handle_request(req);
 
 	return gateway_forward_request(req);
 }

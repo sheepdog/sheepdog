@@ -175,27 +175,10 @@ struct cache_deletion_work {
 	struct work work;
 };
 
-static void cache_delete_work(struct work *work)
-{
-	struct cache_deletion_work *dw =
-		container_of(work, struct cache_deletion_work, work);
-
-	object_cache_delete(dw->vid);
-}
-
-static void cache_delete_done(struct work *work)
-{
-	struct cache_deletion_work *dw =
-		container_of(work, struct cache_deletion_work, work);
-
-	free(dw);
-}
-
 static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data, const struct sd_node *sender)
 {
 	unsigned long vid = rsp->vdi.vdi_id;
-	struct cache_deletion_work *dw;
 	int ret = rsp->result;
 	char *name = data;
 
@@ -210,16 +193,6 @@ static int post_cluster_del_vdi(const struct sd_req *req, struct sd_rsp *rsp,
 		if (sys->cinfo.flags & SD_CLUSTER_FLAG_RECYCLE_VID)
 			run_vid_gc(vid);
 	}
-
-	if (!sys->enable_object_cache)
-		return ret;
-
-	dw = xzalloc(sizeof(*dw));
-	dw->vid = vid;
-	dw->work.fn = cache_delete_work;
-	dw->work.done = cache_delete_done;
-
-	queue_work(sys->deletion_wqueue, &dw->work);
 
 	return ret;
 }
@@ -440,23 +413,7 @@ static int cluster_get_vdi_attr(struct request *req)
 
 static int local_release_vdi(struct request *req)
 {
-	uint32_t vid = req->rq.vdi.base_vdi_id;
-	int ret;
-
-	if (!sys->enable_object_cache)
-		return SD_RES_SUCCESS;
-
-	if (!vid) {
-		sd_info("Some VDI failed to release the object cache. "
-			"Probably you are running old QEMU.");
-		return SD_RES_SUCCESS;
-	}
-
-	ret = object_cache_flush_vdi(vid);
-	if (ret == SD_RES_SUCCESS)
-		object_cache_delete(vid);
-
-	return ret;
+	return SD_RES_SUCCESS;
 }
 
 static int local_get_store_list(struct request *req)
@@ -740,11 +697,6 @@ static int cluster_notify_vdi_del(const struct sd_req *req, struct sd_rsp *rsp,
 static int cluster_delete_cache(const struct sd_req *req, struct sd_rsp *rsp,
 				void *data, const struct sd_node *sender)
 {
-	uint32_t vid = oid_to_vid(req->obj.oid);
-
-	if (sys->enable_object_cache)
-		object_cache_delete(vid);
-
 	return SD_RES_SUCCESS;
 }
 
@@ -910,31 +862,6 @@ static int local_get_hash(struct request *request)
 				  rsp->hash.digest);
 }
 
-static int local_get_cache_info(struct request *request)
-{
-	struct sd_rsp *rsp = &request->rp;
-
-	sd_assert(request->rq.data_length == sizeof(struct object_cache_info));
-	rsp->data_length = object_cache_get_info((struct object_cache_info *)
-						 request->data);
-
-	return SD_RES_SUCCESS;
-}
-
-static int local_cache_purge(struct request *req)
-{
-	const struct sd_req *hdr = &req->rq;
-	uint32_t vid = oid_to_vid(req->rq.obj.oid);
-
-	if (hdr->flags == SD_FLAG_CMD_WRITE) {
-		object_cache_delete(vid);
-		goto out;
-	}
-	object_cache_format();
-out:
-	return SD_RES_SUCCESS;
-}
-
 static int local_sd_stat(const struct sd_req *req, struct sd_rsp *rsp,
 			 void *data, const struct sd_node *sender)
 {
@@ -947,11 +874,6 @@ static int local_sd_stat(const struct sd_req *req, struct sd_rsp *rsp,
 static int local_flush_vdi(struct request *req)
 {
 	int ret = SD_RES_INVALID_PARMS;
-
-	if (sys->enable_object_cache) {
-		uint32_t vid = oid_to_vid(req->rq.obj.oid);
-		ret = object_cache_flush_vdi(vid);
-	}
 
 	return ret;
 }
@@ -990,9 +912,7 @@ out:
 
 static int local_flush_and_del(struct request *req)
 {
-	if (!sys->enable_object_cache)
-		return SD_RES_SUCCESS;
-	return object_cache_flush_and_del(req);
+	return SD_RES_SUCCESS;
 }
 
 static int local_trace_enable(const struct sd_req *req, struct sd_rsp *rsp,
@@ -1842,18 +1762,6 @@ static struct sd_op_template sd_ops[] = {
 		.name = "GET_HASH",
 		.type = SD_OP_TYPE_LOCAL,
 		.process_work = local_get_hash,
-	},
-
-	[SD_OP_GET_CACHE_INFO] = {
-		.name = "GET_CACHE_INFO",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_work = local_get_cache_info,
-	},
-
-	[SD_OP_CACHE_PURGE] = {
-		.name = "CACHE_PURGE",
-		.type = SD_OP_TYPE_LOCAL,
-		.process_work = local_cache_purge,
 	},
 
 	[SD_OP_STAT] = {

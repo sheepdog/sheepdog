@@ -468,20 +468,6 @@ int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
 	struct sd_req hdr;
 	int ret;
 
-	if (sys->enable_object_cache && object_is_cached(oid)) {
-		ret = object_cache_write(oid, data, datalen, offset,
-					 create);
-		if (ret == SD_RES_NO_CACHE)
-			goto forward_write;
-
-		if (ret != 0) {
-			sd_err("write cache failed %" PRIx64 " %" PRIx32, oid,
-			       ret);
-			return ret;
-		}
-	}
-
-forward_write:
 	if (create)
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
 	else
@@ -525,19 +511,6 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
 		   uint64_t offset)
 {
-	int ret;
-
-	if (sys->enable_object_cache && object_is_cached(oid)) {
-		ret = object_cache_read(oid, data, datalen, offset);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("try forward read %" PRIx64 " %s", oid,
-			       sd_strerror(ret));
-			goto forward_read;
-		}
-		return ret;
-	}
-
-forward_read:
 	return read_backend_object(oid, data, datalen, offset);
 }
 
@@ -545,12 +518,6 @@ int sd_remove_object(uint64_t oid)
 {
 	struct sd_req hdr;
 	int ret;
-
-	if (sys->enable_object_cache && object_is_cached(oid)) {
-		ret = object_cache_remove(oid);
-		if (ret != SD_RES_SUCCESS)
-			return ret;
-	}
 
 	sd_init_req(&hdr, SD_OP_REMOVE_OBJ);
 	hdr.obj.oid = oid;

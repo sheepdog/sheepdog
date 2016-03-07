@@ -526,9 +526,6 @@ int default_format(void)
 	if (ret != SD_RES_SUCCESS)
 		return ret;
 
-	if (sys->enable_object_cache)
-		object_cache_format();
-
 	return SD_RES_SUCCESS;
 }
 

@@ -91,8 +91,8 @@
 #define SD_OP_MD_UNPLUG 0xB3
 #define SD_OP_GET_HASH       0xB4
 #define SD_OP_REWEIGHT       0xB5
-#define SD_OP_GET_CACHE_INFO 0xB6
-#define SD_OP_CACHE_PURGE    0xB7
+#define SD_OP_GET_CACHE_INFO 0xB6 /* obsolete */
+#define SD_OP_CACHE_PURGE    0xB7 /* obsolete */
 #define SD_OP_STAT	0xB8
 #define SD_OP_GET_LOGLEVEL	0xB9
 #define SD_OP_SET_LOGLEVEL	0xBA

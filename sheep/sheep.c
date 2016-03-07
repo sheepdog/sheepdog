@@ -83,16 +83,6 @@ static const char cluster_help[] =
 "cluster_id is used to identify which cluster it belongs to,\n"
 "if not set, /sheepdog is used internally as default.\n";
 
-static const char cache_help[] =
-"Available arguments:\n"
-"\tsize=: size of the cache in megabytes\n"
-"\tdir=: path to the location of the cache (default: $STORE/cache)\n"
-"\tdirectio: use directio mode for cache IO, "
-"if not specified use buffered IO\n"
-"\nExample:\n\t$ sheep -w size=200G,dir=/my_ssd,directio ...\n"
-"This tries to use /my_ssd as the cache storage with 200G allocted to the\n"
-"cache in directio mode\n";
-
 static const char log_help[] =
 "Example:\n\t$ sheep -l dir=/var/log/,level=debug,format=server ...\n"
 "Available arguments:\n"
@@ -163,7 +153,6 @@ static struct sd_option sheep_options[] = {
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'V', "vnodes", true, "set number of vnodes", vnodes_help},
-	{'w', "cache", true, "enable object cache", cache_help},
 	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
@@ -303,46 +292,6 @@ static void crash_handler(int signo, siginfo_t *info, void *context)
 
 static struct system_info __sys;
 struct system_info *sys = &__sys;
-
-static int cache_size_parser(const char *s)
-{
-	const uint64_t max_cache_size = ((uint64_t)UINT32_MAX + 1)*1024*1024;
-	uint64_t cache_size;
-
-	if (option_parse_size(s, &cache_size) < 0)
-		return -1;
-#define MIN_CACHE_SIZE (10*1024*1024) /* 10M */
-	if (cache_size < MIN_CACHE_SIZE || cache_size > max_cache_size) {
-		sd_err("Invalid cache option '%s': size must be between "
-		       "between %uM and %" PRIu64 "G", s,
-		       MIN_CACHE_SIZE/1024/1024, max_cache_size/1024/1024/1024);
-		return -1;
-	}
-
-	sys->object_cache_size = cache_size / 1024 / 1024;
-	return 0;
-}
-
-static int cache_directio_parser(const char *s)
-{
-	sys->object_cache_directio = true;
-	return 0;
-}
-
-static char ocpath[PATH_MAX];
-
-static int cache_dir_parser(const char *s)
-{
-	snprintf(ocpath, sizeof(ocpath), "%s", s);
-	return 0;
-}
-
-static struct option_parser cache_parsers[] = {
-	{ "size=", cache_size_parser },
-	{ "directio", cache_directio_parser },
-	{ "dir=", cache_dir_parser },
-	{ NULL, NULL },
-};
 
 static int log_level = SDOG_INFO;
 
@@ -512,13 +461,6 @@ static int create_work_queues(void)
 	sys->block_wqueue = create_ordered_work_queue("block");
 	sys->md_wqueue = create_ordered_work_queue("md");
 	sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
-	if (sys->enable_object_cache) {
-		sys->oc_reclaim_wqueue =
-			create_ordered_work_queue("oc_reclaim");
-		sys->oc_push_wqueue = create_work_queue("oc_push", WQ_DYNAMIC);
-		if (!sys->oc_reclaim_wqueue || !sys->oc_push_wqueue)
-			return -1;
-	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
 	    !sys->areq_wqueue)
@@ -784,18 +726,6 @@ int main(int argc, char **argv)
 			}
 
 			sys->cdrv_option = get_cdrv_option(sys->cdrv, optarg);
-			break;
-		case 'w':
-			sys->enable_object_cache = true;
-			sys->object_cache_size = 0;
-
-			if (option_parse(optarg, ",", cache_parsers) < 0)
-				exit(1);
-
-			if (sys->object_cache_size == 0) {
-				sd_err("object cache size is not set");
-				exit(1);
-			}
 			break;
 		case 'i':
 			if (option_parse(optarg, ",", ionic_parsers) < 0)
@@ -1074,15 +1004,6 @@ int main(int argc, char **argv)
 	ret = init_store_driver(sys->gateway_only);
 	if (ret)
 		goto cleanup_journal;
-
-	if (sys->enable_object_cache) {
-		if (!strlen(ocpath))
-			/* use object cache internally */
-			memcpy(ocpath, dir, strlen(dir));
-		ret = object_cache_init(ocpath);
-		if (ret)
-			goto cleanup_journal;
-	}
 
 	ret = trace_init();
 	if (ret)
