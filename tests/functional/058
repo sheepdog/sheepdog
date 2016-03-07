@@ -4,12 +4,12 @@
 . ./common
 
 for i in `seq 0 5`; do
-	_start_sheep $i "-w size=200M"
+	_start_sheep $i
 done
 _wait_for_sheep 6
 _cluster_format -c 6
 _vdi_create test 100M
-dd if=/dev/zero | $DOG vdi write -w test
+dd if=/dev/zero | $DOG vdi write test
 $QEMU_IO -f raw -c "discard 0 100m" sheepdog:test | _filter_qemu_io
 $DOG vdi check test
 for i in `seq 0 24`; do
