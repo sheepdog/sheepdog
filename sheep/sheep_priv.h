@@ -176,10 +176,6 @@ struct system_info {
 #ifdef HAVE_HTTP
 	struct work_queue *http_wqueue;
 #endif
-	bool enable_object_cache;
-
-	uint32_t object_cache_size;
-	bool object_cache_directio;
 
 	uatomic_bool use_journal;
 	bool backend_dio;
@@ -473,8 +469,6 @@ void get_recovery_state(struct recovery_state *state);
 void set_recovery(struct recovery_throttling *rthrottling);
 struct recovery_throttling get_recovery(void);
 
-int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset);
 int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
 		    uint64_t offset, bool create);
 int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
@@ -568,24 +562,6 @@ static inline bool is_data_vid_update(const struct sd_req *hdr)
 		hdr->obj.offset + hdr->data_length <=
 			data_vid_offset(SD_INODE_DATA_INDEX);
 }
-
-/* object_cache */
-
-void object_cache_format(void);
-bool bypass_object_cache(const struct request *req);
-bool object_is_cached(uint64_t oid);
-
-int object_cache_handle_request(struct request *req);
-int object_cache_write(uint64_t oid, char *data, unsigned int datalen,
-		       uint64_t offset, bool create);
-int object_cache_read(uint64_t oid, char *data, unsigned int datalen,
-		      uint64_t offset);
-int object_cache_flush_vdi(uint32_t vid);
-int object_cache_flush_and_del(const struct request *req);
-void object_cache_delete(uint32_t vid);
-int object_cache_init(const char *p);
-int object_cache_remove(uint64_t oid);
-int object_cache_get_info(struct object_cache_info *info);
 
 /* store layout migration */
 int sd_migrate_store(int from, int to);

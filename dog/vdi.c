@@ -2620,117 +2620,6 @@ out:
 	return ret;
 }
 
-static int vid_to_name_tag(uint32_t vid, char *name, char *tag)
-{
-	struct sd_inode *inode = xmalloc(SD_INODE_HEADER_SIZE);
-	int ret;
-
-	ret = dog_read_object(vid_to_vdi_oid(vid), inode, SD_INODE_HEADER_SIZE,
-			      0, true);
-	if (ret != SD_RES_SUCCESS)
-		goto out;
-
-	pstrcpy(name, SD_MAX_VDI_LEN, inode->name);
-	pstrcpy(tag, SD_MAX_VDI_TAG_LEN, inode->tag);
-out:
-	free(inode);
-	return ret;
-}
-
-static int vdi_cache_info(int argc, char **argv)
-{
-	struct object_cache_info info = {};
-	struct sd_req hdr;
-	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
-	int ret, i;
-
-	sd_init_req(&hdr, SD_OP_GET_CACHE_INFO);
-	hdr.data_length = sizeof(info);
-	ret = dog_exec_req(&sd_nid, &hdr, &info);
-	if (ret < 0)
-		return EXIT_SYSFAIL;
-
-	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("failed to get cache information: %s",
-		       sd_strerror(rsp->result));
-		return EXIT_FAILURE;
-	}
-
-	fprintf(stdout, "Name\tTag\tTotal\tDirty\tClean\n");
-	for (i = 0; i < info.count; i++) {
-		uint32_t object_size;
-		uint32_t vid = info.caches[i].vid;
-		struct sd_inode *inode = NULL;
-		int r;
-
-		r = dog_read_object(vid_to_vdi_oid(vid), inode,
-				    SD_INODE_HEADER_SIZE, 0, true);
-		if (r != EXIT_SUCCESS)
-			return r;
-
-		if (!inode->block_size_shift)
-			return EXIT_FAILURE;
-
-		object_size = (UINT32_C(1) << inode->block_size_shift);
-
-		uint64_t total = info.caches[i].total * object_size,
-			 dirty = info.caches[i].dirty * object_size,
-			 clean = total - dirty;
-
-		char name[SD_MAX_VDI_LEN], tag[SD_MAX_VDI_TAG_LEN];
-
-		ret = vid_to_name_tag(info.caches[i].vid, name, tag);
-		if (ret != SD_RES_SUCCESS)
-			return EXIT_FAILURE;
-		fprintf(stdout, "%s\t%s\t%s\t%s\t%s\n",
-			name, tag, strnumber(total), strnumber(dirty),
-			strnumber(clean));
-	}
-
-	fprintf(stdout, "\nCache size %s, used %s, %s\n",
-		strnumber(info.size), strnumber(info.used),
-		info.directio ? "directio" : "non-directio");
-
-	return EXIT_SUCCESS;
-}
-
-static int vdi_cache_purge(int argc, char **argv)
-{
-	const char *vdiname;
-	struct sd_req hdr;
-	uint32_t vid;
-	int ret = EXIT_SUCCESS;
-
-	sd_init_req(&hdr, SD_OP_CACHE_PURGE);
-
-	if (optind < argc) {
-		vdiname = argv[optind++];
-		ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-				    vdi_cmd_data.snapshot_tag, &vid);
-		if (ret != SD_RES_SUCCESS) {
-			sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
-					": %s", vdiname, vdi_cmd_data.snapshot_id,
-					vdi_cmd_data.snapshot_tag, sd_strerror(ret));
-			ret = EXIT_FAILURE;
-			goto out;
-		}
-		hdr.obj.oid = vid_to_vdi_oid(vid);
-		hdr.flags = SD_FLAG_CMD_WRITE;
-		hdr.data_length = 0;
-	} else {
-		confirm("This operation purges the cache of all the vdi"
-			". Continue? [yes/no]: ");
-	}
-
-	ret = send_light_req(&sd_nid, &hdr);
-	if (ret) {
-		sd_err("failed to execute request");
-		return EXIT_FAILURE;
-	}
-out:
-	return ret;
-}
-
 static int vdi_object_dump_inode(int argc, char **argv)
 {
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
@@ -2814,10 +2703,6 @@ static struct subcommand vdi_cache_cmd[] = {
 	 NULL, CMD_NEED_ARG, vdi_cache_flush},
 	{"delete", NULL, NULL, "delete the cache of the vdi specified in all nodes.",
 	 NULL, CMD_NEED_ARG, vdi_cache_delete},
-	{"info", NULL, NULL, "show usage of the cache",
-	 NULL, 0, vdi_cache_info},
-	{"purge", NULL, NULL, "purge the cache of all vdi (no flush)",
-	 NULL, 0, vdi_cache_purge},
 	{NULL,},
 };
 

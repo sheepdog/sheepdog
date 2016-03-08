@@ -31,7 +31,6 @@ mount.c
 nfs.c
 nfsd.c
 oalloc.c
-object_cache.c
 object_list_cache.c
 ops.c
 plain_store.c
