@@ -594,11 +594,12 @@ static bool add_new_participant(struct vdi_state_entry *entry,
 		return false;
 	}
 
-	idx = entry->nr_participants++;
+	idx = entry->nr_participants;
 	memcpy(&entry->participants[idx], owner, sizeof(*owner));
 	entry->participants_state[idx] =
 		is_modified(entry) ?
 		SHARED_LOCK_STATE_INVALIDATED : SHARED_LOCK_STATE_SHARED;
+	entry->nr_participants++;
 
 	sd_debug("new participant %s (%d) joined to VID: %"PRIx32", state is %d",
 		 node_id_to_str(&entry->participants[idx]), idx, entry->vid,
