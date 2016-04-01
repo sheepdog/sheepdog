@@ -21,9 +21,7 @@
 #include "event.h"
 #include "mock.h"
 
-#define LOOP_WHEN(expr)				\
-	while (expr)				\
-		event_loop(-1)
+#include "sheep_priv.h"
 
 #define assert_ret(call, expect)			\
 	do {						\
@@ -38,6 +36,7 @@ static void teardown(void)
 
 static void do_test(const char *arg)
 {
+	struct system_info mock_sys = {0}; sys = &mock_sys;
 	struct cluster_driver *driver;
 	struct sd_node node;
 	const char *option;
@@ -54,27 +53,25 @@ static void do_test(const char *arg)
 	assert_ret(driver->init(option), 0);
 	assert_ret(driver->join(&node, msg, len), 0);
 
-	LOOP_WHEN(method_nr_call(sd_join_handler) == 0);
-	LOOP_WHEN(method_nr_call(sd_accept_handler) == 0);
+	event_loop(-1);
+	event_loop(-1);
 	ck_assert_int_eq(method_nr_call(sd_join_handler), 1);
 	ck_assert_int_eq(method_nr_call(sd_accept_handler), 1);
 
 	assert_ret(driver->block(), 0);
-	assert_ret(driver->block(), 0);
 
-	LOOP_WHEN(method_nr_call(sd_block_handler) == 0);
-	ck_assert_int_eq(method_nr_call(sd_block_handler), 1);
+	event_loop(-1);
+	/*
+	 * sd_block_handler is called not once but twice
+	 * with ZooKeeper cluster driver
+	 */
+	ck_assert_int_eq(method_nr_call(sd_block_handler),
+			 strcmp(driver->name, "zookeeper") == 0 ? 2 : 1);
 
 	assert_ret(driver->unblock(msg, len), 0);
-	LOOP_WHEN(method_nr_call(sd_block_handler) == 1);
 
-	ck_assert_int_eq(method_nr_call(sd_block_handler), 2);
+	event_loop(-1);
 	ck_assert_int_eq(method_nr_call(sd_notify_handler), 1);
-
-	assert_ret(driver->unblock(msg, len), 0);
-	LOOP_WHEN(method_nr_call(sd_notify_handler) == 1);
-
-	ck_assert_int_eq(method_nr_call(sd_notify_handler), 2);
 
 	free(msg);
 }
