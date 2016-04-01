@@ -17,6 +17,7 @@
 
 START_TEST(test_vdi)
 {
+	struct system_info mock_sys = {0}; sys = &mock_sys;
 	add_vdi_state(1, 1, true, 0, 22, 0);
 	add_vdi_state(2, 1, true, 0, 22, 0);
 	add_vdi_state(3, 2, false, 0, 22, 0);
