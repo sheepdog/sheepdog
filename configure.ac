@@ -180,6 +180,7 @@ AC_CONFIG_FILES([Makefile
 		tests/unit/mock/Makefile
 		tests/unit/dog/Makefile
 		tests/unit/sheep/Makefile
+		tests/unit/lib/Makefile
 		tools/Makefile])
 
 ### Local business

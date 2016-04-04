@@ -1,3 +1,3 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-SUBDIRS			= mock dog sheep
+SUBDIRS			= mock dog sheep lib
