@@ -23,6 +23,8 @@ cscope.*
 *.la
 *.lo
 *.service
+*.log
+*.trs
 
 #
 # for GLOBAL
@@ -44,6 +46,7 @@ tools/zk_control
 tests/unit/dog/test_common
 tests/unit/sheep/test_vdi
 tests/unit/sheep/test_cluster_driver
+tests/unit/sheep/test_hash
 
 # directories
 .deps
@@ -59,6 +62,7 @@ config.status
 config.guess
 config.sub
 configure
+compile
 depcomp
 install-sh
 missing
@@ -76,6 +80,8 @@ tests/check.log
 tests/check.time
 tests/atconfig
 tests/*.out.bad
+tests/unit/dog/dog
+tests/unit/sheep/sheep
 
 *.patch
 

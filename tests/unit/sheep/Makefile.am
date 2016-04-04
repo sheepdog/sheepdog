@@ -6,6 +6,7 @@ check_PROGRAMS		= ${TESTS}
 
 AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  -I$(top_srcdir)/sheep				\
+			  -I$(top_srcdir)/sheep/store			\
 			  -I../mock					\
 			  @CHECK_CFLAGS@
 
@@ -13,8 +14,8 @@ LIBS			= $(top_srcdir)/lib/libsd.a		\
 			  ../mock/libmock.a -lpthread -lm		\
 			  @CHECK_LIBS@
 
-test_vdi_SOURCES	= test_vdi.c mock_sheep.c mock_store.c		\
-			  mock_request.c sheep/vdi.c
+test_vdi_SOURCES	= test_vdi.c sheep/vdi.c mock_sheep.c mock_store.c		\
+			  mock_request.c
 
 test_cluster_driver_SOURCES	= mock_sheep.c mock_group.c		\
 				  sheep/cluster/local.c	\
@@ -28,7 +29,7 @@ LIBS += -lzookeeper_mt
 endif
 
 test_hash_SOURCES	= test_hash.c mock_sheep.c mock_group.c \
-				mock_plain_store.c mock_gateway.c
+				mock_plain_store.c mock_gateway.c mock_store.c mock_vdi.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o

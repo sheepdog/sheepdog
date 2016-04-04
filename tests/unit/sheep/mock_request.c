@@ -15,4 +15,11 @@
 #include "sheep_priv.h"
 
 MOCK_METHOD(exec_local_req, int, 0, struct sd_req *rq, void *data)
+MOCK_METHOD(sheep_exec_req, int, 0,
+	    const struct node_id *nid, struct sd_req *hdr, void *buf)
+MOCK_METHOD(for_each_object_in_wd, int, 0,
+	    int (*func)(uint64_t oid, const char *path,
+			uint32_t epoch, uint8_t ec_index,
+			struct vnode_info *vinfo, void *arg),
+	    bool cleanup, void *arg)
 MOCK_VOID_METHOD(put_request, struct request *req)

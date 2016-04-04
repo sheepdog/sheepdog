@@ -26,11 +26,12 @@ MOCK_VOID_METHOD(sd_leave_handler, const struct sd_node *left,
 		 const struct rb_root *nroot, size_t nr_nodes)
 MOCK_VOID_METHOD(sd_notify_handler, const struct sd_node *sender, void *msg,
 		 size_t msg_len)
-MOCK_METHOD(sd_block_handler, bool, true, const struct sd_node *sender)
+MOCK_METHOD(sd_block_handler, bool, false, const struct sd_node *sender)
 MOCK_METHOD(sd_reconnect_handler, int, 0)
 MOCK_VOID_METHOD(sd_update_node_handler, struct sd_node *node)
 
 MOCK_METHOD(get_vnode_info, struct vnode_info *, NULL)
 MOCK_METHOD(start_recovery, int, 0, struct vnode_info *cur_vinfo,
-	    struct vnode_info *old_vinfo, bool epoch_lifted)
+	    struct vnode_info *old_vinfo, bool epoch_lifted, bool wildcard)
 MOCK_VOID_METHOD(put_vnode_info, struct vnode_info *vnode_info)
+MOCK_METHOD(leave_cluster, int, 0)

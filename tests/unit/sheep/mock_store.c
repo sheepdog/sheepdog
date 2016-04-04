@@ -14,6 +14,8 @@
 #include "mock.h"
 #include "sheep_priv.h"
 
+struct store_driver *sd_store = NULL;
+
 MOCK_METHOD(sd_read_object, int, 0,
 	    uint64_t oid, char *data, unsigned int datalen, uint64_t offset)
 MOCK_METHOD(sd_write_object, int, 0,
@@ -21,3 +23,6 @@ MOCK_METHOD(sd_write_object, int, 0,
 	    bool create)
 MOCK_METHOD(sd_remove_object, int, 0,
 	    uint64_t oid)
+
+/* sheep/store/common.c */
+MOCK_METHOD(store_id_match, bool, false, enum store_id id)
