@@ -6,3 +6,9 @@
 	path = tests/earthquake/tgt.git
 	url = https://github.com/sheepdog/tgt.git
 	branch = earthquake
+[submodule "tests/unit/cmock"]
+	path = tests/unit/cmock
+	url = https://github.com/ThrowTheSwitch/CMock.git
+[submodule "tests/unit/unity"]
+	path = tests/unit/unity
+	url = https://github.com/ThrowTheSwitch/Unity.git

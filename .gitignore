@@ -47,6 +47,7 @@ tests/unit/dog/test_common
 tests/unit/sheep/test_vdi
 tests/unit/sheep/test_cluster_driver
 tests/unit/sheep/test_hash
+tests/unit/lib/test_util
 
 # directories
 .deps
