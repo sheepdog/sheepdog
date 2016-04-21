@@ -8,6 +8,7 @@ AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  -I$(top_srcdir)/sheep				\
 			  -I$(top_srcdir)/sheep/store			\
 			  -I../mock					\
+			  -I../unity/src				\
 			  @CHECK_CFLAGS@
 
 LIBS			= $(top_srcdir)/lib/libsd.a		\
@@ -15,7 +16,7 @@ LIBS			= $(top_srcdir)/lib/libsd.a		\
 			  @CHECK_LIBS@
 
 test_vdi_SOURCES	= test_vdi.c sheep/vdi.c mock_sheep.c mock_store.c		\
-			  mock_request.c
+			  mock_request.c ../unity/src/unity.c
 
 test_cluster_driver_SOURCES	= mock_sheep.c mock_group.c		\
 				  sheep/cluster/local.c	\
