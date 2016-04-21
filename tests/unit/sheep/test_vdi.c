@@ -69,7 +69,7 @@ static void test_fill_vdi_state_list_should_set_deleted(void)
 	TEST_ASSERT_EQUAL_UINT8(0, state.copy_policy);
 	TEST_ASSERT_EQUAL_UINT8(22, state.block_size_shift);
 	TEST_ASSERT_EQUAL_UINT32(0, state.parent_vid);
-	TEST_ASSERT_TRUE(state.deleted); /* FAIL */
+	TEST_ASSERT_TRUE(state.deleted);
 }
 
 int main(void)
