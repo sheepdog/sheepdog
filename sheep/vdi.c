@@ -424,6 +424,7 @@ int fill_vdi_state_list(const struct sd_req *hdr,
 		vs[last].vid = entry->vid;
 		vs[last].nr_copies = entry->nr_copies;
 		vs[last].snapshot = entry->snapshot;
+		vs[last].deleted = entry->deleted;
 		vs[last].copy_policy = entry->copy_policy;
 		vs[last].block_size_shift = entry->block_size_shift;
 		vs[last].lock_state = entry->lock_state;

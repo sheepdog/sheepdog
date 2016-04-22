@@ -1,7 +1,9 @@
 /*
  * Copyright (C) 2013 Zelin.io
+ * Copyright (C) 2016 Nippon Telegraph and Telephone Corporation
  *
  * Kai Zhang <kyle@zelin.io>
+ * Takashi Menjo <menjo.takashi@lab.ntt.co.jp>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version
@@ -11,42 +13,71 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <check.h>
+#include <unity.h>
 
 #include "sheep_priv.h"
 
-START_TEST(test_vdi)
+static void test_vdi(void)
 {
 	struct system_info mock_sys = {0}; sys = &mock_sys;
 	add_vdi_state(1, 1, true, 0, 22, 0);
 	add_vdi_state(2, 1, true, 0, 22, 0);
 	add_vdi_state(3, 2, false, 0, 22, 0);
-
-	ck_assert_int_eq(get_vdi_copy_number(1), 1);
-	ck_assert_int_eq(get_vdi_copy_number(2), 1);
-	ck_assert_int_eq(get_vdi_copy_number(3), 2);
+	TEST_ASSERT_EQUAL_INT(1, get_vdi_copy_number(1));
+	TEST_ASSERT_EQUAL_INT(1, get_vdi_copy_number(2));
+	TEST_ASSERT_EQUAL_INT(2, get_vdi_copy_number(3));
 }
-END_TEST
 
-static Suite *test_suite(void)
+static void test_fill_vdi_state_list_empty(void)
 {
-	Suite *s = suite_create("test vdi");
+	const struct sd_req request = {0};
+	struct sd_rsp response = {0};
+	TEST_ASSERT_EQUAL_INT(SD_RES_SUCCESS, fill_vdi_state_list(&request, &response, NULL));
+}
 
-	TCase *tc_vdi = tcase_create("vdi");
-	tcase_add_test(tc_vdi, test_vdi);
+static void test_fill_vdi_state_list_one(void)
+{
+	const size_t SIZE_VDI_STATE = sizeof(struct vdi_state);
+	const struct sd_req request = { .data_length = SIZE_VDI_STATE };
+	struct sd_rsp response = {0};
+	struct vdi_state state = {0};
+	add_vdi_state(1, 3, false, 0, 22, 0);
+	TEST_ASSERT_EQUAL_INT(SD_RES_SUCCESS, fill_vdi_state_list(&request, &response, &state));
+	TEST_ASSERT_EQUAL_UINT32(SIZE_VDI_STATE, response.data_length);
+	TEST_ASSERT_EQUAL_UINT32(1, state.vid);
+	TEST_ASSERT_EQUAL_INT(3, state.nr_copies);
+	TEST_ASSERT_FALSE(state.snapshot);
+	TEST_ASSERT_EQUAL_UINT8(0, state.copy_policy);
+	TEST_ASSERT_EQUAL_UINT8(22, state.block_size_shift);
+	TEST_ASSERT_EQUAL_UINT32(0, state.parent_vid);
+	TEST_ASSERT_FALSE(state.deleted);
+}
 
-	suite_add_tcase(s, tc_vdi);
-
-	return s;
+static void test_fill_vdi_state_list_should_set_deleted(void)
+{
+	const size_t SIZE_VDI_STATE = sizeof(struct vdi_state);
+	const struct sd_req request = { .data_length = SIZE_VDI_STATE };
+	struct sd_rsp response = {0};
+	struct vdi_state state = {0};
+	add_vdi_state(1, 3, false, 0, 22, 0);
+	vdi_mark_deleted(1);
+	TEST_ASSERT_EQUAL_INT(SD_RES_SUCCESS, fill_vdi_state_list(&request, &response, &state));
+	TEST_ASSERT_EQUAL_UINT32(SIZE_VDI_STATE, response.data_length);
+	TEST_ASSERT_EQUAL_UINT32(1, state.vid);
+	TEST_ASSERT_EQUAL_INT(3, state.nr_copies);
+	TEST_ASSERT_FALSE(state.snapshot);
+	TEST_ASSERT_EQUAL_UINT8(0, state.copy_policy);
+	TEST_ASSERT_EQUAL_UINT8(22, state.block_size_shift);
+	TEST_ASSERT_EQUAL_UINT32(0, state.parent_vid);
+	TEST_ASSERT_TRUE(state.deleted);
 }
 
 int main(void)
 {
-	int number_failed;
-	Suite *s = test_suite();
-	SRunner *sr = srunner_create(s);
-	srunner_run_all(sr, CK_NORMAL);
-	number_failed = srunner_ntests_failed(sr);
-	srunner_free(sr);
-	return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+	UNITY_BEGIN();
+	RUN_TEST(test_vdi);
+	RUN_TEST(test_fill_vdi_state_list_empty);
+	RUN_TEST(test_fill_vdi_state_list_one);
+	RUN_TEST(test_fill_vdi_state_list_should_set_deleted);
+	return UNITY_END();
 }
