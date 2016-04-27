@@ -22,6 +22,8 @@ static struct sd_option cluster_options[] = {
 	{'b', "store", true, "specify backend store"},
 	{'c', "copies", true, "specify the default data redundancy (number of copies)"},
 	{'f', "force", false, "do not prompt for confirmation"},
+	{'F', "avoid-diskfull", false, "skip recovery if recovery process can"
+	 " cause disk full"},
 	{'l', "lock", false, "Lock vdi to exclude multiple users"},
 	{'m', "multithread", false,
 	 "use multi-thread for 'cluster snapshot save'"},
@@ -49,6 +51,7 @@ static struct cluster_cmd_data {
 	bool fixed_vnodes;
 	bool use_lock;
 	bool recycle_vid;
+	bool avoid_diskfull;
 } cluster_cmd_data;
 
 #define DEFAULT_STORE	"plain"
@@ -186,6 +189,9 @@ static int cluster_format(int argc, char **argv)
 		hdr.cluster.flags &= ~SD_CLUSTER_FLAG_AUTO_VNODES;
 	else
 		hdr.cluster.flags |= SD_CLUSTER_FLAG_AUTO_VNODES;
+
+	if (cluster_cmd_data.avoid_diskfull)
+		hdr.cluster.flags |= SD_CLUSTER_FLAG_AVOID_DISKFULL;
 
 	printf("using backend %s store\n", store_name);
 	ret = dog_exec_req(&sd_nid, &hdr, store_name);
@@ -893,7 +899,7 @@ failure:
 static struct subcommand cluster_cmd[] = {
 	{"info", NULL, "aprhvTd", "show cluster information",
 	 NULL, CMD_NEED_NODELIST, cluster_info, cluster_options},
-	{"format", NULL, "bcltaphzTVRf", "create a Sheepdog store",
+	{"format", NULL, "bcltaphzTVRfF", "create a Sheepdog store",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_NODELIST, cluster_format, cluster_options},
 	{"shutdown", NULL, "aphT", "stop Sheepdog",
 	 NULL, CMD_NEED_ROOT, cluster_shutdown, cluster_options},
@@ -968,6 +974,9 @@ static int cluster_parser(int ch, const char *opt)
 		break;
 	case 'd':
 		cluster_cmd_data.diff = true;
+		break;
+	case 'F':
+		cluster_cmd_data.avoid_diskfull = true;
 		break;
 	}
 
