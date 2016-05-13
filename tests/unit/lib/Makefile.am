@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-TESTS			= test_util
+TESTS			= test_util test_work
 
 check_PROGRAMS		= ${TESTS}
 
@@ -13,11 +13,15 @@ AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  @CHECK_CFLAGS@
 
 LIBS			= -pthread -lm					\
+			  $(top_srcdir)/lib/libsd.a			\
 			  @CHECK_LIBS@
 
 test_util_SOURCES	= test_util.c ../../../lib/util.c		\
 			  ../mocks/Mocklogger.c				\
 			  ../cmock/src/cmock.c ../unity/src/unity.c
+
+test_work_SOURCES	= test_work.c ../../../lib/work.c		\
+			  ../unity/src/unity.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o
