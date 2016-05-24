@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <inttypes.h>
 
 #include "util.h"
 #include "work.h"
@@ -63,6 +64,42 @@ again:
 		sd_err("failed to write %s, %m", path);
 		ret = -1;
 		goto close_fd;
+	}
+
+	if (sparse) {
+		uint64_t nonzero_head = 0;
+		uint32_t nonzero_len = len;
+
+		find_zero_blocks(buf, &nonzero_head, &nonzero_len);
+
+		if (nonzero_head > 0) {
+			/* discard head */
+			ret = xfallocate(
+				fd, FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE,
+				0, (size_t)nonzero_head);
+			if (ret < 0) {
+				sd_err("failed to discard file %s, "
+				       "head %" PRIu64 ", %m",
+				       path, nonzero_head);
+				goto close_fd;
+			}
+		}
+
+		const size_t nonzero_tail = nonzero_head + nonzero_len;
+		if (nonzero_tail < len) {
+			/* discard tail */
+			const size_t block_end = roundup(len, BLOCK_SIZE);
+			const size_t tail_len = block_end - nonzero_tail;
+			ret = xfallocate(
+				fd, FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE,
+				nonzero_tail, tail_len);
+			if (ret < 0) {
+				sd_err("failed to discard file %s, "
+				       "tail %zu, len %zu, %m",
+				       path, nonzero_tail, tail_len);
+				goto close_fd;
+			}
+		}
 	}
 
 	ret = rename(tmp_path, path);

@@ -135,7 +135,7 @@ static void test_atomic_create_and_write_sparse(void)
 	struct stat s;
 	TEST_ASSERT_EQUAL_INT(0, stat(obj_path, &s));
 	TEST_ASSERT_EQUAL(BUF_LEN, s.st_size);
-	TEST_ASSERT_EQUAL(BLOCK_SIZE, s.st_blocks * 512); /* FAIL */
+	TEST_ASSERT_EQUAL(BLOCK_SIZE, s.st_blocks * 512);
 
 	subtest_object_content();
 }
