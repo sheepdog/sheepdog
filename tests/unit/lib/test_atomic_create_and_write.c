@@ -81,7 +81,7 @@ static void test_atomic_create_and_write_nonexist(void)
 {
 	subtest_try_unlink(tmp_path);
 
-	TEST_ASSERT_EQUAL_INT(0, atomic_create_and_write(obj_path, buf, BUF_LEN, false));
+	TEST_ASSERT_EQUAL_INT(0, atomic_create_and_write(obj_path, buf, BUF_LEN, false, false));
 	TEST_ASSERT_EQUAL_INT(0, access(obj_path, F_OK));
 	TEST_ASSERT_EQUAL_INT(-1, access(tmp_path, F_OK));
 
@@ -100,7 +100,7 @@ static void test_atomic_create_and_write_nonforce(void)
 	subtest_try_unlink(tmp_path);
 
 	tmp_fd = subtest_open(tmp_path, O_WRONLY | O_CREAT | O_SYNC | O_EXCL, S_IRWXU);
-	TEST_ASSERT_EQUAL_INT(-1, atomic_create_and_write(obj_path, buf, BUF_LEN, false));
+	TEST_ASSERT_EQUAL_INT(-1, atomic_create_and_write(obj_path, buf, BUF_LEN, false, false));
 	TEST_ASSERT_EQUAL_INT(-1, access(obj_path, F_OK));
 	TEST_ASSERT_EQUAL_INT(0, access(tmp_path, F_OK));
 }
@@ -110,7 +110,7 @@ static void test_atomic_create_and_write_force(void)
 	subtest_try_unlink(tmp_path);
 
 	tmp_fd = subtest_open(tmp_path, O_WRONLY | O_CREAT | O_SYNC | O_EXCL, S_IRWXU);
-	TEST_ASSERT_EQUAL_INT(0, atomic_create_and_write(obj_path, buf, BUF_LEN, true));
+	TEST_ASSERT_EQUAL_INT(0, atomic_create_and_write(obj_path, buf, BUF_LEN, true, false));
 	TEST_ASSERT_EQUAL_INT(0, access(obj_path, F_OK));
 	TEST_ASSERT_EQUAL_INT(-1, access(tmp_path, F_OK));
 
@@ -124,11 +124,28 @@ static void test_atomic_create_and_write_force(void)
 	subtest_object_content();
 }
 
+static void test_atomic_create_and_write_sparse(void)
+{
+	subtest_try_unlink(tmp_path);
+
+	TEST_ASSERT_EQUAL_INT(0, atomic_create_and_write(obj_path, buf, BUF_LEN, false, true));
+	TEST_ASSERT_EQUAL_INT(0, access(obj_path, F_OK));
+	TEST_ASSERT_EQUAL_INT(-1, access(tmp_path, F_OK));
+
+	struct stat s;
+	TEST_ASSERT_EQUAL_INT(0, stat(obj_path, &s));
+	TEST_ASSERT_EQUAL(BUF_LEN, s.st_size);
+	TEST_ASSERT_EQUAL(BLOCK_SIZE, s.st_blocks * 512); /* FAIL */
+
+	subtest_object_content();
+}
+
 int main(int argc, char **argv)
 {
 	UNITY_BEGIN();
 	RUN_TEST(test_atomic_create_and_write_nonexist);
 	RUN_TEST(test_atomic_create_and_write_nonforce);
 	RUN_TEST(test_atomic_create_and_write_force);
+	RUN_TEST(test_atomic_create_and_write_sparse);
 	return UNITY_END();
 }

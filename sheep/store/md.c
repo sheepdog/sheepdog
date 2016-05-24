@@ -665,7 +665,7 @@ static int md_move_object(uint64_t oid, const char *old, const char *new)
 		goto out_close;
 	}
 
-	if (atomic_create_and_write(new, buf.buf, buf.len, false) < 0) {
+	if (atomic_create_and_write(new, buf.buf, buf.len, false, true) < 0) {
 		if (errno != EEXIST) {
 			sd_err("failed to create %s", new);
 			ret = -1;

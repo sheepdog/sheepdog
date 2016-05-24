@@ -34,7 +34,7 @@ void register_util_wq(struct work_queue *wq)
  * temporary file exists.
  */
 int atomic_create_and_write(const char *path, const char *buf, size_t len,
-			    bool force_create)
+			    bool force_create, bool sparse)
 {
 	int fd, ret;
 	char tmp_path[PATH_MAX];
