@@ -23,7 +23,7 @@ int rmdir_r(const char *dir_path);
 int purge_directory(const char *dir_path);
 int purge_directory_async(const char *dir_path);
 int atomic_create_and_write(const char *path, const char *buf, size_t len,
-                            bool force_create);
+                            bool force_create, bool sparse);
 int install_sighandler(int signum, void (*handler)(int, siginfo_t *, void *),
                        bool once);
 int install_crash_handler(void (*handler)(int, siginfo_t *, void *));
