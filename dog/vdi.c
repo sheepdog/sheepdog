@@ -914,16 +914,6 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 		goto out;
 	}
 
-	sd_init_req(&hdr, SD_OP_DELETE_CACHE);
-	hdr.obj.oid = vid_to_vdi_oid(vid);
-
-	ret = send_light_req(&sd_nid, &hdr);
-	if (ret) {
-		sd_err("failed to execute request");
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
 	ret = dog_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode),
 			      0, false);
 	if (ret) {
@@ -2583,43 +2573,6 @@ out:
 	return ret;
 }
 
-static int vdi_cache_delete(int argc, char **argv)
-{
-	const char *vdiname;
-	struct sd_req hdr;
-	uint32_t vid;
-	int ret = EXIT_SUCCESS;
-
-	if (optind < argc)
-		vdiname = argv[optind++];
-	else {
-		sd_err("please specify VDI name");
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	ret = find_vdi_name(vdiname, vdi_cmd_data.snapshot_id,
-			    vdi_cmd_data.snapshot_tag, &vid);
-	if (ret != SD_RES_SUCCESS) {
-		sd_err("Failed to open VDI %s (snapshot id: %d snapshot tag: %s)"
-				": %s", vdiname, vdi_cmd_data.snapshot_id,
-				vdi_cmd_data.snapshot_tag, sd_strerror(ret));
-		ret = EXIT_FAILURE;
-		goto out;
-	}
-
-	sd_init_req(&hdr, SD_OP_DELETE_CACHE);
-	hdr.obj.oid = vid_to_vdi_oid(vid);
-
-	ret = send_light_req(&sd_nid, &hdr);
-	if (ret) {
-		sd_err("failed to execute request");
-		return EXIT_FAILURE;
-	}
-out:
-	return ret;
-}
-
 static int vdi_object_dump_inode(int argc, char **argv)
 {
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
@@ -2701,8 +2654,6 @@ static int vdi_object(int argc, char **argv)
 static struct subcommand vdi_cache_cmd[] = {
 	{"flush", NULL, NULL, "flush the cache of the vdi specified.",
 	 NULL, CMD_NEED_ARG, vdi_cache_flush},
-	{"delete", NULL, NULL, "delete the cache of the vdi specified in all nodes.",
-	 NULL, CMD_NEED_ARG, vdi_cache_delete},
 	{NULL,},
 };
 

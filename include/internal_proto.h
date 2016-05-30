@@ -85,7 +85,7 @@
 #define SD_OP_FLUSH_NODES 0xAD
 #define SD_OP_FLUSH_PEER 0xAE
 #define SD_OP_NOTIFY_VDI_ADD  0xAF
-#define SD_OP_DELETE_CACHE    0xB0
+#define SD_OP_DELETE_CACHE    0xB0 /* obsolete */
 #define SD_OP_MD_INFO   0xB1
 #define SD_OP_MD_PLUG   0xB2
 #define SD_OP_MD_UNPLUG 0xB3
