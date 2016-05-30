@@ -2613,16 +2613,6 @@ static int vdi_object(int argc, char **argv)
 	return do_generic_subcommand(vdi_object_cmd, argc, argv);
 }
 
-
-static struct subcommand vdi_cache_cmd[] = {
-	{NULL,},
-};
-
-static int vdi_cache(int argc, char **argv)
-{
-	return do_generic_subcommand(vdi_cache_cmd, argc, argv);
-}
-
 static void construct_vdi_tree(uint32_t vid, const char *name, const char *tag,
 			       uint32_t snapid, uint32_t flags,
 			       const struct sd_inode *i, void *data)
@@ -2921,10 +2911,6 @@ static struct subcommand vdi_cmd[] = {
 	 "restore snapshot images from a backup provided in STDIN",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_restore, vdi_options},
-	{"cache", "<vdiname>", "saphT",
-	 "Run 'dog vdi cache' for more information",
-	 vdi_cache_cmd, CMD_NEED_ROOT|CMD_NEED_ARG,
-	 vdi_cache, vdi_options},
 	{"alter-copy", "<vdiname>", "caphTf", "set the vdi's redundancy level",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG|CMD_NEED_NODELIST, vdi_alter_copy, vdi_options},
 	{"lock", NULL, "aphT", "See 'dog vdi lock' for more information",
