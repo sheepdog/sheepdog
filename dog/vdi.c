@@ -2575,7 +2575,7 @@ static int vdi_object_dump_inode(int argc, char **argv)
 		if (!inode->data_vdi_id[i])
 			continue;
 
-		printf("%d: %"PRIu32"\n", i, inode->data_vdi_id[i]);
+		printf("%d: %"PRIx32"\n", i, inode->data_vdi_id[i]);
 	}
 
 	printf("gref:\n");
