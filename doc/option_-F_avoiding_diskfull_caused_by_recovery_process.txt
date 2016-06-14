@@ -1,0 +1,133 @@
+Option: -F avoiding diskfull caused by recovery process
+
+1. Introduction
+Sheep can corrupt its cluster by diskfull with recovery process. 
+For avoiding this problem, this patch adds a new option -F to sheep.
+If this command is passed to the sheep process, every sheep process of the cluster stops itself when there is a possibility of diskfull during recovery.
+
+[Pull Request] sheep: avoid diskfull caused by recovery process #185 
+https://github.com/sheepdog/sheepdog/pull/185
+
+Commit:8c888c0d5f3573e56a289627f93892a1e80fe6c3
+Commited on 27 Apr 2016.
+
+2. Description
+This option is executed before starting recovery process when nodes are inserted or ejected.
+In each node, to decide to execute recovery process, entire space of the node and required space after recovery process are compared. 
+If [entire space of the node] >= [required space after recovery process], recovery process will be excuted.
+However, if [entire space of the node] < [required space after recovery process], recovery process will NOT be excuted to avoid diskfull.
+
+When recovery process is not excuted with this option, some logs are outputed as below.
+If operators find these logs, new nodes should be inserted ASAP to recover low redundancy.
+
+*Example of logs when recovery process is not excuted with this option
+May 18 15:16:24  EMERG [rw 6430] check_diskfull_possibility(1247) node IPv4 ip:10.36.4.8 port:7000 will cause disk full, stopping whole cluster
+May 18 15:16:24  DEBUG [rw 6430] check_diskfull_possibility(1254) node IPv4 ip:10.36.4.8 port:7000 (space: 1029439488) can store required space during next recovery (1266679808)
+May 18 15:16:24  EMERG [rw 6430] check_diskfull_possibility(1247) node IPv4 ip:10.36.4.8 port:7001 will cause disk full, stopping whole cluster
+May 18 15:16:24  DEBUG [rw 6430] check_diskfull_possibility(1254) node IPv4 ip:10.36.4.8 port:7001 (space: 1029439488) can store required space during next recovery (1266679808)
+May 18 15:16:24  EMERG [rw 6430] prepare_object_list(1291) canceling recovery because of disk full
+
+Here are 2 considerations.
+
+i) ONLY "data object files" are targets for calculating the required space after recovery process.
+There are some types of "object file", e.g. "data object file", "i-node object file".
+That's because, normally, other object files are much smaller than "data object files" and they can be ignored.
+
+ii) The object files in ".stale" directory may cause diskfull even though this option decides that it's possible to execute recovery process.
+When recovery process runs, in each node, a list of the object files, that are targets for recovery, is made and recovery process will be done in order of that list.
+At first, these object files move from "obj" directory to ".stale" directory.
+Then, the object files, that will remain after recovery process, move back to "obj" directory.
+The other object files, that will move to other node, still remain in ".stale" directory and will be copied to other node.
+Finally, when recovery process is done in all nodes, the files in ".stale" directory will be deleted in each node.
+These object files in ".stale" directory are not included in the required space after recovery process. 
+That's why the object files in ".stale" directory may cause diskfull.
+
+Due to these 2 matters, e.g. a huge amount of i-node object files, many data object files in ".stale" directory, disk full may occur even though this option decides to run recovery process.
+
+3. Usage
+Give option: -F when a cluster is formated.
+
+e.g. $ dog cluster format --copies=3 -F
+
+This option is still active after the cluster is shut down and then reboots.
+
+4. Attention
+As previously noticed in the section 2, disk full may occur even though this option is valid.
+That's because the calculation of the required space is simplified.
+This simplified calculation doesn't cover whole cases on which recovery process is required.
+Here are the 2 typical cases, that cause disk full.
+
+i) There is a huge amount of the object files except for the data object files, e.g. i-node object files, in one node.
+
+ii) There are many data object files in ".stale" directory in one node.
+
+5. Operation
+Here lists the 3 typical oprateion case with this option: -F valid.
+
+Case 1: Recovery process doesn't run with the decision of NOT enough sapce to recovery by this option.
+ [Possible situation] 
+ One node is removed as in node failure with a high usage rate in the whole cluseter.
+ 
+ *Example of a high usage in the whole cluseter
+  # dog node info
+  Id	Size	Used	Avail	Use%
+   0	982 MB	848 MB	134 MB	 86%
+   1	982 MB	728 MB	254 MB	 74%
+   2	982 MB	840 MB	142 MB	 85%
+  Total	2.9 GB	2.4 GB	529 MB	 82%
+  
+  Total virtual image size	1.4 GB
+  
+ [Detection]
+ Detect node's removal as usual.
+ Then, chceck a log message of sheep.log in a non-removal node as below and we will detect this situation.
+ 
+ *Example of a log message
+ EMERG [rw 6430] prepare_object_list(1291) canceling recovery because of disk full
+ 
+ [Coping]
+ Add a node having the same or more space than the removal node's space.
+ To avoid rebalancing between non-failure nodes, it's recommended that a node having same space as the removed node's space is added.
+ 
+Case 2: Recovery process runs and succeeds with the decision of enough sapce to recovery by this option.
+ [Possible situation]
+ One node is removed as in node failure with a non-high usage rate in the whole cluseter.
+ 
+ [Detection]
+ Detect node's removal as usual.
+ Then, chceck a log message of sheep.log in a non-removal node as below and we will detect this situation.
+ 
+ *Example of a log message
+ DEBUG [main] finish_recovery(857) recovery complete: new epoch 3
+ 
+ [Coping]
+ Add a node having the same or more space than the removed node's space.
+ To avoid rebalancing between non-failure nodes, it's recommended that a node having same space as the removed node's space is added.
+ 
+Case 3: Recovery process runs and fails with with the decision of enough sapce to recovery by this option.
+ [Possible situation]
+ One node is removed as in node failure with not a high usage rate for data object files but a high usage rate for other files in the whole cluseter.
+ *See the section 4.
+ 
+ [Detection]
+ Detect node's removal as usual.
+ Then, chceck a log message of sheep.log in a non-removal node as below and we will detect this situation.
+ 
+ *Example of a log message
+ DEBUG [rw 21090] check_diskfull_possibility(1254) node IPv4 ip:10.36.4.8 port:7001 (space: 95850496) can store required space during next recovery (54525952)
+ ~~~
+ ERROR [rw 2200] default_create_and_write(345) failed to open /mnt/sheepdisk1/obj/80310ba500000000.tmp: No space left on device
+ 
+ [Coping]
+ Add a node having the same or more space than the removed node's space.
+ To avoid rebalancing between non-failure nodes, it's recommended that a node having same space as the removed node's space is added.
+ 
+ [To avoid this case 3]
+ -Against situation i) in the section 4:
+   We, operators, have to keep checking node's(disk's) usage rate for all files, e.g. data object files, i-node object files, files not related to sheepdog.
+ 
+ -Against situation ii) in the section 4:
+   If value of v-node in each node changes after recovery process, it may occur that many objcet data files move from "obj" directory to ".stale" directory. 
+   Files in ".stale" directory are not targets for calculating the required space after recovery process. 
+   In this situation, it has possibilities that the sum of the object files in the "obj" and ".stalce" directory exceeds the entire node's space. 
+   With the option: "fixed v-node", that stops rebalancing between non-failure nodes, it could be possible to avoid this situation.
