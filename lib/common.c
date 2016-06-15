@@ -23,6 +23,13 @@
 #include "work.h"
 #include "common.h"
 
+#ifndef FALLOC_FL_KEEP_SIZE
+#define FALLOC_FL_KEEP_SIZE 0x01
+#endif
+#ifndef FALLOC_FL_PUNCH_HOLE
+#define FALLOC_FL_PUNCH_HOLE 0x02
+#endif
+
 static struct work_queue *util_wqueue;
 
 void register_util_wq(struct work_queue *wq)
