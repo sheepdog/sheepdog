@@ -4,6 +4,8 @@
 
 . ./common
 
+_notrun "Skipped this test. Because of the known bug https://github.com/sheepdog/sheepdog/issues/103"
+
 _start_sheep 0 -g
 _start_sheep 1 -g
 _wait_for_sheep 2
