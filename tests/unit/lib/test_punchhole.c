@@ -4,6 +4,7 @@
 #include <fcntl.h>	/* O_* flags */
 #include <unity.h>
 #include <cmock.h>
+#include <linux/falloc.h>
 
 #include "util.h"
 #include "Mocklogger.h"
