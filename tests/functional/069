@@ -40,10 +40,9 @@ _start_sheep 0
 _wait_for_sheep 1
 _start_sheep 2
 _wait_for_sheep_stop 2
-_wait_for_sheep 1
+sleep 2
 _start_sheep 1
-_wait_for_sheep 2
+sleep 2
+_cluster_format -p 7001
 
-for i in 0 1; do
-    $DOG cluster info -p 700$i | _filter_cluster_info
-done
+$DOG cluster info -p 7001 | _filter_cluster_info
