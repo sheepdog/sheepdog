@@ -59,13 +59,14 @@ The cluster's redundancy level is already set to 3, nothing changed.
 
 $ ../../dog/dog cluster alter-copy -c 4:2
 Changing redundancy level of erasure coded vdi is not supported yet.
-Usage: dog cluster alter-copy [-a address] [-p port] [-h] [-T] [-c copies]
+Usage: dog cluster alter-copy [-a address] [-p port] [-h] [-T] [-c copies] [-f]
 Options:
   -a, --address           specify the daemon address (default: localhost)
   -p, --port              specify the daemon port
   -h, --help              display this help and exit
   -T, --time              show elapsed time
   -c, --copies            specify the default data redundancy (number of copies)
+  -f, --force             do not prompt for confirmation
 
 -----
 
@@ -133,13 +134,14 @@ test's redundancy level is already set to 2, nothing changed.
 
 $ ../../dog/dog vdi alter-copy test -c 4:2
 Changing redundancy level of erasure coded vdi is not supported yet.
-Usage: dog vdi alter-copy [-c copies] [-a address] [-p port] [-h] [-T] <vdiname>
+Usage: dog vdi alter-copy [-c copies] [-a address] [-p port] [-h] [-T] [-f] <vdiname>
 Options:
   -c, --copies            specify the data redundancy level
   -a, --address           specify the daemon address (default: localhost)
   -p, --port              specify the daemon port
   -h, --help              display this help and exit
   -T, --time              show elapsed time
+  -f, --force             do operation forcibly
 
 -----
 
