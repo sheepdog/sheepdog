@@ -20,10 +20,6 @@ char *epoch_path;
 struct store_driver *sd_store;
 LIST_HEAD(store_drivers);
 
-#ifndef FALLOC_FL_PUNCH_HOLE
-#define FALLOC_FL_PUNCH_HOLE 0x02
-#endif
-
 #define sector_algined(x) ({ ((x) & (SECTOR_SIZE - 1)) == 0; })
 
 static inline bool iocb_is_aligned(const struct siocb *iocb)
