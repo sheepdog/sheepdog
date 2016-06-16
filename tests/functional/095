@@ -6,9 +6,9 @@
 
 # make different size of devices
 for i in `seq 0 2`; do
-	_make_device $i    $((100 * 1024 ** 2))
-	_make_device $i/d0 $((100 * 1024 ** 2))
-	_make_device $i/d1 $((100 * 1024 ** 2))
+	mkdir $STORE/$i    
+	mkdir $STORE/$i/d0 
+	mkdir $STORE/$i/d1 
 done
 
 for i in `seq 0 2`; do
@@ -26,7 +26,6 @@ _random | $DOG vdi write test
 $DOG vdi read test | md5sum > $STORE/csum.1
 
 # remove obj directory to occut EIO
-umount $STORE/0/d0
 rm -rf $STORE/0/d0
 
 $DOG vdi read test | md5sum > $STORE/csum.2
