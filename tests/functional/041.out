@@ -13,7 +13,7 @@ d210baf5c55b42b5e0edf04a8535ad6d  -
 s test         1   12 MB  4.0 MB  0.0 MB DATE   7c2b25      6         snap1  22
 s test         2   12 MB  4.0 MB  4.0 MB DATE   7c2b26      6         snap2  22
 s test         3   12 MB  4.0 MB  4.0 MB DATE   7c2b27      6         snap3  22
-s test         4   12 MB  0.0 MB  4.0 MB DATE   7c2b29      6                22
+s test         4   12 MB  4.0 MB  4.0 MB DATE   7c2b29      6                22
   test         0   12 MB  0.0 MB  8.0 MB DATE   7c2b2a      6                22
 test---[DATE]-+-[DATE]---[DATE]---(you are here)
                           `-[DATE]
@@ -21,8 +21,8 @@ test---[DATE]-+-[DATE]---[DATE]---(you are here)
 s test         1   12 MB  4.0 MB  0.0 MB DATE   7c2b25      6         snap1  22
 s test         2   12 MB  4.0 MB  4.0 MB DATE   7c2b26      6         snap2  22
 s test         3   12 MB  4.0 MB  4.0 MB DATE   7c2b27      6         snap3  22
-s test         4   12 MB  0.0 MB  4.0 MB DATE   7c2b29      6                22
-s test         5   12 MB  0.0 MB  4.0 MB DATE   7c2b2b      6                22
+s test         4   12 MB  4.0 MB  4.0 MB DATE   7c2b29      6                22
+s test         5   12 MB  4.0 MB  4.0 MB DATE   7c2b2b      6                22
   test         0   12 MB  0.0 MB  8.0 MB DATE   7c2b2c      6                22
 test---[DATE]-+-[DATE]---[DATE]---(you are here)
                           `-[DATE]---[DATE]
@@ -30,9 +30,9 @@ test---[DATE]-+-[DATE]---[DATE]---(you are here)
 s test         1   12 MB  4.0 MB  0.0 MB DATE   7c2b25      6         snap1  22
 s test         2   12 MB  4.0 MB  4.0 MB DATE   7c2b26      6         snap2  22
 s test         3   12 MB  4.0 MB  4.0 MB DATE   7c2b27      6         snap3  22
-s test         4   12 MB  0.0 MB  4.0 MB DATE   7c2b29      6                22
-s test         5   12 MB  0.0 MB  4.0 MB DATE   7c2b2b      6                22
-s test         6   12 MB  0.0 MB  4.0 MB DATE   7c2b2d      6                22
+s test         4   12 MB  4.0 MB  4.0 MB DATE   7c2b29      6                22
+s test         5   12 MB  4.0 MB  4.0 MB DATE   7c2b2b      6                22
+s test         6   12 MB  8.0 MB  0.0 MB DATE   7c2b2d      6                22
   test         0   12 MB  0.0 MB  8.0 MB DATE   7c2b2e      6                22
 test---[DATE]-+-[DATE]---[DATE]---(you are here)
                           |-[DATE]---[DATE]
@@ -41,10 +41,10 @@ test---[DATE]-+-[DATE]---[DATE]---(you are here)
 s test         1   12 MB  4.0 MB  0.0 MB DATE   7c2b25      6         snap1  22
 s test         2   12 MB  4.0 MB  4.0 MB DATE   7c2b26      6         snap2  22
 s test         3   12 MB  4.0 MB  4.0 MB DATE   7c2b27      6         snap3  22
-s test         4   12 MB  0.0 MB  4.0 MB DATE   7c2b29      6                22
-s test         5   12 MB  0.0 MB  4.0 MB DATE   7c2b2b      6                22
-s test         6   12 MB  0.0 MB  4.0 MB DATE   7c2b2d      6                22
-s test         7   12 MB  0.0 MB  8.0 MB DATE   7c2b2f      6                22
+s test         4   12 MB  4.0 MB  4.0 MB DATE   7c2b29      6                22
+s test         5   12 MB  4.0 MB  4.0 MB DATE   7c2b2b      6                22
+s test         6   12 MB  8.0 MB  0.0 MB DATE   7c2b2d      6                22
+s test         7   12 MB  4.0 MB  4.0 MB DATE   7c2b2f      6                22
   test         0   12 MB  0.0 MB  8.0 MB DATE   7c2b30      6                22
 test---[DATE]-+-[DATE]-+-[DATE]---(you are here)
                           |                    `-[DATE]
