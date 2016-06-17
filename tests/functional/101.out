@@ -27,4 +27,4 @@ Format failed: Targeted backend store is not found
 (/_)_|_  Are you sure you want to continue? [yes/no]: using backend dummy store
 Available stores:
 ---------------------------------------
-plain tree
+tree plain
