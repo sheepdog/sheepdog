@@ -13,19 +13,19 @@ def MakeZeroFile(nbSize):
 
 def MakeXFS(path):
     args = ["mkfs.xfs", "-ssize=4096", "-f", path]
-    subprocess.check_call(args)
+    subprocess.check_output(args)
     return True
 
 
 def MountLoopbackXFS(path, mnt):
     args = ["sudo", "mount", "-oloop,noatime", "-t", "xfs", path, mnt]
-    subprocess.check_call(args)
+    subprocess.check_output(args)
     return True
 
 
 def UnmountFS(mnt):
     args = ["sudo", "umount", mnt]
-    subprocess.check_call(args)
+    subprocess.check_output(args)
     return True
 
 
@@ -85,13 +85,13 @@ def StartSheep(disks, port=None, zone=None, cluster=None):
         cmd.append("--cluster")
         cmd.append(cluster)
     cmd.append(disksArg)
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
 def KillLocalNode(port):
     cmd = ["dog", "node", "kill", "--local", "--port", str(port)]
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
@@ -102,7 +102,7 @@ def ForceFormatCluster(copies, port=None):
         cmd.append(str(port))
     cmd.append("--copies")
     cmd.append(str(copies))
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
@@ -111,7 +111,7 @@ def ShutdownCluster(port=None):
     if port is not None:
         cmd.append("--port")
         cmd.append(str(port))
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
@@ -124,7 +124,7 @@ def CreateVDI(name, nb_size=4194304, prealloc=False, port=None):
         cmd.append("--prealloc")
     cmd.append(name)
     cmd.append(str(nb_size))
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
@@ -137,7 +137,7 @@ def DeleteVDI(name, tag=None, port=None):
         cmd.append("--snapshot")
         cmd.append(tag)
     cmd.append(name)
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
@@ -206,7 +206,7 @@ def SnapshotVDI(name, tag, port=None):
     cmd.append("--snapshot")
     cmd.append(tag)
     cmd.append(name)
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
 
 
@@ -219,5 +219,5 @@ def CloneVDI(src, tag, dst, port=None):
     cmd.append(tag)
     cmd.append(src)
     cmd.append(dst)
-    subprocess.check_call(cmd)
+    subprocess.check_output(cmd)
     return True
