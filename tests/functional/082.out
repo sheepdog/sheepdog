@@ -3,6 +3,7 @@ using backend plain store
 dog
 sheep
 checker.c
+common.c
 config.c
 corosync.c
 data1
@@ -36,15 +37,19 @@ ops.c
 plain_store.c
 recovery.c
 request.c
+request_tp.c
 s3.c
 sheep.c
 shepherd.c
-store.c
 swift.c
 trace.c
+tree_store.c
 vdi.c
 xdr.c
+xio_client.c
+xio_server.c
 zookeeper.c
+benchmark.c
 cluster.c
 common.c
 dog.c
@@ -58,13 +63,14 @@ snap.c
 trace.c
 treeview.c
 trunk.c
+upgrade.c
 vdi.c
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  sd/dog       0   16 PB   56 MB  0.0 MB DATE   5a5cbf    4:2              
-  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2              
-  sd/sheep     0   16 PB  176 MB  0.0 MB DATE   8ad11e    4:2              
-  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2              
-  sd/sheep/allocator     0   16 PB  316 MB  0.0 MB DATE   fd57fc    4:2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  sd/dog       0   16 PB   64 MB  0.0 MB DATE   5a5cbf    4:2                22
+  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2                22
+  sd/sheep     0   16 PB  188 MB  0.0 MB DATE   8ad11e    4:2                22
+  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2                22
+  sd/sheep/allocator     0   16 PB  316 MB  0.0 MB DATE   fd57fc    4:2                22
 data1
 data10
 data11
@@ -77,17 +83,17 @@ data6
 data7
 data8
 data9
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  sd/dog       0   16 PB   56 MB  0.0 MB DATE   5a5cbf    4:2              
-  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2              
-  sd/sheep     0   16 PB  176 MB  0.0 MB DATE   8ad11e    4:2              
-  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2              
-  sd/sheep/allocator     0   16 PB  316 MB  0.0 MB DATE   fd57fc    4:2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  sd/dog       0   16 PB   64 MB  0.0 MB DATE   5a5cbf    4:2                22
+  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2                22
+  sd/sheep     0   16 PB  188 MB  0.0 MB DATE   8ad11e    4:2                22
+  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2                22
+  sd/sheep/allocator     0   16 PB  316 MB  0.0 MB DATE   fd57fc    4:2                22
 dog
 sheep
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag
-  sd/dog       0   16 PB   56 MB  0.0 MB DATE   5a5cbf    4:2              
-  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2              
-  sd/sheep     0   16 PB  176 MB  0.0 MB DATE   8ad11e    4:2              
-  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2              
-  sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc    4:2              
+  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
+  sd/dog       0   16 PB   64 MB  0.0 MB DATE   5a5cbf    4:2                22
+  sd           0   16 PB  8.0 MB  0.0 MB DATE   7927f2    4:2                22
+  sd/sheep     0   16 PB  188 MB  0.0 MB DATE   8ad11e    4:2                22
+  sd/dog/allocator     0   16 PB  4.0 MB  0.0 MB DATE   936d95    4:2                22
+  sd/sheep/allocator     0   16 PB  4.0 MB  0.0 MB DATE   fd57fc    4:2                22
