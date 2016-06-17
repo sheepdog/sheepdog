@@ -188,5 +188,10 @@ _filter_node_info()
 	_filter_info
 }
 
+_filter_file()
+{
+	awk '{print $1, $2, $3, ""}'
+}
+
 # make sure this script returns success
 /bin/true

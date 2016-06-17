@@ -13,6 +13,27 @@ which $ISCSID > /dev/null || _notrun "Require iscsid but it's not installed"
 which $ISCSIADM > /dev/null || _notrun "Require iscsiadm but it's not installed"
 which $MULTIPATHD > /dev/null || _notrun "Require multipathd but it's not installed"
 which $SCSI_ID > /dev/null || _notrun "Require scsi_id but it's not installed"
+which $SYSTEMCTL > /dev/null || _notrun "Require systemctl but it's not installed"
+
+OS_RELEASE="/etc/os-release"
+DISTRIBUTION=""
+MULTIPASS_SERVICE=""
+if [ -s ${OS_RELEASE} -a -r ${OS_RELEASE} ]; then
+    DISTRIBUTION=`grep '^NAME' ${OS_RELEASE} | awk -F\" '{print $2}'`
+    case ${DISTRIBUTION} in
+        "Ubuntu")
+            MULTIPATH_SERVICE="multipath-tools"
+            ;;
+        "CentOS Linux")
+            MULTIPATH_SERVICE="multipathd"
+            ;;
+        *)
+            _notrun "Distribution name not found in ${OS_RELEASE}"
+            ;;
+    esac
+else
+    _notrun "${OS_RELEASE} is not found"
+fi
 
 $ISCSIADM -m node --logout &> /dev/null
 pkill -9 $ISCSID > /dev/null
@@ -25,14 +46,14 @@ ORIG_DEVFILES=097_orig_devfiles
 LOGIN_DEVFILES=097_login_devfiles
 DIFF_DEVFILES=097_diff_devfiles
 
-/bin/ls /dev/sd* > $ORIG_DEVFILES
+/bin/ls /dev/sd* > $ORIG_DEVFILES 2>/dev/null
 
 for i in `seq 0 2`; do
       _start_sheep $i
 done
 
 _wait_for_sheep 3
-_cluster_format
+_cluster_format -l
 
 $DOG vdi create test 128M
 
@@ -94,7 +115,6 @@ multipaths {
                 wwid                    $SCSI_ID
                 alias                   sheepdog-iscsi
                 path_grouping_policy    failover
-                path_checker            readsector0
                 path_selector           "round-robin 0"
                 failback                manual
                 rr_weight               priorities
@@ -109,7 +129,7 @@ ORIG_MULTIPATH_CONF=/etc/multipath.conf
 cp $ORIG_MULTIPATH_CONF $SAVED_MULTIPATH_CONF
 cp $MULTIPATH_CONF $ORIG_MULTIPATH_CONF
 
-/etc/init.d/multipath-tools restart
+systemctl restart ${MULTIPATH_SERVICE}
 sleep 3
 
 if [ ! -b /dev/mapper/sheepdog-iscsi ]
@@ -117,7 +137,7 @@ then
     _notrun "device file doesn't exist"
 fi
 
-file /dev/mapper/sheepdog-iscsi
+file -L /dev/mapper/sheepdog-iscsi | _filter_file
 
 MNTPOINT=`pwd`/mnt
 if [ ! -d $MNTPOINT ]
