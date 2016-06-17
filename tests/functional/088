@@ -10,10 +10,12 @@ NEW_SHEEP_OPTIONS="-n -y $MY_ADDR -l level=debug"
 
 echo "1. start sheep with my address"
 SHEEP_OPTIONS=$NEW_SHEEP_OPTIONS
-_start_sheep 0
-_wait_for_sheep 1
+for i in `seq 0 2`; do
+	_start_sheep $i
+done
+_wait_for_sheep 3
 echo "----- cluster format ------"
-_cluster_format -c 1
+_cluster_format -c 3
 echo "----- cluster info -----"
 $DOG cluster info | _filter_cluster_info | _filter_ip
 echo "----- vdi create -----"
@@ -25,9 +27,13 @@ $DOG cluster shutdown
 _wait_for_sheep_stop
 
 echo "2. start sheep with default"
+for i in `seq 0 1`; do
+	_start_sheep $i
+done
+_wait_for_sheep 2
 SHEEP_OPTIONS=$ORIG_SHEEP_OPTIONS
-_start_sheep 0
-_wait_for_sheep 1
+_start_sheep 2
+_wait_for_sheep 3
 echo "----- cluster info -----"
 $DOG cluster info | _filter_cluster_info | _filter_ip
 echo "----- node info -----"
@@ -37,9 +43,12 @@ $DOG cluster shutdown
 _wait_for_sheep_stop
 
 echo "3. start sheep with my address again"
+rm -rf $STORE/2 
 SHEEP_OPTIONS=$NEW_SHEEP_OPTIONS
-_start_sheep 0
-_wait_for_sheep 1
+for i in `seq 0 2`; do
+	_start_sheep $i
+done
+_wait_for_sheep 3
 echo "----- cluster info -----"
 $DOG cluster info | _filter_cluster_info | _filter_ip
 echo "----- vdi list -----"
