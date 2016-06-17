@@ -143,6 +143,8 @@ _cleanup()
     local i
     _kill_all_dogs
     _kill_all_sheeps
+    _kill_tgtd
+    _kill_multipathd
 
     _cleanup_devices
 
@@ -375,6 +377,16 @@ _kill_sheep_force()
     fi
 
     _wait_for_sheep_stop $1
+}
+
+_kill_tgtd()
+{
+    pkill -9 ${TGTD}
+}
+
+_kill_multipathd()
+{
+    pkill -9 ${MULTIPATHD}
 }
 
 _wait_for_sheep_recovery()
