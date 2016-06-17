@@ -15,10 +15,11 @@ _need_to_be_root
 
 which nginx > /dev/null || _notrun "Require nginx but it's not running"
 pkill nginx > /dev/null
+sleep 2
 nginx -c `pwd`/nginx.conf
 
 for i in `seq 0 5`; do
-	_start_sheep $i "-r swift,port=800$i"
+	_start_sheep $i "-r swift,port=800$i,host=127.0.0.1"
 done
 
 _wait_for_sheep 6
