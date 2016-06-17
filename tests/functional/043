@@ -30,7 +30,7 @@ for i in `seq 0 10`; do
     echo $(($i + 100)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-for i in 0 1 2 3 4; do
+for i in 0 1 2 3; do
     $DOG vdi read test -p 700$i | md5sum
     $DOG cluster info -p 700$i | _filter_cluster_info
 done
@@ -42,7 +42,7 @@ for i in `seq 0 10`; do
     echo $(($i + 200)) | $DOG vdi write test $((i * 4 * 1024 * 1024)) 512
 done
 
-for i in 0 1 2 4; do
+for i in 0 1 2; do
     $DOG vdi read test -p 700$i | md5sum
     $DOG cluster info -p 700$i | _filter_cluster_info
 done
@@ -50,10 +50,10 @@ done
 # check whether sheep 4 can receive notify event
 _vdi_create test2 20M
 
-for i in 0 1 2 4; do
+for i in 0 1 2; do
     _vdi_list -p 700$i
 done
 
 # check whether we can write to a gateway after EIO
 _safe_remove $STORE/0/obj
-echo hello | $DOG vdi write test 0 512
+echo hello | $DOG vdi write -p 7001 test 0 512
