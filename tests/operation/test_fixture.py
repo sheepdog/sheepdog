@@ -88,7 +88,13 @@ class NodeAndClusterTest(unittest.TestCase):
             fixture.DestroySheepdogDisk(t[0], t[1])
 
     def _SheepExists(self):
-        return (subprocess.call(["sudo", "pgrep", "sheep"]) == 0)
+        try:
+          subprocess.check_output(["sudo", "pgrep", "sheep"])
+          return True
+        except subprocess.CalledProcessError as e:
+          if e.returncode == 1:
+            return False
+          raise
 
     def testStartAndKillNode(self):
         self.assertFalse(self._SheepExists())
@@ -103,7 +109,7 @@ class NodeAndClusterTest(unittest.TestCase):
         self.assertFalse(self._SheepExists())
 
     def testFormatAndShutdownCluster(self):
-        self.assertEquals(1, subprocess.call(["sudo", "pgrep", "sheep"]))
+        self.assertFalse(self._SheepExists())
         for i in range(3):
             t = fixture.CreateSheepdogDisk(1024**3)
             p = i + 7000
@@ -111,11 +117,11 @@ class NodeAndClusterTest(unittest.TestCase):
             self.assertTrue(fixture.StartSheep(t[1], port=p, zone=z))
             self._disks.append(t)
         time.sleep(2)
-        self.assertEquals(0, subprocess.call(["sudo", "pgrep", "sheep"]))
+        self.assertTrue(self._SheepExists())
         self.assertTrue(fixture.ForceFormatCluster(3))
         self.assertTrue(fixture.ShutdownCluster())
         time.sleep(2)
-        self.assertEquals(1, subprocess.call(["sudo", "pgrep", "sheep"]))
+        self.assertFalse(self._SheepExists())
 
 
 class VDITest(unittest.TestCase):
