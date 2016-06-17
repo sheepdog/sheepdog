@@ -1,1 +1,0 @@
-{"directory": "/home/mitake/github/sheepdog.git/tests/earthquake/tgt.git", "command": "/usr/local/bin/clang -I/home/mitake/github/sheepdog.git/tests/earthquake/tgt.git -o /home/mitake/github/sheepdog.git/tests/earthquake/tgt.git/usr/bs_sheepdog.o -c /home/mitake/github/sheepdog.git/tests/earthquake/tgt.git/usr/bs_sheepdog.c", "file": "usr/bs_sheepdog.c"}
