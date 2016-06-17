@@ -81,9 +81,8 @@ def StartSheep(disks, port=None, zone=None, cluster=None):
     if zone is not None:
         cmd.append("--zone")
         cmd.append(str(zone))
-    if cluster is not None:
-        cmd.append("--cluster")
-        cmd.append(cluster)
+    cmd.append("--cluster")
+    cmd.append(cluster or "local")
     cmd.append(disksArg)
     subprocess.check_output(cmd)
     return True
