@@ -25,6 +25,7 @@ cscope.*
 *.service
 *.log
 *.trs
+*.pyc
 
 #
 # for GLOBAL
