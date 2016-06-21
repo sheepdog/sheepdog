@@ -1,13 +1,16 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-TESTS			= test_vdi test_cluster_driver test_hash
+TESTS			= test_vdi test_cluster_driver test_hash test_group
 
 check_PROGRAMS		= ${TESTS}
 
 AM_CPPFLAGS		= -I$(top_srcdir)/include			\
 			  -I$(top_srcdir)/sheep				\
 			  -I$(top_srcdir)/sheep/store			\
+			  -I$(top_srcdir)/sheep/tracepoint		\
 			  -I../mock					\
+			  -I../mocks					\
+			  -I../cmock/src				\
 			  -I../unity/src				\
 			  @CHECK_CFLAGS@
 
@@ -31,6 +34,20 @@ endif
 
 test_hash_SOURCES	= test_hash.c mock_sheep.c mock_group.c \
 				mock_plain_store.c mock_gateway.c mock_store.c mock_vdi.c
+
+test_group_SOURCES	= test_group.c ../../../sheep/group.c \
+				../../../sheep/ops.c \
+				mock_sheep.c \
+				../../../sheep/request.c \
+				../../../sheep/store/common.c \
+				../../../sheep/store/md.c \
+				../../../sheep/vdi.c \
+				../../../sheep/config.c \
+				../../../sheep/recovery.c \
+				../../../sheep/gateway.c \
+				../../../sheep/object_list_cache.c \
+				../../../sheep/migrate.c \
+				../cmock/src/cmock.c ../unity/src/unity.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o
