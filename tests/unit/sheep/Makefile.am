@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES	= Makefile.in
 
-TESTS			= test_vdi test_cluster_driver test_hash test_group
+TESTS			= test_vdi test_cluster_driver test_hash test_group test_recovery
 
 check_PROGRAMS		= ${TESTS}
 
@@ -48,6 +48,20 @@ test_group_SOURCES	= test_group.c ../../../sheep/group.c \
 				../../../sheep/object_list_cache.c \
 				../../../sheep/migrate.c \
 				../cmock/src/cmock.c ../unity/src/unity.c
+
+test_recovery_SOURCES   = test_recovery.c ../../../sheep/recovery.c \
+                ../../../sheep/ops.c \
+                mock_sheep.c \
+                ../../../sheep/request.c \
+                ../../../sheep/store/common.c \
+                ../../../sheep/store/md.c \
+                ../../../sheep/vdi.c \
+                ../../../sheep/config.c \
+                ../../../sheep/group.c \
+                ../../../sheep/gateway.c \
+                ../../../sheep/object_list_cache.c \
+                ../../../sheep/migrate.c \
+                ../cmock/src/cmock.c ../unity/src/unity.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o
