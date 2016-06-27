@@ -388,6 +388,16 @@ class SheepdogClient(object):
         req.obj.ec_index = ec_index
         return self._call(req)
 
+    def read_peer(self, oid, size, epoch, ec_index):
+        req = Request()
+        req.opcode = proto.SD_OP_READ_PEER
+        req.proto_ver = proto.SD_SHEEP_PROTO_VER
+        req.data_length = size
+        req.obj.oid = oid
+        req.epoch = epoch
+        req.obj.ec_index = ec_index
+        return self._call(req)
+
 class SheepdogVDI(object):
 
     def __init__(self, client, inode):
