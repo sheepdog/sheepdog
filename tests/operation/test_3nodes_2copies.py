@@ -372,6 +372,30 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
         actual_remove_file = actual_remove_list[0]
         self.assertEqual(expected_remove_file, actual_remove_file)
 
+    def testCreateAndWritePeer(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+
+        p = 7000
+        client = sheep.SheepdogClient(port=p)
+
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            contentToWrite = os.urandom(NB_OBJECT)
+            response = client.create_and_write_peer(oid, contentToWrite, 1, 0)
+
+            obj_name = format(oid, 'x').zfill(16)
+            find_result = fixture.FindObjFileName(self._disks, obj_name)
+            self.assertEqual(1, len(find_result))
+
+            expected = hashlib.md5(contentToWrite).hexdigest()
+            actual = fixture.GetMd5(find_result[0])
+            self.assertEqual(expected, actual)
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(ThreeNodesTwoCopiesTest)
