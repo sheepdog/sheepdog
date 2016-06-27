@@ -335,6 +335,16 @@ class SheepdogClient(object):
         rsp = self._call(req)
         return self._parse_vids(rsp.data)
 
+    def create_and_write_obj(self, oid, data, offset):
+        req = Request()
+        req.opcode = proto.SD_OP_CREATE_AND_WRITE_OBJ
+        req.proto_ver = proto.SD_PROTO_VER
+        req.flags = proto.SD_FLAG_CMD_WRITE
+        req.obj.oid = oid
+        req.data = data
+        req.data_length = len(data)
+        req.obj.offset = offset
+        return self._call(req)
 
 class SheepdogVDI(object):
 
