@@ -315,6 +315,35 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
                 actual = fixture.GetMd5(rslt)
                 self.assertEqual(expected, actual)
 
+    def testWriteObj(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        self._assertMakeZero("alpha", NB_VDI)
+
+        p = 7000
+        oids= []
+        contentToWrite = {}
+
+        client = sheep.SheepdogClient(port=p)
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            oids.append(oid)
+            contentToWrite[oid] = os.urandom(NB_OBJECT)
+            response = client.write_obj(oid, contentToWrite[oid], 0)
+
+        for oid in oids:
+            obj_name = format(oid, 'x').zfill(16)
+            find_lists = fixture.FindObjFileName(self._disks, obj_name)
+            self.assertEqual(self._COPIES, len(find_lists))
+            expected = hashlib.md5(contentToWrite[oid]).hexdigest()
+            for rslt in find_lists:
+                actual = fixture.GetMd5(rslt)
+                self.assertEqual(expected, actual)
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(ThreeNodesTwoCopiesTest)
