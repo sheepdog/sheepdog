@@ -396,6 +396,39 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
             actual = fixture.GetMd5(find_result[0])
             self.assertEqual(expected, actual)
 
+    def testWritePeer(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        self._assertMakeZero("alpha", NB_VDI)
+
+        p = 7000
+        client = sheep.SheepdogClient(port=p)
+
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            obj_name = format(oid, 'x').zfill(16)
+            obj_full_path = self.__class__._disks[p-7000][1] + "/obj/" + obj_name
+
+            check_path_list = fixture.FindObjFileName(self.__class__._disks, obj_name)
+            self.assertEqual(self.__class__._COPIES, len(check_path_list))
+
+            for check_path in check_path_list:
+                if check_path == obj_full_path:
+                    contentToWrite = os.urandom(NB_OBJECT)
+                    response = client.write_peer(oid, contentToWrite, 1, i)
+
+                    expected = hashlib.md5(contentToWrite).hexdigest()
+                    actual = fixture.GetMd5(obj_full_path)
+                    self.assertEqual(expected, actual)
+
+                    expected = fixture.GetMd5(check_path_list[0])
+                    actual = fixture.GetMd5(check_path_list[1])
+                    self.assertNotEqual(expected, actual)
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(ThreeNodesTwoCopiesTest)
