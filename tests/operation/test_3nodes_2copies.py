@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 
+
 import fixture
 import sheep
 
@@ -43,6 +44,23 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
     def _assertUniqueName(self, name, iterable):
         return self._assertUnique(lambda x: x["name"] == name, iterable)
 
+    def _assertGetVid(self, vdi_name, vdi_size):
+        vdi_info = self._assertUniqueName(vdi_name, fixture.ListVDI())
+        self.assertEqual(vdi_size, vdi_info["nb_size"])
+        return vdi_info["vdi_id"]
+
+    def _assertMakeRandom(self, vdi_name, data_size):
+        data = os.urandom(data_size)
+        self.assertEqual(data_size, len(data))
+        self.assertTrue(fixture.WriteVDI(vdi_name, data))
+        return data
+
+    def _assertMakeZero(self, vdi_name, data_size):
+        data = ''.zfill(data_size)
+        self.assertEqual(data_size, len(data))
+        self.assertTrue(fixture.WriteVDI(vdi_name, data))
+        return data
+
     def setUp(self):
         fixture.ForceFormatCluster(self.__class__._COPIES)
 
@@ -52,14 +70,8 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
         assert NB_VDI % NB_OBJECT == 0
 
         self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
-
-        alpha = self._assertUniqueName("alpha", fixture.ListVDI())
-        self.assertEqual(NB_VDI, alpha["nb_size"])
-        a_vid = alpha["vdi_id"]
-
-        contentToWrite = os.urandom(NB_VDI)
-        self.assertEqual(NB_VDI, len(contentToWrite))
-        self.assertTrue(fixture.WriteVDI("alpha", contentToWrite))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
 
         for p in self.__class__._ports:
             client = sheep.SheepdogClient(port=p)
@@ -82,15 +94,10 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
         assert NB_OBJECT % NB_SUBOBJECT == 0
 
         self.assertTrue(fixture.CreateVDI("alpha", NB_OBJECT))
-
-        alpha = self._assertUniqueName("alpha", fixture.ListVDI())
-        self.assertEqual(NB_OBJECT, alpha["nb_size"])
-        a_vid = alpha["vdi_id"]
+        a_vid = self._assertGetVid("alpha", NB_OBJECT)
         oid = a_vid << 32
+        contentToWrite = self._assertMakeRandom("alpha", NB_OBJECT)
 
-        contentToWrite = os.urandom(NB_OBJECT)
-        self.assertEqual(NB_OBJECT, len(contentToWrite))
-        self.assertTrue(fixture.WriteVDI("alpha", contentToWrite))
 
         for p in self.__class__._ports:
             client = sheep.SheepdogClient(port=p)
@@ -265,6 +272,22 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
                 a_inode.block_size_shift)
             self.assertEqual(a_state.parent_vid, a_inode.parent_vdi_id)
 
+    def testGetObjList(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
+
+        for p in self.__class__._ports:
+            ls_objects = set(fixture.GetObjFileName(self._disks[p - 7000][1]))
+            client = sheep.SheepdogClient(port=p)
+            rsp_objects = set(client.get_obj_list(NB_VDI, 1))
+            self.assertEqual(ls_objects, rsp_objects)
+
 
 if __name__ == '__main__':
-    unittest.main()
+    suite = unittest.TestLoader().loadTestsFromTestCase(ThreeNodesTwoCopiesTest)
+    unittest.TextTestRunner(verbosity=2).run(suite)

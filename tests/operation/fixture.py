@@ -220,3 +220,29 @@ def CloneVDI(src, tag, dst, port=None):
     cmd.append(dst)
     subprocess.check_output(cmd)
     return True
+
+def GetObjFileName(directory):
+    cmd = ["ls"]
+    obj_dir = directory + "/obj"
+    cmd.append(obj_dir)
+    rslt = (subprocess.check_output(cmd)).split('\n')
+    rslt.remove('')
+    return rslt
+
+def FindObjFileName(disks, file_name):
+    cmd = ["find"]
+    for img, mnt in disks:
+        cmd.append(mnt)
+    cmd.append("-type")
+    cmd.append("f")
+    cmd.append("-name")
+    cmd.append(file_name)
+    rslt = (subprocess.check_output(cmd)).split('\n')
+    rslt.remove('')
+    return rslt
+
+def GetMd5(file_path):
+    cmd = ["md5sum", file_path]
+    rslt_list = (subprocess.check_output(cmd)).split()
+    rslt = rslt_list[0]
+    return rslt
