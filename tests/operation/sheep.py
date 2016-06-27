@@ -357,6 +357,13 @@ class SheepdogClient(object):
         req.obj.offset = offset
         return self._call(req)
 
+    def remove_obj(self, oid):
+        req = Request()
+        req.opcode = proto.SD_OP_REMOVE_OBJ
+        req.proto_ver = proto.SD_PROTO_VER
+        req.obj.oid = oid
+        return self._call(req)
+
 class SheepdogVDI(object):
 
     def __init__(self, client, inode):

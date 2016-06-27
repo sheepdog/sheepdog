@@ -344,6 +344,34 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
                 actual = fixture.GetMd5(rslt)
                 self.assertEqual(expected, actual)
 
+    def testRemoveObj(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
+
+        obj_set_before = set()
+        for (img, mnt) in self._disks:
+            obj_set_before |= set(fixture.GetObjFileName(mnt))
+        expected_remove_file = list(sorted(obj_set_before))[0]
+        remove_oid = long(expected_remove_file, 16)
+
+        obj_set_after = set()
+        for p in self.__class__._ports:
+            for result in fixture.GetObjFileName(self._disks[p - 7000][1]):
+                if result == expected_remove_file:
+                    client = sheep.SheepdogClient(port=p)
+                    self.assertTrue(client.remove_obj(remove_oid))
+            obj_set_after |= set(fixture.GetObjFileName(self._disks[p - 7000][1]))
+
+        actual_remove_list = list(obj_set_before - obj_set_after)
+        self.assertEqual(1, len(actual_remove_list))
+        actual_remove_file = actual_remove_list[0]
+        self.assertEqual(expected_remove_file, actual_remove_file)
+
 
 if __name__ == '__main__':
     suite = unittest.TestLoader().loadTestsFromTestCase(ThreeNodesTwoCopiesTest)
