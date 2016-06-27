@@ -11,3 +11,7 @@ If a new C struct is needed, add a corresponding Python class using Struct.
 
 ## To add fixtures
 Edit `fixture.py`.
+
+## How to start operation tests
+$ sudo python test_*.py
+e.g. $ sudo python test_3nodes_2copies.py

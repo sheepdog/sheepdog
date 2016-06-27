@@ -96,6 +96,10 @@ class Request(object):
         proto.SD_OP_WRITE_OBJ,
         proto.SD_OP_REMOVE_OBJ,
         proto.SD_OP_DISCARD_OBJ,
+        proto.SD_OP_CREATE_AND_WRITE_PEER,
+        proto.SD_OP_READ_PEER,
+        proto.SD_OP_WRITE_PEER,
+        proto.SD_OP_REMOVE_PEER,
     )
     VDI_OPS = (
         proto.SD_OP_NEW_VDI,
@@ -245,6 +249,16 @@ class SheepdogClient(object):
                     b = b >> 1
         return vids
 
+    def _parse_vids(self, data):
+        length = len(data) / 8
+        fmt = '<%dQ' % length
+        vids = struct.unpack(fmt, data)
+
+        def _vid_to_str(vid):
+            return '%016x' % vid
+
+        return map(_vid_to_str, vids)
+
     def _parse_vdi_state(self, data):
         assert len(data) % 1428 == 0
         nr_vdis = len(data) / 1428
@@ -312,6 +326,86 @@ class SheepdogClient(object):
     def find_vdi(self, vdiname):
         return SheepdogVDI(self, self.find_inode(vdiname))
 
+    def get_obj_list(self, data_length, epoch):
+        req = Request()
+        req.opcode = proto.SD_OP_GET_OBJ_LIST
+        req.proto_ver = proto.SD_SHEEP_PROTO_VER
+        req.data_length = data_length
+        req.epoch = epoch
+        rsp = self._call(req)
+        return self._parse_vids(rsp.data)
+
+    def create_and_write_obj(self, oid, data, offset):
+        req = Request()
+        req.opcode = proto.SD_OP_CREATE_AND_WRITE_OBJ
+        req.proto_ver = proto.SD_PROTO_VER
+        req.flags = proto.SD_FLAG_CMD_WRITE
+        req.obj.oid = oid
+        req.data = data
+        req.data_length = len(data)
+        req.obj.offset = offset
+        return self._call(req)
+
+    def write_obj(self, oid, data, offset):
+        req = Request()
+        req.opcode = proto.SD_OP_WRITE_OBJ
+        req.proto_ver = proto.SD_PROTO_VER
+        req.flags = proto.SD_FLAG_CMD_WRITE
+        req.obj.oid = oid
+        req.data = data
+        req.data_length = len(data)
+        req.obj.offset = offset
+        return self._call(req)
+
+    def remove_obj(self, oid):
+        req = Request()
+        req.opcode = proto.SD_OP_REMOVE_OBJ
+        req.proto_ver = proto.SD_PROTO_VER
+        req.obj.oid = oid
+        return self._call(req)
+
+    def create_and_write_peer(self, oid, data, epoch, ec_index):
+        req = Request()
+        req.opcode = proto.SD_OP_CREATE_AND_WRITE_PEER
+        req.proto_ver = proto.SD_SHEEP_PROTO_VER
+        req.flags = proto.SD_FLAG_CMD_WRITE
+        req.obj.oid = oid
+        req.data = data
+        req.data_length = len(data)
+        req.epoch = epoch
+        req.obj.ec_index = ec_index
+        return self._call(req)
+
+    def write_peer(self, oid, data, epoch, ec_index):
+        req = Request()
+        req.opcode = proto.SD_OP_WRITE_PEER
+        req.proto_ver = proto.SD_SHEEP_PROTO_VER
+        req.flags = proto.SD_FLAG_CMD_WRITE
+        req.obj.oid = oid
+        req.data = data
+        req.data_length = len(data)
+        req.epoch = epoch
+        req.obj.ec_index = ec_index
+        return self._call(req)
+
+    def read_peer(self, oid, size, epoch, ec_index):
+        req = Request()
+        req.opcode = proto.SD_OP_READ_PEER
+        req.proto_ver = proto.SD_SHEEP_PROTO_VER
+        req.data_length = size
+        req.obj.oid = oid
+        req.epoch = epoch
+        req.obj.ec_index = ec_index
+        return self._call(req)
+
+    def remove_peer(self, oid, epoch, ec_index):
+        req = Request()
+        req.opcode = proto.SD_OP_REMOVE_PEER
+        req.proto_ver = proto.SD_SHEEP_PROTO_VER
+        req.obj.oid = oid
+        req.epoch = epoch
+        req.obj.ec_index = ec_index
+        return self._call(req)
 
 class SheepdogVDI(object):
 

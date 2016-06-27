@@ -7,6 +7,7 @@ import subprocess
 import tempfile
 import time
 
+
 import fixture
 import sheep
 
@@ -43,6 +44,23 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
     def _assertUniqueName(self, name, iterable):
         return self._assertUnique(lambda x: x["name"] == name, iterable)
 
+    def _assertGetVid(self, vdi_name, vdi_size):
+        vdi_info = self._assertUniqueName(vdi_name, fixture.ListVDI())
+        self.assertEqual(vdi_size, vdi_info["nb_size"])
+        return vdi_info["vdi_id"]
+
+    def _assertMakeRandom(self, vdi_name, data_size):
+        data = os.urandom(data_size)
+        self.assertEqual(data_size, len(data))
+        self.assertTrue(fixture.WriteVDI(vdi_name, data))
+        return data
+
+    def _assertMakeZero(self, vdi_name, data_size):
+        data = ''.zfill(data_size)
+        self.assertEqual(data_size, len(data))
+        self.assertTrue(fixture.WriteVDI(vdi_name, data))
+        return data
+
     def setUp(self):
         fixture.ForceFormatCluster(self.__class__._COPIES)
 
@@ -52,14 +70,8 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
         assert NB_VDI % NB_OBJECT == 0
 
         self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
-
-        alpha = self._assertUniqueName("alpha", fixture.ListVDI())
-        self.assertEqual(NB_VDI, alpha["nb_size"])
-        a_vid = alpha["vdi_id"]
-
-        contentToWrite = os.urandom(NB_VDI)
-        self.assertEqual(NB_VDI, len(contentToWrite))
-        self.assertTrue(fixture.WriteVDI("alpha", contentToWrite))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
 
         for p in self.__class__._ports:
             client = sheep.SheepdogClient(port=p)
@@ -82,15 +94,10 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
         assert NB_OBJECT % NB_SUBOBJECT == 0
 
         self.assertTrue(fixture.CreateVDI("alpha", NB_OBJECT))
-
-        alpha = self._assertUniqueName("alpha", fixture.ListVDI())
-        self.assertEqual(NB_OBJECT, alpha["nb_size"])
-        a_vid = alpha["vdi_id"]
+        a_vid = self._assertGetVid("alpha", NB_OBJECT)
         oid = a_vid << 32
+        contentToWrite = self._assertMakeRandom("alpha", NB_OBJECT)
 
-        contentToWrite = os.urandom(NB_OBJECT)
-        self.assertEqual(NB_OBJECT, len(contentToWrite))
-        self.assertTrue(fixture.WriteVDI("alpha", contentToWrite))
 
         for p in self.__class__._ports:
             client = sheep.SheepdogClient(port=p)
@@ -265,6 +272,218 @@ class ThreeNodesTwoCopiesTest(unittest.TestCase):
                 a_inode.block_size_shift)
             self.assertEqual(a_state.parent_vid, a_inode.parent_vdi_id)
 
+    def testGetObjList(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
+
+        for p in self.__class__._ports:
+            ls_objects = set(fixture.GetObjFileName(self._disks[p - 7000][1]))
+            client = sheep.SheepdogClient(port=p)
+            rsp_objects = set(client.get_obj_list(NB_VDI, 1))
+            self.assertEqual(ls_objects, rsp_objects)
+
+    def testCreateAndWriteObj(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+
+        p = 7000
+        oids = []
+        contentToWrite = {}
+
+        client = sheep.SheepdogClient(port=p)
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            oids.append(oid)
+            contentToWrite[oid] = os.urandom(NB_OBJECT)
+            response = client.create_and_write_obj(oid, contentToWrite[oid], 0)
+
+        for oid in oids:
+            obj_name = format(oid, 'x').zfill(16)
+            find_lists = fixture.FindObjFileName(self._disks, obj_name)
+            self.assertEqual(self._COPIES, len(find_lists))
+            expected = hashlib.md5(contentToWrite[oid]).hexdigest()
+            for rslt in find_lists:
+                actual = fixture.GetMd5(rslt)
+                self.assertEqual(expected, actual)
+
+    def testWriteObj(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        self._assertMakeZero("alpha", NB_VDI)
+
+        p = 7000
+        oids= []
+        contentToWrite = {}
+
+        client = sheep.SheepdogClient(port=p)
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            oids.append(oid)
+            contentToWrite[oid] = os.urandom(NB_OBJECT)
+            response = client.write_obj(oid, contentToWrite[oid], 0)
+
+        for oid in oids:
+            obj_name = format(oid, 'x').zfill(16)
+            find_lists = fixture.FindObjFileName(self._disks, obj_name)
+            self.assertEqual(self._COPIES, len(find_lists))
+            expected = hashlib.md5(contentToWrite[oid]).hexdigest()
+            for rslt in find_lists:
+                actual = fixture.GetMd5(rslt)
+                self.assertEqual(expected, actual)
+
+    def testRemoveObj(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
+
+        obj_set_before = set()
+        for (img, mnt) in self._disks:
+            obj_set_before |= set(fixture.GetObjFileName(mnt))
+        expected_remove_file = list(sorted(obj_set_before))[0]
+        remove_oid = long(expected_remove_file, 16)
+
+        obj_set_after = set()
+        for p in self.__class__._ports:
+            for result in fixture.GetObjFileName(self._disks[p - 7000][1]):
+                if result == expected_remove_file:
+                    client = sheep.SheepdogClient(port=p)
+                    self.assertTrue(client.remove_obj(remove_oid))
+            obj_set_after |= set(fixture.GetObjFileName(self._disks[p - 7000][1]))
+
+        actual_remove_list = list(obj_set_before - obj_set_after)
+        self.assertEqual(1, len(actual_remove_list))
+        actual_remove_file = actual_remove_list[0]
+        self.assertEqual(expected_remove_file, actual_remove_file)
+
+    def testCreateAndWritePeer(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+
+        p = 7000
+        client = sheep.SheepdogClient(port=p)
+
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            contentToWrite = os.urandom(NB_OBJECT)
+            response = client.create_and_write_peer(oid, contentToWrite, 1, 0)
+
+            obj_name = format(oid, 'x').zfill(16)
+            find_result = fixture.FindObjFileName(self._disks, obj_name)
+            self.assertEqual(1, len(find_result))
+
+            expected = hashlib.md5(contentToWrite).hexdigest()
+            actual = fixture.GetMd5(find_result[0])
+            self.assertEqual(expected, actual)
+
+    def testWritePeer(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        self._assertMakeZero("alpha", NB_VDI)
+
+        p = 7000
+        client = sheep.SheepdogClient(port=p)
+
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            obj_name = format(oid, 'x').zfill(16)
+            obj_full_path = self.__class__._disks[p-7000][1] + "/obj/" + obj_name
+
+            check_path_list = fixture.FindObjFileName(self.__class__._disks, obj_name)
+            self.assertEqual(self.__class__._COPIES, len(check_path_list))
+
+            for check_path in check_path_list:
+                if check_path == obj_full_path:
+                    contentToWrite = os.urandom(NB_OBJECT)
+                    response = client.write_peer(oid, contentToWrite, 1, i)
+
+                    expected = hashlib.md5(contentToWrite).hexdigest()
+                    actual = fixture.GetMd5(obj_full_path)
+                    self.assertEqual(expected, actual)
+
+                    expected = fixture.GetMd5(check_path_list[0])
+                    actual = fixture.GetMd5(check_path_list[1])
+                    self.assertNotEqual(expected, actual)
+
+    def testReadPeer(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
+
+        p = 7000
+        client = sheep.SheepdogClient(port=p)
+
+        for i in range(NB_VDI / NB_OBJECT):
+            oid = (a_vid << 32) | i
+            obj_name = format(oid, 'x').zfill(16)
+            obj_full_path = self.__class__._disks[p-7000][1] + "/obj/" + obj_name
+
+            check_path_list = fixture.FindObjFileName(self.__class__._disks, obj_name)
+            self.assertEqual(self.__class__._COPIES, len(check_path_list))
+
+            for check_path in check_path_list:
+                if check_path == obj_full_path:
+                    response = client.read_peer(oid, NB_OBJECT, 1, 0)
+                    actual = hashlib.md5(response.data).hexdigest()
+                    expected = fixture.GetMd5(obj_full_path)
+
+    def testRemovePeer(self):
+        NB_OBJECT = 1 << 22
+        NB_VDI = NB_OBJECT * 4
+        assert NB_VDI % NB_OBJECT == 0
+
+        self.assertTrue(fixture.CreateVDI("alpha", NB_VDI))
+        a_vid = self._assertGetVid("alpha", NB_VDI)
+        contentToWrite = self._assertMakeRandom("alpha", NB_VDI)
+
+        obj_set_before = set()
+        for (img, mnt) in self._disks:
+            obj_set_before |= set(fixture.GetObjFileName(mnt))
+        expected_remove_file = list(sorted(obj_set_before))[0]
+        remove_oid = long(expected_remove_file, 16)
+
+        obj_set_after = set()
+        for p in self.__class__._ports:
+            for result in fixture.GetObjFileName(self._disks[p - 7000][1]):
+                if result == expected_remove_file:
+                    client = sheep.SheepdogClient(port=p)
+                    self.assertTrue(client.remove_peer(remove_oid, 1, 0))
+            obj_set_after |= set(fixture.GetObjFileName(self._disks[p - 7000][1]))
+
+        actual_remove_list = list(obj_set_before - obj_set_after)
+        self.assertEqual(1, len(actual_remove_list))
+        actual_remove_file = actual_remove_list[0]
+        self.assertEqual(expected_remove_file, actual_remove_file)
+
 
 if __name__ == '__main__':
-    unittest.main()
+    suite = unittest.TestLoader().loadTestsFromTestCase(ThreeNodesTwoCopiesTest)
+    unittest.TextTestRunner(verbosity=2).run(suite)
