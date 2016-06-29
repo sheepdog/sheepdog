@@ -39,9 +39,9 @@ int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
 		flags &= ~syncflag;
 
-	if (sys->backend_dio && iocb_is_aligned(iocb)) {
+	if (sys->backend_dio && is_data_obj(oid) && iocb_is_aligned(iocb)) {
 		if (!is_aligned_to_pagesize(iocb->buf))
-			panic("Memory isn't aligned to pagesize %p", iocb->buf);
+			panic("Memory isn't aligned to pagesize %p, oid: %"PRIx64, iocb->buf, oid);
 		flags |= O_DIRECT;
 	}
 
