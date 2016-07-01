@@ -173,6 +173,7 @@ struct system_info {
 	struct work_queue *oc_push_wqueue;
 	struct work_queue *md_wqueue;
 	struct work_queue *areq_wqueue;
+	struct work_queue *bitmap_collection_wqueue;
 #ifdef HAVE_HTTP
 	struct work_queue *http_wqueue;
 #endif
@@ -632,5 +633,7 @@ void free_request(struct request *req);
 #ifdef HAVE_ACCELIO
 void xio_send_reply(struct client_info *ci);
 #endif
+
+#define BITMAP_COLLECTION_WORKERS 32
 
 #endif
