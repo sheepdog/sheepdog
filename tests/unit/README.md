@@ -11,4 +11,4 @@ To run unit tests:
 When configuring sheepdog in "sheepdog" directory, put --enabel-unittest option.
   e.g. ./configure --enable-unittest 
 
-Then type "make check""
+Then type "make check"
