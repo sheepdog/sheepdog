@@ -13,11 +13,6 @@ prepare() {
 }
 
 build_sheepdog(){
-  cd ~
-  if [ ! -d sheepdog ] ; then
-    git clone https://github.com/matsu777/sheepdog.git
-  fi
-  cd ./sheepdog
   ./autogen.sh
   ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
   make
@@ -25,26 +20,20 @@ build_sheepdog(){
 }
 
 get_submodule(){
-  cd ~
-  cd ./sheepdog/tests/unit
-  git submodule update -f --init unity
-  git submodule update -f --init cmock
+  git submodule update -f --init ./tests/unity
+  git submodule update -f --init ./tests/unit/cmock
 }
 
 exec_functional() {
-  cd ~
-  sudo ./sheepdog/tests/functional/check
+  sudo ./tests/functional/check
 }
 
 exec_operation() {
-  cd ~
-  sudo python ./sheepdog/tests/operation/test_3nodes_2copies.py
+  sudo python ./tests/operation/test_3nodes_2copies.py
 }
 
 exec_unit() {
   ulimit -s $ULIMIT_SIZE
-  cd ~
-  cd ./sheepdog/tests/unit
   make check
 }
 
