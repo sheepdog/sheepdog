@@ -645,7 +645,6 @@ static inline void prepare_schedule_oid(uint64_t oid)
 {
 	struct recovery_info *rinfo = main_thread_get(current_rinfo);
 
-	struct recovery_work *rw;
 	struct recovery_obj_work *row;
 
 	if (xlfind(&oid, rinfo->prio_oids, rinfo->nr_prio_oids, oid_cmp)) {
