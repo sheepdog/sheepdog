@@ -153,6 +153,7 @@ static struct sd_option sheep_options[] = {
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'V', "vnodes", true, "set number of vnodes", vnodes_help},
+	{'w', "wq-threads", true, "specify a number of threads for workqueue"},
 	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
@@ -345,6 +346,48 @@ static struct option_parser log_parsers[] = {
 	{ NULL, NULL },
 };
 
+static int wq_net_threads;
+static int wq_net_parser(const char *s)
+{
+	wq_net_threads = atoi(s);
+	return 0;
+}
+
+static int wq_gway_threads;
+static int wq_gway_parser(const char *s)
+{
+	wq_gway_threads = atoi(s);
+	return 0;
+}
+
+static int wq_io_threads;
+static int wq_io_parser(const char *s)
+{
+	wq_io_threads = atoi(s);
+	return 0;
+}
+
+static int wq_recovery_threads;
+static int wq_recovery_parser(const char *s)
+{
+	wq_recovery_threads = atoi(s);
+	return 0;
+}
+
+static int wq_async_threads;
+static int wq_async_parser(const char *s)
+{
+	wq_async_threads = atoi(s);
+	return 0;
+}
+
+static struct option_parser wq_parsers[] = {
+	{ "net=", wq_net_parser },
+	{ "gway=", wq_gway_parser },
+	{ "io=", wq_io_parser },
+	{ "recovery=", wq_recovery_parser },
+	{ "async=", wq_async_parser },
+};
 
 static const char *io_addr, *io_pt;
 static int ionic_host_parser(const char *s)
@@ -453,14 +496,44 @@ static int create_work_queues(void)
 	if (init_work_queue(get_nr_nodes))
 		return -1;
 
-	sys->net_wqueue = create_work_queue("net", WQ_UNLIMITED);
-	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
-	sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
-	sys->recovery_wqueue = create_work_queue("rw", WQ_UNLIMITED);
+	if (wq_net_threads) {
+		sd_info("# of threads in net workqueue: %d", wq_net_threads);
+		sys->net_wqueue = create_fixed_work_queue("net", wq_net_threads);
+	} else {
+		sd_info("net workqueue is created as unlimited, it is not recommended!");
+		sys->net_wqueue = create_work_queue("net", WQ_UNLIMITED);
+	}
+	if (wq_gway_threads) {
+		sd_info("# of threads in gway workqueue: %d", wq_gway_threads);
+		sys->gateway_wqueue = create_fixed_work_queue("gway", wq_gway_threads);
+	} else {
+		sd_info("gway workqueue is created as unlimited, it is not recommended!");
+		sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
+	}
+	if (wq_io_threads) {
+		sd_info("# of threads in io workqueue: %d", wq_io_threads);
+		sys->io_wqueue = create_fixed_work_queue("io", wq_io_threads);
+	} else {
+		sd_info("io workqueue is created as unlimited, it is not recommended!");
+		sys->io_wqueue = create_fixed_work_queue("io", WQ_UNLIMITED);
+	}
+	if (wq_recovery_threads) {
+		sd_info("# of threads in rw workqueue: %d", wq_recovery_threads);
+		sys->recovery_wqueue = create_fixed_work_queue("rw", wq_recovery_threads);
+	} else {
+		sd_info("recovery workqueue is created as unlimited, it is not recommended!");
+		sys->recovery_wqueue = create_fixed_work_queue("rw", WQ_UNLIMITED);
+	}
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
 	sys->md_wqueue = create_ordered_work_queue("md");
-	sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
+	if (wq_async_threads) {
+		sd_info("# of threads in async_req workqueue: %d", wq_async_threads);
+		sys->areq_wqueue = create_fixed_work_queue("async_req", wq_async_threads);
+	} else {
+		sd_info("async_req workqueue is created as unlimited, it is not recommended!");
+		sys->areq_wqueue = create_fixed_work_queue("async_req", WQ_UNLIMITED);
+	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
 	    !sys->areq_wqueue)
@@ -804,6 +877,10 @@ int main(int argc, char **argv)
 			break;
 		case 'W':
 			wildcard_recovery = true;
+			break;
+		case 'w':
+			if (option_parse(optarg, ",", wq_parsers) < 0)
+				exit(1);
 			break;
 		default:
 			usage(1);
