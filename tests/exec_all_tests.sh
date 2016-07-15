@@ -20,8 +20,10 @@ build_sheepdog(){
 }
 
 get_submodule(){
-  git submodule update -f --init ./tests/unit/unity
-  git submodule update -f --init ./tests/unit/cmock
+  rm -rf ./tests/unit/unity
+  rm -rf ./tests/unit/cmock
+  git submodule update --init ./tests/unit/unity
+  git submodule update --init ./tests/unit/cmock
 }
 
 exec_functional() {
