@@ -16,7 +16,7 @@
 #
 
 # bootstrap / init
-m4_define([sheepdog_version], [0.9.3])
+m4_define([sheepdog_version], [0.9.4_rc0])
 
 m4_define([git_version],
 	m4_esyscmd([git describe --tags --dirty 2> /dev/null | sed 's/^v//' \
