@@ -39,9 +39,9 @@ int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 	if (uatomic_is_true(&sys->use_journal) || sys->nosync == true)
 		flags &= ~syncflag;
 
-	if (sys->backend_dio && iocb_is_aligned(iocb)) {
+	if (sys->backend_dio && is_data_obj(oid) && iocb_is_aligned(iocb)) {
 		if (!is_aligned_to_pagesize(iocb->buf))
-			panic("Memory isn't aligned to pagesize %p", iocb->buf);
+			panic("Memory isn't aligned to pagesize %p, oid: %"PRIx64, iocb->buf, oid);
 		flags |= O_DIRECT;
 	}
 
@@ -409,7 +409,7 @@ int init_disk_space(const char *base_path)
 	if (sys->gateway_only)
 		goto out;
 
-	/* We need to init md even we don't need to update sapce */
+	/* We need to init md even we don't need to update space */
 	mds = md_init_space();
 
 	/* If it is restarted */

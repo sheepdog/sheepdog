@@ -620,24 +620,12 @@ static inline bool is_ec_dentry(const char *dentry)
 /* http.c */
 #ifdef HAVE_HTTP
 int http_init(const char *options);
-#else
-static inline int http_init(const char *options)
-{
-	sd_notice("http service is not compiled");
-	return 0;
-}
 #endif /* END BUILD_HTTP */
 
 #ifdef HAVE_NFS
 int nfs_init(const char *options);
 int nfs_create(const char *name);
 int nfs_delete(const char *name);
-#else
-static inline int nfs_init(const char *options)
-{
-	sd_notice("nfs server service is not compiled");
-	return 0;
-}
 #endif
 
 extern bool wildcard_recovery;
