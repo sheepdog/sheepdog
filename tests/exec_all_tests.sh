@@ -4,12 +4,11 @@ export LANG=C LC_ALL=C
 
 USR_PATH=/usr
 VAR_PATH=/var
-ULIMIT_SIZE=16384
 
 prepare() {
   sudo apt-get --quiet -y install \
     git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev qemu check python zookeeper xfsprogs
-  sudo /usr/share/zookeeper/bin/zkServer.sh start
+  sudo /usr/share/zookeeper/bin/zkServer.sh restart
 }
 
 build_sheepdog(){
@@ -35,14 +34,13 @@ exec_operation() {
 }
 
 exec_unit() {
-  ulimit -s $ULIMIT_SIZE
-  make check
+  sudo make check
 }
 
 #main
 prepare
-build_sheepdog
 get_submodule
-exec_functional
-exec_operation
+build_sheepdog
 exec_unit
+exec_operation
+exec_functional
