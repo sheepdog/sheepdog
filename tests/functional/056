@@ -4,6 +4,16 @@
 
 . ./common
 
+_need_to_be_root
+
+_make_device 0 $((300 * 1024 ** 2))
+_make_device 1 $((300 * 1024 ** 2))
+_make_device 2 $((300 * 1024 ** 2))
+_make_device 3 $((300 * 1024 ** 2))
+_make_device 4 $((300 * 1024 ** 2))
+_make_device 5 $((300 * 1024 ** 2))
+_make_device 6 $((300 * 1024 ** 2))
+
 MD=true
 
 for i in `seq 0 5`; do

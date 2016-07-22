@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 set -xueo pipefail
 export LANG=C LC_ALL=C
 
@@ -34,7 +34,7 @@ exec_operation() {
 }
 
 exec_unit() {
-  sudo make check
+  make check
 }
 
 #main

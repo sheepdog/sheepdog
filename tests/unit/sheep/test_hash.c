@@ -483,7 +483,7 @@ static void gen_data_from_disks(double *data, int idx)
 	int nr_disks;
 	double *p = data;
 
-        disks = (struct disk *)malloc(sizeof(struct disk) * DATA_SIZE);
+	disks = (struct disk *)malloc(sizeof(struct disk) * DATA_SIZE);
 
 	nr_disks = gen_disks(disks, idx);
 	INIT_RB_ROOT(&md.vroot);
@@ -495,7 +495,7 @@ static void gen_data_from_disks(double *data, int idx)
 
 	ck_assert_int_eq(p - data, DATA_SIZE);
 
-        free(disks);
+	free(disks);
 }
 
 START_TEST(test_disks_dispersion)
