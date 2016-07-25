@@ -18,6 +18,7 @@
 #include "work.h"
 #include "xio.h"
 #include "sheep_priv.h"
+#include "util.h"
 
 #include <libxio.h>
 
@@ -264,6 +265,7 @@ struct xio_gateway_work {
 	uint8_t *buf;
 	uint32_t epoch;
 
+	refcnt_t *remaining;
 	int finish_efd;
 };
 
@@ -278,7 +280,10 @@ static void xio_gateway_main(struct work *work)
 {
 	struct xio_gateway_work *w = container_of(work, struct xio_gateway_work, work);
 
-	eventfd_xwrite(w->finish_efd, 1);
+	refcount_dec(w->remaining);
+	if (refcount_read(w->remaining) == 0)
+		eventfd_xwrite(w->finish_efd, 1);
+
 	free(w);
 }
 
@@ -287,6 +292,9 @@ int xio_send_gateway_reqs(struct sd_req *hdr, int nr_to_send,
 			  struct req_iter *reqs, struct request *req)
 {
 	int efd, err_ret = 0;
+	refcnt_t nr_work;
+
+	refcount_set(&nr_work, nr_to_send);
 
 	efd = eventfd(0, EFD_SEMAPHORE);
 	if (efd < 0) {
@@ -305,6 +313,8 @@ int xio_send_gateway_reqs(struct sd_req *hdr, int nr_to_send,
 			goto out;
 		}
 
+		w->remaining = &nr_work;
+
 		w->nid = &target_nodes[i]->nid;
 		w->buf = reqs[i].buf;
 		w->epoch = req->rq.epoch;
@@ -321,8 +331,7 @@ int xio_send_gateway_reqs(struct sd_req *hdr, int nr_to_send,
 		queue_work(sys->xio_wqueue, &w->work);
 	}
 
-	for (int i = 0; i < nr_to_send; i++)
-		eventfd_xread(efd);
+	eventfd_xread(efd);
 
 out:
 	return err_ret;
