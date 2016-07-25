@@ -176,7 +176,9 @@ struct system_info {
 #ifdef HAVE_HTTP
 	struct work_queue *http_wqueue;
 #endif
-
+#ifdef HAVE_ACCELIO
+	struct work_queue *xio_wqueue;
+#endif
 	uatomic_bool use_journal;
 	bool backend_dio;
 	/* upgrade data layout before starting service if necessary*/

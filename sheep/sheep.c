@@ -381,12 +381,24 @@ static int wq_async_parser(const char *s)
 	return 0;
 }
 
+#ifdef HAVE_ACCELIO
+static int wq_xio_threads;
+static int wq_xio_parser(const char *s)
+{
+	wq_xio_threads = atoi(s);
+	return 0;
+}
+#endif
+
 static struct option_parser wq_parsers[] = {
 	{ "net=", wq_net_parser },
 	{ "gway=", wq_gway_parser },
 	{ "io=", wq_io_parser },
 	{ "recovery=", wq_recovery_parser },
 	{ "async=", wq_async_parser },
+#ifdef HAVE_ACCELIO
+	{ "xio=", wq_xio_parser },
+#endif
 };
 
 static const char *io_addr, *io_pt;
@@ -534,6 +546,15 @@ static int create_work_queues(void)
 		sd_info("async_req workqueue is created as unlimited, it is not recommended!");
 		sys->areq_wqueue = create_fixed_work_queue("async_req", WQ_UNLIMITED);
 	}
+#ifdef HAVE_ACCELIO
+	if (wq_xio_threads) {
+		sd_info("# of threads in xio_req workqueue: %d", wq_xio_threads);
+		sys->xio_wqueue = create_fixed_work_queue("xio", wq_xio_threads);
+	} else {
+		sd_info("xio workqueue is created as unlimited, it is not recommended!");
+		sys->xio_wqueue = create_fixed_work_queue("xio", WQ_UNLIMITED);
+	}
+#endif
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
 	    !sys->areq_wqueue)
