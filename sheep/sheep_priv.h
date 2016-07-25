@@ -631,8 +631,18 @@ struct request *alloc_request(struct client_info *ci, uint32_t data_length);
 void queue_request(struct request *req);
 void free_request(struct request *req);
 
+struct req_iter {
+	uint8_t *buf;
+	uint32_t wlen;
+	uint32_t dlen;
+	uint64_t off;
+};
+
 #ifdef HAVE_ACCELIO
 void xio_send_reply(struct client_info *ci);
+
+int xio_send_gateway_reqs(int nr_to_send, const struct sd_node *target_nodes[],
+			  struct req_iter *reqs, struct request *req);
 #endif
 
 #endif

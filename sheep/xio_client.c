@@ -17,6 +17,7 @@
 #include "event.h"
 #include "work.h"
 #include "xio.h"
+#include "sheep_priv.h"
 
 #include <libxio.h>
 
@@ -254,98 +255,75 @@ int xio_exec_req(const struct node_id *nid, struct sd_req *hdr, void *data,
 	return 0;
 }
 
-static int gw_client_on_response(struct xio_session *session,
-				 struct xio_msg *rsp,
-				 int last_in_rxq,
-				 void *cb_user_context)
-{
-	struct xio_forward_info_entry *fi_entry =
-		(struct xio_forward_info_entry *)cb_user_context;
-	struct xio_forward_info *fi = fi_entry->fi;
+struct xio_gateway_work {
+	struct work work;
 
-	struct xio_vmsg *pimsg = &rsp->in;
-	struct xio_iovec_ex *isglist = vmsg_sglist(pimsg);
+	const struct node_id *nid;
+	struct sd_req hdr;
 
-	int nents = vmsg_sglist_nents(pimsg), total = 0;
+	uint8_t *buf;
+	uint32_t epoch;
 
-	sd_debug("response on fi_entry %p", fi_entry);
-
-	for (int i = 0; i < nents; i++) {
-		memcpy((char *)fi_entry->buf + total,
-		       isglist[i].iov_base, isglist[i].iov_len);
-
-		total += isglist[i].iov_len;
-	}
-
-	fi->nr_done++;
-	if (fi->nr_done == fi->nr_send)
-		xio_context_stop_loop(fi->ctx);
-
-	return 0;
-}
-
-static struct xio_session_ops gw_client_ses_ops = {
-	.on_session_event = on_session_event,
-	.on_session_established = NULL,
-	.on_msg = gw_client_on_response,
-	.on_msg_error = on_msg_error,
-	.assign_data_in_buf		= client_assign_data_in_buf,
+	int finish_efd;
 };
 
-struct xio_session *sd_xio_gw_create_session(struct xio_context *ctx,
-					     const struct node_id *nid,
-					     void *user_ctx)
+static void xio_gateway_work(struct work *work)
 {
-	struct xio_session *session;
-	char url[256];
-	struct xio_session_params params;
+	struct xio_gateway_work *w = container_of(work, struct xio_gateway_work, work);
 
-	if (nid->io_transport_type == IO_TRANSPORT_TYPE_RDMA)
-		snprintf(url, 256, "rdma://%s",
-			 addr_to_str(nid->io_addr, nid->io_port));
-	else
-		snprintf(url, 256, "tcp://%s",
-			 addr_to_str(nid->io_addr, nid->io_port));
-
-	memset(&params, 0, sizeof(params));
-	params.type = XIO_SESSION_CLIENT;
-	params.ses_ops = &gw_client_ses_ops;
-	params.uri = url;
-	params.user_context = user_ctx;
-
-	session = xio_session_create(&params);
-
-	return session;
+	xio_exec_req(w->nid, &w->hdr, w->buf, sheep_need_retry, w->epoch, MAX_RETRY_COUNT);
 }
 
-struct xio_connection *sd_xio_gw_create_connection(struct xio_context *ctx,
-						   struct xio_session *session,
-						   void *user_ctx)
+static void xio_gateway_main(struct work *work)
 {
-	struct xio_connection *conn;
-	struct xio_connection_params cparams;
+	struct xio_gateway_work *w = container_of(work, struct xio_gateway_work, work);
 
-	memset(&cparams, 0, sizeof(cparams));
-	cparams.session = session;
-	cparams.ctx = ctx;
-	cparams.conn_user_context = user_ctx;
-
-	conn = xio_connect(&cparams);
-
-	return conn;
+	eventfd_xwrite(w->finish_efd, 1);
+	free(w);
 }
 
-void xio_gw_send_req(struct xio_connection *conn, struct sd_req *hdr,
-		     void *data, bool (*need_retry)(uint32_t epoch),
-		     uint32_t epoch, uint32_t max_count)
+int xio_send_gateway_reqs(int nr_to_send, const struct sd_node *target_nodes[],
+			  struct req_iter *reqs, struct request *req)
 {
-	struct xio_msg *xreq = xzalloc(sizeof(*xreq));
-	struct sd_rsp *rsp = xzalloc(sizeof(*rsp));
+	int efd, err_ret = 0;
 
-	client_msg_vec_init(xreq);
-	msg_prep_for_send(hdr, rsp, data, xreq);
+	efd = eventfd(0, EFD_SEMAPHORE);
+	if (efd < 0) {
+		sd_err("failed to create event fd for notifying completion of"
+		       " xio gateway requests: %m");
+		return SD_RES_SYSTEM_ERROR;
+	}
 
-	xio_send_request(conn, xreq);
+	for (int i = 0; i < nr_to_send; i++) {
+		struct xio_gateway_work *w = zalloc(sizeof(*w));
+		if (!w) {
+			err_ret = SD_RES_NO_MEM;
+			sd_err("failed to allocate memory for xio gateway"
+			       " request");
+
+			goto out;
+		}
+
+		w->nid = &target_nodes[i]->nid;
+		w->buf = reqs[i].buf;
+		w->epoch = req->rq.epoch;
+
+		w->hdr.data_length = reqs[i].dlen;
+		w->hdr.obj.offset = reqs[i].off;
+		w->hdr.obj.ec_index = i;
+		w->hdr.obj.copy_policy = req->rq.obj.copy_policy;
+
+		w->work.fn = xio_gateway_work;
+		w->work.done = xio_gateway_main;
+
+		queue_work(sys->xio_wqueue, &w->work);
+	}
+
+	for (int i = 0; i < nr_to_send; i++)
+		eventfd_xread(efd);
+
+out:
+	return err_ret;
 }
 
 void xio_init_main_ctx(void)
