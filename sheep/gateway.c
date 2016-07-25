@@ -582,7 +582,8 @@ static int gateway_forward_request(struct request *req)
 
 #else  /* HAVE_ACCELIO */
 
-	err_ret = xio_send_gateway_reqs(nr_to_send, target_nodes, reqs, req);
+	err_ret = xio_send_gateway_reqs(&hdr, nr_to_send, target_nodes,
+					reqs, req);
 	if (err_ret)
 		sd_err("failed to send xio gateway requests: %s",
 		       sd_strerror(err_ret));

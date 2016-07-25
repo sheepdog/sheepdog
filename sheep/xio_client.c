@@ -282,7 +282,8 @@ static void xio_gateway_main(struct work *work)
 	free(w);
 }
 
-int xio_send_gateway_reqs(int nr_to_send, const struct sd_node *target_nodes[],
+int xio_send_gateway_reqs(struct sd_req *hdr, int nr_to_send,
+			  const struct sd_node *target_nodes[],
 			  struct req_iter *reqs, struct request *req)
 {
 	int efd, err_ret = 0;
@@ -308,10 +309,11 @@ int xio_send_gateway_reqs(int nr_to_send, const struct sd_node *target_nodes[],
 		w->buf = reqs[i].buf;
 		w->epoch = req->rq.epoch;
 
-		w->hdr.data_length = reqs[i].dlen;
-		w->hdr.obj.offset = reqs[i].off;
-		w->hdr.obj.ec_index = i;
-		w->hdr.obj.copy_policy = req->rq.obj.copy_policy;
+		hdr->data_length = reqs[i].dlen;
+		hdr->obj.offset = reqs[i].off;
+		hdr->obj.ec_index = i;
+		hdr->obj.copy_policy = req->rq.obj.copy_policy;
+		memcpy(&w->hdr, hdr, sizeof(*hdr));
 
 		w->work.fn = xio_gateway_work;
 		w->work.done = xio_gateway_main;

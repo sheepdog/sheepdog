@@ -641,7 +641,8 @@ struct req_iter {
 #ifdef HAVE_ACCELIO
 void xio_send_reply(struct client_info *ci);
 
-int xio_send_gateway_reqs(int nr_to_send, const struct sd_node *target_nodes[],
+int xio_send_gateway_reqs(struct sd_req *hdr, int nr_to_send,
+			  const struct sd_node *target_nodes[],
 			  struct req_iter *reqs, struct request *req);
 #endif
 
