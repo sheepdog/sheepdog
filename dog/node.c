@@ -248,23 +248,25 @@ static int node_recovery_set(int argc, char **argv)
 		exit(EXIT_USAGE);
 	}
 
-	rthrottling->max_exec_count = strtoul(argv[optind], &p, 10);
-	if (argv[optind] == p || rthrottling->max_exec_count < 0 ||
-	 UINT32_MAX <= rthrottling->max_exec_count || errno != 0 ||
-	 *p != '\0') {
+	/* clear errno before calling strtol */
+	errno = 0;
+
+	const long max = strtol(argv[optind], &p, 10);
+	if (argv[optind] == p || errno != 0 || *p != '\0' ||
+	    max < 0L || (int64_t)UINT32_MAX < (int64_t)max) {
 		sd_err("Invalid max (%s)", argv[optind]);
 		exit(EXIT_USAGE);
 	}
+	rthrottling->max_exec_count = (uint32_t)max;
 
 	optind++;
 
-	rthrottling->queue_work_interval = strtoull(argv[optind], &p, 10);
-	if (argv[optind] == p || rthrottling->queue_work_interval < 0 ||
-	 UINT64_MAX <= rthrottling->queue_work_interval || errno != 0 ||
-	 *p != '\0') {
+	const long long interval = strtoll(argv[optind], &p, 10);
+	if (argv[optind] == p || errno != 0 || *p != '\0' || interval < 0LL) {
 		sd_err("Invalid interval (%s)", argv[optind]);
 		exit(EXIT_USAGE);
 	}
+	rthrottling->queue_work_interval = (uint64_t)interval;
 
 	if ((rthrottling->max_exec_count == 0 &&
 	 rthrottling->queue_work_interval != 0) ||
