@@ -11,14 +11,14 @@ prepare() {
   sudo /usr/share/zookeeper/bin/zkServer.sh restart
 }
 
-build_sheepdog(){
+build_sheepdog() {
   ./autogen.sh
   ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
   make
   sudo make install
 }
 
-get_submodule(){
+get_submodule() {
   rm -rf ./tests/unit/unity
   rm -rf ./tests/unit/cmock
   git submodule update --init ./tests/unit/unity
