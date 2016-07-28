@@ -7,7 +7,7 @@ VAR_PATH=/var
 
 prepare() {
   sudo apt-get --quiet -y install \
-    git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev qemu check python zookeeper xfsprogs
+    git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev qemu check python zookeeper xfsprogs bc
   sudo /usr/share/zookeeper/bin/zkServer.sh restart
 }
 
