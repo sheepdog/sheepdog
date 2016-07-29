@@ -5,7 +5,6 @@ export LANG=C LC_ALL=C
 set_up() {
   sudo rm -rf /tmp/sheepdog
   sudo rm -rf /tmp/sheepdog_locks
-  sudo rm -f /tmp/sheepdog_shm
 }
 
 exec_functional() {
