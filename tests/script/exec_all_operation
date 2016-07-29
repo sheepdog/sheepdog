@@ -1,0 +1,10 @@
+#!/bin/bash
+set -xueo pipefail
+export LANG=C LC_ALL=C
+
+exec_operation() {
+  sudo python ./tests/operation/test_3nodes_2copies.py
+}
+
+#main
+exec_operation

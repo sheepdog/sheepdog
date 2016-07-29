@@ -1,0 +1,10 @@
+#!/bin/bash
+set -xueo pipefail
+export LANG=C LC_ALL=C
+
+exec_functional() {
+  sudo ./tests/functional/check
+}
+
+#main
+exec_functional
