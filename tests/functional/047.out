@@ -1,5 +1,0 @@
-QA output created by 047
-using backend plain store
-  Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
-  test         0  4.0 GB  8.0 MB  0.0 MB DATE   7c2b25      1                22
-hello sheepdog

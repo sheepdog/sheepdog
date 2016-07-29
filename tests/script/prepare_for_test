@@ -1,0 +1,22 @@
+#!/bin/bash
+set -xueo pipefail
+export LANG=C LC_ALL=C
+
+USR_PATH=/usr
+VAR_PATH=/var
+
+prepare() {
+  sudo apt-get --quiet -y install \
+    git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev qemu check python zookeeper xfsprogs bc
+}
+
+build_sheepdog() {
+  ./autogen.sh
+  ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
+  make
+  sudo make install
+}
+
+#main
+prepare
+build_sheepdog

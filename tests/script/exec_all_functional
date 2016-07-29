@@ -1,0 +1,15 @@
+#!/bin/bash
+set -xueo pipefail
+export LANG=C LC_ALL=C
+
+set_up() {
+  sudo rm -rf /tmp/sheepdog
+}
+
+exec_functional() {
+  sudo ./tests/functional/check
+}
+
+#main
+set_up
+exec_functional

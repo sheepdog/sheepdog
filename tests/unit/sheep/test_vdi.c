@@ -17,6 +17,16 @@
 
 #include "sheep_priv.h"
 
+void setUp(void)
+{
+	clean_vdi_state();
+}
+
+void tearDown(void)
+{
+	/* add codes if needed */
+}
+
 static void test_vdi(void)
 {
 	struct system_info mock_sys = {0}; sys = &mock_sys;

@@ -10,3 +10,6 @@ Running tests:
     - To randomize test order: ./check -r [test(s)]
 
 To test zookeeper, you should set tickTime=500 first at zoo.cfg.
+
+Required package:
+    qemu-io (>=2.5.0)

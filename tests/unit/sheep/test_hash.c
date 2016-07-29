@@ -410,9 +410,11 @@ START_TEST(test_disks_update)
 {
 	size_t nr_vdisks;
 	size_t nr_vdisks_after;
-	struct disk disks[DATA_SIZE];
+	struct disk *disks;
 	struct vdisk vdisks[DATA_SIZE];
 	struct vdisk vdisks_after[DATA_SIZE];
+
+	disks = (struct disk *)malloc(sizeof(struct disk) * DATA_SIZE);
 
 	gen_disks(disks, 0);
 
@@ -468,15 +470,20 @@ START_TEST(test_disks_update)
 	nr_vdisks_after = get_vdisks_array(vdisks_after);
 	ck_assert(is_subset(vdisks, nr_vdisks, vdisks_after,
 			    nr_vdisks_after, vdisk_cmp));
+
+
+	free(disks);
 }
 END_TEST
 
 static void gen_data_from_disks(double *data, int idx)
 {
-	struct disk disks[DATA_SIZE];
+	struct disk *disks;
 	struct vdisk *vdisk;
 	int nr_disks;
 	double *p = data;
+
+	disks = (struct disk *)malloc(sizeof(struct disk) * DATA_SIZE);
 
 	nr_disks = gen_disks(disks, idx);
 	INIT_RB_ROOT(&md.vroot);
@@ -487,6 +494,8 @@ static void gen_data_from_disks(double *data, int idx)
 		*p++ = vdisk->hash;
 
 	ck_assert_int_eq(p - data, DATA_SIZE);
+
+	free(disks);
 }
 
 START_TEST(test_disks_dispersion)
