@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Test dog node recovery set-throttle
+
+. ./common
+
+function oneTimeSetUp {
+	_start_sheep 0
+	_wait_for_sheep 1
+	_cluster_format -c 1
+}
+
+function setUp {
+	dog node recovery set-throttle -- 0 0
+}
+
+function testSetThrottleSuccess {
+	setUp
+	dog node recovery set-throttle -- "$@"
+	[ $? -eq 0 ] || exit 1
+	dog node recovery get-throttle
+}
+
+function testSetThrottleFailure {
+	setUp
+	! dog node recovery set-throttle -- "$@"
+	[ $? -eq 0 ] || exit 1
+	dog node recovery get-throttle
+}
+
+oneTimeSetUp
+
+testSetThrottleFailure  0  1
+testSetThrottleFailure  0 -1
+testSetThrottleFailure  0 -2
+
+testSetThrottleFailure  1  0
+testSetThrottleFailure  1 -1
+testSetThrottleFailure  1 -2
+
+testSetThrottleFailure -1  0
+testSetThrottleFailure -1  1
+testSetThrottleFailure -1 -1
+testSetThrottleFailure -1 -2
+
+testSetThrottleFailure -2  0
+testSetThrottleFailure -2  1
+testSetThrottleFailure -2 -1
+testSetThrottleFailure -2 -2
+
+testSetThrottleFailure 4294967295 9223372036854775808
+testSetThrottleFailure 4294967296 9223372036854775807
+testSetThrottleFailure 4294967296 9223372036854775808
+
+testSetThrottleSuccess 0 0
+testSetThrottleSuccess 1 1
+testSetThrottleSuccess 4294967295 9223372036854775807
