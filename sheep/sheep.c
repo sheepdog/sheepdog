@@ -653,7 +653,7 @@ int main(int argc, char **argv)
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
 	int nr_vnodes = SD_DEFAULT_VNODES, rc = 1;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
-	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
+	char *dir, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
 	bool explicit_addr = false;
 	int64_t zone = -1;
@@ -683,9 +683,8 @@ int main(int argc, char **argv)
 				 &longindex)) >= 0) {
 		switch (ch) {
 		case 'p':
-			port = strtol(optarg, &p, 10);
-			if (optarg == p || port < 1 || UINT16_MAX < port
-				|| *p != '\0') {
+			port = str_to_u16(optarg);
+			if (errno != 0 || port < 1) {
 				sd_err("Invalid port number '%s'", optarg);
 				exit(1);
 			}
@@ -720,9 +719,8 @@ int main(int argc, char **argv)
 			nr_vnodes = 0;
 			break;
 		case 'z':
-			zone = strtol(optarg, &p, 10);
-			if (optarg == p || zone < 0 || UINT32_MAX < zone
-				|| *p != '\0') {
+			zone = str_to_u32(optarg);
+			if (errno != 0) {
 				sd_err("Invalid zone id '%s': must be "
 				       "an integer between 0 and %u", optarg,
 				       UINT32_MAX);

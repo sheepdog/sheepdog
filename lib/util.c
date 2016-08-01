@@ -962,3 +962,45 @@ char *xstrdup(const char *s)
 	return ret;
 }
 
+/*
+ * Convert a decimal string like as strtoll to uint32_t/uint16_t
+ *
+ * returns:
+ *   - a converted value if success i.e. neither negative value nor overflow
+ *   - undefined if something went wrong and set errno accordingly
+ *
+ * errno:
+ *   - 0 if success
+ *   - EINVAL if one of the following:
+ *       - nptr was an empty string
+ *       - there was an unconvertible character in nptr
+ *   - ERANGE if negative/positive overflow occurred
+ */
+uint32_t str_to_u32(const char *nptr)
+{
+	char *endptr;
+	errno = 0;
+	const long long conv = strtoll(nptr, &endptr, 10);
+	/* empty string or unconvertible character */
+	if (nptr == endptr || *endptr != '\0') {
+		errno = EINVAL;
+		return (uint32_t)conv;
+	}
+	/* negative value or overflow */
+	if (conv < 0LL || UINT32_MAX < conv) {
+		errno = ERANGE;
+		return UINT32_MAX;
+	}
+	return (uint32_t)conv;
+}
+
+uint16_t str_to_u16(const char *nptr)
+{
+	const uint32_t conv = str_to_u32(nptr);
+	/* overflow */
+	if (UINT16_MAX < conv) {
+		errno = ERANGE;
+		return UINT16_MAX;
+	}
+	return (uint16_t)conv;
+}

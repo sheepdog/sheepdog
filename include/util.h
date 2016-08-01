@@ -580,4 +580,6 @@ char *xstrdup(const char *s);
 struct work_queue;
 void register_util_wq(struct work_queue *wq);
 
+uint32_t str_to_u32(const char *nptr);
+uint16_t str_to_u16(const char *nptr);
 #endif
