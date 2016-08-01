@@ -697,7 +697,7 @@ int main(int argc, char **argv)
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
 	int rc = 1;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
-	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
+	char *dir, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
 	bool explicit_addr = false;
 	bool daemonize = true;
@@ -730,9 +730,8 @@ int main(int argc, char **argv)
 				 &longindex)) >= 0) {
 		switch (ch) {
 		case 'p':
-			port = strtol(optarg, &p, 10);
-			if (optarg == p || port < 1 || UINT16_MAX < port
-				|| *p != '\0') {
+			port = str_to_u16(optarg);
+			if (errno != 0 || port < 1) {
 				sd_err("Invalid port number '%s'", optarg);
 				exit(1);
 			}
@@ -773,9 +772,8 @@ int main(int argc, char **argv)
 			nr_vnodes = 0;
 			break;
 		case 'z':
-			zone = strtol(optarg, &p, 10);
-			if (optarg == p || zone < 0 || UINT32_MAX < zone
-				|| *p != '\0') {
+			zone = str_to_u32(optarg);
+			if (errno != 0) {
 				sd_err("Invalid zone id '%s': must be "
 				       "an integer between 0 and %u", optarg,
 				       UINT32_MAX);
@@ -866,9 +864,8 @@ int main(int argc, char **argv)
 				sd_err("Options '-g' and '-V' can not be both specified");
 				exit(1);
 			}
-			nr_vnodes = strtol(optarg, &p, 10);
-			if (optarg == p || nr_vnodes < 1
-				|| UINT16_MAX < nr_vnodes || *p != '\0') {
+			nr_vnodes = str_to_u16(optarg);
+			if (errno != 0 || nr_vnodes < 1) {
 				sd_err("Invalid number of vnodes '%s': must be "
 					"an integer between 1 and %u",
 					optarg, UINT16_MAX);
