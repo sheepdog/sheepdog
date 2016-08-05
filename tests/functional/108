@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Test sheep -p/--port
+
+. ./common
+
+err=0
+
+function testStartPortSucceeded
+{
+	port="$1"
+	mkdir -p "$STORE/0"
+	if $SHEEP "$STORE/0" -p "$port" ; then
+		sleep 1 # DO NOT use _wait_for_sheep
+		if grep daemon "$STORE/0/sheep.log" >/dev/null 2>&1 ; then
+			$DOG node list -p "$port"
+		else
+			err=1
+		fi
+	else
+		err=1
+	fi
+	_cleanup
+}
+
+function testStartPortFailed
+{
+	port="$1"
+	mkdir -p "$STORE/0"
+	$SHEEP "$STORE/0" -p "$port" && err=1
+	_cleanup
+}
+
+testStartPortSucceeded 7000
+testStartPortSucceeded 65535 # UINT16_MAX
+testStartPortFailed 0
+testStartPortFailed 65536 # UINT16_MAX + 1
+testStartPortFailed 65537 # UINT16_MAx + 2
+testStartPortFailed 4294967297 # UINT32_MAX + 2
+testStartPortFailed -1
+testStartPortFailed a
+testStartPortFailed 42a
+testStartPortFailed +
+testStartPortFailed -
+
+exit $err
