@@ -1,0 +1,568 @@
+QA output created by 113
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	355 MB	200 MB	155 MB	 56%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	355 MB	200 MB	155 MB	 56%
+
+Total virtual image size	100 MB
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	355 MB	200 MB	155 MB	 56%
+
+Total virtual image size	100 MB
+Id	Size	Used	Avail	Use%
+ 0	128 MB	80 MB	48 MB	 62%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	305 MB	200 MB	105 MB	 65%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	128 MB	80 MB	48 MB	 62%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	305 MB	200 MB	105 MB	 65%
+
+Total virtual image size	100 MB
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	355 MB	200 MB	155 MB	 56%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+ 3	88 MB	0.0 MB	88 MB	  0%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	76 MB	102 MB	 42%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	64 MB	24 MB	 72%
+ 3	88 MB	12 MB	76 MB	 13%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	64 MB	24 MB	 72%
+ 3	88 MB	20 MB	68 MB	 22%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	44 MB	44 MB	 49%
+ 2	88 MB	64 MB	24 MB	 72%
+ 3	88 MB	24 MB	64 MB	 27%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	44 MB	44 MB	 49%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	28 MB	60 MB	 31%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	44 MB	44 MB	 49%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	28 MB	60 MB	 31%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      9 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE     10 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      9 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE     11 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+DATE     10 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      9 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	64 MB	114 MB	 35%
+ 1	88 MB	40 MB	48 MB	 45%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	36 MB	52 MB	 40%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	44 MB	44 MB	 49%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	28 MB	60 MB	 31%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	44 MB	44 MB	 49%
+ 2	88 MB	60 MB	28 MB	 67%
+ 3	88 MB	28 MB	60 MB	 31%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	44 MB	44 MB	 49%
+ 2	88 MB	64 MB	24 MB	 72%
+ 3	88 MB	24 MB	64 MB	 27%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	68 MB	110 MB	 38%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	64 MB	24 MB	 72%
+ 3	88 MB	20 MB	68 MB	 22%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      9 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	76 MB	102 MB	 42%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	64 MB	24 MB	 72%
+ 3	88 MB	12 MB	76 MB	 13%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE     10 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      9 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+ 3	88 MB	0.0 MB	88 MB	  0%
+Total	443 MB	200 MB	243 MB	 45%
+
+Total virtual image size	100 MB
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 2 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE     11 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100]
+DATE     10 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:10]
+DATE      9 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:20]
+DATE      8 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:30]
+DATE      7 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:40]
+DATE      6 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:50]
+DATE      5 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:60]
+DATE      4 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:70]
+DATE      3 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:80]
+DATE      2 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:90]
+DATE      1 [127.0.0.1:7000:200, 127.0.0.1:7001:100, 127.0.0.1:7002:100, 127.0.0.1:7003:100]
+Id	Size	Used	Avail	Use%
+ 0	178 MB	80 MB	98 MB	 44%
+ 1	88 MB	48 MB	40 MB	 54%
+ 2	88 MB	72 MB	16 MB	 81%
+Total	355 MB	200 MB	155 MB	 56%
+
+Total virtual image size	100 MB
