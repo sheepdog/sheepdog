@@ -30,6 +30,27 @@ function testSetVnodesFailed
 	_cleanup
 }
 
+function testSetAutoNodeVnodesFailed
+{
+	SHEEP_OPTIONS='' _start_sheep 0
+	_wait_for_sheep 1
+	$DOG cluster format -c 1
+	$DOG node vnodes set 42 && err=1
+	_cleanup
+}
+
+function testSetGatewayVnodesFailed
+{
+	SHEEP_OPTIONS='-V 100' _start_sheep 0
+	_wait_for_sheep 1
+	$DOG cluster format -V -c 1
+	SHEEP_OPTIONS='-g' _start_sheep 1
+	_wait_for_sheep 2
+	_wait_for_sheep_recovery 0
+	$DOG node vnodes set -p 7001 42 && err=1
+	_cleanup
+}
+
 testSetVnodesSucceeded 1
 testSetVnodesSucceeded 65535 # UINT16_MAX
 
@@ -42,5 +63,8 @@ testSetVnodesFailed a
 testSetVnodesFailed 42a
 testSetVnodesFailed +
 testSetVnodesFailed -
+
+testSetAutoNodeVnodesFailed
+testSetGatewayVnodesFailed
 
 exit $err
