@@ -1,0 +1,26 @@
+#!/bin/bash
+set -xueo pipefail
+export LANG=C LC_ALL=C
+
+USR_PATH=/usr
+VAR_PATH=/var
+
+set_up() {
+  ./autogen.sh
+  ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
+  make
+  sudo make install
+}
+
+exec_operation() {
+  sudo python ./tests/operation/test_3nodes_2copies.py
+}
+
+tear_down() {
+  make clean
+}
+
+#main
+set_up
+exec_operation
+tear_down

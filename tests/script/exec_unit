@@ -1,0 +1,31 @@
+#!/bin/bash
+set -xueo pipefail
+export LANG=C LC_ALL=C
+
+USR_PATH=/usr
+VAR_PATH=/var
+
+set_up() {
+  rm -rf ./tests/unit/unity
+  git submodule update --init ./tests/unit/unity
+
+  rm -rf ./tests/unit/cmock
+  git submodule update --init ./tests/unit/cmock
+
+  sudo /usr/share/zookeeper/bin/zkServer.sh restart
+}
+
+exec_unit() {
+  ./autogen.sh
+  ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
+  make check
+}
+
+tear_down() {
+  make clean
+}
+
+#main
+set_up
+exec_unit
+tear_down
