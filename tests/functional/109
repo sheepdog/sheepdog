@@ -1,0 +1,45 @@
+#!/bin/bash
+
+# Test sheep -z/--zone
+
+. ./common
+
+err=0
+
+function testStartZoneSucceeded
+{
+	zone="$1"
+	mkdir -p "$STORE/0"
+	if $SHEEP "$STORE/0" -z "$zone" ; then
+		_wait_for_sheep 1
+		if grep daemon "$STORE/0/sheep.log" >/dev/null 2>&1 ; then
+			$DOG node list
+		else
+			err=1
+		fi
+	else
+		err=1
+	fi
+	_cleanup
+}
+
+function testStartZoneFailed
+{
+	zone="$1"
+	mkdir -p "$STORE/0"
+	$SHEEP "$STORE/0" -z "$zone" && err=1
+	_cleanup
+}
+
+testStartZoneSucceeded 0
+testStartZoneSucceeded 1
+testStartZoneSucceeded 4294967295 # UINT32_MAX
+testStartZoneFailed 4294967296 # UINT32_MAX + 1
+testStartZoneFailed 9223372036854775808 # INT64_MAX + 1
+testStartZoneFailed -1
+testStartZoneFailed a
+testStartZoneFailed 42a
+testStartZoneFailed +
+testStartZoneFailed -
+
+exit $err

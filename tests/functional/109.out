@@ -1,0 +1,14 @@
+QA output created by 109
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128          0
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128          1
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	128 4294967295
+Invalid zone id '4294967296': must be an integer between 0 and 4294967295
+Invalid zone id '9223372036854775808': must be an integer between 0 and 4294967295
+Invalid zone id '-1': must be an integer between 0 and 4294967295
+Invalid zone id 'a': must be an integer between 0 and 4294967295
+Invalid zone id '42a': must be an integer between 0 and 4294967295
+Invalid zone id '+': must be an integer between 0 and 4294967295
+Invalid zone id '-': must be an integer between 0 and 4294967295

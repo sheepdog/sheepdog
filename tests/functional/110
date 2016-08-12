@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Test sheep -V/--vnodes
+
+. ./common
+
+function testStartVnodesFailed
+{
+	( SHEEP_OPTIONS="-V $1" _start_sheep 0 ) && :
+	_wait_for_sheep_stop 0
+	_cleanup
+}
+
+function testStartVnodesSucceeded
+{
+	SHEEP_OPTIONS="-V $1" _start_sheep 0
+	_wait_for_sheep 1
+	$DOG node list
+	_cleanup
+}
+
+function testStartVnodesGatewayFailed
+{
+	( SHEEP_OPTIONS='-g -V 42' _start_sheep 0 ) && :
+	_wait_for_sheep_stop 0
+	_cleanup
+}
+
+testStartVnodesSucceeded 1
+testStartVnodesSucceeded 65535 # UINT16_MAX
+testStartVnodesFailed 0
+testStartVnodesFailed 65536 # UINT16_MAX + 1
+testStartVnodesFailed 65537 # UINT16_MAX + 2
+testStartVnodesFailed 4294967297 # UINT32_MAX + 2
+testStartVnodesFailed -1
+testStartVnodesFailed a
+testStartVnodesFailed 42a
+testStartVnodesFailed +
+testStartVnodesFailed -
+testStartVnodesGatewayFailed

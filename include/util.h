@@ -575,4 +575,6 @@ static inline uint64_t clock_get_time(void)
 }
 
 char *xstrdup(const char *s);
+uint32_t str_to_u32(const char *nptr);
+uint16_t str_to_u16(const char *nptr);
 #endif

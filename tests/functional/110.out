@@ -1,0 +1,25 @@
+QA output created by 110
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	 1          0
+  Id   Host:Port         V-Nodes       Zone
+   0   127.0.0.1:7000      	65535          0
+Invalid number of vnodes '0': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '65536': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '65537': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '4294967297': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '-1': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes 'a': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '42a': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '+': must be an integer between 1 and 65535
+cannot start sheep 0
+Invalid number of vnodes '-': must be an integer between 1 and 65535
+cannot start sheep 0
+Options '-g' and '-V' can not be both specified
+cannot start sheep 0
