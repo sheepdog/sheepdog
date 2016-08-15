@@ -1,0 +1,8 @@
+language: c
+sudo: required
+dist: trusty
+script:
+  - ./tests/script/prepare_for_test
+  - ./tests/script/exec_unit
+  - ./tests/script/exec_operation
+  - ./tests/script/exec_functional
