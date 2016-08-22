@@ -12,11 +12,7 @@ function testStartZoneSucceeded
 	mkdir -p "$STORE/0"
 	if $SHEEP "$STORE/0" -z "$zone" ; then
 		_wait_for_sheep 1
-		if grep daemon "$STORE/0/sheep.log" >/dev/null 2>&1 ; then
-			$DOG node list
-		else
-			err=1
-		fi
+		$DOG node list
 	else
 		err=1
 	fi
