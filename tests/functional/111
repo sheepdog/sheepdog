@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Test sheep -V/--vnodes
+
+. ./common
+
+err=0
+
+function setUpFixedCluster
+{
+	SHEEP_OPTIONS='-V 100' _start_sheep 0
+	_wait_for_sheep 1
+	$DOG cluster format -V -c 1
+}
+
+function testSetVnodesSucceeded
+{
+	setUpFixedCluster
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG node vnodes set -- "$1" || err=1
+	_wait_for_sheep_recovery 0
+	$DOG cluster info -v | _filter_cluster_info
+	_cleanup
+}
+
+function testSetVnodesFailed
+{
+	setUpFixedCluster
+	$DOG node vnodes set -- "$1" && err=1
+	_cleanup
+}
+
+testSetVnodesSucceeded 1
+testSetVnodesSucceeded 65535 # UINT16_MAX
+
+testSetVnodesFailed 0
+testSetVnodesFailed 65536 # UINT16_MAX + 1
+testSetVnodesFailed 65537 # UINT16_MAX + 2
+testSetVnodesFailed 4294967297 # UINT32_MAX + 2
+testSetVnodesFailed -1
+testSetVnodesFailed a
+testSetVnodesFailed 42a
+testSetVnodesFailed +
+testSetVnodesFailed -
+
+exit $err
