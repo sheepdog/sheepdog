@@ -1,0 +1,153 @@
+#!/bin/bash
+
+# Test fixed vnodes feature more
+
+. ./common
+
+_need_to_be_root
+
+function setUpCluster3
+{
+	_make_device 0 $((200*1024**2))
+	_make_device 1 $((100*1024**2))
+	_make_device 2 $((100*1024**2))
+	SHEEP_OPTIONS='-V 200' _start_sheep 0
+	SHEEP_OPTIONS='-V 100' _start_sheep 1
+	SHEEP_OPTIONS='-V 100' _start_sheep 2
+	_wait_for_sheep 3
+	_cluster_format -V -c 2
+}
+
+function setUpCluster4
+{
+	_make_device 0 $((200*1024**2))
+	_make_device 1 $((100*1024**2))
+	_make_device 2 $((100*1024**2))
+	_make_device 3 $((100*1024**2))
+	SHEEP_OPTIONS='-V 200' _start_sheep 0
+	SHEEP_OPTIONS='-V 100' _start_sheep 1
+	SHEEP_OPTIONS='-V 100' _start_sheep 2
+	SHEEP_OPTIONS='-V 100' _start_sheep 3
+	_wait_for_sheep 4
+	_cluster_format -V -c 2
+}
+
+function testJoinCluster
+{
+	setUpCluster3
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG vdi create -P foo 100M >/dev/null 2>&1
+	$DOG node info
+
+	_make_device 3 $((100*1024**2))
+	SHEEP_OPTIONS='-V 100' _start_sheep 3
+	_wait_for_sheep 4
+	for i in 0 1 2 3 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG node info
+	_cleanup
+}
+
+function testLeaveCluster
+{
+	setUpCluster4
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG vdi create -P foo 100M >/dev/null 2>&1
+	$DOG node info
+
+	_kill_sheep 3
+	_wait_for_sheep_stop 3
+	_wait_for_sheep 3
+	for i in 0 1 2 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG node info
+	_cleanup
+}
+
+function testReweightCluster
+{
+	setUpCluster3
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG vdi create -P foo 100M >/dev/null 2>&1
+	$DOG node info
+
+	dd if=/dev/zero of="$STORE/0/dummy" bs=1024k count=50 \
+		>/dev/null 2>&1
+	$DOG node info
+	$DOG cluster reweight
+	for i in 0 1 2 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG node info
+	_cleanup
+}
+
+function testJoinClusterStepByStep
+{
+	setUpCluster3
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG vdi create -P foo 100M >/dev/null 2>&1
+	$DOG node info
+
+	_make_device 3 $((100*1024**2))
+	SHEEP_OPTIONS='-V 10' _start_sheep 3
+	_wait_for_sheep 4
+	for i in 0 1 2 3 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG node info
+
+	for ((vnodes=20 ; vnodes<=100 ; vnodes+=10)) ; do
+		$DOG node vnodes set -p 7003 "$vnodes"
+		for i in 0 1 2 3 ; do
+			_wait_for_sheep_recovery "$i"
+		done
+		$DOG cluster info -v | _filter_cluster_info
+		$DOG node info
+	done
+
+	_cleanup
+}
+
+function testLeaveClusterStepByStep
+{
+	setUpCluster4
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG vdi create -P foo 100M >/dev/null 2>&1
+	$DOG node info
+
+	for ((vnodes=90 ; vnodes>=10 ; vnodes-=10)) ; do
+		$DOG node vnodes set -p 7003 "$vnodes"
+		for i in 0 1 2 3 ; do
+			_wait_for_sheep_recovery "$i"
+		done
+		$DOG cluster info -v | _filter_cluster_info
+		$DOG node info
+	done
+
+	_kill_sheep 3
+	_wait_for_sheep_stop 3
+	_wait_for_sheep 3
+	for i in 0 1 2 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+	$DOG cluster info -v | _filter_cluster_info
+	$DOG node info
+
+	_cleanup
+}
+
+testJoinCluster
+testLeaveCluster
+testReweightCluster
+testJoinClusterStepByStep
+testLeaveClusterStepByStep
