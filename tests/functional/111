@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test sheep -V/--vnodes
+# Test dog node vnodes set
 
 . ./common
 
