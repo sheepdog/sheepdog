@@ -53,3 +53,7 @@ using backend plain store
 Invalid number of vnodes '+': must be an integer between 1 and 65535
 using backend plain store
 Invalid number of vnodes '-': must be an integer between 1 and 65535
+using backend plain store
+Failed to execute request
+using backend plain store
+Failed to execute request
