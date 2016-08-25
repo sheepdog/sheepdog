@@ -1,0 +1,55 @@
+QA output created by 111
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 1 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:100]
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 1 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:1]
+DATE      1 [127.0.0.1:7000:100]
+using backend plain store
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 1 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      1 [127.0.0.1:7000:100]
+Cluster status: running, auto-recovery enabled
+Cluster store: plain with 1 redundancy policy
+Cluster vnodes strategy: fixed
+Cluster vnode mode: node
+Cluster created at DATE
+
+Epoch Time           Version [Host:Port:V-Nodes,,,]
+DATE      2 [127.0.0.1:7000:65535]
+DATE      1 [127.0.0.1:7000:100]
+using backend plain store
+Invalid number of vnodes '0': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '65536': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '65537': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '4294967297': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '-1': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes 'a': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '42a': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '+': must be an integer between 1 and 65535
+using backend plain store
+Invalid number of vnodes '-': must be an integer between 1 and 65535

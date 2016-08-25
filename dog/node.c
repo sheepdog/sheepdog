@@ -789,11 +789,9 @@ static int do_vnodes_set(const struct node_id *nid, int *nr_vnodes)
 static int node_vnodes_set(int argc, char **argv)
 {
 	int ret = 0;
-	char *p;
-	int32_t nr_vnodes = strtol(argv[optind], &p, 10);
+	int32_t nr_vnodes = str_to_u16(argv[optind]);
 
-	if (argv[optind] == p || nr_vnodes < 1 || nr_vnodes > UINT16_MAX
-		|| *p != '\0') {
+	if (errno != 0 || nr_vnodes < 1) {
 		sd_err("Invalid number of vnodes '%s': must be an integer "
 			"between 1 and %u",
 			argv[optind], UINT16_MAX);
