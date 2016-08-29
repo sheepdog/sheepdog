@@ -651,6 +651,7 @@ static int md_move_object(uint64_t oid, const char *old, const char *new)
 	struct strbuf buf = STRBUF_INIT;
 	int fd, ret = -1;
 	size_t sz = get_store_objsize(oid);
+	const bool sparse = is_sparse_object(oid);
 
 	fd = open(old, O_RDONLY);
 	if (fd < 0) {
@@ -665,7 +666,7 @@ static int md_move_object(uint64_t oid, const char *old, const char *new)
 		goto out_close;
 	}
 
-	if (atomic_create_and_write(new, buf.buf, buf.len, false, true) < 0) {
+	if (atomic_create_and_write(new, buf.buf, buf.len, false, sparse) < 0) {
 		if (errno != EEXIST) {
 			sd_err("failed to create %s", new);
 			ret = -1;
