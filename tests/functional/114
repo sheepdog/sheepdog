@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# Test md plug and sparse object
+
+. ./common
+
+MD=true
+
+_need_to_be_root
+
+if [ "$STORE" != "/tmp/sheepdog/114" ]; then
+	_notrun "This test cannot be run when WD is manually set"
+fi
+
+function _listFiles
+{
+	for i in "$@" ; do
+		stat -c "%n %b %B %s" "$i"/* |\
+		awk '{print $1,$2*$3,$4;}' |\
+		sort |\
+		_filter_store
+	done
+}
+
+function setUp
+{
+	_make_device 0 $((256*1024**2))
+	_make_device 1 $((256*1024**2))
+	_make_device 2 $((256*1024**2))
+	MD_STORE=",$STORE/1"
+	_start_sheep 0
+	_wait_for_sheep 1
+	_cluster_format -c 1
+}
+
+function testPlugAndSparse
+{
+	setUp
+
+	$DOG node md info | _filter_store
+
+	for ((i=0; i<10; ++i)) ; do
+		$DOG vdi create -P "v$i" 8M
+	done
+
+	_listFiles "$STORE"/1
+
+	$DOG node md plug -f "$STORE"/2
+	_wait_for_sheep_recovery 0
+
+	$DOG node md info | _filter_store
+	_listFiles "$STORE"/{1,2}
+
+	_cleanup
+}
+
+testPlugAndSparse
