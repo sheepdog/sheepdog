@@ -883,9 +883,6 @@ worker_fn bool is_refresh_required(uint32_t vid)
 		goto out;
 	}
 
-	if (entry->snapshot)
-		goto out;
-
 	if (entry->lock_state != LOCK_STATE_SHARED)
 		goto out;
 
@@ -920,9 +917,6 @@ worker_fn void validate_myself(uint32_t vid)
 		sd_alert("VID: %"PRIx32" doesn't exist", vid);
 		goto out;
 	}
-
-	if (entry->snapshot)
-		goto out;
 
 	if (entry->lock_state != LOCK_STATE_SHARED)
 		goto out;
