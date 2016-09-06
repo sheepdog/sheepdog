@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#include <search.h>
 
 #include "dog.h"
 #include "treeview.h"
@@ -284,6 +286,67 @@ static void print_obj_ref(uint32_t vid, const char *name, const char *tag,
 		info.name = name;
 		print_vdi_list(vid, name, tag, snapid, flags, i, &info);
 	}
+}
+
+/* For sorting vdi_state by vid in ascending order */
+static int compare_vdi_state_by_vid(const void *lhs, const void *rhs)
+{
+	const struct vdi_state *a = (const struct vdi_state *)lhs;
+	const struct vdi_state *b = (const struct vdi_state *)rhs;
+	return a->vid < b->vid ? -1 : (a->vid > b->vid ? 1 : 0);
+}
+
+/* User data of print_lock_list */
+struct lock_list_data {
+	const struct vdi_state *sorted;
+	size_t nmemb;
+};
+
+static void print_lock_list(uint32_t vid, const char *name, const char *tag,
+			    uint32_t snapid, uint32_t flags,
+			    const struct sd_inode *i, void *data)
+{
+	const struct lock_list_data *u = (const struct lock_list_data *)data;
+	const struct vdi_state key = { .vid = vid };
+	const struct vdi_state *found = bsearch(&key, u->sorted, u->nmemb,
+						sizeof(struct vdi_state),
+						compare_vdi_state_by_vid);
+
+	if (!found || found->lock_state == LOCK_STATE_UNLOCKED)
+		return;
+
+	const bool is_clone = (i->snap_id == 1 && i->parent_vdi_id != 0);
+
+	printf("%c %-8s  %5" PRIu32 "  %6" PRIx32 "  %-13s ",
+	       vdi_is_snapshot(i) ? 's' : (is_clone ? 'c' : ' '),
+	       name, snapid, vid, tag);
+
+	if (found->lock_state == LOCK_STATE_LOCKED) {
+		printf(" %s\n", node_id_to_str(&found->lock_owner));
+		return;
+	}
+
+	/* LOCK_STATE_SHARED */
+	for (uint32_t j = 0; j < found->nr_participants; j++) {
+		printf(" %s", node_id_to_str(&found->participants[j]));
+
+		const uint32_t state = found->participants_state[j];
+		switch(state) {
+		case SHARED_LOCK_STATE_MODIFIED:
+			printf("(modified)");
+			break;
+		case SHARED_LOCK_STATE_SHARED:
+			printf("(shared)");
+			break;
+		case SHARED_LOCK_STATE_INVALIDATED:
+			printf("(invalidated)");
+			break;
+		default:
+			printf("(UNKNOWN %" PRIu32 ", BUG!)", state);
+			break;
+		}
+	}
+	printf("\n");
 }
 
 static int vdi_list(int argc, char **argv)
@@ -2732,57 +2795,20 @@ static int vdi_alter_copy(int argc, char **argv)
 
 static int lock_list(int argc, char **argv)
 {
-	struct vdi_state *vs = NULL;
-	int ret = 0, count = 0;
+	int count = 0;
+	struct vdi_state *vs = get_vdi_state(&count);
+	sd_assert(count >= 0);
 
-	vs = get_vdi_state(&count);
+	const size_t nmemb = (size_t)count;
+	qsort(vs, nmemb, sizeof(struct vdi_state), compare_vdi_state_by_vid);
 
-	init_tree();
-	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE,
-			NULL, true) < 0)
-		goto out;
+	printf("  Name         Id  VDI id  Tag            Owner node(s)\n");
 
-	printf("VDI | owner node\n");
-	for (int i = 0; i < count; i++) {
-		struct vdi_tree *vdi;
+	struct lock_list_data data = { .sorted = vs, .nmemb = nmemb };
+	const int ret = parse_vdi(print_lock_list, SD_INODE_SIZE, &data, true);
 
-		if (vs[i].lock_state == LOCK_STATE_UNLOCKED)
-			continue;
-
-		vdi = find_vdi_from_root_by_vid(vs[i].vid);
-		if (vs[i].lock_state == LOCK_STATE_LOCKED) {
-			printf("%s | %s\n", vdi->name,
-			       node_id_to_str(&vs[i].lock_owner));
-		} else {	/* LOCK_STATE_SHARED */
-			printf("%s |", vdi->name);
-
-			for (int j = 0; j < vs[i].nr_participants; j++) {
-				printf(" %s",
-				       node_id_to_str(&vs[i].participants[j]));
-				switch(vs[i].participants_state[j]) {
-				case SHARED_LOCK_STATE_MODIFIED:
-					printf("(modified)");
-					break;
-				case SHARED_LOCK_STATE_SHARED:
-					printf("(shared)");
-					break;
-				case SHARED_LOCK_STATE_INVALIDATED:
-					printf("(invalidated)");
-					break;
-				default:
-					printf("(UNKNOWN %d, BUG!)",
-					       vs[i].participants_state[j]);
-					break;
-				}
-			}
-
-			printf("\n");
-		}
-	}
-
-out:
 	free(vs);
-	return ret;
+	return (ret < 0) ? EXIT_SYSFAIL : EXIT_SUCCESS;
 }
 
 static int lock_unlock(int argc, char **argv)
