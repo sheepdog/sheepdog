@@ -98,6 +98,40 @@ static inline bool is_data_obj_writeable(const struct sd_inode *inode,
 	return inode->vdi_id == sd_inode_get_vid(inode, idx);
 }
 
+/*
+ * Make string description of VDI for logging.
+ * Here 20 is sizeof(" (tag=, vid=abcdef)") plus 1.
+ * Note that vid is 24-bit practically so its max length in hex is 6 chars.
+ */
+#define VDI_DESC_MAX (SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN + 20)
+static inline void describe_vdi(const char *name, uint32_t snapid,
+				const char *tag, uint32_t vid, char *desc)
+{
+	if (vid) {
+		if (snapid > 0)
+			snprintf(desc, VDI_DESC_MAX,
+				 "%s (snapid=%" PRIu32 ", vid=%" PRIx32 ")",
+				 name, snapid, vid);
+		else if (tag[0])
+			snprintf(desc, VDI_DESC_MAX,
+				 "%s (tag=%s, vid=%" PRIx32 ")",
+				 name, tag, vid);
+		else
+			snprintf(desc, VDI_DESC_MAX,
+				 "%s (vid=%" PRIx32 ")",
+				 name, vid);
+	} else {
+		if (snapid > 0)
+			snprintf(desc, VDI_DESC_MAX, "%s (snapid=%" PRIu32 ")",
+				 name, snapid);
+		else if (tag[0])
+			snprintf(desc, VDI_DESC_MAX, "%s (tag=%s)",
+				 name, tag);
+		else
+			snprintf(desc, VDI_DESC_MAX, "%s", name);
+	}
+}
+
 static void vdi_show_progress(uint64_t done, uint64_t total)
 {
 	return show_progress(done, total, false);
@@ -2813,57 +2847,80 @@ static int lock_list(int argc, char **argv)
 
 static int lock_unlock(int argc, char **argv)
 {
-	struct sd_req hdr;
-	const char *vdiname = argv[optind];
-	struct vdi_tree *vdi;
 	struct vdi_state *vs = NULL;
-	int ret = EXIT_SYSFAIL, vs_count = 0;
-	uint32_t type;
+	int ret = 0;
+	char vdidesc[VDI_DESC_MAX] = { 0 };
 
-	init_tree();
-	if (parse_vdi(construct_vdi_tree, SD_INODE_HEADER_SIZE,
-			NULL, true) < 0)
-		goto out;
-
-	vdi = find_vdi_from_root_by_name(vdiname);
-	if (!vdi) {
-		sd_err("VDI: %s not found", vdiname);
+	const char *vdiname = argv[optind];
+	if (!vdiname) {
+		sd_err("VDI name must be specified");
+		ret = EXIT_USAGE;
 		goto out;
 	}
 
+	const uint32_t snapid = vdi_cmd_data.snapshot_id;
+	const char *tag = vdi_cmd_data.snapshot_tag;
+	uint32_t vid = 0;
+	ret = find_vdi_name(vdiname, snapid, tag, &vid);
+	describe_vdi(vdiname, snapid, tag, vid, vdidesc);
+	if (ret != SD_RES_SUCCESS) {
+		sd_err("Failed to find VDI %s: %s",
+		       vdidesc, sd_strerror(ret));
+		ret = EXIT_FAILURE;
+		goto out;
+	}
+	sd_assert(vid > 0);
+
+	/* TODO: get not all the status but only the state of target VDI */
+	int vs_count = 0;
 	vs = get_vdi_state(&vs_count);
-	if (!vs)
-		goto out;
-
-	for (int i = 0; i < vs_count; i++) {
-		if (vs[i].vid != vdi->vid)
-			continue;
-
-		switch (vs[i].lock_state) {
-		case LOCK_STATE_UNLOCKED:
-			sd_err("VDI: %s is not locked", vdiname);
-			goto out;
-		case LOCK_STATE_LOCKED:
-			type = LOCK_TYPE_NORMAL;
-			break;
-		case LOCK_STATE_SHARED:
-			type = LOCK_TYPE_SHARED;
-			break;
-		default:
-			sd_err("VDI: %s unknown lock state", vdiname);
-			goto out;
-		}
-
-		sd_init_req(&hdr, SD_OP_RELEASE_VDI);
-		hdr.vdi.base_vdi_id = vdi->vid;
-		hdr.vdi.type = type;
-		ret = dog_exec_req(&sd_nid, &hdr, NULL);
+	if (!vs) {
+		sd_err("Failed to get VDI state");
+		ret = EXIT_SYSFAIL;
 		goto out;
 	}
+	sd_assert(vs_count >= 0);
+
+	/* run linear search to find vdi_state whose ID is vid */
+	size_t nmemb = (size_t)vs_count;
+	const struct vdi_state key = { .vid = vid };
+	const struct vdi_state *found = lfind(&key, vs, &nmemb,
+					      sizeof(struct vdi_state),
+					      compare_vdi_state_by_vid);
+	if (!found) {
+		sd_err("Failed to find VDI state %s", vdidesc);
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+
+	uint32_t type = 0;
+	switch (found->lock_state) {
+	case LOCK_STATE_UNLOCKED:
+		sd_err("VDI %s is not locked", vdidesc);
+		ret = EXIT_FAILURE;
+		goto out;
+	case LOCK_STATE_LOCKED:
+		type = LOCK_TYPE_NORMAL;
+		break;
+	case LOCK_STATE_SHARED:
+		type = LOCK_TYPE_SHARED;
+		break;
+	default:
+		sd_err("VDI %s unknown lock state (%" PRIu32 ")",
+		       vdidesc, found->lock_state);
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
+
+	struct sd_req hdr;
+	sd_init_req(&hdr, SD_OP_RELEASE_VDI);
+	hdr.vdi.base_vdi_id = vid;
+	hdr.vdi.type = type;
+	ret = dog_exec_req(&sd_nid, &hdr, NULL);
+	ret = ret ? EXIT_FAILURE : EXIT_SUCCESS;
 
 out:
-	if (vs)
-		free(vs);
+	free(vs);
 	return ret;
 }
 
@@ -2939,7 +2996,7 @@ static struct subcommand vdi_cmd[] = {
 	 vdi_restore, vdi_options},
 	{"alter-copy", "<vdiname>", "caphTf", "set the vdi's redundancy level",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG|CMD_NEED_NODELIST, vdi_alter_copy, vdi_options},
-	{"lock", NULL, "aphT", "See 'dog vdi lock' for more information",
+	{"lock", NULL, "saphT", "See 'dog vdi lock' for more information",
 	 vdi_lock_cmd, CMD_NEED_ROOT|CMD_NEED_ARG, vdi_lock, vdi_options},
 	{NULL,},
 };
