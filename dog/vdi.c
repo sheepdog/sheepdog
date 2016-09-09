@@ -2829,8 +2829,15 @@ static int vdi_alter_copy(int argc, char **argv)
 
 static int lock_list(int argc, char **argv)
 {
+	int ret = 0;
+
 	int count = 0;
 	struct vdi_state *vs = get_vdi_state(&count);
+	if (!vs) {
+		sd_err("Failed to get VDI state");
+		ret = EXIT_SYSFAIL;
+		goto out;
+	}
 	sd_assert(count >= 0);
 
 	const size_t nmemb = (size_t)count;
@@ -2839,10 +2846,12 @@ static int lock_list(int argc, char **argv)
 	printf("  Name         Id  VDI id  Tag            Owner node(s)\n");
 
 	struct lock_list_data data = { .sorted = vs, .nmemb = nmemb };
-	const int ret = parse_vdi(print_lock_list, SD_INODE_SIZE, &data, true);
+	ret = parse_vdi(print_lock_list, SD_INODE_SIZE, &data, true);
+	ret = ret ? EXIT_SYSFAIL : EXIT_SUCCESS;
 
+out:
 	free(vs);
-	return (ret < 0) ? EXIT_SYSFAIL : EXIT_SUCCESS;
+	return ret;
 }
 
 static int lock_unlock(int argc, char **argv)
