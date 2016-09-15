@@ -515,14 +515,14 @@ static int create_work_queues(void)
 		sys->io_wqueue = create_fixed_work_queue("io", wq_io_threads);
 	} else {
 		sd_info("io workqueue is created as unlimited, it is not recommended!");
-		sys->io_wqueue = create_fixed_work_queue("io", WQ_UNLIMITED);
+		sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
 	}
 	if (wq_recovery_threads) {
 		sd_info("# of threads in rw workqueue: %d", wq_recovery_threads);
 		sys->recovery_wqueue = create_fixed_work_queue("rw", wq_recovery_threads);
 	} else {
 		sd_info("recovery workqueue is created as unlimited, it is not recommended!");
-		sys->recovery_wqueue = create_fixed_work_queue("rw", WQ_UNLIMITED);
+		sys->recovery_wqueue = create_work_queue("rw", WQ_UNLIMITED);
 	}
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
@@ -532,7 +532,7 @@ static int create_work_queues(void)
 		sys->areq_wqueue = create_fixed_work_queue("async_req", wq_async_threads);
 	} else {
 		sd_info("async_req workqueue is created as unlimited, it is not recommended!");
-		sys->areq_wqueue = create_fixed_work_queue("async_req", WQ_UNLIMITED);
+		sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
