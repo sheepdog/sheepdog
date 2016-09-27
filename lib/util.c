@@ -43,8 +43,9 @@ void *xzalloc(size_t size)
 
 void *xrealloc(void *ptr, size_t size)
 {
+	errno = 0;
 	void *ret = realloc(ptr, size);
-	if (unlikely(!ret))
+	if (unlikely(errno == ENOMEM))
 		panic("Out of memory");
 	return ret;
 }
