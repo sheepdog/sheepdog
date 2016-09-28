@@ -99,6 +99,7 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 {
 	int nr = 0;
 	struct objlist_cache_entry *entry;
+	uint64_t *newbuf = NULL;
 
 	/* first try getting the cached buffer with only a read lock held */
 	sd_read_lock(&obj_list_cache.lock);
@@ -111,9 +112,17 @@ int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
 		goto out;
 
+	/* Update obj_list_cache.buf indirectly to keep previous pointer */
+	newbuf = realloc(obj_list_cache.buf,
+			 obj_list_cache.cache_size * sizeof(uint64_t));
+	if (!newbuf && errno == ENOMEM) {
+		sd_rw_unlock(&obj_list_cache.lock);
+		sd_err("Failed to allocate memory for object list");
+		return SD_RES_NO_MEM;
+	}
+
 	obj_list_cache.buf_version = obj_list_cache.tree_version;
-	obj_list_cache.buf = xrealloc(obj_list_cache.buf,
-				obj_list_cache.cache_size * sizeof(uint64_t));
+	obj_list_cache.buf = newbuf;
 
 	rb_for_each_entry(entry, &obj_list_cache.root, node) {
 		obj_list_cache.buf[nr++] = entry->oid;
