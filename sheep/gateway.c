@@ -849,36 +849,48 @@ int gateway_write_obj(struct request *req)
 			goto out;
 		}
 
-		sd_debug("update ledger objects of %"PRIx64, hdr->obj.oid);
-		refcnt_work = zalloc(sizeof(*refcnt_work));
-		if (!refcnt_work)
-			goto free_bufs;
+		if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_RECYCLE_VID)) {
+			sd_debug("update ledger objects of %"PRIx64,
+				 hdr->obj.oid);
+			refcnt_work = zalloc(sizeof(*refcnt_work));
+			if (!refcnt_work)
+				goto free_bufs;
 
-		refcnt_work->vids = vids;
-		refcnt_work->refs = refs;
-		refcnt_work->nr_vids = nr_vids;
-		refcnt_work->new_vids = calloc(hdr->data_length,
-					       sizeof(uint32_t));
-		if (!refcnt_work->new_vids)
-			goto free_work;
-		memcpy(refcnt_work->new_vids, new_vids, hdr->data_length);
+			refcnt_work->vids = vids;
+			refcnt_work->refs = refs;
+			refcnt_work->nr_vids = nr_vids;
+			refcnt_work->new_vids = calloc(hdr->data_length,
+						       sizeof(uint32_t));
+			if (!refcnt_work->new_vids)
+				goto free_work;
+			memcpy(refcnt_work->new_vids, new_vids,
+			       hdr->data_length);
 
-		refcnt_work->offset = offset;
-		refcnt_work->start = start;
+			refcnt_work->offset = offset;
+			refcnt_work->start = start;
 
-		refcnt_work->work.fn = async_update_obj_refcnt_work;
-		refcnt_work->work.done = async_update_obj_refcnt_done;
+			refcnt_work->work.fn = async_update_obj_refcnt_work;
+			refcnt_work->work.done = async_update_obj_refcnt_done;
 
-		queue_work(sys->io_wqueue, &refcnt_work->work);
-		goto out;
+			queue_work(sys->io_wqueue, &refcnt_work->work);
+			goto out;
 
-free_work:
-		free(refcnt_work);
-free_bufs:
-		free(vids);
-		free(refs);
+		free_work:
+			free(refcnt_work);
+		free_bufs:
+			free(vids);
+			free(refs);
 
-		ret = SD_RES_NO_MEM;
+			ret = SD_RES_NO_MEM;
+		} else {
+			/*
+			 * async ledger update can cause invalid reference
+			 * counting and data loss:
+			 * https://github.com/sheepdog/sheepdog/issues/315
+			 */
+			update_obj_refcnt(offset, start, nr_vids,
+					  vids, new_vids, refs);
+		}
 	}
 
 out:
