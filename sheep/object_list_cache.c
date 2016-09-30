@@ -97,39 +97,50 @@ int objlist_cache_insert(uint64_t oid)
 
 int get_obj_list(const struct sd_req *hdr, struct sd_rsp *rsp, void *data)
 {
-	int nr = 0;
+	int nr = 0, ret = SD_RES_SUCCESS;
 	struct objlist_cache_entry *entry;
+	uint64_t *newbuf = NULL;
 
 	/* first try getting the cached buffer with only a read lock held */
 	sd_read_lock(&obj_list_cache.lock);
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
-		goto out;
+		goto ready;
 
 	/* if that fails grab a write lock for the usually necessary update */
 	sd_rw_unlock(&obj_list_cache.lock);
 	sd_write_lock(&obj_list_cache.lock);
 	if (obj_list_cache.tree_version == obj_list_cache.buf_version)
+		goto ready;
+
+	/* Update obj_list_cache.buf indirectly to keep previous pointer */
+	newbuf = realloc(obj_list_cache.buf,
+			 obj_list_cache.cache_size * sizeof(uint64_t));
+	if (!newbuf && errno == ENOMEM) {
+		sd_err("Failed to allocate memory for object list");
+		ret = SD_RES_NO_MEM;
 		goto out;
+	}
 
 	obj_list_cache.buf_version = obj_list_cache.tree_version;
-	obj_list_cache.buf = xrealloc(obj_list_cache.buf,
-				obj_list_cache.cache_size * sizeof(uint64_t));
+	obj_list_cache.buf = newbuf;
 
 	rb_for_each_entry(entry, &obj_list_cache.root, node) {
 		obj_list_cache.buf[nr++] = entry->oid;
 	}
 
-out:
+ready:
 	if (hdr->data_length < obj_list_cache.cache_size * sizeof(uint64_t)) {
-		sd_rw_unlock(&obj_list_cache.lock);
 		sd_err("GET_OBJ_LIST buffer too small");
-		return SD_RES_BUFFER_SMALL;
+		ret = SD_RES_BUFFER_SMALL;
+		goto out;
 	}
 
 	rsp->data_length = obj_list_cache.cache_size * sizeof(uint64_t);
 	memcpy(data, obj_list_cache.buf, rsp->data_length);
+
+out:
 	sd_rw_unlock(&obj_list_cache.lock);
-	return SD_RES_SUCCESS;
+	return ret;
 }
 
 static void objlist_deletion_work(struct work *work)
