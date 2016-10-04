@@ -25,6 +25,7 @@ L: sheepdog@lists.wpkg.org
 Sheepdog Stable Branches
 ------------------------------
 M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+M: Takashi Menjo <menjo.takashi@lab.ntt.co.jp>
 B: sheepdog/stable-*
 L: sheepdog@lists.wpkg.org
 
@@ -61,15 +62,11 @@ L: libvir-list@redhat.com
 Openstack Drivers
 ------------------------------
 M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
-F: openstack/glance/store/sheepdog.py
+M: Takashi Menjo <menjo.takashi@lab.ntt.co.jp>
+M: YAMADA Hideki <yamada.hideki@lab.ntt.co.jp>
+F: openstack/glance_store/glance_store/_drivers/sheepdog.py
 F: openstack/cinder/volume/drivers/sheepdog.py
 L: openstack-dev@lists.openstack.org
-
-Earthquake testing stuff
-------------------------------
-M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
-F: tests/earthquake/*
-L: sheepdog@lists.wpkg.org
 
 Debian related stuff
 ------------------------------
