@@ -1,4 +1,130 @@
-## 1.0 (not released yet)
+## 1.1 (not released yet)
+
+## 1.0.1 (release candidate)
+
+IMPORTANT BUG FIX:
+ - handle a case of snapshot then failover properly on iSCSI multipath
+   use case (please use tgt 1.0.68 or later together)
+ - disable asynchronous update of ledger objects if VID recycling is
+   enabled for avoiding data object loss
+ - do not make non-ledger and non-inode objects moving between disks
+   when "dog node md plug" be sparse
+
+NEW FEATURE:
+ - fixed work queue: Sets and limits the number of threads in a sheep
+   process. You can get stable performance with this if tuned properly.
+
+SHEEP COMMAND INTERFACE
+ - new option "-w" to set fixed work queue (default: disabled i.e. the
+   number of threads increases and decreases automatically and unlimitedly)
+   **(note that "-w" was object cache option before v1.0)**
+
+DOG COMMAND INTERFACE:
+ - refine output of "dog vdi lock list"
+ - enhance "dog vdi lock unlock" to unlock not only working VDI but
+   also snapshot
+
+TESTING:
+ - Travis CI: Tests a new pull request automatically
+
+## 1.0
+
+NEW FEATURE:
+ - VDI over 4TiB: Now we can create a VDI larger than 4 tebibytes in
+   size. This is realized by enlarging the size of data objects in a
+   VDI. When you let it 8MiB (=2\*\*23 bytes), the size of VDI is 8TiB
+   (=8MiB\*1024\*1024). Note that this can degrade I/O performance. So
+   you should use this only if nesessary.
+ - multi-cluster in one ZooKeeper: Now we can manage one or more
+   Sheepdog clusters in one ZooKeeper ensemble. You should give the
+   cluster driver a "cluster ID" to which cluster the sheep process
+   is to join when it is launched.
+ - fixed vnodes: Gives vnodes to each sheep process in a cluster not
+   automatically but manually. This is useful for reducing temporal
+   disk space during recovery. Note that vnodes should be given to
+   each sheep process in proportion to the capacity of disk(s). So
+   you should use this carefully.
+ - recycleing VID: Lets a cluster garbage-collect VDI IDs when all
+   the members in a VDI family are deleted then reuse them when a
+   new VDI is being created. This is useful for a cluster that VDIs
+   are created, snapshotted and deleted many times.
+ - avoiding diskfull caused by recovery: Lets each sheep process in
+   a cluster not start recovery if total capacity of objects placed
+   on it in the next epoch is larger than that of disk(s).
+
+SHEEP COMMAND INTERFACE:
+ - new option "-V" to set the number of fixed vnodes manually
+   (default: disabled i.e. vnodes calculated automatically)
+ - a "cluster ID" can be given to the ZooKeeper cluster driver in
+   the form of "host:port[,..]**/clusterID**" (default: "/sheepdog")
+
+DOG COMMAND INTERFACE:
+ - new command "dog benchmark":
+ - new option "-z" to "dog cluster format" to set default data object
+   size and VDI size in a cluster
+   (default: 22 i.e. 4MiB = 2\*\*22 bytes per data object and
+                     4TiB = 4MiB\*1024\*1024 per VDI)
+ - new option "-V" to "dog cluster format" to enable fixed vnodes
+   (default: disabled i.e. vnodes calculated automatically)
+ - new option "-R" to "dog cluster format" to enable recycling VID
+   (default: disabled)
+ - new option "-F" to "dog cluster format" to enable avoiding diskfull
+   caused by recovery (default: disabled i.e. try to recover always)
+ - new option "-z" to "dog vdi create" to set data object size and VDI
+   size being created individually with cluster's default
+ - new option "-R" to "dog vdi snapshot" not to create a new snapshot
+   if a working VDI does not have its own objects (default: disabled)
+
+TESTING:
+ - operation test: Useful for testing SD\_OP\_\*.
+
+OTHER IMPORTANT NOTE:
+ - **object cache feature and related interfaces are removed**
+
+## 0.9.4 (release candidate)
+
+NEW FEATURE:
+ - updating ledger object asynchronously: Now each sheep in a cluster
+   updates an inode object and related ledger objects in an asynchronous
+   manner. This improves performance of copy-on-write and dereferencing,
+   especially deleting VDIs.
+
+## 0.9.3
+
+NEW FEATURE:
+ - store driver "tree": Puts data objects into separate subdirectories
+   based on their object ID, and meta objects into different directory
+   from data objects. This is useful for massive cluster.
+ - recovery speed throttling: Limits the number of objects being
+   transferred from one sheep process to another when recovery.
+   This will increase the recovery time but reduce the impact on the
+   application.
+ - wildcard recovery: Lets a sheep process search all objects from
+   all nodes when it is launched. This enables us to upgrade a cluster
+   even if object placement strategy is changed.
+
+SHEEP COMMAND INTERFACE:
+ - new option "-R" to set recovery speed throttling
+   (default: no throttle)
+ - new option "-W" to enable wildcard recovery (default: disabled)
+
+DOG COMMAND INTERFACE:
+ - new command "dog upgrade" to upgrade inode, epoch and config files
+   and object location from old version
+ - new subcommand "dog node format" to set store driver
+ - new subsubcommand "get-throttle" and "set-throttle" to "dog node
+   recovery" to get/set recovery speed throttling
+
+## 0.9.2
+
+DOG COMMAND INTERFACE:
+ - new option "-l" to "dog cluster format" to enable VDI lock
+   (default: disabled)
+
+## 0.9.1
+
+DOG COMMAND INTERFACE:
+ - enhance "dog vdi lock unlock" to unlock shared-locked VDI by tgtd
 
 ## 0.9.0
 
