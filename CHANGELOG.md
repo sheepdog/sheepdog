@@ -1,3 +1,48 @@
+## 0.9.4 (release candidate)
+
+NEW FEATURE:
+ - updating ledger object asynchronously: Now each sheep in a cluster
+   updates an inode object and related ledger objects in an asynchronous
+   manner. This improves performance of copy-on-write and dereferencing,
+   especially deleting VDIs.
+
+## 0.9.3
+
+NEW FEATURE:
+ - store driver "tree": Puts data objects into separate subdirectories
+   based on their object ID, and meta objects into different directory
+   from data objects. This is useful for massive cluster.
+ - recovery speed throttling: Limits the number of objects being
+   transferred from one sheep process to another when recovery.
+   This will increase the recovery time but reduce the impact on the
+   application.
+ - wildcard recovery: Lets a sheep process search all objects from
+   all nodes when it is launched. This enables us to upgrade a cluster
+   even if object placement strategy is changed.
+
+SHEEP COMMAND INTERFACE:
+ - new option "-R" to set recovery speed throttling
+   (default: no throttle)
+ - new option "-W" to enable wildcard recovery (default: disabled)
+
+DOG COMMAND INTERFACE:
+ - new command "dog upgrade" to upgrade inode, epoch and config files
+   and object location from old version
+ - new subcommand "dog node format" to set store driver
+ - new subsubcommand "get-throttle" and "set-throttle" to "dog node
+   recovery" to get/set recovery speed throttling
+
+## 0.9.2
+
+DOG COMMAND INTERFACE:
+ - new option "-l" to "dog cluster format" to enable VDI lock
+   (default: disabled)
+
+## 0.9.1
+
+DOG COMMAND INTERFACE:
+ - enhance "dog vdi lock unlock" to unlock shared-locked VDI by tgtd
+
 ## 0.9.0
 
 NEW FEATURE:
