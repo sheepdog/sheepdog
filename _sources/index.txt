@@ -58,13 +58,12 @@ Sheepdog is an Open Source software, released under the terms of the
 
 Packages
 --------
-You can also install Sheepdog with deb packages.
+You can also install Sheepdog with deb/rpm packages.
 Before installing Sheepdog packages, install dependent packages listed at Getting Started on Wiki.
 
-+ Debian
-  + v1.0.0: `sheepdog-1.0.0-1.amd64.deb <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/deb/sheepdog-1.0.0-1.amd64.deb>`__
-+ RPM
-  + v1.0.0: `sheepdog-1.0.0-1.el7.centos.x86_64.rpm <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/rpm/sheepdog-1.0.0-1.el7.centos.x86_64.rpm>`__
++ v1.0.0
+  + `Ubuntu 16.04 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/deb/sheepdog-1.0.0-1.amd64.deb>`__
+  + `CentOS 7 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/rpm/sheepdog-1.0.0-1.el7.centos.x86_64.rpm>`__
 
 Mailing list and IRC
 --------------------
