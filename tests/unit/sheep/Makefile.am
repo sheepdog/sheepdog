@@ -64,7 +64,7 @@ test_recovery_SOURCES   = test_recovery.c ../../../sheep/recovery.c \
                 ../cmock/src/cmock.c ../unity/src/unity.c
 
 clean-local:
-	rm -f ${check_PROGRAMS} *.o
+	rm -f ${check_PROGRAMS} *.o sheep.info
 
 coverage:
 	@lcov -d . -c -o sheep.info

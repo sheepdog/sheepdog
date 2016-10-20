@@ -36,7 +36,7 @@ test_atomic_create_and_write_SOURCES =					\
 			  ../cmock/src/cmock.c ../unity/src/unity.c
 
 clean-local:
-	rm -f ${check_PROGRAMS} *.o
+	rm -f ${check_PROGRAMS} *.o lib.info
 
 coverage:
-	@lcov -d . -c -o sheep.info
+	@lcov -d . -c -o lib.info

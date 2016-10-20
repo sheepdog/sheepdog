@@ -17,7 +17,7 @@ test_common_SOURCES	= test_common.c mock_dog.c			\
 			  dog/common.c
 
 clean-local:
-	rm -f ${check_PROGRAMS} *.o
+	rm -f ${check_PROGRAMS} *.o dog.info
 
 coverage:
 	@lcov -d . -c -o dog.info
