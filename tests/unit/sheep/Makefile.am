@@ -19,7 +19,7 @@ LIBS			= $(top_srcdir)/lib/libsd.a		\
 			  @CHECK_LIBS@
 
 test_vdi_SOURCES	= test_vdi.c sheep/vdi.c mock_sheep.c mock_store.c		\
-			  mock_request.c ../unity/src/unity.c
+			  mock_request.c unity.c
 
 test_cluster_driver_SOURCES	= mock_sheep.c mock_group.c		\
 				  sheep/cluster/local.c	\
@@ -35,33 +35,33 @@ endif
 test_hash_SOURCES	= test_hash.c mock_sheep.c mock_group.c \
 				mock_plain_store.c mock_gateway.c mock_store.c mock_vdi.c
 
-test_group_SOURCES	= test_group.c ../../../sheep/group.c \
-				../../../sheep/ops.c \
+test_group_SOURCES	= test_group.c sheep/group.c \
+				sheep/ops.c \
 				mock_sheep.c \
-				../../../sheep/request.c \
-				../../../sheep/store/common.c \
-				../../../sheep/store/md.c \
-				../../../sheep/vdi.c \
-				../../../sheep/config.c \
-				../../../sheep/recovery.c \
-				../../../sheep/gateway.c \
-				../../../sheep/object_list_cache.c \
-				../../../sheep/migrate.c \
-				../cmock/src/cmock.c ../unity/src/unity.c
+				sheep/request.c \
+				sheep/store/common.c \
+				sheep/store/md.c \
+				sheep/vdi.c \
+				sheep/config.c \
+				sheep/recovery.c \
+				sheep/gateway.c \
+				sheep/object_list_cache.c \
+				sheep/migrate.c \
+				cmock.c unity.c
 
-test_recovery_SOURCES   = test_recovery.c ../../../sheep/recovery.c \
-                ../../../sheep/ops.c \
+test_recovery_SOURCES   = test_recovery.c sheep/recovery.c \
+                sheep/ops.c \
                 mock_sheep.c \
-                ../../../sheep/request.c \
-                ../../../sheep/store/common.c \
-                ../../../sheep/store/md.c \
-                ../../../sheep/vdi.c \
-                ../../../sheep/config.c \
-                ../../../sheep/group.c \
-                ../../../sheep/gateway.c \
-                ../../../sheep/object_list_cache.c \
-                ../../../sheep/migrate.c \
-                ../cmock/src/cmock.c ../unity/src/unity.c
+                sheep/request.c \
+                sheep/store/common.c \
+                sheep/store/md.c \
+                sheep/vdi.c \
+                sheep/config.c \
+                sheep/group.c \
+                sheep/gateway.c \
+                sheep/object_list_cache.c \
+                sheep/migrate.c \
+                cmock.c unity.c
 
 clean-local:
 	rm -f ${check_PROGRAMS} *.o sheep.info
@@ -73,5 +73,11 @@ sheep/%.c: $(top_srcdir)/sheep/%.c
 	@mkdir -p $(@D)
 	@cp $< $@
 
+cmock.c: ../cmock/src/cmock.c
+	@cp $< $@
+
+unity.c: ../unity/src/unity.c
+	@cp $< $@
+
 distclean-local:
-	rm -rf sheep
+	rm -rf sheep cmock.c unity.c
