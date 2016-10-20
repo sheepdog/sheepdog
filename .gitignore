@@ -58,7 +58,6 @@ coverage
 aclocal.m4
 Makefile
 Makefile.in
-INSTALL
 config.log
 config.status
 config.guess
