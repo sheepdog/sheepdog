@@ -9,3 +9,4 @@ check.time
 097_login_devfiles
 097_diff_devfiles
 multipath.conf
+saved_multipath.conf

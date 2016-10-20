@@ -44,11 +44,6 @@ sheep/sheep
 sheepfs/sheepfs
 shepherd/shepherd
 tools/zk_control
-tests/unit/dog/test_common
-tests/unit/sheep/test_vdi
-tests/unit/sheep/test_cluster_driver
-tests/unit/sheep/test_hash
-tests/unit/lib/test_util
 
 # directories
 .deps
@@ -58,7 +53,6 @@ coverage
 aclocal.m4
 Makefile
 Makefile.in
-INSTALL
 config.log
 config.status
 config.guess

@@ -1,4 +1,4 @@
-MAINTAINERCLEANFILES	= Makefile.in
+MAINTAINERCLEANFILES	= Makefile.in config
 
 TESTS			= test_vdi test_cluster_driver test_hash test_group test_recovery
 
@@ -64,7 +64,7 @@ test_recovery_SOURCES   = test_recovery.c sheep/recovery.c \
                 cmock.c unity.c
 
 clean-local:
-	rm -f ${check_PROGRAMS} *.o sheep.info
+	rm -f sheep.info
 
 coverage:
 	@lcov -d . -c -o sheep.info
