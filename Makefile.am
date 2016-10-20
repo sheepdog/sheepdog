@@ -9,7 +9,7 @@ AUTOMAKE_OPTIONS	= foreign
 MAINTAINERCLEANFILES	= Makefile.in aclocal.m4 configure depcomp	\
 			  config.guess config.sub missing install-sh	\
 			  autoheader automake autoconf config.status	\
-			  config.log
+			  config.log compile ltmain.sh test-driver
 
 sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
