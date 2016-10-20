@@ -1,4 +1,4 @@
-MAINTAINERCLEANFILES	= Makefile.in
+MAINTAINERCLEANFILES	= Makefile.in config
 
 TESTS			= test_vdi test_cluster_driver test_hash test_group test_recovery
 
