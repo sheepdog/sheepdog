@@ -1,4 +1,4 @@
-## 0.9.4 (release candidate)
+## 0.9.4
 
 NEW FEATURE:
  - updating ledger object asynchronously: Now each sheep in a cluster
