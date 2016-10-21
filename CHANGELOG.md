@@ -1,4 +1,4 @@
-## 1.0.1 (release candidate)
+## 1.0.1
 
 IMPORTANT BUG FIX:
  - handle a case of snapshot then failover properly on iSCSI multipath
