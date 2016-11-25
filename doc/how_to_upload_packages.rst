@@ -96,8 +96,22 @@ Replace source-code file which answers your purpose.
  Make spec file like "Example of rpm spec file" at Reference.
  
  Then, save it as "sheepdog.spec" in rpmbuild/SPECS.
+ 
+ 4. Install the required packages
 
- 4. Make rpm-package
+ Install the required packages listed on BuildRequires in "sheepdog.spec".
+
+ You may need to add "EPEL" repository to install the following packages.
+ 
+ ::
+
+     $ sudo yum install autoconf automake yasm corosynclib-devel userspace-rcu-devel
+
+ 5. Download source code
+
+ Download the targeted source code and put it in rpmbuild/SOURCES.
+
+ 6. Make rpm-package
 
  ::
 
@@ -111,15 +125,16 @@ Replace source-code file which answers your purpose.
  
  In the brach "gh-pages", put the package, that you made, in data/package/deb for deb-package or data/package/rpm for rpm-package.
  
- Then, like this PR below >
- 
- https://github.com/sheepdog/sheepdog/pull/317/files
- 
- modify the following 3 files.
+ Then, modify the following 3 files.
  
  - _sources/index.txt 
  - index.html 
  - src/index.rst 
+
+ like this PR below:
+
+ https://github.com/sheepdog/sheepdog/pull/317/files
+
  
 4. Pull Request
 ---------------
@@ -148,7 +163,7 @@ Example of rpm spec file:
     Requires(preun): initscripts
     
     # Build bits
-    BuildRequires: autoconf automake
+    BuildRequires: autoconf automake yasm
     BuildRequires: corosynclib-devel userspace-rcu-devel
     
     BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
