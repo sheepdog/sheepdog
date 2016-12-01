@@ -43,8 +43,8 @@ Source Code
 Sheepdog is an Open Source software, released under the terms of the
 `GPL2 <./_static/LICENSE.txt>`__.
 
-+ The latest 1.x release is `1.0 <https://github.com/sheepdog/sheepdog/tarball/v1.0>`__
-+ The latest 0.9.x release is `0.9.3 <https://github.com/sheepdog/sheepdog/tarball/v0.9.3>`__
++ The latest 1.0.x release is `1.0.1 <https://github.com/sheepdog/sheepdog/tarball/v1.0.1>`__
++ The latest 0.9.x release is `0.9.4 <https://github.com/sheepdog/sheepdog/tarball/v0.9.4>`__
 + The latest 0.8.x release is `0.8.3 <https://github.com/sheepdog/sheepdog/tarball/v0.8.3>`__
 + The latest 0.7.x release is `0.7.8 <https://github.com/sheepdog/sheepdog/tarball/v0.7.8>`__
 + The latest developent code is available on the git tree
@@ -59,9 +59,13 @@ Packages
 You can also install Sheepdog with deb/rpm packages.
 Before installing Sheepdog packages, install dependent packages listed at Getting Started on Wiki.
 
++ v1.0.1
+  + `Ubuntu 16.04 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/v1.0.1/ubuntu16.04/sheepdog-1.0.1-1_amd64.deb>`__
+  + `CentOS 7 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/v1.0.1/centos7/sheepdog-1.0.1-1.el7.centos.x86_64.rpm>`__
+
 + v1.0.0
-  + `Ubuntu 16.04 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/deb/sheepdog-1.0.0-1.amd64.deb>`__
-  + `CentOS 7 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/rpm/sheepdog-1.0.0-1.el7.centos.x86_64.rpm>`__
+  + `Ubuntu 16.04 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/v1.0.0/ubuntu16.04/sheepdog-1.0.0-1.amd64.deb>`__
+  + `CentOS 7 <https://github.com/sheepdog/sheepdog/raw/gh-pages/data/package/v1.0.0/cenots7/sheepdog-1.0.0-1.el7.centos.x86_64.rpm>`__
 
 Mailing list and IRC
 --------------------
