@@ -1084,13 +1084,12 @@ int main(int argc, char **argv)
 		goto cleanup_journal;
 
 	#ifdef HAVE_HTTP
-	if (http_options && http_init(http_options) != 0)
+	if (http_init(http_options) != 0)
 		goto cleanup_journal;
 	#endif
 
 	#ifdef HAVE_NFS
-	ret = nfs_init(NULL);
-	if (ret)
+	if (nfs_init(NULL) != 0)
 		goto cleanup_journal;
 	#endif
 

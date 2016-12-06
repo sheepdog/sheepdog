@@ -437,7 +437,8 @@ int http_init(const char *options)
 	if (!sys->http_wqueue)
 		return -1;
 
-	FCGX_Init();
+	if (FCGX_Init() != 0)
+		return -1;
 
 #define LISTEN_QUEUE_DEPTH 1024 /* No rationale */
 	snprintf(address, sizeof(address), "%s:%s", http_host, http_port);
