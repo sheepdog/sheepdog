@@ -1201,6 +1201,7 @@ int peer_decref_object(struct request *req)
 
 		/* reclaim object */
 		if (exist) {
+			objlist_cache_remove(ledger_oid);
 			ret = sd_store->remove_object(ledger_oid, -1);
 			if (ret != SD_RES_SUCCESS) {
 				sd_err("error %s", sd_strerror(ret));
