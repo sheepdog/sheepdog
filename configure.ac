@@ -541,7 +541,7 @@ fi
 if test "x${enable_trace}" = xyes && \
 		cc_supports_flag -pg ; then
 	AC_MSG_NOTICE([Enabling trace (-pg)])
-	TRACE_CFLAGS="-pg -nopie"
+	TRACE_CFLAGS="-pg -fno-pie"
 else
 	TRACE_CFLAGS=""
 fi
