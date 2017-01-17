@@ -20,7 +20,7 @@
 #include "internal_proto.h"
 
 #define QUEUE_ZNODE "/sheepdog/queue"
-#define MIN_THRESHOLD 86400
+#define DEFAULT_THRESHOLD 86400L
 
 #define FOR_EACH_ZNODE(parent, path, strs)			       \
 	for ((strs)->data += (strs)->count;			       \
@@ -294,27 +294,26 @@ err:
 static int do_purge(int argc, char **argv)
 {
 	struct String_vector strs;
-	int rc, len, threshold, deleted = 0;
+	int rc, len, deleted = 0;
+	long threshold = DEFAULT_THRESHOLD;
 	char *p, path[256];
 	struct zk_event ev;
 	struct Stat stat;
 	struct timeval tv;
 
-	if (argc != 3) {
-		fprintf(stderr, "remove queue: need specify "
-				"threshold in seconds\n");
-		return -1;
-	}
-
-	threshold = strtol(argv[2], &p, 10);
-	if (p == argv[2]) {
-		fprintf(stderr, "threshold must be a number\n");
-		return -1;
-	}
-	if (threshold < MIN_THRESHOLD) {
-		threshold = MIN_THRESHOLD;
-		fprintf(stdout, "threshold is less than %d seconds, "
-			"set it to %d\n", MIN_THRESHOLD, MIN_THRESHOLD);
+	if (argc < 3) {
+		fprintf(stderr, "threshold not given; use default %ld\n",
+		        threshold);
+	} else {
+		threshold = strtol(argv[2], &p, 10);
+		if (*p != '\0' || threshold < 0L) {
+			fprintf(stderr,
+			        "threshold must be a non-negative number\n");
+			return -1;
+		} else if (errno == ERANGE) {
+			fprintf(stderr, "threshold too large\n");
+			return -1;
+		}
 	}
 
 	gettimeofday(&tv, NULL);
