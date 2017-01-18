@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test fixed vnodes feature
+# Test fixed vnodes feature -- format
 
 . ./common
 
@@ -41,15 +41,6 @@ function setUpFixedCluster
 	setUpDevice
 	setUpFixedNode
 	_cluster_format -V -c 2
-}
-
-function setUpClusterShutdown
-{
-	"$1" # setUpFoobarCluster
-	$DOG cluster shutdown
-	for i in 0 1 2 ; do
-		_wait_for_sheep_stop "$i"
-	done
 }
 
 function testFormatAutoCluster
@@ -111,69 +102,6 @@ function testFormatMixedClusterFailed
 	_cleanup
 }
 
-# Give me SHEEP_OPTIONS when you call testJoinSucceeded
-function testJoinSucceeded
-{
-	"$1" # setUpFoobarCluster
-	$DOG cluster info -v | _filter_cluster_info
-
-	_make_device 3 $((400*1024**2))
-	_start_sheep 3
-	_wait_for_sheep 4
-	for i in 0 1 2 3 ; do
-		_wait_for_sheep_recovery "$i"
-	done
-	$DOG cluster info -v | _filter_cluster_info
-
-	_cleanup
-}
-
-# Give me SHEEP_OPTIONS when you call testJoinFailed
-function testJoinFailed
-{
-	"$1" # setUpFoobarCluster
-	$DOG cluster info -v | _filter_cluster_info
-
-	_make_device 3 $((400*1024**2))
-	_start_sheep 3
-	_wait_for_sheep_stop 3
-	_wait_for_sheep 3
-	for i in 0 1 2 ; do
-		_wait_for_sheep_recovery "$i"
-	done
-	$DOG cluster info -v | _filter_cluster_info
-
-	_cleanup
-}
-
-function testRejoinSucceeded
-{
-	setUpClusterShutdown "$1" # setUpFoobarCluster
-	"$2" # setUpFoobarNode
-	_cleanup
-}
-
-# Give me SHEEP_OPTIONS when you call testRejoinFailed
-function testRejoinFailed
-{
-	setUpClusterShutdown "$1" # setUpFoobarCluster
-	_start_sheep 0
-	_wait_for_sheep_stop 0
-	_cleanup
-}
-
 testFormatAutoCluster
 testFormatFixedCluster
 testFormatMixedClusterFailed
-
-SHEEP_OPTIONS=''       testJoinSucceeded setUpAutoCluster
-SHEEP_OPTIONS='-V 400' testJoinSucceeded setUpFixedCluster
-SHEEP_OPTIONS=''       testJoinFailed    setUpFixedCluster
-SHEEP_OPTIONS='-V 400' testJoinFailed    setUpAutoCluster
-
-testRejoinSucceeded setUpAutoCluster  setUpAutoNode
-testRejoinSucceeded setUpFixedCluster setUpFixedNode
-
-SHEEP_OPTIONS='-V 42' testRejoinFailed setUpAutoCluster
-SHEEP_OPTIONS=''      testRejoinFailed setUpFixedCluster
-SHEEP_OPTIONS='-V 42' testRejoinFailed setUpFixedCluster
