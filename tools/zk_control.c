@@ -354,6 +354,9 @@ static int do_purge(int argc, char **argv)
 	fprintf(stdout, "completed. %d queue nodes are deleted\n", deleted);
 	return 0;
 err:
+	if (deleted > 0) {
+		fprintf(stderr, "%d queue nodes are deleted, but ", deleted);
+	}
 	fprintf(stderr, "failed to purge %s, %s\n", QUEUE_ZNODE, zerror(rc));
 	return -1;
 }
