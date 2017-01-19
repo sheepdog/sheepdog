@@ -11,10 +11,16 @@ function testStartPortSucceeded
 	port="$1"
 	mkdir -p "$STORE/0"
 	if $SHEEP "$STORE/0" -p "$port" ; then
-		sleep 1 # DO NOT use _wait_for_sheep
-		if grep daemon "$STORE/0/sheep.log" >/dev/null 2>&1 ; then
-			$DOG node list -p "$port"
-		else
+		local i=0
+		while [ $i -lt 5 ] ; do
+			if grep daemon "$STORE/0/sheep.log" >/dev/null 2>&1 ; then
+				$DOG node list -p "$port"
+				break
+			fi
+			sleep 1
+			i=$((i+1))
+		done
+		if [ $i -eq 5 ] ; then
 			err=1
 		fi
 	else
