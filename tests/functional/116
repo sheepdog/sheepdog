@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Test fixed vnodes feature (node join, auto cluster)
+
+. ./common
+
+_need_to_be_root
+
+function setUpDevice
+{
+	_make_device 0 $((100*1024**2))
+	_make_device 1 $((200*1024**2))
+	_make_device 2 $((300*1024**2))
+}
+
+function setUpAutoNode
+{
+	SHEEP_OPTIONS='' _start_sheep 0
+	SHEEP_OPTIONS='' _start_sheep 1
+	SHEEP_OPTIONS='' _start_sheep 2
+	_wait_for_sheep 3
+}
+
+function setUpAutoCluster
+{
+	setUpDevice
+	setUpAutoNode
+	_cluster_format -c 2
+}
+
+# Give me SHEEP_OPTIONS when you call testJoinSucceeded
+function testJoinSucceeded
+{
+	"$1" # setUpFoobarCluster
+	$DOG cluster info -v | _filter_cluster_info
+
+	_make_device 3 $((400*1024**2))
+	_start_sheep 3
+	_wait_for_sheep 4
+	for i in 0 1 2 3 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+	$DOG cluster info -v | _filter_cluster_info
+
+	_cleanup
+}
+
+# Give me SHEEP_OPTIONS when you call testJoinFailed
+function testJoinFailed
+{
+	"$1" # setUpFoobarCluster
+	$DOG cluster info -v | _filter_cluster_info
+
+	_make_device 3 $((400*1024**2))
+	_start_sheep 3
+	_wait_for_sheep_stop 3
+	_wait_for_sheep 3
+	for i in 0 1 2 ; do
+		_wait_for_sheep_recovery "$i"
+	done
+	$DOG cluster info -v | _filter_cluster_info
+
+	_cleanup
+}
+
+SHEEP_OPTIONS=''       testJoinSucceeded setUpAutoCluster
+SHEEP_OPTIONS='-V 400' testJoinFailed    setUpAutoCluster
