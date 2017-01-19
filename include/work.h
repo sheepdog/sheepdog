@@ -25,7 +25,6 @@ struct work_queue {
 enum wq_thread_control {
 	WQ_ORDERED, /* Only 1 thread created for work queue */
 	WQ_DYNAMIC, /* # of threads proportional to nr_nodes created */
-	WQ_UNLIMITED, /* Unlimited # of threads created */
 	WQ_FIXED, /* Fixed # of threads created */
 };
 

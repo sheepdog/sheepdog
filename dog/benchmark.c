@@ -99,9 +99,6 @@ static int benchmark_io(int argc, char **argv)
 		else if (!strcmp("dynamic",
 				 benchmark_cmd_data.workqueue_type))
 			wq_type = WQ_DYNAMIC;
-		else if (!strcmp("unlimited",
-				   benchmark_cmd_data.workqueue_type))
-			wq_type = WQ_UNLIMITED;
 		else if (!strcmp("fixed",
 				 benchmark_cmd_data.workqueue_type))
 			wq_type = WQ_FIXED;
@@ -109,7 +106,7 @@ static int benchmark_io(int argc, char **argv)
 			sd_err("unknown workqueue type: %s",
 			       benchmark_cmd_data.workqueue_type);
 			sd_err("assumed workqueue types:"
-			       " ordered, dynamic, unlimited");
+			       " ordered, dynamic");
 			return EXIT_SYSFAIL;
 		}
 	}

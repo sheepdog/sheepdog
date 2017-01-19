@@ -21,7 +21,6 @@ static void test_create_work_queue(void)
 {
 	const char *name_o = "wq_ordered";
 	const char *name_d = "wq_dynamic";
-	const char *name_u = "wq_unlimited";
 	enum wq_thread_control tc = WQ_ORDERED;
 
 	wq = create_work_queue(name_o, tc);
@@ -29,10 +28,6 @@ static void test_create_work_queue(void)
 
 	tc = WQ_DYNAMIC;
 	wq = create_work_queue(name_d, tc);
-	TEST_ASSERT_NOT_NULL(wq);
-
-	tc = WQ_UNLIMITED;
-	wq = create_work_queue(name_u, tc);
 	TEST_ASSERT_NOT_NULL(wq);
 }
 

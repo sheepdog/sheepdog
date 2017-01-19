@@ -52,7 +52,7 @@ static void test_start_recovery()
 	/* create work queue */
 	init_event(EPOLL_SIZE);
 	init_work_queue(NULL);
-	sys->recovery_wqueue = create_work_queue("rw", WQ_UNLIMITED);
+	sys->recovery_wqueue = create_work_queue("rw", WQ_DYNAMIC);
 
 	INIT_LIST_HEAD(&sys->req_wait_queue);
 
