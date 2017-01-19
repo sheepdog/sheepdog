@@ -38,15 +38,10 @@ function testStartPortFailed
 }
 
 testStartPortSucceeded 7000
-testStartPortSucceeded 65535 # UINT16_MAX
 testStartPortFailed 0
 testStartPortFailed 65536 # UINT16_MAX + 1
-testStartPortFailed 65537 # UINT16_MAx + 2
-testStartPortFailed 4294967297 # UINT32_MAX + 2
 testStartPortFailed -1
 testStartPortFailed a
 testStartPortFailed 42a
-testStartPortFailed +
-testStartPortFailed -
 
 exit $err

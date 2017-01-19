@@ -1,14 +1,8 @@
 QA output created by 108
   Id   Host:Port         V-Nodes       Zone
    0   127.0.0.1:7000      	128   16777343
-  Id   Host:Port         V-Nodes       Zone
-   0   127.0.0.1:65535     	128   16777343
 Invalid port number '0'
 Invalid port number '65536'
-Invalid port number '65537'
-Invalid port number '4294967297'
 Invalid port number '-1'
 Invalid port number 'a'
 Invalid port number '42a'
-Invalid port number '+'
-Invalid port number '-'

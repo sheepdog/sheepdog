@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Test fixed vnodes feature -- rejoin
+
+. ./common
+
+_need_to_be_root
+
+function setUpDevice
+{
+	_make_device 0 $((100*1024**2))
+	_make_device 1 $((200*1024**2))
+	_make_device 2 $((300*1024**2))
+}
+
+function setUpAutoNode
+{
+	SHEEP_OPTIONS='' _start_sheep 0
+	SHEEP_OPTIONS='' _start_sheep 1
+	SHEEP_OPTIONS='' _start_sheep 2
+	_wait_for_sheep 3
+}
+
+function setUpAutoCluster
+{
+	setUpDevice
+	setUpAutoNode
+	_cluster_format -c 2
+}
+
+function setUpFixedNode
+{
+	SHEEP_OPTIONS='-V 100' _start_sheep 0
+	SHEEP_OPTIONS='-V 200' _start_sheep 1
+	SHEEP_OPTIONS='-V 300' _start_sheep 2
+	_wait_for_sheep 3
+}
+
+function setUpFixedCluster
+{
+	setUpDevice
+	setUpFixedNode
+	_cluster_format -V -c 2
+}
+
+function setUpClusterShutdown
+{
+	"$1" # setUpFoobarCluster
+	$DOG cluster shutdown
+	for i in 0 1 2 ; do
+		_wait_for_sheep_stop "$i"
+	done
+}
+
+function testRejoinSucceeded
+{
+	setUpClusterShutdown "$1" # setUpFoobarCluster
+	"$2" # setUpFoobarNode
+	_cleanup
+}
+
+# Give me SHEEP_OPTIONS when you call testRejoinFailed
+function testRejoinFailed
+{
+	setUpClusterShutdown "$1" # setUpFoobarCluster
+	_start_sheep 0
+	_wait_for_sheep_stop 0
+	_cleanup
+}
+
+testRejoinSucceeded setUpAutoCluster  setUpAutoNode
+testRejoinSucceeded setUpFixedCluster setUpFixedNode
+
+SHEEP_OPTIONS='-V 42' testRejoinFailed setUpAutoCluster
+SHEEP_OPTIONS=''      testRejoinFailed setUpFixedCluster
+SHEEP_OPTIONS='-V 42' testRejoinFailed setUpFixedCluster

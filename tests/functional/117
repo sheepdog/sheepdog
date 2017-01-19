@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Test md node event after disk failure
+# Test md disk failure after node event
 
 . ./common
 
@@ -16,20 +16,20 @@ _make_device 6 $((300 * 1024 ** 2))
 
 MD=true
 
-for i in `seq 0 5`; do
+for i in `seq 0 6`; do
 	_start_sheep $i
 done
-_wait_for_sheep 6
+_wait_for_sheep 7
 _cluster_format
 _vdi_create test 200M -P
 
-# node event after disk failure
-_safe_remove $STORE/0/d0
-
+# disk failures after node event
+_safe_remove $STORE/1/d0
 _random | $DOG vdi write test &
 sleep 1
-_start_sheep 6
-_wait_for_sheep 7
+_kill_sheep 2
+_wait_for_sheep 6
+_safe_remove $STORE/1/d1
 _wait_for_sheep_recovery 0
 wait # dog
 $DOG vdi check test
