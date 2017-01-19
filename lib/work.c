@@ -72,6 +72,7 @@ static int efd;
 static LIST_HEAD(wq_info_list);
 static size_t nr_nodes = 1;
 static size_t (*wq_get_nr_nodes)(void);
+static size_t nr_cores = 1;
 
 static void *worker_routine(void *arg);
 
@@ -206,11 +207,9 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 	case WQ_ORDERED:
 		break;
 	case WQ_DYNAMIC:
-		/* FIXME: 2 * nr_nodes threads. No rationale yet. */
-		nr = nr_nodes * 2;
-		break;
-	case WQ_UNLIMITED:
-		nr = SIZE_MAX;
+		/* max(#nodes,#cores,16)*2 threads */
+		nr = (uint64_t)max(nr_nodes, nr_cores);
+		nr = max(nr, UINT64_C(16)) * 2;
 		break;
 	case WQ_FIXED:
 		nr = wi->nr_threads;
@@ -393,17 +392,6 @@ int init_work_queue(size_t (*get_nr_nodes)(void))
 	return 0;
 }
 
-/*
- * Allowing unlimited threads to be created is necessary to solve the following
- * problems:
- *
- *  1. timeout of IO requests from guests. With on-demand short threads, we
- *     guarantee that there is always one thread available to execute the
- *     request as soon as possible.
- *  2. sheep halt for corner case that all gateway and io threads are executing
- *     local requests that ask for creation of another thread to execute the
- *     requests and sleep-wait for responses.
- */
 struct work_queue *create_work_queue(const char *name,
 				     enum wq_thread_control tc)
 {
@@ -528,3 +516,12 @@ int sd_thread_join(sd_thread_t thread, void **retval)
 	return pthread_join(thread, retval);
 }
 
+static void __attribute__((constructor)) init_nr_cores(void)
+{
+	const long nr = sysconf(_SC_NPROCESSORS_ONLN);
+	if (nr == -1L) {
+		fprintf(stderr, "cannot get the number of online processors\n");
+		exit(1);
+	}
+	nr_cores = (size_t)nr;
+}
