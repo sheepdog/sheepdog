@@ -154,6 +154,8 @@ static struct sd_option sheep_options[] = {
 	{'w', "cache", true, "enable object cache", cache_help},
 	{'q', "wq-threads", true, "specify a number of threads for workqueue"},
 	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
+	{'x', "max-dynamic-threads", true,
+	 "specify the maximum number of threads for dynamic workqueue"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
 	{'z', "zone", true,
@@ -730,6 +732,7 @@ int main(int argc, char **argv)
 	     *argp = NULL;
 	bool explicit_addr = false;
 	int64_t zone = -1;
+	uint32_t max_dynamic_threads = 0;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
 #ifdef HAVE_HTTP
@@ -883,6 +886,16 @@ int main(int argc, char **argv)
 		case 'q':
 			if (option_parse(optarg, ",", wq_parsers) < 0)
 				exit(1);
+			break;
+		case 'x':
+			max_dynamic_threads = str_to_u32(optarg);
+			if (errno != 0 || max_dynamic_threads < 1) {
+				sd_err("Invalid number of threads '%s': "
+				       "must be an integer between 1 and %"PRIu32,
+				       optarg, UINT32_MAX);
+				exit(1);
+			}
+			set_max_dynamic_threads((size_t)max_dynamic_threads);
 			break;
 		default:
 			usage(1);

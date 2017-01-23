@@ -65,6 +65,7 @@ struct work_queue *create_fixed_work_queue(const char *name, int nr_threads);
 void queue_work(struct work_queue *q, struct work *work);
 bool work_queue_empty(struct work_queue *q);
 int wq_trace_init(void);
+void set_max_dynamic_threads(size_t nr_max);
 
 #ifdef HAVE_TRACE
 void suspend_worker_threads(void);
