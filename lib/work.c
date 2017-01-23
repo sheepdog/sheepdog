@@ -37,6 +37,9 @@
 #define TRACEPOINT_DEFINE
 #include "work_tp.h"
 
+/* If this is greater than 0, the number of threads grows based on it. */
+static size_t max_dynamic_threads = 0;
+
 /*
  * The protection period from shrinking work queue.  This is necessary
  * to avoid many calls of pthread_create.  Without it, threads are
@@ -207,9 +210,13 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 	case WQ_ORDERED:
 		break;
 	case WQ_DYNAMIC:
-		/* max(#nodes,#cores,16)*2 threads */
-		nr = (uint64_t)max(nr_nodes, nr_cores);
-		nr = max(nr, UINT64_C(16)) * 2;
+		if (max_dynamic_threads > 0) {
+			nr = (uint64_t)max_dynamic_threads;
+		} else {
+			/* max(#nodes,#cores,16)*2 threads */
+			nr = (uint64_t)max(nr_nodes, nr_cores);
+			nr = max(nr, UINT64_C(16)) * 2;
+		}
 		break;
 	case WQ_FIXED:
 		nr = wi->nr_threads;
@@ -458,6 +465,11 @@ bool work_queue_empty(struct work_queue *q)
 	struct wq_info *wi = container_of(q, struct wq_info, q);
 
 	return uatomic_read(&wi->nr_queued_work) == 0;
+}
+
+void set_max_dynamic_threads(size_t nr_max)
+{
+	max_dynamic_threads = nr_max;
 }
 
 struct thread_args {
