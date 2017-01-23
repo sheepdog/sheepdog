@@ -97,12 +97,12 @@ int dog_read_object(uint64_t oid, void *data, unsigned int datalen,
 
 	ret = dog_exec_req(&sd_nid, &hdr, data);
 	if (ret < 0) {
-		sd_err("Failed to read object %" PRIx64, oid);
+		sd_err("Failed to read object %016" PRIx64, oid);
 		return SD_RES_EIO;
 	}
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("Failed to read object %" PRIx64 " %s", oid,
+		sd_err("Failed to read object %016" PRIx64 " %s", oid,
 		       sd_strerror(rsp->result));
 		return rsp->result;
 	}
@@ -139,11 +139,11 @@ int dog_write_object(uint64_t oid, uint64_t cow_oid, void *data,
 
 	ret = dog_exec_req(&sd_nid, &hdr, data);
 	if (ret < 0) {
-		sd_err("Failed to write object %" PRIx64, oid);
+		sd_err("Failed to write object %016" PRIx64, oid);
 		return SD_RES_EIO;
 	}
 	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("Failed to write object %" PRIx64 ": %s", oid,
+		sd_err("Failed to write object %016" PRIx64 ": %s", oid,
 		       sd_strerror(rsp->result));
 		return rsp->result;
 	}

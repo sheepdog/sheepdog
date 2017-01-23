@@ -179,7 +179,7 @@ static int search_erasure_object(uint64_t oid, uint8_t idx,
 		hdr.obj.tgt_epoch = tgt_epoch;
 		hdr.obj.ec_index = idx;
 
-		sd_debug("%"PRIx64" epoch %"PRIu32" tgt %"PRIu32" idx %d, %s",
+		sd_debug("%016"PRIx64" epoch %"PRIu32" tgt %"PRIu32" idx %d, %s",
 			 oid, epoch, tgt_epoch, idx, node_to_str(n));
 		if (sheep_exec_req(&n->nid, &hdr, buf) == SD_RES_SUCCESS)
 			return SD_RES_SUCCESS;
@@ -210,7 +210,7 @@ again:
 			goto rollback;
 	}
 	node = oid_to_node(oid, &old->vroot, idx);
-	sd_debug("%"PRIx64" epoch %"PRIu32" tgt %"PRIu32" idx %d, %s",
+	sd_debug("%016"PRIx64" epoch %"PRIu32" tgt %"PRIu32" idx %d, %s",
 		 oid, epoch, tgt_epoch, idx, node_to_str(node));
 	if (invalid_node(node, rw->cur_vinfo))
 		goto rollback;
@@ -236,7 +236,7 @@ rollback:
 		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
 					      rw->cur_vinfo, true);
 		if (!new_old) {
-			sd_warn("can not read %"PRIx64" idx %d", oid, idx);
+			sd_warn("can not read %016"PRIx64" idx %d", oid, idx);
 			free(buf);
 			buf = NULL;
 			goto done;
@@ -360,7 +360,7 @@ static int recover_object_from_replica(struct recovery_obj_work *row,
 		ret = recover_object_from(row, node, tgt_epoch, false);
 		switch (ret) {
 		case SD_RES_SUCCESS:
-			sd_debug("recovered oid %"PRIx64" from %d to epoch %d",
+			sd_debug("recovered oid %016"PRIx64" from %d to epoch %d",
 				 oid, tgt_epoch, epoch);
 			return ret;
 		case SD_RES_OLD_NODE_VER:
@@ -397,14 +397,14 @@ static int recover_object_wildcard(struct recovery_obj_work *row,
 	struct sd_node *n;
 
 	rb_for_each_entry(n, &old->nroot, rb) {
-		sd_info("doing wildcard recovery: at epoch %u, object %"PRIx64
+		sd_info("doing wildcard recovery: at epoch %u, object %016"PRIx64
 			", from %s", tgt_epoch, oid, node_to_str(n));
 
 		ret = recover_object_from(row, n, tgt_epoch, true);
 
 		switch (ret) {
 		case SD_RES_SUCCESS:
-			sd_debug("recovered oid %"PRIx64" from %d to epoch %d"
+			sd_debug("recovered oid %016"PRIx64" from %d to epoch %d"
 				 " (wildcard)", oid, tgt_epoch, epoch);
 			return ret;
 		case SD_RES_OLD_NODE_VER:
@@ -446,7 +446,7 @@ static int recover_replication_object(struct recovery_obj_work *row)
 
 	old = grab_vnode_info(rw->old_vinfo);
 again:
-	sd_debug("try recover object %"PRIx64" from epoch %"PRIu32, oid,
+	sd_debug("try recover object %016"PRIx64" from epoch %"PRIu32, oid,
 		 tgt_epoch);
 
 	if (row->wildcard)
@@ -462,7 +462,7 @@ again:
 		row->stop = true;
 		break;
 	case SD_RES_STALE_OBJ:
-		sd_alert("cannot access any replicas of %"PRIx64" at epoch %d",
+		sd_alert("cannot access any replicas of %016"PRIx64" at epoch %d",
 			 oid, tgt_epoch);
 		sd_alert("clients may see old data");
 		/* fall through */
@@ -471,7 +471,7 @@ again:
 		new_old = rollback_vnode_info(&tgt_epoch, rw->rinfo,
 					      rw->cur_vinfo, false);
 		if (!new_old) {
-			sd_err("can not recover oid %"PRIx64, oid);
+			sd_err("can not recover oid %016"PRIx64, oid);
 			ret = -1;
 			goto out;
 		}
@@ -542,7 +542,7 @@ uint8_t local_ec_index(struct vnode_info *vinfo, uint64_t oid)
 		if (node_is_local(n))
 			return idx;
 	}
-	sd_debug("can't get valid index for %"PRIx64, oid);
+	sd_debug("can't get valid index for %016"PRIx64, oid);
 	return SD_MAX_COPIES;
 }
 
@@ -578,7 +578,7 @@ static int recover_erasure_object(struct recovery_obj_work *row)
 		buf = rebuild_erasure_object(oid, idx, row);
 	if (!buf) {
 		if (!row->stop)
-			sd_err("failed to recover %"PRIx64" idx %d", oid, idx);
+			sd_err("failed to recover %016"PRIx64" idx %d", oid, idx);
 		goto out;
 	}
 
@@ -597,7 +597,7 @@ static int do_recover_object(struct recovery_obj_work *row)
 {
 	uint64_t oid = row->oid;
 
-	sd_debug("try recover object %"PRIx64, oid);
+	sd_debug("try recover object %016"PRIx64, oid);
 
 	if (is_erasure_oid(oid))
 		return recover_erasure_object(row);
@@ -636,7 +636,7 @@ static void recover_object_work(struct work *work)
 
 	ret = do_recover_object(row);
 	if (ret != 0)
-		sd_err("failed to recover object %"PRIx64, oid);
+		sd_err("failed to recover object %016"PRIx64, oid);
 }
 
 bool node_in_recovery(void)
@@ -689,7 +689,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 
 	cur = rinfo->cur_vinfo;
 	if (sd_store->exist(oid, local_ec_index(cur, oid))) {
-		sd_debug("the object %" PRIx64 " is already recovered", oid);
+		sd_debug("the object %016" PRIx64 " is already recovered", oid);
 		return false;
 	}
 
@@ -706,7 +706,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		break;
 	case RW_RECOVER_OBJ:
 		if (xlfind(&oid, rinfo->oids, rinfo->done, oid_cmp)) {
-			sd_debug("%" PRIx64 " has been already recovered", oid);
+			sd_debug("%016" PRIx64 " has been already recovered", oid);
 			return false;
 		}
 
@@ -736,10 +736,10 @@ main_fn bool oid_in_recovery(uint64_t oid)
 		 * Newly created object after prepare_object_list() might not be
 		 * in the list
 		 */
-		sd_debug("%"PRIx64" is not in the recovery list", oid);
+		sd_debug("%016"PRIx64" is not in the recovery list", oid);
 		return false;
 	case RW_NOTIFY_COMPLETION:
-		sd_debug("the object %" PRIx64 " is already recovered", oid);
+		sd_debug("the object %016" PRIx64 " is already recovered", oid);
 		return false;
 	}
 
@@ -1002,7 +1002,7 @@ static void recover_object_main(struct work *work)
 	if (!(rinfo->done % DIV_ROUND_UP(rinfo->count, 100)))
 		sd_info("object recovery progress %3.0lf%% ",
 			(double)rinfo->done / rinfo->count * 100);
-	sd_debug("object %"PRIx64" is recovered (%"PRIu64"/%"PRIu64")",
+	sd_debug("object %016"PRIx64" is recovered (%"PRIu64"/%"PRIu64")",
 		row->oid, rinfo->done, rinfo->count);
 
 	if (rinfo->done >= rinfo->count)

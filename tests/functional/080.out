@@ -1,14 +1,14 @@
 QA output created by 080
 using backend plain store
-Failed to write object 7c2b2500000000: IO has halted as there are not enough living nodes
+Failed to write object 007c2b2500000000: IO has halted as there are not enough living nodes
 Failed to write VDI
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
   test         0   10 MB  0.0 MB  0.0 MB DATE   7c2b25    4:2                22
 Failed to create VDI test1: Failed to write to requested VDI
-Failed to write object 7c2b2500000000: IO has halted as there are not enough living nodes
+Failed to write object 007c2b2500000000: IO has halted as there are not enough living nodes
 Failed to write VDI
 Failed to create VDI test1: Failed to write to requested VDI
-Failed to write object 7c2b2500000000: IO has halted as there are not enough living nodes
+Failed to write object 007c2b2500000000: IO has halted as there are not enough living nodes
 Failed to write VDI
   Name        Id    Size    Used  Shared    Creation time   VDI id  Copies  Tag   Block Size Shift
   test         0   10 MB  0.0 MB  0.0 MB DATE   7c2b25    4:2                22
