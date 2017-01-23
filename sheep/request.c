@@ -210,7 +210,7 @@ static bool request_in_recovery(struct request *req)
 		return false;
 
 	if (oid_in_recovery(req->local_oid)) {
-		sd_debug("%"PRIx64" wait on oid", req->local_oid);
+		sd_debug("%016"PRIx64" wait on oid", req->local_oid);
 		sleep_on_wait_queue(req);
 		return true;
 	}
@@ -233,7 +233,7 @@ void wakeup_requests_on_epoch(void)
 			 * its epoch changes.
 			 */
 			assert(is_gateway_op(req->op));
-			sd_debug("gateway %"PRIx64, req->rq.obj.oid);
+			sd_debug("gateway %016"PRIx64, req->rq.obj.oid);
 			req->rq.epoch = sys->cinfo.epoch;
 			del_requeue_request(req);
 			break;
@@ -243,7 +243,7 @@ void wakeup_requests_on_epoch(void)
 			 * changes.
 			 */
 			assert(!is_gateway_op(req->op));
-			sd_debug("peer %"PRIx64, req->rq.obj.oid);
+			sd_debug("peer %016"PRIx64, req->rq.obj.oid);
 			del_requeue_request(req);
 			break;
 		default:
@@ -265,7 +265,7 @@ void wakeup_requests_on_oid(uint64_t oid)
 	list_for_each_entry(req, &pending_list, request_list) {
 		if (req->local_oid != oid)
 			continue;
-		sd_debug("retry %" PRIx64, req->local_oid);
+		sd_debug("retry %016" PRIx64, req->local_oid);
 		del_requeue_request(req);
 	}
 	list_splice_init(&pending_list, &sys->req_wait_queue);
@@ -279,7 +279,7 @@ void wakeup_all_requests(void)
 	list_splice_init(&sys->req_wait_queue, &pending_list);
 
 	list_for_each_entry(req, &pending_list, request_list) {
-		sd_debug("%"PRIx64, req->rq.obj.oid);
+		sd_debug("%016"PRIx64, req->rq.obj.oid);
 		del_requeue_request(req);
 	}
 }

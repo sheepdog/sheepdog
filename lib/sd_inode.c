@@ -166,7 +166,7 @@ static void traverse_btree(const struct sd_inode *inode, btree_cb_fn fn,
 			ret = inode_actor.reader(iter_idx->oid, &tmp,
 						 SD_INODE_DATA_INDEX_SIZE, 0);
 			if (ret != SD_RES_SUCCESS) {
-				sd_err("failed to read %"PRIx64, iter_idx->oid);
+				sd_err("failed to read %016"PRIx64, iter_idx->oid);
 				iter_idx++;
 				continue;
 			}
@@ -516,7 +516,7 @@ static int search_whole_btree(read_node_fn reader, const struct sd_inode *inode,
 								 idx);
 				path->p_index_header = leaf_node;
 			} else {
-				sd_debug("last ext-node is full (oid: %"
+				sd_debug("last ext-node is full (oid: %016"
 					 PRIx64")", oid);
 				free(leaf_node);
 			}

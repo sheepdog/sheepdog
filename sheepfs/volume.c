@@ -175,7 +175,7 @@ static int volume_rw_object(char *buf, uint64_t oid, size_t size,
 	put_socket_fd(vdi, sock_idx);
 
 	if (ret || rsp->result != SD_RES_SUCCESS) {
-		sheepfs_pr("failed to %s object %" PRIx64 " ret %d, res %s\n",
+		sheepfs_pr("failed to %s object %016" PRIx64 " ret %d, res %s\n",
 			   rw == VOLUME_READ ? "read" : "write",
 			   oid, ret, sd_strerror(rsp->result));
 		return -1;
@@ -226,7 +226,7 @@ static ssize_t volume_do_rw(const char *path, char *buf, size_t size,
 
 	do {
 #ifdef DEBUG
-		sheepfs_pr("%s oid %"PRIx64", off %ju, len %zu,"
+		sheepfs_pr("%s oid %016"PRIx64", off %ju, len %zu,"
 			   " size %zu\n",
 			   rw == VOLUME_READ ? "read" : "write",
 			   oid, start, len, size);

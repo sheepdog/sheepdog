@@ -274,7 +274,7 @@ static void do_save_object(struct work *work)
 	return;
 error:
 	free(buf);
-	sd_err("Fail to save object, oid %"PRIx64, sw->entry.oid);
+	sd_err("Fail to save object, oid %016"PRIx64, sw->entry.oid);
 	uatomic_set_true(&work_error);
 }
 
@@ -428,7 +428,7 @@ static void do_load_object(struct work *work)
 	return;
 error:
 	free(buffer);
-	sd_err("Fail to load object, oid %"PRIx64, sw->entry.oid);
+	sd_err("Fail to load object, oid %016"PRIx64, sw->entry.oid);
 	uatomic_set_true(&work_error);
 }
 
@@ -480,7 +480,7 @@ static int visit_vdi_obj_entry(struct trunk_entry *entry, void *data)
 
 	inode = slice_read(entry->sha1, &size);
 	if (!inode) {
-		sd_err("Fail to load vdi object, oid %"PRIx64, entry->oid);
+		sd_err("Fail to load vdi object, oid %016"PRIx64, entry->oid);
 		goto out;
 	}
 

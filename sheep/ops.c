@@ -888,7 +888,7 @@ static int local_discard_obj(struct request *req)
 	int ret, idx = data_oid_to_idx(oid);
 	struct sd_inode *inode = xmalloc(sizeof(struct sd_inode));
 
-	sd_debug("%"PRIx64, oid);
+	sd_debug("%016"PRIx64, oid);
 	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
 			     sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS)
@@ -902,7 +902,7 @@ static int local_discard_obj(struct request *req)
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 		if (sd_remove_object(oid) != SD_RES_SUCCESS)
-			sd_err("failed to remove %"PRIx64, oid);
+			sd_err("failed to remove %016"PRIx64, oid);
 	}
 	/*
 	 * Return success even if sd_remove_object fails because we have updated
@@ -1157,7 +1157,7 @@ int peer_decref_object(struct request *req)
 	bool exist = false, locked;
 	static struct sd_mutex lock = SD_MUTEX_INITIALIZER;
 
-	sd_debug("%" PRIx64 ", %" PRIu32 ", %" PRIu32 ", %" PRIu32,
+	sd_debug("%016" PRIx64 ", %" PRIu32 ", %" PRIu32 ", %" PRIu32,
 		 ledger_oid, epoch, generation, count);
 
 	ledger = xvalloc(SD_LEDGER_OBJ_SIZE);
@@ -1183,7 +1183,7 @@ int peer_decref_object(struct request *req)
 		ledger[0] = 1;
 		break;
 	default:
-		sd_err("failed to read ledger object %"PRIx64": %s",
+		sd_err("failed to read ledger object %016"PRIx64": %s",
 		       ledger_oid, sd_strerror(ret));
 		goto out;
 	}
@@ -1230,7 +1230,7 @@ int peer_decref_object(struct request *req)
 			ret = sd_store->create_and_write(ledger_oid, &iocb);
 
 		if (ret != SD_RES_SUCCESS)
-			sd_err("failed to update ledger object %"PRIx64": %s",
+			sd_err("failed to update ledger object %016"PRIx64": %s",
 			       ledger_oid, sd_strerror(ret));
 	}
 out:
@@ -1984,14 +1984,14 @@ void do_process_work(struct work *work)
 	struct request *req = container_of(work, struct request, work);
 	int ret = SD_RES_SUCCESS;
 
-	sd_debug("%x, %" PRIx64", %"PRIu32, req->rq.opcode, req->rq.obj.oid,
+	sd_debug("%x, %016" PRIx64", %"PRIu32, req->rq.opcode, req->rq.obj.oid,
 		 req->rq.epoch);
 
 	if (req->op->process_work)
 		ret = req->op->process_work(req);
 
 	if (ret != SD_RES_SUCCESS) {
-		sd_debug("failed: %x, %" PRIx64" , %u, %s", req->rq.opcode,
+		sd_debug("failed: %x, %016" PRIx64" , %u, %s", req->rq.opcode,
 			 req->rq.obj.oid, req->rq.epoch, sd_strerror(ret));
 	}
 

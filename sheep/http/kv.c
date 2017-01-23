@@ -132,7 +132,7 @@ static void bucket_iterater(struct sd_index *idx, void *arg, int ignore)
 	oid = vid_to_data_oid(idx->vdi_id, idx->idx);
 	ret = sd_read_object(oid, (char *)&bnode, sizeof(bnode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("Failed to read data object %"PRIx64, oid);
+		sd_err("Failed to read data object %016"PRIx64, oid);
 		return;
 	}
 
@@ -162,7 +162,7 @@ static int read_account_meta(const char *account, uint64_t *bucket_count,
 	inode = xmalloc(sizeof(*inode));
 	ret = sd_read_object(oid, (char *)inode, sizeof(struct sd_inode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("Failed to read inode header %"PRIx64, oid);
+		sd_err("Failed to read inode header %016"PRIx64, oid);
 		goto out;
 	}
 
@@ -256,7 +256,7 @@ static int bnode_do_create(struct kv_bnode *bnode, struct sd_inode *inode,
 	bnode->oid = oid;
 	ret = sd_write_object(oid, (char *)bnode, sizeof(*bnode), 0, create);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to create object, %" PRIx64, oid);
+		sd_err("failed to create object, %016" PRIx64, oid);
 		goto out;
 	}
 	if (!create)
@@ -265,7 +265,7 @@ static int bnode_do_create(struct kv_bnode *bnode, struct sd_inode *inode,
 	sd_inode_set_vid(inode, idx, vid);
 	ret = sd_inode_write_vid(inode, idx, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update inode, %" PRIx64,
+		sd_err("failed to update inode, %016" PRIx64,
 		       vid_to_vdi_oid(vid));
 		goto out;
 	}
@@ -510,7 +510,7 @@ static void object_iterater(struct sd_index *idx, void *arg, int ignore)
 	oid = vid_to_data_oid(idx->vdi_id, idx->idx);
 	ret = sd_read_object(oid, (char *)onode, read_size, 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("Failed to read data object %"PRIx64, oid);
+		sd_err("Failed to read data object %016"PRIx64, oid);
 		goto out;
 	}
 
@@ -696,7 +696,7 @@ static int vdi_read_write(uint32_t vid, char *data, size_t length,
 
 		ret = exec_local_req_async(&hdr, data, iocb);
 		if (ret != SD_RES_SUCCESS)
-			sd_err("failed to write object %" PRIx64 ", %s",
+			sd_err("failed to write object %016" PRIx64 ", %s",
 			       hdr.obj.oid, sd_strerror(ret));
 
 		offset += len;
@@ -895,7 +895,7 @@ static int onode_do_update(struct kv_onode *onode)
 	ret = sd_write_object(onode->oid, (char *)onode, ONODE_HDR_SIZE + len,
 			      0, false);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("Failed to update object, %" PRIx64, onode->oid);
+		sd_err("Failed to update object, %016" PRIx64, onode->oid);
 	return ret;
 }
 
@@ -970,7 +970,7 @@ static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
 	ret = sd_write_object(oid, (char *)onode, ONODE_HDR_SIZE + len,
 			      0, create);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to create object, %" PRIx64, oid);
+		sd_err("failed to create object, %016" PRIx64, oid);
 		goto out;
 	}
 	if (!create)
@@ -979,7 +979,7 @@ static int onode_do_create(struct kv_onode *onode, struct sd_inode *inode,
 	sd_inode_set_vid(inode, idx, vid);
 	ret = sd_inode_write_vid(inode, idx, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update inode, %" PRIx64,
+		sd_err("failed to update inode, %016" PRIx64,
 		       vid_to_vdi_oid(vid));
 		goto out;
 	}

@@ -872,7 +872,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	ret = dog_read_object(vid_to_vdi_oid(vid), inode, sizeof(*inode),
 			      0, false);
 	if (ret) {
-		sd_err("failed to read inode object: %"PRIx64,
+		sd_err("failed to read inode object: %016"PRIx64,
 		       vid_to_vdi_oid(vid));
 		ret = EXIT_FAILURE;
 		goto out;
@@ -905,7 +905,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 				       false, true);
 		if (ret) {
 			sd_err("failed to update inode for discarding objects:"
-			       " %"PRIx64, vid_to_vdi_oid(vid));
+			       " %016"PRIx64, vid_to_vdi_oid(vid));
 			ret = EXIT_FAILURE;
 			goto out;
 		}
@@ -1077,7 +1077,7 @@ static int vdi_object_location(int argc, char **argv)
 	vdi_id = sd_inode_get_vid(inode, idx);
 	oid = vid_to_data_oid(vdi_id, idx);
 	if (vdi_id) {
-		printf("Looking for the object 0x%" PRIx64
+		printf("Looking for the object %016" PRIx64
 		       " (vid 0x%" PRIx32 " idx %"PRIu64
 		       ", %u copies) with %d nodes\n\n",
 			oid, vid, idx, inode->nr_copies, sd_nodes_nr);
@@ -1239,7 +1239,7 @@ retry:
 		struct rb_root nroot = RB_ROOT;
 
 		log = (struct epoch_log *)next_log;
-		printf("\nobj %"PRIx64" locations at epoch %d, copies = %d\n",
+		printf("\nobj %016"PRIx64" locations at epoch %d, copies = %d\n",
 		       oid, log->epoch, nr_copies);
 		printf("---------------------------------------------------\n");
 
@@ -1315,11 +1315,11 @@ static int vdi_track(int argc, char **argv)
 		vdi_id = sd_inode_get_vid(inode, idx);
 		oid = vid_to_data_oid(vdi_id, idx);
 
-		printf("Tracking the object 0x%" PRIx64
+		printf("Tracking the object %016" PRIx64
 		       " (the inode vid 0x%" PRIx32 " idx %u)"
 		       " with %d nodes\n", oid, vid, idx, sd_nodes_nr);
 	} else
-		printf("Tracking the object 0x%" PRIx64
+		printf("Tracking the object %016" PRIx64
 		       " (the inode vid 0x%" PRIx32 ")"
 		       " with %d nodes\n", oid, vid, sd_nodes_nr);
 
@@ -1683,7 +1683,7 @@ static void write_object_to(const struct sd_vnode *vnode, uint64_t oid,
 		exit(EXIT_SYSFAIL);
 
 	if (rsp->result != SD_RES_SUCCESS) {
-		sd_err("FATAL: failed to write %"PRIx64", %s", oid,
+		sd_err("FATAL: failed to write %016"PRIx64", %s", oid,
 		       sd_strerror(rsp->result));
 		exit(EXIT_FAILURE);
 	}
@@ -1762,9 +1762,9 @@ static void vdi_repair_main(struct work *work)
 	struct vdi_check_info *info = vcw->info;
 
 	if (vcw->object_found)
-		fprintf(stdout, "fixed replica %"PRIx64"\n", info->oid);
+		fprintf(stdout, "fixed replica %016"PRIx64"\n", info->oid);
 	else
-		fprintf(stdout, "fixed missing %"PRIx64"\n", info->oid);
+		fprintf(stdout, "fixed missing %016"PRIx64"\n", info->oid);
 
 	info->refcnt--;
 	if (info->refcnt == 0)
@@ -1806,7 +1806,7 @@ static void vdi_check_object_work(struct work *work)
 		vcw->object_found = false;
 		break;
 	default:
-		sd_err("failed to read %" PRIx64 " from %s, %s", info->oid,
+		sd_err("failed to read %016" PRIx64 " from %s, %s", info->oid,
 		       addr_to_str(vcw->vnode->node->nid.addr,
 				   vcw->vnode->node->nid.port),
 		       sd_strerror(rsp->result));
@@ -1819,10 +1819,10 @@ static void check_replicatoin_object(struct vdi_check_info *info)
 	if (info->majority == NULL) {
 		switch (info->result) {
 		case VDI_CHECK_NO_OBJ_FOUND:
-			sd_err("no node has %" PRIx64, info->oid);
+			sd_err("no node has %016" PRIx64, info->oid);
 			break;
 		case VDI_CHECK_NO_MAJORITY_FOUND:
-			sd_err("no majority of %" PRIx64, info->oid);
+			sd_err("no majority of %016" PRIx64, info->oid);
 			break;
 		default:
 			sd_err("unknown result of vdi check: %d", info->result);
@@ -1885,12 +1885,12 @@ static void check_erasure_object(struct vdi_check_info *info)
 			ec_decode_buffer(ctx, ds, idx, obj, d + k);
 			if (memcmp(obj, info->vcw[d + k].buf, len) != 0) {
 				/* TODO repair the inconsistency */
-				sd_err("object %"PRIx64" is inconsistent", oid);
+				sd_err("object %016"PRIx64" is inconsistent", oid);
 				goto out;
 			}
 		}
 	} else if (j > p) {
-		sd_err("failed to rebuild object %"PRIx64". %d copies get "
+		sd_err("failed to rebuild object %016"PRIx64". %d copies get "
 		       "lost, more than %d", oid, j, p);
 		goto out;
 	} else {
@@ -1903,7 +1903,7 @@ static void check_erasure_object(struct vdi_check_info *info)
 			ec_decode_buffer(ctx, ds, input_idx, obj, m);
 			write_object_to(info->vcw[m].vnode, oid, obj,
 					len, true, info->vcw[m].ec_index);
-			fprintf(stdout, "fixed missing %"PRIx64", "
+			fprintf(stdout, "fixed missing %016"PRIx64", "
 				"copy index %d\n", info->oid, m);
 		}
 	}

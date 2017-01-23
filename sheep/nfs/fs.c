@@ -57,7 +57,7 @@ static int inode_do_create(struct inode_data *id)
 	ret = sd_write_object(oid, (char *)inode, INODE_META_SIZE + inode->size,
 			      0, create);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to create object, %" PRIx64, oid);
+		sd_err("failed to create object, %016" PRIx64, oid);
 		goto out;
 	}
 	if (!create)
@@ -66,7 +66,7 @@ static int inode_do_create(struct inode_data *id)
 	sd_inode_set_vid(sd_inode, idx, vid);
 	ret = sd_inode_write_vid(sd_inode, idx, vid, vid, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update sd inode, %" PRIx64,
+		sd_err("failed to update sd inode, %016" PRIx64,
 		       vid_to_vdi_oid(vid));
 		goto out;
 	}
@@ -227,7 +227,7 @@ static struct inode *inode_read(uint64_t ino, uint64_t size)
 
 	ret = sd_read_object(ino, (char *)inode, size, 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read %" PRIx64 " %s", ino, sd_strerror(ret));
+		sd_err("failed to read %016" PRIx64 " %s", ino, sd_strerror(ret));
 		free(inode);
 		inode = (struct inode *)-ret;
 	}
@@ -251,7 +251,7 @@ static int inode_write(struct inode *inode, uint64_t size)
 
 	ret = sd_write_object(oid, (char *)inode, size, 0, 0);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to write %" PRIx64" %s", oid, sd_strerror(ret));
+		sd_err("failed to write %016" PRIx64" %s", oid, sd_strerror(ret));
 
 	return ret;
 }
@@ -296,7 +296,7 @@ struct dentry *fs_lookup_dir(struct inode *inode, const char *name)
 	struct dentry *key = xmalloc(sizeof(*key));
 	uint64_t dentry_count = inode->size / sizeof(struct dentry);
 
-	sd_debug("%"PRIx64", %s", inode->ino, name);
+	sd_debug("%016"PRIx64", %s", inode->ino, name);
 
 	pstrcpy(key->name, NFS_MAXNAMLEN, name);
 

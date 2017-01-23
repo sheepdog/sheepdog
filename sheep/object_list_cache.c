@@ -162,7 +162,7 @@ static void objlist_deletion_work(struct work *work)
 		if (is_vdi_obj(entry->oid))
 			continue;
 
-		sd_debug("delete object entry %" PRIx64, entry->oid);
+		sd_debug("delete object entry %016" PRIx64, entry->oid);
 		rb_erase(&entry->node, &obj_list_cache.root);
 		free(entry);
 	}
