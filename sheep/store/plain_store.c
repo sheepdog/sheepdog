@@ -61,7 +61,7 @@ static int default_trim(int fd, uint64_t oid, const struct siocb *iocb,
 	trim_zero_blocks(iocb->buf, poffset, plen);
 
 	if (iocb->offset < *poffset) {
-		sd_debug("discard between %d, %ld, %" PRIx64, iocb->offset,
+		sd_debug("discard between %d, %ld, %016" PRIx64, iocb->offset,
 			 *poffset, oid);
 
 		if (discard(fd, iocb->offset, *poffset) < 0)
@@ -74,7 +74,7 @@ static int default_trim(int fd, uint64_t oid, const struct siocb *iocb,
 		if (end == get_objsize(oid, object_size))
 			/* This is necessary to punch the last block */
 			end = round_up(end, BLOCK_SIZE);
-		sd_debug("discard between %ld, %ld, %" PRIx64, *poffset + *plen,
+		sd_debug("discard between %ld, %ld, %016" PRIx64, *poffset + *plen,
 			 end, oid);
 
 		if (discard(fd, *poffset + *plen, end) < 0)
@@ -133,7 +133,7 @@ int default_write(uint64_t oid, const struct siocb *iocb)
 
 	size = xpwrite(fd, iocb->buf, len, offset);
 	if (unlikely(size != len)) {
-		sd_err("failed to write object %"PRIx64", path=%s, offset=%"
+		sd_err("failed to write object %016"PRIx64", path=%s, offset=%"
 		       PRId32", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
@@ -199,7 +199,7 @@ static int init_vdi_state(uint64_t oid, const char *wd, uint32_t epoch)
 
 	ret = default_read(oid, &iocb);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read inode header %" PRIx64 " %" PRId32
+		sd_err("failed to read inode header %016" PRIx64 " %" PRId32
 		       "wat %s", oid, epoch, wd);
 		goto out;
 	}
@@ -227,7 +227,7 @@ static int init_objlist_and_vdi_bitmap(uint64_t oid, const char *wd,
 	objlist_cache_insert(oid);
 
 	if (is_vdi_obj(oid)) {
-		sd_debug("found the VDI object %" PRIx64" epoch %"PRIu32
+		sd_debug("found the VDI object %016" PRIx64" epoch %"PRIu32
 			 " at %s", oid, epoch, wd);
 		ret = init_vdi_state(oid, wd, epoch);
 		if (ret != SD_RES_SUCCESS)
@@ -273,7 +273,7 @@ static int default_read_from_path(uint64_t oid, const char *path,
 
 	size = xpread(fd, iocb->buf, iocb->length, iocb->offset);
 	if (size < 0) {
-		sd_err("failed to read object %"PRIx64", path=%s, offset=%"
+		sd_err("failed to read object %016"PRIx64", path=%s, offset=%"
 		       PRId32", size=%"PRId32", result=%zd, %m", oid, path,
 		       iocb->offset, iocb->length, size);
 		ret = err_to_sderr(path, oid, errno);
@@ -314,7 +314,7 @@ int default_create_and_write(uint64_t oid, const struct siocb *iocb)
 	size_t obj_size;
 	uint64_t offset = iocb->offset;
 
-	sd_debug("%"PRIx64, oid);
+	sd_debug("%016"PRIx64, oid);
 	get_store_path(oid, iocb->ec_index, path);
 	get_store_tmp_path(oid, iocb->ec_index, tmp_path);
 
@@ -415,7 +415,7 @@ int default_link(uint64_t oid, uint32_t tgt_epoch)
 {
 	char path[PATH_MAX], stale_path[PATH_MAX];
 
-	sd_debug("try link %"PRIx64" from snapshot with epoch %d", oid,
+	sd_debug("try link %016"PRIx64" from snapshot with epoch %d", oid,
 		 tgt_epoch);
 
 	snprintf(path, PATH_MAX, "%s/%016"PRIx64, md_get_object_dir(oid), oid);
@@ -496,7 +496,7 @@ static int move_object_to_stale_dir(uint64_t oid, const char *wd,
 		return SD_RES_EIO;
 	}
 
-	sd_debug("moved object %"PRIx64, oid);
+	sd_debug("moved object %016"PRIx64, oid);
 	return SD_RES_SUCCESS;
 }
 
@@ -628,7 +628,7 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	get_buffer_sha1(buf, length, sha1);
 	free(buf);
 
-	sd_debug("the message digest of %"PRIx64" at epoch %d is %s", oid,
+	sd_debug("the message digest of %016"PRIx64" at epoch %d is %s", oid,
 		 epoch, sha1_to_hex(sha1));
 
 	if (is_readonly_obj)

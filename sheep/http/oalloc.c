@@ -123,7 +123,7 @@ int oalloc_new_prepare(uint32_t vid, uint64_t *start, uint64_t count)
 
 	ret = sd_read_object(oid, meta, SD_DATA_OBJ_SIZE, 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read meta %" PRIx64 ", %s", oid,
+		sd_err("failed to read meta %016" PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 		goto out;
 	}
@@ -150,7 +150,7 @@ int oalloc_new_prepare(uint32_t vid, uint64_t *start, uint64_t count)
 	/* Update the meta object */
 	ret = sd_write_object(oid, meta, oalloc_meta_length(hd), 0, false);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to update meta %"PRIx64 ", %s", oid,
+		sd_err("failed to update meta %016"PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 out:
 	free(meta);
@@ -172,7 +172,7 @@ int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count)
 	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
 			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read inode, %" PRIx64 ", %s",
+		sd_err("failed to read inode, %016" PRIx64 ", %s",
 		       vid_to_vdi_oid(vid), sd_strerror(ret));
 		goto out;
 	}
@@ -182,7 +182,7 @@ int oalloc_new_finish(uint32_t vid, uint64_t start, uint64_t count)
 
 	ret = sd_inode_write(inode, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update inode, %" PRIx64", %s",
+		sd_err("failed to update inode, %016" PRIx64", %s",
 		       vid_to_vdi_oid(vid), sd_strerror(ret));
 		goto out;
 	}
@@ -270,7 +270,7 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 	ret = sd_read_object(vid_to_vdi_oid(vid), (char *)inode,
 			     sizeof(*inode), 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read inode, %" PRIx64 ", %s",
+		sd_err("failed to read inode, %016" PRIx64 ", %s",
 		       vid_to_vdi_oid(vid), sd_strerror(ret));
 		goto out;
 	}
@@ -281,14 +281,14 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 
 	ret = sd_inode_write(inode, 0, false, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update inode, %" PRIx64", %s",
+		sd_err("failed to update inode, %016" PRIx64", %s",
 		       vid_to_vdi_oid(vid), sd_strerror(ret));
 		goto out;
 	}
 
 	ret = sd_read_object(oid, meta, SD_DATA_OBJ_SIZE, 0);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read meta %" PRIx64 ", %s", oid,
+		sd_err("failed to read meta %016" PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 		goto out;
 	}
@@ -316,7 +316,7 @@ int oalloc_free(uint32_t vid, uint64_t start, uint64_t count)
 	hd = (struct header *)meta;
 	ret = sd_write_object(oid, meta, oalloc_meta_length(hd), 0, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to update meta %"PRIx64 ", %s", oid,
+		sd_err("failed to update meta %016"PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 		goto out;
 	}

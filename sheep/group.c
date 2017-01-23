@@ -763,7 +763,7 @@ static void cinfo_collection_work(struct work *work)
 			return;
 		}
 
-		panic("this node should have object of inode: %"PRIx64
+		panic("this node should have object of inode: %016"PRIx64
 		      "but doesn't have", vid_to_vdi_oid(w->next_vid));
 	}
 

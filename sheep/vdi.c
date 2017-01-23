@@ -1742,12 +1742,12 @@ static void delete_cb(struct sd_index *idx, void *arg, int ignore)
 	if (idx->vdi_id) {
 		oid = vid_to_data_oid(idx->vdi_id, idx->idx);
 		if (idx->vdi_id != darg->inode->vdi_id)
-			sd_debug("object %" PRIx64 " is base's data, would"
+			sd_debug("object %016" PRIx64 " is base's data, would"
 				 " not be deleted.", oid);
 		else {
 			ret = sd_remove_object(oid);
 			if (ret != SD_RES_SUCCESS)
-				sd_err("remove object %" PRIx64 " fail, %d",
+				sd_err("remove object %016" PRIx64 " fail, %d",
 				       oid, ret);
 			(*(darg->nr_deleted))++;
 		}
@@ -2189,7 +2189,7 @@ static int clean_matched_obj(uint64_t oid, const char *path,
 	int ret = SD_RES_SUCCESS;
 
 	if (oid_to_vid(oid) == vid) {
-		sd_info("removing object %"PRIx64" (path: %s), it means the"
+		sd_info("removing object %016"PRIx64" (path: %s), it means the"
 			" object is leaked", oid, path);
 		ret = unlink(path);
 		if (ret) {

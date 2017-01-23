@@ -37,7 +37,7 @@ int prepare_iocb(uint64_t oid, const struct siocb *iocb, bool create)
 
 	if (sys->backend_dio && is_data_obj(oid) && iocb_is_aligned(iocb)) {
 		if (!is_aligned_to_pagesize(iocb->buf))
-			panic("Memory isn't aligned to pagesize %p, oid: %"PRIx64, iocb->buf, oid);
+			panic("Memory isn't aligned to pagesize %p, oid: %016"PRIx64, iocb->buf, oid);
 		flags |= O_DIRECT;
 	}
 
@@ -67,18 +67,18 @@ int err_to_sderr(const char *path, uint64_t oid, int err)
 		return SD_RES_NO_OBJ;
 	case ENOSPC:
 		/* TODO: stop automatic recovery */
-		sd_err("diskfull, oid=%"PRIx64, oid);
+		sd_err("diskfull, oid=%016"PRIx64, oid);
 		return SD_RES_NO_SPACE;
 	case EMFILE:
 	case ENFILE:
 	case EINTR:
 	case EAGAIN:
 	case EEXIST:
-		sd_err("%m, oid=%"PRIx64, oid);
+		sd_err("%m, oid=%016"PRIx64, oid);
 		/* make gateway try again */
 		return SD_RES_NETWORK_ERROR;
 	default:
-		sd_err("oid=%"PRIx64", %m", oid);
+		sd_err("oid=%016"PRIx64", %m", oid);
 		return md_handle_eio(dir);
 	}
 }
@@ -476,7 +476,7 @@ int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to write object %" PRIx64 ", %s", oid,
+		sd_err("failed to write object %016" PRIx64 ", %s", oid,
 			   sd_strerror(ret));
 
 	return ret;
@@ -495,7 +495,7 @@ int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to read object %" PRIx64 ", %s", oid,
+		sd_err("failed to read object %016" PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 	return ret;
 }
@@ -510,7 +510,7 @@ int sd_remove_object(uint64_t oid)
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to remove object %" PRIx64 ", %s", oid,
+		sd_err("failed to remove object %016" PRIx64 ", %s", oid,
 		       sd_strerror(ret));
 
 	return ret;
@@ -539,7 +539,7 @@ int sd_dec_object_refcnt(uint64_t data_oid, uint32_t generation,
 	int ret;
 	uint64_t ledger_oid = data_oid_to_ledger_oid(data_oid);
 
-	sd_debug("%"PRIx64", %" PRId32 ", %" PRId32,
+	sd_debug("%016"PRIx64", %" PRId32 ", %" PRId32,
 		 data_oid, generation, refcnt);
 
 	if (generation == 0 && refcnt == 0)
@@ -552,7 +552,7 @@ int sd_dec_object_refcnt(uint64_t data_oid, uint32_t generation,
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)
-		sd_err("failed to decrement reference %" PRIx64 ", %s",
+		sd_err("failed to decrement reference %016" PRIx64 ", %s",
 		       ledger_oid, sd_strerror(ret));
 
 	return ret;
