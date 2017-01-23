@@ -72,7 +72,7 @@ void object_tree_print(void)
 	printf("nr_objs: %d\n", tree.nr_objs);
 
 	rb_for_each_entry(entry, &tree.root, node)
-		printf("Obj id: %"PRIx64"\n", entry->oid);
+		printf("Obj id: %016"PRIx64"\n", entry->oid);
 }
 
 void object_tree_free(void)

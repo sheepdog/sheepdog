@@ -39,7 +39,7 @@ static struct req_iter *prepare_replication_requests(struct request *req,
 	uint64_t off = req->rq.obj.offset;
 	struct req_iter *reqs;
 
-	sd_debug("%"PRIx64, req->rq.obj.oid);
+	sd_debug("%016"PRIx64, req->rq.obj.oid);
 
 	reqs = zalloc(sizeof(*reqs) * nr_copies);
 	if(unlikely(!reqs))
@@ -149,7 +149,7 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 
 		reqs[i].buf = malloc(l);
 		if(!reqs[i].buf) {
-			sd_err("failed to init request buffer %"PRIx64,
+			sd_err("failed to init request buffer %016"PRIx64,
 			       req->rq.obj.oid);
 			for(j = 0; j < i; j++)
 				free(reqs[j].buf);
@@ -173,7 +173,7 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 
 	p = buf = init_erasure_buffer(req, SD_EC_DATA_STRIPE_SIZE * nr_stripe);
 	if (!buf) {
-		sd_err("failed to init erasure buffer %"PRIx64,
+		sd_err("failed to init erasure buffer %016"PRIx64,
 		       req->rq.obj.oid);
 		for (i = 0; i < nr_to_send; i++)
 			free(reqs[i].buf);
@@ -297,7 +297,7 @@ static int gateway_replication_read(struct request *req)
 		if (ret == SD_RES_SUCCESS)
 			goto out;
 
-		sd_err("local read %"PRIx64" failed, %s", oid,
+		sd_err("local read %016"PRIx64" failed, %s", oid,
 		       sd_strerror(ret));
 		break;
 	}
@@ -466,7 +466,7 @@ again:
 		}
 		ret = rsp->result;
 		if (ret != SD_RES_SUCCESS) {
-			sd_err("fail %"PRIx64", %s", req->rq.obj.oid,
+			sd_err("fail %016"PRIx64", %s", req->rq.obj.oid,
 			       sd_strerror(ret));
 			err_ret = ret;
 		}
@@ -519,7 +519,7 @@ static int gateway_forward_request(struct request *req)
 	struct forward_info fi;
 #endif
 
-	sd_debug("%"PRIx64, oid);
+	sd_debug("%016"PRIx64, oid);
 
 	gateway_init_fwd_hdr(&hdr, &req->rq);
 	oid_to_nodes(oid, &req->vinfo->vroot, nr_copies, target_nodes);
@@ -662,7 +662,7 @@ static int prepare_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 			     nr_vids * sizeof(vids[0]),
 			     offsetof(struct sd_inode, data_vdi_id[start]));
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read vdi, %" PRIx64, hdr->obj.oid);
+		sd_err("failed to read vdi, %016" PRIx64, hdr->obj.oid);
 		return ret;
 	}
 
@@ -670,7 +670,7 @@ static int prepare_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 			     nr_vids * sizeof(refs[0]),
 			     offsetof(struct sd_inode, gref[start]));
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to read vdi, %" PRIx64, hdr->obj.oid);
+		sd_err("failed to read vdi, %016" PRIx64, hdr->obj.oid);
 		return ret;
 	}
 
@@ -724,7 +724,7 @@ int gateway_read_obj(struct request *req)
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    !is_inode_refresh_req(req) &&
 	    is_refresh_required(oid_to_vid(oid))) {
-		sd_debug("refresh is required: %"PRIx64, oid);
+		sd_debug("refresh is required: %016"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
 
@@ -790,7 +790,7 @@ int gateway_write_obj(struct request *req)
 
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    is_refresh_required(oid_to_vid(oid))) {
-		sd_debug("refresh is required: %"PRIx64, oid);
+		sd_debug("refresh is required: %016"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
 
@@ -835,14 +835,14 @@ int gateway_write_obj(struct request *req)
 			- offsetof(struct sd_inode, data_vdi_id);
 		start = offset / sizeof(*vids);
 
-		sd_debug("update reference counts, %" PRIx64, hdr->obj.oid);
+		sd_debug("update reference counts, %016" PRIx64, hdr->obj.oid);
 
 		ret = sd_write_object(hdr->obj.oid, (char *)zeroed_refs,
 				      nr_vids * sizeof(*zeroed_refs),
 				      offsetof(struct sd_inode, gref)
 				      + start * sizeof(*zeroed_refs), false);
 		if (ret != SD_RES_SUCCESS) {
-			sd_err("updating reference count of inode object %"
+			sd_err("updating reference count of inode object %016"
 			       PRIx64 " failed: %s", hdr->obj.oid,
 			       sd_strerror(ret));
 
@@ -850,7 +850,7 @@ int gateway_write_obj(struct request *req)
 		}
 
 		if (!(sys->cinfo.flags & SD_CLUSTER_FLAG_RECYCLE_VID)) {
-			sd_debug("update ledger objects of %"PRIx64,
+			sd_debug("update ledger objects of %016"PRIx64,
 				 hdr->obj.oid);
 			refcnt_work = zalloc(sizeof(*refcnt_work));
 			if (!refcnt_work)
@@ -943,7 +943,7 @@ int gateway_create_and_write_obj(struct request *req)
 
 	if ((req->rq.flags & SD_FLAG_CMD_TGT) &&
 	    is_refresh_required(oid_to_vid(oid))) {
-		sd_debug("refresh is required: %"PRIx64, oid);
+		sd_debug("refresh is required: %016"PRIx64, oid);
 		return SD_RES_INODE_INVALIDATED;
 	}
 

@@ -119,7 +119,7 @@ void *nfs3_setattr(struct svc_req *req, struct nfs_arg *argp)
 	struct inode *inode;
 	int ret;
 
-	sd_debug("%"PRIx64, fh->ino);
+	sd_debug("%016"PRIx64, fh->ino);
 
 	inode = fs_read_inode_hdr(fh->ino);
 	if (IS_ERR(inode)) {
@@ -165,7 +165,7 @@ void *nfs3_lookup(struct svc_req *req, struct nfs_arg *argp)
 	struct dentry *dentry;
 	char *name = arg->what.name;
 
-	sd_debug("%"PRIx64" %s", fh->ino, name);
+	sd_debug("%016"PRIx64" %s", fh->ino, name);
 
 	inode = fs_read_inode_full(fh->ino);
 	if (IS_ERR(inode)) {
@@ -264,7 +264,7 @@ void *nfs3_read(struct svc_req *req, struct nfs_arg *argp)
 	struct inode *inode;
 	int ret;
 
-	sd_debug("%"PRIx64"count %"PRIu64" offset %"PRIu64, fh->ino,
+	sd_debug("%016"PRIx64"count %"PRIu64" offset %"PRIu64, fh->ino,
 		 count, offset);
 
 	inode = fs_read_inode_full(fh->ino);
@@ -310,7 +310,7 @@ void *nfs3_write(struct svc_req *req, struct nfs_arg *argp)
 	int64_t done;
 	void *buffer = arg->data.data_val;
 
-	sd_debug("%"PRIx64" count %"PRIu64" offset %"PRIu64" stable %d",
+	sd_debug("%016"PRIx64" count %"PRIu64" offset %"PRIu64" stable %d",
 		 fh->ino, count, offset, arg->stable);
 
 	inode = fs_read_inode_full(fh->ino);
@@ -358,7 +358,7 @@ void *nfs3_create(struct svc_req *req, struct nfs_arg *argp)
 	char *name = arg->where.name;
 	int mode = arg->how.mode, ret;
 
-	sd_debug("%"PRIx64" %s, mode %d, size %"PRIu64, fh->ino, name, mode,
+	sd_debug("%016"PRIx64" %s, mode %d, size %"PRIu64, fh->ino, name, mode,
 		 sattr->size.size);
 
 	new->mode = S_IFREG | sd_def_fmode;
@@ -399,7 +399,7 @@ void *nfs3_mkdir(struct svc_req *req, struct nfs_arg *argp)
 	char *name = arg->where.name;
 	int ret;
 
-	sd_debug("%"PRIx64" %s", fh->ino, name);
+	sd_debug("%016"PRIx64" %s", fh->ino, name);
 
 	parent = fs_read_inode_full(fh->ino);
 	if (IS_ERR(parent)) {
@@ -565,7 +565,7 @@ void *nfs3_readdir(struct svc_req *req, struct nfs_arg *argp)
 	struct dir_reader_d wd;
 	int ret;
 
-	sd_debug("%"PRIx64" count %"PRIu32", at %"PRIu64, fh->ino,
+	sd_debug("%016"PRIx64" count %"PRIu32", at %"PRIu64, fh->ino,
 		 (uint32_t)arg->count, arg->cookie);
 
 	inode = fs_read_inode_full(fh->ino);

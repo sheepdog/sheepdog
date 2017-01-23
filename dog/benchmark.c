@@ -69,7 +69,7 @@ static void benchmark_io_worker(struct work *work)
 			       io_work->offset, 0, io_work->nr_copies,
 			       io_work->copy_policy, false, false);
 	if (ret != SD_RES_SUCCESS) {
-		sd_err("failed to write object %"PRIx64", %s",
+		sd_err("failed to write object %016"PRIx64", %s",
 		       oid, sd_strerror(ret));
 		exit(1);
 	}
