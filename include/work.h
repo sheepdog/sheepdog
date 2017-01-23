@@ -25,7 +25,6 @@ struct work_queue {
 enum wq_thread_control {
 	WQ_ORDERED, /* Only 1 thread created for work queue */
 	WQ_DYNAMIC, /* # of threads proportional to nr_nodes created */
-	WQ_UNLIMITED, /* Unlimited # of threads created */
 	WQ_FIXED, /* Fixed # of threads created */
 };
 
@@ -67,6 +66,7 @@ struct work_queue *create_fixed_work_queue(const char *name, int nr_threads);
 void queue_work(struct work_queue *q, struct work *work);
 bool work_queue_empty(struct work_queue *q);
 int wq_trace_init(void);
+void set_max_dynamic_threads(size_t nr_max);
 
 #ifdef HAVE_TRACE
 void suspend_worker_threads(void);

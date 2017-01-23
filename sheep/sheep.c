@@ -155,6 +155,8 @@ static struct sd_option sheep_options[] = {
 	{'V', "vnodes", true, "set number of vnodes", vnodes_help},
 	{'w', "wq-threads", true, "specify a number of threads for workqueue"},
 	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
+	{'x', "max-dynamic-threads", true,
+	 "specify the maximum number of threads for dynamic workqueue"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
 	{'z', "zone", true,
@@ -500,29 +502,29 @@ static int create_work_queues(void)
 		sd_info("# of threads in net workqueue: %d", wq_net_threads);
 		sys->net_wqueue = create_fixed_work_queue("net", wq_net_threads);
 	} else {
-		sd_info("net workqueue is created as unlimited, it is not recommended!");
-		sys->net_wqueue = create_work_queue("net", WQ_UNLIMITED);
+		sd_info("net workqueue is created as dynamic");
+		sys->net_wqueue = create_work_queue("net", WQ_DYNAMIC);
 	}
 	if (wq_gway_threads) {
 		sd_info("# of threads in gway workqueue: %d", wq_gway_threads);
 		sys->gateway_wqueue = create_fixed_work_queue("gway", wq_gway_threads);
 	} else {
-		sd_info("gway workqueue is created as unlimited, it is not recommended!");
-		sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
+		sd_info("gway workqueue is created as dynamic");
+		sys->gateway_wqueue = create_work_queue("gway", WQ_DYNAMIC);
 	}
 	if (wq_io_threads) {
 		sd_info("# of threads in io workqueue: %d", wq_io_threads);
 		sys->io_wqueue = create_fixed_work_queue("io", wq_io_threads);
 	} else {
-		sd_info("io workqueue is created as unlimited, it is not recommended!");
-		sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
+		sd_info("io workqueue is created as dynamic");
+		sys->io_wqueue = create_work_queue("io", WQ_DYNAMIC);
 	}
 	if (wq_recovery_threads) {
 		sd_info("# of threads in rw workqueue: %d", wq_recovery_threads);
 		sys->recovery_wqueue = create_fixed_work_queue("rw", wq_recovery_threads);
 	} else {
-		sd_info("recovery workqueue is created as unlimited, it is not recommended!");
-		sys->recovery_wqueue = create_work_queue("rw", WQ_UNLIMITED);
+		sd_info("recovery workqueue is created as dynamic");
+		sys->recovery_wqueue = create_work_queue("rw", WQ_DYNAMIC);
 	}
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
@@ -531,8 +533,8 @@ static int create_work_queues(void)
 		sd_info("# of threads in async_req workqueue: %d", wq_async_threads);
 		sys->areq_wqueue = create_fixed_work_queue("async_req", wq_async_threads);
 	} else {
-		sd_info("async_req workqueue is created as unlimited, it is not recommended!");
-		sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
+		sd_info("async_req workqueue is created as dynamic");
+		sys->areq_wqueue = create_work_queue("async_req", WQ_DYNAMIC);
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
@@ -703,6 +705,7 @@ int main(int argc, char **argv)
 	bool daemonize = true;
 	int32_t nr_vnodes = -1;
 	int64_t zone = -1;
+	uint32_t max_dynamic_threads = 0;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
 #ifdef HAVE_HTTP
@@ -878,6 +881,16 @@ int main(int argc, char **argv)
 		case 'w':
 			if (option_parse(optarg, ",", wq_parsers) < 0)
 				exit(1);
+			break;
+		case 'x':
+			max_dynamic_threads = str_to_u32(optarg);
+			if (errno != 0 || max_dynamic_threads < 1) {
+				sd_err("Invalid number of threads '%s': "
+				       "must be an integer between 1 and %"PRIu32,
+				       optarg, UINT32_MAX);
+				exit(1);
+			}
+			set_max_dynamic_threads((size_t)max_dynamic_threads);
 			break;
 		default:
 			usage(1);
