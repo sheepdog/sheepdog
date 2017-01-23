@@ -37,6 +37,9 @@
 #define TRACEPOINT_DEFINE
 #include "work_tp.h"
 
+/* If this is greater than 0, the number of threads grows based on it. */
+static size_t max_dynamic_threads = 0;
+
 /*
  * The protection period from shrinking work queue.  This is necessary
  * to avoid many calls of pthread_create.  Without it, threads are
@@ -207,9 +210,13 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 	case WQ_ORDERED:
 		break;
 	case WQ_DYNAMIC:
-		/* max(#nodes,#cores,16)*2 threads */
-		nr = (uint64_t)max(nr_nodes, nr_cores);
-		nr = max(nr, UINT64_C(16)) * 2;
+		if (max_dynamic_threads > 0) {
+			nr = (uint64_t)max_dynamic_threads;
+		} else {
+			/* max(#nodes,#cores,16)*2 threads */
+			nr = (uint64_t)max(nr_nodes, nr_cores);
+			nr = max(nr, UINT64_C(16)) * 2;
+		}
 		break;
 	case WQ_FIXED:
 		nr = wi->nr_threads;
@@ -220,19 +227,30 @@ static inline uint64_t wq_get_roof(struct wq_info *wi)
 	return nr;
 }
 
-static bool wq_need_grow(struct wq_info *wi)
+/*
+ * Return non-zero if a given workqueue need to grow.
+ * The return value is the new number of threads.
+ *
+ * Otherwise, return zero.
+ */
+static size_t wq_need_grow(struct wq_info *wi)
 {
+	size_t roof = 0;
+
 	if (wi->tc == WQ_FIXED)
-		return false;
+		return 0;
 
-	if (wi->nr_threads < uatomic_read(&wi->nr_queued_work) &&
-	    wi->nr_threads * 2 <= wq_get_roof(wi)) {
-		wi->tm_end_of_protection = get_msec_time() +
-			WQ_PROTECTION_PERIOD;
-		return true;
-	}
+	/* do not need to grow if there are enough threads */
+	if (wi->nr_threads >= uatomic_read(&wi->nr_queued_work))
+		return 0;
 
-	return false;
+	/* cannot grow if # threads already reaches maximum */
+	roof = (size_t)wq_get_roof(wi);
+	if (wi->nr_threads >= roof)
+		return 0;
+
+	wi->tm_end_of_protection = get_msec_time() + WQ_PROTECTION_PERIOD;
+	return min(wi->nr_threads * 2, roof);
 }
 
 /*
@@ -274,15 +292,16 @@ static int create_worker_threads(struct wq_info *wi, size_t nr_threads)
 void queue_work(struct work_queue *q, struct work *work)
 {
 	struct wq_info *wi = container_of(q, struct wq_info, q);
+	size_t new_nr_threads = 0;
 
 	tracepoint(work, queue_work, wi, work);
 
 	uatomic_inc(&wi->nr_queued_work);
 	sd_mutex_lock(&wi->pending_lock);
 
-	if (wq_need_grow(wi))
-		/* double the thread pool size */
-		create_worker_threads(wi, wi->nr_threads * 2);
+	new_nr_threads = wq_need_grow(wi);
+	if (new_nr_threads > 0)
+		create_worker_threads(wi, new_nr_threads);
 
 	list_add_tail(&work->w_list, &wi->q.pending_list);
 	sd_mutex_unlock(&wi->pending_lock);
@@ -458,6 +477,11 @@ bool work_queue_empty(struct work_queue *q)
 	struct wq_info *wi = container_of(q, struct wq_info, q);
 
 	return uatomic_read(&wi->nr_queued_work) == 0;
+}
+
+void set_max_dynamic_threads(size_t nr_max)
+{
+	max_dynamic_threads = nr_max;
 }
 
 struct thread_args {
