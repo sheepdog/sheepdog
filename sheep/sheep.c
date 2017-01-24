@@ -152,7 +152,10 @@ static struct sd_option sheep_options[] = {
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "cache", true, "enable object cache", cache_help},
+	{'q', "wq-threads", true, "specify a number of threads for workqueue"},
 	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
+	{'x', "max-dynamic-threads", true,
+	 "specify the maximum number of threads for dynamic workqueue"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
 	{'z', "zone", true,
@@ -381,6 +384,48 @@ static struct option_parser log_parsers[] = {
 	{ NULL, NULL },
 };
 
+static int wq_net_threads;
+static int wq_net_parser(const char *s)
+{
+	wq_net_threads = atoi(s);
+	return 0;
+}
+
+static int wq_gway_threads;
+static int wq_gway_parser(const char *s)
+{
+	wq_gway_threads = atoi(s);
+	return 0;
+}
+
+static int wq_io_threads;
+static int wq_io_parser(const char *s)
+{
+	wq_io_threads = atoi(s);
+	return 0;
+}
+
+static int wq_recovery_threads;
+static int wq_recovery_parser(const char *s)
+{
+	wq_recovery_threads = atoi(s);
+	return 0;
+}
+
+static int wq_async_threads;
+static int wq_async_parser(const char *s)
+{
+	wq_async_threads = atoi(s);
+	return 0;
+}
+
+static struct option_parser wq_parsers[] = {
+	{ "net=", wq_net_parser },
+	{ "gway=", wq_gway_parser },
+	{ "io=", wq_io_parser },
+	{ "recovery=", wq_recovery_parser },
+	{ "async=", wq_async_parser },
+};
 
 static const char *io_addr, *io_pt;
 static int ionic_host_parser(const char *s)
@@ -477,14 +522,44 @@ static int create_work_queues(void)
 	if (init_work_queue(get_nr_nodes))
 		return -1;
 
-	sys->net_wqueue = create_work_queue("net", WQ_UNLIMITED);
-	sys->gateway_wqueue = create_work_queue("gway", WQ_UNLIMITED);
-	sys->io_wqueue = create_work_queue("io", WQ_UNLIMITED);
-	sys->recovery_wqueue = create_work_queue("rw", WQ_UNLIMITED);
+	if (wq_net_threads) {
+		sd_info("# of threads in net workqueue: %d", wq_net_threads);
+		sys->net_wqueue = create_fixed_work_queue("net", wq_net_threads);
+	} else {
+		sd_info("net workqueue is created as dynamic");
+		sys->net_wqueue = create_work_queue("net", WQ_DYNAMIC);
+	}
+	if (wq_gway_threads) {
+		sd_info("# of threads in gway workqueue: %d", wq_gway_threads);
+		sys->gateway_wqueue = create_fixed_work_queue("gway", wq_gway_threads);
+	} else {
+		sd_info("gway workqueue is created as dynamic");
+		sys->gateway_wqueue = create_work_queue("gway", WQ_DYNAMIC);
+	}
+	if (wq_io_threads) {
+		sd_info("# of threads in io workqueue: %d", wq_io_threads);
+		sys->io_wqueue = create_fixed_work_queue("io", wq_io_threads);
+	} else {
+		sd_info("io workqueue is created as dynamic");
+		sys->io_wqueue = create_work_queue("io", WQ_DYNAMIC);
+	}
+	if (wq_recovery_threads) {
+		sd_info("# of threads in rw workqueue: %d", wq_recovery_threads);
+		sys->recovery_wqueue = create_fixed_work_queue("rw", wq_recovery_threads);
+	} else {
+		sd_info("recovery workqueue is created as dynamic");
+		sys->recovery_wqueue = create_work_queue("rw", WQ_DYNAMIC);
+	}
 	sys->deletion_wqueue = create_ordered_work_queue("deletion");
 	sys->block_wqueue = create_ordered_work_queue("block");
 	sys->md_wqueue = create_ordered_work_queue("md");
-	sys->areq_wqueue = create_work_queue("async_req", WQ_UNLIMITED);
+	if (wq_async_threads) {
+		sd_info("# of threads in async_req workqueue: %d", wq_async_threads);
+		sys->areq_wqueue = create_fixed_work_queue("async_req", wq_async_threads);
+	} else {
+		sd_info("async_req workqueue is created as dynamic");
+		sys->areq_wqueue = create_work_queue("async_req", WQ_DYNAMIC);
+	}
 	if (sys->enable_object_cache) {
 		sys->oc_reclaim_wqueue =
 			create_ordered_work_queue("oc_reclaim");
@@ -653,10 +728,11 @@ int main(int argc, char **argv)
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
 	int nr_vnodes = SD_DEFAULT_VNODES, rc = 1;
 	const char *dirp = DEFAULT_OBJECT_DIR, *short_options;
-	char *dir, *p, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
+	char *dir, *pid_file = NULL, *bindaddr = NULL, log_path[PATH_MAX],
 	     *argp = NULL;
 	bool explicit_addr = false;
 	int64_t zone = -1;
+	uint32_t max_dynamic_threads = 0;
 	struct cluster_driver *cdrv;
 	struct option *long_options;
 #ifdef HAVE_HTTP
@@ -683,9 +759,8 @@ int main(int argc, char **argv)
 				 &longindex)) >= 0) {
 		switch (ch) {
 		case 'p':
-			port = strtol(optarg, &p, 10);
-			if (optarg == p || port < 1 || UINT16_MAX < port
-				|| *p != '\0') {
+			port = str_to_u16(optarg);
+			if (errno != 0 || port < 1) {
 				sd_err("Invalid port number '%s'", optarg);
 				exit(1);
 			}
@@ -720,9 +795,8 @@ int main(int argc, char **argv)
 			nr_vnodes = 0;
 			break;
 		case 'z':
-			zone = strtol(optarg, &p, 10);
-			if (optarg == p || zone < 0 || UINT32_MAX < zone
-				|| *p != '\0') {
+			zone = str_to_u32(optarg);
+			if (errno != 0) {
 				sd_err("Invalid zone id '%s': must be "
 				       "an integer between 0 and %u", optarg,
 				       UINT32_MAX);
@@ -808,6 +882,20 @@ int main(int argc, char **argv)
 			break;
 		case 'W':
 			wildcard_recovery = true;
+			break;
+		case 'q':
+			if (option_parse(optarg, ",", wq_parsers) < 0)
+				exit(1);
+			break;
+		case 'x':
+			max_dynamic_threads = str_to_u32(optarg);
+			if (errno != 0 || max_dynamic_threads < 1) {
+				sd_err("Invalid number of threads '%s': "
+				       "must be an integer between 1 and %"PRIu32,
+				       optarg, UINT32_MAX);
+				exit(1);
+			}
+			set_max_dynamic_threads((size_t)max_dynamic_threads);
 			break;
 		default:
 			usage(1);
