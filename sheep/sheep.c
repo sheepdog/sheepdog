@@ -152,7 +152,7 @@ static struct sd_option sheep_options[] = {
 	{'u', "upgrade", false, "upgrade to the latest data layout"},
 	{'v', "version", false, "show the version"},
 	{'w', "cache", true, "enable object cache", cache_help},
-	{'w', "wq-threads", true, "specify a number of threads for workqueue"},
+	{'q', "wq-threads", true, "specify a number of threads for workqueue"},
 	{'W', "wildcard-recovery", false, "wildcard recovery for first time"},
 	{'y', "myaddr", true, "specify the address advertised to other sheep",
 	 myaddr_help},
@@ -880,7 +880,7 @@ int main(int argc, char **argv)
 		case 'W':
 			wildcard_recovery = true;
 			break;
-		case 'w':
+		case 'q':
 			if (option_parse(optarg, ",", wq_parsers) < 0)
 				exit(1);
 			break;
