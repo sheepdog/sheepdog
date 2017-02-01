@@ -1,3 +1,5 @@
+%define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7)
+
 Name: sheepdog
 Summary: The Sheepdog Distributed Storage System for QEMU
 Version: @version@
@@ -9,9 +11,14 @@ Source0: http://downloads.sourceforge.net/project/sheepdog/%{name}/%{version}/%{
 
 # Runtime bits
 Requires: corosync %{_requires}
+%if %{use_systemd}
+Requires: systemd
+BuildRequires: systemd-units
+%else
 Requires(post): chkconfig
 Requires(preun): chkconfig
 Requires(preun): initscripts
+%endif
 
 # Build bits
 BuildRequires: autoconf automake
@@ -37,6 +44,11 @@ rm -rf %{buildroot}
 
 make install DESTDIR=%{buildroot}
 
+# drop init file (systemd only)
+%if %{use_systemd}
+rm -f $RPM_BUILD_ROOT%{_initddir}/sheepdog
+%endif
+
 ## tree fixup
 # drop static libs
 rm -f %{buildroot}%{_libdir}/*.a
@@ -45,20 +57,35 @@ rm -f %{buildroot}%{_libdir}/*.a
 rm -rf %{buildroot}
 
 %post
+%if %{use_systemd}
+/usr/bin/systemctl preset sheepdog.service >/dev/null 2>&1 || :
+%else
 /sbin/chkconfig --add sheepdog
+%endif
 ln -s -f %{_bindir}/dog %{_bindir}/collie
 
 %preun
+
 if [ $1 -eq 0 ] ; then
-	/sbin/service sheepdog stop >/dev/null 2>&1
-	/sbin/chkconfig --del sheepdog
+    %if %use_systemd
+    /usr/bin/systemctl --no-reload disable sheepdog.service >/dev/null 2>&1 || :
+    /usr/bin/systemctl stop sheepdog.service >/dev/null 2>&1 || :
+    %else
+    /sbin/service sheepdog stop >/dev/null 2>&1
+    /sbin/chkconfig --del sheepdog
+    %endif
 fi
 
 %postun
 if [ "$1" -ge "1" ] ; then
-	/sbin/service sheepdog condrestart >/dev/null 2>&1 || :
+    %if %use_systemd
+    /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+    /usr/bin/systemctl try-restart sheepdog.service >/dev/null 2>&1 || :
+    %else
+    /sbin/service sheepdog condrestart >/dev/null 2>&1 || :
+    %endif
 else
-	rm -f /usr/sbin/collie
+    rm -f /usr/sbin/collie
 fi
 
 %files
@@ -68,16 +95,11 @@ fi
 %{_sbindir}/sheepfs
 %{_bindir}/dog
 %{_sbindir}/shepherd
-%if 0%{_have_zookeeper}
-	%{_sbindir}/zk_control
-%endif
-%attr(755,-,-)%config %{_initddir}/sheepdog
 %dir %{_localstatedir}/lib/sheepdog
 %config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/sheepfs.8*
 %{_mandir}/man8/dog.8*
-%{_prefix}/lib/systemd/system/sheepdog.service
 %dir %{_includedir}/sheepdog
 %{_includedir}/sheepdog/internal.h
 %{_includedir}/sheepdog/list.h
@@ -86,6 +108,14 @@ fi
 %{_includedir}/sheepdog/util.h
 %{_libdir}/libsheepdog.la
 %{_libdir}/libsheepdog.so
+%if 0%{_have_zookeeper}
+%{_sbindir}/zk_control
+%endif
+%if %{use_systemd}
+%{_unitdir}/sheepdog.service
+%else
+%attr(755,-,-)%config %{_initddir}/sheepdog
+%endif
 
 %changelog
 * @date@ Autotools generated version <nobody@nowhere.org> - @version@-1.@alphatag@
