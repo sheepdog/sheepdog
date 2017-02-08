@@ -1,3 +1,25 @@
+## 1.0.2 (release candidate)
+
+IMPORTANT CHANGES:
+ - Unlimited workqueue is now removed and changed to dynamic one.
+   This is for sheep not to consume a huge amount of memory by
+   creating new threads infinitely under heavy load, and to avoid
+   being shot by OOM-killer.
+ - zk\_control now can purge znodes within 24 hours. It purges znodes
+   created before the given threshold. This is useful if tens of
+   thousands of znodes are created in a day.
+
+SHEEP COMMAND INTERFACE:
+ - New option "-x" to set the maximum number of threads for dynamic
+   workqueue. (default: decided by "max(#nodes,#cores,16)\*2" formula)
+
+ZK\_CONTROL COMMAND INTERFACE:
+ - The "purge" subcommand can take a non-negative interger as a
+   threshold in seconds. (default: 86400 (24 hours))
+
+LOGGING:
+ - Print object IDs in 16-digit zero-padded hexadecimal to sheep.log.
+
 ## 1.0.1
 
 IMPORTANT BUG FIX:
