@@ -25,7 +25,7 @@ sbin_PROGRAMS		= shepherd
 
 shepherd_SOURCES		= shepherd.c
 
-shepherd_LDADD	  	= ../lib/libsd.a -lpthread
+shepherd_LDADD	  	= ../lib/libsd.a -lpthread -lm
 shepherd_DEPENDENCIES	= ../lib/libsd.a
 
 EXTRA_DIST		=

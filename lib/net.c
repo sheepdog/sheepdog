@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/uio.h>
+#include <math.h>
 
 #include "sheepdog_proto.h"
 #include "sheep.h"
@@ -231,6 +232,12 @@ reread:
 		if (errno == EAGAIN && repeat &&
 		    (need_retry == NULL || need_retry(epoch))) {
 			repeat--;
+
+			/* exponential backoff */
+			usleep(random() %
+			       (long int)(pow(2.0, max_count - repeat) *
+					  EXP_BACKOFF_BASE));
+
 			goto reread;
 		}
 
@@ -276,6 +283,12 @@ rewrite:
 		if (errno == EAGAIN && repeat &&
 		    (need_retry == NULL || need_retry(epoch))) {
 			repeat--;
+
+			/* exponential backoff */
+			usleep(random() %
+			       (long int)(pow(2.0, max_count - repeat) *
+					  EXP_BACKOFF_BASE));
+
 			goto rewrite;
 		}
 

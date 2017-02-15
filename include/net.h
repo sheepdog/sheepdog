@@ -18,6 +18,8 @@
 #define POLL_TIMEOUT 5 /* seconds */
 #define MAX_RETRY_COUNT (MAX_POLLTIME / POLL_TIMEOUT)
 
+#define EXP_BACKOFF_BASE (100 * 1000) /* 100 ms == 100,000 us */
+
 enum conn_state {
 	C_IO_HEADER = 0,
 	C_IO_DATA_INIT,
