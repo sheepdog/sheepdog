@@ -369,6 +369,13 @@ static int wq_io_parser(const char *s)
 	return 0;
 }
 
+static int wq_peer_threads;
+static int wq_peer_parser(const char *s)
+{
+	wq_peer_threads = atoi(s);
+	return 0;
+}
+
 static int wq_recovery_threads;
 static int wq_recovery_parser(const char *s)
 {
@@ -387,6 +394,7 @@ static struct option_parser wq_parsers[] = {
 	{ "net=", wq_net_parser },
 	{ "gway=", wq_gway_parser },
 	{ "io=", wq_io_parser },
+	{ "peer=", wq_peer_parser },
 	{ "recovery=", wq_recovery_parser },
 	{ "async=", wq_async_parser },
 };
@@ -519,6 +527,13 @@ static int create_work_queues(void)
 		sd_info("io workqueue is created as dynamic");
 		sys->io_wqueue = create_work_queue("io", WQ_DYNAMIC);
 	}
+	if (wq_peer_threads) {
+		sd_info("# of threads in peer workqueue: %d", wq_peer_threads);
+		sys->peer_wqueue = create_fixed_work_queue("peer", wq_peer_threads);
+	} else {
+		sd_info("peer workqueue is created as dynamic");
+		sys->peer_wqueue = create_work_queue("peer", WQ_DYNAMIC);
+	}
 	if (wq_recovery_threads) {
 		sd_info("# of threads in rw workqueue: %d", wq_recovery_threads);
 		sys->recovery_wqueue = create_fixed_work_queue("rw", wq_recovery_threads);
@@ -538,7 +553,7 @@ static int create_work_queues(void)
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
-	    !sys->areq_wqueue)
+	    !sys->areq_wqueue || !sys->peer_wqueue)
 			return -1;
 
 	util_wq = create_ordered_work_queue("util");

@@ -287,7 +287,7 @@ static void queue_peer_request(struct request *req)
 
 	req->work.fn = do_process_work;
 	req->work.done = io_op_done;
-	queue_work(sys->io_wqueue, &req->work);
+	queue_work(sys->peer_wqueue, &req->work);
 }
 
 /*
