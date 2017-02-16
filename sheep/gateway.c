@@ -872,7 +872,7 @@ int gateway_write_obj(struct request *req)
 			refcnt_work->work.fn = async_update_obj_refcnt_work;
 			refcnt_work->work.done = async_update_obj_refcnt_done;
 
-			queue_work(sys->io_wqueue, &refcnt_work->work);
+			queue_work(sys->reclaim_wqueue, &refcnt_work->work);
 			goto out;
 
 		free_work:
