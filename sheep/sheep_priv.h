@@ -169,8 +169,6 @@ struct system_info {
 	struct work_queue *recovery_wqueue;
 	struct work_queue *recovery_notify_wqueue;
 	struct work_queue *block_wqueue;
-	struct work_queue *oc_reclaim_wqueue;
-	struct work_queue *oc_push_wqueue;
 	struct work_queue *md_wqueue;
 	struct work_queue *areq_wqueue;
 #ifdef HAVE_HTTP
