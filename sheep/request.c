@@ -534,6 +534,19 @@ static void submit_local_request(struct request *req)
 	eventfd_xwrite(sys->local_req_efd, 1);
 }
 
+struct close_eventfd_atexit_arg {
+	int efd;
+};
+
+static void close_eventfd_atexit(void *_arg)
+{
+	struct close_eventfd_atexit_arg *arg =
+		(struct close_eventfd_atexit_arg*)_arg;
+
+	close(arg->efd);
+	free(arg);
+}
+
 /*
  * Exec the request locally and synchronously.
  *
@@ -544,10 +557,50 @@ worker_fn int exec_local_req(struct sd_req *rq, void *data)
 {
 	struct request *req;
 	int ret;
+	static __thread int efd = -1;
 
 	req = alloc_local_request(data, rq->data_length);
 	req->rq = *rq;
-	req->local_req_efd = eventfd(0, 0);
+
+	if (unlikely(efd == -1)) {
+		struct worker_atexit *wa;
+		struct close_eventfd_atexit_arg *arg;
+
+		efd = eventfd(0, 0);
+		if (efd < 0)
+			goto atexit_err;
+
+		wa = zalloc(sizeof(*wa));
+		if (!wa)
+			goto atexit_close_fd;
+
+		arg = zalloc(sizeof(*arg));
+		if (!arg)
+			goto atexit_free_wa;
+
+		wa->arg = arg;
+		wa->f = close_eventfd_atexit;
+
+		if (register_worker_atexit(wa))
+			goto atexit_free_arg;
+
+		goto fd_ready;
+
+	atexit_free_arg:
+		free(arg);
+	atexit_free_wa:
+		free(wa);
+	atexit_close_fd:
+		close(efd);
+	atexit_err:
+		req->rp.result = SD_RES_NETWORK_ERROR;
+		sd_err("eventfd failed, %m");
+		goto out;
+	}
+
+fd_ready:
+	req->local_req_efd = efd;
+
 	if (req->local_req_efd < 0) {
 		sd_err("eventfd failed, %m");
 		/* Fake the result to ask for retry */
@@ -561,7 +614,6 @@ out:
 	/* fill rq with response header as exec_req does */
 	memcpy(rq, &req->rp, sizeof(req->rp));
 
-	close(req->local_req_efd);
 	ret = req->rp.result;
 	free_local_request(req);
 
