@@ -462,8 +462,8 @@ int init_global_pathnames(const char *d, char *argp)
 }
 
 /* Write data to both local object cache (if enabled) and backends */
-int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
-		    uint64_t offset, bool create)
+static int __sd_write_object(uint64_t oid, char *data, unsigned int datalen,
+			     uint64_t offset, bool create, uint16_t flags)
 {
 	struct sd_req hdr;
 	int ret;
@@ -486,7 +486,7 @@ forward_write:
 		sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
 	else
 		sd_init_req(&hdr, SD_OP_WRITE_OBJ);
-	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.flags = SD_FLAG_CMD_WRITE | flags;
 	hdr.data_length = datalen;
 
 	hdr.obj.oid = oid;
@@ -500,8 +500,21 @@ forward_write:
 	return ret;
 }
 
+int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
+		    uint64_t offset, bool create)
+{
+	return __sd_write_object(oid, data, datalen, offset, create, 0);
+}
+
+int sd_write_object_fwd(uint64_t oid, char *data, unsigned int datalen,
+			uint64_t offset, bool create)
+{
+	return __sd_write_object(oid, data, datalen, offset, create,
+				 SD_FLAG_CMD_FWD);
+}
+
 int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
-			uint64_t offset)
+			uint64_t offset, uint16_t flags)
 {
 	struct sd_req hdr;
 	int ret;
@@ -510,6 +523,7 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
 	hdr.data_length = datalen;
 	hdr.obj.oid = oid;
 	hdr.obj.offset = offset;
+	hdr.flags = flags;
 
 	ret = exec_local_req(&hdr, data);
 	if (ret != SD_RES_SUCCESS)
@@ -522,8 +536,8 @@ int read_backend_object(uint64_t oid, char *data, unsigned int datalen,
  * Read data firstly from local object cache(if enabled), if fail,
  * try read backends
  */
-int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
-		   uint64_t offset)
+static int __sd_read_object(uint64_t oid, char *data, unsigned int datalen,
+			    uint64_t offset, uint16_t flags)
 {
 	int ret;
 
@@ -538,7 +552,19 @@ int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
 	}
 
 forward_read:
-	return read_backend_object(oid, data, datalen, offset);
+	return read_backend_object(oid, data, datalen, offset, flags);
+}
+
+int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
+		   uint64_t offset)
+{
+	return __sd_read_object(oid, data, datalen, offset, 0);
+}
+
+int sd_read_object_fwd(uint64_t oid, char *data, unsigned int datalen,
+		       uint64_t offset)
+{
+	return __sd_read_object(oid, data, datalen, offset, SD_FLAG_CMD_FWD);
 }
 
 int sd_remove_object(uint64_t oid)
@@ -596,6 +622,11 @@ int sd_dec_object_refcnt(uint64_t data_oid, uint32_t generation,
 	hdr.ref.oid = ledger_oid;
 	hdr.ref.generation = generation;
 	hdr.ref.count = refcnt;
+	/*
+	 * decrements are always performed in the gateway threads, so it must
+	 * avoid the cyclic dependency of workqueue.
+	 */
+	hdr.flags = SD_FLAG_CMD_FWD;
 
 	ret = exec_local_req(&hdr, NULL);
 	if (ret != SD_RES_SUCCESS)

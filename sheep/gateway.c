@@ -559,17 +559,17 @@ static int prepare_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 	offset = hdr->obj.offset - offsetof(struct sd_inode, data_vdi_id);
 	start = offset / sizeof(*vids);
 
-	ret = sd_read_object(hdr->obj.oid, (char *)vids,
-			     nr_vids * sizeof(vids[0]),
-			     offsetof(struct sd_inode, data_vdi_id[start]));
+	ret = sd_read_object_fwd(hdr->obj.oid, (char *)vids,
+				 nr_vids * sizeof(vids[0]),
+				 offsetof(struct sd_inode, data_vdi_id[start]));
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read vdi, %016" PRIx64, hdr->obj.oid);
 		return ret;
 	}
 
-	ret = sd_read_object(hdr->obj.oid, (char *)refs,
-			     nr_vids * sizeof(refs[0]),
-			     offsetof(struct sd_inode, gref[start]));
+	ret = sd_read_object_fwd(hdr->obj.oid, (char *)refs,
+				 nr_vids * sizeof(refs[0]),
+				 offsetof(struct sd_inode, gref[start]));
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read vdi, %016" PRIx64, hdr->obj.oid);
 		return ret;
@@ -606,11 +606,11 @@ static int update_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 		refs[i].count = 0;
 	}
 
-	return sd_write_object(hdr->obj.oid, (char *)refs,
-			       nr_vids * sizeof(*refs),
-			       offsetof(struct sd_inode, gref)
-			       + start * sizeof(*refs),
-			       false);
+	return sd_write_object_fwd(hdr->obj.oid, (char *)refs,
+				   nr_vids * sizeof(*refs),
+				   offsetof(struct sd_inode, gref)
+				   + start * sizeof(*refs),
+				   false);
 }
 
 static bool is_inode_refresh_req(struct request *req)
