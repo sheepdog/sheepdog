@@ -383,6 +383,13 @@ static int wq_reclaim_parser(const char *s)
 	return 0;
 }
 
+static int wq_gway_fwd_threads;
+static int wq_gway_fwd_parser(const char *s)
+{
+	wq_gway_fwd_threads = atoi(s);
+	return 0;
+}
+
 static int wq_recovery_threads;
 static int wq_recovery_parser(const char *s)
 {
@@ -403,6 +410,7 @@ static struct option_parser wq_parsers[] = {
 	{ "io=", wq_io_parser },
 	{ "peer=", wq_peer_parser },
 	{ "reclaim=", wq_reclaim_parser },
+	{ "gway_fwd=", wq_gway_fwd_parser },
 	{ "recovery=", wq_recovery_parser },
 	{ "async=", wq_async_parser },
 };
@@ -544,10 +552,17 @@ static int create_work_queues(void)
 	}
 	if (wq_reclaim_threads) {
 		sd_info("# of threads in reclaim workqueue: %d", wq_reclaim_threads);
-		sys->reclaim_wqueue = create_fixed_work_queue("peer", wq_reclaim_threads);
+		sys->reclaim_wqueue = create_fixed_work_queue("reclaim", wq_reclaim_threads);
 	} else {
 		sd_info("reclaim workqueue is created as dynamic");
 		sys->reclaim_wqueue = create_work_queue("reclaim", WQ_DYNAMIC);
+	}
+	if (wq_gway_fwd_threads) {
+		sd_info("# of threads in gway_fwd workqueue: %d", wq_gway_fwd_threads);
+		sys->gateway_fwd_wqueue = create_fixed_work_queue("gway_fwd", wq_gway_fwd_threads);
+	} else {
+		sd_info("gway_fwd workqueue is created as dynamic");
+		sys->gateway_fwd_wqueue = create_work_queue("gway_fwd", WQ_DYNAMIC);
 	}
 	if (wq_recovery_threads) {
 		sd_info("# of threads in rw workqueue: %d", wq_recovery_threads);
@@ -568,7 +583,8 @@ static int create_work_queues(void)
 	}
 	if (!sys->gateway_wqueue || !sys->io_wqueue || !sys->recovery_wqueue ||
 	    !sys->deletion_wqueue || !sys->block_wqueue || !sys->md_wqueue ||
-	    !sys->areq_wqueue || !sys->peer_wqueue || !sys->reclaim_wqueue)
+	    !sys->areq_wqueue || !sys->peer_wqueue || !sys->reclaim_wqueue ||
+	    !sys->gateway_fwd_wqueue)
 			return -1;
 
 	util_wq = create_ordered_work_queue("util");

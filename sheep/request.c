@@ -331,7 +331,10 @@ static void queue_gateway_request(struct request *req)
 
 	req->work.fn = do_process_work;
 	req->work.done = gateway_op_done;
-	queue_work(sys->gateway_wqueue, &req->work);
+	if (hdr->flags & SD_FLAG_CMD_FWD)
+		queue_work(sys->gateway_fwd_wqueue, &req->work);
+	else
+		queue_work(sys->gateway_wqueue, &req->work);
 	return;
 
 end_request:

@@ -917,6 +917,7 @@ static int gateway_handle_cow(struct request *req)
 	if (req->rq.data_length != len) {
 		/* Partial write, need read the copy first */
 		sd_init_req(&hdr, SD_OP_READ_OBJ);
+		hdr.flags |= SD_FLAG_CMD_FWD;
 		hdr.obj.oid = req_hdr->obj.cow_oid;
 		hdr.data_length = len;
 		hdr.obj.offset = 0;
@@ -927,7 +928,7 @@ static int gateway_handle_cow(struct request *req)
 
 	memcpy(buf + req_hdr->obj.offset, req->data, req_hdr->data_length);
 	sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
-	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_FWD;
 	hdr.obj.oid = oid;
 	hdr.data_length = len;
 	hdr.obj.offset = 0;
