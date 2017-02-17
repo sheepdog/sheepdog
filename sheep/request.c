@@ -287,7 +287,11 @@ static void queue_peer_request(struct request *req)
 
 	req->work.fn = do_process_work;
 	req->work.done = io_op_done;
-	queue_work(sys->peer_wqueue, &req->work);
+
+	if (req->rq.opcode == SD_OP_REMOVE_PEER)
+		queue_work(sys->remove_peer_wqueue, &req->work);
+	else
+		queue_work(sys->peer_wqueue, &req->work);
 }
 
 /*
@@ -331,7 +335,10 @@ static void queue_gateway_request(struct request *req)
 
 	req->work.fn = do_process_work;
 	req->work.done = gateway_op_done;
-	if (hdr->flags & SD_FLAG_CMD_FWD)
+
+	if (hdr->opcode == SD_OP_REMOVE_OBJ)
+		queue_work(sys->remove_wqueue, &req->work);
+	else if (hdr->flags & SD_FLAG_CMD_FWD)
 		queue_work(sys->gateway_fwd_wqueue, &req->work);
 	else
 		queue_work(sys->gateway_wqueue, &req->work);
