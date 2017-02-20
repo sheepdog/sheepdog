@@ -79,6 +79,11 @@ static size_t nr_cores = 1;
 
 static void *worker_routine(void *arg);
 
+#define MAX_WORKER_ATEXIT 8
+
+static __thread struct worker_atexit *registered_worker_atexit[MAX_WORKER_ATEXIT];
+static __thread int nr_registered_worker_atexit;
+
 #ifdef HAVE_TRACE
 
 #define TID_MAX_DEFAULT 0x8000 /* default maximum tid for most systems */
@@ -383,6 +388,12 @@ retest:
 		eventfd_xwrite(efd, 1);
 	}
 
+	for (int i = 0; i < nr_registered_worker_atexit; i++) {
+		registered_worker_atexit[i]->f(
+			registered_worker_atexit[i]->arg);
+		free(registered_worker_atexit[i]);
+	}
+
 	pthread_exit(NULL);
 }
 
@@ -548,4 +559,13 @@ static void __attribute__((constructor)) init_nr_cores(void)
 		exit(1);
 	}
 	nr_cores = (size_t)nr;
+}
+
+int register_worker_atexit(struct worker_atexit* w)
+{
+	if (nr_registered_worker_atexit == MAX_WORKER_ATEXIT)
+		return -1;
+
+	registered_worker_atexit[nr_registered_worker_atexit++] = w;
+	return 0;
 }
