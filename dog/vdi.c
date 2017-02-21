@@ -25,6 +25,8 @@
 
 struct rb_root oid_tree = RB_ROOT;
 
+#define NR_BATCHED_RECLAMATION_DEFAULT 128
+
 static struct sd_option vdi_options[] = {
 	{'P', "prealloc", false, "preallocate all the data objects"},
 	{'n', "no-share", false, "share nothing with its parent"},
@@ -44,6 +46,10 @@ static struct sd_option vdi_options[] = {
 			       " data object size"},
 	{'R', "reduce-identical-snapshots", false, "do not create snapshot if "
 	 "working VDI doesn't have its own objects"},
+	{'B', "nr-batched-reclamation", true, "specify a number of batched"
+	 "reclamation during VDI deletion"},
+	{'I', "reclamation-interval", true, "specify how long (unit: second)"
+	 "in reclamation loop during VDI deletion"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -66,6 +72,8 @@ static struct vdi_cmd_data {
 	bool no_share;
 	bool exist;
 	bool reduce_identical_snapshots;
+	int nr_batched_reclamation;
+	int reclamation_interval;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -991,9 +999,8 @@ static int vdi_resize(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-#define NR_BATCHED_DISCARD 128	/* TODO: the value should be optional */
-
-static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
+static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag,
+			 int nr_batched_reclamation, int reclamation_interval)
 {
 	int ret, nr_objs;
 	struct sd_req hdr;
@@ -1002,6 +1009,9 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 	uint32_t vid;
 	struct sd_inode *inode = xzalloc(sizeof(*inode));
 	int i = 0;
+
+	if (!nr_batched_reclamation)
+		nr_batched_reclamation = NR_BATCHED_RECLAMATION_DEFAULT;
 
 	ret = find_vdi_name(vdiname, snap_id, snap_tag, &vid);
 	if (ret != SD_RES_SUCCESS) {
@@ -1029,7 +1039,7 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 		start_idx = i;
 
 		nr_filled_idx = 0;
-		while (i < nr_objs && nr_filled_idx < NR_BATCHED_DISCARD) {
+		while (i < nr_objs && nr_filled_idx < nr_batched_reclamation) {
 			if (inode->data_vdi_id[i]) {
 				inode->data_vdi_id[i] = 0;
 				nr_filled_idx++;
@@ -1051,6 +1061,9 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag)
 			ret = EXIT_FAILURE;
 			goto out;
 		}
+
+		if (i < nr_objs && reclamation_interval)
+			sleep(reclamation_interval);
 	}
 
 	sd_init_req(&hdr, SD_OP_DEL_VDI);
@@ -1087,7 +1100,9 @@ static int vdi_delete(int argc, char **argv)
 	const char *vdiname = argv[optind];
 
 	return do_vdi_delete(vdiname, vdi_cmd_data.snapshot_id,
-			     vdi_cmd_data.snapshot_tag);
+			     vdi_cmd_data.snapshot_tag,
+			     vdi_cmd_data.nr_batched_reclamation,
+			     vdi_cmd_data.reclamation_interval);
 }
 
 static int vdi_rollback(int argc, char **argv)
@@ -1113,7 +1128,9 @@ static int vdi_rollback(int argc, char **argv)
 		confirm("This operation discards any changes made since the"
 			" previous\nsnapshot was taken.  Continue? [yes/no]: ");
 
-	ret = do_vdi_delete(vdiname, 0, NULL);
+	ret = do_vdi_delete(vdiname, 0, NULL,
+			    vdi_cmd_data.nr_batched_reclamation,
+			    vdi_cmd_data.reclamation_interval);
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("Failed to delete the current state");
 		return EXIT_FAILURE;
@@ -2541,7 +2558,9 @@ static uint32_t do_restore(const char *vdiname, int snapid, const char *tag)
 		ret = restore_obj(backup, vid, inode);
 		if (ret != SD_RES_SUCCESS) {
 			sd_err("failed to restore backup");
-			do_vdi_delete(vdiname, 0, NULL);
+			do_vdi_delete(vdiname, 0, NULL,
+				      vdi_cmd_data.nr_batched_reclamation,
+				      vdi_cmd_data.reclamation_interval);
 			ret = EXIT_FAILURE;
 			break;
 		}
@@ -2603,7 +2622,9 @@ static int vdi_restore(int argc, char **argv)
 		goto out;
 	}
 
-	ret = do_vdi_delete(vdiname, 0, NULL);
+	ret = do_vdi_delete(vdiname, 0, NULL,
+			    vdi_cmd_data.nr_batched_reclamation,
+			    vdi_cmd_data.reclamation_interval);
 	if (ret != EXIT_SUCCESS) {
 		sd_err("Failed to delete the current state");
 		goto out;
@@ -2958,10 +2979,10 @@ static struct subcommand vdi_cmd[] = {
 	{"clone", "<src vdi> <dst vdi>", "sPnaphrvT", "clone an image",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG,
 	 vdi_clone, vdi_options},
-	{"delete", "<vdiname>", "saphT", "delete an image",
+	{"delete", "<vdiname>", "saphTBI", "delete an image",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG,
 	 vdi_delete, vdi_options},
-	{"rollback", "<vdiname>", "saphfrvT", "rollback to a snapshot",
+	{"rollback", "<vdiname>", "saphfrvTBI", "rollback to a snapshot",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG,
 	 vdi_rollback, vdi_options},
 	{"list", "[vdiname]", "aprhoT", "list images",
@@ -2999,7 +3020,7 @@ static struct subcommand vdi_cmd[] = {
 	 "create an incremental backup between two snapshots and outputs to STDOUT",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_backup, vdi_options},
-	{"restore", "<vdiname>", "saphT",
+	{"restore", "<vdiname>", "saphTBI",
 	 "restore snapshot images from a backup provided in STDIN",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_NODELIST|CMD_NEED_ARG,
 	 vdi_restore, vdi_options},
@@ -3115,6 +3136,33 @@ static int vdi_parser(int ch, const char *opt)
 		break;
 	case 'R':
 		vdi_cmd_data.reduce_identical_snapshots = true;
+		break;
+	case 'B':
+		vdi_cmd_data.nr_batched_reclamation = strtol(opt, &p, 10);
+		if (opt == p) {
+			sd_err("The number of batched reclamation is"
+			       " invalid: %s", opt);
+			exit(EXIT_FAILURE);
+		}
+		if (vdi_cmd_data.nr_batched_reclamation <= 0) {
+			sd_err("The number of batched reclamation must be"
+				"positive integer");
+			exit(EXIT_FAILURE);
+		}
+		break;
+	case 'I':
+		vdi_cmd_data.reclamation_interval = strtol(opt, &p, 10);
+		if (opt == p) {
+			sd_err("The interval of batched reclamation is"
+			       " invalid: %s", opt);
+			exit(EXIT_FAILURE);
+		}
+		if (vdi_cmd_data.reclamation_interval <= 0) {
+			sd_err("The interval of batched reclamation must be"
+				"positive integer");
+			exit(EXIT_FAILURE);
+		}
+		break;
 	}
 
 	return 0;
