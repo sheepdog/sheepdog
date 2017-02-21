@@ -658,17 +658,17 @@ static int prepare_obj_refcnt(const struct sd_req *hdr, uint32_t *vids,
 	offset = hdr->obj.offset - offsetof(struct sd_inode, data_vdi_id);
 	start = offset / sizeof(*vids);
 
-	ret = sd_read_object(hdr->obj.oid, (char *)vids,
-			     nr_vids * sizeof(vids[0]),
-			     offsetof(struct sd_inode, data_vdi_id[start]));
+	ret = sd_read_object_fwd(hdr->obj.oid, (char *)vids,
+				 nr_vids * sizeof(vids[0]),
+				 offsetof(struct sd_inode, data_vdi_id[start]));
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read vdi, %016" PRIx64, hdr->obj.oid);
 		return ret;
 	}
 
-	ret = sd_read_object(hdr->obj.oid, (char *)refs,
-			     nr_vids * sizeof(refs[0]),
-			     offsetof(struct sd_inode, gref[start]));
+	ret = sd_read_object_fwd(hdr->obj.oid, (char *)refs,
+				 nr_vids * sizeof(refs[0]),
+				 offsetof(struct sd_inode, gref[start]));
 	if (ret != SD_RES_SUCCESS) {
 		sd_err("failed to read vdi, %016" PRIx64, hdr->obj.oid);
 		return ret;
@@ -837,7 +837,7 @@ int gateway_write_obj(struct request *req)
 
 		sd_debug("update reference counts, %016" PRIx64, hdr->obj.oid);
 
-		ret = sd_write_object(hdr->obj.oid, (char *)zeroed_refs,
+		ret = sd_write_object_fwd(hdr->obj.oid, (char *)zeroed_refs,
 				      nr_vids * sizeof(*zeroed_refs),
 				      offsetof(struct sd_inode, gref)
 				      + start * sizeof(*zeroed_refs), false);
@@ -872,7 +872,7 @@ int gateway_write_obj(struct request *req)
 			refcnt_work->work.fn = async_update_obj_refcnt_work;
 			refcnt_work->work.done = async_update_obj_refcnt_done;
 
-			queue_work(sys->io_wqueue, &refcnt_work->work);
+			queue_work(sys->reclaim_wqueue, &refcnt_work->work);
 			goto out;
 
 		free_work:
@@ -917,6 +917,7 @@ static int gateway_handle_cow(struct request *req)
 	if (req->rq.data_length != len) {
 		/* Partial write, need read the copy first */
 		sd_init_req(&hdr, SD_OP_READ_OBJ);
+		hdr.flags |= SD_FLAG_CMD_FWD;
 		hdr.obj.oid = req_hdr->obj.cow_oid;
 		hdr.data_length = len;
 		hdr.obj.offset = 0;
@@ -927,7 +928,7 @@ static int gateway_handle_cow(struct request *req)
 
 	memcpy(buf + req_hdr->obj.offset, req->data, req_hdr->data_length);
 	sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
-	hdr.flags = SD_FLAG_CMD_WRITE;
+	hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_FWD;
 	hdr.obj.oid = oid;
 	hdr.data_length = len;
 	hdr.obj.offset = 0;

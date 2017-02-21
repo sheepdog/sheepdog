@@ -165,12 +165,15 @@ struct system_info {
 	struct work_queue *net_wqueue;
 	struct work_queue *gateway_wqueue;
 	struct work_queue *io_wqueue;
+	struct work_queue *peer_wqueue;
+	struct work_queue *reclaim_wqueue;
+	struct work_queue *gateway_fwd_wqueue;
+	struct work_queue *remove_wqueue;
+	struct work_queue *remove_peer_wqueue;
 	struct work_queue *deletion_wqueue;
 	struct work_queue *recovery_wqueue;
 	struct work_queue *recovery_notify_wqueue;
 	struct work_queue *block_wqueue;
-	struct work_queue *oc_reclaim_wqueue;
-	struct work_queue *oc_push_wqueue;
 	struct work_queue *md_wqueue;
 	struct work_queue *areq_wqueue;
 #ifdef HAVE_HTTP
@@ -471,7 +474,11 @@ struct recovery_throttling get_recovery(void);
 
 int sd_write_object(uint64_t oid, char *data, unsigned int datalen,
 		    uint64_t offset, bool create);
+int sd_write_object_fwd(uint64_t oid, char *data, unsigned int datalen,
+			uint64_t offset, bool create);
 int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
+		   uint64_t offset);
+int sd_read_object_fwd(uint64_t oid, char *data, unsigned int datalen,
 		   uint64_t offset);
 int sd_remove_object(uint64_t oid);
 int sd_discard_object(uint64_t oid);
