@@ -1,3 +1,23 @@
+## KNOWN ISSUES
+
+### Distributed deadlock
+
+Distributed deadlock tends to occue when many requests causing update
+of reference count (eg: writing to the working VDI whose snapshot has
+been taken; or deleting such a working VDI or its snapshot) come to
+the Sheepdog cluster in parallel and the number of threads handling
+such requests is too small. In such a case, alive as a process, the
+sheep cannot handle some kind of requests at all, such as read, write
+and remove objects.
+
+Workaround: set the number of threads for *gateway* and *io*
+workqueues large enough. It's recommended that you set it to larger
+than twice of *N* for *gateway* and larger than *N* for *io*. Here,
+*N* is the number of VDIs in the cluster copied-on-write or deleted
+in parallel.
+
+See #362 and #368 for more information.
+
 ## 0.9.5 (release candidate)
 
 IMPORTANT CHANGES:
@@ -5,6 +25,10 @@ IMPORTANT CHANGES:
    This is for sheep not to consume a huge amount of memory by
    creating new threads infinitely under heavy load, and to avoid
    being shot by OOM-killer.
+ - Ledger objects are now updated synchronously. This makes it easy
+   for us to estimate the necessary number of threads for avoiding
+   distributed deadlock, in exchange for performance of copy-on-write,
+   including deleting VDI.
  - zk\_control now can purge znodes within 24 hours. It purges znodes
    created before the given threshold. This is useful if tens of
    thousands of znodes are created in a day.
@@ -34,6 +58,7 @@ NEW FEATURE:
    updates an inode object and related ledger objects in an asynchronous
    manner. This improves performance of copy-on-write and dereferencing,
    especially deleting VDIs.
+   **(Note that this feature will be removed in 0.9.5.)**
 
 ## 0.9.3
 
