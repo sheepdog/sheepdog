@@ -903,7 +903,7 @@ static int gateway_handle_cow(struct request *req)
 {
 	uint64_t oid = req->rq.obj.oid;
 	size_t len = get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
-	struct sd_req hdr, *req_hdr = &req->rq;
+	struct sd_req *req_hdr = &req->rq;
 	char *buf;
 	int ret;
 
@@ -916,23 +916,13 @@ static int gateway_handle_cow(struct request *req)
 
 	if (req->rq.data_length != len) {
 		/* Partial write, need read the copy first */
-		sd_init_req(&hdr, SD_OP_READ_OBJ);
-		hdr.flags |= SD_FLAG_CMD_FWD;
-		hdr.obj.oid = req_hdr->obj.cow_oid;
-		hdr.data_length = len;
-		hdr.obj.offset = 0;
-		ret = exec_local_req(&hdr, buf);
+		ret = sd_read_object_fwd(req_hdr->obj.cow_oid, buf, len, 0);
 		if (ret != SD_RES_SUCCESS)
 			goto out;
 	}
 
 	memcpy(buf + req_hdr->obj.offset, req->data, req_hdr->data_length);
-	sd_init_req(&hdr, SD_OP_CREATE_AND_WRITE_OBJ);
-	hdr.flags = SD_FLAG_CMD_WRITE | SD_FLAG_CMD_FWD;
-	hdr.obj.oid = oid;
-	hdr.data_length = len;
-	hdr.obj.offset = 0;
-	ret = exec_local_req(&hdr, buf);
+	ret = sd_write_object_fwd(oid, buf, len, 0, true); /* true to CREATE */
 out:
 	free(buf);
 	return ret;
