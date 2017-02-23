@@ -481,7 +481,6 @@ int sd_read_object(uint64_t oid, char *data, unsigned int datalen,
 int sd_read_object_fwd(uint64_t oid, char *data, unsigned int datalen,
 		   uint64_t offset);
 int sd_remove_object(uint64_t oid);
-int sd_discard_object(uint64_t oid);
 int sd_dec_object_refcnt(uint64_t data_oid, uint32_t generation,
 			 uint32_t refcnt);
 
