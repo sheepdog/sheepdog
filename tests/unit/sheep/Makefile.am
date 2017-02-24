@@ -19,7 +19,8 @@ LIBS			= $(top_srcdir)/lib/libsd.a		\
 			  @CHECK_LIBS@
 
 test_vdi_SOURCES	= test_vdi.c sheep/vdi.c mock_sheep.c mock_store.c		\
-			  mock_request.c unity.c
+			  mock_request.c
+nodist_test_vdi_SOURCES = unity.c
 
 test_cluster_driver_SOURCES	= mock_sheep.c mock_group.c		\
 				  sheep/cluster/local.c	\
@@ -46,8 +47,8 @@ test_group_SOURCES	= test_group.c sheep/group.c \
 				sheep/recovery.c \
 				sheep/gateway.c \
 				sheep/object_list_cache.c \
-				sheep/migrate.c \
-				cmock.c unity.c
+				sheep/migrate.c
+nodist_test_group_SOURCES = cmock.c unity.c
 
 test_recovery_SOURCES   = test_recovery.c sheep/recovery.c \
                 sheep/ops.c \
@@ -60,8 +61,8 @@ test_recovery_SOURCES   = test_recovery.c sheep/recovery.c \
                 sheep/group.c \
                 sheep/gateway.c \
                 sheep/object_list_cache.c \
-                sheep/migrate.c \
-                cmock.c unity.c
+                sheep/migrate.c
+nodist_test_recovery_SOURCES = cmock.c unity.c
 
 clean-local:
 	rm -f sheep.info
