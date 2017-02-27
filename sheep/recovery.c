@@ -81,7 +81,12 @@ struct recovery_info {
 
 	bool wildcard;
 
-	bool cancel;		/* for avoiding disk full by recovery */
+	/*
+	 * set this to true to cancel recovery in the following cases:
+	 * 1) for avoiding disk full by recovery
+	 * 2) failed to get object list from any other node
+	 */
+	bool cancel;
 };
 
 struct recovery_timer {
@@ -702,6 +707,7 @@ main_fn bool oid_in_recovery(uint64_t oid)
 
 	switch (rinfo->state) {
 	case RW_PREPARE_LIST:
+	case RW_CANCELED:
 		/* oid is not recovered yet */
 		break;
 	case RW_RECOVER_OBJ:
@@ -855,6 +861,24 @@ static inline void finish_recovery(struct recovery_info *rinfo)
 	free_recovery_info(rinfo);
 
 	sd_debug("recovery complete: new epoch %"PRIu32, recovered_epoch);
+}
+
+/*
+ * To cancel recovery, call this function instead of finish_recovery().
+ *
+ * RW_CANCELED is a dead-end state; cancel_recovery() does not put the
+ * next recovery work to avoid eventual transition to RW_NOTIFY_COMPLETION
+ * state.
+ *
+ * On-demand recovery still in effect; cancel_recovery() leaves
+ * current_rinfo as it is for letting sheep recovery objects on demand
+ * in cases of clients' read/write requests.
+ */
+static void cancel_recovery(struct recovery_info *rinfo)
+{
+	const uint32_t canceled_epoch = rinfo->epoch;
+	rinfo->state = RW_CANCELED;
+	sd_debug("recovery canceled: new epoch %"PRIu32, canceled_epoch);
 }
 
 static void recover_next_object(struct recovery_info *rinfo)
@@ -1051,7 +1075,7 @@ static void finish_object_list(struct work *work)
 	uint32_t nr_threads = md_nr_disks() * 2;
 
 	if (rinfo->cancel) {
-		finish_recovery(rinfo);
+		cancel_recovery(rinfo);
 		return;
 	}
 
@@ -1307,8 +1331,36 @@ again:
 		}
 
 		oids = fetch_object_list(node, rw->epoch, &nr_oids);
-		if (!oids)
-			continue;
+		if (!oids) {
+			int ret;
+			struct sd_req hdr;
+
+			rw->rinfo->cancel = true;
+			sd_emerg("canceling recovery at epoch %d "
+			         "due to failure of fetching object list",
+			         rw->epoch);
+			sd_emerg("please add a new node ASAP");
+
+			/*
+			 * Pause recovery running in other nodes. This is
+			 * because, unlike a case of diskfull, other node
+			 * could succeed in fetching object list. Even if the
+			 * pausing failed, the recovery will not complete
+			 * because this node never send COMPLETE_RECOVERY,
+			 * so objects cannot be lost by purging .stale.
+			 */
+			sd_notice("pausing recovery running in other nodes");
+			sd_init_req(&hdr, SD_OP_DISABLE_RECOVER);
+			ret = exec_local_req(&hdr, NULL);
+			if (ret == SD_RES_SUCCESS)
+				sd_notice("succeeded in pausing "
+				          "recovery running in other nodes");
+			else
+				sd_err("failed to pause "
+				       "recovery running in other nodes");
+
+			goto out;
+		}
 		screen_object_list(rlw, oids, nr_oids);
 		free(oids);
 	}

@@ -326,6 +326,7 @@ enum rw_state {
 	RW_PREPARE_LIST, /* the recovery thread is preparing object list */
 	RW_RECOVER_OBJ, /* the thread is recovering objects */
 	RW_NOTIFY_COMPLETION, /* the thread is notifying recovery completion */
+	RW_CANCELED, /* recovery canceled; no recovery thread is running */
 };
 
 struct recovery_state {
