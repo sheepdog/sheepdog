@@ -6,8 +6,8 @@ Version: @version@
 Release: 1%{?dist}
 License: GPLv2 and GPLv2+
 Group: System Environment/Base
-URL: http://www.osrg.net/sheepdog
-Source0: http://downloads.sourceforge.net/project/sheepdog/%{name}/%{version}/%{name}-%{version}.tar.gz
+URL: http://sheepdog.github.io/sheepdog
+Source0: https://github.com/sheepdog/%{name}/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 # Runtime bits
 Requires: corosync %{_requires}
