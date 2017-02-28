@@ -18,22 +18,22 @@ LIBS			= -pthread -lm					\
 			  @CHECK_LIBS@
 
 test_util_SOURCES	= test_util.c lib/util.c		\
-			  ../mocks/Mocklogger.c				\
-			  cmock.c unity.c
+			  ../mocks/Mocklogger.c
+nodist_test_util_SOURCES = cmock.c unity.c
 
-test_work_SOURCES	= test_work.c lib/work.c		\
-			  unity.c
+test_work_SOURCES	= test_work.c lib/work.c
+nodist_test_work_SOURCES = unity.c
 
 test_punchhole_SOURCES	= test_punchhole.c				\
 			  lib/util.c				\
-			  ../mocks/Mocklogger.c				\
-			  cmock.c unity.c
+			  ../mocks/Mocklogger.c
+nodist_test_punchhole_SOURCES = cmock.c unity.c
 
 test_atomic_create_and_write_SOURCES =					\
 			  test_atomic_create_and_write.c		\
 			  lib/common.c				\
-			  ../mocks/Mocklogger.c				\
-			  cmock.c unity.c
+			  ../mocks/Mocklogger.c
+nodist_test_atomic_create_and_write_SOURCES = cmock.c unity.c
 
 clean-local:
 	rm -f lib.info
