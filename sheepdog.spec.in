@@ -1,4 +1,19 @@
+# Define options
 %define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7)
+%define enable_fuse %{?_have_fuse}%{!?_have_fuse:0}
+%define enable_zookeeper %{?_have_zookeeper}%{!?_have_zookeeper:0}
+
+# Configure args
+%if 0%{?enable_fuse} == 1
+%define fuse_configure_args $(echo "--enable-sheepfs")
+%else
+%define fuse_configure_args %{nil}
+%endif
+%if 0%{?enable_zookeeper} == 1
+%define zookeeper_configure_args $(echo "--enable-zookeeper")
+%else
+%define zookeeper_configure_args %{nil}
+%endif
 
 Name: sheepdog
 Summary: The Sheepdog Distributed Storage System for QEMU
@@ -6,14 +21,16 @@ Version: @version@
 Release: 1%{?dist}
 License: GPLv2 and GPLv2+
 Group: System Environment/Base
-URL: http://www.osrg.net/sheepdog
-Source0: http://downloads.sourceforge.net/project/sheepdog/%{name}/%{version}/%{name}-%{version}.tar.gz
+URL: http://sheepdog.github.io/sheepdog
+Source0: https://github.com/sheepdog/%{name}/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 # Runtime bits
-Requires: corosync %{_requires}
+Requires: corosync
+%if 0%{enable_fuse}
+Requires: fuse
+%endif
 %if %{use_systemd}
 Requires: systemd
-BuildRequires: systemd-units
 %else
 Requires(post): chkconfig
 Requires(preun): chkconfig
@@ -22,7 +39,16 @@ Requires(preun): initscripts
 
 # Build bits
 BuildRequires: autoconf automake
-BuildRequires: corosynclib-devel userspace-rcu-devel %{_buildrequires}
+BuildRequires: corosynclib-devel userspace-rcu-devel
+%if 0%{enable_fuse}
+BuildRequires: fuse-devel
+%endif
+%if 0%{enable_zookeeper}
+BuildRequires: %{_includedir}/zookeeper/zookeeper.h
+%endif
+%if %{use_systemd}
+BuildRequires: systemd-units
+%endif
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 
@@ -35,7 +61,7 @@ a distributed object storage system for QEMU.
 
 %build
 ./autogen.sh
-%{configure} --with-initddir=%{_initrddir} %{_configopts}
+%{configure} --with-initddir=%{_initrddir} %{fuse_configure_args} %{zookeeper_configure_args}
 
 make %{_smp_mflags}
 
@@ -65,7 +91,6 @@ rm -rf %{buildroot}
 ln -s -f %{_bindir}/dog %{_bindir}/collie
 
 %preun
-
 if [ $1 -eq 0 ] ; then
     %if %use_systemd
     /usr/bin/systemctl --no-reload disable sheepdog.service >/dev/null 2>&1 || :
@@ -85,20 +110,18 @@ if [ "$1" -ge "1" ] ; then
     /sbin/service sheepdog condrestart >/dev/null 2>&1 || :
     %endif
 else
-    rm -f /usr/sbin/collie
+    unlink /usr/bin/collie
 fi
 
 %files
 %defattr(-,root,root,-)
 %doc COPYING README INSTALL
 %{_sbindir}/sheep
-%{_sbindir}/sheepfs
 %{_bindir}/dog
 %{_sbindir}/shepherd
 %dir %{_localstatedir}/lib/sheepdog
 %config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
-%{_mandir}/man8/sheepfs.8*
 %{_mandir}/man8/dog.8*
 %dir %{_includedir}/sheepdog
 %{_includedir}/sheepdog/internal.h
@@ -108,7 +131,11 @@ fi
 %{_includedir}/sheepdog/util.h
 %{_libdir}/libsheepdog.la
 %{_libdir}/libsheepdog.so
-%if 0%{_have_zookeeper}
+%if 0%{enable_fuse}
+%{_sbindir}/sheepfs
+%{_mandir}/man8/sheepfs.8*
+%endif
+%if 0%{enable_zookeeper}
 %{_sbindir}/zk_control
 %endif
 %if %{use_systemd}
