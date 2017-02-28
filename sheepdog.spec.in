@@ -6,9 +6,13 @@
 # Configure args
 %if 0%{?enable_fuse} == 1
 %define fuse_configure_args $(echo "--enable-sheepfs")
+%else
+%define fuse_configure_args %{nil}
 %endif
 %if 0%{?enable_zookeeper} == 1
 %define zookeeper_configure_args $(echo "--enable-zookeeper")
+%else
+%define zookeeper_configure_args %{nil}
 %endif
 
 Name: sheepdog
