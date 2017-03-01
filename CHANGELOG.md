@@ -2,7 +2,7 @@
 
 ### Distributed deadlock
 
-Distributed deadlock tends to occue when many requests causing update
+Distributed deadlock tends to occur when many requests causing update
 of reference count (eg: writing to the working VDI whose snapshot has
 been taken; or deleting such a working VDI or its snapshot) come to
 the Sheepdog cluster in parallel and the number of threads handling
@@ -18,7 +18,7 @@ in parallel.
 
 See #362 and #368 for more information.
 
-## 0.9.5 (release candidate)
+## 0.9.5
 
 IMPORTANT CHANGES:
  - Unlimited workqueue is now removed and changed to dynamic one.
