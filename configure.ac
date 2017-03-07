@@ -240,7 +240,7 @@ AM_CONDITIONAL(BUILD_COVERAGE, test x$enable_coverage = xyes)
 
 AC_ARG_ENABLE([corosync],
 	[  --enable-corosync       : build corosync cluster driver ],,
-	[ enable_corosync="yes" ],)
+	[ enable_corosync="yes" ])
 AM_CONDITIONAL(BUILD_COROSYNC, test x$enable_corosync = xyes)
 
 AC_ARG_ENABLE([zookeeper],

@@ -25,7 +25,9 @@ URL: http://sheepdog.github.io/sheepdog
 Source0: https://github.com/sheepdog/%{name}/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 # Runtime bits
+%if 0%{?enable_corosync} == 1
 Requires: corosync
+%endif
 %if 0%{enable_fuse}
 Requires: fuse
 %endif
@@ -39,7 +41,10 @@ Requires(preun): initscripts
 
 # Build bits
 BuildRequires: autoconf automake
-BuildRequires: corosynclib-devel userspace-rcu-devel
+BuildRequires: userspace-rcu-devel
+%if 0%{?enable_corosync} == 1
+BuildRequires: corosynclib-devel
+%endif
 %if 0%{enable_fuse}
 BuildRequires: fuse-devel
 %endif
