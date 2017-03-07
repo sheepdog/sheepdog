@@ -2,6 +2,7 @@
 %define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7)
 %define enable_fuse %{?_have_fuse}%{!?_have_fuse:0}
 %define enable_zookeeper %{?_have_zookeeper}%{!?_have_zookeeper:0}
+%define enable_corosync %{?_have_corosync}%{!?_have_corosync:0}
 
 # Configure args
 %if 0%{?enable_fuse} == 1
@@ -14,6 +15,11 @@
 %else
 %define zookeeper_configure_args %{nil}
 %endif
+%if 0%{?enable_corosync} == 1
+%define corosync_configure_args %{nil}
+%else
+%define corosync_configure_args $(echo "--disable-corosync") 
+%endif
 
 Name: sheepdog
 Summary: The Sheepdog Distributed Storage System for QEMU
@@ -25,7 +31,7 @@ URL: http://sheepdog.github.io/sheepdog
 Source0: https://github.com/sheepdog/%{name}/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 # Runtime bits
-%if 0%{?enable_corosync} == 1
+%if 0%{enable_corosync}
 Requires: corosync
 %endif
 %if 0%{enable_fuse}
@@ -42,7 +48,7 @@ Requires(preun): initscripts
 # Build bits
 BuildRequires: autoconf automake
 BuildRequires: userspace-rcu-devel
-%if 0%{?enable_corosync} == 1
+%if 0%{enable_corosync}
 BuildRequires: corosynclib-devel
 %endif
 %if 0%{enable_fuse}
@@ -66,7 +72,7 @@ a distributed object storage system for QEMU.
 
 %build
 ./autogen.sh
-%{configure} --with-initddir=%{_initrddir} %{fuse_configure_args} %{zookeeper_configure_args}
+%{configure} --with-initddir=%{_initrddir} %{fuse_configure_args} %{zookeeper_configure_args} %{corosync_configure_args}
 
 make %{_smp_mflags}
 
