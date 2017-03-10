@@ -70,6 +70,10 @@ if BUILD_SHEEPFS
 RPMBUILDOPTS += --define "_have_fuse 1"
 endif
 
+if BUILD_COROSYNC
+RPMBUILDOPTS += --define "_have_corosync 1"
+endif
+
 $(TARFILE):
 	$(MAKE) dist
 
