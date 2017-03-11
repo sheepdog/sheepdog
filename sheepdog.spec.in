@@ -8,15 +8,15 @@
 %if 0%{?enable_fuse} == 1
 %define fuse_configure_args $(echo "--enable-sheepfs")
 %else
-%define fuse_configure_args %{nil}
+%define fuse_configure_args $(echo "--disable-sheepfs")
 %endif
 %if 0%{?enable_zookeeper} == 1
 %define zookeeper_configure_args $(echo "--enable-zookeeper")
 %else
-%define zookeeper_configure_args %{nil}
+%define zookeeper_configure_args $(echo "--disable-zookeeper")
 %endif
 %if 0%{?enable_corosync} == 1
-%define corosync_configure_args %{nil}
+%define corosync_configure_args $(echo "--enable-corosync")
 %else
 %define corosync_configure_args $(echo "--disable-corosync") 
 %endif
@@ -46,8 +46,8 @@ Requires(preun): initscripts
 %endif
 
 # Build bits
-BuildRequires: autoconf automake
-BuildRequires: userspace-rcu-devel
+BuildRequires: autoconf automake libtool
+BuildRequires: userspace-rcu-devel yasm
 %if 0%{enable_corosync}
 BuildRequires: corosynclib-devel
 %endif
@@ -66,6 +66,40 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 %description
 This package contains the Sheepdog server, and command line tool which offer
 a distributed object storage system for QEMU.
+
+# for libs
+%package libs
+Summary: Shared libraries for Sheepdog
+Group: Applications/File
+
+%description libs
+This package provides the libsheepdog shared library.
+
+# for devel
+%package devel
+Summary: Header files for Sheepdog
+Group: Development/Libraries
+Requires: %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description devel
+This package provides the header files for libsheepdog.
+
+# for sheepfs
+%if 0%{enable_fuse}
+%package sheepfs
+Summary: FUSE-based pseudo file system for Sheepdog
+Group: Applications/File
+Requires: %{name}%{?_isa} = %{version}-%{release}
+Requires: fuse
+BuildRequires: fuse-devel
+
+%description sheepfs
+This package provides the sheepfs.
+
+Sheepfs is a FUSE-based pseudo file system in userland to access both
+sheepdog's internal state (for e.g, cluster info, vdi list) as well
+as sheepdog's high reliable storage.
+%endif
 
 %prep
 %setup -q
@@ -89,6 +123,8 @@ rm -f $RPM_BUILD_ROOT%{_initddir}/sheepdog
 ## tree fixup
 # drop static libs
 rm -f %{buildroot}%{_libdir}/*.a
+# drop libtool library file
+rm -f %{buildroot}%{_libdir}/*.la
 
 # install collie command
 ln -s -f dog $RPM_BUILD_ROOT%{_bindir}/collie
@@ -135,18 +171,6 @@ fi
 %config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/dog.8*
-%dir %{_includedir}/sheepdog
-%{_includedir}/sheepdog/internal.h
-%{_includedir}/sheepdog/list.h
-%{_includedir}/sheepdog/sheepdog.h
-%{_includedir}/sheepdog/sheepdog_proto.h
-%{_includedir}/sheepdog/util.h
-%{_libdir}/libsheepdog.la
-%{_libdir}/libsheepdog.so
-%if 0%{enable_fuse}
-%{_sbindir}/sheepfs
-%{_mandir}/man8/sheepfs.8*
-%endif
 %if 0%{enable_zookeeper}
 %{_sbindir}/zk_control
 %endif
@@ -154,6 +178,26 @@ fi
 %{_unitdir}/sheepdog.service
 %else
 %attr(755,-,-)%config %{_initddir}/sheepdog
+%endif
+
+# for libs
+%files libs
+%defattr(-,root,root,-)
+%{_libdir}/*.so
+
+# for devel
+%files devel
+%defattr(-,root,root,-)
+%dir %{_includedir}/sheepdog
+%{_includedir}/sheepdog/*.h
+
+
+# for sheepfs
+%if 0%{enable_fuse}
+%files sheepfs
+%defattr(-,root,root,-)
+%{_sbindir}/sheepfs
+%{_mandir}/man8/sheepfs.8*
 %endif
 
 %changelog
