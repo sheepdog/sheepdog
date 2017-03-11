@@ -90,6 +90,9 @@ rm -f $RPM_BUILD_ROOT%{_initddir}/sheepdog
 # drop static libs
 rm -f %{buildroot}%{_libdir}/*.a
 
+# install collie command
+ln -s -f dog $RPM_BUILD_ROOT%{_bindir}/collie
+
 %clean
 rm -rf %{buildroot}
 
@@ -99,7 +102,6 @@ rm -rf %{buildroot}
 %else
 /sbin/chkconfig --add sheepdog
 %endif
-ln -s -f %{_bindir}/dog %{_bindir}/collie
 
 %preun
 if [ $1 -eq 0 ] ; then
@@ -120,14 +122,13 @@ if [ "$1" -ge "1" ] ; then
     %else
     /sbin/service sheepdog condrestart >/dev/null 2>&1 || :
     %endif
-else
-    unlink /usr/bin/collie
 fi
 
 %files
 %defattr(-,root,root,-)
 %doc COPYING README INSTALL
 %{_sbindir}/sheep
+%{_bindir}/collie
 %{_bindir}/dog
 %{_sbindir}/shepherd
 %dir %{_localstatedir}/lib/sheepdog
