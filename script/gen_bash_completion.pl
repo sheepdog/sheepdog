@@ -7,7 +7,7 @@ use strict;
 
 my ($program) = @ARGV;
 
-print "#!bash\n";
+print "# dog bash completion script\n";
 print "\n";
 
 open IN, "$program -h |" or die "cannot find $program\n";

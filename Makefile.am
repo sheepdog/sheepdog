@@ -53,7 +53,7 @@ $(SPEC): $(SPEC).in
 	-e "s#@version@#$(VERSION)#g" \
 	-e "s#@date@#$$date#g" \
 	$< > $@-t
-	chmod a-w $@-t
+	chmod a-w,u+w $@-t
 	mv $@-t $@
 
 RPMBUILDOPTS = --define "_sourcedir $(abs_builddir)" \
