@@ -5,20 +5,10 @@
 %define enable_corosync %{?_have_corosync}%{!?_have_corosync:0}
 
 # Configure args
-%if 0%{?enable_fuse} == 1
+%if 0%{?enable_fuse}
 %define fuse_configure_args $(echo "--enable-sheepfs")
 %else
-%define fuse_configure_args %{nil}
-%endif
-%if 0%{?enable_zookeeper} == 1
-%define zookeeper_configure_args $(echo "--enable-zookeeper")
-%else
-%define zookeeper_configure_args %{nil}
-%endif
-%if 0%{?enable_corosync} == 1
-%define corosync_configure_args %{nil}
-%else
-%define corosync_configure_args $(echo "--disable-corosync") 
+%define fuse_configure_args $(echo "--disable-sheepfs")
 %endif
 
 Name: sheepdog
@@ -31,12 +21,6 @@ URL: http://sheepdog.github.io/sheepdog
 Source0: https://github.com/sheepdog/%{name}/archive/v%{version}.tar.gz#/%{name}-%{version}.tar.gz
 
 # Runtime bits
-%if 0%{enable_corosync}
-Requires: corosync
-%endif
-%if 0%{enable_fuse}
-Requires: fuse
-%endif
 %if %{use_systemd}
 Requires: systemd
 %else
@@ -46,17 +30,8 @@ Requires(preun): initscripts
 %endif
 
 # Build bits
-BuildRequires: autoconf automake
-BuildRequires: userspace-rcu-devel
-%if 0%{enable_corosync}
-BuildRequires: corosynclib-devel
-%endif
-%if 0%{enable_fuse}
-BuildRequires: fuse-devel
-%endif
-%if 0%{enable_zookeeper}
-BuildRequires: %{_includedir}/zookeeper/zookeeper.h
-%endif
+BuildRequires: autoconf automake libtool
+BuildRequires: userspace-rcu-devel yasm
 %if %{use_systemd}
 BuildRequires: systemd-units
 %endif
@@ -67,45 +42,176 @@ BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
 This package contains the Sheepdog server, and command line tool which offer
 a distributed object storage system for QEMU.
 
+# for libs
+%package libs
+Summary: Shared libraries for Sheepdog
+Group: Applications/File
+
+%description libs
+This package provides the libsheepdog shared library.
+
+# for devel
+%package devel
+Summary: Header files for Sheepdog
+Group: Development/Libraries
+Requires: %{name}-libs%{?_isa} = %{version}-%{release}
+
+%description devel
+This package provides the header files for libsheepdog.
+
+# for zookeeper driver
+%if 0%{?enable_zookeeper}
+%package zookeeper
+Summary: ZooKeeper cluster driver for Sheepdog
+Group: Applications/File
+Conflicts: %{name}-corosync
+Requires: %{name}%{?_isa} = %{version}-%{release}
+BuildRequires: %{_includedir}/zookeeper/zookeeper.h
+
+%description zookeeper
+This package provides the ZooKeeper cluster driver for sheepdog.
+%endif
+
+# for corosync driver
+%if 0%{?enable_corosync}
+%package corosync
+Summary: Corosync cluster driver for Sheepdog
+Group: Applications/File
+Conflicts: %{name}-zookeeper
+Requires: %{name}%{?_isa} = %{version}-%{release}
+
+%description corosync
+This package provides the corosync cluster driver for sheepdog.
+%endif
+
+# for sheepfs
+%if 0%{?enable_fuse}
+%package sheepfs
+Summary: FUSE-based pseudo file system for Sheepdog
+Group: Applications/File
+Requires: %{name}%{?_isa} = %{version}-%{release}
+Requires: fuse
+BuildRequires: fuse-devel
+
+%description sheepfs
+This package provides the sheepfs.
+
+Sheepfs is a FUSE-based pseudo file system in userland to access both
+sheepdog's internal state (for e.g, cluster info, vdi list) as well
+as sheepdog's high reliable storage.
+%endif
+
 %prep
 %setup -q
 
 %build
 ./autogen.sh
-%{configure} --with-initddir=%{_initrddir} %{fuse_configure_args} %{zookeeper_configure_args} %{corosync_configure_args}
 
-make %{_smp_mflags}
+## for zookeeper driver
+%if 0%{?enable_zookeeper}
+%{configure} \
+  --with-initddir=%{_initrddir} \
+  --enable-zookeeper \
+  --disable-corosync
+make %{?_smp_mflags}
+%{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
+    %{_builddir}/%{name}-%{version}/sheep/sheep.zookeeper
+%{__mv} %{_builddir}/%{name}-%{version}/tools/zk_control \
+    %{_builddir}/%{name}-%{version}/tools/zk_control.zookeeper
+make clean
+%endif
+
+# for corosync driver
+%if 0%{?enable_corosync}
+%{configure} \
+  --with-initddir=%{_initrddir} \
+  --disable-zookeeper \
+  --enable-corosync
+make %{?_smp_mflags}
+%{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
+    %{_builddir}/%{name}-%{version}/sheep/sheep.corosync
+make clean
+%endif
+
+# for localonly driver
+%{configure} \
+  --with-initddir=%{_initrddir} \
+  --disable-zookeeper \
+  --disable-corosync \
+  %{fuse_configure_args}
+make %{?_smp_mflags}
+%{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
+    %{_builddir}/%{name}-%{version}/sheep/sheep.local
 
 %install
-rm -rf %{buildroot}
+%{__rm} -rf %{buildroot}
 
 make install DESTDIR=%{buildroot}
 
 # drop init file (systemd only)
 %if %{use_systemd}
-rm -f $RPM_BUILD_ROOT%{_initddir}/sheepdog
+%{__rm} -f $RPM_BUILD_ROOT%{_initddir}/sheepdog
 %endif
 
 ## tree fixup
 # drop static libs
-rm -f %{buildroot}%{_libdir}/*.a
+%{__rm} -f %{buildroot}%{_libdir}/*.a
+# drop libtool library file
+%{__rm} -f %{buildroot}%{_libdir}/*.la
+# drop dirty sbin/sheep
+%{__rm} -f %{buildroot}%{_sbindir}/sheep
+
+# install collie command
+%{__ln_s} -f dog $RPM_BUILD_ROOT%{_bindir}/collie
+
+## install drivers
+# install zookeeper driver
+%if 0%{?enable_zookeeper}
+%{__install} -m755 %{_builddir}/%{name}-%{version}/sheep/sheep.zookeeper \
+    $RPM_BUILD_ROOT%{_sbindir}/sheep.zookeeper
+%{__install} -m755 %{_builddir}/%{name}-%{version}/tools/zk_control.zookeeper \
+    $RPM_BUILD_ROOT%{_sbindir}/zk_control.zookeeper
+%endif
+
+# install corosync driver
+%if 0%{?enable_corosync}
+%{__install} -m755 %{_builddir}/%{name}-%{version}/sheep/sheep.corosync \
+    $RPM_BUILD_ROOT%{_sbindir}/sheep.corosync
+%endif
+
+# install localonly driver
+%{__install} -m755 %{_builddir}/%{name}-%{version}/sheep/sheep.local \
+    $RPM_BUILD_ROOT%{_sbindir}/sheep.local
 
 %clean
-rm -rf %{buildroot}
+%{__rm} -rf %{buildroot}
 
 %post
 %if %{use_systemd}
-/usr/bin/systemctl preset sheepdog.service >/dev/null 2>&1 || :
+%{_bindir}/systemctl preset sheepdog.service >/dev/null 2>&1 || :
 %else
 /sbin/chkconfig --add sheepdog
 %endif
-ln -s -f %{_bindir}/dog %{_bindir}/collie
+if [ ! -L %{_sbindir}/sheep ]; then
+    %{__ln_s} -f sheep.local %{_sbindir}/sheep
+fi
+
+%if 0%{?enable_zookeeper}
+%post zookeeper
+%{__ln_s} -f sheep.zookeeper %{_sbindir}/sheep
+%{__ln_s} -f zk_control.zookeeper %{_sbindir}/zk_control
+%endif
+
+%if 0%{?enable_corosync}
+%post corosync
+%{__ln_s} -f sheep.corosync %{_sbindir}/sheep
+%endif
 
 %preun
 if [ $1 -eq 0 ] ; then
-    %if %use_systemd
-    /usr/bin/systemctl --no-reload disable sheepdog.service >/dev/null 2>&1 || :
-    /usr/bin/systemctl stop sheepdog.service >/dev/null 2>&1 || :
+    %if %{use_systemd}
+    %{_bindir}/systemctl --no-reload disable sheepdog.service >/dev/null 2>&1 || :
+    %{_bindir}/systemctl stop sheepdog.service >/dev/null 2>&1 || :
     %else
     /sbin/service sheepdog stop >/dev/null 2>&1
     /sbin/chkconfig --del sheepdog
@@ -114,45 +220,83 @@ fi
 
 %postun
 if [ "$1" -ge "1" ] ; then
-    %if %use_systemd
-    /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
-    /usr/bin/systemctl try-restart sheepdog.service >/dev/null 2>&1 || :
+    %if %{use_systemd}
+    %{_bindir}/systemctl daemon-reload >/dev/null 2>&1 || :
+    %{_bindir}/systemctl try-restart sheepdog.service >/dev/null 2>&1 || :
     %else
     /sbin/service sheepdog condrestart >/dev/null 2>&1 || :
     %endif
-else
-    unlink /usr/bin/collie
 fi
+if [ $1 -eq 0 ] && [ -L %{_sbindir}/sheep ] ; then
+    /bin/unlink %{_sbindir}/sheep
+fi
+
+%if 0%{?enable_zookeeper}
+%postun zookeeper
+if [ $1 -eq 0 ] ; then
+    /bin/unlink %{_sbindir}/zk_control
+    if [ ! -L %{_sbindir}/sheep ]; then
+        %{__ln_s} -f sheep.local %{_sbindir}/sheep
+    fi
+fi
+%endif
+
+%if 0%{?enable_corosync}
+%postun corosync
+if [ $1 -eq 0 ] && [ ! -L %{_sbindir}/sheep ]; then
+    %{__ln_s} -f sheep.local %{_sbindir}/sheep
+fi
+%endif
 
 %files
 %defattr(-,root,root,-)
 %doc COPYING README INSTALL
-%{_sbindir}/sheep
+%{_sbindir}/sheep.local
+%{_bindir}/collie
 %{_bindir}/dog
 %{_sbindir}/shepherd
 %dir %{_localstatedir}/lib/sheepdog
 %config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/dog.8*
-%dir %{_includedir}/sheepdog
-%{_includedir}/sheepdog/internal.h
-%{_includedir}/sheepdog/list.h
-%{_includedir}/sheepdog/sheepdog.h
-%{_includedir}/sheepdog/sheepdog_proto.h
-%{_includedir}/sheepdog/util.h
-%{_libdir}/libsheepdog.la
-%{_libdir}/libsheepdog.so
-%if 0%{enable_fuse}
-%{_sbindir}/sheepfs
-%{_mandir}/man8/sheepfs.8*
-%endif
-%if 0%{enable_zookeeper}
-%{_sbindir}/zk_control
-%endif
 %if %{use_systemd}
 %{_unitdir}/sheepdog.service
 %else
 %attr(755,-,-)%config %{_initddir}/sheepdog
+%endif
+
+# for libs
+%files libs
+%defattr(-,root,root,-)
+%{_libdir}/*.so
+
+# for devel
+%files devel
+%defattr(-,root,root,-)
+%dir %{_includedir}/sheepdog
+%{_includedir}/sheepdog/*.h
+
+# for zookeeper driver
+%if 0%{?enable_zookeeper}
+%files zookeeper
+%defattr(-,root,root,-)
+%{_sbindir}/sheep.zookeeper
+%{_sbindir}/zk_control.zookeeper
+%endif
+
+# for corosync driver
+%if 0%{?enable_corosync}
+%files corosync
+%defattr(-,root,root,-)
+%{_sbindir}/sheep.corosync
+%endif
+
+# for sheepfs
+%if 0%{?enable_fuse}
+%files sheepfs
+%defattr(-,root,root,-)
+%{_sbindir}/sheepfs
+%{_mandir}/man8/sheepfs.8*
 %endif
 
 %changelog
