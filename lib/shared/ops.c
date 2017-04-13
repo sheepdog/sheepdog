@@ -179,7 +179,7 @@ static int sheep_ctl_response(struct sheep_request *req, struct sd_rsp *rsp)
 
 static struct sd_op_template sd_ops[] = {
 	[VDI_READ] = {
-		.name = "VDI WRITE",
+		.name = "VDI READ",
 		.request_process = vdi_rw_request,
 	},
 	[VDI_WRITE] = {
