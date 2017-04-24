@@ -9,7 +9,7 @@ If this command is passed to the sheep process, every sheep process of the clust
 https://github.com/sheepdog/sheepdog/pull/185
 
 Commit:8c888c0d5f3573e56a289627f93892a1e80fe6c3
-Commited on 27 Apr 2016.
+Committed on 27 Apr 2016.
 
 2. Description
 This option is executed before starting recovery process when nodes are inserted or ejected.
@@ -17,7 +17,7 @@ In each node, to decide to execute recovery process, entire space of the node an
 If [entire space of the node] >= [required space after recovery process], recovery process will be excuted.
 However, if [entire space of the node] < [required space after recovery process], recovery process will NOT be excuted to avoid diskfull.
 
-When recovery process is not excuted with this option, some logs are outputed as below.
+When recovery process is not excuted with this option, some logs are outputted as below.
 If operators find these logs, new nodes should be inserted ASAP to recover low redundancy.
 
 *Example of logs when recovery process is not excuted with this option

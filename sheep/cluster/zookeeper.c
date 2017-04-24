@@ -1500,7 +1500,7 @@ static int zk_init(const char *option)
 		return -1;
 
 	timeo = zoo_recv_timeout(zhandle);
-	sd_info("the negociated session timeout is %d", timeo);
+	sd_info("the negotiated session timeout is %d", timeo);
 
 	uatomic_set_false(&stop);
 	uatomic_set_false(&is_master);

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# Genrate bash_completion_dog
+# Generate bash_completion_dog
 #
 
 use strict;
