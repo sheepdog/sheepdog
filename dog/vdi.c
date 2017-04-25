@@ -50,6 +50,8 @@ static struct sd_option vdi_options[] = {
 	 "reclamation during VDI deletion"},
 	{'I', "reclamation-interval", true, "specify how long (unit: second)"
 	 "in reclamation loop during VDI deletion"},
+	{'m', "max-reclaim", true, "specify the maximum number of reclaimed objects "
+	 "(if this option is specified, an inode object won't be reclaimed)"},
 	{ 0, NULL, false, NULL },
 };
 
@@ -74,6 +76,7 @@ static struct vdi_cmd_data {
 	bool reduce_identical_snapshots;
 	int nr_batched_reclamation;
 	int reclamation_interval;
+	int nr_max_reclaim;
 } vdi_cmd_data = { ~0, };
 
 struct get_vdi_info {
@@ -1002,7 +1005,7 @@ static int vdi_resize(int argc, char **argv)
 static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag,
 			 int nr_batched_reclamation, int reclamation_interval)
 {
-	int ret, nr_objs;
+	int ret, nr_objs, nr_reclaimed;
 	struct sd_req hdr;
 	struct sd_rsp *rsp = (struct sd_rsp *)&hdr;
 	char data[SD_MAX_VDI_LEN + SD_MAX_VDI_TAG_LEN];
@@ -1031,8 +1034,13 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag,
 	}
 
 	nr_objs = count_data_objs(inode);
+	nr_reclaimed = 0;
 	while (i < nr_objs) {
 		int start_idx, nr_filled_idx;
+
+		if (vdi_cmd_data.nr_max_reclaim &&
+		    vdi_cmd_data.nr_max_reclaim <= nr_reclaimed)
+			break;
 
 		while (i < nr_objs && !inode->data_vdi_id[i])
 			i++;
@@ -1043,9 +1051,14 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag,
 			if (inode->data_vdi_id[i]) {
 				inode->data_vdi_id[i] = 0;
 				nr_filled_idx++;
+				nr_reclaimed++;
 			}
 
 			i++;
+
+			if (vdi_cmd_data.nr_max_reclaim &&
+			    vdi_cmd_data.nr_max_reclaim <= nr_reclaimed)
+				break;
 		}
 
 		ret = dog_write_object(vid_to_vdi_oid(vid), 0,
@@ -1065,6 +1078,9 @@ static int do_vdi_delete(const char *vdiname, int snap_id, const char *snap_tag,
 		if (i < nr_objs && reclamation_interval)
 			sleep(reclamation_interval);
 	}
+
+	if (vdi_cmd_data.nr_max_reclaim)
+		return EXIT_SUCCESS;
 
 	sd_init_req(&hdr, SD_OP_DEL_VDI);
 	hdr.flags = SD_FLAG_CMD_WRITE;
@@ -2979,7 +2995,7 @@ static struct subcommand vdi_cmd[] = {
 	{"clone", "<src vdi> <dst vdi>", "sPnaphrvT", "clone an image",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG,
 	 vdi_clone, vdi_options},
-	{"delete", "<vdiname>", "saphTBI", "delete an image",
+	{"delete", "<vdiname>", "saphTBIm", "delete an image",
 	 NULL, CMD_NEED_ROOT|CMD_NEED_ARG,
 	 vdi_delete, vdi_options},
 	{"rollback", "<vdiname>", "saphfrvTBI", "rollback to a snapshot",
@@ -3159,6 +3175,19 @@ static int vdi_parser(int ch, const char *opt)
 		}
 		if (vdi_cmd_data.reclamation_interval <= 0) {
 			sd_err("The interval of batched reclamation must be"
+				"positive integer");
+			exit(EXIT_FAILURE);
+		}
+		break;
+	case 'm':
+		vdi_cmd_data.nr_max_reclaim = strtol(opt, &p, 10);
+		if (opt == p) {
+			sd_err("The maximum number of reclamation is"
+			       " invalid: %s", opt);
+			exit(EXIT_FAILURE);
+		}
+		if (vdi_cmd_data.nr_max_reclaim <= 0) {
+			sd_err("The maximum number of reclamation must be"
 				"positive integer");
 			exit(EXIT_FAILURE);
 		}
