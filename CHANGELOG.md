@@ -160,7 +160,7 @@ DOG COMMAND INTERFACE:
  - new subcommand "node log level" for changing log level at runtime
   - "node log level set" sets loglevel of running sheep process
   - "node log level get" gets loglevel from running sheep process
-  - "node log level list" lists avialable loglevels
+  - "node log level list" lists available loglevels
  - new option "-o" of "vdi track", for tracking objects with their oids
  - new option "-y" of "vdi create", for create hyper-volume vdi
  - new option "-s" of "cluster info", show backend store information
