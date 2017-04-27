@@ -785,7 +785,7 @@ static void rx_work(struct work *work)
 		}
 	}
 
-	tracepoint(request, rx_work, conn->fd, work, req, hdr.opcode);
+	tracepoint(request, rx_work, conn->fd, work, hdr.id, hdr.opcode);
 }
 
 static void rx_main(struct work *work)
@@ -824,7 +824,7 @@ static void rx_main(struct work *work)
 			 ci->conn.port);
 	}
 
-	tracepoint(request, rx_main, ci->conn.fd, work, req);
+	tracepoint(request, rx_main, ci->conn.fd, work, req->rq.id, req->rq.opcode);
 	queue_request(req);
 }
 
@@ -855,7 +855,7 @@ static void tx_work(struct work *work)
 		conn->dead = true;
 	}
 
-	tracepoint(request, tx_work, conn->fd, work, req);
+	tracepoint(request, tx_work, conn->fd, work, req->rq.id, req->rq.opcode);
 }
 
 static void tx_main(struct work *work)
@@ -863,7 +863,8 @@ static void tx_main(struct work *work)
 	struct client_info *ci = container_of(work, struct client_info,
 					      tx_work);
 
-	tracepoint(request, tx_main, ci->conn.fd, work, ci->tx_req);
+	tracepoint(request, tx_main, ci->conn.fd, work,
+			ci->tx_req->rq.id, ci->tx_req->rq.opcode, ci->tx_req->rp.result);
 
 	refcount_dec(&ci->refcnt);
 
@@ -973,6 +974,7 @@ static void client_handler(int fd, int events, void *data)
 	struct client_info *ci = (struct client_info *)data;
 
 	sd_debug("%x, %d", events, ci->conn.dead);
+	tracepoint(request, client_handler, events, ci->conn.dead);
 
 	if (events & (EPOLLERR | EPOLLHUP))
 		ci->conn.dead = true;

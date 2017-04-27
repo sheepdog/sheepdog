@@ -82,6 +82,29 @@ TRACEPOINT_EVENT(
 		)
 	)
 
+TRACEPOINT_EVENT(
+	work,
+	create_thread,
+	TP_ARGS(const char *, name, void *, wi, int, nr),
+	TP_FIELDS(
+		ctf_string(queue_name, name)
+		ctf_integer_hex(void *, worker_info_ptr, wi)
+		ctf_integer(int, nr_threads, nr)
+		)
+	)
+
+TRACEPOINT_EVENT(
+	work,
+	destroy_thread,
+	TP_ARGS(const char *, name, void *, wi, int, nr),
+	TP_FIELDS(
+		ctf_string(queue_name, name)
+		ctf_integer_hex(void *, worker_info_ptr, wi)
+		ctf_integer(int, nr_threads, nr)
+		)
+	)
+
+
 #endif /* WORK_TRACEPOINT_H */
 
 #include <lttng/tracepoint-event.h>

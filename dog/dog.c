@@ -542,6 +542,8 @@ int main(int argc, char **argv)
 		}
 	}
 
+	srandom(clock_get_time());
+
 	if (sd_inode_actor_init(dog_bnode_writer, dog_bnode_reader) < 0)
 		exit(EXIT_SYSFAIL);
 

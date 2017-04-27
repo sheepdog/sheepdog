@@ -201,7 +201,9 @@ static void do_event_loop(int timeout, bool sort_with_prio)
 
 refresh:
 	event_loop_refresh = false;
+	tracepoint(event, wait_start);
 	nr = epoll_wait(efd, events, nr_events, timeout);
+	tracepoint(event, wait_return);
 	if (sort_with_prio)
 		xqsort(events, nr, epoll_event_cmp);
 
@@ -211,7 +213,7 @@ refresh:
 		sd_err("epoll_wait failed: %m");
 		exit(1);
 	} else if (nr) {
-		tracepoint(event, loop_start, nr_events);
+		tracepoint(event, loop_start, nr);
 
 		for (i = 0; i < nr; i++) {
 			struct event_info *ei;

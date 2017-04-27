@@ -33,6 +33,9 @@
 #include "event.h"
 #include "net.h"
 
+#define TRACEPOINT_DEFINE
+#include "net_tp.h"
+
 int conn_tx_off(struct connection *conn)
 {
 	conn->events &= ~EPOLLOUT;
@@ -207,6 +210,7 @@ reconnect:
 success:
 	freeaddrinfo(res0);
 	sd_debug("%d, %s:%d", fd, name, port);
+	tracepoint(net, connect, fd, name, port);
 	return fd;
 }
 
@@ -215,7 +219,9 @@ int do_read(int sockfd, void *buf, uint32_t len,
 	    uint32_t epoch, uint32_t max_count)
 {
 	int ret, repeat = max_count;
+	tracepoint(net, do_read_start, sockfd, buf, len);
 reread:
+	tracepoint(net, do_read, sockfd, buf, len);
 	ret = read(sockfd, buf, len);
 	if (ret == 0) {
 		sd_debug("connection is closed (%d bytes left)", len);
@@ -243,6 +249,7 @@ reread:
 	if (len)
 		goto reread;
 
+	tracepoint(net, do_read_done, sockfd, buf);
 	return 0;
 }
 
@@ -264,7 +271,9 @@ static int do_write(int sockfd, struct msghdr *msg, int len,
 		    uint32_t max_count)
 {
 	int ret, repeat = max_count;
+	tracepoint(net, do_write_start, sockfd, msg, len);
 rewrite:
+	tracepoint(net, do_write, sockfd, msg, len);
 	ret = sendmsg(sockfd, msg, 0);
 	if (ret < 0) {
 		if (errno == EINTR)
@@ -289,6 +298,7 @@ rewrite:
 		goto rewrite;
 	}
 
+	tracepoint(net, do_write_done, sockfd, msg);
 	return 0;
 }
 
@@ -299,6 +309,8 @@ int send_req(int sockfd, struct sd_req *hdr, void *data, unsigned int wlen,
 	int ret;
 	struct msghdr msg;
 	struct iovec iov[2];
+
+	tracepoint(net, send_req, sockfd, hdr->id, hdr->opcode, hdr->data_length);
 
 	memset(&msg, 0, sizeof(msg));
 
@@ -331,6 +343,8 @@ int exec_req(int sockfd, struct sd_req *hdr, void *data,
 	int ret;
 	struct sd_rsp *rsp = (struct sd_rsp *)hdr;
 	unsigned int wlen, rlen;
+
+	tracepoint(net, exec_req, sockfd, hdr);
 
 	if (hdr->flags & SD_FLAG_CMD_WRITE) {
 		wlen = hdr->data_length;

@@ -40,6 +40,9 @@ static inline void sd_init_req(struct sd_req *req, uint8_t opcode)
 	memset(req, 0, sizeof(*req));
 	req->opcode = opcode;
 	req->proto_ver = opcode < 0x80 ? SD_PROTO_VER : SD_SHEEP_PROTO_VER;
+#ifdef ENABLE_LTTNG_UST
+	req->id = (uint32_t) random();
+#endif
 }
 
 static inline int same_zone(const struct sd_vnode *v1,
