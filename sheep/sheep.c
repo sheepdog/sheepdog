@@ -770,6 +770,50 @@ static void sighup_handler(int signo, siginfo_t *info, void *context)
 	kill(logger_pid, SIGHUP);
 }
 
+static void show_features(int feat) /* feat: 0; show cdrv only */
+{
+	struct cluster_driver *cdrv;
+
+	fprintf(stdout, "\nSupported features:\n");
+	/* show cluster driver */
+	if (!sys->cdrv) {
+		fprintf(stdout, "\tCluster drivers:");
+		FOR_EACH_CLUSTER_DRIVER(cdrv) {
+			fprintf(stdout, " %s", cdrv->name);
+		}
+		fprintf(stdout, "\n");
+	}
+
+	if (feat) {
+		/* show other features */
+		fprintf(stdout, "\tMiscellaneous:");
+		int have_feats = 0;
+#ifdef HAVE_HTTP
+		fprintf(stdout, " http");
+		have_feats = 1;
+#endif
+#ifdef HAVE_ACCELIO
+		fprintf(stdout, " accelio");
+		have_feats = 1;
+#endif
+#ifdef HAVE_DISKVNODES
+		fprintf(stdout, " diskvnodes");
+		have_feats = 1;
+#endif
+#ifdef HAVE_NFS
+		fprintf(stdout, " nfs");
+		have_feats = 1;
+#endif
+#ifdef HAVE_TRACE
+		fprintf(stdout, " trace");
+		have_feats = 1;
+#endif
+		if (!have_feats)
+			fprintf(stdout, " none");
+		fprintf(stdout, "\n");
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int ch, longindex, ret, port = SD_LISTEN_PORT, io_port = SD_LISTEN_PORT;
@@ -782,7 +826,6 @@ int main(int argc, char **argv)
 	int32_t nr_vnodes = -1;
 	int64_t zone = -1;
 	uint32_t max_dynamic_threads = 0;
-	struct cluster_driver *cdrv;
 	struct option *long_options;
 #ifdef HAVE_HTTP
 	const char *http_options = NULL;
@@ -867,11 +910,7 @@ int main(int argc, char **argv)
 			sys->cdrv = find_cdrv(optarg);
 			if (!sys->cdrv) {
 				sd_err("Invalid cluster driver '%s'", optarg);
-				fprintf(stderr, "Supported drivers:");
-				FOR_EACH_CLUSTER_DRIVER(cdrv) {
-					fprintf(stderr, " %s", cdrv->name);
-				}
-				fprintf(stderr, "\n");
+				show_features(0);
 				exit(1);
 			}
 
@@ -935,6 +974,7 @@ int main(int argc, char **argv)
 		case 'v':
 			fprintf(stdout, "Sheepdog daemon version %s\n",
 				PACKAGE_VERSION);
+			show_features(1);
 			exit(0);
 			break;
 		case 'V':
