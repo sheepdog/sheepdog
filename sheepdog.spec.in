@@ -164,6 +164,11 @@ make install DESTDIR=%{buildroot}
 # install collie command
 %{__ln_s} -f dog $RPM_BUILD_ROOT%{_bindir}/collie
 
+# install sysconfig template
+%{__mkdir} -p $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig
+%{__install} -m644 %{_builddir}/%{name}-%{version}/script/sheepdog.sysconfig \
+    $RPM_BUILD_ROOT%{_sysconfdir}/sysconfig/sheepdog
+
 ## install drivers
 # install zookeeper driver
 %if 0%{?enable_zookeeper}
@@ -259,6 +264,7 @@ fi
 %config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
 %{_mandir}/man8/dog.8*
+%config %{_sysconfdir}/sysconfig/sheepdog
 %if %{use_systemd}
 %{_unitdir}/sheepdog.service
 %else

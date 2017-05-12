@@ -1,6 +1,6 @@
 MAINTAINERCLEANFILES    = Makefile.in
 
-EXTRA_DIST		= sheepdog.in sheepdog.service.in
+EXTRA_DIST		= sheepdog.in sheepdog.service.in sheepdog.sysconfig
 
 noinst_HEADERS		= checkarch.sh vditest gen_man.pl gen_bash_completion.pl
 

@@ -1,0 +1,3 @@
+# sheepdog service script configuration file
+# see sheep(8) for details.
+SHEEP_OPTS="--cluster local --log dst=syslog --upgrade /var/lib/sheepdog"
