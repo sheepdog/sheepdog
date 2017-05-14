@@ -79,6 +79,8 @@ Summary: Corosync cluster driver for Sheepdog
 Group: Applications/File
 Conflicts: %{name}-zookeeper
 Requires: %{name}%{?_isa} = %{version}-%{release}
+BuildRequires: %{_includedir}/corosync/cpg.h
+BuildRequires: %{_includedir}/corosync/cfg.h
 
 %description corosync
 This package provides the corosync cluster driver for sheepdog.
