@@ -2,28 +2,79 @@
 set -xueo pipefail
 export LANG=C LC_ALL=C
 
+check_dist() {
+  if [ -e /etc/debian_version ] || [ -e /etc/debian_release ]; then
+    # Debian or Ubuntu
+    echo "deb"
+
+  elif [ -e /etc/redhat-release ]; then
+    # RHEL or CentOS
+    EL_MAJOR=`cat /etc/rpm/macros.dist |grep rhel | cut -d " " -f 2`
+    if [ ${EL_MAJOR} -eq 7 ]; then
+      echo "el7"
+    else
+      # For now it supports to CentOS7 only
+      echo "unsupported"
+    fi
+
+  else
+    # Other
+    echo "unsupported"
+  fi
+}
+
 prepare() {
-  sudo apt-get update
-  sudo apt-get --quiet -y install \
-    git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev check python zookeeper xfsprogs bc gcc g++
+  if [ ${dist} = "deb" ]; then
+    sudo apt-get update
+    sudo apt-get --quiet -y install \
+      git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev check python zookeeper xfsprogs bc gcc g++
+
+  elif [ ${dist} = "el7" ]; then
+    # epel and bigtop (zookeeper) repo for el7
+    sudo yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    sudo curl -L -o /etc/yum.repos.d/bigtop.repo http://www.apache.org/dist/bigtop/bigtop-1.1.0/repos/centos7/bigtop.repo
+
+    sudo yum install -y kernel-devel-`uname -r` kernel-headers-`uname -r` \
+      autoconf automake bc check check-devel gcc gcc-c++ git libtool lsof \
+      make net-tools userspace-rcu userspace-rcu-devel yasm yasm-devel \
+      fuse fuse-devel corosync corosynclib corosynclib-devel \
+      zookeeper zookeeper-native zookeeper-server java-1.8.0-openjdk-headless
+  else
+
+    echo "unsupported distribution"
+    return 1
+  fi
 }
 
 build_qemu() {
-  sudo apt-get --quiet -y install zlib1g-dev libglib2.0-dev libpixman-1-dev
-  cd /tmp
-  if [ ! -d qemu ] ; then
-    git clone "${QEMU_GITREPO:-git://git.qemu-project.org/qemu.git}"
+  if [ ${dist} = "deb" ]; then
+    sudo apt-get --quiet -y install zlib1g-dev libglib2.0-dev libpixman-1-dev
+    cd /tmp
+    if [ ! -d qemu ]; then
+      git clone "${QEMU_GITREPO:-git://git.qemu-project.org/qemu.git}"
+    fi
+    cd qemu
+    git checkout -b v2.5.1.1 v2.5.1.1
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+      --target-list=x86_64-softmmu
+    make
+    sudo make install
+    cd ~
+
+  elif [ ${dist} = "el7" ]; then
+    # CentOS Virt-SIG provides qemu with the sheepdog enabled.
+    sudo yum install -y centos-release-qemu-ev
+    sudo yum install -y qemu-kvm-ev qemu-img-ev
+
+  else
+    echo "unsupported distribution"
+    return 1
   fi
-  cd qemu
-  git checkout -b v2.5.1.1 v2.5.1.1
-  ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
-    --target-list=x86_64-softmmu
-  make
-  sudo make install
-  cd ~
+
   qemu-io -V
 }
 
 #main
+dist=`check_dist`
 prepare
 build_qemu

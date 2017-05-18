@@ -12,7 +12,14 @@ set_up() {
   rm -rf ./tests/unit/cmock
   git submodule update --init ./tests/unit/cmock
 
-  sudo /usr/share/zookeeper/bin/zkServer.sh restart
+  if [ -e /usr/share/zookeeper/bin/zkServer.sh ]; then
+    sudo /usr/share/zookeeper/bin/zkServer.sh restart
+  elif [ -e /usr/lib/zookeeper/bin/zkServer.sh ]; then
+    sudo /usr/lib/zookeeper/bin/zkServer.sh restart
+  else
+    echo "zkServer.sh command is not found"
+    return 1
+  fi
 }
 
 exec_unit() {
