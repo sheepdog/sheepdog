@@ -52,8 +52,8 @@ foreach (@help) {
     }
 }
 
-foreach my $cmd (keys %subcmds) {
-    my @subcmds = @{$subcmds{$cmd}};
+foreach my $cmd (sort keys %subcmds) {
+    my @subcmds = sort @{$subcmds{$cmd}};
 
     print command($cmd, @subcmds);
 
@@ -66,7 +66,7 @@ print <<__EOB__;
 _dog()
 {
     local opts cur cmd subcmd
-    opts="@{[keys %subcmds]}"
+    opts="@{[sort keys %subcmds]}"
     cur="\${COMP_WORDS[COMP_CWORD]}"
 
     if [ \$COMP_CWORD -gt 1 ]; then
@@ -80,10 +80,11 @@ _dog()
     case "\${cmd}" in
 __EOB__
 
-    foreach my $cmd (keys %subcmds) {
+foreach my $cmd (sort keys %subcmds) {
+	(my $cmd_func = $cmd) =~ s/-/_/g;
 	print <<__EOB__;
         $cmd)
-            _dog_$cmd \${subcmd}
+            _dog_${cmd_func} \${subcmd}
             ;;
 __EOB__
     }
@@ -108,8 +109,9 @@ sub command {
     my ($cmd, @subcmds) = @_;
     my $output;
 
+    (my $cmd_func = $cmd) =~ s/-/_/g;
     $output = <<__EOB__;
-    _dog_${cmd}()
+    _dog_${cmd_func}()
     {
 	local opts
 	opts="@subcmds"
@@ -118,9 +120,10 @@ sub command {
 __EOB__
 
     foreach my $subcmd (@subcmds) {
+	(my $subcmd_func = $subcmd) =~ s/-/_/g;
 	$output .= <<__EOB__;
 	    $subcmd)
-	        _dog_${cmd}_${subcmd}
+	        _dog_${cmd_func}_${subcmd_func}
 	        ;;
 __EOB__
     }
@@ -149,11 +152,12 @@ __EOB__
 sub subcommand {
     my ($cmd, $subcmd) = @_;
     my $output;
-    my @opts = @{$opts{"$cmd $subcmd"}};
-    my @subsubcmds = @{$subsubcmds{"$cmd $subcmd"}};
+    my @opts = sort @{$opts{"$cmd $subcmd"}};
+    my @subsubcmds = sort @{$subsubcmds{"$cmd $subcmd"}};
 
+    (my $cmd_subcmd_func = "${cmd}_${subcmd}") =~ s/-/_/g;
     $output = <<__EOB__;
-    _dog_${cmd}_${subcmd}()
+    _dog_${cmd_subcmd_func}()
     {
         local cur
         cur="\${COMP_WORDS[COMP_CWORD]}"
