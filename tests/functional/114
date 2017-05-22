@@ -14,11 +14,22 @@ fi
 
 function _listFiles
 {
+	# Workaround for SELinux enabled environment.
+	# If SELinux is not disabled (enforcing or permissive),
+	# SELinux uses 1 block. see xattr(7) for details.
+	extra_blocksize=0
+	if [ -e /etc/redhat-release ] && [ `getenforce` != Disabled ]; then
+		extra_blocksize=`tune2fs -l ${1}.img |grep "Block size" | tr -s " "| cut -d " " -f 3`
+	fi
+
 	for i in "$@" ; do
+		# Remove extra block size amount from calculation. If SELinux
+		# is disabled (or not installed) , it is 0, if enabled, it is
+		# remove for one block size.
 		stat -c "%n %b %B %s" "$i"/* |\
-		awk '{print $1,$2*$3,$4;}' |\
-		sort |\
-		_filter_store
+			awk '{print $1,$2*$3-'${extra_blocksize}',$4;}' |\
+			sort |\
+			_filter_store
 	done
 }
 
