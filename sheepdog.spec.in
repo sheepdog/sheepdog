@@ -3,14 +3,9 @@
 %define enable_fuse %{?_have_fuse}%{!?_have_fuse:0}
 %define enable_zookeeper %{?_have_zookeeper}%{!?_have_zookeeper:0}
 %define enable_corosync %{?_have_corosync}%{!?_have_corosync:0}
+%define enable_shepherd %{?_have_shepherd}%{!?_have_shepherd:0}
 
-# Configure args
-%if 0%{?enable_fuse}
-%define fuse_configure_args $(echo "--enable-sheepfs")
-%else
-%define fuse_configure_args $(echo "--disable-sheepfs")
-%endif
-
+# Main
 Name: sheepdog
 Summary: The Sheepdog Distributed Storage System for QEMU
 Version: @version@
@@ -107,6 +102,25 @@ as sheepdog's high reliable storage.
 %setup -q
 
 %build
+# Configure args
+%if 0%{?enable_fuse}
+%define fuse_configure_args $(echo "--enable-sheepfs")
+%else
+%define fuse_configure_args $(echo "--disable-sheepfs")
+%endif
+
+%if 0%{?enable_shepherd}
+%define shepherd_configure_args $(echo "--enable-shepherd")
+%else
+%define shepherd_configure_args $(echo "--disable-shepherd")
+%endif
+
+%define configure_args $(echo \
+        %{?fuse_configure_args} \
+        %{?shepherd_configure_args} \
+        )
+
+# Autogen
 ./autogen.sh
 
 ## for zookeeper driver
@@ -114,7 +128,8 @@ as sheepdog's high reliable storage.
 %{configure} \
   --with-initddir=%{_initrddir} \
   --enable-zookeeper \
-  --disable-corosync
+  --disable-corosync \
+  %{?configure_args}
 make %{?_smp_mflags}
 %{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
     %{_builddir}/%{name}-%{version}/sheep/sheep.zookeeper
@@ -128,7 +143,8 @@ make clean
 %{configure} \
   --with-initddir=%{_initrddir} \
   --disable-zookeeper \
-  --enable-corosync
+  --enable-corosync \
+  %{?configure_args}
 make %{?_smp_mflags}
 %{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
     %{_builddir}/%{name}-%{version}/sheep/sheep.corosync
@@ -140,7 +156,7 @@ make clean
   --with-initddir=%{_initrddir} \
   --disable-zookeeper \
   --disable-corosync \
-  %{fuse_configure_args}
+  %{?configure_args}
 make %{?_smp_mflags}
 %{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
     %{_builddir}/%{name}-%{version}/sheep/sheep.local
@@ -261,7 +277,6 @@ fi
 %{_sbindir}/sheep.local
 %{_bindir}/collie
 %{_bindir}/dog
-%{_sbindir}/shepherd
 %dir %{_localstatedir}/lib/sheepdog
 %config %{_sysconfdir}/bash_completion.d/dog
 %{_mandir}/man8/sheep.8*
@@ -272,6 +287,10 @@ fi
 %else
 %attr(755,-,-)%config %{_initddir}/sheepdog
 %endif
+%if 0%{?enable_shepherd}
+%{_sbindir}/shepherd
+%endif
+
 
 # for libs
 %files libs
