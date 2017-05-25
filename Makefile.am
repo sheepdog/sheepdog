@@ -15,7 +15,11 @@ sheepdogsysconfdir	= ${SHEEPDOGCONFDIR}
 
 sheepdogsysconf_DATA	= 
 
-SUBDIRS			= lib dog sheep include script shepherd tools
+SUBDIRS			= lib dog sheep include script tools
+
+if BUILD_SHEPHERD
+SUBDIRS			+= shepherd
+endif
 
 if BUILD_SHEEPFS
 SUBDIRS			+= sheepfs
@@ -66,13 +70,18 @@ if BUILD_ZOOKEEPER
 RPMBUILDOPTS += --define "_have_zookeeper 1"
 endif
 
+if BUILD_COROSYNC
+RPMBUILDOPTS += --define "_have_corosync 1"
+endif
+
+if BUILD_SHEPHERD
+RPMBUILDOPTS += --define "_have_shepherd 1"
+endif
+
 if BUILD_SHEEPFS
 RPMBUILDOPTS += --define "_have_fuse 1"
 endif
 
-if BUILD_COROSYNC
-RPMBUILDOPTS += --define "_have_corosync 1"
-endif
 
 $(TARFILE):
 	$(MAKE) dist
