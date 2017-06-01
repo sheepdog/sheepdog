@@ -69,7 +69,7 @@ endif
 sheep_DEPENDENCIES	= ../lib/libsd.a
 
 
-noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h
+noinst_HEADERS		= sheep_priv.h cluster.h http/http.h trace/trace.h \
 			  nfs/nfs.h nfs/fs.h
 
 EXTRA_DIST		=
