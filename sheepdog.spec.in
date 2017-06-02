@@ -1,9 +1,15 @@
 # Define options
-%define use_systemd (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7)
-%define enable_fuse %{?_have_fuse}%{!?_have_fuse:0}
-%define enable_zookeeper %{?_have_zookeeper}%{!?_have_zookeeper:0}
-%define enable_corosync %{?_have_corosync}%{!?_have_corosync:0}
-%define enable_shepherd %{?_have_shepherd}%{!?_have_shepherd:0}
+%define use_systemd       (0%{?fedora} && 0%{?fedora} >= 18) || (0%{?rhel} && 0%{?rhel} >= 7)
+%define enable_fuse       %{?_have_fuse}%{!?_have_fuse:0}
+%define enable_zookeeper  %{?_have_zookeeper}%{!?_have_zookeeper:0}
+%define enable_corosync   %{?_have_corosync}%{!?_have_corosync:0}
+%define enable_shepherd   %{?_have_shepherd}%{!?_have_shepherd:0}
+%define enable_http       %{?_have_http}%{!?_have_http:0}
+%define enable_nfs        %{?_have_nfs}%{!?_have_nfs:0}
+%define enable_diskvnodes %{?_have_diskvnodes}%{!?_have_diskvnodes:0}
+%define enable_lttng_ust  %{?_have_lttng_ust}%{!?_have_lttng_ust:0}
+%define enable_accelio    %{?_have_accelio}%{!?_have_accelio:0}
+%define enable_trace      %{?_have_trace}%{!?_have_trace:0}
 
 # Main
 Name: sheepdog
@@ -23,12 +29,30 @@ Requires(post): chkconfig
 Requires(preun): chkconfig
 Requires(preun): initscripts
 %endif
+%if 0%{?enable_http}
+BuildRequires: fcgi
+%endif
+%if 0%{?enable_lttng_ust}
+BuildRequires: lttng-ust
+%endif
 
 # Build bits
 BuildRequires: autoconf automake libtool
 BuildRequires: userspace-rcu-devel yasm
 %if %{use_systemd}
 BuildRequires: systemd-units
+%endif
+%if 0%{?enable_http}
+BuildRequires: libcurl-devel fcgi-devel
+%endif
+%if 0%{?enable_nfs}
+BuildRequires: %{_includedir}/rpc/rpc.h
+%endif
+%if 0%{?enable_lttng_ust}
+BuildRequires: lttng-ust-devel
+%endif
+%if 0%{?enable_accelio}
+BuildRequires: %{_includedir}/libxio.h
 %endif
 
 BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
@@ -115,21 +139,58 @@ as sheepdog's high reliable storage.
 %define shepherd_configure_args $(echo "--disable-shepherd")
 %endif
 
-%define configure_args $(echo \
-        %{?fuse_configure_args} \
-        %{?shepherd_configure_args} \
-        )
+%if 0%{?enable_http}
+%define http_configure_args $(echo "--enable-http")
+%else
+%define http_configure_args $(echo "--disable-http")
+%endif
+
+%if 0%{?enable_nfs}
+%define nfs_configure_args $(echo "--enable-nfs")
+%else
+%define nfs_configure_args $(echo "--disable-nfs")
+%endif
+
+%if 0%{?enable_diskvnodes}
+%define diskvnodes_configure_args $(echo "--enable-diskvnodes")
+%else
+%define diskvnodes_configure_args $(echo "--disable-diskvnodes")
+%endif
+
+%if 0%{?enable_lttng_ust}
+%define lttng_ust_configure_args $(echo "--enable-lttng-ust")
+%else
+%define lttng_ust_configure_args $(echo "--disable-lttng-ust")
+%endif
+
+%if 0%{?enable_accelio}
+%define accelio_configure_args $(echo "--enable-accelio")
+%else
+%define accelio_configure_args $(echo "--disable-accelio")
+%endif
+
+%if 0%{?enable_trace}
+%define trace_configure_args $(echo "--enable-trace")
+%else
+%define trace_configure_args $(echo "--disable-trace")
+%endif
 
 # Autogen
 ./autogen.sh
 
-## for zookeeper driver
+# for zookeeper driver
 %if 0%{?enable_zookeeper}
 %{configure} \
   --with-initddir=%{_initrddir} \
   --enable-zookeeper \
   --disable-corosync \
-  %{?configure_args}
+  %{?fuse_configure_args} \
+  %{?http_configure_args} \
+  %{?nfs_configure_args} \
+  %{?diskvnodes_configure_args} \
+  %{?lttng_ust_configure_args} \
+  %{?accelio_configure_args} \
+  %{?trace_configure_args}
 make %{?_smp_mflags}
 %{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
     %{_builddir}/%{name}-%{version}/sheep/sheep.zookeeper
@@ -144,7 +205,13 @@ make clean
   --with-initddir=%{_initrddir} \
   --disable-zookeeper \
   --enable-corosync \
-  %{?configure_args}
+  %{?fuse_configure_args} \
+  %{?http_configure_args} \
+  %{?nfs_configure_args} \
+  %{?diskvnodes_configure_args} \
+  %{?lttng_ust_configure_args} \
+  %{?accelio_configure_args} \
+  %{?trace_configure_args}
 make %{?_smp_mflags}
 %{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
     %{_builddir}/%{name}-%{version}/sheep/sheep.corosync
@@ -156,7 +223,14 @@ make clean
   --with-initddir=%{_initrddir} \
   --disable-zookeeper \
   --disable-corosync \
-  %{?configure_args}
+  %{?shepherd_configure_args} \
+  %{?fuse_configure_args} \
+  %{?http_configure_args} \
+  %{?nfs_configure_args} \
+  %{?diskvnodes_configure_args} \
+  %{?lttng_ust_configure_args} \
+  %{?accelio_configure_args} \
+  %{?trace_configure_args}
 make %{?_smp_mflags}
 %{__mv} %{_builddir}/%{name}-%{version}/sheep/sheep \
     %{_builddir}/%{name}-%{version}/sheep/sheep.local
@@ -290,7 +364,6 @@ fi
 %if 0%{?enable_shepherd}
 %{_sbindir}/shepherd
 %endif
-
 
 # for libs
 %files libs

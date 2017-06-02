@@ -82,6 +82,29 @@ if BUILD_SHEEPFS
 RPMBUILDOPTS += --define "_have_fuse 1"
 endif
 
+if BUILD_HTTP
+RPMBUILDOPTS += --define "_have_http 1"
+endif
+
+if BUILD_NFS
+RPMBUILDOPTS += --define "_have_nfs 1"
+endif
+
+if BUILD_DISKVNODES
+RPMBUILDOPTS += --define "_have_diskvnodes 1"
+endif
+
+if BUILD_LTTNG_UST
+RPMBUILDOPTS += --define "_have_lttng_ust 1"
+endif
+
+if BUILD_ACCELIO
+RPMBUILDOPTS += --define "_have_accelio 1"
+endif
+
+if BUILD_TRACE
+RPMBUILDOPTS += --define "_have_trace 1"
+endif
 
 $(TARFILE):
 	$(MAKE) dist
