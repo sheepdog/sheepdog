@@ -30,7 +30,7 @@ Compile-time dependencies:
 
 2. Make Package
 -----------------
-Here is just an exmple with sheepdog-sheepdog-v1.0-0-gc949903.tar.gz.
+Here is just an exmple with sheepdog-1.0.1.tar.gz.
 
 Replace source-code file which answers your purpose.
 
@@ -46,14 +46,13 @@ Replace source-code file which answers your purpose.
  
  ::
 
-     $ wget https://github.com/sheepdog/sheepdog/tarball/v1.0/sheepdog-sheepdog-v1.0-0-gc949903.tar.gz
-     $ tar zxvf sheepdog-sheepdog-v1.0-0-gc949903.tar.gz
+     $ curl -L https://github.com/sheepdog/sheepdog/archive/v1.0.1.tar.gz| tar zx
 
  3. Set configuration
 
  ::
 
-     $ cd sheepdog-sheepdog-v1.0-0-gc949903
+     $ cd sheepdog-1.0.1
      $ ./autogen.sh
      $ ./configure
 
@@ -72,53 +71,35 @@ Replace source-code file which answers your purpose.
  The deb-package file will be made in the current directory.
 
 - rpm
- 1. Install "rpm-build"
+ 1. Install the required packages
 
  ::
 
      $ sudo yum install rpm-build
-
-
- 2. Make "rpmbuild" directory
-
- ::
-
-     $ cd ~
-     $ mkdir -p rpmbuild/BUILD
-     $ mkdir -p rpmbuild/BUILDROOT
-     $ mkdir -p rpmbuild/RPMS
-     $ mkdir -p rpmbuild/SOURCES
-     $ mkdir -p rpmbuild/SPECS
-     $ mkdir -p rpmbuild/SRPMS
-
- 3. Make spec file
- 
- Make spec file like "Example of rpm spec file" at Reference.
- 
- Then, save it as "sheepdog.spec" in rpmbuild/SPECS.
- 
- 4. Install the required packages
-
- Install the required packages listed on BuildRequires in "sheepdog.spec".
-
- You may need to add "EPEL" repository to install the following packages.
- 
- ::
-
      $ sudo yum install autoconf automake yasm corosynclib-devel userspace-rcu-devel
 
- 5. Download source code
 
- Download the targeted source code and put it in rpmbuild/SOURCES.
-
- 6. Make rpm-package
+ 2. Download & extract source-code file
 
  ::
 
-     $ cd ~/rpmbuild/SPECS
-     $ rpmbuild -ba sheepdog.spec
+     $ curl -L https://github.com/sheepdog/sheepdog/archive/v1.0.1.tar.gz| tar zx
 
- The rpm-package file will be made in rpmbuild/RPMS.
+ 3. Set configuration
+
+ ::
+
+     $ cd sheepdog-1.0.1
+     $ ./autogen.sh
+     $ ./configure
+
+ 4. Make rpm-package
+
+ ::
+
+     $ make rpm
+
+ The rpm-package file will be made in `./x86_64/` .
 
 3. Modify gh-pages
 ------------------
@@ -141,96 +122,3 @@ Replace source-code file which answers your purpose.
 
  Do pull-request to the branch "gh-pages".
 
-Reference
-=========
-
-Example of rpm spec file:
- ::
-
-    Name: sheepdog-sheepdog
-    Summary: The Sheepdog Distributed Storage System for QEMU
-    Version: c949903
-    Release: 1%{?dist}
-    License: GPLv2 and GPLv2+
-    Group: System Environment/Base
-    URL: http://www.osrg.net/sheepdog
-    Source0: https://github.com/sheepdog/sheepdog/tarball/v1.0/sheepdog-sheepdog-v1.0-0-gc949903.tar.gz
-    
-    # Runtime bits
-    Requires: corosync
-    Requires(post): chkconfig
-    Requires(preun): chkconfig
-    Requires(preun): initscripts
-    
-    # Build bits
-    BuildRequires: autoconf automake yasm
-    BuildRequires: corosynclib-devel userspace-rcu-devel
-    
-    BuildRoot: %(mktemp -ud %{_tmppath}/%{name}-%{version}-%{release}-XXXXXX)
-    
-    %description
-    This package contains the Sheepdog server, and command line tool which offer
-    a distributed object storage system for QEMU.
-    
-    %prep
-    %setup -q
-    
-    %build
-    ./autogen.sh
-    %{configure} --with-initddir=%{_initrddir} %{_configopts}
-    
-    make %{_smp_mflags}
-    
-    %install
-    rm -rf %{buildroot}
-    
-    make install DESTDIR=%{buildroot}
-    
-    ## tree fixup
-    # drop static libs
-    rm -f %{buildroot}%{_libdir}/*.a
-    
-    %clean
-    rm -rf %{buildroot}
-    
-    %post
-    /sbin/chkconfig --add sheepdog
-    ln -s -f %{_bindir}/dog %{_bindir}/collie
-    
-    %preun
-    if [ $1 -eq 0 ] ; then
-    	/sbin/service sheepdog stop >/dev/null 2>&1
-    	/sbin/chkconfig --del sheepdog
-    fi
-    
-    %postun
-    if [ "$1" -ge "1" ] ; then
-    	/sbin/service sheepdog condrestart >/dev/null 2>&1 || :
-    else
-    	rm -f /usr/sbin/collie
-    fi
-    
-    %files
-    %defattr(-,root,root,-)
-    %doc COPYING README INSTALL
-    %{_sbindir}/sheep
-    %{_bindir}/dog
-    %{_sbindir}/shepherd
-    %attr(755,-,-)%config %{_initddir}/sheepdog
-    %dir %{_localstatedir}/lib/sheepdog
-    %config %{_sysconfdir}/bash_completion.d/dog
-    %{_mandir}/man8/sheep.8*
-    %{_mandir}/man8/dog.8*
-    %{_prefix}/lib/systemd/system/sheepdog.service
-    %dir %{_includedir}/sheepdog
-    %{_includedir}/sheepdog/internal.h
-    %{_includedir}/sheepdog/list.h
-    %{_includedir}/sheepdog/sheepdog.h
-    %{_includedir}/sheepdog/sheepdog_proto.h
-    %{_includedir}/sheepdog/util.h
-    %{_libdir}/libsheepdog.la
-    %{_libdir}/libsheepdog.so
-    
-    %changelog
-    * Mon Oct 3 2016 Autotools generated version <sheepdog-users@lists.wpkg.org> - v1.0-1.0.0
-    - Autotools generated version
