@@ -12,7 +12,7 @@ ADD ./docker/run.sh /root/run.sh
 WORKDIR $SHEEPSRC
 ADD . $SHEEPSRC
 RUN ./autogen.sh
-RUN ./configure && make && make check && make install
+RUN ./configure --prefix=/usr && make && make check && make install
 
 RUN mkdir $SHEEPSTORE
 
