@@ -37,6 +37,7 @@
 
 #define TRACEPOINT_DEFINE
 #include "sockfd_cache_tp.h"
+#define MONITOR_INTERVAL 5
 
 struct sockfd_cache {
 	struct rb_root root;
@@ -72,7 +73,9 @@ struct sockfd_cache_fd {
 struct sockfd_cache_entry {
 	struct rb_node rb;
 	struct node_id nid;
-	struct sockfd_cache_fd *fds;
+	struct sockfd_cache_fd *fds_io;
+	struct sockfd_cache_fd *fds_nio;
+	enum channel_status channel_status;
 };
 
 static int sockfd_cache_cmp(const struct sockfd_cache_entry *a,
@@ -98,12 +101,24 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
 {
 	int idx = -1, i;
 
-	for (i = 0; i < fds_count; i++) {
-		if (!uatomic_set_true(&entry->fds[i].in_use))
-			continue;
-		idx = i;
-		break;
+	if (entry->nid.io_port && entry->channel_status == IO) {
+		for (i = 0; i < fds_count; i++) {
+			if (entry->fds_io[i].fd == -1 ||
+				!uatomic_set_true(&entry->fds_io[i].in_use))
+				continue;
+			idx = i;
+			goto out;
+		}
 	}
+	for (i = 0; i < fds_count; i++) {
+		if (entry->fds_nio[i].fd == -1 ||
+			!uatomic_set_true(&entry->fds_nio[i].in_use))
+			continue;
+		/*let caller know if this is an IO or NonIO port*/
+		idx = (i + 1) << 20;
+		goto out;
+	}
+out:
 	return idx;
 }
 
@@ -135,9 +150,11 @@ out:
 static inline bool slots_all_free(struct sockfd_cache_entry *entry)
 {
 	int i;
-	for (i = 0; i < fds_count; i++)
-		if (uatomic_is_true(&entry->fds[i].in_use))
+	for (i = 0; i < fds_count; i++) {
+		if (uatomic_is_true(&entry->fds_io[i].in_use) ||
+			uatomic_is_true(&entry->fds_nio[i].in_use))
 			return false;
+	}
 	return true;
 }
 
@@ -145,13 +162,18 @@ static inline void destroy_all_slots(struct sockfd_cache_entry *entry)
 {
 	int i;
 	for (i = 0; i < fds_count; i++)
-		if (entry->fds[i].fd != -1)
-			close(entry->fds[i].fd);
+		if (entry->fds_io[i].fd != -1) {
+			close(entry->fds_io[i].fd);
+			entry->fds_io[i].fd = -1;
+			close(entry->fds_nio[i].fd);
+			entry->fds_nio[i].fd = -1;
+		}
 }
 
 static void free_cache_entry(struct sockfd_cache_entry *entry)
 {
-	free(entry->fds);
+	free(entry->fds_io);
+	free(entry->fds_nio);
 	free(entry);
 }
 
@@ -195,11 +217,15 @@ static void sockfd_cache_add_nolock(const struct node_id *nid)
 	struct sockfd_cache_entry *new = xmalloc(sizeof(*new));
 	int i;
 
-	new->fds = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
-	for (i = 0; i < fds_count; i++)
-		new->fds[i].fd = -1;
+	new->fds_io = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
+	new->fds_nio = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
+	for (i = 0; i < fds_count; i++) {
+		new->fds_io[i].fd = -1;
+		new->fds_nio[i].fd = -1;
+	}
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
+	new->channel_status = nid->io_port ? IO : NonIO;
 	if (sockfd_cache_insert(new)) {
 		free_cache_entry(new);
 		return;
@@ -229,11 +255,15 @@ void sockfd_cache_add(const struct node_id *nid)
 
 	sd_write_lock(&sockfd_cache.lock);
 	new = xmalloc(sizeof(*new));
-	new->fds = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
-	for (i = 0; i < fds_count; i++)
-		new->fds[i].fd = -1;
+	new->fds_io = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
+	new->fds_nio = xzalloc(sizeof(struct sockfd_cache_fd) * fds_count);
+	for (i = 0; i < fds_count; i++) {
+		new->fds_io[i].fd = -1;
+		new->fds_nio[i].fd = -1;
+	}
 
 	memcpy(&new->nid, nid, sizeof(struct node_id));
+	new->channel_status = nid->io_port ? IO : NonIO;
 	if (sockfd_cache_insert(new)) {
 		free_cache_entry(new);
 		sd_rw_unlock(&sockfd_cache.lock);
@@ -262,10 +292,13 @@ static void do_grow_fds(struct work *work)
 	new_fds_count = fds_count * 2;
 	new_size = sizeof(struct sockfd_cache_fd) * fds_count * 2;
 	rb_for_each_entry(entry, &sockfd_cache.root, rb) {
-		entry->fds = xrealloc(entry->fds, new_size);
+		entry->fds_io = xrealloc(entry->fds_io, new_size);
+		entry->fds_nio = xrealloc(entry->fds_nio, new_size);
 		for (i = old_fds_count; i < new_fds_count; i++) {
-			entry->fds[i].fd = -1;
-			uatomic_set_false(&entry->fds[i].in_use);
+			entry->fds_io[i].fd = -1;
+			uatomic_set_false(&entry->fds_io[i].in_use);
+			entry->fds_nio[i].fd = -1;
+			uatomic_set_false(&entry->fds_nio[i].in_use);
 		}
 	}
 
@@ -318,6 +351,80 @@ alive:
 	return true;
 }
 
+static void prepare_conns(struct sockfd_cache_entry *entry, bool first_only)
+{
+	int idx;
+	struct node_id *nid = &entry->nid;
+	if (entry->channel_status == IO) {
+		for (idx = 0; idx < fds_count; idx++) {
+			/*check fd value twice to avoid unecessary lock*/
+			if (entry->fds_io[idx].fd != -1)
+				continue;
+			sd_write_lock(&sockfd_cache.lock);
+			/*
+			 * IO channel recovered or fds_count increased,
+			 * connect fds
+			 */
+			if (entry->fds_io[idx].fd != -1) {
+				sd_rw_unlock(&sockfd_cache.lock);
+				continue;
+			}
+			int fd = connect_to_addr(nid->io_addr, nid->io_port);
+			if (fd >= 0) {
+				entry->fds_io[idx].fd = fd;
+				if (first_only) {
+					sd_rw_unlock(&sockfd_cache.lock);
+					break;
+				}
+			} else {
+				/*
+				 * if any thread close and the fd to -1, we can
+				 * find it here and retest to confirm IO
+				 * channel is down
+				 */
+				entry->channel_status = NonIO;
+				sd_rw_unlock(&sockfd_cache.lock);
+				sd_err("fallback to non-io connection");
+				break; /*clear fds next round*/
+			}
+			sd_rw_unlock(&sockfd_cache.lock);
+		}
+	} else {
+		for (idx = 0; idx < fds_count; idx++) {
+			if (entry->fds_io[idx].fd != -1 &&
+				uatomic_set_true(&entry->fds_io[idx].in_use)) {
+				close(entry->fds_io[idx].fd);
+				entry->fds_io[idx].fd = -1;
+				uatomic_set_false(&entry->fds_io[idx].in_use);
+			}
+		}
+	}
+
+	for (idx = 0; idx < fds_count; idx++) {
+		if (entry->fds_nio[idx].fd != -1)
+			continue;
+		/*check fd value twice to avoid unecessary lock*/
+		sd_write_lock(&sockfd_cache.lock);
+		if (entry->fds_nio[idx].fd != -1) {
+			sd_rw_unlock(&sockfd_cache.lock);
+			continue;
+		}
+		int fd = connect_to_addr(nid->addr, nid->port);
+		if (fd >= 0) {
+			entry->fds_nio[idx].fd = fd;
+			if (first_only) {
+				sd_rw_unlock(&sockfd_cache.lock);
+				break;
+			}
+		} else {
+			sd_err("Can not connect to %s through NonIO channel!",
+				addr_to_str(nid->addr, nid->port));
+		}
+		sd_rw_unlock(&sockfd_cache.lock);
+	}
+}
+
+#define IDX (idx >= (1 << 20)) ? (idx >> 20) - 1 : idx
 /* Try to create/get cached IO connection. If failed, fallback to non-IO one */
 static struct sockfd *sockfd_cache_get_long(const struct node_id *nid)
 {
@@ -344,36 +451,34 @@ grab:
 		 */
 		if (!revalidate_node(nid))
 			return NULL;
+		/*
+		 * When cache entry was newly added by revalidate_node()
+		 * function, all fds are -1, so any call to sockfd_cache_grab()
+		 * will return NULL for first time. we need to establish at
+		 * least one fd for current grab. Most likely, this step is
+		 * required for those cache entries created by external
+		 * commands such as dog.
+		 */
+		entry = sockfd_cache_search(nid);
+		prepare_conns(entry, true);
 
 		goto grab;
 	}
 
-	check_idx(idx);
-	if (entry->fds[idx].fd != -1) {
-		sd_debug("%s, idx %d", addr_to_str(addr, port), idx);
-		goto out;
-	}
+	check_idx(IDX);
+	if (idx >= (1 << 20))
+		fd = entry->fds_nio[(idx >> 20) - 1].fd;
+	else
+		fd = entry->fds_io[idx].fd;
 
-	/* Create a new cached connection for this node */
-	sd_debug("create cache connection %s idx %d", addr_to_str(addr, port),
-		 idx);
-	fd = connect_to_addr(addr, port);
-	if (fd < 0) {
-		if (use_io) {
-			sd_err("fallback to non-io connection");
-			fd = connect_to_addr(nid->addr, nid->port);
-			if (fd >= 0)
-				goto new;
-		}
-		uatomic_set_false(&entry->fds[idx].in_use);
+	if (fd == -1)
 		return NULL;
-	}
-new:
-	entry->fds[idx].fd = fd;
-out:
+
+	sd_debug("%s, idx %d", addr_to_str(addr, port), idx);
+
 	sfd = xmalloc(sizeof(*sfd));
-	sfd->fd = entry->fds[idx].fd;
-	sfd->idx = idx;
+	sfd->fd = fd;
+	sfd->idx = idx; /*Need to know which fds array we are using*/
 
 	tracepoint(sockfd_cache, cache_get, 0);
 
@@ -391,8 +496,15 @@ static void sockfd_cache_put_long(const struct node_id *nid, int idx)
 
 	sd_read_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
-	if (entry)
-		uatomic_set_false(&entry->fds[idx].in_use);
+	if (!entry) {
+		sd_rw_unlock(&sockfd_cache.lock);
+		return;
+	}
+	if (idx >= (1 << 20))
+		uatomic_set_false(&entry->fds_nio[(idx >> 20) - 1].in_use);
+	else
+		uatomic_set_false(&entry->fds_io[idx].in_use);
+
 	sd_rw_unlock(&sockfd_cache.lock);
 }
 
@@ -407,10 +519,18 @@ static void sockfd_cache_close(const struct node_id *nid, int idx)
 
 	sd_write_lock(&sockfd_cache.lock);
 	entry = sockfd_cache_search(nid);
-	if (entry) {
-		close(entry->fds[idx].fd);
-		entry->fds[idx].fd = -1;
-		uatomic_set_false(&entry->fds[idx].in_use);
+	if (!entry) {
+		sd_rw_unlock(&sockfd_cache.lock);
+		return;
+	}
+	if (idx >= (1 << 20)) {
+		close(entry->fds_nio[(idx >> 20) - 1].fd);
+		entry->fds_nio[(idx >> 20) - 1].fd = -1;
+		uatomic_set_false(&entry->fds_nio[(idx >> 20) - 1].in_use);
+	} else {
+		close(entry->fds_io[idx].fd);
+		entry->fds_io[idx].fd = -1;
+		uatomic_set_false(&entry->fds_io[idx].in_use);
 	}
 	sd_rw_unlock(&sockfd_cache.lock);
 }
@@ -516,4 +636,46 @@ void sockfd_cache_del(const struct node_id *nid, struct sockfd *sfd)
 	sockfd_cache_close(nid, sfd->idx);
 	sockfd_cache_del_node(nid);
 	free(sfd);
+}
+
+static void *monitor_sd_node_connectivity(void *ignored)
+{
+	int err;
+
+	sd_info("node connectivity monitor main loop");
+
+	for (;;) {
+		struct sockfd_cache_entry *entry;
+		rb_for_each_entry(entry, &sockfd_cache.root, rb) {
+			struct node_id *nid = &entry->nid;
+
+			if (nid->io_port && entry->channel_status == NonIO) {
+				int fd = connect_to_addr(nid->io_addr,
+					       nid->io_port);
+				if (fd > 0) {
+					close(fd);
+					entry->channel_status = IO;
+				}
+			}
+			prepare_conns(entry, false);
+		}
+		sleep(MONITOR_INTERVAL);
+	}
+
+	err = pthread_detach(pthread_self());
+	if (err)
+		sd_err("%s", strerror(err));
+	pthread_exit(NULL);
+}
+
+int start_node_connectivity_monitor(void)
+{
+	sd_thread_t t;
+	int err;
+	err = sd_thread_create("monio", &t, monitor_sd_node_connectivity, NULL);
+	if (err) {
+		sd_err("%s", strerror(err));
+		return -1;
+	}
+	return 0;
 }
