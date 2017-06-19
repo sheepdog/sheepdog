@@ -792,16 +792,20 @@ static void show_features(int feat) /* feat: 0; show cdrv only */
 		fprintf(stdout, " http");
 		have_feats = 1;
 #endif
-#ifdef HAVE_ACCELIO
-		fprintf(stdout, " accelio");
+#ifdef HAVE_NFS
+		fprintf(stdout, " nfs");
 		have_feats = 1;
 #endif
 #ifdef HAVE_DISKVNODES
 		fprintf(stdout, " diskvnodes");
 		have_feats = 1;
 #endif
-#ifdef HAVE_NFS
-		fprintf(stdout, " nfs");
+#ifdef HAVE_LTTNG_UST
+		fprintf(stdout, " lttng-ust");
+		have_feats = 1;
+#endif
+#ifdef HAVE_ACCELIO
+		fprintf(stdout, " accelio");
 		have_feats = 1;
 #endif
 #ifdef HAVE_TRACE
