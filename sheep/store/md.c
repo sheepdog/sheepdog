@@ -13,7 +13,7 @@
 
 #include "sheep_priv.h"
 
-#define MD_VDISK_SIZE ((uint64_t)1*1024*1024*1024) /* 1G */
+#define MD_VDISK_SIZE ((uint64_t)1*1024*1024*16) /* 16M */
 
 #define NONE_EXIST_PATH "/all/disks/are/broken/,ps/əʌo7/!"
 
