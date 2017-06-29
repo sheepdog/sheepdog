@@ -27,7 +27,13 @@ function _listFiles
 		# is disabled (or not installed) , it is 0, if enabled, it is
 		# remove for one block size.
 		stat -c "%n %b %B %s" "$i"/* |\
-			awk '{print $1,$2*$3-'${extra_blocksize}',$4;}' |\
+			awk '{
+				if ($2*$3-'${extra_blocksize}' == $4) {
+					print $1, "allocated", $4;
+				} else {
+					print $1, "sparse", $4;
+				}
+			}' |\
 			sort |\
 			_filter_store
 	done
