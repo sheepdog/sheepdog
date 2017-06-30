@@ -25,7 +25,7 @@ set_up() {
 exec_unit() {
   ./autogen.sh
   ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
-  make check
+  make check -j $(nproc)
 }
 
 tear_down() {
