@@ -26,7 +26,7 @@ check_dist() {
 prepare() {
   if [ ${dist} = "deb" ]; then
     sudo apt-get update
-    sudo apt-get --quiet -y install \
+    sudo apt-get --quiet --no-install-recommends -y install \
       git pkg-config make autoconf libtool yasm liburcu-dev libzookeeper-mt-dev check python zookeeper xfsprogs bc gcc g++
 
   elif [ ${dist} = "el7" ]; then
@@ -51,13 +51,17 @@ build_qemu() {
     sudo apt-get --quiet -y install zlib1g-dev libglib2.0-dev libpixman-1-dev
     cd /tmp
     if [ ! -d qemu ]; then
-      git clone "${QEMU_GITREPO:-git://git.qemu-project.org/qemu.git}"
+      if [[ -v QEMU_GITREPO ]] ; then
+          git clone "${QEMU_GITREPO}"
+      else
+          git clone --depth=1 -b v2.5.1.1 git://git.qemu-project.org/qemu.git
+      fi
     fi
     cd qemu
     git checkout -b v2.5.1.1 v2.5.1.1
     ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
       --target-list=x86_64-softmmu
-    make
+    make -j $(nproc)
     sudo make install
     cd ~
 

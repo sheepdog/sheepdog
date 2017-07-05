@@ -8,7 +8,7 @@ VAR_PATH=/var
 set_up() {
   ./autogen.sh
   ./configure --prefix=$USR_PATH --localstatedir=$VAR_PATH --enable-zookeeper --disable-corosync --enable-unittest
-  make
+  make -j $(nproc)
   sudo make install
 }
 
