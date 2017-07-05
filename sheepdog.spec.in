@@ -30,10 +30,10 @@ Requires(preun): chkconfig
 Requires(preun): initscripts
 %endif
 %if 0%{?enable_http}
-BuildRequires: fcgi
+Requires: fcgi
 %endif
 %if 0%{?enable_lttng_ust}
-BuildRequires: lttng-ust
+Requires: lttng-ust
 %endif
 
 # Build bits
