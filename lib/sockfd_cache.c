@@ -97,7 +97,7 @@ static struct sockfd_cache_entry *sockfd_cache_search(const struct node_id *nid)
 	return rb_search(&sockfd_cache.root, &key, rb, sockfd_cache_cmp);
 }
 
-static inline int get_free_slot(struct sockfd_cache_entry *entry)
+static inline int get_free_slot(struct sockfd_cache_entry *entry, bool *isIO)
 {
 	int idx = -1, i;
 
@@ -107,6 +107,7 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
 				!uatomic_set_true(&entry->fds_io[i].in_use))
 				continue;
 			idx = i;
+			*isIO = true;
 			goto out;
 		}
 	}
@@ -115,7 +116,8 @@ static inline int get_free_slot(struct sockfd_cache_entry *entry)
 			!uatomic_set_true(&entry->fds_nio[i].in_use))
 			continue;
 		/*let caller know if this is an IO or NonIO port*/
-		idx = (i + 1) << 20;
+		idx = i;
+		*isIO = false;
 		goto out;
 	}
 out:
@@ -128,7 +130,7 @@ out:
  * If no free slot available, this typically means we should use short FD.
  */
 static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
-						    int *ret_idx)
+						    int *ret_idx, bool *isIO)
 {
 	struct sockfd_cache_entry *entry;
 
@@ -139,7 +141,7 @@ static struct sockfd_cache_entry *sockfd_cache_grab(const struct node_id *nid,
 		goto out;
 	}
 
-	*ret_idx = get_free_slot(entry);
+	*ret_idx = get_free_slot(entry, isIO);
 	if (*ret_idx == -1)
 		entry = NULL;
 out:
@@ -424,12 +426,12 @@ static void prepare_conns(struct sockfd_cache_entry *entry, bool first_only)
 	}
 }
 
-#define IDX (idx >= (1 << 20)) ? (idx >> 20) - 1 : idx
 /* Try to create/get cached IO connection. If failed, fallback to non-IO one */
 static struct sockfd *sockfd_cache_get_long(const struct node_id *nid)
 {
 	struct sockfd_cache_entry *entry;
 	struct sockfd *sfd;
+	bool isIO = true;
 #ifndef HAVE_ACCELIO
 	bool use_io = nid->io_port ? true : false;
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
@@ -440,7 +442,7 @@ static struct sockfd *sockfd_cache_get_long(const struct node_id *nid)
 	int fd, idx = -1, port = nid->port;
 #endif
 grab:
-	entry = sockfd_cache_grab(nid, &idx);
+	entry = sockfd_cache_grab(nid, &idx, &isIO);
 	if (!entry) {
 		/*
 		 * The node is deleted, but someone asks us to grab it.
@@ -465,9 +467,9 @@ grab:
 		goto grab;
 	}
 
-	check_idx(IDX);
-	if (idx >= (1 << 20))
-		fd = entry->fds_nio[(idx >> 20) - 1].fd;
+	check_idx(idx);
+	if (!isIO)
+		fd = entry->fds_nio[idx].fd;
 	else
 		fd = entry->fds_io[idx].fd;
 
@@ -478,14 +480,15 @@ grab:
 
 	sfd = xmalloc(sizeof(*sfd));
 	sfd->fd = fd;
-	sfd->idx = idx; /*Need to know which fds array we are using*/
+	sfd->idx = idx;
+	sfd->isIO = isIO; /*Need to know which fds array we are using*/
 
 	tracepoint(sockfd_cache, cache_get, 0);
 
 	return sfd;
 }
 
-static void sockfd_cache_put_long(const struct node_id *nid, int idx)
+static void sockfd_cache_put_long(const struct node_id *nid, int idx, bool isIO)
 {
 	bool use_io = nid->io_port ? true : false;
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
@@ -500,15 +503,15 @@ static void sockfd_cache_put_long(const struct node_id *nid, int idx)
 		sd_rw_unlock(&sockfd_cache.lock);
 		return;
 	}
-	if (idx >= (1 << 20))
-		uatomic_set_false(&entry->fds_nio[(idx >> 20) - 1].in_use);
+	if (!isIO)
+		uatomic_set_false(&entry->fds_nio[idx].in_use);
 	else
 		uatomic_set_false(&entry->fds_io[idx].in_use);
 
 	sd_rw_unlock(&sockfd_cache.lock);
 }
 
-static void sockfd_cache_close(const struct node_id *nid, int idx)
+static void sockfd_cache_close(const struct node_id *nid, int idx, bool isIO)
 {
 	bool use_io = nid->io_port ? true : false;
 	const uint8_t *addr = use_io ? nid->io_addr : nid->addr;
@@ -523,10 +526,10 @@ static void sockfd_cache_close(const struct node_id *nid, int idx)
 		sd_rw_unlock(&sockfd_cache.lock);
 		return;
 	}
-	if (idx >= (1 << 20)) {
-		close(entry->fds_nio[(idx >> 20) - 1].fd);
-		entry->fds_nio[(idx >> 20) - 1].fd = -1;
-		uatomic_set_false(&entry->fds_nio[(idx >> 20) - 1].in_use);
+	if (!isIO) {
+		close(entry->fds_nio[idx].fd);
+		entry->fds_nio[idx].fd = -1;
+		uatomic_set_false(&entry->fds_nio[idx].in_use);
 	} else {
 		close(entry->fds_io[idx].fd);
 		entry->fds_io[idx].fd = -1;
@@ -577,6 +580,7 @@ struct sockfd *sockfd_cache_get(const struct node_id *nid)
 	sfd = xmalloc(sizeof(*sfd));
 	sfd->idx = -1;
 	sfd->fd = fd;
+	sfd->isIO = false;
 	sd_debug("%d", fd);
 	return sfd;
 }
@@ -591,6 +595,7 @@ struct sockfd *sockfd_cache_get(const struct node_id *nid)
 void sockfd_cache_put(const struct node_id *nid, struct sockfd *sfd)
 {
 	if (sfd->idx == -1) {
+		assert(!isIO);
 		sd_debug("%d", sfd->fd);
 		close(sfd->fd);
 		free(sfd);
@@ -599,7 +604,7 @@ void sockfd_cache_put(const struct node_id *nid, struct sockfd *sfd)
 		return;
 	}
 
-	sockfd_cache_put_long(nid, sfd->idx);
+	sockfd_cache_put_long(nid, sfd->idx, sfd->isIO);
 	free(sfd);
 
 	tracepoint(sockfd_cache, cache_put, 1);
@@ -627,13 +632,14 @@ void sockfd_cache_del_node(const struct node_id *nid)
 void sockfd_cache_del(const struct node_id *nid, struct sockfd *sfd)
 {
 	if (sfd->idx == -1) {
+		assert(!isIO);
 		sd_debug("%d", sfd->fd);
 		close(sfd->fd);
 		free(sfd);
 		return;
 	}
 
-	sockfd_cache_close(nid, sfd->idx);
+	sockfd_cache_close(nid, sfd->idx, sfd->isIO);
 	sockfd_cache_del_node(nid);
 	free(sfd);
 }

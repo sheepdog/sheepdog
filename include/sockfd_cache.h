@@ -22,6 +22,7 @@ int start_node_connectivity_monitor(void);
 struct sockfd {
 	int fd;
 	int idx;
+	bool isIO;
 };
 
 #endif	/* SOCKFD_CACHE_H */
