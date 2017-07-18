@@ -14,6 +14,7 @@ void sockfd_cache_del_node(const struct node_id *nid);
 void sockfd_cache_del(const struct node_id *nid, struct sockfd *sfd);
 void sockfd_cache_add(const struct node_id *nid);
 void sockfd_cache_add_group(const struct rb_root *nroot);
+void init_to_connect_list(void);
 
 int sockfd_init(void);
 int start_node_connectivity_monitor(void);

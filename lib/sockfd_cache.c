@@ -34,11 +34,17 @@
 #include "rbtree.h"
 #include "util.h"
 #include "sheep.h"
+#include "list.h"
 
 #define TRACEPOINT_DEFINE
 #include "sockfd_cache_tp.h"
 #define MONITOR_INTERVAL 5
 
+struct nid_test_work {
+	struct list_node w_list;
+	struct node_id nid;
+};
+struct list_head to_connect_list;
 struct sockfd_cache {
 	struct rb_root root;
 	struct sd_rw_lock lock;
@@ -175,7 +181,9 @@ static inline void destroy_all_slots(struct sockfd_cache_entry *entry)
 static void free_cache_entry(struct sockfd_cache_entry *entry)
 {
 	free(entry->fds_io);
+	entry->fds_io = 0;
 	free(entry->fds_nio);
+	entry->fds_nio = 0;
 	free(entry);
 }
 
@@ -203,10 +211,10 @@ static bool sockfd_cache_destroy(const struct node_id *nid)
 	}
 
 	rb_erase(&entry->rb, &sockfd_cache.root);
-	sd_rw_unlock(&sockfd_cache.lock);
 
 	destroy_all_slots(entry);
 	free_cache_entry(entry);
+	sd_rw_unlock(&sockfd_cache.lock);
 
 	return true;
 false_out:
@@ -359,23 +367,16 @@ static void prepare_conns(struct sockfd_cache_entry *entry, bool first_only)
 	struct node_id *nid = &entry->nid;
 	if (entry->channel_status == IO) {
 		for (idx = 0; idx < fds_count; idx++) {
-			/*check fd value twice to avoid unecessary lock*/
-			if (entry->fds_io[idx].fd != -1)
-				continue;
-			sd_write_lock(&sockfd_cache.lock);
 			/*
 			 * IO channel recovered or fds_count increased,
 			 * connect fds
 			 */
-			if (entry->fds_io[idx].fd != -1) {
-				sd_rw_unlock(&sockfd_cache.lock);
+			if (entry->fds_io[idx].fd != -1)
 				continue;
-			}
 			int fd = connect_to_addr(nid->io_addr, nid->io_port);
 			if (fd >= 0) {
 				entry->fds_io[idx].fd = fd;
 				if (first_only) {
-					sd_rw_unlock(&sockfd_cache.lock);
 					break;
 				}
 			} else {
@@ -385,11 +386,14 @@ static void prepare_conns(struct sockfd_cache_entry *entry, bool first_only)
 				 * channel is down
 				 */
 				entry->channel_status = NonIO;
-				sd_rw_unlock(&sockfd_cache.lock);
+				struct nid_test_work *work =
+					xmalloc(sizeof(struct nid_test_work));
+				memcpy(&work->nid, &entry->nid,
+						sizeof(struct node_id));
+				list_add_tail(&work->w_list, &to_connect_list);
 				sd_err("fallback to non-io connection");
 				break; /*clear fds next round*/
 			}
-			sd_rw_unlock(&sockfd_cache.lock);
 		}
 	} else {
 		for (idx = 0; idx < fds_count; idx++) {
@@ -405,24 +409,16 @@ static void prepare_conns(struct sockfd_cache_entry *entry, bool first_only)
 	for (idx = 0; idx < fds_count; idx++) {
 		if (entry->fds_nio[idx].fd != -1)
 			continue;
-		/*check fd value twice to avoid unecessary lock*/
-		sd_write_lock(&sockfd_cache.lock);
-		if (entry->fds_nio[idx].fd != -1) {
-			sd_rw_unlock(&sockfd_cache.lock);
-			continue;
-		}
 		int fd = connect_to_addr(nid->addr, nid->port);
 		if (fd >= 0) {
 			entry->fds_nio[idx].fd = fd;
 			if (first_only) {
-				sd_rw_unlock(&sockfd_cache.lock);
 				break;
 			}
 		} else {
 			sd_err("Can not connect to %s through NonIO channel!",
 				addr_to_str(nid->addr, nid->port));
 		}
-		sd_rw_unlock(&sockfd_cache.lock);
 	}
 }
 
@@ -462,7 +458,9 @@ grab:
 		 * commands such as dog.
 		 */
 		entry = sockfd_cache_search(nid);
+		sd_write_lock(&sockfd_cache.lock);
 		prepare_conns(entry, true);
+		sd_rw_unlock(&sockfd_cache.lock);
 
 		goto grab;
 	}
@@ -644,28 +642,63 @@ void sockfd_cache_del(const struct node_id *nid, struct sockfd *sfd)
 	free(sfd);
 }
 
+void init_to_connect_list()
+{
+	INIT_LIST_HEAD(&to_connect_list);
+}
+
 static void *monitor_sd_node_connectivity(void *ignored)
 {
 	int err;
 
 	sd_info("node connectivity monitor main loop");
+	init_to_connect_list();
 
 	for (;;) {
 		struct sockfd_cache_entry *entry;
-		rb_for_each_entry(entry, &sockfd_cache.root, rb) {
-			struct node_id *nid = &entry->nid;
 
-			if (nid->io_port && entry->channel_status == NonIO) {
+		if (list_empty(&to_connect_list))
+			sleep(MONITOR_INTERVAL);
+		else {
+			struct nid_test_work *work =
+				list_first_entry(&to_connect_list,
+					struct nid_test_work, w_list);
+			struct node_id *nid = &work->nid;
+
+			if (nid->io_port) {
 				int fd = connect_to_addr(nid->io_addr,
 					       nid->io_port);
-				if (fd > 0) {
-					close(fd);
-					entry->channel_status = IO;
+				sd_write_lock(&sockfd_cache.lock);
+				entry = sockfd_cache_search(nid);
+				if (entry) {
+					if (fd > 0) {
+						close(fd);
+						entry->channel_status = IO;
+						list_del(&work->w_list);
+						free(work);
+					} else { /*still can not connect*/
+						list_del(&work->w_list);
+						list_add_tail(&work->w_list,
+							&to_connect_list);
+					}
+				} else {
+					list_del(&work->w_list);
+					free(work);
+					sd_err("entry for node %s not exists",
+						addr_to_str(nid->addr,
+							nid->port));
+					if (fd > 0)
+						close(fd);
 				}
+				sd_rw_unlock(&sockfd_cache.lock);
 			}
-			prepare_conns(entry, false);
 		}
-		sleep(MONITOR_INTERVAL);
+		sd_write_lock(&sockfd_cache.lock);
+		rb_for_each_entry(entry, &sockfd_cache.root, rb) {
+			if (entry->fds_io)
+				prepare_conns(entry, false);
+		}
+		sd_rw_unlock(&sockfd_cache.lock);
 	}
 
 	err = pthread_detach(pthread_self());
