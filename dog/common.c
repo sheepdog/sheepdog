@@ -234,6 +234,7 @@ int dog_exec_req(const struct node_id *nid, struct sd_req *hdr, void *buf)
 	struct sockfd *sfd;
 	int ret;
 
+	init_to_connect_list();
 	sfd = sockfd_cache_get(nid);
 	if (!sfd)
 		return -1;

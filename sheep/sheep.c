@@ -1173,6 +1173,10 @@ int main(int argc, char **argv)
 		goto cleanup_log;
 	}
 
+	ret = start_node_connectivity_monitor();
+	if (ret)
+		goto cleanup_journal;
+
 	/* We should init trace for work queue before journal init */
 	ret = wq_trace_init();
 	if (ret) {
