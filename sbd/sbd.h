@@ -16,6 +16,7 @@
 #include <linux/kthread.h>
 #include <linux/gfp.h>
 #include <linux/version.h>
+#include <linux/vmalloc.h>
 
 #include "sheepdog_proto.h"
 
