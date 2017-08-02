@@ -148,11 +148,12 @@ static struct req_iter *prepare_erasure_requests(struct request *req, int *nr)
 		int l = strip_size * nr_stripe;
 
 		reqs[i].buf = malloc(l);
-		if(!reqs[i].buf) {
+		if (!reqs[i].buf) {
 			sd_err("failed to init request buffer %016"PRIx64,
 			       req->rq.obj.oid);
 			for(j = 0; j < i; j++)
 				free(reqs[j].buf);
+			free(reqs);
 			reqs = NULL;
 			goto out;
 		}
