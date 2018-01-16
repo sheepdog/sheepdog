@@ -611,8 +611,8 @@ int default_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	}
 
 	length = get_store_objsize(oid);
-	buf = valloc(length);
-	if (buf == NULL)
+	ret = posix_memalign((void **)&buf, getpagesize(), length);
+	if (ret)
 		return SD_RES_NO_MEM;
 
 	iocb.epoch = epoch;

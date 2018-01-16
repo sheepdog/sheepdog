@@ -58,11 +58,12 @@ void *xcalloc(size_t nmemb, size_t size)
 	return ret;
 }
 
-/* zeroed memory version of valloc() */
+/* zeroed memory version of posix_memalign() */
 void *xvalloc(size_t size)
 {
-	void *ret = valloc(size);
-	if (unlikely(!ret))
+	void *ret = NULL;
+	int err = posix_memalign((void **)&ret, getpagesize(), size);
+	if (unlikely(err))
 		panic("Out of memory");
 	memset(ret, 0, size);
 	return ret;
