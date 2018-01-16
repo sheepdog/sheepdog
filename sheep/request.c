@@ -660,9 +660,11 @@ struct request *alloc_request(struct client_info *ci, uint32_t data_length)
 		return NULL;
 
 	if (data_length) {
+		int ret;
+
 		req->data_length = data_length;
-		req->data = valloc(data_length);
-		if (!req->data) {
+		ret = posix_memalign((void **)&req->data, getpagesize(), data_length);
+		if (ret) {
 			free(req);
 			return NULL;
 		}

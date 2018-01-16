@@ -662,7 +662,7 @@ static int get_object_path(uint64_t oid, uint32_t epoch, char *path,
 int tree_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 {
 	int ret;
-	void *buf;
+	void *buf = NULL;
 	struct siocb iocb = {};
 	uint32_t length;
 	bool is_readonly_obj = oid_is_readonly(oid);
@@ -681,8 +681,8 @@ int tree_get_hash(uint64_t oid, uint32_t epoch, uint8_t *sha1)
 	}
 
 	length = get_store_objsize(oid);
-	buf = valloc(length);
-	if (buf == NULL)
+	ret = posix_memalign((void **)&buf, getpagesize(), length);
+	if (ret)
 		return SD_RES_NO_MEM;
 
 	iocb.epoch = epoch;

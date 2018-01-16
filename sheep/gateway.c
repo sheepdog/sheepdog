@@ -75,8 +75,8 @@ static void *init_erasure_buffer(struct request *req, int buf_len)
 	uint64_t tail = round_down(off + len, SD_EC_DATA_STRIPE_SIZE);
 	int ret;
 
-	buf = valloc(buf_len);
-	if(unlikely(!buf))
+	ret = posix_memalign((void **)&buf, getpagesize(), buf_len);
+	if(unlikely(ret))
 		return NULL;
 	memset(buf, 0, buf_len);
 
@@ -905,11 +905,11 @@ static int gateway_handle_cow(struct request *req)
 	uint64_t oid = req->rq.obj.oid;
 	size_t len = get_objsize(oid, get_vdi_object_size(oid_to_vid(oid)));
 	struct sd_req *req_hdr = &req->rq;
-	char *buf;
+	char *buf = NULL;
 	int ret;
 
-	buf = valloc(len);
-	if(unlikely(!buf)) {
+	ret = posix_memalign((void **)&buf, getpagesize(), len);
+	if(unlikely(ret)) {
 		ret = SD_RES_NO_MEM;
 		goto out;
 	}
