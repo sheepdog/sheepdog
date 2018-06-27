@@ -18,13 +18,13 @@ Descriptions of section entries:
 
 Sheepdog Overall
 ------------------------------
-M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 B: sheeepdog/*
 L: sheepdog@lists.wpkg.org
 
 Sheepdog Stable Branches
 ------------------------------
-M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 M: Takashi Menjo <menjo.takashi@lab.ntt.co.jp>
 B: sheepdog/stable-*
 L: sheepdog@lists.wpkg.org
@@ -43,13 +43,13 @@ L: sheepdog@lists.wpkg.org
 
 QEMU Driver
 ------------------------------
-M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 F: qemu/block/sheedog.c
 L: qemu-devel@nongnu.org
 
 iSCSI Target Driver
 ------------------------------
-M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 F: tgt/usr/bs_sheepdog.c
 L: stgt@vger.kernel.org
 
@@ -61,7 +61,7 @@ L: libvir-list@redhat.com
 
 Openstack Drivers
 ------------------------------
-M: Hitoshi Mitake <mitake.hitoshi@lab.ntt.co.jp>
+M: MORITA Kazutaka <morita.kazutaka@gmail.com>
 M: Takashi Menjo <menjo.takashi@lab.ntt.co.jp>
 M: YAMADA Hideki <yamada.hideki@lab.ntt.co.jp>
 F: openstack/glance_store/glance_store/_drivers/sheepdog.py
