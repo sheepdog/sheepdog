@@ -235,17 +235,14 @@ static int notify_vdi_add(uint32_t vdi_id, uint8_t nr_copies,
 
 int farm_init(const char *path)
 {
-	int ret = -1;
-
 	if (create_directory(path) < 0)
 		goto out;
 	if (snap_init(farm_dir) < 0)
 		goto out;
 	return 0;
 out:
-	if (ret)
-		sd_err("Fail to init farm.");
-	return ret;
+	sd_err("Fail to init farm.");
+	return -1;
 }
 
 bool farm_contain_snapshot(uint32_t idx, const char *tag)
