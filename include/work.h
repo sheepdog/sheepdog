@@ -80,4 +80,11 @@ int sd_thread_create_with_idx(const char *, sd_thread_t *,
 		     void *(*start_routine)(void *), void *);
 int sd_thread_join(sd_thread_t , void **);
 
+struct worker_atexit {
+	void (*f)(void *);
+	void *arg;
+};
+
+int register_worker_atexit(struct worker_atexit*);
+
 #endif
