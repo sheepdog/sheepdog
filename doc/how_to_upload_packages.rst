@@ -30,7 +30,7 @@ Compile-time dependencies:
 
 2. Make Package
 -----------------
-Here is just an exmple with sheepdog-1.0.1.tar.gz.
+Here is just an example with sheepdog-1.0.1.tar.gz.
 
 Replace source-code file which answers your purpose.
 
