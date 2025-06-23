@@ -27,9 +27,9 @@ typedef void (*sha1_init_func_t)(void *);
 typedef void (*sha1_update_func_t)(void *, const uint8_t *, unsigned int);
 typedef void (*sha1_final_func_t)(void *, uint8_t *);
 
-sha1_init_func_t sha1_init;
-sha1_update_func_t sha1_update;
-sha1_final_func_t sha1_final;
+extern sha1_init_func_t sha1_init;
+extern sha1_update_func_t sha1_update;
+extern sha1_final_func_t sha1_final;
 
 const char *sha1_to_hex(const unsigned char *sha1);
 void get_buffer_sha1(unsigned char *buf, unsigned len, unsigned char *sha1);
